@@ -19,16 +19,16 @@ def replace_in_file(workspace, src_file_path, from_str, to_str):
 
   If any edits were necessary, returns the new filename (which may be the same as the old filename).
   """
-  from_bytes = from_str.encode('ascii')
-  to_bytes = to_str.encode('ascii')
+  from_bytes = from_str.encode("ascii")
+  to_bytes = to_str.encode("ascii")
   data = read_file(os.path.join(workspace, src_file_path), binary_mode=True)
   if from_bytes not in data and from_str not in src_file_path:
     return None
 
   dst_file_path = src_file_path.replace(from_str, to_str)
-  safe_file_dump(os.path.join(workspace, dst_file_path),
-                 data.replace(from_bytes, to_bytes),
-                 mode='wb')
+  safe_file_dump(
+    os.path.join(workspace, dst_file_path), data.replace(from_bytes, to_bytes), mode="wb"
+  )
   if src_file_path != dst_file_path:
     os.unlink(os.path.join(workspace, src_file_path))
   return dst_file_path
@@ -39,12 +39,12 @@ def any_match(globs, filename):
 
 
 def locate_dist_info_dir(workspace):
-  dir_suffix = '*.dist-info'
+  dir_suffix = "*.dist-info"
   matches = glob.glob(os.path.join(workspace, dir_suffix))
   if not matches:
-    raise Exception('Unable to locate `{}` directory in input whl.'.format(dir_suffix))
+    raise Exception("Unable to locate `{}` directory in input whl.".format(dir_suffix))
   if len(matches) > 1:
-    raise Exception('Too many `{}` directories in input whl: {}'.format(dir_suffix, matches))
+    raise Exception("Too many `{}` directories in input whl: {}".format(dir_suffix, matches))
   return os.path.relpath(matches[0], workspace)
 
 
@@ -56,7 +56,7 @@ def fingerprint_file(workspace, filename):
   content = read_file(os.path.join(workspace, filename), binary_mode=True)
   fingerprint = hashlib.sha256(content)
   b64_encoded = base64.b64encode(fingerprint.digest())
-  return f'sha256={b64_encoded.decode()}', str(len(content))
+  return f"sha256={b64_encoded.decode()}", str(len(content))
 
 
 def rewrite_record_file(workspace, src_record_file, mutated_file_tuples):
@@ -73,49 +73,49 @@ def rewrite_record_file(workspace, src_record_file, mutated_file_tuples):
     else:
       mutated_files.add(dst)
   if not dst_record_file:
-    raise Exception('Malformed whl or bad globs: `{}` was not rewritten.'.format(src_record_file))
+    raise Exception("Malformed whl or bad globs: `{}` was not rewritten.".format(src_record_file))
 
   output_records = []
   file_name = os.path.join(workspace, dst_record_file)
   for line in read_file(file_name).splitlines():
-    filename, fingerprint_str, size_str = line.rsplit(',', 3)
+    filename, fingerprint_str, size_str = line.rsplit(",", 3)
     if filename in mutated_files:
       fingerprint_str, size_str = fingerprint_file(workspace, filename)
-      output_line = ','.join((filename, fingerprint_str, size_str))
+      output_line = ",".join((filename, fingerprint_str, size_str))
     else:
       output_line = line
     output_records.append(output_line)
 
-  safe_file_dump(file_name, '\r\n'.join(output_records) + '\r\n')
+  safe_file_dump(file_name, "\r\n".join(output_records) + "\r\n")
 
 
 # The wheel METADATA file will contain a line like: `Version: 1.11.0.dev3+7951ec01`.
 # We don't parse the entire file because it's large (it contains the entire release notes history).
-_version_re = re.compile(r'Version: (?P<version>\S+)')
+_version_re = re.compile(r"Version: (?P<version>\S+)")
 
 
 def reversion(args):
   with temporary_dir() as workspace:
     # Extract the input.
-    with open_zip(args.whl_file, 'r') as whl:
+    with open_zip(args.whl_file, "r") as whl:
       src_filenames = whl.namelist()
       whl.extractall(workspace)
 
     # Determine the location of the `dist-info` directory.
     dist_info_dir = locate_dist_info_dir(workspace)
-    record_file = os.path.join(dist_info_dir, 'RECORD')
+    record_file = os.path.join(dist_info_dir, "RECORD")
 
     # Get version from the input whl's metadata.
     input_version = None
-    metadata_file = os.path.join(workspace, dist_info_dir, 'METADATA')
-    with open(metadata_file, 'r') as info:
+    metadata_file = os.path.join(workspace, dist_info_dir, "METADATA")
+    with open(metadata_file, "r") as info:
       for line in info:
         mo = _version_re.match(line)
         if mo:
-          input_version = mo.group('version')
+          input_version = mo.group("version")
           break
     if not input_version:
-      raise Exception('Could not find `Version:` line in {}'.format(metadata_file))
+      raise Exception("Could not find `Version:` line in {}".format(metadata_file))
 
     # Rewrite and move all files (including the RECORD file), recording which files need to be
     # re-fingerprinted due to content changes.
@@ -138,11 +138,11 @@ def reversion(args):
     # Create a new output whl in the destination.
     dst_whl_filename = os.path.basename(args.whl_file).replace(input_version, args.target_version)
     dst_whl_file = os.path.join(args.dest_dir, dst_whl_filename)
-    with open_zip(dst_whl_file, 'w', zipfile.ZIP_DEFLATED) as whl:
+    with open_zip(dst_whl_file, "w", zipfile.ZIP_DEFLATED) as whl:
       for dst_filename in dst_filenames:
         whl.write(os.path.join(workspace, dst_filename), dst_filename)
 
-    print('Wrote whl with version {} to {}.\n'.format(args.target_version, dst_whl_file))
+    print("Wrote whl with version {} to {}.\n".format(args.target_version, dst_whl_file))
 
 
 def main():
@@ -152,20 +152,18 @@ def main():
   optional `--glob` argument to add additional globs: ie  `--glob='thing-to-match*.txt'`.
   """
   parser = argparse.ArgumentParser()
-  parser.add_argument('whl_file',
-                      help='The input whl file.')
-  parser.add_argument('dest_dir',
-                      help='The destination directory for the output whl.')
-  parser.add_argument('target_version',
-                      help='The target version of the output whl.')
-  parser.add_argument('--glob', action='append',
-                      default=[
-                        '*.dist-info/*',
-                        '*-nspkg.pth',
-                      ],
-                      help='Globs (fnmatch) to rewrite within the whl: may be specified multiple times.')
+  parser.add_argument("whl_file", help="The input whl file.")
+  parser.add_argument("dest_dir", help="The destination directory for the output whl.")
+  parser.add_argument("target_version", help="The target version of the output whl.")
+  parser.add_argument(
+    "--glob",
+    action="append",
+    default=["*.dist-info/*", "*-nspkg.pth"],
+    help="Globs (fnmatch) to rewrite within the whl: may be specified multiple times.",
+  )
   args = parser.parse_args()
   reversion(args)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
   main()

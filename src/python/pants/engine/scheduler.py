@@ -46,6 +46,7 @@ class ExecutionRequest:
   :param roots: Roots for this request.
   :type roots: list of tuples of subject and product.
   """
+
   roots: Any
   native: Any
 
@@ -109,7 +110,7 @@ class Scheduler:
 
     # If configured, visualize the rule graph before asserting that it is valid.
     if self._visualize_to_dir is not None:
-      rule_graph_name = 'rule_graph.dot'
+      rule_graph_name = "rule_graph.dot"
       self.visualize_rule_graph_to_file(os.path.join(self._visualize_to_dir, rule_graph_name))
 
     if validate:
@@ -121,7 +122,7 @@ class Scheduler:
   def graph_trace(self, session, execution_request):
     with temporary_file_path() as path:
       self._native.lib.graph_trace(self._scheduler, session, execution_request, path.encode())
-      with open(path, 'r') as fd:
+      with open(path, "r") as fd:
         for line in fd.readlines():
           yield line.rstrip()
 
@@ -171,7 +172,7 @@ class Scheduler:
         if type(rule) is TaskRule:
           self._register_task(output_type, rule, rule_index.union_rules)
         else:
-          raise ValueError('Unexpected Rule type: {}'.format(rule))
+          raise ValueError("Unexpected Rule type: {}".format(rule))
 
   def _register_task(self, output_type, rule: TaskRule, union_rules):
     """Register the given TaskRule with the native scheduler."""
@@ -202,10 +203,7 @@ class Scheduler:
     self._raise_or_return(res)
 
   def visualize_rule_graph_to_file(self, filename):
-    self._native.lib.rule_graph_visualize(
-      self._scheduler,
-      self._root_type_ids(),
-      filename.encode())
+    self._native.lib.rule_graph_visualize(self._scheduler, self._root_type_ids(), filename.encode())
 
   def rule_graph_visualization(self):
     with temporary_file_path() as path:
@@ -220,11 +218,9 @@ class Scheduler:
     product_type_id = TypeId(self._to_id(product_type))
     with temporary_file_path() as path:
       self._native.lib.rule_subgraph_visualize(
-        self._scheduler,
-        root_type_id,
-        product_type_id,
-        path.encode())
-      with open(path, 'r') as fd:
+        self._scheduler, root_type_id, product_type_id, path.encode()
+      )
+      with open(path, "r") as fd:
         for line in fd.readlines():
           yield line.rstrip()
 
@@ -247,10 +243,9 @@ class Scheduler:
       params = subject_or_params.params
     else:
       params = [subject_or_params]
-    res = self._native.lib.execution_add_root_select(self._scheduler,
-                                                     execution_request,
-                                                     self._to_vals_buf(params),
-                                                     self._to_type(product))
+    res = self._native.lib.execution_add_root_select(
+      self._scheduler, execution_request, self._to_vals_buf(params), self._to_type(product)
+    )
     self._raise_or_return(res)
 
   @property
@@ -261,7 +256,9 @@ class Scheduler:
     return self._from_value(self._native.lib.scheduler_metrics(self._scheduler, session))
 
   def poll_workunits(self, session) -> Tuple[Dict[str, Any], ...]:
-    result: Tuple[Dict[str, Any], ...] = self._from_value(self._native.lib.poll_session_workunits(self._scheduler, session))
+    result: Tuple[Dict[str, Any], ...] = self._from_value(
+      self._native.lib.poll_session_workunits(self._scheduler, session)
+    )
     return result
 
   def with_fork_context(self, func):
@@ -274,12 +271,16 @@ class Scheduler:
     if raw_roots == self._native.ffi.NULL:
       raise KeyboardInterrupt
 
-    remaining_runtime_exceptions_to_capture = list(self._native.consume_cffi_extern_method_runtime_exceptions())
+    remaining_runtime_exceptions_to_capture = list(
+      self._native.consume_cffi_extern_method_runtime_exceptions()
+    )
     try:
       roots = []
       for raw_root in self._native.unpack(raw_roots.nodes_ptr, raw_roots.nodes_len):
         # Check if there were any uncaught exceptions within rules that were executed.
-        remaining_runtime_exceptions_to_capture.extend(self._native.consume_cffi_extern_method_runtime_exceptions())
+        remaining_runtime_exceptions_to_capture.extend(
+          self._native.consume_cffi_extern_method_runtime_exceptions()
+        )
 
         if raw_root.is_throw:
           state = Throw(self._from_value(raw_root.handle))
@@ -287,8 +288,10 @@ class Scheduler:
           # NB: We expect all NULL handles to correspond to uncaught exceptions which are collected
           # in `self._native._peek_cffi_extern_method_runtime_exceptions()`!
           if not remaining_runtime_exceptions_to_capture:
-            raise ExecutionError('Internal logic error in scheduler: expected more elements in '
-                                 '`self._native._peek_cffi_extern_method_runtime_exceptions()`.')
+            raise ExecutionError(
+              "Internal logic error in scheduler: expected more elements in "
+              "`self._native._peek_cffi_extern_method_runtime_exceptions()`."
+            )
           matching_runtime_exception = remaining_runtime_exceptions_to_capture.pop(0)
           state = Throw(matching_runtime_exception)
         else:
@@ -298,8 +301,10 @@ class Scheduler:
       self._native.lib.nodes_destroy(raw_roots)
 
     if remaining_runtime_exceptions_to_capture:
-      raise ExecutionError('Internal logic error in scheduler: expected elements in '
-                           '`self._native._peek_cffi_extern_method_runtime_exceptions()`.')
+      raise ExecutionError(
+        "Internal logic error in scheduler: expected elements in "
+        "`self._native._peek_cffi_extern_method_runtime_exceptions()`."
+      )
     return roots
 
   def lease_files_in_graph(self, session):
@@ -310,8 +315,16 @@ class Scheduler:
 
   def new_session(self, zipkin_trace_v2, build_id, v2_ui=False, should_report_workunits=False):
     """Creates a new SchedulerSession for this Scheduler."""
-    return SchedulerSession(self, self._native.new_session(
-      self._scheduler, zipkin_trace_v2, v2_ui, multiprocessing.cpu_count(), build_id, should_report_workunits)
+    return SchedulerSession(
+      self,
+      self._native.new_session(
+        self._scheduler,
+        zipkin_trace_v2,
+        v2_ui,
+        multiprocessing.cpu_count(),
+        build_id,
+        should_report_workunits,
+      ),
     )
 
 
@@ -385,7 +398,7 @@ class SchedulerSession:
       :class:`pants.engine.fs.PathGlobs` objects.
     :returns: An ExecutionRequest for the given products and subjects.
     """
-    roots = (tuple((s, p) for s in subjects for p in products))
+    roots = tuple((s, p) for s in subjects for p in products)
     return self.execution_request_literal(roots)
 
   def invalidate_files(self, direct_filenames):
@@ -416,7 +429,7 @@ class SchedulerSession:
 
   def _maybe_visualize(self):
     if self._scheduler.visualize_to_dir is not None:
-      name = f'graph.{self._run_count:03d}.dot'
+      name = f"graph.{self._run_count:03d}.dot"
       self._run_count += 1
       self.visualize_graph_to_file(os.path.join(self._scheduler.visualize_to_dir, name))
 
@@ -430,7 +443,7 @@ class SchedulerSession:
       zip(
         execution_request.roots,
         self._scheduler._run_and_return_roots(self._session, execution_request.native),
-      ),
+      )
     )
 
     ExceptionSink.toggle_ignoring_sigint_v2_engine(False)
@@ -438,10 +451,10 @@ class SchedulerSession:
     self._maybe_visualize()
 
     logger.debug(
-      'computed %s nodes in %f seconds. there are %s total nodes.',
+      "computed %s nodes in %f seconds. there are %s total nodes.",
       len(roots),
       time.time() - start_time,
-      self._scheduler.graph_len()
+      self._scheduler.graph_len(),
     )
 
     returns = tuple((root, state) for root, state in roots if type(state) is Return)
@@ -449,19 +462,19 @@ class SchedulerSession:
     return returns, throws
 
   def _trace_on_error(self, unique_exceptions, request):
-    exception_noun = pluralize(len(unique_exceptions), 'Exception')
+    exception_noun = pluralize(len(unique_exceptions), "Exception")
     if self._scheduler.include_trace_on_error:
-      cumulative_trace = '\n'.join(self.trace(request))
+      cumulative_trace = "\n".join(self.trace(request))
       raise ExecutionError(
-        '{} encountered:\n{}'.format(exception_noun, cumulative_trace),
-        unique_exceptions,
+        "{} encountered:\n{}".format(exception_noun, cumulative_trace), unique_exceptions
       )
     else:
       raise ExecutionError(
-        '{} encountered:\n  {}'.format(
+        "{} encountered:\n  {}".format(
           exception_noun,
-          '\n  '.join('{}: {}'.format(type(t).__name__, str(t)) for t in unique_exceptions)),
-        unique_exceptions
+          "\n  ".join("{}: {}".format(type(t).__name__, str(t)) for t in unique_exceptions),
+        ),
+        unique_exceptions,
       )
 
   def run_goal_rule(self, product, subject):
@@ -492,7 +505,7 @@ class SchedulerSession:
     raised_exception = None
     try:
       request = self.execution_request([product], subjects)
-    except:                     # noqa: T803
+    except:  # noqa: T803
       # If there are any exceptions during CFFI extern method calls, we want to return an error with
       # them and whatever failure results from it. This typically results from unhashable types.
       if self._scheduler._native._peek_cffi_extern_method_runtime_exceptions():
@@ -508,31 +521,41 @@ class SchedulerSession:
     internal_errors = self._scheduler._native.consume_cffi_extern_method_runtime_exceptions()
     if internal_errors:
       error_tracebacks = [
-        ''.join(
-          traceback.format_exception(etype=error_info.exc_type,
-                                     value=error_info.exc_value,
-                                     tb=error_info.traceback))
+        "".join(
+          traceback.format_exception(
+            etype=error_info.exc_type, value=error_info.exc_value, tb=error_info.traceback
+          )
+        )
         for error_info in internal_errors
       ]
 
       raised_exception_message = None
       if raised_exception:
         exc_type, exc_value, tb = raised_exception
-        raised_exception_message = dedent("""\
+        raised_exception_message = dedent(
+          """\
           The engine execution request raised this error, which is probably due to the errors in the
           CFFI extern methods listed above, as CFFI externs return None upon error:
           {}
-        """).format(''.join(traceback.format_exception(etype=exc_type, value=exc_value, tb=tb)))
+        """
+        ).format(
+          "".join(traceback.format_exception(etype=exc_type, value=exc_value, tb=tb))
+        )
 
-      raise ExecutionError(dedent("""\
+      raise ExecutionError(
+        dedent(
+          """\
         {error_description} raised in CFFI extern methods:
         {joined_tracebacks}{raised_exception_message}
-        """).format(
-          error_description=pluralize(len(internal_errors), 'Exception'),
-          joined_tracebacks='\n+++++++++\n'.join(formatted_tb for formatted_tb in error_tracebacks),
+        """
+        ).format(
+          error_description=pluralize(len(internal_errors), "Exception"),
+          joined_tracebacks="\n+++++++++\n".join(formatted_tb for formatted_tb in error_tracebacks),
           raised_exception_message=(
-            '\n\n{}'.format(raised_exception_message) if raised_exception_message else '')
-        ))
+            "\n\n{}".format(raised_exception_message) if raised_exception_message else ""
+          ),
+        )
+      )
 
     returns, throws = self.execute(request)
 
@@ -575,17 +598,15 @@ class SchedulerSession:
     return self._scheduler._raise_or_return(result)
 
   def run_local_interactive_process(
-    self, request: 'InteractiveProcessRequest'
-  ) -> 'InteractiveProcessResult':
+    self, request: "InteractiveProcessRequest"
+  ) -> "InteractiveProcessResult":
     sched_pointer = self._scheduler._scheduler
     session_pointer = self._session
 
     wrapped_result = self._scheduler._native.lib.run_local_interactive_process(
-      sched_pointer,
-      session_pointer,
-      self._scheduler._to_value(request)
+      sched_pointer, session_pointer, self._scheduler._to_value(request)
     )
-    result: 'InteractiveProcessResult' = self._scheduler._raise_or_return(wrapped_result)
+    result: "InteractiveProcessResult" = self._scheduler._raise_or_return(wrapped_result)
     return result
 
   def materialize_directory(

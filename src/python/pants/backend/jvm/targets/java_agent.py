@@ -8,16 +8,18 @@ from pants.base.exceptions import TargetDefinitionException
 class JavaAgent(JavaLibrary):
   """A Java agent entrypoint."""
 
-  def __init__(self,
-               name,
-               sources=None,
-               excludes=None,
-               premain=None,
-               agent_class=None,
-               can_redefine=False,
-               can_retransform=False,
-               can_set_native_method_prefix=False,
-               **kwargs):
+  def __init__(
+    self,
+    name,
+    sources=None,
+    excludes=None,
+    premain=None,
+    agent_class=None,
+    can_redefine=False,
+    can_retransform=False,
+    can_set_native_method_prefix=False,
+    **kwargs
+  ):
     """
     :param string premain: When an agent is specified at JVM launch time this attribute specifies
       the agent class. Exactly one of ``premain`` or ``agent_class`` must be specified.
@@ -33,23 +35,30 @@ class JavaAgent(JavaLibrary):
     """
 
     super().__init__(
-        name=name,
-        sources=sources,
-        provides=None,
-        excludes=self.assert_list(excludes, key_arg='excludes'),
-        **kwargs)
+      name=name,
+      sources=sources,
+      provides=None,
+      excludes=self.assert_list(excludes, key_arg="excludes"),
+      **kwargs
+    )
 
     if not (premain or agent_class):
-      raise TargetDefinitionException(self, "Must have at least one of 'premain' or 'agent_class' "
-                                            "defined.")
+      raise TargetDefinitionException(
+        self, "Must have at least one of 'premain' or 'agent_class' " "defined."
+      )
     if premain and not isinstance(premain, str):
-      raise TargetDefinitionException(self, 'The premain must be a fully qualified class name, '
-                                            'given {} of type {}'.format(premain, type(premain)))
+      raise TargetDefinitionException(
+        self,
+        "The premain must be a fully qualified class name, "
+        "given {} of type {}".format(premain, type(premain)),
+      )
 
     if agent_class and not isinstance(agent_class, str):
-      raise TargetDefinitionException(self,
-                                      'The agent_class must be a fully qualified class name, given '
-                                      '{} of type {}'.format(agent_class, type(agent_class)))
+      raise TargetDefinitionException(
+        self,
+        "The agent_class must be a fully qualified class name, given "
+        "{} of type {}".format(agent_class, type(agent_class)),
+      )
 
     self._premain = premain
     self._agent_class = agent_class

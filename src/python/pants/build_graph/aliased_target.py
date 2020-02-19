@@ -22,17 +22,16 @@ class AliasTargetMacro(TargetMacro):
     :param string target: The address of the destination target.
     """
     if name is None:
-      raise TargetDefinitionException('{}:?'.format(self._parse_context.rel_path),
-                                      'The alias() must have a name!')
+      raise TargetDefinitionException(
+        "{}:?".format(self._parse_context.rel_path), "The alias() must have a name!"
+      )
     if target is None:
-      raise TargetDefinitionException('{}:{}'.format(self._parse_context.rel_path, name),
-                                      'The alias() must have a "target" parameter.')
+      raise TargetDefinitionException(
+        "{}:{}".format(self._parse_context.rel_path, name),
+        'The alias() must have a "target" parameter.',
+      )
     self._parse_context.create_object(
-      AliasTarget,
-      type_alias='alias',
-      name=name,
-      dependencies=[target] if target else [],
-      **kwargs
+      AliasTarget, type_alias="alias", name=name, dependencies=[target] if target else [], **kwargs
     )
 
 

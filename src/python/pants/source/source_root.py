@@ -12,10 +12,10 @@ from pants.util.memo import memoized_method, memoized_property
 
 
 class SourceRootCategories:
-  UNKNOWN = 'unknown'
-  SOURCE = 'source'
-  TEST = 'test'
-  THIRDPARTY = 'thirdparty'
+  UNKNOWN = "unknown"
+  SOURCE = "source"
+  TEST = "test"
+  THIRDPARTY = "thirdparty"
   ALL = [UNKNOWN, SOURCE, TEST, THIRDPARTY]
 
 
@@ -46,7 +46,7 @@ class SourceRootFactory:
     self._lang_canonicalizations = lang_canonicalizations
 
   def _canonicalize_langs(self, langs):
-    for lang in (langs or ()):
+    for lang in langs or ():
       canonicalized = self._lang_canonicalizations.get(lang, (lang,))
       for canonical in canonicalized:
         yield canonical
@@ -59,7 +59,7 @@ class SourceRootFactory:
 class SourceRoots:
   """An interface for querying source roots."""
 
-  def __init__(self, source_root_config: 'SourceRootConfig') -> None:
+  def __init__(self, source_root_config: "SourceRootConfig") -> None:
     """Create an object for querying source roots via patterns in a trie.
 
     :param source_root_config: The SourceRootConfig for the source root patterns to query against.
@@ -96,7 +96,7 @@ class SourceRoots:
     matched = self._trie.find(path)
     if matched:
       return matched
-    elif self._options.unmatched == 'fail':
+    elif self._options.unmatched == "fail":
       return None
     # If no source root is found, use the path directly.
     # TODO: Remove this logic. It should be an error to have no matching source root.
@@ -128,7 +128,7 @@ class SourceRoots:
         yield self._source_root_factory.create(root, langs, category)
       fixed_roots.add(root)
 
-    for relpath, dirnames, _ in project_tree.walk('', topdown=True):
+    for relpath, dirnames, _ in project_tree.walk("", topdown=True):
       match = self._trie.find(relpath)
       if match:
         if not any(fixed_root.startswith(relpath) for fixed_root in fixed_roots):
@@ -172,42 +172,31 @@ class SourceRootConfig(Subsystem):
   within reason.  This means that in most cases the defaults below will be sufficient and repo
   owners will not need to explicitly specify source root patterns at all.
   """
-  options_scope = 'source'
+
+  options_scope = "source"
 
   # TODO: When we have a proper model of the concept of a language, these should really be
   # gathered from backends.
   _DEFAULT_LANG_CANONICALIZATIONS = {
-    'jvm': ('java', 'scala'),
-    'protobuf': ('proto',),
-    'py': ('python',),
-    'golang': ('go',),
+    "jvm": ("java", "scala"),
+    "protobuf": ("proto",),
+    "py": ("python",),
+    "golang": ("go",),
   }
 
-  _DEFAULT_SOURCE_ROOT_PATTERNS = [
-    'src/*',
-    'src/main/*',
-  ]
+  _DEFAULT_SOURCE_ROOT_PATTERNS = ["src/*", "src/main/*"]
 
-  _DEFAULT_TEST_ROOT_PATTERNS = [
-    'test/*',
-    'tests/*',
-    'src/test/*',
-  ]
+  _DEFAULT_TEST_ROOT_PATTERNS = ["test/*", "tests/*", "src/test/*"]
 
-  _DEFAULT_THIRDPARTY_ROOT_PATTERNS = [
-    '3rdparty/*',
-    '3rd_party/*',
-    'thirdparty/*',
-    'third_party/*',
-  ]
+  _DEFAULT_THIRDPARTY_ROOT_PATTERNS = ["3rdparty/*", "3rd_party/*", "thirdparty/*", "third_party/*"]
 
   _DEFAULT_SOURCE_ROOTS = {
     # Our default patterns will detect src/go as a go source root.
     # However a typical repo might have src/go in the GOPATH, meaning src/go/src is the
     # actual source root (the root of the package namespace).
     # These fixed source roots will correct the patterns' incorrect guess.
-    'src/go/src': ('go',),
-    'src/main/go/src': ('go',),
+    "src/go/src": ("go",),
+    "src/main/go/src": ("go",),
   }
 
   _DEFAULT_TEST_ROOTS: Dict[str, Tuple[str, ...]] = {}
@@ -217,55 +206,106 @@ class SourceRootConfig(Subsystem):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--unmatched', choices=['create', 'fail'], default='create', advanced=True,
-             fingerprint=True,
-             help='Configures the behavior when sources are defined outside of any configured '
-                  'source root. `create` will cause a source root to be implicitly created at '
-                  'the definition location of the sources; `fail` will trigger an error.')
-    register('--lang-canonicalizations', metavar='<map>', type=dict, fingerprint=True,
-             default=cls._DEFAULT_LANG_CANONICALIZATIONS, advanced=True,
-             help='Map of language aliases to their canonical names.')
+    register(
+      "--unmatched",
+      choices=["create", "fail"],
+      default="create",
+      advanced=True,
+      fingerprint=True,
+      help="Configures the behavior when sources are defined outside of any configured "
+      "source root. `create` will cause a source root to be implicitly created at "
+      "the definition location of the sources; `fail` will trigger an error.",
+    )
+    register(
+      "--lang-canonicalizations",
+      metavar="<map>",
+      type=dict,
+      fingerprint=True,
+      default=cls._DEFAULT_LANG_CANONICALIZATIONS,
+      advanced=True,
+      help="Map of language aliases to their canonical names.",
+    )
 
-    pattern_help_fmt = ('A list of source root patterns for {} code. Use a "*" wildcard path '
-                        'segment to match the language name, which will be canonicalized.')
-    register('--source-root-patterns', metavar='<list>', type=list, fingerprint=True,
-             default=cls._DEFAULT_SOURCE_ROOT_PATTERNS, advanced=True,
-             help=pattern_help_fmt.format('source'))
-    register('--test-root-patterns', metavar='<list>', type=list, fingerprint=True,
-             default=cls._DEFAULT_TEST_ROOT_PATTERNS, advanced=True,
-             help=pattern_help_fmt.format('test'))
-    register('--thirdparty-root-patterns', metavar='<list>', type=list, fingerprint=True,
-             default=cls._DEFAULT_THIRDPARTY_ROOT_PATTERNS, advanced=True,
-             help=pattern_help_fmt.format('third-party'))
+    pattern_help_fmt = (
+      'A list of source root patterns for {} code. Use a "*" wildcard path '
+      "segment to match the language name, which will be canonicalized."
+    )
+    register(
+      "--source-root-patterns",
+      metavar="<list>",
+      type=list,
+      fingerprint=True,
+      default=cls._DEFAULT_SOURCE_ROOT_PATTERNS,
+      advanced=True,
+      help=pattern_help_fmt.format("source"),
+    )
+    register(
+      "--test-root-patterns",
+      metavar="<list>",
+      type=list,
+      fingerprint=True,
+      default=cls._DEFAULT_TEST_ROOT_PATTERNS,
+      advanced=True,
+      help=pattern_help_fmt.format("test"),
+    )
+    register(
+      "--thirdparty-root-patterns",
+      metavar="<list>",
+      type=list,
+      fingerprint=True,
+      default=cls._DEFAULT_THIRDPARTY_ROOT_PATTERNS,
+      advanced=True,
+      help=pattern_help_fmt.format("third-party"),
+    )
 
-    fixed_help_fmt = ('A map of source roots for {} code to list of languages. '
-                      'Useful when you want to enumerate fixed source roots explicitly, '
-                      'instead of relying on patterns.')
-    register('--source-roots', metavar='<map>', type=dict, fingerprint=True,
-             default=cls._DEFAULT_SOURCE_ROOTS, advanced=True,
-             help=fixed_help_fmt.format('source'))
-    register('--test-roots', metavar='<map>', type=dict, fingerprint=True,
-             default=cls._DEFAULT_TEST_ROOTS, advanced=True,
-             help=fixed_help_fmt.format('test'))
-    register('--thirdparty-roots', metavar='<map>', type=dict, fingerprint=True,
-             default=cls._DEFAULT_THIRDPARTY_ROOTS, advanced=True,
-             help=fixed_help_fmt.format('third-party'))
+    fixed_help_fmt = (
+      "A map of source roots for {} code to list of languages. "
+      "Useful when you want to enumerate fixed source roots explicitly, "
+      "instead of relying on patterns."
+    )
+    register(
+      "--source-roots",
+      metavar="<map>",
+      type=dict,
+      fingerprint=True,
+      default=cls._DEFAULT_SOURCE_ROOTS,
+      advanced=True,
+      help=fixed_help_fmt.format("source"),
+    )
+    register(
+      "--test-roots",
+      metavar="<map>",
+      type=dict,
+      fingerprint=True,
+      default=cls._DEFAULT_TEST_ROOTS,
+      advanced=True,
+      help=fixed_help_fmt.format("test"),
+    )
+    register(
+      "--thirdparty-roots",
+      metavar="<map>",
+      type=dict,
+      fingerprint=True,
+      default=cls._DEFAULT_THIRDPARTY_ROOTS,
+      advanced=True,
+      help=fixed_help_fmt.format("third-party"),
+    )
 
   @memoized_method
   def get_source_roots(self):
     return SourceRoots(self)
 
-  def create_trie(self) -> 'SourceRootTrie':
+  def create_trie(self) -> "SourceRootTrie":
     """Create a trie of source root patterns from options."""
     trie = SourceRootTrie(self.source_root_factory)
     options = self.get_options()
 
     for category in SourceRootCategories.ALL:
       # Add patterns.
-      for pattern in options.get('{}_root_patterns'.format(category), []):
+      for pattern in options.get("{}_root_patterns".format(category), []):
         trie.add_pattern(pattern, category)
       # Add fixed source roots.
-      for path, langs in options.get('{}_roots'.format(category), {}).items():
+      for path, langs in options.get("{}_roots".format(category), {}).items():
         trie.add_fixed(path, langs, category)
 
     return trie
@@ -286,9 +326,10 @@ class SourceRootTrie:
   the path we're matching. E.g., ^/src/java/foo/bar will match both the fixed root ^/src/java and
   the pattern src/java, but ^/my/project/src/java/foo/bar will match only the pattern.
   """
+
   class InvalidPath(Exception):
     def __init__(self, path, reason):
-      super().__init__(f'Invalid source root path or pattern: {path}. Reason: {reason}.')
+      super().__init__(f"Invalid source root path or pattern: {path}. Reason: {reason}.")
 
   class Node:
     def __init__(self):
@@ -311,8 +352,8 @@ class SourceRootTrie:
       ret = self.children.get(key)
       if ret:
         langs.update(ret.langs)
-      elif key != '^':
-        ret = self.children.get('*')
+      elif key != "^":
+        ret = self.children.get("*")
         if ret:
           langs.add(key)
       return ret
@@ -331,7 +372,7 @@ class SourceRootTrie:
             else:
               yield key, langs, category
       else:
-        yield '', self.langs, self.category
+        yield "", self.langs, self.category
 
   def __init__(self, source_root_factory: SourceRootFactory) -> None:
     self._source_root_factory = source_root_factory
@@ -343,21 +384,21 @@ class SourceRootTrie:
 
   def add_fixed(self, path, langs, category=SourceRootCategories.UNKNOWN):
     """Add a fixed source root to the trie."""
-    if '*' in path:
-      raise self.InvalidPath(path, 'fixed path cannot contain the * character')
-    fixed_path = os.path.join('^', path) if path else '^'
+    if "*" in path:
+      raise self.InvalidPath(path, "fixed path cannot contain the * character")
+    fixed_path = os.path.join("^", path) if path else "^"
     self._do_add_pattern(fixed_path, tuple(langs), category)
 
   def fixed(self):
     """Returns a list of just the fixed source roots in the trie."""
     for key, child in self._root.children.items():
-      if key == '^':
+      if key == "^":
         return list(child.subpatterns())
     return []
 
   def _do_add_pattern(self, pattern, langs, category):
     if pattern != os.path.normpath(pattern):
-      raise self.InvalidPath(pattern, 'must be a normalized path')
+      raise self.InvalidPath(pattern, "must be a normalized path")
     keys = pattern.split(os.path.sep)
 
     node = self._root
@@ -377,7 +418,7 @@ class SourceRootTrie:
       for name in node.children:
         child = node.children[name]
         if child.is_terminal:
-          effective_path = '/'.join([*path_components, name])
+          effective_path = "/".join([*path_components, name])
           source_roots.add(effective_path)
         traverse_helper(node=child, path_components=[*path_components, name])
 
@@ -386,7 +427,7 @@ class SourceRootTrie:
 
   def find(self, path) -> Optional[SourceRoot]:
     """Find the source root for the given path."""
-    keys = ['^'] + path.split(os.path.sep)
+    keys = ["^"] + path.split(os.path.sep)
     for i in range(len(keys)):
       # See if we have a match at position i.  We have such a match if following the path
       # segments into the trie, from the root, leads us to a terminal.
@@ -402,7 +443,7 @@ class SourceRootTrie:
           j += 1
       if node.is_terminal:
         if j == 1:  # The match was on the root itself.
-          path = ''
+          path = ""
         else:
           path = os.path.join(*keys[1:j])
         return self._source_root_factory.create(path, langs, node.category)

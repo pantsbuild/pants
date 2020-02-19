@@ -15,8 +15,9 @@ from pants.util.strutil import create_path_env_var
 
 class _list_field(property):
   """A decorator for methods corresponding to list-valued fields of an `ExtensibleAlgebraic`."""
+
   __isabstractmethod__ = True
-  _field_type = 'list'
+  _field_type = "list"
 
 
 # NB: prototypal inheritance seems *deeply* linked with the idea here!
@@ -30,7 +31,7 @@ class _ExtensibleAlgebraic(ABC):
     all_list_fields = []
     for field_name in cls.__abstractmethods__:
       f = getattr(cls, field_name)
-      if getattr(f, '_field_type', None) == 'list':
+      if getattr(f, "_field_type", None) == "list":
         all_list_fields.append(field_name)
     return frozenset(all_list_fields)
 
@@ -38,13 +39,16 @@ class _ExtensibleAlgebraic(ABC):
   def copy(self, **kwargs):
     """Implementations should have the same behavior as a `datatype()`'s `copy()` method."""
 
-  class AlgebraicDataError(Exception): pass
+  class AlgebraicDataError(Exception):
+    pass
 
   def _single_list_field_operation(self, field_name, list_value, prepend=True):
     if field_name not in self._list_fields:
       raise self.AlgebraicDataError(
-        "Field '{}' is not in this object's set of declared list fields: {} (this object is : {})."
-        .format(field_name, self._list_fields, self))
+        "Field '{}' is not in this object's set of declared list fields: {} (this object is : {}).".format(
+          field_name, self._list_fields, self
+        )
+      )
     cur_value = getattr(self, field_name)
 
     if prepend:
@@ -78,18 +82,20 @@ class _ExtensibleAlgebraic(ABC):
     if nonexistent_excluded_fields:
       raise self.AlgebraicDataError(
         "Fields {} to exclude from a sequence() were not found in this object's list fields: {}. "
-        "This object is {}, the other object is {}."
-        .format(nonexistent_excluded_fields, self._list_fields, self, other))
+        "This object is {}, the other object is {}.".format(
+          nonexistent_excluded_fields, self._list_fields, self, other
+        )
+      )
 
-    shared_list_fields = (self._list_fields
-                          & other._list_fields
-                          - exclude_list_fields)
+    shared_list_fields = self._list_fields & other._list_fields - exclude_list_fields
     if not shared_list_fields:
       raise self.AlgebraicDataError(
         "Objects to sequence have no shared fields after excluding {}. "
         "This object is {}, with list fields: {}. "
-        "The other object is {}, with list fields: {}."
-        .format(exclude_list_fields, self, self._list_fields, other, other._list_fields))
+        "The other object is {}, with list fields: {}.".format(
+          exclude_list_fields, self, self._list_fields, other, other._list_fields
+        )
+      )
 
     for list_field_name in shared_list_fields:
       lhs_value = getattr(self, list_field_name)
@@ -100,7 +106,6 @@ class _ExtensibleAlgebraic(ABC):
 
 
 class _AlgebraicDataclass:
-
   def copy(self, **kwargs):
     assert dataclasses.is_dataclass(self)
     return dataclasses.replace(self, **kwargs)
@@ -127,7 +132,6 @@ def _hydrate_dataclass_properties(cls):
 
 
 class _Executable(_ExtensibleAlgebraic):
-
   @_list_field
   def path_entries(self):
     """A list of directory paths containing this executable, to be used in a subprocess's PATH.
@@ -172,13 +176,12 @@ class _Executable(_ExtensibleAlgebraic):
 
     :rtype: dict of string -> string
     """
-    lib_path_env_var: str = match(Platform.current, {
-      Platform.darwin: "DYLD_LIBRARY_PATH",
-      Platform.linux: "LD_LIBRARY_PATH",
-    })
+    lib_path_env_var: str = match(
+      Platform.current, {Platform.darwin: "DYLD_LIBRARY_PATH", Platform.linux: "LD_LIBRARY_PATH"}
+    )
 
     return {
-      'PATH': create_path_env_var(self.path_entries),
+      "PATH": create_path_env_var(self.path_entries),
       lib_path_env_var: create_path_env_var(self.runtime_library_dirs),
     }
 
@@ -195,7 +198,6 @@ class Assembler(_AlgebraicDataclass, _Executable):
 
 
 class _LinkerMixin(_Executable):
-
   @_list_field
   def linking_library_dirs(self):
     """Directories to search for libraries needed at link time.
@@ -220,10 +222,9 @@ class _LinkerMixin(_Executable):
       os.path.dirname(f) for f in self.extra_object_files
     ]
 
-    ret.update({
-      'LDSHARED': self.exe_filename,
-      'LIBRARY_PATH': create_path_env_var(full_library_path_dirs),
-    })
+    ret.update(
+      {"LDSHARED": self.exe_filename, "LIBRARY_PATH": create_path_env_var(full_library_path_dirs)}
+    )
 
     return ret
 
@@ -240,7 +241,6 @@ class Linker(_AlgebraicDataclass, _LinkerMixin):
 
 
 class _CompilerMixin(_Executable):
-
   @_list_field
   def include_dirs(self):
     """Directories to search for header files to #include during compilation.
@@ -253,7 +253,7 @@ class _CompilerMixin(_Executable):
     ret = super(_CompilerMixin, self).invocation_environment_dict.copy()
 
     if self.include_dirs:
-      ret['CPATH'] = create_path_env_var(self.include_dirs)
+      ret["CPATH"] = create_path_env_var(self.include_dirs)
 
     return ret
 
@@ -271,7 +271,7 @@ class CCompiler(_AlgebraicDataclass, _CompilerMixin):
   def invocation_environment_dict(self):
     ret = super().invocation_environment_dict.copy()
 
-    ret['CC'] = self.exe_filename
+    ret["CC"] = self.exe_filename
 
     return ret
 
@@ -289,7 +289,7 @@ class CppCompiler(_AlgebraicDataclass, _CompilerMixin):
   def invocation_environment_dict(self):
     ret = super().invocation_environment_dict.copy()
 
-    ret['CXX'] = self.exe_filename
+    ret["CXX"] = self.exe_filename
 
     return ret
 

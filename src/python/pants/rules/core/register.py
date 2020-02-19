@@ -32,5 +32,5 @@ def rules():
     *run.rules(),
     *strip_source_roots.rules(),
     *distdir.rules(),
-    *test.rules()
+    *test.rules(),
   ]

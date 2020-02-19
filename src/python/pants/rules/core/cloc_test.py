@@ -16,7 +16,7 @@ class ClocTest(GoalRuleTestBase):
 
   @classmethod
   def alias_groups(cls):
-    return BuildFileAliases(targets={'java_library': JavaLibrary})
+    return BuildFileAliases(targets={"java_library": JavaLibrary})
 
   def assert_counts(
     self,
@@ -37,30 +37,32 @@ class ClocTest(GoalRuleTestBase):
       self.assertEqual(comment, int(fields[3]))
       self.assertEqual(code, int(fields[4]))
       return
-    self.fail(f'Found no output line for {lang}')
+    self.fail(f"Found no output line for {lang}")
 
   def test_cloc(self) -> None:
-    py_dir = 'src/py/foo'
-    self.create_file(f'{py_dir}/foo.py', '# A comment.\n\nprint("some code")\n# Another comment.')
-    self.create_file(f'{py_dir}/bar.py', '# A comment.\n\nprint("some more code")')
-    self.add_to_build_file(py_dir, 'python_library()')
+    py_dir = "src/py/foo"
+    self.create_file(f"{py_dir}/foo.py", '# A comment.\n\nprint("some code")\n# Another comment.')
+    self.create_file(f"{py_dir}/bar.py", '# A comment.\n\nprint("some more code")')
+    self.add_to_build_file(py_dir, "python_library()")
 
-    java_dir = 'src/java/foo'
-    self.create_file(f'{java_dir}/Foo.java', '// A comment. \n class Foo(){}\n')
-    self.create_file(f'{java_dir}/Ignored.java', '// We do not expect this file to appear in counts.')
+    java_dir = "src/java/foo"
+    self.create_file(f"{java_dir}/Foo.java", "// A comment. \n class Foo(){}\n")
+    self.create_file(
+      f"{java_dir}/Ignored.java", "// We do not expect this file to appear in counts."
+    )
     self.add_to_build_file(java_dir, "java_library(source='Foo.java')")
 
     output = self.execute_rule(args=[py_dir, java_dir])
-    self.assert_counts(output, 'Python', num_files=2, blank=2, comment=3, code=2)
-    self.assert_counts(output, 'Java', comment=1, code=1)
+    self.assert_counts(output, "Python", num_files=2, blank=2, comment=3, code=2)
+    self.assert_counts(output, "Java", comment=1, code=1)
 
   def test_ignored(self) -> None:
-    py_dir = 'src/py/foo'
+    py_dir = "src/py/foo"
     self.create_file(f"{py_dir}/foo.py", "print('some code')")
-    self.create_file(f'{py_dir}/empty.py', '')
-    self.add_to_build_file(py_dir, 'python_library()')
+    self.create_file(f"{py_dir}/empty.py", "")
+    self.add_to_build_file(py_dir, "python_library()")
 
-    output = self.execute_rule(args=[py_dir, '--cloc2-ignored'])
+    output = self.execute_rule(args=[py_dir, "--cloc2-ignored"])
     assert "Ignored the following files:" in output
     assert "empty.py: zero sized file" in output
 
@@ -71,9 +73,9 @@ class ClocTest(GoalRuleTestBase):
     py_dir = "src/py/foo"
     self.create_file(f"{py_dir}/foo.py", "print('some code')")
     self.create_file(f"{py_dir}/bar.py", "print('some code')\nprint('more code')")
-    self.add_to_build_file(py_dir, 'python_library()')
+    self.add_to_build_file(py_dir, "python_library()")
     output = self.execute_rule(args=[f"{py_dir}/foo.py"])
-    self.assert_counts(output, 'Python', num_files=1, code=1)
+    self.assert_counts(output, "Python", num_files=1, code=1)
 
   def test_filesystem_specs_without_owners(self) -> None:
     """Unlike most goals, cloc works on any readable file in the build root, regardless of whether
@@ -82,11 +84,11 @@ class ClocTest(GoalRuleTestBase):
     self.create_file("test/foo.ex", 'IO.puts("im a free thinker!")')
     self.create_file("test/foo.hs", 'main = putStrLn "Whats Pants, precious?"')
     output = self.execute_rule(args=["test/foo.*"])
-    self.assert_counts(output, 'Elixir', code=1)
-    self.assert_counts(output, 'Haskell', code=1)
+    self.assert_counts(output, "Elixir", code=1)
+    self.assert_counts(output, "Haskell", code=1)
 
   def test_no_sources_exits_gracefully(self) -> None:
-    py_dir = 'src/py/foo'
-    self.add_to_build_file(py_dir, 'python_library()')
+    py_dir = "src/py/foo"
+    self.add_to_build_file(py_dir, "python_library()")
     output = self.execute_rule(args=[py_dir])
     assert output.strip() == ""

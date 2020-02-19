@@ -22,17 +22,22 @@ class ResourcesTask(Task):
 
   @classmethod
   def product_types(cls):
-    return ['runtime_classpath']
+    return ["runtime_classpath"]
 
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--confs', advanced=True, type=list, default=['default'],
-             help='Prepare resources for these Ivy confs.')
+    register(
+      "--confs",
+      advanced=True,
+      type=list,
+      default=["default"],
+      help="Prepare resources for these Ivy confs.",
+    )
 
   @classmethod
   def prepare(cls, options, round_manager):
-    round_manager.require_data('compile_classpath')
+    round_manager.require_data("compile_classpath")
 
   @property
   def cache_target_dirs(self):
@@ -43,17 +48,19 @@ class ResourcesTask(Task):
     # TODO: Rewrite those tests. execute() is not supposed to return anything.
     processed_targets = []
 
-    compile_classpath = self.context.products.get_data('compile_classpath')
-    runtime_classpath = self.context.products.get_data('runtime_classpath', compile_classpath.copy)
+    compile_classpath = self.context.products.get_data("compile_classpath")
+    runtime_classpath = self.context.products.get_data("runtime_classpath", compile_classpath.copy)
 
     all_relevant_resources_targets = self.find_all_relevant_resources_targets()
     if not all_relevant_resources_targets:
       return processed_targets
 
-    with self.invalidated(targets=all_relevant_resources_targets,
-                          fingerprint_strategy=self.create_invalidation_strategy(),
-                          invalidate_dependents=False,
-                          topological_order=False) as invalidation:
+    with self.invalidated(
+      targets=all_relevant_resources_targets,
+      fingerprint_strategy=self.create_invalidation_strategy(),
+      invalidate_dependents=False,
+      topological_order=False,
+    ) as invalidation:
       for vt in invalidation.invalid_vts:
         # Generate resources to the chroot.
         self.prepare_resources(vt.target, vt.results_dir)
@@ -61,7 +68,9 @@ class ResourcesTask(Task):
       for vt, digest in self._capture_resources(invalidation.all_vts):
         # Register the target's chroot in the products.
         for conf in self.get_options().confs:
-          runtime_classpath.add_for_target(vt.target, [(conf, ClasspathEntry(vt.results_dir, digest))])
+          runtime_classpath.add_for_target(
+            vt.target, [(conf, ClasspathEntry(vt.results_dir, digest))]
+          )
 
     return processed_targets
 
@@ -76,11 +85,13 @@ class ResourcesTask(Task):
     snapshots = self.context._scheduler.capture_snapshots(
       tuple(
         PathGlobsAndRoot(
-          PathGlobs([os.path.join(fast_relpath(vt.results_dir, buildroot), '**')]),
+          PathGlobs([os.path.join(fast_relpath(vt.results_dir, buildroot), "**")]),
           buildroot,
           Digest.load(vt.current_results_dir),
-        ) for vt in vts
-      ))
+        )
+        for vt in vts
+      )
+    )
     result = []
     for vt, snapshot in zip(vts, snapshots):
       snapshot.directory_digest.dump(vt.current_results_dir)

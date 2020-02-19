@@ -34,7 +34,7 @@ class SubstituteAliasedTargets(Task):
         build_graph.inject_dependency(dependee, dependency.address)
 
   def _expand(self, target):
-    self.context.log.debug('expanding {}'.format(target.address.spec))
+    self.context.log.debug("expanding {}".format(target.address.spec))
     if isinstance(target, AliasTarget):
       for dep in target.dependencies:
         for expanded in self._expand(dep):

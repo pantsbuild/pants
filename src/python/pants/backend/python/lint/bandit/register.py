@@ -7,7 +7,4 @@ from pants.backend.python.lint.bandit import rules as bandit_rules
 
 
 def rules():
-  return (
-    *bandit_rules.rules(),
-    *python_lint_target.rules(),
-  )
+  return (*bandit_rules.rules(), *python_lint_target.rules())

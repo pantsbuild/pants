@@ -13,7 +13,8 @@ from pants.source.source_root import AllSourceRoots, SourceRoot, SourceRootConfi
 
 class RootsOptions(LineOriented, GoalSubsystem):
   """List the repo's registered source roots."""
-  name = 'roots'
+
+  name = "roots"
 
 
 class Roots(Goal):
@@ -52,14 +53,10 @@ async def all_roots(source_root_config: SourceRootConfig) -> AllSourceRoots:
 async def list_roots(console: Console, options: RootsOptions, all_roots: AllSourceRoots) -> Roots:
   with options.line_oriented(console) as print_stdout:
     for src_root in sorted(all_roots, key=lambda x: x.path):
-      all_langs = ','.join(sorted(src_root.langs))
+      all_langs = ",".join(sorted(src_root.langs))
       print_stdout(f"{src_root.path}: {all_langs or '*'}")
   return Roots(exit_code=0)
 
 
 def rules():
-  return [
-      subsystem_rule(SourceRootConfig),
-      all_roots,
-      list_roots,
-    ]
+  return [subsystem_rule(SourceRootConfig), all_roots, list_roots]

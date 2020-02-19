@@ -11,10 +11,10 @@ from pants.base.specs import (
 
 
 def test_more_specific():
-  single_address = SingleAddress(directory='foo/bar', name='baz')
-  sibling_addresses = SiblingAddresses(directory='foo/bar')
-  ascendant_addresses = AscendantAddresses(directory='foo/bar')
-  descendant_addresses = DescendantAddresses(directory='foo/bar')
+  single_address = SingleAddress(directory="foo/bar", name="baz")
+  sibling_addresses = SiblingAddresses(directory="foo/bar")
+  ascendant_addresses = AscendantAddresses(directory="foo/bar")
+  descendant_addresses = DescendantAddresses(directory="foo/bar")
 
   assert single_address == more_specific(single_address, None)
   assert single_address == more_specific(single_address, sibling_addresses)

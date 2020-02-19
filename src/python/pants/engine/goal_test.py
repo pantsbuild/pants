@@ -15,7 +15,6 @@ from pants.testutil.engine.util import MockConsole, run_rule
   reason="Figure out how to create a GoalSubsystem for tests. We can't call global_instance()"
 )
 def test_line_oriented_goal() -> None:
-
   class OutputtingGoalOptions(LineOriented, GoalSubsystem):
     name = "dummy"
 

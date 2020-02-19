@@ -13,42 +13,63 @@ class Depmap(ConsoleTask):
   Generates either a textual dependency tree or a graphviz digraph dot file for the dependency
   set of a target.
   """
+
   class SourceRootTypes:
     """Defines SourceRoot Types Constants"""
-    SOURCE = 'SOURCE'  # Source Target
-    TEST = 'TEST'  # Test Target
-    SOURCE_GENERATED = 'SOURCE_GENERATED'  # Code Gen Source Targets
-    EXCLUDED = 'EXCLUDED'  # Excluded Target
-    RESOURCE = 'RESOURCE'  # Resource belonging to Source Target
-    TEST_RESOURCE = 'TEST_RESOURCE'  # Resource belonging to Test Target
+
+    SOURCE = "SOURCE"  # Source Target
+    TEST = "TEST"  # Test Target
+    SOURCE_GENERATED = "SOURCE_GENERATED"  # Code Gen Source Targets
+    EXCLUDED = "EXCLUDED"  # Excluded Target
+    RESOURCE = "RESOURCE"  # Resource belonging to Source Target
+    TEST_RESOURCE = "TEST_RESOURCE"  # Resource belonging to Test Target
 
   _register_console_transitivity_option = False
 
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--internal-only', type=bool,
-             help='Specifies that only internal dependencies should be included in the graph '
-                  'output (no external jars).')
-    register('--external-only', type=bool,
-             help='Specifies that only external dependencies should be included in the graph '
-                  'output (only external jars).')
-    register('--minimal', type=bool,
-             help='For a textual dependency tree, only prints a dependency the 1st '
-                  'time it is encountered. This is a no-op for --graph.')
-    register('--graph', type=bool,
-             help='Specifies the internal dependency graph should be output in the dot digraph '
-                  'format.')
-    register('--tree', type=bool,
-             help='For text output, show an ascii tree to help visually line up indentions.')
-    register('--show-types', type=bool,
-             help='Show types of objects in depmap --graph.')
-    register('--separator', default='-',
-             help='Specifies the separator to use between the org/name/rev components of a '
-                  'dependency\'s fully qualified name.')
     register(
-      '--transitive', type=bool, default=True, fingerprint=True,
-      help='If True, use all targets in the build graph, else use only target roots.',
+      "--internal-only",
+      type=bool,
+      help="Specifies that only internal dependencies should be included in the graph "
+      "output (no external jars).",
+    )
+    register(
+      "--external-only",
+      type=bool,
+      help="Specifies that only external dependencies should be included in the graph "
+      "output (only external jars).",
+    )
+    register(
+      "--minimal",
+      type=bool,
+      help="For a textual dependency tree, only prints a dependency the 1st "
+      "time it is encountered. This is a no-op for --graph.",
+    )
+    register(
+      "--graph",
+      type=bool,
+      help="Specifies the internal dependency graph should be output in the dot digraph " "format.",
+    )
+    register(
+      "--tree",
+      type=bool,
+      help="For text output, show an ascii tree to help visually line up indentions.",
+    )
+    register("--show-types", type=bool, help="Show types of objects in depmap --graph.")
+    register(
+      "--separator",
+      default="-",
+      help="Specifies the separator to use between the org/name/rev components of a "
+      "dependency's fully qualified name.",
+    )
+    register(
+      "--transitive",
+      type=bool,
+      default=True,
+      fingerprint=True,
+      help="If True, use all targets in the build graph, else use only target roots.",
       removal_version="1.27.0.dev0",
       removal_hint="This option has no impact on the goal `depmap`.",
     )
@@ -60,7 +81,7 @@ class Depmap(ConsoleTask):
     self.is_external_only = self.get_options().external_only
 
     if self.is_internal_only and self.is_external_only:
-      raise TaskError('At most one of --internal-only or --external-only can be selected.')
+      raise TaskError("At most one of --internal-only or --external-only can be selected.")
 
     self.is_minimal = self.get_options().minimal
     self.is_graph = self.get_options().graph
@@ -87,36 +108,44 @@ class Depmap(ConsoleTask):
       params.update(org=dependency.org, name=dependency.name, rev=dependency.rev)
       is_internal_dep = False
     else:
-      params.update(org='internal', name=dependency.id)
+      params.update(org="internal", name=dependency.id)
       is_internal_dep = True
 
-    return ('{org}{sep}{name}{sep}{rev}' if params.get('rev') else
-            '{org}{sep}{name}').format(**params), is_internal_dep
+    return (
+      ("{org}{sep}{name}{sep}{rev}" if params.get("rev") else "{org}{sep}{name}").format(**params),
+      is_internal_dep,
+    )
 
   def _enumerate_visible_deps(self, dep, predicate):
     # We present the dependencies out of classpath order and instead in alphabetized internal deps,
     # then alphabetized external deps order for ease in scanning output.
-    dependencies = sorted(x for x in getattr(dep, 'dependencies', []))
+    dependencies = sorted(x for x in getattr(dep, "dependencies", []))
     if not self.is_internal_only:
-      dependencies.extend(sorted((x for x in getattr(dep, 'jar_dependencies', [])),
-                                 key=lambda x: (x.org, x.name, x.rev, x.classifier)))
+      dependencies.extend(
+        sorted(
+          (x for x in getattr(dep, "jar_dependencies", [])),
+          key=lambda x: (x.org, x.name, x.rev, x.classifier),
+        )
+      )
     for inner_dep in dependencies:
       dep_id, internal = self._dep_id(inner_dep)
       if predicate(internal):
         yield inner_dep
 
   def output_candidate(self, internal):
-    return ((not self.is_internal_only and not self.is_external_only)
-            or (self.is_internal_only and internal)
-            or (self.is_external_only and not internal))
+    return (
+      (not self.is_internal_only and not self.is_external_only)
+      or (self.is_internal_only and internal)
+      or (self.is_external_only and not internal)
+    )
 
   def _output_dependency_tree(self, target):
     """Plain-text depmap output handler."""
 
     def make_line(dep, indent, is_dupe=False):
-      indent_join, indent_chars = ('--', '  |') if self.should_tree else ('', '  ')
-      dupe_char = '*' if is_dupe else ''
-      return ''.join((indent * indent_chars, indent_join, dupe_char, dep))
+      indent_join, indent_chars = ("--", "  |") if self.should_tree else ("", "  ")
+      dupe_char = "*" if is_dupe else ""
+      return "".join((indent * indent_chars, indent_join, dupe_char, dep))
 
     def output_deps(dep, indent, outputted, stack):
       dep_id, internal = self._dep_id(dep)
@@ -125,9 +154,7 @@ class Depmap(ConsoleTask):
         return
 
       if self.output_candidate(internal):
-        yield make_line(dep_id,
-                        0 if self.is_external_only else indent,
-                        is_dupe=dep_id in outputted)
+        yield make_line(dep_id, 0 if self.is_external_only else indent, is_dupe=dep_id in outputted)
         outputted.add(dep_id)
 
       for sub_dep in self._enumerate_visible_deps(dep, self.output_candidate):
@@ -143,11 +170,11 @@ class Depmap(ConsoleTask):
 
     def maybe_add_type(dep, dep_id):
       """Add a class type to a dependency id if --show-types is passed."""
-      return dep_id if not self.show_types else '\\n'.join((dep_id, dep.__class__.__name__))
+      return dep_id if not self.show_types else "\\n".join((dep_id, dep.__class__.__name__))
 
     def make_node(dep, dep_id, internal):
       line_fmt = '  "{id}" [style=filled, fillcolor={color}{internal}];'
-      int_shape = ', shape=ellipse' if not internal else ''
+      int_shape = ", shape=ellipse" if not internal else ""
 
       dep_class = dep.__class__.__name__
       if dep_class not in color_by_type:
@@ -156,7 +183,7 @@ class Depmap(ConsoleTask):
       return line_fmt.format(id=dep_id, internal=int_shape, color=color_by_type[dep_class])
 
     def make_edge(from_dep_id, to_dep_id, internal):
-      style = ' [style=dashed]' if not internal else ''
+      style = " [style=dashed]" if not internal else ""
       return '  "{}" -> "{}"{};'.format(from_dep_id, to_dep_id, style)
 
     def output_deps(dep, parent, parent_id, outputted):
@@ -177,8 +204,8 @@ class Depmap(ConsoleTask):
           outputted.add(edge_id)
 
     yield 'digraph "{}" {{'.format(target.id)
-    yield '  node [shape=rectangle, colorscheme=set312;];'
-    yield '  rankdir=LR;'
+    yield "  node [shape=rectangle, colorscheme=set312;];"
+    yield "  rankdir=LR;"
     for line in output_deps(target, parent=None, parent_id=None, outputted=set()):
       yield line
-    yield '}'
+    yield "}"

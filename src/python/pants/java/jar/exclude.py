@@ -23,10 +23,7 @@ class Exclude:
     return self._name
 
   def __eq__(self, other):
-    return all([other,
-                type(other) == Exclude,
-                self.org == other.org,
-                self.name == other.name])
+    return all([other, type(other) == Exclude, self.org == other.org, self.name == other.name])
 
   def __lt__(self, other):
     return (self.org, self.name) < (other.org, other.name)

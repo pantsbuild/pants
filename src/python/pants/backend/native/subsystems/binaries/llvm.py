@@ -16,16 +16,13 @@ from pants.util.memo import memoized_method, memoized_property
 
 class LLVMReleaseUrlGenerator(BinaryToolUrlGenerator):
 
-  _DIST_URL_FMT = 'https://releases.llvm.org/{version}/{base}.tar.xz'
+  _DIST_URL_FMT = "https://releases.llvm.org/{version}/{base}.tar.xz"
 
-  _ARCHIVE_BASE_FMT = 'clang+llvm-{version}-x86_64-{system_id}'
+  _ARCHIVE_BASE_FMT = "clang+llvm-{version}-x86_64-{system_id}"
 
   # TODO: Give a more useful error message than KeyError if the host platform was not recognized
   # (and make it easy for other BinaryTool subclasses to do this as well).
-  _SYSTEM_ID = {
-    'mac': 'apple-darwin',
-    'linux': 'linux-gnu-ubuntu-16.04',
-  }
+  _SYSTEM_ID = {"mac": "apple-darwin", "linux": "linux-gnu-ubuntu-16.04"}
 
   def generate_urls(self, version, host_platform):
     system_id = self._SYSTEM_ID[host_platform.os_name]
@@ -44,9 +41,10 @@ class LLVM(NativeTool):
   their release archives, these methods may have to change. They should be stable to version
   upgrades, however.
   """
-  options_scope = 'llvm'
-  default_version = '6.0.0'
-  archive_type = 'txz'
+
+  options_scope = "llvm"
+  default_version = "6.0.0"
+  archive_type = "txz"
 
   def get_external_url_generator(self):
     return LLVMReleaseUrlGenerator()
@@ -59,7 +57,7 @@ class LLVM(NativeTool):
     children = os.listdir(unpacked_path)
     if len(children) == 1:
       llvm_base_dir = os.path.join(unpacked_path, children[0])
-      assert(is_readable_dir(llvm_base_dir))
+      assert is_readable_dir(llvm_base_dir)
       return llvm_base_dir
     return unpacked_path
 
@@ -76,16 +74,13 @@ class LLVM(NativeTool):
 
   @memoized_property
   def path_entries(self):
-    return self._filemap([('bin',)])
+    return self._filemap([("bin",)])
 
   # TODO(#5663): this is currently dead code.
   def linker(self, platform: Platform) -> Linker:
     return Linker(
       path_entries=self.path_entries,
-      exe_filename=match(platform, {
-        Platform.darwin: "ld64.lld",
-        Platform.linux: "lld",
-      }),
+      exe_filename=match(platform, {Platform.darwin: "ld64.lld", Platform.linux: "lld"}),
       runtime_library_dirs=(),
       linking_library_dirs=(),
       extra_args=(),
@@ -94,31 +89,33 @@ class LLVM(NativeTool):
 
   @memoized_property
   def _common_include_dirs(self):
-    return self._filemap([('lib/clang', self.version(), 'include')])
+    return self._filemap([("lib/clang", self.version(), "include")])
 
   @memoized_property
   def _common_lib_dirs(self):
-    return self._filemap([('lib',)])
+    return self._filemap([("lib",)])
 
   def c_compiler(self) -> CCompiler:
     return CCompiler(
       path_entries=self.path_entries,
-      exe_filename='clang',
+      exe_filename="clang",
       runtime_library_dirs=self._common_lib_dirs,
       include_dirs=self._common_include_dirs,
-      extra_args=())
+      extra_args=(),
+    )
 
   @memoized_property
   def _cpp_include_dirs(self):
-    return self._filemap([('include/c++/v1',)])
+    return self._filemap([("include/c++/v1",)])
 
   def cpp_compiler(self) -> CppCompiler:
     return CppCompiler(
       path_entries=self.path_entries,
-      exe_filename='clang++',
+      exe_filename="clang++",
       runtime_library_dirs=self._common_lib_dirs,
       include_dirs=(self._cpp_include_dirs + self._common_include_dirs),
-      extra_args=())
+      extra_args=(),
+    )
 
 
 # TODO(#5663): use this over the XCode linker!
@@ -138,9 +135,4 @@ def get_clang_plusplus(llvm: LLVM) -> CppCompiler:
 
 
 def create_llvm_rules():
-  return [
-    get_lld,
-    get_clang,
-    get_clang_plusplus,
-    RootRule(LLVM),
-  ]
+  return [get_lld, get_clang, get_clang_plusplus, RootRule(LLVM)]

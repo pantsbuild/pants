@@ -11,6 +11,7 @@ from pants.util.memo import memoized_property
 @dataclass(frozen=True)
 class MirroredTargetOptionDeclaration:
   """An interface for operations to perform on an option which may also be set on a target."""
+
   options: Any
   option_name: str
   accessor: Any
@@ -87,9 +88,8 @@ class MirroredTargetOptionMixin(ABC):
   def _mirrored_option_declarations(self):
     return {
       option_name: MirroredTargetOptionDeclaration(
-        options=self.get_options(),
-        option_name=option_name,
-        accessor=accessor)
+        options=self.get_options(), option_name=option_name, accessor=accessor
+      )
       for option_name, accessor in self.mirrored_target_option_actions.items()
     }
 

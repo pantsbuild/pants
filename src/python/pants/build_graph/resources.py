@@ -17,4 +17,4 @@ class Resources(Files):
 
   @classmethod
   def alias(cls):
-    return 'resources'
+    return "resources"

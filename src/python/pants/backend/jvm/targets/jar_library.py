@@ -21,17 +21,19 @@ class JarLibrary(Target):
     :param managed_dependencies: Address of a managed_jar_dependencies() target to use. If omitted, uses
       the default managed_jar_dependencies() target set by --jar-dependency-management-default-target.
     """
-    jars = self.assert_list(jars, expected_type=JarDependency, key_arg='jars')
+    jars = self.assert_list(jars, expected_type=JarDependency, key_arg="jars")
     payload = payload or Payload()
-    payload.add_fields({
-      'jars': JarsField(jars),
-      'excludes': ExcludesField([]),
-      'managed_dependencies': PrimitiveField(managed_dependencies),
-    })
+    payload.add_fields(
+      {
+        "jars": JarsField(jars),
+        "excludes": ExcludesField([]),
+        "managed_dependencies": PrimitiveField(managed_dependencies),
+      }
+    )
     super().__init__(payload=payload, **kwargs)
     # NB: Waiting to validate until superclasses are initialized.
     if not jars:
-      raise TargetDefinitionException(self, 'Must have a non-empty list of jars.')
+      raise TargetDefinitionException(self, "Must have a non-empty list of jars.")
 
   @property
   def managed_dependencies(self):
@@ -40,8 +42,7 @@ class JarLibrary(Target):
     :API: public
     """
     if self.payload.managed_dependencies:
-      address = Address.parse(self.payload.managed_dependencies,
-                              relative_to=self.address.spec_path)
+      address = Address.parse(self.payload.managed_dependencies, relative_to=self.address.spec_path)
       self._build_graph.inject_address_closure(address)
       return self._build_graph.get_target(address)
     return None

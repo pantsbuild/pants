@@ -44,7 +44,7 @@ def check_file_content(path, expected_content):
   :param str path: Path to file.
   :param str expected_content: Expected file content.
   """
-  with open(path, 'r') as input:
+  with open(path, "r") as input:
     return expected_content == input.read()
 
 

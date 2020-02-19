@@ -16,7 +16,7 @@ class IntransitiveDependencyFactory(IntermediateTargetFactoryBase):
     return dict(_transitive=False)
 
   def __call__(self, address):
-    return self._create_intermediate_target(address, 'intransitive')
+    return self._create_intermediate_target(address, "intransitive")
 
 
 class ProvidedDependencyFactory(IntermediateTargetFactoryBase):
@@ -30,7 +30,7 @@ class ProvidedDependencyFactory(IntermediateTargetFactoryBase):
 
   @property
   def extra_target_arguments(self):
-    return dict(_transitive=False, scope='compile test')
+    return dict(_transitive=False, scope="compile test")
 
   def __call__(self, address):
-    return self._create_intermediate_target(address, 'provided')
+    return self._create_intermediate_target(address, "provided")

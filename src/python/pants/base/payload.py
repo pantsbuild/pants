@@ -6,10 +6,12 @@ from hashlib import sha1
 from pants.util.strutil import ensure_binary
 
 
-class PayloadFieldAlreadyDefinedError(Exception): pass
+class PayloadFieldAlreadyDefinedError(Exception):
+  pass
 
 
-class PayloadFrozenError(Exception): pass
+class PayloadFrozenError(Exception):
+  pass
 
 
 class Payload:
@@ -83,13 +85,15 @@ class Payload:
     """
     if key in self._fields:
       raise PayloadFieldAlreadyDefinedError(
-        'Key {key} is already set on this payload. The existing field was {existing_field}.'
-        ' Tried to set new field {field}.'
-        .format(key=key, existing_field=self._fields[key], field=field))
+        "Key {key} is already set on this payload. The existing field was {existing_field}."
+        " Tried to set new field {field}.".format(
+          key=key, existing_field=self._fields[key], field=field
+        )
+      )
     elif self._frozen:
       raise PayloadFrozenError(
-        'Payload is frozen, field with key {key} cannot be added to it.'
-        .format(key=key))
+        "Payload is frozen, field with key {key} cannot be added to it.".format(key=key)
+      )
     else:
       self._fields[key] = field
       self._fingerprint_memo = None

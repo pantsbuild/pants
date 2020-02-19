@@ -9,7 +9,7 @@ from pants.util.dirutil import safe_mkdir
 
 
 # Lists of target addresses.
-CacheStat = namedtuple('CacheStat', ['hit_targets', 'miss_targets'])
+CacheStat = namedtuple("CacheStat", ["hit_targets", "miss_targets"])
 
 
 class ArtifactCacheStats:
@@ -20,6 +20,7 @@ class ArtifactCacheStats:
   def __init__(self, dir=None):
     def init_stat():
       return CacheStat([], [])
+
     self.stats_per_cache = defaultdict(init_stat)
     self._dir = dir
     safe_mkdir(self._dir)
@@ -35,13 +36,15 @@ class ArtifactCacheStats:
     """Returns the cache stats as a list of dicts."""
     ret = []
     for cache_name, stat in self.stats_per_cache.items():
-      ret.append({
-        'cache_name': cache_name,
-        'num_hits': len(stat.hit_targets),
-        'num_misses': len(stat.miss_targets),
-        'hits': stat.hit_targets,
-        'misses': stat.miss_targets
-      })
+      ret.append(
+        {
+          "cache_name": cache_name,
+          "num_hits": len(stat.hit_targets),
+          "num_misses": len(stat.miss_targets),
+          "hits": stat.hit_targets,
+          "misses": stat.miss_targets,
+        }
+      )
     return ret
 
   # hit_or_miss is the appropriate index in CacheStat, i.e., 0 for hit, 1 for miss.
@@ -52,16 +55,19 @@ class ArtifactCacheStats:
       if isinstance(cause, UnreadableArtifact):
         return (target_address, str(cause.err))
       elif cause == False:
-        return (target_address, 'uncached')
+        return (target_address, "uncached")
       else:
-        return (target_address, '')
+        return (target_address, "")
 
     causes = causes or [True] * len(targets)
     target_with_causes = [format_vts(tgt, cause) for tgt, cause in zip(targets, causes)]
     self.stats_per_cache[cache_name][hit_or_miss].extend(target_with_causes)
-    suffix = 'misses' if hit_or_miss else 'hits'
+    suffix = "misses" if hit_or_miss else "hits"
     if self._dir and os.path.exists(self._dir):  # Check existence in case of a clean-all.
-      with open(os.path.join(self._dir, '{}.{}'.format(cache_name, suffix)), 'a') as f:
-        f.write('\n'.join([' '.join(target_with_cause).strip()
-                           for target_with_cause in target_with_causes]))
-        f.write('\n')
+      with open(os.path.join(self._dir, "{}.{}".format(cache_name, suffix)), "a") as f:
+        f.write(
+          "\n".join(
+            [" ".join(target_with_cause).strip() for target_with_cause in target_with_causes]
+          )
+        )
+        f.write("\n")

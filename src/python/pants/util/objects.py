@@ -35,8 +35,10 @@ class TypeConstraint(ABC):
 
   def make_type_constraint_error(self, obj, constraint):
     return TypeConstraintError(
-      "value {!r} (with type {!r}) must satisfy this type constraint: {}."
-      .format(obj, type(obj).__name__, constraint))
+      "value {!r} (with type {!r}) must satisfy this type constraint: {}.".format(
+        obj, type(obj).__name__, constraint
+      )
+    )
 
   # TODO: disallow overriding this method with some form of mixin/decorator along with datatype
   # __eq__!
@@ -77,15 +79,15 @@ class TypeOnlyConstraint(TypeConstraint):
     """
 
     if not types:
-      raise ValueError('Must supply at least one type')
+      raise ValueError("Must supply at least one type")
     if any(not isinstance(t, type) for t in types):
-      raise TypeError(f'Supplied types must be types. {types!r}')
+      raise TypeError(f"Supplied types must be types. {types!r}")
 
     if len(types) == 1:
       type_list = types[0].__name__
     else:
-      type_list = ' or '.join(t.__name__ for t in types)
-    description = f'{type(self).__name__}({type_list})'
+      type_list = " or ".join(t.__name__ for t in types)
+    description = f"{type(self).__name__}({type_list})"
 
     super().__init__(description=description)
 
@@ -115,8 +117,8 @@ class TypeOnlyConstraint(TypeConstraint):
     return type(self) == type(other) and self._types == other._types
 
   def __repr__(self):
-    constrained_type = ', '.join(t.__name__ for t in self._types)
-    return (f'{type(self).__name__}({constrained_type})')
+    constrained_type = ", ".join(t.__name__ for t in self._types)
+    return f"{type(self).__name__}({constrained_type})"
 
 
 class SuperclassesOf(TypeOnlyConstraint):

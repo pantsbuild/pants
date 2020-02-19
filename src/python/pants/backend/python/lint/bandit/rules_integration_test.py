@@ -24,7 +24,6 @@ from pants.testutil.test_base import TestBase
 
 
 class BanditIntegrationTest(TestBase):
-
   def setUp(self):
     super().setUp()
     init_subsystems([download_pex_bin.DownloadedPexBin.Factory])
@@ -35,7 +34,7 @@ class BanditIntegrationTest(TestBase):
 
   @classmethod
   def alias_groups(cls) -> BuildFileAliases:
-    return BuildFileAliases(targets={'python_library': PythonLibrary})
+    return BuildFileAliases(targets={"python_library": PythonLibrary})
 
   @classmethod
   def rules(cls):
@@ -68,7 +67,7 @@ class BanditIntegrationTest(TestBase):
       args.append(f"--bandit-skip")
     input_snapshot = self.request_single_product(Snapshot, InputFilesContent(source_files))
     adaptor = PythonTargetAdaptor(
-      sources=EagerFilesetWithSpec('test', {'globs': []}, snapshot=input_snapshot),
+      sources=EagerFilesetWithSpec("test", {"globs": []}, snapshot=input_snapshot),
       address=Address.parse("test:target"),
       compatibility=[interpreter_constraints] if interpreter_constraints else None,
     )
@@ -76,7 +75,8 @@ class BanditIntegrationTest(TestBase):
       origin = SingleAddress(directory="test", name="target")
     target = BanditTarget(PythonTargetAdaptorWithOrigin(adaptor, origin))
     return self.request_single_product(
-      LintResult, Params(
+      LintResult,
+      Params(
         target,
         create_options_bootstrapper(args=args),
         download_pex_bin.DownloadedPexBin.Factory.global_instance(),

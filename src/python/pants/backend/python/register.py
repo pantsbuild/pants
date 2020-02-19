@@ -57,36 +57,36 @@ def build_file_aliases():
       PythonLibrary.alias(): PythonLibrary,
       PythonTests.alias(): PythonTests,
       PythonDistribution.alias(): PythonDistribution,
-      'python_requirement_library': PythonRequirementLibrary,
+      "python_requirement_library": PythonRequirementLibrary,
       Resources.alias(): Resources,
       UnpackedWheels.alias(): UnpackedWheels,
     },
     objects={
-      'python_requirement': PythonRequirement,
-      'python_artifact': PythonArtifact,
-      'setup_py': PythonArtifact,
+      "python_requirement": PythonRequirement,
+      "python_artifact": PythonArtifact,
+      "setup_py": PythonArtifact,
     },
     context_aware_object_factories={
-      'python_requirements': PythonRequirements,
+      "python_requirements": PythonRequirements,
       PantsRequirement.alias: PantsRequirement,
-    }
+    },
   )
 
 
 def register_goals():
-  task(name='interpreter', action=SelectInterpreter).install('pyprep')
-  task(name='build-local-dists', action=BuildLocalPythonDistributions).install('pyprep')
-  task(name='requirements', action=ResolveRequirements).install('pyprep')
-  task(name='sources', action=GatherSources).install('pyprep')
-  task(name='py', action=PythonRun).install('run')
-  task(name='pytest-prep', action=PytestPrep).install('test')
-  task(name='pytest', action=PytestRun).install('test')
-  task(name='py', action=PythonRepl).install('repl')
-  task(name='setup-py', action=SetupPy).install()
-  task(name='py', action=PythonBinaryCreate).install('binary')
-  task(name='py-wheels', action=LocalPythonDistributionArtifact).install('binary')
-  task(name='py', action=PythonBundle).install('bundle')
-  task(name='unpack-wheels', action=UnpackWheels).install()
+  task(name="interpreter", action=SelectInterpreter).install("pyprep")
+  task(name="build-local-dists", action=BuildLocalPythonDistributions).install("pyprep")
+  task(name="requirements", action=ResolveRequirements).install("pyprep")
+  task(name="sources", action=GatherSources).install("pyprep")
+  task(name="py", action=PythonRun).install("run")
+  task(name="pytest-prep", action=PytestPrep).install("test")
+  task(name="pytest", action=PytestRun).install("test")
+  task(name="py", action=PythonRepl).install("repl")
+  task(name="setup-py", action=SetupPy).install()
+  task(name="py", action=PythonBinaryCreate).install("binary")
+  task(name="py-wheels", action=LocalPythonDistributionArtifact).install("binary")
+  task(name="py", action=PythonBundle).install("bundle")
+  task(name="unpack-wheels", action=UnpackWheels).install()
 
 
 def rules():

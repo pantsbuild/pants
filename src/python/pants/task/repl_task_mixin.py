@@ -47,8 +47,8 @@ class ReplTaskMixin(MutexTaskMixin):
     session_setup = self.setup_repl_session(targets)
     self.context.release_lock()
     with STTYSettings.preserved():
-      with self.context.new_workunit(name='repl', labels=[WorkUnitLabel.RUN]):
-        print('')  # Start REPL output on a new line.
+      with self.context.new_workunit(name="repl", labels=[WorkUnitLabel.RUN]):
+        print("")  # Start REPL output on a new line.
         try:
           return self.launch_repl(session_setup)
         except KeyboardInterrupt:

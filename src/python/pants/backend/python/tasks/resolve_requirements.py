@@ -9,9 +9,10 @@ from pants.backend.python.tasks.resolve_requirements_task_base import ResolveReq
 
 class ResolveRequirements(ResolveRequirementsTaskBase):
   """Resolve external Python requirements."""
-  REQUIREMENTS_PEX = 'python_requirements_pex'
 
-  options_scope = 'resolve-requirements'
+  REQUIREMENTS_PEX = "python_requirements_pex"
+
+  options_scope = "resolve-requirements"
 
   @classmethod
   def product_types(cls):

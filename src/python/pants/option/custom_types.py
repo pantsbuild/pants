@@ -22,8 +22,9 @@ class UnsetBool:
   """
 
   def __init__(self) -> None:
-    raise NotImplementedError('UnsetBool cannot be instantiated. It should only be used as a '
-                              'sentinel type.')
+    raise NotImplementedError(
+      "UnsetBool cannot be instantiated. It should only be used as a " "sentinel type."
+    )
 
 
 def dict_option(s: str) -> "DictValueComponent":
@@ -36,7 +37,7 @@ def dict_option(s: str) -> "DictValueComponent":
   warn_or_error(
     removal_version="1.27.0.dev0",
     deprecated_entity_description="pants.option.custom_types.dict_option",
-    hint="Instead of setting an option's type as `type=dict_option`, set `type=dict`."
+    hint="Instead of setting an option's type as `type=dict_option`, set `type=dict`.",
   )
   return DictValueComponent.create(s)
 
@@ -57,7 +58,7 @@ def list_option(s: str) -> "ListValueComponent":
   warn_or_error(
     removal_version="1.27.0.dev0",
     deprecated_entity_description="pants.option.custom_types.list_option",
-    hint="Instead of setting an option's type as `type=list_option`, set `type=list`."
+    hint="Instead of setting an option's type as `type=list_option`, set `type=list`.",
   )
   return ListValueComponent.create(s)
 
@@ -83,7 +84,7 @@ def target_list_option(s):
     removal_version="1.27.0.dev0",
     deprecated_entity_description="pants.option.custom_types.target_list_option",
     hint="Instead of setting an option's type as `type=target_list_option`, set "
-         "`type=list, member_type=target_option`."
+    "`type=list, member_type=target_option`.",
   )
   return _convert(s, (list, tuple))
 
@@ -164,8 +165,9 @@ class ListValueComponent:
   file can append to and/or filter the default value list, instead of having to repeat most
   of the contents of the default value list.
   """
-  REPLACE = 'REPLACE'
-  MODIFY = 'MODIFY'
+
+  REPLACE = "REPLACE"
+  MODIFY = "MODIFY"
 
   # We use a regex to parse the comma-separated lists of modifier expressions (each of which is
   # a list or tuple literal preceded by a + or a -).  Note that these expressions are technically
@@ -179,12 +181,12 @@ class ListValueComponent:
     # followed by a comma (possibly surrounded by whitespace), followed by a
     # positive lookahead assertion for [ or (.  The lookahead/lookbehind assertions mean that
     # the bracket/paren characters don't get consumed in the split.
-    return re.compile(r'(?<=\]|\))\s*,\s*(?=[+-](?:\[|\())')
+    return re.compile(r"(?<=\]|\))\s*,\s*(?=[+-](?:\[|\())")
 
   @classmethod
   def _split_modifier_expr(cls, s: str) -> List[str]:
     # This check ensures that the first expression (before the first split point) is a modification.
-    if s.startswith('+') or s.startswith('-'):
+    if s.startswith("+") or s.startswith("-"):
       return cls._get_modifier_expr_re().split(s)
     return [s]
 
@@ -207,7 +209,7 @@ class ListValueComponent:
         appends.extend(component._appends)
         filters.extend(component._filters)
       else:
-        raise ParseError(f'Unknown action for list value: {component._action}')
+        raise ParseError(f"Unknown action for list value: {component._action}")
     return cls(action, appends, filters)
 
   def __init__(self, action: str, appends: List, filters: List) -> None:
@@ -252,21 +254,21 @@ class ListValueComponent:
     elif isinstance(value, (list, tuple)):  # Ensure we can handle list-typed default values.
       action = cls.REPLACE
       appends = value
-    elif value.startswith('[') or value.startswith('('):
+    elif value.startswith("[") or value.startswith("("):
       action = cls.REPLACE
       appends = _convert(value, (list, tuple))
-    elif value.startswith('+[') or value.startswith('+('):
+    elif value.startswith("+[") or value.startswith("+("):
       appends = _convert(value[1:], (list, tuple))
-    elif value.startswith('-[') or value.startswith('-('):
+    elif value.startswith("-[") or value.startswith("-("):
       filters = _convert(value[1:], (list, tuple))
     elif isinstance(value, str):
       appends = [value]
     else:
-      appends = _convert(f'[{value}]', list)
+      appends = _convert(f"[{value}]", list)
     return cls(action, list(appends), list(filters))
 
   def __repr__(self) -> str:
-    return f'{self._action} +{self._appends} -{self._filters}'
+    return f"{self._action} +{self._appends} -{self._filters}"
 
 
 class DictValueComponent:
@@ -277,8 +279,9 @@ class DictValueComponent:
   Each component may either replace or extend the preceding component.  So that, e.g., a config
   file can extend the default value of a dict, instead of having to repeat it.
   """
-  REPLACE = 'REPLACE'
-  EXTEND = 'EXTEND'
+
+  REPLACE = "REPLACE"
+  EXTEND = "EXTEND"
 
   @classmethod
   def merge(cls, components: Iterable["DictValueComponent"]) -> "DictValueComponent":
@@ -296,7 +299,7 @@ class DictValueComponent:
       elif component.action is cls.EXTEND:
         val.update(component.val)
       else:
-        raise ParseError(f'Unknown action for dict value: {component.action}')
+        raise ParseError(f"Unknown action for dict value: {component.action}")
     return cls(action, val)
 
   def __init__(self, action: str, val: Dict) -> None:
@@ -318,18 +321,18 @@ class DictValueComponent:
     elif isinstance(value, dict):  # Ensure we can handle dict-typed default values.
       action = cls.REPLACE
       val = value
-    elif value.startswith('{'):
+    elif value.startswith("{"):
       action = cls.REPLACE
       val = _convert(value, dict)
-    elif value.startswith('+{'):
+    elif value.startswith("+{"):
       action = cls.EXTEND
       val = _convert(value[1:], dict)
     else:
-      raise ParseError(f'Invalid dict value: {value}')
+      raise ParseError(f"Invalid dict value: {value}")
     return cls(action, dict(val))
 
   def __repr__(self) -> str:
-    return f'{self.action} {self.val}'
+    return f"{self.action} {self.val}"
 
 
 class GlobExpansionConjunction(Enum):
@@ -338,5 +341,6 @@ class GlobExpansionConjunction(Enum):
   NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to
   be aware of any changes to this object's definition.
   """
+
   any_match = "any_match"
   all_match = "all_match"

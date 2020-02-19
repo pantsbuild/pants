@@ -5,8 +5,8 @@ import collections
 from typing import Callable, DefaultDict, Iterable, MutableMapping, TypeVar
 
 
-_K = TypeVar('_K')
-_V = TypeVar('_V')
+_K = TypeVar("_K")
+_V = TypeVar("_V")
 
 
 def factory_dict(value_factory: Callable[[_K], _V], *args, **kwargs) -> DefaultDict:
@@ -18,11 +18,13 @@ def factory_dict(value_factory: Callable[[_K], _V], *args, **kwargs) -> DefaultD
   :param *args: Any positional args to pass through to `dict`.
   :param **kwrags: Any kwargs to pass through to `dict`.
   """
+
   class FactoryDict(collections.defaultdict):
     @staticmethod
     def __never_called():
-      raise AssertionError('The default factory should never be called since we override '
-                           '__missing__.')
+      raise AssertionError(
+        "The default factory should never be called since we override " "__missing__."
+      )
 
     def __init__(self):
       super().__init__(self.__never_called, *args, **kwargs)
@@ -45,7 +47,7 @@ def recursively_update(d: MutableMapping, d2: MutableMapping) -> None:
     d[k] = v
 
 
-_T = TypeVar('_T')
+_T = TypeVar("_T")
 
 
 def assert_single_element(iterable: Iterable[_T]) -> _T:

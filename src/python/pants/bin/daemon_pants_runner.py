@@ -37,7 +37,7 @@ class DaemonExiter(Exiter):
   @classmethod
   @contextmanager
   def override_global_exiter(
-    cls, maybe_shutdown_socket: MaybeShutdownSocket, finalizer: Callable[[], None],
+    cls, maybe_shutdown_socket: MaybeShutdownSocket, finalizer: Callable[[], None]
   ) -> Iterator[None]:
     with ExceptionSink.exiter_as(
       lambda previous_exiter: cls(maybe_shutdown_socket, finalizer, previous_exiter)
@@ -67,7 +67,7 @@ class DaemonExiter(Exiter):
           with self._maybe_shutdown_socket.lock:
             NailgunProtocol.send_stderr(
               self._maybe_shutdown_socket.socket,
-              '\nUnexpected exception in finalizer: {!r}\n'.format(e)
+              "\nUnexpected exception in finalizer: {!r}\n".format(e),
             )
         except Exception:
           pass
@@ -98,12 +98,16 @@ class _PantsRunFinishedWithFailureException(Exception):
     """
     :param int exit_code: an optional exit code (defaults to PANTS_FAILED_EXIT_CODE)
     """
-    super(_PantsRunFinishedWithFailureException, self).__init__('Terminated with {}'.format(exit_code))
+    super(_PantsRunFinishedWithFailureException, self).__init__(
+      "Terminated with {}".format(exit_code)
+    )
 
     if exit_code == PANTS_SUCCEEDED_EXIT_CODE:
       raise ValueError(
-        "Cannot create {} with a successful exit code of {}"
-        .format(type(self).__name__, PANTS_SUCCEEDED_EXIT_CODE))
+        "Cannot create {} with a successful exit code of {}".format(
+          type(self).__name__, PANTS_SUCCEEDED_EXIT_CODE
+        )
+      )
 
     self._exit_code = exit_code
 
@@ -125,7 +129,7 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       args=args,
       env=env,
       services=services,
-      scheduler_service=scheduler_service
+      scheduler_service=scheduler_service,
     )
 
   def __init__(self, maybe_shutdown_socket, args, env, services, scheduler_service):
@@ -155,26 +159,28 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     # no middle-man.
     stdin_ttyname, stdout_ttyname, stderr_ttyname = NailgunProtocol.ttynames_from_env(env)
     assert stdin_ttyname == stdout_ttyname == stderr_ttyname, (
-      'expected all stdio ttys to be the same, but instead got: {}\n'
-      'please file a bug at http://github.com/pantsbuild/pants'
-      .format([stdin_ttyname, stdout_ttyname, stderr_ttyname])
+      "expected all stdio ttys to be the same, but instead got: {}\n"
+      "please file a bug at http://github.com/pantsbuild/pants".format(
+        [stdin_ttyname, stdout_ttyname, stderr_ttyname]
+      )
     )
-    with open(stdin_ttyname, 'rb+', 0) as tty:
+    with open(stdin_ttyname, "rb+", 0) as tty:
       tty_fileno = tty.fileno()
       with stdio_as(stdin_fd=tty_fileno, stdout_fd=tty_fileno, stderr_fd=tty_fileno):
+
         def finalizer():
           termios.tcdrain(tty_fileno)
+
         yield finalizer
 
   @classmethod
   @contextmanager
-  def _pipe_stdio(cls, maybe_shutdown_socket, stdin_isatty, stdout_isatty, stderr_isatty, handle_stdin):
+  def _pipe_stdio(
+    cls, maybe_shutdown_socket, stdin_isatty, stdout_isatty, stderr_isatty, handle_stdin
+  ):
     """Handles stdio redirection in the case of pipes and/or mixed pipes and ttys."""
-    stdio_writers = (
-      (ChunkType.STDOUT, stdout_isatty),
-      (ChunkType.STDERR, stderr_isatty)
-    )
-    types, ttys = zip(*(stdio_writers))
+    stdio_writers = ((ChunkType.STDOUT, stdout_isatty), (ChunkType.STDERR, stderr_isatty))
+    types, ttys = zip(*stdio_writers)
 
     @contextmanager
     def maybe_handle_stdin(want):
@@ -182,27 +188,33 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         with NailgunStreamStdinReader.open(maybe_shutdown_socket, stdin_isatty) as fd:
           yield fd
       else:
-        with open('/dev/null', 'rb') as fh:
+        with open("/dev/null", "rb") as fh:
           yield fh.fileno()
 
     # TODO https://github.com/pantsbuild/pants/issues/7653
-    with maybe_handle_stdin(handle_stdin) as stdin_fd,\
-      PipedNailgunStreamWriter.open_multi(maybe_shutdown_socket.socket, types, ttys) as ((stdout_pipe, stderr_pipe), writer),\
-      stdio_as(stdout_fd=stdout_pipe.write_fd, stderr_fd=stderr_pipe.write_fd, stdin_fd=stdin_fd):
+    with maybe_handle_stdin(handle_stdin) as stdin_fd, PipedNailgunStreamWriter.open_multi(
+      maybe_shutdown_socket.socket, types, ttys
+    ) as ((stdout_pipe, stderr_pipe), writer), stdio_as(
+      stdout_fd=stdout_pipe.write_fd, stderr_fd=stderr_pipe.write_fd, stdin_fd=stdin_fd
+    ):
       # N.B. This will be passed to and called by the `DaemonExiter` prior to sending an
       # exit chunk, to avoid any socket shutdown vs write races.
       stdout, stderr = sys.stdout, sys.stderr
+
       def finalizer():
         try:
           stdout.flush()
           stderr.flush()
         finally:
-          time.sleep(.001)  # HACK: Sleep 1ms in the main thread to free the GIL.
+          time.sleep(0.001)  # HACK: Sleep 1ms in the main thread to free the GIL.
           stdout_pipe.stop_writing()
           stderr_pipe.stop_writing()
           writer.join(timeout=60)
           if writer.isAlive():
-            raise NailgunStreamWriterError("pantsd timed out while waiting for the stdout/err to finish writing to the socket.")
+            raise NailgunStreamWriterError(
+              "pantsd timed out while waiting for the stdout/err to finish writing to the socket."
+            )
+
       yield finalizer
 
   @classmethod
@@ -218,16 +230,12 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         yield finalizer
     else:
       with cls._pipe_stdio(
-        sock,
-        stdin_isatty,
-        stdout_isatty,
-        stderr_isatty,
-        handle_stdin
+        sock, stdin_isatty, stdout_isatty, stderr_isatty, handle_stdin
       ) as finalizer:
         yield finalizer
 
   def _maybe_get_client_start_time_from_env(self, env):
-    client_start_time = env.pop('PANTSD_RUNTRACKER_CLIENT_START_TIME', None)
+    client_start_time = env.pop("PANTSD_RUNTRACKER_CLIENT_START_TIME", None)
     return None if client_start_time is None else float(client_start_time)
 
   def run(self):
@@ -241,37 +249,35 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       NailgunProtocol.send_pgrp(self._maybe_shutdown_socket.socket, os.getpgrp() * -1)
 
     # Invoke a Pants run with stdio redirected and a proxied environment.
-    with self.nailgunned_stdio(self._maybe_shutdown_socket, self._env) as finalizer, \
-      DaemonExiter.override_global_exiter(self._maybe_shutdown_socket, finalizer), \
-      hermetic_environment_as(**self._env), \
-      encapsulated_global_logger():
+    with self.nailgunned_stdio(
+      self._maybe_shutdown_socket, self._env
+    ) as finalizer, DaemonExiter.override_global_exiter(
+      self._maybe_shutdown_socket, finalizer
+    ), hermetic_environment_as(
+      **self._env
+    ), encapsulated_global_logger():
       try:
         # Clean global state.
         clean_global_runtime_state(reset_subsystem=True)
 
         options, _, options_bootstrapper = LocalPantsRunner.parse_options(self._args, self._env)
         graph_helper, specs, exit_code = self._scheduler_service.prepare_v1_graph_run_v2(
-          options, options_bootstrapper,
+          options, options_bootstrapper
         )
         self.exit_code = exit_code
 
         # Otherwise, conduct a normal run.
         with ExceptionSink.exiter_as_until_exception(lambda _: PantsRunFailCheckerExiter()):
           runner = LocalPantsRunner.create(
-            self._args,
-            self._env,
-            specs,
-            graph_helper,
-            options_bootstrapper,
+            self._args, self._env, specs, graph_helper, options_bootstrapper
           )
           runner.set_start_time(self._maybe_get_client_start_time_from_env(self._env))
 
           runner.run()
       except KeyboardInterrupt:
-        self._exiter.exit_and_fail('Interrupted by user.\n')
+        self._exiter.exit_and_fail("Interrupted by user.\n")
       except _PantsRunFinishedWithFailureException as e:
-        ExceptionSink.log_exception(
-          'Pants run failed with exception: {}; exiting'.format(e))
+        ExceptionSink.log_exception("Pants run failed with exception: {}; exiting".format(e))
         self._exiter.exit(e.exit_code)
       except Exception as e:
         # TODO: We override sys.excepthook above when we call ExceptionSink.set_exiter(). That

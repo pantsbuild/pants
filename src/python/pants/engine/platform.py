@@ -15,7 +15,7 @@ class Platform(Enum):
 
   # TODO: try to turn all of these accesses into v2 dependency injections!
   @memoized_classproperty
-  def current(cls) -> 'Platform':
+  def current(cls) -> "Platform":
     return Platform(get_normalized_os_name())
 
 
@@ -25,7 +25,7 @@ class PlatformConstraint(Enum):
   none = "none"
 
   @memoized_classproperty
-  def local_platform(cls) -> 'PlatformConstraint':
+  def local_platform(cls) -> "PlatformConstraint":
     return PlatformConstraint(Platform.current.value)
 
 

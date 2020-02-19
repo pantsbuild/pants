@@ -105,7 +105,7 @@ class MutexTaskMixin(Task):
     Otherwise throws TaskError.
     """
     if len(self.context.target_roots) == 0:
-      raise self.NoActivationsError('No target specified.')
+      raise self.NoActivationsError("No target specified.")
 
     def resolve(targets):
       # Recursively resolve target aliases.
@@ -131,9 +131,11 @@ class MutexTaskMixin(Task):
       # TODO: once https://github.com/pantsbuild/pants/issues/425 lands, we should add
       # language-specific flags that would resolve the ambiguity here
       def render_target(target):
-        return '{} (a {})'.format(target.address.reference(), target.type_alias)
-      raise self.IncompatibleActivationsError('Mutually incompatible targets specified: {} vs {} '
-                                              '(and {} others)'
-                                              .format(render_target(accepted[0]),
-                                                      render_target(rejected[0]),
-                                                      len(accepted) + len(rejected) - 2))
+        return "{} (a {})".format(target.address.reference(), target.type_alias)
+
+      raise self.IncompatibleActivationsError(
+        "Mutually incompatible targets specified: {} vs {} "
+        "(and {} others)".format(
+          render_target(accepted[0]), render_target(rejected[0]), len(accepted) + len(rejected) - 2
+        )
+      )

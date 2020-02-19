@@ -21,34 +21,46 @@ _REQUESTS_TIMEOUTS = (15, 30)
 def _open_monkey(self, link):
   # requests does not support file:// -- so we must short-circuit manually
   if link.local:
-    return open(link.local_path, 'rb')  # noqa: T802
+    return open(link.local_path, "rb")  # noqa: T802
   for attempt in range(self._max_retries + 1):
     try:
-      return StreamFilelike(self._session.get(
-          link.url, verify=self._verify, stream=True, headers={'User-Agent': self.USER_AGENT},
-          timeout=_REQUESTS_TIMEOUTS),
-          link)
+      return StreamFilelike(
+        self._session.get(
+          link.url,
+          verify=self._verify,
+          stream=True,
+          headers={"User-Agent": self.USER_AGENT},
+          timeout=_REQUESTS_TIMEOUTS,
+        ),
+        link,
+      )
     except requests.exceptions.ReadTimeout:
       # Connect timeouts are handled by the HTTPAdapter, unfortunately read timeouts are not
       # so we'll retry them ourselves.
-      logger.warning(f'Read timeout trying to fetch {link.url}, retrying. '
-                     f'{self._max_retries - attempt} retries remain.')
+      logger.warning(
+        f"Read timeout trying to fetch {link.url}, retrying. "
+        f"{self._max_retries - attempt} retries remain."
+      )
     except requests.exceptions.RequestException as e:
       raise self.Error(e)
 
   raise self.Error(
-      requests.packages.urllib3.exceptions.MaxRetryError(
-          None,
-          link,
-          'Exceeded max retries of %d' % self._max_retries))
+    requests.packages.urllib3.exceptions.MaxRetryError(
+      None, link, "Exceeded max retries of %d" % self._max_retries
+    )
+  )
 
 
 def _resolve_monkey(self, link):
-  return link.wrap(self._session.head(
-      link.url, verify=self._verify, allow_redirects=True,
-      headers={'User-Agent': self.USER_AGENT},
+  return link.wrap(
+    self._session.head(
+      link.url,
+      verify=self._verify,
+      allow_redirects=True,
+      headers={"User-Agent": self.USER_AGENT},
       timeout=_REQUESTS_TIMEOUTS,
-  ).url)
+    ).url
+  )
 
 
 RequestsContext.open = _open_monkey
@@ -61,15 +73,28 @@ class PythonRepos(Subsystem):
   Note that this is part of the Pants core, and not the python backend, because it's
   used to bootstrap Pants plugins.
   """
-  options_scope = 'python-repos'
+
+  options_scope = "python-repos"
 
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--repos', advanced=True, type=list, default=[], fingerprint=True,
-             help='URLs of code repositories.')
-    register('--indexes', advanced=True, type=list, fingerprint=True,
-             default=['https://pypi.org/simple/'], help='URLs of code repository indexes.')
+    register(
+      "--repos",
+      advanced=True,
+      type=list,
+      default=[],
+      fingerprint=True,
+      help="URLs of code repositories.",
+    )
+    register(
+      "--indexes",
+      advanced=True,
+      type=list,
+      fingerprint=True,
+      default=["https://pypi.org/simple/"],
+      help="URLs of code repository indexes.",
+    )
 
   @property
   def repos(self):

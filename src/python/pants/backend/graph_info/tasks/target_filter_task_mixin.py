@@ -25,5 +25,5 @@ class TargetFilterTaskMixin(Task):
     registered_aliases = self.context.build_configuration.registered_aliases()
     target_types = registered_aliases.target_types_by_alias.get(alias, None)
     if not target_types:
-      raise self.InvalidTargetType('Not a target type: {}'.format(alias))
+      raise self.InvalidTargetType("Not a target type: {}".format(alias))
     return target_types

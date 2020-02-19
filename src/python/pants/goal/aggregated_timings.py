@@ -32,14 +32,16 @@ class AggregatedTimings:
       self._tool_labels.add(label)
     # Check existence in case we're a clean-all. We don't want to write anything in that case.
     if self._path and os.path.exists(os.path.dirname(self._path)):
-      with open(self._path, 'w') as f:
+      with open(self._path, "w") as f:
         for x in self.get_all():
-          f.write('{label}: {timing}\n'.format(**x))
+          f.write("{label}: {timing}\n".format(**x))
 
   def get_all(self):
     """Returns all the timings, sorted in decreasing order.
 
     Each value is a dict: { path: <path>, timing: <timing in seconds> }
     """
-    return [{'label': x[0], 'timing': x[1], 'is_tool': x[0] in self._tool_labels}
-            for x in sorted(self._timings_by_path.items(), key=lambda x: x[1], reverse=True)]
+    return [
+      {"label": x[0], "timing": x[1], "is_tool": x[0] in self._tool_labels}
+      for x in sorted(self._timings_by_path.items(), key=lambda x: x[1], reverse=True)
+    ]

@@ -7,19 +7,24 @@ from pants.util.memo import memoized_method
 
 
 class Rsc(NativeTool):
-  options_scope = 'rsc'
+  options_scope = "rsc"
 
   default_version = _ZINC_COMPILER_VERSION
-  name = 'rsc-pants-native-image'
+  name = "rsc-pants-native-image"
 
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
 
-    register('--native-image', fingerprint=True, type=bool,
-             help='Use a pre-compiled native-image for rsc. Requires running in hermetic mode')
-    register('--jvm-options', type=list, metavar='<option>...',
-      help='Run RSC with these jvm options.')
+    register(
+      "--native-image",
+      fingerprint=True,
+      type=bool,
+      help="Use a pre-compiled native-image for rsc. Requires running in hermetic mode",
+    )
+    register(
+      "--jvm-options", type=list, metavar="<option>...", help="Run RSC with these jvm options."
+    )
 
   @property
   def use_native_image(self):

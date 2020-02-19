@@ -27,9 +27,13 @@ class ClasspathEntry:
     return self._path
 
   def hydrate_missing_directory_digest(self, directory_digest):
-    assert os.path.exists(self.path), f'Classpath entry {self} with digest to be mutated should point to an existing file or directory!'
-    assert self.directory_digest is None or self._directory_digest == directory_digest, f'Classpath entry {self} with digest {self.directory_digest} to be mutated is expected to be None ' \
-                                                                                        f'or the same as the incoming digest {directory_digest}!'
+    assert os.path.exists(
+      self.path
+    ), f"Classpath entry {self} with digest to be mutated should point to an existing file or directory!"
+    assert self.directory_digest is None or self._directory_digest == directory_digest, (
+      f"Classpath entry {self} with digest {self.directory_digest} to be mutated is expected to be None "
+      f"or the same as the incoming digest {directory_digest}!"
+    )
     self._directory_digest = directory_digest
 
   @property
@@ -56,18 +60,17 @@ class ClasspathEntry:
 
   def __eq__(self, other):
     return (
-      isinstance(other, ClasspathEntry) and
-      self.path == other.path and
-      self.directory_digest == other.directory_digest
+      isinstance(other, ClasspathEntry)
+      and self.path == other.path
+      and self.directory_digest == other.directory_digest
     )
 
   def __ne__(self, other):
     return not self == other
 
   def __repr__(self):
-    return 'ClasspathEntry(path={!r}, directory_digest={!r})'.format(
-      self.path,
-      self.directory_digest,
+    return "ClasspathEntry(path={!r}, directory_digest={!r})".format(
+      self.path, self.directory_digest
     )
 
   @classmethod
@@ -127,19 +130,20 @@ class ArtifactClasspathEntry(ClasspathEntry):
     return hash((self.path, self.coordinate, self.cache_path))
 
   def __eq__(self, other):
-    return (isinstance(other, ArtifactClasspathEntry) and
-            self.path == other.path and
-            self.coordinate == other.coordinate and
-            self.cache_path == other.cache_path and
-            self.directory_digest == other.directory_digest)
+    return (
+      isinstance(other, ArtifactClasspathEntry)
+      and self.path == other.path
+      and self.coordinate == other.coordinate
+      and self.cache_path == other.cache_path
+      and self.directory_digest == other.directory_digest
+    )
 
   def __ne__(self, other):
     return not self == other
 
   def __repr__(self):
-    return (
-      'ArtifactClasspathEntry(path={!r}, coordinate={!r}, cache_path={!r}, directory_digest={!r})'
-        .format(self.path, self.coordinate, self.cache_path, self.directory_digest)
+    return "ArtifactClasspathEntry(path={!r}, coordinate={!r}, cache_path={!r}, directory_digest={!r})".format(
+      self.path, self.coordinate, self.cache_path, self.directory_digest
     )
 
 

@@ -88,7 +88,7 @@ def hermetic_environment_as(**kwargs: Optional[str]) -> Iterator[None]:
 def _stdio_stream_as(src_fd: int, dst_fd: int, dst_sys_attribute: str, mode: str) -> Iterator[None]:
   """Replace the given dst_fd and attribute on `sys` with an open handle to the given src_fd."""
   if src_fd == -1:
-    src = open('/dev/null', mode)
+    src = open("/dev/null", mode)
     src_fd = src.fileno()
 
   # Capture the python and os level file handles.
@@ -124,16 +124,16 @@ def stdio_as(stdout_fd: int, stderr_fd: int, stdin_fd: int) -> Iterator[None]:
 
   The streams expect unicode. To write and read bytes, access their buffer, e.g. `stdin.buffer.read()`.
   """
-  with _stdio_stream_as(stdin_fd,  0, 'stdin',  'r'),\
-       _stdio_stream_as(stdout_fd, 1, 'stdout', 'w'),\
-       _stdio_stream_as(stderr_fd, 2, 'stderr', 'w'):
+  with _stdio_stream_as(stdin_fd, 0, "stdin", "r"), _stdio_stream_as(
+    stdout_fd, 1, "stdout", "w"
+  ), _stdio_stream_as(stderr_fd, 2, "stderr", "w"):
     yield
 
 
 @contextmanager
 def signal_handler_as(
   sig: int, handler: Union[int, Callable[[int, FrameType], None]]
-)-> Iterator[None]:
+) -> Iterator[None]:
   """Temporarily replaces a signal handler for the given signal and restores the old handler.
 
   :param sig: The target signal to replace the handler for (e.g. signal.SIGINT).
@@ -218,7 +218,7 @@ def temporary_file(
     :param permissions: If provided, sets the file to use these permissions.
     :param binary_mode: Whether file opens in binary or text mode.
   """
-  mode = 'w+b' if binary_mode else 'w+'  # tempfile's default is 'w+b'
+  mode = "w+b" if binary_mode else "w+"  # tempfile's default is 'w+b'
   with tempfile.NamedTemporaryFile(suffix=suffix, dir=root_dir, delete=False, mode=mode) as fd:
     try:
       if permissions is not None:
@@ -238,7 +238,7 @@ def safe_file(path: str, suffix: Optional[str] = None, cleanup: bool = True) -> 
   :param suffix: Use this suffix to create the copy. Otherwise use a random string.
   :param cleanup: Whether or not to clean up the copy.
   """
-  safe_path = f'{path}.{(suffix or uuid.uuid4())}'
+  safe_path = f"{path}.{(suffix or uuid.uuid4())}"
   if os.path.exists(path):
     shutil.copy(path, safe_path)
   try:
@@ -280,7 +280,7 @@ def open_zip(path_or_file: Union[str, Any], *args, **kwargs) -> Iterator[zipfile
   :raises: `zipfile.BadZipfile` if zipfile.ZipFile cannot open a zip at path_or_file.
   """
   if not path_or_file:
-    raise InvalidZipPath(f'Invalid zip location: {path_or_file}')
+    raise InvalidZipPath(f"Invalid zip location: {path_or_file}")
   if "allowZip64" not in kwargs:
     kwargs["allowZip64"] = True
   try:
@@ -364,6 +364,7 @@ def maybe_profiled(profile_path: Optional[str]) -> Iterator[None]:
     return
 
   import cProfile
+
   profiler = cProfile.Profile()
   try:
     profiler.enable()
@@ -371,10 +372,13 @@ def maybe_profiled(profile_path: Optional[str]) -> Iterator[None]:
   finally:
     profiler.disable()
     profiler.dump_stats(profile_path)
-    view_cmd = green('gprof2dot -f pstats {path} | dot -Tpng -o {path}.png && open {path}.png'
-                     .format(path=profile_path))
+    view_cmd = green(
+      "gprof2dot -f pstats {path} | dot -Tpng -o {path}.png && open {path}.png".format(
+        path=profile_path
+      )
+    )
     logging.getLogger().info(
-      f'Dumped profile data to: {profile_path}\nUse e.g. {view_cmd} to render and view.'
+      f"Dumped profile data to: {profile_path}\nUse e.g. {view_cmd} to render and view."
     )
 
 

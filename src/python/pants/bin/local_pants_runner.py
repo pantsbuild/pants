@@ -37,7 +37,6 @@ logger = logging.getLogger(__name__)
 
 
 class LocalExiter(Exiter):
-
   @classmethod
   @contextmanager
   def wrap_global_exiter(cls, run_tracker, repro):
@@ -59,9 +58,10 @@ class LocalExiter(Exiter):
         elif result == PANTS_FAILED_EXIT_CODE:
           outcome = WorkUnit.FAILURE
         else:
-          run_tracker_msg = ("unrecognized exit code {} provided to {}.exit() -- "
-                             "interpreting as a failure in the run tracker"
-                             .format(result, type(self).__name__))
+          run_tracker_msg = (
+            "unrecognized exit code {} provided to {}.exit() -- "
+            "interpreting as a failure in the run tracker".format(result, type(self).__name__)
+          )
           # Log the unrecognized exit code to the fatal exception log.
           ExceptionSink.log_exception(run_tracker_msg)
           # Ensure the unrecognized exit code message is also logged to the terminal.
@@ -86,8 +86,7 @@ class LocalExiter(Exiter):
         self._repro.log_location_of_repro_file()
 
     if additional_messages:
-      msg = '{}\n\n{}'.format('\n'.join(additional_messages),
-                              msg or '')
+      msg = "{}\n\n{}".format("\n".join(additional_messages), msg or "")
 
     super().exit(result=result, msg=msg, *args, **kwargs)
 
@@ -117,14 +116,12 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       native = Native()
       native.set_panic_handler()
       graph_scheduler_helper = EngineInitializer.setup_legacy_graph(
-        native,
-        options_bootstrapper,
-        build_config
+        native, options_bootstrapper, build_config
       )
 
-      v2_ui = options.for_global_scope().get('v2_ui', False)
-      zipkin_trace_v2 = options.for_scope('reporting').zipkin_trace_v2
-      #TODO(#8658) This should_report_workunits flag must be set to True for
+      v2_ui = options.for_global_scope().get("v2_ui", False)
+      zipkin_trace_v2 = options.for_scope("reporting").zipkin_trace_v2
+      # TODO(#8658) This should_report_workunits flag must be set to True for
       # StreamingWorkunitHandler to receive WorkUnits. It should eventually
       # be merged with the zipkin_trace_v2 flag, since they both involve most
       # of the same engine functionality, but for now is separate to avoid
@@ -140,10 +137,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
 
   @staticmethod
   def _maybe_init_specs(
-    specs: Optional[Specs],
-    graph_session: LegacyGraphSession,
-    options: Options,
-    build_root: str,
+    specs: Optional[Specs], graph_session: LegacyGraphSession, options: Options, build_root: str
   ) -> Specs:
     if specs:
       return specs
@@ -154,7 +148,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       build_root=build_root,
       session=graph_session.scheduler_session,
       exclude_patterns=tuple(global_options.exclude_target_regexp),
-      tags=tuple(global_options.tag)
+      tags=tuple(global_options.tag),
     )
 
   @classmethod
@@ -177,9 +171,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     build_root = get_buildroot()
 
     options, build_config, options_bootstrapper = cls.parse_options(
-      args,
-      env,
-      options_bootstrapper=options_bootstrapper,
+      args, env, options_bootstrapper=options_bootstrapper
     )
     global_options = options.for_global_scope()
     # This works as expected due to the encapsulated_logger in DaemonPantsRunner and
@@ -200,20 +192,12 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     # If we're running with the daemon, we'll be handed a session from the
     # resident graph helper - otherwise initialize a new one here.
     graph_session, scheduler_session = cls._maybe_init_graph_session(
-      daemon_graph_session,
-      options_bootstrapper,
-      build_config,
-      options
+      daemon_graph_session, options_bootstrapper, build_config, options
     )
 
-    specs = cls._maybe_init_specs(
-      specs,
-      graph_session,
-      options,
-      build_root
-    )
+    specs = cls._maybe_init_specs(specs, graph_session, options, build_root)
 
-    profile_path = env.get('PANTS_PROFILE')
+    profile_path = env.get("PANTS_PROFILE")
 
     return cls(
       build_root=build_root,
@@ -273,7 +257,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     self._run_tracker = RunTracker.global_instance()
 
     # Propagates parent_build_id to pants runs that may be called from this pants run.
-    os.environ['PANTS_PARENT_BUILD_ID'] = self._run_tracker.run_id
+    os.environ["PANTS_PARENT_BUILD_ID"] = self._run_tracker.run_id
 
     self._reporting = Reporting.global_instance()
 
@@ -291,8 +275,9 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       self._repro.capture(self._run_tracker.run_info.get_as_dict())
 
   def run(self):
-    with LocalExiter.wrap_global_exiter(self._run_tracker, self._repro), \
-         maybe_profiled(self._profile_path):
+    with LocalExiter.wrap_global_exiter(self._run_tracker, self._repro), maybe_profiled(
+      self._profile_path
+    ):
       self._run()
 
   def _maybe_handle_help(self):
@@ -318,17 +303,21 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       return PANTS_SUCCEEDED_EXIT_CODE
 
     # Setup and run GoalRunner.
-    return GoalRunner.Factory(
-      self._build_root,
-      self._options_bootstrapper,
-      self._options,
-      self._build_config,
-      self._run_tracker,
-      self._reporting,
-      self._graph_session,
-      self._specs,
-      self._exiter
-    ).create().run()
+    return (
+      GoalRunner.Factory(
+        self._build_root,
+        self._options_bootstrapper,
+        self._options,
+        self._build_config,
+        self._run_tracker,
+        self._reporting,
+        self._graph_session,
+        self._specs,
+        self._exiter,
+      )
+      .create()
+      .run()
+    )
 
   def _maybe_run_v2(self):
     # N.B. For daemon runs, @goal_rules are invoked pre-fork -
@@ -343,10 +332,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       return PANTS_SUCCEEDED_EXIT_CODE
 
     return self._graph_session.run_goal_rules(
-      self._options_bootstrapper,
-      self._options,
-      goals,
-      self._specs,
+      self._options_bootstrapper, self._options, goals, self._specs
     )
 
   @staticmethod
@@ -371,7 +357,9 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     streaming_handlers = global_options.streaming_workunits_handlers
     report_interval = global_options.streaming_workunits_report_interval
     callbacks = Subsystem.get_streaming_workunit_callbacks(streaming_handlers)
-    streaming_reporter = StreamingWorkunitHandler(self._scheduler_session, callbacks=callbacks, report_interval_seconds=report_interval)
+    streaming_reporter = StreamingWorkunitHandler(
+      self._scheduler_session, callbacks=callbacks, report_interval_seconds=report_interval
+    )
 
     help_output = self._maybe_handle_help()
     if help_output is not None:
@@ -384,9 +372,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       finally:
         run_tracker_result = self._finish_run()
     final_exit_code = self._compute_final_exit_code(
-      engine_result,
-      goal_runner_result,
-      run_tracker_result
+      engine_result, goal_runner_result, run_tracker_result
     )
     self._exiter.exit(final_exit_code)
 

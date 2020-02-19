@@ -9,24 +9,22 @@ from pants.engine.rules import rule
 
 
 class Binutils(NativeTool):
-  options_scope = 'binutils'
-  default_version = '2.30'
-  archive_type = 'tgz'
+  options_scope = "binutils"
+  default_version = "2.30"
+  archive_type = "tgz"
 
   def path_entries(self):
-    return [os.path.join(self.select(), 'bin')]
+    return [os.path.join(self.select(), "bin")]
 
   def assembler(self) -> Assembler:
     return Assembler(
-      path_entries=self.path_entries(),
-      exe_filename='as',
-      runtime_library_dirs=(),
-      extra_args=())
+      path_entries=self.path_entries(), exe_filename="as", runtime_library_dirs=(), extra_args=()
+    )
 
   def linker(self) -> Linker:
     return Linker(
       path_entries=self.path_entries(),
-      exe_filename='ld',
+      exe_filename="ld",
       runtime_library_dirs=(),
       linking_library_dirs=(),
       extra_args=(),
@@ -45,7 +43,4 @@ def get_ld(binutils: Binutils) -> Linker:
 
 
 def create_binutils_rules():
-  return [
-    get_as,
-    get_ld,
-  ]
+  return [get_as, get_ld]

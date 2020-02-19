@@ -20,9 +20,13 @@ class Clean(Task):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--async', type=bool, default=False,
-             help='Allows clean-all to run in the background. Can dramatically speed up clean-all '
-                  'for large pants workdirs.')
+    register(
+      "--async",
+      type=bool,
+      default=False,
+      help="Allows clean-all to run in the background. Can dramatically speed up clean-all "
+      "for large pants workdirs.",
+    )
 
   def execute(self):
     pants_wd = self.get_options().pants_workdir
@@ -32,8 +36,10 @@ class Clean(Task):
     pants_trash = os.path.join(pants_wd, "trash")
 
     # Creates, and eventually deletes, trash dir created in .pants_cleanall.
-    with temporary_dir(cleanup=False, root_dir=os.path.dirname(pants_wd), prefix=".pants_cleanall") as tmpdir:
-      logger.debug(f'Moving trash to {tmpdir} for deletion')
+    with temporary_dir(
+      cleanup=False, root_dir=os.path.dirname(pants_wd), prefix=".pants_cleanall"
+    ) as tmpdir:
+      logger.debug(f"Moving trash to {tmpdir} for deletion")
 
       tmp_trash = os.path.join(tmpdir, "trash")
 
@@ -41,7 +47,7 @@ class Clean(Task):
       safe_concurrent_rename(pants_wd, tmp_trash)
       safe_concurrent_rename(tmpdir, pants_wd)
 
-      if self.get_options()['async']:
+      if self.get_options()["async"]:
         # The trash directory is deleted in a child process.
         pid = os.fork()
         if pid == 0:
@@ -55,6 +61,7 @@ class Clean(Task):
           logger.debug(f"Forked an asynchronous clean-all worker at pid: {pid}")
       else:
         # Recursively removes pants cache; user waits patiently.
-        logger.info(f'For async removal, run'
-                    f' `{self.get_options().pants_bin_name} clean-all --async`')
+        logger.info(
+          f"For async removal, run" f" `{self.get_options().pants_bin_name} clean-all --async`"
+        )
         safe_rmtree(pants_trash)

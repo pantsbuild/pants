@@ -92,6 +92,7 @@ class ExportedTarget:
 
   The code provided by this artifact can be from this target or from any targets it owns.
   """
+
   hydrated_target: HydratedTarget
 
 
@@ -103,6 +104,7 @@ class DependencyOwner:
   owned by an ExportedTarget (which involves going from ExportedTarget -> dep -> owner (which
   is itself an ExportedTarget) and checking if owner is this the original ExportedTarget.
   """
+
   exported_target: ExportedTarget
 
 
@@ -115,6 +117,7 @@ class OwnedDependency:
   The owner of a target T is T's closest filesystem ancestor among the exported targets
   that directly or indirectly depend on it (including T itself).
   """
+
   hydrated_target: HydratedTarget
 
 
@@ -130,12 +133,14 @@ class ExportedTargetRequirements:
   - The "normal" 3rdparty requirements of the ExportedTarget and all targets it owns.
   - The published versions of any other ExportedTargets it depends on.
   """
+
   requirement_strs: Tuple[str, ...]
 
 
 @dataclass(frozen=True)
 class AncestorInitPyFiles:
   """__init__.py files in enclosing packages of the exported code."""
+
   digests: Tuple[Digest, ...]  # The files stripped of their source roots.
 
 
@@ -152,6 +157,7 @@ class SetupPySources:
   Includes some information derived from analyzing the source, namely the packages,
   namespace packages and resource files in the source.
   """
+
   digest: Digest
   packages: Tuple[str, ...]
   namespace_packages: Tuple[str, ...]
@@ -161,6 +167,7 @@ class SetupPySources:
 @dataclass(frozen=True)
 class SetupPyChrootRequest:
   """A request to create a chroot containing a setup.py and the sources it operates on."""
+
   exported_target: ExportedTarget
   py2: bool  # Whether to use py2 or py3 package semantics.
 
@@ -168,6 +175,7 @@ class SetupPyChrootRequest:
 @dataclass(frozen=True)
 class SetupPyChroot:
   """A chroot containing a generated setup.py and the sources it operates on."""
+
   digest: Digest
   # The keywords are embedded in the setup.py file in the digest, so these aren't
   # strictly needed here, but they are convenient for testing.
@@ -177,6 +185,7 @@ class SetupPyChroot:
 @dataclass(frozen=True)
 class RunSetupPyRequest:
   """A request to run a setup.py command."""
+
   exported_target: ExportedTarget
   chroot: SetupPyChroot
   args: Tuple[str, ...]
@@ -185,34 +194,40 @@ class RunSetupPyRequest:
 @dataclass(frozen=True)
 class RunSetupPyResult:
   """The result of running a setup.py command."""
+
   output: Digest  # The state of the chroot after running setup.py.
 
 
 @dataclass(frozen=True)
 class SetuptoolsSetup:
   """The setuptools tool."""
+
   requirements_pex: Pex
 
 
 class SetupPyOptions(GoalSubsystem):
   """Run setup.py commands."""
+
   name = "setup-py2"
 
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
     register(
-      '--args', type=list, member_type=shell_str,
+      "--args",
+      type=list,
+      member_type=shell_str,
       help="Arguments to pass directly to setup.py, e.g. "
-           "`--setup-py2-args=\"bdist_wheel --python-tag py36.py37\"`. If unspecified, we just "
-           "dump the setup.py chroot."
+      '`--setup-py2-args="bdist_wheel --python-tag py36.py37"`. If unspecified, we just '
+      "dump the setup.py chroot.",
     )
     register(
-      '--transitive', type=bool,
+      "--transitive",
+      type=bool,
       help="If specified, will run the setup.py command recursively on all exported targets that "
-           "the specified targets depend on, in dependency order.  This is useful, e.g., when "
-           "the command publishes dists, to ensure that any dependencies of a dist are published "
-           "before it."
+      "the specified targets depend on, in dependency order.  This is useful, e.g., when "
+      "the command publishes dists, to ensure that any dependencies of a dist are published "
+      "before it.",
     )
 
 
@@ -222,9 +237,11 @@ class SetupPy(Goal):
 
 def validate_args(args: Tuple[str, ...]):
   # We rely on the dist dir being the default, so we know where to find the created dists.
-  if '--dist-dir' in args or '-d' in args:
-    raise InvalidSetupPyArgs('Cannot set --dist-dir/-d in setup.py args. To change where dists '
-                             'are written, use the global --pants-distdir option.')
+  if "--dist-dir" in args or "-d" in args:
+    raise InvalidSetupPyArgs(
+      "Cannot set --dist-dir/-d in setup.py args. To change where dists "
+      "are written, use the global --pants-distdir option."
+    )
   # We don't allow publishing via setup.py, as we don't want the setup.py running rule,
   # which is not a @console_rule, to side-effect (plus, we'd need to ensure that publishing
   # happens in dependency order).  Note that `upload` and `register` were removed in
@@ -232,8 +249,8 @@ def validate_args(args: Tuple[str, ...]):
   # the default version used by our Setuptools subsystem.
   # TODO: A `publish` rule, that can invoke Twine to do the actual uploading.
   #  See https://github.com/pantsbuild/pants/issues/8935.
-  if 'upload' in args or 'register' in args:
-    raise InvalidSetupPyArgs('Cannot use the `upload` or `register` setup.py commands')
+  if "upload" in args or "register" in args:
+    raise InvalidSetupPyArgs("Cannot use the `upload` or `register` setup.py commands")
 
 
 @goal_rule
@@ -243,7 +260,7 @@ async def run_setup_pys(
   console: Console,
   python_setup: PythonSetup,
   distdir: DistDir,
-  workspace: Workspace
+  workspace: Workspace,
 ) -> SetupPy:
   """Run setup.py commands on all exported targets addressed."""
   args = tuple(options.values.args)
@@ -263,13 +280,15 @@ async def run_setup_pys(
       explicit_nonexported_targets.append(target)
   if explicit_nonexported_targets:
     raise TargetNotExported(
-      'Cannot run setup.py on these targets, because they have no `provides=` clause: '
-      f'{", ".join(so.address.reference() for so in explicit_nonexported_targets)}')
+      "Cannot run setup.py on these targets, because they have no `provides=` clause: "
+      f'{", ".join(so.address.reference() for so in explicit_nonexported_targets)}'
+    )
 
   if options.values.transitive:
     # Expand out to all owners of the entire dep closure.
     tht = await Get[TransitiveHydratedTargets](
-      Addresses(et.hydrated_target.address for et in exported_targets))
+      Addresses(et.hydrated_target.address for et in exported_targets)
+    )
     owners = await MultiGet(
       Get[ExportedTarget](OwnedDependency(ht)) for ht in tht.closure if is_ownable_target(ht)
     )
@@ -277,13 +296,14 @@ async def run_setup_pys(
 
   py2 = is_python2(
     (
-      getattr(target_with_origin.target.adaptor, 'compatibility', None)
+      getattr(target_with_origin.target.adaptor, "compatibility", None)
       for target_with_origin in targets_with_origins
     ),
-    python_setup
+    python_setup,
   )
-  chroots = await MultiGet(Get[SetupPyChroot](
-    SetupPyChrootRequest(target, py2)) for target in exported_targets)
+  chroots = await MultiGet(
+    Get[SetupPyChroot](SetupPyChrootRequest(target, py2)) for target in exported_targets
+  )
 
   # If args were provided, run setup.py with them; Otherwise just dump chroots.
   if args:
@@ -294,7 +314,7 @@ async def run_setup_pys(
 
     for exported_target, setup_py_result in zip(exported_targets, setup_py_results):
       addr = exported_target.hydrated_target.address.reference()
-      console.print_stderr(f'Writing dist for {addr} under {distdir.relpath}/.')
+      console.print_stderr(f"Writing dist for {addr} under {distdir.relpath}/.")
       workspace.materialize_directory(
         DirectoryToMaterialize(setup_py_result.output, path_prefix=str(distdir.relpath))
       )
@@ -303,8 +323,8 @@ async def run_setup_pys(
     for exported_target, chroot in zip(exported_targets, chroots):
       addr = exported_target.hydrated_target.address.reference()
       provides = exported_target.hydrated_target.adaptor.provides
-      setup_py_dir = distdir.relpath / f'{provides.name}-{provides.version}'
-      console.print_stderr(f'Writing setup.py chroot for {addr} to {setup_py_dir}')
+      setup_py_dir = distdir.relpath / f"{provides.name}-{provides.version}"
+      console.print_stderr(f"Writing setup.py chroot for {addr} to {setup_py_dir}")
       workspace.materialize_directory(
         DirectoryToMaterialize(chroot.digest, path_prefix=str(setup_py_dir))
       )
@@ -313,7 +333,7 @@ async def run_setup_pys(
 
 
 # We write .py sources into the chroot under this dir.
-CHROOT_SOURCE_ROOT = 'src'
+CHROOT_SOURCE_ROOT = "src"
 
 
 SETUP_BOILERPLATE = """
@@ -328,34 +348,35 @@ setup(**{setup_kwargs_str})
 
 @rule
 async def run_setup_py(
-    req: RunSetupPyRequest,
-    setuptools_setup: SetuptoolsSetup,
-    python_setup: PythonSetup,
-    subprocess_encoding_environment: SubprocessEncodingEnvironment
+  req: RunSetupPyRequest,
+  setuptools_setup: SetuptoolsSetup,
+  python_setup: PythonSetup,
+  subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> RunSetupPyResult:
   """Run a setup.py command on a single exported target."""
   merged_input_files = await Get[Digest](
-    DirectoriesToMerge(directories=(
-      req.chroot.digest,
-      setuptools_setup.requirements_pex.directory_digest))
+    DirectoriesToMerge(
+      directories=(req.chroot.digest, setuptools_setup.requirements_pex.directory_digest)
+    )
   )
   # The setuptools dist dir, created by it under the chroot (not to be confused with
   # pants's own dist dir, at the buildroot).
-  dist_dir = 'dist/'
+  dist_dir = "dist/"
   request = setuptools_setup.requirements_pex.create_execute_request(
     python_setup=python_setup,
     subprocess_encoding_environment=subprocess_encoding_environment,
     pex_path="./setuptools.pex",
-    pex_args=('setup.py', *req.args),
+    pex_args=("setup.py", *req.args),
     input_files=merged_input_files,
     # setuptools commands that create dists write them to the distdir.
     # TODO: Could there be other useful files to capture?
     output_directories=(dist_dir,),
-    description=f'Run setuptools for {req.exported_target.hydrated_target.address.reference()}',
+    description=f"Run setuptools for {req.exported_target.hydrated_target.address.reference()}",
   )
   result = await Get[ExecuteProcessResult](ExecuteProcessRequest, request)
   output_digest = await Get[Digest](
-    DirectoryWithPrefixToStrip(result.output_directory_digest, dist_dir))
+    DirectoryWithPrefixToStrip(result.output_directory_digest, dist_dir)
+  )
   return RunSetupPyResult(output_digest)
 
 
@@ -371,49 +392,61 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
 
   # Generate the kwargs to the setup() call.
   setup_kwargs = request.exported_target.hydrated_target.adaptor.provides.setup_py_keywords.copy()
-  setup_kwargs.update({
-    'package_dir': {'': CHROOT_SOURCE_ROOT},
-    'packages': sources.packages,
-    'namespace_packages': sources.namespace_packages,
-    'package_data': dict(sources.package_data),
-    'install_requires': requirements.requirement_strs
-  })
+  setup_kwargs.update(
+    {
+      "package_dir": {"": CHROOT_SOURCE_ROOT},
+      "packages": sources.packages,
+      "namespace_packages": sources.namespace_packages,
+      "package_data": dict(sources.package_data),
+      "install_requires": requirements.requirement_strs,
+    }
+  )
   ht = request.exported_target.hydrated_target
-  key_to_binary_spec = getattr(ht.adaptor.provides, 'binaries', {})
+  key_to_binary_spec = getattr(ht.adaptor.provides, "binaries", {})
   keys = list(key_to_binary_spec.keys())
-  binaries = await MultiGet(Get[HydratedTarget](
-    Address, Address.parse(key_to_binary_spec[key], relative_to=ht.address.spec_path))
-    for key in keys)
+  binaries = await MultiGet(
+    Get[HydratedTarget](
+      Address, Address.parse(key_to_binary_spec[key], relative_to=ht.address.spec_path)
+    )
+    for key in keys
+  )
   for key, binary in zip(keys, binaries):
-    if (not isinstance(binary.adaptor, PythonBinaryAdaptor) or
-        getattr(binary.adaptor, 'entry_point', None) is None):
+    if (
+      not isinstance(binary.adaptor, PythonBinaryAdaptor)
+      or getattr(binary.adaptor, "entry_point", None) is None
+    ):
       raise InvalidEntryPoint(
-        f'The binary {key} exported by {ht.address.reference()} is not a valid entry point.')
-    entry_points = setup_kwargs['entry_points'] = setup_kwargs.get('entry_points', {})
-    console_scripts = entry_points['console_scripts'] = entry_points.get('console_scripts', [])
-    console_scripts.append(f'{key}={binary.adaptor.entry_point}')
+        f"The binary {key} exported by {ht.address.reference()} is not a valid entry point."
+      )
+    entry_points = setup_kwargs["entry_points"] = setup_kwargs.get("entry_points", {})
+    console_scripts = entry_points["console_scripts"] = entry_points.get("console_scripts", [])
+    console_scripts.append(f"{key}={binary.adaptor.entry_point}")
 
   # Generate the setup script.
   setup_py_content = SETUP_BOILERPLATE.format(
-    target_address_spec=ht.address.reference(),
-    setup_kwargs_str=distutils_repr(setup_kwargs)
+    target_address_spec=ht.address.reference(), setup_kwargs_str=distutils_repr(setup_kwargs)
   ).encode()
   extra_files_digest = await Get[Digest](
-    InputFilesContent([
-      FileContent('setup.py', setup_py_content),
-      FileContent('MANIFEST.in', 'include *.py'.encode())  # Make sure setup.py is included.
-    ]))
+    InputFilesContent(
+      [
+        FileContent("setup.py", setup_py_content),
+        FileContent("MANIFEST.in", "include *.py".encode()),  # Make sure setup.py is included.
+      ]
+    )
+  )
 
   chroot_digest = await Get[Digest](DirectoriesToMerge((src_digest, extra_files_digest)))
   return SetupPyChroot(chroot_digest, json.dumps(setup_kwargs, sort_keys=True))
 
 
 @rule
-async def get_sources(request: SetupPySourcesRequest,
-                      source_root_config: SourceRootConfig) -> SetupPySources:
+async def get_sources(
+  request: SetupPySourcesRequest, source_root_config: SourceRootConfig
+) -> SetupPySources:
   targets = request.hydrated_targets
   stripped_srcs_list = await MultiGet(
-    Get[SourceRootStrippedSources](HydratedTarget, target) for target in targets)
+    Get[SourceRootStrippedSources](HydratedTarget, target) for target in targets
+  )
 
   # Create a chroot with all the sources, and any ancestor __init__.py files that might be needed
   # for imports to work.  Note that if a repo has multiple exported targets under a single ancestor
@@ -421,28 +454,35 @@ async def get_sources(request: SetupPySourcesRequest,
   # have an __init__.py. We don't validate this here, because it would require inspecting *all*
   # targets, whether or not they are in the target set for this run - basically the entire repo.
   # So it's the repo owners' responsibility to ensure __init__.py hygiene.
-  stripped_srcs_digests = [stripped_sources.snapshot.directory_digest
-                           for stripped_sources in stripped_srcs_list]
+  stripped_srcs_digests = [
+    stripped_sources.snapshot.directory_digest for stripped_sources in stripped_srcs_list
+  ]
   ancestor_init_pys = await Get[AncestorInitPyFiles](HydratedTargets, targets)
   sources_digest = await Get[Digest](
-    DirectoriesToMerge(directories=tuple([*stripped_srcs_digests, *ancestor_init_pys.digests])))
+    DirectoriesToMerge(directories=tuple([*stripped_srcs_digests, *ancestor_init_pys.digests]))
+  )
   init_pys_snapshot = await Get[Snapshot](
-    SnapshotSubset(sources_digest, PathGlobs(['**/__init__.py'])))
+    SnapshotSubset(sources_digest, PathGlobs(["**/__init__.py"]))
+  )
   init_py_contents = await Get[FilesContent](Digest, init_pys_snapshot.directory_digest)
 
   packages, namespace_packages, package_data = find_packages(
     source_roots=source_root_config.get_source_roots(),
     tgts_and_stripped_srcs=list(zip(targets, stripped_srcs_list)),
     init_py_contents=init_py_contents,
-    py2=request.py2)
-  return SetupPySources(digest=sources_digest, packages=packages,
-                        namespace_packages=namespace_packages, package_data=package_data)
+    py2=request.py2,
+  )
+  return SetupPySources(
+    digest=sources_digest,
+    packages=packages,
+    namespace_packages=namespace_packages,
+    package_data=package_data,
+  )
 
 
 @rule
 async def get_ancestor_init_py(
-    targets: HydratedTargets,
-    source_root_config: SourceRootConfig
+  targets: HydratedTargets, source_root_config: SourceRootConfig
 ) -> AncestorInitPyFiles:
   """Find any ancestor __init__.py files for the given targets.
 
@@ -466,27 +506,31 @@ async def get_ancestor_init_py(
   # Note that we must MultiGet single globs instead of a a single Get for all the globs, because
   # we match each result to its originating glob (see use of zip below).
   ancestor_init_py_snapshots = await MultiGet[Snapshot](
-    Get[Snapshot](PathGlobs,
-                  PathGlobs([os.path.join(source_dir_ancestor[1], '__init__.py')]))
+    Get[Snapshot](PathGlobs, PathGlobs([os.path.join(source_dir_ancestor[1], "__init__.py")]))
     for source_dir_ancestor in source_dir_ancestors_list
   )
 
   source_root_stripped_ancestor_init_pys = await MultiGet[Digest](
-    Get[Digest](DirectoryWithPrefixToStrip(
-      directory_digest=snapshot.directory_digest, prefix=source_dir_ancestor[0])
-  ) for snapshot, source_dir_ancestor in zip(ancestor_init_py_snapshots, source_dir_ancestors_list))
+    Get[Digest](
+      DirectoryWithPrefixToStrip(
+        directory_digest=snapshot.directory_digest, prefix=source_dir_ancestor[0]
+      )
+    )
+    for snapshot, source_dir_ancestor in zip(ancestor_init_py_snapshots, source_dir_ancestors_list)
+  )
 
   return AncestorInitPyFiles(source_root_stripped_ancestor_init_pys)
 
 
 def _is_exported(target: HydratedTarget) -> bool:
-  return getattr(target.adaptor, 'provides', None) is not None
+  return getattr(target.adaptor, "provides", None) is not None
 
 
 @rule(name="Compute distribution's 3rd party requirements")
 async def get_requirements(dep_owner: DependencyOwner) -> ExportedTargetRequirements:
   tht = await Get[TransitiveHydratedTargets](
-    Addresses([dep_owner.exported_target.hydrated_target.address]))
+    Addresses([dep_owner.exported_target.hydrated_target.address])
+  )
 
   ownable_tgts = [tgt for tgt in tht.closure if is_ownable_target(tgt)]
   owners = await MultiGet(Get[ExportedTarget](OwnedDependency(ht)) for ht in ownable_tgts)
@@ -516,9 +560,13 @@ async def get_requirements(dep_owner: DependencyOwner) -> ExportedTargetRequirem
 
   # Add the requirements on any exported targets on which we depend.
   exported_targets_we_depend_on = await MultiGet(
-    Get[ExportedTarget](OwnedDependency(ht)) for ht in owned_by_others)
-  req_strs.extend(sorted(et.hydrated_target.adaptor.provides.requirement
-                  for et in set(exported_targets_we_depend_on)))
+    Get[ExportedTarget](OwnedDependency(ht)) for ht in owned_by_others
+  )
+  req_strs.extend(
+    sorted(
+      et.hydrated_target.adaptor.provides.requirement for et in set(exported_targets_we_depend_on)
+    )
+  )
 
   return ExportedTargetRequirements(tuple(req_strs))
 
@@ -530,12 +578,15 @@ async def get_owned_dependencies(dependency_owner: DependencyOwner) -> OwnedDepe
   Includes dependency_owner itself.
   """
   tht = await Get[TransitiveHydratedTargets](
-    Addresses([dependency_owner.exported_target.hydrated_target.address]))
-  ownable_targets = [tgt for tgt in tht.closure
-                     if isinstance(tgt.adaptor, (PythonTargetAdaptor, ResourcesAdaptor))]
+    Addresses([dependency_owner.exported_target.hydrated_target.address])
+  )
+  ownable_targets = [
+    tgt for tgt in tht.closure if isinstance(tgt.adaptor, (PythonTargetAdaptor, ResourcesAdaptor))
+  ]
   owners = await MultiGet(Get[ExportedTarget](OwnedDependency(ht)) for ht in ownable_targets)
-  owned_dependencies = [tgt for owner, tgt in zip(owners, ownable_targets)
-                        if owner == dependency_owner.exported_target]
+  owned_dependencies = [
+    tgt for owner, tgt in zip(owners, ownable_targets) if owner == dependency_owner.exported_target
+  ]
   return OwnedDependencies(OwnedDependency(t) for t in owned_dependencies)
 
 
@@ -559,7 +610,8 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
   # ancestors of the given target, i.e., their spec_paths are all prefixes. So sorting by
   # address will effectively sort by closeness of ancestry to the given target.
   exported_ancestor_tgts = sorted(
-    [t for t in ancestor_tgts if _is_exported(t)], key=lambda t: t.address, reverse=True)
+    [t for t in ancestor_tgts if _is_exported(t)], key=lambda t: t.address, reverse=True
+  )
   exported_ancestor_iter = iter(exported_ancestor_tgts)
   for exported_ancestor in exported_ancestor_iter:
     tht = await Get[TransitiveHydratedTargets](Addresses([exported_ancestor.address]))
@@ -576,11 +628,12 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
         sibling = next(exported_ancestor_iter, None)
       if sibling_owners:
         raise AmbiguousOwnerError(
-          f'Exporting owners for {hydrated_target.address.reference()} are ambiguous. Found '
-          f'{exported_ancestor.address.reference()} and {len(sibling_owners)} others: '
-          f'{", ".join(so.address.reference() for so in sibling_owners)}')
+          f"Exporting owners for {hydrated_target.address.reference()} are ambiguous. Found "
+          f"{exported_ancestor.address.reference()} and {len(sibling_owners)} others: "
+          f'{", ".join(so.address.reference() for so in sibling_owners)}'
+        )
       return ExportedTarget(owner)
-  raise NoOwnerError(f'No exported target owner found for {hydrated_target.address.reference()}')
+  raise NoOwnerError(f"No exported target owner found for {hydrated_target.address.reference()}")
 
 
 @rule(name="Set up setuptools")
@@ -593,12 +646,10 @@ async def setup_setuptools(setuptools: Setuptools) -> SetuptoolsSetup:
       requirements=PexRequirements(requirements=tuple(setuptools.get_requirement_specs())),
       interpreter_constraints=PexInterpreterConstraints(
         constraint_set=tuple(setuptools.default_interpreter_constraints)
-      )
+      ),
     )
   )
-  return SetuptoolsSetup(
-    requirements_pex=requirements_pex,
-  )
+  return SetuptoolsSetup(requirements_pex=requirements_pex)
 
 
 def is_ownable_target(tgt: HydratedTarget):

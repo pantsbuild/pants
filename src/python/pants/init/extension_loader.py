@@ -11,17 +11,21 @@ from pants.base.exceptions import BackendConfigurationError
 from pants.build_graph.build_configuration import BuildConfiguration
 
 
-class PluginLoadingError(Exception): pass
+class PluginLoadingError(Exception):
+  pass
 
 
-class PluginNotFound(PluginLoadingError): pass
+class PluginNotFound(PluginLoadingError):
+  pass
 
 
-class PluginLoadOrderError(PluginLoadingError): pass
+class PluginLoadOrderError(PluginLoadingError):
+  pass
 
 
-def load_backends_and_plugins(plugins1, plugins2, working_set, backends1, backends2,
-                              build_configuration):
+def load_backends_and_plugins(
+  plugins1, plugins2, working_set, backends1, backends2, build_configuration
+):
   """Load named plugins and source backends
 
   :param list<str> plugins1: v1 plugins to load.
@@ -68,35 +72,35 @@ def load_plugins(build_configuration, plugins, working_set, is_v1_plugin):
     dist = working_set.find(req)
 
     if not dist:
-      raise PluginNotFound(f'Could not find plugin: {req}')
+      raise PluginNotFound(f"Could not find plugin: {req}")
 
-    entries = dist.get_entry_map().get('pantsbuild.plugin', {})
+    entries = dist.get_entry_map().get("pantsbuild.plugin", {})
 
-    if 'load_after' in entries:
-      deps = entries['load_after'].load()()
+    if "load_after" in entries:
+      deps = entries["load_after"].load()()
       for dep_name in deps:
         dep = Requirement.parse(dep_name)
         if dep.key not in loaded:
-          raise PluginLoadOrderError(f'Plugin {plugin} must be loaded after {dep}')
+          raise PluginLoadOrderError(f"Plugin {plugin} must be loaded after {dep}")
 
     if is_v1_plugin:
-      if 'register_goals' in entries:
-        entries['register_goals'].load()()
+      if "register_goals" in entries:
+        entries["register_goals"].load()()
 
       # TODO: Might v2 plugins need to register global subsystems? Hopefully not.
-      if 'global_subsystems' in entries:
-        subsystems = entries['global_subsystems'].load()()
+      if "global_subsystems" in entries:
+        subsystems = entries["global_subsystems"].load()()
         build_configuration.register_optionables(subsystems)
 
       # The v2 target API is still TBD, so we keep build_file_aliases as a v1-only thing.
       # Having thus no overlap between v1 and v2 backend entrypoints makes things much simpler.
       # TODO: Revisit, ideally with a v2-only entry point, once the v2 target API is a thing.
-      if 'build_file_aliases' in entries:
-        aliases = entries['build_file_aliases'].load()()
+      if "build_file_aliases" in entries:
+        aliases = entries["build_file_aliases"].load()()
         build_configuration.register_aliases(aliases)
     else:
-      if 'rules' in entries:
-        rules = entries['rules'].load()()
+      if "rules" in entries:
+        rules = entries["rules"].load()()
         build_configuration.register_rules(rules)
     loaded[dist.as_requirement().key] = dist
 
@@ -111,22 +115,18 @@ def load_build_configuration_from_source(build_configuration, backends1, backend
     the build configuration.
   """
   # pants.build_graph and pants.core_task must always be loaded, and before any other backends.
-  backend_packages1 = OrderedSet([
-      'pants.build_graph',
-      'pants.core_tasks',
-    ] + (backends1 or []))
+  backend_packages1 = OrderedSet(["pants.build_graph", "pants.core_tasks"] + (backends1 or []))
   for backend_package in backend_packages1:
     load_backend(build_configuration, backend_package, is_v1_backend=True)
 
-  backend_packages2 = OrderedSet([
-      'pants.rules.core',
-    ] + (backends2 or []))
+  backend_packages2 = OrderedSet(["pants.rules.core"] + (backends2 or []))
   for backend_package in backend_packages2:
     load_backend(build_configuration, backend_package, is_v1_backend=False)
 
 
-def load_backend(build_configuration: BuildConfiguration, backend_package: str,
-                 is_v1_backend: bool) -> None:
+def load_backend(
+  build_configuration: BuildConfiguration, backend_package: str, is_v1_backend: bool
+) -> None:
   """Installs the given backend package into the build configuration.
 
   :param build_configuration: the BuildConfiguration to install the backend plugin into.
@@ -135,12 +135,12 @@ def load_backend(build_configuration: BuildConfiguration, backend_package: str,
   :param bool is_v1_backend: Is this a v1 or v2 backend.
   :raises: :class:``pants.base.exceptions.BuildConfigurationError`` if there is a problem loading
     the build configuration."""
-  backend_module = backend_package + '.register'
+  backend_module = backend_package + ".register"
   try:
     module = importlib.import_module(backend_module)
   except ImportError as ex:
     traceback.print_exc()
-    raise BackendConfigurationError(f'Failed to load the {backend_module} backend: {ex!r}')
+    raise BackendConfigurationError(f"Failed to load the {backend_module} backend: {ex!r}")
 
   def invoke_entrypoint(name):
     entrypoint = getattr(module, name, lambda: None)
@@ -149,24 +149,24 @@ def load_backend(build_configuration: BuildConfiguration, backend_package: str,
     except TypeError as e:
       traceback.print_exc()
       raise BackendConfigurationError(
-        f'Entrypoint {name} in {backend_module} must be a zero-arg callable: {e!r}'
+        f"Entrypoint {name} in {backend_module} must be a zero-arg callable: {e!r}"
       )
 
   if is_v1_backend:
-    invoke_entrypoint('register_goals')
+    invoke_entrypoint("register_goals")
 
     # TODO: Might v2 plugins need to register global subsystems? Hopefully not.
-    subsystems = invoke_entrypoint('global_subsystems')
+    subsystems = invoke_entrypoint("global_subsystems")
     if subsystems:
       build_configuration.register_optionables(subsystems)
 
     # The v2 target API is still TBD, so we keep build_file_aliases as a v1-only thing.
     # Having thus no overlap between v1 and v2 backend entrypoints makes things much simpler.
     # TODO: Revisit, ideally with a v2-only entry point, once the v2 target API is a thing.
-    build_file_aliases = invoke_entrypoint('build_file_aliases')
+    build_file_aliases = invoke_entrypoint("build_file_aliases")
     if build_file_aliases:
       build_configuration.register_aliases(build_file_aliases)
   else:
-    rules = invoke_entrypoint('rules')
+    rules = invoke_entrypoint("rules")
     if rules:
       build_configuration.register_rules(rules)

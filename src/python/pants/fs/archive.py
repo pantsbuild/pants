@@ -18,7 +18,6 @@ from pants.util.strutil import ensure_text
 
 
 class Archiver(ABC):
-
   def extract(self, path, outdir, concurrency_safe=False, **kwargs):
     """Extracts an archive's contents to the specified outdir with an optional filter.
 
@@ -79,9 +78,9 @@ class TarArchiver(Archiver):
     """
 
     basedir = ensure_text(basedir)
-    tarpath = os.path.join(outdir, '{}.{}'.format(ensure_text(name), self.extension))
+    tarpath = os.path.join(outdir, "{}.{}".format(ensure_text(name), self.extension))
     with open_tar(tarpath, self.mode, dereference=dereference, errorlevel=1) as tar:
-      tar.add(basedir, arcname=prefix or '.')
+      tar.add(basedir, arcname=prefix or ".")
     return tarpath
 
 
@@ -92,7 +91,8 @@ class XZCompressedTarArchiver(TarArchiver):
   extract() method.
   """
 
-  class XZArchiverError(Exception): pass
+  class XZArchiverError(Exception):
+    pass
 
   def __init__(self, xz_binary_path):
 
@@ -100,12 +100,12 @@ class XZCompressedTarArchiver(TarArchiver):
     if not is_executable(xz_binary_path):
       raise self.XZArchiverError(
         "The path {} does not name an existing executable file. An xz executable must be provided "
-        "to decompress xz archives."
-        .format(xz_binary_path))
+        "to decompress xz archives.".format(xz_binary_path)
+      )
 
     self._xz_binary_path = xz_binary_path
 
-    super().__init__('r|', 'tar.xz')
+    super().__init__("r|", "tar.xz")
 
   @contextmanager
   def _invoke_xz(self, xz_input_file):
@@ -117,19 +117,15 @@ class XZCompressedTarArchiver(TarArchiver):
     # TODO: --threads=0 is supposed to use "the number of processor cores on the machine", but I
     # see no more than 100% cpu used at any point. This seems like it could be a bug? If performance
     # is an issue, investigate further.
-    cmd = [self._xz_binary_path, '--decompress', '--stdout', '--keep', '--threads=0', xz_input_file]
+    cmd = [self._xz_binary_path, "--decompress", "--stdout", "--keep", "--threads=0", xz_input_file]
 
     try:
       # Pipe stderr to our own stderr, but leave stdout open so we can yield it.
-      process = subprocess.Popen(
-        cmd,
-        stdout=subprocess.PIPE,
-        stderr=sys.stderr)
+      process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=sys.stderr)
     except OSError as e:
       raise self.XZArchiverError(
-        "Error invoking xz with command {} for input file {}: {}"
-        .format(cmd, xz_input_file, e),
-        e)
+        "Error invoking xz with command {} for input file {}: {}".format(cmd, xz_input_file, e), e
+      )
 
     # This is a file object.
     yield process.stdout
@@ -137,13 +133,14 @@ class XZCompressedTarArchiver(TarArchiver):
     rc = process.wait()
     if rc != 0:
       raise self.XZArchiverError(
-        "Error decompressing xz input with command {} for input file {}. Exit code was: {}. "
-        .format(cmd, xz_input_file, rc))
+        "Error decompressing xz input with command {} for input file {}. Exit code was: {}. ".format(
+          cmd, xz_input_file, rc
+        )
+      )
 
   def _extract(self, path, outdir):
     with self._invoke_xz(path) as xz_decompressed_tar_stream:
-      return super()._extract(
-        xz_decompressed_tar_stream, outdir, mode=self.mode)
+      return super()._extract(xz_decompressed_tar_stream, outdir, mode=self.mode)
 
   # TODO: implement this method, if we ever need it.
   def create(self, *args, **kwargs):
@@ -167,9 +164,9 @@ class ZipArchiver(Archiver):
     with open_zip(path) as archive_file:
       for name in archive_file.namelist():
         # While we're at it, we also perform this safety test.
-        if name.startswith('/') or name.startswith('..'):
-          raise ValueError('Zip file contains unsafe path: {}'.format(name))
-        if (not filter_func or filter_func(name)):
+        if name.startswith("/") or name.startswith(".."):
+          raise ValueError("Zip file contains unsafe path: {}".format(name))
+        if not filter_func or filter_func(name):
           archive_file.extract(name, outdir)
 
   def __init__(self, compression, extension):
@@ -184,8 +181,8 @@ class ZipArchiver(Archiver):
     """
     :API: public
     """
-    zippath = os.path.join(outdir, '{}.{}'.format(name, self.extension))
-    with open_zip(zippath, 'w', compression=self.compression) as zip:
+    zippath = os.path.join(outdir, "{}.{}".format(name, self.extension))
+    with open_zip(zippath, "w", compression=self.compression) as zip:
       # For symlinks, we want to archive the actual content of linked files but
       # under the relpath derived from symlink.
       for root, _, files in safe_walk(basedir, followlinks=True):
@@ -200,23 +197,17 @@ class ZipArchiver(Archiver):
     return zippath
 
 
-TAR = TarArchiver('w:', 'tar')
-TGZ = TarArchiver('w:gz', 'tar.gz')
-TBZ2 = TarArchiver('w:bz2', 'tar.bz2')
-ZIP = ZipArchiver(ZIP_DEFLATED, 'zip')
+TAR = TarArchiver("w:", "tar")
+TGZ = TarArchiver("w:gz", "tar.gz")
+TBZ2 = TarArchiver("w:bz2", "tar.bz2")
+ZIP = ZipArchiver(ZIP_DEFLATED, "zip")
 
-_ARCHIVER_BY_TYPE = OrderedDict(
-  tar=TAR,
-  tgz=TGZ,
-  tbz2=TBZ2,
-  zip=ZIP)
+_ARCHIVER_BY_TYPE = OrderedDict(tar=TAR, tgz=TGZ, tbz2=TBZ2, zip=ZIP)
 
-archive_extensions = {
-  name: archiver.extension for name, archiver in _ARCHIVER_BY_TYPE.items()
-}
+archive_extensions = {name: archiver.extension for name, archiver in _ARCHIVER_BY_TYPE.items()}
 
 TYPE_NAMES = frozenset(_ARCHIVER_BY_TYPE.keys())
-TYPE_NAMES_NO_PRESERVE_SYMLINKS = frozenset({'zip'})
+TYPE_NAMES_NO_PRESERVE_SYMLINKS = frozenset({"zip"})
 TYPE_NAMES_PRESERVE_SYMLINKS = TYPE_NAMES - TYPE_NAMES_NO_PRESERVE_SYMLINKS
 
 
@@ -238,7 +229,7 @@ def create_archiver(typename):
   """
   archiver = _ARCHIVER_BY_TYPE.get(typename)
   if not archiver:
-    raise ValueError('No archiver registered for {!r}'.format(typename))
+    raise ValueError("No archiver registered for {!r}".format(typename))
   return archiver
 
 
@@ -250,14 +241,14 @@ def archiver_for_path(path_name):
   :param string path_name: The path name of the archive - need not exist.
   :raises: :class:`ValueError` If the path name does not uniquely identify a supported archive type.
   """
-  if path_name.endswith('.tar.gz'):
+  if path_name.endswith(".tar.gz"):
     return TGZ
-  elif path_name.endswith('.tar.bz2'):
+  elif path_name.endswith(".tar.bz2"):
     return TBZ2
   else:
     _, ext = os.path.splitext(path_name)
     if ext:
       ext = ext[1:]  # Trim leading '.'.
     if not ext:
-      raise ValueError('Could not determine archive type of path {}'.format(path_name))
+      raise ValueError("Could not determine archive type of path {}".format(path_name))
     return create_archiver(ext)

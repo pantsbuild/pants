@@ -25,6 +25,6 @@ def retry_on_exception(func, max_retries, exception_types, backoff_func=lambda n
     try:
       return func()
     except exception_types as e:
-      logger.debug(f'encountered exception on retry #{i}: {e!r}')
+      logger.debug(f"encountered exception on retry #{i}: {e!r}")
       if i == max_retries - 1:
         raise

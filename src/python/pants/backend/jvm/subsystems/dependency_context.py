@@ -28,7 +28,7 @@ class DependencyContext(Subsystem, DependencyContextBase):
   via subsystem or option dependencies rather than declared statically.
   """
 
-  options_scope = 'jvm-dependency-context'
+  options_scope = "jvm-dependency-context"
 
   types_with_closure = (AnnotationProcessor, JavacPlugin, ScalacPlugin)
   target_closure_kwargs = dict(include_scopes=Scopes.JVM_COMPILE_SCOPES, respect_intransitive=True)
@@ -55,9 +55,9 @@ class DependencyContext(Subsystem, DependencyContextBase):
     If the target does not override the language property, returns true iff the property
     is true for any of the matched languages for the target.
     """
-    if target.has_sources('.java'):
+    if target.has_sources(".java"):
       matching_subsystem = Java.global_instance()
-    elif target.has_sources('.scala'):
+    elif target.has_sources(".scala"):
       matching_subsystem = ScalaPlatform.global_instance()
     else:
       return getattr(target, option_name)
@@ -65,7 +65,7 @@ class DependencyContext(Subsystem, DependencyContextBase):
     return matching_subsystem.get_scalar_mirrored_target_option(option_name, target)
 
   def dependencies_respecting_strict_deps(self, target):
-    if self.defaulted_property(target, 'strict_deps'):
+    if self.defaulted_property(target, "strict_deps"):
       dependencies = target.strict_dependencies(self)
     else:
       dependencies = self.all_dependencies(target)
@@ -96,13 +96,14 @@ class ResolvedJarAwareFingerprintStrategy(FingerprintStrategy):
       # changes between versions, that you won't get runtime errors due to using an artifact built
       # against a binary incompatible version resolved for a previous compile.
       classpath_entries = self._classpath_products.get_artifact_classpath_entries_for_targets(
-        [target])
+        [target]
+      )
       for _, entry in classpath_entries:
         hasher.update(str(entry.coordinate).encode())
     return hasher.hexdigest()
 
   def direct(self, target):
-    return self._dep_context.defaulted_property(target, 'strict_deps')
+    return self._dep_context.defaulted_property(target, "strict_deps")
 
   def dependencies(self, target):
     if self.direct(target):

@@ -17,10 +17,10 @@ from pants.util.dirutil import safe_mkdir
 # Bump this to invalidate all existing keys in artifact caches across all pants deployments in the
 # world. Do this if you've made a change that invalidates existing artifacts, e.g.,  fixed a bug
 # that caused bad artifacts to be cached.
-GLOBAL_CACHE_KEY_GEN_VERSION = '7'
+GLOBAL_CACHE_KEY_GEN_VERSION = "7"
 
 
-class CacheKey(namedtuple('CacheKey', ['id', 'hash'])):
+class CacheKey(namedtuple("CacheKey", ["id", "hash"])):
   """A CacheKey represents some version of a set of targets.
 
   - id identifies the set of targets.
@@ -28,7 +28,7 @@ class CacheKey(namedtuple('CacheKey', ['id', 'hash'])):
     determines a given version of the artifacts created when building the target set.
   """
 
-  _UNCACHEABLE_HASH = '__UNCACHEABLE_HASH__'
+  _UNCACHEABLE_HASH = "__UNCACHEABLE_HASH__"
 
   @classmethod
   def uncacheable(cls, id):
@@ -100,7 +100,7 @@ class CacheKeyGenerator(CacheKeyGeneratorInterface):
     else:
       target_key = target.invalidation_hash(fingerprint_strategy)
     if target_key is not None:
-      full_key = '{target_key}_{key_suffix}'.format(target_key=target_key, key_suffix=key_suffix)
+      full_key = "{target_key}_{key_suffix}".format(target_key=target_key, key_suffix=key_suffix)
       return CacheKey(target.id, full_key)
     else:
       return None
@@ -120,7 +120,7 @@ class BuildInvalidator:
   """Invalidates build targets based on the SHA1 hash of source files and other inputs."""
 
   class Factory(Subsystem):
-    options_scope = 'build-invalidator'
+    options_scope = "build-invalidator"
 
     @classmethod
     def create(cls, build_task=None):
@@ -130,7 +130,7 @@ class BuildInvalidator:
                              supplied the build invalidator will act globally across all build
                              tasks.
       """
-      root = os.path.join(cls.global_instance().get_options().pants_workdir, 'build_invalidator')
+      root = os.path.join(cls.global_instance().get_options().pants_workdir, "build_invalidator")
       return BuildInvalidator(root, scope=build_task)
 
   @staticmethod
@@ -206,10 +206,10 @@ class BuildInvalidator:
     return self._sha_file_by_id(cache_key.id)
 
   def _sha_file_by_id(self, id):
-    return os.path.join(self._root, safe_filename(id, extension='.hash'))
+    return os.path.join(self._root, safe_filename(id, extension=".hash"))
 
   def _write_sha(self, cache_key):
-    with open(self._sha_file(cache_key), 'w') as fd:
+    with open(self._sha_file(cache_key), "w") as fd:
       fd.write(cache_key.hash)
 
   def _read_sha(self, cache_key):
@@ -217,7 +217,7 @@ class BuildInvalidator:
 
   def _read_sha_by_id(self, id):
     try:
-      with open(self._sha_file_by_id(id), 'r') as fd:
+      with open(self._sha_file_by_id(id), "r") as fd:
         return fd.read().strip()
     except IOError as e:
       if e.errno != errno.ENOENT:

@@ -22,17 +22,17 @@ TRACE = 5
 # Although logging supports the WARN level, its not documented and could conceivably be yanked.
 # Since pants has supported 'warn' since inception, leave the 'warn' choice as-is but explicitly
 # setup a 'WARN' logging level name that maps to 'WARNING'.
-logging.addLevelName(logging.WARNING, 'WARN')
-logging.addLevelName(TRACE, 'TRACE')
+logging.addLevelName(logging.WARNING, "WARN")
+logging.addLevelName(TRACE, "TRACE")
 
 
-class LoggingSetupResult(namedtuple('LoggingSetupResult', ['log_filename', 'log_handler'])):
+class LoggingSetupResult(namedtuple("LoggingSetupResult", ["log_filename", "log_handler"])):
   """A structured result for logging setup."""
 
 
 def _configure_requests_debug_logging():
   http.client.HTTPConnection.debuglevel = 1
-  requests_logger = logging.getLogger('requests.packages.urllib3')
+  requests_logger = logging.getLogger("requests.packages.urllib3")
   requests_logger.setLevel(TRACE)
   requests_logger.propagate = True
 
@@ -63,19 +63,18 @@ def setup_logging_to_stderr(python_logger, level):
 
 def setup_logging_from_options(bootstrap_options):
   # N.B. quiet help says 'Squelches all console output apart from errors'.
-  level = 'ERROR' if bootstrap_options.quiet else bootstrap_options.level.upper()
+  level = "ERROR" if bootstrap_options.quiet else bootstrap_options.level.upper()
   native = Native()
   return setup_logging(
     level,
     console_stream=sys.stderr,
     log_dir=bootstrap_options.logdir,
     native=native,
-    warnings_filter_regexes=bootstrap_options.ignore_pants_warnings
+    warnings_filter_regexes=bootstrap_options.ignore_pants_warnings,
   )
 
 
 class NativeHandler(StreamHandler):
-
   def __init__(self, level, native=None, stream=None, native_filename=None):
     super().__init__(stream)
     self.native = native
@@ -97,7 +96,7 @@ class NativeHandler(StreamHandler):
 
 def create_native_pantsd_file_log_handler(level, native, native_filename):
   fd = native.setup_pantsd_logger(native_filename, get_numeric_level(level))
-  ExceptionSink.reset_interactive_output_stream(os.fdopen(os.dup(fd), 'a'))
+  ExceptionSink.reset_interactive_output_stream(os.fdopen(os.dup(fd), "a"))
   return NativeHandler(level, native, native_filename=native_filename)
 
 
@@ -189,27 +188,25 @@ def setup_logging(
   for handler in logger.handlers:
     logger.removeHandler(handler)
 
-
   if console_stream:
     native_handler = create_native_stderr_log_handler(level, native, stream=console_stream)
     logger.addHandler(native_handler)
 
   if log_dir:
     safe_mkdir(log_dir)
-    log_filename = os.path.join(log_dir, log_name or 'pants.log')
+    log_filename = os.path.join(log_dir, log_name or "pants.log")
 
     native_handler = create_native_pantsd_file_log_handler(level, native, log_filename)
     file_handler = native_handler
     logger.addHandler(native_handler)
-
 
   logger.setLevel(level)
 
   # This routes warnings through our loggers instead of straight to raw stderr.
   logging.captureWarnings(True)
 
-  for message_regexp in (warnings_filter_regexes or ()):
-    warnings.filterwarnings(action='ignore', message=message_regexp)
+  for message_regexp in warnings_filter_regexes or ():
+    warnings.filterwarnings(action="ignore", message=message_regexp)
 
   _maybe_configure_extended_logging(logger)
 

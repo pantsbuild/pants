@@ -37,6 +37,7 @@ class JvmPrepCommand(RuntimePlatformMixin, JvmTarget):
 
   :API: public
   """
+
   _goals: FrozenSet[str] = frozenset()
 
   @staticmethod
@@ -53,8 +54,16 @@ class JvmPrepCommand(RuntimePlatformMixin, JvmTarget):
   def goals() -> FrozenSet[str]:
     return JvmPrepCommand._goals
 
-  def __init__(self, payload=None, mainclass=None, args=None, jvm_options=None, goal=None,
-    runtime_platform=None, **kwargs):
+  def __init__(
+    self,
+    payload=None,
+    mainclass=None,
+    args=None,
+    jvm_options=None,
+    goal=None,
+    runtime_platform=None,
+    **kwargs
+  ):
     """
     :param args: A list of command-line args to the excutable.
     :param goal: Pants goal to run this command in [test, binary or compile]. If not specified,
@@ -68,16 +77,19 @@ class JvmPrepCommand(RuntimePlatformMixin, JvmTarget):
       the platform kwarg.
       """
     payload = payload or Payload()
-    goal = goal or 'test'
-    payload.add_fields({
-      'goal': PrimitiveField(goal),
-      'mainclass': PrimitiveField(mainclass),
-      'args': PrimitiveField(args or []),
-      'jvm_options': PrimitiveField(jvm_options or []),
-    })
+    goal = goal or "test"
+    payload.add_fields(
+      {
+        "goal": PrimitiveField(goal),
+        "mainclass": PrimitiveField(mainclass),
+        "args": PrimitiveField(args or []),
+        "jvm_options": PrimitiveField(jvm_options or []),
+      }
+    )
     super().__init__(payload=payload, runtime_platform=runtime_platform, **kwargs)
     if not mainclass:
-      raise TargetDefinitionException(self, 'mainclass must be specified.')
+      raise TargetDefinitionException(self, "mainclass must be specified.")
     if goal not in self.goals():
-      raise TargetDefinitionException(self, 'Got goal "{}". Goal must be one of {}.'.format(
-          goal, self.goals()))
+      raise TargetDefinitionException(
+        self, 'Got goal "{}". Goal must be one of {}.'.format(goal, self.goals())
+      )

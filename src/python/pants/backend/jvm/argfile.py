@@ -13,13 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 @contextmanager
-def safe_args(args,
-              options,
-              max_args=None,
-              argfile=None,
-              delimiter='\n',
-              quoter=None,
-              delete=True):
+def safe_args(args, options, max_args=None, argfile=None, delimiter="\n", quoter=None, delete=True):
   """Yields args if there are less than a limit otherwise writes args to an argfile and yields an
   argument list with one argument formed from the path of the argfile.
 
@@ -36,15 +30,16 @@ def safe_args(args,
   """
   max_args = max_args or options.max_subprocess_args
   if len(args) > max_args:
+
     def create_argfile(f):
       logger.debug(f"Creating argfile {f.name} with contents {' '.join(args)}")
       f.write(delimiter.join(args))
       f.close()
-      return [quoter(f.name) if quoter else f'@{f.name}']
+      return [quoter(f.name) if quoter else f"@{f.name}"]
 
     if argfile:
       try:
-        with safe_open(argfile, 'w') as fp:
+        with safe_open(argfile, "w") as fp:
           yield create_argfile(fp)
       finally:
         if delete and os.path.exists(argfile):

@@ -29,4 +29,4 @@ class JavacPlugin(JavaLibrary):
     for address_spec in super().compute_dependency_address_specs(kwargs, payload):
       yield address_spec
 
-    yield Java.global_instance().injectables_address_spec_for_key('tools.jar')
+    yield Java.global_instance().injectables_address_spec_for_key("tools.jar")

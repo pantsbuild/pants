@@ -65,7 +65,7 @@ class NativeCompile(NativeTask, metaclass=ABCMeta):
 
   @classmethod
   def implementation_version(cls):
-    return super().implementation_version() + [('NativeCompile', 1)]
+    return super().implementation_version() + [("NativeCompile", 1)]
 
   class NativeCompileError(TaskError):
     """Raised for errors in this class's logic.
@@ -125,8 +125,10 @@ class NativeCompile(NativeTask, metaclass=ABCMeta):
     if duplicate_filename_err_msgs:
       raise self.NativeCompileError(
         "Error in target '{}': source files must have a unique filename within a '{}' target. "
-        "Conflicting filenames:\n{}"
-        .format(target.address.spec, target.alias(), '\n'.join(duplicate_filename_err_msgs)))
+        "Conflicting filenames:\n{}".format(
+          target.address.spec, target.alias(), "\n".join(duplicate_filename_err_msgs)
+        )
+      )
 
     return [os.path.join(get_buildroot(), rel_root, src) for src in target_relative_sources]
 
@@ -158,31 +160,37 @@ class NativeCompile(NativeTask, metaclass=ABCMeta):
 
     include_dirs = []
     for dep in self.native_deps(target):
-      source_lib_base_dir = os.path.join(get_buildroot(),
-                                         dep._sources_field.rel_path)
+      source_lib_base_dir = os.path.join(get_buildroot(), dep._sources_field.rel_path)
       include_dirs.append(source_lib_base_dir)
     for ext_dep in self.packaged_native_deps(target):
-      external_lib_include_dir = os.path.join(get_buildroot(),
-                                              ext_dep._sources_field.rel_path,
-                                              ext_dep.include_relpath)
-      self.context.log.debug('ext_dep: {}, external_lib_include_dir: {}'
-                             .format(ext_dep, external_lib_include_dir))
+      external_lib_include_dir = os.path.join(
+        get_buildroot(), ext_dep._sources_field.rel_path, ext_dep.include_relpath
+      )
+      self.context.log.debug(
+        "ext_dep: {}, external_lib_include_dir: {}".format(ext_dep, external_lib_include_dir)
+      )
       include_dirs.append(external_lib_include_dir)
 
     sources_and_headers = self.get_sources_headers_for_target(target)
-    compiler_option_sets = (self._compile_settings.native_build_step
-                                .get_compiler_option_sets_for_target(target))
-    self.context.log.debug('target: {}, compiler_option_sets: {}'.format(target, compiler_option_sets))
+    compiler_option_sets = self._compile_settings.native_build_step.get_compiler_option_sets_for_target(
+      target
+    )
+    self.context.log.debug(
+      "target: {}, compiler_option_sets: {}".format(target, compiler_option_sets)
+    )
 
     compile_request = NativeCompileRequest(
       compiler=self._compiler(target),
       include_dirs=include_dirs,
       sources=sources_and_headers,
-      compiler_options=(self._compile_settings
-                            .native_build_step
-                            .get_merged_args_for_compiler_option_sets(compiler_option_sets)),
+      compiler_options=(
+        self._compile_settings.native_build_step.get_merged_args_for_compiler_option_sets(
+          compiler_option_sets
+        )
+      ),
       output_dir=versioned_target.results_dir,
-      header_file_extensions=self._compile_settings.header_file_extensions)
+      header_file_extensions=self._compile_settings.header_file_extensions,
+    )
 
     self.context.log.debug(repr(compile_request))
 
@@ -193,7 +201,8 @@ class NativeCompile(NativeTask, metaclass=ABCMeta):
       if not s.endswith(tuple(compile_request.header_file_extensions)):
         yield s
 
-  class _HeaderOnlyLibrary(Exception): pass
+  class _HeaderOnlyLibrary(Exception):
+    pass
 
   def _make_compile_argv(self, compile_request):
     """Return a list of arguments to use to compile sources. Subclasses can override and append."""
@@ -208,16 +217,17 @@ class NativeCompile(NativeTask, metaclass=ABCMeta):
     buildroot = get_buildroot()
     # TODO: add -v to every compiler and linker invocation!
     argv = (
-      [compiler.exe_filename] +
-      list(compiler.extra_args) +
+      [compiler.exe_filename]
+      + list(compiler.extra_args)
+      +
       # TODO: If we need to produce static libs, don't add -fPIC! (could use Variants -- see #5788).
-      ['-c', '-fPIC'] +
-      list(compiler_options) +
-      [
-        '-I{}'.format(os.path.join(buildroot, inc_dir))
-        for inc_dir in compile_request.include_dirs
-      ] +
-      [os.path.join(buildroot, src) for src in sources_minus_headers])
+      ["-c", "-fPIC"]
+      + list(compiler_options)
+      + [
+        "-I{}".format(os.path.join(buildroot, inc_dir)) for inc_dir in compile_request.include_dirs
+      ]
+      + [os.path.join(buildroot, src) for src in sources_minus_headers]
+    )
 
     self.context.log.info("selected compiler exe name: '{}'".format(compiler.exe_filename))
     self.context.log.debug("compile argv: {}".format(argv))
@@ -234,7 +244,7 @@ class NativeCompile(NativeTask, metaclass=ABCMeta):
     try:
       argv = self._make_compile_argv(compile_request)
     except self._HeaderOnlyLibrary:
-      self.context.log.debug('{} is a header-only library'.format(compile_request))
+      self.context.log.debug("{} is a header-only library".format(compile_request))
       return
 
     compiler = compile_request.compiler
@@ -242,27 +252,33 @@ class NativeCompile(NativeTask, metaclass=ABCMeta):
     env = compiler.invocation_environment_dict
 
     with self.context.new_workunit(
-        name=self.workunit_label, labels=[WorkUnitLabel.COMPILER]) as workunit:
+      name=self.workunit_label, labels=[WorkUnitLabel.COMPILER]
+    ) as workunit:
       try:
         process = subprocess.Popen(
           argv,
           cwd=output_dir,
-          stdout=workunit.output('stdout'),
-          stderr=workunit.output('stderr'),
-          env=env)
+          stdout=workunit.output("stdout"),
+          stderr=workunit.output("stderr"),
+          env=env,
+        )
       except OSError as e:
         workunit.set_outcome(WorkUnit.FAILURE)
         raise self.NativeCompileError(
-          "Error invoking '{exe}' with command {cmd} and environment {env} for request {req}: {err}"
-          .format(exe=compiler.exe_filename, cmd=argv, env=env, req=compile_request, err=e))
+          "Error invoking '{exe}' with command {cmd} and environment {env} for request {req}: {err}".format(
+            exe=compiler.exe_filename, cmd=argv, env=env, req=compile_request, err=e
+          )
+        )
 
       rc = process.wait()
       if rc != 0:
         workunit.set_outcome(WorkUnit.FAILURE)
         raise self.NativeCompileError(
           "Error in '{section_name}' with command {cmd} and environment {env} for request {req}. "
-          "Exit code was: {rc}."
-          .format(section_name=self.workunit_label, cmd=argv, env=env, req=compile_request, rc=rc))
+          "Exit code was: {rc}.".format(
+            section_name=self.workunit_label, cmd=argv, env=env, req=compile_request, rc=rc
+          )
+        )
 
   def collect_cached_objects(self, versioned_target):
     """Scan `versioned_target`'s results directory and return the output files from that directory.

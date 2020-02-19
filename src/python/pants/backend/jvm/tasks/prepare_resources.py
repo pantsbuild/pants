@@ -27,13 +27,14 @@ class PrepareResources(ResourcesTask):
 
   @classmethod
   def implementation_version(cls):
-    return super().implementation_version() + [('PrepareResources', 2)]
+    return super().implementation_version() + [("PrepareResources", 2)]
 
   def find_all_relevant_resources_targets(self):
     # NB: Ordering isn't relevant here, because it is applied during the dep walk to
     # consume from the runtime_classpath.
     def is_jvm_target(target):
       return isinstance(target, JvmTarget)
+
     jvm_targets = self.context.targets(predicate=is_jvm_target)
 
     all_resources_tgts = OrderedSet()
@@ -51,5 +52,5 @@ class PrepareResources(ResourcesTask):
       # TODO(Benjy Weinberger): Symlink instead?
       src = os.path.join(self._buildroot, target.target_base, resource_file_from_source_root)
       dst = os.path.join(chroot, resource_file_from_source_root)
-      self.context.log.debug(f'Copying resource from {src} to {dst}')
+      self.context.log.debug(f"Copying resource from {src} to {dst}")
       shutil.copy(src, dst)

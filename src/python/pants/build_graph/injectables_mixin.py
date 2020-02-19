@@ -10,6 +10,7 @@ class InjectablesMixin:
 
   :API: public
   """
+
   class NoMappingForKey(Exception):
     """Thrown when a mapping doesn't exist for a given injectables key."""
 
@@ -47,7 +48,7 @@ class InjectablesMixin:
     address_specs = mapping[key]
     assert isinstance(address_specs, list), (
       'invalid `injectables_address_spec_mapping` on {!r} for key "{}". '
-      'expected a `list` but instead found a `{}`: {}'
+      "expected a `list` but instead found a `{}`: {}"
     ).format(self, key, type(address_specs), address_specs)
     return [Address.parse(s).spec for s in address_specs]
 
@@ -62,7 +63,7 @@ class InjectablesMixin:
       return None
     if specs_len != 1:
       raise self.TooManySpecsForKey(
-        f'injectables address spec mapping for key included {specs_len} elements, expected 1'
+        f"injectables address spec mapping for key included {specs_len} elements, expected 1"
       )
     return address_specs[0]
 
@@ -78,8 +79,8 @@ class InjectablesMixin:
       removal_version="1.27.0.dev0",
       deprecated_entity_description="injectables_spec_mapping()",
       hint="Use `injectables_address_spec_mapping()` instead. The API is the same as "
-           "before. This change is to prepare for Pants eventually supporting file system specs, "
-           "e.g. `./pants cloc foo.py`. In preparation, we renamed `Spec` to `AddressSpec`."
+      "before. This change is to prepare for Pants eventually supporting file system specs, "
+      "e.g. `./pants cloc foo.py`. In preparation, we renamed `Spec` to `AddressSpec`.",
     )
     return self.injectables_address_spec_mapping
 
@@ -92,8 +93,8 @@ class InjectablesMixin:
       removal_version="1.27.0.dev0",
       deprecated_entity_description="injectables_specs_for_key()",
       hint="Use `injectables_specs_for_key()` instead. The API is the same as "
-           "before. This change is to prepare for Pants eventually supporting file system specs, "
-           "e.g. `./pants cloc foo.py`. In preparation, we renamed `Spec` to `AddressSpec`."
+      "before. This change is to prepare for Pants eventually supporting file system specs, "
+      "e.g. `./pants cloc foo.py`. In preparation, we renamed `Spec` to `AddressSpec`.",
     )
     return self.injectables_address_specs_for_key(key)
 
@@ -106,7 +107,7 @@ class InjectablesMixin:
       removal_version="1.27.0.dev0",
       deprecated_entity_description="injectables_spec_for_key()",
       hint="Use `injectables_spec_for_key()` instead. The API is the same as "
-           "before. This change is to prepare for Pants eventually supporting file system specs, "
-           "e.g. `./pants cloc foo.py`. In preparation, we renamed `Spec` to `AddressSpec`."
+      "before. This change is to prepare for Pants eventually supporting file system specs, "
+      "e.g. `./pants cloc foo.py`. In preparation, we renamed `Spec` to `AddressSpec`.",
     )
     return self.injectables_address_spec_for_key(key)

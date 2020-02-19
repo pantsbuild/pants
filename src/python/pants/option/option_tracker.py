@@ -26,10 +26,7 @@ class OptionTracker:
       self.values: List["OptionTracker.OptionHistoryRecord"] = []
 
     def record_value(
-      self, value: str,
-      rank: int,
-      deprecation_version: Optional[str],
-      details: Optional[str] = None,
+      self, value: str, rank: int, deprecation_version: Optional[str], details: Optional[str] = None
     ) -> None:
       """Record that the option was set to the given value at the given rank.
 
@@ -45,14 +42,15 @@ class OptionTracker:
         if self.latest.rank > rank:
           return
         if self.latest.value == value:
-          return # No change.
+          return  # No change.
         if self.latest.deprecation_version:
           # Higher RankedValue may not contain deprecation version, so this make sure
           # deprecation_version propagate to later and higher ranked value since it is immutable
           deprecation_version_to_write = self.latest.deprecation_version or deprecation_version
 
-      self.values.append(OptionTracker.OptionHistoryRecord(value, rank,
-                                                           deprecation_version_to_write, details))
+      self.values.append(
+        OptionTracker.OptionHistoryRecord(value, rank, deprecation_version_to_write, details)
+      )
 
     @property
     def was_overridden(self) -> bool:

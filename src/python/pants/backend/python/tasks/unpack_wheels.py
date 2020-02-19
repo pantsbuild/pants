@@ -21,7 +21,6 @@ from pants.util.objects import SubclassesOf
 
 
 class UnpackWheelsFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintStrategy):
-
   def compute_fingerprint(self, target):
     """UnpackedWheels targets need to be re-unpacked if any of its configuration changes or any of
     the jars they import have changed.
@@ -51,37 +50,43 @@ class UnpackWheels(UnpackRemoteSourcesBase):
       PythonSetup,
     )
 
-  class _NativeCodeExtractionSetupFailure(Exception): pass
+  class _NativeCodeExtractionSetupFailure(Exception):
+    pass
 
   def _get_matching_wheel(self, pex_path, interpreter, requirements, module_name):
     """Use PexBuilderWrapper to resolve a single wheel from the requirement specs using pex."""
-    with self.context.new_workunit('extract-native-wheels'):
+    with self.context.new_workunit("extract-native-wheels"):
       with safe_concurrent_creation(pex_path) as chroot:
         pex_builder = PexBuilderWrapper.Factory.create(
-          builder=PEXBuilder(path=chroot, interpreter=interpreter),
-          log=self.context.log)
+          builder=PEXBuilder(path=chroot, interpreter=interpreter), log=self.context.log
+        )
         return pex_builder.extract_single_dist_for_current_platform(requirements, module_name)
 
   @memoized_method
   def _compatible_interpreter(self, unpacked_whls):
-    constraints = PythonSetup.global_instance().compatibility_or_constraints(unpacked_whls.compatibility)
+    constraints = PythonSetup.global_instance().compatibility_or_constraints(
+      unpacked_whls.compatibility
+    )
     allowable_interpreters = PythonInterpreterCache.global_instance().setup(filters=constraints)
     return min(allowable_interpreters)
 
-  class WheelUnpackingError(TaskError): pass
+  class WheelUnpackingError(TaskError):
+    pass
 
   def unpack_target(self, unpacked_whls, unpack_dir):
     interpreter = self._compatible_interpreter(unpacked_whls)
 
-    with temporary_dir() as resolve_dir,\
-         temporary_dir() as extract_dir:
+    with temporary_dir() as resolve_dir, temporary_dir() as extract_dir:
       try:
-        matched_dist = self._get_matching_wheel(resolve_dir, interpreter,
-                                                unpacked_whls.all_imported_requirements,
-                                                unpacked_whls.module_name)
+        matched_dist = self._get_matching_wheel(
+          resolve_dir,
+          interpreter,
+          unpacked_whls.all_imported_requirements,
+          unpacked_whls.module_name,
+        )
         ZIP.extract(matched_dist.location, extract_dir)
         if unpacked_whls.within_data_subdir:
-          data_dir_prefix = '{name}-{version}.data/{subdir}'.format(
+          data_dir_prefix = "{name}-{version}.data/{subdir}".format(
             name=matched_dist.project_name,
             version=matched_dist.version,
             subdir=unpacked_whls.within_data_subdir,
@@ -94,6 +99,5 @@ class UnpackWheels(UnpackRemoteSourcesBase):
         mergetree(dist_data_dir, unpack_dir, file_filter=unpack_filter)
       except Exception as e:
         raise self.WheelUnpackingError(
-          "Error extracting wheel for target {}: {}"
-          .format(unpacked_whls, str(e)),
-          e)
+          "Error extracting wheel for target {}: {}".format(unpacked_whls, str(e)), e
+        )

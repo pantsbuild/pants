@@ -37,25 +37,21 @@ class BuildFilePath:
 def build_file_aliases():
   return BuildFileAliases(
     targets={
-      'alias': AliasTargetFactory(),
-      'files': Files,
-      'prep_command': PrepCommand,
-      'resources': Resources,
-      'remote_sources': RemoteSources,
-      'target': Target,
+      "alias": AliasTargetFactory(),
+      "files": Files,
+      "prep_command": PrepCommand,
+      "resources": Resources,
+      "remote_sources": RemoteSources,
+      "target": Target,
     },
-    objects={
-      'get_buildroot': get_buildroot,
-      'netrc': Netrc,
-      'pants_version': pants_version,
-    },
+    objects={"get_buildroot": get_buildroot, "netrc": Netrc, "pants_version": pants_version},
     context_aware_object_factories={
-      'buildfile_path': BuildFilePath,
-      'globs': Globs,
-      'intransitive': IntransitiveDependencyFactory,
-      'provided': ProvidedDependencyFactory,
-      'rglobs': RGlobs,
-      'scoped': ScopedDependencyFactory,
-      'zglobs': ZGlobs,
-    }
+      "buildfile_path": BuildFilePath,
+      "globs": Globs,
+      "intransitive": IntransitiveDependencyFactory,
+      "provided": ProvidedDependencyFactory,
+      "rglobs": RGlobs,
+      "scoped": ScopedDependencyFactory,
+      "zglobs": ZGlobs,
+    },
   )

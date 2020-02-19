@@ -32,7 +32,7 @@ class Jarable(ABC):
     """
     exported = bool(self.provides)
 
-    org = self.provides.org if exported else 'internal'
+    org = self.provides.org if exported else "internal"
     name = self.provides.name if exported else self.identifier
 
     # TODO(John Sirois): This should return something less than a JarDependency encapsulating just

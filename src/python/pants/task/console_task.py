@@ -26,14 +26,21 @@ class ConsoleTask(QuietTaskMixin, Task):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--sep', default='\\n', metavar='<separator>',
-             help='String to use to separate results.')
-    register('--output-file', metavar='<path>',
-             help='Write the console output to this file instead.')
+    register(
+      "--sep", default="\\n", metavar="<separator>", help="String to use to separate results."
+    )
+    register(
+      "--output-file", metavar="<path>", help="Write the console output to this file instead."
+    )
 
     if cls._register_console_transitivity_option:
-      register('--transitive', type=bool, default=True, fingerprint=True,
-               help='If True, use all targets in the build graph, else use only target roots.')
+      register(
+        "--transitive",
+        type=bool,
+        default=True,
+        fingerprint=True,
+        help="If True, use all targets in the build graph, else use only target roots.",
+      )
 
   @property
   def act_transitively(self):
@@ -43,12 +50,12 @@ class ConsoleTask(QuietTaskMixin, Task):
         entity_description=f"Pants defaulting to `--transitive` for `{self.options_scope}`",
         removal_version="1.27.0.dev0",
         hint_message="Currently, Pants defaults to `--transitive`, which means that it "
-                     "will run against transitive dependencies for the targets you specify on the "
-                     "command line, rather than only the targets you specify. This is often useful, "
-                     "such as running `./pants dependencies --transitive`, but it is surprising "
-                     "to have this behavior by default.\n\nTo prepare for this change to the default "
-                     f"value, set in `pants.ini` under the section `{self.options_scope}` the value "
-                     "`transitive: False`. In Pants 1.27.0, you can safely remove the setting."
+        "will run against transitive dependencies for the targets you specify on the "
+        "command line, rather than only the targets you specify. This is often useful, "
+        "such as running `./pants dependencies --transitive`, but it is surprising "
+        "to have this behavior by default.\n\nTo prepare for this change to the default "
+        f"value, set in `pants.ini` under the section `{self.options_scope}` the value "
+        "`transitive: False`. In Pants 1.27.0, you can safely remove the setting.",
       )
       return self.get_options().transitive
     # `Task` defaults to returning `True` in `act_transitively`, so we keep that default value.
@@ -56,13 +63,15 @@ class ConsoleTask(QuietTaskMixin, Task):
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
-    self._console_separator = self.get_options().sep.encode().decode('unicode_escape')
+    self._console_separator = self.get_options().sep.encode().decode("unicode_escape")
     if self.get_options().output_file:
       try:
-        self._outstream = safe_open(os.path.abspath(self.get_options().output_file), 'wb')
+        self._outstream = safe_open(os.path.abspath(self.get_options().output_file), "wb")
       except IOError as e:
-        raise TaskError('Error opening stream {out_file} due to'
-                        ' {error_str}'.format(out_file=self.get_options().output_file, error_str=e))
+        raise TaskError(
+          "Error opening stream {out_file} due to"
+          " {error_str}".format(out_file=self.get_options().output_file, error_str=e)
+        )
     else:
       self._outstream = self.context.console_outstream
 
@@ -89,4 +98,4 @@ class ConsoleTask(QuietTaskMixin, Task):
           self._outstream.close()
 
   def console_output(self, targets):
-    raise NotImplementedError('console_output must be implemented by subclasses of ConsoleTask')
+    raise NotImplementedError("console_output must be implemented by subclasses of ConsoleTask")

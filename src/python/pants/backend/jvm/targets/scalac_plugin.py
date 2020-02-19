@@ -28,5 +28,5 @@ class ScalacPlugin(ScalaLibrary):
     for address_spec in super().compute_dependency_address_specs(kwargs, payload):
       yield address_spec
 
-    for address_spec in ScalaPlatform.global_instance().injectables_address_specs_for_key('scalac'):
+    for address_spec in ScalaPlatform.global_instance().injectables_address_specs_for_key("scalac"):
       yield address_spec

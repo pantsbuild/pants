@@ -33,8 +33,10 @@ class TargetMacro:
       :rtype: :class:`TargetMacro.Factory`
       """
       if not target_types:
-        raise ValueError('The given `context_aware_object_factory` {} must expand 1 produced '
-                         'type; none were registered'.format(context_aware_object_factory))
+        raise ValueError(
+          "The given `context_aware_object_factory` {} must expand 1 produced "
+          "type; none were registered".format(context_aware_object_factory)
+        )
 
       class Factory(cls):
         @property
@@ -45,7 +47,9 @@ class TargetMacro:
           class Macro(TargetMacro):
             def expand(self, *args, **kwargs):
               context_aware_object_factory(parse_context, *args, **kwargs)
+
           return Macro()
+
       return Factory()
 
     @abstractmethod
@@ -107,24 +111,29 @@ class BuildFileAliases:
   @classmethod
   def _validate_alias(cls, category: str, alias: str, obj: Any) -> None:
     if not isinstance(alias, str):
-      raise TypeError('Aliases must be strings, given {category} entry {alias!r} of type {typ} as '
-                      'the alias of {obj}'
-                      .format(category=category, alias=alias, typ=type(alias).__name__, obj=obj))
+      raise TypeError(
+        "Aliases must be strings, given {category} entry {alias!r} of type {typ} as "
+        "the alias of {obj}".format(
+          category=category, alias=alias, typ=type(alias).__name__, obj=obj
+        )
+      )
 
   @classmethod
   def _validate_not_targets(cls, category: str, alias: str, obj: Any) -> None:
     if cls._is_target_type(obj):
-      raise TypeError('The {category} entry {alias!r} is a Target subclasss - these should be '
-                      'registered via the `targets` parameter'
-                      .format(category=category, alias=alias))
+      raise TypeError(
+        "The {category} entry {alias!r} is a Target subclasss - these should be "
+        "registered via the `targets` parameter".format(category=category, alias=alias)
+      )
     if cls._is_target_macro_factory(obj):
-      raise TypeError('The {category} entry {alias!r} is a TargetMacro.Factory instance - these '
-                      'should be registered via the `targets` parameter'
-                      .format(category=category, alias=alias))
+      raise TypeError(
+        "The {category} entry {alias!r} is a TargetMacro.Factory instance - these "
+        "should be registered via the `targets` parameter".format(category=category, alias=alias)
+      )
 
   @classmethod
   def _validate_targets(
-    cls, targets: Optional[Dict[str, Union[Type[Target], TargetMacro.Factory]]],
+    cls, targets: Optional[Dict[str, Union[Type[Target], TargetMacro.Factory]]]
   ) -> Tuple[Dict[str, Type[Target]], Dict[str, TargetMacro.Factory]]:
     if not targets:
       return {}, {}
@@ -132,15 +141,17 @@ class BuildFileAliases:
     target_types = {}
     target_macro_factories = {}
     for alias, obj in targets.items():
-      cls._validate_alias('targets', alias, obj)
+      cls._validate_alias("targets", alias, obj)
       if cls._is_target_type(obj):
         target_types[alias] = cast(Type[Target], obj)
       elif cls._is_target_macro_factory(obj):
         target_macro_factories[alias] = cast(TargetMacro.Factory, obj)
       else:
-        raise TypeError('Only Target types and TargetMacro.Factory instances can be registered '
-                        'via the `targets` parameter, given item {alias!r} with value {value} of '
-                        'type {typ}'.format(alias=alias, value=obj, typ=type(obj).__name__))
+        raise TypeError(
+          "Only Target types and TargetMacro.Factory instances can be registered "
+          "via the `targets` parameter, given item {alias!r} with value {value} of "
+          "type {typ}".format(alias=alias, value=obj, typ=type(obj).__name__)
+        )
 
     return target_types, target_macro_factories
 
@@ -150,8 +161,8 @@ class BuildFileAliases:
       return {}
 
     for alias, obj in objects.items():
-      cls._validate_alias('objects', alias, obj)
-      cls._validate_not_targets('objects', alias, obj)
+      cls._validate_alias("objects", alias, obj)
+      cls._validate_not_targets("objects", alias, obj)
     return objects.copy()
 
   @classmethod
@@ -160,11 +171,12 @@ class BuildFileAliases:
       return {}
 
     for alias, obj in context_aware_object_factories.items():
-      cls._validate_alias('context_aware_object_factories', alias, obj)
-      cls._validate_not_targets('context_aware_object_factories', alias, obj)
+      cls._validate_alias("context_aware_object_factories", alias, obj)
+      cls._validate_not_targets("context_aware_object_factories", alias, obj)
       if not callable(obj):
-        raise TypeError('The given context aware object factory {alias!r} must be a callable.'
-                        .format(alias=alias))
+        raise TypeError(
+          "The given context aware object factory {alias!r} must be a callable.".format(alias=alias)
+        )
 
     return context_aware_object_factories.copy()
 
@@ -255,7 +267,7 @@ class BuildFileAliases:
     :rtype: :class:`BuildFileAliases`
     """
     if not isinstance(other, BuildFileAliases):
-      raise TypeError('Can only merge other BuildFileAliases, given {0}'.format(other))
+      raise TypeError("Can only merge other BuildFileAliases, given {0}".format(other))
 
     def merge(*items):
       merged = {}
@@ -263,21 +275,30 @@ class BuildFileAliases:
         merged.update(item)
       return merged
 
-    targets = merge(self.target_types, self.target_macro_factories,
-                    other.target_types, other.target_macro_factories)
+    targets = merge(
+      self.target_types,
+      self.target_macro_factories,
+      other.target_types,
+      other.target_macro_factories,
+    )
     objects = merge(self.objects, other.objects)
-    context_aware_object_factories=merge(self.context_aware_object_factories,
-                                         other.context_aware_object_factories)
-    return BuildFileAliases(targets=targets,
-                            objects=objects,
-                            context_aware_object_factories=context_aware_object_factories)
+    context_aware_object_factories = merge(
+      self.context_aware_object_factories, other.context_aware_object_factories
+    )
+    return BuildFileAliases(
+      targets=targets,
+      objects=objects,
+      context_aware_object_factories=context_aware_object_factories,
+    )
 
   def _tuple(self):
     tuplize = lambda d: tuple(sorted(d.items()))
-    return (tuplize(self._target_types),
-            tuplize(self._target_macro_factories),
-            tuplize(self._objects),
-            tuplize(self._context_aware_object_factories))
+    return (
+      tuplize(self._target_types),
+      tuplize(self._target_macro_factories),
+      tuplize(self._objects),
+      tuplize(self._context_aware_object_factories),
+    )
 
   def __eq__(self, other):
     return isinstance(other, BuildFileAliases) and self._tuple() == other._tuple()

@@ -17,10 +17,11 @@ class JvmToolMixin:
 
   :API: public
   """
+
   class InvalidToolClasspath(TaskError):
     """Indicates an invalid jvm tool classpath."""
 
-  class JvmTool(namedtuple('JvmTool', ['scope', 'key', 'classpath', 'main', 'custom_rules'])):
+  class JvmTool(namedtuple("JvmTool", ["scope", "key", "classpath", "main", "custom_rules"])):
     """Represents a jvm tool classpath request."""
 
     def dep_spec(self, options):
@@ -28,16 +29,22 @@ class JvmToolMixin:
 
       :rtype: string
       """
-      option = self.key.replace('-', '_')
+      option = self.key.replace("-", "_")
       dep_spec = options.for_scope(self.scope)[option]
-      if dep_spec.startswith('['):
-        raise ValueError(dedent("""\
+      if dep_spec.startswith("["):
+        raise ValueError(
+          dedent(
+            """\
           JVM tool configuration now expects a single target address, use the
           following in pants.ini:
 
           [{scope}]
           {key}: //tool/classpath:address
-          """.format(scope=self.scope, key=self.key)))
+          """.format(
+              scope=self.scope, key=self.key
+            )
+          )
+        )
       return dep_spec
 
     def is_default(self, options):
@@ -45,7 +52,7 @@ class JvmToolMixin:
 
       :rtype: bool
       """
-      return options.for_scope(self.scope).is_default(self.key.replace('-', '_'))
+      return options.for_scope(self.scope).is_default(self.key.replace("-", "_"))
 
   _jvm_tools: List[JvmTool] = []
 
@@ -62,27 +69,34 @@ class JvmToolMixin:
                                     See src/python/pants/options/options_bootstrapper.py for
                                     details.
     """
-    return ['-Xmx256m']
+    return ["-Xmx256m"]
 
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--jvm-options', type=list,  advanced=True, metavar='<option>...',
-             default=cls.get_jvm_options_default(register.bootstrap),
-             help='Run with these JVM options.')
+    register(
+      "--jvm-options",
+      type=list,
+      advanced=True,
+      metavar="<option>...",
+      default=cls.get_jvm_options_default(register.bootstrap),
+      help="Run with these JVM options.",
+    )
 
   @classmethod
-  def register_jvm_tool(cls,
-                        register,
-                        key,
-                        classpath_spec=None,
-                        main=None,
-                        custom_rules=None,
-                        fingerprint=True,
-                        classpath=None,
-                        help=None,
-                        removal_version=None,
-                        removal_hint=None):
+  def register_jvm_tool(
+    cls,
+    register,
+    key,
+    classpath_spec=None,
+    main=None,
+    custom_rules=None,
+    fingerprint=True,
+    classpath=None,
+    help=None,
+    removal_version=None,
+    removal_hint=None,
+  ):
     """Registers a jvm tool under `key` for lazy classpath resolution.
 
     Classpaths can be retrieved in `execute` scope via `tool_classpath_from_products`.
@@ -114,22 +128,28 @@ class JvmToolMixin:
     :param string removal_version: A semver at which this tool will be removed.
     :param unicode removal_hint: A hint on how to migrate away from this tool.
     """
+
     def formulate_help():
       if classpath:
-        return ('Target address spec for overriding the classpath of the {} jvm tool which is, '
-                'by default: {}'.format(key, classpath))
+        return (
+          "Target address spec for overriding the classpath of the {} jvm tool which is, "
+          "by default: {}".format(key, classpath)
+        )
       else:
-        return f'Target address spec for specifying the classpath of the {key} jvm tool.'
+        return f"Target address spec for specifying the classpath of the {key} jvm tool."
+
     help = help or formulate_help()
 
-    register(f'--{key}',
-             advanced=True,
-             type=target_option,
-             default=f'//:{key}' if classpath_spec is None else classpath_spec,
-             help=help,
-             fingerprint=fingerprint,
-             removal_version=removal_version,
-             removal_hint=removal_hint)
+    register(
+      f"--{key}",
+      advanced=True,
+      type=target_option,
+      default=f"//:{key}" if classpath_spec is None else classpath_spec,
+      help=help,
+      fingerprint=fingerprint,
+      removal_version=removal_version,
+      removal_hint=removal_hint,
+    )
 
     # TODO(John Sirois): Move towards requiring tool specs point to jvm_binary targets.
     # These already have a main and are a natural place to house any custom shading rules.  That
@@ -145,7 +165,7 @@ class JvmToolMixin:
   @classmethod
   def prepare_tools(cls, round_manager):
     """Subclasses must call this method to ensure jvm tool products are available."""
-    round_manager.require_data('jvm_build_tools_classpath_callbacks')
+    round_manager.require_data("jvm_build_tools_classpath_callbacks")
 
   @staticmethod
   def get_registered_tools() -> List["JvmTool"]:
@@ -159,14 +179,15 @@ class JvmToolMixin:
 
   def set_distribution(self, minimum_version=None, maximum_version=None, jdk=False):
     try:
-      self._dist = DistributionLocator.cached(minimum_version=minimum_version,
-                                              maximum_version=maximum_version, jdk=jdk)
+      self._dist = DistributionLocator.cached(
+        minimum_version=minimum_version, maximum_version=maximum_version, jdk=jdk
+      )
     except DistributionLocator.Error as e:
       raise TaskError(e)
 
   @property
   def dist(self):
-    if getattr(self, '_dist', None) is None:
+    if getattr(self, "_dist", None) is None:
       # Use default until told otherwise.
       self.set_distribution()
     return self._dist
@@ -194,9 +215,11 @@ class JvmToolMixin:
     """
     classpath = cls.tool_classpath_entries_from_products(products, key, scope)
     if len(classpath) != 1:
-      params = dict(tool=key, scope=scope, count=len(classpath), classpath='\n\t'.join(classpath))
-      raise cls.InvalidToolClasspath('Expected tool {tool} in scope {scope} to resolve to one '
-                                     'jar, instead found {count}:\n\t{classpath}'.format(**params))
+      params = dict(tool=key, scope=scope, count=len(classpath), classpath="\n\t".join(classpath))
+      raise cls.InvalidToolClasspath(
+        "Expected tool {tool} in scope {scope} to resolve to one "
+        "jar, instead found {count}:\n\t{classpath}".format(**params)
+      )
     return classpath[0]
 
   @classmethod
@@ -218,8 +241,8 @@ class JvmToolMixin:
     :returns: A list of paths.
     :rtype: list
     """
-    callback_product_map = products.get_data('jvm_build_tools_classpath_callbacks') or {}
+    callback_product_map = products.get_data("jvm_build_tools_classpath_callbacks") or {}
     callback = callback_product_map.get(scope, {}).get(key)
     if not callback:
-      raise TaskError(f'No bootstrap callback registered for {key} in {scope}')
+      raise TaskError(f"No bootstrap callback registered for {key} in {scope}")
     return callback()

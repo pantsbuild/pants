@@ -7,8 +7,4 @@ from pants.backend.python.lint.docformatter.rules import rules as docformatter_r
 
 
 def rules():
-  return (
-    *docformatter_rules(),
-    *python_format_target.rules(),
-    *python_lint_target.rules(),
-  )
+  return (*docformatter_rules(), *python_format_target.rules(), *python_lint_target.rules())

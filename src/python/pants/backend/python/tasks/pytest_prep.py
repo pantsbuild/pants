@@ -22,7 +22,7 @@ class PytestPrep(PythonExecutionTaskBase):
 
     @staticmethod
     def make_plugin_name(name):
-      return '__{}_{}_plugin__'.format(__name__.replace('.', '_'), name)
+      return "__{}_{}_plugin__".format(__name__.replace(".", "_"), name)
 
     @memoized_classproperty
     def coverage_plugin_module(cls):
@@ -30,7 +30,7 @@ class PytestPrep(PythonExecutionTaskBase):
 
       :rtype: str
       """
-      return cls.make_plugin_name('coverage')
+      return cls.make_plugin_name("coverage")
 
     @memoized_classproperty
     def pytest_plugin_module(cls):
@@ -38,7 +38,7 @@ class PytestPrep(PythonExecutionTaskBase):
 
       :rtype: str
       """
-      return cls.make_plugin_name('pytest')
+      return cls.make_plugin_name("pytest")
 
     def __init__(self, interpreter, pex):
       # Here we hack around `coverage.cmdline` nuking the 0th element of `sys.path` (our root pex)
@@ -47,7 +47,9 @@ class PytestPrep(PythonExecutionTaskBase):
       pex_path = pex.path()
       pex_info = PexInfo.from_pex(pex_path)
       pex_info.merge_pex_path(pex_path)  # We're now on the sys.path twice.
-      PEXBuilder(pex_path, interpreter=interpreter, pex_info=pex_info).freeze(bytecode_compile=False)
+      PEXBuilder(pex_path, interpreter=interpreter, pex_info=pex_info).freeze(
+        bytecode_compile=False
+      )
       self._pex = PEX(pex=pex_path, interpreter=interpreter)
       self._interpreter = interpreter
 
@@ -69,7 +71,7 @@ class PytestPrep(PythonExecutionTaskBase):
 
   @classmethod
   def implementation_version(cls):
-    return super().implementation_version() + [('PytestPrep', 2)]
+    return super().implementation_version() + [("PytestPrep", 2)]
 
   @classmethod
   def product_types(cls):
@@ -81,12 +83,13 @@ class PytestPrep(PythonExecutionTaskBase):
 
   @classmethod
   def _module_resource(cls, module_name, resource_relpath):
-    return cls.ExtraFile(path=f'{module_name}.py',
-                         content=pkg_resources.resource_string(__name__, resource_relpath))
+    return cls.ExtraFile(
+      path=f"{module_name}.py", content=pkg_resources.resource_string(__name__, resource_relpath)
+    )
 
   def extra_files(self):
-    yield self._module_resource(self.PytestBinary.pytest_plugin_module, 'pytest/plugin.py')
-    yield self._module_resource(self.PytestBinary.coverage_plugin_module, 'coverage/plugin.py')
+    yield self._module_resource(self.PytestBinary.pytest_plugin_module, "pytest/plugin.py")
+    yield self._module_resource(self.PytestBinary.coverage_plugin_module, "coverage/plugin.py")
 
   def extra_requirements(self):
     return PyTest.global_instance().get_requirement_strings()
@@ -95,8 +98,9 @@ class PytestPrep(PythonExecutionTaskBase):
     if not self.context.targets(lambda t: isinstance(t, PythonTests)):
       return
     pex_info = PexInfo.default()
-    pex_info.entry_point = 'pytest'
+    pex_info.entry_point = "pytest"
     pytest_binary = self.create_pex(pex_info)
     interpreter = self.context.products.get_data(PythonInterpreter)
-    self.context.products.register_data(self.PytestBinary,
-                                        self.PytestBinary(interpreter, pytest_binary))
+    self.context.products.register_data(
+      self.PytestBinary, self.PytestBinary(interpreter, pytest_binary)
+    )

@@ -48,9 +48,9 @@ class StreamableWatchmanClient(pywatchman.client):
         # Socket timeout - yield runtime context.
         yield
       else:
-        if 'error' in result:
-          raise pywatchman.WatchmanError('error from watchman: {}'.format(result['error']))
-        elif self.isUnilateralResponse(result) or 'subscribe' in result:
+        if "error" in result:
+          raise pywatchman.WatchmanError("error from watchman: {}".format(result["error"]))
+        elif self.isUnilateralResponse(result) or "subscribe" in result:
           yield result
         else:
           yield result

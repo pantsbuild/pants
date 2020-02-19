@@ -50,13 +50,12 @@ class FmtTest(TestBase):
       #  some premade snapshots and possibly a generalized make_hydrated_target_with_origin function.
       directory_digest=EMPTY_DIRECTORY_DIGEST,
       files=tuple(["formatted.txt", "fake.txt"] if include_sources else []),
-      dirs=()
+      dirs=(),
     )
     ht = HydratedTarget(
       address=Address.parse(f"src:{name}"),
       adaptor=adaptor_type(
-        sources=EagerFilesetWithSpec("src", {"globs": []}, snapshot=mocked_snapshot),
-        name=name,
+        sources=EagerFilesetWithSpec("src", {"globs": []}, snapshot=mocked_snapshot), name=name
       ),
       dependencies=(),
     )
@@ -65,9 +64,9 @@ class FmtTest(TestBase):
   def run_fmt_rule(self, *, targets: List[HydratedTargetWithOrigin]) -> Tuple[Fmt, str]:
     result_digest = self.request_single_product(
       Digest,
-      InputFilesContent([
-        FileContent(path=self.formatted_file.as_posix(), content=self.formatted_content.encode())
-      ])
+      InputFilesContent(
+        [FileContent(path=self.formatted_file.as_posix(), content=self.formatted_content.encode())]
+      ),
     )
     console = MockConsole(use_colors=False)
     result: Fmt = run_rule(
@@ -76,7 +75,7 @@ class FmtTest(TestBase):
         console,
         HydratedTargetsWithOrigins(targets),
         Workspace(self.scheduler),
-        UnionMembership(union_rules={FormatTarget: [PythonTargetAdaptorWithOrigin]})
+        UnionMembership(union_rules={FormatTarget: [PythonTargetAdaptorWithOrigin]}),
       ],
       mock_gets=[
         MockGet(
@@ -91,7 +90,7 @@ class FmtTest(TestBase):
               ),
             ),
             combined_digest=result_digest,
-          )
+          ),
         ),
         MockGet(product_type=Digest, subject_type=DirectoriesToMerge, mock=lambda _: result_digest),
       ],

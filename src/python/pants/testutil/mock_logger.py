@@ -19,7 +19,7 @@ class MockLogger:
 
   def _maybe_log(self, level, *msg_elements):
     if level <= self._level:
-      sys.stderr.write(''.join(msg_elements))
+      sys.stderr.write("".join(msg_elements))
 
   def debug(self, *msg_elements):
     """

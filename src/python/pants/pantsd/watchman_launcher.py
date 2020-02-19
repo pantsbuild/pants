@@ -18,12 +18,14 @@ class WatchmanLauncher:
     """
     binary_tool_fetcher = BinaryToolFetcher(
       bootstrap_dir=bootstrap_options.pants_bootstrapdir,
-      timeout_secs=bootstrap_options.binaries_fetch_timeout_secs)
+      timeout_secs=bootstrap_options.binaries_fetch_timeout_secs,
+    )
     binary_util = BinaryUtil(
       baseurls=bootstrap_options.binaries_baseurls,
       binary_tool_fetcher=binary_tool_fetcher,
       path_by_id=bootstrap_options.binaries_path_by_id,
-      allow_external_binary_tool_downloads=bootstrap_options.allow_external_binary_tool_downloads)
+      allow_external_binary_tool_downloads=bootstrap_options.allow_external_binary_tool_downloads,
+    )
 
     return WatchmanLauncher(
       binary_util,
@@ -33,11 +35,20 @@ class WatchmanLauncher:
       bootstrap_options.watchman_startup_timeout,
       bootstrap_options.watchman_socket_timeout,
       bootstrap_options.watchman_socket_path,
-      bootstrap_options.pants_subprocessdir
+      bootstrap_options.pants_subprocessdir,
     )
 
-  def __init__(self, binary_util, log_level, watchman_version, watchman_supportdir,
-               startup_timeout, socket_timeout, socket_path_override=None, metadata_base_dir=None):
+  def __init__(
+    self,
+    binary_util,
+    log_level,
+    watchman_version,
+    watchman_supportdir,
+    startup_timeout,
+    socket_timeout,
+    socket_path_override=None,
+    metadata_base_dir=None,
+  ):
     """
     :param binary_util: The BinaryUtil subsystem instance for binary retrieval.
     :param log_level: The current log level of pants.
@@ -64,13 +75,13 @@ class WatchmanLauncher:
     # data (10s of gigabytes over the course of an ~hour for an active fs) and is not particularly
     # helpful except for debugging Watchman itself. Thus, here we intentionally avoid this level
     # in the mapping of pants log level -> watchman.
-    return {'warn': '0', 'info': '1', 'debug': '1'}.get(level, '1')
+    return {"warn": "0", "info": "1", "debug": "1"}.get(level, "1")
 
   @testable_memoized_property
   def watchman(self):
-    watchman_binary = self._binary_util.select_binary(self._watchman_supportdir,
-                                                      self._watchman_version,
-                                                      'watchman')
+    watchman_binary = self._binary_util.select_binary(
+      self._watchman_supportdir, self._watchman_version, "watchman"
+    )
     return Watchman(
       watchman_binary,
       self._metadata_base_dir,
@@ -82,15 +93,18 @@ class WatchmanLauncher:
 
   def maybe_launch(self):
     if not self.watchman.is_alive():
-      self._logger.debug('launching watchman')
+      self._logger.debug("launching watchman")
       try:
         self.watchman.launch()
       except (Watchman.ExecutionError, Watchman.InvalidCommandOutput) as e:
-        self._logger.fatal('failed to launch watchman: {!r})'.format(e))
+        self._logger.fatal("failed to launch watchman: {!r})".format(e))
         raise
 
-    self._logger.debug('watchman is running, pid={pid} socket={socket}'
-                       .format(pid=self.watchman.pid, socket=self.watchman.socket))
+    self._logger.debug(
+      "watchman is running, pid={pid} socket={socket}".format(
+        pid=self.watchman.pid, socket=self.watchman.socket
+      )
+    )
 
     return self.watchman
 

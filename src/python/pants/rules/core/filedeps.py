@@ -19,18 +19,20 @@ class FiledepsOptions(LineOriented, GoalSubsystem):
   Files may be listed with absolute or relative paths and any BUILD files implied in the transitive
   closure of targets are also included.
   """
-  name = 'filedeps2'
+
+  name = "filedeps2"
 
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
     register(
-      '--absolute', type=bool, default=True,
-      help='If True, output with absolute path; else, output with path relative to the build root'
+      "--absolute",
+      type=bool,
+      default=True,
+      help="If True, output with absolute path; else, output with path relative to the build root",
     )
     register(
-      '--globs', type=bool,
-      help='Instead of outputting filenames, output globs (ignoring excludes)'
+      "--globs", type=bool, help="Instead of outputting filenames, output globs (ignoring excludes)"
     )
 
 
@@ -72,6 +74,4 @@ async def file_deps(
 
 
 def rules():
-  return [
-      file_deps,
-    ]
+  return [file_deps]

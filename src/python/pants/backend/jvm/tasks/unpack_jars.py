@@ -12,7 +12,6 @@ from pants.util.objects import SubclassesOf
 
 
 class UnpackJarsFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintStrategy):
-
   def compute_fingerprint(self, target):
     """UnpackedJars targets need to be re-unpacked if any of its configuration changes or any of
     the jars they import have changed.
@@ -43,7 +42,7 @@ class UnpackJars(UnpackRemoteSourcesBase):
 
   @classmethod
   def implementation_version(cls):
-    return super().implementation_version() + [('UnpackJars', 0)]
+    return super().implementation_version() + [("UnpackJars", 0)]
 
   def get_fingerprint_strategy(self):
     return UnpackJarsFingerprintStrategy()
@@ -55,6 +54,9 @@ class UnpackJars(UnpackRemoteSourcesBase):
 
     for coordinate, jar_path in jar_import_products.imports(unpacked_jars):
       if not unpacked_jars.payload.intransitive or coordinate in direct_coords:
-        self.context.log.info('Unpacking jar {coordinate} from {jar_path} to {unpack_dir}.'.format(
-          coordinate=coordinate, jar_path=jar_path, unpack_dir=unpack_dir))
+        self.context.log.info(
+          "Unpacking jar {coordinate} from {jar_path} to {unpack_dir}.".format(
+            coordinate=coordinate, jar_path=jar_path, unpack_dir=unpack_dir
+          )
+        )
         ZIP.extract(jar_path, unpack_dir, filter_func=unpack_filter)

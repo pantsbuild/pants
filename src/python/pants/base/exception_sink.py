@@ -51,8 +51,9 @@ class SignalHandler:
     self._ignoring_sigint_v2_engine = False
 
   def _check_sigint_gate_is_correct(self):
-    assert self._threads_ignoring_sigint >= 0, \
-      "This should never happen, someone must have modified the counter outside of SignalHandler."
+    assert (
+      self._threads_ignoring_sigint >= 0
+    ), "This should never happen, someone must have modified the counter outside of SignalHandler."
 
   def _handle_sigint_if_enabled(self, signum, _frame):
     with self._ignore_sigint_lock:
@@ -79,7 +80,7 @@ class SignalHandler:
         self._check_sigint_gate_is_correct()
 
   def handle_sigint(self, signum, _frame):
-    raise KeyboardInterrupt('User interrupted execution with control-c!')
+    raise KeyboardInterrupt("User interrupted execution with control-c!")
 
   # TODO(#7406): figure out how to let sys.exit work in a signal handler instead of having to raise
   # this exception!
@@ -98,10 +99,10 @@ class SignalHandler:
       super(SignalHandler.SignalHandledNonLocalExit, self).__init__()
 
   def handle_sigquit(self, signum, _frame):
-    raise self.SignalHandledNonLocalExit(signum, 'SIGQUIT')
+    raise self.SignalHandledNonLocalExit(signum, "SIGQUIT")
 
   def handle_sigterm(self, signum, _frame):
-    raise self.SignalHandledNonLocalExit(signum, 'SIGTERM')
+    raise self.SignalHandledNonLocalExit(signum, "SIGTERM")
 
 
 class ExceptionSink:
@@ -128,10 +129,10 @@ class ExceptionSink:
   _shared_error_fileobj = None
 
   def __new__(cls, *args, **kwargs):
-    raise TypeError('Instances of {} are not allowed to be constructed!'
-                    .format(cls.__name__))
+    raise TypeError("Instances of {} are not allowed to be constructed!".format(cls.__name__))
 
-  class ExceptionSinkError(Exception): pass
+  class ExceptionSinkError(Exception):
+    pass
 
   @classmethod
   def reset_should_print_backtrace_to_terminal(cls, should_print_backtrace):
@@ -165,11 +166,12 @@ class ExceptionSink:
     cls._check_or_create_new_destination(new_log_location)
 
     pid_specific_error_stream, shared_error_stream = cls._recapture_fatal_error_log_streams(
-      new_log_location)
+      new_log_location
+    )
 
     # NB: mutate process-global state!
     if faulthandler.is_enabled():
-      logger.debug('re-enabling faulthandler')
+      logger.debug("re-enabling faulthandler")
       # Call Py_CLEAR() on the previous error stream:
       # https://github.com/vstinner/faulthandler/blob/master/faulthandler.c
       faulthandler.disable()
@@ -236,9 +238,7 @@ class ExceptionSink:
 
   @classmethod
   def reset_interactive_output_stream(
-    cls,
-    interactive_output_stream,
-    override_faulthandler_destination=True
+    cls, interactive_output_stream, override_faulthandler_destination=True
   ):
     """
     Class state:
@@ -253,28 +253,27 @@ class ExceptionSink:
       # NB: mutate process-global state!
       # This permits a non-fatal `kill -31 <pants pid>` for stacktrace retrieval.
       if override_faulthandler_destination:
-        faulthandler.register(signal.SIGUSR2, interactive_output_stream,
-                              all_threads=True, chain=False)
+        faulthandler.register(
+          signal.SIGUSR2, interactive_output_stream, all_threads=True, chain=False
+        )
       # NB: mutate the class variables!
       cls._interactive_output_stream = interactive_output_stream
     except ValueError:
       # Warn about "ValueError: IO on closed file" when the stream is closed.
       cls.log_exception(
-        "Cannot reset interactive_output_stream -- stream (probably stderr) is closed")
+        "Cannot reset interactive_output_stream -- stream (probably stderr) is closed"
+      )
 
   @classmethod
   def exceptions_log_path(cls, for_pid=None, in_dir=None):
     """Get the path to either the shared or pid-specific fatal errors log file."""
     if for_pid is None:
-      intermediate_filename_component = ''
+      intermediate_filename_component = ""
     else:
       assert isinstance(for_pid, Pid)
-      intermediate_filename_component = '.{}'.format(for_pid)
+      intermediate_filename_component = ".{}".format(for_pid)
     in_dir = in_dir or cls._log_dir
-    return os.path.join(
-      in_dir,
-      '.pids',
-      'exceptions{}.log'.format(intermediate_filename_component))
+    return os.path.join(in_dir, ".pids", "exceptions{}.log".format(intermediate_filename_component))
 
   @classmethod
   def log_exception(cls, msg):
@@ -290,8 +289,10 @@ class ExceptionSink:
       cls._try_write_with_flush(cls._pid_specific_error_fileobj, fatal_error_log_entry)
     except Exception as e:
       logger.error(
-        "Error logging the message '{}' to the pid-specific file handle for {} at pid {}:\n{}"
-        .format(msg, cls._log_dir, pid, e))
+        "Error logging the message '{}' to the pid-specific file handle for {} at pid {}:\n{}".format(
+          msg, cls._log_dir, pid, e
+        )
+      )
 
     # Write to the shared log.
     try:
@@ -300,8 +301,10 @@ class ExceptionSink:
       cls._try_write_with_flush(cls._shared_error_fileobj, fatal_error_log_entry)
     except Exception as e:
       logger.error(
-        "Error logging the message '{}' to the shared file handle for {} at pid {}:\n{}"
-        .format(msg, cls._log_dir, pid, e))
+        "Error logging the message '{}' to the shared file handle for {} at pid {}:\n{}".format(
+          msg, cls._log_dir, pid, e
+        )
+      )
 
   @classmethod
   def _try_write_with_flush(cls, fileobj, payload):
@@ -318,9 +321,11 @@ class ExceptionSink:
       safe_mkdir(destination)
     except Exception as e:
       raise cls.ExceptionSinkError(
-        "The provided exception sink path at '{}' is not writable or could not be created: {}."
-        .format(destination, str(e)),
-        e)
+        "The provided exception sink path at '{}' is not writable or could not be created: {}.".format(
+          destination, str(e)
+        ),
+        e,
+      )
 
   @classmethod
   def _recapture_fatal_error_log_streams(cls, new_log_location):
@@ -333,13 +338,15 @@ class ExceptionSink:
     assert pid_specific_log_path != shared_log_path
     try:
       # Truncate the pid-specific error log file.
-      pid_specific_error_stream = safe_open(pid_specific_log_path, mode='w')
+      pid_specific_error_stream = safe_open(pid_specific_log_path, mode="w")
       # Append to the shared error file.
-      shared_error_stream = safe_open(shared_log_path, mode='a')
+      shared_error_stream = safe_open(shared_log_path, mode="a")
     except Exception as e:
       raise cls.ExceptionSinkError(
-        "Error opening fatal error log streams for log location '{}': {}"
-        .format(new_log_location, str(e)))
+        "Error opening fatal error log streams for log location '{}': {}".format(
+          new_log_location, str(e)
+        )
+      )
 
     return (pid_specific_error_stream, shared_error_stream)
 
@@ -424,16 +431,17 @@ pid: {pid}
       process_title=setproctitle.getproctitle(),
       args=sys.argv,
       pid=pid,
-      message=msg)
+      message=msg,
+    )
 
-  _traceback_omitted_default_text = '(backtrace omitted)'
+  _traceback_omitted_default_text = "(backtrace omitted)"
 
   @classmethod
   def _format_traceback(cls, traceback_lines, should_print_backtrace):
     if should_print_backtrace:
-      traceback_string = '\n{}'.format(''.join(traceback_lines))
+      traceback_string = "\n{}".format("".join(traceback_lines))
     else:
-      traceback_string = ' {}'.format(cls._traceback_omitted_default_text)
+      traceback_string = " {}".format(cls._traceback_omitted_default_text)
     return traceback_string
 
   _UNHANDLED_EXCEPTION_LOG_FORMAT = """\
@@ -444,15 +452,17 @@ Exception message: {exception_message}{maybe_newline}
   @classmethod
   def _format_unhandled_exception_log(cls, exc, tb, add_newline, should_print_backtrace):
     exc_type = type(exc)
-    exception_full_name = '{}.{}'.format(exc_type.__module__, exc_type.__name__)
-    exception_message = str(exc) if exc else '(no message)'
-    maybe_newline = '\n' if add_newline else ''
+    exception_full_name = "{}.{}".format(exc_type.__module__, exc_type.__name__)
+    exception_message = str(exc) if exc else "(no message)"
+    maybe_newline = "\n" if add_newline else ""
     return cls._UNHANDLED_EXCEPTION_LOG_FORMAT.format(
       exception_type=exception_full_name,
-      backtrace=cls._format_traceback(traceback_lines=traceback.format_tb(tb),
-                                      should_print_backtrace=should_print_backtrace),
+      backtrace=cls._format_traceback(
+        traceback_lines=traceback.format_tb(tb), should_print_backtrace=should_print_backtrace
+      ),
       exception_message=exception_message,
-      maybe_newline=maybe_newline)
+      maybe_newline=maybe_newline,
+    )
 
   _EXIT_FAILURE_TERMINAL_MESSAGE_FORMAT = """\
 {timestamp_msg}{terminal_msg}{details_msg}
@@ -460,13 +470,20 @@ Exception message: {exception_message}{maybe_newline}
 
   @classmethod
   def _exit_with_failure(cls, terminal_msg):
-    timestamp_msg = (f'timestamp: {cls._iso_timestamp_for_now()}\n'
-                     if cls._should_print_backtrace_to_terminal else '')
-    details_msg = ('' if cls._should_print_backtrace_to_terminal
-                   else '\n\n(Use --print-exception-stacktrace to see more error details.)')
-    terminal_msg = terminal_msg or '<no exit reason provided>'
+    timestamp_msg = (
+      f"timestamp: {cls._iso_timestamp_for_now()}\n"
+      if cls._should_print_backtrace_to_terminal
+      else ""
+    )
+    details_msg = (
+      ""
+      if cls._should_print_backtrace_to_terminal
+      else "\n\n(Use --print-exception-stacktrace to see more error details.)"
+    )
+    terminal_msg = terminal_msg or "<no exit reason provided>"
     formatted_terminal_msg = cls._EXIT_FAILURE_TERMINAL_MESSAGE_FORMAT.format(
-      timestamp_msg=timestamp_msg, terminal_msg=terminal_msg, details_msg=details_msg)
+      timestamp_msg=timestamp_msg, terminal_msg=terminal_msg, details_msg=details_msg
+    )
     # Exit with failure, printing a message to the terminal (or whatever the interactive stream is).
     cls._exiter.exit_and_fail(msg=formatted_terminal_msg, out=cls._interactive_output_stream)
 
@@ -484,28 +501,29 @@ Exception message: {exception_message}{maybe_newline}
     extra_err_msg = None
     try:
       # Always output the unhandled exception details into a log file, including the traceback.
-      exception_log_entry = cls._format_unhandled_exception_log(exc, tb, add_newline,
-                                                                should_print_backtrace=True)
+      exception_log_entry = cls._format_unhandled_exception_log(
+        exc, tb, add_newline, should_print_backtrace=True
+      )
       cls.log_exception(exception_log_entry)
     except Exception as e:
-      extra_err_msg = 'Additional error logging unhandled exception {}: {}'.format(exc, e)
+      extra_err_msg = "Additional error logging unhandled exception {}: {}".format(exc, e)
       logger.error(extra_err_msg)
 
     # Generate an unhandled exception report fit to be printed to the terminal (respecting the
     # Exiter's should_print_backtrace field).
     if cls._should_print_backtrace_to_terminal:
       stderr_printed_error = cls._format_unhandled_exception_log(
-        exc, tb, add_newline,
-        should_print_backtrace=cls._should_print_backtrace_to_terminal)
+        exc, tb, add_newline, should_print_backtrace=cls._should_print_backtrace_to_terminal
+      )
       if extra_err_msg:
-        stderr_printed_error = '{}\n{}'.format(stderr_printed_error, extra_err_msg)
+        stderr_printed_error = "{}\n{}".format(stderr_printed_error, extra_err_msg)
     else:
       # If the user didn't ask for a backtrace, show a succinct error message without
       # all the exception-related preamble.  A power-user/pants developer can still
       # get all the preamble info along with the backtrace, but the end user shouldn't
       # see that boilerplate by default.
-      error_msgs = getattr(exc, 'end_user_messages', lambda: [str(exc)])()
-      stderr_printed_error = '\n' + '\n'.join(f'ERROR: {msg}' for msg in error_msgs)
+      error_msgs = getattr(exc, "end_user_messages", lambda: [str(exc)])()
+      stderr_printed_error = "\n" + "\n".join(f"ERROR: {msg}" for msg in error_msgs)
     cls._exit_with_failure(stderr_printed_error)
 
   _CATCHABLE_SIGNAL_ERROR_LOG_FORMAT = """\
@@ -516,12 +534,12 @@ Signal {signum} ({signame}) was raised. Exiting with failure.{formatted_tracebac
   def _handle_signal_gracefully(cls, signum, signame, traceback_lines):
     """Signal handler for non-fatal signals which raises or logs an error and exits with failure."""
     # Extract the stack, and format an entry to be written to the exception log.
-    formatted_traceback = cls._format_traceback(traceback_lines=traceback_lines,
-                                                should_print_backtrace=True)
+    formatted_traceback = cls._format_traceback(
+      traceback_lines=traceback_lines, should_print_backtrace=True
+    )
     signal_error_log_entry = cls._CATCHABLE_SIGNAL_ERROR_LOG_FORMAT.format(
-      signum=signum,
-      signame=signame,
-      formatted_traceback=formatted_traceback)
+      signum=signum, signame=signame, formatted_traceback=formatted_traceback
+    )
     # TODO: determine the appropriate signal-safe behavior here (to avoid writing to our file
     # descriptors re-entrantly, which raises an IOError).
     # This method catches any exceptions raised within it.
@@ -530,11 +548,11 @@ Signal {signum} ({signame}) was raised. Exiting with failure.{formatted_tracebac
     # Create a potentially-abbreviated traceback for the terminal or other interactive stream.
     formatted_traceback_for_terminal = cls._format_traceback(
       traceback_lines=traceback_lines,
-      should_print_backtrace=cls._should_print_backtrace_to_terminal)
+      should_print_backtrace=cls._should_print_backtrace_to_terminal,
+    )
     terminal_log_entry = cls._CATCHABLE_SIGNAL_ERROR_LOG_FORMAT.format(
-      signum=signum,
-      signame=signame,
-      formatted_traceback=formatted_traceback_for_terminal)
+      signum=signum, signame=signame, formatted_traceback=formatted_traceback_for_terminal
+    )
     # Exit, printing the output to the terminal.
     cls._exit_with_failure(terminal_log_entry)
 
@@ -555,4 +573,5 @@ ExceptionSink.reset_signal_handler(SignalHandler())
 # to explicitly request it. The exception log will have any stacktraces regardless so this should
 # not hamper debugging.
 ExceptionSink.reset_should_print_backtrace_to_terminal(
-  should_print_backtrace=os.environ.get('PANTS_PRINT_EXCEPTION_STACKTRACE', 'True') == 'True')
+  should_print_backtrace=os.environ.get("PANTS_PRINT_EXCEPTION_STACKTRACE", "True") == "True"
+)

@@ -24,7 +24,7 @@ class RunInfo:
     safe_mkdir_for(self._info_file)
     self._info = OrderedDict()
     if os.path.exists(self._info_file):
-      with open(self._info_file, 'r') as infile:
+      with open(self._info_file, "r") as infile:
         info = infile.read()
       for m in re.finditer("""^([^:]+):(.*)$""", info, re.MULTILINE):
         self._info[m.group(1).strip()] = m.group(2).strip()
@@ -53,36 +53,45 @@ class RunInfo:
     kv_pairs = []
     for key, val in keyvals:
       key = key.strip()
-      if kwargs.get('stringify', True):
+      if kwargs.get("stringify", True):
         val = str(val).strip()
-      if ':' in key:
+      if ":" in key:
         raise ValueError(f'info key "{key}" must not contain a colon.')
       kv_pairs.append((key, val))
 
     for k, v in kv_pairs:
       if k in self._info:
-        raise ValueError(f'info key "{k}" already exists with value {self._info[k]}. '
-                         'Cannot add it again with value {v}.')
+        raise ValueError(
+          f'info key "{k}" already exists with value {self._info[k]}. '
+          "Cannot add it again with value {v}."
+        )
       self._info[k] = v
 
     try:
-      with open(self._info_file, 'a') as outfile:
+      with open(self._info_file, "a") as outfile:
         for k, v in kv_pairs:
-          outfile.write('{}: {}\n'.format(k, v))
+          outfile.write("{}: {}\n".format(k, v))
     except IOError:
-      if not kwargs.get('ignore_errors', False):
+      if not kwargs.get("ignore_errors", False):
         raise
 
   def add_basic_info(self, run_id, timestamp):
     """Adds basic build info."""
-    datetime = time.strftime('%A %b %d, %Y %H:%M:%S', time.localtime(timestamp))
+    datetime = time.strftime("%A %b %d, %Y %H:%M:%S", time.localtime(timestamp))
     user = getpass.getuser()
     machine = socket.gethostname()
     buildroot = get_buildroot()
     # TODO: Get rid of the redundant 'path' key once everyone is off it.
-    self.add_infos(('id', run_id), ('timestamp', timestamp), ('datetime', datetime),
-                   ('user', user), ('machine', machine), ('path', buildroot),
-                   ('buildroot', buildroot), ('version', VERSION))
+    self.add_infos(
+      ("id", run_id),
+      ("timestamp", timestamp),
+      ("datetime", datetime),
+      ("user", user),
+      ("machine", machine),
+      ("path", buildroot),
+      ("buildroot", buildroot),
+      ("version", VERSION),
+    )
 
   def add_scm_info(self):
     """Adds SCM-related info."""
@@ -91,4 +100,4 @@ class RunInfo:
       return
     revision = scm.commit_id
     branch = scm.branch_name or revision
-    self.add_infos(('revision', revision), ('branch', branch))
+    self.add_infos(("revision", revision), ("branch", branch))

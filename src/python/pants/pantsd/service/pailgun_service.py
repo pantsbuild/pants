@@ -50,11 +50,7 @@ class PailgunService(PantsService):
     # Constructs and returns a runnable PantsRunner.
     def runner_factory(sock, arguments, environment):
       return self._runner_class.create(
-        sock,
-        arguments,
-        environment,
-        self.services,
-        self._scheduler_service,
+        sock, arguments, environment, self.services, self._scheduler_service
       )
 
     # Plumb the daemon's lifecycle lock to the `PailgunServer` to safeguard teardown.
@@ -65,11 +61,13 @@ class PailgunService(PantsService):
       with self.services.lifecycle_lock:
         yield
 
-    return PailgunServer(self._bind_addr, runner_factory, lifecycle_lock, self._request_complete_callback)
+    return PailgunServer(
+      self._bind_addr, runner_factory, lifecycle_lock, self._request_complete_callback
+    )
 
   def run(self):
     """Main service entrypoint. Called via Thread.start() via PantsDaemon.run()."""
-    self._logger.info('starting pailgun server on port {}'.format(self.pailgun_port))
+    self._logger.info("starting pailgun server on port {}".format(self.pailgun_port))
 
     try:
       # Manually call handle_request() in a loop vs serve_forever() for interruptability.
@@ -78,9 +76,9 @@ class PailgunService(PantsService):
         self._state.maybe_pause()
     except select.error as e:
       # SocketServer can throw `error: (9, 'Bad file descriptor')` on teardown. Ignore it.
-      self._logger.warning('pailgun service shutting down due to an error: {}'.format(e))
+      self._logger.warning("pailgun service shutting down due to an error: {}".format(e))
     finally:
-      self._logger.info('pailgun service on port {} shutting down'.format(self.pailgun_port))
+      self._logger.info("pailgun service on port {} shutting down".format(self.pailgun_port))
 
   def terminate(self):
     """Override of PantsService.terminate() that cleans up when the Pailgun server is terminated."""

@@ -45,17 +45,27 @@ class ExportDepAsJar(ConsoleTask):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--formatted', type=bool, implicit_value=False,
-      help='Causes output to be a single line of JSON.')
-    register('--sources', type=bool,
-      help='Causes the sources of dependencies to be zipped and included in the project.')
     register(
-      '--transitive', type=bool, default=True, fingerprint=True,
-      help='If True, use all targets in the build graph, else use only target roots.',
+      "--formatted",
+      type=bool,
+      implicit_value=False,
+      help="Causes output to be a single line of JSON.",
+    )
+    register(
+      "--sources",
+      type=bool,
+      help="Causes the sources of dependencies to be zipped and included in the project.",
+    )
+    register(
+      "--transitive",
+      type=bool,
+      default=True,
+      fingerprint=True,
+      help="If True, use all targets in the build graph, else use only target roots.",
       removal_version="1.27.0.dev0",
       removal_hint="`export-dep-as-jar` should always act transitively, which is the default. "
-                   "This option will be going away to ensure that Pants always does the right "
-                   "thing.",
+      "This option will be going away to ensure that Pants always does the right "
+      "thing.",
     )
 
   @property
@@ -66,13 +76,13 @@ class ExportDepAsJar(ConsoleTask):
   @classmethod
   def prepare(cls, options, round_manager):
     super().prepare(options, round_manager)
-    round_manager.require_data('zinc_args')
-    round_manager.require_data('runtime_classpath')
-    round_manager.require_data('export_dep_as_jar_signal')
+    round_manager.require_data("zinc_args")
+    round_manager.require_data("runtime_classpath")
+    round_manager.require_data("export_dep_as_jar_signal")
 
   @property
   def _output_folder(self):
-    return self.options_scope.replace('.', os.sep)
+    return self.options_scope.replace(".", os.sep)
 
   @staticmethod
   def _source_roots_for_target(target):
@@ -82,7 +92,7 @@ class ExportDepAsJar(ConsoleTask):
 
     def root_package_prefix(source_file):
       source = os.path.dirname(source_file)
-      return os.path.join(get_buildroot(), target.target_base, source), source.replace(os.sep, '.')
+      return os.path.join(get_buildroot(), target.target_base, source), source.replace(os.sep, ".")
 
     return {root_package_prefix(source) for source in target.sources_relative_to_source_root()}
 
@@ -110,9 +120,9 @@ class ExportDepAsJar(ConsoleTask):
     :returns: String representing the key as a maven coordinate
     """
     if jar.rev:
-      return '{0}:{1}:{2}'.format(jar.org, jar.name, jar.rev)
+      return "{0}:{1}:{2}".format(jar.org, jar.name, jar.rev)
     else:
-      return '{0}:{1}'.format(jar.org, jar.name)
+      return "{0}:{1}".format(jar.org, jar.name)
 
   @staticmethod
   def _exclude_id(jar):
@@ -120,7 +130,7 @@ class ExportDepAsJar(ConsoleTask):
     :param Exclude jar: key for an excluded jar
     :returns: String representing the key as a maven coordinate
     """
-    return '{0}:{1}'.format(jar.org, jar.name) if jar.name else jar.org
+    return "{0}:{1}".format(jar.org, jar.name) if jar.name else jar.org
 
   @staticmethod
   def _get_target_type(tgt, resource_target_map, runtime_classpath):
@@ -130,9 +140,11 @@ class ExportDepAsJar(ConsoleTask):
     if is_test(tgt):
       return SourceRootTypes.TEST
     else:
-      if (isinstance(tgt, Resources) and
-        tgt in resource_target_map and
-        is_test(resource_target_map[tgt])):
+      if (
+        isinstance(tgt, Resources)
+        and tgt in resource_target_map
+        and is_test(resource_target_map[tgt])
+      ):
         return SourceRootTypes.TEST_RESOURCE
       elif isinstance(tgt, Resources):
         return SourceRootTypes.RESOURCE
@@ -154,18 +166,20 @@ class ExportDepAsJar(ConsoleTask):
     """
     mapping = defaultdict(dict)
     jar_products = classpath_products.get_artifact_classpath_entries_for_targets(
-      targets, respect_excludes=False)
+      targets, respect_excludes=False
+    )
     for conf, jar_entry in jar_products:
-      conf = jar_entry.coordinate.classifier or 'default'
+      conf = jar_entry.coordinate.classifier or "default"
       mapping[self._jar_id(jar_entry.coordinate)][conf] = jar_entry.cache_path
     return mapping
 
   @staticmethod
-  def _zip_sources(target, location, suffix='.jar'):
+  def _zip_sources(target, location, suffix=".jar"):
     with temporary_file(root_dir=location, cleanup=False, suffix=suffix) as f:
-      with zipfile.ZipFile(f, 'a') as zip_file:
+      with zipfile.ZipFile(f, "a") as zip_file:
         for src_from_source_root, src_from_build_root in zip(
-          target.sources_relative_to_source_root(), target.sources_relative_to_buildroot()):
+          target.sources_relative_to_source_root(), target.sources_relative_to_buildroot()
+        ):
           zip_file.write(os.path.join(get_buildroot(), src_from_build_root), src_from_source_root)
     return f
 
@@ -181,33 +195,40 @@ class ExportDepAsJar(ConsoleTask):
     return list(sorted(dependencies_to_include))
 
   def _extract_arguments_with_prefix_from_zinc_args(self, args, prefix):
-    return [option[len(prefix):] for option in args if option.startswith(prefix)]
+    return [option[len(prefix) :] for option in args if option.startswith(prefix)]
 
   def _process_target(
-    self, current_target, modulizable_target_set, resource_target_map, runtime_classpath, zinc_args_for_target
+    self,
+    current_target,
+    modulizable_target_set,
+    resource_target_map,
+    runtime_classpath,
+    zinc_args_for_target,
   ):
     """
     :type current_target:pants.build_graph.target.Target
     """
     info = {
       # this means 'dependencies'
-      'targets': [],
-      'libraries': [],
-      'roots': [],
-      'id': current_target.id,
-      'target_type': ExportDepAsJar._get_target_type(current_target, resource_target_map, runtime_classpath),
-      'is_synthetic': current_target.is_synthetic,
-      'pants_target_type': self._get_pants_target_alias(type(current_target)),
-      'is_target_root': current_target in modulizable_target_set,
-      'transitive': current_target.transitive,
-      'scope': str(current_target.scope),
-      'scalac_args': self._extract_arguments_with_prefix_from_zinc_args(zinc_args_for_target, '-S'),
-      'javac_args': self._extract_arguments_with_prefix_from_zinc_args(zinc_args_for_target, '-C'),
-      'extra_jvm_options': current_target.payload.get_field_value('extra_jvm_options', [])
+      "targets": [],
+      "libraries": [],
+      "roots": [],
+      "id": current_target.id,
+      "target_type": ExportDepAsJar._get_target_type(
+        current_target, resource_target_map, runtime_classpath
+      ),
+      "is_synthetic": current_target.is_synthetic,
+      "pants_target_type": self._get_pants_target_alias(type(current_target)),
+      "is_target_root": current_target in modulizable_target_set,
+      "transitive": current_target.transitive,
+      "scope": str(current_target.scope),
+      "scalac_args": self._extract_arguments_with_prefix_from_zinc_args(zinc_args_for_target, "-S"),
+      "javac_args": self._extract_arguments_with_prefix_from_zinc_args(zinc_args_for_target, "-C"),
+      "extra_jvm_options": current_target.payload.get_field_value("extra_jvm_options", []),
     }
 
     if not current_target.is_synthetic:
-      info['globs'] = current_target.globs_relative_to_buildroot()
+      info["globs"] = current_target.globs_relative_to_buildroot()
 
     def iter_transitive_jars(jar_lib):
       """
@@ -242,63 +263,68 @@ class ExportDepAsJar(ConsoleTask):
     libraries_for_target = set([self._jar_id(jar) for jar in iter_transitive_jars(current_target)])
     for dep in self._dependencies_to_include_in_libraries(current_target, modulizable_target_set):
       libraries_for_target.update(_full_library_set_for_target(dep))
-    info['libraries'].extend(libraries_for_target)
+    info["libraries"].extend(libraries_for_target)
 
-    info['roots'] = [{
-      'source_root': os.path.realpath(source_root_package_prefix[0]),
-      'package_prefix': source_root_package_prefix[1]
-    } for source_root_package_prefix in self._source_roots_for_target(current_target)]
+    info["roots"] = [
+      {
+        "source_root": os.path.realpath(source_root_package_prefix[0]),
+        "package_prefix": source_root_package_prefix[1],
+      }
+      for source_root_package_prefix in self._source_roots_for_target(current_target)
+    ]
 
     for dep in current_target.dependencies:
       if dep in modulizable_target_set:
-        info['targets'].append(dep.address.spec)
+        info["targets"].append(dep.address.spec)
 
     if isinstance(current_target, ScalaLibrary):
       for dep in current_target.java_sources:
-        info['targets'].append(dep.address.spec)
+        info["targets"].append(dep.address.spec)
 
     if isinstance(current_target, JvmTarget):
-      info['excludes'] = [self._exclude_id(exclude) for exclude in current_target.excludes]
-      info['platform'] = current_target.platform.name
-      if hasattr(current_target, 'runtime_platform'):
-        info['runtime_platform'] = current_target.runtime_platform.name
+      info["excludes"] = [self._exclude_id(exclude) for exclude in current_target.excludes]
+      info["platform"] = current_target.platform.name
+      if hasattr(current_target, "runtime_platform"):
+        info["runtime_platform"] = current_target.runtime_platform.name
 
     return info
 
   def initialize_graph_info(self):
     scala_platform = ScalaPlatform.global_instance()
     scala_platform_map = {
-      'scala_version': scala_platform.version,
-      'compiler_classpath': [
+      "scala_version": scala_platform.version,
+      "compiler_classpath": [
         cp_entry.path
         for cp_entry in scala_platform.compiler_classpath_entries(self.context.products)
       ],
     }
 
     jvm_platforms_map = {
-      'default_platform': JvmPlatform.global_instance().default_platform.name,
-      'platforms': {
+      "default_platform": JvmPlatform.global_instance().default_platform.name,
+      "platforms": {
         str(platform_name): {
-          'target_level': str(platform.target_level),
-          'source_level': str(platform.source_level),
-          'args': platform.args,
-        } for platform_name, platform in JvmPlatform.global_instance().platforms_by_name.items()},
+          "target_level": str(platform.target_level),
+          "source_level": str(platform.source_level),
+          "args": platform.args,
+        }
+        for platform_name, platform in JvmPlatform.global_instance().platforms_by_name.items()
+      },
     }
 
     graph_info = {
-      'version': DEFAULT_EXPORT_VERSION,
-      'targets': {},
-      'jvm_platforms': jvm_platforms_map,
-      'scala_platform': scala_platform_map,
+      "version": DEFAULT_EXPORT_VERSION,
+      "targets": {},
+      "jvm_platforms": jvm_platforms_map,
+      "scala_platform": scala_platform_map,
       # `jvm_distributions` are static distribution settings from config,
       # `preferred_jvm_distributions` are distributions that pants actually uses for the
       # given platform setting.
-      'preferred_jvm_distributions': {}
+      "preferred_jvm_distributions": {},
     }
 
     for platform_name, platform in JvmPlatform.global_instance().platforms_by_name.items():
       preferred_distributions = {}
-      for strict, strict_key in [(True, 'strict'), (False, 'non_strict')]:
+      for strict, strict_key in [(True, "strict"), (False, "non_strict")]:
         try:
           dist = JvmPlatform.preferred_jvm_distribution([platform], strict=strict)
           preferred_distributions[strict_key] = dist.home
@@ -306,7 +332,7 @@ class ExportDepAsJar(ConsoleTask):
           pass
 
       if preferred_distributions:
-        graph_info['preferred_jvm_distributions'][platform_name] = preferred_distributions
+        graph_info["preferred_jvm_distributions"][platform_name] = preferred_distributions
 
     return graph_info
 
@@ -318,11 +344,15 @@ class ExportDepAsJar(ConsoleTask):
     targets.extend(additional_java_targets)
     return set(targets)
 
-  def _get_targets_to_make_into_modules(self, target_roots_set, resource_target_map, runtime_classpath):
+  def _get_targets_to_make_into_modules(
+    self, target_roots_set, resource_target_map, runtime_classpath
+  ):
     target_root_addresses = [t.address for t in target_roots_set]
     dependees_of_target_roots = [
-      t for t in self.context.build_graph.transitive_dependees_of_addresses(target_root_addresses)
-      if self._get_target_type(t, resource_target_map, runtime_classpath) is not SourceRootTypes.RESOURCE_GENERATED
+      t
+      for t in self.context.build_graph.transitive_dependees_of_addresses(target_root_addresses)
+      if self._get_target_type(t, resource_target_map, runtime_classpath)
+      is not SourceRootTypes.RESOURCE_GENERATED
     ]
     return dependees_of_target_roots
 
@@ -335,25 +365,30 @@ class ExportDepAsJar(ConsoleTask):
       # yic assumed that the cost to fingerprint the target may not be that lower than
       # just zipping up the resources anyway.
       jarred_resources = ExportDepAsJar._zip_sources(target, resource_jar_root)
-      library_entry['default'] = jarred_resources.name
+      library_entry["default"] = jarred_resources.name
     elif target_type == SourceRootTypes.RESOURCE_GENERATED:
       library_entry.update(
-        [(conf, os.path.realpath(path_entry)) for conf, path_entry in runtime_classpath.get_for_target(target)]
+        [
+          (conf, os.path.realpath(path_entry))
+          for conf, path_entry in runtime_classpath.get_for_target(target)
+        ]
       )
     else:
       jar_products = runtime_classpath.get_for_target(target)
       for conf, jar_entry in jar_products:
         # TODO(yic): check --compile-rsc-use-classpath-jars is enabled.
         # If not, zip up the classes/ dir here.
-        if 'z.jar' in jar_entry:
+        if "z.jar" in jar_entry:
           library_entry[conf] = jar_entry
       if self.get_options().sources:
         # NB: We create the jar in the same place as we create the resources
         # (as opposed to where we store the z.jar), because the path to the z.jar depends
         # on tasks outside of this one.
         # In addition to that, we may not want to depend on z.jar existing to export source jars.
-        jarred_sources = ExportDepAsJar._zip_sources(target, resource_jar_root, suffix='-sources.jar')
-        library_entry['sources'] = jarred_sources.name
+        jarred_sources = ExportDepAsJar._zip_sources(
+          target, resource_jar_root, suffix="-sources.jar"
+        )
+        library_entry["sources"] = jarred_sources.name
     return library_entry
 
   def generate_targets_map(self, targets, runtime_classpath, zinc_args_for_all_targets):
@@ -392,28 +427,40 @@ class ExportDepAsJar(ConsoleTask):
           # Targets that weren't selected by ZincCompile also wont have zinc args.
           zinc_args_for_target = []
         else:
-          raise TaskError(f"There was an error exporting target {target} - There were no zinc arguments registered for it")
-      info = self._process_target(target, modulizable_targets, resource_target_map, runtime_classpath, zinc_args_for_target)
+          raise TaskError(
+            f"There was an error exporting target {target} - There were no zinc arguments registered for it"
+          )
+      info = self._process_target(
+        target, modulizable_targets, resource_target_map, runtime_classpath, zinc_args_for_target
+      )
       targets_map[target.address.spec] = info
 
     graph_info = self.initialize_graph_info()
-    graph_info['targets'] = targets_map
-    graph_info['libraries'] = libraries_map
+    graph_info["targets"] = targets_map
+    graph_info["libraries"] = libraries_map
 
     return graph_info
 
   def console_output(self, targets):
-    zinc_args_for_all_targets = self.context.products.get_data('zinc_args')
+    zinc_args_for_all_targets = self.context.products.get_data("zinc_args")
 
     if zinc_args_for_all_targets is None:
-      raise TaskError("There was an error compiling the targets - There there are no zing argument entries")
+      raise TaskError(
+        "There was an error compiling the targets - There there are no zing argument entries"
+      )
 
-    runtime_classpath = self.context.products.get_data('runtime_classpath')
+    runtime_classpath = self.context.products.get_data("runtime_classpath")
     if runtime_classpath is None:
-      raise TaskError("There was an error compiling the targets - There is no runtime_classpath classpath")
-    graph_info = self.generate_targets_map(targets, runtime_classpath=runtime_classpath, zinc_args_for_all_targets=zinc_args_for_all_targets)
+      raise TaskError(
+        "There was an error compiling the targets - There is no runtime_classpath classpath"
+      )
+    graph_info = self.generate_targets_map(
+      targets,
+      runtime_classpath=runtime_classpath,
+      zinc_args_for_all_targets=zinc_args_for_all_targets,
+    )
 
     if self.get_options().formatted:
-      return json.dumps(graph_info, indent=4, separators=(',', ': ')).splitlines()
+      return json.dumps(graph_info, indent=4, separators=(",", ": ")).splitlines()
     else:
       return [json.dumps(graph_info)]

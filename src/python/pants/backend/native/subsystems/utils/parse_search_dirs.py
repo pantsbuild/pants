@@ -26,13 +26,14 @@ class ParseSearchDirs(Subsystem):
   compiler executables.
   """
 
-  options_scope = 'parse-search-dirs'
+  options_scope = "parse-search-dirs"
 
-  class ParseSearchDirsError(Exception): pass
+  class ParseSearchDirsError(Exception):
+    pass
 
   @memoized_classproperty
   def _search_dirs_libraries_regex(cls):
-    return re.compile('^libraries: =(.*)$', flags=re.MULTILINE)
+    return re.compile("^libraries: =(.*)$", flags=re.MULTILINE)
 
   def _invoke_compiler_exe(self, cmd, env):
     try:
@@ -41,30 +42,34 @@ class ParseSearchDirs(Subsystem):
     except OSError as e:
       # We use `safe_shlex_join` here to pretty-print the command.
       raise self.ParseSearchDirsError(
-        "Process invocation with argv '{}' and environment {!r} failed."
-        .format(safe_shlex_join(cmd), env),
-        e)
+        "Process invocation with argv '{}' and environment {!r} failed.".format(
+          safe_shlex_join(cmd), env
+        ),
+        e,
+      )
     except subprocess.CalledProcessError as e:
       raise self.ParseSearchDirsError(
         "Process invocation with argv '{}' and environment {!r} exited with non-zero code {}. "
-        "output:\n{}"
-        .format(safe_shlex_join(cmd), env, e.returncode, e.output),
-        e)
+        "output:\n{}".format(safe_shlex_join(cmd), env, e.returncode, e.output),
+        e,
+      )
 
     return compiler_output
 
   def _parse_libraries_from_compiler_search_dirs(self, compiler_exe, env):
     # This argument is supported by at least gcc and clang.
-    cmd = [compiler_exe, '-print-search-dirs']
+    cmd = [compiler_exe, "-print-search-dirs"]
 
     compiler_output = self._invoke_compiler_exe(cmd, env)
 
     libs_line = self._search_dirs_libraries_regex.search(compiler_output)
     if not libs_line:
       raise self.ParseSearchDirsError(
-        "Could not parse libraries from output of {!r}:\n{}"
-        .format(safe_shlex_join(cmd), compiler_output))
-    return libs_line.group(1).split(':')
+        "Could not parse libraries from output of {!r}:\n{}".format(
+          safe_shlex_join(cmd), compiler_output
+        )
+      )
+    return libs_line.group(1).split(":")
 
   def _filter_existing_dirs(self, dir_candidates, compiler_exe):
     real_dirs = OrderedSet()
@@ -74,9 +79,10 @@ class ParseSearchDirs(Subsystem):
       if is_readable_dir(maybe_existing_dir):
         real_dirs.add(os.path.realpath(maybe_existing_dir))
       else:
-        logger.debug("non-existent or non-accessible directory at {} while "
-                     "parsing directories from {}"
-                     .format(maybe_existing_dir, compiler_exe))
+        logger.debug(
+          "non-existent or non-accessible directory at {} while "
+          "parsing directories from {}".format(maybe_existing_dir, compiler_exe)
+        )
 
     return list(real_dirs)
 

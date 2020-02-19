@@ -55,6 +55,7 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
   of the helpers.  Ideally console tasks don't inherit a workdir, invalidator or build cache for
   example.
   """
+
   options_scope_category = ScopeInfo.TASK
 
   # We set this explicitly on the synthetic subclass, so that it shares a stable name with
@@ -66,12 +67,12 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
     """
     :API: public
     """
-    return [('TaskBase', 2)]
+    return [("TaskBase", 2)]
 
   @classmethod
   @memoized_method
   def implementation_version_str(cls):
-    return '.'.join(['_'.join(map(str, x)) for x in cls.implementation_version()])
+    return ".".join(["_".join(map(str, x)) for x in cls.implementation_version()])
 
   @classmethod
   @memoized_method
@@ -90,13 +91,15 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
 
   @classmethod
   def _compute_stable_name(cls):
-    return '{}_{}'.format(cls.__module__, cls.__name__).replace('.', '_')
+    return "{}_{}".format(cls.__module__, cls.__name__).replace(".", "_")
 
   @classmethod
   def subsystem_dependencies(cls):
-    return (super().subsystem_dependencies() +
-            (CacheSetup.scoped(cls), BuildInvalidator.Factory, SourceRootConfig) +
-            ((TargetFilter.scoped(cls),) if cls.target_filtering_enabled else tuple()))
+    return (
+      super().subsystem_dependencies()
+      + (CacheSetup.scoped(cls), BuildInvalidator.Factory, SourceRootConfig)
+      + ((TargetFilter.scoped(cls),) if cls.target_filtering_enabled else tuple())
+    )
 
   @classmethod
   def product_types(cls):
@@ -122,13 +125,15 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
   def register_options(cls, register):
     super().register_options(register)
     if cls.supports_passthru_args():
-      register('--passthrough-args',
-               type=list,
-               advanced=True,
-               fingerprint=True,
-               help='Pass these options as pass-through args; ie: as if by appending '
-                    '`-- <passthrough arg> ...` to the command line. Any passthrough args actually'
-                    'supplied on the command line will be used as well.')
+      register(
+        "--passthrough-args",
+        type=list,
+        advanced=True,
+        fingerprint=True,
+        help="Pass these options as pass-through args; ie: as if by appending "
+        "`-- <passthrough arg> ...` to the command line. Any passthrough args actually"
+        "supplied on the command line will be used as well.",
+      )
 
   @classmethod
   def _scoped_options(cls, options):
@@ -208,10 +213,10 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
     :API: public
     """
     if not self.supports_passthru_args():
-      raise TaskError('{} Does not support passthru args.'.format(self.stable_name()))
+      raise TaskError("{} Does not support passthru args.".format(self.stable_name()))
 
     passthru_args = []
-    passthru_args.extend(self.get_options().get('passthrough_args', default=()))
+    passthru_args.extend(self.get_options().get("passthrough_args", default=()))
     passthru_args.extend(self.context.options.passthru_args_for_scope(self.options_scope))
     return passthru_args
 
@@ -263,8 +268,11 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
 
     :API: public
     """
-    initial_targets = (self.context.targets(predicate) if self.act_transitively
-                       else list(filter(predicate, self.context.target_roots)))
+    initial_targets = (
+      self.context.targets(predicate)
+      if self.act_transitively
+      else list(filter(predicate, self.context.target_roots))
+    )
 
     if not self.target_filtering_enabled:
       return initial_targets
@@ -398,12 +406,14 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
     return False
 
   @contextmanager
-  def invalidated(self,
-                  targets,
-                  invalidate_dependents=False,
-                  silent=False,
-                  fingerprint_strategy=None,
-                  topological_order=False):
+  def invalidated(
+    self,
+    targets,
+    invalidate_dependents=False,
+    silent=False,
+    fingerprint_strategy=None,
+    topological_order=False,
+  ):
     """Checks targets for invalidation, first checking the artifact cache.
 
     Subclasses call this to figure out what to work on.
@@ -424,29 +434,29 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
     :returns: Yields an InvalidationCheck object reflecting the targets.
     :rtype: InvalidationCheck
     """
-    invalidation_check = self._do_invalidation_check(fingerprint_strategy,
-                                                     invalidate_dependents,
-                                                     targets,
-                                                     topological_order)
+    invalidation_check = self._do_invalidation_check(
+      fingerprint_strategy, invalidate_dependents, targets, topological_order
+    )
 
     self._maybe_create_results_dirs(invalidation_check.all_vts)
 
     if invalidation_check.invalid_vts and self.artifact_cache_reads_enabled():
-      with self.context.new_workunit('cache'):
-        cached_vts, uncached_vts, uncached_causes = \
-          self.check_artifact_cache(self.check_artifact_cache_for(invalidation_check))
+      with self.context.new_workunit("cache"):
+        cached_vts, uncached_vts, uncached_causes = self.check_artifact_cache(
+          self.check_artifact_cache_for(invalidation_check)
+        )
       if cached_vts:
         cached_targets = [vt.target for vt in cached_vts]
         self.context.run_tracker.artifact_cache_stats.add_hits(self._task_name, cached_targets)
         if not silent:
-          self._report_targets('Using cached artifacts for ', cached_targets, '.')
+          self._report_targets("Using cached artifacts for ", cached_targets, ".")
       if uncached_vts:
         uncached_targets = [vt.target for vt in uncached_vts]
-        self.context.run_tracker.artifact_cache_stats.add_misses(self._task_name,
-                                                                 uncached_targets,
-                                                                 uncached_causes)
+        self.context.run_tracker.artifact_cache_stats.add_misses(
+          self._task_name, uncached_targets, uncached_causes
+        )
         if not silent:
-          self._report_targets('No cached artifacts for ', uncached_targets, '.')
+          self._report_targets("No cached artifacts for ", uncached_targets, ".")
       # Now that we've checked the cache, re-partition whatever is still invalid.
       invalidation_check = InvalidationCheck(invalidation_check.all_vts, uncached_vts)
 
@@ -458,13 +468,13 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
       if len(targets):
         target_address_references = [t.address.reference() for t in targets]
         msg_elements = [
-          'Invalidated ',
-          items_to_report_element(target_address_references, 'target'),
-          '.',
+          "Invalidated ",
+          items_to_report_element(target_address_references, "target"),
+          ".",
         ]
         self.context.log.info(*msg_elements)
 
-    self._update_invalidation_report(invalidation_check, 'pre-check')
+    self._update_invalidation_report(invalidation_check, "pre-check")
 
     # Cache has been checked to create the full list of invalid VTs.
     # Only copy previous_results for this subset of VTs.
@@ -491,7 +501,7 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
     # Yield the result, and then mark the targets as up to date.
     yield invalidation_check
 
-    self._update_invalidation_report(invalidation_check, 'post-check')
+    self._update_invalidation_report(invalidation_check, "post-check")
 
     for vt in invalidation_check.invalid_vts:
       vt.update()
@@ -504,31 +514,32 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
     invalidation_report = self.context.invalidation_report
     if invalidation_report:
       for vts in invalidation_check.all_vts:
-        invalidation_report.add_vts(self._task_name, vts.targets, vts.cache_key, vts.valid,
-                                    phase=phase)
+        invalidation_report.add_vts(
+          self._task_name, vts.targets, vts.cache_key, vts.valid, phase=phase
+        )
 
-  def _do_invalidation_check(self,
-                             fingerprint_strategy,
-                             invalidate_dependents,
-                             targets,
-                             topological_order):
+  def _do_invalidation_check(
+    self, fingerprint_strategy, invalidate_dependents, targets, topological_order
+  ):
 
     if self._cache_factory.ignore:
       cache_key_generator = UncacheableCacheKeyGenerator()
     else:
       cache_key_generator = CacheKeyGenerator(
-        self.context.options.for_global_scope().cache_key_gen_version,
-        self.fingerprint)
+        self.context.options.for_global_scope().cache_key_gen_version, self.fingerprint
+      )
 
-    cache_manager = InvalidationCacheManager(self.workdir,
-                                             cache_key_generator,
-                                             self._build_invalidator,
-                                             invalidate_dependents,
-                                             fingerprint_strategy=fingerprint_strategy,
-                                             invalidation_report=self.context.invalidation_report,
-                                             task_name=self._task_name,
-                                             task_version_slug=self.implementation_version_slug(),
-                                             artifact_write_callback=self.maybe_write_artifact)
+    cache_manager = InvalidationCacheManager(
+      self.workdir,
+      cache_key_generator,
+      self._build_invalidator,
+      invalidate_dependents,
+      fingerprint_strategy=fingerprint_strategy,
+      invalidation_report=self.context.invalidation_report,
+      task_name=self._task_name,
+      task_version_slug=self.implementation_version_slug(),
+      artifact_write_callback=self.maybe_write_artifact,
+    )
 
     # If this Task's execution has been forced, invalidate all our target fingerprints.
     if self._cache_factory.ignore and not self._force_invalidated:
@@ -542,9 +553,9 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
       self.update_artifact_cache([(vt, [vt.current_results_dir])])
 
   def _launch_background_workdir_cleanup(self, vts):
-    workdir_build_cleanup_job = Work(self._cleanup_workdir_stale_builds,
-                                     [(vts,)],
-                                     'workdir_build_cleanup')
+    workdir_build_cleanup_job = Work(
+      self._cleanup_workdir_stale_builds, [(vts,)], "workdir_build_cleanup"
+    )
     self.context.submit_background_work_chain([workdir_build_cleanup_job])
 
   def _cleanup_workdir_stale_builds(self, vts):
@@ -561,10 +572,10 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
   def _should_cache_target_dir(self, vt):
     """Return true if the given vt should be written to a cache (if configured)."""
     return (
-      self.cache_target_dirs and
-      vt.cacheable and
-      (not vt.is_incremental or self.cache_incremental) and
-      self.artifact_cache_writes_enabled()
+      self.cache_target_dirs
+      and vt.cacheable
+      and (not vt.is_incremental or self.cache_incremental)
+      and self.artifact_cache_writes_enabled()
     )
 
   def _maybe_create_results_dirs(self, vts):
@@ -601,8 +612,10 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
       return [], [], []
 
     read_cache = self._cache_factory.get_read_cache()
-    items = [(read_cache, vt.cache_key, vt.current_results_dir if self.cache_target_dirs else None)
-             for vt in vts]
+    items = [
+      (read_cache, vt.cache_key, vt.current_results_dir if self.cache_target_dirs else None)
+      for vt in vts
+    ]
     res = self.context.subproc_map(call_use_cached_files, items)
 
     cached_vts = []
@@ -637,8 +650,9 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
     """
     update_artifact_cache_work = self._get_update_artifact_cache_work(vts_artifactfiles_pairs)
     if update_artifact_cache_work:
-      self.context.submit_background_work_chain([update_artifact_cache_work],
-                                                parent_workunit_name='cache')
+      self.context.submit_background_work_chain(
+        [update_artifact_cache_work], parent_workunit_name="cache"
+      )
 
   def _get_update_artifact_cache_work(self, vts_artifactfiles_pairs):
     """Create a Work instance to update an artifact cache, if we're configured to.
@@ -657,10 +671,7 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
         targets.update(vts.targets)
 
       self._report_targets(
-        'Caching artifacts for ',
-        list(targets),
-        '.',
-        logger=self.context.log.debug,
+        "Caching artifacts for ", list(targets), ".", logger=self.context.log.debug
       )
 
       always_overwrite = self._cache_factory.overwrite()
@@ -671,17 +682,13 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
         overwrite = always_overwrite or vts.cache_key in self._cache_key_errors
         args_tuples.append((cache, vts.cache_key, artifactfiles, overwrite))
 
-      return Work(lambda x: self.context.subproc_map(call_insert, x), [(args_tuples,)], 'insert')
+      return Work(lambda x: self.context.subproc_map(call_insert, x), [(args_tuples,)], "insert")
     else:
       return None
 
   def _report_targets(self, prefix, targets, suffix, logger=None):
     target_address_references = [t.address.reference() for t in targets]
-    msg_elements = [
-      prefix,
-      items_to_report_element(target_address_references, 'target'),
-      suffix,
-    ]
+    msg_elements = [prefix, items_to_report_element(target_address_references, "target"), suffix]
     logger = logger or self.context.log.info
     logger(*msg_elements)
 
@@ -694,10 +701,11 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
     """
     target_roots = self.context.target_roots
     if len(target_roots) == 0:
-      raise TaskError('No target specified.')
+      raise TaskError("No target specified.")
     elif len(target_roots) > 1:
-      raise TaskError('Multiple targets specified: {}'
-                      .format(', '.join([repr(t) for t in target_roots])))
+      raise TaskError(
+        "Multiple targets specified: {}".format(", ".join([repr(t) for t in target_roots]))
+      )
     return target_roots[0]
 
   def determine_target_roots(self, goal_name):
@@ -706,7 +714,7 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
     :param string goal_name: The goal name to use for any warning emissions.
     """
     if not self.context.target_roots:
-      print('WARNING: No targets were matched in goal `{}`.'.format(goal_name), file=sys.stderr)
+      print("WARNING: No targets were matched in goal `{}`.".format(goal_name), file=sys.stderr)
 
     # For the v2 path, e.g. `./pants list` is a functional no-op. This matches the v2 mode behavior
     # of e.g. `./pants --changed-parent=HEAD list` (w/ no changes) returning an empty result.
@@ -741,4 +749,5 @@ class Task(TaskBase):
 
 class QuietTaskMixin:
   """A mixin to signal that pants shouldn't print verbose progress information for this task."""
+
   pass

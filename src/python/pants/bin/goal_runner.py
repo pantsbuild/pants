@@ -68,20 +68,15 @@ class GoalRunnerFactory:
 
     # V1 tasks do not understand FilesystemSpecs, so we eagerly convert them into AddressSpecs.
     if self._specs.filesystem_specs.dependencies:
-      owned_addresses, = self._graph_session.scheduler_session.product_request(
+      (owned_addresses,) = self._graph_session.scheduler_session.product_request(
         Addresses, [Params(self._specs.filesystem_specs, self._options_bootstrapper)]
       )
       updated_address_specs = AddressSpecs(
-        dependencies=tuple(
-          SingleAddress(a.spec_path, a.target_name) for a in owned_addresses
-        ),
+        dependencies=tuple(SingleAddress(a.spec_path, a.target_name) for a in owned_addresses),
         tags=self._specs.address_specs.matcher.tags,
         exclude_patterns=self._specs.address_specs.matcher.exclude_patterns,
       )
-      self._specs = Specs(
-        address_specs=updated_address_specs,
-        filesystem_specs=FilesystemSpecs([]),
-      )
+      self._specs = Specs(address_specs=updated_address_specs, filesystem_specs=FilesystemSpecs([]))
 
   def _determine_v1_goals(self, options: Options) -> List[Goal]:
     """Check and populate the requested goals for a given run."""
@@ -90,64 +85,61 @@ class GoalRunnerFactory:
 
   def _address_specs_to_targets(self, build_graph: LegacyBuildGraph, address_specs: AddressSpecs):
     """Populate the BuildGraph and target list from a set of input TargetRoots."""
-    with self._run_tracker.new_workunit(name='parse', labels=[WorkUnitLabel.SETUP]):
+    with self._run_tracker.new_workunit(name="parse", labels=[WorkUnitLabel.SETUP]):
       return [
         build_graph.get_target(address)
-        for address
-        in build_graph.inject_roots_closure(address_specs, self._fail_fast)
+        for address in build_graph.inject_roots_closure(address_specs, self._fail_fast)
       ]
 
   def _should_be_quiet(self, goals):
     if self._explain:
       return True
 
-    if self._global_options.get_rank('quiet') > RankedValue.HARDCODED:
+    if self._global_options.get_rank("quiet") > RankedValue.HARDCODED:
       return self._global_options.quiet
 
     return any(goal.has_task_of_type(QuietTaskMixin) for goal in goals)
 
   def _setup_context(self):
-    with self._run_tracker.new_workunit(name='setup', labels=[WorkUnitLabel.SETUP]):
+    with self._run_tracker.new_workunit(name="setup", labels=[WorkUnitLabel.SETUP]):
       build_file_parser = BuildFileParser(self._build_config, self._root_dir)
       build_graph, address_mapper = self._graph_session.create_build_graph(
-        self._specs,
-        self._root_dir
+        self._specs, self._root_dir
       )
 
       goals = self._determine_v1_goals(self._options)
       is_quiet = self._should_be_quiet(goals)
 
-      target_root_instances = self._address_specs_to_targets(
-        build_graph, self._specs.address_specs,
-      )
+      target_root_instances = self._address_specs_to_targets(build_graph, self._specs.address_specs)
 
       # Now that we've parsed the bootstrap BUILD files, and know about the SCM system.
       self._run_tracker.run_info.add_scm_info()
 
       # Update the Reporting settings now that we have options and goal info.
-      invalidation_report = self._reporting.update_reporting(self._global_options,
-                                                             is_quiet,
-                                                             self._run_tracker)
+      invalidation_report = self._reporting.update_reporting(
+        self._global_options, is_quiet, self._run_tracker
+      )
 
-      context = Context(options=self._options,
-                        run_tracker=self._run_tracker,
-                        target_roots=target_root_instances,
-                        requested_goals=self._options.goals,
-                        build_graph=build_graph,
-                        build_file_parser=build_file_parser,
-                        build_configuration=self._build_config,
-                        address_mapper=address_mapper,
-                        invalidation_report=invalidation_report,
-                        scheduler=self._graph_session.scheduler_session)
+      context = Context(
+        options=self._options,
+        run_tracker=self._run_tracker,
+        target_roots=target_root_instances,
+        requested_goals=self._options.goals,
+        build_graph=build_graph,
+        build_file_parser=build_file_parser,
+        build_configuration=self._build_config,
+        address_mapper=address_mapper,
+        invalidation_report=invalidation_report,
+        scheduler=self._graph_session.scheduler_session,
+      )
 
       return goals, context
 
   def create(self):
     goals, context = self._setup_context()
-    return GoalRunner(context=context,
-                      goals=goals,
-                      run_tracker=self._run_tracker,
-                      kill_nailguns=self._kill_nailguns)
+    return GoalRunner(
+      context=context, goals=goals, run_tracker=self._run_tracker, kill_nailguns=self._kill_nailguns
+    )
 
 
 class GoalRunner:
@@ -172,12 +164,11 @@ class GoalRunner:
     self._kill_nailguns = kill_nailguns
 
   def _is_valid_workdir(self, workdir):
-    if workdir.endswith('.pants.d'):
+    if workdir.endswith(".pants.d"):
       return True
 
     self._context.log.error(
-      'Pants working directory should end with \'.pants.d\', currently it is {}\n'
-      .format(workdir)
+      "Pants working directory should end with '.pants.d', currently it is {}\n".format(workdir)
     )
     return False
 

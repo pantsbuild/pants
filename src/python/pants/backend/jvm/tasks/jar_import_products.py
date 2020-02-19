@@ -12,7 +12,7 @@ class JarImportProducts:
   Jar imports are jars containing source code to be unpacked and used locally.
   """
 
-  JarImport = namedtuple('JarImport', ['coordinate', 'jar'])
+  JarImport = namedtuple("JarImport", ["coordinate", "jar"])
   """Represents a jar containing source imports.
 
   Each jar import has a `coordinate` :class:`pants.java.jar_utls.M2Coordinate`
@@ -32,7 +32,7 @@ class JarImportProducts:
     :param string jar: The path of the resolved import jar.
     """
     if not isinstance(target, ImportJarsMixin):
-      raise ValueError(f'The given target is not an `ImportJarsMixin`: {target}')
+      raise ValueError(f"The given target is not an `ImportJarsMixin`: {target}")
     self._imports[target].append(self.JarImport(coordinate, jar))
 
   def imports(self, target):
@@ -45,4 +45,4 @@ class JarImportProducts:
     return self._imports[target]
 
   def __repr__(self):
-    return f'JarImportProducts({self._imports!r})'
+    return f"JarImportProducts({self._imports!r})"

@@ -29,9 +29,10 @@ class ProjectTree(ABC):
   def __init__(self, build_root, ignore_patterns=None):
     if not os.path.isabs(build_root):
       raise self.InvalidBuildRootError(
-          'ProjectTree build_root {} must be an absolute path.'.format(build_root))
+        "ProjectTree build_root {} must be an absolute path.".format(build_root)
+      )
     self.build_root = os.path.realpath(build_root)
-    logger.debug('ProjectTree ignore_patterns: %s', ignore_patterns)
+    logger.debug("ProjectTree ignore_patterns: %s", ignore_patterns)
     self.ignore_patterns = ignore_patterns if ignore_patterns else []
     self.ignore = PathSpec.from_lines(GitWildMatchPattern, self.ignore_patterns)
 
@@ -135,7 +136,7 @@ class ProjectTree(ABC):
       matched_dirs = self.ignore.match_files([os.path.join(root, "{}/".format(d)) for d in dirs])
       matched_files = self.ignore.match_files([os.path.join(root, f) for f in files])
       for matched_dir in matched_dirs:
-        dirs.remove(fast_relpath(matched_dir, root).rstrip('/'))
+        dirs.remove(fast_relpath(matched_dir, root).rstrip("/"))
 
       for matched_file in matched_files:
         files.remove(fast_relpath(matched_file, root))
@@ -145,13 +146,14 @@ class ProjectTree(ABC):
   def readlink(self, relpath):
     link_path = self.relative_readlink(relpath)
     if os.path.isabs(link_path):
-      raise IOError('Absolute symlinks not supported in {}: {} -> {}'.format(
-        self, relpath, link_path))
+      raise IOError(
+        "Absolute symlinks not supported in {}: {} -> {}".format(self, relpath, link_path)
+      )
     # In order to enforce that this link does not escape the build_root, we join and
     # then remove it.
-    abs_normpath = os.path.normpath(os.path.join(self.build_root,
-                                                 os.path.dirname(relpath),
-                                                 link_path))
+    abs_normpath = os.path.normpath(
+      os.path.join(self.build_root, os.path.dirname(relpath), link_path)
+    )
     return fast_relpath(abs_normpath, self.build_root)
 
   def isignored(self, relpath, directory=False):
@@ -169,21 +171,22 @@ class ProjectTree(ABC):
       ProjectTree, or None to use identity.
     """
     selector = selector or (lambda x: x)
-    prefixed_entries = [(self._append_slash_if_dir_path(selector(entry)), entry)
-                          for entry in entries]
+    prefixed_entries = [
+      (self._append_slash_if_dir_path(selector(entry)), entry) for entry in entries
+    ]
     ignored_paths = set(self.ignore.match_files(path for path, _ in prefixed_entries))
     return [entry for path, entry in prefixed_entries if path not in ignored_paths]
 
   def _relpath_no_dot(self, relpath):
-    return relpath.lstrip('./') if relpath != '.' else ''
+    return relpath.lstrip("./") if relpath != "." else ""
 
   def _raise_access_ignored(self, relpath):
     """Raises exception when accessing ignored path."""
-    raise self.AccessIgnoredPathError('The path {} is ignored in {}'.format(relpath, self))
+    raise self.AccessIgnoredPathError("The path {} is ignored in {}".format(relpath, self))
 
   def _append_trailing_slash(self, relpath):
     """Add a trailing slash if not already has one."""
-    return relpath if relpath.endswith('/') or len(relpath) == 0 else relpath + '/'
+    return relpath if relpath.endswith("/") or len(relpath) == 0 else relpath + "/"
 
   def _append_slash_if_dir_path(self, relpath):
     """For a dir path return a path that has a trailing slash."""
@@ -200,22 +203,26 @@ class Stat(ABC):
   Note that in order to preserve these invariants, end-user functions are not able to instantiate
   this base class (via the `init=False` argument to the dataclass decorator).
   """
+
   path: str
 
 
 @dataclass(frozen=True)
 class File(Stat):
   """A file."""
+
   path: str
 
 
 @dataclass(frozen=True)
 class Dir(Stat):
   """A directory."""
+
   path: str
 
 
 @dataclass(frozen=True)
 class Link(Stat):
   """A symbolic link."""
+
   path: str

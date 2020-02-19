@@ -8,11 +8,11 @@ from pants.option.custom_types import dict_with_files_option, list_option
 
 
 def is_list_option(kwargs) -> bool:
-  return cast(bool, kwargs.get('action') == 'append' or kwargs.get('type') in [list, list_option])
+  return cast(bool, kwargs.get("action") == "append" or kwargs.get("type") in [list, list_option])
 
 
 def is_dict_option(kwargs) -> bool:
-  return kwargs.get('type') in (dict, dict_with_files_option)
+  return kwargs.get("type") in (dict, dict_with_files_option)
 
 
 def flatten_shlexed_list(shlexed_args: Sequence[str]) -> List[str]:

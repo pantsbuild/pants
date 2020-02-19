@@ -30,15 +30,15 @@ class PythonRun(PythonExecutionTaskBase):
       env = self.prepare_pex_env()
 
       self.context.release_lock()
-      cmdline = ' '.join(pex.cmdline(args))
-      with self.context.new_workunit(name='run',
-                                     cmd=cmdline,
-                                     labels=[WorkUnitLabel.TOOL, WorkUnitLabel.RUN]):
+      cmdline = " ".join(pex.cmdline(args))
+      with self.context.new_workunit(
+        name="run", cmd=cmdline, labels=[WorkUnitLabel.TOOL, WorkUnitLabel.RUN]
+      ):
         po = pex.run(blocking=False, args=args, env=env)
         try:
           result = po.wait()
           if result != 0:
-            msg = f'{cmdline} ... exited non-zero ({result})'
+            msg = f"{cmdline} ... exited non-zero ({result})"
             raise TaskError(msg, exit_code=result)
         except KeyboardInterrupt:
           # The process may still have exited, even if we were interrupted.

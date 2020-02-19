@@ -26,15 +26,14 @@ if TYPE_CHECKING:
 @dataclass(frozen=True)
 class FileContent:
   """The content of a file."""
+
   path: str
   content: bytes
   is_executable: bool = False
 
   def __repr__(self):
-    return 'FileContent(path={}, content=(len:{}), is_executable={})'.format(
-      self.path,
-      len(self.content),
-      self.is_executable,
+    return "FileContent(path={}, content=(len:{}), is_executable={})".format(
+      self.path, len(self.content), self.is_executable
     )
 
 
@@ -59,6 +58,7 @@ class PathGlobs:
   NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to
   be aware of any changes to this object's definition.
   """
+
   globs: Tuple[str, ...]
   glob_match_error_behavior: GlobMatchErrorBehavior
   conjunction: GlobExpansionConjunction
@@ -123,12 +123,13 @@ class Digest:
   relies on the latter existing. This can be resolved when ordering is removed from Snapshots. See
   https://github.com/pantsbuild/pants/issues/5802
   """
+
   fingerprint: str
   serialized_bytes_length: int
 
   @classmethod
   def _path(cls, digested_path):
-    return '{}.digest'.format(digested_path.rstrip(os.sep))
+    return "{}.digest".format(digested_path.rstrip(os.sep))
 
   @classmethod
   def clear(cls, digested_path):
@@ -143,14 +144,14 @@ class Digest:
     """
     read_file = maybe_read_file(cls._path(digested_path))
     if read_file:
-      fingerprint, length = read_file.split(':')
+      fingerprint, length = read_file.split(":")
       return Digest(fingerprint, int(length))
     else:
       return None
 
   def dump(self, digested_path):
     """Dump this Digest object adjacent to the given digested_path."""
-    payload = '{}:{}'.format(self.fingerprint, self.serialized_bytes_length)
+    payload = "{}:{}".format(self.fingerprint, self.serialized_bytes_length)
     safe_file_dump(self._path(digested_path), payload=payload)
 
 
@@ -163,6 +164,7 @@ class PathGlobsAndRoot:
   operations in cases where the expected Digest is known, and the content for the Digest is already
   stored.
   """
+
   path_globs: PathGlobs
   root: str
   digest_hint: Optional[Digest] = None
@@ -176,6 +178,7 @@ class Snapshot:
   of the files being operated on and easing their movement to and from isolated execution
   sandboxes.
   """
+
   directory_digest: Digest
   files: Tuple[str, ...]
   dirs: Tuple[str, ...]
@@ -188,6 +191,7 @@ class Snapshot:
 @dataclass(frozen=True)
 class SnapshotSubset:
   """A request to create a subset of a snapshot."""
+
   directory_digest: Digest
   globs: PathGlobs
 
@@ -199,7 +203,7 @@ class DirectoriesToMerge:
   def __post_init__(self) -> None:
     non_digests = [v for v in self.directories if not isinstance(v, Digest)]  # type: ignore[misc]
     if non_digests:
-      formatted_non_digests = '\n'.join(f"* {v}" for v in non_digests)
+      formatted_non_digests = "\n".join(f"* {v}" for v in non_digests)
       raise ValueError(f"Not all arguments are digests:\n\n{formatted_non_digests}")
 
 
@@ -219,6 +223,7 @@ class DirectoryWithPrefixToAdd:
 class DirectoryToMaterialize:
   """A request to materialize the contents of a directory digest at the build root, optionally with
   a path prefix (relative to the build root)."""
+
   directory_digest: Digest
   path_prefix: str = ""  # i.e., we default to the root level of the build root
 
@@ -237,6 +242,7 @@ class DirectoriesToMaterialize(Collection[DirectoryToMaterialize]):
 @dataclass(frozen=True)
 class MaterializeDirectoryResult:
   """Result of materializing a directory, contains the full output paths."""
+
   output_paths: Tuple[str, ...]
 
 
@@ -254,6 +260,7 @@ class UrlToFetch:
 @dataclass(frozen=True)
 class Workspace:
   """Abstract handle for operations that touch the real local filesystem."""
+
   _scheduler: "SchedulerSession"
 
   def materialize_directory(
@@ -271,25 +278,19 @@ class Workspace:
 
 
 # TODO: don't recreate this in python, get this from fs::EMPTY_DIGEST somehow.
-_EMPTY_FINGERPRINT = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+_EMPTY_FINGERPRINT = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
 
-EMPTY_DIRECTORY_DIGEST = Digest(
-  fingerprint=_EMPTY_FINGERPRINT,
-  serialized_bytes_length=0
-)
+EMPTY_DIRECTORY_DIGEST = Digest(fingerprint=_EMPTY_FINGERPRINT, serialized_bytes_length=0)
 
-EMPTY_SNAPSHOT = Snapshot(
-  directory_digest=EMPTY_DIRECTORY_DIGEST,
-  files=(),
-  dirs=()
-)
+EMPTY_SNAPSHOT = Snapshot(directory_digest=EMPTY_DIRECTORY_DIGEST, files=(), dirs=())
 
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class SingleFileExecutable:
   """Wraps a `Snapshot` and ensures that it only contains a single file."""
+
   _exe_filename: Path
   directory_digest: Digest
 
@@ -297,17 +298,18 @@ class SingleFileExecutable:
   def exe_filename(self) -> str:
     return ensure_relative_file_name(self._exe_filename)
 
-  class ValidationError(ValueError): pass
+  class ValidationError(ValueError):
+    pass
 
   @classmethod
   def _raise_validation_error(cls, snapshot: Snapshot, should_message: str) -> None:
-    raise cls.ValidationError(f'snapshot {snapshot} used for {cls} should {should_message}')
+    raise cls.ValidationError(f"snapshot {snapshot} used for {cls} should {should_message}")
 
   def __init__(self, snapshot: Snapshot) -> None:
     if len(snapshot.files) != 1:
-      self._raise_validation_error(snapshot, 'have exactly 1 file!')
+      self._raise_validation_error(snapshot, "have exactly 1 file!")
     if snapshot.directory_digest == EMPTY_DIRECTORY_DIGEST:
-      self._raise_validation_error(snapshot, 'have a non-empty digest!')
+      self._raise_validation_error(snapshot, "have a non-empty digest!")
 
     self._exe_filename = Path(snapshot.files[0])
     self.directory_digest = snapshot.directory_digest

@@ -90,7 +90,7 @@ class Jar:
       if os.path.isfile(manifest_path):
         manifest_entry = Jar.FileSystemEntry(manifest_path, dest=Manifest.PATH)
 
-        non_manifest_chroot = os.path.join(safe_mkdtemp(), 'chroot')
+        non_manifest_chroot = os.path.join(safe_mkdtemp(), "chroot")
         shutil.copytree(self._src, non_manifest_chroot)
         os.unlink(os.path.join(non_manifest_chroot, manifest_relpath))
         return Jar.FileSystemEntry(non_manifest_chroot), manifest_entry
@@ -139,7 +139,7 @@ class Jar:
     :param string main: a fully qualified class name
     """
     if not main or not isinstance(main, str):
-      raise ValueError('The main entry must be a non-empty string')
+      raise ValueError("The main entry must be a non-empty string")
     self._main = main
 
   def append_classpath(self, classpath):
@@ -164,13 +164,17 @@ class Jar:
     :param string dest: the path the source file or directory should have in this jar
     """
     if not src or not isinstance(src, str):
-      raise ValueError('The src path must be a non-empty string, got {} of type {}.'.format(
-        src, type(src)))
+      raise ValueError(
+        "The src path must be a non-empty string, got {} of type {}.".format(src, type(src))
+      )
     if dest and not isinstance(dest, str):
-      raise ValueError('The dest entry path must be a non-empty string, got {} of type {}.'.format(
-        dest, type(dest)))
+      raise ValueError(
+        "The dest entry path must be a non-empty string, got {} of type {}.".format(
+          dest, type(dest)
+        )
+      )
     if not os.path.isdir(src) and not dest:
-      raise self.Error(f'Source file {src} must have a jar destination specified')
+      raise self.Error(f"Source file {src} must have a jar destination specified")
 
     self._add_entry(self.FileSystemEntry(src, dest))
 
@@ -181,10 +185,10 @@ class Jar:
     :param string contents: the raw byte contents of the file to write to ``path``
     """
     if not path or not isinstance(path, str):
-      raise ValueError('The path must be a non-empty string')
+      raise ValueError("The path must be a non-empty string")
 
     if contents is None or not isinstance(contents, bytes):
-      raise ValueError('The contents must be a sequence of bytes')
+      raise ValueError("The contents must be a sequence of bytes")
 
     self._add_entry(self.MemoryEntry(path, contents))
 
@@ -201,7 +205,7 @@ class Jar:
     :param string jar: the path to the pre-existing jar to graft into this jar
     """
     if not jar or not isinstance(jar, str):
-      raise ValueError('The jar path must be a non-empty string')
+      raise ValueError("The jar path must be a non-empty string")
 
     self._jars.append(jar)
 
@@ -216,20 +220,21 @@ class Jar:
     with temporary_dir() as manifest_stage_dir:
       # relativize urls in canonical classpath, this needs to be stable too therefore
       # do not follow the symlinks because symlinks may vary from platform to platform.
-      classpath = relativize_classpath(self.classpath,
-                                       os.path.dirname(self._path),
-                                       followlinks=False)
+      classpath = relativize_classpath(
+        self.classpath, os.path.dirname(self._path), followlinks=False
+      )
 
       def as_cli_entry(entry):
         src = entry.materialize(manifest_stage_dir)
-        return f'{src}={entry.dest}' if entry.dest else src
+        return f"{src}={entry.dest}" if entry.dest else src
+
       files = [as_cli_entry(entry) for entry in self._entries] if self._entries else []
 
       jars = self._jars or []
 
-      with safe_args(classpath, options, delimiter=',') as classpath_args:
-        with safe_args(files, options, delimiter=',') as files_args:
-          with safe_args(jars, options, delimiter=',') as jars_args:
+      with safe_args(classpath, options, delimiter=",") as classpath_args:
+        with safe_args(files, options, delimiter=",") as files_args:
+          with safe_args(jars, options, delimiter=",") as jars_args:
 
             # If you specify --manifest to jar-tool you cannot specify --main.
             if self._manifest_entry:
@@ -239,19 +244,19 @@ class Jar:
 
             if self._main and manifest_file:
               main_arg = None
-              with open(manifest_file, 'a') as f:
+              with open(manifest_file, "a") as f:
                 f.write(f"Main-Class: {self._main}\n")
             else:
               main_arg = self._main
 
             if main_arg:
-              args.append(f'-main={self._main}')
+              args.append(f"-main={self._main}")
 
             if classpath_args:
               args.append(f"-classpath={','.join(classpath_args)}")
 
             if manifest_file:
-              args.append(f'-manifest={manifest_file}')
+              args.append(f"-manifest={manifest_file}")
 
             if files_args:
               args.append(f"-files={','.join(files_args)}")
@@ -282,21 +287,21 @@ class JarTask(NailgunTask):
 
   @staticmethod
   def _flag(bool_value):
-    return 'true' if bool_value else 'false'
+    return "true" if bool_value else "false"
 
   _DUPLICATE_ACTION_TO_NAME = {
-      Duplicate.SKIP: 'SKIP',
-      Duplicate.REPLACE: 'REPLACE',
-      Duplicate.CONCAT: 'CONCAT',
-      Duplicate.CONCAT_TEXT: 'CONCAT_TEXT',
-      Duplicate.FAIL: 'THROW',
+    Duplicate.SKIP: "SKIP",
+    Duplicate.REPLACE: "REPLACE",
+    Duplicate.CONCAT: "CONCAT",
+    Duplicate.CONCAT_TEXT: "CONCAT_TEXT",
+    Duplicate.FAIL: "THROW",
   }
 
   @classmethod
   def _action_name(cls, action):
     name = cls._DUPLICATE_ACTION_TO_NAME.get(action)
     if name is None:
-      raise ValueError(f'Unrecognized duplicate action: {action}')
+      raise ValueError(f"Unrecognized duplicate action: {action}")
     return name
 
   def __init__(self, *args, **kwargs):
@@ -321,15 +326,15 @@ class JarTask(NailgunTask):
     try:
       yield jar
     except jar.Error as e:
-      raise TaskError(f'Failed to write to jar at {path}: {e!r}')
+      raise TaskError(f"Failed to write to jar at {path}: {e!r}")
 
     with jar._render_jar_tool_args(self.get_options()) as args:
       if args:  # Don't build an empty jar
-        args.append(f'-update={self._flag(not overwrite)}')
-        args.append(f'-compress={self._flag(compressed)}')
+        args.append(f"-update={self._flag(not overwrite)}")
+        args.append(f"-compress={self._flag(compressed)}")
 
         jar_rules = jar_rules or JarRules.default()
-        args.append(f'-default_action={self._action_name(jar_rules.default_dup_action)}')
+        args.append(f"-default_action={self._action_name(jar_rules.default_dup_action)}")
 
         skip_patterns = []
         duplicate_actions = []
@@ -338,10 +343,11 @@ class JarTask(NailgunTask):
           if isinstance(rule, Skip):
             skip_patterns.append(rule.apply_pattern)
           elif isinstance(rule, Duplicate):
-            duplicate_actions.append('{}={}'.format(
-              rule.apply_pattern.pattern, self._action_name(rule.action)))
+            duplicate_actions.append(
+              "{}={}".format(rule.apply_pattern.pattern, self._action_name(rule.action))
+            )
           else:
-            raise ValueError(f'Unrecognized rule: {rule}')
+            raise ValueError(f"Unrecognized rule: {rule}")
 
         if skip_patterns:
           args.append(f"-skip={','.join(p.pattern for p in skip_patterns)}")
@@ -352,11 +358,10 @@ class JarTask(NailgunTask):
         args.append(path)
 
         if JarTool.global_instance().run(context=self.context, runjava=self.runjava, args=args):
-          raise TaskError('jar-tool failed')
+          raise TaskError("jar-tool failed")
 
 
 class JarBuilderTask(JarTask):
-
   class JarBuilder(ABC):
     """A utility to aid in adding the classes and resources associated with targets to a jar.
 
@@ -366,17 +371,17 @@ class JarBuilderTask(JarTask):
     @staticmethod
     def _add_agent_manifest(agent, manifest):
       # TODO(John Sirois): refactor an agent model to support 'Boot-Class-Path' properly.
-      manifest.addentry(Manifest.MANIFEST_VERSION, '1.0')
+      manifest.addentry(Manifest.MANIFEST_VERSION, "1.0")
       if agent.premain:
-        manifest.addentry('Premain-Class', agent.premain)
+        manifest.addentry("Premain-Class", agent.premain)
       if agent.agent_class:
-        manifest.addentry('Agent-Class', agent.agent_class)
+        manifest.addentry("Agent-Class", agent.agent_class)
       if agent.can_redefine:
-        manifest.addentry('Can-Redefine-Classes', 'true')
+        manifest.addentry("Can-Redefine-Classes", "true")
       if agent.can_retransform:
-        manifest.addentry('Can-Retransform-Classes', 'true')
+        manifest.addentry("Can-Retransform-Classes", "true")
       if agent.can_set_native_method_prefix:
-        manifest.addentry('Can-Set-Native-Method-Prefix', 'true')
+        manifest.addentry("Can-Set-Native-Method-Prefix", "true")
 
     @staticmethod
     def _add_manifest_entries(jvm_binary_target, manifest):
@@ -398,7 +403,7 @@ class JarBuilderTask(JarTask):
       Later, in execute context, the `create_jar_builder` method can be called to get back a
       prepared ``JarTask.JarBuilder`` ready for use.
       """
-      round_manager.require_data('runtime_classpath')
+      round_manager.require_data("runtime_classpath")
 
     def __init__(self, context, jar):
       self._context = context
@@ -417,7 +422,7 @@ class JarBuilderTask(JarTask):
       """
       products_added = False
 
-      classpath_products = self._context.products.get_data('runtime_classpath')
+      classpath_products = self._context.products.get_data("runtime_classpath")
 
       # TODO(John Sirois): Manifest handling is broken.  We should be tracking state and failing
       # fast if any duplicate entries are added; ie: if we get a second binary or a second agent.
@@ -432,10 +437,13 @@ class JarBuilderTask(JarTask):
       if recursive:
         agents = [t for t in target.closure() if isinstance(t, JavaAgent)]
         if len(agents) > 1:
-          raise TaskError('Only 1 agent can be added to a jar, found {} for {}:\n\t{}'
-                          .format(len(agents),
-                                  target.address.reference(),
-                                  '\n\t'.join(agent.address.reference() for agent in agents)))
+          raise TaskError(
+            "Only 1 agent can be added to a jar, found {} for {}:\n\t{}".format(
+              len(agents),
+              target.address.reference(),
+              "\n\t".join(agent.address.reference() for agent in agents),
+            )
+          )
         elif agents:
           self._add_agent_manifest(agents[0], self._manifest)
           products_added = True
@@ -450,8 +458,7 @@ class JarBuilderTask(JarTask):
       if not recursive and target.has_resources:
         targets += target.resources
       # We only gather internal classpath elements per our contract.
-      target_classpath = ClasspathUtil.internal_classpath(targets,
-                                                          classpath_products)
+      target_classpath = ClasspathUtil.internal_classpath(targets, classpath_products)
       for entry in target_classpath:
         if ClasspathUtil.is_jar(entry):
           self._jar.writejar(entry)

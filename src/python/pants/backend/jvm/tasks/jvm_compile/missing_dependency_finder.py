@@ -13,11 +13,12 @@ def normalize_classname(classname):
   """
   Ensure the dot separated class name (zinc reported class not found may use '/' separator)
   """
-  return classname.replace('/', '.')
+  return classname.replace("/", ".")
 
 
-class ClassNotFoundError(namedtuple('CompileError', ['source', 'lineno', 'classname'])):
+class ClassNotFoundError(namedtuple("CompileError", ["source", "lineno", "classname"])):
   """Represents class not found compile errors."""
+
   pass
 
 
@@ -37,14 +38,14 @@ class CompileErrorExtractor:
         return None
 
     def get_matched_error(match):
-      source = safe_get_named_group(match, 'filename')
-      lineno = safe_get_named_group(match, 'lineno')
-      classname = safe_get_named_group(match, 'classname')
+      source = safe_get_named_group(match, "filename")
+      lineno = safe_get_named_group(match, "lineno")
+      classname = safe_get_named_group(match, "classname")
       if not classname:
-        classnameonly = safe_get_named_group(match, 'classnameonly')
-        packagename = safe_get_named_group(match, 'packagename')
+        classnameonly = safe_get_named_group(match, "classnameonly")
+        packagename = safe_get_named_group(match, "packagename")
         if classnameonly and packagename:
-          classname = '.'.join([packagename, classnameonly])
+          classname = ".".join([packagename, classnameonly])
       if classname:
         classname = normalize_classname(classname)
       return ClassNotFoundError(source, lineno, classname)
@@ -81,8 +82,9 @@ class StringSimilarityRanker:
     self._base_str = base_str
 
   def sort(self, strings):
-    return sorted(strings, key=lambda str: SequenceMatcher(a=self._base_str, b=str).ratio(),
-      reverse=True)
+    return sorted(
+      strings, key=lambda str: SequenceMatcher(a=self._base_str, b=str).ratio(), reverse=True
+    )
 
 
 class MissingDependencyFinder:
@@ -101,8 +103,9 @@ class MissingDependencyFinder:
     to deps that contain the class mapping. `no_dep_found` are the classnames that are
     unable to find the deps.
     """
-    not_found_classnames = [err.classname for err in
-                            self.compile_error_extractor.extract(compile_failure_log)]
+    not_found_classnames = [
+      err.classname for err in self.compile_error_extractor.extract(compile_failure_log)
+    ]
     return self._select_target_candidates_for_class(not_found_classnames, target)
 
   def _select_target_candidates_for_class(self, classnames, target):

@@ -29,7 +29,7 @@ class _ConcretePythonLintTarget:
 
 @rule
 async def lint_python_target(
-  concrete_target: _ConcretePythonLintTarget, union_membership: UnionMembership,
+  concrete_target: _ConcretePythonLintTarget, union_membership: UnionMembership
 ) -> LintResults:
   """This aggregator allows us to have multiple linters operate over the same Python targets.
 
@@ -84,5 +84,5 @@ def rules():
     tests_adaptor,
     plugin_adaptor,
     *(RootRule(target_type) for target_type in PYTHON_TARGET_TYPES),
-    *(UnionRule(LintTarget, target_type) for target_type in PYTHON_TARGET_TYPES)
+    *(UnionRule(LintTarget, target_type) for target_type in PYTHON_TARGET_TYPES),
   ]

@@ -19,8 +19,19 @@ class Job:
   keys of its dependent jobs.
   """
 
-  def __init__(self, key, fn, dependencies, size=0, on_success=None, on_failure=None,
-    run_asap=False, duration=None, options_scope=None, target=None):
+  def __init__(
+    self,
+    key,
+    fn,
+    dependencies,
+    size=0,
+    on_success=None,
+    on_failure=None,
+    run_asap=False,
+    duration=None,
+    options_scope=None,
+    target=None,
+  ):
     """
 
     :param key: Key used to reference and look up jobs
@@ -55,12 +66,12 @@ class Job:
       self.on_failure()
 
 
-UNSTARTED = 'Unstarted'
-QUEUED = 'Queued'
-SUCCESSFUL = 'Successful'
-FAILED = 'Failed'
-CANCELED = 'Canceled'
-RUNNING = 'Running'
+UNSTARTED = "Unstarted"
+QUEUED = "Queued"
+SUCCESSFUL = "Successful"
+FAILED = "Failed"
+CANCELED = "Canceled"
+RUNNING = "Running"
 
 
 class StatusTable:
@@ -118,14 +129,14 @@ class UnexecutableGraphError(Exception):
 
 class NoRootJobError(UnexecutableGraphError):
   def __init__(self):
-    super().__init__(
-      "All scheduled jobs have dependencies. There must be a circular dependency.")
+    super().__init__("All scheduled jobs have dependencies. There must be a circular dependency.")
 
 
 class UnknownJobError(UnexecutableGraphError):
   def __init__(self, undefined_dependencies):
-    super().__init__("Undefined dependencies {}"
-                                          .format(", ".join(map(repr, undefined_dependencies))))
+    super().__init__(
+      "Undefined dependencies {}".format(", ".join(map(repr, undefined_dependencies)))
+    )
 
 
 class JobExistsError(UnexecutableGraphError):
@@ -186,13 +197,11 @@ class ExecutionGraph:
     def entry(key):
       dependees = self._dependees[key]
       if dependees:
-        return "{} <- {{\n  {}\n}}".format(key, ',\n  '.join(dependees))
+        return "{} <- {{\n  {}\n}}".format(key, ",\n  ".join(dependees))
       else:
         return f"{key} <- {{}}"
-    return "\n".join([
-      entry(key)
-      for key in self._job_keys_as_scheduled
-    ])
+
+    return "\n".join([entry(key) for key in self._job_keys_as_scheduled])
 
   def _schedule(self, job):
     key = job.key
@@ -226,13 +235,13 @@ class ExecutionGraph:
     while len(bfs_queue) > 0:
       job_key = bfs_queue.popleft()
       for dependency_key in self._dependencies[job_key]:
-        job_priority[dependency_key] = \
-          max(job_priority[dependency_key],
-              job_size[dependency_key] + job_priority[job_key])
+        job_priority[dependency_key] = max(
+          job_priority[dependency_key], job_size[dependency_key] + job_priority[job_key]
+        )
         satisfied_dependees_count[dependency_key] += 1
         if satisfied_dependees_count[dependency_key] == len(self._dependees[dependency_key]):
           bfs_queue.append(dependency_key)
-    
+
     max_priority = max(job_priority.values())
     immediate_priority = max_priority + 1
 
@@ -265,8 +274,10 @@ class ExecutionGraph:
     """
     log.debug(self.format_dependee_graph())
 
-    status_table = StatusTable(self._job_keys_as_scheduled,
-                               {key: len(self._jobs[key].dependencies) for key in self._job_keys_as_scheduled})
+    status_table = StatusTable(
+      self._job_keys_as_scheduled,
+      {key: len(self._jobs[key].dependencies) for key in self._job_keys_as_scheduled},
+    )
     finished_queue = queue.Queue()
 
     heap = []
@@ -276,7 +287,7 @@ class ExecutionGraph:
       for job_key in job_keys:
         status_table.mark_queued(job_key)
         # minus because jobs with larger priority should go first
-        heappush(heap, (-self._job_priority[job_key], job_key))
+        heappush(heap, (-(self._job_priority[job_key]), job_key))
 
     def try_to_submit_jobs_from_heap():
       def worker(worker_key, work):
@@ -287,7 +298,12 @@ class ExecutionGraph:
           result = (worker_key, SUCCESSFUL, None, timer.elapsed)
         except BaseException:
           _, exc_value, exc_traceback = sys.exc_info()
-          result = (worker_key, FAILED, (exc_value, traceback.format_tb(exc_traceback)), timer.elapsed)
+          result = (
+            worker_key,
+            FAILED,
+            (exc_value, traceback.format_tb(exc_traceback)),
+            timer.elapsed,
+          )
         finished_queue.put(result)
         jobs_in_flight.decrement()
 
@@ -349,10 +365,13 @@ class ExecutionGraph:
           exception, tb = value
           log.error(f"{finished_key} failed: {exception} in {finished_job.duration}")
           if self._print_stack_trace:
-            log.error('Traceback:\n{}'.format('\n'.join(tb)))
+            log.error("Traceback:\n{}".format("\n".join(tb)))
         else:
-          log.debug("{} finished with status {} and in {}".format(finished_key, result_status,
-            finished_job.duration))
+          log.debug(
+            "{} finished with status {} and in {}".format(
+              finished_key, result_status, finished_job.duration
+            )
+          )
     except ExecutionFailure:
       raise
     except Exception as e:
@@ -369,11 +388,15 @@ class ExecutionGraph:
     running_jobs = sorted(i for (i, s) in status_table.unfinished_items() if s is RUNNING)
     queued_jobs = sorted(i for (i, s) in status_table.unfinished_items() if s is QUEUED)
     unstarted_jobs = sorted(i for (i, s) in status_table.unfinished_items() if s is UNSTARTED)
-    log.debug("Running   ({}):\n  {}\n"
-              "Queued    ({}):\n  {}\n"
-              "Unstarted ({}):\n  {}\n"
-      .format(
-      len(running_jobs), '\n  '.join(running_jobs),
-      len(queued_jobs), '\n  '.join(queued_jobs),
-      len(unstarted_jobs), '\n  '.join(unstarted_jobs),
-    ))
+    log.debug(
+      "Running   ({}):\n  {}\n"
+      "Queued    ({}):\n  {}\n"
+      "Unstarted ({}):\n  {}\n".format(
+        len(running_jobs),
+        "\n  ".join(running_jobs),
+        len(queued_jobs),
+        "\n  ".join(queued_jobs),
+        len(unstarted_jobs),
+        "\n  ".join(unstarted_jobs),
+      )
+    )

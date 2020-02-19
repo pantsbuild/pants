@@ -28,6 +28,7 @@ class RunJvmPrepCommandBase(Task):
 
   :API: public
   """
+
   goal: Optional[str] = None
   classpath_product_only = False
 
@@ -51,37 +52,41 @@ class RunJvmPrepCommandBase(Task):
     :API: public
     """
     super().prepare(options, round_manager)
-    round_manager.require_data('compile_classpath')
+    round_manager.require_data("compile_classpath")
     if not cls.classpath_product_only:
-      round_manager.require_data('runtime_classpath')
+      round_manager.require_data("runtime_classpath")
 
   @classmethod
   def runnable_prep_cmd(cls, tgt):
-    return isinstance(tgt, JvmPrepCommand) and tgt.payload.get_field_value('goal') == cls.goal
+    return isinstance(tgt, JvmPrepCommand) and tgt.payload.get_field_value("goal") == cls.goal
 
   def execute(self):
     if self.goal not in JvmPrepCommand.goals():
-      raise  AssertionError('Got goal "{}". Expected goal to be one of {}'.format(
-          self.goal, JvmPrepCommand.goals()))
+      raise AssertionError(
+        'Got goal "{}". Expected goal to be one of {}'.format(self.goal, JvmPrepCommand.goals())
+      )
 
-    targets = self.context.targets(postorder=True,  predicate=self.runnable_prep_cmd)
+    targets = self.context.targets(postorder=True, predicate=self.runnable_prep_cmd)
 
-    compile_classpath = self.context.products.get_data('compile_classpath')
-    classpath_products = self.context.products.get_data('runtime_classpath', compile_classpath.copy)
+    compile_classpath = self.context.products.get_data("compile_classpath")
+    classpath_products = self.context.products.get_data("runtime_classpath", compile_classpath.copy)
 
-    with self.context.new_workunit(name='jvm_prep_command', labels=[WorkUnitLabel.PREP]) as workunit:
+    with self.context.new_workunit(
+      name="jvm_prep_command", labels=[WorkUnitLabel.PREP]
+    ) as workunit:
       for target in targets:
         distribution = JvmPlatform.preferred_jvm_distribution([target.runtime_platform])
         executor = SubprocessExecutor(distribution)
 
-        mainclass = target.payload.get_field_value('mainclass')
-        args = target.payload.get_field_value('args', [])
-        target_jvm_options = target.payload.get_field_value('jvm_options', [])
+        mainclass = target.payload.get_field_value("mainclass")
+        args = target.payload.get_field_value("args", [])
+        target_jvm_options = target.payload.get_field_value("jvm_options", [])
         cp = list(ClasspathUtil.classpath(target.closure(), classpath_products))
         if not cp:
-          raise TaskError('target {} has no classpath. (Add dependencies= parameter?'
-                          .format(target.address.spec))
-        self.context.log.info(f'Running prep command for {target.address.spec}')
+          raise TaskError(
+            "target {} has no classpath. (Add dependencies= parameter?".format(target.address.spec)
+          )
+        self.context.log.info(f"Running prep command for {target.address.spec}")
         returncode = distribution.execute_java(
           executor=executor,
           classpath=cp,
@@ -89,26 +94,29 @@ class RunJvmPrepCommandBase(Task):
           jvm_options=target_jvm_options,
           args=args,
           workunit_factory=self.context.new_workunit,
-          workunit_name='run',
+          workunit_name="run",
           workunit_labels=[WorkUnitLabel.PREP],
         )
 
         workunit.set_outcome(WorkUnit.FAILURE if returncode else WorkUnit.SUCCESS)
         if returncode:
-          raise TaskError(f'RunJvmPrepCommand failed to run {mainclass}')
+          raise TaskError(f"RunJvmPrepCommand failed to run {mainclass}")
 
 
 class RunBinaryJvmPrepCommand(RunJvmPrepCommandBase):
   """Run code from a JVM compiled language before other tasks in the binary goal."""
-  goal = 'binary'
+
+  goal = "binary"
 
 
 class RunTestJvmPrepCommand(RunJvmPrepCommandBase):
   """Run code from a JVM compiled language before other tasks in the test goal."""
-  goal = 'test'
+
+  goal = "test"
 
 
 class RunCompileJvmPrepCommand(RunJvmPrepCommandBase):
   """Run code from a JVM compiled language before other tasks in the compile goal."""
-  goal = 'compile'
+
+  goal = "compile"
   classpath_product_only = True

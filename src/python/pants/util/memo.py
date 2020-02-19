@@ -60,9 +60,7 @@ def per_instance(*args, **kwargs):
   return equal_args(*instance_and_rest, **kwargs)
 
 
-def memoized(
-  func: Optional[F] = None, key_factory=equal_args, cache_factory=dict,
-) -> F:
+def memoized(func: Optional[F] = None, key_factory=equal_args, cache_factory=dict) -> F:
   """Memoizes the results of a function call.
 
   By default, exactly one result is memoized for each unique combination of function arguments.
@@ -111,7 +109,7 @@ def memoized(
     )
 
   if not inspect.isfunction(func):
-    raise ValueError('The @memoized decorator must be applied innermost of all decorators.')
+    raise ValueError("The @memoized decorator must be applied innermost of all decorators.")
 
   key_func = key_factory or equal_args
   memoized_results = cache_factory() if cache_factory else {}
@@ -129,24 +127,25 @@ def memoized(
   def put(*args, **kwargs):
     key = key_func(*args, **kwargs)
     yield functools.partial(memoized_results.__setitem__, key)
+
   memoize.put = put  # type: ignore[attr-defined]
 
   def forget(*args, **kwargs):
     key = key_func(*args, **kwargs)
     if key in memoized_results:
       del memoized_results[key]
+
   memoize.forget = forget  # type: ignore[attr-defined]
 
   def clear():
     memoized_results.clear()
+
   memoize.clear = clear  # type: ignore[attr-defined]
 
   return memoize  # type: ignore[return-value]
 
 
-def memoized_method(
-  func: Optional[F] = None, key_factory=per_instance, cache_factory=dict,
-) -> F:
+def memoized_method(func: Optional[F] = None, key_factory=per_instance, cache_factory=dict) -> F:
   """A convenience wrapper for memoizing instance methods.
 
   Typically you'd expect a memoized instance method to hold a cached value per class instance;
@@ -179,13 +178,11 @@ def memoized_method(
   :raises: `ValueError` if the wrapper is applied to anything other than a function.
   :returns: A wrapped function that memoizes its results or else a function wrapper that does this.
   """
-  return memoized(
-    func=func, key_factory=key_factory, cache_factory=cache_factory
-  )
+  return memoized(func=func, key_factory=key_factory, cache_factory=cache_factory)
 
 
 def memoized_property(
-  func: Optional[Callable[..., T]] = None, key_factory=per_instance, cache_factory=dict,
+  func: Optional[Callable[..., T]] = None, key_factory=per_instance, cache_factory=dict
 ) -> T:
   """A convenience wrapper for memoizing properties.
 
@@ -250,13 +247,12 @@ def memoized_property(
   """
   getter = memoized_method(func=func, key_factory=key_factory, cache_factory=cache_factory)
   return property(  # type: ignore[return-value]
-    fget=getter,
-    fdel=lambda self: getter.forget(self),  # type: ignore[attr-defined, no-any-return]
+    fget=getter, fdel=lambda self: getter.forget(self)  # type: ignore[attr-defined, no-any-return]
   )
 
 
 def memoized_classmethod(
-  func: Optional[F] = None, key_factory=per_instance, cache_factory=dict,
+  func: Optional[F] = None, key_factory=per_instance, cache_factory=dict
 ) -> F:
   return classmethod(  # type: ignore[return-value]
     memoized_method(func, key_factory=key_factory, cache_factory=cache_factory)
@@ -264,7 +260,7 @@ def memoized_classmethod(
 
 
 def memoized_classproperty(
-  func: Optional[Callable[..., T]] = None, key_factory=per_instance, cache_factory=dict,
+  func: Optional[Callable[..., T]] = None, key_factory=per_instance, cache_factory=dict
 ) -> T:
   return classproperty(
     memoized_classmethod(func, key_factory=key_factory, cache_factory=cache_factory)
@@ -272,7 +268,7 @@ def memoized_classproperty(
 
 
 def memoized_staticmethod(
-  func: Optional[F] = None, key_factory=equal_args, cache_factory=dict,
+  func: Optional[F] = None, key_factory=equal_args, cache_factory=dict
 ) -> F:
   return staticmethod(  # type: ignore[return-value]
     memoized(func, key_factory=key_factory, cache_factory=cache_factory)
@@ -280,7 +276,7 @@ def memoized_staticmethod(
 
 
 def memoized_staticproperty(
-  func: Optional[Callable[..., T]] = None, key_factory=equal_args, cache_factory=dict,
+  func: Optional[Callable[..., T]] = None, key_factory=equal_args, cache_factory=dict
 ) -> T:
   return staticproperty(
     memoized_staticmethod(func, key_factory=key_factory, cache_factory=cache_factory)
@@ -288,7 +284,7 @@ def memoized_staticproperty(
 
 
 def testable_memoized_property(
-  func: Optional[Callable[..., T]] = None, key_factory=per_instance, cache_factory=dict,
+  func: Optional[Callable[..., T]] = None, key_factory=per_instance, cache_factory=dict
 ) -> T:
   """A variant of `memoized_property` that allows for setting of properties (for tests, etc)."""
   getter = memoized_method(func=func, key_factory=key_factory, cache_factory=cache_factory)

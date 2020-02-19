@@ -62,7 +62,7 @@ async def lint(
   # http://flake8.pycqa.org/en/latest/user/invocation.html.
   interpreter_constraints = PexInterpreterConstraints.create_from_adaptors(
     adaptors=[adaptor] if isinstance(adaptor, PythonTargetAdaptor) else [],
-    python_setup=python_setup
+    python_setup=python_setup,
   )
   requirements_pex = await Get[Pex](
     CreatePex(
@@ -89,7 +89,7 @@ async def lint(
         requirements_pex.directory_digest,
         config_snapshot.directory_digest,
       )
-    ),
+    )
   )
 
   source_files = await Get[TargetSourceFiles](FindTargetSourceFilesRequest(adaptor_with_origin))
@@ -97,10 +97,10 @@ async def lint(
   request = requirements_pex.create_execute_request(
     python_setup=python_setup,
     subprocess_encoding_environment=subprocess_encoding_environment,
-    pex_path=f'./flake8.pex',
+    pex_path=f"./flake8.pex",
     pex_args=generate_args(source_files=source_files, flake8=flake8),
     input_files=merged_input_files,
-    description=f'Run Flake8 for {adaptor.address.reference()}',
+    description=f"Run Flake8 for {adaptor.address.reference()}",
   )
   result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, request)
   return LintResult.from_fallible_execute_process_result(result)

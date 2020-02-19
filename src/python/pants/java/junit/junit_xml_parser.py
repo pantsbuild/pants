@@ -19,6 +19,7 @@ from pants.util.xml_parser import XmlParser
 @dataclass(unsafe_hash=True, order=True)
 class Test:
   """Describes a junit-style test or collection of tests."""
+
   classname: str
   methodname: Optional[str]
 
@@ -45,7 +46,7 @@ class Test:
     if self.methodname is None:
       return self.classname
     else:
-      return '{}#{}'.format(self.classname, self.methodname)
+      return "{}#{}".format(self.classname, self.methodname)
 
 
 class RegistryOfTests:
@@ -72,13 +73,11 @@ class RegistryOfTests:
     """
     return len(self._test_to_target) == 0
 
-  def filter(self, targets: Sequence[Target]) -> 'RegistryOfTests':
+  def filter(self, targets: Sequence[Target]) -> "RegistryOfTests":
     """Returns a new instance containing only the given test targets."""
     target_set = set(targets)
     return RegistryOfTests(
-      (test, target)
-      for test, target in self._test_to_target.items()
-      if target in target_set
+      (test, target) for test, target in self._test_to_target.items() if target in target_set
     )
 
   def match_test_spec(self, possible_test_specs):
@@ -96,7 +95,7 @@ class RegistryOfTests:
       fqcn = test_spec.classname
       cn_to_specs[test_spec.classname].append(test_spec)
 
-      non_fqcn = fqcn.split('.')[-1]
+      non_fqcn = fqcn.split(".")[-1]
       cn_to_specs[non_fqcn].append(test_spec)
 
     matched_spec_to_target = {}
@@ -145,8 +144,7 @@ class ParseError(Exception):
   """Indicates an error parsing a junit xml report file."""
 
   def __init__(self, xml_path, cause):
-    super().__init__('Error parsing test result file {}: {}'
-                                     .format(xml_path, cause))
+    super().__init__("Error parsing test result file {}: {}".format(xml_path, cause))
     self._xml_path = xml_path
     self._cause = cause
 
@@ -190,15 +188,16 @@ def parse_failed_targets(test_registry, junit_xml_path, error_handler):
   def parse_junit_xml_file(path):
     try:
       xml = XmlParser.from_file(path)
-      failures = int(xml.get_attribute('testsuite', 'failures'))
-      errors = int(xml.get_attribute('testsuite', 'errors'))
+      failures = int(xml.get_attribute("testsuite", "failures"))
+      errors = int(xml.get_attribute("testsuite", "errors"))
       if failures or errors:
-        for testcase in xml.parsed.getElementsByTagName('testcase'):
-          test_failed = testcase.getElementsByTagName('failure')
-          test_errored = testcase.getElementsByTagName('error')
+        for testcase in xml.parsed.getElementsByTagName("testcase"):
+          test_failed = testcase.getElementsByTagName("failure")
+          test_errored = testcase.getElementsByTagName("error")
           if test_failed or test_errored:
-            test = Test(classname=testcase.getAttribute('classname'),
-                        methodname=testcase.getAttribute('name'))
+            test = Test(
+              classname=testcase.getAttribute("classname"), methodname=testcase.getAttribute("name")
+            )
             target = test_registry.get_owning_target(test)
             failed_targets[target].add(test)
     except (XmlParser.XmlError, ValueError) as e:
@@ -206,7 +205,7 @@ def parse_failed_targets(test_registry, junit_xml_path, error_handler):
 
   if os.path.isdir(junit_xml_path):
     for root, _, files in safe_walk(junit_xml_path):
-      for junit_xml_file in fnmatch.filter(files, 'TEST-*.xml'):
+      for junit_xml_file in fnmatch.filter(files, "TEST-*.xml"):
         parse_junit_xml_file(os.path.join(root, junit_xml_file))
   else:
     parse_junit_xml_file(junit_xml_path)

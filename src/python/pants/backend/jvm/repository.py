@@ -20,15 +20,15 @@ class Repository:
     self.push_db_basedir = push_db_basedir
 
   def push_db(self, target):
-    return os.path.join(self.push_db_basedir,
-                        target.provides.org,
-                        target.provides.name,
-                        'publish.properties')
+    return os.path.join(
+      self.push_db_basedir, target.provides.org, target.provides.name, "publish.properties"
+    )
 
   def __eq__(self, other):
-    return (
-      isinstance(other, Repository) and
-      (self.name, self.url, self.push_db_basedir) == (other.name, other.url, other.push_db_basedir)
+    return isinstance(other, Repository) and (self.name, self.url, self.push_db_basedir) == (
+      other.name,
+      other.url,
+      other.push_db_basedir,
     )
 
   def __hash__(self):

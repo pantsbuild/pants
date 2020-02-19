@@ -21,43 +21,47 @@ class DependencyType(Enum):
 # TODO(#8762) Get this rule to feature parity with the dependencies task.
 class DependenciesOptions(LineOriented, GoalSubsystem):
   """Print the target's dependencies."""
-  name = 'dependencies2'
+
+  name = "dependencies2"
 
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
     register(
-      '--transitive',
+      "--transitive",
       default=False,
       type=bool,
-      help='Run dependencies against transitive dependencies of targets specified on the command line.',
+      help="Run dependencies against transitive dependencies of targets specified on the command line.",
     )
     # TODO(#8762): Wire this up. Currently we only support `internal`.
     register(
-      '--type', type=DependencyType, default=DependencyType.SOURCE,
+      "--type",
+      type=DependencyType,
+      default=DependencyType.SOURCE,
       help="Which types of dependencies to find, where `source` means source code dependencies "
-           "and `3rdparty` means third-party requirements and JARs."
+      "and `3rdparty` means third-party requirements and JARs.",
     )
 
 
 class Dependencies(Goal):
   subsystem_cls = DependenciesOptions
 
+
 @goal_rule
 async def dependencies(
-  console: Console, addresses: Addresses, options: DependenciesOptions,
+  console: Console, addresses: Addresses, options: DependenciesOptions
 ) -> Dependencies:
   address_strings: Set[str] = set()
   if options.values.transitive:
     transitive_targets = await Get[TransitiveHydratedTargets](Addresses, addresses)
     transitive_dependencies = transitive_targets.closure - set(transitive_targets.roots)
-    address_strings.update(hydrated_target.address.spec for hydrated_target in transitive_dependencies)
+    address_strings.update(
+      hydrated_target.address.spec for hydrated_target in transitive_dependencies
+    )
   else:
     hydrated_targets = await Get[HydratedTargets](Addresses, addresses)
     address_strings.update(
-      dep.spec
-      for hydrated_target in hydrated_targets
-      for dep in hydrated_target.dependencies
+      dep.spec for hydrated_target in hydrated_targets for dep in hydrated_target.dependencies
     )
 
   with options.line_oriented(console) as print_stdout:
@@ -68,6 +72,4 @@ async def dependencies(
 
 
 def rules():
-  return [
-    dependencies,
-  ]
+  return [dependencies]

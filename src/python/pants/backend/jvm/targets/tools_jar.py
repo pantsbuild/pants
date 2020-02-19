@@ -11,4 +11,4 @@ class ToolsJar(Target):
   """
 
   def __init__(self, *args, **kwargs):
-    super().__init__(scope='compile', *args, **kwargs)
+    super().__init__(scope="compile", *args, **kwargs)

@@ -24,10 +24,9 @@ class ManagedJarDependencies(Target):
     """
     jar_objects, library_specs = self._split_jars_and_specs(artifacts or ())
     payload = payload or Payload()
-    payload.add_fields({
-      'artifacts': JarsField(jar_objects),
-      'library_specs': PrimitiveField(library_specs)
-    })
+    payload.add_fields(
+      {"artifacts": JarsField(jar_objects), "library_specs": PrimitiveField(library_specs)}
+    )
     super().__init__(payload=payload, **kwargs)
 
   @classmethod
@@ -36,19 +35,21 @@ class ManagedJarDependencies(Target):
       yield address_spec
 
     if kwargs:
-      _, address_specs = cls._split_jars_and_specs(kwargs.get('artifacts', ()))
+      _, address_specs = cls._split_jars_and_specs(kwargs.get("artifacts", ()))
       for address_spec in address_specs:
         yield address_spec
     elif payload:
       payload_dict = payload.as_dict()
-      for address_spec in payload_dict.get('library_specs', ()):
+      for address_spec in payload_dict.get("library_specs", ()):
         yield address_spec
 
   @memoized_property
   def library_specs(self):
     """Lists of specs to resolve to jar_libraries containing more jars."""
-    return [Address.parse(spec, relative_to=self.address.spec_path).spec
-            for spec in self.payload.library_specs]
+    return [
+      Address.parse(spec, relative_to=self.address.spec_path).spec
+      for spec in self.payload.library_specs
+    ]
 
   @classmethod
   def _split_jars_and_specs(cls, jars):
@@ -130,16 +131,14 @@ class ManagedJarLibraries:
     # Support the default target name protocol.
     if name is None:
       name = os.path.basename(self._parse_context.rel_path)
-    management = self._parse_context.create_object('managed_jar_dependencies',
-                                                   name=name,
-                                                   artifacts=artifacts,
-                                                   **kwargs)
+    management = self._parse_context.create_object(
+      "managed_jar_dependencies", name=name, artifacts=artifacts, **kwargs
+    )
     jars, _ = ManagedJarDependencies._split_jars_and_specs(artifacts)
     for library_name, dep in self._jars_by_name(management, jars).items():
-      self._parse_context.create_object('jar_library',
-                                        name=library_name,
-                                        jars=[copy.deepcopy(dep)],
-                                        managed_dependencies=f':{name}')
+      self._parse_context.create_object(
+        "jar_library", name=library_name, jars=[copy.deepcopy(dep)], managed_dependencies=f":{name}"
+      )
 
   @classmethod
   def _jars_by_name(cls, management, jars):
@@ -150,12 +149,10 @@ class ManagedJarLibraries:
         previous = jars_by_name[library_name]
         raise cls.JarLibraryNameCollision(
           management,
-          'Two jar coordinates would generate the same name. Please put one of them in a separate '
-          'jar_library() definition.\n  {coord1}: {name}\n  {coord2}: {name}\n'.format(
-            coord1=previous,
-            coord2=dep,
-            name=library_name,
-          )
+          "Two jar coordinates would generate the same name. Please put one of them in a separate "
+          "jar_library() definition.\n  {coord1}: {name}\n  {coord2}: {name}\n".format(
+            coord1=previous, coord2=dep, name=library_name
+          ),
         )
       jars_by_name[library_name] = dep
     return jars_by_name
@@ -171,4 +168,4 @@ class ManagedJarLibraries:
 
   @classmethod
   def _jar_library_name(cls, coord):
-    return '.'.join(cls._jar_coordinate_parts(coord))
+    return ".".join(cls._jar_coordinate_parts(coord))

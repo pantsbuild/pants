@@ -18,15 +18,23 @@ class UnpackedJars(ImportJarsMixin, Target):
   :API: public
   """
 
-  imported_target_kwargs_field = 'libraries'
-  imported_target_payload_field = 'library_specs'
+  imported_target_kwargs_field = "libraries"
+  imported_target_payload_field = "library_specs"
 
   class ExpectedLibrariesError(Exception):
     """Thrown when the target has no libraries defined."""
+
     pass
 
-  def __init__(self, payload=None, libraries=None, include_patterns=None, exclude_patterns=None,
-               intransitive=False, **kwargs):
+  def __init__(
+    self,
+    payload=None,
+    libraries=None,
+    include_patterns=None,
+    exclude_patterns=None,
+    intransitive=False,
+    **kwargs
+  ):
     """
     :param list libraries: addresses of jar_library targets that specify the jars you want to unpack
     :param list include_patterns: fileset patterns to include from the archive
@@ -36,14 +44,17 @@ class UnpackedJars(ImportJarsMixin, Target):
       the jars themselves.
     """
     payload = payload or Payload()
-    payload.add_fields({
-      'library_specs': PrimitiveField(libraries or ()),
-      'include_patterns' : PrimitiveField(include_patterns or ()),
-      'exclude_patterns' : PrimitiveField(exclude_patterns or ()),
-      'intransitive': PrimitiveField(intransitive)
-    })
+    payload.add_fields(
+      {
+        "library_specs": PrimitiveField(libraries or ()),
+        "include_patterns": PrimitiveField(include_patterns or ()),
+        "exclude_patterns": PrimitiveField(exclude_patterns or ()),
+        "intransitive": PrimitiveField(intransitive),
+      }
+    )
     super().__init__(payload=payload, **kwargs)
 
     if not libraries:
-      raise self.ExpectedLibrariesError('Expected non-empty libraries attribute for {spec}'
-                                        .format(spec=self.address.spec))
+      raise self.ExpectedLibrariesError(
+        "Expected non-empty libraries attribute for {spec}".format(spec=self.address.spec)
+      )

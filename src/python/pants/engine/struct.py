@@ -18,11 +18,11 @@ class Struct(Serializable, SerializableFactory, Validatable):
   """
 
   # Fields dealing with inheritance.
-  _INHERITANCE_FIELDS = {'extends', 'merges'}
+  _INHERITANCE_FIELDS = {"extends", "merges"}
   # The type alias for an instance overwrites any inherited type_alias field.
-  _TYPE_ALIAS_FIELD = 'type_alias'
+  _TYPE_ALIAS_FIELD = "type_alias"
   # The field that indicates whether a Struct is abstract (and should thus skip validation).
-  _ABSTRACT_FIELD = 'abstract'
+  _ABSTRACT_FIELD = "abstract"
   # Fields that should not be inherited.
   _UNINHERITABLE_FIELDS = _INHERITANCE_FIELDS | {_TYPE_ALIAS_FIELD, _ABSTRACT_FIELD}
   # Fields that are only intended for consumption by the Struct baseclass.
@@ -70,7 +70,7 @@ class Struct(Serializable, SerializableFactory, Validatable):
     """
     self._kwargs = kwargs
 
-    self._kwargs['abstract'] = abstract
+    self._kwargs["abstract"] = abstract
     self._kwargs[self._TYPE_ALIAS_FIELD] = type_alias
 
     self.extends = extends
@@ -80,11 +80,12 @@ class Struct(Serializable, SerializableFactory, Validatable):
     # address directly assigned (vs. inferred from name + source file location) and we only require
     # that if they do, their name - if also assigned, matches the address.
     if self.address:
-      target_name, _, config_specifier = self.address.target_name.partition('@')
+      target_name, _, config_specifier = self.address.target_name.partition("@")
       if self.name and self.name != target_name:
-        self.report_validation_error('Address and name do not match! address: {}, name: {}'
-                                     .format(self.address, self.name))
-      self._kwargs['name'] = target_name
+        self.report_validation_error(
+          "Address and name do not match! address: {}, name: {}".format(self.address, self.name)
+        )
+      self._kwargs["name"] = target_name
 
   def kwargs(self) -> Dict[str, Any]:
     """Returns a dict of the kwargs for this Struct which were not interpreted by the baseclass.
@@ -105,7 +106,7 @@ class Struct(Serializable, SerializableFactory, Validatable):
 
     :rtype: string
     """
-    return self._kwargs.get('name')
+    return self._kwargs.get("name")
 
   @property
   def address(self) -> Optional[Address]:
@@ -115,7 +116,7 @@ class Struct(Serializable, SerializableFactory, Validatable):
     generally embedded objects; ie: attributes values of enclosing named structs.
     Any top-level struct, though, will be identifiable via a unique address.
     """
-    return cast(Optional[Address], self._kwargs.get('address'))
+    return cast(Optional[Address], self._kwargs.get("address"))
 
   @property
   def type_alias(self) -> str:
@@ -134,7 +135,7 @@ class Struct(Serializable, SerializableFactory, Validatable):
     """Return `True` if this object has been marked as abstract.
 
     Abstract objects are not validated. See: `validate_concrete`."""
-    return self._kwargs.get('abstract', False)
+    return self._kwargs.get("abstract", False)
 
   # It only makes sense to inherit a subset of our own fields (we should not inherit new fields!),
   # our superclasses logically provide fields within this constrained set.
@@ -172,7 +173,7 @@ class Struct(Serializable, SerializableFactory, Validatable):
 
     # Allow for embedded objects inheriting from addressable objects - they should never inherit an
     # address and any top-level object inheriting will have its own address.
-    attributes.pop('address', None)
+    attributes.pop("address", None)
 
     # We should never inherit special fields - these are for local book-keeping only.
     for field in self._UNINHERITABLE_FIELDS:
@@ -185,14 +186,16 @@ class Struct(Serializable, SerializableFactory, Validatable):
       return self
 
     # Filter out the attributes that we will consume below for inheritance.
-    attributes = {k: v for k, v in self._asdict().items()
-                  if k not in self._INHERITANCE_FIELDS and v is not None}
+    attributes = {
+      k: v for k, v in self._asdict().items() if k not in self._INHERITANCE_FIELDS and v is not None
+    }
 
     if self.extends:
       for k, v in self._extract_inheritable_attributes(self.extends).items():
         attributes.setdefault(k, v)
 
     if self.merges:
+
       def merge(attrs):
         for k, v in attrs.items():
           if isinstance(v, MutableMapping):
@@ -251,8 +254,10 @@ class Struct(Serializable, SerializableFactory, Validatable):
         return tuple(sorted(hashable(v) for v in value))
       else:
         return value
-    return tuple(sorted((k, hashable(v)) for k, v in self._kwargs.items()
-                        if k not in self._INHERITANCE_FIELDS))
+
+    return tuple(
+      sorted((k, hashable(v)) for k, v in self._kwargs.items() if k not in self._INHERITANCE_FIELDS)
+    )
 
   def __hash__(self):
     return hash(self._key())
@@ -266,13 +271,14 @@ class Struct(Serializable, SerializableFactory, Validatable):
   def __repr__(self):
     classname = type(self).__name__
     if self.address:
-      return '{classname}(address={address})'.format(classname=classname,
-                                                     address=self.address.reference())
+      return "{classname}(address={address})".format(
+        classname=classname, address=self.address.reference()
+      )
     else:
-      return '{classname}({args})'.format(classname=classname,
-                                          args=', '.join(sorted('{}={!r}'.format(k, v)
-                                                                for k, v in self._kwargs.items()
-                                                                if v)))
+      return "{classname}({args})".format(
+        classname=classname,
+        args=", ".join(sorted("{}={!r}".format(k, v) for k, v in self._kwargs.items() if v)),
+      )
 
 
 class StructWithDeps(Struct):

@@ -48,7 +48,7 @@ def hash_file(path: Union[str, Path], digest: Optional[Digest] = None) -> str:
   If a hashlib message digest is not supplied a new sha1 message digest is used.
   """
   digest = digest or hashlib.sha1()
-  with open(path, 'rb') as fd:
+  with open(path, "rb") as fd:
     s = fd.read(8192)
     while s:
       digest.update(s)
@@ -62,14 +62,14 @@ def hash_dir(path: Path, *, digest: Optional[Digest] = None) -> str:
   If a hashlib message digest is not supplied a new sha1 message digest is used.
   """
   if not isinstance(path, Path):
-    raise TypeError(f'Expected path to be a pathlib.Path, given a: {type(path)}')
+    raise TypeError(f"Expected path to be a pathlib.Path, given a: {type(path)}")
 
   if not path.is_dir():
-    raise ValueError(f'Expected path to de a directory, given: {path}')
+    raise ValueError(f"Expected path to de a directory, given: {path}")
 
   digest = digest or hashlib.sha1()
   root = path.resolve()
-  for pth in sorted(p for p in root.rglob('*')):
+  for pth in sorted(p for p in root.rglob("*")):
     digest.update(bytes(pth.relative_to(root)))
     if not pth.is_dir():
       hash_file(pth, digest=digest)
@@ -119,28 +119,36 @@ class CoercingEncoder(json.JSONEncoder):
       # inputs, and allowing them creates an ambiguity we don't need to deal with right now. See
       # discussion in #6475.
       if isinstance(o, OrderedDict):
-        raise TypeError('{cls} does not support OrderedDict inputs: {val!r}.'
-                        .format(cls=type(self).__name__, val=o))
+        raise TypeError(
+          "{cls} does not support OrderedDict inputs: {val!r}.".format(
+            cls=type(self).__name__, val=o
+          )
+        )
       # TODO(#7082): we can remove the sorted() and OrderedDict when we drop python 2.7 and simply
       # ensure we encode the keys/values as we do right here.
       ordered_kv_pairs = sorted(o.items(), key=lambda x: x[0])
       return OrderedDict(
-        (self._maybe_encode_dict_key(k), self.default(v))
-        for k, v in ordered_kv_pairs)
+        (self._maybe_encode_dict_key(k), self.default(v)) for k, v in ordered_kv_pairs
+      )
     if isinstance(o, Set):
       # We disallow OrderedSet (although it is not a stdlib collection) for the same reasons as
       # OrderedDict above.
       if isinstance(o, OrderedSet):
-        raise TypeError('{cls} does not support OrderedSet inputs: {val!r}.'
-                        .format(cls=type(self).__name__, val=o))
+        raise TypeError(
+          "{cls} does not support OrderedSet inputs: {val!r}.".format(
+            cls=type(self).__name__, val=o
+          )
+        )
       # Set order is arbitrary in python 3.6 and 3.7, so we need to keep this sorted() call.
       return sorted(self.default(i) for i in o)
     if isinstance(o, Iterable) and not isinstance(o, (bytes, list, str)):
       return list(self.default(i) for i in o)
-    logger.debug("Our custom json encoder {} is trying to hash a primitive type, but has gone through"
-                 "checking every other registered type class before. These checks are expensive,"
-                 "so you should consider registering the type {} within"
-                 "this function ({}.default)".format(type(self).__name__, type(o), type(self).__name__))
+    logger.debug(
+      "Our custom json encoder {} is trying to hash a primitive type, but has gone through"
+      "checking every other registered type class before. These checks are expensive,"
+      "so you should consider registering the type {} within"
+      "this function ({}.default)".format(type(self).__name__, type(o), type(self).__name__)
+    )
     return o
 
   def encode(self, o):
@@ -190,8 +198,9 @@ class Sharder:
       :param string shard_spec: A string of the form M/N where M, N are ints and 0 <= M < N.
       """
       super(Sharder.InvalidShardSpec, self).__init__(
-          "Invalid shard spec '{}', should be of the form M/N, where M, N are ints "
-          "and 0 <= M < N.".format(shard_spec))
+        "Invalid shard spec '{}', should be of the form M/N, where M, N are ints "
+        "and 0 <= M < N.".format(shard_spec)
+      )
 
   @staticmethod
   def compute_shard(s, mod):
@@ -205,6 +214,7 @@ class Sharder:
     """
     :param string shard_spec: A string of the form M/N where M, N are ints and 0 <= M < N.
     """
+
     def ensure_int(s):
       try:
         return int(s)
@@ -212,8 +222,8 @@ class Sharder:
         raise self.InvalidShardSpec(shard_spec)
 
     if shard_spec is None:
-      raise self.InvalidShardSpec('None')
-    shard_str, _, nshards_str = shard_spec.partition('/')
+      raise self.InvalidShardSpec("None")
+    shard_str, _, nshards_str = shard_spec.partition("/")
     self._shard = ensure_int(shard_str)
     self._nshards = ensure_int(nshards_str)
 

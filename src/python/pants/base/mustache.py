@@ -29,8 +29,9 @@ class MustacheRenderer:
         return [convert_val(e) for e in x]
       else:
         return x
+
     items = [(key, convert_val(val)) for (key, val) in args.items()]
-    ret = dict([(key + '?', True) for (key, val) in items if val and not key.endswith('?')])
+    ret = dict([(key + "?", True) for (key, val) in items if val and not key.endswith("?")])
     ret.update(dict(items))
     return ret
 
@@ -51,9 +52,11 @@ class MustacheRenderer:
     self._template_dir = template_dir
     self._package_name = package_name
     if self._package_name is not None:
+
       class PartialsLoader:
         def get(me, template_name):
           return self._get_template_text_from_package(template_name)
+
       partials = PartialsLoader()
     else:
       partials = None
@@ -82,11 +85,12 @@ class MustacheRenderer:
   def _get_template_text_from_package(self, template_name):
     """Load the named template embedded in our package."""
     if self._package_name is None:
-      raise self.MustacheError('No package specified for template loading.')
+      raise self.MustacheError("No package specified for template loading.")
 
-    path = os.path.join('templates', template_name + '.mustache')
+    path = os.path.join("templates", template_name + ".mustache")
     template_text = pkgutil.get_data(self._package_name, path)
     if template_text is None:
       raise self.MustacheError(
-        'could not find template {} in package {}'.format(path, self._package_name))
-    return template_text.decode('utf8')
+        "could not find template {} in package {}".format(path, self._package_name)
+      )
+    return template_text.decode("utf8")

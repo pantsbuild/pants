@@ -73,14 +73,9 @@ class Page(Target):
     def _compute_fingerprint(self):
       return combine_hashes(artifact.fingerprint() for artifact in self)
 
-  def __init__(self,
-               sources,
-               address=None,
-               payload=None,
-               format=None,
-               links=None,
-               provides=None,
-               **kwargs):
+  def __init__(
+    self, sources, address=None, payload=None, format=None, links=None, provides=None, **kwargs
+  ):
     """
     :param sources: Page source file. Exactly one will be present.
     :param format: Page's format, ``md`` or ``rst``. By default, Pants infers from ``source`` file
@@ -93,22 +88,24 @@ class Page(Target):
     """
     payload = payload or Payload()
     if not format:
-      if sources.files[0].lower().endswith('.rst'):
-        format = 'rst'
+      if sources.files[0].lower().endswith(".rst"):
+        format = "rst"
       else:
-        format = 'md'
-    payload.add_fields({
-      'sources': self.create_sources_field(sources=sources,
-                                           sources_rel_path=address.spec_path,
-                                           key_arg='sources'),
-      'format': PrimitiveField(format),
-      'links': PrimitiveField(links or []),
-      'provides': self.ProvidesTupleField(provides or []),
-    })
+        format = "md"
+    payload.add_fields(
+      {
+        "sources": self.create_sources_field(
+          sources=sources, sources_rel_path=address.spec_path, key_arg="sources"
+        ),
+        "format": PrimitiveField(format),
+        "links": PrimitiveField(links or []),
+        "provides": self.ProvidesTupleField(provides or []),
+      }
+    )
     super().__init__(address=address, payload=payload, **kwargs)
 
     if provides and not isinstance(provides[0], WikiArtifact):
-      raise ValueError('Page must provide a wiki_artifact. Found instead: {}'.format(provides))
+      raise ValueError("Page must provide a wiki_artifact. Found instead: {}".format(provides))
 
   @property
   def source(self):
@@ -121,7 +118,7 @@ class Page(Target):
       yield address_spec
 
     target_representation = kwargs or payload.as_dict()
-    for address_spec in target_representation.get('links', []):
+    for address_spec in target_representation.get("links", []):
       yield address_spec
 
   @property

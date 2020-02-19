@@ -77,7 +77,7 @@ def subsystem_rule(optionable_factory: Type[OptionableFactory]) -> "TaskRule":
 def _get_starting_indent(source):
   """Used to remove leading indentation from `source` so ast.parse() doesn't raise an exception."""
   if source.startswith(" "):
-    return sum(1 for _ in itertools.takewhile(lambda c: c in {' ', b' '}, source))
+    return sum(1 for _ in itertools.takewhile(lambda c: c in {" ", b" "}, source))
   return 0
 
 
@@ -86,7 +86,7 @@ def _make_rule(
   parameter_types: typing.Iterable[Type],
   *,
   cacheable: bool = True,
-  name: Optional[str] = None
+  name: Optional[str] = None,
 ) -> Callable[[Callable], Callable]:
   """A @decorator that declares that a particular static function may be used as a TaskRule.
 
@@ -109,7 +109,7 @@ def _make_rule(
 
   def wrapper(func):
     if not inspect.isfunction(func):
-      raise ValueError('The @rule decorator must be applied innermost of all decorators.')
+      raise ValueError("The @rule decorator must be applied innermost of all decorators.")
 
     owning_module = sys.modules[func.__module__]
     source = inspect.getsource(func)
@@ -122,19 +122,21 @@ def _make_rule(
       resolved = getattr(owning_module, name, None) or owning_module.__builtins__.get(name, None)
       if resolved is None:
         raise ValueError(
-          f'Could not resolve type `{name}` in top level of module {owning_module.__name__}'
+          f"Could not resolve type `{name}` in top level of module {owning_module.__name__}"
         )
       elif not isinstance(resolved, type):
         raise ValueError(
-          f'Expected a `type` constructor for `{name}`, but got: {resolved} (type '
-          f'`{type(resolved).__name__}`)'
+          f"Expected a `type` constructor for `{name}`, but got: {resolved} (type "
+          f"`{type(resolved).__name__}`)"
         )
       return resolved
 
     gets = OrderedSet()
     rule_func_node = assert_single_element(
-      node for node in ast.iter_child_nodes(module_ast)
-      if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == func.__name__)
+      node
+      for node in ast.iter_child_nodes(module_ast)
+      if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == func.__name__
+    )
 
     parents_table = {}
     for parent in ast.walk(rule_func_node):
@@ -145,7 +147,8 @@ def _make_rule(
     rule_visitor.visit(rule_func_node)
     gets.update(
       Get.create_statically_for_rule_graph(resolve_type(p), resolve_type(s))
-      for p, s in rule_visitor.gets)
+      for p, s in rule_visitor.gets
+    )
 
     # Register dependencies for @goal_rule/Goal.
     dependency_rules = (subsystem_rule(return_type.subsystem_cls),) if is_goal_cls else None
@@ -160,16 +163,17 @@ def _make_rule(
     func.__line_number__ = func.__code__.co_firstlineno
 
     func.rule = TaskRule(
-        return_type,
-        tuple(parameter_types),
-        func,
-        input_gets=tuple(gets),
-        dependency_rules=dependency_rules,
-        cacheable=cacheable,
-        name=effective_name,
-      )
+      return_type,
+      tuple(parameter_types),
+      func,
+      input_gets=tuple(gets),
+      dependency_rules=dependency_rules,
+      cacheable=cacheable,
+      name=effective_name,
+    )
 
     return func
+
   return wrapper
 
 
@@ -194,52 +198,55 @@ class MissingParameterTypeAnnotation(InvalidTypeAnnotation):
 
 
 def _ensure_type_annotation(
-  *, type_annotation: Optional[Type], name: str, raise_type: Type[InvalidTypeAnnotation],
+  *, type_annotation: Optional[Type], name: str, raise_type: Type[InvalidTypeAnnotation]
 ) -> Type:
   if type_annotation is None:
-    raise raise_type(f'{name} is missing a type annotation.')
+    raise raise_type(f"{name} is missing a type annotation.")
   if not isinstance(type_annotation, type):
     raise raise_type(
-      f'The annotation for {name} must be a type, got {type_annotation} of type {type(type_annotation)}.'
+      f"The annotation for {name} must be a type, got {type_annotation} of type {type(type_annotation)}."
     )
   return type_annotation
 
 
-PUBLIC_RULE_DECORATOR_ARGUMENTS = {'name'}
+PUBLIC_RULE_DECORATOR_ARGUMENTS = {"name"}
 # We don't want @rule-writers to use 'cacheable' as a kwarg directly, but rather
 # set it implicitly based on whether the rule annotation is @rule or @goal_rule.
 # So we leave it out of PUBLIC_RULE_DECORATOR_ARGUMENTS.
-IMPLICIT_PRIVATE_RULE_DECORATOR_ARGUMENTS = {'cacheable'}
+IMPLICIT_PRIVATE_RULE_DECORATOR_ARGUMENTS = {"cacheable"}
 
 
 def rule_decorator(*args, **kwargs) -> Callable:
   if len(args) != 1 and not inspect.isfunction(args[0]):
     raise ValueError(
-      'The @rule decorator expects no arguments and for the function it decorates to be '
-      f'type-annotated. Given {args}.'
+      "The @rule decorator expects no arguments and for the function it decorates to be "
+      f"type-annotated. Given {args}."
     )
 
-  if len(set(kwargs) - PUBLIC_RULE_DECORATOR_ARGUMENTS - IMPLICIT_PRIVATE_RULE_DECORATOR_ARGUMENTS) != 0:
+  if (
+    len(set(kwargs) - PUBLIC_RULE_DECORATOR_ARGUMENTS - IMPLICIT_PRIVATE_RULE_DECORATOR_ARGUMENTS)
+    != 0
+  ):
     raise UnrecognizedRuleArgument(
       f"`@rule`s and `@goal_rule`s only accept the following keyword arguments: {PUBLIC_RULE_DECORATOR_ARGUMENTS}"
     )
 
   func = args[0]
 
-  cacheable: bool = kwargs['cacheable']
-  name: Optional[str] = kwargs.get('name')
+  cacheable: bool = kwargs["cacheable"]
+  name: Optional[str] = kwargs.get("name")
 
-  func_id = f'@rule {func.__module__}:{func.__name__}'
+  func_id = f"@rule {func.__module__}:{func.__name__}"
   type_hints = get_type_hints(func)
   return_type = _ensure_type_annotation(
     type_annotation=type_hints.get("return"),
-    name=f'{func_id} return',
+    name=f"{func_id} return",
     raise_type=MissingReturnTypeAnnotation,
   )
   parameter_types = tuple(
     _ensure_type_annotation(
       type_annotation=type_hints.get(parameter),
-      name=f'{func_id} parameter {parameter}',
+      name=f"{func_id} parameter {parameter}",
       raise_type=MissingParameterTypeAnnotation,
     )
     for parameter in inspect.signature(func).parameters
@@ -248,7 +255,9 @@ def rule_decorator(*args, **kwargs) -> Callable:
   return _make_rule(return_type, parameter_types, cacheable=cacheable, name=name)(func)
 
 
-def validate_parameter_types(func_id: str, parameter_types: Tuple[Type, ...], cacheable: bool) -> None:
+def validate_parameter_types(
+  func_id: str, parameter_types: Tuple[Type, ...], cacheable: bool
+) -> None:
   if cacheable:
     for ty in parameter_types:
       if getattr(ty, "__side_effecting", False):
@@ -259,8 +268,10 @@ def inner_rule(*args, **kwargs) -> Callable:
   if len(args) == 1 and inspect.isfunction(args[0]):
     return rule_decorator(*args, **kwargs)
   else:
+
     def wrapper(*args):
       return rule_decorator(*args, **kwargs)
+
     return wrapper
 
 
@@ -275,14 +286,15 @@ def goal_rule(*args, **kwargs) -> Callable:
 @dataclass(frozen=True)
 class UnionRule:
   """Specify that an instance of `union_member` can be substituted wherever `union_base` is used."""
+
   union_base: Type
   union_member: Type
 
   def __post_init__(self) -> None:
     if not union.is_instance(self.union_base):
       raise ValueError(
-        f'union_base must be a type annotated with @union: was {self.union_base} '
-        f'(type {type(self.union_base).__name__})'
+        f"union_base must be a type annotated with @union: was {self.union_base} "
+        f"(type {type(self.union_base).__name__})"
       )
 
 
@@ -293,7 +305,7 @@ class UnionMembership:
   def is_member(self, union_type, putative_member):
     members = self.union_rules.get(union_type)
     if members is None:
-      raise TypeError(f'Not a registered union type: {union_type}')
+      raise TypeError(f"Not a registered union type: {union_type}")
     return type(putative_member) in members
 
 
@@ -334,6 +346,7 @@ class TaskRule(Rule):
   should always prefer the `@rule` constructor, and in cases where that is too constraining
   (likely due to #4535) please bump or open a ticket to explain the usecase.
   """
+
   _output_type: Type
   input_selectors: Tuple[Type, ...]
   input_gets: Tuple
@@ -364,14 +377,14 @@ class TaskRule(Rule):
     self.name = name
 
   def __str__(self):
-    return ('(name={}, {}, {!r}, {}, gets={}, opts={})'
-            .format(self.name or '<not defined>',
-                    self.output_type.__name__,
-                    self.input_selectors,
-                    self.func.__name__,
-                    self.input_gets,
-                    self.dependency_optionables,
-                    ))
+    return "(name={}, {}, {!r}, {}, gets={}, opts={})".format(
+      self.name or "<not defined>",
+      self.output_type.__name__,
+      self.input_selectors,
+      self.func.__name__,
+      self.input_gets,
+      self.dependency_optionables,
+    )
 
   @property
   def output_type(self):
@@ -395,6 +408,7 @@ class RootRule(Rule):
   particular type might be when a value is provided as a root subject at the beginning
   of an execution.
   """
+
   _output_type: Type
 
   def __init__(self, output_type: Type) -> None:
@@ -417,6 +431,7 @@ class RootRule(Rule):
 @dataclass(frozen=True)
 class RuleIndex:
   """Holds a normalized index of Rules used to instantiate Nodes."""
+
   rules: Any
   roots: Any
   union_rules: Any
@@ -460,15 +475,19 @@ class RuleIndex:
         add_rule(entry)
       elif isinstance(entry, UnionRule):
         add_type_transition_rule(entry)
-      elif hasattr(entry, '__call__'):
-        rule = getattr(entry, 'rule', None)
+      elif hasattr(entry, "__call__"):
+        rule = getattr(entry, "rule", None)
         if rule is None:
           raise TypeError("Expected callable {} to be decorated with @rule.".format(entry))
         add_rule(rule)
       else:
-        raise TypeError("""\
+        raise TypeError(
+          """\
 Rule entry {} had an unexpected type: {}. Rules either extend Rule or UnionRule, or are static \
-functions decorated with @rule.""".format(entry, type(entry)))
+functions decorated with @rule.""".format(
+            entry, type(entry)
+          )
+        )
 
     return cls(serializable_rules, serializable_roots, union_rules)
 
@@ -478,8 +497,6 @@ functions decorated with @rule.""".format(entry, type(entry)))
     union_rules: Any
 
   def normalized_rules(self):
-    rules = OrderedSet(rule
-                       for ruleset in self.rules.values()
-                       for rule in ruleset)
+    rules = OrderedSet(rule for ruleset in self.rules.values() for rule in ruleset)
     rules.update(self.roots)
     return self.NormalizedRules(rules, self.union_rules)

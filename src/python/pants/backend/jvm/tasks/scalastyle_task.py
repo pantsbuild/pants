@@ -22,15 +22,15 @@ class FileExcluder:
     self.excludes = set()
     if excludes_path:
       if not os.path.exists(excludes_path):
-        raise TaskError(f'Excludes file does not exist: {excludes_path}')
-      with open(excludes_path, 'r') as fh:
+        raise TaskError(f"Excludes file does not exist: {excludes_path}")
+      with open(excludes_path, "r") as fh:
         for line in fh.readlines():
           pattern = line.strip()
-          if pattern and not pattern.startswith('#'):
+          if pattern and not pattern.startswith("#"):
             self.excludes.add(re.compile(pattern))
-            log.debug(f'Exclude pattern: {pattern}')
+            log.debug(f"Exclude pattern: {pattern}")
     else:
-      log.debug('No excludes file specified. All scala sources will be checked.')
+      log.debug("No excludes file specified. All scala sources will be checked.")
 
   def should_include(self, source_filename):
     for exclude in self.excludes:
@@ -49,22 +49,22 @@ class ScalastyleTask(LintTaskMixin, NailgunTask):
 
   class UnspecifiedConfig(TaskError):
     def __init__(self):
-      super().__init__('Path to scalastyle config file must be specified.')
+      super().__init__("Path to scalastyle config file must be specified.")
 
   class MissingConfig(TaskError):
     def __init__(self, path):
-      super().__init__(f'Scalastyle config file does not exist: {path}.')
+      super().__init__(f"Scalastyle config file does not exist: {path}.")
 
-  _SCALA_SOURCE_EXTENSION = '.scala'
+  _SCALA_SOURCE_EXTENSION = ".scala"
 
-  _MAIN = 'org.scalastyle.Main'
+  _MAIN = "org.scalastyle.Main"
 
   def _resolve_conflicting_options(self, *, old_option: str, new_option: str):
     return resolve_conflicting_options(
       old_option=old_option,
       new_option=new_option,
-      old_scope='lint-scalastyle',
-      new_scope='scalastyle',
+      old_scope="lint-scalastyle",
+      new_scope="scalastyle",
       old_container=self.get_options(),
       new_container=Scalastyle.global_instance().options,
     )
@@ -76,23 +76,36 @@ class ScalastyleTask(LintTaskMixin, NailgunTask):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--config', type=file_option, advanced=True, fingerprint=True,
-             removal_version='1.27.0.dev0', removal_hint='Use `--scalastyle-config` instead.',
-             help='Path to scalastyle config file.')
-    register('--excludes', type=file_option, advanced=True, fingerprint=True,
-             help='Path to optional scalastyle excludes file. Each line is a regex. (Blank lines '
-                  'and lines starting with \'#\' are ignored.) A file is skipped if its path '
-                  '(relative to the repo root) matches any of these regexes.')
+    register(
+      "--config",
+      type=file_option,
+      advanced=True,
+      fingerprint=True,
+      removal_version="1.27.0.dev0",
+      removal_hint="Use `--scalastyle-config` instead.",
+      help="Path to scalastyle config file.",
+    )
+    register(
+      "--excludes",
+      type=file_option,
+      advanced=True,
+      fingerprint=True,
+      help="Path to optional scalastyle excludes file. Each line is a regex. (Blank lines "
+      "and lines starting with '#' are ignored.) A file is skipped if its path "
+      "(relative to the repo root) matches any of these regexes.",
+    )
     # TODO: Use the task's log level instead of this separate verbosity knob.
-    register('--verbose', type=bool,
-             help='Enable verbose scalastyle output.')
+    register("--verbose", type=bool, help="Enable verbose scalastyle output.")
 
   @classmethod
   def get_non_synthetic_scala_targets(cls, targets):
-    return [target for target in targets
-            if isinstance(target, Target)
-            and target.has_sources(cls._SCALA_SOURCE_EXTENSION)
-            and not target.is_synthetic]
+    return [
+      target
+      for target in targets
+      if isinstance(target, Target)
+      and target.has_sources(cls._SCALA_SOURCE_EXTENSION)
+      and not target.is_synthetic
+    ]
 
   @classmethod
   def get_non_excluded_scala_sources(cls, scalastyle_excluder, scala_targets):
@@ -102,24 +115,26 @@ class ScalastyleTask(LintTaskMixin, NailgunTask):
       scala_sources.extend(target.sources_relative_to_buildroot())
 
     # make sure only the sources with the .scala extension stay.
-    scala_sources = [filename for filename in scala_sources if filename.endswith(cls._SCALA_SOURCE_EXTENSION)]
+    scala_sources = [
+      filename for filename in scala_sources if filename.endswith(cls._SCALA_SOURCE_EXTENSION)
+    ]
 
     # filter out all sources matching exclude patterns, if specified in config.
-    scala_sources = [source for source in scala_sources if scalastyle_excluder.should_include(source)]
+    scala_sources = [
+      source for source in scala_sources if scalastyle_excluder.should_include(source)
+    ]
 
     return scala_sources
 
   @property
   def skip_execution(self):
     return self.resolve_conflicting_skip_options(
-      old_scope="lint-scalastyle",
-      new_scope="scalastyle",
-      subsystem=Scalastyle.global_instance(),
+      old_scope="lint-scalastyle", new_scope="scalastyle", subsystem=Scalastyle.global_instance()
     )
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
-    self._results_dir = os.path.join(self.workdir, 'results')
+    self._results_dir = os.path.join(self.workdir, "results")
 
   def _create_result_file(self, target):
     result_file = os.path.join(self._results_dir, target.id)
@@ -145,34 +160,40 @@ class ScalastyleTask(LintTaskMixin, NailgunTask):
       scalastyle_quiet = self.get_options().quiet or False
       scalastyle_excluder = self.create_file_excluder()
 
-      self.context.log.debug('Non synthetic scala targets to be checked:')
+      self.context.log.debug("Non synthetic scala targets to be checked:")
       for target in invalid_targets:
-        self.context.log.debug(f'  {target.address.spec}')
+        self.context.log.debug(f"  {target.address.spec}")
 
       scala_sources = self.get_non_excluded_scala_sources(scalastyle_excluder, invalid_targets)
-      self.context.log.debug('Non excluded scala sources to be checked:')
+      self.context.log.debug("Non excluded scala sources to be checked:")
       for source in scala_sources:
-        self.context.log.debug(f'  {source}')
+        self.context.log.debug(f"  {source}")
 
       if scala_sources:
+
         def call(srcs):
           def to_java_boolean(x):
             return str(x).lower()
 
           cp = ScalaPlatform.global_instance().style_classpath(self.context.products)
           scalastyle_args = [
-            '-c', scalastyle_config,
-            '-v', to_java_boolean(scalastyle_verbose),
-            '-q', to_java_boolean(scalastyle_quiet),
-            ]
-          return self.runjava(classpath=cp,
-                              main=self._MAIN,
-                              jvm_options=self.get_options().jvm_options,
-                              args=scalastyle_args + srcs)
+            "-c",
+            scalastyle_config,
+            "-v",
+            to_java_boolean(scalastyle_verbose),
+            "-q",
+            to_java_boolean(scalastyle_quiet),
+          ]
+          return self.runjava(
+            classpath=cp,
+            main=self._MAIN,
+            jvm_options=self.get_options().jvm_options,
+            args=scalastyle_args + srcs,
+          )
 
         result = Xargs(call).execute(scala_sources)
         if result != 0:
-          raise TaskError(f'java {ScalastyleTask._MAIN} ... exited non-zero ({result})')
+          raise TaskError(f"java {ScalastyleTask._MAIN} ... exited non-zero ({result})")
 
   def validate_scalastyle_config(self):
     config = self._resolve_conflicting_options(old_option="config", new_option="config")

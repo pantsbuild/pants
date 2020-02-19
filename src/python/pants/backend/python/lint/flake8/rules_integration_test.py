@@ -25,7 +25,6 @@ from pants.testutil.test_base import TestBase
 
 
 class Flake8IntegrationTest(TestBase):
-
   def setUp(self):
     super().setUp()
     init_subsystems([download_pex_bin.DownloadedPexBin.Factory])
@@ -36,7 +35,7 @@ class Flake8IntegrationTest(TestBase):
 
   @classmethod
   def alias_groups(cls) -> BuildFileAliases:
-    return BuildFileAliases(targets={'python_library': PythonLibrary})
+    return BuildFileAliases(targets={"python_library": PythonLibrary})
 
   @classmethod
   def rules(cls):
@@ -69,7 +68,7 @@ class Flake8IntegrationTest(TestBase):
       args.append(f"--flake8-skip")
     input_snapshot = self.request_single_product(Snapshot, InputFilesContent(source_files))
     adaptor = PythonTargetAdaptor(
-      sources=EagerFilesetWithSpec('test', {'globs': []}, snapshot=input_snapshot),
+      sources=EagerFilesetWithSpec("test", {"globs": []}, snapshot=input_snapshot),
       address=Address.parse("test:target"),
       compatibility=[interpreter_constraints] if interpreter_constraints else None,
     )
@@ -77,7 +76,8 @@ class Flake8IntegrationTest(TestBase):
       origin = SingleAddress(directory="test", name="target")
     target = Flake8Target(PythonTargetAdaptorWithOrigin(adaptor, origin))
     return self.request_single_product(
-      LintResult, Params(
+      LintResult,
+      Params(
         target,
         create_options_bootstrapper(args=args),
         download_pex_bin.DownloadedPexBin.Factory.global_instance(),
@@ -108,10 +108,10 @@ class Flake8IntegrationTest(TestBase):
 
   @skip_unless_python27_and_python3_present
   def test_uses_correct_python_version(self) -> None:
-    py2_result = self.run_flake8([self.py3_only_source], interpreter_constraints='CPython==2.7.*')
+    py2_result = self.run_flake8([self.py3_only_source], interpreter_constraints="CPython==2.7.*")
     assert py2_result.exit_code == 1
     assert "test/py3.py:1:8: E999 SyntaxError" in py2_result.stdout
-    py3_result = self.run_flake8([self.py3_only_source], interpreter_constraints='CPython>=3.6')
+    py3_result = self.run_flake8([self.py3_only_source], interpreter_constraints="CPython>=3.6")
     assert py3_result.exit_code == 0
     assert py3_result.stdout.strip() == ""
 

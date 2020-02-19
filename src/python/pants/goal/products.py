@@ -14,6 +14,7 @@ class ProductError(Exception):
   """
   :API: public
   """
+
   pass
 
 
@@ -124,8 +125,9 @@ class UnionProducts:
     return "UnionProducts({})".format(self._products_by_target)
 
   def __eq__(self, other):
-    return (isinstance(other, UnionProducts) and
-            self._products_by_target == other._products_by_target)
+    return (
+      isinstance(other, UnionProducts) and self._products_by_target == other._products_by_target
+    )
 
   def __ne__(self, other):
     return not self == other
@@ -260,6 +262,7 @@ class Products:
 
   :API: public
   """
+
   class ProductMapping:
     """Maps products of a given type by target. Each product is a map from basedir to a list of
     files in that dir.
@@ -344,10 +347,14 @@ class Products:
       return keys
 
     def __repr__(self):
-      return 'ProductMapping({}) {{\n  {}\n}}'.format(self.typename, '\n  '.join(
-          '{} => {}\n    {}'.format(str(target), basedir, outputs)
+      return "ProductMapping({}) {{\n  {}\n}}".format(
+        self.typename,
+        "\n  ".join(
+          "{} => {}\n    {}".format(str(target), basedir, outputs)
           for target, outputs_by_basedir in self.by_target.items()
-          for basedir, outputs in outputs_by_basedir.items()))
+          for basedir, outputs in outputs_by_basedir.items()
+        ),
+      )
 
     def __bool__(self):
       return not self.empty()
@@ -412,8 +419,11 @@ class Products:
              registered.
     """
     if typename in self.data_products:
-      raise ProductError('Already have a product registered for {}, cannot over-write with {}'
-                         .format(typename, value))
+      raise ProductError(
+        "Already have a product registered for {}, cannot over-write with {}".format(
+          typename, value
+        )
+      )
     return self.safe_create_data(typename, lambda: value)
 
   def safe_create_data(self, typename, init_func):
@@ -450,12 +460,12 @@ class Products:
     """
     product_mapping = self.get(product_type).get(target)
     if len(product_mapping) != 1:
-      raise ProductError('{} directories in product mapping: requires exactly 1.'
-                         .format(len(product_mapping)))
+      raise ProductError(
+        "{} directories in product mapping: requires exactly 1.".format(len(product_mapping))
+      )
 
     for _, files in product_mapping.items():
       if len(files) != 1:
-        raise ProductError('{} files in target directory: requires exactly 1.'
-                           .format(len(files)))
+        raise ProductError("{} files in target directory: requires exactly 1.".format(len(files)))
 
       return files[0]

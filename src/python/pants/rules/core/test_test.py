@@ -40,14 +40,12 @@ class MockOptions:
 
 class TestTest(TestBase):
   def make_ipr(self, content: bytes) -> InteractiveProcessRequest:
-    input_files_content = InputFilesContent((
-      FileContent(path='program.py', content=content, is_executable=True),
-    ))
+    input_files_content = InputFilesContent(
+      (FileContent(path="program.py", content=content, is_executable=True),)
+    )
     digest = self.request_single_product(Digest, input_files_content)
     return InteractiveProcessRequest(
-      argv=("/usr/bin/python", "program.py",),
-      run_in_workspace=False,
-      input_files=digest,
+      argv=("/usr/bin/python", "program.py"), run_in_workspace=False, input_files=digest
     )
 
   def make_successful_ipr(self) -> InteractiveProcessRequest:
@@ -60,12 +58,15 @@ class TestTest(TestBase):
 
   @staticmethod
   def make_addresses_with_origins(*addresses: Address) -> AddressesWithOrigins:
-    return AddressesWithOrigins([
-      AddressWithOrigin(
-        address=address,
-        origin=SingleAddress(directory=address.spec_path, name=address.target_name)
-      ) for address in addresses
-    ])
+    return AddressesWithOrigins(
+      [
+        AddressWithOrigin(
+          address=address,
+          origin=SingleAddress(directory=address.spec_path, name=address.target_name),
+        )
+        for address in addresses
+      ]
+    )
 
   def single_target_test(self, result, expected_console_output, success=True, debug=False):
     console = MockConsole(use_colors=False)
@@ -86,8 +87,10 @@ class TestTest(TestBase):
           subject_type=AddressWithOrigin,
           mock=lambda _: AddressAndDebugRequest(
             addr,
-            TestDebugRequest(ipr=self.make_successful_ipr() if success else self.make_failure_ipr())
-          )
+            TestDebugRequest(
+              ipr=self.make_successful_ipr() if success else self.make_failure_ipr()
+            ),
+          ),
         ),
       ],
     )
@@ -96,24 +99,28 @@ class TestTest(TestBase):
 
   def test_output_success(self) -> None:
     self.single_target_test(
-      result=TestResult(status=Status.SUCCESS, stdout='Here is some output from a test', stderr=''),
-      expected_console_output=dedent("""\
+      result=TestResult(status=Status.SUCCESS, stdout="Here is some output from a test", stderr=""),
+      expected_console_output=dedent(
+        """\
         some/target stdout:
         Here is some output from a test
 
         some/target                                                                     .....   SUCCESS
-      """),
+      """
+      ),
     )
 
   def test_output_failure(self) -> None:
     self.single_target_test(
-      result=TestResult(status=Status.FAILURE, stdout='Here is some output from a test', stderr=''),
-      expected_console_output=dedent("""\
+      result=TestResult(status=Status.FAILURE, stdout="Here is some output from a test", stderr=""),
+      expected_console_output=dedent(
+        """\
         some/target stdout:
         Here is some output from a test
 
         some/target                                                                     .....   FAILURE
-        """),
+        """
+      ),
       success=False,
     )
 
@@ -127,9 +134,9 @@ class TestTest(TestBase):
     def make_result(address_with_origin: AddressWithOrigin) -> AddressAndTestResult:
       address = address_with_origin.address
       if address == address1:
-        tr = TestResult(status=Status.SUCCESS, stdout='I passed\n', stderr='')
+        tr = TestResult(status=Status.SUCCESS, stdout="I passed\n", stderr="")
       elif address == address2:
-        tr = TestResult(status=Status.FAILURE, stdout='I failed\n', stderr='')
+        tr = TestResult(status=Status.FAILURE, stdout="I failed\n", stderr="")
       else:
         raise Exception("Unrecognised target")
       return AddressAndTestResult(address, tr)
@@ -151,13 +158,16 @@ class TestTest(TestBase):
         MockGet(
           product_type=AddressAndDebugRequest,
           subject_type=AddressWithOrigin,
-          mock=make_debug_request
+          mock=make_debug_request,
         ),
       ],
     )
 
     self.assertEqual(1, res.exit_code)
-    self.assertEqual(console.stdout.getvalue(), dedent("""\
+    self.assertEqual(
+      console.stdout.getvalue(),
+      dedent(
+        """\
       testprojects/tests/python/pants/passes stdout:
       I passed
 
@@ -167,27 +177,26 @@ class TestTest(TestBase):
 
       testprojects/tests/python/pants/passes                                          .....   SUCCESS
       testprojects/tests/python/pants/fails                                           .....   FAILURE
-      """))
+      """
+      ),
+    )
 
   def test_stderr(self) -> None:
     self.single_target_test(
-      result=TestResult(status=Status.FAILURE, stdout='', stderr='Failure running the tests!'),
-      expected_console_output=dedent("""\
+      result=TestResult(status=Status.FAILURE, stdout="", stderr="Failure running the tests!"),
+      expected_console_output=dedent(
+        """\
         some/target stderr:
         Failure running the tests!
 
         some/target                                                                     .....   FAILURE
-        """),
+        """
+      ),
       success=False,
     )
 
   def test_debug_options(self) -> None:
-    self.single_target_test(
-      result=None,
-      expected_console_output='',
-      success=False,
-      debug=True
-    )
+    self.single_target_test(result=None, expected_console_output="", success=False, debug=True)
 
   def run_coordinator_of_tests(
     self,
@@ -205,13 +214,13 @@ class TestTest(TestBase):
         #  some premade snapshots and possibly a generalized make_hydrated_target function.
         directory_digest=EMPTY_DIRECTORY_DIGEST,
         files=tuple(["test.py"] if include_sources else []),
-        dirs=()
-      )
+        dirs=(),
+      ),
     )
     target_adaptor = (
-      PythonTestsAdaptor(type_alias='python_tests', sources=mocked_fileset)
-      if test_target_type else
-      PythonBinaryAdaptor(type_alias='python_binary', sources=mocked_fileset)
+      PythonTestsAdaptor(type_alias="python_tests", sources=mocked_fileset)
+      if test_target_type
+      else PythonBinaryAdaptor(type_alias="python_binary", sources=mocked_fileset)
     )
     with self.captured_logging(logging.INFO):
       result: AddressAndTestResult = run_rule(
@@ -227,8 +236,8 @@ class TestTest(TestBase):
           MockGet(
             product_type=TestResult,
             subject_type=PythonTestsAdaptorWithOrigin,
-            mock=lambda _: TestResult(status=Status.SUCCESS, stdout='foo', stderr=''),
-          ),
+            mock=lambda _: TestResult(status=Status.SUCCESS, stdout="foo", stderr=""),
+          )
         ],
       )
     return result
@@ -237,7 +246,7 @@ class TestTest(TestBase):
     addr = Address.parse("some/dir:tests")
     result = self.run_coordinator_of_tests(address=addr)
     assert result == AddressAndTestResult(
-      addr, TestResult(status=Status.SUCCESS, stdout='foo', stderr='')
+      addr, TestResult(status=Status.SUCCESS, stdout="foo", stderr="")
     )
 
   def test_coordinator_single_non_test_target(self) -> None:
@@ -245,11 +254,9 @@ class TestTest(TestBase):
     # Note that this is not the same error message the end user will see, as we're resolving
     # union Get requests in run_rule, not the real engine.  But this test still asserts that
     # we error when we expect to error.
-    with self.assertRaisesRegex(AssertionError, r'Rule requested: .* which cannot be satisfied.'):
+    with self.assertRaisesRegex(AssertionError, r"Rule requested: .* which cannot be satisfied."):
       self.run_coordinator_of_tests(
-        address=addr,
-        origin=SingleAddress(directory='some/dir', name='bin'),
-        test_target_type=False,
+        address=addr, origin=SingleAddress(directory="some/dir", name="bin"), test_target_type=False
       )
 
   def test_coordinator_empty_sources(self) -> None:
@@ -260,17 +267,15 @@ class TestTest(TestBase):
   def test_coordinator_globbed_test_target(self) -> None:
     addr = Address.parse("some/dir:tests")
     result = self.run_coordinator_of_tests(
-      address=addr, origin=DescendantAddresses(directory='some/dir'),
+      address=addr, origin=DescendantAddresses(directory="some/dir")
     )
     assert result == AddressAndTestResult(
-      addr, TestResult(status=Status.SUCCESS, stdout='foo', stderr='')
+      addr, TestResult(status=Status.SUCCESS, stdout="foo", stderr="")
     )
 
   def test_coordinator_globbed_non_test_target(self) -> None:
     addr = Address.parse("some/dir:bin")
     result = self.run_coordinator_of_tests(
-      address=addr,
-      origin=DescendantAddresses(directory='some/dir'),
-      test_target_type=False,
+      address=addr, origin=DescendantAddresses(directory="some/dir"), test_target_type=False
     )
     assert result == AddressAndTestResult(addr, None)

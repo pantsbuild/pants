@@ -65,9 +65,7 @@ class JvmPlatformAnalysisMixin:
     # being run once for each in the graph over the course of the entire search, which means that
     # the total asymptotic runtime complexity is O(|V|+2|E|), which is still O(|V|+|E|).
     self.context.build_graph.walk_transitive_dependency_graph(
-      addresses=[t.address for t in targets],
-      work=accumulate_jvm_deps,
-      postorder=True
+      addresses=[t.address for t in targets], work=accumulate_jvm_deps, postorder=True
     )
 
     return jvm_deps
@@ -112,8 +110,9 @@ class JvmPlatformAnalysisMixin:
     :return: the dict mapping JvmTarget -> set of JvmTargets.
     """
     jvm_deps = self._unfiltered_jvm_dependency_map()
-    return {target: deps for target, deps in jvm_deps.items()
-            if deps and self._is_jvm_target(target)}
+    return {
+      target: deps for target, deps in jvm_deps.items() if deps and self._is_jvm_target(target)
+    }
 
 
 class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
@@ -133,7 +132,7 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
 
     def compute_fingerprint(self, target):
       hasher = sha1()
-      if hasattr(target, 'platform'):
+      if hasattr(target, "platform"):
         hasher.update(str(tuple(target.platform)).encode())
       return hasher.hexdigest()
 
@@ -150,17 +149,25 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
     # 'java' product type indicates this task does codegen for java.
     # TODO(John Sirois): plug this into a pre-products validation phase when one becomes available
     # instead of using fake products.
-    return ['java']
+    return ["java"]
 
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--check', default='fatal', choices=['off', 'warn', 'fatal'], fingerprint=True,
-             help='Check to make sure no jvm targets target an earlier jdk than their dependencies')
-    register('--children-before-parents', type=bool,
-             fingerprint=True,
-             help='Organize output in the form target -> dependencies, rather than '
-                  'target -> dependees.')
+    register(
+      "--check",
+      default="fatal",
+      choices=["off", "warn", "fatal"],
+      fingerprint=True,
+      help="Check to make sure no jvm targets target an earlier jdk than their dependencies",
+    )
+    register(
+      "--children-before-parents",
+      type=bool,
+      fingerprint=True,
+      help="Organize output in the form target -> dependencies, rather than "
+      "target -> dependees.",
+    )
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
@@ -183,13 +190,15 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
     try:
       sort_targets(self.jvm_targets)
     except CycleException:
-      self.context.log.warn('Cannot validate dependencies when cycles exist in the build graph.')
+      self.context.log.warn("Cannot validate dependencies when cycles exist in the build graph.")
       return
 
     try:
-      with self.invalidated(self.jvm_targets,
-                            fingerprint_strategy=self.PlatformFingerprintStrategy(),
-                            invalidate_dependents=True) as vts:
+      with self.invalidated(
+        self.jvm_targets,
+        fingerprint_strategy=self.PlatformFingerprintStrategy(),
+        invalidate_dependents=True,
+      ) as vts:
         dependency_map = self.jvm_dependency_map
         for vts_target in vts.invalid_vts:
           for target in vts_target.targets:
@@ -205,10 +214,10 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
           error_message = self._create_full_error_message(conflicts)
           raise self.IllegalJavaTargetLevelDependency(error_message)
     except self.IllegalJavaTargetLevelDependency as e:
-      if self.check == 'fatal':
+      if self.check == "fatal":
         raise e
       else:
-        assert self.check == 'warn'
+        assert self.check == "warn"
         self.context.log.warn(error_message)
         return error_message
 
@@ -216,9 +225,11 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
     return '\n  {target} targeting "{platform_name}"\n  {relationship}: {dependencies}'.format(
       target=target.address.spec,
       platform_name=target.platform.name,
-      dependencies=''.join('\n    {} targeting "{}"'.format(d.address.spec, d.platform.name)
-                           for d in sorted(invalid_dependencies)),
-      relationship='is depended on by' if self.parents_before_children else 'depends on',
+      dependencies="".join(
+        '\n    {} targeting "{}"'.format(d.address.spec, d.platform.name)
+        for d in sorted(invalid_dependencies)
+      ),
+      relationship="is depended on by" if self.parents_before_children else "depends on",
     )
 
   def _create_full_error_message(self, invalids):
@@ -230,14 +241,18 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
       invalids = list(dependency_to_dependees.items())
 
     invalids = sorted(invalids)
-    individual_errors = '\n'.join(self._create_individual_error_message(target, deps)
-                                  for target, deps in invalids)
-    return ('Dependencies cannot have a higher java target level than dependees!\n{errors}\n\n'
-            'Consider running ./pants jvm-platform-explain with the same targets for more details.'
-            .format(errors=individual_errors))
+    individual_errors = "\n".join(
+      self._create_individual_error_message(target, deps) for target, deps in invalids
+    )
+    return (
+      "Dependencies cannot have a higher java target level than dependees!\n{errors}\n\n"
+      "Consider running ./pants jvm-platform-explain with the same targets for more details.".format(
+        errors=individual_errors
+      )
+    )
 
   def execute(self):
-    if self.check != 'off':
+    if self.check != "off":
       # Return value is just for unit testing.
       return self.validate_platform_dependencies()
 
@@ -262,8 +277,10 @@ class JvmPlatformExplain(JvmPlatformAnalysisMixin, ConsoleTask):
   downgraded to a different version.
   """
 
-  Ranges = namedtuple('ranges', ['min_allowed_version', 'max_allowed_version',
-                                 'target_dependencies', 'target_dependees'])
+  Ranges = namedtuple(
+    "ranges",
+    ["min_allowed_version", "max_allowed_version", "target_dependencies", "target_dependees"],
+  )
 
   @classproperty
   def _register_console_transitivity_option(cls):
@@ -273,30 +290,50 @@ class JvmPlatformExplain(JvmPlatformAnalysisMixin, ConsoleTask):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--ranges', type=bool, default=True,
-             help='For each target, list the minimum and maximum possible jvm target level, based '
-                  'on its dependencies and dependees, respectively.')
-    register('--detailed', type=bool,
-             help='Always list the dependencies and dependees that contributed to the assessment of '
-                  'legal jvm target levels (rather than only on failure).')
-    register('--only-broken', type=bool,
-             help='Only print jvm target level ranges for targets with currently invalid ranges.')
-    register('--upgradeable', type=bool,
-             help='Print a list of targets which can be upgraded to a higher version than they '
-                  'currently are.')
-    register('--downgradeable', type=bool,
-             help='Print a list of targets which can be downgraded to a lower version than they '
-                  'currently are.')
-    register('--filter',
-             help='Limit jvm platform possibility explanation to targets whose specs match this '
-                  'regex pattern.')
-    register('--list-transitive-deps', type=bool,
-             help='List transitive dependencies in analysis output.')
+    register(
+      "--ranges",
+      type=bool,
+      default=True,
+      help="For each target, list the minimum and maximum possible jvm target level, based "
+      "on its dependencies and dependees, respectively.",
+    )
+    register(
+      "--detailed",
+      type=bool,
+      help="Always list the dependencies and dependees that contributed to the assessment of "
+      "legal jvm target levels (rather than only on failure).",
+    )
+    register(
+      "--only-broken",
+      type=bool,
+      help="Only print jvm target level ranges for targets with currently invalid ranges.",
+    )
+    register(
+      "--upgradeable",
+      type=bool,
+      help="Print a list of targets which can be upgraded to a higher version than they "
+      "currently are.",
+    )
+    register(
+      "--downgradeable",
+      type=bool,
+      help="Print a list of targets which can be downgraded to a lower version than they "
+      "currently are.",
+    )
+    register(
+      "--filter",
+      help="Limit jvm platform possibility explanation to targets whose specs match this "
+      "regex pattern.",
+    )
+    register(
+      "--list-transitive-deps", type=bool, help="List transitive dependencies in analysis output."
+    )
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
-    self._explain_regex = (re.compile(self.get_options().filter) if self.get_options().filter
-                           else None)
+    self._explain_regex = (
+      re.compile(self.get_options().filter) if self.get_options().filter else None
+    )
 
   def _format_error(self, text):
     if self.get_options().colors:
@@ -311,8 +348,9 @@ class JvmPlatformExplain(JvmPlatformAnalysisMixin, ConsoleTask):
     if not self.get_options().list_transitive_deps:
       return self.jvm_dependency_map
     full_map = self._unfiltered_jvm_dependency_map(fully_transitive=True)
-    return {target: deps for target, deps in full_map.items()
-            if self._is_jvm_target(target) and deps}
+    return {
+      target: deps for target, deps in full_map.items() if self._is_jvm_target(target) and deps
+    }
 
   @memoized_property
   def _ranges(self):
@@ -338,14 +376,15 @@ class JvmPlatformExplain(JvmPlatformAnalysisMixin, ConsoleTask):
         # A target can't have a higher version than any of its dependees.
         max_allowed_version[target] = min(get_versions(target_dependees[target]))
 
-    return self.Ranges(min_allowed_version, max_allowed_version, target_dependencies,
-                       target_dependees)
+    return self.Ranges(
+      min_allowed_version, max_allowed_version, target_dependencies, target_dependees
+    )
 
   def possible_version_evaluation(self):
     """Evaluate the possible range of versions for each target, yielding the output analysis."""
     only_broken = self.get_options().only_broken
     ranges = self._ranges
-    yield 'Allowable JVM platform ranges (* = anything):'
+    yield "Allowable JVM platform ranges (* = anything):"
     for target in sorted(filter(self._is_relevant, self.jvm_targets)):
       min_version = ranges.min_allowed_version.get(target)
       max_version = ranges.max_allowed_version.get(target)
@@ -361,30 +400,32 @@ class JvmPlatformExplain(JvmPlatformAnalysisMixin, ConsoleTask):
         continue
 
       if min_version and max_version:
-        range_text = f'{min_version} to {max_version}'
+        range_text = f"{min_version} to {max_version}"
         if min_version > max_version:
           range_text = self._format_error(range_text)
       elif min_version:
-        range_text = f'{min_version}+'
+        range_text = f"{min_version}+"
       elif max_version:
-        range_text = f'<={max_version}'
+        range_text = f"<={max_version}"
       else:
-        range_text = '*'
-      yield f'{target.address.spec}: {range_text}  (is {current_text})'
+        range_text = "*"
+      yield f"{target.address.spec}: {range_text}  (is {current_text})"
       if self.get_options().detailed or not current_valid:
         if min_version:
-          min_because = [t for t in ranges.target_dependencies[target]
-                         if self.jvm_version(t) == min_version]
-          yield f'  min={min_version} because of dependencies:'
+          min_because = [
+            t for t in ranges.target_dependencies[target] if self.jvm_version(t) == min_version
+          ]
+          yield f"  min={min_version} because of dependencies:"
           for dep in sorted(min_because):
-            yield f'    {dep.address.spec}'
+            yield f"    {dep.address.spec}"
         if max_version:
-          max_because = [t for t in ranges.target_dependees[target]
-                         if self.jvm_version(t) == max_version]
-          yield f'  max={max_version} because of dependees:'
+          max_because = [
+            t for t in ranges.target_dependees[target] if self.jvm_version(t) == max_version
+          ]
+          yield f"  max={max_version} because of dependees:"
           for dep in sorted(max_because):
-            yield f'    {dep.address.spec}'
-        yield ''
+            yield f"    {dep.address.spec}"
+        yield ""
 
   def _changeable(self, change_name, can_change, change_getter):
     changes = {}
@@ -392,24 +433,26 @@ class JvmPlatformExplain(JvmPlatformAnalysisMixin, ConsoleTask):
       allowed = change_getter(target)
       if allowed is None or can_change(self.jvm_version(target), allowed):
         changes[target] = allowed
-    yield 'The following {count} target{plural} can be {change}d:'.format(
-      count=len(changes),
-      change=change_name,
-      plural='' if len(changes) == 1 else 's',
+    yield "The following {count} target{plural} can be {change}d:".format(
+      count=len(changes), change=change_name, plural="" if len(changes) == 1 else "s"
     )
     for target, allowed in sorted(changes.items()):
       yield f"{target.address.spec} can {change_name} to {(allowed or '*')}"
-    yield ''
+    yield ""
 
   def downgradeable(self):
-    return self._changeable('downgrade',
-                            can_change=lambda curr, nxt: curr > nxt,
-                            change_getter=self._ranges.min_allowed_version.get)
+    return self._changeable(
+      "downgrade",
+      can_change=lambda curr, nxt: curr > nxt,
+      change_getter=self._ranges.min_allowed_version.get,
+    )
 
   def upgradeable(self):
-    return self._changeable('upgrade',
-                            can_change=lambda curr, nxt: curr < nxt,
-                            change_getter=self._ranges.max_allowed_version.get)
+    return self._changeable(
+      "upgrade",
+      can_change=lambda curr, nxt: curr < nxt,
+      change_getter=self._ranges.max_allowed_version.get,
+    )
 
   def console_output(self, targets):
     if self.get_options().ranges:

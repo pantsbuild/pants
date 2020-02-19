@@ -58,11 +58,11 @@ class ImportRemoteSourcesMixin(Target, metaclass=ABCMeta):
     :rtype: list of str
     """
     if kwargs is not None:
-      assert payload is None, 'may not provide both kwargs and payload'
+      assert payload is None, "may not provide both kwargs and payload"
       field = cls.imported_target_kwargs_field
       target_representation = kwargs
     else:
-      assert payload is not None, 'must provide either kwargs or payload'
+      assert payload is not None, "must provide either kwargs or payload"
       field = cls.imported_target_payload_field
       target_representation = payload.as_dict()
 
@@ -70,8 +70,9 @@ class ImportRemoteSourcesMixin(Target, metaclass=ABCMeta):
     for item in target_representation.get(field, ()):
       if not isinstance(item, str):
         raise cls.ExpectedAddressError(
-          'expected imports to contain string addresses, got {obj} (type: {found_class}) instead.'
-          .format(obj=item, found_class=type(item).__name__)
+          "expected imports to contain string addresses, got {obj} (type: {found_class}) instead.".format(
+            obj=item, found_class=type(item).__name__
+          )
         )
       specs.append(item)
 
@@ -85,19 +86,24 @@ class ImportRemoteSourcesMixin(Target, metaclass=ABCMeta):
     """
     libs = []
     for spec in self.imported_target_specs(payload=self.payload):
-      resolved_target = self._build_graph.get_target_from_spec(spec,
-                                                               relative_to=self.address.spec_path)
+      resolved_target = self._build_graph.get_target_from_spec(
+        spec, relative_to=self.address.spec_path
+      )
       if not resolved_target:
         raise self.UnresolvedImportError(
-          'Could not find target {spec} referenced from {relative_to}'
-          .format(spec=spec, relative_to=self.address.spec))
+          "Could not find target {spec} referenced from {relative_to}".format(
+            spec=spec, relative_to=self.address.spec
+          )
+        )
       try:
         libs.append(self.expected_target_constraint.validate_satisfied_by(resolved_target))
       except TypeConstraintError as e:
         raise self.WrongTargetTypeError(
-          'Wrong target type {spec} referenced from remote sources target {relative_to}: {err}'
-          .format(spec=spec, relative_to=self.address.spec, err=str(e)),
-          e)
+          "Wrong target type {spec} referenced from remote sources target {relative_to}: {err}".format(
+            spec=spec, relative_to=self.address.spec, err=str(e)
+          ),
+          e,
+        )
     return libs
 
   @classmethod

@@ -14,8 +14,17 @@ class CompileContext:
   and a finalized compile in its permanent location.
   """
 
-  def __init__(self, target, analysis_file, classes_dir, jar_file,
-               log_dir, args_file, post_compile_merge_dir, sources):
+  def __init__(
+    self,
+    target,
+    analysis_file,
+    classes_dir,
+    jar_file,
+    log_dir,
+    args_file,
+    post_compile_merge_dir,
+    sources,
+  ):
     self.target = target
     self.analysis_file = analysis_file
     self.classes_dir = classes_dir

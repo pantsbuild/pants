@@ -24,6 +24,7 @@ class PrepCommand(Target):
 
   :API: public
   """
+
   _goals: FrozenSet[str] = frozenset()
 
   @staticmethod
@@ -40,8 +41,16 @@ class PrepCommand(Target):
   def allowed_goals() -> FrozenSet[str]:
     return PrepCommand._goals
 
-  def __init__(self, address=None, payload=None, prep_executable=None, prep_args=None,
-               prep_environ=False, goals=None, **kwargs):
+  def __init__(
+    self,
+    address=None,
+    payload=None,
+    prep_executable=None,
+    prep_args=None,
+    prep_environ=False,
+    goals=None,
+    **kwargs
+  ):
     """
     :API: public
 
@@ -54,34 +63,40 @@ class PrepCommand(Target):
     :param goals: One or more pants goals to run this command in [test, binary or compile]. If not
       specified, runs in the 'test' goal.
     """
+
     def raise_bad_target(msg):
       raise TargetDefinitionException(address.spec, msg)
 
     if not prep_executable:
-      raise_bad_target('prep_executable must be specified.')
+      raise_bad_target("prep_executable must be specified.")
 
     if goals:
       goals = sorted(goals)
     else:
-      goals = ['test']
+      goals = ["test"]
 
     bad_goals = set(goals) - self.allowed_goals()
     if bad_goals:
-      raise_bad_target('Got unrecognized goal{maybe_pluralize} {unrecognized}. '
-                       'Goal must be one of {allowed}.'
-                       .format(maybe_pluralize='' if len(bad_goals) == 1 else 's',
-                               unrecognized=', '.join(sorted(bad_goals)),
-                               allowed=self.allowed_goals()))
+      raise_bad_target(
+        "Got unrecognized goal{maybe_pluralize} {unrecognized}. "
+        "Goal must be one of {allowed}.".format(
+          maybe_pluralize="" if len(bad_goals) == 1 else "s",
+          unrecognized=", ".join(sorted(bad_goals)),
+          allowed=self.allowed_goals(),
+        )
+      )
 
     payload = payload or Payload()
-    payload.add_fields({
-      'goals': PrimitiveField(goals),
-      'prep_command_executable': PrimitiveField(prep_executable),
-      'prep_command_args': PrimitiveField(prep_args or []),
-      'prep_environ': PrimitiveField(prep_environ),
-    })
+    payload.add_fields(
+      {
+        "goals": PrimitiveField(goals),
+        "prep_command_executable": PrimitiveField(prep_executable),
+        "prep_command_args": PrimitiveField(prep_args or []),
+        "prep_environ": PrimitiveField(prep_environ),
+      }
+    )
     super().__init__(address=address, payload=payload, **kwargs)
 
   @memoized_property
   def goals(self):
-    return frozenset(self.payload.get_field_value('goals'))
+    return frozenset(self.payload.get_field_value("goals"))

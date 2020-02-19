@@ -9,7 +9,7 @@ from pants.bin.pants_runner import PantsRunner
 from pants.util.contextutil import maybe_profiled
 
 
-TEST_STR = 'T E S T'
+TEST_STR = "T E S T"
 
 
 def test():
@@ -21,14 +21,15 @@ def test():
 def test_env():
   """An alternate test entrypoint for exercising scrubbing."""
   import os
-  print('PANTS_ENTRYPOINT={}'.format(os.environ.get('PANTS_ENTRYPOINT')))
+
+  print("PANTS_ENTRYPOINT={}".format(os.environ.get("PANTS_ENTRYPOINT")))
 
 
 def main():
   start_time = time.time()
 
-  with maybe_profiled(os.environ.get('PANTSC_PROFILE')):
+  with maybe_profiled(os.environ.get("PANTSC_PROFILE")):
     try:
       PantsRunner(start_time=start_time).run()
     except KeyboardInterrupt as e:
-      ExceptionSink.get_global_exiter().exit_and_fail('Interrupted by user:\n{}'.format(e))
+      ExceptionSink.get_global_exiter().exit_and_fail("Interrupted by user:\n{}".format(e))

@@ -15,6 +15,7 @@ class ParseError(Exception):
 @dataclass(frozen=True)
 class SymbolTable:
   """A symbol table dict mapping symbol name to implementation class."""
+
   table: Dict[str, Type]
 
 
@@ -25,11 +26,11 @@ class HydratedStruct:
   This exists so that the rule graph can statically provide a struct for a target, and rules can depend on this
   without needing to depend on having a concrete instance of SymbolTable to register their input selectors.
   """
+
   value: Struct
 
 
 class Parser(ABC):
-
   @abstractmethod
   def parse(self, filepath: str, filecontent: bytes):
     """

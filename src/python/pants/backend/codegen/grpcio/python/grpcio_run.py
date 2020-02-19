@@ -21,7 +21,7 @@ class GrpcioRun(SimpleCodegenTask):
   """Task to compile protobuf into python code"""
 
   gentarget_type = PythonGrpcioLibrary
-  sources_globs = ('**/*',)
+  sources_globs = ("**/*",)
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -40,12 +40,14 @@ class GrpcioRun(SimpleCodegenTask):
     logging.debug(f"Executing grpcio code generation with args: [{args}]")
 
     with pushd(get_buildroot()):
-      workunit_factory = functools.partial(self.context.new_workunit,
-                                           name='run-grpcio',
-                                           labels=[WorkUnitLabel.TOOL, WorkUnitLabel.LINT])
+      workunit_factory = functools.partial(
+        self.context.new_workunit,
+        name="run-grpcio",
+        labels=[WorkUnitLabel.TOOL, WorkUnitLabel.LINT],
+      )
       cmdline, exit_code = self._grpcio_binary.run(workunit_factory, args)
       if exit_code != 0:
-        raise TaskError(f'{cmdline} ... exited non-zero ({exit_code}).', exit_code=exit_code)
+        raise TaskError(f"{cmdline} ... exited non-zero ({exit_code}).", exit_code=exit_code)
       # Create __init__.py in each subdirectory of the target directory so that setup_py recognizes
       # them as modules.
       target_workdir_path = Path(target_workdir)
@@ -55,9 +57,9 @@ class GrpcioRun(SimpleCodegenTask):
       logging.info(f"Grpcio finished code generation into: [{target_workdir}]")
 
   def build_args(self, target, target_workdir):
-    proto_path = f'--proto_path={target.target_base}'
-    python_out = f'--python_out={target_workdir}'
-    grpc_python_out = f'--grpc_python_out={target_workdir}'
+    proto_path = f"--proto_path={target.target_base}"
+    python_out = f"--python_out={target_workdir}"
+    grpc_python_out = f"--grpc_python_out={target_workdir}"
 
     args = [python_out, grpc_python_out, proto_path]
 

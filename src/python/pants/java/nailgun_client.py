@@ -25,8 +25,16 @@ logger = logging.getLogger(__name__)
 class NailgunClientSession(NailgunProtocol, NailgunProtocol.TimeoutProvider):
   """Handles a single nailgun client session."""
 
-  def __init__(self, sock, in_file, out_file, err_file, exit_on_broken_pipe=False,
-               remote_pid_callback=None, remote_pgrp_callback=None):
+  def __init__(
+    self,
+    sock,
+    in_file,
+    out_file,
+    err_file,
+    exit_on_broken_pipe=False,
+    remote_pid_callback=None,
+    remote_pgrp_callback=None,
+  ):
     """
     :param bool exit_on_broken_pipe: whether or not to exit when `Broken Pipe` errors are
                 encountered
@@ -35,11 +43,12 @@ class NailgunClientSession(NailgunProtocol, NailgunProtocol.TimeoutProvider):
                                  a remote client.
     """
     self._sock = sock
-    self._input_writer = None if not in_file else NailgunStreamWriter(
-      (in_file.fileno(),),
-      self._sock,
-      (ChunkType.STDIN,),
-      ChunkType.STDIN_EOF
+    self._input_writer = (
+      None
+      if not in_file
+      else NailgunStreamWriter(
+        (in_file.fileno(),), self._sock, (ChunkType.STDIN,), ChunkType.STDIN_EOF
+      )
     )
     self._stdout = out_file
     self._stderr = err_file
@@ -111,9 +120,7 @@ class NailgunClientSession(NailgunProtocol, NailgunProtocol.TimeoutProvider):
                                 to .set_exit_timeout() will be raised."""
     try:
       for chunk_type, payload in self.iter_chunks(
-        MaybeShutdownSocket(self._sock),
-        return_bytes=True,
-        timeout_object=self,
+        MaybeShutdownSocket(self._sock), return_bytes=True, timeout_object=self
       ):
         # TODO(#6579): assert that we have at this point received all the chunk types in
         # ChunkType.REQUEST_TYPES, then require PID and PGRP (exactly once?), and then allow any of
@@ -138,18 +145,21 @@ class NailgunClientSession(NailgunProtocol, NailgunProtocol.TimeoutProvider):
         elif chunk_type == ChunkType.START_READING_INPUT:
           self._maybe_start_input_writer()
         else:
-          raise self.ProtocolError('received unexpected chunk {} -> {}'.format(chunk_type, payload))
+          raise self.ProtocolError("received unexpected chunk {} -> {}".format(chunk_type, payload))
     except NailgunProtocol.ProcessStreamTimeout as e:
-      assert(self.remote_pid is not None)
+      assert self.remote_pid is not None
       # NB: We overwrite the process title in the pantsd process, which causes it to have an
       # argv with lots of empty spaces for some reason. We filter those out and pretty-print the
       # rest here.
       filtered_remote_cmdline = safe_shlex_join(
-        arg for arg in self.remote_process_cmdline if arg != '')
+        arg for arg in self.remote_process_cmdline if arg != ""
+      )
       logger.warning(
-        "timed out when attempting to gracefully shut down the remote client executing \"{}\". "
-        "sending SIGKILL to the remote client at pid: {}. message: {}"
-        .format(filtered_remote_cmdline, self.remote_pid, e))
+        'timed out when attempting to gracefully shut down the remote client executing "{}". '
+        "sending SIGKILL to the remote client at pid: {}. message: {}".format(
+          filtered_remote_cmdline, self.remote_pid, e
+        )
+      )
     finally:
       # Bad chunk types received from the server can throw NailgunProtocol.ProtocolError in
       # NailgunProtocol.iter_chunks(). This ensures the NailgunStreamWriter is always stopped.
@@ -177,7 +187,7 @@ class NailgunClient:
   class NailgunError(Exception):
     """Indicates an error interacting with a nailgun server."""
 
-    DESCRIPTION = 'Problem talking to nailgun server'
+    DESCRIPTION = "Problem talking to nailgun server"
 
     _MSG_FMT = """\
 {description} (address: {address}, remote_pid={pid}, remote_pgrp={pgrp}): {wrapped_exc!r}\
@@ -194,35 +204,46 @@ class NailgunClient:
       if self.pid is not None:
         pid_msg = str(self.pid)
       else:
-        pid_msg = '<remote PID chunk not yet received!>'
+        pid_msg = "<remote PID chunk not yet received!>"
       if self.pgrp is not None:
         pgrp_msg = str(self.pgrp)
       else:
-        pgrp_msg = '<remote PGRP chunk not yet received!>'
+        pgrp_msg = "<remote PGRP chunk not yet received!>"
 
       msg = self._MSG_FMT.format(
         description=self.DESCRIPTION,
         address=self.address,
         pid=pid_msg,
         pgrp=pgrp_msg,
-        wrapped_exc=self.wrapped_exc)
+        wrapped_exc=self.wrapped_exc,
+      )
       super(NailgunClient.NailgunError, self).__init__(msg, self.wrapped_exc)
 
   class NailgunConnectionError(NailgunError):
     """Indicates an error upon initial connect to the nailgun server."""
-    DESCRIPTION = 'Problem connecting to nailgun server'
+
+    DESCRIPTION = "Problem connecting to nailgun server"
 
   class NailgunExecutionError(NailgunError):
     """Indicates an error upon initial command execution on the nailgun server."""
-    DESCRIPTION = 'Problem executing command on nailgun server'
+
+    DESCRIPTION = "Problem executing command on nailgun server"
 
   # For backwards compatibility with nails expecting the ng c client special env vars.
   ENV_DEFAULTS = dict(NAILGUN_FILESEPARATOR=os.sep, NAILGUN_PATHSEPARATOR=os.pathsep)
-  DEFAULT_NG_HOST = '127.0.0.1'
+  DEFAULT_NG_HOST = "127.0.0.1"
   DEFAULT_NG_PORT = 2113
 
-  def __init__(self, host=None, port=None, ins=sys.stdin, out=None, err=None,
-               exit_on_broken_pipe=False, metadata_base_dir=None):
+  def __init__(
+    self,
+    host=None,
+    port=None,
+    ins=sys.stdin,
+    out=None,
+    err=None,
+    exit_on_broken_pipe=False,
+    metadata_base_dir=None,
+  ):
     """Creates a nailgun client that can be used to issue zero or more nailgun commands.
 
     :param string host: the nailgun server to contact (defaults to '127.0.0.1')
@@ -242,7 +263,7 @@ class NailgunClient:
     self._host = host or self.DEFAULT_NG_HOST
     self._port = port or self.DEFAULT_NG_PORT
     self._address = (self._host, self._port)
-    self._address_string = ':'.join(str(i) for i in self._address)
+    self._address_string = ":".join(str(i) for i in self._address)
     self._stdin = ins
     self._stdout = out or sys.stdout.buffer
     self._stderr = err or sys.stderr.buffer
@@ -254,10 +275,7 @@ class NailgunClient:
     self._current_remote_pgrp = None
 
   def _get_remote_pid_file_path(self, pid):
-    return os.path.join(
-      self._metadata_base_dir,
-      'nailgun-client',
-      str(pid))
+    return os.path.join(self._metadata_base_dir, "nailgun-client", str(pid))
 
   # TODO(#6579): this should be done within a contextmanager for RAII!
   def _maybe_write_pid_file(self):
@@ -285,13 +303,11 @@ class NailgunClient:
     :returns: a connected `socket.socket`.
     :raises: `NailgunClient.NailgunConnectionError` on failure to connect.
     """
-    sock = RecvBufferedSocket(
-      sock=socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
-    )
+    sock = RecvBufferedSocket(sock=socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM))
     try:
       sock.connect(self._address)
     except (socket.error, socket.gaierror) as e:
-      logger.debug('Encountered socket exception {!r} when attempting connect to nailgun'.format(e))
+      logger.debug("Encountered socket exception {!r} when attempting connect to nailgun".format(e))
       sock.close()
       raise self.NailgunConnectionError(
         address=self._address_string,
@@ -353,7 +369,8 @@ class NailgunClient:
       err_file=self._stderr,
       exit_on_broken_pipe=self._exit_on_broken_pipe,
       remote_pid_callback=self._receive_remote_pid,
-      remote_pgrp_callback=self._receive_remote_pgrp)
+      remote_pgrp_callback=self._receive_remote_pgrp,
+    )
     try:
       return self._session.execute(cwd, main_class, *args, **environment)
     except (socket.error, NailgunProtocol.ProtocolError) as e:
@@ -368,4 +385,4 @@ class NailgunClient:
       self._session = None
 
   def __repr__(self):
-    return 'NailgunClient(host={!r}, port={!r})'.format(self._host, self._port)
+    return "NailgunClient(host={!r}, port={!r})".format(self._host, self._port)

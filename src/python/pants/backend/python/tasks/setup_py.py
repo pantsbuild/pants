@@ -70,6 +70,7 @@ class TargetAncestorIterator:
     :returns: A target iterator yielding the target and its siblings and then it ancestors from
               nearest to furthest removed.
     """
+
     def iter_targets_in_spec_path(spec_path):
       try:
         siblings = SiblingAddresses(spec_path)
@@ -180,6 +181,7 @@ class ExportedTargetDependencyCalculator(ABC):
     def collect(current):
       closure.add(current)
       return True
+
     self._walk(target, collect)
 
     return closure
@@ -222,8 +224,10 @@ class ExportedTargetDependencyCalculator(ABC):
     #     owner.
 
     if not self.is_exported(exported_target):
-      raise self.UnExportedError('Cannot calculate reduced dependencies for a non-exported '
-                                 'target, given: {}'.format(exported_target))
+      raise self.UnExportedError(
+        "Cannot calculate reduced dependencies for a non-exported "
+        "target, given: {}".format(exported_target)
+      )
 
     owner_by_owned_python_target = OrderedDict()
 
@@ -244,17 +248,17 @@ class ExportedTargetDependencyCalculator(ABC):
           if self.is_exported(potential_owner) and owned in self._closure(potential_owner):
             potential_owners.add(potential_owner)
         if not potential_owners:
-          raise self.NoOwnerError('No exported target owner found for {}'.format(owned))
+          raise self.NoOwnerError("No exported target owner found for {}".format(owned))
         owner = potential_owners.pop()
         if potential_owners:
-          ambiguous_owners = [o for o in potential_owners
-                              if o.address.spec_path == owner.address.spec_path]
+          ambiguous_owners = [
+            o for o in potential_owners if o.address.spec_path == owner.address.spec_path
+          ]
           if ambiguous_owners:
-            raise self.AmbiguousOwnerError('Owners for {} are ambiguous.  Found {} and '
-                                           '{} others: {}'.format(owned,
-                                                                  owner,
-                                                                  len(ambiguous_owners),
-                                                                  ambiguous_owners))
+            raise self.AmbiguousOwnerError(
+              "Owners for {} are ambiguous.  Found {} and "
+              "{} others: {}".format(owned, owner, len(ambiguous_owners), ambiguous_owners)
+            )
         owner_by_owned_python_target[owned] = owner
 
     reduced_dependencies = OrderedSet()
@@ -291,11 +295,11 @@ def declares_namespace_package(filename):
   for call in calls:
     if len(call.args) != 1:
       continue
-    if isinstance(call.func, ast.Attribute) and call.func.attr != 'declare_namespace':
+    if isinstance(call.func, ast.Attribute) and call.func.attr != "declare_namespace":
       continue
-    if isinstance(call.func, ast.Name) and call.func.id != 'declare_namespace':
+    if isinstance(call.func, ast.Name) and call.func.id != "declare_namespace":
       continue
-    if isinstance(call.args[0], ast.Name) and call.args[0].id == '__name__':
+    if isinstance(call.args[0], ast.Name) and call.args[0].id == "__name__":
       return True
   return False
 
@@ -303,9 +307,9 @@ def declares_namespace_package(filename):
 class SetupPy(Task):
   """Generate setup.py-based Python projects."""
 
-  SOURCE_ROOT = 'src'
+  SOURCE_ROOT = "src"
 
-  PYTHON_DISTS_PRODUCT = 'python_dists'
+  PYTHON_DISTS_PRODUCT = "python_dists"
 
   @staticmethod
   def is_requirements(target):
@@ -352,12 +356,15 @@ class SetupPy(Task):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--run',
-             help="The command to run against setup.py.  Don't forget to quote any additional "
-                  "parameters.  If no run command is specified, pants will by default generate "
-                  "and dump the source distribution.")
-    register('--recursive', type=bool,
-             help='Transitively run setup_py on all provided downstream targets.')
+    register(
+      "--run",
+      help="The command to run against setup.py.  Don't forget to quote any additional "
+      "parameters.  If no run command is specified, pants will by default generate "
+      "and dump the source distribution.",
+    )
+    register(
+      "--recursive", type=bool, help="Transitively run setup_py on all provided downstream targets."
+    )
 
   @classmethod
   def iter_entry_points(cls, target):
@@ -365,31 +372,36 @@ class SetupPy(Task):
     for name, binary_target in target.provided_binaries.items():
       concrete_target = binary_target
       if not isinstance(concrete_target, PythonBinary) or concrete_target.entry_point is None:
-        raise TargetDefinitionException(target,
-            'Cannot add a binary to a PythonArtifact if it does not contain an entry_point.')
+        raise TargetDefinitionException(
+          target, "Cannot add a binary to a PythonArtifact if it does not contain an entry_point."
+        )
       yield name, concrete_target.entry_point
 
   @classmethod
   def nearest_subpackage(cls, package, all_packages):
     """Given a package, find its nearest parent in all_packages."""
+
     def shared_prefix(candidate):
-      zipped = zip(package.split('.'), candidate.split('.'))
+      zipped = zip(package.split("."), candidate.split("."))
       matching = itertools.takewhile(lambda pair: pair[0] == pair[1], zipped)
       return [pair[0] for pair in matching]
+
     shared_packages = [_f for _f in map(shared_prefix, all_packages) if _f]
-    return '.'.join(max(shared_packages, key=len)) if shared_packages else package
+    return ".".join(max(shared_packages, key=len)) if shared_packages else package
 
   @memoized_property
   def nsutil_pex(self):
     interpreter = self.context.products.get_data(PythonInterpreter)
-    chroot = os.path.join(self.workdir, 'nsutil', interpreter.version_string)
+    chroot = os.path.join(self.workdir, "nsutil", interpreter.version_string)
     if not os.path.exists(chroot):
       pex_info = PexInfo.default(interpreter=interpreter)
       with safe_concurrent_creation(chroot) as scratch:
         builder = PEXBuilder(path=scratch, interpreter=interpreter, pex_info=pex_info, copy=True)
         with temporary_file(binary_mode=False) as fp:
           declares_namespace_package_code = inspect.getsource(declares_namespace_package)
-          fp.write(textwrap.dedent("""
+          fp.write(
+            textwrap.dedent(
+              """
             import sys
 
 
@@ -400,22 +412,27 @@ class SetupPy(Task):
               for path in sys.argv[1:]:
                 if declares_namespace_package(path):
                   print(path)
-          """).strip().format(declares_namespace_package_code=declares_namespace_package_code))
+          """
+            )
+            .strip()
+            .format(declares_namespace_package_code=declares_namespace_package_code)
+          )
           fp.close()
-          builder.set_executable(filename=fp.name, env_filename='main.py')
+          builder.set_executable(filename=fp.name, env_filename="main.py")
           builder.freeze(bytecode_compile=False)
     return PEX(pex=chroot, interpreter=interpreter)
 
   def filter_namespace_packages(self, root_target, inits):
     args = list(inits)
-    with self.context.new_workunit(name='find-namespace-packages',
-                                   cmd=' '.join(self.nsutil_pex.cmdline(args=args)),
-                                   labels=[WorkUnitLabel.TOOL]) as workunit:
+    with self.context.new_workunit(
+      name="find-namespace-packages",
+      cmd=" ".join(self.nsutil_pex.cmdline(args=args)),
+      labels=[WorkUnitLabel.TOOL],
+    ) as workunit:
 
-      process = self.nsutil_pex.run(args=args,
-                                    stdout=subprocess.PIPE,
-                                    stderr=subprocess.PIPE,
-                                    blocking=False)
+      process = self.nsutil_pex.run(
+        args=args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, blocking=False
+      )
 
       stdout, stderr = process.communicate()
 
@@ -426,15 +443,17 @@ class SetupPy(Task):
         stream.write(ensure_binary(data))
         stream.flush()
 
-      write('stdout', stdout)
-      write('stderr', stderr)
+      write("stdout", stdout)
+      write("stderr", stderr)
 
       exit_code = process.returncode
       if exit_code != 0:
-        raise TaskError('Failure trying to detect namespace packages when constructing setup.py '
-                        'project for {}:\n{}'.format(root_target.address.reference(), stderr),
-                        exit_code=exit_code,
-                        failed_targets=[root_target])
+        raise TaskError(
+          "Failure trying to detect namespace packages when constructing setup.py "
+          "project for {}:\n{}".format(root_target.address.reference(), stderr),
+          exit_code=exit_code,
+          failed_targets=[root_target],
+        )
 
       return ensure_text(stdout).splitlines()
 
@@ -452,40 +471,42 @@ class SetupPy(Task):
 
     def iter_files():
       for root, _, files in safe_walk(base):
-        module = os.path.relpath(root, base).replace(os.path.sep, '.')
+        module = os.path.relpath(root, base).replace(os.path.sep, ".")
         for filename in files:
           yield module, filename, os.path.join(root, filename)
 
     # establish packages, namespace packages in first pass
     inits_to_check = {}
     for module, filename, real_filename in iter_files():
-      if filename != '__init__.py':
+      if filename != "__init__.py":
         continue
       packages.add(module)
       inits_to_check[real_filename] = module
-    namespace_packages = {inits_to_check[init]
-                          for init in self.filter_namespace_packages(root_target,
-                                                                     inits_to_check.keys())}
+    namespace_packages = {
+      inits_to_check[init]
+      for init in self.filter_namespace_packages(root_target, inits_to_check.keys())
+    }
 
     # second pass establishes non-source content (resources)
     for module, filename, real_filename in iter_files():
-      if filename.endswith('.py'):
+      if filename.endswith(".py"):
         if module not in packages:
           # TODO(wickman) Consider changing this to a full-on error as it could indicate bad BUILD
           # hygiene.
           # raise cls.UndefinedSource('{} is source but does not belong to a package!'
           #                           .format(filename))
-          self.context.log.warn('{} is source but does not belong to a package.'
-                                .format(real_filename))
+          self.context.log.warn(
+            "{} is source but does not belong to a package.".format(real_filename)
+          )
         else:
           continue
       submodule = self.nearest_subpackage(module, packages)
       if submodule == module:
         resources[submodule].add(filename)
       else:
-        assert module.startswith(submodule + '.')
-        relative_module = module[len(submodule) + 1:]
-        relative_filename = os.path.join(relative_module.replace('.', os.path.sep), filename)
+        assert module.startswith(submodule + ".")
+        relative_module = module[len(submodule) + 1 :]
+        relative_filename = os.path.join(relative_module.replace(".", os.path.sep), filename)
         resources[submodule].add(relative_filename)
 
     return packages, namespace_packages, resources
@@ -514,9 +535,11 @@ class SetupPy(Task):
 
   def write_contents(self, root_target, reduced_dependencies, chroot):
     """Write contents of the target."""
+
     def write_target_source(target, src):
-      chroot.copy(os.path.join(get_buildroot(), target.target_base, src),
-                  os.path.join(self.SOURCE_ROOT, src))
+      chroot.copy(
+        os.path.join(get_buildroot(), target.target_base, src), os.path.join(self.SOURCE_ROOT, src)
+      )
       # check parent __init__.pys to see if they also need to be copied.  this is to allow
       # us to determine if they belong to regular packages or namespace packages.
       while True:
@@ -524,9 +547,11 @@ class SetupPy(Task):
         if not src:
           # Do not allow the repository root to leak (i.e. '.' should not be a package in setup.py)
           break
-        if os.path.exists(os.path.join(target.target_base, src, '__init__.py')):
-          chroot.copy(os.path.join(target.target_base, src, '__init__.py'),
-                      os.path.join(self.SOURCE_ROOT, src, '__init__.py'))
+        if os.path.exists(os.path.join(target.target_base, src, "__init__.py")):
+          chroot.copy(
+            os.path.join(target.target_base, src, "__init__.py"),
+            os.path.join(self.SOURCE_ROOT, src, "__init__.py"),
+          )
 
     def write_target(target):
       # We want to operate on the final sources target owns, so we potentially replace it with
@@ -555,35 +580,39 @@ class SetupPy(Task):
     """
     setup_keywords = root_target.provides.setup_py_keywords.copy()
 
-    package_dir = {'': self.SOURCE_ROOT}
+    package_dir = {"": self.SOURCE_ROOT}
     packages, namespace_packages, resources = self.find_packages(root_target, chroot)
 
     if namespace_packages:
-      setup_keywords['namespace_packages'] = list(sorted(namespace_packages))
+      setup_keywords["namespace_packages"] = list(sorted(namespace_packages))
 
     if packages:
       setup_keywords.update(
-          package_dir=package_dir,
-          packages=list(sorted(packages)),
-          package_data=dict((str(package), list(map(str, rs)))
-                            for (package, rs) in resources.items()))
+        package_dir=package_dir,
+        packages=list(sorted(packages)),
+        package_data=dict(
+          (str(package), list(map(str, rs))) for (package, rs) in resources.items()
+        ),
+      )
 
-    setup_keywords['install_requires'] = list(self.install_requires(reduced_dependencies))
+    setup_keywords["install_requires"] = list(self.install_requires(reduced_dependencies))
 
     for binary_name, entry_point in self.iter_entry_points(root_target):
-      if 'entry_points' not in setup_keywords:
-        setup_keywords['entry_points'] = {}
-      if 'console_scripts' not in setup_keywords['entry_points']:
-        setup_keywords['entry_points']['console_scripts'] = []
-      setup_keywords['entry_points']['console_scripts'].append(
-          '{} = {}'.format(binary_name, entry_point))
+      if "entry_points" not in setup_keywords:
+        setup_keywords["entry_points"] = {}
+      if "console_scripts" not in setup_keywords["entry_points"]:
+        setup_keywords["entry_points"]["console_scripts"] = []
+      setup_keywords["entry_points"]["console_scripts"].append(
+        "{} = {}".format(binary_name, entry_point)
+      )
 
-    setup_py = self._setup_boilerplate().format(setup_dict=distutils_repr(setup_keywords),
-                                                setup_target=root_target.address.reference())
-    chroot.write(ensure_binary(setup_py), 'setup.py')
+    setup_py = self._setup_boilerplate().format(
+      setup_dict=distutils_repr(setup_keywords), setup_target=root_target.address.reference()
+    )
+    chroot.write(ensure_binary(setup_py), "setup.py")
 
     # Make sure that `setup.py` is included.
-    chroot.write('include *.py', 'MANIFEST.in', mode='w')
+    chroot.write("include *.py", "MANIFEST.in", mode="w")
 
   def create_setup_py(self, target, dist_dir):
     chroot = Chroot(dist_dir, name=target.provides.name)
@@ -591,7 +620,7 @@ class SetupPy(Task):
     reduced_deps = dependency_calculator.reduced_dependencies(target)
     self.write_contents(target, reduced_deps, chroot)
     self.write_setup(target, reduced_deps, chroot)
-    target_base = '{}-{}'.format(target.provides.name, target.provides.version)
+    target_base = "{}-{}".format(target.provides.name, target.provides.version)
     setup_dir = os.path.join(dist_dir, target_base)
     safe_rmtree(setup_dir)
     shutil.move(chroot.path(), setup_dir)
@@ -603,8 +632,9 @@ class SetupPy(Task):
     def is_exported_python_target(t):
       return t.is_original and self.has_provides(t) and not is_local_python_dist(t)
 
-    exported_python_targets = OrderedSet(t for t in self.context.target_roots
-                                         if is_exported_python_target(t))
+    exported_python_targets = OrderedSet(
+      t for t in self.context.target_roots if is_exported_python_target(t)
+    )
 
     dist_dir = self.get_options().pants_distdir
 
@@ -617,7 +647,7 @@ class SetupPy(Task):
 
     def create(exported_python_target):
       if exported_python_target not in created:
-        self.context.log.info('Creating setup.py project for {}'.format(exported_python_target))
+        self.context.log.info("Creating setup.py project for {}".format(exported_python_target))
         subject = self.derived_by_original.get(exported_python_target, exported_python_target)
         setup_dir, dependencies = self.create_setup_py(subject, dist_dir)
         created[exported_python_target] = setup_dir
@@ -635,19 +665,19 @@ class SetupPy(Task):
       setup_dir = created.get(exported_python_target)
       if setup_dir:
         if not self._run:
-          self.context.log.info('Running packager against {}'.format(setup_dir))
+          self.context.log.info("Running packager against {}".format(setup_dir))
           setup_runner = Packager(setup_dir, interpreter=interpreter)
           tgz_name = os.path.basename(setup_runner.sdist())
           sdist_path = os.path.join(dist_dir, tgz_name)
-          self.context.log.info('Writing {}'.format(sdist_path))
+          self.context.log.info("Writing {}".format(sdist_path))
           shutil.move(setup_runner.sdist(), sdist_path)
           safe_rmtree(setup_dir)
           python_dists[exported_python_target] = sdist_path
         else:
-          self.context.log.info('Running {} against {}'.format(self._run, setup_dir))
+          self.context.log.info("Running {} against {}".format(self._run, setup_dir))
           split_command = safe_shlex_split(self._run)
           setup_runner = SetupPyRunner(setup_dir, split_command, interpreter=interpreter)
           installed = setup_runner.run()
           if not installed:
-            raise TaskError('Install failed.')
+            raise TaskError("Install failed.")
           python_dists[exported_python_target] = setup_dir

@@ -64,7 +64,9 @@ class ExecuteProcessRequest:
     self.output_files = output_files or ()
     self.output_directories = output_directories or ()
     self.timeout_seconds = timeout_seconds
-    self.unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule = unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule
+    self.unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule = (
+      unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule
+    )
     self.jdk_home = jdk_home
     self.is_nailgunnable = is_nailgunnable
 
@@ -84,11 +86,14 @@ class MultiPlatformExecuteProcessRequest:
       raise ValueError("At least one platform constrained ExecuteProcessRequest must be passed.")
     validated_constraints = tuple(
       constraint.value
-      for pair in request_dict.keys() for constraint in pair
+      for pair in request_dict.keys()
+      for constraint in pair
       if PlatformConstraint(constraint.value)
     )
     if len({req.description for req in request_dict.values()}) != 1:
-      raise ValueError(f"The `description` of all execute_process_requests in a {MultiPlatformExecuteProcessRequest.__name__} must be identical.")
+      raise ValueError(
+        f"The `description` of all execute_process_requests in a {MultiPlatformExecuteProcessRequest.__name__} must be identical."
+      )
 
     self.platform_constraints = validated_constraints
     self.execute_process_requests = tuple(request_dict.values())
@@ -106,6 +111,7 @@ class ExecuteProcessResult:
   """Result of successfully executing a process.
 
   Requesting one of these will raise an exception if the exit code is non-zero."""
+
   stdout: bytes
   stderr: bytes
   output_directory_digest: Digest
@@ -116,6 +122,7 @@ class FallibleExecuteProcessResult:
   """Result of executing a process.
 
   Requesting one of these will not raise an exception if the exit code is non-zero."""
+
   stdout: bytes
   stderr: bytes
   exit_code: int
@@ -142,10 +149,7 @@ stderr:
     self.stderr = stderr
 
     msg = self.MSG_FMT.format(
-      desc=process_description,
-      code=exit_code,
-      stdout=stdout.decode(),
-      stderr=stderr.decode()
+      desc=process_description, code=exit_code, stdout=stdout.decode(), stderr=stderr.decode()
     )
 
     super().__init__(msg)
@@ -153,14 +157,14 @@ stderr:
 
 @rule
 def get_multi_platform_request_description(
-  req: MultiPlatformExecuteProcessRequest
+  req: MultiPlatformExecuteProcessRequest,
 ) -> ProductDescription:
   return req.product_description
 
 
 @rule
 def upcast_execute_process_request(
-  req: ExecuteProcessRequest
+  req: ExecuteProcessRequest,
 ) -> MultiPlatformExecuteProcessRequest:
   """This rule allows an ExecuteProcessRequest to be run as a
   platform compatible MultiPlatformExecuteProcessRequest.
@@ -178,16 +182,11 @@ def fallible_to_exec_result_or_raise(
 
   if fallible_result.exit_code == 0:
     return ExecuteProcessResult(
-      fallible_result.stdout,
-      fallible_result.stderr,
-      fallible_result.output_directory_digest
+      fallible_result.stdout, fallible_result.stderr, fallible_result.output_directory_digest
     )
   else:
     raise ProcessExecutionFailure(
-      fallible_result.exit_code,
-      fallible_result.stdout,
-      fallible_result.stderr,
-      description.value
+      fallible_result.exit_code, fallible_result.stdout, fallible_result.stderr, description.value
     )
 
 

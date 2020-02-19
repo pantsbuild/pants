@@ -9,16 +9,16 @@ from pants.util.objects import SubclassesOf
 
 class CppCompile(NativeCompile):
 
-  options_scope = 'cpp-compile'
+  options_scope = "cpp-compile"
 
   # Compile only C++ library targets.
   source_target_constraint = SubclassesOf(CppLibrary)
 
-  workunit_label = 'cpp-compile'
+  workunit_label = "cpp-compile"
 
   @classmethod
   def implementation_version(cls):
-    return super().implementation_version() + [('CppCompile', 0)]
+    return super().implementation_version() + [("CppCompile", 0)]
 
   @classmethod
   def subsystem_dependencies(cls):

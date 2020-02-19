@@ -16,10 +16,18 @@ class PackagedNativeLibrary(Target):
 
   @classmethod
   def alias(cls):
-    return 'packaged_native_library'
+    return "packaged_native_library"
 
-  def __init__(self, address, payload=None, sources=None, include_relpath=None, lib_relpath=None,
-               native_lib_names=None, **kwargs):
+  def __init__(
+    self,
+    address,
+    payload=None,
+    sources=None,
+    include_relpath=None,
+    lib_relpath=None,
+    native_lib_names=None,
+    **kwargs
+  ):
     """
     :param sources: Files owned by this target.
     :param str include_relpath: The path where C/C++ headers are located, relative to this target's
@@ -36,12 +44,14 @@ class PackagedNativeLibrary(Target):
     """
     if not payload:
       payload = Payload()
-    payload.add_fields({
-      'sources': self.create_sources_field(sources, address.spec_path, key_arg='sources'),
-      'include_relpath': PrimitiveField(include_relpath),
-      'lib_relpath': PrimitiveField(lib_relpath),
-      'native_lib_names': PrimitiveField(native_lib_names),
-    })
+    payload.add_fields(
+      {
+        "sources": self.create_sources_field(sources, address.spec_path, key_arg="sources"),
+        "include_relpath": PrimitiveField(include_relpath),
+        "lib_relpath": PrimitiveField(lib_relpath),
+        "native_lib_names": PrimitiveField(native_lib_names),
+      }
+    )
     super().__init__(address=address, payload=payload, **kwargs)
 
   @property

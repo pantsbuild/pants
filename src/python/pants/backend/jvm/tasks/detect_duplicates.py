@@ -12,10 +12,17 @@ from pants.java.jar.manifest import Manifest
 from pants.util.memo import memoized_property
 
 
-EXCLUDED_FILES = ['.DS_Store', 'cmdline.arg.info.txt.1', 'dependencies',
-                  'license', 'license.txt', 'notice','notice.txt']
-EXCLUDED_DIRS = ['META-INF/services']
-EXCLUDED_PATTERNS=[r'^META-INF/[^/]+\.(SF|DSA|RSA)$']  # signature file
+EXCLUDED_FILES = [
+  ".DS_Store",
+  "cmdline.arg.info.txt.1",
+  "dependencies",
+  "license",
+  "license.txt",
+  "notice",
+  "notice.txt",
+]
+EXCLUDED_DIRS = ["META-INF/services"]
+EXCLUDED_PATTERNS = [r"^META-INF/[^/]+\.(SF|DSA|RSA)$"]  # signature file
 
 
 class DuplicateDetector(JvmBinaryTask):
@@ -23,27 +30,42 @@ class DuplicateDetector(JvmBinaryTask):
 
   @staticmethod
   def _isdir(name):
-    return name[-1] == '/'
+    return name[-1] == "/"
 
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--exclude-files', default=EXCLUDED_FILES, type=list,
-             help='Case insensitive filenames (without directory) to exclude from duplicate check.')
-    register('--exclude-dirs', default=EXCLUDED_DIRS, type=list,
-             help='Directory names to exclude from duplicate check.')
-    register('--exclude-patterns', default=EXCLUDED_PATTERNS, type=list,
-             help='Regular expressions matching paths (directory and filename) to exclude from '
-                  'the duplicate check.')
-    register('--max-dups', type=int, default=10,
-             help='Maximum number of duplicate classes to display per artifact.')
-    register('--skip', type=bool,
-             help='Disable the dup checking step.')
+    register(
+      "--exclude-files",
+      default=EXCLUDED_FILES,
+      type=list,
+      help="Case insensitive filenames (without directory) to exclude from duplicate check.",
+    )
+    register(
+      "--exclude-dirs",
+      default=EXCLUDED_DIRS,
+      type=list,
+      help="Directory names to exclude from duplicate check.",
+    )
+    register(
+      "--exclude-patterns",
+      default=EXCLUDED_PATTERNS,
+      type=list,
+      help="Regular expressions matching paths (directory and filename) to exclude from "
+      "the duplicate check.",
+    )
+    register(
+      "--max-dups",
+      type=int,
+      default=10,
+      help="Maximum number of duplicate classes to display per artifact.",
+    )
+    register("--skip", type=bool, help="Disable the dup checking step.")
 
   @classmethod
   def prepare(cls, options, round_manager):
     super().prepare(options, round_manager)
-    round_manager.require_data('runtime_classpath')
+    round_manager.require_data("runtime_classpath")
 
   @memoized_property
   def max_dups(self):
@@ -92,16 +114,17 @@ class DuplicateDetector(JvmBinaryTask):
 
   def _check_conflicts(self, artifacts_by_file_name, binary_target):
     conflicts_by_artifacts = self._get_conflicts_by_artifacts(
-      artifacts_by_file_name, binary_target.payload.deploy_jar_rules)
+      artifacts_by_file_name, binary_target.payload.deploy_jar_rules
+    )
     if len(conflicts_by_artifacts) > 0:
       self._log_conflicts(conflicts_by_artifacts, binary_target)
       if self.get_options().fail_fast:
-        raise TaskError(f'Failing build for target {binary_target}.')
+        raise TaskError(f"Failing build for target {binary_target}.")
     return conflicts_by_artifacts
 
   def _get_internal_dependencies(self, binary_target):
     artifacts_by_file_name = defaultdict(set)
-    classpath_products = self.context.products.get_data('runtime_classpath')
+    classpath_products = self.context.products.get_data("runtime_classpath")
 
     # Select classfiles from the classpath - we want all the direct products of internal targets,
     # no external JarLibrary products.
@@ -116,7 +139,7 @@ class DuplicateDetector(JvmBinaryTask):
   def _get_external_dependencies(self, binary_target):
     artifacts_by_file_name = defaultdict(set)
     for external_dep, coordinate in self.list_external_jar_dependencies(binary_target):
-      self.context.log.debug(f'  scanning {coordinate} from {external_dep}')
+      self.context.log.debug(f"  scanning {coordinate} from {external_dep}")
       for qualified_file_name in ClasspathUtil.classpath_entries_contents([external_dep]):
         artifacts_by_file_name[qualified_file_name].add(coordinate.artifact_filename)
     return artifacts_by_file_name
@@ -152,14 +175,15 @@ class DuplicateDetector(JvmBinaryTask):
     return conflicts_by_artifacts
 
   def _log_conflicts(self, conflicts_by_artifacts, target):
-    self.context.log.warn(f'\n ===== For target {target}:')
+    self.context.log.warn(f"\n ===== For target {target}:")
     for artifacts, duplicate_files in conflicts_by_artifacts.items():
       if len(artifacts) < 2:
         continue
       self.context.log.warn(
-        f'Duplicate classes and/or resources detected in artifacts: {artifacts}')
+        f"Duplicate classes and/or resources detected in artifacts: {artifacts}"
+      )
       dup_list = list(duplicate_files)
-      for duplicate_file in dup_list[:self.max_dups]:
-        self.context.log.warn(f'     {duplicate_file}')
+      for duplicate_file in dup_list[: self.max_dups]:
+        self.context.log.warn(f"     {duplicate_file}")
       if len(dup_list) > self.max_dups:
-        self.context.log.warn(f'     ... {(len(dup_list) - self.max_dups)} more ...')
+        self.context.log.warn(f"     ... {(len(dup_list) - self.max_dups)} more ...")

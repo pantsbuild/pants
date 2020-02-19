@@ -33,15 +33,15 @@ def identify_missing_init_files(sources: Sequence[str]) -> Set[str]:
   an __init__.py. """
   packages: Set[str] = set()
   for source in sources:
-    if source.endswith('.py'):
+    if source.endswith(".py"):
       pkg_dir = os.path.dirname(source)
       if pkg_dir and pkg_dir not in packages:
-        package = ''
+        package = ""
         for component in pkg_dir.split(os.sep):
           package = os.path.join(package, component)
           packages.add(package)
 
-  return {os.path.join(package, '__init__.py') for package in packages} - set(sources)
+  return {os.path.join(package, "__init__.py") for package in packages} - set(sources)
 
 
 def _create_source_dumper(builder: PEXBuilder, tgt: Target) -> Callable[[str], None]:
@@ -73,14 +73,18 @@ class PexBuilderWrapper:
   """Wraps PEXBuilder to provide an API that consumes targets and other BUILD file entities."""
 
   class Factory(Subsystem):
-    options_scope = 'pex-builder-wrapper'
+    options_scope = "pex-builder-wrapper"
 
     @classmethod
     def register_options(cls, register):
       super(PexBuilderWrapper.Factory, cls).register_options(register)
-      register('--setuptools-version', advanced=True, default='40.6.3',
-               help='The setuptools version to include in the pex if namespace packages need to be '
-                    'injected.')
+      register(
+        "--setuptools-version",
+        advanced=True,
+        default="40.6.3",
+        help="The setuptools version to include in the pex if namespace packages need to be "
+        "injected.",
+      )
 
     @classmethod
     def subsystem_dependencies(cls):
@@ -92,22 +96,21 @@ class PexBuilderWrapper:
     @classmethod
     def create(cls, builder, log=None):
       options = cls.global_instance().get_options()
-      setuptools_requirement = f'setuptools=={options.setuptools_version}'
+      setuptools_requirement = f"setuptools=={options.setuptools_version}"
 
       log = log or logging.getLogger(__name__)
 
-      return PexBuilderWrapper(builder=builder,
-                               python_repos_subsystem=PythonRepos.global_instance(),
-                               python_setup_subsystem=PythonSetup.global_instance(),
-                               setuptools_requirement=PythonRequirement(setuptools_requirement),
-                               log=log)
+      return PexBuilderWrapper(
+        builder=builder,
+        python_repos_subsystem=PythonRepos.global_instance(),
+        python_setup_subsystem=PythonSetup.global_instance(),
+        setuptools_requirement=PythonRequirement(setuptools_requirement),
+        log=log,
+      )
 
-  def __init__(self,
-               builder,
-               python_repos_subsystem,
-               python_setup_subsystem,
-               setuptools_requirement,
-               log):
+  def __init__(
+    self, builder, python_repos_subsystem, python_setup_subsystem, setuptools_requirement, log
+  ):
     assert isinstance(builder, PEXBuilder)
     assert isinstance(python_repos_subsystem, PythonRepos)
     assert isinstance(python_setup_subsystem, PythonSetup)
@@ -133,7 +136,8 @@ class PexBuilderWrapper:
     reqs = [req for req_lib in req_libs for req in req_lib.requirements]
     self.add_resolved_requirements(reqs, platforms=platforms)
 
-  class SingleDistExtractionError(Exception): pass
+  class SingleDistExtractionError(Exception):
+    pass
 
   def extract_single_dist_for_current_platform(self, reqs, dist_key):
     """Resolve a specific distribution from a set of requirements matching the current platform.
@@ -145,14 +149,11 @@ class PexBuilderWrapper:
     :raises: :class:`self.SingleDistExtractionError` if no dists or multiple dists matched the given
              `dist_key`.
     """
-    distributions = self._resolve_distributions_by_platform(reqs, platforms=['current'])
+    distributions = self._resolve_distributions_by_platform(reqs, platforms=["current"])
     try:
-      matched_dist = assert_single_element(list(
-        dist
-        for _, dists in distributions.items()
-        for dist in dists
-        if dist.key == dist_key
-      ))
+      matched_dist = assert_single_element(
+        list(dist for _, dists in distributions.items() for dist in dists if dist.key == dist_key)
+      )
     except (StopIteration, ValueError) as e:
       raise self.SingleDistExtractionError(
         f"Exactly one dist was expected to match name {dist_key} in requirements {reqs}: {e!r}"
@@ -163,14 +164,15 @@ class PexBuilderWrapper:
     deduped_reqs = OrderedSet(reqs)
     find_links = OrderedSet()
     for req in deduped_reqs:
-      self._log.debug(f'  Dumping requirement: {req}')
+      self._log.debug(f"  Dumping requirement: {req}")
       self._builder.add_requirement(str(req.requirement))
       if req.repository:
         find_links.add(req.repository)
 
     # Resolve the requirements into distributions.
-    distributions = self._resolve_multi(self._builder.interpreter, deduped_reqs, platforms,
-      find_links)
+    distributions = self._resolve_multi(
+      self._builder.interpreter, deduped_reqs, platforms, find_links
+    )
     return distributions
 
   def add_resolved_requirements(self, reqs, platforms=None):
@@ -185,7 +187,7 @@ class PexBuilderWrapper:
     for platform, dists in distributions.items():
       for dist in dists:
         if dist.location not in locations:
-          self._log.debug(f'  Dumping distribution: .../{os.path.basename(dist.location)}')
+          self._log.debug(f"  Dumping distribution: .../{os.path.basename(dist.location)}")
           self.add_distribution(dist)
         locations.add(dist.location)
 
@@ -211,8 +213,9 @@ class PexBuilderWrapper:
     fetchers.extend(Fetcher([path]) for path in find_links)
 
     for platform in platforms:
-      requirements_cache_dir = os.path.join(python_setup.resolver_cache_dir,
-        str(interpreter.identity))
+      requirements_cache_dir = os.path.join(
+        python_setup.resolver_cache_dir, str(interpreter.identity)
+      )
       resolved_dists = resolve(
         requirements=[str(req.requirement) for req in requirements],
         interpreter=interpreter,
@@ -222,37 +225,41 @@ class PexBuilderWrapper:
         cache=requirements_cache_dir,
         cache_ttl=python_setup.resolver_cache_ttl,
         allow_prereleases=python_setup.resolver_allow_prereleases,
-        use_manylinux=python_setup.use_manylinux)
+        use_manylinux=python_setup.use_manylinux,
+      )
       distributions[platform] = [resolved_dist.distribution for resolved_dist in resolved_dists]
 
     return distributions
 
   def add_sources_from(self, tgt: Target) -> None:
     dump_source = _create_source_dumper(self._builder, tgt)
-    self._log.debug(f'  Dumping sources: {tgt}')
+    self._log.debug(f"  Dumping sources: {tgt}")
     for relpath in tgt.sources_relative_to_buildroot():
       try:
         dump_source(relpath)
       except OSError:
-        self._log.error(f'Failed to copy {relpath} for target {tgt.address.spec}')
+        self._log.error(f"Failed to copy {relpath} for target {tgt.address.spec}")
         raise
 
-    if (getattr(tgt, '_resource_target_specs', None) or
-      getattr(tgt, '_synthetic_resources_target', None)):
+    if getattr(tgt, "_resource_target_specs", None) or getattr(
+      tgt, "_synthetic_resources_target", None
+    ):
       # No one should be on old-style resources any more.  And if they are,
       # switching to the new python pipeline will be a great opportunity to fix that.
       raise TaskError(
-        f'Old-style resources not supported for target {tgt.address.spec}. Depend on resources() '
-        'targets instead.'
+        f"Old-style resources not supported for target {tgt.address.spec}. Depend on resources() "
+        "targets instead."
       )
 
   def _prepare_inits(self) -> Set[str]:
     chroot = self._builder.chroot()
-    sources = chroot.get('source') | chroot.get('resource')
+    sources = chroot.get("source") | chroot.get("resource")
     missing_init_files = identify_missing_init_files(sources)
     if missing_init_files:
       with temporary_file(permissions=0o644) as ns_package:
-        ns_package.write(b'__import__("pkg_resources").declare_namespace(__name__)  # type: ignore[attr-defined]')
+        ns_package.write(
+          b'__import__("pkg_resources").declare_namespace(__name__)  # type: ignore[attr-defined]'
+        )
         ns_package.flush()
         for missing_init_file in missing_init_files:
           self._builder.add_source(filename=ns_package.name, env_filename=missing_init_file)
@@ -265,7 +272,7 @@ class PexBuilderWrapper:
     if self._frozen:
       return
     if self._prepare_inits():
-      dist = self._distributions.get('setuptools')
+      dist = self._distributions.get("setuptools")
       if not dist:
         self.add_resolved_requirements([self._setuptools_requirement])
     self._builder.freeze(bytecode_compile=False)

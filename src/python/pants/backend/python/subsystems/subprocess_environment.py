@@ -10,21 +10,27 @@ from pants.subsystem.subsystem import Subsystem
 
 
 class SubprocessEnvironment(Subsystem):
-  options_scope = 'subprocess-environment'
+  options_scope = "subprocess-environment"
 
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
 
     # TODO(#7735): move the --lang and --lc-all flags to a general subprocess support subystem.
-    register('--lang',
-             default=os.environ.get('LANG'),
-             fingerprint=True, advanced=True,
-             help='Override the `LANG` environment variable for any forked subprocesses.')
-    register('--lc-all',
-             default=os.environ.get('LC_ALL'),
-             fingerprint=True, advanced=True,
-             help='Override the `LC_ALL` environment variable for any forked subprocesses.')
+    register(
+      "--lang",
+      default=os.environ.get("LANG"),
+      fingerprint=True,
+      advanced=True,
+      help="Override the `LANG` environment variable for any forked subprocesses.",
+    )
+    register(
+      "--lc-all",
+      default=os.environ.get("LC_ALL"),
+      fingerprint=True,
+      advanced=True,
+      help="Override the `LC_ALL` environment variable for any forked subprocesses.",
+    )
 
 
 @dataclass(frozen=True)
@@ -34,15 +40,12 @@ class SubprocessEncodingEnvironment:
 
   @property
   def invocation_environment_dict(self):
-    return {
-      'LANG': self.lang or '',
-      'LC_ALL': self.lc_all or '',
-    }
+    return {"LANG": self.lang or "", "LC_ALL": self.lc_all or ""}
 
 
 @rule
 def create_subprocess_encoding_environment(
-  subprocess_environment: SubprocessEnvironment
+  subprocess_environment: SubprocessEnvironment,
 ) -> SubprocessEncodingEnvironment:
   return SubprocessEncodingEnvironment(
     lang=subprocess_environment.get_options().lang,
@@ -51,7 +54,4 @@ def create_subprocess_encoding_environment(
 
 
 def rules():
-  return [
-    subsystem_rule(SubprocessEnvironment),
-    create_subprocess_encoding_environment,
-  ]
+  return [subsystem_rule(SubprocessEnvironment), create_subprocess_encoding_environment]

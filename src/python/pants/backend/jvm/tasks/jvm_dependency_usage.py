@@ -42,25 +42,44 @@ class JvmDependencyUsage(Task):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--internal-only', default=False, type=bool, fingerprint=True,
-             help='Specifies that only internal dependencies should be included in the graph '
-                  'output (no external jars).')
-    register('--summary', default=True, type=bool,
-             help='When set, outputs a summary of the "worst" dependencies; otherwise, '
-                  'outputs a JSON report.')
-    register('--size-estimator',
-             choices=list(cls.size_estimators.keys()), default='filesize', fingerprint=True,
-             help='The method of target size estimation.')
-    register('--transitive', default=True, type=bool,
-             help='Score all targets in the build graph transitively.')
-    register('--output-file', type=str,
-             help='Output destination. When unset, outputs to <stdout>.')
-    register('--use-cached', type=bool,
-             help='Use cached dependency data to compute analysis result. '
-                  'When set, skips `resolve` and `compile` steps. '
-                  'Useful for computing analysis for a lot of targets, but '
-                  'result can differ from direct execution because cached information '
-                  'doesn\'t depend on 3rdparty libraries versions.')
+    register(
+      "--internal-only",
+      default=False,
+      type=bool,
+      fingerprint=True,
+      help="Specifies that only internal dependencies should be included in the graph "
+      "output (no external jars).",
+    )
+    register(
+      "--summary",
+      default=True,
+      type=bool,
+      help='When set, outputs a summary of the "worst" dependencies; otherwise, '
+      "outputs a JSON report.",
+    )
+    register(
+      "--size-estimator",
+      choices=list(cls.size_estimators.keys()),
+      default="filesize",
+      fingerprint=True,
+      help="The method of target size estimation.",
+    )
+    register(
+      "--transitive",
+      default=True,
+      type=bool,
+      help="Score all targets in the build graph transitively.",
+    )
+    register("--output-file", type=str, help="Output destination. When unset, outputs to <stdout>.")
+    register(
+      "--use-cached",
+      type=bool,
+      help="Use cached dependency data to compute analysis result. "
+      "When set, skips `resolve` and `compile` steps. "
+      "Useful for computing analysis for a lot of targets, but "
+      "result can differ from direct execution because cached information "
+      "doesn't depend on 3rdparty libraries versions.",
+    )
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -70,13 +89,13 @@ class JvmDependencyUsage(Task):
   def prepare(cls, options, round_manager):
     super().prepare(options, round_manager)
     if not options.use_cached:
-      round_manager.require_data('runtime_classpath')
-      round_manager.require_data('product_deps_by_target')
+      round_manager.require_data("runtime_classpath")
+      round_manager.require_data("product_deps_by_target")
     else:
       # We want to have synthetic targets in build graph to deserialize nodes properly.
-      round_manager.optional_data('java')
-      round_manager.optional_data('scala')
-      round_manager.optional_data('deferred_sources')
+      round_manager.optional_data("java")
+      round_manager.optional_data("scala")
+      round_manager.optional_data("deferred_sources")
 
   @classmethod
   def skip(cls, options):
@@ -84,20 +103,21 @@ class JvmDependencyUsage(Task):
     return False
 
   def execute(self):
-    graph = self.create_dep_usage_graph(self.context.targets() if self.get_options().transitive
-                                        else self.context.target_roots)
+    graph = self.create_dep_usage_graph(
+      self.context.targets() if self.get_options().transitive else self.context.target_roots
+    )
     output_file = self.get_options().output_file
     if output_file:
-      self.context.log.info(f'Writing dependency usage to {output_file}')
-      with open(output_file, 'w') as fh:
+      self.context.log.info(f"Writing dependency usage to {output_file}")
+      with open(output_file, "w") as fh:
         self._render(graph, fh)
     else:
-      sys.stdout.write('\n')
+      sys.stdout.write("\n")
       self._render(graph, sys.stdout)
 
   @classmethod
   def implementation_version(cls):
-    return super().implementation_version() + [('JvmDependencyUsage', 7)]
+    return super().implementation_version() + [("JvmDependencyUsage", 7)]
 
   def _render(self, graph, fh):
     chunks = graph.to_summary() if self.get_options().summary else graph.to_json()
@@ -134,8 +154,7 @@ class JvmDependencyUsage(Task):
 
     Synthetic targets contribute products and dependencies to their concrete target.
     """
-    with self.invalidated(targets,
-                          invalidate_dependents=True) as invalidation_check:
+    with self.invalidated(targets, invalidate_dependents=True) as invalidation_check:
       target_to_vts = {}
       for vts in invalidation_check.all_vts:
         target_to_vts[vts.target] = vts
@@ -145,14 +164,18 @@ class JvmDependencyUsage(Task):
       else:
         node_creator = self.cached_node_creator(target_to_vts)
 
-      return DependencyUsageGraph(self.create_dep_usage_nodes(targets, node_creator),
-                                  self.size_estimators[self.get_options().size_estimator])
+      return DependencyUsageGraph(
+        self.create_dep_usage_nodes(targets, node_creator),
+        self.size_estimators[self.get_options().size_estimator],
+      )
 
   @memoized_property
   def _analyzer(self):
-    return JvmDependencyAnalyzer(get_buildroot(),
-                                 DistributionLocator.cached(),
-                                 self.context.products.get_data('runtime_classpath'))
+    return JvmDependencyAnalyzer(
+      get_buildroot(),
+      DistributionLocator.cached(),
+      self.context.products.get_data("runtime_classpath"),
+    )
 
   def calculating_node_creator(self, target_to_vts):
     """Strategy directly computes dependency graph node based on
@@ -167,7 +190,7 @@ class JvmDependencyUsage(Task):
       transitive_deps = set(transitive_deps_by_target.get(target))
       node = self.create_dep_usage_node(target, targets_by_file, transitive_deps)
       vt = target_to_vts[target]
-      with open(self.nodes_json(vt.results_dir), mode='w') as fp:
+      with open(self.nodes_json(vt.results_dir), mode="w") as fp:
         json.dump(node.to_cacheable_dict(), fp, indent=2, sort_keys=True)
       vt.update()
       return node
@@ -177,14 +200,14 @@ class JvmDependencyUsage(Task):
   def cached_node_creator(self, target_to_vts):
     """Strategy restores dependency graph node from the build cache.
     """
+
     def creator(target):
       vt = target_to_vts[target]
       if vt.valid and os.path.exists(self.nodes_json(vt.results_dir)):
         try:
-          with open(self.nodes_json(vt.results_dir), 'r') as fp:
+          with open(self.nodes_json(vt.results_dir), "r") as fp:
             return Node.from_cacheable_dict(
-              json.load(fp),
-              lambda spec: next(self.context.resolve(spec).__iter__())
+              json.load(fp), lambda spec: next(self.context.resolve(spec).__iter__())
             )
         except Exception:
           self.context.log.warn(f"Can't deserialize json for target {target}")
@@ -196,7 +219,7 @@ class JvmDependencyUsage(Task):
     return creator
 
   def nodes_json(self, target_results_dir):
-    return os.path.join(target_results_dir, 'node.json')
+    return os.path.join(target_results_dir, "node.json")
 
   def create_dep_usage_nodes(self, targets, node_creator):
     nodes = {}
@@ -223,8 +246,9 @@ class JvmDependencyUsage(Task):
 
   def create_dep_usage_node(self, target, targets_by_file, transitive_deps):
     declared_deps_with_aliases = set(self._analyzer.resolve_aliases(target))
-    eligible_unused_deps = {d for d, _ in self._analyzer.resolve_aliases(target,
-                                                                         scope=Scopes.DEFAULT)}
+    eligible_unused_deps = {
+      d for d, _ in self._analyzer.resolve_aliases(target, scope=Scopes.DEFAULT)
+    }
     concrete_target = target.concrete_derived_from
     declared_deps = [resolved for resolved, _ in declared_deps_with_aliases]
     products_total = self._analyzer.count_products(target)
@@ -232,11 +256,9 @@ class JvmDependencyUsage(Task):
     node.add_derivation(target, products_total)
 
     def _construct_edge(dep_tgt, products_used):
-      is_declared, is_used = self._dep_type(target,
-                                            dep_tgt,
-                                            declared_deps,
-                                            eligible_unused_deps,
-                                            len(products_used) > 0)
+      is_declared, is_used = self._dep_type(
+        target, dep_tgt, declared_deps, eligible_unused_deps, len(products_used) > 0
+      )
       return Edge(is_declared=is_declared, is_used=is_used, products_used=products_used)
 
     # Record declared Edges, initially all as "unused" or "declared".
@@ -247,7 +269,7 @@ class JvmDependencyUsage(Task):
 
     # Record the used products and undeclared Edges for this target. Note that some of
     # these may be self edges, which are considered later.
-    product_deps_by_target = self.context.products.get_data('product_deps_by_target')
+    product_deps_by_target = self.context.products.get_data("product_deps_by_target")
     product_deps_for_target = product_deps_by_target.get(target, [])
     # product_deps is a list of class files / jars
     for product_dep in product_deps_for_target:
@@ -295,9 +317,9 @@ class Node:
     edges = {}
     for dest in self.dep_edges:
       edges[dest.address.spec] = {
-        'products_used': list(self.dep_edges[dest].products_used),
-        'is_declared': self.dep_edges[dest].is_declared,
-        'is_used': self.dep_edges[dest].is_used,
+        "products_used": list(self.dep_edges[dest].products_used),
+        "is_declared": self.dep_edges[dest].is_declared,
+        "is_used": self.dep_edges[dest].is_used,
       }
     aliases = {}
 
@@ -305,25 +327,26 @@ class Node:
       aliases[dep.address.spec] = [alias.address.spec for alias in dep_aliases]
 
     return {
-      'target': self.concrete_target.address.spec,
-      'products_total': self.products_total,
-      'derivations': [derivation.address.spec for derivation in self.derivations],
-      'dep_edges': edges,
-      'aliases': aliases,
+      "target": self.concrete_target.address.spec,
+      "products_total": self.products_total,
+      "derivations": [derivation.address.spec for derivation in self.derivations],
+      "dep_edges": edges,
+      "aliases": aliases,
     }
 
   @staticmethod
   def from_cacheable_dict(cached_dict, target_resolve_func):
-    res = Node(target_resolve_func(cached_dict['target']))
-    res.products_total = cached_dict['products_total']
-    res.derivations.update([target_resolve_func(spec) for spec in cached_dict['derivations']])
-    for edge in cached_dict['dep_edges']:
+    res = Node(target_resolve_func(cached_dict["target"]))
+    res.products_total = cached_dict["products_total"]
+    res.derivations.update([target_resolve_func(spec) for spec in cached_dict["derivations"]])
+    for edge in cached_dict["dep_edges"]:
       res.dep_edges[target_resolve_func(edge)] = Edge(
-        is_declared=cached_dict['dep_edges'][edge]['is_declared'],
-        is_used=cached_dict['dep_edges'][edge]['is_used'],
-        products_used=set(cached_dict['dep_edges'][edge]['products_used']))
-    for dep in cached_dict['aliases']:
-      for alias in cached_dict['aliases'][dep]:
+        is_declared=cached_dict["dep_edges"][edge]["is_declared"],
+        is_used=cached_dict["dep_edges"][edge]["is_used"],
+        products_used=set(cached_dict["dep_edges"][edge]["products_used"]),
+      )
+    for dep in cached_dict["aliases"]:
+      for alias in cached_dict["aliases"][dep]:
         res.dep_aliases[target_resolve_func(dep)].add(target_resolve_func(alias))
     return res
 
@@ -363,13 +386,13 @@ class DependencyUsageGraph:
 
   def _edge_type(self, target, edge, dep):
     if target == dep:
-      return 'self'
+      return "self"
     elif edge.is_declared and edge.is_used:
-      return 'declared'
+      return "declared"
     elif edge.is_declared and not edge.is_used:
-      return 'unused'
+      return "unused"
     else:
-      return 'undeclared'
+      return "undeclared"
 
   def _used_ratio(self, dep_tgt, edge):
     if edge.products_used:
@@ -396,7 +419,7 @@ class DependencyUsageGraph:
         max_target_usage[dep_target] = max(max_target_usage[dep_target], used_ratio)
 
     # Calculate a score for each.
-    Score = namedtuple('Score', ('badness', 'max_usage', 'cost_transitive', 'target'))
+    Score = namedtuple("Score", ("badness", "max_usage", "cost_transitive", "target"))
     scores = []
     for target, max_usage in max_target_usage.items():
       cost_transitive = self._trans_cost(target)
@@ -404,12 +427,12 @@ class DependencyUsageGraph:
       scores.append(Score(score, max_usage, cost_transitive, target.address.spec))
 
     # Output in order by score.
-    yield '[\n'
+    yield "[\n"
     first = True
     for score in sorted(scores, key=lambda s: s.badness):
-      yield '{}  {}'.format('' if first else ',\n', json.dumps(score._asdict()))
+      yield "{}  {}".format("" if first else ",\n", json.dumps(score._asdict()))
       first = False
-    yield '\n]\n'
+    yield "\n]\n"
 
   def to_json(self):
     """Outputs the entire graph."""
@@ -417,19 +440,21 @@ class DependencyUsageGraph:
 
     def gen_dep_edge(node, edge, dep_tgt, aliases):
       return {
-        'target': dep_tgt.address.spec,
-        'dependency_type': self._edge_type(node.concrete_target, edge, dep_tgt),
-        'products_used': len(edge.products_used),
-        'products_used_ratio': self._used_ratio(dep_tgt, edge),
-        'aliases': [alias.address.spec for alias in aliases],
+        "target": dep_tgt.address.spec,
+        "dependency_type": self._edge_type(node.concrete_target, edge, dep_tgt),
+        "products_used": len(edge.products_used),
+        "products_used_ratio": self._used_ratio(dep_tgt, edge),
+        "aliases": [alias.address.spec for alias in aliases],
       }
 
     for node in self._nodes.values():
       res_dict[node.concrete_target.address.spec] = {
-        'cost': self._cost(node.concrete_target),
-        'cost_transitive': self._trans_cost(node.concrete_target),
-        'products_total': node.products_total,
-        'dependencies': [gen_dep_edge(node, edge, dep_tgt, node.dep_aliases.get(dep_tgt, {}))
-                         for dep_tgt, edge in node.dep_edges.items()],
+        "cost": self._cost(node.concrete_target),
+        "cost_transitive": self._trans_cost(node.concrete_target),
+        "products_total": node.products_total,
+        "dependencies": [
+          gen_dep_edge(node, edge, dep_tgt, node.dep_aliases.get(dep_tgt, {}))
+          for dep_tgt, edge in node.dep_edges.items()
+        ],
       }
     yield str(json.dumps(res_dict, indent=2, sort_keys=True))

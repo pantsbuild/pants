@@ -85,9 +85,11 @@ class Options:
     for si in scope_infos:
       ret.add(si)
       if si.scope in original_scopes:
-        raise cls.DuplicateScopeError('Scope `{}` claimed by {}, was also claimed by {}.'.format(
+        raise cls.DuplicateScopeError(
+          "Scope `{}` claimed by {}, was also claimed by {}.".format(
             si.scope, si, original_scopes[si.scope]
-          ))
+          )
+        )
       original_scopes[si.scope] = si
       if si.deprecated_scope:
         ret.add(ScopeInfo(si.deprecated_scope, si.category, si.optionable_cls))
@@ -133,7 +135,7 @@ class Options:
       spec_files = bootstrap_option_values.spec_files
       if spec_files:
         for spec_file in spec_files:
-          with open(spec_file, 'r') as f:
+          with open(spec_file, "r") as f:
             split_args.specs.extend([line for line in [line.strip() for line in f] if line])
 
     help_request = splitter.help_request
@@ -218,10 +220,10 @@ class Options:
     :API: public
     """
     warn_or_error(
-      removal_version='1.27.0.dev0',
-      deprecated_entity_description='.target_specs',
-      hint='Use .specs instead. This change is in preparation for Pants eventually allowing you to '
-           'pass file names as arguments, e.g. `./pants cloc foo.py`.',
+      removal_version="1.27.0.dev0",
+      deprecated_entity_description=".target_specs",
+      hint="Use .specs instead. This change is in preparation for Pants eventually allowing you to "
+      "pass file names as arguments, e.g. `./pants cloc foo.py`.",
     )
     return self._specs
 
@@ -232,10 +234,10 @@ class Options:
     :API: public
     """
     warn_or_error(
-      removal_version='1.27.0.dev0',
-      deprecated_entity_description='.positional_args',
-      hint='Use .specs instead. This change is in preparation for Pants eventually allowing you to '
-           'pass file names as arguments, e.g. `./pants cloc foo.py`.',
+      removal_version="1.27.0.dev0",
+      deprecated_entity_description=".positional_args",
+      hint="Use .specs instead. This change is in preparation for Pants eventually allowing you to "
+      "pass file names as arguments, e.g. `./pants cloc foo.py`.",
     )
     return self._specs
 
@@ -256,10 +258,12 @@ class Options:
     """
     v1, ambiguous, v2 = [], [], []
     for goal in self._goals:
-      goal_dot = f'{goal}.'
-      scope_categories = {s.category
-                          for s in self.known_scope_to_info.values()
-                          if s.scope == goal or s.scope.startswith(goal_dot)}
+      goal_dot = f"{goal}."
+      scope_categories = {
+        s.category
+        for s in self.known_scope_to_info.values()
+        if s.scope == goal or s.scope.startswith(goal_dot)
+      }
       is_v1 = ScopeInfo.TASK in scope_categories
       is_v2 = ScopeInfo.GOAL in scope_categories
       if is_v1 and is_v2:
@@ -327,14 +331,18 @@ class Options:
     # only intended them to go to one of them. If the wrong one is not a no-op then the error will
     # be unpredictable. However this is  not a common case, and can be circumvented with an
     # explicit test.pytest or test.junit scope.
-    if (scope and self._passthru_owner and scope.startswith(self._passthru_owner) and
-          (len(scope) == len(self._passthru_owner) or scope[len(self._passthru_owner)] == '.')):
+    if (
+      scope
+      and self._passthru_owner
+      and scope.startswith(self._passthru_owner)
+      and (len(scope) == len(self._passthru_owner) or scope[len(self._passthru_owner)] == ".")
+    ):
       return self._passthru
     return []
 
   def _assert_not_frozen(self) -> None:
     if self._frozen:
-      raise self.FrozenOptionsError(f'cannot mutate frozen Options instance {self!r}.')
+      raise self.FrozenOptionsError(f"cannot mutate frozen Options instance {self!r}.")
 
   def register(self, scope: str, *args, **kwargs) -> None:
     """Register an option in the given scope."""
@@ -350,8 +358,9 @@ class Options:
     # TODO(benjy): Make this an instance of a class that implements __call__, so we can
     # docstring it, and so it's less weird than attatching properties to a function.
     def register(*args, **kwargs):
-      kwargs['registering_class'] = optionable_class
+      kwargs["registering_class"] = optionable_class
       self.register(optionable_class.options_scope, *args, **kwargs)
+
     # Clients can access the bootstrap option values as register.bootstrap.
     register.bootstrap = self.bootstrap_option_values()
     # Clients can access the scope as register.scope.
@@ -386,10 +395,10 @@ class Options:
       explicit_keys = self.for_scope(scope, inherit_from_enclosing_scope=False).get_explicit_keys()
       if explicit_keys:
         warn_or_error(
-            removal_version=si.removal_version,
-            deprecated_entity_description=f'scope {scope}',
-            hint=si.removal_hint,
-          )
+          removal_version=si.removal_version,
+          deprecated_entity_description=f"scope {scope}",
+          hint=si.removal_hint,
+        )
 
     # Check if we're the new name of a deprecated scope, and clone values from that scope.
     # Note that deprecated_scope and scope share the same Optionable class, so deprecated_scope's
@@ -399,8 +408,9 @@ class Options:
     if deprecated_scope is not None and scope != deprecated_scope:
       # Do the deprecation check only on keys that were explicitly set on the deprecated scope
       # (and not on its enclosing scopes).
-      explicit_keys = self.for_scope(deprecated_scope,
-                                     inherit_from_enclosing_scope=False).get_explicit_keys()
+      explicit_keys = self.for_scope(
+        deprecated_scope, inherit_from_enclosing_scope=False
+      ).get_explicit_keys()
       if explicit_keys:
         # Update our values with those of the deprecated scope (now including values inherited
         # from its enclosing scope).
@@ -409,10 +419,10 @@ class Options:
         values.update(self.for_scope(deprecated_scope))
 
         warn_or_error(
-            removal_version=self.known_scope_to_info[scope].deprecated_scope_removal_version,
-            deprecated_entity_description=f'scope {deprecated_scope}',
-            hint=f"Use scope {scope} instead (options: {', '.join(explicit_keys)})"
-          )
+          removal_version=self.known_scope_to_info[scope].deprecated_scope_removal_version,
+          deprecated_entity_description=f"scope {deprecated_scope}",
+          hint=f"Use scope {scope} instead (options: {', '.join(explicit_keys)})",
+        )
 
   @frozen_after_init
   @dataclass(unsafe_hash=True)
@@ -427,6 +437,7 @@ class Options:
     :param normalized_arg: the fully-scoped option name, without any leading dashes.
     :param scoped_arg: the fully-scoped option as it would appear on the command line.
     """
+
     scope: str
     arg: str
     normalized_arg: str
@@ -435,16 +446,16 @@ class Options:
     def __init__(self, scope: str, arg: str) -> None:
       self.scope = scope
       self.arg = arg
-      self.normalized_arg = re.sub('^-+', '', arg)
+      self.normalized_arg = re.sub("^-+", "", arg)
       if scope == GLOBAL_SCOPE:
         self.scoped_arg = arg
       else:
-        dashed_scope = scope.replace('.', '-')
-        self.scoped_arg = f'--{dashed_scope}-{self.normalized_arg}'
+        dashed_scope = scope.replace(".", "-")
+        self.scoped_arg = f"--{dashed_scope}-{self.normalized_arg}"
 
     @property
     def normalized_scoped_arg(self):
-      return re.sub(r'^-+', '', self.scoped_arg)
+      return re.sub(r"^-+", "", self.scoped_arg)
 
   @memoized_property
   def _all_scoped_flag_names_for_fuzzy_matching(self):
@@ -454,15 +465,14 @@ class Options:
     scopes on the command line.
     """
     all_scoped_flag_names = []
+
     def register_all_scoped_names(parser):
       scope = parser.scope
       known_args = parser.known_args
       for arg in known_args:
-        scoped_flag = self._ScopedFlagNameForFuzzyMatching(
-          scope=scope,
-          arg=arg,
-        )
+        scoped_flag = self._ScopedFlagNameForFuzzyMatching(scope=scope, arg=arg)
         all_scoped_flag_names.append(scoped_flag)
+
     self.walk_parsers(register_all_scoped_names)
     return sorted(all_scoped_flag_names, key=lambda flag_info: flag_info.scoped_arg)
 
@@ -477,15 +487,16 @@ class Options:
       namespace=namespace,
       get_all_scoped_flag_names=lambda: self._all_scoped_flag_names_for_fuzzy_matching,
       levenshtein_max_distance=levenshtein_max_distance,
-      include_passive_options=include_passive_options
+      include_passive_options=include_passive_options,
     )
 
   # TODO: Eagerly precompute backing data for this?
   @memoized_method
   def for_scope(
-      self, scope: str,
-      inherit_from_enclosing_scope: bool = True,
-      include_passive_options: bool = False
+    self,
+    scope: str,
+    inherit_from_enclosing_scope: bool = True,
+    include_passive_options: bool = False,
   ) -> OptionValueContainer:
     """Return the option values for the given scope.
 
@@ -503,7 +514,9 @@ class Options:
 
     # Now add our values.
     flags_in_scope = self._scope_to_flags.get(scope, [])
-    parse_args_request = self._make_parse_args_request(flags_in_scope, values, include_passive_options)
+    parse_args_request = self._make_parse_args_request(
+      flags_in_scope, values, include_passive_options
+    )
     self._parser_hierarchy.get_parser_by_scope(scope).parse_args(parse_args_request)
 
     # Check for any deprecation conditions, which are evaluated using `self._flag_matchers`.
@@ -512,8 +525,9 @@ class Options:
 
     return values
 
-  def get_fingerprintable_for_scope(self, bottom_scope, include_passthru=False,
-                                    fingerprint_key=None, invert=False):
+  def get_fingerprintable_for_scope(
+    self, bottom_scope, include_passthru=False, fingerprint_key=None, invert=False
+  ):
     """Returns a list of fingerprintable (option type, option value) pairs for the given scope.
 
     Fingerprintable options are options registered via a "fingerprint=True" kwarg. This flag
@@ -530,7 +544,7 @@ class Options:
 
     :API: public
     """
-    fingerprint_key = fingerprint_key or 'fingerprint'
+    fingerprint_key = fingerprint_key or "fingerprint"
     fingerprint_default = bool(invert)
     pairs = []
 
@@ -547,19 +561,19 @@ class Options:
       parser = self._parser_hierarchy.get_parser_by_scope(registration_scope)
       # Sort the arguments, so that the fingerprint is consistent.
       for (_, kwargs) in sorted(parser.option_registrations_iter()):
-        if kwargs.get('recursive', False) and not kwargs.get('recursive_root', False):
+        if kwargs.get("recursive", False) and not kwargs.get("recursive_root", False):
           continue  # We only need to fprint recursive options once.
         if kwargs.get(fingerprint_key, fingerprint_default) is not True:
           continue
         # Note that we read the value from scope, even if the registration was on an enclosing
         # scope, to get the right value for recursive options (and because this mirrors what
         # option-using code does).
-        val = self.for_scope(bottom_scope)[kwargs['dest']]
+        val = self.for_scope(bottom_scope)[kwargs["dest"]]
         # If we have a list then we delegate to the fingerprinting implementation of the members.
         if is_list_option(kwargs):
-          val_type = kwargs.get('member_type', str)
+          val_type = kwargs.get("member_type", str)
         else:
-          val_type = kwargs.get('type', str)
+          val_type = kwargs.get("type", str)
         pairs.append((val_type, val))
     return pairs
 

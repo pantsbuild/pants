@@ -45,27 +45,38 @@ class CoursierMixin(JvmResolverBase):
   1. Add relative url support
   """
 
-  RESULT_FILENAME = 'result'
+  RESULT_FILENAME = "result"
 
   @classmethod
   def implementation_version(cls):
-    return super().implementation_version() + [('CoursierMixin', 2)]
+    return super().implementation_version() + [("CoursierMixin", 2)]
 
   @classmethod
   def subsystem_dependencies(cls):
     return super().subsystem_dependencies() + (
       CoursierSubsystem,
       DistributionLocator,
-      JarDependencyManagement
+      JarDependencyManagement,
     )
 
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--allow-global-excludes', type=bool, advanced=False, fingerprint=True, default=True,
-             help='Whether global excludes are allowed.')
-    register('--report', type=bool, advanced=False, default=False,
-             help='Show the resolve output. This would also force a resolve even if the resolve task is validated.')
+    register(
+      "--allow-global-excludes",
+      type=bool,
+      advanced=False,
+      fingerprint=True,
+      default=True,
+      help="Whether global excludes are allowed.",
+    )
+    register(
+      "--report",
+      type=bool,
+      advanced=False,
+      default=False,
+      help="Show the resolve output. This would also force a resolve even if the resolve task is validated.",
+    )
 
   @staticmethod
   def _compute_jars_to_resolve_and_pin(raw_jars, artifact_set, manager):
@@ -131,23 +142,25 @@ class CoursierMixin(JvmResolverBase):
 
     executor = executor or SubprocessExecutor(DistributionLocator.cached())
     if not isinstance(executor, Executor):
-      raise ValueError('The executor argument must be an Executor instance, given {} of type {}'.format(
-        executor, type(executor)))
+      raise ValueError(
+        "The executor argument must be an Executor instance, given {} of type {}".format(
+          executor, type(executor)
+        )
+      )
 
     for artifact_set, target_subset in jar_targets.items():
       # TODO(wisechengyi): this is the only place we are using IvyUtil method, which isn't specific to ivy really.
       raw_jar_deps, global_excludes = IvyUtils.calculate_classpath(target_subset)
 
       # ['sources'] * False = [], ['sources'] * True = ['sources']
-      confs_for_fingerprint = ['sources'] * sources + ['javadoc'] * javadoc
+      confs_for_fingerprint = ["sources"] * sources + ["javadoc"] * javadoc
       fp_strategy = CoursierResolveFingerprintStrategy(confs_for_fingerprint)
 
       compile_classpath.add_excludes_for_targets(target_subset)
 
-      with self.invalidated(target_subset,
-                            invalidate_dependents=False,
-                            silent=False,
-                            fingerprint_strategy=fp_strategy) as invalidation_check:
+      with self.invalidated(
+        target_subset, invalidate_dependents=False, silent=False, fingerprint_strategy=fp_strategy
+      ) as invalidation_check:
 
         if not invalidation_check.all_vts:
           continue
@@ -163,26 +176,47 @@ class CoursierMixin(JvmResolverBase):
           # Check each individual target without context first
           # If the individuals are valid, check them as a VersionedTargetSet
           # The order of 'or' statement matters, because checking for cache is more expensive.
-          if resolve_vts.valid or (self.artifact_cache_reads_enabled() and
-                                   len(self.check_artifact_cache([resolve_vts])[0]) == len(resolve_vts.targets)):
+          if resolve_vts.valid or (
+            self.artifact_cache_reads_enabled()
+            and len(self.check_artifact_cache([resolve_vts])[0]) == len(resolve_vts.targets)
+          ):
             # Load up from the results dir
-            success = self._load_from_results_dir(compile_classpath, vt_set_results_dir,
-                                                  coursier_cache_dir, invalidation_check, pants_jar_base_dir)
+            success = self._load_from_results_dir(
+              compile_classpath,
+              vt_set_results_dir,
+              coursier_cache_dir,
+              invalidation_check,
+              pants_jar_base_dir,
+            )
             if success:
               resolve_vts.update()
               return
 
-        jars_to_resolve, pinned_coords = self._compute_jars_to_resolve_and_pin(raw_jar_deps,
-                                                                               artifact_set,
-                                                                               manager)
+        jars_to_resolve, pinned_coords = self._compute_jars_to_resolve_and_pin(
+          raw_jar_deps, artifact_set, manager
+        )
 
-        results = self._get_result_from_coursier(jars_to_resolve, global_excludes, pinned_coords,
-                                                 coursier_cache_dir, sources, javadoc, executor)
+        results = self._get_result_from_coursier(
+          jars_to_resolve,
+          global_excludes,
+          pinned_coords,
+          coursier_cache_dir,
+          sources,
+          javadoc,
+          executor,
+        )
 
         for conf, result_list in results.items():
           for result in result_list:
-            self._load_json_result(conf, compile_classpath, coursier_cache_dir, invalidation_check,
-                                   pants_jar_base_dir, result, self._override_classifiers_for_conf(conf))
+            self._load_json_result(
+              conf,
+              compile_classpath,
+              coursier_cache_dir,
+              invalidation_check,
+              pants_jar_base_dir,
+              result,
+              self._override_classifiers_for_conf(conf),
+            )
 
         self._populate_results_dir(vt_set_results_dir, results)
         resolve_vts.update()
@@ -191,10 +225,10 @@ class CoursierMixin(JvmResolverBase):
           self.update_artifact_cache([(resolve_vts, [vt_set_results_dir])])
 
   def _override_classifiers_for_conf(self, conf):
-     # TODO Encapsulate this in the result from coursier instead of here.
-     #      https://github.com/coursier/coursier/issues/803
-    if conf == 'src_doc':
-      return ['sources', 'javadoc']
+    # TODO Encapsulate this in the result from coursier instead of here.
+    #      https://github.com/coursier/coursier/issues/803
+    if conf == "src_doc":
+      return ["sources", "javadoc"]
     else:
       return None
 
@@ -202,18 +236,26 @@ class CoursierMixin(JvmResolverBase):
     """
     Given a `VergetTargetSet`, prepare its results dir.
     """
-    vt_set_results_dir = os.path.join(self.versioned_workdir, 'results', vts.cache_key.hash)
+    vt_set_results_dir = os.path.join(self.versioned_workdir, "results", vts.cache_key.hash)
     safe_mkdir(vt_set_results_dir)
     return vt_set_results_dir
 
   def _prepare_workdir(self):
     """Prepare the location in our task workdir to store all the hardlinks to coursier cache dir."""
-    pants_jar_base_dir = os.path.join(self.versioned_workdir, 'cache')
+    pants_jar_base_dir = os.path.join(self.versioned_workdir, "cache")
     safe_mkdir(pants_jar_base_dir)
     return pants_jar_base_dir
 
-  def _get_result_from_coursier(self, jars_to_resolve, global_excludes, pinned_coords,
-                                coursier_cache_path, sources, javadoc, executor):
+  def _get_result_from_coursier(
+    self,
+    jars_to_resolve,
+    global_excludes,
+    pinned_coords,
+    coursier_cache_path,
+    sources,
+    javadoc,
+    executor,
+  ):
     """
     Calling coursier and return the result per invocation.
 
@@ -266,52 +308,91 @@ class CoursierMixin(JvmResolverBase):
 
     repos = coursier_subsystem_instance.get_options().repos
     # make [repoX, repoY] -> ['-r', repoX, '-r', repoY]
-    repo_args = list(itertools.chain(*list(zip(['-r'] * len(repos), repos))))
-    artifact_types_arg = ['-A', ','.join(coursier_subsystem_instance.get_options().artifact_types)]
+    repo_args = list(itertools.chain(*list(zip(["-r"] * len(repos), repos))))
+    artifact_types_arg = ["-A", ",".join(coursier_subsystem_instance.get_options().artifact_types)]
     advanced_options = coursier_subsystem_instance.get_options().fetch_options
-    common_args = ['fetch',
-                   # Print the resolution tree
-                   '-t',
-                   '--cache', coursier_cache_path
-                   ] + repo_args + artifact_types_arg + advanced_options
+    common_args = (
+      [
+        "fetch",
+        # Print the resolution tree
+        "-t",
+        "--cache",
+        coursier_cache_path,
+      ]
+      + repo_args
+      + artifact_types_arg
+      + advanced_options
+    )
 
-    coursier_work_temp_dir = os.path.join(self.versioned_workdir, 'tmp')
+    coursier_work_temp_dir = os.path.join(self.versioned_workdir, "tmp")
     safe_mkdir(coursier_work_temp_dir)
 
-    results_by_conf = self._get_default_conf_results(common_args, coursier_jar, global_excludes, jars_to_resolve,
-                                                     coursier_work_temp_dir,
-                                                     pinned_coords, executor)
+    results_by_conf = self._get_default_conf_results(
+      common_args,
+      coursier_jar,
+      global_excludes,
+      jars_to_resolve,
+      coursier_work_temp_dir,
+      pinned_coords,
+      executor,
+    )
     if sources or javadoc:
-      non_default_conf_results = self._get_non_default_conf_results(common_args, coursier_jar, global_excludes,
-                                                                    jars_to_resolve, coursier_work_temp_dir,
-                                                                    pinned_coords, sources, javadoc, executor)
+      non_default_conf_results = self._get_non_default_conf_results(
+        common_args,
+        coursier_jar,
+        global_excludes,
+        jars_to_resolve,
+        coursier_work_temp_dir,
+        pinned_coords,
+        sources,
+        javadoc,
+        executor,
+      )
       results_by_conf.update(non_default_conf_results)
 
     return results_by_conf
 
-  def _get_default_conf_results(self, common_args, coursier_jar, global_excludes, jars_to_resolve,
-                                coursier_work_temp_dir,
-                                pinned_coords, executor):
+  def _get_default_conf_results(
+    self,
+    common_args,
+    coursier_jar,
+    global_excludes,
+    jars_to_resolve,
+    coursier_work_temp_dir,
+    pinned_coords,
+    executor,
+  ):
 
     # Variable to store coursier result each run.
     results = defaultdict(list)
     with temporary_file(coursier_work_temp_dir, cleanup=False) as f:
       output_fn = f.name
 
-    cmd_args = self._construct_cmd_args(jars_to_resolve,
-                                        common_args,
-                                        global_excludes if self.get_options().allow_global_excludes else [],
-                                        pinned_coords,
-                                        coursier_work_temp_dir,
-                                        output_fn)
+    cmd_args = self._construct_cmd_args(
+      jars_to_resolve,
+      common_args,
+      global_excludes if self.get_options().allow_global_excludes else [],
+      pinned_coords,
+      coursier_work_temp_dir,
+      output_fn,
+    )
 
-    results['default'].append(self._call_coursier(cmd_args, coursier_jar, output_fn, executor))
+    results["default"].append(self._call_coursier(cmd_args, coursier_jar, output_fn, executor))
 
     return results
 
-  def _get_non_default_conf_results(self, common_args, coursier_jar, global_excludes, jars_to_resolve,
-                                    coursier_work_temp_dir, pinned_coords,
-                                    sources, javadoc, executor):
+  def _get_non_default_conf_results(
+    self,
+    common_args,
+    coursier_jar,
+    global_excludes,
+    jars_to_resolve,
+    coursier_work_temp_dir,
+    pinned_coords,
+    sources,
+    javadoc,
+    executor,
+  ):
     # To prevent improper api usage during development. User should not see this anyway.
     if not sources and not javadoc:
       raise TaskError("sources or javadoc has to be True.")
@@ -329,79 +410,87 @@ class CoursierMixin(JvmResolverBase):
       new_pinned_coords = pinned_coords
       new_jars_to_resolve = jars_to_resolve
     if sources:
-      special_args.append('--sources')
-      new_pinned_coords.extend(c.copy(classifier='sources') for c in pinned_coords)
-      new_jars_to_resolve.extend(c.copy(classifier='sources') for c in jars_to_resolve)
+      special_args.append("--sources")
+      new_pinned_coords.extend(c.copy(classifier="sources") for c in pinned_coords)
+      new_jars_to_resolve.extend(c.copy(classifier="sources") for c in jars_to_resolve)
 
     if javadoc:
-      special_args.append('--javadoc')
-      new_pinned_coords.extend(c.copy(classifier='javadoc') for c in pinned_coords)
-      new_jars_to_resolve.extend(c.copy(classifier='javadoc') for c in jars_to_resolve)
+      special_args.append("--javadoc")
+      new_pinned_coords.extend(c.copy(classifier="javadoc") for c in pinned_coords)
+      new_jars_to_resolve.extend(c.copy(classifier="javadoc") for c in jars_to_resolve)
 
-    cmd_args = self._construct_cmd_args(new_jars_to_resolve,
-                                        common_args,
-                                        global_excludes if self.get_options().allow_global_excludes else [],
-                                        new_pinned_coords,
-                                        coursier_work_temp_dir,
-                                        output_fn)
+    cmd_args = self._construct_cmd_args(
+      new_jars_to_resolve,
+      common_args,
+      global_excludes if self.get_options().allow_global_excludes else [],
+      new_pinned_coords,
+      coursier_work_temp_dir,
+      output_fn,
+    )
     cmd_args.extend(special_args)
 
     # sources and/or javadoc share the same conf
-    results['src_doc'] = [self._call_coursier(cmd_args, coursier_jar, output_fn, executor)]
+    results["src_doc"] = [self._call_coursier(cmd_args, coursier_jar, output_fn, executor)]
     return results
 
   def _call_coursier(self, cmd_args, coursier_jar, output_fn, executor):
 
     runner = executor.runner(
       classpath=[coursier_jar],
-      main='coursier.cli.Coursier',
+      main="coursier.cli.Coursier",
       jvm_options=self.get_options().jvm_options,
-      args=cmd_args)
+      args=cmd_args,
+    )
 
     labels = [WorkUnitLabel.COMPILER] if self.get_options().report else [WorkUnitLabel.TOOL]
-    return_code = util.execute_runner(runner, self.context.new_workunit, 'coursier', labels)
+    return_code = util.execute_runner(runner, self.context.new_workunit, "coursier", labels)
 
     if return_code:
-      raise TaskError(f'The coursier process exited non-zero: {return_code}')
+      raise TaskError(f"The coursier process exited non-zero: {return_code}")
 
-    with open(output_fn, 'r') as f:
+    with open(output_fn, "r") as f:
       return json.loads(f.read())
 
   @staticmethod
-  def _construct_cmd_args(jars, common_args, global_excludes,
-                          pinned_coords, coursier_workdir, json_output_path):
+  def _construct_cmd_args(
+    jars, common_args, global_excludes, pinned_coords, coursier_workdir, json_output_path
+  ):
 
     # Make a copy, so there is no side effect or others using `common_args`
     cmd_args = list(common_args)
 
-    cmd_args.extend(['--json-output-file', json_output_path])
+    cmd_args.extend(["--json-output-file", json_output_path])
 
     # Dealing with intransitivity and forced versions.
     for j in jars:
       if not j.rev:
-        raise TaskError('Undefined revs for jars unsupported by Coursier. "{}"'.format(repr(j.coordinate).replace('M2Coordinate', 'jar')))
+        raise TaskError(
+          'Undefined revs for jars unsupported by Coursier. "{}"'.format(
+            repr(j.coordinate).replace("M2Coordinate", "jar")
+          )
+        )
 
       module = j.coordinate.simple_coord
       if j.coordinate.classifier:
-        module += f',classifier={j.coordinate.classifier}'
+        module += f",classifier={j.coordinate.classifier}"
 
       if j.get_url():
         jar_url = j.get_url()
-        module += f',url={parse.quote_plus(jar_url)}'
+        module += f",url={parse.quote_plus(jar_url)}"
 
       if j.intransitive:
-        cmd_args.append('--intransitive')
+        cmd_args.append("--intransitive")
 
       cmd_args.append(module)
 
       # Force requires specifying the coord again with -V
       if j.force:
-        cmd_args.append('-V')
+        cmd_args.append("-V")
         cmd_args.append(j.coordinate.simple_coord)
 
     # Force pinned coordinates
     for m2coord in pinned_coords:
-      cmd_args.append('-V')
+      cmd_args.append("-V")
       cmd_args.append(m2coord.simple_coord)
 
     # Local exclusions
@@ -416,20 +505,28 @@ class CoursierMixin(JvmResolverBase):
     if local_exclude_args:
       with temporary_file(coursier_workdir, cleanup=False) as f:
         exclude_file = f.name
-        with open(exclude_file, 'w') as ex_f:
-          ex_f.write('\n'.join(local_exclude_args))
+        with open(exclude_file, "w") as ex_f:
+          ex_f.write("\n".join(local_exclude_args))
 
-        cmd_args.append('--local-exclude-file')
+        cmd_args.append("--local-exclude-file")
         cmd_args.append(exclude_file)
 
     for ex in global_excludes:
-      cmd_args.append('-E')
+      cmd_args.append("-E")
       cmd_args.append(f"{ex.org}:{ex.name or '*'}")
 
     return cmd_args
 
-  def _load_json_result(self, conf, compile_classpath, coursier_cache_path, invalidation_check,
-                        pants_jar_path_base, result, override_classifiers=None):
+  def _load_json_result(
+    self,
+    conf,
+    compile_classpath,
+    coursier_cache_path,
+    invalidation_check,
+    pants_jar_path_base,
+    result,
+    override_classifiers=None,
+  ):
     """
     Given a coursier run result, load it into compile_classpath by target.
 
@@ -443,14 +540,16 @@ class CoursierMixin(JvmResolverBase):
     # Parse the coursier result
     flattened_resolution = self._extract_dependencies_by_root(result)
 
-    coord_to_resolved_jars = self._map_coord_to_resolved_jars(result, coursier_cache_path, pants_jar_path_base)
+    coord_to_resolved_jars = self._map_coord_to_resolved_jars(
+      result, coursier_cache_path, pants_jar_path_base
+    )
 
     # Construct a map from org:name to the reconciled org:name:version coordinate
     # This is used when there is won't be a conflict_resolution entry because the conflict
     # was resolved in pants.
     org_name_to_org_name_rev = {}
     for coord in coord_to_resolved_jars.keys():
-      org_name_to_org_name_rev[f'{coord.org}:{coord.name}'] = coord
+      org_name_to_org_name_rev[f"{coord.org}:{coord.name}"] = coord
 
     jars_per_target = []
 
@@ -458,6 +557,7 @@ class CoursierMixin(JvmResolverBase):
       t = vt.target
       jars_to_digest = []
       if isinstance(t, JarLibrary):
+
         def get_transitive_resolved_jars(my_coord, resolved_jars):
           transitive_jar_path_for_coord = []
           coord_str = str(my_coord)
@@ -480,12 +580,15 @@ class CoursierMixin(JvmResolverBase):
             coord_candidates = [jar.coordinate]
 
           # if conflict resolution entries, then update versions to the resolved ones.
-          if jar.coordinate.simple_coord in result['conflict_resolution']:
+          if jar.coordinate.simple_coord in result["conflict_resolution"]:
             parsed_conflict = self.to_m2_coord(
-              result['conflict_resolution'][jar.coordinate.simple_coord])
+              result["conflict_resolution"][jar.coordinate.simple_coord]
+            )
             coord_candidates = [c.copy(rev=parsed_conflict.rev) for c in coord_candidates]
-          elif f'{jar.coordinate.org}:{jar.coordinate.name}' in org_name_to_org_name_rev:
-            parsed_conflict = org_name_to_org_name_rev[f'{jar.coordinate.org}:{jar.coordinate.name}']
+          elif f"{jar.coordinate.org}:{jar.coordinate.name}" in org_name_to_org_name_rev:
+            parsed_conflict = org_name_to_org_name_rev[
+              f"{jar.coordinate.org}:{jar.coordinate.name}"
+            ]
             coord_candidates = [c.copy(rev=parsed_conflict.rev) for c in coord_candidates]
 
           for coord in coord_candidates:
@@ -500,11 +603,17 @@ class CoursierMixin(JvmResolverBase):
       compile_classpath.add_jars_for_targets([target], conf, jars_to_add)
 
   def _populate_results_dir(self, vts_results_dir, results):
-    with open(os.path.join(vts_results_dir, self.RESULT_FILENAME), 'w') as f:
+    with open(os.path.join(vts_results_dir, self.RESULT_FILENAME), "w") as f:
       json.dump(results, f)
 
-  def _load_from_results_dir(self, compile_classpath, vts_results_dir,
-                             coursier_cache_path, invalidation_check, pants_jar_path_base):
+  def _load_from_results_dir(
+    self,
+    compile_classpath,
+    vts_results_dir,
+    coursier_cache_path,
+    invalidation_check,
+    pants_jar_path_base,
+  ):
     """
     Given vts_results_dir, load the results which can be from multiple runs of coursier into compile_classpath.
 
@@ -514,18 +623,20 @@ class CoursierMixin(JvmResolverBase):
     if not os.path.exists(result_file_path):
       return
 
-    with open(result_file_path, 'r') as f:
+    with open(result_file_path, "r") as f:
       results = json.load(f)
       for conf, result_list in results.items():
         for result in result_list:
           try:
-            self._load_json_result(conf,
-                                   compile_classpath,
-                                   coursier_cache_path,
-                                   invalidation_check,
-                                   pants_jar_path_base,
-                                   result,
-                                   self._override_classifiers_for_conf(conf))
+            self._load_json_result(
+              conf,
+              compile_classpath,
+              coursier_cache_path,
+              invalidation_check,
+              pants_jar_path_base,
+              result,
+              self._override_classifiers_for_conf(conf),
+            )
           except CoursierResultNotFound:
             return False
 
@@ -566,8 +677,8 @@ class CoursierMixin(JvmResolverBase):
     """
     flat_result = defaultdict(list)
 
-    for artifact in result['dependencies']:
-      flat_result[artifact['coord']].extend(artifact['dependencies'])
+    for artifact in result["dependencies"]:
+      flat_result[artifact["coord"]].extend(artifact["dependencies"])
 
     return flat_result
 
@@ -619,9 +730,9 @@ class CoursierMixin(JvmResolverBase):
 
     coord_to_resolved_jars = dict()
 
-    for dep in result['dependencies']:
-      coord = dep['coord']
-      jar_path = dep.get('file', None)
+    for dep in result["dependencies"]:
+      coord = dep["coord"]
+      jar_path = dep.get("file", None)
       if not jar_path:
         # NB: Not all coordinates will have associated files.
         #     This is fine. Some coordinates will just have dependencies.
@@ -637,9 +748,7 @@ class CoursierMixin(JvmResolverBase):
         safe_hardlink_or_copy(jar_path, pants_path)
 
       coord = cls.to_m2_coord(coord)
-      resolved_jar = ResolvedJar(coord,
-                                 cache_path=jar_path,
-                                 pants_path=pants_path)
+      resolved_jar = ResolvedJar(coord, cache_path=jar_path, pants_path=pants_path)
       coord_to_resolved_jars[coord] = resolved_jar
     return coord_to_resolved_jars
 
@@ -661,28 +770,29 @@ class CoursierMixin(JvmResolverBase):
       # Appending the string 'absolute' to the jar_path and joining that is a hack to work around
       # python's os.path.join behavior of throwing away all components that come before an
       # absolute path. See https://docs.python.org/3.3/library/os.path.html#os.path.join
-      return os.path.join(pants_jar_path_base, os.path.normpath('absolute/' + jar_path))
+      return os.path.join(pants_jar_path_base, os.path.normpath("absolute/" + jar_path))
     else:
-      return os.path.join(pants_jar_path_base, 'relative', os.path.relpath(jar_path, coursier_cache_path))
+      return os.path.join(
+        pants_jar_path_base, "relative", os.path.relpath(jar_path, coursier_cache_path)
+      )
 
 
 class CoursierResolve(CoursierMixin, NailgunTask):
-
   @classmethod
   def subsystem_dependencies(cls):
     return super().subsystem_dependencies() + (JvmResolveSubsystem,)
 
   @classmethod
   def product_types(cls):
-    return ['compile_classpath']
+    return ["compile_classpath"]
 
   @classmethod
   def prepare(cls, options, round_manager):
     super().prepare(options, round_manager)
     # Codegen may inject extra resolvable deps, so make sure we have a product dependency
     # on relevant codegen tasks, if any.
-    round_manager.optional_data('java')
-    round_manager.optional_data('scala')
+    round_manager.optional_data("java")
+    round_manager.optional_data("scala")
 
   @classmethod
   def register_options(cls, register):
@@ -690,7 +800,7 @@ class CoursierResolve(CoursierMixin, NailgunTask):
 
   @classmethod
   def implementation_version(cls):
-    return super().implementation_version() + [('CoursierResolve', 2)]
+    return super().implementation_version() + [("CoursierResolve", 2)]
 
   def execute(self):
     """Resolves the specified confs for the configured targets and returns an iterator over
@@ -698,15 +808,17 @@ class CoursierResolve(CoursierMixin, NailgunTask):
     """
 
     jvm_resolve_subsystem = JvmResolveSubsystem.global_instance()
-    if jvm_resolve_subsystem.get_options().resolver != 'coursier':
+    if jvm_resolve_subsystem.get_options().resolver != "coursier":
       return
 
     # executor = self.create_java_executor()
-    classpath_products = self.context.products.get_data('compile_classpath',
-                                                        init_func=ClasspathProducts.init_func(
-                                                          self.get_options().pants_workdir))
+    classpath_products = self.context.products.get_data(
+      "compile_classpath", init_func=ClasspathProducts.init_func(self.get_options().pants_workdir)
+    )
     executor = self.create_java_executor()
-    self.resolve(self.context.targets(), classpath_products, sources=False, javadoc=False, executor=executor)
+    self.resolve(
+      self.context.targets(), classpath_products, sources=False, javadoc=False, executor=executor
+    )
 
   def check_artifact_cache_for(self, invalidation_check):
     # Coursier resolution is an output dependent on the entire target set, and is not divisible
@@ -716,7 +828,6 @@ class CoursierResolve(CoursierMixin, NailgunTask):
 
 
 class CoursierResolveFingerprintStrategy(FingerprintStrategy):
-
   def __init__(self, confs):
     super().__init__()
     self._confs = sorted(confs or [])
@@ -730,7 +841,7 @@ class CoursierResolveFingerprintStrategy(FingerprintStrategy):
 
       hash_elements_for_target.append(target.payload.fingerprint())
     elif isinstance(target, JvmTarget) and target.payload.excludes:
-      hash_elements_for_target.append(target.payload.fingerprint(field_keys=('excludes',)))
+      hash_elements_for_target.append(target.payload.fingerprint(field_keys=("excludes",)))
     else:
       pass
 
@@ -747,12 +858,12 @@ class CoursierResolveFingerprintStrategy(FingerprintStrategy):
       hasher.update(element.encode())
 
     # Just in case so we do not collide with ivy cache
-    hasher.update(b'coursier')
+    hasher.update(b"coursier")
 
     return hasher.hexdigest()
 
   def __hash__(self):
-    return hash((type(self), '-'.join(self._confs)))
+    return hash((type(self), "-".join(self._confs)))
 
   def __eq__(self, other):
     return type(self) == type(other) and self._confs == other._confs

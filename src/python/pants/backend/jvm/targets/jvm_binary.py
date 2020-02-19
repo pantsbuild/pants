@@ -20,7 +20,6 @@ from pants.java.jar.exclude import Exclude
 
 
 class JarRule(FingerprintedMixin, metaclass=ABCMeta):
-
   def __init__(self, apply_pattern, payload=None):
     self.payload = payload or Payload()
     if not isinstance(apply_pattern, str):
@@ -28,12 +27,11 @@ class JarRule(FingerprintedMixin, metaclass=ABCMeta):
     try:
       self._apply_pattern = re.compile(apply_pattern)
     except re.error as e:
-      raise ValueError('The supplied apply_pattern: {pattern} '
-                       'is not a valid regular expression: {msg}'
-                       .format(pattern=apply_pattern, msg=e))
-    self.payload.add_fields({
-      'apply_pattern': PrimitiveField(apply_pattern),
-    })
+      raise ValueError(
+        "The supplied apply_pattern: {pattern} "
+        "is not a valid regular expression: {msg}".format(pattern=apply_pattern, msg=e)
+      )
+    self.payload.add_fields({"apply_pattern": PrimitiveField(apply_pattern)})
 
   def fingerprint(self):
     return self.payload.fingerprint()
@@ -65,8 +63,8 @@ class Duplicate(JarRule):
 
       :param string path: The path of the duplicate entry.
       """
-      assert path and isinstance(path, str), 'A non-empty path must be supplied.'
-      super(Duplicate.Error, self).__init__(f'Duplicate entry encountered for path {path}')
+      assert path and isinstance(path, str), "A non-empty path must be supplied."
+      super(Duplicate.Error, self).__init__(f"Duplicate entry encountered for path {path}")
       self._path = path
 
     @property
@@ -74,21 +72,21 @@ class Duplicate(JarRule):
       """The path of the duplicate entry."""
       return self._path
 
-  SKIP = 'SKIP'
+  SKIP = "SKIP"
   """Retains the 1st entry and skips subsequent duplicates."""
 
-  REPLACE = 'REPLACE'
+  REPLACE = "REPLACE"
   """Retains the most recent entry and skips prior duplicates."""
 
-  CONCAT = 'CONCAT'
+  CONCAT = "CONCAT"
   """Concatenates the contents of all duplicate entries encountered in the order encountered."""
 
-  CONCAT_TEXT = 'CONCAT_TEXT'
+  CONCAT_TEXT = "CONCAT_TEXT"
   """Concatenates the contents of all duplicate entries encountered in the order encountered,
   separating entries with newlines if needed.
   """
 
-  FAIL = 'FAIL'
+  FAIL = "FAIL"
   """Raises a :class:``Duplicate.Error`` when a duplicate entry is
   encountered.
   """
@@ -103,8 +101,11 @@ class Duplicate(JarRule):
     :raises: ``ValueError`` if the action is invalid.
     """
     if action not in cls._VALID_ACTIONS:
-      raise ValueError('The supplied action must be one of {valid}, given: {given}'
-                       .format(valid=cls._VALID_ACTIONS, given=action))
+      raise ValueError(
+        "The supplied action must be one of {valid}, given: {given}".format(
+          valid=cls._VALID_ACTIONS, given=action
+        )
+      )
     return action
 
   def __init__(self, apply_pattern, action):
@@ -117,9 +118,7 @@ class Duplicate(JarRule):
       or ``Duplicate.FAIL``.
     """
     payload = Payload()
-    payload.add_fields({
-      'action': PrimitiveField(self.validate_action(action)),
-    })
+    payload.add_fields({"action": PrimitiveField(self.validate_action(action))})
     super().__init__(apply_pattern, payload=payload)
 
   @property
@@ -131,8 +130,9 @@ class Duplicate(JarRule):
     return self.payload.fingerprint()
 
   def __repr__(self):
-    return "Duplicate(apply_pattern={0}, action={1})".format(self.payload.apply_pattern,
-                                                             self.payload.action)
+    return "Duplicate(apply_pattern={0}, action={1})".format(
+      self.payload.apply_pattern, self.payload.action
+    )
 
 
 class JarRules(FingerprintedMixin):
@@ -157,8 +157,9 @@ class JarRules(FingerprintedMixin):
   """
 
   @classmethod
-  def skip_signatures_and_duplicates_concat_well_known_metadata(cls, default_dup_action=None,
-                                                                additional_rules=None):
+  def skip_signatures_and_duplicates_concat_well_known_metadata(
+    cls, default_dup_action=None, additional_rules=None
+  ):
     """Produces a rule set useful in many deploy jar creation contexts.
 
     The rule set skips duplicate entries by default, retaining the 1st encountered.  In addition it
@@ -175,14 +176,15 @@ class JarRules(FingerprintedMixin):
     :returns: JarRules
     """
     default_dup_action = Duplicate.validate_action(default_dup_action or Duplicate.SKIP)
-    additional_rules = assert_list(additional_rules,
-                                   expected_type=(Duplicate, Skip))
+    additional_rules = assert_list(additional_rules, expected_type=(Duplicate, Skip))
 
-    rules = [Skip(r'^META-INF/[^/]+\.SF$'),  # signature file
-             Skip(r'^META-INF/[^/]+\.DSA$'),  # default signature alg. file
-             Skip(r'^META-INF/[^/]+\.RSA$'),  # default signature alg. file
-             Skip(r'^META-INF/INDEX.LIST$'),  # interferes with Class-Path: see man jar for i option
-             Duplicate(r'^META-INF/services/', Duplicate.CONCAT_TEXT)]  # 1 svc fqcn per line
+    rules = [
+      Skip(r"^META-INF/[^/]+\.SF$"),  # signature file
+      Skip(r"^META-INF/[^/]+\.DSA$"),  # default signature alg. file
+      Skip(r"^META-INF/[^/]+\.RSA$"),  # default signature alg. file
+      Skip(r"^META-INF/INDEX.LIST$"),  # interferes with Class-Path: see man jar for i option
+      Duplicate(r"^META-INF/services/", Duplicate.CONCAT_TEXT),
+    ]  # 1 svc fqcn per line
 
     return JarRules(rules=rules + additional_rules, default_dup_action=default_dup_action)
 
@@ -205,7 +207,7 @@ class JarRules(FingerprintedMixin):
   def set_default(cls, rules):
     """Sets the default site-wide jar rules."""
     if not isinstance(rules, JarRules):
-      raise ValueError('The default rules must be a JarRules instance.')
+      raise ValueError("The default rules must be a JarRules instance.")
     cls._DEFAULT = rules
 
   def __init__(self, rules=None, default_dup_action=Duplicate.SKIP):
@@ -217,9 +219,9 @@ class JarRules(FingerprintedMixin):
       no explicit rules apply to the entry.
     """
     self.payload = Payload()
-    self.payload.add_fields({
-      'default_dup_action': PrimitiveField(Duplicate.validate_action(default_dup_action))
-    })
+    self.payload.add_fields(
+      {"default_dup_action": PrimitiveField(Duplicate.validate_action(default_dup_action))}
+    )
     self._rules = assert_list(rules, expected_type=JarRule, key_arg="rules")
 
   @property
@@ -266,11 +268,11 @@ class ManifestEntries(FingerprintedMixin):
       for key in entries.keys():
         if not isinstance(key, str):
           raise self.ExpectedDictionaryError(
-            "entries must be dictionary of strings, got key {} type {}"
-            .format(key, type(key).__name__))
-    self.payload.add_fields({
-      'entries': PrimitiveField(entries or {}),
-      })
+            "entries must be dictionary of strings, got key {} type {}".format(
+              key, type(key).__name__
+            )
+          )
+    self.payload.add_fields({"entries": PrimitiveField(entries or {})})
 
   def fingerprint(self):
     return self.payload.fingerprint()
@@ -294,20 +296,22 @@ class JvmBinary(RuntimePlatformMixin, JvmTarget):
   :API: public
   """
 
-  def __init__(self,
-               name=None,
-               address=None,
-               payload=None,
-               main=None,
-               basename=None,
-               sources=None,
-               deploy_excludes=None,
-               deploy_jar_rules=None,
-               manifest_entries=None,
-               shading_rules=None,
-               extra_jvm_options=None,
-               runtime_platform=None,
-               **kwargs):
+  def __init__(
+    self,
+    name=None,
+    address=None,
+    payload=None,
+    main=None,
+    basename=None,
+    sources=None,
+    deploy_excludes=None,
+    deploy_jar_rules=None,
+    manifest_entries=None,
+    shading_rules=None,
+    extra_jvm_options=None,
+    runtime_platform=None,
+    **kwargs,
+  ):
     """
     :API: public
 
@@ -346,30 +350,41 @@ class JvmBinary(RuntimePlatformMixin, JvmTarget):
     """
     self.address = address  # Set in case a TargetDefinitionException is thrown early
     if main and not isinstance(main, str):
-      raise TargetDefinitionException(self, 'main must be a fully qualified classname')
+      raise TargetDefinitionException(self, "main must be a fully qualified classname")
     if deploy_jar_rules and not isinstance(deploy_jar_rules, JarRules):
-      raise TargetDefinitionException(self,
-                                      'deploy_jar_rules must be a JarRules specification. got {}'
-                                      .format(type(deploy_jar_rules).__name__))
+      raise TargetDefinitionException(
+        self,
+        "deploy_jar_rules must be a JarRules specification. got {}".format(
+          type(deploy_jar_rules).__name__
+        ),
+      )
     if manifest_entries and not isinstance(manifest_entries, dict):
-      raise TargetDefinitionException(self,
-                                      'manifest_entries must be a dict. got {}'
-                                      .format(type(manifest_entries).__name__))
+      raise TargetDefinitionException(
+        self, "manifest_entries must be a dict. got {}".format(type(manifest_entries).__name__)
+      )
     payload = payload or Payload()
-    payload.add_fields({
-      'basename': PrimitiveField(basename or name),
-      'deploy_excludes': ExcludesField(self.assert_list(deploy_excludes,
-                                                        expected_type=Exclude,
-                                                        key_arg='deploy_excludes')),
-      'deploy_jar_rules': FingerprintedField(deploy_jar_rules or JarRules.default()),
-      'manifest_entries': FingerprintedField(ManifestEntries(manifest_entries)),
-      'main': PrimitiveField(main),
-      'shading_rules': PrimitiveField(shading_rules or ()),
-      'extra_jvm_options': PrimitiveField(list(extra_jvm_options or ())),
-    })
+    payload.add_fields(
+      {
+        "basename": PrimitiveField(basename or name),
+        "deploy_excludes": ExcludesField(
+          self.assert_list(deploy_excludes, expected_type=Exclude, key_arg="deploy_excludes")
+        ),
+        "deploy_jar_rules": FingerprintedField(deploy_jar_rules or JarRules.default()),
+        "manifest_entries": FingerprintedField(ManifestEntries(manifest_entries)),
+        "main": PrimitiveField(main),
+        "shading_rules": PrimitiveField(shading_rules or ()),
+        "extra_jvm_options": PrimitiveField(list(extra_jvm_options or ())),
+      }
+    )
 
-    super().__init__(name=name, address=address, payload=payload, sources=sources,
-      runtime_platform=runtime_platform, **kwargs)
+    super().__init__(
+      name=name,
+      address=address,
+      payload=payload,
+      sources=sources,
+      runtime_platform=runtime_platform,
+      **kwargs,
+    )
 
   @property
   def basename(self):

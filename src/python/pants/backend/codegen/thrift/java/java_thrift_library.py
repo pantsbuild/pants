@@ -16,17 +16,19 @@ class JavaThriftLibrary(JvmTarget):
   # In general a plugin will contribute a target and a task, but in this case we have a shared
   # target that can be used by at least 2 tasks - ThriftGen and ScroogeGen.  This is likely not
   # uncommon (gcc & clang) so the arrangement needs to be cleaned up and supported well.
-  _COMPILERS = frozenset({'thrift', 'scrooge'})
+  _COMPILERS = frozenset({"thrift", "scrooge"})
 
-  def __init__(self,
-               compiler=None,
-               language=None,
-               namespace_map=None,
-               thrift_linter_strict=None,
-               default_java_namespace=None,
-               include_paths=None,
-               compiler_args=None,
-               **kwargs):
+  def __init__(
+    self,
+    compiler=None,
+    language=None,
+    namespace_map=None,
+    thrift_linter_strict=None,
+    default_java_namespace=None,
+    include_paths=None,
+    compiler_args=None,
+    **kwargs
+  ):
     """
     :API: public
 
@@ -45,13 +47,17 @@ class JavaThriftLibrary(JvmTarget):
 
     def check_value_for_arg(arg, value, values):
       if value and value not in values:
-        raise TargetDefinitionException(self, "{} may only be set to {} ('{}' not valid)"
-                                        .format(arg, ', or '.join(map(repr, values)), value))
+        raise TargetDefinitionException(
+          self,
+          "{} may only be set to {} ('{}' not valid)".format(
+            arg, ", or ".join(map(repr, values)), value
+          ),
+        )
       return value
 
     # The following fields are only added to the fingerprint via FingerprintStrategy when their
     # values impact the outcome of the task.  See JavaThriftLibraryFingerprintStrategy.
-    self._compiler = check_value_for_arg('compiler', compiler, self._COMPILERS)
+    self._compiler = check_value_for_arg("compiler", compiler, self._COMPILERS)
     self._language = language
 
     self.namespace_map = namespace_map

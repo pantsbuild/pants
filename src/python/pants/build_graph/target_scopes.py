@@ -20,11 +20,11 @@ class Scope(frozenset):
     :rtype: set
     """
     if not scope:
-      return ('default',)
+      return ("default",)
     if isinstance(scope, str):
-      scope = scope.split(' ')
+      scope = scope.split(" ")
     scope = {str(s).lower() for s in scope if s}
-    return scope or ('default',)
+    return scope or ("default",)
 
   def __new__(cls, scope):
     return super().__new__(cls, cls._parse(scope))
@@ -41,13 +41,13 @@ class Scope(frozenset):
     :rtype: bool
     """
     if include_scopes is not None and not isinstance(include_scopes, Scope):
-      raise ValueError('include_scopes must be a Scope instance but was {}.'.format(
-        type(include_scopes)
-      ))
+      raise ValueError(
+        "include_scopes must be a Scope instance but was {}.".format(type(include_scopes))
+      )
     if exclude_scopes is not None and not isinstance(exclude_scopes, Scope):
-      raise ValueError('exclude_scopes must be a Scope instance but was {}.'.format(
-        type(exclude_scopes)
-      ))
+      raise ValueError(
+        "exclude_scopes must be a Scope instance but was {}.".format(type(exclude_scopes))
+      )
     if exclude_scopes and any(s in exclude_scopes for s in self):
       return False
     if include_scopes and not any(s in include_scopes for s in self):
@@ -61,20 +61,20 @@ class Scope(frozenset):
     return Scope(super().__or__(other))
 
   def __str__(self):
-    return ' '.join(sorted(self))
+    return " ".join(sorted(self))
 
 
 class Scopes:
   """Default scope constants."""
 
-  DEFAULT = Scope('DEFAULT')
+  DEFAULT = Scope("DEFAULT")
   # The `FORCED` scope is equivalent to DEFAULT, but additionally declares that a dep
   # might not be detected as used at compile time, and should thus always be considered
   # to have been used at compile time.
-  FORCED = Scope('FORCED')
-  COMPILE = Scope('COMPILE')
-  RUNTIME = Scope('RUNTIME')
-  TEST = Scope('TEST')
+  FORCED = Scope("FORCED")
+  COMPILE = Scope("COMPILE")
+  RUNTIME = Scope("RUNTIME")
+  TEST = Scope("TEST")
 
   DEFAULT_OR_FORCED = DEFAULT | FORCED
 

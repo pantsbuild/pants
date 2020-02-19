@@ -36,6 +36,7 @@ class WorkerPool:
     self._run_tracker = run_tracker
     self.thread_lock = threading.Lock()
     self.thread_counter = 0
+
     def intitialize():
       with self.thread_lock:
         threading.current_thread().name = "{}-{}".format(thread_name_prefix, self.thread_counter)
@@ -43,9 +44,7 @@ class WorkerPool:
       self._run_tracker.register_thread(parent_workunit)
 
     # All workers accrue work to the same root.
-    self._pool = ThreadPool(processes=num_workers,
-                            initializer=intitialize,
-                            )
+    self._pool = ThreadPool(processes=num_workers, initializer=intitialize)
     # We mustn't shutdown when there are pending workchains, as they may need to submit work
     # in the future, and the pool doesn't know about this yet.
     self._pending_workchains = 0
@@ -78,9 +77,16 @@ class WorkerPool:
       if on_success:
         on_success([])
     else:
+
       def do_work(*args):
-        self._do_work(work.func, *args, workunit_name=work.workunit_name,
-                      workunit_parent=workunit_parent, on_failure=on_failure)
+        self._do_work(
+          work.func,
+          *args,
+          workunit_name=work.workunit_name,
+          workunit_parent=workunit_parent,
+          on_failure=on_failure
+        )
+
       return self._pool.map_async(do_work, work.args_tuples, chunksize=1, callback=on_success)
 
   def submit_async_work_chain(self, work_chain, workunit_parent, done_hook=None):
@@ -93,6 +99,7 @@ class WorkerPool:
     - workunit_parent: Work is accounted for under this workunit.
     - done_hook: If not None, invoked with no args after all work is done, or on error.
     """
+
     def done():
       if done_hook:
         done_hook()
@@ -102,7 +109,7 @@ class WorkerPool:
 
     def error(e):
       done()
-      self._run_tracker.log(Report.ERROR, '{}'.format(e))
+      self._run_tracker.log(Report.ERROR, "{}".format(e))
 
     # We filter out Nones defensively. There shouldn't be any, but if a bug causes one,
     # Pants might hang indefinitely without this filtering.
@@ -110,8 +117,12 @@ class WorkerPool:
 
     def submit_next():
       try:
-        self.submit_async_work(next(work_iter), workunit_parent=workunit_parent,
-                               on_success=lambda x: submit_next(), on_failure=error)
+        self.submit_async_work(
+          next(work_iter),
+          workunit_parent=workunit_parent,
+          on_success=lambda x: submit_next(),
+          on_failure=error,
+        )
       except StopIteration:
         done()  # The success case.
 
@@ -121,7 +132,7 @@ class WorkerPool:
       submit_next()
     except Exception as e:  # Handles errors in the submission code.
       done()
-      self._run_tracker.log(Report.ERROR, '{}'.format(e))
+      self._run_tracker.log(Report.ERROR, "{}".format(e))
       raise
 
   def submit_work_and_wait(self, work, workunit_parent=None):
@@ -135,9 +146,12 @@ class WorkerPool:
     if work is None or len(work.args_tuples) == 0:  # map hangs on 0-length iterables.
       return []
     else:
+
       def do_work(*args):
-        return self._do_work(work.func, *args, workunit_name=work.workunit_name,
-                             workunit_parent=workunit_parent)
+        return self._do_work(
+          work.func, *args, workunit_name=work.workunit_name, workunit_parent=workunit_parent
+        )
+
       # We need to specify a timeout explicitly, because otherwise python ignores SIGINT when waiting
       # on a condition variable, so we won't be able to ctrl-c out.
       return self._pool.map_async(do_work, work.args_tuples, chunksize=1).get(timeout=1000000000)
@@ -145,7 +159,9 @@ class WorkerPool:
   def _do_work(self, func, args_tuple, workunit_name, workunit_parent, on_failure=None):
     try:
       if workunit_name:
-        with self._run_tracker.new_workunit_under_parent(name=workunit_name, parent=workunit_parent):
+        with self._run_tracker.new_workunit_under_parent(
+          name=workunit_name, parent=workunit_parent
+        ):
           return func(*args_tuple)
       else:
         return func(*args_tuple)
@@ -190,6 +206,7 @@ class SubprocPool:
 
   To avoid this, the pools themselves are kept in this singleton and new RunTrackers re-use them.
   """
+
   _pool = None
   _lock = threading.Lock()
   _num_processes = multiprocessing.cpu_count()

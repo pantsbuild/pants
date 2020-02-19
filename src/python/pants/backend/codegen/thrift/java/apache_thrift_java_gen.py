@@ -17,11 +17,11 @@ class ApacheThriftJavaGen(ApacheThriftGenBase):
   """Generate Java source files from thrift IDL files."""
 
   gentarget_type = JavaThriftLibrary
-  thrift_generator = 'java'
+  thrift_generator = "java"
 
-  _COMPILER = 'thrift'
+  _COMPILER = "thrift"
 
-  sources_globs = ('**/*',)
+  sources_globs = ("**/*",)
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -29,7 +29,7 @@ class ApacheThriftJavaGen(ApacheThriftGenBase):
 
   @classmethod
   def implementation_version(cls):
-    return super().implementation_version() + [('ApacheThriftJavaGen', 2)]
+    return super().implementation_version() + [("ApacheThriftJavaGen", 2)]
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
@@ -39,16 +39,16 @@ class ApacheThriftJavaGen(ApacheThriftGenBase):
     return JavaLibrary
 
   def is_gentarget(self, target):
-    return (super().is_gentarget(target) and
-            self._thrift_defaults.compiler(target) == self._COMPILER)
+    return super().is_gentarget(target) and self._thrift_defaults.compiler(target) == self._COMPILER
 
   def _validate(self, target):
     # TODO: Fix ThriftDefaults to only pertain to scrooge (see TODO there) and then
     # get rid of this spurious validation.
     if self._thrift_defaults.language(target) != self.thrift_generator:
       raise TargetDefinitionException(
-          target,
-          'Compiler {} supports only language={}.'.format(self._COMPILER, self.thrift_generator))
+        target,
+        "Compiler {} supports only language={}.".format(self._COMPILER, self.thrift_generator),
+      )
 
   def execute_codegen(self, target, target_workdir):
     self._validate(target)

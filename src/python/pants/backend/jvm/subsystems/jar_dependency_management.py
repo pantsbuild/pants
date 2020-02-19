@@ -27,7 +27,7 @@ class JarDependencyManagement(Subsystem):
   https://docs.google.com/document/d/1AM_0e1Az_NHtR150Zsuyaa6u7InzBQGLq8MrUT57Od8/edit
   """
 
-  options_scope = 'jar-dependency-management'
+  options_scope = "jar-dependency-management"
 
   class IncompatibleManagedJarDependencies(TaskError):
     """The given set of targets has an incompatible combination of managed_jar_dependencies."""
@@ -40,22 +40,29 @@ class JarDependencyManagement(Subsystem):
   def register_options(cls, register):
     super().register_options(register)
 
-    conflict_strategies = [
-      'FAIL',
-      'USE_DIRECT',
-      'USE_DIRECT_IF_FORCED',
-      'USE_MANAGED',
-      'USE_NEWER',
-    ]
+    conflict_strategies = ["FAIL", "USE_DIRECT", "USE_DIRECT_IF_FORCED", "USE_MANAGED", "USE_NEWER"]
 
-    register('--default-target', advanced=True, type=str, default=None, fingerprint=True,
-             help='Address of the default managed_jar_dependencies target to use for the whole '
-                  'repo.')
-    register('--conflict-strategy', choices=conflict_strategies, default='FAIL', fingerprint=True,
-             help='Specifies how to behave when a jar_library has a jar with an explicit version '
-                  'that differs from one in the managed_jar_dependencies target it depends on.')
-    register('--suppress-conflict-warnings', type=bool,
-             help='Turns warning messages into debug messages when resolving jar conflicts.')
+    register(
+      "--default-target",
+      advanced=True,
+      type=str,
+      default=None,
+      fingerprint=True,
+      help="Address of the default managed_jar_dependencies target to use for the whole " "repo.",
+    )
+    register(
+      "--conflict-strategy",
+      choices=conflict_strategies,
+      default="FAIL",
+      fingerprint=True,
+      help="Specifies how to behave when a jar_library has a jar with an explicit version "
+      "that differs from one in the managed_jar_dependencies target it depends on.",
+    )
+    register(
+      "--suppress-conflict-warnings",
+      type=bool,
+      help="Turns warning messages into debug messages when resolving jar conflicts.",
+    )
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
@@ -83,25 +90,28 @@ class JarDependencyManagement(Subsystem):
       the --conflict-strategy is 'FAIL' (which is the default).
     """
     if M2Coordinate.unversioned(managed_coord) != M2Coordinate.unversioned(direct_coord):
-      raise ValueError('Illegal arguments passed to resolve_version_conflict: managed_coord and '
-                       'direct_coord must only differ by their version!\n'
-                       '  Managed: {}\n  Direct:  {}\n'.format(
-        M2Coordinate.unversioned(managed_coord),
-        M2Coordinate.unversioned(direct_coord),
-      ))
+      raise ValueError(
+        "Illegal arguments passed to resolve_version_conflict: managed_coord and "
+        "direct_coord must only differ by their version!\n"
+        "  Managed: {}\n  Direct:  {}\n".format(
+          M2Coordinate.unversioned(managed_coord), M2Coordinate.unversioned(direct_coord)
+        )
+      )
 
     if direct_coord.rev is None or direct_coord.rev == managed_coord.rev:
       return managed_coord
 
     strategy = self.get_options().conflict_strategy
-    message = dedent("""
+    message = dedent(
+      """
       An artifact directly specified by a jar_library target has a different version than what
       is specified by managed_jar_dependencies.
 
         Artifact: jar(org={org}, name={name}, classifier={classifier}, ext={ext})
         Direct version:  {direct}
         Managed version: {managed}
-    """).format(
+    """
+    ).format(
       org=direct_coord.org,
       name=direct_coord.name,
       classifier=direct_coord.classifier,
@@ -110,42 +120,42 @@ class JarDependencyManagement(Subsystem):
       managed=managed_coord.rev,
     )
 
-    if strategy == 'FAIL':
+    if strategy == "FAIL":
       raise self.DirectManagedVersionConflict(
-        '{}\nThis raises an error due to the current --jar-dependency-management-conflict-strategy.'
-        .format(message)
+        "{}\nThis raises an error due to the current --jar-dependency-management-conflict-strategy.".format(
+          message
+        )
       )
 
     is_silent = self.get_options().suppress_conflict_warnings
     log = logger.debug if is_silent else logger.warn
 
-    if strategy == 'USE_DIRECT':
+    if strategy == "USE_DIRECT":
       log(message)
-      log(f'[{strategy}] Using direct version: {direct_coord}')
+      log(f"[{strategy}] Using direct version: {direct_coord}")
       return direct_coord
 
-    if strategy == 'USE_DIRECT_IF_FORCED':
+    if strategy == "USE_DIRECT_IF_FORCED":
       log(message)
       if force:
-        log(f'[{strategy}] Using direct version, because force=True: {direct_coord}')
+        log(f"[{strategy}] Using direct version, because force=True: {direct_coord}")
         return direct_coord
       else:
-        log(f'[{strategy}] Using managed version, because force=False: {managed_coord}')
+        log(f"[{strategy}] Using managed version, because force=False: {managed_coord}")
         return managed_coord
 
-    if strategy == 'USE_MANAGED':
+    if strategy == "USE_MANAGED":
       log(message)
-      log(f'[{strategy}] Using managed version: {managed_coord}')
+      log(f"[{strategy}] Using managed version: {managed_coord}")
       return managed_coord
 
-    if strategy == 'USE_NEWER':
-      newer = max([managed_coord, direct_coord],
-                  key=lambda coord: Revision.lenient(coord.rev))
+    if strategy == "USE_NEWER":
+      newer = max([managed_coord, direct_coord], key=lambda coord: Revision.lenient(coord.rev))
       log(message)
-      log(f'[{strategy}] Using newer version: {newer}')
+      log(f"[{strategy}] Using newer version: {newer}")
       return newer
 
-    raise TaskError(f'Unknown value for --conflict-strategy: {strategy}')
+    raise TaskError(f"Unknown value for --conflict-strategy: {strategy}")
 
   @property
   def default_artifact_set(self):
@@ -274,11 +284,11 @@ class PinnedJarArtifactSet:
 
   def __str__(self):
     if len(self) == 0:
-      return 'PinnedJarArtifactSet()'
+      return "PinnedJarArtifactSet()"
     first = next(iter(self))
     if len(self) == 1:
-      return f'PinnedJarArtifactSet({first})'
-    return f'PinnedJarArtifactSet({first}, ... {(len(self) - 1)} artifacts)'
+      return f"PinnedJarArtifactSet({first})"
+    return f"PinnedJarArtifactSet({first}, ... {(len(self) - 1)} artifacts)"
 
 
 class JarDependencyManagementSetup(Task):
@@ -293,12 +303,9 @@ class JarDependencyManagementSetup(Task):
     def __init__(self, target, coord, rev1, rev2):
       super(JarDependencyManagementSetup.DuplicateCoordinateError, self).__init__(
         target,
-        'Version conflict inside a managed_jar_dependencies target: {coord} {rev1} vs {rev2}'
-        .format(
-          coord=coord,
-          rev1=rev1,
-          rev2=rev2,
-        )
+        "Version conflict inside a managed_jar_dependencies target: {coord} {rev1} vs {rev2}".format(
+          coord=coord, rev1=rev1, rev2=rev2
+        ),
       )
 
   class IllegalVersionOverride(TaskError):
@@ -310,8 +317,7 @@ class JarDependencyManagementSetup(Task):
 
     def __init__(self, target, coord):
       super(JarDependencyManagementSetup.MissingVersion, self).__init__(
-        target,
-        f'The jar {coord} specified in {target.address.spec} is missing a version (rev).'
+        target, f"The jar {coord} specified in {target.address.spec} is missing a version (rev)."
       )
 
   @classmethod
@@ -338,13 +344,15 @@ class JarDependencyManagementSetup(Task):
       targets = list(self.context.resolve(spec))
     except AddressLookupError:
       raise self.InvalidDefaultTarget(
-        f'Unable to resolve default managed_jar_dependencies target: {spec}')
+        f"Unable to resolve default managed_jar_dependencies target: {spec}"
+      )
     target = targets[0]
     if not isinstance(target, ManagedJarDependencies):
       if not any(isinstance(t, ManagedJarDependencies) for t in target.closure()):
         raise self.InvalidDefaultTarget(
-          'Neither the default target nor any of its transitive dependencies is a '
-          'managed_jar_dependencies() target! "{}" is a {}.'.format(spec, type(target).__name__))
+          "Neither the default target nor any of its transitive dependencies is a "
+          'managed_jar_dependencies() target! "{}" is a {}.'.format(spec, type(target).__name__)
+        )
     manager._artifact_set_map[target.id] = self._compute_artifact_set(target)
     manager._default_target = target
 
@@ -352,11 +360,14 @@ class JarDependencyManagementSetup(Task):
     dm = JarDependencyManagement.global_instance()
     for target in targets:
       dm._artifact_set_map[target.id] = self._compute_artifact_set(target)
-      self.context.log.debug('Computed artifact map for {} ({} jars)'
-                             .format(target.id, dm._artifact_set_map[target.id]))
+      self.context.log.debug(
+        "Computed artifact map for {} ({} jars)".format(target.id, dm._artifact_set_map[target.id])
+      )
 
   def _library_targets(self, managed_jar_dependencies):
-    targets = [t for spec in managed_jar_dependencies.library_specs for t in self.context.resolve(spec)]
+    targets = [
+      t for spec in managed_jar_dependencies.library_specs for t in self.context.resolve(spec)
+    ]
     for t in Target.closure_for_targets(targets):
       yield t
 
@@ -370,10 +381,12 @@ class JarDependencyManagementSetup(Task):
       elif type(dep) == Target:
         pass
       else:
-        raise TargetDefinitionException(managed_jar_dependencies,
-                                        'Artifacts must be jar() objects, the address of a jar_library(), '
-                                        'or the address of a target() with jar_library()\'s as dependencies. '
-                                        'Spec {} does not refer to any of those.'.format(dep.address.spec))
+        raise TargetDefinitionException(
+          managed_jar_dependencies,
+          "Artifacts must be jar() objects, the address of a jar_library(), "
+          "or the address of a target() with jar_library()'s as dependencies. "
+          "Spec {} does not refer to any of those.".format(dep.address.spec),
+        )
 
   def _compute_artifact_set(self, management_target):
     """Computes the set of pinned artifacts specified by this target, and any of its dependencies.
@@ -406,11 +419,15 @@ class JarDependencyManagementSetup(Task):
     def handle_conflict(artifact, target):
       previous_coord = artifact_set[artifact]
       previous_spec = specs_by_coordinate[previous_coord]
-      message = ('Artifact {previous_coord} (from {previous_target}) overridden by {new_coord} '
-                 '(in {new_target}).'.format(previous_coord=previous_coord,
-                                             previous_target=previous_spec,
-                                             new_coord=artifact,
-                                             new_target=target.address.spec))
+      message = (
+        "Artifact {previous_coord} (from {previous_target}) overridden by {new_coord} "
+        "(in {new_target}).".format(
+          previous_coord=previous_coord,
+          previous_target=previous_spec,
+          new_coord=artifact,
+          new_target=target.address.spec,
+        )
+      )
       raise self.IllegalVersionOverride(message)
 
     def handle_target(target):
@@ -425,6 +442,6 @@ class JarDependencyManagementSetup(Task):
     self.context.build_graph.walk_transitive_dependency_graph(
       addresses=[management_target.address],
       work=handle_target,
-      postorder=True, # Process dependencies first.
+      postorder=True,  # Process dependencies first.
     )
     return artifact_set

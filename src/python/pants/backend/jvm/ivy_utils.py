@@ -33,11 +33,20 @@ from pants.util.fileutil import atomic_copy, safe_hardlink_or_copy
 
 class IvyResolutionStep:
   """Ivy specific class for describing steps of performing resolution."""
+
   # NB(nh): This class is the base class for the ivy resolve and fetch steps.
   # It also specifies the abstract methods that define the components of resolution steps.
 
-  def __init__(self, confs, hash_name, pinned_artifacts, soft_excludes, ivy_resolution_cache_dir,
-               ivy_repository_cache_dir, ivy_workdir):
+  def __init__(
+    self,
+    confs,
+    hash_name,
+    pinned_artifacts,
+    soft_excludes,
+    ivy_resolution_cache_dir,
+    ivy_repository_cache_dir,
+    ivy_workdir,
+  ):
     """
     :param confs: A tuple of string ivy confs to resolve for.
     :param hash_name: A unique string name for this resolve.
@@ -73,8 +82,9 @@ class IvyResolutionStep:
     """Loads the result of a resolve or fetch."""
 
   @abstractmethod
-  def exec_and_load(self, executor, extra_args, targets, jvm_options, workunit_name,
-                       workunit_factory):
+  def exec_and_load(
+    self, executor, extra_args, targets, jvm_options, workunit_name, workunit_factory
+  ):
     """Runs the resolve or fetch and loads the result, returning it."""
 
   @property
@@ -83,19 +93,19 @@ class IvyResolutionStep:
 
   @property
   def hardlink_classpath_filename(self):
-    return os.path.join(self.workdir, 'classpath')
+    return os.path.join(self.workdir, "classpath")
 
   @property
   def ivy_cache_classpath_filename(self):
-    return f'{self.hardlink_classpath_filename}.raw'
+    return f"{self.hardlink_classpath_filename}.raw"
 
   @property
   def frozen_resolve_file(self):
-    return os.path.join(self.workdir, 'resolution.json')
+    return os.path.join(self.workdir, "resolution.json")
 
   @property
   def hardlink_dir(self):
-    return os.path.join(self.ivy_workdir, 'jars')
+    return os.path.join(self.ivy_workdir, "jars")
 
   @abstractmethod
   def ivy_xml_path(self):
@@ -110,93 +120,113 @@ class IvyResolutionStep:
       self.hardlink_dir,
       self.ivy_repository_cache_dir,
       self.ivy_cache_classpath_filename,
-      self.hardlink_classpath_filename)
+      self.hardlink_classpath_filename,
+    )
     return artifact_paths, hardlink_map
 
-  def _call_ivy(self, executor, extra_args, ivyxml, jvm_options, hash_name_for_report,
-                workunit_factory, workunit_name):
-    IvyUtils.do_resolve(executor,
-                        extra_args,
-                        ivyxml,
-                        jvm_options,
-                        self.workdir_reports_by_conf,
-                        self.confs,
-                        self.ivy_resolution_cache_dir,
-                        self.ivy_cache_classpath_filename,
-                        hash_name_for_report,
-                        workunit_factory,
-                        workunit_name)
+  def _call_ivy(
+    self,
+    executor,
+    extra_args,
+    ivyxml,
+    jvm_options,
+    hash_name_for_report,
+    workunit_factory,
+    workunit_name,
+  ):
+    IvyUtils.do_resolve(
+      executor,
+      extra_args,
+      ivyxml,
+      jvm_options,
+      self.workdir_reports_by_conf,
+      self.confs,
+      self.ivy_resolution_cache_dir,
+      self.ivy_cache_classpath_filename,
+      hash_name_for_report,
+      workunit_factory,
+      workunit_name,
+    )
 
 
 class IvyFetchStep(IvyResolutionStep):
   """Resolves ivy artifacts using the coordinates from a previous resolve."""
 
   def required_load_files_exist(self):
-    return (all(os.path.isfile(report) for report in self.workdir_reports_by_conf.values()) and
-                os.path.isfile(self.ivy_cache_classpath_filename) and
-                os.path.isfile(self.frozen_resolve_file))
+    return (
+      all(os.path.isfile(report) for report in self.workdir_reports_by_conf.values())
+      and os.path.isfile(self.ivy_cache_classpath_filename)
+      and os.path.isfile(self.frozen_resolve_file)
+    )
 
   def resolve_report_path(self, conf):
-    return os.path.join(self.workdir, f'fetch-report-{conf}.xml')
+    return os.path.join(self.workdir, f"fetch-report-{conf}.xml")
 
   @property
   def ivy_xml_path(self):
-    return os.path.join(self.workdir, 'fetch-ivy.xml')
+    return os.path.join(self.workdir, "fetch-ivy.xml")
 
   def required_exec_files_exist(self):
     return os.path.isfile(self.frozen_resolve_file)
 
   def load(self, targets):
     try:
-      frozen_resolutions = FrozenResolution.load_from_file(self.frozen_resolve_file,
-                                                         targets)
+      frozen_resolutions = FrozenResolution.load_from_file(self.frozen_resolve_file, targets)
     except Exception as e:
-      logger.debug(f'Failed to load {self.frozen_resolve_file}: {e!r}')
+      logger.debug(f"Failed to load {self.frozen_resolve_file}: {e!r}")
       return NO_RESOLVE_RUN_RESULT
     return self._load_from_fetch(frozen_resolutions)
 
-  def exec_and_load(self, executor, extra_args, targets, jvm_options, workunit_name,
-                       workunit_factory):
+  def exec_and_load(
+    self, executor, extra_args, targets, jvm_options, workunit_name, workunit_factory
+  ):
     try:
-      frozen_resolutions = FrozenResolution.load_from_file(self.frozen_resolve_file,
-                                                         targets)
+      frozen_resolutions = FrozenResolution.load_from_file(self.frozen_resolve_file, targets)
     except Exception as e:
-      logger.debug(f'Failed to load {self.frozen_resolve_file}: {e!r}')
+      logger.debug(f"Failed to load {self.frozen_resolve_file}: {e!r}")
       return NO_RESOLVE_RUN_RESULT
 
-    self._do_fetch(executor, extra_args, frozen_resolutions, jvm_options,
-                           workunit_name, workunit_factory)
+    self._do_fetch(
+      executor, extra_args, frozen_resolutions, jvm_options, workunit_name, workunit_factory
+    )
     result = self._load_from_fetch(frozen_resolutions)
 
     if not result.all_linked_artifacts_exist():
       raise IvyResolveMappingError(
-        f'Some artifacts were not linked to {self.ivy_workdir} for {result}')
+        f"Some artifacts were not linked to {self.ivy_workdir} for {result}"
+      )
     return result
 
   def _load_from_fetch(self, frozen_resolutions):
     artifact_paths, hardlink_map = self._construct_and_load_hardlink_map()
-    return IvyFetchResolveResult(artifact_paths,
-                                 hardlink_map,
-                                 self.hash_name,
-                                 self.workdir_reports_by_conf,
-                                 frozen_resolutions)
+    return IvyFetchResolveResult(
+      artifact_paths, hardlink_map, self.hash_name, self.workdir_reports_by_conf, frozen_resolutions
+    )
 
-  def _do_fetch(self, executor, extra_args, frozen_resolution, jvm_options, workunit_name,
-                        workunit_factory):
+  def _do_fetch(
+    self, executor, extra_args, frozen_resolution, jvm_options, workunit_name, workunit_factory
+  ):
     # It's important for fetches to have a different ivy report from resolves as their
     # contents differ.
-    hash_name_for_report = f'{self.hash_name}-fetch'
+    hash_name_for_report = f"{self.hash_name}-fetch"
 
     ivyxml = self.ivy_xml_path
     self._prepare_ivy_xml(frozen_resolution, ivyxml, hash_name_for_report)
 
-    self._call_ivy(executor, extra_args, ivyxml, jvm_options, hash_name_for_report,
-                   workunit_factory, workunit_name)
+    self._call_ivy(
+      executor,
+      extra_args,
+      ivyxml,
+      jvm_options,
+      hash_name_for_report,
+      workunit_factory,
+      workunit_name,
+    )
 
   def _prepare_ivy_xml(self, frozen_resolution, ivyxml, resolve_hash_name_for_report):
     # NB(nh): Our ivy.xml ensures that we always get the default configuration, even if it's not
     # part of the requested confs.
-    default_resolution = frozen_resolution.get('default')
+    default_resolution = frozen_resolution.get("default")
     if default_resolution is None:
       raise IvyUtils.IvyError("Couldn't find the frozen resolution for the 'default' ivy conf.")
 
@@ -204,50 +234,55 @@ class IvyFetchStep(IvyResolutionStep):
       jars = default_resolution.jar_dependencies
       IvyUtils.generate_fetch_ivy(jars, ivyxml, self.confs, resolve_hash_name_for_report)
     except Exception as e:
-      raise IvyUtils.IvyError(f'Failed to prepare ivy resolve: {e!r}')
+      raise IvyUtils.IvyError(f"Failed to prepare ivy resolve: {e!r}")
 
 
 class IvyResolveStep(IvyResolutionStep):
   """Resolves ivy artifacts and produces a cacheable file containing the resulting coordinates."""
 
   def required_load_files_exist(self):
-    return (all(os.path.isfile(report) for report in self.workdir_reports_by_conf.values()) and
-                os.path.isfile(self.ivy_cache_classpath_filename))
+    return all(
+      os.path.isfile(report) for report in self.workdir_reports_by_conf.values()
+    ) and os.path.isfile(self.ivy_cache_classpath_filename)
 
   def resolve_report_path(self, conf):
-    return os.path.join(self.workdir, f'resolve-report-{conf}.xml')
+    return os.path.join(self.workdir, f"resolve-report-{conf}.xml")
 
   @property
   def ivy_xml_path(self):
-    return os.path.join(self.workdir, 'resolve-ivy.xml')
+    return os.path.join(self.workdir, "resolve-ivy.xml")
 
   def load(self, targets):
     artifact_paths, hardlink_map = self._construct_and_load_hardlink_map()
-    return IvyResolveResult(artifact_paths,
-                            hardlink_map,
-                            self.hash_name,
-                            self.workdir_reports_by_conf)
+    return IvyResolveResult(
+      artifact_paths, hardlink_map, self.hash_name, self.workdir_reports_by_conf
+    )
 
-  def exec_and_load(self, executor, extra_args, targets, jvm_options,
-                       workunit_name, workunit_factory):
+  def exec_and_load(
+    self, executor, extra_args, targets, jvm_options, workunit_name, workunit_factory
+  ):
     self._do_resolve(executor, extra_args, targets, jvm_options, workunit_name, workunit_factory)
     result = self.load(targets)
 
     if not result.all_linked_artifacts_exist():
       raise IvyResolveMappingError(
-        f'Some artifacts were not linked to {self.ivy_workdir} for {result}')
+        f"Some artifacts were not linked to {self.ivy_workdir} for {result}"
+      )
 
     frozen_resolutions_by_conf = result.get_frozen_resolutions_by_conf(targets)
     FrozenResolution.dump_to_file(self.frozen_resolve_file, frozen_resolutions_by_conf)
     return result
 
-  def _do_resolve(self, executor, extra_args, targets, jvm_options, workunit_name, workunit_factory):
+  def _do_resolve(
+    self, executor, extra_args, targets, jvm_options, workunit_name, workunit_factory
+  ):
     ivyxml = self.ivy_xml_path
-    hash_name = f'{self.hash_name}-resolve'
+    hash_name = f"{self.hash_name}-resolve"
     self._prepare_ivy_xml(targets, ivyxml, hash_name)
 
-    self._call_ivy(executor, extra_args, ivyxml, jvm_options, hash_name,
-                   workunit_factory, workunit_name)
+    self._call_ivy(
+      executor, extra_args, ivyxml, jvm_options, hash_name, workunit_factory, workunit_name
+    )
 
   def _prepare_ivy_xml(self, targets, ivyxml, hash_name):
     # TODO(John Sirois): merge the code below into IvyUtils or up here; either way, better
@@ -259,8 +294,9 @@ class IvyResolveStep(IvyResolutionStep):
     if self.soft_excludes:
       global_excludes = []
 
-    IvyUtils.generate_ivy(targets, jars, global_excludes, ivyxml, self.confs,
-                          hash_name, self.pinned_artifacts)
+    IvyUtils.generate_ivy(
+      targets, jars, global_excludes, ivyxml, self.confs, hash_name, self.pinned_artifacts
+    )
 
 
 class FrozenResolution:
@@ -268,6 +304,7 @@ class FrozenResolution:
 
   With this we can do a simple fetch.
   """
+
   # TODO(nh): include full dependency graph in here.
   # So that we can inject it into the build graph if we want to.
 
@@ -282,9 +319,16 @@ class FrozenResolution:
   @property
   def jar_dependencies(self):
     return [
-      JarDependency(c.org, c.name, c.rev, classifier=c.classifier, ext=c.ext,
-                    **self.coordinate_to_attributes.get(c, {}))
-      for c in self.all_resolved_coordinates]
+      JarDependency(
+        c.org,
+        c.name,
+        c.rev,
+        classifier=c.classifier,
+        ext=c.ext,
+        **self.coordinate_to_attributes.get(c, {}),
+      )
+      for c in self.all_resolved_coordinates
+    ]
 
   def add_resolved_jars(self, target, resolved_jars):
     coords = [j.coordinate for j in resolved_jars]
@@ -294,7 +338,7 @@ class FrozenResolution:
     for j in target.jar_dependencies:
       url = j.get_url(relative=True)
       if url:
-        self.coordinate_to_attributes[j.coordinate] = {'url': url, 'base_path': j.base_path}
+        self.coordinate_to_attributes[j.coordinate] = {"url": url, "base_path": j.base_path}
       else:
         self.coordinate_to_attributes[j.coordinate] = {}
 
@@ -304,21 +348,26 @@ class FrozenResolution:
       self.all_resolved_coordinates.add(c)
 
   def target_spec_to_coordinate_strings(self):
-    return {t.address.spec: [str(c) for c in coordinates]
-            for t, coordinates in self.target_to_resolved_coordinates.items()}
+    return {
+      t.address.spec: [str(c) for c in coordinates]
+      for t, coordinates in self.target_to_resolved_coordinates.items()
+    }
 
   def __repr__(self):
-    return 'FrozenResolution(\n  target_to_resolved_coordinates\n    {}\n  all\n    {}'.format(
-      '\n    '.join(':  '.join([t.address.spec,
-                                '\n      '.join(str(c) for c in cs)])
-                    for t,cs in self.target_to_resolved_coordinates.items()),
-      '\n    '.join(str(c) for c in self.coordinate_to_attributes.keys())
+    return "FrozenResolution(\n  target_to_resolved_coordinates\n    {}\n  all\n    {}".format(
+      "\n    ".join(
+        ":  ".join([t.address.spec, "\n      ".join(str(c) for c in cs)])
+        for t, cs in self.target_to_resolved_coordinates.items()
+      ),
+      "\n    ".join(str(c) for c in self.coordinate_to_attributes.keys()),
     )
 
   def __eq__(self, other):
-    return (type(self) == type(other) and
-            self.all_resolved_coordinates == other.all_resolved_coordinates and
-            self.target_to_resolved_coordinates == other.target_to_resolved_coordinates)
+    return (
+      type(self) == type(other)
+      and self.all_resolved_coordinates == other.all_resolved_coordinates
+      and self.target_to_resolved_coordinates == other.target_to_resolved_coordinates
+    )
 
   def __ne__(self, other):
     return not self == other
@@ -328,7 +377,7 @@ class FrozenResolution:
     if not os.path.exists(filename):
       return None
 
-    with open(filename, 'r') as f:
+    with open(filename, "r") as f:
       # Using OrderedDict here to maintain insertion order of dict entries.
       from_file = json.load(f, object_pairs_hook=OrderedDict)
     result = {}
@@ -339,15 +388,16 @@ class FrozenResolution:
       def m2_for(c):
         return M2Coordinate.from_string(c)
 
-      for coord, attr_dict in serialized_resolution['coord_to_attrs'].items():
+      for coord, attr_dict in serialized_resolution["coord_to_attrs"].items():
         m2 = m2_for(coord)
         resolution.coordinate_to_attributes[m2] = attr_dict
 
-      for spec, coord_strs in serialized_resolution['target_to_coords'].items():
+      for spec, coord_strs in serialized_resolution["target_to_coords"].items():
         t = target_lookup.get(spec, None)
         if t is None:
-          raise cls.MissingTarget('Cannot find target for address {} in frozen resolution'
-                                  .format(spec))
+          raise cls.MissingTarget(
+            "Cannot find target for address {} in frozen resolution".format(spec)
+          )
         resolution.add_resolution_coords(t, [m2_for(c) for c in coord_strs])
       result[conf] = resolution
 
@@ -357,14 +407,20 @@ class FrozenResolution:
   def dump_to_file(cls, filename, resolutions_by_conf):
     res = {}
     for conf, resolution in resolutions_by_conf.items():
-      res[conf] = OrderedDict([
-        ['target_to_coords',resolution.target_spec_to_coordinate_strings()],
-        ['coord_to_attrs', OrderedDict([str(c), attrs]
-                                       for c, attrs in resolution.coordinate_to_attributes.items())]
-      ])
+      res[conf] = OrderedDict(
+        [
+          ["target_to_coords", resolution.target_spec_to_coordinate_strings()],
+          [
+            "coord_to_attrs",
+            OrderedDict(
+              [str(c), attrs] for c, attrs in resolution.coordinate_to_attributes.items()
+            ),
+          ],
+        ]
+      )
 
     with safe_concurrent_creation(filename) as tmp_filename:
-      with open(tmp_filename, 'w') as f:
+      with open(tmp_filename, "w") as f:
         json.dump(res, f)
 
 
@@ -431,10 +487,9 @@ class IvyResolveResult:
     ivy_jar_memo = {}
     for target in jar_library_targets:
       # Add the artifacts from each dependency module.
-      resolved_jars = self._resolved_jars_with_hardlinks(conf, ivy_info, ivy_jar_memo,
-                                                        self._jar_dependencies_for_target(conf,
-                                                                                          target),
-                                                        target)
+      resolved_jars = self._resolved_jars_with_hardlinks(
+        conf, ivy_info, ivy_jar_memo, self._jar_dependencies_for_target(conf, target), target
+      )
       yield target, resolved_jars
 
   def _jar_dependencies_for_target(self, conf, target):
@@ -457,31 +512,39 @@ class IvyResolveResult:
     else:
 
       raise IvyResolveMappingError(
-        'Jar {resolved_jar} in {spec} not resolved to the ivy '
-        'hardlink map in conf {conf}.'
-          .format(spec=target.address.spec,
-                  resolved_jar=resolved_jar_without_hardlink.cache_path,
-                  conf=conf))
+        "Jar {resolved_jar} in {spec} not resolved to the ivy "
+        "hardlink map in conf {conf}.".format(
+          spec=target.address.spec, resolved_jar=resolved_jar_without_hardlink.cache_path, conf=conf
+        )
+      )
 
-    return ResolvedJar(coordinate=resolved_jar_without_hardlink.coordinate,
-                       pants_path=pants_path,
-                       cache_path=resolved_jar_without_hardlink.cache_path)
+    return ResolvedJar(
+      coordinate=resolved_jar_without_hardlink.coordinate,
+      pants_path=pants_path,
+      cache_path=resolved_jar_without_hardlink.cache_path,
+    )
 
   def _resolved_jars_with_hardlinks(self, conf, ivy_info, ivy_jar_memo, coordinates, target):
-    raw_resolved_jars = ivy_info.get_resolved_jars_for_coordinates(coordinates,
-                                                                   memo=ivy_jar_memo)
-    resolved_jars = [self._new_resolved_jar_with_hardlink_path(conf, target, raw_resolved_jar)
-                     for raw_resolved_jar in raw_resolved_jars]
+    raw_resolved_jars = ivy_info.get_resolved_jars_for_coordinates(coordinates, memo=ivy_jar_memo)
+    resolved_jars = [
+      self._new_resolved_jar_with_hardlink_path(conf, target, raw_resolved_jar)
+      for raw_resolved_jar in raw_resolved_jars
+    ]
     return resolved_jars
 
 
 class IvyFetchResolveResult(IvyResolveResult):
   """A resolve result that uses the frozen resolution to look up dependencies."""
 
-  def __init__(self, resolved_artifact_paths, hardlink_map, resolve_hash_name, reports_by_conf,
-               frozen_resolutions):
-    super().__init__(resolved_artifact_paths, hardlink_map,
-                                                resolve_hash_name, reports_by_conf)
+  def __init__(
+    self,
+    resolved_artifact_paths,
+    hardlink_map,
+    resolve_hash_name,
+    reports_by_conf,
+    frozen_resolutions,
+  ):
+    super().__init__(resolved_artifact_paths, hardlink_map, resolve_hash_name, reports_by_conf)
     self._frozen_resolutions = frozen_resolutions
 
   def _jar_dependencies_for_target(self, conf, target):
@@ -491,14 +554,15 @@ class IvyFetchResolveResult(IvyResolveResult):
 NO_RESOLVE_RUN_RESULT = IvyResolveResult([], {}, None, {})
 
 
-IvyModule = namedtuple('IvyModule', ['ref', 'artifact', 'callers'])
+IvyModule = namedtuple("IvyModule", ["ref", "artifact", "callers"])
 
 
-Dependency = namedtuple('DependencyAttributes',
-                        ['org', 'name', 'rev', 'mutable', 'force', 'transitive'])
+Dependency = namedtuple(
+  "DependencyAttributes", ["org", "name", "rev", "mutable", "force", "transitive"]
+)
 
 
-Artifact = namedtuple('Artifact', ['name', 'type_', 'ext', 'url', 'classifier'])
+Artifact = namedtuple("Artifact", ["name", "type_", "ext", "url", "classifier"])
 
 
 logger = logging.getLogger(__name__)
@@ -515,14 +579,14 @@ class IvyModuleRef:
   """
 
   # latest.integration is ivy magic meaning "just get the latest version"
-  _ANY_REV = 'latest.integration'
+  _ANY_REV = "latest.integration"
 
   def __init__(self, org, name, rev, classifier=None, ext=None):
     self.org = org
     self.name = name
     self.rev = rev
     self.classifier = classifier
-    self.ext = ext or 'jar'
+    self.ext = ext or "jar"
 
     self._id = (self.org, self.name, self.rev, self.classifier, self.ext)
 
@@ -532,8 +596,13 @@ class IvyModuleRef:
   # TODO(#6071): Return NotImplemented if other does not have attributes
   def __lt__(self, other):
     # We can't just re-use __repr__ or __str_ because we want to order rev last
-    return ((self.org, self.name, self.classifier or '', self.ext, self.rev) <
-            (other.org, other.name, other.classifier or '', other.ext, other.rev))
+    return (self.org, self.name, self.classifier or "", self.ext, self.rev) < (
+      other.org,
+      other.name,
+      other.classifier or "",
+      other.ext,
+      other.rev,
+    )
 
   def __hash__(self):
     return hash(self._id)
@@ -542,8 +611,9 @@ class IvyModuleRef:
     return f"IvyModuleRef({':'.join(x or '' for x in self._id)})"
 
   def __repr__(self):
-    return ('IvyModuleRef(org={!r}, name={!r}, rev={!r}, classifier={!r}, ext={!r})'
-            .format(*self._id))
+    return "IvyModuleRef(org={!r}, name={!r}, rev={!r}, classifier={!r}, ext={!r})".format(
+      *self._id
+    )
 
   @property
   def caller_key(self):
@@ -562,8 +632,9 @@ class IvyModuleRef:
     the one we request, and we want to ensure that all requesters of any version of that dependency
     are able to learn about it.
     """
-    return IvyModuleRef(name=self.name, org=self.org, rev=self._ANY_REV, classifier=self.classifier,
-                        ext=self.ext)
+    return IvyModuleRef(
+      name=self.name, org=self.org, rev=self._ANY_REV, classifier=self.classifier, ext=self.ext
+    )
 
 
 class IvyInfo:
@@ -574,7 +645,7 @@ class IvyInfo:
   def __init__(self, conf):
     self._conf = conf
     self.modules_by_ref = {}  # Map from ref to referenced module.
-    self.refs_by_unversioned_refs = {} # Map from unversioned ref to the resolved versioned ref
+    self.refs_by_unversioned_refs = {}  # Map from unversioned ref to the resolved versioned ref
     # Map from ref of caller to refs of modules required by that caller.
     self._deps_by_caller = defaultdict(OrderedSet)
     # Map from _unversioned_ ref to OrderedSet of IvyArtifact instances.
@@ -587,11 +658,13 @@ class IvyInfo:
 
     ref_unversioned = module.ref.unversioned
     if ref_unversioned in self.refs_by_unversioned_refs:
-      raise IvyResolveMappingError('Already defined module {}, as rev {}!'
-                                   .format(ref_unversioned, module.ref.rev))
+      raise IvyResolveMappingError(
+        "Already defined module {}, as rev {}!".format(ref_unversioned, module.ref.rev)
+      )
     if module.ref in self.modules_by_ref:
-      raise IvyResolveMappingError('Already defined module {}, would be overwritten!'
-                                   .format(module.ref))
+      raise IvyResolveMappingError(
+        "Already defined module {}, would be overwritten!".format(module.ref)
+      )
     self.refs_by_unversioned_refs[ref_unversioned] = module.ref
     self.modules_by_ref[module.ref] = module
 
@@ -656,18 +729,26 @@ class IvyInfo:
               including transitive dependencies.
     :rtype: list of :class:`pants.java.jar.ResolvedJar`
     """
+
     def to_resolved_jar(jar_ref, jar_path):
-      return ResolvedJar(coordinate=M2Coordinate(org=jar_ref.org,
-                                                 name=jar_ref.name,
-                                                 rev=jar_ref.rev,
-                                                 classifier=jar_ref.classifier,
-                                                 ext=jar_ref.ext),
-                         cache_path=jar_path)
+      return ResolvedJar(
+        coordinate=M2Coordinate(
+          org=jar_ref.org,
+          name=jar_ref.name,
+          rev=jar_ref.rev,
+          classifier=jar_ref.classifier,
+          ext=jar_ref.ext,
+        ),
+        cache_path=jar_path,
+      )
+
     resolved_jars = OrderedSet()
+
     def create_collection(dep):
       return OrderedSet([dep])
+
     for jar in coordinates:
-      classifier = jar.classifier if self._conf == 'default' else self._conf
+      classifier = jar.classifier if self._conf == "default" else self._conf
       jar_module_ref = IvyModuleRef(jar.org, jar.name, jar.rev, classifier, jar.ext)
       for module_ref in self.traverse_dependency_graph(jar_module_ref, create_collection, memo):
         for artifact_path in self._artifacts_by_ref[module_ref.unversioned]:
@@ -675,7 +756,7 @@ class IvyInfo:
     return resolved_jars
 
   def __repr__(self):
-    return f'IvyInfo(conf={self._conf}, refs={self.modules_by_ref.keys()})'
+    return f"IvyInfo(conf={self._conf}, refs={self.modules_by_ref.keys()})"
 
 
 class IvyUtils:
@@ -690,7 +771,7 @@ class IvyUtils:
   # Protect writes to the global map of jar path -> hardlinks to that jar.
   _hardlink_map_lock = threading.Lock()
 
-  INTERNAL_ORG_NAME = 'internal'
+  INTERNAL_ORG_NAME = "internal"
 
   class IvyError(Exception):
     """Indicates an error preparing an ivy operation."""
@@ -717,13 +798,24 @@ class IvyUtils:
     if not os.path.exists(path):
       return []
     else:
-      with safe_open(path, 'r') as cp:
+      with safe_open(path, "r") as cp:
         return [_f for _f in (path.strip() for path in cp.read().split(os.pathsep)) if _f]
 
   @classmethod
-  def do_resolve(cls, executor, extra_args, ivyxml, jvm_options, workdir_report_paths_by_conf,
-                 confs, ivy_resolution_cache_dir, ivy_cache_classpath_filename, resolve_hash_name,
-                 workunit_factory, workunit_name):
+  def do_resolve(
+    cls,
+    executor,
+    extra_args,
+    ivyxml,
+    jvm_options,
+    workdir_report_paths_by_conf,
+    confs,
+    ivy_resolution_cache_dir,
+    ivy_cache_classpath_filename,
+    resolve_hash_name,
+    workunit_factory,
+    workunit_name,
+  ):
     """Execute Ivy with the given ivy.xml and copies all relevant files into the workdir.
 
     This method does an Ivy resolve, which may be either a Pants resolve or a Pants fetch depending
@@ -747,63 +839,83 @@ class IvyUtils:
 
     with safe_concurrent_creation(ivy_cache_classpath_filename) as raw_target_classpath_file_tmp:
       extra_args = extra_args or []
-      args = ['-cachepath', raw_target_classpath_file_tmp] + extra_args
+      args = ["-cachepath", raw_target_classpath_file_tmp] + extra_args
 
       with cls._ivy_lock:
-        cls._exec_ivy(ivy, confs, ivyxml, args,
-                      jvm_options=jvm_options,
-                      executor=executor,
-                      workunit_name=workunit_name,
-                      workunit_factory=workunit_factory)
+        cls._exec_ivy(
+          ivy,
+          confs,
+          ivyxml,
+          args,
+          jvm_options=jvm_options,
+          executor=executor,
+          workunit_name=workunit_name,
+          workunit_factory=workunit_factory,
+        )
 
       if not os.path.exists(raw_target_classpath_file_tmp):
-        raise cls.IvyError('Ivy failed to create classpath file at {}'
-                           .format(raw_target_classpath_file_tmp))
+        raise cls.IvyError(
+          "Ivy failed to create classpath file at {}".format(raw_target_classpath_file_tmp)
+        )
 
-      cls._copy_ivy_reports(workdir_report_paths_by_conf, confs, ivy_resolution_cache_dir, resolve_hash_name)
+      cls._copy_ivy_reports(
+        workdir_report_paths_by_conf, confs, ivy_resolution_cache_dir, resolve_hash_name
+      )
 
-    logger.debug(f'Moved ivy classfile file to {ivy_cache_classpath_filename}')
+    logger.debug(f"Moved ivy classfile file to {ivy_cache_classpath_filename}")
 
   @classmethod
-  def _copy_ivy_reports(cls, workdir_report_paths_by_conf, confs, ivy_resolution_cache_dir, resolve_hash_name):
+  def _copy_ivy_reports(
+    cls, workdir_report_paths_by_conf, confs, ivy_resolution_cache_dir, resolve_hash_name
+  ):
     for conf in confs:
-      ivy_cache_report_path = IvyUtils.xml_report_path(ivy_resolution_cache_dir, resolve_hash_name,
-                                                       conf)
+      ivy_cache_report_path = IvyUtils.xml_report_path(
+        ivy_resolution_cache_dir, resolve_hash_name, conf
+      )
       workdir_report_path = workdir_report_paths_by_conf[conf]
       try:
-        atomic_copy(ivy_cache_report_path,
-                    workdir_report_path)
+        atomic_copy(ivy_cache_report_path, workdir_report_path)
       except IOError as e:
-        raise cls.IvyError('Failed to copy report into workdir from {} to {}: {}'
-                           .format(ivy_cache_report_path, workdir_report_path, e))
+        raise cls.IvyError(
+          "Failed to copy report into workdir from {} to {}: {}".format(
+            ivy_cache_report_path, workdir_report_path, e
+          )
+        )
 
   @classmethod
-  def _exec_ivy(cls, ivy, confs, ivyxml, args, jvm_options, executor,
-                workunit_name, workunit_factory):
+  def _exec_ivy(
+    cls, ivy, confs, ivyxml, args, jvm_options, executor, workunit_name, workunit_factory
+  ):
     ivy = ivy or Bootstrapper.default_ivy()
 
-    ivy_args = ['-ivy', ivyxml]
-    ivy_args.append('-confs')
+    ivy_args = ["-ivy", ivyxml]
+    ivy_args.append("-confs")
     ivy_args.extend(confs)
     ivy_args.extend(args)
 
     ivy_jvm_options = list(jvm_options)
     # Disable cache in File.getCanonicalPath(), makes Ivy work with -symlink option properly on ng.
-    ivy_jvm_options.append('-Dsun.io.useCanonCaches=false')
+    ivy_jvm_options.append("-Dsun.io.useCanonCaches=false")
 
     runner = ivy.runner(jvm_options=ivy_jvm_options, args=ivy_args, executor=executor)
     try:
       with ivy.resolution_lock():
-        result = execute_runner(runner, workunit_factory=workunit_factory,
-                                workunit_name=workunit_name)
+        result = execute_runner(
+          runner, workunit_factory=workunit_factory, workunit_name=workunit_name
+        )
       if result != 0:
-        raise IvyUtils.IvyError(f'Ivy returned {result}. cmd={runner.cmd}')
+        raise IvyUtils.IvyError(f"Ivy returned {result}. cmd={runner.cmd}")
     except runner.executor.Error as e:
       raise IvyUtils.IvyError(e)
 
   @classmethod
-  def construct_and_load_hardlink_map(cls, hardlink_dir, ivy_repository_cache_dir,
-                                     ivy_cache_classpath_filename, hardlink_classpath_filename):
+  def construct_and_load_hardlink_map(
+    cls,
+    hardlink_dir,
+    ivy_repository_cache_dir,
+    ivy_cache_classpath_filename,
+    hardlink_classpath_filename,
+  ):
     # Make our actual classpath be hardlinks, so that the paths are uniform across systems.
     # Note that we must do this even if we read the raw_target_classpath_file from the artifact
     # cache. If we cache the target_classpath_file we won't know how to create the hardlinks.
@@ -812,10 +924,12 @@ class IvyUtils:
       # in artifact-cached analysis files are consistent across systems.
       # Note that we have one global, well-known hardlink dir, again so that paths are
       # consistent across builds.
-      hardlink_map = cls._hardlink_cachepath(ivy_repository_cache_dir,
-                                           ivy_cache_classpath_filename,
-                                           hardlink_dir,
-                                           hardlink_classpath_filename)
+      hardlink_map = cls._hardlink_cachepath(
+        ivy_repository_cache_dir,
+        ivy_cache_classpath_filename,
+        hardlink_dir,
+        hardlink_classpath_filename,
+      )
     classpath = cls._load_classpath_from_cachepath(hardlink_classpath_filename)
     return classpath, hardlink_map
 
@@ -853,8 +967,8 @@ class IvyUtils:
       safe_hardlink_or_copy(path, hardlink)
 
     # (re)create the classpath with all of the paths
-    with safe_open(outpath, 'w') as outfile:
-      outfile.write(':'.join(OrderedSet(hardlink_map.values())))
+    with safe_open(outpath, "w") as outfile:
+      outfile.write(":".join(OrderedSet(hardlink_map.values())))
 
     return dict(hardlink_map)
 
@@ -871,8 +985,10 @@ class IvyUtils:
     :returns: The report path.
     :rtype: string
     """
-    return os.path.join(resolution_cache_dir, '{}-{}-{}.xml'.format(IvyUtils.INTERNAL_ORG_NAME,
-                                                                    resolve_hash_name, conf))
+    return os.path.join(
+      resolution_cache_dir,
+      "{}-{}-{}.xml".format(IvyUtils.INTERNAL_ORG_NAME, resolve_hash_name, conf),
+    )
 
   @classmethod
   def parse_xml_report(cls, conf, path):
@@ -887,50 +1003,67 @@ class IvyUtils:
     :raises: :class:`IvyResolveMappingError` if no report exists.
     """
     if not os.path.exists(path):
-      raise cls.IvyResolveReportError(f'Missing expected ivy output file {path}')
+      raise cls.IvyResolveReportError(f"Missing expected ivy output file {path}")
 
     logger.debug(f"Parsing ivy report {path}")
     ret = IvyInfo(conf)
     etree = ET.parse(path)
     doc = etree.getroot()
-    for module in doc.findall('dependencies/module'):
-      org = module.get('organisation')
-      name = module.get('name')
-      for revision in module.findall('revision'):
-        rev = revision.get('name')
+    for module in doc.findall("dependencies/module"):
+      org = module.get("organisation")
+      name = module.get("name")
+      for revision in module.findall("revision"):
+        rev = revision.get("name")
         callers = []
-        for caller in revision.findall('caller'):
-          callers.append(IvyModuleRef(caller.get('organisation'),
-                                      caller.get('name'),
-                                      caller.get('callerrev')))
+        for caller in revision.findall("caller"):
+          callers.append(
+            IvyModuleRef(caller.get("organisation"), caller.get("name"), caller.get("callerrev"))
+          )
 
-        for artifact in revision.findall('artifacts/artifact'):
-          classifier = artifact.get('extra-classifier')
-          ext = artifact.get('ext')
-          ivy_module_ref = IvyModuleRef(org=org, name=name, rev=rev,
-                                        classifier=classifier, ext=ext)
+        for artifact in revision.findall("artifacts/artifact"):
+          classifier = artifact.get("extra-classifier")
+          ext = artifact.get("ext")
+          ivy_module_ref = IvyModuleRef(org=org, name=name, rev=rev, classifier=classifier, ext=ext)
 
-          artifact_cache_path = artifact.get('location')
+          artifact_cache_path = artifact.get("location")
           ivy_module = IvyModule(ivy_module_ref, artifact_cache_path, tuple(callers))
 
           ret.add_module(ivy_module)
     return ret
 
   @classmethod
-  def generate_ivy(cls, targets, jars, excludes, ivyxml, confs, resolve_hash_name=None,
-                   pinned_artifacts=None, jar_dep_manager=None):
+  def generate_ivy(
+    cls,
+    targets,
+    jars,
+    excludes,
+    ivyxml,
+    confs,
+    resolve_hash_name=None,
+    pinned_artifacts=None,
+    jar_dep_manager=None,
+  ):
     if not resolve_hash_name:
       resolve_hash_name = Target.maybe_readable_identify(targets)
-    return cls._generate_resolve_ivy(jars, excludes, ivyxml, confs, resolve_hash_name, pinned_artifacts,
-                             jar_dep_manager)
+    return cls._generate_resolve_ivy(
+      jars, excludes, ivyxml, confs, resolve_hash_name, pinned_artifacts, jar_dep_manager
+    )
 
   @classmethod
-  def _generate_resolve_ivy(cls, jars, excludes, ivyxml, confs, resolve_hash_name, pinned_artifacts=None,
-                    jar_dep_manager=None):
+  def _generate_resolve_ivy(
+    cls,
+    jars,
+    excludes,
+    ivyxml,
+    confs,
+    resolve_hash_name,
+    pinned_artifacts=None,
+    jar_dep_manager=None,
+  ):
     org = IvyUtils.INTERNAL_ORG_NAME
     name = resolve_hash_name
 
-    extra_configurations = [conf for conf in confs if conf and conf != 'default']
+    extra_configurations = [conf for conf in confs if conf and conf != "default"]
 
     jars_by_key = OrderedDict()
     for jar in jars:
@@ -938,7 +1071,7 @@ class IvyUtils:
       jars.append(jar)
 
     manager = jar_dep_manager or JarDependencyManagement.global_instance()
-    artifact_set = PinnedJarArtifactSet(pinned_artifacts) # Copy, because we're modifying it.
+    artifact_set = PinnedJarArtifactSet(pinned_artifacts)  # Copy, because we're modifying it.
     for jars in jars_by_key.values():
       for i, dep in enumerate(jars):
         direct_coord = M2Coordinate.create(dep)
@@ -976,9 +1109,10 @@ class IvyUtils:
       extra_configurations=extra_configurations,
       dependencies=dependencies,
       excludes=excludes,
-      overrides=overrides)
+      overrides=overrides,
+    )
 
-    template_relpath = os.path.join('templates', 'ivy_utils', 'ivy.xml.mustache')
+    template_relpath = os.path.join("templates", "ivy_utils", "ivy.xml.mustache")
     cls._write_ivy_xml_file(ivyxml, template_data, template_relpath)
 
   @classmethod
@@ -987,7 +1121,7 @@ class IvyUtils:
     org = IvyUtils.INTERNAL_ORG_NAME
     name = resolve_hash_name
 
-    extra_configurations = [conf for conf in confs if conf and conf != 'default']
+    extra_configurations = [conf for conf in confs if conf and conf != "default"]
 
     # Use org name _and_ rev so that we can have dependencies with different versions. This will
     # allow for batching fetching if we want to do that.
@@ -995,22 +1129,20 @@ class IvyUtils:
     for jar in jars:
       jars_by_key.setdefault((jar.org, jar.name, jar.rev), []).append(jar)
 
-
     dependencies = [cls._generate_fetch_jar_template(_jars) for _jars in jars_by_key.values()]
 
-    template_data = TemplateData(org=org,
-                                 module=name,
-                                 extra_configurations=extra_configurations,
-                                 dependencies=dependencies)
+    template_data = TemplateData(
+      org=org, module=name, extra_configurations=extra_configurations, dependencies=dependencies
+    )
 
-    template_relpath = os.path.join('templates', 'ivy_utils', 'ivy_fetch.xml.mustache')
+    template_relpath = os.path.join("templates", "ivy_utils", "ivy_fetch.xml.mustache")
     cls._write_ivy_xml_file(ivyxml, template_data, template_relpath)
 
   @classmethod
   def _write_ivy_xml_file(cls, ivyxml, template_data, template_relpath):
     template_text = pkgutil.get_data(__name__, template_relpath).decode()
     generator = Generator(template_text, lib=template_data)
-    with safe_open(ivyxml, 'w') as output:
+    with safe_open(ivyxml, "w") as output:
       generator.write(output)
 
   @classmethod
@@ -1044,8 +1176,9 @@ class IvyUtils:
       # See: https://github.com/pantsbuild/pants/issues/2239
       coordinate = (jar.org, jar.name, jar.classifier)
       existing = jars.get(coordinate)
-      jars[coordinate] = jar if not existing else cls._resolve_conflict(existing=existing,
-                                                                        proposed=jar)
+      jars[coordinate] = (
+        jar if not existing else cls._resolve_conflict(existing=existing, proposed=jar)
+      )
 
     def collect_jars(target):
       if isinstance(target, JarLibrary):
@@ -1053,15 +1186,18 @@ class IvyUtils:
           add_jar(jar)
 
     def collect_excludes(target):
-      target_excludes = target.payload.get_field_value('excludes')
+      target_excludes = target.payload.get_field_value("excludes")
       if target_excludes:
         global_excludes.update(target_excludes)
 
     def collect_provide_excludes(target):
       if not (isinstance(target, ExportableJvmLibrary) and target.provides):
         return
-      logger.debug('Automatically excluding jar {}.{}, which is provided by {}'.format(
-        target.provides.org, target.provides.name, target))
+      logger.debug(
+        "Automatically excluding jar {}.{}, which is provided by {}".format(
+          target.provides.org, target.provides.name, target
+        )
+      )
       provide_excludes.add(Exclude(org=target.provides.org, name=target.provides.name))
 
     def collect_elements(target):
@@ -1097,45 +1233,58 @@ class IvyUtils:
         return proposed
       return existing
     elif existing.force and proposed.force:
-      raise cls.IvyResolveConflictingDepsError('Cannot force {}#{};{} to both rev {} and {}'.format(
-        proposed.org, proposed.name, proposed.classifier or '', existing.rev, proposed.rev
-      ))
+      raise cls.IvyResolveConflictingDepsError(
+        "Cannot force {}#{};{} to both rev {} and {}".format(
+          proposed.org, proposed.name, proposed.classifier or "", existing.rev, proposed.rev
+        )
+      )
     elif existing.force:
-      logger.debug('Ignoring rev {} for {}#{};{} already forced to {}'.format(
-        proposed.rev, proposed.org, proposed.name, proposed.classifier or '', existing.rev
-      ))
+      logger.debug(
+        "Ignoring rev {} for {}#{};{} already forced to {}".format(
+          proposed.rev, proposed.org, proposed.name, proposed.classifier or "", existing.rev
+        )
+      )
       return existing
     elif proposed.force:
-      logger.debug('Forcing {}#{};{} from {} to {}'.format(
-        proposed.org, proposed.name, proposed.classifier or '', existing.rev, proposed.rev
-      ))
+      logger.debug(
+        "Forcing {}#{};{} from {} to {}".format(
+          proposed.org, proposed.name, proposed.classifier or "", existing.rev, proposed.rev
+        )
+      )
       return proposed
     else:
       if Revision.lenient(proposed.rev) > Revision.lenient(existing.rev):
-        logger.debug('Upgrading {}#{};{} from rev {}  to {}'.format(
-          proposed.org, proposed.name, proposed.classifier or '', existing.rev, proposed.rev,
-        ))
+        logger.debug(
+          "Upgrading {}#{};{} from rev {}  to {}".format(
+            proposed.org, proposed.name, proposed.classifier or "", existing.rev, proposed.rev
+          )
+        )
         return proposed
       else:
         return existing
 
   @classmethod
   def _generate_jar_template(cls, jars):
-    global_dep_attributes = set(Dependency(org=jar.org,
-                                           name=jar.name,
-                                           rev=jar.rev,
-                                           mutable=jar.mutable,
-                                           force=jar.force,
-                                           transitive=jar.transitive)
-                                for jar in jars)
+    global_dep_attributes = set(
+      Dependency(
+        org=jar.org,
+        name=jar.name,
+        rev=jar.rev,
+        mutable=jar.mutable,
+        force=jar.force,
+        transitive=jar.transitive,
+      )
+      for jar in jars
+    )
     if len(global_dep_attributes) != 1:
       # TODO: Need to provide information about where these came from - could be
       # far-flung JarLibrary targets. The jars here were collected from targets via
       # `calculate_classpath` above so executing this step there instead may make more
       # sense.
       conflicting_dependencies = sorted(str(g) for g in global_dep_attributes)
-      raise cls.IvyResolveConflictingDepsError('Found conflicting dependencies:\n\t{}'
-                                               .format('\n\t'.join(conflicting_dependencies)))
+      raise cls.IvyResolveConflictingDepsError(
+        "Found conflicting dependencies:\n\t{}".format("\n\t".join(conflicting_dependencies))
+      )
     jar_attributes = global_dep_attributes.pop()
 
     excludes = set()
@@ -1151,41 +1300,40 @@ class IvyUtils:
       if url:
         any_have_url = True
       classifier = jar.classifier
-      artifact = Artifact(name=jar.name,
-                          type_=ext or 'jar',
-                          ext=ext,
-                          url=url,
-                          classifier=classifier)
+      artifact = Artifact(
+        name=jar.name, type_=ext or "jar", ext=ext, url=url, classifier=classifier
+      )
       artifacts[(ext, url, classifier)] = artifact
 
     template = TemplateData(
-        org=jar_attributes.org,
-        module=jar_attributes.name,
-        version=jar_attributes.rev,
-        mutable=jar_attributes.mutable,
-        force=jar_attributes.force,
-        transitive=jar_attributes.transitive,
-        artifacts=list(artifacts.values()),
-        any_have_url=any_have_url,
-        excludes=[cls._generate_exclude_template(exclude) for exclude in excludes])
+      org=jar_attributes.org,
+      module=jar_attributes.name,
+      version=jar_attributes.rev,
+      mutable=jar_attributes.mutable,
+      force=jar_attributes.force,
+      transitive=jar_attributes.transitive,
+      artifacts=list(artifacts.values()),
+      any_have_url=any_have_url,
+      excludes=[cls._generate_exclude_template(exclude) for exclude in excludes],
+    )
 
     return template
 
   @classmethod
   def _generate_fetch_jar_template(cls, jars):
-    global_dep_attributes = set(Dependency(org=jar.org,
-                                           name=jar.name,
-                                           rev=jar.rev,
-                                           transitive=False,
-                                           mutable=jar.mutable,
-                                           force=True)
-                                for jar in jars)
+    global_dep_attributes = set(
+      Dependency(
+        org=jar.org, name=jar.name, rev=jar.rev, transitive=False, mutable=jar.mutable, force=True
+      )
+      for jar in jars
+    )
     if len(global_dep_attributes) != 1:
       # If we batch fetches and assume conflict manager all, we could ignore these.
       # Leaving this here for now.
       conflicting_dependencies = sorted(str(g) for g in global_dep_attributes)
-      raise cls.IvyResolveConflictingDepsError('Found conflicting dependencies:\n\t{}'
-                                               .format('\n\t'.join(conflicting_dependencies)))
+      raise cls.IvyResolveConflictingDepsError(
+        "Found conflicting dependencies:\n\t{}".format("\n\t".join(conflicting_dependencies))
+      )
     jar_attributes = global_dep_attributes.pop()
 
     any_have_url = False
@@ -1197,20 +1345,19 @@ class IvyUtils:
       if url:
         any_have_url = True
       classifier = jar.classifier
-      artifact = Artifact(name=jar.name,
-                          type_=ext or 'jar',
-                          ext=ext,
-                          url=url,
-                          classifier=classifier)
+      artifact = Artifact(
+        name=jar.name, type_=ext or "jar", ext=ext, url=url, classifier=classifier
+      )
       artifacts[(ext, url, classifier)] = artifact
 
     template = TemplateData(
-        org=jar_attributes.org,
-        module=jar_attributes.name,
-        version=jar_attributes.rev,
-        mutable=jar_attributes.mutable,
-        artifacts=list(artifacts.values()),
-        any_have_url=any_have_url,
-        excludes=[])
+      org=jar_attributes.org,
+      module=jar_attributes.name,
+      version=jar_attributes.rev,
+      mutable=jar_attributes.mutable,
+      artifacts=list(artifacts.values()),
+      any_have_url=any_have_url,
+      excludes=[],
+    )
 
     return template

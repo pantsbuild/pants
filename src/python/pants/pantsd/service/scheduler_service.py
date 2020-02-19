@@ -55,8 +55,7 @@ class SchedulerService(PantsService):
     # This session is only used for checking whether any invalidation globs have been invalidated.
     # It is not involved with a build itself; just with deciding when we should restart pantsd.
     self._scheduler_session = self._scheduler.new_session(
-      zipkin_trace_v2=False,
-      build_id="background_pantsd_session",
+      zipkin_trace_v2=False, build_id="background_pantsd_session"
     )
     self._logger = logging.getLogger(__name__)
     self._event_queue: queue.Queue = queue.Queue(maxsize=self.QUEUE_SIZE)
@@ -69,47 +68,55 @@ class SchedulerService(PantsService):
   def _get_snapshot(self):
     """Returns a Snapshot of the input globs"""
     return self._scheduler_session.product_request(
-      Snapshot, subjects=[PathGlobs(self._invalidation_globs)])[0]
+      Snapshot, subjects=[PathGlobs(self._invalidation_globs)]
+    )[0]
 
   def setup(self, services):
     """Service setup."""
     super().setup(services)
     # Register filesystem event handlers on an FSEventService instance.
-    self._fs_event_service.register_all_files_handler(self._enqueue_fs_event, self._fs_event_service.PANTS_ALL_FILES_SUBSCRIPTION_NAME)
+    self._fs_event_service.register_all_files_handler(
+      self._enqueue_fs_event, self._fs_event_service.PANTS_ALL_FILES_SUBSCRIPTION_NAME
+    )
 
     # N.B. We compute the invalidating fileset eagerly at launch with an assumption that files
     # that exist at startup are the only ones that can affect the running daemon.
     if self._invalidation_globs:
       self._invalidating_snapshot = self._get_snapshot()
       self._invalidating_files = self._invalidating_snapshot.files
-      self._logger.info('watching invalidating files: {}'.format(self._invalidating_files))
+      self._logger.info("watching invalidating files: {}".format(self._invalidating_files))
 
     if self._pantsd_pidfile:
       self._fs_event_service.register_pidfile_handler(self._pantsd_pidfile, self._enqueue_fs_event)
 
   def _enqueue_fs_event(self, event):
     """Watchman filesystem event handler for BUILD/requirements.txt updates. Called via a thread."""
-    self._logger.info('enqueuing {} changes for subscription {}'
-                      .format(len(event['files']), event['subscription']))
+    self._logger.info(
+      "enqueuing {} changes for subscription {}".format(len(event["files"]), event["subscription"])
+    )
     self._event_queue.put(event)
 
   def _maybe_invalidate_scheduler_batch(self):
     new_snapshot = self._get_snapshot()
-    if self._invalidating_snapshot and \
-      new_snapshot.directory_digest != self._invalidating_snapshot.directory_digest:
+    if (
+      self._invalidating_snapshot
+      and new_snapshot.directory_digest != self._invalidating_snapshot.directory_digest
+    ):
       self._logger.fatal(
-        'saw file events covered by invalidation globs [{}], terminating the daemon.'
-          .format(self._invalidating_files))
+        "saw file events covered by invalidation globs [{}], terminating the daemon.".format(
+          self._invalidating_files
+        )
+      )
       self.terminate()
 
   def _maybe_invalidate_scheduler_pidfile(self):
     new_pid = self._check_pid_changed()
     if new_pid is not False:
-      self._logger.fatal('{} says pantsd PID is {} but my PID is: {}: terminating'.format(
-        self._pantsd_pidfile,
-        new_pid,
-        os.getpid(),
-      ))
+      self._logger.fatal(
+        "{} says pantsd PID is {} but my PID is: {}: terminating".format(
+          self._pantsd_pidfile, new_pid, os.getpid()
+        )
+      )
       self.terminate()
 
   def _check_pid_changed(self):
@@ -125,7 +132,7 @@ class SchedulerService(PantsService):
       return False
 
   def _handle_batch_event(self, files):
-    self._logger.debug('handling change event for: %s', files)
+    self._logger.debug("handling change event for: %s", files)
 
     invalidated = self._scheduler.invalidate_files(files)
     if invalidated:
@@ -141,18 +148,26 @@ class SchedulerService(PantsService):
       return
 
     try:
-      subscription, is_initial_event, files = (event['subscription'],
-                                               event['is_fresh_instance'],
-                                               event['files'])
+      subscription, is_initial_event, files = (
+        event["subscription"],
+        event["is_fresh_instance"],
+        event["files"],
+      )
     except (KeyError, UnicodeDecodeError) as e:
-      self._logger.warning('%r raised by invalid watchman event: %s', e, event)
+      self._logger.warning("%r raised by invalid watchman event: %s", e, event)
       return
 
-    self._logger.debug('processing {} files for subscription {} (first_event={})'
-                       .format(len(files), subscription, is_initial_event))
+    self._logger.debug(
+      "processing {} files for subscription {} (first_event={})".format(
+        len(files), subscription, is_initial_event
+      )
+    )
 
     # The first watchman event for all_files is a listing of all files - ignore it.
-    if not is_initial_event and subscription == self._fs_event_service.PANTS_ALL_FILES_SUBSCRIPTION_NAME:
+    if (
+      not is_initial_event
+      and subscription == self._fs_event_service.PANTS_ALL_FILES_SUBSCRIPTION_NAME
+    ):
       self._handle_batch_event(files)
 
     # However, we do want to check for the initial event in the pid file creation.
@@ -172,7 +187,7 @@ class SchedulerService(PantsService):
     return self._scheduler.graph_len()
 
   def prepare_v1_graph_run_v2(
-    self, options: Options, options_bootstrapper: OptionsBootstrapper,
+    self, options: Options, options_bootstrapper: OptionsBootstrapper
   ) -> Tuple[LegacyGraphSession, Specs, int]:
     """For v1 (and v2): computing Specs for a later v1 run
 
@@ -182,14 +197,14 @@ class SchedulerService(PantsService):
     # racing watchman startup vs invalidation events.
     graph_len = self._scheduler.graph_len()
     if graph_len > 0:
-      self._logger.debug('graph len was {}, waiting for initial watchman event'.format(graph_len))
+      self._logger.debug("graph len was {}, waiting for initial watchman event".format(graph_len))
       self._watchman_is_running.wait()
     build_id = RunTracker.global_instance().run_id
-    v2_ui = options.for_global_scope().get('v2_ui', False)
-    zipkin_trace_v2 = options.for_scope('reporting').zipkin_trace_v2
+    v2_ui = options.for_global_scope().get("v2_ui", False)
+    zipkin_trace_v2 = options.for_scope("reporting").zipkin_trace_v2
     session = self._graph_helper.new_session(zipkin_trace_v2, build_id, v2_ui)
 
-    if options.for_global_scope().get('loop', False):
+    if options.for_global_scope().get("loop", False):
       fn = self._loop
     else:
       fn = self._body
@@ -198,7 +213,7 @@ class SchedulerService(PantsService):
     return session, specs, exit_code
 
   def _loop(
-    self, session: LegacyGraphSession, options: Options, options_bootstrapper: OptionsBootstrapper,
+    self, session: LegacyGraphSession, options: Options, options_bootstrapper: OptionsBootstrapper
   ) -> Tuple[Specs, int]:
     # TODO: See https://github.com/pantsbuild/pants/issues/6288 regarding Ctrl+C handling.
     iterations = options.for_global_scope().loop_max
@@ -212,19 +227,23 @@ class SchedulerService(PantsService):
         print(e, file=sys.stderr)
 
       iterations -= 1
-      while iterations and not self._state.is_terminating and not self._loop_condition.wait(timeout=1):
+      while (
+        iterations and not self._state.is_terminating and not self._loop_condition.wait(timeout=1)
+      ):
         continue
     return cast(Specs, specs), exit_code
 
   def _body(
-    self, session: LegacyGraphSession, options: Options, options_bootstrapper: OptionsBootstrapper,
+    self, session: LegacyGraphSession, options: Options, options_bootstrapper: OptionsBootstrapper
   ) -> Tuple[Specs, int]:
     global_options = options.for_global_scope()
     specs = SpecsCalculator.create(
       options=options,
       session=session.scheduler_session,
-      exclude_patterns=tuple(global_options.exclude_target_regexp) if global_options.exclude_target_regexp else tuple(),
-      tags=tuple(global_options.tag) if global_options.tag else tuple()
+      exclude_patterns=tuple(global_options.exclude_target_regexp)
+      if global_options.exclude_target_regexp
+      else tuple(),
+      tags=tuple(global_options.tag) if global_options.tag else tuple(),
     )
     exit_code = PANTS_SUCCEEDED_EXIT_CODE
 
@@ -234,12 +253,7 @@ class SchedulerService(PantsService):
       goals = v2_goals + (ambiguous_goals if global_options.v2 else tuple())
 
       # N.B. @goal_rules run pre-fork in order to cache the products they request during execution.
-      exit_code = session.run_goal_rules(
-          options_bootstrapper,
-          options,
-          goals,
-          specs,
-        )
+      exit_code = session.run_goal_rules(options_bootstrapper, options, goals, specs)
 
     return specs, exit_code
 

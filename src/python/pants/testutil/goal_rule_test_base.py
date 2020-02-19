@@ -33,7 +33,7 @@ class GoalRuleTestBase(TestBase):
     super().setUp()
 
     if not issubclass(self.goal_cls, Goal):
-      raise AssertionError(f'goal_cls() must return a Goal subclass, got {self.goal_cls}')
+      raise AssertionError(f"goal_cls() must return a Goal subclass, got {self.goal_cls}")
 
   def execute_rule(
     self,
@@ -50,10 +50,12 @@ class GoalRuleTestBase(TestBase):
     """
     # Create an OptionsBootstrapper for these args/env, and a captured Console instance.
     options_bootstrapper = create_options_bootstrapper(
-      args=(self.goal_cls.name, *(args or [])), env=env,
+      args=(self.goal_cls.name, *(args or [])), env=env
     )
     BuildConfigInitializer.get(options_bootstrapper)
-    full_options = options_bootstrapper.get_full_options(list(self.goal_cls.subsystem_cls.known_scope_infos()))
+    full_options = options_bootstrapper.get_full_options(
+      list(self.goal_cls.subsystem_cls.known_scope_infos())
+    )
     stdout, stderr = StringIO(), StringIO()
     console = Console(stdout=stdout, stderr=stderr)
     scheduler = self.scheduler
@@ -62,11 +64,7 @@ class GoalRuleTestBase(TestBase):
     # Run for the target specs parsed from the args.
     specs = SpecsCalculator.parse_specs(full_options.specs, self.build_root)
     params = Params(
-      specs.provided_specs,
-      console,
-      options_bootstrapper,
-      workspace,
-      *(additional_params or []),
+      specs.provided_specs, console, options_bootstrapper, workspace, *(additional_params or [])
     )
     actual_exit_code = self.scheduler.run_goal_rule(self.goal_cls, params)
 
@@ -75,8 +73,9 @@ class GoalRuleTestBase(TestBase):
     stdout_val = stdout.getvalue()
     stderr_val = stderr.getvalue()
 
-    assert exit_code == actual_exit_code, \
-      f"Exited with {actual_exit_code} (expected {exit_code}):\nstdout:\n{stdout_val}\nstderr:\n{stderr_val}"
+    assert (
+      exit_code == actual_exit_code
+    ), f"Exited with {actual_exit_code} (expected {exit_code}):\nstdout:\n{stdout_val}\nstderr:\n{stderr_val}"
 
     return stdout_val
 
@@ -95,7 +94,7 @@ class GoalRuleTestBase(TestBase):
     # '1,2,3,' - splitting this by the separator we should get ['1', '2', '3', ''] - always an extra
     # empty string if the separator is properly always a suffix and not applied just between
     # entries.
-    self.assertEqual(sorted(list(output) + ['']), sorted((self.execute_rule(**kwargs)).split(sep)))
+    self.assertEqual(sorted(list(output) + [""]), sorted((self.execute_rule(**kwargs)).split(sep)))
 
   def assert_console_output(self, *output, **kwargs):
     """Verifies the expected output entries are emitted by the console task under test.

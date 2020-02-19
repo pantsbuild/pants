@@ -13,7 +13,7 @@ def _validate_maybe_string(name, item):
 
 def _validate_string(name, item):
   if not item:
-    raise ValueError(f'{name} is a required field')
+    raise ValueError(f"{name} is a required field")
   return _validate_maybe_string(name, item)
 
 
@@ -33,8 +33,8 @@ class Scm:
     """
     # For the url format, see: http://maven.apache.org/scm/git.html
     params = dict(user=user, repo=repo)
-    connection = 'scm:git:git@github.com:{user}/{repo}.git'.format(**params)
-    url = 'https://github.com/{user}/{repo}'.format(**params)
+    connection = "scm:git:git@github.com:{user}/{repo}.git".format(**params)
+    url = "https://github.com/{user}/{repo}".format(**params)
     return cls(connection=connection, developer_connection=connection, url=url)
 
   def __init__(self, connection, developer_connection, url, tag=None):
@@ -46,10 +46,10 @@ class Scm:
     :param string tag: An optional tag corresponding to the published release.  This will be
                        populated by pants during publish runs.
     """
-    self.connection = _validate_string('connection', connection)
-    self.developer_connection = _validate_string('developer_connection', developer_connection)
-    self.url = _validate_string('url', url)
-    self.tag = _validate_maybe_string('tag', tag)
+    self.connection = _validate_string("connection", connection)
+    self.developer_connection = _validate_string("developer_connection", developer_connection)
+    self.url = _validate_string("url", url)
+    self.tag = _validate_maybe_string("tag", tag)
 
   def tagged(self, tag):
     """Creates a new `Scm` identical to this `Scm` but with the given `tag`."""
@@ -68,9 +68,9 @@ class License:
     :param string url: An url pointing to the license text.
     :param string comments: Optional comments clarifying the license.
     """
-    self.name = _validate_string('name', name)
-    self.url = _validate_string('url', url)
-    self.comments = _validate_maybe_string('comments', comments)
+    self.name = _validate_string("name", name)
+    self.url = _validate_string("url", url)
+    self.comments = _validate_maybe_string("comments", comments)
 
 
 class Developer:
@@ -79,8 +79,16 @@ class Developer:
   Refer to the schema here: http://maven.apache.org/maven-v4_0_0.xsd
   """
 
-  def __init__(self, user_id=None, name=None, email=None, url=None, organization=None,
-               organization_url=None, roles=None):
+  def __init__(
+    self,
+    user_id=None,
+    name=None,
+    email=None,
+    url=None,
+    organization=None,
+    organization_url=None,
+    roles=None,
+  ):
     """One of `user_id`, `name`, or `email` is required, all other parameters are optional.
 
     :param string user_id: The user id of the developer; typically the one used to access the scm.
@@ -94,15 +102,16 @@ class Developer:
     :param list roles: An optional list of role names that apply to this developer on this project.
     """
     if not (user_id or name or email):
-      raise ValueError("At least one of 'user_id', 'name' or 'email' must be specified for each "
-                       "developer.")
-    self.user_id = _validate_maybe_string('user_id', user_id)
-    self.name = _validate_maybe_string('name', name)
-    self.email = _validate_maybe_string('email', email)
-    self.url = _validate_maybe_string('url', url)
-    self.organization = _validate_maybe_string('organization', organization)
-    self.organization_url = _validate_maybe_string('organization_url', organization_url)
-    self.roles = assert_list(roles, key_arg='roles')
+      raise ValueError(
+        "At least one of 'user_id', 'name' or 'email' must be specified for each " "developer."
+      )
+    self.user_id = _validate_maybe_string("user_id", user_id)
+    self.name = _validate_maybe_string("name", name)
+    self.email = _validate_maybe_string("email", email)
+    self.url = _validate_maybe_string("url", url)
+    self.organization = _validate_maybe_string("organization", organization)
+    self.organization_url = _validate_maybe_string("organization_url", organization_url)
+    self.roles = assert_list(roles, key_arg="roles")
 
   @property
   def has_roles(self):
@@ -130,22 +139,25 @@ class OSSRHPublicationMetadata(PublicationMetadata):
     :param string name: The optional full name of the library.  If not supplied an appropriate name
                         will be synthesized.
     """
+
     def validate_nonempty_list(list_name, item, expected_type):
-      assert_list(item, expected_type=expected_type, can_be_none=False, key_arg='roles', allowable=(list,))
+      assert_list(
+        item, expected_type=expected_type, can_be_none=False, key_arg="roles", allowable=(list,)
+      )
       if not item:
-        raise ValueError(f'At least 1 entry is required in the {list_name} list.')
+        raise ValueError(f"At least 1 entry is required in the {list_name} list.")
       return item
 
-    self.description = _validate_string('description', description)
-    self.url = _validate_string('url', url)
-    self.licenses = validate_nonempty_list('licenses', licenses, License)
-    self.developers = validate_nonempty_list('developers', developers, Developer)
+    self.description = _validate_string("description", description)
+    self.url = _validate_string("url", url)
+    self.licenses = validate_nonempty_list("licenses", licenses, License)
+    self.developers = validate_nonempty_list("developers", developers, Developer)
 
     if not isinstance(scm, Scm):
       raise ValueError("scm must be an instance of Scm")
     self.scm = scm
 
-    self.name = _validate_maybe_string('name', name)
+    self.name = _validate_maybe_string("name", name)
 
   def _compute_fingerprint(self):
     # TODO(John Sirois): Untangle a JvmTarget's default fingerprint from the `provides` payload

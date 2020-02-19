@@ -48,7 +48,6 @@ class ConfigFile(ABC):
 
 
 class File1(ConfigFile):
-
   @property
   def content(self) -> str:
     return match(
@@ -130,7 +129,7 @@ class File1(ConfigFile):
           recursively_interpolated_from_section = "%(interpolated_from_section)s (again)"
           """
         ),
-      }
+      },
     )
 
   @property
@@ -146,32 +145,22 @@ class File1(ConfigFile):
       self.format,
       {
         ConfigFormat.ini: {**common_values, "disclaimer": "\nLet it be known\nthat."},
-        ConfigFormat.toml: {**common_values, "disclaimer": "Let it be known\nthat."}
-      }
+        ConfigFormat.toml: {**common_values, "disclaimer": "Let it be known\nthat."},
+      },
     )
 
   @property
   def expected_options(self) -> Dict:
     ini_values = {
-      "a": {
-        "list": "[1, 2, 3, 42]",
-        "list2": "+[7, 8, 9]",
-        "list3": '-["x", "y", "z"]',
-      },
-      "b": {
-        "preempt": "True",
-      },
-      "b.nested": {
-        "dict": "{\n'a': 1,\n'b': 42,\n'c': ['42', '42'],\n}"
-      },
-      "b.nested.nested-again": {
-        "movie": "inception",
-      },
+      "a": {"list": "[1, 2, 3, 42]", "list2": "+[7, 8, 9]", "list3": '-["x", "y", "z"]'},
+      "b": {"preempt": "True"},
+      "b.nested": {"dict": "{\n'a': 1,\n'b': 42,\n'c': ['42', '42'],\n}"},
+      "b.nested.nested-again": {"movie": "inception"},
       "c": {
         "name": "overridden_from_default",
         "interpolated_from_section": "overridden_from_default is interpolated",
         "recursively_interpolated_from_section": "overridden_from_default is interpolated (again)",
-      }
+      },
     }
     return match(
       self.format,
@@ -179,19 +168,14 @@ class File1(ConfigFile):
         ConfigFormat.ini: ini_values,
         ConfigFormat.toml: {
           **ini_values,
-          "a": {
-            **ini_values["a"], "list": '["1", "2", "3", "42"]',
-          },
-          "b.nested": {
-            "dict": '{\n  "a": 1,\n  "b": "42",\n  "c": ["42", "42"],\n}'
-          },
-        }
-      }
+          "a": {**ini_values["a"], "list": '["1", "2", "3", "42"]'},
+          "b.nested": {"dict": '{\n  "a": 1,\n  "b": "42",\n  "c": ["42", "42"],\n}'},
+        },
+      },
     )
 
 
 class File2(ConfigFile):
-
   @property
   def content(self) -> str:
     return match(
@@ -232,7 +216,7 @@ class File2(ConfigFile):
           no_values_in_parent = true
           """
         ),
-      }
+      },
     )
 
   @property
@@ -258,8 +242,9 @@ class ConfigBaseTest(TestBase):
   file2 = File2(ConfigFormat.ini)
 
   def _setup_config(self) -> Config:
-    with temporary_file(binary_mode=False, suffix=self.file1.suffix) as config1, \
-      temporary_file(binary_mode=False, suffix=self.file2.suffix) as config2:
+    with temporary_file(binary_mode=False, suffix=self.file1.suffix) as config1, temporary_file(
+      binary_mode=False, suffix=self.file2.suffix
+    ) as config2:
       config1.write(self.file1.content)
       config1.close()
       config2.write(self.file2.content)
@@ -273,14 +258,12 @@ class ConfigBaseTest(TestBase):
   def setUp(self) -> None:
     self.config = self._setup_config()
     self.default_seed_values = Config._determine_seed_values(
-      seed_values={"buildroot": self.build_root},
+      seed_values={"buildroot": self.build_root}
     )
     self.expected_combined_values = {
       **self.file1.expected_options,
       **self.file2.expected_options,
-      "a": {
-        **self.file2.expected_options["a"], **self.file1.expected_options["a"],
-      },
+      "a": {**self.file2.expected_options["a"], **self.file1.expected_options["a"]},
     }
 
   def test_sections(self) -> None:
@@ -292,7 +275,7 @@ class ConfigBaseTest(TestBase):
       assert self.config.has_section(section) is True
     # We should only look at explicitly defined sections. For example, if `cache.java` is defined
     # but `cache` is not, then `cache` should not be included in the sections.
-    assert self.config.has_section('p') is False
+    assert self.config.has_section("p") is False
 
   def test_has_option(self) -> None:
     # Check has all DEFAULT values
@@ -314,19 +297,11 @@ class ConfigBaseTest(TestBase):
       for option in self.file1.default_values:
         assert self.config.has_option(section=section, option=option) is False
     # Check that non-existent options are False
-    nonexistent_options = {
-      "DEFAULT": "fake",
-      "a": "fake",
-      "b": "fast",
-    }
+    nonexistent_options = {"DEFAULT": "fake", "a": "fake", "b": "fast"}
     for section, option in nonexistent_options.items():
       assert self.config.has_option(section=section, option=option) is False
     # Check that sections aren't misclassified as options
-    nested_sections = {
-      "b": "nested",
-      "b.nested": "nested-again",
-      "p": "child",
-    }
+    nested_sections = {"b": "nested", "b.nested": "nested-again", "p": "child"}
     for parent_section, child_section in nested_sections.items():
       assert self.config.has_option(section=parent_section, option=child_section) is False
 
@@ -344,7 +319,8 @@ class ConfigBaseTest(TestBase):
       assert file1_config.values.options(section=section) == expected
     for section, options in self.file2.expected_options.items():
       assert file2_config.values.options(section=section) == [
-        *options.keys(), *self.default_seed_values.keys()
+        *options.keys(),
+        *self.default_seed_values.keys(),
       ]
     # Check non-existent section
     for config in file1_config, file2_config:
@@ -358,10 +334,13 @@ class ConfigBaseTest(TestBase):
     # NB: string interpolation should only happen when calling _ConfigValues.get_value(). The
     # values for _ConfigValues.defaults are not yet interpolated.
     default_file1_values_unexpanded = {
-      **self.file1.default_values, "path": "/a/b/%(answer)s", "embed": "%(path)s::foo",
+      **self.file1.default_values,
+      "path": "/a/b/%(answer)s",
+      "embed": "%(path)s::foo",
     }
     assert file1_config.values.defaults == {
-      **self.default_seed_values, **default_file1_values_unexpanded,
+      **self.default_seed_values,
+      **default_file1_values_unexpanded,
     }
     assert file2_config.values.defaults == self.default_seed_values
 
@@ -381,12 +360,12 @@ class ConfigBaseTest(TestBase):
         assert self.config.get(section=section, option=option) == expected
 
     def check_defaults(default: str) -> None:
-      assert self.config.get(section='c', option='fast') is None
-      assert self.config.get(section='c', option='preempt', default=None) is None
-      assert self.config.get(section='c', option='jake', default=default) == default
+      assert self.config.get(section="c", option="fast") is None
+      assert self.config.get(section="c", option="preempt", default=None) is None
+      assert self.config.get(section="c", option="jake", default=default) == default
 
-    check_defaults('')
-    check_defaults('42')
+    check_defaults("")
+    check_defaults("42")
 
   def test_empty(self) -> None:
     config = Config.load([])
@@ -431,18 +410,11 @@ def test_toml_serializer() -> None:
       "listy": ["a", "b", "c"],
       "map": {"a": 0, "b": 1},
     },
-    "cache.java": {
-      "o": "",
-    },
-    "inception.nested.nested-again.one-more": {
-      "o": "",
-    }
+    "cache.java": {"o": ""},
+    "inception.nested.nested-again.one-more": {"o": ""},
   }
   assert TomlSerializer(original_values).normalize() == {
-    "GLOBAL": {
-      **original_values["GLOBAL"],
-      "map": "{'a': 0, 'b': 1}",
-    },
+    "GLOBAL": {**original_values["GLOBAL"], "map": "{'a': 0, 'b': 1}"},
     "cache": {"java": {"o": ""}},
     "inception": {"nested": {"nested-again": {"one-more": {"o": ""}}}},
   }

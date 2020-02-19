@@ -23,7 +23,6 @@ from pants.testutil.test_base import TestBase
 
 
 class BlackIntegrationTest(TestBase):
-
   def setUp(self):
     super().setUp()
     init_subsystems([download_pex_bin.DownloadedPexBin.Factory])
@@ -64,25 +63,31 @@ class BlackIntegrationTest(TestBase):
       args.append(f"--black-skip")
     input_snapshot = self.request_single_product(Snapshot, InputFilesContent(source_files))
     adaptor = TargetAdaptor(
-      sources=EagerFilesetWithSpec('test', {'globs': []}, snapshot=input_snapshot),
+      sources=EagerFilesetWithSpec("test", {"globs": []}, snapshot=input_snapshot),
       address=Address.parse("test:target"),
     )
     if origin is None:
       origin = SingleAddress(directory="test", name="target")
     adaptor_with_origin = TargetAdaptorWithOrigin(adaptor, origin)
     options_bootstrapper = create_options_bootstrapper(args=args)
-    lint_result = self.request_single_product(LintResult, Params(
-      BlackTarget(adaptor_with_origin),
-      options_bootstrapper,
-      download_pex_bin.DownloadedPexBin.Factory.global_instance(),
-    ))
-    fmt_result = self.request_single_product(FmtResult, Params(
-      BlackTarget(
-        adaptor_with_origin, prior_formatter_result_digest=input_snapshot.directory_digest,
+    lint_result = self.request_single_product(
+      LintResult,
+      Params(
+        BlackTarget(adaptor_with_origin),
+        options_bootstrapper,
+        download_pex_bin.DownloadedPexBin.Factory.global_instance(),
       ),
-      options_bootstrapper,
-      download_pex_bin.DownloadedPexBin.Factory.global_instance(),
-    ))
+    )
+    fmt_result = self.request_single_product(
+      FmtResult,
+      Params(
+        BlackTarget(
+          adaptor_with_origin, prior_formatter_result_digest=input_snapshot.directory_digest
+        ),
+        options_bootstrapper,
+        download_pex_bin.DownloadedPexBin.Factory.global_instance(),
+      ),
+    )
     return lint_result, fmt_result
 
   def get_digest(self, source_files: List[FileContent]) -> Digest:
@@ -120,7 +125,7 @@ class BlackIntegrationTest(TestBase):
   @pytest.mark.skip(reason="#9148: The config file exists but parser.py cannot find it")
   def test_respects_config_file(self) -> None:
     lint_result, fmt_result = self.run_black(
-      [self.needs_config_source], config="[tool.black]\nskip-string-normalization = 'true'\n",
+      [self.needs_config_source], config="[tool.black]\nskip-string-normalization = 'true'\n"
     )
     self.assertEqual(lint_result.exit_code, 0)
     self.assertIn("1 file would be left unchanged", lint_result.stderr)
@@ -129,7 +134,7 @@ class BlackIntegrationTest(TestBase):
 
   def test_respects_passthrough_args(self) -> None:
     lint_result, fmt_result = self.run_black(
-      [self.needs_config_source], passthrough_args="--skip-string-normalization",
+      [self.needs_config_source], passthrough_args="--skip-string-normalization"
     )
     assert lint_result.exit_code == 0
     assert "1 file would be left unchanged" in lint_result.stderr

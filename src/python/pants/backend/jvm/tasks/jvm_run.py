@@ -13,7 +13,7 @@ from pants.java.executor import CommandLineGrabber
 from pants.util.dirutil import safe_open
 
 
-_CWD_NOT_PRESENT = 'CWD NOT PRESENT'
+_CWD_NOT_PRESENT = "CWD NOT PRESENT"
 logger = logging.getLogger(__name__)
 
 
@@ -22,20 +22,29 @@ def is_binary(target):
 
 
 class JvmRun(JvmTask):
-
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--only-write-cmd-line', metavar='<file>',
-             help='Instead of running, just write the cmd line to this file.')
+    register(
+      "--only-write-cmd-line",
+      metavar="<file>",
+      help="Instead of running, just write the cmd line to this file.",
+    )
     # Note the use of implicit_value. This is so we can support three cases:
     # --cwd=<path>
     # --cwd (uses the implicit value)
     # No explicit --cwd at all (uses the default)
-    register('--cwd', default=_CWD_NOT_PRESENT, implicit_value='',
-             help='Set the working directory. If no argument is passed, use the target path.')
-    register('--main', metavar='<main class>',
-             help='Invoke this class (overrides "main"" attribute in jvm_binary targets)')
+    register(
+      "--cwd",
+      default=_CWD_NOT_PRESENT,
+      implicit_value="",
+      help="Set the working directory. If no argument is passed, use the target path.",
+    )
+    register(
+      "--main",
+      metavar="<main class>",
+      help='Invoke this class (overrides "main"" attribute in jvm_binary targets)',
+    )
 
   @classmethod
   def supports_passthru_args(cls):
@@ -86,7 +95,7 @@ class JvmRun(JvmTask):
       jvm = self.preferred_jvm_distribution_for_targets([binary])
       executor = CommandLineGrabber(jvm) if self.only_write_cmd_line else None
       self.context.release_lock()
-      with self.context.new_workunit(name='run', labels=[WorkUnitLabel.RUN]):
+      with self.context.new_workunit(name="run", labels=[WorkUnitLabel.RUN]):
         result = jvm.execute_java(
           classpath=self.classpath([target]),
           main=self.get_options().main or binary.main,
@@ -95,12 +104,11 @@ class JvmRun(JvmTask):
           args=self.args,
           cwd=working_dir,
           synthetic_jar_dir=self.workdir,
-          create_synthetic_jar=self.synthetic_classpath
+          create_synthetic_jar=self.synthetic_classpath,
         )
 
       if self.only_write_cmd_line:
-        with safe_open(expand_path(self.only_write_cmd_line), 'w') as outfile:
-          outfile.write(' '.join(executor.cmd))
+        with safe_open(expand_path(self.only_write_cmd_line), "w") as outfile:
+          outfile.write(" ".join(executor.cmd))
       elif result != 0:
-        raise TaskError(f'java {binary.main} ... exited non-zero ({result})',
-                        exit_code=result)
+        raise TaskError(f"java {binary.main} ... exited non-zero ({result})", exit_code=result)

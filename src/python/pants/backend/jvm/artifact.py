@@ -32,10 +32,14 @@ class Artifact(PayloadField):
     if not isinstance(repo, Repository):
       raise ValueError("repo must be an instance of Repository")
 
-    if (publication_metadata is not None
-        and not isinstance(publication_metadata, PublicationMetadata)):
-      raise ValueError("publication_metadata must be a {} but was a {}"
-                       .format(PublicationMetadata, type(publication_metadata)))
+    if publication_metadata is not None and not isinstance(
+      publication_metadata, PublicationMetadata
+    ):
+      raise ValueError(
+        "publication_metadata must be a {} but was a {}".format(
+          PublicationMetadata, type(publication_metadata)
+        )
+      )
 
     self.org = org
     self._base_name = name
@@ -51,9 +55,7 @@ class Artifact(PayloadField):
     self._base_name = value
 
   def __eq__(self, other):
-    return (type(other) == Artifact and
-            self.org == other.org and
-            self.name == other.name)
+    return type(other) == Artifact and self.org == other.org and self.name == other.name
 
   def __hash__(self):
     return hash((self.org, self.name))
@@ -76,7 +78,7 @@ class Artifact(PayloadField):
     return not self.__eq__(other)
 
   def __repr__(self):
-    return f'{self.org}-{self.name} -> {self.repo}'
+    return f"{self.org}-{self.name} -> {self.repo}"
 
   def __str__(self):
-    return f'{self.org}#{self.name}'
+    return f"{self.org}#{self.name}"

@@ -44,9 +44,10 @@ class HelpPrinter:
 
   def print_help(self) -> Literal[0, 1]:
     """Print help to the console."""
+
     def print_hint() -> None:
-      print(f'Use `{self.bin_name} goals` to list goals.')
-      print(f'Use `{self.bin_name} help` to get help.')
+      print(f"Use `{self.bin_name} goals` to list goals.")
+      print(f"Use `{self.bin_name} help` to get help.")
 
     if isinstance(self._help_request, VersionHelp):
       print(pants_version())
@@ -55,17 +56,17 @@ class HelpPrinter:
     elif isinstance(self._help_request, GoalsHelp):
       self._print_goals_help()
     elif isinstance(self._help_request, UnknownGoalHelp):
-      print('Unknown goals: {}'.format(', '.join(self._help_request.unknown_goals)))
+      print("Unknown goals: {}".format(", ".join(self._help_request.unknown_goals)))
       print_hint()
       return 1
     elif isinstance(self._help_request, NoGoalHelp):
-      print('No goals specified.')
+      print("No goals specified.")
       print_hint()
       return 1
     return 0
 
   def _print_goals_help(self) -> None:
-    print(f'\nUse `{self.bin_name} help $goal` to get help for a particular goal.\n')
+    print(f"\nUse `{self.bin_name} help $goal` to get help for a particular goal.\n")
     global_options = self._options.for_global_scope()
     goal_descriptions: Dict[str, str] = {}
     if global_options.v2:
@@ -75,7 +76,9 @@ class HelpPrinter:
         if scope_info.category == ScopeInfo.GOAL
       ]
       for scope_info in goal_scope_infos:
-        if scope_info.optionable_cls is None or not issubclass(scope_info.optionable_cls, GoalSubsystem):
+        if scope_info.optionable_cls is None or not issubclass(
+          scope_info.optionable_cls, GoalSubsystem
+        ):
           continue
         is_unimplemented = any(
           self._union_membership.union_rules.get(union_type) is None
@@ -86,13 +89,13 @@ class HelpPrinter:
         description = scope_info.description or "<no description>"
         goal_descriptions[scope_info.scope] = description
     if global_options.v1:
-      goal_descriptions.update({goal.name: goal.description_first_line
-                                for goal in Goal.all()
-                                if goal.description})
+      goal_descriptions.update(
+        {goal.name: goal.description_first_line for goal in Goal.all() if goal.description}
+      )
 
     max_width = max(len(name) for name in goal_descriptions.keys()) if goal_descriptions else 0
     for name, description in sorted(goal_descriptions.items()):
-      print(f'  {name.rjust(max_width)}: {description}')
+      print(f"  {name.rjust(max_width)}: {description}")
     print()
 
   def _print_options_help(self):
@@ -118,18 +121,20 @@ class HelpPrinter:
       return
     else:
       print(pants_release())
-      print('\nUsage:')
-      print(f'  {self.bin_name} [option ...] [goal ...] [target...]  Attempt the specified goals.')
-      print(f'  {self.bin_name} help                                 Get help.')
-      print(f'  {self.bin_name} help [goal]                          Get help for a goal.')
-      print(f'  {self.bin_name} help-advanced [goal]                 Get help for a goal\'s advanced options.')
-      print(f'  {self.bin_name} help-all                             Get help for all goals.')
-      print(f'  {self.bin_name} goals                                List all installed goals.')
-      print('')
-      print('  [target] accepts two special forms:')
-      print('    dir:  to include all targets in the specified directory.')
-      print('    dir:: to include all targets found recursively under the directory.')
-      print('\nFriendly docs:\n  http://pantsbuild.org/')
+      print("\nUsage:")
+      print(f"  {self.bin_name} [option ...] [goal ...] [target...]  Attempt the specified goals.")
+      print(f"  {self.bin_name} help                                 Get help.")
+      print(f"  {self.bin_name} help [goal]                          Get help for a goal.")
+      print(
+        f"  {self.bin_name} help-advanced [goal]                 Get help for a goal's advanced options."
+      )
+      print(f"  {self.bin_name} help-all                             Get help for all goals.")
+      print(f"  {self.bin_name} goals                                List all installed goals.")
+      print("")
+      print("  [target] accepts two special forms:")
+      print("    dir:  to include all targets in the specified directory.")
+      print("    dir:: to include all targets found recursively under the directory.")
+      print("\nFriendly docs:\n  http://pantsbuild.org/")
 
       print(self._format_help(ScopeInfo(GLOBAL_SCOPE, ScopeInfo.GLOBAL)))
 
@@ -151,4 +156,4 @@ class HelpPrinter:
     formatted_lines = help_formatter.format_options(
       scope, description, self._options.get_parser(scope).option_registrations_iter()
     )
-    return '\n'.join(formatted_lines)
+    return "\n".join(formatted_lines)

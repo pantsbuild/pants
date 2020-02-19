@@ -50,7 +50,9 @@ async def format_python_target(
 
 
 @rule
-def target_adaptor(adaptor_with_origin: PythonTargetAdaptorWithOrigin) -> _ConcretePythonFormatTarget:
+def target_adaptor(
+  adaptor_with_origin: PythonTargetAdaptorWithOrigin,
+) -> _ConcretePythonFormatTarget:
   return _ConcretePythonFormatTarget(adaptor_with_origin)
 
 
@@ -60,7 +62,9 @@ def app_adaptor(adaptor_with_origin: PythonAppAdaptorWithOrigin) -> _ConcretePyt
 
 
 @rule
-def binary_adaptor(adaptor_with_origin: PythonBinaryAdaptorWithOrigin) -> _ConcretePythonFormatTarget:
+def binary_adaptor(
+  adaptor_with_origin: PythonBinaryAdaptorWithOrigin,
+) -> _ConcretePythonFormatTarget:
   return _ConcretePythonFormatTarget(adaptor_with_origin)
 
 
@@ -70,7 +74,9 @@ def tests_adaptor(adaptor_with_origin: PythonTestsAdaptorWithOrigin) -> _Concret
 
 
 @rule
-def plugin_adaptor(adaptor_with_origin: PantsPluginAdaptorWithOrigin) -> _ConcretePythonFormatTarget:
+def plugin_adaptor(
+  adaptor_with_origin: PantsPluginAdaptorWithOrigin,
+) -> _ConcretePythonFormatTarget:
   return _ConcretePythonFormatTarget(adaptor_with_origin)
 
 
@@ -83,5 +89,5 @@ def rules():
     tests_adaptor,
     plugin_adaptor,
     *(RootRule(target_type) for target_type in PYTHON_TARGET_TYPES),
-    *(UnionRule(FormatTarget, target_type) for target_type in PYTHON_TARGET_TYPES)
+    *(UnionRule(FormatTarget, target_type) for target_type in PYTHON_TARGET_TYPES),
   ]

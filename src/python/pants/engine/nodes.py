@@ -18,7 +18,7 @@ def _satisfied_by(t, o):
 class State(ABC):
   @classmethod
   def raise_unrecognized(cls, state):
-    raise ValueError('Unrecognized Node State: {}'.format(state))
+    raise ValueError("Unrecognized Node State: {}".format(state))
 
   @staticmethod
   def from_components(components):
@@ -38,6 +38,7 @@ class State(ABC):
 @dataclass(frozen=True)
 class Return(State):
   """Indicates that a Node successfully returned a value."""
+
   value: Any
 
   @classmethod
@@ -51,4 +52,5 @@ class Return(State):
 @dataclass(frozen=True)
 class Throw(State):
   """Indicates that a Node should have been able to return a value, but failed."""
+
   exc: Any

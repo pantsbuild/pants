@@ -11,15 +11,19 @@ from pants.util.memo import memoized_property
 
 
 class Cookies(Subsystem):
-  options_scope = 'cookies'
+  options_scope = "cookies"
 
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--path', advanced=True, fingerprint=True,
-             default=os.path.join(register.bootstrap.pants_bootstrapdir, 'auth', 'cookies'),
-             help='Path to file that stores persistent cookies. '
-                  'Defaults to <pants bootstrap dir>/auth/cookies.')
+    register(
+      "--path",
+      advanced=True,
+      fingerprint=True,
+      default=os.path.join(register.bootstrap.pants_bootstrapdir, "auth", "cookies"),
+      help="Path to file that stores persistent cookies. "
+      "Defaults to <pants bootstrap dir>/auth/cookies.",
+    )
 
   def update(self, cookies):
     """Add specified cookies to our cookie jar, and persists it.
@@ -53,6 +57,6 @@ class Cookies(Subsystem):
   @memoized_property
   def _lock(self):
     """An identity-keyed inter-process lock around the cookie file."""
-    lockfile = '{}.lock'.format(self._get_cookie_file())
+    lockfile = "{}.lock".format(self._get_cookie_file())
     safe_mkdir_for(lockfile)
     return OwnerPrintingInterProcessFileLock(lockfile)

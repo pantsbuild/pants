@@ -25,13 +25,14 @@ class Get(Generic[_Product]):
     # verbose form: Get[product](subject_declared_type, subject)
     # shorthand form: Get[product](subject_declared_type(<constructor args for subject>))
   """
+
   product: Type[_Product]
   # TODO: Consider attemping to create a Get[_Product, _Subject] which still allows for the 2-arg
   # Get form, and then making this Type[_Subject]!
   subject_declared_type: Type
   subject: Optional[Any]
 
-  def __await__(self) -> 'Generator[Get[_Product], None, _Product]':
+  def __await__(self) -> "Generator[Get[_Product], None, _Product]":
     """Allow a Get to be `await`ed within an `async` method, returning a strongly-typed result.
 
     The `yield`ed value `self` is interpreted by the engine within `extern_generator_send()` in
@@ -63,20 +64,20 @@ class Get(Generic[_Product]):
     # NB: Compat for Python 3.6, which doesn't recognize the __class_getitem__ override, but *does*
     # contain an __orig_class__ attribute which is gone in later Pythons.
     # TODO: Remove after we drop support for running pants with Python 3.6!
-    maybe_orig_class = getattr(self, '__orig_class__', None)
+    maybe_orig_class = getattr(self, "__orig_class__", None)
     if maybe_orig_class:
-      type_param, = maybe_orig_class.__args__
+      (type_param,) = maybe_orig_class.__args__
       args = (type_param,) + args
 
     if len(args) not in (2, 3):
-      raise ValueError(
-        f'Expected either two or three arguments to {Get.__name__}; got {args}.'
-      )
+      raise ValueError(f"Expected either two or three arguments to {Get.__name__}; got {args}.")
     if len(args) == 2:
       product, subject = args
 
       if isinstance(subject, (type, TypeConstraint)):
-        raise TypeError(dedent("""\
+        raise TypeError(
+          dedent(
+            """\
           The two-argument form of Get does not accept a type as its second argument.
 
           args were: Get({args!r})
@@ -85,8 +86,11 @@ class Get(Generic[_Product]):
           the `input_gets` field of a rule. If you are using a `await Get(...)` in a rule
           and a type was intended, use the 3-argument version:
           Get({product!r}, {subject_type!r}, {subject!r})
-          """.format(args=args, product=product, subject_type=type(subject), subject=subject)
-        ))
+          """.format(
+              args=args, product=product, subject_type=type(subject), subject=subject
+            )
+          )
+        )
 
       subject_declared_type = type(subject)
     else:
@@ -103,12 +107,14 @@ class Get(Generic[_Product]):
     :param call_node: An `ast.Call` node representing a call to `Get(..)`.
     :return: A tuple of product type id and subject type id.
     """
+
     def render_args(args):
-      return ', '.join(
+      return ", ".join(
         # Dump the Name's id to simplify output when available, falling back to the name of the
         # node's class.
-        getattr(a, 'id', type(a).__name__)
-        for a in args)
+        getattr(a, "id", type(a).__name__)
+        for a in args
+      )
 
     # If the Get was provided with a type parameter, use that as the `product_type`.
     func = call_node.func
@@ -119,10 +125,11 @@ class Get(Generic[_Product]):
       if isinstance(index_expr, ast.Name):
         subscript_args = (index_expr,)
       else:
-        raise ValueError(f'Unrecognized type argument T for Get[T]: {ast.dump(index_expr)}')
+        raise ValueError(f"Unrecognized type argument T for Get[T]: {ast.dump(index_expr)}")
     else:
       raise ValueError(
-        f'Unrecognized Get call node type: expected Get or Get[T], received {ast.dump(call_node)}')
+        f"Unrecognized Get call node type: expected Get or Get[T], received {ast.dump(call_node)}"
+      )
 
     # Shuffle over the type parameter to be the first argument, if provided.
     combined_args = subscript_args + tuple(call_node.args)
@@ -131,22 +138,26 @@ class Get(Generic[_Product]):
       product_type, subject_constructor = combined_args
       if not isinstance(product_type, ast.Name) or not isinstance(subject_constructor, ast.Call):
         raise ValueError(
-          f'Two arg form of {Get.__name__} expected (product_type, subject_type(subject)), but '
-          f'got: ({render_args(combined_args)})')
+          f"Two arg form of {Get.__name__} expected (product_type, subject_type(subject)), but "
+          f"got: ({render_args(combined_args)})"
+        )
       return (product_type.id, subject_constructor.func.id)
     elif len(combined_args) == 3:
       product_type, subject_declared_type, _ = combined_args
       if not isinstance(product_type, ast.Name) or not isinstance(subject_declared_type, ast.Name):
         raise ValueError(
-          f'Three arg form of {Get.__name__} expected (product_type, subject_declared_type, subject), but '
-          f'got: ({render_args(combined_args)})')
+          f"Three arg form of {Get.__name__} expected (product_type, subject_declared_type, subject), but "
+          f"got: ({render_args(combined_args)})"
+        )
       return (product_type.id, subject_declared_type.id)
     else:
-      raise ValueError(f'Invalid {Get.__name__}; expected either two or three args, but '
-                       f'got: ({render_args(combined_args)})')
+      raise ValueError(
+        f"Invalid {Get.__name__}; expected either two or three args, but "
+        f"got: ({render_args(combined_args)})"
+      )
 
   @classmethod
-  def create_statically_for_rule_graph(cls, product_type, subject_type) -> 'Get':
+  def create_statically_for_rule_graph(cls, product_type, subject_type) -> "Get":
     """Construct a `Get` with a None value.
 
     This method is used to help make it explicit which `Get` instances are parsed from @rule bodies
@@ -159,6 +170,7 @@ class Get(Generic[_Product]):
 @dataclass(unsafe_hash=True)
 class MultiGet(Generic[_Product]):
   """Can be constructed with an iterable of `Get()`s and `await`ed to evaluate them in parallel."""
+
   gets: Tuple[Get[_Product], ...]
 
   def __await__(self) -> Generator[Tuple[Get[_Product], ...], None, Tuple[_Product, ...]]:
@@ -190,6 +202,7 @@ class Params:
 
   Distinct types are enforced at consumption time by the rust type of the same name.
   """
+
   params: Tuple[Any, ...]
 
   def __init__(self, *args: Any) -> None:

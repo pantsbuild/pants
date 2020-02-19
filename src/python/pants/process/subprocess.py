@@ -14,7 +14,7 @@ class Subprocess:
     # needs to be set on the bootstrap scope vs a Subsystem scope such that we have early access
     # to the option (e.g. via `OptionsBootstrapper` vs `OptionsInitializer`) in order to bootstrap
     # process-metadata dependent runs such as the pantsd thin client runner (`RemotePantsRunner`).
-    options_scope = 'subprocess'
+    options_scope = "subprocess"
 
     def create(self):
       options = self.global_instance().get_options()

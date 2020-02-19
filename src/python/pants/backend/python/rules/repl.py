@@ -29,19 +29,12 @@ async def run_python_repl(repl: PythonRepl) -> ReplBinary:
     ht.address for ht in targets.closure if isinstance(ht.adaptor, PythonTargetAdaptor)
   )
   create_pex = CreatePexFromTargetClosure(
-    addresses=python_addresses,
-    output_filename="python-repl.pex",
+    addresses=python_addresses, output_filename="python-repl.pex"
   )
 
   repl_pex = await Get[Pex](CreatePexFromTargetClosure, create_pex)
-  return ReplBinary(
-    digest=repl_pex.directory_digest,
-    binary_name=repl_pex.output_filename,
-  )
+  return ReplBinary(digest=repl_pex.directory_digest, binary_name=repl_pex.output_filename)
 
 
 def rules():
-  return [
-    UnionRule(ReplImplementation, PythonRepl),
-    run_python_repl,
-  ]
+  return [UnionRule(ReplImplementation, PythonRepl), run_python_repl]

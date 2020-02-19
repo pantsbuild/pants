@@ -49,6 +49,7 @@ class AggregatedFmtResults:
   language implementation should run each formatter one at a time and pipe the resulting digest of
   one formatter into the next. The `combined_digest` must contain all files for the target,
   including any which were not re-formatted."""
+
   results: Tuple[FmtResult, ...]
   combined_digest: Digest
 
@@ -62,12 +63,11 @@ class FormatTarget:
 
   @staticmethod
   def is_formattable(
-    adaptor_with_origin: TargetAdaptorWithOrigin, *, union_membership: UnionMembership,
+    adaptor_with_origin: TargetAdaptorWithOrigin, *, union_membership: UnionMembership
   ) -> bool:
     is_fmt_target = union_membership.is_member(FormatTarget, adaptor_with_origin)
-    has_sources = (
-      hasattr(adaptor_with_origin.adaptor, "sources")
-      and bool(adaptor_with_origin.adaptor.sources.snapshot.files)
+    has_sources = hasattr(adaptor_with_origin.adaptor, "sources") and bool(
+      adaptor_with_origin.adaptor.sources.snapshot.files
     )
     return has_sources and is_fmt_target
 
@@ -77,7 +77,7 @@ class FmtOptions(GoalSubsystem):
 
   # TODO: make this "fmt"
   # Blocked on https://github.com/pantsbuild/pants/issues/8351
-  name = 'fmt2'
+  name = "fmt2"
 
   required_union_implementations = (FormatTarget,)
 
@@ -91,7 +91,7 @@ async def fmt(
   console: Console,
   targets_with_origins: HydratedTargetsWithOrigins,
   workspace: Workspace,
-  union_membership: UnionMembership
+  union_membership: UnionMembership,
 ) -> Fmt:
   adaptors_with_origins = [
     TargetAdaptorWithOrigin.create(target_with_origin.target.adaptor, target_with_origin.origin)

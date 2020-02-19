@@ -27,8 +27,9 @@ class LegacyAddressMapper(AddressMapper):
     self._build_root = build_root
 
   def scan_build_files(self, base_path):
-    build_file_addresses = self._internal_scan_specs([DescendantAddresses(base_path)],
-                                                     missing_is_fatal=False)
+    build_file_addresses = self._internal_scan_specs(
+      [DescendantAddresses(base_path)], missing_is_fatal=False
+    )
 
     return {bfa.rel_path for bfa in build_file_addresses}
 
@@ -44,7 +45,8 @@ class LegacyAddressMapper(AddressMapper):
     # information for debugging most of the time.
     return any(
       address.spec_path == os.path.dirname(fp)
-      for fp in file_paths if BuildFile._is_buildfile_name(os.path.basename(fp))
+      for fp in file_paths
+      if BuildFile._is_buildfile_name(os.path.basename(fp))
     )
 
   @staticmethod
@@ -58,7 +60,7 @@ class LegacyAddressMapper(AddressMapper):
     return self._internal_scan_specs(specs, fail_fast=fail_fast, missing_is_fatal=True)
 
   def _specs_string(self, specs):
-    return ', '.join(s.to_spec_string() for s in specs)
+    return ", ".join(s.to_spec_string() for s in specs)
 
   def _internal_scan_specs(self, specs, fail_fast=True, missing_is_fatal=True):
     # TODO: This should really use `product_request`, but on the other hand, we need to
@@ -71,8 +73,10 @@ class LegacyAddressMapper(AddressMapper):
       if isinstance(state.exc, (AddressLookupError, ResolveError)):
         if missing_is_fatal:
           raise self.BuildFileScanError(
-            'AddressSpec `{}` does not match any targets.\n{}'.format(
-              self._specs_string(specs), str(state.exc)))
+            "AddressSpec `{}` does not match any targets.\n{}".format(
+              self._specs_string(specs), str(state.exc)
+            )
+          )
         else:
           # NB: ignore Throws containing ResolveErrors because they are due to missing targets / files
           return set()
@@ -82,7 +86,8 @@ class LegacyAddressMapper(AddressMapper):
     _, state = returns[0]
     if missing_is_fatal and not state.value.dependencies:
       raise self.BuildFileScanError(
-        'AddressSpec `{}` does not match any targets.'.format(self._specs_string(specs)))
+        "AddressSpec `{}` does not match any targets.".format(self._specs_string(specs))
+      )
 
     return set(state.value.dependencies)
 
@@ -93,6 +98,6 @@ class LegacyAddressMapper(AddressMapper):
       except ValueError as e:
         raise self.InvalidRootError(e)
     else:
-      base_path = ''
+      base_path = ""
 
     return self._internal_scan_specs([DescendantAddresses(base_path)], missing_is_fatal=False)

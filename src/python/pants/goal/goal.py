@@ -21,14 +21,19 @@ def _create_stable_task_type(superclass, options_scope):
   a class method to an instance method, and instantiating the task much sooner in the
   lifecycle.
   """
-  subclass_name = '{0}_{1}'.format(superclass.__name__,
-                                  options_scope.replace('.', '_').replace('-', '_'))
-  return type(subclass_name, (superclass,), {
-    '__doc__': superclass.__doc__,
-    '__module__': superclass.__module__,
-    'options_scope': options_scope,
-    '_stable_name': superclass.stable_name()
-  })
+  subclass_name = "{0}_{1}".format(
+    superclass.__name__, options_scope.replace(".", "_").replace("-", "_")
+  )
+  return type(
+    subclass_name,
+    (superclass,),
+    {
+      "__doc__": superclass.__doc__,
+      "__module__": superclass.__module__,
+      "options_scope": options_scope,
+      "_stable_name": superclass.stable_name(),
+    },
+  )
 
 
 class Goal:
@@ -38,10 +43,11 @@ class Goal:
 
   :API: public
   """
+
   _goal_by_name: Dict[str, "_Goal"] = {}
 
   def __new__(cls, *args, **kwargs):
-    raise TypeError('Do not instantiate {0}. Call by_name() instead.'.format(cls))
+    raise TypeError("Do not instantiate {0}. Call by_name() instead.".format(cls))
 
   @classmethod
   def register(cls, name, description, options_registrar_cls=None):
@@ -67,8 +73,9 @@ class Goal:
     """
     goal = cls.by_name(name)
     goal._description = description
-    goal._options_registrar_cls = (options_registrar_cls.registrar_for_scope(name)
-                                   if options_registrar_cls else None)
+    goal._options_registrar_cls = (
+      options_registrar_cls.registrar_for_scope(name) if options_registrar_cls else None
+    )
     return goal
 
   @classmethod
@@ -97,7 +104,7 @@ class Goal:
 
     :API: public
     """
-    return goal_name if goal_name == task_name else '{0}.{1}'.format(goal_name, task_name)
+    return goal_name if goal_name == task_name else "{0}.{1}".format(goal_name, task_name)
 
   @staticmethod
   def all():
@@ -135,7 +142,7 @@ class _Goal(object):
     """
     Optionable.validate_scope_name_component(name)
     self.name = name
-    self._description = ''
+    self._description = ""
     self._options_registrar_cls = None
     self.serialize = False
     self._task_type_by_name = {}  # name -> Task subclass.
@@ -151,12 +158,12 @@ class _Goal(object):
     if namesake_task and namesake_task.__doc__:
       # First line of docstring.
       return namesake_task.__doc__
-    return ''
+    return ""
 
   @property
   def description_first_line(self):
     # TODO: This is repetitive of Optionable.get_description(), which is used by v2 Goals.
-    return self.description.partition('\n')[0].strip()
+    return self.description.partition("\n")[0].strip()
 
   def register_options(self, options):
     if self._options_registrar_cls:
@@ -176,7 +183,7 @@ class _Goal(object):
     :API: public
     """
     if [bool(place) for place in [first, replace, before, after]].count(True) > 1:
-      raise GoalError('Can only specify one of first, replace, before or after')
+      raise GoalError("Can only specify one of first, replace, before or after")
 
     otn = self._ordered_task_names
     if replace:
@@ -188,9 +195,10 @@ class _Goal(object):
     task_name = task_registrar.name
     if task_name in self._task_type_by_name:
       raise GoalError(
-        'Can only specify a task name once per goal, saw multiple values for {} in goal {}'.format(
-          task_name,
-          self.name))
+        "Can only specify a task name once per goal, saw multiple values for {} in goal {}".format(
+          task_name, self.name
+        )
+      )
     Optionable.validate_scope_name_component(task_name)
     options_scope = Goal.scope(self.name, task_name)
 
@@ -227,7 +235,7 @@ class _Goal(object):
       del self._task_type_by_name[name]
       self._ordered_task_names = [x for x in self._ordered_task_names if x != name]
     else:
-      raise GoalError('Cannot uninstall unknown task: {0}'.format(name))
+      raise GoalError("Cannot uninstall unknown task: {0}".format(name))
 
   def subsystems(self):
     """Returns all subsystem types used by tasks in this goal, in no particular order."""

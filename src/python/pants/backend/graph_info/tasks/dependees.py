@@ -15,13 +15,21 @@ class ReverseDepmap(ConsoleTask):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--closed', type=bool,
-             help='Include the input targets in the output along with the dependees.')
+    register(
+      "--closed",
+      type=bool,
+      help="Include the input targets in the output along with the dependees.",
+    )
     # TODO: consider refactoring out common output format methods into MultiFormatConsoleTask.
-    register('--output-format', default='text', choices=['text', 'json'],
-             help='Output format of results.')
-    register('--transitive', type=bool, default=False,
-             help='Whether to include only the first level of dependendees.')
+    register(
+      "--output-format", default="text", choices=["text", "json"], help="Output format of results."
+    )
+    register(
+      "--transitive",
+      type=bool,
+      default=False,
+      help="Whether to include only the first level of dependendees.",
+    )
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
@@ -35,7 +43,7 @@ class ReverseDepmap(ConsoleTask):
 
   def console_output(self, _):
     dependees_by_target = defaultdict(set)
-    for address in self.context.build_graph.inject_address_specs_closure([DescendantAddresses('')]):
+    for address in self.context.build_graph.inject_address_specs_closure([DescendantAddresses("")]):
       target = self.context.build_graph.get_target(address)
       # TODO(John Sirois): tighten up the notion of targets written down in a BUILD by a
       # user vs. targets created by pants at runtime.
@@ -45,7 +53,7 @@ class ReverseDepmap(ConsoleTask):
         dependees_by_target[dependency].add(concrete_target)
 
     roots = set(self.context.target_roots)
-    if self.get_options().output_format == 'json':
+    if self.get_options().output_format == "json":
       deps = defaultdict(list)
       for root in roots:
         if self._closed:
@@ -54,7 +62,7 @@ class ReverseDepmap(ConsoleTask):
           deps[root.address.spec].append(dependent.address.spec)
       for address in deps.keys():
         deps[address].sort()
-      yield json.dumps(deps, indent=4, separators=(',', ': '), sort_keys=True)
+      yield json.dumps(deps, indent=4, separators=(",", ": "), sort_keys=True)
     else:
       if self._closed:
         # N.B. Sorting is necessary because `roots` is a set, and in Python 3 sets

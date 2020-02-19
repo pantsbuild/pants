@@ -26,7 +26,7 @@ class JvmApp(AppBase):
       Class-Path set to those jars.
     """
     payload = payload or Payload()
-    payload.add_field('deployjar', PrimitiveField(deployjar))
+    payload.add_field("deployjar", PrimitiveField(deployjar))
     super().__init__(payload=payload, **kwargs)
 
   @classmethod

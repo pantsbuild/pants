@@ -17,4 +17,4 @@ class PantsDaemonKill(Task):
       with pantsd.lifecycle_lock:
         pantsd.terminate()
     except ProcessManager.NonResponsiveProcess as e:
-      raise TaskError('failure while terminating pantsd: {}'.format(e))
+      raise TaskError("failure while terminating pantsd: {}".format(e))

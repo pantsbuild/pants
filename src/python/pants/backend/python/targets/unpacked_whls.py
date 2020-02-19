@@ -22,21 +22,31 @@ class UnpackedWheels(ImportWheelsMixin, Target):
   :API: public
   """
 
-  imported_target_kwargs_field = 'libraries'
-  imported_target_payload_field = 'library_specs'
+  imported_target_kwargs_field = "libraries"
+  imported_target_payload_field = "library_specs"
 
   @classmethod
   def alias(cls):
-    return 'unpacked_whls'
+    return "unpacked_whls"
 
   class ExpectedLibrariesError(Exception):
     """Thrown when the target has no libraries defined."""
+
     pass
 
   # TODO: consider introducing some form of source roots instead of the manual `within_data_subdir`
   # kwarg!
-  def __init__(self, module_name, libraries=None, include_patterns=None, exclude_patterns=None,
-               compatibility=None, within_data_subdir=None, payload=None, **kwargs):
+  def __init__(
+    self,
+    module_name,
+    libraries=None,
+    include_patterns=None,
+    exclude_patterns=None,
+    compatibility=None,
+    within_data_subdir=None,
+    payload=None,
+    **kwargs
+  ):
     """
     :param str module_name: The name of the specific python module containing headers and/or
                             libraries to extract (e.g. 'tensorflow').
@@ -58,21 +68,24 @@ class UnpackedWheels(ImportWheelsMixin, Target):
                                    setup.py.
     """
     payload = payload or Payload()
-    payload.add_fields({
-      'library_specs': PrimitiveField(libraries or ()),
-      'module_name': PrimitiveField(module_name),
-      'include_patterns' : PrimitiveField(include_patterns or ()),
-      'exclude_patterns' : PrimitiveField(exclude_patterns or ()),
-      'compatibility': PrimitiveField(maybe_list(compatibility or ())),
-      'within_data_subdir': PrimitiveField(within_data_subdir),
-      # TODO: consider supporting transitive deps like UnpackedJars!
-      # TODO: consider supporting `platforms` as in PythonBinary!
-    })
+    payload.add_fields(
+      {
+        "library_specs": PrimitiveField(libraries or ()),
+        "module_name": PrimitiveField(module_name),
+        "include_patterns": PrimitiveField(include_patterns or ()),
+        "exclude_patterns": PrimitiveField(exclude_patterns or ()),
+        "compatibility": PrimitiveField(maybe_list(compatibility or ())),
+        "within_data_subdir": PrimitiveField(within_data_subdir),
+        # TODO: consider supporting transitive deps like UnpackedJars!
+        # TODO: consider supporting `platforms` as in PythonBinary!
+      }
+    )
     super().__init__(payload=payload, **kwargs)
 
     if not libraries:
-      raise self.ExpectedLibrariesError('Expected non-empty libraries attribute for {spec}'
-                                        .format(spec=self.address.spec))
+      raise self.ExpectedLibrariesError(
+        "Expected non-empty libraries attribute for {spec}".format(spec=self.address.spec)
+      )
 
   @property
   def module_name(self):

@@ -29,19 +29,36 @@ class Filter(TargetFilterTaskMixin, ConsoleTask):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--type', type=list, metavar='[+-]type1,type2,...',
-             help='Filter on these target types.')
-    register('--target', type=list, metavar='[+-]spec1,spec2,...',
-             help='Filter on these target addresses.')
-    register('--ancestor', type=list, metavar='[+-]spec1,spec2,...',
-             help='Filter on targets that these targets depend on.')
-    register('--regex', type=list, metavar='[+-]regex1,regex2,...',
-             help='Filter on target addresses matching these regexes.')
-    register('--tag-regex', type=list, metavar='[+-]regex1,regex2,...',
-             help='Filter on targets with tags matching these regexes.')
     register(
-      '--transitive', type=bool, default=True, fingerprint=True,
-      help='If True, use all targets in the build graph, else use only target roots.',
+      "--type", type=list, metavar="[+-]type1,type2,...", help="Filter on these target types."
+    )
+    register(
+      "--target", type=list, metavar="[+-]spec1,spec2,...", help="Filter on these target addresses."
+    )
+    register(
+      "--ancestor",
+      type=list,
+      metavar="[+-]spec1,spec2,...",
+      help="Filter on targets that these targets depend on.",
+    )
+    register(
+      "--regex",
+      type=list,
+      metavar="[+-]regex1,regex2,...",
+      help="Filter on target addresses matching these regexes.",
+    )
+    register(
+      "--tag-regex",
+      type=list,
+      metavar="[+-]regex1,regex2,...",
+      help="Filter on targets with tags matching these regexes.",
+    )
+    register(
+      "--transitive",
+      type=bool,
+      default=True,
+      fingerprint=True,
+      help="If True, use all targets in the build graph, else use only target roots.",
       removal_version="1.27.0.dev0",
       removal_hint="This option has no impact on the goal `filter`.",
     )
@@ -56,24 +73,30 @@ class Filter(TargetFilterTaskMixin, ConsoleTask):
         address_spec = spec_parser.parse_spec(spec_str)
         addresses = self.context.address_mapper.scan_address_specs([address_spec])
       except AddressLookupError as e:
-        raise TaskError('Failed to parse address selector: {spec_str}\n {message}'.format(spec_str=spec_str, message=e))
+        raise TaskError(
+          "Failed to parse address selector: {spec_str}\n {message}".format(
+            spec_str=spec_str, message=e
+          )
+        )
       # filter specs may not have been parsed as part of the context: force parsing
       matches = set()
       for address in addresses:
         self.context.build_graph.inject_address_closure(address)
         matches.add(self.context.build_graph.get_target(address))
       if not matches:
-        raise TaskError('No matches for address selector: {spec_str}'.format(spec_str=spec_str))
+        raise TaskError("No matches for address selector: {spec_str}".format(spec_str=spec_str))
       return matches
 
     def filter_for_address(spec):
       matches = _get_targets(spec)
       return lambda target: target in matches
+
     self._filters.extend(create_filters(self.get_options().target, filter_for_address))
 
     def filter_for_type(name):
       target_types = self.target_types_for_alias(name)
       return lambda target: isinstance(target, tuple(target_types))
+
     self._filters.extend(create_filters(self.get_options().type, filter_for_type))
 
     def filter_for_ancestor(spec):
@@ -82,6 +105,7 @@ class Filter(TargetFilterTaskMixin, ConsoleTask):
       for ancestor in ancestors:
         ancestor.walk(children.add)
       return lambda target: target in children
+
     self._filters.extend(create_filters(self.get_options().ancestor, filter_for_ancestor))
 
     def filter_for_regex(regex):
@@ -90,6 +114,7 @@ class Filter(TargetFilterTaskMixin, ConsoleTask):
       except re.error as e:
         raise TaskError("Invalid regular expression: {}: {}".format(regex, e))
       return lambda target: parser.search(str(target.address.spec))
+
     self._filters.extend(create_filters(self.get_options().regex, filter_for_regex))
 
     def filter_for_tag_regex(tag_regex):
@@ -98,6 +123,7 @@ class Filter(TargetFilterTaskMixin, ConsoleTask):
       except re.error as e:
         raise TaskError("Invalid regular expression: {}: {}".format(tag_regex, e))
       return lambda target: any(regex.search(str(tag)) for tag in target.tags)
+
     self._filters.extend(create_filters(self.get_options().tag_regex, filter_for_tag_regex))
 
   def console_output(self, _):

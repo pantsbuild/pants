@@ -32,7 +32,6 @@ logger = logging.getLogger(__name__)
 
 
 class AbstractTarget:
-
   @classmethod
   def subsystems(cls):
     """The subsystems this target uses.
@@ -88,14 +87,18 @@ class Target(AbstractTarget):
     class UnknownArgumentError(TargetDefinitionException):
       """An unknown keyword argument was supplied to Target."""
 
-    options_scope = 'target-arguments'
+    options_scope = "target-arguments"
 
     @classmethod
     def register_options(cls, register):
-      register('--ignored', advanced=True, type=dict,
-               help='Map of target name to a list of keyword arguments that should be ignored if a '
-                    'target receives them unexpectedly. Typically used to allow usage of arguments '
-                    'in BUILD files that are not yet available in the current version of pants.')
+      register(
+        "--ignored",
+        advanced=True,
+        type=dict,
+        help="Map of target name to a list of keyword arguments that should be ignored if a "
+        "target receives them unexpectedly. Typically used to allow usage of arguments "
+        "in BUILD files that are not yet available in the current version of pants.",
+      )
 
     @classmethod
     def check(cls, target, kwargs):
@@ -114,30 +117,40 @@ class Target(AbstractTarget):
       # There doesn't appear to be an easy way to error if a Target subclass explicitly takes
       # `source` as a named kwarg; it would be nice to error rather than silently swallow the value,
       # if there were such a way.
-      ignore_params.add('source')
+      ignore_params.add("source")
       unknown_args = {arg: value for arg, value in kwargs.items() if arg not in ignore_params}
       ignored_args = {arg: value for arg, value in kwargs.items() if arg in ignore_params}
       if ignored_args:
-        logger.debug('{target} ignoring the unimplemented arguments: {args}'
-                     .format(target=target.address.spec,
-                             args=', '.join('{} = {}'.format(key, val)
-                                            for key, val in ignored_args.items())))
+        logger.debug(
+          "{target} ignoring the unimplemented arguments: {args}".format(
+            target=target.address.spec,
+            args=", ".join("{} = {}".format(key, val) for key, val in ignored_args.items()),
+          )
+        )
       if unknown_args:
-        error_message = '{target_type} received unknown arguments: {args}'
-        raise self.UnknownArgumentError(target.address.spec, error_message.format(
-          target_type=type(target).__name__,
-          args=''.join('\n  {} = {}'.format(key, value) for key, value in unknown_args.items())
-        ))
+        error_message = "{target_type} received unknown arguments: {args}"
+        raise self.UnknownArgumentError(
+          target.address.spec,
+          error_message.format(
+            target_type=type(target).__name__,
+            args="".join("\n  {} = {}".format(key, value) for key, value in unknown_args.items()),
+          ),
+        )
 
   class TagAssignments(Subsystem):
     """Tags to add to targets in addition to any defined in their BUILD files."""
 
-    options_scope = 'target-tag-assignments'
+    options_scope = "target-tag-assignments"
 
     @classmethod
     def register_options(cls, register):
-      register('--tag-targets-mappings', type=dict, default=None, fingerprint=True,
-               help='Dict with tag assignments for targets. Ex: { "tag1": ["path/to/target:foo"] }')
+      register(
+        "--tag-targets-mappings",
+        type=dict,
+        default=None,
+        fingerprint=True,
+        help='Dict with tag assignments for targets. Ex: { "tag1": ["path/to/target:foo"] }',
+      )
 
     @classmethod
     def tags_for(cls, target_address):
@@ -148,7 +161,7 @@ class Target(AbstractTarget):
       result = {}
       for tag, targets in (self.get_options().tag_targets_mappings or {}).items():
         for target in targets:
-          target_tags = result.setdefault(Address.parse(target).spec, []) 
+          target_tags = result.setdefault(Address.parse(target).spec, [])
           target_tags.append(tag)
       return result
 
@@ -161,11 +174,12 @@ class Target(AbstractTarget):
     """
     :API: public
     """
-    class ConcreteTargetAddressable(TargetAddressable):
 
+    class ConcreteTargetAddressable(TargetAddressable):
       @classmethod
       def get_target_type(cls):
         return target_cls
+
     return ConcreteTargetAddressable
 
   @memoized_property
@@ -177,7 +191,7 @@ class Target(AbstractTarget):
     """
     source_root = self._sources_field.source_root
     if not source_root:
-      raise TargetDefinitionException(self, 'Not under any configured source root.')
+      raise TargetDefinitionException(self, "Not under any configured source root.")
     return source_root.path
 
   @classmethod
@@ -221,23 +235,36 @@ class Target(AbstractTarget):
     return ids[0] if len(ids) == 1 else cls.combine_ids(ids)
 
   @classmethod
-  def _closure_dep_predicate(cls, roots, include_scopes=None, exclude_scopes=None, respect_intransitive=False):
+  def _closure_dep_predicate(
+    cls, roots, include_scopes=None, exclude_scopes=None, respect_intransitive=False
+  ):
     if not respect_intransitive and include_scopes is None and exclude_scopes is None:
       return None
 
     root_lookup = set(roots)
+
     def predicate(target, dep_target):
-      if not dep_target.scope.in_scope(include_scopes=include_scopes, exclude_scopes=exclude_scopes):
+      if not dep_target.scope.in_scope(
+        include_scopes=include_scopes, exclude_scopes=exclude_scopes
+      ):
         return False
       # dep_target.transitive == False means that dep_target is only included if target is a root target.
       if respect_intransitive and not dep_target.transitive and target not in root_lookup:
         return False
       return True
+
     return predicate
 
   @classmethod
-  def closure_for_targets(cls, target_roots, exclude_scopes=None, include_scopes=None,
-                          bfs=None, postorder=None, respect_intransitive=False):
+  def closure_for_targets(
+    cls,
+    target_roots,
+    exclude_scopes=None,
+    include_scopes=None,
+    bfs=None,
+    postorder=None,
+    respect_intransitive=False,
+  ):
     """Computes the closure of the given targets respecting the given input scopes.
 
     :API: public
@@ -253,38 +280,49 @@ class Target(AbstractTarget):
       will not be included unless they are direct dependencies of one of the root targets. (Defaults
       to False).
     """
-    target_roots = list(target_roots) # Sometimes generators are passed into this function.
+    target_roots = list(target_roots)  # Sometimes generators are passed into this function.
     if not target_roots:
       return OrderedSet()
 
     build_graph = target_roots[0]._build_graph
     addresses = [target.address for target in target_roots]
-    dep_predicate = cls._closure_dep_predicate(target_roots,
-                                               include_scopes=include_scopes,
-                                               exclude_scopes=exclude_scopes,
-                                               respect_intransitive=respect_intransitive)
+    dep_predicate = cls._closure_dep_predicate(
+      target_roots,
+      include_scopes=include_scopes,
+      exclude_scopes=exclude_scopes,
+      respect_intransitive=respect_intransitive,
+    )
     closure = OrderedSet()
 
     if not bfs:
       build_graph.walk_transitive_dependency_graph(
-        addresses=addresses,
-        work=closure.add,
-        postorder=postorder,
-        dep_predicate=dep_predicate,
+        addresses=addresses, work=closure.add, postorder=postorder, dep_predicate=dep_predicate
       )
     else:
-      closure.update(build_graph.transitive_subgraph_of_addresses_bfs(
-        addresses=addresses,
-        dep_predicate=dep_predicate,
-      ))
+      closure.update(
+        build_graph.transitive_subgraph_of_addresses_bfs(
+          addresses=addresses, dep_predicate=dep_predicate
+        )
+      )
 
     # Make sure all the roots made it into the closure.
     closure.update(target_roots)
     return closure
 
-  def __init__(self, name, address, build_graph, type_alias=None, payload=None, tags=None,
-               description=None, no_cache=False, scope=None, _transitive=None,
-               **kwargs):
+  def __init__(
+    self,
+    name,
+    address,
+    build_graph,
+    type_alias=None,
+    payload=None,
+    tags=None,
+    description=None,
+    no_cache=False,
+    scope=None,
+    _transitive=None,
+    **kwargs
+  ):
     """
     :API: public
 
@@ -317,9 +355,10 @@ class Target(AbstractTarget):
 
     self.payload = payload or Payload()
     self._scope = Scope(scope)
-    self.payload.add_field('scope_string', PrimitiveField(str(scope)))
-    self.payload.add_field('transitive',
-                           PrimitiveField(True if _transitive is None else _transitive))
+    self.payload.add_field("scope_string", PrimitiveField(str(scope)))
+    self.payload.add_field(
+      "transitive", PrimitiveField(True if _transitive is None else _transitive)
+    )
     self.payload.freeze()
     self.name = name
     self.address = address
@@ -376,8 +415,12 @@ class Target(AbstractTarget):
     """
     :API: public
     """
-    return assert_list(putative_list, expected_type, key_arg=key_arg,
-                       raise_type=lambda msg: TargetDefinitionException(self, msg))
+    return assert_list(
+      putative_list,
+      expected_type,
+      key_arg=key_arg,
+      raise_type=lambda msg: TargetDefinitionException(self, msg),
+    )
 
   def compute_invalidation_hash(self, fingerprint_strategy=None):
     """
@@ -397,7 +440,9 @@ class Target(AbstractTarget):
     """
     fingerprint_strategy = fingerprint_strategy or DefaultFingerprintStrategy()
     if fingerprint_strategy not in self._cached_fingerprint_map:
-      self._cached_fingerprint_map[fingerprint_strategy] = self.compute_invalidation_hash(fingerprint_strategy)
+      self._cached_fingerprint_map[fingerprint_strategy] = self.compute_invalidation_hash(
+        fingerprint_strategy
+      )
     return self._cached_fingerprint_map[fingerprint_strategy]
 
   def mark_extra_invalidation_hash_dirty(self):
@@ -438,7 +483,7 @@ class Target(AbstractTarget):
 
     fingerprint_strategy = fingerprint_strategy or DefaultFingerprintStrategy()
 
-    direct = (depth == 0 and fingerprint_strategy.direct(self))
+    direct = depth == 0 and fingerprint_strategy.direct(self)
     if direct:
       fingerprint_map = self._cached_direct_transitive_fingerprint_map
     else:
@@ -454,12 +499,13 @@ class Target(AbstractTarget):
             if direct:
               dep_hash = dep.invalidation_hash(fingerprint_strategy)
             else:
-              dep_hash = dep.transitive_invalidation_hash(fingerprint_strategy, depth=depth+1)
+              dep_hash = dep.transitive_invalidation_hash(fingerprint_strategy, depth=depth + 1)
             if dep_hash is not None:
               yield dep_hash
           except self.RecursiveDepthError as e:
-            raise self.RecursiveDepthError("{message}\n  referenced from {spec}"
-                                           .format(message=e, spec=dep.address.spec))
+            raise self.RecursiveDepthError(
+              "{message}\n  referenced from {spec}".format(message=e, spec=dep.address.spec)
+            )
 
       dep_hashes = sorted(list(dep_hash_iter()))
       for dep_hash in dep_hashes:
@@ -468,8 +514,9 @@ class Target(AbstractTarget):
       if target_hash is None and not dep_hashes:
         return None
       dependencies_hash = hasher.hexdigest()[:12]
-      combined_hash = '{target_hash}.{deps_hash}'.format(target_hash=target_hash,
-                                                         deps_hash=dependencies_hash)
+      combined_hash = "{target_hash}.{deps_hash}".format(
+        target_hash=target_hash, deps_hash=dependencies_hash
+      )
       fingerprint_map[fingerprint_strategy] = combined_hash
     return fingerprint_map[fingerprint_strategy]
 
@@ -494,11 +541,12 @@ class Target(AbstractTarget):
 
     def invalidate_dependee(dependee):
       dependee.mark_transitive_invalidation_hash_dirty()
+
     self._build_graph.walk_transitive_dependee_graph([self.address], work=invalidate_dependee)
 
   @memoized_property
   def _sources_field(self):
-    sources_field = self.payload.get_field('sources')
+    sources_field = self.payload.get_field("sources")
     if sources_field is not None:
       return sources_field
     return SourcesField(sources=FilesetWithSpec.empty(self.address.spec_path))
@@ -598,13 +646,13 @@ class Target(AbstractTarget):
 
   @staticmethod
   def _validate_target_representation_args(kwargs, payload):
-    assert (kwargs is None) ^ (payload is None), 'must provide either kwargs or payload'
-    assert (kwargs is None) or isinstance(kwargs, dict), (
-      'expected a `dict` object for kwargs, instead found a {}'.format(type(kwargs))
-    )
-    assert (payload is None) or isinstance(payload, Payload), (
-      'expected a `Payload` object for payload, instead found a {}'.format(type(payload))
-    )
+    assert (kwargs is None) ^ (payload is None), "must provide either kwargs or payload"
+    assert (kwargs is None) or isinstance(
+      kwargs, dict
+    ), "expected a `dict` object for kwargs, instead found a {}".format(type(kwargs))
+    assert (payload is None) or isinstance(
+      payload, Payload
+    ), "expected a `Payload` object for payload, instead found a {}".format(type(payload))
 
   @classmethod
   def compute_injectable_address_specs(cls, kwargs=None, payload=None):
@@ -672,8 +720,8 @@ class Target(AbstractTarget):
       removal_version="1.27.0.dev0",
       deprecated_entity_description="Target.compute_injectable_specs()",
       hint="Use `Target.compute_injectable_address_specs()` instead. The API is the same as "
-           "before. This change is to prepare for Pants eventually supporting file system specs, "
-           "e.g. `./pants cloc foo.py`. In preparation, we renamed `Spec` to `AddressSpec`."
+      "before. This change is to prepare for Pants eventually supporting file system specs, "
+      "e.g. `./pants cloc foo.py`. In preparation, we renamed `Spec` to `AddressSpec`.",
     )
 
   @classmethod
@@ -702,8 +750,8 @@ class Target(AbstractTarget):
       removal_version="1.27.0.dev0",
       deprecated_entity_description="Target.compute_dependency_specs()",
       hint="Use `Target.compute_dependency_address_specs()` instead. The API is the same as "
-           "before. This change is to prepare for Pants eventually supporting file system specs, "
-           "e.g. `./pants cloc foo.py`. In preparation, we renamed `Spec` to `AddressSpec`."
+      "before. This change is to prepare for Pants eventually supporting file system specs, "
+      "e.g. `./pants cloc foo.py`. In preparation, we renamed `Spec` to `AddressSpec`.",
     )
 
   @property
@@ -714,8 +762,10 @@ class Target(AbstractTarget):
     :return: targets that this target depends on
     :rtype: list of Target
     """
-    return [self._build_graph.get_target(dep_address)
-            for dep_address in self._build_graph.dependencies_of(self.address)]
+    return [
+      self._build_graph.get_target(dep_address)
+      for dep_address in self._build_graph.dependencies_of(self.address)
+    ]
 
   @property
   def export_addresses(self):
@@ -723,7 +773,7 @@ class Target(AbstractTarget):
     if exports is None:
 
       exports = []
-      for export_spec in getattr(self, 'export_specs', tuple()):
+      for export_spec in getattr(self, "export_specs", tuple()):
         if isinstance(export_spec, Target):
           exports.append(export_spec.address)
         else:
@@ -734,8 +784,11 @@ class Target(AbstractTarget):
       invalid_export_specs = [a.spec for a in exports if a not in dep_addresses]
       if len(invalid_export_specs) > 0:
         raise TargetDefinitionException(
-            self,
-            'Invalid exports: these exports must also be dependencies\n  {}'.format('\n  '.join(invalid_export_specs)))
+          self,
+          "Invalid exports: these exports must also be dependencies\n  {}".format(
+            "\n  ".join(invalid_export_specs)
+          ),
+        )
 
       self._cached_exports_addresses = exports
     return exports
@@ -755,6 +808,7 @@ class Target(AbstractTarget):
       default_predicate = self._closure_dep_predicate({self}, **dep_context.target_closure_kwargs)
       # TODO(#5977): this branch needs testing!
       if not default_predicate:
+
         def default_predicate(*args, **kwargs):
           return True
 
@@ -771,12 +825,9 @@ class Target(AbstractTarget):
           return True
         return False
 
-      dep_addresses = [d.address for d in self.dependencies
-                        if default_predicate(self, d)
-                      ]
+      dep_addresses = [d.address for d in self.dependencies if default_predicate(self, d)]
       result = self._build_graph.transitive_subgraph_of_addresses_bfs(
-        addresses=dep_addresses,
-        dep_predicate=dep_predicate
+        addresses=dep_addresses, dep_predicate=dep_predicate
       )
 
       strict_deps = OrderedSet()
@@ -784,9 +835,7 @@ class Target(AbstractTarget):
         if type(declared) in dep_context.alias_types:
           continue
         if isinstance(declared, dep_context.types_with_closure):
-          strict_deps.update(declared.closure(
-            bfs=True,
-            **dep_context.target_closure_kwargs))
+          strict_deps.update(declared.closure(bfs=True, **dep_context.target_closure_kwargs))
         strict_deps.add(declared)
 
       strict_deps = list(strict_deps)
@@ -794,8 +843,11 @@ class Target(AbstractTarget):
     return strict_deps
 
   def _dep_is_exported(self, dependency):
-    return dependency.address in self.export_addresses or \
-           dependency.is_synthetic and (dependency.concrete_derived_from.address in self.export_addresses)
+    return (
+      dependency.address in self.export_addresses
+      or dependency.is_synthetic
+      and (dependency.concrete_derived_from.address in self.export_addresses)
+    )
 
   @property
   def dependents(self):
@@ -805,8 +857,10 @@ class Target(AbstractTarget):
     :return: targets that depend on this target
     :rtype: list of Target
     """
-    return [self._build_graph.get_target(dep_address)
-            for dep_address in self._build_graph.dependents_of(self.address)]
+    return [
+      self._build_graph.get_target(dep_address)
+      for dep_address in self._build_graph.dependents_of(self.address)
+    ]
 
   @property
   def is_synthetic(self):
@@ -859,9 +913,9 @@ class Target(AbstractTarget):
       as its single argument and returns True if the target should passed to ``work``.
     """
     if not callable(work):
-      raise ValueError('work must be callable but was {}'.format(work))
+      raise ValueError("work must be callable but was {}".format(work))
     if predicate and not callable(predicate):
-      raise ValueError('predicate must be callable but was {}'.format(predicate))
+      raise ValueError("predicate must be callable but was {}".format(predicate))
     self._build_graph.walk_transitive_dependency_graph([self.address], work, predicate)
 
   def closure(self, *vargs, **kwargs):
@@ -888,7 +942,7 @@ class Target(AbstractTarget):
     return not self.__eq__(other)
 
   def __repr__(self):
-    addr = self.address if hasattr(self, 'address') else 'address not yet set'
+    addr = self.address if hasattr(self, "address") else "address not yet set"
     return "{}({})".format(type(self).__name__, addr)
 
   # List of glob patterns, or a single glob pattern.
@@ -922,7 +976,11 @@ class Target(AbstractTarget):
       sources = FilesetWithSpec.empty(sources_rel_path)
     elif not isinstance(sources, FilesetWithSpec):
       key_arg_section = "'{}' to be ".format(key_arg) if key_arg else ""
-      raise TargetDefinitionException(self, "Expected {}a glob, an address or a list, but was {}"
-                                            .format(key_arg_section, type(sources)))
+      raise TargetDefinitionException(
+        self,
+        "Expected {}a glob, an address or a list, but was {}".format(
+          key_arg_section, type(sources)
+        ),
+      )
 
     return SourcesField(sources=sources)

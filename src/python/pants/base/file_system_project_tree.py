@@ -22,8 +22,9 @@ class FileSystemProjectTree(ProjectTree):
     # an optional call, so that we can use it in fs.py rather than applying it by default.
     abspath = os.path.normpath(self._join(relpath))
     if os.path.realpath(abspath) != abspath:
-      raise ValueError('scandir for non-canonical path "{}" not supported in {}.'.format(
-        relpath, self))
+      raise ValueError(
+        'scandir for non-canonical path "{}" not supported in {}.'.format(relpath, self)
+      )
 
     for entry in os.scandir(abspath):
       # NB: We don't use `DirEntry.stat`, as the scandir docs indicate that that always requires
@@ -36,7 +37,7 @@ class FileSystemProjectTree(ProjectTree):
       elif entry.is_symlink():
         yield Link(entry_path)
       else:
-        raise IOError('Unsupported file type in {}: {}'.format(self, entry_path))
+        raise IOError("Unsupported file type in {}: {}".format(self, entry_path))
 
   def _isdir_raw(self, relpath):
     return os.path.isdir(self._join(relpath))
@@ -48,7 +49,7 @@ class FileSystemProjectTree(ProjectTree):
     return os.path.exists(self._join(relpath))
 
   def _content_raw(self, file_relpath):
-    with open(self._join(file_relpath), 'rb') as source:
+    with open(self._join(file_relpath), "rb") as source:
       return source.read()
 
   def _relative_readlink_raw(self, relpath):
@@ -56,11 +57,9 @@ class FileSystemProjectTree(ProjectTree):
 
   def _walk_raw(self, relpath, topdown=True):
     def onerror(error):
-      raise OSError(getattr(error, 'errno', None), 'Failed to walk below {}'.format(relpath), error)
+      raise OSError(getattr(error, "errno", None), "Failed to walk below {}".format(relpath), error)
 
-    for root, dirs, files in safe_walk(self._join(relpath),
-                                       topdown=topdown,
-                                       onerror=onerror):
+    for root, dirs, files in safe_walk(self._join(relpath), topdown=topdown, onerror=onerror):
       yield fast_relpath(root, self.build_root), dirs, files
 
   def __eq__(self, other):
@@ -73,4 +72,4 @@ class FileSystemProjectTree(ProjectTree):
     return hash(self.build_root)
 
   def __repr__(self):
-    return '{}({})'.format(self.__class__.__name__, self.build_root)
+    return "{}({})".format(self.__class__.__name__, self.build_root)

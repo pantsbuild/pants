@@ -68,12 +68,11 @@ class GoalSubsystem(SubsystemClientMixin, Optionable):
       dep = CacheSetup.scoped(
         cls,
         removal_version=cls.deprecated_cache_setup_removal_version,
-        removal_hint='Goal `{}` uses an independent caching implementation, and ignores `{}`.'.format(
-          cls.options_scope,
-          CacheSetup.subscope(cls.options_scope),
-        )
+        removal_hint="Goal `{}` uses an independent caching implementation, and ignores `{}`.".format(
+          cls.options_scope, CacheSetup.subscope(cls.options_scope)
+        ),
       )
-      return dep,
+      return (dep,)
     return tuple()
 
   def __init__(self, scope, scoped_options):
@@ -107,6 +106,7 @@ class Goal:
   they are not cacheable, and the `Goal` product of a `@goal_rule` contains only a exit_code
   value to indicate whether the rule exited cleanly.
   """
+
   exit_code: int
   subsystem_cls: ClassVar[Type[GoalSubsystem]]
 
@@ -126,8 +126,11 @@ class Outputting:
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--output-file', metavar='<path>',
-             help='Output to this file.  If unspecified, outputs to stdout.')
+    register(
+      "--output-file",
+      metavar="<path>",
+      help="Output to this file.  If unspecified, outputs to stdout.",
+    )
 
   @contextmanager
   def output(self, console):
@@ -142,7 +145,7 @@ class Outputting:
   def output_sink(self, console):
     stdout_file = None
     if self.values.output_file:
-      stdout_file = open(self.values.output_file, 'w')
+      stdout_file = open(self.values.output_file, "w")
       output_sink = stdout_file
     else:
       output_sink = console.stdout
@@ -158,8 +161,12 @@ class LineOriented(Outputting):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--sep', default='\\n', metavar='<separator>',
-             help='String to use to separate lines in line-oriented output.')
+    register(
+      "--sep",
+      default="\\n",
+      metavar="<separator>",
+      help="String to use to separate lines in line-oriented output.",
+    )
 
   @contextmanager
   def line_oriented(self, console):
@@ -167,6 +174,6 @@ class LineOriented(Outputting):
 
     The passed options instance will generally be the `Goal.Options` of an `Outputting` `Goal`.
     """
-    sep = self.values.sep.encode().decode('unicode_escape')
+    sep = self.values.sep.encode().decode("unicode_escape")
     with self.output_sink(console) as output_sink:
       yield lambda msg: print(msg, file=output_sink, end=sep)

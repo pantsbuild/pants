@@ -26,6 +26,7 @@ from pants.engine.selectors import Get
 @dataclass(frozen=True)
 class DownloadedClocScript:
   """Cloc script as downloaded from the pantsbuild binaries repo."""
+
   exe: SingleFileExecutable
 
   @property
@@ -45,13 +46,15 @@ async def download_cloc_script(cloc_binary_tool: ClocBinary) -> DownloadedClocSc
 
 class CountLinesOfCodeOptions(GoalSubsystem):
   """Print counts of lines of code."""
-  name = 'cloc2'
+
+  name = "cloc2"
 
   @classmethod
   def register_options(cls, register) -> None:
     super().register_options(register)
-    register('--ignored', type=bool, fingerprint=True,
-             help='Show information about files ignored by cloc.')
+    register(
+      "--ignored", type=bool, fingerprint=True, help="Show information about files ignored by cloc."
+    )
 
 
 class CountLinesOfCode(Goal):
@@ -68,16 +71,16 @@ async def run_cloc(
   """Runs the cloc perl script in an isolated process"""
 
   snapshots = [sources_snapshot.snapshot for sources_snapshot in sources_snapshots]
-  file_content = '\n'.join(
+  file_content = "\n".join(
     sorted(set(itertools.chain.from_iterable(snapshot.files for snapshot in snapshots)))
   ).encode()
 
   if not file_content:
     return CountLinesOfCode(exit_code=0)
 
-  input_files_filename = 'input_files.txt'
+  input_files_filename = "input_files.txt"
   input_file_digest = await Get[Digest](
-    InputFilesContent([FileContent(path=input_files_filename, content=file_content)]),
+    InputFilesContent([FileContent(path=input_files_filename, content=file_content)])
   )
   digest = await Get[Digest](
     DirectoriesToMerge(
@@ -89,22 +92,22 @@ async def run_cloc(
     )
   )
 
-  report_filename = 'report.txt'
-  ignore_filename = 'ignored.txt'
+  report_filename = "report.txt"
+  ignore_filename = "ignored.txt"
 
   cmd = (
-    '/usr/bin/perl',
+    "/usr/bin/perl",
     cloc_script.script_path,
-    '--skip-uniqueness',  # Skip the file uniqueness check.
-    f'--ignored={ignore_filename}',  # Write the names and reasons of ignored files to this file.
-    f'--report-file={report_filename}',  # Write the output to this file rather than stdout.
-    f'--list-file={input_files_filename}',  # Read an exhaustive list of files to process from this file.
+    "--skip-uniqueness",  # Skip the file uniqueness check.
+    f"--ignored={ignore_filename}",  # Write the names and reasons of ignored files to this file.
+    f"--report-file={report_filename}",  # Write the output to this file rather than stdout.
+    f"--list-file={input_files_filename}",  # Read an exhaustive list of files to process from this file.
   )
   req = ExecuteProcessRequest(
     argv=cmd,
     input_files=digest,
     output_files=(report_filename, ignore_filename),
-    description='cloc',
+    description="cloc",
   )
 
   exec_result = await Get[ExecuteProcessResult](ExecuteProcessRequest, req)
@@ -124,8 +127,4 @@ async def run_cloc(
 
 
 def rules():
-  return [
-    run_cloc,
-    download_cloc_script,
-    subsystem_rule(ClocBinary),
-  ]
+  return [run_cloc, download_cloc_script, subsystem_rule(ClocBinary)]

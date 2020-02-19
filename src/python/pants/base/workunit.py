@@ -16,33 +16,34 @@ class WorkUnitLabel:
   """
   :API: public
   """
+
   # Labels describing a workunit.  Reporting code can use this to decide how to display
   # information about this workunit.
   #
   # Note that a workunit can have multiple labels where this makes sense, e.g., TOOL, COMPILER
   # and NAILGUN.
-  SETUP = 'SETUP'         # Parsing build files etc.
-  GOAL = 'GOAL'           # Executing a goal.
-  TASK = 'TASK'           # Executing a task within a goal.
-  GROUP = 'GROUP'         # Executing a group.
+  SETUP = "SETUP"  # Parsing build files etc.
+  GOAL = "GOAL"  # Executing a goal.
+  TASK = "TASK"  # Executing a task within a goal.
+  GROUP = "GROUP"  # Executing a group.
 
-  BOOTSTRAP = 'BOOTSTRAP' # Invocation of code to fetch a tool.
-  TOOL = 'TOOL'           # Single invocations of a tool.
-  MULTITOOL = 'MULTITOOL' # Multiple consecutive invocations of the same tool.
-  COMPILER = 'COMPILER'   # Invocation of a compiler.
-  LINKER = 'LINKER'       # Invocation of a linker.
+  BOOTSTRAP = "BOOTSTRAP"  # Invocation of code to fetch a tool.
+  TOOL = "TOOL"  # Single invocations of a tool.
+  MULTITOOL = "MULTITOOL"  # Multiple consecutive invocations of the same tool.
+  COMPILER = "COMPILER"  # Invocation of a compiler.
+  LINKER = "LINKER"  # Invocation of a linker.
 
-  TEST = 'TEST'           # Running a test.
-  JVM = 'JVM'             # Running a tool via the JVM.
-  NAILGUN = 'NAILGUN'     # Running a tool via nailgun.
-  RUN = 'RUN'             # Running a binary.
-  REPL = 'REPL'           # Running a repl.
-  PREP = 'PREP'           # Running a prep command
-  LINT = 'LINT'           # Running a lint or static analysis tool.
+  TEST = "TEST"  # Running a test.
+  JVM = "JVM"  # Running a tool via the JVM.
+  NAILGUN = "NAILGUN"  # Running a tool via nailgun.
+  RUN = "RUN"  # Running a binary.
+  REPL = "REPL"  # Running a repl.
+  PREP = "PREP"  # Running a prep command
+  LINT = "LINT"  # Running a lint or static analysis tool.
 
   # Do not attempt to print workunit's label upon invocation
   # This has nothing to do with a process's own stderr/stdout.
-  SUPPRESS_LABEL = 'SUPPRESS_LABEL'
+  SUPPRESS_LABEL = "SUPPRESS_LABEL"
 
   @classmethod
   @memoized_method
@@ -50,7 +51,7 @@ class WorkUnitLabel:
     """
     :API: public
     """
-    return [key for key in dir(cls) if not key.startswith('_') and key.isupper()]
+    return [key for key in dir(cls) if not key.startswith("_") and key.isupper()]
 
 
 class WorkUnit:
@@ -77,7 +78,7 @@ class WorkUnit:
   # Generic workunit log config.
   #   log_level: Display log messages up to this level.
   #   color: log color settings.
-  LogConfig = namedtuple('LogConfig', ['level', 'colors'])
+  LogConfig = namedtuple("LogConfig", ["level", "colors"])
 
   @staticmethod
   def outcome_string(outcome):
@@ -85,9 +86,9 @@ class WorkUnit:
 
     :API: public
     """
-    return ['ABORTED', 'FAILURE', 'WARNING', 'SUCCESS', 'UNKNOWN'][outcome]
+    return ["ABORTED", "FAILURE", "WARNING", "SUCCESS", "UNKNOWN"][outcome]
 
-  def __init__(self, run_info_dir, parent, name, labels=None, cmd='', log_config=None):
+  def __init__(self, run_info_dir, parent, name, labels=None, cmd="", log_config=None):
     """
     - run_info_dir: The path of the run_info_dir from the RunTracker that tracks this WorkUnit.
     - parent: The containing workunit, if any. E.g., 'compile' might contain 'java', 'scala' etc.,
@@ -170,13 +171,14 @@ class WorkUnit:
     those of its subunits. The right thing happens: The outcome of a work unit is the
     worst outcome of any of its subunits and any outcome set on it directly."""
     if outcome not in range(0, 5):
-      raise Exception('Invalid outcome: {}'.format(outcome))
+      raise Exception("Invalid outcome: {}".format(outcome))
 
     if outcome < self._outcome:
       self._outcome = outcome
-      if self.parent: self.parent.set_outcome(self._outcome)
+      if self.parent:
+        self.parent.set_outcome(self._outcome)
 
-  _valid_name_re = re.compile(r'\w+')
+  _valid_name_re = re.compile(r"\w+")
 
   def output(self, name):
     """Returns the output buffer for the specified output name (e.g., 'stdout'), creating it if
@@ -186,14 +188,16 @@ class WorkUnit:
     """
     m = WorkUnit._valid_name_re.match(name)
     if not m or m.group(0) != name:
-      raise Exception('Invalid output name: {}'.format(name))
+      raise Exception("Invalid output name: {}".format(name))
     if name not in self._outputs:
-      workunit_name = re.sub(r'\W', '_', self.name)
-      path = os.path.join(self.run_info_dir,
-                          'tool_outputs', '{workunit_name}-{id}.{output_name}'
-                          .format(workunit_name=workunit_name,
-                                  id=self.id,
-                                  output_name=name))
+      workunit_name = re.sub(r"\W", "_", self.name)
+      path = os.path.join(
+        self.run_info_dir,
+        "tool_outputs",
+        "{workunit_name}-{id}.{output_name}".format(
+          workunit_name=workunit_name, id=self.id, output_name=name
+        ),
+      )
       safe_mkdir_for(path)
       self._outputs[name] = FileBackedRWBuf(path)
       self._output_paths[name] = path
@@ -226,7 +230,7 @@ class WorkUnit:
 
     :API: public
     """
-    return time.strftime('%H:%M:%S', time.localtime(self.start_time))
+    return time.strftime("%H:%M:%S", time.localtime(self.start_time))
 
   @property
   def start_delta_string(self):
@@ -235,7 +239,7 @@ class WorkUnit:
     :API: public
     """
     delta = int(self.start_time) - int(self.root().start_time)
-    return '{:02}:{:02}'.format(int(delta / 60), delta % 60)
+    return "{:02}:{:02}".format(int(delta / 60), delta % 60)
 
   def root(self):
     """
@@ -277,7 +281,7 @@ class WorkUnit:
 
     :API: public
     """
-    return ':'.join(reversed([w.name for w in self.ancestors()]))
+    return ":".join(reversed([w.name for w in self.ancestors()]))
 
   def unaccounted_time(self):
     """Returns non-leaf time spent in this workunit.
@@ -295,11 +299,19 @@ class WorkUnit:
     :API: public
     """
     ret = {}
-    for key in ['name', 'cmd', 'id', 'start_time', 'end_time',
-                'outcome', 'start_time_string', 'start_delta_string']:
+    for key in [
+      "name",
+      "cmd",
+      "id",
+      "start_time",
+      "end_time",
+      "outcome",
+      "start_time_string",
+      "start_delta_string",
+    ]:
       val = getattr(self, key)
-      ret[key] = val() if hasattr(val, '__call__') else val
-    ret['parent'] = self.parent.to_dict() if self.parent else None
+      ret[key] = val() if hasattr(val, "__call__") else val
+    ret["parent"] = self.parent.to_dict() if self.parent else None
     return ret
 
   def _self_time(self):

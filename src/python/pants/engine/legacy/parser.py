@@ -35,7 +35,7 @@ class LegacyPythonCallbacksParser(Parser):
 
   def __init__(
     self,
-    symbol_table:SymbolTable,
+    symbol_table: SymbolTable,
     aliases: BuildFileAliases,
     build_file_imports_behavior: BuildFileImportsBehavior,
   ) -> None:
@@ -52,7 +52,7 @@ class LegacyPythonCallbacksParser(Parser):
 
   @staticmethod
   def _generate_symbols(
-    symbol_table: SymbolTable, aliases: BuildFileAliases,
+    symbol_table: SymbolTable, aliases: BuildFileAliases
   ) -> Tuple[Dict, ParseContext]:
     symbols: Dict = {}
 
@@ -77,16 +77,17 @@ class LegacyPythonCallbacksParser(Parser):
       def __call__(self, *args, **kwargs):
         # Target names default to the name of the directory their BUILD file is in
         # (as long as it's not the root directory).
-        if 'name' not in kwargs and issubclass(self._object_type, TargetAdaptor):
+        if "name" not in kwargs and issubclass(self._object_type, TargetAdaptor):
           dirname = os.path.basename(self._parse_context.rel_path)
           if dirname:
-            kwargs['name'] = dirname
+            kwargs["name"] = dirname
           else:
             raise UnaddressableObjectError(
-                'Targets in root-level BUILD files must be named explicitly.')
-        name = kwargs.get('name')
+              "Targets in root-level BUILD files must be named explicitly."
+            )
+        name = kwargs.get("name")
         if name and self._serializable:
-          kwargs.setdefault('type_alias', self._type_alias)
+          kwargs.setdefault("type_alias", self._type_alias)
           obj = self._object_type(**kwargs)
           self._parse_context._storage.add(obj)
           return obj
@@ -121,11 +122,11 @@ class LegacyPythonCallbacksParser(Parser):
       def __call__(self, *args, **kwargs):
         return self._glob_type(*args, spec_path=self._parse_context.rel_path, **kwargs)
 
-    symbols['globs'] = GlobWrapper(parse_context, Globs)
-    symbols['rglobs'] = GlobWrapper(parse_context, RGlobs)
-    symbols['zglobs'] = GlobWrapper(parse_context, ZGlobs)
+    symbols["globs"] = GlobWrapper(parse_context, Globs)
+    symbols["rglobs"] = GlobWrapper(parse_context, RGlobs)
+    symbols["zglobs"] = GlobWrapper(parse_context, ZGlobs)
 
-    symbols['bundle'] = BundleAdaptor
+    symbols["bundle"] = BundleAdaptor
 
     return symbols, parse_context
 
@@ -168,7 +169,9 @@ class LegacyPythonCallbacksParser(Parser):
     # Note that this is incredibly poor sandboxing. There are many ways to get around it.
     # But it's sufficient to tell most users who aren't being actively malicious that they're doing
     # something wrong, and it has a low performance overhead.
-    if "globs" in python or (self._build_file_imports_behavior != BuildFileImportsBehavior.allow and 'import' in python):
+    if "globs" in python or (
+      self._build_file_imports_behavior != BuildFileImportsBehavior.allow and "import" in python
+    ):
       io_wrapped_python = StringIO(python)
       for token in tokenize.generate_tokens(io_wrapped_python.readline):
         token_str = token[1]
@@ -176,23 +179,23 @@ class LegacyPythonCallbacksParser(Parser):
 
         self.check_for_deprecated_globs_usage(token_str, filepath, lineno)
 
-        if token_str == 'import':
+        if token_str == "import":
           if self._build_file_imports_behavior == BuildFileImportsBehavior.allow:
             continue
           elif self._build_file_imports_behavior == BuildFileImportsBehavior.warn:
             logger.warning(
-              f'Import used in {filepath} at line {lineno}. Import statements should '
-              f'be avoided in BUILD files because they can easily break Pants caching and lead to '
-              f'stale results. Instead, consider rewriting your code into a Pants plugin: '
-              f'https://www.pantsbuild.org/howto_plugin.html'
+              f"Import used in {filepath} at line {lineno}. Import statements should "
+              f"be avoided in BUILD files because they can easily break Pants caching and lead to "
+              f"stale results. Instead, consider rewriting your code into a Pants plugin: "
+              f"https://www.pantsbuild.org/howto_plugin.html"
             )
           else:
             raise ParseError(
-              f'Import used in {filepath} at line {lineno}. Import statements are banned in '
-              f'BUILD files in this repository and should generally be avoided because '
-              f'they can easily break Pants caching and lead to stale results. Instead, consider '
-              f'rewriting your code into a Pants plugin: '
-              f'https://www.pantsbuild.org/howto_plugin.html'
+              f"Import used in {filepath} at line {lineno}. Import statements are banned in "
+              f"BUILD files in this repository and should generally be avoided because "
+              f"they can easily break Pants caching and lead to stale results. Instead, consider "
+              f"rewriting your code into a Pants plugin: "
+              f"https://www.pantsbuild.org/howto_plugin.html"
             )
 
     return list(self._parse_context._storage.objects)

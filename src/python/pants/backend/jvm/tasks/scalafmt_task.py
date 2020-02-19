@@ -24,8 +24,8 @@ class ScalafmtTask(RewriteBase):
     return resolve_conflicting_options(
       old_option=old_option,
       new_option=new_option,
-      old_scope='fmt-scalafmt',
-      new_scope='scalafmt',
+      old_scope="fmt-scalafmt",
+      new_scope="scalafmt",
       old_container=self.get_options(),
       new_container=Scalafmt.global_instance().options,
     )
@@ -33,10 +33,8 @@ class ScalafmtTask(RewriteBase):
   def _resolve_conflicting_skip(self, *, old_scope: str):
     # Skip mypy because this is a temporary hack, and mypy doesn't follow the inheritance chain
     # properly.
-    return self.resolve_conflicting_skip_options( # type: ignore
-      old_scope=old_scope,
-      new_scope='scalafmt',
-      subsystem=Scalafmt.global_instance(),
+    return self.resolve_conflicting_skip_options(  # type: ignore
+      old_scope=old_scope, new_scope="scalafmt", subsystem=Scalafmt.global_instance()
     )
 
   @classmethod
@@ -46,42 +44,48 @@ class ScalafmtTask(RewriteBase):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--configuration', advanced=True, type=file_option, fingerprint=True,
-             removal_version='1.27.0.dev0', removal_hint='Use `--scalafmt-config` instead.',
-             help='Path to scalafmt config file, if not specified default scalafmt config used')
+    register(
+      "--configuration",
+      advanced=True,
+      type=file_option,
+      fingerprint=True,
+      removal_version="1.27.0.dev0",
+      removal_hint="Use `--scalafmt-config` instead.",
+      help="Path to scalafmt config file, if not specified default scalafmt config used",
+    )
 
-    cls.register_jvm_tool(register,
-                          'scalafmt',
-                          classpath=[
-                          JarDependency(org='com.geirsson',
-                                        name='scalafmt-cli_2.11',
-                                        rev='1.5.1')
-                          ])
+    cls.register_jvm_tool(
+      register,
+      "scalafmt",
+      classpath=[JarDependency(org="com.geirsson", name="scalafmt-cli_2.11", rev="1.5.1")],
+    )
 
   @classmethod
   def target_types(cls):
-    return ['scala_library', 'junit_tests']
+    return ["scala_library", "junit_tests"]
 
   @classmethod
   def source_extension(cls):
-    return '.scala'
+    return ".scala"
 
   @classmethod
   def implementation_version(cls):
-    return super().implementation_version() + [('ScalaFmt', 5)]
+    return super().implementation_version() + [("ScalaFmt", 5)]
 
   def invoke_tool(self, absolute_root, target_sources):
     args = list(self.additional_args)
     config = self._resolve_conflicting_options(old_option="configuration", new_option="config")
     if config is not None:
-      args.extend(['--config', config])
+      args.extend(["--config", config])
     args.extend([source for _target, source in target_sources])
 
-    return self.runjava(classpath=self.tool_classpath('scalafmt'),
-                        main='org.scalafmt.cli.Cli',
-                        args=args,
-                        workunit_name='scalafmt',
-                        jvm_options=self.get_options().jvm_options)
+    return self.runjava(
+      classpath=self.tool_classpath("scalafmt"),
+      main="org.scalafmt.cli.Cli",
+      args=args,
+      workunit_name="scalafmt",
+      jvm_options=self.get_options().jvm_options,
+    )
 
   @property
   @abstractmethod
@@ -105,7 +109,7 @@ class ScalaFmtCheckFormat(LintTaskMixin, ScalafmtTask):
   """
 
   sideeffecting = False
-  additional_args = ['--test']
+  additional_args = ["--test"]
 
   @property
   def skip_execution(self):
@@ -113,8 +117,10 @@ class ScalaFmtCheckFormat(LintTaskMixin, ScalafmtTask):
 
   def process_result(self, result):
     if result != 0:
-      raise TaskError('Scalafmt failed with exit code {}; to fix run: '
-                      '`./pants fmt <targets>`'.format(result), exit_code=result)
+      raise TaskError(
+        "Scalafmt failed with exit code {}; to fix run: " "`./pants fmt <targets>`".format(result),
+        exit_code=result,
+      )
 
 
 class ScalaFmtFormat(FmtTaskMixin, ScalafmtTask):
@@ -128,7 +134,7 @@ class ScalaFmtFormat(FmtTaskMixin, ScalafmtTask):
   """
 
   sideeffecting = True
-  additional_args = ['-i']
+  additional_args = ["-i"]
 
   @property
   def skip_execution(self):
@@ -137,4 +143,4 @@ class ScalaFmtFormat(FmtTaskMixin, ScalafmtTask):
   def process_result(self, result):
     # Processes the results of running the scalafmt command.
     if result != 0:
-      raise TaskError('Scalafmt failed to format files', exit_code=result)
+      raise TaskError("Scalafmt failed to format files", exit_code=result)

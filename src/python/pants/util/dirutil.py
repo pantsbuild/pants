@@ -50,7 +50,7 @@ def fast_relpath(path: str, start: str) -> str:
   """A prefix-based relpath, with no normalization or support for returning `..`."""
   relpath = fast_relpath_optional(path, start)
   if relpath is None:
-    raise ValueError(f'{start} is not a directory containing {path}')
+    raise ValueError(f"{start} is not a directory containing {path}")
   return relpath
 
 
@@ -64,14 +64,14 @@ def fast_relpath_optional(path: str, start: str) -> Optional[str]:
     return path
 
   # Determine where the matchable prefix ends.
-  pref_end = len(start) - 1 if start[-1] == '/' else len(start)
+  pref_end = len(start) - 1 if start[-1] == "/" else len(start)
   if pref_end > len(path):
     # The prefix is too long to match.
     return None
-  elif path[:pref_end] == start[:pref_end] and (len(path) == pref_end or path[pref_end] == '/'):
+  elif path[:pref_end] == start[:pref_end] and (len(path) == pref_end or path[pref_end] == "/"):
     # The prefix matches, and the entries are either identical, or the suffix indicates that
     # the prefix is a directory.
-    return path[pref_end+1:]
+    return path[pref_end + 1 :]
   return None
 
 
@@ -82,8 +82,8 @@ def ensure_relative_file_name(path: Path) -> str:
   subprocess, without putting the executable file on the PATH.
   """
   if path.is_absolute():
-    raise ValueError(f'path {path} is expected to be relative!')
-  return f'./{path}'
+    raise ValueError(f"path {path} is expected to be relative!")
+  return f"./{path}"
 
 
 def safe_mkdir(directory: str, clean: bool = False) -> None:
@@ -125,7 +125,7 @@ def safe_mkdir_for_all(paths: Sequence[str]) -> None:
 
 
 def safe_file_dump(
-  filename: str, payload: Union[bytes, str] = '', mode: str = 'w', makedirs: bool = False
+  filename: str, payload: Union[bytes, str] = "", mode: str = "w", makedirs: bool = False
 ) -> None:
   """Write a string to a file.
 
@@ -148,19 +148,23 @@ def safe_file_dump(
 
 
 @overload
-def maybe_read_file(filename: str) -> Optional[str]: ...
+def maybe_read_file(filename: str) -> Optional[str]:
+  ...
 
 
 @overload
-def maybe_read_file(filename: str, binary_mode: Literal[False]) -> Optional[str]: ...
+def maybe_read_file(filename: str, binary_mode: Literal[False]) -> Optional[str]:
+  ...
 
 
 @overload
-def maybe_read_file(filename: str, binary_mode: Literal[True]) -> Optional[bytes]: ...
+def maybe_read_file(filename: str, binary_mode: Literal[True]) -> Optional[bytes]:
+  ...
 
 
 @overload
-def maybe_read_file(filename: str, binary_mode: bool) -> Optional[Union[bytes, str]]: ...
+def maybe_read_file(filename: str, binary_mode: bool) -> Optional[Union[bytes, str]]:
+  ...
 
 
 def maybe_read_file(filename: str, binary_mode: bool = False) -> Optional[Union[bytes, str]]:
@@ -177,19 +181,23 @@ def maybe_read_file(filename: str, binary_mode: bool = False) -> Optional[Union[
 
 
 @overload
-def read_file(filename: str) -> str: ...
+def read_file(filename: str) -> str:
+  ...
 
 
 @overload
-def read_file(filename: str, binary_mode: Literal[False]) -> str: ...
+def read_file(filename: str, binary_mode: Literal[False]) -> str:
+  ...
 
 
 @overload
-def read_file(filename: str, binary_mode: Literal[True]) -> bytes: ...
+def read_file(filename: str, binary_mode: Literal[True]) -> bytes:
+  ...
 
 
 @overload
-def read_file(filename: str, binary_mode: bool) -> Union[str, bytes]: ...
+def read_file(filename: str, binary_mode: bool) -> Union[str, bytes]:
+  ...
 
 
 def read_file(filename: str, binary_mode: bool = False) -> Union[bytes, str]:
@@ -199,7 +207,7 @@ def read_file(filename: str, binary_mode: bool = False) -> Union[bytes, str]:
   :param binary_mode: Read from file as bytes or unicode.
   :returns: The contents of the file.
   """
-  mode = 'rb' if binary_mode else 'r'
+  mode = "rb" if binary_mode else "r"
   with open(filename, mode) as f:
     content: Union[bytes, str] = f.read()
     return content
@@ -230,9 +238,7 @@ class ExistingDirError(ValueError):
   """Indicates a copy operation would over-write a directory with a file."""
 
 
-def mergetree(
-  src: str, dst: str, symlinks: bool = False, ignore=None, file_filter=None
-) -> None:
+def mergetree(src: str, dst: str, symlinks: bool = False, ignore=None, file_filter=None) -> None:
   """Just like `shutil.copytree`, except the `dst` dir may exist.
 
   The `src` directory will be walked and its contents copied into `dst`. If `dst` already exists the
@@ -263,9 +269,11 @@ def mergetree(
       dst_dir = os.path.join(dst_path, dirname)
       if os.path.exists(dst_dir):
         if not os.path.isdir(dst_dir):
-          raise ExistingFileError('While copying the tree at {} to {}, encountered directory {} in '
-                                  'the source tree that already exists in the destination as a '
-                                  'non-directory.'.format(src, dst, dst_dir))
+          raise ExistingFileError(
+            "While copying the tree at {} to {}, encountered directory {} in "
+            "the source tree that already exists in the destination as a "
+            "non-directory.".format(src, dst, dst_dir)
+          )
         visit_dirs.append(dirname)
       elif symlinks and os.path.islink(src_dir):
         link = os.readlink(src_dir)
@@ -289,9 +297,12 @@ def mergetree(
       dst_filename = os.path.join(dst_path, filename)
       if os.path.exists(dst_filename):
         if not os.path.isfile(dst_filename):
-          raise ExistingDirError('While copying the tree at {} to {}, encountered file {} in the '
-                                 'source tree that already exists in the destination as a non-file.'
-                                 .format(src, dst, dst_filename))
+          raise ExistingDirError(
+            "While copying the tree at {} to {}, encountered file {} in the "
+            "source tree that already exists in the destination as a non-file.".format(
+              src, dst, dst_filename
+            )
+          )
         else:
           os.unlink(dst_filename)
       src_filename = os.path.join(src_path, filename)
@@ -427,7 +438,7 @@ def safe_concurrent_creation(target_path: str) -> Iterator[str]:
   :yields: A temporary path containing the original path with a unique (uuid4) suffix.
   """
   safe_mkdir_for(target_path)
-  tmp_path = f'{target_path}.tmp.{uuid.uuid4().hex}'
+  tmp_path = f"{target_path}.tmp.{uuid.uuid4().hex}"
   try:
     yield tmp_path
   except Exception:
@@ -441,7 +452,7 @@ def safe_concurrent_creation(target_path: str) -> Iterator[str]:
 def chmod_plus_x(path: str) -> None:
   """Equivalent of unix `chmod a+x path`"""
   path_mode = os.stat(path).st_mode
-  path_mode &= int('777', 8)
+  path_mode &= int("777", 8)
   if path_mode & stat.S_IRUSR:
     path_mode |= stat.S_IXUSR
   if path_mode & stat.S_IRGRP:
@@ -546,7 +557,7 @@ def touch(path: str, times: Optional[Union[int, Tuple[int, int]]] = None):
     )
   if isinstance(times, int):
     times = (times, times)
-  with safe_open(path, 'a'):
+  with safe_open(path, "a"):
     os.utime(path, times)
 
 
@@ -564,7 +575,7 @@ def recursive_dirname(f: str) -> Iterator[str]:
     yield f
     prev = f
     f = os.path.dirname(f)
-  yield ''
+  yield ""
 
 
 def get_basedir(path: str) -> str:
@@ -575,7 +586,7 @@ def get_basedir(path: str) -> str:
     get_basedir('/foo/bar/baz') --> ''
     get_basedir('foo') --> 'foo'
   """
-  return path[:path.index(os.sep)] if os.sep in path else path
+  return path[: path.index(os.sep)] if os.sep in path else path
 
 
 def rm_rf(name: str) -> None:
@@ -611,10 +622,12 @@ def check_no_overlapping_paths(paths: Iterable[str]) -> None:
     list_copy_without_path = list(paths)
     list_copy_without_path.remove(path)
     if path in list_copy_without_path:
-      raise ValueError(f'{path} appeared more than once. All paths must be unique.')
+      raise ValueError(f"{path} appeared more than once. All paths must be unique.")
     for p in list_copy_without_path:
       if path in p:
-        raise ValueError(f'{path} and {p} have the same prefix. All paths must be unique and cannot overlap.')
+        raise ValueError(
+          f"{path} and {p} have the same prefix. All paths must be unique and cannot overlap."
+        )
 
 
 def is_executable(path: str) -> bool:

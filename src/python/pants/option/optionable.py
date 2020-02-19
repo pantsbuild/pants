@@ -47,19 +47,19 @@ class OptionableFactory(ABC):
     # NB: We must populate several dunder methods on the partial function because partial functions
     # do not have these defined by default and the engine uses these values to visualize functions
     # in error messages and the rule graph.
-    snake_scope = cls.options_scope.replace('-', '_')
-    partial_construct_optionable.__name__ = f'construct_scope_{snake_scope}'
+    snake_scope = cls.options_scope.replace("-", "_")
+    partial_construct_optionable.__name__ = f"construct_scope_{snake_scope}"
     partial_construct_optionable.__module__ = cls.__module__
     _, class_definition_lineno = inspect.getsourcelines(cls)
     partial_construct_optionable.__line_number__ = class_definition_lineno
 
     return dict(
-        output_type=cls.optionable_cls,
-        input_selectors=tuple(),
-        func=partial_construct_optionable,
-        input_gets=(Get.create_statically_for_rule_graph(ScopedOptions, Scope),),
-        dependency_optionables=(cls.optionable_cls,),
-      )
+      output_type=cls.optionable_cls,
+      input_selectors=tuple(),
+      func=partial_construct_optionable,
+      input_gets=(Get.create_statically_for_rule_graph(ScopedOptions, Scope),),
+      dependency_optionables=(cls.optionable_cls,),
+    )
 
 
 class Optionable(OptionableFactory, metaclass=ABCMeta):
@@ -76,7 +76,7 @@ class Optionable(OptionableFactory, metaclass=ABCMeta):
   deprecated_options_scope: Optional[str] = None
   deprecated_options_scope_removal_version: Optional[str] = None
 
-  _scope_name_component_re = re.compile(r'^(?:[a-z0-9])+(?:-(?:[a-z0-9])+)*$')
+  _scope_name_component_re = re.compile(r"^(?:[a-z0-9])+(?:-(?:[a-z0-9])+)*$")
 
   @classproperty
   def optionable_cls(cls):
@@ -92,21 +92,20 @@ class Optionable(OptionableFactory, metaclass=ABCMeta):
     if not cls.is_valid_scope_name_component(s):
       raise OptionsError(
         f'Options scope "{s}" is not valid:\nReplace in code with a new scope name consisting of '
-        f'dash-separated-words, with words consisting only of lower-case letters and digits.'
+        f"dash-separated-words, with words consisting only of lower-case letters and digits."
       )
 
   @classmethod
   def get_scope_info(cls):
     """Returns a ScopeInfo instance representing this Optionable's options scope."""
     if cls.options_scope is None or cls.options_scope_category is None:
-      raise OptionsError(
-        f'{cls.__name__} must set options_scope and options_scope_category.')
+      raise OptionsError(f"{cls.__name__} must set options_scope and options_scope_category.")
     return ScopeInfo(cls.options_scope, cls.options_scope_category, cls)
 
   @classmethod
   def subscope(cls, scope):
     """Create a subscope under this Optionable's scope."""
-    return f'{cls.options_scope}.{scope}'
+    return f"{cls.options_scope}.{scope}"
 
   @classmethod
   def known_scope_infos(cls):
@@ -124,12 +123,12 @@ class Optionable(OptionableFactory, metaclass=ABCMeta):
     pants command. These flags will then be as specific as possible, including e.g. all dependent
     subsystem scopes.
     """
-    return re.sub(r'\.', '-', cls.options_scope)
+    return re.sub(r"\.", "-", cls.options_scope)
 
   @classmethod
   def get_description(cls):
     # First line of docstring.
-    return '' if cls.__doc__ is None else cls.__doc__.partition('\n')[0].strip()
+    return "" if cls.__doc__ is None else cls.__doc__.partition("\n")[0].strip()
 
   @classmethod
   def register_options(cls, register):
@@ -157,4 +156,4 @@ class Optionable(OptionableFactory, metaclass=ABCMeta):
     # subclass anyway.
     cls = type(self)
     if not isinstance(cls.options_scope, str):
-      raise NotImplementedError(f'{cls} must set an options_scope class-level property.')
+      raise NotImplementedError(f"{cls} must set an options_scope class-level property.")

@@ -41,7 +41,7 @@ class RecvBufferedSocket:
     self._socket = sock
     self._chunk_size = chunk_size
     self._select_timeout = select_timeout
-    self._buffer = b''
+    self._buffer = b""
     self._maybe_tune_socket(sock)
 
   def _maybe_tune_socket(self, sock):
@@ -55,7 +55,7 @@ class RecvBufferedSocket:
 
   def recv(self, bufsize):
     """Buffers up to _chunk_size bytes when the internal buffer has less than `bufsize` bytes."""
-    assert bufsize > 0, 'a positive bufsize is required'
+    assert bufsize > 0, "a positive bufsize is required"
 
     if len(self._buffer) < bufsize and is_readable(self._socket, timeout=self._select_timeout):
       recvd = self._socket.recv(max(self._chunk_size, bufsize))

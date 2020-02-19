@@ -43,10 +43,12 @@ class ProcessGroup:
 
   def _instance_from_process(self, process):
     """Default converter from psutil.Process to process instance classes for subclassing."""
-    return ProcessManager(name=process.name(),
-                          pid=process.pid,
-                          process_name=process.name(),
-                          metadata_base_dir=self._metadata_base_dir)
+    return ProcessManager(
+      name=process.name(),
+      pid=process.pid,
+      process_name=process.name(),
+      metadata_base_dir=self._metadata_base_dir,
+    )
 
   def iter_processes(self, proc_filter=None):
     """Yields processes from psutil.process_iter with an optional filter and swallows psutil errors.
@@ -69,12 +71,15 @@ class ProcessGroup:
 class ProcessMetadataManager:
   """"Manages contextual, on-disk process metadata."""
 
-  class MetadataError(Exception): pass
-  class Timeout(Exception): pass
+  class MetadataError(Exception):
+    pass
+
+  class Timeout(Exception):
+    pass
 
   FAIL_WAIT_SEC = 10
   INFO_INTERVAL_SEC = 5
-  WAIT_INTERVAL_SEC = .1
+  WAIT_INTERVAL_SEC = 0.1
 
   def __init__(self, metadata_base_dir=None):
     """
@@ -83,8 +88,7 @@ class ProcessMetadataManager:
     super().__init__()
 
     self._metadata_base_dir = (
-      metadata_base_dir or
-      Subprocess.Factory.global_instance().create().get_subprocess_dir()
+      metadata_base_dir or Subprocess.Factory.global_instance().create().get_subprocess_dir()
     )
 
   @staticmethod
@@ -104,8 +108,14 @@ class ProcessMetadataManager:
       return item
 
   @classmethod
-  def _deadline_until(cls, closure, action_msg, timeout=FAIL_WAIT_SEC,
-                      wait_interval=WAIT_INTERVAL_SEC, info_interval=INFO_INTERVAL_SEC):
+  def _deadline_until(
+    cls,
+    closure,
+    action_msg,
+    timeout=FAIL_WAIT_SEC,
+    wait_interval=WAIT_INTERVAL_SEC,
+    info_interval=INFO_INTERVAL_SEC,
+  ):
     """Execute a function/closure repeatedly until a True condition or timeout is met.
 
     :param func closure: the function/closure to execute (should not block for long periods of time
@@ -129,10 +139,12 @@ class ProcessMetadataManager:
 
       now = time.time()
       if now > deadline:
-        raise cls.Timeout('exceeded timeout of {} seconds while waiting for {}'.format(timeout, action_msg))
+        raise cls.Timeout(
+          "exceeded timeout of {} seconds while waiting for {}".format(timeout, action_msg)
+        )
 
       if now > info_deadline:
-        logger.info('waiting for {}...'.format(action_msg))
+        logger.info("waiting for {}...".format(action_msg))
         info_deadline = info_deadline + info_interval
       elif wait_interval:
         time.sleep(wait_interval)
@@ -140,10 +152,11 @@ class ProcessMetadataManager:
   @classmethod
   def _wait_for_file(cls, filename, timeout=FAIL_WAIT_SEC, want_content=True):
     """Wait up to timeout seconds for filename to appear with a non-zero size or raise Timeout()."""
+
     def file_waiter():
       return os.path.exists(filename) and (not want_content or os.path.getsize(filename))
 
-    action_msg = 'file {} to appear'.format(filename)
+    action_msg = "file {} to appear".format(filename)
     return cls._deadline_until(file_waiter, action_msg, timeout=timeout)
 
   @staticmethod
@@ -210,18 +223,24 @@ class ProcessMetadataManager:
     :raises: `ProcessManager.MetadataError` when OSError is encountered on metadata dir removal.
     """
     meta_dir = self._get_metadata_dir_by_name(name, self._metadata_base_dir)
-    logger.debug('purging metadata directory: {}'.format(meta_dir))
+    logger.debug("purging metadata directory: {}".format(meta_dir))
     try:
       rm_rf(meta_dir)
     except OSError as e:
-      raise ProcessMetadataManager.MetadataError('failed to purge metadata directory {}: {!r}'.format(meta_dir, e))
+      raise ProcessMetadataManager.MetadataError(
+        "failed to purge metadata directory {}: {!r}".format(meta_dir, e)
+      )
 
 
 class ProcessManager(ProcessMetadataManager):
   """Subprocess/daemon management mixin/superclass. Not intended to be thread-safe."""
 
-  class InvalidCommandOutput(Exception): pass
-  class NonResponsiveProcess(Exception): pass
+  class InvalidCommandOutput(Exception):
+    pass
+
+  class NonResponsiveProcess(Exception):
+    pass
+
   class ExecutionError(Exception):
     def __init__(self, message, output=None):
       super(ProcessManager.ExecutionError, self).__init__(message)
@@ -229,13 +248,14 @@ class ProcessManager(ProcessMetadataManager):
       self.output = output
 
     def __repr__(self):
-      return '{}(message={!r}, output={!r})'.format(type(self).__name__, self.message, self.output)
+      return "{}(message={!r}, output={!r})".format(type(self).__name__, self.message, self.output)
 
   KILL_WAIT_SEC = 5
   KILL_CHAIN = (signal.SIGTERM, signal.SIGKILL)
 
-  def __init__(self, name, pid=None, socket=None, process_name=None, socket_type=int,
-               metadata_base_dir=None):
+  def __init__(
+    self, name, pid=None, socket=None, process_name=None, socket_type=int, metadata_base_dir=None
+  ):
     """
     :param string name: The process identity/name (e.g. 'pantsd' or 'ng_Zinc').
     :param int pid: The process pid. Overrides fetching of the self.pid @property.
@@ -271,7 +291,7 @@ class ProcessManager(ProcessMetadataManager):
       # N.B. This lock can't key into the actual named metadata dir (e.g. `.pids/pantsd/lock`
       # via `ProcessMetadataManager._get_metadata_dir_by_name()`) because of a need to purge
       # the named metadata dir on startup to avoid stale metadata reads.
-      os.path.join(self._metadata_base_dir, '.lock.{}'.format(self._name))
+      os.path.join(self._metadata_base_dir, ".lock.{}".format(self._name))
     )
 
   @property
@@ -298,12 +318,12 @@ class ProcessManager(ProcessMetadataManager):
   @property
   def pid(self):
     """The running processes pid (or None)."""
-    return self._pid or self.read_metadata_by_name(self._name, 'pid', int)
+    return self._pid or self.read_metadata_by_name(self._name, "pid", int)
 
   @property
   def socket(self):
     """The running processes socket/port information (or None)."""
-    return self._socket or self.read_metadata_by_name(self._name, 'socket', self._socket_type)
+    return self._socket or self.read_metadata_by_name(self._name, "socket", self._socket_type)
 
   @classmethod
   def get_subprocess_output(cls, command, ignore_stderr=True, **kwargs):
@@ -315,38 +335,38 @@ class ProcessManager(ProcessMetadataManager):
     :returns: The output of the command.
     """
     if ignore_stderr is False:
-      kwargs.setdefault('stderr', subprocess.STDOUT)
+      kwargs.setdefault("stderr", subprocess.STDOUT)
 
     try:
       return subprocess.check_output(command, **kwargs).decode().strip()
     except (OSError, subprocess.CalledProcessError) as e:
-      subprocess_output = getattr(e, 'output', '').strip()
+      subprocess_output = getattr(e, "output", "").strip()
       raise cls.ExecutionError(str(e), subprocess_output)
 
   def await_pid(self, timeout):
     """Wait up to a given timeout for a process to write pid metadata."""
-    return self.await_metadata_by_name(self._name, 'pid', timeout, int)
+    return self.await_metadata_by_name(self._name, "pid", timeout, int)
 
   def await_socket(self, timeout):
     """Wait up to a given timeout for a process to write socket info."""
-    return self.await_metadata_by_name(self._name, 'socket', timeout, self._socket_type)
+    return self.await_metadata_by_name(self._name, "socket", timeout, self._socket_type)
 
   def write_pid(self, pid=None):
     """Write the current processes PID to the pidfile location"""
     pid = pid or os.getpid()
-    self.write_metadata_by_name(self._name, 'pid', str(pid))
+    self.write_metadata_by_name(self._name, "pid", str(pid))
 
   def write_socket(self, socket_info):
     """Write the local processes socket information (TCP port or UNIX socket)."""
-    self.write_metadata_by_name(self._name, 'socket', str(socket_info))
+    self.write_metadata_by_name(self._name, "socket", str(socket_info))
 
   def write_named_socket(self, socket_name, socket_info):
     """A multi-tenant, named alternative to ProcessManager.write_socket()."""
-    self.write_metadata_by_name(self._name, 'socket_{}'.format(socket_name), str(socket_info))
+    self.write_metadata_by_name(self._name, "socket_{}".format(socket_name), str(socket_info))
 
   def read_named_socket(self, socket_name, socket_type):
     """A multi-tenant, named alternative to ProcessManager.socket."""
-    return self.read_metadata_by_name(self._name, 'socket_{}'.format(socket_name), socket_type)
+    return self.read_metadata_by_name(self._name, "socket_{}".format(socket_name), socket_type)
 
   def _as_process(self):
     """Returns a psutil `Process` object wrapping our pid.
@@ -379,11 +399,14 @@ class ProcessManager(ProcessMetadataManager):
       process = self._as_process()
       return not (
         # Can happen if we don't find our pid.
-        (not process) or
+        (not process)
+        or
         # Check for walkers.
-        (process.status() == psutil.STATUS_ZOMBIE) or
+        (process.status() == psutil.STATUS_ZOMBIE)
+        or
         # Check for stale pids.
-        (self.process_name and self.process_name != process.name()) or
+        (self.process_name and self.process_name != process.name())
+        or
         # Extended checking.
         (extended_check and not extended_check(process))
       )
@@ -399,7 +422,7 @@ class ProcessManager(ProcessMetadataManager):
     :raises: `ProcessManager.MetadataError` when OSError is encountered on metadata dir removal.
     """
     if not force and self.is_alive():
-      raise ProcessMetadataManager.MetadataError('cannot purge metadata for a running process!')
+      raise ProcessMetadataManager.MetadataError("cannot purge metadata for a running process!")
 
     super().purge_metadata_by_name(self._name)
 
@@ -412,35 +435,45 @@ class ProcessManager(ProcessMetadataManager):
     """Ensure a process is terminated by sending a chain of kill signals (SIGTERM, SIGKILL)."""
     alive = self.is_alive()
     if alive:
-      logger.debug('terminating {}'.format(self._name))
+      logger.debug("terminating {}".format(self._name))
       for signal_type in signal_chain:
         pid = self.pid
         try:
-          logger.debug('sending signal {} to pid {}'.format(signal_type, pid))
+          logger.debug("sending signal {} to pid {}".format(signal_type, pid))
           self._kill(signal_type)
         except OSError as e:
-          logger.warning('caught OSError({e!s}) during attempt to kill -{signal} {pid}!'
-                         .format(e=e, signal=signal_type, pid=pid))
+          logger.warning(
+            "caught OSError({e!s}) during attempt to kill -{signal} {pid}!".format(
+              e=e, signal=signal_type, pid=pid
+            )
+          )
 
         # Wait up to kill_wait seconds to terminate or move onto the next signal.
         try:
-          if self._deadline_until(self.is_dead, 'daemon to exit', timeout=kill_wait):
+          if self._deadline_until(self.is_dead, "daemon to exit", timeout=kill_wait):
             alive = False
-            logger.debug('successfully terminated pid {}'.format(pid))
+            logger.debug("successfully terminated pid {}".format(pid))
             break
         except self.Timeout:
           # Loop to the next kill signal on timeout.
           pass
 
     if alive:
-      raise ProcessManager.NonResponsiveProcess('failed to kill pid {pid} with signals {chain}'
-                                      .format(pid=self.pid, chain=signal_chain))
+      raise ProcessManager.NonResponsiveProcess(
+        "failed to kill pid {pid} with signals {chain}".format(pid=self.pid, chain=signal_chain)
+      )
 
     if purge:
       self.purge_metadata(force=True)
 
-  def daemonize(self, pre_fork_opts=None, post_fork_parent_opts=None, post_fork_child_opts=None,
-                fork_context=None, write_pid=True):
+  def daemonize(
+    self,
+    pre_fork_opts=None,
+    post_fork_parent_opts=None,
+    post_fork_child_opts=None,
+    fork_context=None,
+    write_pid=True,
+  ):
     """Perform a double-fork, execute callbacks and write the child pid file.
 
     The double-fork here is necessary to truly daemonize the subprocess such that it can never
@@ -461,7 +494,7 @@ class ProcessManager(ProcessMetadataManager):
     """
 
     def double_fork():
-      logger.debug('forking %s', self)
+      logger.debug("forking %s", self)
       pid = os.fork()
       if pid == 0:
         os.setsid()
@@ -469,7 +502,8 @@ class ProcessManager(ProcessMetadataManager):
         if second_pid == 0:
           return False, True
         else:
-          if write_pid: self.write_pid(second_pid)
+          if write_pid:
+            self.write_pid(second_pid)
           return False, False
       else:
         # This prevents un-reaped, throw-away parent processes from lingering in the process table.
@@ -541,9 +575,9 @@ class ProcessManager(ProcessMetadataManager):
 class FingerprintedProcessManager(ProcessManager):
   """A `ProcessManager` subclass that provides a general strategy for process fingerprinting."""
 
-  FINGERPRINT_KEY = 'fingerprint'
+  FINGERPRINT_KEY = "fingerprint"
   FINGERPRINT_CMD_KEY: Optional[str] = None
-  FINGERPRINT_CMD_SEP = '='
+  FINGERPRINT_CMD_SEP = "="
 
   @property
   def fingerprint(self):
@@ -556,9 +590,8 @@ class FingerprintedProcessManager(ProcessManager):
               metadata or `None`.
     :rtype: string
     """
-    return (
-      self.parse_fingerprint(self.cmdline) or
-      self.read_metadata_by_name(self.name, self.FINGERPRINT_KEY)
+    return self.parse_fingerprint(self.cmdline) or self.read_metadata_by_name(
+      self.name, self.FINGERPRINT_KEY
     )
 
   def parse_fingerprint(self, cmdline, key=None, sep=None):
@@ -575,7 +608,7 @@ class FingerprintedProcessManager(ProcessManager):
       sep = sep or self.FINGERPRINT_CMD_SEP
       cmdline = cmdline or []
       for cmd_part in cmdline:
-        if cmd_part.startswith('{}{}'.format(key, sep)):
+        if cmd_part.startswith("{}{}".format(key, sep)):
           return cmd_part.split(sep)[1]
 
   def has_current_fingerprint(self, fingerprint):

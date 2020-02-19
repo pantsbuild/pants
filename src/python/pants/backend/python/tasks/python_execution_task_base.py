@@ -36,10 +36,7 @@ def ensure_interpreter_search_path_env(interpreter):
   separated from the execution of the pex.
   """
   chosen_interpreter_binary_path = interpreter.binary
-  return {
-    'PEX_IGNORE_RCFILES': '1',
-    'PEX_PYTHON_PATH': chosen_interpreter_binary_path,
-  }
+  return {"PEX_IGNORE_RCFILES": "1", "PEX_PYTHON_PATH": chosen_interpreter_binary_path}
 
 
 class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
@@ -67,6 +64,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
   @dataclass(frozen=True)
   class ExtraFile:
     """Models an extra file to place in a PEX."""
+
     path: str
     content: bytes
 
@@ -77,7 +75,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
       :param str path: The path this extra file should have when added to a PEX.
       :rtype: :class:`ExtraFile`
       """
-      return cls(path=path, content=b'')
+      return cls(path=path, content=b"")
 
     def add_to(self, builder):
       """Adds this extra file to a PEX builder.
@@ -88,7 +86,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
       with temporary_file() as fp:
         fp.write(self.content)
         fp.close()
-        add = builder.add_source if self.path.endswith('.py') else builder.add_resource
+        add = builder.add_source if self.path.endswith(".py") else builder.add_resource
         add(fp.name, self.path)
 
   @classmethod
@@ -134,8 +132,10 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
     :rtype: :class:`pex.pex.PEX`
     """
     relevant_targets = self.context.targets(
-      lambda tgt: isinstance(tgt, (
-        PythonDistribution, PythonRequirementLibrary, PythonTarget, Files)))
+      lambda tgt: isinstance(
+        tgt, (PythonDistribution, PythonRequirementLibrary, PythonTarget, Files)
+      )
+    )
     with self.invalidated(relevant_targets) as invalidation_check:
 
       # If there are no relevant targets, we still go through the motions of resolving
@@ -143,9 +143,10 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
       # for this special case.
       if invalidation_check.all_vts:
         target_set_id = VersionedTargetSet.from_versioned_targets(
-          invalidation_check.all_vts).cache_key.hash
+          invalidation_check.all_vts
+        ).cache_key.hash
       else:
-        target_set_id = 'no_targets'
+        target_set_id = "no_targets"
 
       interpreter = self.context.products.get_data(PythonInterpreter)
       path = os.path.realpath(os.path.join(self.workdir, str(interpreter.identity), target_set_id))
@@ -155,12 +156,13 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
       if not os.path.isdir(path):
         pexes = [
           self.context.products.get_data(ResolveRequirements.REQUIREMENTS_PEX),
-          self.context.products.get_data(GatherSources.PYTHON_SOURCES)
+          self.context.products.get_data(GatherSources.PYTHON_SOURCES),
         ]
 
         if self.extra_requirements():
           extra_requirements_pex = self.resolve_requirement_strings(
-            interpreter, self.extra_requirements())
+            interpreter, self.extra_requirements()
+          )
           # Add the extra requirements first, so they take precedence over any colliding version
           # in the target set's dependency closure.
           pexes = [extra_requirements_pex] + pexes

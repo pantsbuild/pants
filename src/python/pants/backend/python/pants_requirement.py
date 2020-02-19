@@ -25,7 +25,7 @@ class PantsRequirement:
 
   @classproperty
   def alias(self):
-    return 'pants_requirement'
+    return "pants_requirement"
 
   def __init__(self, parse_context):
     self._parse_context = parse_context
@@ -39,15 +39,19 @@ class PantsRequirement:
                         'pantsbuild.pants.contrib.python.checks'.
     """
     name = name or dist or os.path.basename(self._parse_context.rel_path)
-    dist = dist or 'pantsbuild.pants'
-    if not (dist == 'pantsbuild.pants' or dist.startswith('pantsbuild.pants.')):
+    dist = dist or "pantsbuild.pants"
+    if not (dist == "pantsbuild.pants" or dist.startswith("pantsbuild.pants.")):
       target = Address(spec_path=self._parse_context.rel_path, target_name=name)
-      raise TargetDefinitionException(target=target,
-                                      msg='The {} target only works for pantsbuild.pants '
-                                          'distributions, given {}'.format(self.alias, dist))
+      raise TargetDefinitionException(
+        target=target,
+        msg="The {} target only works for pantsbuild.pants "
+        "distributions, given {}".format(self.alias, dist),
+      )
 
-    requirement = PythonRequirement(requirement="{key}=={version}".format(key=dist, version=pants_version()))
+    requirement = PythonRequirement(
+      requirement="{key}=={version}".format(key=dist, version=pants_version())
+    )
 
-    self._parse_context.create_object('python_requirement_library',
-                                      name=name,
-                                      requirements=[requirement])
+    self._parse_context.create_object(
+      "python_requirement_library", name=name, requirements=[requirement]
+    )

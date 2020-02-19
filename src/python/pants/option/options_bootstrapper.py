@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 class OptionsBootstrapper:
   """Holds the result of the first stage of options parsing, and assists with parsing full
   options."""
+
   env_tuples: Tuple[Tuple[str, str], ...]
   bootstrap_args: Tuple[str, ...]
   args: Tuple[str, ...]
@@ -50,8 +51,8 @@ class OptionsBootstrapper:
     # also parse --pants-config as a regular option later, but there's no harm in that.  In fact,
     # it's preferable, so that any code that happens to want to know where we read config from
     # can inspect the option.
-    flag = '--pants-config-files='
-    evars = ['PANTS_GLOBAL_PANTS_CONFIG_FILES', 'PANTS_PANTS_CONFIG_FILES', 'PANTS_CONFIG_FILES']
+    flag = "--pants-config-files="
+    evars = ["PANTS_GLOBAL_PANTS_CONFIG_FILES", "PANTS_PANTS_CONFIG_FILES", "PANTS_CONFIG_FILES"]
 
     path_list_values = []
     default = get_default_pants_config_file()
@@ -67,17 +68,16 @@ class OptionsBootstrapper:
       # very unlikely that any task or subsystem will have an option named --pants-config-files.
       # TODO: Enforce a ban on options with a --pants- prefix outside our global options?
       if arg.startswith(flag):
-        path_list_values.append(ListValueComponent.create(arg[len(flag):]))
+        path_list_values.append(ListValueComponent.create(arg[len(flag) :]))
 
     return ListValueComponent.merge(path_list_values).val
 
   @staticmethod
-  def parse_bootstrap_options(env: Mapping[str, str], args: Sequence[str], config: Config) -> Options:
+  def parse_bootstrap_options(
+    env: Mapping[str, str], args: Sequence[str], config: Config
+  ) -> Options:
     bootstrap_options = Options.create(
-      env=env,
-      config=config,
-      known_scope_infos=[GlobalOptionsRegistrar.get_scope_info()],
-      args=args,
+      env=env, config=config, known_scope_infos=[GlobalOptionsRegistrar.get_scope_info()], args=args
     )
 
     def register_global(*args, **kwargs):
@@ -89,15 +89,14 @@ class OptionsBootstrapper:
 
   @classmethod
   def create(
-    cls, env: Optional[Mapping[str, str]] = None, args: Optional[Sequence[str]] = None,
+    cls, env: Optional[Mapping[str, str]] = None, args: Optional[Sequence[str]] = None
   ) -> "OptionsBootstrapper":
     """Parses the minimum amount of configuration necessary to create an OptionsBootstrapper.
 
     :param env: An environment dictionary, or None to use `os.environ`.
     :param args: An args array, or None to use `sys.argv`.
     """
-    env = {k: v for k, v in (os.environ if env is None else env).items()
-           if k.startswith('PANTS_')}
+    env = {k: v for k, v in (os.environ if env is None else env).items() if k.startswith("PANTS_")}
     args = tuple(sys.argv if args is None else args)
 
     flags = set()
@@ -107,9 +106,7 @@ class OptionsBootstrapper:
     def filecontent_for(path: str) -> FileContent:
       is_executable = os.stat(path).st_mode & stat.S_IXUSR == stat.S_IXUSR
       return FileContent(
-        ensure_text(path),
-        read_file(path, binary_mode=True),
-        is_executable=is_executable,
+        ensure_text(path), read_file(path, binary_mode=True), is_executable=is_executable
       )
 
     def capture_the_flags(*args: str, **kwargs) -> None:
@@ -117,13 +114,13 @@ class OptionsBootstrapper:
         flags.add(arg)
         if len(arg) == 2:
           short_flags.add(arg)
-        elif kwargs.get('type') == bool:
-          flags.add(f'--no-{arg[2:]}')
+        elif kwargs.get("type") == bool:
+          flags.add(f"--no-{arg[2:]}")
 
     GlobalOptionsRegistrar.register_bootstrap_options(capture_the_flags)
 
     def is_bootstrap_option(arg: str) -> bool:
-      components = arg.split('=', 1)
+      components = arg.split("=", 1)
       if components[0] in flags:
         return True
       for flag in short_flags:
@@ -134,7 +131,7 @@ class OptionsBootstrapper:
     # Take just the bootstrap args, so we don't choke on other global-scope args on the cmd line.
     # Stop before '--' since args after that are pass-through and may have duplicate names to our
     # bootstrap options.
-    bargs = tuple(filter(is_bootstrap_option, itertools.takewhile(lambda arg: arg != '--', args)))
+    bargs = tuple(filter(is_bootstrap_option, itertools.takewhile(lambda arg: arg != "--", args)))
 
     config_file_paths = cls.get_config_file_paths(env=env, args=args)
     config_files_products = [filecontent_for(p) for p in config_file_paths]
@@ -147,14 +144,15 @@ class OptionsBootstrapper:
     # from (typically pants.ini), then config override, then rcfiles.
     full_config_paths = pre_bootstrap_config.sources()
     if bootstrap_option_values.pantsrc:
-      rcfiles = [os.path.expanduser(str(rcfile)) for rcfile in bootstrap_option_values.pantsrc_files]
+      rcfiles = [
+        os.path.expanduser(str(rcfile)) for rcfile in bootstrap_option_values.pantsrc_files
+      ]
       existing_rcfiles = list(filter(os.path.exists, rcfiles))
       full_config_paths.extend(existing_rcfiles)
 
     full_config_files_products = [filecontent_for(p) for p in full_config_paths]
     post_bootstrap_config = Config.load_file_contents(
-      full_config_files_products,
-      seed_values=bootstrap_option_values.as_dict(),
+      full_config_files_products, seed_values=bootstrap_option_values.as_dict()
     )
 
     env_tuples = tuple(sorted(env.items(), key=lambda x: x[0]))
@@ -183,11 +181,13 @@ class OptionsBootstrapper:
   @memoized_method
   def _full_options(self, known_scope_infos: Tuple[ScopeInfo, ...]) -> Options:
     bootstrap_option_values = self.get_bootstrap_options().for_global_scope()
-    options = Options.create(self.env,
-                             self.config,
-                             known_scope_infos,
-                             args=self.args,
-                             bootstrap_option_values=bootstrap_option_values)
+    options = Options.create(
+      self.env,
+      self.config,
+      known_scope_infos,
+      args=self.args,
+      bootstrap_option_values=bootstrap_option_values,
+    )
 
     distinct_optionable_classes: Set[Type[Optionable]] = set()
     for ksi in sorted(known_scope_infos, key=lambda si: si.scope):
@@ -223,12 +223,14 @@ class OptionsBootstrapper:
           error_log.append(f"Invalid scope [{section}] in {config.config_path}")
         else:
           # All the options specified under [`section`] in `config` excluding bootstrap defaults.
-          all_options_under_scope = (
-            set(config.values.options(section)) - set(config.values.defaults)
+          all_options_under_scope = set(config.values.options(section)) - set(
+            config.values.defaults
           )
           for option in all_options_under_scope:
             if option not in valid_options_under_scope:
-              error_log.append(f"Invalid option '{option}' under [{section}] in {config.config_path}")
+              error_log.append(
+                f"Invalid option '{option}' under [{section}] in {config.config_path}"
+              )
 
     if error_log:
       for error in error_log:

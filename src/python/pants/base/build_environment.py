@@ -21,8 +21,9 @@ def pants_version() -> str:
 
 def pants_release() -> str:
   """Returns a user-friendly release label."""
-  return ('Pants {version} https://pypi.org/pypi/pantsbuild.pants/{version}'
-          .format(version=pants_version()))
+  return "Pants {version} https://pypi.org/pypi/pantsbuild.pants/{version}".format(
+    version=pants_version()
+  )
 
 
 def get_buildroot() -> str:
@@ -36,19 +37,19 @@ def get_buildroot() -> str:
 def get_pants_cachedir() -> str:
   """Return the pants global cache directory."""
   # Follow the unix XDB base spec: http://standards.freedesktop.org/basedir-spec/latest/index.html.
-  cache_home = os.environ.get('XDG_CACHE_HOME')
+  cache_home = os.environ.get("XDG_CACHE_HOME")
   if not cache_home:
-    cache_home = '~/.cache'
-  return os.path.expanduser(os.path.join(cache_home, 'pants'))
+    cache_home = "~/.cache"
+  return os.path.expanduser(os.path.join(cache_home, "pants"))
 
 
 def get_pants_configdir() -> str:
   """Return the pants global config directory."""
   # Follow the unix XDB base spec: http://standards.freedesktop.org/basedir-spec/latest/index.html.
-  config_home = os.environ.get('XDG_CONFIG_HOME')
+  config_home = os.environ.get("XDG_CONFIG_HOME")
   if not config_home:
-    config_home = '~/.config'
-  return os.path.expanduser(os.path.join(config_home, 'pants'))
+    config_home = "~/.config"
+  return os.path.expanduser(os.path.join(config_home, "pants"))
 
 
 def get_default_pants_config_file() -> str:
@@ -56,7 +57,7 @@ def get_default_pants_config_file() -> str:
   default_toml = Path(get_buildroot(), "pants.toml")
   if default_toml.is_file():
     return str(default_toml)
-  return os.path.join(get_buildroot(), 'pants.ini')
+  return os.path.join(get_buildroot(), "pants.ini")
 
 
 _SCM: Optional[Scm] = None
@@ -72,15 +73,16 @@ def get_scm() -> Optional[Scm]:
   if _SCM:
     return _SCM
   from pants.scm.git import Git
+
   # We know about git, so attempt an auto-configure
   worktree = Git.detect_worktree()
   if worktree and os.path.isdir(worktree):
     git = Git(worktree=worktree)
     try:
-      logger.debug(f'Detected git repository at {worktree} on branch {git.branch_name}')
+      logger.debug(f"Detected git repository at {worktree} on branch {git.branch_name}")
       set_scm(git)
     except git.LocalException as e:
-      logger.info(f'Failed to load git repository at {worktree}: {e!r}')
+      logger.info(f"Failed to load git repository at {worktree}: {e!r}")
   return _SCM
 
 
@@ -89,6 +91,6 @@ def set_scm(scm: Optional[Scm]) -> None:
   if scm is None:
     return
   if not isinstance(scm, Scm):
-    raise ValueError(f'The scm must be an instance of Scm, given {scm}')
+    raise ValueError(f"The scm must be an instance of Scm, given {scm}")
   global _SCM
   _SCM = scm

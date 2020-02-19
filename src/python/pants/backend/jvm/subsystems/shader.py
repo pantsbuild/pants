@@ -19,19 +19,19 @@ from pants.util.contextutil import temporary_file
 logger = logging.getLogger(__name__)
 
 
-class UnaryRule(namedtuple('UnaryRule', ['name', 'pattern'])):
+class UnaryRule(namedtuple("UnaryRule", ["name", "pattern"])):
   """Base class for shading keep and zap rules specifiable in BUILD files."""
 
   def render(self):
-    return f'{self.name} {self.pattern}\n'
+    return f"{self.name} {self.pattern}\n"
 
 
-class RelocateRule(namedtuple('Rule', ['from_pattern', 'to_pattern'])):
+class RelocateRule(namedtuple("Rule", ["from_pattern", "to_pattern"])):
   """Base class for shading relocation rules specifiable in BUILD files."""
 
-  _wildcard_pattern = re.compile('[*]+')
-  _starts_with_number_pattern = re.compile('^[0-9]')
-  _illegal_package_char_pattern = re.compile('[^a-z0-9_]', re.I)
+  _wildcard_pattern = re.compile("[*]+")
+  _starts_with_number_pattern = re.compile("^[0-9]")
+  _illegal_package_char_pattern = re.compile("[^a-z0-9_]", re.I)
 
   @classmethod
   def _infer_shaded_pattern_iter(cls, from_pattern, prefix=None):
@@ -39,25 +39,25 @@ class RelocateRule(namedtuple('Rule', ['from_pattern', 'to_pattern'])):
       yield prefix
     last = 0
     for i, match in enumerate(cls._wildcard_pattern.finditer(from_pattern)):
-      yield from_pattern[last:match.start()]
-      yield f'@{i + 1}'
+      yield from_pattern[last : match.start()]
+      yield f"@{i + 1}"
       last = match.end()
     yield from_pattern[last:]
 
   @classmethod
   def new(cls, from_pattern, shade_pattern=None, shade_prefix=None):
     if not shade_pattern:
-      shade_pattern = ''.join(cls._infer_shaded_pattern_iter(from_pattern, shade_prefix))
+      shade_pattern = "".join(cls._infer_shaded_pattern_iter(from_pattern, shade_prefix))
     return cls(from_pattern, shade_pattern)
 
   def render(self):
-    return f'rule {self.from_pattern} {self.to_pattern}\n'
+    return f"rule {self.from_pattern} {self.to_pattern}\n"
 
 
 class Shading:
   """Wrapper around relocate and exclude shading rules exposed in BUILD files."""
 
-  SHADE_PREFIX = '__shaded_by_pants__.'
+  SHADE_PREFIX = "__shaded_by_pants__."
   """The default shading package."""
 
   @classmethod
@@ -79,7 +79,7 @@ class Shading:
       a root. '*' is a wildcard that matches any individual package component, and '**' is a
       wildcard that matches any trailing pattern (ie the rest of the string).
     """
-    return UnaryRule('keep', pattern)
+    return UnaryRule("keep", pattern)
 
   @classmethod
   def create_zap(cls, pattern):
@@ -97,7 +97,7 @@ class Shading:
       from the jar. '*' is a wildcard that matches any individual package component, and '**' is a
       wildcard that matches any trailing pattern (ie the rest of the string).
     """
-    return UnaryRule('zap', pattern)
+    return UnaryRule("zap", pattern)
 
   @classmethod
   def create_relocate(cls, from_pattern, shade_pattern=None, shade_prefix=None):
@@ -156,7 +156,7 @@ class Shading:
       shaded. '*' is a wildcard that matches any individual package component, and '**' is a
       wildcard that matches any trailing pattern (ie the rest of the string).
     """
-    return cls.create_relocate(pattern, shade_prefix='')
+    return cls.create_relocate(pattern, shade_prefix="")
 
   @classmethod
   def create_keep_package(cls, package_name, recursive=True):
@@ -194,8 +194,9 @@ class Shading:
     :param bool recursive: Whether to rename everything under any subpackage of ``package_name``,
       or just direct children of the package. (Defaults to True).
     """
-    return cls.create_relocate(from_pattern=cls._format_package_glob(package_name, recursive),
-                               shade_prefix=shade_prefix)
+    return cls.create_relocate(
+      from_pattern=cls._format_package_glob(package_name, recursive), shade_prefix=shade_prefix
+    )
 
   @classmethod
   def create_exclude_package(cls, package_name, recursive=True):
@@ -207,8 +208,9 @@ class Shading:
     :param bool recursive: Whether to exclude everything under any subpackage of ``package_name``,
       or just direct children of the package. (Defaults to True).
     """
-    return cls.create_relocate(from_pattern=cls._format_package_glob(package_name, recursive),
-                               shade_prefix='')
+    return cls.create_relocate(
+      from_pattern=cls._format_package_glob(package_name, recursive), shade_prefix=""
+    )
 
   @classmethod
   def _format_package_glob(cls, package_name, recursive=True):
@@ -222,7 +224,7 @@ class Shader:
     """Indicates an error shading a jar."""
 
   class Factory(JvmToolMixin, Subsystem):
-    options_scope = 'shader'
+    options_scope = "shader"
 
     class Error(SubsystemError):
       """Error creating a Shader with the Shader.Factory subsystem."""
@@ -235,15 +237,19 @@ class Shader:
     def register_options(cls, register):
       super(Shader.Factory, cls).register_options(register)
 
-      register('--binary-package-excludes', type=list, fingerprint=True,
-               default=['com.oracle', 'com.sun', 'java', 'javax', 'jdk', 'oracle', 'sun'],
-               help='Packages that the shader will exclude for binaries')
+      register(
+        "--binary-package-excludes",
+        type=list,
+        fingerprint=True,
+        default=["com.oracle", "com.sun", "java", "javax", "jdk", "oracle", "sun"],
+        help="Packages that the shader will exclude for binaries",
+      )
 
-      cls.register_jvm_tool(register,
-                            'jarjar',
-                            classpath=[
-                              JarDependency(org='org.pantsbuild', name='jarjar', rev='1.7.2')
-                            ])
+      cls.register_jvm_tool(
+        register,
+        "jarjar",
+        classpath=[JarDependency(org="org.pantsbuild", name="jarjar", rev="1.7.2")],
+      )
 
     @classmethod
     def create(cls, context, executor=None):
@@ -253,9 +259,12 @@ class Shader:
       """
       if executor is None:
         executor = SubprocessExecutor(DistributionLocator.cached())
-      classpath = cls.global_instance().tool_classpath_from_products(context.products, 'jarjar',
-                                                                     cls.options_scope)
-      return Shader(classpath, executor, cls.global_instance().get_options().binary_package_excludes)
+      classpath = cls.global_instance().tool_classpath_from_products(
+        context.products, "jarjar", cls.options_scope
+      )
+      return Shader(
+        classpath, executor, cls.global_instance().get_options().binary_package_excludes
+      )
 
   @classmethod
   def exclude_package(cls, package_name=None, recursive=False):
@@ -268,7 +277,7 @@ class Shader:
     :returns: A `Shader.Rule` describing the shading exclusion.
     """
     if not package_name:
-      return Shading.create_exclude('**' if recursive else '*')
+      return Shading.create_exclude("**" if recursive else "*")
     return Shading.create_exclude_package(package_name, recursive=recursive)
 
   @classmethod
@@ -291,7 +300,7 @@ class Shader:
     :returns: A `Shader.Rule` describing the packages to be shaded.
     """
     if not package_name:
-      return Shading.create_relocate('**' if recursive else '*')
+      return Shading.create_relocate("**" if recursive else "*")
     return Shading.create_relocate_package(package_name, recursive=recursive)
 
   @classmethod
@@ -306,13 +315,13 @@ class Shader:
   @staticmethod
   def _iter_packages(paths):
     for path in paths:
-      yield path.replace('/', '.')
+      yield path.replace("/", ".")
 
   @staticmethod
   def _potential_package_path(path):
     # TODO(John Sirois): Implement a full valid java package name check, `-` just happens to get
     # the common non-package cases like META-INF/...
-    return (path.endswith('.class') or path.endswith('.java')) and '-' not in path
+    return (path.endswith(".class") or path.endswith(".java")) and "-" not in path
 
   @classmethod
   def _iter_jar_packages(cls, path):
@@ -365,7 +374,7 @@ class Shader:
 
     # Exclude the main entrypoint's package from shading. There may be package-private classes that
     # the main class accesses so we must preserve the whole package).
-    parts = main.rsplit('.', 1)
+    parts = main.rsplit(".", 1)
     if len(parts) == 2:
       main_package = parts[0]
     else:
@@ -373,8 +382,10 @@ class Shader:
       main_package = None
     rules.append(self.exclude_package(main_package))
 
-    rules.extend(self.exclude_package(system_pkg, recursive=True)
-                 for system_pkg in self._binary_package_excludes)
+    rules.extend(
+      self.exclude_package(system_pkg, recursive=True)
+      for system_pkg in self._binary_package_excludes
+    )
 
     # Shade everything else.
     #
@@ -389,8 +400,9 @@ class Shader:
     #
     # As a result we explicitly shade all the non `main_package` packages in the binary jar instead
     # which does support recursively shading jarjar.
-    rules.extend(self.shade_package(pkg) for pkg in sorted(self._iter_jar_packages(jar))
-                 if pkg != main_package)
+    rules.extend(
+      self.shade_package(pkg) for pkg in sorted(self._iter_jar_packages(jar)) if pkg != main_package
+    )
 
     return rules
 
@@ -418,10 +430,12 @@ class Shader:
     """
     with self.temporary_rules_file(rules) as rules_file:
       logger.debug(f"Running jarjar with rules:\n{' '.join(rule.render() for rule in rules)}")
-      yield self._executor.runner(classpath=self._jarjar_classpath,
-                                  main='org.pantsbuild.jarjar.Main',
-                                  jvm_options=jvm_options,
-                                  args=['process', rules_file, jar, output_jar])
+      yield self._executor.runner(
+        classpath=self._jarjar_classpath,
+        main="org.pantsbuild.jarjar.Main",
+        jvm_options=jvm_options,
+        args=["process", rules_file, jar, output_jar],
+      )
 
   def binary_shader(self, output_jar, main, jar, custom_rules=None, jvm_options=None):
     """Yields an `Executor.Runner` that will perform shading of the binary `jar` when `run()`.

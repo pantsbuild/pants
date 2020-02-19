@@ -14,12 +14,18 @@ class JvmResolveSubsystem(Subsystem):
 
   :API: public
   """
-  options_scope = 'resolver'
+
+  options_scope = "resolver"
 
   # TODO: Convert to an enum.
-  CHOICES = ['ivy', 'coursier']
+  CHOICES = ["ivy", "coursier"]
 
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--resolver', choices=cls.CHOICES, default='ivy', help='Resolver to use for external jvm dependencies.')
+    register(
+      "--resolver",
+      choices=cls.CHOICES,
+      default="ivy",
+      help="Resolver to use for external jvm dependencies.",
+    )

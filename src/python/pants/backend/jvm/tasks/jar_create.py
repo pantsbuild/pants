@@ -15,17 +15,19 @@ def is_jvm_binary(target):
 
 
 def is_java_library(target):
-  return target.has_sources('.java')
+  return target.has_sources(".java")
 
 
 def is_scala_library(target):
-  return target.has_sources('.scala')
+  return target.has_sources(".scala")
 
 
 def is_jvm_library(target):
-  return (is_java_library(target)
-          or is_scala_library(target)
-          or (is_jvm_binary(target) and target.has_resources))
+  return (
+    is_java_library(target)
+    or is_scala_library(target)
+    or (is_jvm_binary(target) and target.has_resources)
+  )
 
 
 class JarCreate(JarBuilderTask):
@@ -34,13 +36,13 @@ class JarCreate(JarBuilderTask):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--compressed', default=True, type=bool,
-             fingerprint=True,
-             help='Create compressed jars.')
+    register(
+      "--compressed", default=True, type=bool, fingerprint=True, help="Create compressed jars."
+    )
 
   @classmethod
   def product_types(cls):
-    return ['jars']
+    return ["jars"]
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -64,13 +66,14 @@ class JarCreate(JarBuilderTask):
     # would attempt to hash the relevant dependencies, but that is really error prone, and
     # this task is more than fast enough to re-run (JarTool "copies" pre-zipped data from input
     # zip/jar files).
-    with self.invalidated(self.context.targets(is_jvm_library),
-                          invalidate_dependents=True) as invalidation_check:
-      with self.context.new_workunit(name='jar-create', labels=[WorkUnitLabel.MULTITOOL]):
-        jar_mapping = self.context.products.get('jars')
+    with self.invalidated(
+      self.context.targets(is_jvm_library), invalidate_dependents=True
+    ) as invalidation_check:
+      with self.context.new_workunit(name="jar-create", labels=[WorkUnitLabel.MULTITOOL]):
+        jar_mapping = self.context.products.get("jars")
 
         for vt in invalidation_check.all_vts:
-          jar_name = vt.target.name + '.jar'
+          jar_name = vt.target.name + ".jar"
           jar_path = os.path.join(vt.results_dir, jar_name)
 
           def add_jar_to_products():
@@ -90,8 +93,10 @@ class JarCreate(JarBuilderTask):
     existing = self._jars.setdefault(path, target)
     if target != existing:
       raise TaskError(
-          'Duplicate name: target {} tried to write {} already mapped to target {}'
-          .format(target, path, existing))
+        "Duplicate name: target {} tried to write {} already mapped to target {}".format(
+          target, path, existing
+        )
+      )
     self._jars[path] = target
     with self.open_jar(path, overwrite=True, compressed=self.compressed) as jar:
       yield jar

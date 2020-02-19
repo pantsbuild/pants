@@ -10,7 +10,7 @@ from pants.engine.native import Native
 from pants.engine.rules import side_effecting
 
 
-#TODO this needs to be a file-like object/stream
+# TODO this needs to be a file-like object/stream
 class NativeWriter:
   def __init__(self, session: Any):
     self._native = Native()
@@ -19,7 +19,7 @@ class NativeWriter:
   def write(self, payload: str):
     raise NotImplementedError
 
-  #TODO It's not clear yet what this function should do, it depends on how
+  # TODO It's not clear yet what this function should do, it depends on how
   # EngineDisplay in Rust ends up handling text.
   def flush(self):
     pass
@@ -38,9 +38,12 @@ class NativeStdErr(NativeWriter):
 @side_effecting
 class Console:
   """Class responsible for writing text to the console while Pants is running. """
+
   side_effecting = True
 
-  def __init__(self, stdout=None, stderr=None, use_colors: bool = True, session: Optional[Any] = None):
+  def __init__(
+    self, stdout=None, stderr=None, use_colors: bool = True, session: Optional[Any] = None
+  ):
     """`stdout` and `stderr` may be explicitly provided when Console is constructed. 
     We use this in tests to provide a mock we can write tests against, rather than writing
     to the system stdout/stderr. If they are not defined, the effective stdout/stderr are
@@ -68,10 +71,10 @@ class Console:
   def write_stderr(self, payload):
     self.stderr.write(payload)
 
-  def print_stdout(self, payload, end='\n'):
+  def print_stdout(self, payload, end="\n"):
     print(payload, file=self.stdout, end=end)
 
-  def print_stderr(self, payload, end='\n'):
+  def print_stderr(self, payload, end="\n"):
     print(payload, file=self.stderr, end=end)
 
   def flush(self):

@@ -37,10 +37,12 @@ class VersionedTargetSet:
     # feels hacky; see if there's a cleaner way for callers to handle awareness of the CacheManager.
     for versioned_target in versioned_targets:
       if versioned_target._cache_manager != cache_manager:
-        raise ValueError("Attempting to combine versioned targets {} and {} with different"
-                         " CacheManager instances: {} and {}".format(first_target, versioned_target,
-                                                                 cache_manager,
-                                                                 versioned_target._cache_manager))
+        raise ValueError(
+          "Attempting to combine versioned targets {} and {} with different"
+          " CacheManager instances: {} and {}".format(
+            first_target, versioned_target, cache_manager, versioned_target._cache_manager
+          )
+        )
     return VersionedTargetSet(cache_manager, versioned_targets)
 
   def __init__(self, cache_manager, versioned_targets):
@@ -55,11 +57,9 @@ class VersionedTargetSet:
     self.valid = self.previous_cache_key == self.cache_key
 
     if cache_manager.invalidation_report:
-      cache_manager.invalidation_report.add_vts(cache_manager.task_name,
-                                                self.targets,
-                                                self.cache_key,
-                                                self.valid,
-                                                phase='init')
+      cache_manager.invalidation_report.add_vts(
+        cache_manager.task_name, self.targets, self.cache_key, self.valid, phase="init"
+      )
 
     self._results_dir = None
     self._current_results_dir = None
@@ -103,7 +103,7 @@ class VersionedTargetSet:
     should generally prefer to access the stable directory.
     """
     if self._results_dir is None:
-      raise ValueError('No results_dir was created for {}'.format(self))
+      raise ValueError("No results_dir was created for {}".format(self))
     return self._results_dir
 
   @property
@@ -111,7 +111,7 @@ class VersionedTargetSet:
     """A unique directory that stores results for this version of these targets.
     """
     if self._current_results_dir is None:
-      raise ValueError('No results_dir was created for {}'.format(self))
+      raise ValueError("No results_dir was created for {}".format(self))
     return self._current_results_dir
 
   @property
@@ -124,21 +124,25 @@ class VersionedTargetSet:
     mutate them.
     """
     if not self.has_previous_results_dir:
-      raise ValueError('There is no previous_results_dir for: {}'.format(self))
+      raise ValueError("There is no previous_results_dir for: {}".format(self))
     return self._previous_results_dir
 
   def ensure_legal(self):
     """Return True as long as the state does not break any internal contracts."""
     # Do our best to provide complete feedback, it's easy to imagine the frustration of flipping between error states.
     if self._results_dir:
-      errors = ''
+      errors = ""
       if not os.path.islink(self._results_dir):
-        errors += '\nThe results_dir is no longer a symlink:\n\t* {}'.format(self._results_dir)
+        errors += "\nThe results_dir is no longer a symlink:\n\t* {}".format(self._results_dir)
       if not os.path.isdir(self._current_results_dir):
-        errors += '\nThe current_results_dir directory was not found\n\t* {}'.format(self._current_results_dir)
+        errors += "\nThe current_results_dir directory was not found\n\t* {}".format(
+          self._current_results_dir
+        )
       if errors:
         raise self.IllegalResultsDir(
-          '\nThe results_dirs state should not be manually cleaned or recreated by tasks.\n{}'.format(errors)
+          "\nThe results_dirs state should not be manually cleaned or recreated by tasks.\n{}".format(
+            errors
+          )
         )
     return True
 
@@ -157,8 +161,9 @@ class VersionedTargetSet:
     return {vt.target: vt for vt in self.versioned_targets}
 
   def __repr__(self):
-    return 'VTS({}, {})'.format(','.join(target.address.spec for target in self.targets),
-                                'valid' if self.valid else 'invalid')
+    return "VTS({}, {})".format(
+      ",".join(target.address.spec for target in self.targets), "valid" if self.valid else "invalid"
+    )
 
 
 class VersionedTarget(VersionedTargetSet):
@@ -222,7 +227,7 @@ class VersionedTarget(VersionedTargetSet):
     self._previous_results_dir = previous_path
 
   def __repr__(self):
-    return 'VT({}, {})'.format(self.target.id, 'valid' if self.valid else 'invalid')
+    return "VT({}, {})".format(self.target.id, "valid" if self.valid else "invalid")
 
 
 class InvalidationCheck:
@@ -256,23 +261,25 @@ class InvalidationCacheManager:
   class CacheValidationError(Exception):
     """Indicates a problem accessing the cache."""
 
-  _STABLE_DIR_NAME = 'current'
+  _STABLE_DIR_NAME = "current"
 
-  def __init__(self,
-               results_dir_root,
-               cache_key_generator,
-               build_invalidator,
-               invalidate_dependents,
-               fingerprint_strategy=None,
-               invalidation_report=None,
-               task_name=None,
-               task_version_slug=None,
-               artifact_write_callback=lambda _: None):
+  def __init__(
+    self,
+    results_dir_root,
+    cache_key_generator,
+    build_invalidator,
+    invalidate_dependents,
+    fingerprint_strategy=None,
+    invalidation_report=None,
+    task_name=None,
+    task_version_slug=None,
+    artifact_write_callback=lambda _: None,
+  ):
     """
     :API: public
     """
     self._cache_key_generator = cache_key_generator
-    self._task_name = task_name or 'UNKNOWN'
+    self._task_name = task_name or "UNKNOWN"
     self._invalidate_dependents = invalidate_dependents
     self._invalidator = build_invalidator
     self._fingerprint_strategy = fingerprint_strategy
@@ -309,9 +316,7 @@ class InvalidationCacheManager:
     self._invalidator.force_invalidate(vts.cache_key)
     vts.valid = False
 
-  def check(self,
-            targets,
-            topological_order=False):
+  def check(self, targets, topological_order=False):
     """Checks whether each of the targets has changed and invalidates it if so.
 
     Returns a list of VersionedTargetSet objects (either valid or invalid). The returned sets
@@ -340,7 +345,7 @@ class InvalidationCacheManager:
     return os.path.join(
       self._results_dir_prefix,
       key.id,
-      self._STABLE_DIR_NAME if stable else sha1(key.hash.encode()).hexdigest()[:12]
+      self._STABLE_DIR_NAME if stable else sha1(key.hash.encode()).hexdigest()[:12],
     )
 
   def wrap_targets(self, targets, topological_order=False):
@@ -351,6 +356,7 @@ class InvalidationCacheManager:
 
     Returns a list of VersionedTargets, each representing one input target.
     """
+
     def vt_iter():
       if topological_order:
         target_set = set(targets)
@@ -361,6 +367,7 @@ class InvalidationCacheManager:
         target_key = self._key_for(target)
         if target_key is not None:
           yield VersionedTarget(self, target, target_key)
+
     return list(vt_iter())
 
   def cacheable(self, cache_key):
@@ -376,12 +383,15 @@ class InvalidationCacheManager:
 
   def _key_for(self, target):
     try:
-      return self._cache_key_generator.key_for_target(target,
-                                                      transitive=self._invalidate_dependents,
-                                                      fingerprint_strategy=self._fingerprint_strategy)
+      return self._cache_key_generator.key_for_target(
+        target,
+        transitive=self._invalidate_dependents,
+        fingerprint_strategy=self._fingerprint_strategy,
+      )
     except Exception as e:
       # This is a catch-all for problems we haven't caught up with and given a better diagnostic.
       # TODO(Eric Ayers): If you see this exception, add a fix to catch the problem earlier.
-      new_exception = self.CacheValidationError("Problem validating target {} in {}: {}"
-                                                .format(target.id, target.address.spec_path, e))
+      new_exception = self.CacheValidationError(
+        "Problem validating target {} in {}: {}".format(target.id, target.address.spec_path, e)
+      )
       raise self.CacheValidationError(new_exception) from e

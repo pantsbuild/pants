@@ -54,15 +54,11 @@ async def parse_address_family(address_mapper: AddressMapper, directory: Dir) ->
   files_content = await Get[FilesContent](Digest, snapshot.directory_digest)
 
   if not files_content:
-    raise ResolveError(
-      'Directory "{}" does not contain any BUILD files.'.format(directory.path)
-    )
+    raise ResolveError('Directory "{}" does not contain any BUILD files.'.format(directory.path))
   address_maps = []
   for filecontent_product in files_content:
     address_maps.append(
-      AddressMap.parse(
-        filecontent_product.path, filecontent_product.content, address_mapper.parser
-      )
+      AddressMap.parse(filecontent_product.path, filecontent_product.content, address_mapper.parser)
     )
   return AddressFamily.create(directory.path, address_maps)
 
@@ -79,6 +75,7 @@ def _raise_did_you_mean(address_family: AddressFamily, name: str, source=None) -
   if source:
     raise resolve_error from source
   raise resolve_error
+
 
 @rule
 async def find_build_file(address: Address) -> BuildFileAddress:
@@ -116,9 +113,7 @@ async def hydrate_struct(address_mapper: AddressMapper, address: Address) -> Hyd
       if outer_key != "dependencies":
         inline_dependencies.append(
           Address.parse(
-            value,
-            relative_to=address.spec_path,
-            subproject_roots=address_mapper.subproject_roots,
+            value, relative_to=address.spec_path, subproject_roots=address_mapper.subproject_roots
           )
         )
     elif isinstance(value, Struct):
@@ -153,9 +148,7 @@ async def hydrate_struct(address_mapper: AddressMapper, address: Address) -> Hyd
         # requested by tasks. But do ensure that their addresses are absolute, since we're
         # about to lose the context in which they were declared.
         value = Address.parse(
-          value,
-          relative_to=address.spec_path,
-          subproject_roots=address_mapper.subproject_roots,
+          value, relative_to=address.spec_path, subproject_roots=address_mapper.subproject_roots
         )
       else:
         value = dependencies[maybe_consume.idx]
@@ -166,7 +159,7 @@ async def hydrate_struct(address_mapper: AddressMapper, address: Address) -> Hyd
 
   # NB: Some pythons throw an UnboundLocalError for `idx` if it is a simple local variable.
   # TODO(#8496): create a decorator for functions which declare a sentinel variable like this!
-  maybe_consume.idx = 0         # type: ignore[attr-defined]
+  maybe_consume.idx = 0  # type: ignore[attr-defined]
 
   # 'zip' the previously-requested dependencies back together as struct fields.
   def consume_dependencies(item, args=None):
@@ -214,7 +207,7 @@ def _hydrate(item_type, spec_path, **kwargs):
 
 @rule
 async def addresses_with_origins_from_address_families(
-  address_mapper: AddressMapper, address_specs: AddressSpecs,
+  address_mapper: AddressMapper, address_specs: AddressSpecs
 ) -> AddressesWithOrigins:
   """Given an AddressMapper and list of AddressSpecs, return matching AddressesWithOrigins.
 
@@ -263,8 +256,7 @@ async def addresses_with_origins_from_address_families(
 
   # NB: This may be empty, as the result of filtering by tag and exclude patterns!
   return AddressesWithOrigins(
-    AddressWithOrigin(address=addr, origin=addr_to_origin[addr])
-    for addr in matched_addresses
+    AddressWithOrigin(address=addr, origin=addr_to_origin[addr]) for addr in matched_addresses
   )
 
 

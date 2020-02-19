@@ -21,24 +21,21 @@ from pants.testutil.test_base import TestBase
 
 
 class IsortIntegrationTest(TestBase):
-
   def setUp(self):
     super().setUp()
     init_subsystems([download_pex_bin.DownloadedPexBin.Factory])
 
-  good_source = FileContent(path="test/good.py", content=b'from animals import cat, dog\n')
-  bad_source = FileContent(path="test/bad.py", content=b'from colors import green, blue\n')
-  fixed_bad_source = FileContent(path="test/bad.py", content=b'from colors import blue, green\n')
+  good_source = FileContent(path="test/good.py", content=b"from animals import cat, dog\n")
+  bad_source = FileContent(path="test/bad.py", content=b"from colors import green, blue\n")
+  fixed_bad_source = FileContent(path="test/bad.py", content=b"from colors import blue, green\n")
   # Note the as import. Isort by default keeps as imports on a new line, so this wouldn't be
   # reformatted by default. If we set the config/CLI args correctly, isort will combine the two
   # imports into one line.
   needs_config_source = FileContent(
-    path="test/config.py",
-    content=b"from colors import blue\nfrom colors import green as verde\n"
+    path="test/config.py", content=b"from colors import blue\nfrom colors import green as verde\n"
   )
   fixed_needs_config_source = FileContent(
-    path="test/config.py",
-    content=b"from colors import blue, green as verde\n"
+    path="test/config.py", content=b"from colors import blue, green as verde\n"
   )
 
   @classmethod
@@ -70,25 +67,31 @@ class IsortIntegrationTest(TestBase):
       args.append(f"--isort-skip")
     input_snapshot = self.request_single_product(Snapshot, InputFilesContent(source_files))
     adaptor = TargetAdaptor(
-      sources=EagerFilesetWithSpec('test', {'globs': []}, snapshot=input_snapshot),
+      sources=EagerFilesetWithSpec("test", {"globs": []}, snapshot=input_snapshot),
       address=Address.parse("test:target"),
     )
     if origin is None:
       origin = SingleAddress(directory="test", name="target")
     adaptor_with_origin = TargetAdaptorWithOrigin(adaptor, origin)
     options_bootstrapper = create_options_bootstrapper(args=args)
-    lint_result = self.request_single_product(LintResult, Params(
-      IsortTarget(adaptor_with_origin),
-      options_bootstrapper,
-      download_pex_bin.DownloadedPexBin.Factory.global_instance(),
-    ))
-    fmt_result = self.request_single_product(FmtResult, Params(
-      IsortTarget(
-        adaptor_with_origin, prior_formatter_result_digest=input_snapshot.directory_digest,
+    lint_result = self.request_single_product(
+      LintResult,
+      Params(
+        IsortTarget(adaptor_with_origin),
+        options_bootstrapper,
+        download_pex_bin.DownloadedPexBin.Factory.global_instance(),
       ),
-      options_bootstrapper,
-      download_pex_bin.DownloadedPexBin.Factory.global_instance(),
-    ))
+    )
+    fmt_result = self.request_single_product(
+      FmtResult,
+      Params(
+        IsortTarget(
+          adaptor_with_origin, prior_formatter_result_digest=input_snapshot.directory_digest
+        ),
+        options_bootstrapper,
+        download_pex_bin.DownloadedPexBin.Factory.global_instance(),
+      ),
+    )
     return lint_result, fmt_result
 
   def get_digest(self, source_files: List[FileContent]) -> Digest:
@@ -128,7 +131,7 @@ class IsortIntegrationTest(TestBase):
 
   def test_respects_config_file(self) -> None:
     lint_result, fmt_result = self.run_isort(
-      [self.needs_config_source], config="[settings]\ncombine_as_imports=True\n",
+      [self.needs_config_source], config="[settings]\ncombine_as_imports=True\n"
     )
     assert lint_result.exit_code == 1
     assert "test/config.py Imports are incorrectly sorted" in lint_result.stdout
@@ -138,7 +141,7 @@ class IsortIntegrationTest(TestBase):
 
   def test_respects_passthrough_args(self) -> None:
     lint_result, fmt_result = self.run_isort(
-      [self.needs_config_source], passthrough_args="--combine-as",
+      [self.needs_config_source], passthrough_args="--combine-as"
     )
     assert lint_result.exit_code == 1
     assert "test/config.py Imports are incorrectly sorted" in lint_result.stdout

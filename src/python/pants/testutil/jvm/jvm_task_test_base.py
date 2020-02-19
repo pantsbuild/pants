@@ -21,7 +21,7 @@ class JvmTaskTestBase(TaskTestBase):
     """
     super().setUp()
     init_subsystem(JvmResolveSubsystem)
-    self.set_options_for_scope('resolver', resolver='ivy')
+    self.set_options_for_scope("resolver", resolver="ivy")
 
   def populate_runtime_classpath(self, context, classpath=None):
     """
@@ -36,8 +36,9 @@ class JvmTaskTestBase(TaskTestBase):
     """
     classpath = classpath or []
     runtime_classpath = self.get_runtime_classpath(context)
-    runtime_classpath.add_for_targets(context.targets(),
-                                      [('default', entry) for entry in classpath])
+    runtime_classpath.add_for_targets(
+      context.targets(), [("default", entry) for entry in classpath]
+    )
 
   def add_to_runtime_classpath(self, context, tgt, files_dict):
     """Creates and adds the given files to the classpath for the given target under a temp path.
@@ -52,10 +53,12 @@ class JvmTaskTestBase(TaskTestBase):
     for rel_path, content in files_dict.items():
       safe_file_dump(os.path.join(classpath_dir, rel_path), content)
     # Add to the classpath.
-    runtime_classpath.add_for_target(tgt, [('default', classpath_dir)])
+    runtime_classpath.add_for_target(tgt, [("default", classpath_dir)])
 
   def get_runtime_classpath(self, context):
     """
     :API: public
     """
-    return context.products.get_data('runtime_classpath', init_func=ClasspathProducts.init_func(self.pants_workdir))
+    return context.products.get_data(
+      "runtime_classpath", init_func=ClasspathProducts.init_func(self.pants_workdir)
+    )

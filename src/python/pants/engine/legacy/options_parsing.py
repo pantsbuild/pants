@@ -14,6 +14,7 @@ from pants.option.scope import Scope, ScopedOptions
 @dataclass(frozen=True)
 class _Options:
   """A wrapper around bootstrapped options values: not for direct consumption."""
+
   options: Options
 
 
@@ -23,7 +24,9 @@ def parse_options(options_bootstrapper: OptionsBootstrapper) -> _Options:
   # remaining relatively stable in order to be efficient. See #6845 for a discussion of how to make
   # minimize the size of that value.
   build_config = BuildConfigInitializer.get(options_bootstrapper)
-  return _Options(OptionsInitializer.create(options_bootstrapper, build_config, init_subsystems=False))
+  return _Options(
+    OptionsInitializer.create(options_bootstrapper, build_config, init_subsystems=False)
+  )
 
 
 @rule

@@ -6,12 +6,12 @@ from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 class TestListGoalsIntegration(PantsRunIntegrationTest):
   def test_goals(self) -> None:
-    command = ['--v1', '--v2', 'goals']
+    command = ["--v1", "--v2", "goals"]
     pants_run = self.run_pants(command=command)
     self.assert_success(pants_run)
-    assert 'to get help for a particular goal' in pants_run.stdout_data
+    assert "to get help for a particular goal" in pants_run.stdout_data
     # Spot check a few core goals.
-    for goal in ['filedeps', 'list', 'roots', 'validate']:
+    for goal in ["filedeps", "list", "roots", "validate"]:
       assert goal in pants_run.stdout_data
 
   def test_only_show_implemented_goals(self) -> None:
@@ -25,8 +25,8 @@ class TestListGoalsIntegration(PantsRunIntegrationTest):
     for goal in goals_that_need_implementation:
       assert goal not in not_implemented_run.stdout_data
 
-    implemented_run = self.run_pants([
-      "--backend-packages2=['pants.backend.python', 'pants.backend.python.lint.isort']", *command],
+    implemented_run = self.run_pants(
+      ["--backend-packages2=['pants.backend.python', 'pants.backend.python.lint.isort']", *command]
     )
     self.assert_success(implemented_run)
     for goal in goals_that_need_implementation:
@@ -34,7 +34,7 @@ class TestListGoalsIntegration(PantsRunIntegrationTest):
 
   def test_ignored_args(self) -> None:
     # Test that arguments (some of which used to be relevant) are ignored.
-    command = ['goals', '--all', '--graphviz', '--llama']
+    command = ["goals", "--all", "--graphviz", "--llama"]
     pants_run = self.run_pants(command=command)
     self.assert_success(pants_run)
-    assert 'to get help for a particular goal' in pants_run.stdout_data
+    assert "to get help for a particular goal" in pants_run.stdout_data

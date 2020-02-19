@@ -11,13 +11,15 @@ from pants.build_graph.target import Target
 from pants.util.memo import memoized_method
 
 
-class FunctionArg(namedtuple('_FunctionArg', ['name', 'description', 'has_default', 'default'])):
+class FunctionArg(namedtuple("_FunctionArg", ["name", "description", "has_default", "default"])):
   """An argument to a function."""
+
   pass
 
 
-class BuildSymbolInfo(namedtuple('_BuildSymbolInfo',
-                                 ['symbol', 'description', 'details_lines', 'args'])):
+class BuildSymbolInfo(
+  namedtuple("_BuildSymbolInfo", ["symbol", "description", "details_lines", "args"])
+):
   """A container for help information about a symbol that can be used in a BUILD file.
 
   symbol: The name of the symbol.
@@ -27,20 +29,20 @@ class BuildSymbolInfo(namedtuple('_BuildSymbolInfo',
   """
 
   def details(self):
-    return '\n'.join(self.details_lines)
+    return "\n".join(self.details_lines)
 
 
 class BuildDictionaryInfoExtracter:
   """Extracts help information about the symbols that may be used in BUILD files."""
 
-  ADD_DESCR = '<Add description>'
+  ADD_DESCR = "<Add description>"
 
   basic_target_args = [
-    FunctionArg('dependencies', '', True, []),
-    FunctionArg('description', '', True, None),
-    FunctionArg('name', '', False, None),
-    FunctionArg('no_cache', '', True, False),
-    FunctionArg('tags', '', True, None),
+    FunctionArg("dependencies", "", True, []),
+    FunctionArg("description", "", True, None),
+    FunctionArg("name", "", False, None),
+    FunctionArg("no_cache", "", True, False),
+    FunctionArg("tags", "", True, None),
   ]
 
   @classmethod
@@ -50,7 +52,7 @@ class BuildDictionaryInfoExtracter:
     In Py2, we could check if __init__ was overridden with inspect.ismethod(obj_type). This no longer works in Py3, so
     we have to use an alternative check.
     """
-    return 'slot wrapper' not in str(init_func)
+    return "slot wrapper" not in str(init_func)
 
   @classmethod
   def get_description_from_docstring(cls, obj):
@@ -59,13 +61,13 @@ class BuildDictionaryInfoExtracter:
     description is a single line.
     details is a list of subsequent lines, possibly empty.
     """
-    doc = obj.__doc__ or ''
-    p = doc.find('\n')
+    doc = obj.__doc__ or ""
+    p = doc.find("\n")
     if p == -1:
       return doc, []
     else:
       description = doc[:p]
-      details = textwrap.dedent(doc[p+1:]).splitlines()
+      details = textwrap.dedent(doc[p + 1 :]).splitlines()
       # Remove leading and trailing empty lines.
       while details and not details[0].strip():
         details = details[1:]
@@ -93,35 +95,35 @@ class BuildDictionaryInfoExtracter:
     (e.g., :param str a:), where there is a single word between the colons (e.g., :returns:),
     and where a newline immediately follows the second colon in the stanza.
     """
-    return re.compile(r':(\w+)\s*(\w+\s+)?(\w*):\s*(.*)')
+    return re.compile(r":(\w+)\s*(\w+\s+)?(\w*):\s*(.*)")
 
   @classmethod
   @memoized_method
   def _get_default_value_re(cls):
-    return re.compile(r' \([Dd]efault: (.*)\)')
+    return re.compile(r" \([Dd]efault: (.*)\)")
 
   @classmethod
   def get_arg_descriptions_from_docstring(cls, obj):
     """Returns an ordered map of arg name -> arg description found in :param: stanzas."""
 
     ret = OrderedDict()
-    name = ''
-    doc = obj.__doc__ or ''
-    lines = [s.strip() for s in doc.split('\n')]
+    name = ""
+    doc = obj.__doc__ or ""
+    lines = [s.strip() for s in doc.split("\n")]
     stanza_first_line_re = cls._get_stanza_first_line_re()
     for line in lines:
       m = stanza_first_line_re.match(line)
-      if m and m.group(1) == 'param':
+      if m and m.group(1) == "param":
         # If first line of a parameter description, set name and description.
         name, description = m.group(3, 4)
         ret[name] = description
-      elif m and m.group(1) != 'param':
+      elif m and m.group(1) != "param":
         # If first line of a description of an item other than a parameter, clear name.
-        name = ''
+        name = ""
       elif name and line:
         # If subsequent line of a parameter description, add to existing description (if any) for
         # that parameter.
-        ret[name] += (' ' + line) if ret[name] else line
+        ret[name] += (" " + line) if ret[name] else line
       # Ignore subsequent lines of descriptions of items other than parameters.
     return ret
 
@@ -141,16 +143,18 @@ class BuildDictionaryInfoExtracter:
 
     # Non-BUILD-file-facing Target.__init__ args that some Target subclasses capture in their
     # own __init__ for various reasons.
-    ignore_args = {'address', 'payload'}
+    ignore_args = {"address", "payload"}
 
     # Now look at the MRO, in reverse (so we see the more 'common' args first).
     # If we see info for an arg, it's more specific than whatever description we have so far,
     # so clobber its entry in the args dict.
     methods_seen = set()  # Ensure we only look at each __init__ method once.
     for _type in reversed([t for t in target_type.mro() if issubclass(t, Target)]):
-      if (cls._is_custom_init(_type.__init__) and
-          _type.__init__ not in methods_seen and
-          _type.__init__ != Target.__init__):
+      if (
+        cls._is_custom_init(_type.__init__)
+        and _type.__init__ not in methods_seen
+        and _type.__init__ != Target.__init__
+      ):
         for arg in cls._get_function_args(_type.__init__):
           args[arg.name] = arg
         methods_seen.add(_type.__init__)
@@ -172,18 +176,23 @@ class BuildDictionaryInfoExtracter:
     arg_descriptions = cls.get_arg_descriptions_from_docstring(func)
     argspec = inspect.getfullargspec(func)
     arg_names = argspec.args
-    if arg_names and arg_names[0] in {'self', 'cls'}:
+    if arg_names and arg_names[0] in {"self", "cls"}:
       arg_names = arg_names[1:]
     num_defaulted_args = len(argspec.defaults) if argspec.defaults is not None else 0
     first_defaulted_arg = len(arg_names) - num_defaulted_args
     for i in range(0, first_defaulted_arg):
-      yield FunctionArg(arg_names[i], arg_descriptions.pop(arg_names[i], ''), False, None)
+      yield FunctionArg(arg_names[i], arg_descriptions.pop(arg_names[i], ""), False, None)
     for i in range(first_defaulted_arg, len(arg_names)):
-      yield FunctionArg(arg_names[i], arg_descriptions.pop(arg_names[i], ''), True,
-                        argspec.defaults[i - first_defaulted_arg])
+      yield FunctionArg(
+        arg_names[i],
+        arg_descriptions.pop(arg_names[i], ""),
+        True,
+        argspec.defaults[i - first_defaulted_arg],
+      )
     if argspec.varargs:
-      yield FunctionArg('*{}'.format(argspec.varargs), arg_descriptions.pop(argspec.varargs, None),
-                        False, None)
+      yield FunctionArg(
+        "*{}".format(argspec.varargs), arg_descriptions.pop(argspec.varargs, None), False, None
+      )
 
     if argspec.varkw:
       # Any remaining arg_descriptions are for kwargs.
@@ -191,7 +200,7 @@ class BuildDictionaryInfoExtracter:
         # Get the default value out of the description, if present.
         mo = cls._get_default_value_re().search(descr)
         default_value = mo.group(1) if mo else None
-        descr_sans_default = '{}{}'.format(descr[:mo.start()], descr[mo.end():]) if mo else descr
+        descr_sans_default = "{}{}".format(descr[: mo.start()], descr[mo.end() :]) if mo else descr
         yield FunctionArg(arg_name, descr_sans_default, True, default_value)
 
   def __init__(self, buildfile_aliases):
@@ -201,20 +210,20 @@ class BuildDictionaryInfoExtracter:
     """Returns a list of FunctionArgs for the specified target_type."""
     target_types = list(self._buildfile_aliases.target_types_by_alias.get(alias))
     if not target_types:
-      raise TaskError('No such target type: {}'.format(alias))
+      raise TaskError("No such target type: {}".format(alias))
     return self.get_args_for_target_type(target_types[0])
 
   def get_object_args(self, alias):
     obj_type = self._buildfile_aliases.objects.get(alias)
     if not obj_type:
-      raise TaskError('No such object type: {}'.format(alias))
+      raise TaskError("No such object type: {}".format(alias))
     if inspect.isfunction(obj_type) or inspect.ismethod(obj_type):
       return self.get_function_args(obj_type)
     elif inspect.isclass(obj_type) and self._is_custom_init(obj_type.__init__):
       return self.get_function_args(obj_type.__init__)
     elif inspect.isclass(obj_type):
       return self.get_function_args(obj_type.__new__)
-    elif hasattr(obj_type, '__call__'):
+    elif hasattr(obj_type, "__call__"):
       return self.get_function_args(obj_type.__call__)
     else:
       return []
@@ -222,7 +231,7 @@ class BuildDictionaryInfoExtracter:
   def get_object_factory_args(self, alias):
     obj_factory = self._buildfile_aliases.context_aware_object_factories.get(alias)
     if not obj_factory:
-      raise TaskError('No such context aware object factory: {}'.format(alias))
+      raise TaskError("No such context aware object factory: {}".format(alias))
     return self.get_function_args(obj_factory.__call__)
 
   def get_target_type_info(self):

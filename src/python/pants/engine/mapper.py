@@ -25,6 +25,7 @@ class AddressMap:
   :param path: The path to the byte source this address map's objects were passed from.
   :param objects_by_name: A dict mapping from object name to the parsed 'thin' addressable object.
   """
+
   path: str
   objects_by_name: Dict[str, ThinAddressableObject]
 
@@ -43,20 +44,22 @@ class AddressMap:
     try:
       objects = parser.parse(filepath, filecontent)
     except Exception as e:
-      raise MappingError(f'Failed to parse {filepath}:\n{e!r}')
+      raise MappingError(f"Failed to parse {filepath}:\n{e!r}")
     objects_by_name: Dict[str, ThinAddressableObject] = {}
     for obj in objects:
       if not Serializable.is_serializable(obj):
-        raise UnaddressableObjectError('Parsed a non-serializable object: {!r}'.format(obj))
+        raise UnaddressableObjectError("Parsed a non-serializable object: {!r}".format(obj))
       attributes = obj._asdict()
 
-      name = attributes.get('name')
+      name = attributes.get("name")
       if not name:
-        raise UnaddressableObjectError('Parsed a non-addressable object: {!r}'.format(obj))
+        raise UnaddressableObjectError("Parsed a non-addressable object: {!r}".format(obj))
 
       if name in objects_by_name:
-        raise DuplicateNameError('An object already exists at {!r} with name {!r}: {!r}.  Cannot '
-                                 'map {!r}'.format(filepath, name, objects_by_name[name], obj))
+        raise DuplicateNameError(
+          "An object already exists at {!r} with name {!r}: {!r}.  Cannot "
+          "map {!r}".format(filepath, name, objects_by_name[name], obj)
+        )
       objects_by_name[name] = obj
     return cls(filepath, dict(sorted(objects_by_name.items())))
 
@@ -78,24 +81,26 @@ class AddressFamily:
   :param namespace: The namespace path of this address family.
   :param objects_by_name: A dict mapping from object name to the parsed 'thin' addressable object.
   """
+
   namespace: str
   objects_by_name: Dict[str, Tuple[str, ThinAddressableObject]]
 
   @classmethod
-  def create(cls, spec_path: str, address_maps: Iterable[AddressMap]) -> 'AddressFamily':
+  def create(cls, spec_path: str, address_maps: Iterable[AddressMap]) -> "AddressFamily":
     """Creates an address family from the given set of address maps.
 
     :param spec_path: The directory prefix shared by all address_maps.
     :param address_maps: The family of maps that form this namespace.
     :raises: :class:`MappingError` if the given address maps do not form a family.
     """
-    if spec_path == '.':
-      spec_path = ''
+    if spec_path == ".":
+      spec_path = ""
     for address_map in address_maps:
       if not address_map.path.startswith(spec_path):
-        raise DifferingFamiliesError('Expected AddressMaps to share the same parent directory {}, '
-                                     'but received: {}'
-                                     .format(spec_path, address_map.path))
+        raise DifferingFamiliesError(
+          "Expected AddressMaps to share the same parent directory {}, "
+          "but received: {}".format(spec_path, address_map.path)
+        )
 
     objects_by_name: Dict[str, Tuple[str, ThinAddressableObject]] = {}
     for address_map in address_maps:
@@ -104,13 +109,13 @@ class AddressFamily:
         previous = objects_by_name.get(name)
         if previous:
           previous_path, _ = previous
-          raise DuplicateNameError('An object with name {name!r} is already defined in '
-                                   '{previous_path!r}, will not overwrite with {obj!r} from '
-                                   '{current_path!r}.'
-                                   .format(name=name,
-                                           previous_path=previous_path,
-                                           obj=obj,
-                                           current_path=current_path))
+          raise DuplicateNameError(
+            "An object with name {name!r} is already defined in "
+            "{previous_path!r}, will not overwrite with {obj!r} from "
+            "{current_path!r}.".format(
+              name=name, previous_path=previous_path, obj=obj, current_path=current_path
+            )
+          )
         objects_by_name[name] = (current_path, obj)
     return AddressFamily(
       namespace=spec_path,
@@ -132,14 +137,16 @@ class AddressFamily:
     return hash(self.namespace)
 
   def __repr__(self):
-    return 'AddressFamily(namespace={!r}, objects_by_name={!r})'.format(
-        self.namespace, list(self.objects_by_name.keys()))
+    return "AddressFamily(namespace={!r}, objects_by_name={!r})".format(
+      self.namespace, list(self.objects_by_name.keys())
+    )
 
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class AddressMapper:
   """Configuration to parse build files matching a filename pattern."""
+
   parser: Parser
   build_patterns: Tuple[str, ...]
   build_ignore_patterns: Tuple[str, ...]
@@ -166,13 +173,13 @@ class AddressMapper:
     :param exclude_target_regexps: A list of regular expressions for excluding targets.
     """
     self.parser = parser
-    self.build_patterns = tuple(build_patterns or ['BUILD', 'BUILD.*'])
+    self.build_patterns = tuple(build_patterns or ["BUILD", "BUILD.*"])
     self.build_ignore_patterns = tuple(build_ignore_patterns or [])
     self.exclude_target_regexps = tuple(exclude_target_regexps or [])
     self.subproject_roots = tuple(subproject_roots or [])
 
   def __repr__(self):
-    return 'AddressMapper(parser={}, build_patterns={})'.format(self.parser, self.build_patterns)
+    return "AddressMapper(parser={}, build_patterns={})".format(self.parser, self.build_patterns)
 
   @memoized_property
   def exclude_patterns(self):

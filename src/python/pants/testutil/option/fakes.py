@@ -53,20 +53,20 @@ def _options_registration_function(defaults, fingerprintables):
   def register(*args, **kwargs):
     _, option_dest = Parser.parse_name_and_dest(*args, **kwargs)
 
-    default = kwargs.get('default')
+    default = kwargs.get("default")
     if default is None:
-      if kwargs.get('type') == bool:
+      if kwargs.get("type") == bool:
         default = False
-      if kwargs.get('type') == list:
+      if kwargs.get("type") == list:
         default = []
     defaults[option_dest] = RankedValue(RankedValue.HARDCODED, default)
 
-    fingerprint = kwargs.get('fingerprint', False)
+    fingerprint = kwargs.get("fingerprint", False)
     if fingerprint:
       if is_list_option(kwargs):
-        val_type = kwargs.get('member_type', str)
+        val_type = kwargs.get("member_type", str)
       else:
-        val_type = kwargs.get('type', str)
+        val_type = kwargs.get("type", str)
       fingerprintables[option_dest] = val_type
 
   return register
@@ -143,10 +143,9 @@ def create_options(options, passthru_args=None, fingerprintable_options=None):
   return FakeOptions()
 
 
-def create_options_for_optionables(optionables,
-                                   options=None,
-                                   options_fingerprintable=None,
-                                   passthru_args=None):
+def create_options_for_optionables(
+  optionables, options=None, options_fingerprintable=None, passthru_args=None
+):
   """Create a fake Options object for testing with appropriate defaults for the given optionables.
 
   Any scoped `options` provided will override defaults, behaving as-if set on the command line.
@@ -193,6 +192,6 @@ def create_options_for_optionables(optionables,
     for scope, opts in options.items():
       all_options[scope].update(opts)
 
-  return create_options(all_options,
-                        passthru_args=passthru_args,
-                        fingerprintable_options=fingerprintable_options)
+  return create_options(
+    all_options, passthru_args=passthru_args, fingerprintable_options=fingerprintable_options
+  )

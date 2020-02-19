@@ -22,7 +22,6 @@ logger = logging.getLogger(__name__)
 
 # TODO(nh): We could fingerprint just the ivy options and not the task options.
 class IvyResolveFingerprintStrategy(FingerprintStrategy):
-
   def __init__(self, confs):
     super().__init__()
     self._confs = sorted(confs or [])
@@ -37,7 +36,7 @@ class IvyResolveFingerprintStrategy(FingerprintStrategy):
 
       hash_elements_for_target.append(target.payload.fingerprint())
     elif isinstance(target, JvmTarget) and target.payload.excludes:
-      hash_elements_for_target.append(target.payload.fingerprint(field_keys=('excludes',)))
+      hash_elements_for_target.append(target.payload.fingerprint(field_keys=("excludes",)))
     else:
       pass
 
@@ -57,7 +56,7 @@ class IvyResolveFingerprintStrategy(FingerprintStrategy):
     return hasher.hexdigest()
 
   def __hash__(self):
-    return hash((type(self), '-'.join(self._confs)))
+    return hash((type(self), "-".join(self._confs)))
 
   def __eq__(self, other):
     return type(self) == type(other) and self._confs == other._confs
@@ -89,13 +88,18 @@ class IvyTaskMixin(JvmResolverBase):
     # TODO: Register an --ivy-jvm-options here and use that, instead of the --jvm-options
     # registered by the task we mix into. That task may have intended those options for some
     # other JVM run than the Ivy one.
-    register('--soft-excludes', type=bool, advanced=True, fingerprint=True,
-             help='If a target depends on a jar that is excluded by another target '
-                  'resolve this jar anyway')
+    register(
+      "--soft-excludes",
+      type=bool,
+      advanced=True,
+      fingerprint=True,
+      help="If a target depends on a jar that is excluded by another target "
+      "resolve this jar anyway",
+    )
 
   @classmethod
   def implementation_version(cls):
-    return super().implementation_version() + [('IvyTaskMixin', 5)]
+    return super().implementation_version() + [("IvyTaskMixin", 5)]
 
   @memoized_property
   def ivy_repository_cache_dir(self):
@@ -105,8 +109,15 @@ class IvyTaskMixin(JvmResolverBase):
   def ivy_resolution_cache_dir(self):
     return IvySubsystem.global_instance().resolution_cache_dir()
 
-  def resolve(self, executor, targets, classpath_products, confs=None, extra_args=None,
-              invalidate_dependents=False):
+  def resolve(
+    self,
+    executor,
+    targets,
+    classpath_products,
+    confs=None,
+    extra_args=None,
+    invalidate_dependents=False,
+  ):
     """Resolves external classpath products (typically jars) for the given targets.
 
     :API: public
@@ -126,17 +137,21 @@ class IvyTaskMixin(JvmResolverBase):
     :returns: The results of each of the resolves run by this call.
     :rtype: list of IvyResolveResult
     """
-    confs = confs or ('default',)
+    confs = confs or ("default",)
     targets_by_sets = JarDependencyManagement.global_instance().targets_by_artifact_set(targets)
     results = []
     for artifact_set, target_subset in targets_by_sets.items():
-      results.append(self._resolve_subset(executor,
-                                                     target_subset,
-                                                     classpath_products,
-                                                     confs=confs,
-                                                     extra_args=extra_args,
-                                                     invalidate_dependents=invalidate_dependents,
-                                                     pinned_artifacts=artifact_set))
+      results.append(
+        self._resolve_subset(
+          executor,
+          target_subset,
+          classpath_products,
+          confs=confs,
+          extra_args=extra_args,
+          invalidate_dependents=invalidate_dependents,
+          pinned_artifacts=artifact_set,
+        )
+      )
     return results
 
   def ivy_classpath(self, targets, silent=True, workunit_name=None):
@@ -150,12 +165,20 @@ class IvyTaskMixin(JvmResolverBase):
     result = self._ivy_resolve(targets, silent=silent, workunit_name=workunit_name)
     return result.resolved_artifact_paths
 
-  def _resolve_subset(self, executor, targets, classpath_products, confs=None, extra_args=None,
-              invalidate_dependents=False, pinned_artifacts=None):
+  def _resolve_subset(
+    self,
+    executor,
+    targets,
+    classpath_products,
+    confs=None,
+    extra_args=None,
+    invalidate_dependents=False,
+    pinned_artifacts=None,
+  ):
     result = self._ivy_resolve(
       targets,
       executor=executor,
-      workunit_name='ivy-resolve',
+      workunit_name="ivy-resolve",
       confs=confs,
       extra_args=extra_args,
       invalidate_dependents=invalidate_dependents,
@@ -177,15 +200,17 @@ class IvyTaskMixin(JvmResolverBase):
 
     return result
 
-  def _ivy_resolve(self,
-                   targets,
-                   executor=None,
-                   silent=False,
-                   workunit_name=None,
-                   confs=None,
-                   extra_args=None,
-                   invalidate_dependents=False,
-                   pinned_artifacts=None):
+  def _ivy_resolve(
+    self,
+    targets,
+    executor=None,
+    silent=False,
+    workunit_name=None,
+    confs=None,
+    extra_args=None,
+    invalidate_dependents=False,
+    pinned_artifacts=None,
+  ):
     """Resolves external dependencies for the given targets.
 
     If there are no targets suitable for jvm transitive dependency resolution, an empty result is
@@ -209,14 +234,16 @@ class IvyTaskMixin(JvmResolverBase):
     if not targets:
       return NO_RESOLVE_RUN_RESULT
 
-    confs = confs or ('default',)
+    confs = confs or ("default",)
 
     fingerprint_strategy = IvyResolveFingerprintStrategy(confs)
 
-    with self.invalidated(targets,
-                          invalidate_dependents=invalidate_dependents,
-                          silent=silent,
-                          fingerprint_strategy=fingerprint_strategy) as invalidation_check:
+    with self.invalidated(
+      targets,
+      invalidate_dependents=invalidate_dependents,
+      silent=silent,
+      fingerprint_strategy=fingerprint_strategy,
+    ) as invalidation_check:
       # In case all the targets were filtered out because they didn't participate in fingerprinting.
       if not invalidation_check.all_vts:
         return NO_RESOLVE_RUN_RESULT
@@ -226,29 +253,50 @@ class IvyTaskMixin(JvmResolverBase):
       resolve_hash_name = resolve_vts.cache_key.hash
       # NB: This used to be a global directory, but is now specific to each task that includes
       # this mixin.
-      ivy_workdir = os.path.join(self.versioned_workdir, 'ivy')
+      ivy_workdir = os.path.join(self.versioned_workdir, "ivy")
       targets = resolve_vts.targets
 
-      fetch = IvyFetchStep(confs,
-                           resolve_hash_name,
-                           pinned_artifacts,
-                           self.get_options().soft_excludes,
-                           self.ivy_resolution_cache_dir,
-                           self.ivy_repository_cache_dir,
-                           ivy_workdir)
-      resolve = IvyResolveStep(confs,
-                               resolve_hash_name,
-                               pinned_artifacts,
-                               self.get_options().soft_excludes,
-                               self.ivy_resolution_cache_dir,
-                               self.ivy_repository_cache_dir,
-                               ivy_workdir)
+      fetch = IvyFetchStep(
+        confs,
+        resolve_hash_name,
+        pinned_artifacts,
+        self.get_options().soft_excludes,
+        self.ivy_resolution_cache_dir,
+        self.ivy_repository_cache_dir,
+        ivy_workdir,
+      )
+      resolve = IvyResolveStep(
+        confs,
+        resolve_hash_name,
+        pinned_artifacts,
+        self.get_options().soft_excludes,
+        self.ivy_resolution_cache_dir,
+        self.ivy_repository_cache_dir,
+        ivy_workdir,
+      )
 
-      return self._perform_resolution(fetch, resolve, executor, extra_args, invalidation_check,
-                                      resolve_vts, targets, workunit_name)
+      return self._perform_resolution(
+        fetch,
+        resolve,
+        executor,
+        extra_args,
+        invalidation_check,
+        resolve_vts,
+        targets,
+        workunit_name,
+      )
 
-  def _perform_resolution(self, fetch, resolve, executor, extra_args, invalidation_check,
-                          resolve_vts, targets, workunit_name):
+  def _perform_resolution(
+    self,
+    fetch,
+    resolve,
+    executor,
+    extra_args,
+    invalidation_check,
+    resolve_vts,
+    targets,
+    workunit_name,
+  ):
     # Resolution loading code, fast paths followed by slow paths.
     #
     # Fast paths
@@ -265,26 +313,28 @@ class IvyTaskMixin(JvmResolverBase):
     if not invalidation_check.invalid_vts and fetch.required_load_files_exist():
       resolve_result = fetch.load(targets)
       if resolve_result.all_linked_artifacts_exist():
-        logger.debug('Using previous fetch.')
+        logger.debug("Using previous fetch.")
         return resolve_result
     if not invalidation_check.invalid_vts and resolve.required_load_files_exist():
       result = resolve.load(targets)
       if result.all_linked_artifacts_exist():
-        logger.debug('Using previous resolve.')
+        logger.debug("Using previous resolve.")
         return result
 
     if not invalidation_check.invalid_vts and fetch.required_exec_files_exist():
-      logger.debug('Performing a fetch using ivy.')
-      result = fetch.exec_and_load(executor, extra_args, targets, jvm_options, workunit_name,
-                                   workunit_factory)
+      logger.debug("Performing a fetch using ivy.")
+      result = fetch.exec_and_load(
+        executor, extra_args, targets, jvm_options, workunit_name, workunit_factory
+      )
       if result.all_linked_artifacts_exist():
         return result
       else:
         logger.debug("Fetch failed, falling through to resolve.")
 
-    logger.debug('Performing a resolve using ivy.')
-    result = resolve.exec_and_load(executor, extra_args, targets, jvm_options, workunit_name,
-                                   workunit_factory)
+    logger.debug("Performing a resolve using ivy.")
+    result = resolve.exec_and_load(
+      executor, extra_args, targets, jvm_options, workunit_name, workunit_factory
+    )
     if self.artifact_cache_writes_enabled():
       self.update_artifact_cache([(resolve_vts, [resolve.frozen_resolve_file])])
     return result

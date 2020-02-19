@@ -43,17 +43,12 @@ class IntermediateTargetFactoryBase(ABC):
     # handwritten dependencies on them. For now just give them names containing "-unstable-" as a
     # hint.
     hash_str = hash_target(str(address), suffix)
-    name = '{name}-unstable-{suffix}-{index}'.format(
-      name=address.target_name,
-      suffix=suffix.replace(' ', '.'),
-      index=hash_str,
+    name = "{name}-unstable-{suffix}-{index}".format(
+      name=address.target_name, suffix=suffix.replace(" ", "."), index=hash_str
     )
 
     self._parse_context.create_object_if_not_exists(
-      'target',
-      name=name,
-      dependencies=[address.spec],
-      **self.extra_target_arguments
+      "target", name=name, dependencies=[address.spec], **self.extra_target_arguments
     )
 
-    return ':{}'.format(name)
+    return ":{}".format(name)

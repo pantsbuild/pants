@@ -41,7 +41,7 @@ class PythonTestRunnerIntegrationTest(TestBase):
   library_source = FileContent(path="library.py", content=b"def add_two(x):\n  return x + 2\n")
 
   create_python_library = partialmethod(
-    TestBase.create_library, path=source_root, target_type="python_library",
+    TestBase.create_library, path=source_root, target_type="python_library"
   )
 
   def write_file(self, file_content: FileContent) -> None:
@@ -71,7 +71,7 @@ class PythonTestRunnerIntegrationTest(TestBase):
           compatibility={[interpreter_constraints] if interpreter_constraints else []},
         )
         """
-      )
+      ),
     )
     for source_file in source_files:
       self.write_file(source_file)
@@ -93,13 +93,11 @@ class PythonTestRunnerIntegrationTest(TestBase):
   def alias_groups(cls) -> BuildFileAliases:
     return BuildFileAliases(
       targets={
-        'python_library': PythonLibrary,
-        'python_tests': PythonTests,
+        "python_library": PythonLibrary,
+        "python_tests": PythonTests,
         "python_requirement_library": PythonRequirementLibrary,
       },
-      objects={
-        "python_requirement": PythonRequirement,
-      }
+      objects={"python_requirement": PythonRequirement},
     )
 
   @classmethod
@@ -120,7 +118,7 @@ class PythonTestRunnerIntegrationTest(TestBase):
     )
 
   def run_pytest(
-    self, *, passthrough_args: Optional[str] = None, origin: Optional[OriginSpec] = None,
+    self, *, passthrough_args: Optional[str] = None, origin: Optional[OriginSpec] = None
   ) -> TestResult:
     args = [
       "--backend-packages2=pants.backend.python",
@@ -139,12 +137,14 @@ class PythonTestRunnerIntegrationTest(TestBase):
     # PythonTestsAdaptorWithOrigin. Why is this necessary in test code?
     v1_target = self.target(f"{self.source_root}:target")
     adaptor = PythonTestsAdaptor(
-      address=v1_target.address.to_address(), sources=v1_target._sources_field.sources,
+      address=v1_target.address.to_address(), sources=v1_target._sources_field.sources
     )
     params = Params(PythonTestsAdaptorWithOrigin(adaptor, origin), options_bootstrapper)
     test_result = self.request_single_product(TestResult, params)
     debug_request = self.request_single_product(TestDebugRequest, params)
-    debug_result = InteractiveRunner(self.scheduler).run_local_interactive_process(debug_request.ipr)
+    debug_result = InteractiveRunner(self.scheduler).run_local_interactive_process(
+      debug_request.ipr
+    )
     if test_result.status == Status.SUCCESS:
       assert debug_result.process_exit_code == 0
     else:
@@ -217,7 +217,7 @@ class PythonTestRunnerIntegrationTest(TestBase):
   def test_transitive_dep(self) -> None:
     self.create_basic_library()
     self.create_python_library(
-      name="transitive_dep", sources=["transitive_dep.py"], dependencies=[":library"],
+      name="transitive_dep", sources=["transitive_dep.py"], dependencies=[":library"]
     )
     self.write_file(
       FileContent(
@@ -269,7 +269,7 @@ class PythonTestRunnerIntegrationTest(TestBase):
   def test_thirdparty_transitive_dep(self) -> None:
     self.setup_thirdparty_dep()
     self.create_python_library(
-      name="library", sources=["library.py"], dependencies=["3rdparty/python:ordered-set"],
+      name="library", sources=["library.py"], dependencies=["3rdparty/python:ordered-set"]
     )
     self.write_file(
       FileContent(
@@ -302,12 +302,14 @@ class PythonTestRunnerIntegrationTest(TestBase):
 
   @skip_unless_python27_and_python3_present
   def test_uses_correct_python_version(self) -> None:
-    self.create_python_test_target([self.py3_only_source], interpreter_constraints='CPython==2.7.*')
+    self.create_python_test_target([self.py3_only_source], interpreter_constraints="CPython==2.7.*")
     py2_result = self.run_pytest()
     assert py2_result.status == Status.FAILURE
     assert "SyntaxError: invalid syntax" in py2_result.stdout
-    Path(self.build_root, self.source_root, "BUILD").unlink()  # Cleanup in order to recreate the target
-    self.create_python_test_target([self.py3_only_source], interpreter_constraints='CPython>=3.6')
+    Path(
+      self.build_root, self.source_root, "BUILD"
+    ).unlink()  # Cleanup in order to recreate the target
+    self.create_python_test_target([self.py3_only_source], interpreter_constraints="CPython>=3.6")
     py3_result = self.run_pytest()
     assert py3_result.status == Status.SUCCESS
     assert "test_py3.py ." in py3_result.stdout

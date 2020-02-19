@@ -43,7 +43,7 @@ class Locatable(ABC):
   """
 
 
-class SerializablePickle(namedtuple('CustomPickle', ['unpickle_func', 'args'])):
+class SerializablePickle(namedtuple("CustomPickle", ["unpickle_func", "args"])):
   """A named tuple to help the readability of the __reduce__ protocol.
 
   See: https://docs.python.org/2.7/library/pickle.html#pickling-and-unpickling-extension-types
@@ -53,10 +53,15 @@ class SerializablePickle(namedtuple('CustomPickle', ['unpickle_func', 'args'])):
   def create(cls, serializable_instance):
     """Return a tuple that implements the __reduce__ pickle protocol for serializable_instance."""
     if not Serializable.is_serializable(serializable_instance):
-      raise ValueError('Can only create pickles for Serializable objects, given {} of type {}'
-                       .format(serializable_instance, type(serializable_instance).__name__))
-    return cls(unpickle_func=_unpickle_serializable,
-               args=(type(serializable_instance), serializable_instance._asdict()))
+      raise ValueError(
+        "Can only create pickles for Serializable objects, given {} of type {}".format(
+          serializable_instance, type(serializable_instance).__name__
+        )
+      )
+    return cls(
+      unpickle_func=_unpickle_serializable,
+      args=(type(serializable_instance), serializable_instance._asdict()),
+    )
 
 
 class Serializable(ABC):
@@ -73,7 +78,7 @@ class Serializable(ABC):
     """
     if inspect.isclass(obj):
       return Serializable.is_serializable_type(obj)
-    return isinstance(obj, Serializable) or hasattr(obj, '_asdict')
+    return isinstance(obj, Serializable) or hasattr(obj, "_asdict")
 
   @staticmethod
   def is_serializable_type(type_):
@@ -83,7 +88,7 @@ class Serializable(ABC):
     """
     if not inspect.isclass(type_):
       return Serializable.is_serializable(type_)
-    return issubclass(type_, Serializable) or hasattr(type_, '_asdict')
+    return issubclass(type_, Serializable) or hasattr(type_, "_asdict")
 
   @abstractmethod
   def _asdict(self):
@@ -134,8 +139,7 @@ class ValidationError(Exception):
                               that led to this validation error.
     :param string message: A message describing the invalid Struct field.
     """
-    super().__init__('Failed to validate {id}: {msg}'
-                                          .format(id=identifier, msg=message))
+    super().__init__("Failed to validate {id}: {msg}".format(id=identifier, msg=message))
 
 
 class Validatable(ABC):
@@ -198,12 +202,13 @@ def union(cls):
   """
   # TODO: Check that the union base type is used as a tag and nothing else (e.g. no attributes)!
   assert isinstance(cls, type)
+
   def non_member_error_message(subject):
-    if hasattr(cls, 'non_member_error_message'):
+    if hasattr(cls, "non_member_error_message"):
       return cls.non_member_error_message(subject)
-    desc = f' ("{cls.__doc__}")' if cls.__doc__ else ''
-    return f'Type {type(subject).__name__} is not a member of the {cls.__name__} @union{desc}'
+    desc = f' ("{cls.__doc__}")' if cls.__doc__ else ""
+    return f"Type {type(subject).__name__} is not a member of the {cls.__name__} @union{desc}"
 
   return union.define_instance_of(
-    cls,
-    non_member_error_message=staticmethod(non_member_error_message))
+    cls, non_member_error_message=staticmethod(non_member_error_message)
+  )

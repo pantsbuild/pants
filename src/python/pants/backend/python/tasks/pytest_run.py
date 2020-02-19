@@ -54,14 +54,15 @@ class _Workdirs:
 
   @memoized_method
   def junitxml_path(self, *targets):
-    xml_path = os.path.join(self.root_dir, 'junitxml',
-                            'TEST-{}.xml'.format(self.target_set_id(*targets)))
+    xml_path = os.path.join(
+      self.root_dir, "junitxml", "TEST-{}.xml".format(self.target_set_id(*targets))
+    )
     safe_mkdir_for(xml_path)
     return xml_path
 
   @memoized_property
   def coverage_path(self):
-    coverage_workdir = os.path.join(self.root_dir, 'coverage')
+    coverage_workdir = os.path.join(self.root_dir, "coverage")
     safe_mkdir(coverage_workdir)
     return coverage_workdir
 
@@ -70,6 +71,7 @@ class _Workdirs:
       for dir_path, _, file_names in os.walk(self.root_dir):
         for filename in file_names:
           yield os.path.join(dir_path, filename)
+
     return list(files_iter())
 
 
@@ -77,12 +79,11 @@ class _Workdirs:
 class PytestResult(TestResult):
   _SUCCESS_EXIT_CODES = (
     0,
-
     # This is returned by pytest when no tests are collected (EXIT_NOTESTSCOLLECTED).
     # We already short-circuit test runs with no test _targets_ to return 0 emulated exit codes and
     # we should do the same for cases when there are test targets but tests themselves have been
     # de-selected out of band via `pytest -k`.
-    5
+    5,
   )
 
   @classmethod
@@ -91,10 +92,9 @@ class PytestResult(TestResult):
 
 
 class PytestRun(PartitionedTestRunnerTaskMixin, Task):
-
   @classmethod
   def implementation_version(cls):
-    return super().implementation_version() + [('PytestRun', 3)]
+    return super().implementation_version() + [("PytestRun", 3)]
 
   @classmethod
   def register_options(cls, register):
@@ -104,39 +104,71 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
     # it to the user-specified directory, post any interaction with the cache to retrieve the
     # privately generated and cached xml files. As such, this option is not part of the
     # fingerprint.
-    register('--junit-xml-dir', metavar='<DIR>',
-             help='Specifying a directory causes junit xml results files to be emitted under '
-                  'that dir for each test run.')
+    register(
+      "--junit-xml-dir",
+      metavar="<DIR>",
+      help="Specifying a directory causes junit xml results files to be emitted under "
+      "that dir for each test run.",
+    )
 
-    register('--profile', metavar='<FILE>', fingerprint=True,
-             help="Specifying a file path causes tests to be profiled with the profiling data "
-                  "emitted to that file (prefix). Note that tests may run in a different cwd, so "
-                  "it's best to use an absolute path to make it easy to find the subprocess "
-                  "profiles later.")
+    register(
+      "--profile",
+      metavar="<FILE>",
+      fingerprint=True,
+      help="Specifying a file path causes tests to be profiled with the profiling data "
+      "emitted to that file (prefix). Note that tests may run in a different cwd, so "
+      "it's best to use an absolute path to make it easy to find the subprocess "
+      "profiles later.",
+    )
 
-    register('--coverage', fingerprint=True,
-             help='Emit coverage information for specified packages or directories (absolute or '
-                  'relative to the build root).  The special value "auto" indicates that Pants '
-                  'should attempt to deduce which packages to emit coverage for.')
-    register('--coverage-include-test-sources', fingerprint=True, type=bool,
-             help='Whether to include test source files in coverage measurement.')
-    register('--coverage-reports', fingerprint=True, choices=('xml', 'html'), type=list,
-             member_type=str, default=('xml', 'html'),
-             help='Which coverage reports to emit.')
+    register(
+      "--coverage",
+      fingerprint=True,
+      help="Emit coverage information for specified packages or directories (absolute or "
+      'relative to the build root).  The special value "auto" indicates that Pants '
+      "should attempt to deduce which packages to emit coverage for.",
+    )
+    register(
+      "--coverage-include-test-sources",
+      fingerprint=True,
+      type=bool,
+      help="Whether to include test source files in coverage measurement.",
+    )
+    register(
+      "--coverage-reports",
+      fingerprint=True,
+      choices=("xml", "html"),
+      type=list,
+      member_type=str,
+      default=("xml", "html"),
+      help="Which coverage reports to emit.",
+    )
     # For a given --coverage specification (which is fingerprinted), we will always copy the
     # associated generated and cached --coverage files to this directory post any interaction with
     # the cache to retrieve the coverage files. As such, this option is not part of the fingerprint.
-    register('--coverage-output-dir', metavar='<DIR>', default=None,
-             help='Directory to emit coverage reports to. '
-             'If not specified, a default within dist is used.')
+    register(
+      "--coverage-output-dir",
+      metavar="<DIR>",
+      default=None,
+      help="Directory to emit coverage reports to. "
+      "If not specified, a default within dist is used.",
+    )
 
-    register('--test-shard', fingerprint=True,
-             help='Subset of tests to run, in the form M/N, 0 <= M < N. For example, 1/3 means '
-                  'run tests number 2, 5, 8, 11, ...')
+    register(
+      "--test-shard",
+      fingerprint=True,
+      help="Subset of tests to run, in the form M/N, 0 <= M < N. For example, 1/3 means "
+      "run tests number 2, 5, 8, 11, ...",
+    )
 
-    register('--extra-pythonpath', type=list, fingerprint=True, advanced=True,
-             help='Add these entries to the PYTHONPATH when running the tests. '
-                  'Useful for attaching to debuggers in test code.')
+    register(
+      "--extra-pythonpath",
+      type=list,
+      fingerprint=True,
+      advanced=True,
+      help="Add these entries to the PYTHONPATH when running the tests. "
+      "Useful for attaching to debuggers in test code.",
+    )
 
   @classmethod
   def supports_passthru_args(cls):
@@ -159,7 +191,8 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
   class InvalidShardSpecification(TaskError):
     """Indicates an invalid `--test-shard` option."""
 
-  DEFAULT_COVERAGE_CONFIG = dedent("""
+  DEFAULT_COVERAGE_CONFIG = dedent(
+    """
     [run]
     branch = True
     timid = False
@@ -168,7 +201,8 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
     exclude_lines =
         def __repr__
         raise NotImplementedError
-    """)
+    """
+  )
 
   @staticmethod
   def _format_string_list(values):
@@ -180,11 +214,11 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
     #   value2
     #
     # See http://nedbatchelder.com/code/coverage/config.html for details.
-    return '\n\t{values}'.format(values='\n\t'.join(values))
+    return "\n\t{values}".format(values="\n\t".join(values))
 
   @property
   def _debug(self):
-    return self.get_options().level == 'debug'
+    return self.get_options().level == "debug"
 
   @staticmethod
   def _ensure_section(cp, section):
@@ -197,8 +231,8 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
     # We use a coverage plugin to map PEX chroot source paths back to their original repo paths for
     # report output.
     plugin_module = PytestPrep.PytestBinary.coverage_plugin_module
-    cls._ensure_section(cp, 'run')
-    cp.set('run', 'plugins', plugin_module)
+    cls._ensure_section(cp, "run")
+    cp.set("run", "plugins", plugin_module)
 
     if srcs_to_omit:
       # It would be nice if we could use the `include` setting to specify just the
@@ -207,20 +241,20 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
       # directories, not individual files, so we can't use that either (in case there are
       # tests in the same dirs as the files they test).
       files_to_omit = [os.path.join(src_chroot_path, relpath) for relpath in sorted(srcs_to_omit)]
-      cp.set('run', 'omit', ','.join(files_to_omit))
+      cp.set("run", "omit", ",".join(files_to_omit))
 
     # Fortunately we *can* use the `include` setting at report time. Any omitted files won't
     # have any data and won't get reported anyway. But setting `include` here allows us to also
     # exclude synthetic __init__.py files created by pex in the chroot. Reporting on those is just
     # confusing to the user, since they don't correspond to any file in the source tree.
-    cls._ensure_section(cp, 'report')
+    cls._ensure_section(cp, "report")
     files_to_report = [os.path.join(src_chroot_path, relpath) for relpath in src_to_target_base]
-    cp.set('report', 'include', ','.join(files_to_report))
+    cp.set("report", "include", ",".join(files_to_report))
 
     cp.add_section(plugin_module)
-    cp.set(plugin_module, 'buildroot', get_buildroot())
-    cp.set(plugin_module, 'src_chroot_path', src_chroot_path)
-    cp.set(plugin_module, 'src_to_target_base', json.dumps(src_to_target_base))
+    cp.set(plugin_module, "buildroot", get_buildroot())
+    cp.set(plugin_module, "src_chroot_path", src_chroot_path)
+    cp.set(plugin_module, "src_to_target_base", json.dumps(src_to_target_base))
 
   def _generate_coverage_config(self, srcs_to_omit, src_to_target_base):
     cp = configparser.ConfigParser()
@@ -230,30 +264,34 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
 
     # See the debug options here: http://nedbatchelder.com/code/coverage/cmd.html#cmd-run-debug
     if self._debug:
-      debug_options = self._format_string_list([
-        # Dumps the coverage config realized values.
-        'config',
-        # Logs which files are skipped or traced and why.
-        'trace'])
-      self._ensure_section(cp, 'run')
-      cp.set('run', 'debug', debug_options)
+      debug_options = self._format_string_list(
+        [
+          # Dumps the coverage config realized values.
+          "config",
+          # Logs which files are skipped or traced and why.
+          "trace",
+        ]
+      )
+      self._ensure_section(cp, "run")
+      cp.set("run", "debug", debug_options)
 
     return cp
 
   @staticmethod
   def _is_coverage_env_var(name):
-    return (
-      name.startswith('COV_CORE_')  # These are from `pytest-cov`.
-      or name.startswith('COVERAGE_')  # These are from `coverage`.
-    )
+    return name.startswith("COV_CORE_") or name.startswith(  # These are from `pytest-cov`.
+      "COVERAGE_"
+    )  # These are from `coverage`.
 
   @contextmanager
   def _scrub_cov_env_vars(self):
     cov_env_vars = {k: v for k, v in os.environ.items() if self._is_coverage_env_var(k)}
     if cov_env_vars:
-      self.context.log.warn('Scrubbing coverage environment variables\n\t{}'
-                            .format('\n\t'.join(sorted(f'{k}={v}'
-                                                       for k, v in cov_env_vars.items()))))
+      self.context.log.warn(
+        "Scrubbing coverage environment variables\n\t{}".format(
+          "\n\t".join(sorted(f"{k}={v}" for k, v in cov_env_vars.items()))
+        )
+      )
       with environment_as(**{k: None for k in cov_env_vars}):
         yield
     else:
@@ -261,8 +299,9 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
 
   @contextmanager
   def _cov_setup(self, workdirs, coverage_morfs, srcs_to_omit, src_to_target_base):
-    cp = self._generate_coverage_config(srcs_to_omit=srcs_to_omit,
-                                        src_to_target_base=src_to_target_base)
+    cp = self._generate_coverage_config(
+      srcs_to_omit=srcs_to_omit, src_to_target_base=src_to_target_base
+    )
     # Note that it's important to put the tmpfile under the workdir, because pytest
     # uses all arguments that look like paths to compute its rootdir, and we want
     # it to pick the buildroot.
@@ -272,9 +311,9 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
       coverage_rc = fp.name
       # Note that --cov-report= with no value turns off terminal reporting, which
       # we handle separately.
-      args = ['--cov-report=', '--cov-config', coverage_rc]
+      args = ["--cov-report=", "--cov-config", coverage_rc]
       for morf in coverage_morfs:
-        args.extend(['--cov', morf])
+        args.extend(["--cov", morf])
 
       with self._scrub_cov_env_vars():
         yield args, coverage_rc
@@ -294,7 +333,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
       for test_target in test_targets:
         srcs_to_omit.update(test_target.sources_relative_to_source_root())
     for test_target in test_targets:
-      libs = (tgt for tgt in test_target.closure() if tgt.has_sources('.py'))
+      libs = (tgt for tgt in test_target.closure() if tgt.has_sources(".py"))
       for lib in libs:
         for src in lib.sources_relative_to_source_root():
           if src not in srcs_to_omit:
@@ -303,7 +342,8 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
     def ensure_trailing_sep(path):
       return path if path.endswith(os.path.sep) else path + os.path.sep
 
-    if coverage == 'auto':
+    if coverage == "auto":
+
       def compute_coverage_pkgs(tgt):
         if tgt.coverage:
           return tgt.coverage
@@ -322,7 +362,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
           # dirs/packages or some arbitrary function that can be registered that takes a test target
           # and hands back the source packages or paths under test.
           def package(test_source_path):
-            return os.path.dirname(test_source_path).replace(os.sep, '.')
+            return os.path.dirname(test_source_path).replace(os.sep, ".")
 
           def packages():
             for test_source_path in tgt.sources_relative_to_source_root():
@@ -335,7 +375,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
       coverage_morfs = set(itertools.chain(*[compute_coverage_pkgs(t) for t in test_targets]))
     else:
       coverage_morfs = []
-      for morf in coverage.split(','):
+      for morf in coverage.split(","):
         if os.path.isdir(morf):
           # The source is a dir, so correct its prefix for the chroot.
           # E.g. if source is /path/to/src/python/foo/bar or src/python/foo/bar then
@@ -348,48 +388,48 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
             prefix = ensure_trailing_sep(target_base)
             if rel_source.startswith(prefix):
               # ... rel_source will match on prefix=src/python/ ...
-              suffix = rel_source[len(prefix):]
+              suffix = rel_source[len(prefix) :]
               # ... suffix will equal foo/bar ...
               coverage_morfs.append(os.path.join(get_buildroot(), pex_src_root, suffix))
               found_target_base = True
               # ... and we end up appending <pex_src_root>/foo/bar to the coverage_sources.
               break
           if not found_target_base:
-            self.context.log.warn(f'Coverage path {morf} is not in any target. Skipping.')
+            self.context.log.warn(f"Coverage path {morf} is not in any target. Skipping.")
         else:
           # The source is to be interpreted as a package name.
           coverage_morfs.append(morf)
 
-    with self._cov_setup(workdirs,
-                         coverage_morfs=coverage_morfs,
-                         srcs_to_omit=srcs_to_omit,
-                         src_to_target_base=src_to_target_base) as (args, coverage_rc):
+    with self._cov_setup(
+      workdirs,
+      coverage_morfs=coverage_morfs,
+      srcs_to_omit=srcs_to_omit,
+      src_to_target_base=src_to_target_base,
+    ) as (args, coverage_rc):
       try:
         yield args
       finally:
-        env = {
-          'PEX_MODULE': 'coverage.cmdline:main'
-        }
+        env = {"PEX_MODULE": "coverage.cmdline:main"}
+
         def coverage_run(subcommand, arguments):
-          return self._pex_run(pex,
-                               workunit_name=f'coverage-{subcommand}',
-                               args=[subcommand] + arguments,
-                               env=env)
+          return self._pex_run(
+            pex, workunit_name=f"coverage-{subcommand}", args=[subcommand] + arguments, env=env
+          )
 
         # The '.coverage' data file is output in the CWD of the test run above; so we make sure to
         # look for it there.
         with self._maybe_run_in_chroot():
           # On failures or timeouts, the .coverage file won't be written.
-          if not os.path.exists('.coverage'):
-            self.context.log.warn('No .coverage file was found! Skipping coverage reporting.')
+          if not os.path.exists(".coverage"):
+            self.context.log.warn("No .coverage file was found! Skipping coverage reporting.")
           else:
             coverage_workdir = workdirs.coverage_path
             coverage_reports = self.get_options().coverage_reports
-            if 'html' in coverage_reports:
-              coverage_run('html', ['-i', '--rcfile', coverage_rc, '-d', coverage_workdir])
-            if 'xml' in coverage_reports:
-              coverage_xml = os.path.join(coverage_workdir, 'coverage.xml')
-              coverage_run('xml', ['-i', '--rcfile', coverage_rc, '-o', coverage_xml])
+            if "html" in coverage_reports:
+              coverage_run("html", ["-i", "--rcfile", coverage_rc, "-d", coverage_workdir])
+            if "xml" in coverage_reports:
+              coverage_xml = os.path.join(coverage_workdir, "coverage.xml")
+              coverage_run("xml", ["-i", "--rcfile", coverage_rc, "-o", coverage_xml])
 
   def _get_sharding_args(self):
     shard_spec = self.get_options().test_shard
@@ -398,10 +438,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
 
     try:
       sharder = Sharder(shard_spec)
-      return [
-        '--pants-shard', f'{sharder.shard}',
-        '--pants-num-shards', f'{sharder.nshards}'
-      ]
+      return ["--pants-shard", f"{sharder.shard}", "--pants-num-shards", f"{sharder.nshards}"]
     except Sharder.InvalidShardSpec as e:
       raise self.InvalidShardSpecification(e)
 
@@ -412,13 +449,11 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
     # uses all arguments that look like paths to compute its rootdir, and we want
     # it to pick the buildroot.
     with temporary_dir(root_dir=self.workdir) as comm_dir:
-      sources_map_path = os.path.join(comm_dir, 'sources_map.json')
-      with open(sources_map_path, 'w') as fp:
+      sources_map_path = os.path.join(comm_dir, "sources_map.json")
+      with open(sources_map_path, "w") as fp:
         json.dump(sources_map, fp)
 
-      renaming_args = [
-        '--pants-sources-map-path', sources_map_path
-      ]
+      renaming_args = ["--pants-sources-map-path", sources_map_path]
 
       yield renaming_args + self._get_sharding_args()
 
@@ -426,17 +461,16 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
   def _test_runner(self, workdirs, test_targets, sources_map):
     pytest_binary = self.context.products.get_data(PytestPrep.PytestBinary)
     with self._pants_pytest_plugin_args(sources_map) as plugin_args:
-      with self._maybe_emit_coverage_data(workdirs,
-                                          test_targets,
-                                          pytest_binary.pex) as coverage_args:
+      with self._maybe_emit_coverage_data(
+        workdirs, test_targets, pytest_binary.pex
+      ) as coverage_args:
         pytest_rootdir = get_buildroot()
         yield (
           pytest_binary,
-          [
-            '--rootdir', pytest_rootdir,
-            '-p', pytest_binary.pytest_plugin_module
-          ] + plugin_args + coverage_args,
-          pytest_rootdir
+          ["--rootdir", pytest_rootdir, "-p", pytest_binary.pytest_plugin_module]
+          + plugin_args
+          + coverage_args,
+          pytest_rootdir,
         )
 
   def _ensure_pytest_interpreter_search_path(self):
@@ -458,32 +492,36 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
       # e.g., modules required during a debugging session.
       extra_pythonpath = self.get_options().extra_pythonpath
       if extra_pythonpath:
-        env['PYTHONPATH'] = os.pathsep.join(extra_pythonpath)
-        env['PEX_INHERIT_PATH'] = 'prefer'
+        env["PYTHONPATH"] = os.pathsep.join(extra_pythonpath)
+        env["PEX_INHERIT_PATH"] = "prefer"
 
       # The pytest runner we use accepts a --pdb argument that will launch an interactive pdb
       # session on any test failure.  In order to support use of this pass-through flag we must
       # turn off stdin buffering that otherwise occurs.  Setting the PYTHONUNBUFFERED env var to
       # any value achieves this in python2.7.  We'll need a different solution when we support
       # running pants under CPython 3 which does not unbuffer stdin using this trick.
-      env['PYTHONUNBUFFERED'] = '1'
+      env["PYTHONUNBUFFERED"] = "1"
 
       # pytest uses py.io.terminalwriter for output. That class detects the terminal
       # width and attempts to use all of it. However we capture and indent the console
       # output, leading to weird-looking line wraps. So we trick the detection code
       # into thinking the terminal window is narrower than it is.
-      env['COLUMNS'] = str(int(os.environ.get('COLUMNS', 80)) - 30)
+      env["COLUMNS"] = str(int(os.environ.get("COLUMNS", 80)) - 30)
 
       profile = self.get_options().profile
       if profile:
-        env['PEX_PROFILE_FILENAME'] = f'{profile}.subprocess.{time.time():.6f}'
+        env["PEX_PROFILE_FILENAME"] = f"{profile}.subprocess.{time.time():.6f}"
 
-      with self.context.new_workunit(name='run',
-                                     cmd=safe_shlex_join(pex.cmdline(args)),
-                                     labels=[WorkUnitLabel.TOOL, WorkUnitLabel.TEST]) as workunit:
+      with self.context.new_workunit(
+        name="run",
+        cmd=safe_shlex_join(pex.cmdline(args)),
+        labels=[WorkUnitLabel.TOOL, WorkUnitLabel.TEST],
+      ) as workunit:
         # NB: Constrain the pex environment to ensure the use of the selected interpreter!
         env.update(self._ensure_pytest_interpreter_search_path())
-        rc = self.spawn_and_wait(test_targets, pex, workunit=workunit, args=args, setsid=True, env=env)
+        rc = self.spawn_and_wait(
+          test_targets, pex, workunit=workunit, args=args, setsid=True, env=env
+        )
         return PytestResult.rc(rc)
     except ErrorWhileTesting:
       # spawn_and_wait wraps the test runner in a timeout, so it could
@@ -493,19 +531,23 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
       # here.
       raise
     except Exception:
-      self.context.log.error('Failed to run test!')
+      self.context.log.error("Failed to run test!")
       self.context.log.info(traceback.format_exc())
       return PytestResult.exception()
 
   def _map_relsrc_to_targets(self, targets):
     pex_src_root = os.path.relpath(self._source_chroot_path, get_buildroot())
     # First map chrooted sources back to their targets.
-    relsrc_to_target = {os.path.join(pex_src_root, src): target for target in targets
-      for src in target.sources_relative_to_source_root()}
+    relsrc_to_target = {
+      os.path.join(pex_src_root, src): target
+      for target in targets
+      for src in target.sources_relative_to_source_root()
+    }
     # Also map the source tree-rooted sources, because in some cases (e.g., a failure to even
     # eval the test file during test collection), that's the path pytest will use in the junit xml.
-    relsrc_to_target.update({src: target for target in targets
-      for src in target.sources_relative_to_buildroot()})
+    relsrc_to_target.update(
+      {src: target for target in targets for src in target.sources_relative_to_buildroot()}
+    )
 
     return relsrc_to_target
 
@@ -518,15 +560,15 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
 
     try:
       xml = XmlParser.from_file(junitxml)
-      failures = int(xml.get_attribute('testsuite', 'failures'))
-      errors = int(xml.get_attribute('testsuite', 'errors'))
+      failures = int(xml.get_attribute("testsuite", "failures"))
+      errors = int(xml.get_attribute("testsuite", "errors"))
       if failures or errors:
-        for testcase in xml.parsed.getElementsByTagName('testcase'):
-          test_failed = testcase.getElementsByTagName('failure')
-          test_errored = testcase.getElementsByTagName('error')
+        for testcase in xml.parsed.getElementsByTagName("testcase"):
+          test_failed = testcase.getElementsByTagName("failure")
+          test_errored = testcase.getElementsByTagName("error")
           if test_failed or test_errored:
             # The file attribute is always relative to the pytest rootdir.
-            pytest_relpath = testcase.getAttribute('file')
+            pytest_relpath = testcase.getAttribute("file")
             relsrc = os.path.normpath(os.path.join(buildroot_relpath, pytest_relpath))
             failed_target = relsrc_to_target.get(relsrc)
             if failed_target:
@@ -536,24 +578,27 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
               # in targets as the failed target
               failed_targets.add(targets[0])
     except (XmlParser.XmlError, ValueError) as e:
-      raise TaskError(f'Error parsing xml file at {junitxml}: {e!r}')
+      raise TaskError(f"Error parsing xml file at {junitxml}: {e!r}")
 
     return failed_targets
 
   def _get_target_from_test(self, test_info, targets, pytest_rootdir):
     relsrc_to_target = self._map_relsrc_to_targets(targets)
     buildroot_relpath = os.path.relpath(pytest_rootdir, get_buildroot())
-    pytest_relpath = test_info['file']
+    pytest_relpath = test_info["file"]
     relsrc = os.path.normpath(os.path.join(buildroot_relpath, pytest_relpath))
     return relsrc_to_target.get(relsrc)
 
   @contextmanager
   def partitions(self, per_target, all_targets, test_targets):
     if per_target:
+
       def iter_partitions():
         for test_target in test_targets:
           yield (test_target,)
+
     else:
+
       def iter_partitions():
         yield tuple(test_targets)
 
@@ -615,7 +660,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
       else:
         pants_distdir = self.context.options.for_global_scope().pants_distdir
         relpath = workdirs.target_set_id()
-        target_dir = os.path.join(pants_distdir, 'coverage', relpath)
+        target_dir = os.path.join(pants_distdir, "coverage", relpath)
       mergetree(workdirs.coverage_path, target_dir)
 
   def _run_pytest(self, fail_fast, test_targets, workdirs):
@@ -631,31 +676,38 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
     if not sources_map:
       return PytestResult.rc(0)
 
-    with self._test_runner(workdirs, test_targets, sources_map) as (pytest_binary,
-                                                                    test_args,
-                                                                    pytest_rootdir):
+    with self._test_runner(workdirs, test_targets, sources_map) as (
+      pytest_binary,
+      test_args,
+      pytest_rootdir,
+    ):
       # Validate that the user didn't provide any passthru args that conflict
       # with those we must set ourselves.
       for arg in (*self.get_passthru_args(), *PyTest.global_instance().options.args):
-        if arg.startswith('--junitxml') or arg.startswith('--confcutdir'):
-          raise TaskError(f'Cannot pass this arg through to pytest: {arg}')
+        if arg.startswith("--junitxml") or arg.startswith("--confcutdir"):
+          raise TaskError(f"Cannot pass this arg through to pytest: {arg}")
 
       junitxml_path = workdirs.junitxml_path(*test_targets)
 
       # N.B. the `--confcutdir` here instructs pytest to stop scanning for conftest.py files at the
       # top of the buildroot. This prevents conftest.py files from outside (e.g. in users home dirs)
       # from leaking into pants test runs. See: https://github.com/pantsbuild/pants/issues/2726
-      args = ['-c', os.devnull,  # Force an empty pytest.ini
-              '-o' 'cache_dir={}'.format(os.path.join(self.workdir, '.pytest_cache')),
-              '--junitxml', junitxml_path,
-              '--confcutdir', get_buildroot(),
-              '--continue-on-collection-errors']
+      args = [
+        "-c",
+        os.devnull,  # Force an empty pytest.ini
+        "-o" "cache_dir={}".format(os.path.join(self.workdir, ".pytest_cache")),
+        "--junitxml",
+        junitxml_path,
+        "--confcutdir",
+        get_buildroot(),
+        "--continue-on-collection-errors",
+      ]
       if fail_fast:
-        args.extend(['-x'])
+        args.extend(["-x"])
       if self._debug:
-        args.extend(['-s'])
+        args.extend(["-s"])
       if self.get_options().colors:
-        args.extend(['--color', 'yes'])
+        args.extend(["--color", "yes"])
 
       # NB: While passthrough args are not supported in v2 yet, as discussed on #9075, it seems
       # likely that we can find a way to preserve the ability to use passthrough args for
@@ -678,17 +730,19 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
       if not os.path.exists(junitxml_path):
         return result
 
-      failed_targets = self._get_failed_targets_from_junitxml(junitxml_path,
-                                                              test_targets,
-                                                              pytest_rootdir)
+      failed_targets = self._get_failed_targets_from_junitxml(
+        junitxml_path, test_targets, pytest_rootdir
+      )
 
       def parse_error_handler(parse_error):
         # Simple error handler to pass to xml parsing function.
-        raise TaskError('Error parsing xml file at {}: {}'
-                        .format(parse_error.xml_path, parse_error.cause))
+        raise TaskError(
+          "Error parsing xml file at {}: {}".format(parse_error.xml_path, parse_error.cause)
+        )
 
-      all_tests_info = self.parse_test_info(junitxml_path, parse_error_handler,
-                                            ['file', 'name', 'classname'])
+      all_tests_info = self.parse_test_info(
+        junitxml_path, parse_error_handler, ["file", "name", "classname"]
+      )
       for test_name, test_info in all_tests_info.items():
         test_target = self._get_target_from_test(test_info, test_targets, pytest_rootdir)
         self.report_all_info_for_single_test(self.options_scope, test_target, test_name, test_info)
@@ -700,9 +754,11 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
     return self.context.products.get_data(GatherSources.PYTHON_SOURCES).path()
 
   def _pex_run(self, pex, workunit_name, args, env):
-    with self.context.new_workunit(name=workunit_name,
-                                   cmd=' '.join(pex.cmdline(args)),
-                                   labels=[WorkUnitLabel.TOOL, WorkUnitLabel.TEST]) as workunit:
+    with self.context.new_workunit(
+      name=workunit_name,
+      cmd=" ".join(pex.cmdline(args)),
+      labels=[WorkUnitLabel.TOOL, WorkUnitLabel.TEST],
+    ) as workunit:
       # NB: Constrain the pex environment to ensure the use of the selected interpreter!
       env.update(self._ensure_pytest_interpreter_search_path())
       process = self._spawn(pex, workunit, args, setsid=False, env=env)
@@ -718,11 +774,13 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
 
   def _spawn(self, pex, workunit, args, setsid=False, env=None):
     env = env or {}
-    process = pex.run(args,
-                      with_chroot=False,  # We handle chrooting ourselves.
-                      blocking=False,
-                      setsid=setsid,
-                      env=env,
-                      stdout=workunit.output('stdout'),
-                      stderr=workunit.output('stderr'))
+    process = pex.run(
+      args,
+      with_chroot=False,  # We handle chrooting ourselves.
+      blocking=False,
+      setsid=setsid,
+      env=env,
+      stdout=workunit.output("stdout"),
+      stderr=workunit.output("stderr"),
+    )
     return SubprocessProcessHandler(process)

@@ -21,7 +21,6 @@ logger = logging.getLogger(__name__)
 
 
 class BaseLocalArtifactCache(ArtifactCache):
-
   def __init__(self, artifact_root, compression, permissions=None, dereference=True):
     """
     :param str artifact_root: The path under which cacheable products will be read/written.
@@ -37,19 +36,22 @@ class BaseLocalArtifactCache(ArtifactCache):
     self._dereference = dereference
 
   def _artifact(self, path):
-    return TarballArtifact(self.artifact_root, path, self._compression, dereference=self._dereference)
+    return TarballArtifact(
+      self.artifact_root, path, self._compression, dereference=self._dereference
+    )
 
   @contextmanager
   def _tmpfile(self, cache_key, use):
     """Allocate tempfile on same device as cache with a suffix chosen to prevent collisions"""
-    with temporary_file(suffix=cache_key.id + use, root_dir=self._cache_root,
-                        permissions=self._permissions) as tmpfile:
+    with temporary_file(
+      suffix=cache_key.id + use, root_dir=self._cache_root, permissions=self._permissions
+    ) as tmpfile:
       yield tmpfile
 
   @contextmanager
   def insert_paths(self, cache_key, paths):
     """Gather paths into artifact, store it, and yield the path to stored artifact tarball."""
-    with self._tmpfile(cache_key, 'write') as tmp:
+    with self._tmpfile(cache_key, "write") as tmp:
       self._artifact(tmp.name).collect(paths)
       yield self._store_tarball(cache_key, tmp.name)
 
@@ -61,7 +63,7 @@ class BaseLocalArtifactCache(ArtifactCache):
     :param str results_dir: The path to the expected destination of the artifact extraction: will
       be cleared both before extraction, and after a failure to extract.
     """
-    with self._tmpfile(cache_key, 'read') as tmp:
+    with self._tmpfile(cache_key, "read") as tmp:
       for chunk in src:
         tmp.write(chunk)
       tmp.close()
@@ -96,8 +98,15 @@ class BaseLocalArtifactCache(ArtifactCache):
 class LocalArtifactCache(BaseLocalArtifactCache):
   """An artifact cache that stores the artifacts in local files."""
 
-  def __init__(self, artifact_root, cache_root, compression, max_entries_per_target=None,
-               permissions=None, dereference=True):
+  def __init__(
+    self,
+    artifact_root,
+    cache_root,
+    compression,
+    max_entries_per_target=None,
+    permissions=None,
+    dereference=True,
+  ):
     """
     :param str artifact_root: The path under which cacheable products will be read/written.
     :param str cache_root: The locally cached files are stored under this directory.
@@ -110,7 +119,7 @@ class LocalArtifactCache(BaseLocalArtifactCache):
       artifact_root,
       compression,
       permissions=int(permissions.strip(), base=8) if permissions else None,
-      dereference=dereference
+      dereference=dereference,
     )
     self._cache_root = os.path.realpath(os.path.expanduser(cache_root))
     self._max_entries_per_target = max_entries_per_target
@@ -146,7 +155,7 @@ class LocalArtifactCache(BaseLocalArtifactCache):
         return True
     except Exception as e:
       # TODO(davidt): Consider being more granular in what is caught.
-      logger.warning('Error while reading {0} from local artifact cache: {1}'.format(tarfile, e))
+      logger.warning("Error while reading {0} from local artifact cache: {1}".format(tarfile, e))
       safe_delete(tarfile)
       return UnreadableArtifact(cache_key, e)
 
@@ -171,7 +180,7 @@ class LocalArtifactCache(BaseLocalArtifactCache):
   def _cache_file_for_key(self, cache_key):
     # Note: it's important to use the id as well as the hash, because two different targets
     # may have the same hash if both have no sources, but we may still want to differentiate them.
-    return os.path.join(self._cache_root, cache_key.id, cache_key.hash) + '.tgz'
+    return os.path.join(self._cache_root, cache_key.id, cache_key.hash) + ".tgz"
 
 
 class TempLocalArtifactCache(BaseLocalArtifactCache):
@@ -185,8 +194,7 @@ class TempLocalArtifactCache(BaseLocalArtifactCache):
     """
     :param str artifact_root: The path under which cacheable products will be read/written.
     """
-    super().__init__(artifact_root, compression=compression,
-                                                 permissions=permissions)
+    super().__init__(artifact_root, compression=compression, permissions=permissions)
 
   def _store_tarball(self, cache_key, src):
     return src

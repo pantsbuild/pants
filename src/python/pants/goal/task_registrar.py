@@ -28,7 +28,9 @@ class TaskRegistrar:
 
     if dependencies:
       # TODO(John Sirois): kill this warning and the kwarg after a deprecation cycle.
-      print(dedent("""
+      print(
+        dedent(
+          """
           WARNING: Registered dependencies are now ignored and only `Task.product_types`
           and product requirements as expressed in `Task.prepare` are used to
           infer Task dependencies.
@@ -36,14 +38,17 @@ class TaskRegistrar:
           Please fix this registration:
             {reg}
             {location}
-          """).format(reg=self,
-                      location=traceback.format_list([traceback.extract_stack()[-2]])[0]),
-            file=sys.stderr)
+          """
+        ).format(
+          reg=self, location=traceback.format_list([traceback.extract_stack()[-2]])[0]
+        ),
+        file=sys.stderr,
+      )
 
   def __repr__(self):
-    return 'TaskRegistrar({name}, {action} serialize={serialize})'.format(name=self.name,
-                                                                          action=self._task,
-                                                                          serialize=self.serialize)
+    return "TaskRegistrar({name}, {action} serialize={serialize})".format(
+      name=self.name, action=self._task, serialize=self.serialize
+    )
 
   @property
   def task_type(self):

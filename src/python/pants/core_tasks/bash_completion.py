@@ -24,8 +24,11 @@ class BashCompletion(ConsoleTask):
   def register_options(cls, register):
     super().register_options(register)
     register(
-      '--transitive', type=bool, default=True, fingerprint=True,
-      help='If True, use all targets in the build graph, else use only target roots.',
+      "--transitive",
+      type=bool,
+      default=True,
+      fingerprint=True,
+      help="If True, use all targets in the build graph, else use only target roots.",
       removal_version="1.27.0.dev0",
       removal_hint="This option has no impact on the goal `bash-completion`.",
     )
@@ -37,7 +40,7 @@ class BashCompletion(ConsoleTask):
     Note that this includes only task scope, and not, say, subsystem scopes,
     as those aren't specifiable on the cmd line.
     """
-    all_scopes ={GLOBAL_SCOPE}
+    all_scopes = {GLOBAL_SCOPE}
     for goal in Goal.all():
       for task in goal.task_types():
         all_scopes.add(task.get_scope_info().scope)
@@ -59,6 +62,7 @@ class BashCompletion(ConsoleTask):
     :return: A map of scope -> options to complete at that scope.
     """
     autocomplete_options_by_scope = defaultdict(set)
+
     def get_from_parser(parser):
       oschi = HelpInfoExtracter.get_option_scope_help_info_from_parser(parser)
       # We ignore advanced options, as they aren't intended to be used on the cmd line.
@@ -73,35 +77,38 @@ class BashCompletion(ConsoleTask):
         # (via the recursion) and it would be confusing and superfluous to have autocompletion
         # to both --goal-recursive-opt and --goal-task-recursive-opt in goal scope.
         if issubclass(ohi.registering_class, TaskBase):
-          goal_scope = oschi.scope.partition('.')[0]
+          goal_scope = oschi.scope.partition(".")[0]
           autocomplete_options_by_scope[goal_scope].update(ohi.scoped_cmd_line_args)
+
     self.context.options.walk_parsers(get_from_parser)
     return autocomplete_options_by_scope
 
   def console_output(self, targets):
     if targets:
-      raise TaskError('This task does not accept any target addresses.')
+      raise TaskError("This task does not accept any target addresses.")
     cmd_line_scopes = sorted(self._get_all_cmd_line_scopes())
     autocomplete_options_by_scope = self.get_autocomplete_options_by_scope()
 
     def bash_scope_key(sc):
       if sc == GLOBAL_SCOPE:
-        return '__pants_global_options'
+        return "__pants_global_options"
       else:
-        return '__pants_options_for_{}'.format(sc.replace('-', '_').replace('.', '_'))
+        return "__pants_options_for_{}".format(sc.replace("-", "_").replace(".", "_"))
 
     options_text_lines = []
     for scope in cmd_line_scopes:
-      options_text_lines.append("{}='{}'".format(bash_scope_key(scope),
-                                                 ' '.join(autocomplete_options_by_scope[scope])))
-    options_text = '\n'.join(options_text_lines)
+      options_text_lines.append(
+        "{}='{}'".format(bash_scope_key(scope), " ".join(autocomplete_options_by_scope[scope]))
+      )
+    options_text = "\n".join(options_text_lines)
 
     generator = Generator(
-      resource_string(__name__,
-                      os.path.join('templates', 'bash_completion', 'autocomplete.sh.mustache')).decode(),
-      scopes_text=' '.join(sorted(list(cmd_line_scopes))),
-      options_text=options_text
+      resource_string(
+        __name__, os.path.join("templates", "bash_completion", "autocomplete.sh.mustache")
+      ).decode(),
+      scopes_text=" ".join(sorted(list(cmd_line_scopes))),
+      options_text=options_text,
     )
 
-    for line in generator.render().split('\n'):
+    for line in generator.render().split("\n"):
       yield line

@@ -11,12 +11,14 @@ from pants.option.optionable import OptionableFactory
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 
 
-class SubsystemClientError(Exception): pass
+class SubsystemClientError(Exception):
+  pass
 
 
 @dataclass(frozen=True)
 class SubsystemDependency(OptionableFactory):
   """Indicates intent to use an instance of `subsystem_cls` scoped to `scope`."""
+
   subsystem_cls: Any
   scope: Any
   removal_version: Optional[Any] = None
@@ -107,9 +109,12 @@ class SubsystemClientMixin:
     """Thrown when a circular subsystem dependency is detected."""
 
     def __init__(self, cycle):
-      message = 'Cycle detected:\n\t{}'.format(' ->\n\t'.join(
-        '{} scope: {}'.format(optionable_cls, optionable_cls.options_scope)
-        for optionable_cls in cycle))
+      message = "Cycle detected:\n\t{}".format(
+        " ->\n\t".join(
+          "{} scope: {}".format(optionable_cls, optionable_cls.options_scope)
+          for optionable_cls in cycle
+        )
+      )
       super().__init__(message)
 
   @classmethod
@@ -128,15 +133,18 @@ class SubsystemClientMixin:
         raise cls.CycleException(list(optionables_path) + [optionable_cls])
       optionables_path.add(optionable_cls)
 
-      scope = (optionable_cls.options_scope if scoped_to == GLOBAL_SCOPE
-               else optionable_cls.subscope(scoped_to))
+      scope = (
+        optionable_cls.options_scope
+        if scoped_to == GLOBAL_SCOPE
+        else optionable_cls.subscope(scoped_to)
+      )
       scope_info = ScopeInfo(
-          scope,
-          optionable_cls.options_scope_category,
-          optionable_cls,
-          removal_version=removal_version,
-          removal_hint=removal_hint
-        )
+        scope,
+        optionable_cls.options_scope_category,
+        optionable_cls,
+        removal_version=removal_version,
+        removal_hint=removal_hint,
+      )
 
       if scope_info not in known_scope_infos:
         known_scope_infos.add(scope_info)
@@ -150,10 +158,12 @@ class SubsystemClientMixin:
           # deprecating all options in the scope.
           collect_scope_infos(dep.subsystem_cls, GLOBAL_SCOPE)
           if not dep.is_global():
-            collect_scope_infos(dep.subsystem_cls,
-                                scope,
-                                removal_version=dep.removal_version,
-                                removal_hint=dep.removal_hint)
+            collect_scope_infos(
+              dep.subsystem_cls,
+              scope,
+              removal_version=dep.removal_version,
+              removal_hint=dep.removal_hint,
+            )
 
       optionables_path.remove(scope_info.optionable_cls)
 

@@ -41,6 +41,7 @@ class HostPlatform:
 
   :class:`BinaryToolUrlGenerator` instances receive this to generate download urls.
   """
+
   os_name: Optional[str]
   arch_or_version: Optional[str]
 
@@ -94,7 +95,8 @@ class PantsHosted(BinaryToolUrlGenerator):
   given, not from binaries.pantsbuild.org.
   """
 
-  class NoBaseUrlsError(ValueError): pass
+  class NoBaseUrlsError(ValueError):
+    pass
 
   def __init__(self, binary_request, baseurls):
     super().__init__()
@@ -102,8 +104,10 @@ class PantsHosted(BinaryToolUrlGenerator):
 
     if not baseurls:
       raise self.NoBaseUrlsError(
-        "Error constructing pants-hosted urls for the {} binary: no baseurls were provided."
-        .format(binary_request.name))
+        "Error constructing pants-hosted urls for the {} binary: no baseurls were provided.".format(
+          binary_request.name
+        )
+      )
     self._baseurls = baseurls
 
   def generate_urls(self, version, host_platform):
@@ -123,6 +127,7 @@ class PantsHosted(BinaryToolUrlGenerator):
 @dataclass(frozen=True)
 class BinaryRequest:
   """Describes a request for a binary to download."""
+
   supportdir: Any
   version: Any
   name: Any
@@ -132,7 +137,7 @@ class BinaryRequest:
 
   def _full_name(self):
     if self.archiver:
-      return '{}.{}'.format(self.name, self.archiver.extension)
+      return "{}.{}".format(self.name, self.archiver.extension)
     return self.name
 
   def get_download_path(self, host_platform):
@@ -147,6 +152,7 @@ class BinaryRequest:
 @dataclass(frozen=True)
 class BinaryFetchRequest:
   """Describes a request to download a file."""
+
   download_path: Any
   urls: Tuple
 
@@ -158,11 +164,11 @@ class BinaryFetchRequest:
   def file_name(self):
     return os.path.basename(self.download_path)
 
-  class NoDownloadUrlsError(ValueError): pass
+  class NoDownloadUrlsError(ValueError):
+    pass
 
 
 class BinaryToolFetcher:
-
   @classmethod
   def _default_http_fetcher(cls):
     """Return a fetcher that resolves local file paths against the build root.
@@ -186,11 +192,12 @@ class BinaryToolFetcher:
     self._ignore_cached_download = ignore_cached_download
 
   class BinaryNotFound(TaskError):
-
     def __init__(self, name, accumulated_errors):
       super(BinaryToolFetcher.BinaryNotFound, self).__init__(
-        'Failed to fetch {name} binary from any source: ({error_msgs})'
-        .format(name=name, error_msgs=', '.join(accumulated_errors)))
+        "Failed to fetch {name} binary from any source: ({error_msgs})".format(
+          name=name, error_msgs=", ".join(accumulated_errors)
+        )
+      )
 
   @contextmanager
   def _select_binary_stream(self, name, urls):
@@ -203,30 +210,34 @@ class BinaryToolFetcher:
     downloaded_successfully = False
     accumulated_errors = []
     for url in OrderedSet(urls):  # De-dup URLS: we only want to try each URL once.
-      logger.info('Attempting to fetch {name} binary from: {url} ...'.format(name=name, url=url))
+      logger.info("Attempting to fetch {name} binary from: {url} ...".format(name=name, url=url))
       try:
         with temporary_file() as dest:
-          logger.debug("in BinaryToolFetcher: url={}, timeout_secs={}"
-                       .format(url, self._timeout_secs))
-          self._fetcher.download(url,
-                                 listener=Fetcher.ProgressListener(),
-                                 path_or_fd=dest,
-                                 timeout_secs=self._timeout_secs)
-          logger.info('Fetched {name} binary from: {url} .'.format(name=name, url=url))
+          logger.debug(
+            "in BinaryToolFetcher: url={}, timeout_secs={}".format(url, self._timeout_secs)
+          )
+          self._fetcher.download(
+            url,
+            listener=Fetcher.ProgressListener(),
+            path_or_fd=dest,
+            timeout_secs=self._timeout_secs,
+          )
+          logger.info("Fetched {name} binary from: {url} .".format(name=name, url=url))
           downloaded_successfully = True
           dest.seek(0)
           yield dest
           break
       except (IOError, Fetcher.Error, ValueError) as e:
-        accumulated_errors.append('Failed to fetch binary from {url}: {error}'
-                                  .format(url=url, error=e))
+        accumulated_errors.append(
+          "Failed to fetch binary from {url}: {error}".format(url=url, error=e)
+        )
     if not downloaded_successfully:
       raise self.BinaryNotFound(name, accumulated_errors)
 
   def _do_fetch(self, download_path, file_name, urls):
     with safe_concurrent_creation(download_path) as downloadpath:
       with self._select_binary_stream(file_name, urls) as binary_tool_stream:
-        with safe_open(downloadpath, 'wb') as bootstrapped_binary:
+        with safe_open(downloadpath, "wb") as bootstrapped_binary:
           shutil.copyfileobj(binary_tool_stream, bootstrapped_binary)
 
   def fetch_binary(self, fetch_request):
@@ -240,8 +251,11 @@ class BinaryToolFetcher:
     if self._ignore_cached_download or not os.path.exists(bootstrapped_binary_path):
       self._do_fetch(bootstrapped_binary_path, file_name, urls)
 
-    logger.debug('Selected {binary} binary bootstrapped to: {path}'
-                 .format(binary=file_name, path=bootstrapped_binary_path))
+    logger.debug(
+      "Selected {binary} binary bootstrapped to: {path}".format(
+        binary=file_name, path=bootstrapped_binary_path
+      )
+    )
     return bootstrapped_binary_path
 
 
@@ -252,13 +266,14 @@ class BinaryUtil:
     """
     :API: public
     """
+
     # N.B. `BinaryUtil` sources all of its options from bootstrap options, so that
     # `BinaryUtil` instances can be created prior to `Subsystem` bootstrapping. So
     # this options scope is unused, but required to remain a `Subsystem`.
-    options_scope = 'binaries'
+    options_scope = "binaries"
 
     @classmethod
-    def create(cls) -> 'BinaryUtil':
+    def create(cls) -> "BinaryUtil":
       # NB: create is a class method to ~force binary fetch location to be global.
       return cast(BinaryUtil, cls._create_for_cls(BinaryUtil))
 
@@ -267,20 +282,23 @@ class BinaryUtil:
       # NB: We read global bootstrap options, but through our own scoped options instance.
       options = cls.global_instance().get_options()
       binary_tool_fetcher = BinaryToolFetcher(
-        bootstrap_dir=options.pants_bootstrapdir,
-        timeout_secs=options.binaries_fetch_timeout_secs)
+        bootstrap_dir=options.pants_bootstrapdir, timeout_secs=options.binaries_fetch_timeout_secs
+      )
       return binary_util_cls(
         baseurls=options.binaries_baseurls,
         binary_tool_fetcher=binary_tool_fetcher,
         path_by_id=options.binaries_path_by_id,
-        allow_external_binary_tool_downloads=options.allow_external_binary_tool_downloads)
+        allow_external_binary_tool_downloads=options.allow_external_binary_tool_downloads,
+      )
 
   class MissingMachineInfo(TaskError):
     """Indicates that pants was unable to map this machine's OS to a binary path prefix."""
+
     pass
 
   class NoBaseUrlsError(TaskError):
     """Indicates that no urls were specified in pants.ini."""
+
     pass
 
   class BinaryResolutionError(TaskError):
@@ -289,10 +307,17 @@ class BinaryUtil:
     def __init__(self, binary_request, base_exception):
       super(BinaryUtil.BinaryResolutionError, self).__init__(
         "Error resolving binary request {}: {}".format(binary_request, base_exception),
-        base_exception)
+        base_exception,
+      )
 
-  def __init__(self, baseurls, binary_tool_fetcher, path_by_id=None,
-               allow_external_binary_tool_downloads=True, uname_func=None):
+  def __init__(
+    self,
+    baseurls,
+    binary_tool_fetcher,
+    path_by_id=None,
+    allow_external_binary_tool_downloads=True,
+    uname_func=None,
+  ):
     """Creates a BinaryUtil with the given settings to define binary lookup behavior.
 
     This constructor is primarily used for testing.  Production code will usually initialize
@@ -321,8 +346,8 @@ class BinaryUtil:
     self._uname_func = uname_func or os.uname
 
   _ID_BY_OS = {
-    'darwin': lambda release, machine: ('darwin', release.split('.')[0]),
-    'linux': lambda release, machine: ('linux', machine),
+    "darwin": lambda release, machine: ("darwin", release.split(".")[0]),
+    "linux": lambda release, machine: ("linux", machine),
   }
 
   # TODO: we create a HostPlatform in this class instead of in the constructor because we don't want
@@ -340,8 +365,10 @@ class BinaryUtil:
       # TODO: test this!
       raise self.MissingMachineInfo(
         "Pants could not resolve binaries for the current host: platform '{}' was not recognized. "
-        "Recognized platforms are: [{}]."
-        .format(os_id_key, ', '.join(sorted(self._ID_BY_OS.keys()))))
+        "Recognized platforms are: [{}].".format(
+          os_id_key, ", ".join(sorted(self._ID_BY_OS.keys()))
+        )
+      )
     try:
       os_name, arch_or_version = self._path_by_id[os_id_tuple]
       return HostPlatform(os_name, arch_or_version)
@@ -356,7 +383,7 @@ class BinaryUtil:
       # less obvious), and we can fix it by pushing appropriate binaries and modifying
       # SUPPORTED_PLATFORM_NORMALIZED_NAMES appropriately.  This is only likely to happen with a
       # major architecture change, so we'll have plenty of warning.
-      if os_id_tuple[0] == 'darwin':
+      if os_id_tuple[0] == "darwin":
         os_name, version = get_closest_mac_host_platform_pair(os_id_tuple[1])
         if os_name is not None and version is not None:
           return HostPlatform(os_name, version)
@@ -365,8 +392,8 @@ class BinaryUtil:
       raise self.MissingMachineInfo(
         "Pants could not resolve binaries for the current host. Update --binaries-path-by-id to "
         "find binaries for the current host platform {}.\n"
-        "--binaries-path-by-id was: {}."
-        .format(os_id_tuple, self._path_by_id))
+        "--binaries-path-by-id was: {}.".format(os_id_tuple, self._path_by_id)
+      )
 
   def _get_download_path(self, binary_request):
     return binary_request.get_download_path(self.host_platform())
@@ -375,8 +402,11 @@ class BinaryUtil:
 
     external_url_generator = binary_request.external_url_generator
 
-    logger.debug("self._allow_external_binary_tool_downloads: {}"
-                 .format(self._allow_external_binary_tool_downloads))
+    logger.debug(
+      "self._allow_external_binary_tool_downloads: {}".format(
+        self._allow_external_binary_tool_downloads
+      )
+    )
     logger.debug("external_url_generator: {}".format(external_url_generator))
 
     if external_url_generator and self._allow_external_binary_tool_downloads:
@@ -410,8 +440,8 @@ class BinaryUtil:
     if not isinstance(urls, list):
       # TODO: add test for this error!
       raise self.BinaryResolutionError(
-        binary_request,
-        TypeError("urls must be a list: was '{}'.".format(urls)))
+        binary_request, TypeError("urls must be a list: was '{}'.".format(urls))
+      )
     fetch_request = BinaryFetchRequest(download_path=download_path, urls=tuple(urls))
 
     logger.debug("fetch_request: {!r}".format(fetch_request))
@@ -442,7 +472,8 @@ class BinaryUtil:
       name=name,
       platform_dependent=True,
       external_url_generator=None,
-      archiver=None)
+      archiver=None,
+    )
 
   def select_binary(self, supportdir, version, name):
     binary_request = self._make_deprecated_binary_request(supportdir, version, name)
@@ -455,7 +486,8 @@ class BinaryUtil:
       name=name,
       platform_dependent=False,
       external_url_generator=None,
-      archiver=None)
+      archiver=None,
+    )
 
   def select_script(self, supportdir, version, name):
     binary_request = self._make_deprecated_script_request(supportdir, version, name)
@@ -463,7 +495,8 @@ class BinaryUtil:
 
 
 def _create_bootstrap_binary_arg_parser():
-  parser = argparse.ArgumentParser(description="""\
+  parser = argparse.ArgumentParser(
+    description="""\
 Helper for download_binary.sh to use BinaryUtil to download the appropriate binaries.
 
 Downloads the specified binary at the specified version if it's not already present.
@@ -477,12 +510,18 @@ If a binary tool with the requested name, version, and filename does not exist, 
 script will exit with an error and print a message to stderr.
 
 See binary_util.py for more information.
-""")
-  parser.add_argument("util_name",
-                      help="Subdirectory for the requested tool in the pants hosted binary schema.")
+"""
+  )
+  parser.add_argument(
+    "util_name", help="Subdirectory for the requested tool in the pants hosted binary schema."
+  )
   parser.add_argument("version", help="Version of the requested binary tool to download.")
-  parser.add_argument("filename", nargs='?', default=None,
-                      help="Filename to download. Defaults to the value provided for `util_name`.")
+  parser.add_argument(
+    "filename",
+    nargs="?",
+    default=None,
+    help="Filename to download. Defaults to the value provided for `util_name`.",
+  )
   return parser
 
 
@@ -505,23 +544,24 @@ def select(argv):
     archiver_for_current_binary = archiver_for_path(filename)
     # BinaryRequest requires the `name` field to be provided without an extension, as it appends the
     # archiver's extension if one is provided, so we have to remove it here.
-    filename = filename[:-(len(archiver_for_current_binary.extension) + 1)]
+    filename = filename[: -(len(archiver_for_current_binary.extension) + 1)]
   except ValueError:
     pass
 
   binary_util = BinaryUtil.Factory.create()
   binary_request = BinaryRequest(
-    supportdir='bin/{}'.format(args.util_name),
+    supportdir="bin/{}".format(args.util_name),
     version=args.version,
     name=filename,
     platform_dependent=True,
     external_url_generator=None,
-    archiver=archiver_for_current_binary)
+    archiver=archiver_for_current_binary,
+  )
 
   return binary_util.select(binary_request)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
   print(select(sys.argv))
 
 
@@ -531,6 +571,4 @@ def provide_binary_util() -> BinaryUtil:
 
 
 def rules():
-  return [
-    provide_binary_util,
-  ]
+  return [provide_binary_util]

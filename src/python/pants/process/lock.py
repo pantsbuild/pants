@@ -22,7 +22,7 @@ def print_to_stderr(message):
 class OwnerPrintingInterProcessFileLock(InterProcessLock):
   @property
   def message_path(self):
-    return f'{self.path_str}.lock_message'
+    return f"{self.path_str}.lock_message"
 
   @property
   def path_str(self):
@@ -30,16 +30,16 @@ class OwnerPrintingInterProcessFileLock(InterProcessLock):
 
   @property
   def missing_message_output(self):
-    return f'Pid {os.getpid()} waiting for a file lock ({self.path_str}), but there was no message at {self.message_path} indicating who is holding it.'
-      
+    return f"Pid {os.getpid()} waiting for a file lock ({self.path_str}), but there was no message at {self.message_path} indicating who is holding it."
+
   def acquire(self, message_fn=print_to_stderr, **kwargs):
-    logger.debug('acquiring lock: {!r}'.format(self))
+    logger.debug("acquiring lock: {!r}".format(self))
     super().acquire(blocking=False)
     if not self.acquired:
       try:
-        with open(self.message_path, 'rb') as f:
-          message = f.read().decode('utf-8', 'replace')
-          output = f'PID {os.getpid()} waiting for a file lock ({self.path_str}) held by: {message}'
+        with open(self.message_path, "rb") as f:
+          message = f.read().decode("utf-8", "replace")
+          output = f"PID {os.getpid()} waiting for a file lock ({self.path_str}) held by: {message}"
       except IOError as e:
         if e.errno == errno.ENOENT:
           output = self.missing_message_output
@@ -50,15 +50,15 @@ class OwnerPrintingInterProcessFileLock(InterProcessLock):
 
     if self.acquired:
       current_process = psutil.Process()
-      cmd_line = ' '.join(current_process.cmdline())
-      message = f'{current_process.pid} ({cmd_line})'
-      with open(self.message_path, 'wb') as f:
+      cmd_line = " ".join(current_process.cmdline())
+      message = f"{current_process.pid} ({cmd_line})"
+      with open(self.message_path, "wb") as f:
         f.write(message.encode())
 
     return self.acquired
 
   def release(self):
-    logger.debug(f'releasing lock: {self!r}')
+    logger.debug(f"releasing lock: {self!r}")
     if self.acquired:
       safe_delete(self.message_path)
     return super().release()

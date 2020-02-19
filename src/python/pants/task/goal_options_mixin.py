@@ -14,6 +14,7 @@ class GoalOptionsRegistrar(Optionable):
   at once and/or setting them per-task. E.g., turning all linters on or off, or
   turning individual linters on or off selectively.
   """
+
   options_scope_category = ScopeInfo.GOAL_V1
 
   @classmethod
@@ -23,11 +24,12 @@ class GoalOptionsRegistrar(Optionable):
     Allows reuse of the same registrar for multiple goals, and also allows us to decouple task
     code from knowing which goal(s) the task is to be registered in.
     """
-    type_name = '{}_{}'.format(cls.__name__, goal)
-    return type(type_name, (cls, ), {'options_scope': goal})
+    type_name = "{}_{}".format(cls.__name__, goal)
+    return type(type_name, (cls,), {"options_scope": goal})
 
 
 class GoalOptionsMixin:
   """A mixin for tasks that inherit options registered at the goal level."""
+
   # Subclasses must set this to the appropriate subclass of GoalOptionsRegistrar.
   goal_options_registrar_cls: Optional[Type[GoalOptionsRegistrar]] = None

@@ -13,19 +13,27 @@ from pants.engine.selectors import Get
 
 class ListOptions(LineOriented, GoalSubsystem):
   """Lists all targets matching the target specs."""
+
   name = "list"
 
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--provides', type=bool,
-             help='List only targets that provide an artifact, displaying the columns specified by '
-                  '--provides-columns.')
-    register('--provides-columns', default='address,artifact_id',
-             help='Display these columns when --provides is specified. Available columns are: '
-                  'address, artifact_id, repo_name, repo_url, push_db_basedir')
-    register('--documented', type=bool,
-             help='Print only targets that are documented with a description.')
+    register(
+      "--provides",
+      type=bool,
+      help="List only targets that provide an artifact, displaying the columns specified by "
+      "--provides-columns.",
+    )
+    register(
+      "--provides-columns",
+      default="address,artifact_id",
+      help="Display these columns when --provides is specified. Available columns are: "
+      "address, artifact_id, repo_name, repo_url, push_db_basedir",
+    )
+    register(
+      "--documented", type=bool, help="Print only targets that are documented with a description."
+    )
 
 
 class List(Goal):
@@ -43,30 +51,35 @@ async def list_targets(console: Console, list_options: ListOptions, addresses: A
     collection = await Get[HydratedTargets](Addresses, addresses)
     if provides:
       extractors = dict(
-          address=lambda target: target.address.spec,
-          artifact_id=lambda target: str(target.adaptor.provides),
-          repo_name=lambda target: target.adaptor.provides.repo.name,
-          repo_url=lambda target: target.adaptor.provides.repo.url,
-          push_db_basedir=lambda target: target.adaptor.provides.repo.push_db_basedir,
+        address=lambda target: target.address.spec,
+        artifact_id=lambda target: str(target.adaptor.provides),
+        repo_name=lambda target: target.adaptor.provides.repo.name,
+        repo_url=lambda target: target.adaptor.provides.repo.url,
+        push_db_basedir=lambda target: target.adaptor.provides.repo.push_db_basedir,
       )
 
       def print_provides(column_extractors, target):
-        if getattr(target.adaptor, 'provides', None):
-          return ' '.join(extractor(target) for extractor in column_extractors)
+        if getattr(target.adaptor, "provides", None):
+          return " ".join(extractor(target) for extractor in column_extractors)
 
       try:
-        column_extractors = [extractors[col] for col in (provides_columns.split(','))]
+        column_extractors = [extractors[col] for col in (provides_columns.split(","))]
       except KeyError:
-        raise Exception('Invalid columns specified: {0}. Valid columns are: address, artifact_id, '
-                        'repo_name, repo_url, push_db_basedir.'.format(provides_columns))
+        raise Exception(
+          "Invalid columns specified: {0}. Valid columns are: address, artifact_id, "
+          "repo_name, repo_url, push_db_basedir.".format(provides_columns)
+        )
 
       print_fn = lambda target: print_provides(column_extractors, target)
     else:
+
       def print_documented(target):
-        description = getattr(target.adaptor, 'description', None)
+        description = getattr(target.adaptor, "description", None)
         if description:
-          return '{0}\n  {1}'.format(target.address.spec,
-                                     '\n  '.join(description.strip().split('\n')))
+          return "{0}\n  {1}".format(
+            target.address.spec, "\n  ".join(description.strip().split("\n"))
+          )
+
       print_fn = print_documented
   else:
     # Otherwise, we can use only addresses.
@@ -75,7 +88,7 @@ async def list_targets(console: Console, list_options: ListOptions, addresses: A
 
   with list_options.line_oriented(console) as print_stdout:
     if not collection.dependencies:
-      console.print_stderr('WARNING: No targets were matched in goal `{}`.'.format('list'))
+      console.print_stderr("WARNING: No targets were matched in goal `{}`.".format("list"))
 
     for item in collection:
       result = print_fn(item)
@@ -86,6 +99,4 @@ async def list_targets(console: Console, list_options: ListOptions, addresses: A
 
 
 def rules():
-  return [
-      list_targets,
-    ]
+  return [list_targets]

@@ -7,21 +7,23 @@ from pants.option.scope import GLOBAL_SCOPE
 class OptionsError(Exception):
   """An options system-related error."""
 
+
 # -----------------------------------------------------------------------
 # Option registration errors
 # -----------------------------------------------------------------------
+
 
 class RegistrationError(OptionsError):
   """An error at option registration time."""
 
   def __init__(self, scope: str, option: str, **msg_format_args) -> None:
-    scope_str = 'global scope' if scope == GLOBAL_SCOPE else f'scope {scope}'
+    scope_str = "global scope" if scope == GLOBAL_SCOPE else f"scope {scope}"
     if self.__doc__ is None:
       raise ValueError(
         "Invalid RegistrationError definition. Please specify the error message in the docstring."
       )
     docstring = self.__doc__.format(**msg_format_args)
-    super().__init__(f'{docstring} [option {option} in {scope_str}].')
+    super().__init__(f"{docstring} [option {option} in {scope_str}].")
 
 
 class BooleanOptionNameWithNo(RegistrationError):
@@ -71,9 +73,11 @@ class RecursiveSubsystemOption(RegistrationError):
 class Shadowing(RegistrationError):
   """Option shadows an option in {outer_scope}."""
 
+
 # -----------------------------------------------------------------------
 # Flag parsing errors
 # -----------------------------------------------------------------------
+
 
 class ParseError(OptionsError):
   """An error at flag parsing time."""

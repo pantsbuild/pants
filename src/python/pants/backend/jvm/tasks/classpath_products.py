@@ -28,6 +28,7 @@ def _not_excluded_filter(excludes):
     path_tuple = product_to_target[0]
     conf, classpath_entry = path_tuple
     return not classpath_entry.is_excluded_by(excludes)
+
   return not_excluded
 
 
@@ -53,10 +54,15 @@ class ClasspathProducts:
     return lambda: ClasspathProducts(pants_workdir)
 
   @classmethod
-  def create_canonical_classpath(cls, classpath_products, targets, basedir,
-                                 save_classpath_file=False,
-                                 internal_classpath_only=True,
-                                 excludes=None):
+  def create_canonical_classpath(
+    cls,
+    classpath_products,
+    targets,
+    basedir,
+    save_classpath_file=False,
+    internal_classpath_only=True,
+    excludes=None,
+  ):
     """Create a stable classpath of symlinks with standardized names.
 
     By default symlinks are created for each target under `basedir` based on its `target.id`.
@@ -82,11 +88,13 @@ class ClasspathProducts:
     :returns: Converted canonical classpath.
     :rtype: list of strings
     """
+
     def delete_old_target_output_files(classpath_prefix):
       """Delete existing output files or symlinks for target."""
       directory, basename = os.path.split(classpath_prefix)
-      pattern = re.compile(r'^{basename}(([0-9]+)(\.jar)?|classpath\.txt)$'
-                           .format(basename=re.escape(basename)))
+      pattern = re.compile(
+        r"^{basename}(([0-9]+)(\.jar)?|classpath\.txt)$".format(basename=re.escape(basename))
+      )
       files = [filename for filename in os.listdir(directory) if pattern.match(filename)]
       for rel_path in files:
         path = os.path.join(directory, rel_path)
@@ -102,7 +110,7 @@ class ClasspathProducts:
       output_dir = basedir
       # TODO(peiyu) improve readability once we deprecate the old naming style.
       # For example, `-` is commonly placed in string format as opposed to here.
-      classpath_prefix_for_target = f'{basedir}/{target.id}-'
+      classpath_prefix_for_target = f"{basedir}/{target.id}-"
 
       if os.path.exists(output_dir):
         delete_old_target_output_files(classpath_prefix_for_target)
@@ -117,8 +125,11 @@ class ClasspathProducts:
     processed_entries = set()
     for target, classpath_entries_for_target in target_to_classpath.items():
       if internal_classpath_only:
-        classpath_entries_for_target = [entry for entry in classpath_entries_for_target
-                                        if ClasspathEntry.is_internal_classpath_entry(entry)]
+        classpath_entries_for_target = [
+          entry
+          for entry in classpath_entries_for_target
+          if ClasspathEntry.is_internal_classpath_entry(entry)
+        ]
       if len(classpath_entries_for_target) > 0:
         classpath_prefix_for_target = prepare_target_output_folder(basedir, target)
 
@@ -140,21 +151,22 @@ class ClasspathProducts:
           # Create a unique symlink path by prefixing the base file name with a monotonic
           # increasing `index` to avoid name collisions.
           _, ext = os.path.splitext(entry.path)
-          symlink_path = f'{classpath_prefix_for_target}{index}{ext}'
+          symlink_path = f"{classpath_prefix_for_target}{index}{ext}"
           real_entry_path = os.path.realpath(entry.path)
           if not os.path.exists(real_entry_path):
-            raise MissingClasspathEntryError('Could not find {realpath} when attempting to link '
-                                             '{src} into {dst}'
-                                             .format(realpath=real_entry_path, src=entry.path, dst=symlink_path))
+            raise MissingClasspathEntryError(
+              "Could not find {realpath} when attempting to link "
+              "{src} into {dst}".format(realpath=real_entry_path, src=entry.path, dst=symlink_path)
+            )
 
           os.symlink(real_entry_path, symlink_path)
           canonical_classpath.append(symlink_path)
 
         if save_classpath_file:
           classpath = [entry.path for entry in classpath_entries_for_target]
-          with safe_open(f'{classpath_prefix_for_target}classpath.txt', 'w') as classpath_file:
+          with safe_open(f"{classpath_prefix_for_target}classpath.txt", "w") as classpath_file:
             classpath_file.write(os.pathsep.join(classpath))
-            classpath_file.write('\n')
+            classpath_file.write("\n")
 
     return canonical_classpath
 
@@ -169,9 +181,11 @@ class ClasspathProducts:
 
     :rtype: :class:`ClasspathProducts`
     """
-    return ClasspathProducts(pants_workdir=self._pants_workdir,
-                             classpaths=self._classpaths.copy(),
-                             excludes=self._excludes.copy())
+    return ClasspathProducts(
+      pants_workdir=self._pants_workdir,
+      classpaths=self._classpaths.copy(),
+      excludes=self._excludes.copy(),
+    )
 
   def add_for_targets(self, targets, classpath_elements):
     """Adds classpath path elements to the products of all the provided targets."""
@@ -198,8 +212,10 @@ class ClasspathProducts:
     classpath_entries = []
     for jar in resolved_jars:
       if not jar.pants_path:
-        raise TaskError(f'Jar: {jar.coordinate} has no specified path.')
-      cp_entry = ArtifactClasspathEntry(jar.pants_path, jar.coordinate, jar.cache_path, jar.directory_digest)
+        raise TaskError(f"Jar: {jar.coordinate} has no specified path.")
+      cp_entry = ArtifactClasspathEntry(
+        jar.pants_path, jar.coordinate, jar.cache_path, jar.directory_digest
+      )
       classpath_entries.append((conf, cp_entry))
 
     for target in targets:
@@ -257,8 +273,14 @@ class ClasspathProducts:
     """
 
     # remove the duplicate, preserve the ordering.
-    return list(OrderedSet([cp for cp, target in self.get_product_target_mappings_for_targets(
-                            targets, respect_excludes)]))
+    return list(
+      OrderedSet(
+        [
+          cp
+          for cp, target in self.get_product_target_mappings_for_targets(targets, respect_excludes)
+        ]
+      )
+    )
 
   def get_product_target_mappings_for_targets(self, targets, respect_excludes=True):
     """Gets the classpath products-target associations for the given targets.
@@ -286,10 +308,14 @@ class ClasspathProducts:
     :returns: The ordered (conf, classpath entry) tuples.
     :rtype: list of (string, :class:`ArtifactClasspathEntry`)
     """
-    classpath_tuples = self.get_classpath_entries_for_targets(targets,
-                                                              respect_excludes=respect_excludes)
-    return [(conf, cp_entry) for conf, cp_entry in classpath_tuples
-            if ClasspathEntry.is_artifact_classpath_entry(cp_entry)]
+    classpath_tuples = self.get_classpath_entries_for_targets(
+      targets, respect_excludes=respect_excludes
+    )
+    return [
+      (conf, cp_entry)
+      for conf, cp_entry in classpath_tuples
+      if ClasspathEntry.is_artifact_classpath_entry(cp_entry)
+    ]
 
   def get_internal_classpath_entries_for_targets(self, targets, respect_excludes=True):
     """Gets the internal classpath products for the given targets.
@@ -302,15 +328,21 @@ class ClasspathProducts:
     :returns: The ordered (conf, classpath entry) tuples.
     :rtype: list of (string, :class:`ClasspathEntry`)
     """
-    classpath_tuples = self.get_classpath_entries_for_targets(targets,
-                                                              respect_excludes=respect_excludes)
-    return [(conf, cp_entry) for conf, cp_entry in classpath_tuples
-            if ClasspathEntry.is_internal_classpath_entry(cp_entry)]
+    classpath_tuples = self.get_classpath_entries_for_targets(
+      targets, respect_excludes=respect_excludes
+    )
+    return [
+      (conf, cp_entry)
+      for conf, cp_entry in classpath_tuples
+      if ClasspathEntry.is_internal_classpath_entry(cp_entry)
+    ]
 
   def update(self, other):
     """Adds the contents of other to this ClasspathProducts."""
     if self._pants_workdir != other._pants_workdir:
-      raise ValueError(f'Other ClasspathProducts from a different pants workdir {other._pants_workdir}')
+      raise ValueError(
+        f"Other ClasspathProducts from a different pants workdir {other._pants_workdir}"
+      )
     for target, products in other._classpaths._products_by_target.items():
       self._classpaths.add_for_target(target, products)
     for target, products in other._excludes._products_by_target.items():
@@ -321,13 +353,15 @@ class ClasspathProducts:
     # set of targets was included here, their closure must be included.
     closure = BuildGraph.closure(root_targets, bfs=True)
     excludes = self._excludes.get_for_targets(closure)
-    return [target_tuple for target_tuple in classpath_target_tuples
-            if _not_excluded_filter(excludes)(target_tuple)]
+    return [
+      target_tuple
+      for target_tuple in classpath_target_tuples
+      if _not_excluded_filter(excludes)(target_tuple)
+    ]
 
   def _add_excludes_for_target(self, target):
     if isinstance(target, ExportableJvmLibrary) and target.provides:
-      self._excludes.add_for_target(target, [Exclude(target.provides.org,
-                                                     target.provides.name)])
+      self._excludes.add_for_target(target, [Exclude(target.provides.org, target.provides.name)])
     if isinstance(target, JvmTarget) and target.excludes:
       self._excludes.add_for_target(target, target.excludes)
 
@@ -335,7 +369,7 @@ class ClasspathProducts:
     wrapped_path_elements = []
     for element in classpath_elements:
       if len(element) != 2:
-        raise ValueError('Input must be a list of tuples containing two elements.')
+        raise ValueError("Input must be a list of tuples containing two elements.")
       if isinstance(element[1], ClasspathEntry):
         wrapped_path_elements.append(element)
       else:
@@ -359,14 +393,18 @@ class ClasspathProducts:
       path = classpath_entry.path
       if os.path.relpath(path, self._pants_workdir).startswith(os.pardir):
         raise TaskError(
-          'Classpath entry {} for target {} is located outside the working directory "{}".'
-          .format(path, target.address.spec, self._pants_workdir))
+          'Classpath entry {} for target {} is located outside the working directory "{}".'.format(
+            path, target.address.spec, self._pants_workdir
+          )
+        )
 
   def __eq__(self, other):
-    return (isinstance(other, ClasspathProducts) and
-            self._pants_workdir == other._pants_workdir and
-            self._classpaths == other._classpaths and
-            self._excludes == other._excludes)
+    return (
+      isinstance(other, ClasspathProducts)
+      and self._pants_workdir == other._pants_workdir
+      and self._classpaths == other._classpaths
+      and self._excludes == other._excludes
+    )
 
   def __ne__(self, other):
     return not self == other

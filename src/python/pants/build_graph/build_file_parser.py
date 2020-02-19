@@ -26,18 +26,22 @@ class BuildFileParser:
 
   class BuildFileParserError(Exception):
     """Base class for all exceptions raised in BuildFileParser to make exception handling easier"""
+
     pass
 
   class BuildFileScanError(BuildFileParserError):
     """Raised if there was a problem when gathering all addresses in a BUILD file"""
+
     pass
 
   class AddressableConflictException(BuildFileParserError):
     """Raised if the same address is redefined in a BUILD file"""
+
     pass
 
   class SiblingConflictException(BuildFileParserError):
     """Raised if the same address is redefined in another BUILD file in the same directory"""
+
     pass
 
   class ParseError(BuildFileParserError):
@@ -74,10 +78,12 @@ class BuildFileParser:
           if address in sibling_address_map:
             raise self.SiblingConflictException(
               "Both {conflicting_file} and {addressable_file} define the same address: "
-              "'{target_name}'"
-              .format(conflicting_file=sibling_build_file,
-                      addressable_file=address.rel_path,
-                      target_name=address.target_name))
+              "'{target_name}'".format(
+                conflicting_file=sibling_build_file,
+                addressable_file=address.rel_path,
+                target_name=address.target_name,
+              )
+            )
       family_address_map_by_build_file[bf] = bf_address_map
     return family_address_map_by_build_file
 
@@ -92,74 +98,83 @@ class BuildFileParser:
       build_contents = build_file.source().decode()
       context = "While parsing {build_file}:\n".format(build_file=build_file)
       curr_lineno = 0
-      for line in build_contents.split('\n'):
-        line = line.encode('ascii', 'backslashreplace')
+      for line in build_contents.split("\n"):
+        line = line.encode("ascii", "backslashreplace")
         curr_lineno += 1
         if curr_lineno == lineno:
-          highlight = '*'
+          highlight = "*"
         else:
-          highlight = ' '
+          highlight = " "
         if curr_lineno >= lineno - 3:
           context += "{highlight}{curr_lineno:4d}: {line}\n".format(
-            highlight=highlight, line=line, curr_lineno=curr_lineno)
+            highlight=highlight, line=line, curr_lineno=curr_lineno
+          )
           if lineno == curr_lineno:
             if offset:
-              context += ("       {caret:>{width}} {error_type}: {message}\n\n"
-                          .format(caret="^", width=int(offset), error_type=error_type,
-                                  message=message))
+              context += "       {caret:>{width}} {error_type}: {message}\n\n".format(
+                caret="^", width=int(offset), error_type=error_type, message=message
+              )
             else:
-              context += ("        {error_type}: {message}\n\n"
-                          .format(error_type=error_type, message=message))
+              context += "        {error_type}: {message}\n\n".format(
+                error_type=error_type, message=message
+              )
         if curr_lineno > lineno + 3:
           break
       return context
 
-    logger.debug("Parsing BUILD file {build_file}."
-                 .format(build_file=build_file))
+    logger.debug("Parsing BUILD file {build_file}.".format(build_file=build_file))
 
     try:
       build_file_code = build_file.code()
     except SyntaxError as e:
       raise self.ParseError(_format_context_msg(e.lineno, e.offset, e.__class__.__name__, e))
     except Exception as e:
-      raise self.ParseError("{error_type}: {message}\n while parsing BUILD file {build_file}"
-                            .format(error_type=e.__class__.__name__,
-                                    message=e, build_file=build_file))
+      raise self.ParseError(
+        "{error_type}: {message}\n while parsing BUILD file {build_file}".format(
+          error_type=e.__class__.__name__, message=e, build_file=build_file
+        )
+      )
 
     parse_state = self._build_configuration.initialize_parse_state(build_file)
     try:
       with warnings.catch_warnings(record=True) as warns:
         exec(build_file_code, parse_state.parse_globals)
         for warn in warns:
-          logger.warning(_format_context_msg(lineno=warn.lineno,
-                                             offset=None,
-                                             error_type=warn.category.__name__,
-                                             message=warn.message))
+          logger.warning(
+            _format_context_msg(
+              lineno=warn.lineno,
+              offset=None,
+              error_type=warn.category.__name__,
+              message=warn.message,
+            )
+          )
     except Exception as e:
-      raise self.ExecuteError("{message}\n while executing BUILD file {build_file}"
-                              .format(message=e, build_file=build_file))
+      raise self.ExecuteError(
+        "{message}\n while executing BUILD file {build_file}".format(
+          message=e, build_file=build_file
+        )
+      )
 
     name_map = {}
     for addressable in parse_state.objects:
       name = addressable.addressed_name
-      logger.debug('Adding {addressable} to the BuildFileParser address map for {build_file} with {name}'
-                   .format(addressable=addressable,
-                           build_file=build_file,
-                           name=name))
+      logger.debug(
+        "Adding {addressable} to the BuildFileParser address map for {build_file} with {name}".format(
+          addressable=addressable, build_file=build_file, name=name
+        )
+      )
       if name in name_map:
         raise self.AddressableConflictException(
-          "File {conflicting_file} defines address '{target_name}' more than once."
-          .format(conflicting_file=build_file,
-                  target_name=name))
+          "File {conflicting_file} defines address '{target_name}' more than once.".format(
+            conflicting_file=build_file, target_name=name
+          )
+        )
       name_map[name] = addressable
 
-    logger.debug("{build_file} produced the following Addressables:"
-                 .format(build_file=build_file))
+    logger.debug("{build_file} produced the following Addressables:".format(build_file=build_file))
     address_map = {}
     for name, addressable in name_map.items():
       address_map[BuildFileAddress(build_file=build_file, target_name=name)] = addressable
-      logger.debug("  * {name}: {addressable}"
-                   .format(name=name,
-                           addressable=addressable))
+      logger.debug("  * {name}: {addressable}".format(name=name, addressable=addressable))
 
     return address_map

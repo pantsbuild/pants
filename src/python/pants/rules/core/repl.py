@@ -21,12 +21,14 @@ from pants.util.contextutil import temporary_dir
 class ReplImplementation:
   """This type proxies from the top-level `repl` goal to a specific REPL implementation
   for a specific language or languages."""
+
   addresses: Addresses
 
 
 class ReplOptions(GoalSubsystem):
   """Opens a REPL."""
-  name = 'repl'
+
+  name = "repl"
   required_union_implementations = (ReplImplementation,)
 
 
@@ -42,13 +44,14 @@ class ReplBinary:
 
 @goal_rule
 async def run_repl(
-    console: Console,
-    workspace: Workspace,
-    runner: InteractiveRunner,
-    addresses: Addresses,
-    build_root: BuildRoot,
-    union_membership: UnionMembership,
-    global_options: GlobalOptions) -> Repl:
+  console: Console,
+  workspace: Workspace,
+  runner: InteractiveRunner,
+  addresses: Addresses,
+  build_root: BuildRoot,
+  union_membership: UnionMembership,
+  global_options: GlobalOptions,
+) -> Repl:
 
   # Once #9142 is merged, we can guarantee that we will only even enter this `goal_rule` if there
   # exists an implementer of the `ReplImplementation` union, so it's not a problem that this can
@@ -63,10 +66,7 @@ async def run_repl(
     )
 
     full_path = PurePath(tmpdir, repl_binary.binary_name).as_posix()
-    run_request = InteractiveProcessRequest(
-      argv=(full_path,),
-      run_in_workspace=True,
-    )
+    run_request = InteractiveProcessRequest(argv=(full_path,), run_in_workspace=True)
 
   result = runner.run_local_interactive_process(run_request)
   exit_code = result.process_exit_code
@@ -80,6 +80,4 @@ async def run_repl(
 
 
 def rules():
-  return [
-    run_repl,
-  ]
+  return [run_repl]

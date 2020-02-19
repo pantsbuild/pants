@@ -22,7 +22,7 @@ from pants.util.meta import classproperty
 
 # TODO: Find a better home for this?
 def is_exe(name):
-  result = subprocess.call(['which', name], stdout=open(os.devnull, 'w'), stderr=subprocess.STDOUT)
+  result = subprocess.call(["which", name], stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
   return result == 0
 
 
@@ -44,11 +44,14 @@ def ensure_cached(task_cls, expected_num_artifacts=None):
                                  unspecified, will assert that the number of
                                  artifacts in the cache is non-zero.
   """
+
   def decorator(test_fn):
     def wrapper(self, *args, **kwargs):
       with self.cache_check(expected_num_artifacts=expected_num_artifacts):
         test_fn(self, *args, **kwargs)
+
     return wrapper
+
   return decorator
 
 
@@ -58,7 +61,7 @@ class TaskTestBase(TestBase):
   :API: public
   """
 
-  options_scope = 'test_scope'
+  options_scope = "test_scope"
 
   @classmethod
   @abstractmethod
@@ -106,9 +109,12 @@ class TaskTestBase(TestBase):
     :param options_scope: The scope to give options on the generated task type.
     :return: A pair (type, options_scope)
     """
-    subclass_name = f'test_{task_type.__name__}_{options_scope}'
-    return type(subclass_name, (task_type,), {'_stable_name': task_type._compute_stable_name(),
-                                              'options_scope': options_scope})
+    subclass_name = f"test_{task_type.__name__}_{options_scope}"
+    return type(
+      subclass_name,
+      (task_type,),
+      {"_stable_name": task_type._compute_stable_name(), "options_scope": options_scope},
+    )
 
   def set_options(self, **kwargs):
     """
@@ -141,12 +147,11 @@ class TaskTestBase(TestBase):
                                    cache is non-zero.
     """
     with temporary_dir() as artifact_cache:
-      self.set_options_for_scope(f'cache.{self.options_scope}',
-                                 write_to=[artifact_cache])
+      self.set_options_for_scope(f"cache.{self.options_scope}", write_to=[artifact_cache])
 
       yield
 
-      cache_subdir_glob_str = os.path.join(artifact_cache, '*/')
+      cache_subdir_glob_str = os.path.join(artifact_cache, "*/")
       cache_subdirs = glob.glob(cache_subdir_glob_str)
 
       if expected_num_artifacts == 0:
@@ -171,7 +176,7 @@ class TaskTestBase(TestBase):
     last_target = None
     for name in reversed(names):
       last_target = self.make_target(
-        f'project_info:{name}',
+        f"project_info:{name}",
         dependencies=[] if last_target is None else [last_target],
         **additional_target_args,
       )
@@ -193,8 +198,9 @@ class ConsoleTaskTestBase(TaskTestBase):
     super().setUp()
 
     task_type = self.task_type()
-    assert issubclass(task_type, ConsoleTask), \
-        f'task_type() must return a ConsoleTask subclass, got {task_type}'
+    assert issubclass(
+      task_type, ConsoleTask
+    ), f"task_type() must return a ConsoleTask subclass, got {task_type}"
 
   def execute_task(self, targets=None, options=None):
     """Creates a new task and executes it with the given config, command line args and targets.
@@ -212,8 +218,15 @@ class ConsoleTaskTestBase(TaskTestBase):
       task.execute()
       return output.getvalue().decode()
 
-  def execute_console_task(self, targets=None, extra_targets=None, options=None,
-                           passthru_args=None, workspace=None, scheduler=None):
+  def execute_console_task(
+    self,
+    targets=None,
+    extra_targets=None,
+    options=None,
+    passthru_args=None,
+    workspace=None,
+    scheduler=None,
+  ):
     """Creates a new task and executes it with the given config, command line args and targets.
 
     :API: public
@@ -230,10 +243,7 @@ class ConsoleTaskTestBase(TaskTestBase):
     options = options or {}
     self.set_options(**options)
     context = self.context(
-      target_roots=targets,
-      passthru_args=passthru_args,
-      workspace=workspace,
-      scheduler=scheduler
+      target_roots=targets, passthru_args=passthru_args, workspace=workspace, scheduler=scheduler
     )
     return self.execute_console_task_given_context(context, extra_targets=extra_targets)
 
@@ -267,7 +277,7 @@ class ConsoleTaskTestBase(TaskTestBase):
     # '1,2,3,' - splitting this by the separator we should get ['1', '2', '3', ''] - always an extra
     # empty string if the separator is properly always a suffix and not applied just between
     # entries.
-    self.assertEqual(sorted(list(output) + ['']), sorted((self.execute_task(**kwargs)).split(sep)))
+    self.assertEqual(sorted(list(output) + [""]), sorted((self.execute_task(**kwargs)).split(sep)))
 
   def assert_console_output(self, *output, **kwargs):
     """Verifies the expected output entries are emitted by the console task under test.
@@ -332,7 +342,7 @@ class DeclarativeTaskTestMixin:
   @memoized_method
   def _synthesize_task_types(self, task_types=()):
     return [
-      self.synthesize_task_subtype(tsk, f'__tmp_{tsk.__name__}')
+      self.synthesize_task_subtype(tsk, f"__tmp_{tsk.__name__}")
       # TODO(#7127): make @memoized_method convert lists to tuples for hashing!
       for tsk in task_types
     ]
@@ -362,38 +372,37 @@ class DeclarativeTaskTestMixin:
     :raises: If any exception is raised during task execution, the context will be attached to the
              exception object as the attribute '_context' with setattr() before re-raising.
     """
-    run_before_synthesized_task_types = self._synthesize_task_types(tuple(self.run_before_task_types))
+    run_before_synthesized_task_types = self._synthesize_task_types(
+      tuple(self.run_before_task_types)
+    )
     run_after_synthesized_task_types = self._synthesize_task_types(tuple(self.run_after_task_types))
-    all_synthesized_task_types = run_before_synthesized_task_types + [
-      self._testing_task_type,
-    ] + run_after_synthesized_task_types
+    all_synthesized_task_types = (
+      run_before_synthesized_task_types
+      + [self._testing_task_type]
+      + run_after_synthesized_task_types
+    )
 
-    context = self.context(
-      for_task_types=all_synthesized_task_types,
-      **context_kwargs)
+    context = self.context(for_task_types=all_synthesized_task_types, **context_kwargs)
     if target_closure is not None:
       assert set(target_closure) == set(context.build_graph.targets())
 
     run_before_task_instances = [
-      self._create_task(task_type, context)
-      for task_type in run_before_synthesized_task_types
+      self._create_task(task_type, context) for task_type in run_before_synthesized_task_types
     ]
-    current_task_instance = self._create_task(
-      self._testing_task_type, context)
+    current_task_instance = self._create_task(self._testing_task_type, context)
     run_after_task_instances = [
-      self._create_task(task_type, context)
-      for task_type in run_after_synthesized_task_types
+      self._create_task(task_type, context) for task_type in run_after_synthesized_task_types
     ]
-    all_task_instances = run_before_task_instances + [
-      current_task_instance
-    ] + run_after_task_instances
+    all_task_instances = (
+      run_before_task_instances + [current_task_instance] + run_after_task_instances
+    )
 
     try:
       for tsk in all_task_instances:
         tsk.execute()
     except Exception as e:
       # TODO(#7644): Remove this hack before anything more starts relying on it!
-      setattr(e, '_context', context)
+      setattr(e, "_context", context)
       raise e
 
     return self.TaskInvocationResult(

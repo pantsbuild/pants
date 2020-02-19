@@ -5,7 +5,7 @@ from pants.base.deprecated import deprecated_module
 from pants.python.python_setup import PythonSetup
 
 
-deprecated_module('1.27.0.dev0', 'Import from pants.python.python_setup instead.')
+deprecated_module("1.27.0.dev0", "Import from pants.python.python_setup instead.")
 
 
 PythonSetup = PythonSetup

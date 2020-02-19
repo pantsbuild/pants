@@ -30,9 +30,9 @@ class BuildRoot(metaclass=SingletonMetaclass):
         buildroot = buildroot.parent
       else:
         raise self.NotFoundError(
-          'No build root detected. Pants detects the build root by looking for at least one file '
-          f'from {self.sentinel_files} in the cwd and its ancestors. If you have none of these '
-          f'files, you can create an empty file in your build root.'
+          "No build root detected. Pants detects the build root by looking for at least one file "
+          f"from {self.sentinel_files} in the cwd and its ancestors. If you have none of these "
+          f"files, you can create an empty file in your build root."
         )
     return str(buildroot)
 
@@ -48,7 +48,7 @@ class BuildRoot(metaclass=SingletonMetaclass):
     """Returns the build root for the current workspace."""
     if self._root_dir is None:
       # This env variable is for testing purpose.
-      override_buildroot = os.environ.get('PANTS_BUILDROOT_OVERRIDE', None)
+      override_buildroot = os.environ.get("PANTS_BUILDROOT_OVERRIDE", None)
       if override_buildroot:
         self._root_dir = override_buildroot
       else:
@@ -60,7 +60,7 @@ class BuildRoot(metaclass=SingletonMetaclass):
     """Manually establishes the build root for the current workspace."""
     path = os.path.realpath(root_dir)
     if not os.path.exists(path):
-      raise ValueError(f'Build root does not exist: {root_dir}')
+      raise ValueError(f"Build root does not exist: {root_dir}")
     self._root_dir = path
 
   def reset(self) -> None:
@@ -68,13 +68,13 @@ class BuildRoot(metaclass=SingletonMetaclass):
     self._root_dir = None
 
   def __str__(self) -> str:
-    return f'BuildRoot({self._root_dir})'
+    return f"BuildRoot({self._root_dir})"
 
   @contextmanager
   def temporary(self, path: str) -> Iterator[None]:
     """Establishes a temporary build root, restoring the prior build root on exit."""
     if path is None:
-      raise ValueError('Can only temporarily establish a build root given a path.')
+      raise ValueError("Can only temporarily establish a build root given a path.")
     prior = self._root_dir
     self._root_dir = path
     try:

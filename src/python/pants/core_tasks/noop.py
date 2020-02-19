@@ -12,7 +12,7 @@ class NoopCompile(NoopExecTask):
 
   @classmethod
   def product_types(cls):
-    return ['ran_compile']
+    return ["ran_compile"]
 
 
 class NoopTest(NoopExecTask):
@@ -23,4 +23,4 @@ class NoopTest(NoopExecTask):
 
   @classmethod
   def product_types(cls):
-    return ['ran_tests']
+    return ["ran_tests"]

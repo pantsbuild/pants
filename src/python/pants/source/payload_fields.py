@@ -22,8 +22,10 @@ class SourcesField(PayloadField):
   @staticmethod
   def _validate_sources(sources: Union[Any, FilesetWithSpec]) -> FilesetWithSpec:
     if not isinstance(sources, FilesetWithSpec):
-      raise ValueError('Expected a FilesetWithSpec. `sources` should be '
-                       'instantiated via `create_sources_field`.')
+      raise ValueError(
+        "Expected a FilesetWithSpec. `sources` should be "
+        "instantiated via `create_sources_field`."
+      )
     return sources
 
   def __init__(self, sources: FilesetWithSpec, ref_address=None) -> None:

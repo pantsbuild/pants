@@ -5,7 +5,6 @@ import tarfile
 
 
 class TarFile(tarfile.TarFile):
-
   def next(self):
     """A copy and modification of the next() method in tarfile module.
 

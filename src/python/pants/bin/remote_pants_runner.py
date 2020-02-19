@@ -20,9 +20,8 @@ logger = logging.getLogger(__name__)
 
 
 class PailgunClientSignalHandler(SignalHandler):
-
   def __init__(self, pailgun_client, timeout=1, *args, **kwargs):
-    assert(isinstance(pailgun_client, NailgunClient))
+    assert isinstance(pailgun_client, NailgunClient)
     self._pailgun_client = pailgun_client
     self._timeout = timeout
     super().__init__(*args, **kwargs)
@@ -30,26 +29,28 @@ class PailgunClientSignalHandler(SignalHandler):
   def _forward_signal_with_timeout(self, signum, signame):
     # TODO Consider not accessing the private function _maybe_last_pid here, or making it public.
     logger.info(
-      'Sending {} to pantsd with pid {}, waiting up to {} seconds before sending SIGKILL...'
-      .format(signame, self._pailgun_client._maybe_last_pid(), self._timeout))
+      "Sending {} to pantsd with pid {}, waiting up to {} seconds before sending SIGKILL...".format(
+        signame, self._pailgun_client._maybe_last_pid(), self._timeout
+      )
+    )
     self._pailgun_client.set_exit_timeout(
-      timeout=self._timeout,
-      reason=KeyboardInterrupt('Interrupted by user over pailgun client!'))
+      timeout=self._timeout, reason=KeyboardInterrupt("Interrupted by user over pailgun client!")
+    )
     self._pailgun_client.maybe_send_signal(signum)
 
   def handle_sigint(self, signum, _frame):
     if self._pailgun_client._maybe_last_pid():
-      self._forward_signal_with_timeout(signum, 'SIGINT')
+      self._forward_signal_with_timeout(signum, "SIGINT")
     else:
       # NB: We consider not having received a PID yet as "not having started substantial work".
       # So in this case, we let the client die gracefully, and the server handle the closed socket.
       super(PailgunClientSignalHandler, self).handle_sigint(signum, _frame)
 
   def handle_sigquit(self, signum, _frame):
-    self._forward_signal_with_timeout(signum, 'SIGQUIT')
+    self._forward_signal_with_timeout(signum, "SIGQUIT")
 
   def handle_sigterm(self, signum, _frame):
-    self._forward_signal_with_timeout(signum, 'SIGTERM')
+    self._forward_signal_with_timeout(signum, "SIGTERM")
 
 
 class RemotePantsRunner:
@@ -61,10 +62,10 @@ class RemotePantsRunner:
   class Terminated(Exception):
     """Raised when an active run is terminated mid-flight."""
 
-  PANTS_COMMAND = 'pants'
+  PANTS_COMMAND = "pants"
   RECOVERABLE_EXCEPTIONS = (
     NailgunClient.NailgunConnectionError,
-    NailgunClient.NailgunExecutionError
+    NailgunClient.NailgunExecutionError,
   )
 
   def __init__(
@@ -75,7 +76,7 @@ class RemotePantsRunner:
     options_bootstrapper: OptionsBootstrapper,
     stdin=None,
     stdout=None,
-    stderr=None
+    stderr=None,
   ) -> None:
     """
     :param Exiter exiter: The Exiter instance to use for this run.
@@ -100,8 +101,8 @@ class RemotePantsRunner:
   def _trapped_signals(self, client):
     """A contextmanager that handles SIGINT (control-c) and SIGQUIT (control-\\) remotely."""
     signal_handler = PailgunClientSignalHandler(
-      client,
-      timeout=self._bootstrap_options.for_global_scope().pantsd_pailgun_quit_timeout)
+      client, timeout=self._bootstrap_options.for_global_scope().pantsd_pailgun_quit_timeout
+    )
     with ExceptionSink.trapped_signals(signal_handler):
       yield
 
@@ -118,8 +119,9 @@ class RemotePantsRunner:
     attempt = 1
     while 1:
       logger.debug(
-        'connecting to pantsd on port {} (attempt {}/{})'
-        .format(pantsd_handle.port, attempt, retries)
+        "connecting to pantsd on port {} (attempt {}/{})".format(
+          pantsd_handle.port, attempt, retries
+        )
       )
       try:
         return self._connect_and_execute(pantsd_handle)
@@ -129,8 +131,9 @@ class RemotePantsRunner:
 
         self._backoff(attempt)
         logger.warning(
-          'pantsd was unresponsive on port {}, retrying ({}/{})'
-          .format(pantsd_handle.port, attempt, retries)
+          "pantsd was unresponsive on port {}, retrying ({}/{})".format(
+            pantsd_handle.port, attempt, retries
+          )
         )
 
         # One possible cause of the daemon being non-responsive during an attempt might be if a
@@ -141,8 +144,8 @@ class RemotePantsRunner:
         attempt += 1
       except NailgunClient.NailgunError as e:
         # Ensure a newline.
-        logger.fatal('')
-        logger.fatal('lost active connection to pantsd!')
+        logger.fatal("")
+        logger.fatal("lost active connection to pantsd!")
         traceback = sys.exc_info()[2]
         raise self._extract_remote_exception(pantsd_handle.pid, e).with_traceback(traceback)
 
@@ -156,19 +159,22 @@ class RemotePantsRunner:
       "PANTSD_RUNTRACKER_CLIENT_START_TIME": str(self._start_time),
       "PANTSD_REQUEST_TIMEOUT_LIMIT": str(
         self._bootstrap_options.for_global_scope().pantsd_timeout_when_multiple_invocations
-      )
+      ),
     }
 
-    assert isinstance(port, int), \
-      'port {} is not an integer! It has type {}.'.format(port, type(port))
+    assert isinstance(port, int), "port {} is not an integer! It has type {}.".format(
+      port, type(port)
+    )
 
     # Instantiate a NailgunClient.
-    client = NailgunClient(port=port,
-                           ins=self._stdin,
-                           out=self._stdout,
-                           err=self._stderr,
-                           exit_on_broken_pipe=True,
-                           metadata_base_dir=pantsd_handle.metadata_base_dir)
+    client = NailgunClient(
+      port=port,
+      ins=self._stdin,
+      out=self._stdout,
+      err=self._stderr,
+      exit_on_broken_pipe=True,
+      metadata_base_dir=pantsd_handle.metadata_base_dir,
+    )
 
     with self._trapped_signals(client), STTYSettings.preserved():
       # Execute the command on the pailgun.
@@ -194,9 +200,12 @@ class RemotePantsRunner:
       if exception_text:
         break
 
-    exception_suffix = '\nRemote exception:\n{}'.format(exception_text) if exception_text else ''
-    return self.Terminated('abruptly lost active connection to pantsd runner: {!r}{}'.format(
-      nailgun_error, exception_suffix))
+    exception_suffix = "\nRemote exception:\n{}".format(exception_text) if exception_text else ""
+    return self.Terminated(
+      "abruptly lost active connection to pantsd runner: {!r}{}".format(
+        nailgun_error, exception_suffix
+      )
+    )
 
   def _restart_pantsd(self):
     return PantsDaemon.Factory.restart(options_bootstrapper=self._options_bootstrapper)

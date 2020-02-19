@@ -33,7 +33,7 @@ class TemplateData(dict):
       return object.__getattribute__(self, key)
 
   def __str__(self):
-    return 'TemplateData({})'.format(pprint.pformat(self))
+    return "TemplateData({})".format(pprint.pformat(self))
 
 
 # TODO(benjy): Get rid of this class? It adds basically nothing over the MustacheRenderer.

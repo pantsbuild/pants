@@ -26,11 +26,12 @@ class PrepareServices(ResourcesTask):
 
   @staticmethod
   def service_info_path(service):
-    return os.path.join('META-INF', 'services', service)
+    return os.path.join("META-INF", "services", service)
 
   def find_all_relevant_resources_targets(self):
     def may_have_jvm_services(target):
       return isinstance(target, JvmTarget) and list(target.services.values())
+
     return self.context.targets(predicate=may_have_jvm_services)
 
   def create_invalidation_strategy(self):
@@ -44,9 +45,11 @@ class PrepareServices(ResourcesTask):
         service_provider_configuration_file = os.path.join(chroot, self.service_info_path(service))
         # NB: provider configuration files must be UTF-8 encoded, see the mini-spec:
         # https://docs.oracle.com/javase/6/docs/api/java/util/ServiceLoader.html
-        with safe_open(service_provider_configuration_file, 'w') as fp:
+        with safe_open(service_provider_configuration_file, "w") as fp:
+
           def write_line(line):
-            fp.write((line + '\n'))
-          write_line(f'# Generated from pants target {target.address.spec}')
+            fp.write((line + "\n"))
+
+          write_line(f"# Generated from pants target {target.address.spec}")
           for impl in impls:
             write_line(impl)

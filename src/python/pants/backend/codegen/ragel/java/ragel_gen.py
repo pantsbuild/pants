@@ -17,7 +17,7 @@ from pants.util.memo import memoized_property
 
 class RagelGen(SimpleCodegenTask):
 
-  sources_globs = ('**/*',)
+  sources_globs = ("**/*",)
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -25,7 +25,7 @@ class RagelGen(SimpleCodegenTask):
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
-    self._java_out = os.path.join(self.workdir, 'gen-java')
+    self._java_out = os.path.join(self.workdir, "gen-java")
 
   @memoized_property
   def ragel_binary(self):
@@ -44,36 +44,37 @@ class RagelGen(SimpleCodegenTask):
       output_file = os.path.join(target_workdir, calculate_genfile(abs_source))
       safe_mkdir_for(output_file)
 
-      args = [self.ragel_binary, '-J', '-o', output_file, abs_source]
+      args = [self.ragel_binary, "-J", "-o", output_file, abs_source]
 
-      self.context.log.debug('Executing: {args}'.format(args=' '.join(args)))
+      self.context.log.debug("Executing: {args}".format(args=" ".join(args)))
       process = subprocess.Popen(args)
       result = process.wait()
       if result != 0:
-        raise TaskError('{binary} ... exited non-zero ({result})'
-                        .format(binary=self.ragel_binary, result=result))
+        raise TaskError(
+          "{binary} ... exited non-zero ({result})".format(binary=self.ragel_binary, result=result)
+        )
 
 
 def calculate_class_and_package(path):
   package, classname = None, None
-  with open(path, 'r') as ragel:
+  with open(path, "r") as ragel:
     for line in ragel.readlines():
       line = line.strip()
-      package_match = re.match(r'^package ([.a-zA-Z0-9]+);', line)
+      package_match = re.match(r"^package ([.a-zA-Z0-9]+);", line)
       if package_match:
         if package:
-          raise TaskError('Multiple package declarations in {path}'.format(path=path))
+          raise TaskError("Multiple package declarations in {path}".format(path=path))
         package = package_match.group(1)
-      class_match = re.match(r'^public class ([A-Za-z0-9_]+).*', line)
+      class_match = re.match(r"^public class ([A-Za-z0-9_]+).*", line)
       if class_match:
         if classname:
-          raise TaskError('Multiple class declarations in {path}'.format(path=path))
+          raise TaskError("Multiple class declarations in {path}".format(path=path))
         classname = class_match.group(1)
 
   if not package:
-    raise TaskError('Missing package declaration in {path}'.format(path=path))
+    raise TaskError("Missing package declaration in {path}".format(path=path))
   if not classname:
-    raise TaskError('Missing class declaration in {path}'.format(path=path))
+    raise TaskError("Missing class declaration in {path}".format(path=path))
   return package, classname
 
 

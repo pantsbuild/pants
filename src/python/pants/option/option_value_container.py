@@ -104,7 +104,7 @@ class OptionValueContainer:
       existing_rank = RankedValue.NONE
 
     if not isinstance(value, RankedValue):
-      raise AttributeError(f'Value must be of type RankedValue: {value}')
+      raise AttributeError(f"Value must be of type RankedValue: {value}")
 
     new_rank = value.rank
     if new_rank >= existing_rank:
@@ -118,7 +118,7 @@ class OptionValueContainer:
 
   # Support attribute setting, e.g., opts.foo = RankedValue(RankedValue.HARDCODED, 42).
   def __setattr__(self, key: Key, value: RankedValue) -> None:
-    if key == '_value_map':
+    if key == "_value_map":
       return super().__setattr__(key, value)
     self._set(key, value)
 
@@ -126,7 +126,7 @@ class OptionValueContainer:
   # Note: Called only if regular attribute lookup fails,
   # so method and member access will be handled the normal way.
   def __getattr__(self, key: Key):
-    if key == '_value_map':
+    if key == "_value_map":
       # In case we get called in copy/deepcopy, which don't invoke the ctor.
       raise AttributeError(key)
     return self._get_underlying_value(key)

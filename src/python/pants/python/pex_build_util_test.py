@@ -48,10 +48,10 @@ class TestPexBuilderWrapper(TestBase):
 
   def test(self):
     init_subsystem(SourceRootConfig)
-    self.create_file('src/python/package/module.py')
-    implicit_package_target = self.make_target(spec='src/python/package',
-                                               target_type=PythonLibrary,
-                                               sources=['module.py'])
+    self.create_file("src/python/package/module.py")
+    implicit_package_target = self.make_target(
+      spec="src/python/package", target_type=PythonLibrary, sources=["module.py"]
+    )
 
     pbw = self.pex_builder_wrapper()
     pbw.add_sources_from(implicit_package_target)
@@ -59,10 +59,10 @@ class TestPexBuilderWrapper(TestBase):
       pbw.build(pex)
       with self.extracted_pex(pex) as chroot_path:
         # Check the paths we know about:
-        package_path = chroot_path / 'package'
+        package_path = chroot_path / "package"
         self.assert_dir_perms(package_path)
 
-        user_files = {package_path / f for f in ('__init__.py', 'module.py')}
+        user_files = {package_path / f for f in ("__init__.py", "module.py")}
         for user_file in user_files:
           self.assert_file_perms(user_file)
 

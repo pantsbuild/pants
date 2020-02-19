@@ -17,7 +17,7 @@ class JavaLibrary(ExportableJvmLibrary):
   :API: public
   """
 
-  default_sources_globs = '*.java'
+  default_sources_globs = "*.java"
   default_sources_exclude_globs = JUnitTests.java_test_globs
 
   @classmethod
@@ -26,9 +26,11 @@ class JavaLibrary(ExportableJvmLibrary):
 
   def __init__(self, address=None, **kwargs):
     super().__init__(address=address, **kwargs)
-    if 'scalac_plugins' in kwargs:
-      raise self.IllegalArgument(address.spec,
-                                 'java_library does not support the scalac_plugins argument.')
-    if 'scalac_plugin_args' in kwargs:
-      raise self.IllegalArgument(address.spec,
-                                 'java_library does not support the scalac_plugin_args argument.')
+    if "scalac_plugins" in kwargs:
+      raise self.IllegalArgument(
+        address.spec, "java_library does not support the scalac_plugins argument."
+      )
+    if "scalac_plugin_args" in kwargs:
+      raise self.IllegalArgument(
+        address.spec, "java_library does not support the scalac_plugin_args argument."
+      )

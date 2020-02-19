@@ -35,11 +35,11 @@ class AnalysisExtraction(NailgunTask):
   @classmethod
   def prepare(cls, options, round_manager):
     super().prepare(options, round_manager)
-    round_manager.require_data('runtime_classpath')
+    round_manager.require_data("runtime_classpath")
 
   @classmethod
   def product_types(cls):
-    return ['product_deps_by_target']
+    return ["product_deps_by_target"]
 
   def _create_products_if_should_run(self):
     """If this task should run, initialize empty products that it will populate.
@@ -48,19 +48,17 @@ class AnalysisExtraction(NailgunTask):
     """
 
     should_run = False
-    if self.context.products.is_required_data('product_deps_by_target'):
+    if self.context.products.is_required_data("product_deps_by_target"):
       should_run = True
-      self.context.products.safe_create_data('product_deps_by_target', dict)
+      self.context.products.safe_create_data("product_deps_by_target", dict)
     return should_run
 
   @memoized_property
   def _zinc(self):
-    return Zinc.Factory.global_instance().create(
-      self.context.products, self.execution_strategy
-    )
+    return Zinc.Factory.global_instance().create(self.context.products, self.execution_strategy)
 
   def _jdeps_output_json(self, vt):
-    return os.path.join(vt.results_dir, 'jdeps_output.json')
+    return os.path.join(vt.results_dir, "jdeps_output.json")
 
   @contextmanager
   def aliased_classpaths(self, classpaths):
@@ -90,47 +88,47 @@ class AnalysisExtraction(NailgunTask):
     if not self._create_products_if_should_run():
       return
 
-    classpath_product = self.context.products.get_data('runtime_classpath')
-    product_deps_by_target = self.context.products.get_data('product_deps_by_target')
+    classpath_product = self.context.products.get_data("runtime_classpath")
+    product_deps_by_target = self.context.products.get_data("product_deps_by_target")
 
     fingerprint_strategy = DependencyContext.global_instance().create_fingerprint_strategy(
-        classpath_product)
+      classpath_product
+    )
 
     # classpath fingerprint strategy only works on targets with a classpath.
-    targets = [target for target in self.context.targets() if hasattr(target, 'strict_deps')]
-    with self.invalidated(targets,
-                          fingerprint_strategy=fingerprint_strategy,
-                          invalidate_dependents=True) as invalidation_check:
+    targets = [target for target in self.context.targets() if hasattr(target, "strict_deps")]
+    with self.invalidated(
+      targets, fingerprint_strategy=fingerprint_strategy, invalidate_dependents=True
+    ) as invalidation_check:
       for vt in invalidation_check.all_vts:
         # A list of class paths to the artifacts created by the target we are computing deps for.
-        target_artifact_classpaths = [path for _, path in classpath_product.get_for_target(vt.target)]
-        potential_deps_classpaths = self._zinc.compile_classpath('runtime_classpath', vt.target)
+        target_artifact_classpaths = [
+          path for _, path in classpath_product.get_for_target(vt.target)
+        ]
+        potential_deps_classpaths = self._zinc.compile_classpath("runtime_classpath", vt.target)
 
         jdeps_output_json = self._jdeps_output_json(vt)
         if not vt.valid:
           self._run_jdeps_analysis(
-            vt.target,
-            target_artifact_classpaths,
-            potential_deps_classpaths,
-            jdeps_output_json
+            vt.target, target_artifact_classpaths, potential_deps_classpaths, jdeps_output_json
           )
-        self._register_products(vt.target,
-                                jdeps_output_json,
-                                product_deps_by_target)
+        self._register_products(vt.target, jdeps_output_json, product_deps_by_target)
 
   @memoized_property
   def _jdeps_summary_line_regex(self):
     return re.compile(r"^.+\s->\s(.+)$")
 
-  def _run_jdeps_analysis(self, target, target_artifact_classpaths, potential_deps_classpaths, jdeps_output_json):
+  def _run_jdeps_analysis(
+    self, target, target_artifact_classpaths, potential_deps_classpaths, jdeps_output_json
+  ):
     with self.aliased_classpaths(potential_deps_classpaths) as classpaths_by_alias:
-      with open(jdeps_output_json, 'w') as f:
+      with open(jdeps_output_json, "w") as f:
         if len(target_artifact_classpaths):
           jdeps_stdout, jdeps_stderr = self._spawn_jdeps_command(
             target, target_artifact_classpaths, classpaths_by_alias.keys()
           ).communicate()
           deps_classpaths = set()
-          for line in io.StringIO(jdeps_stdout.decode('utf-8')):
+          for line in io.StringIO(jdeps_stdout.decode("utf-8")):
             match = self._jdeps_summary_line_regex.fullmatch(line.strip())
             if match is not None:
               dep_name = match.group(1)
@@ -142,25 +140,24 @@ class AnalysisExtraction(NailgunTask):
 
   def _spawn_jdeps_command(self, target, target_artifact_classpaths, potential_deps_classpaths):
     jdk = DistributionLocator.cached(jdk=True)
-    tool_classpath = jdk.find_libs(['tools.jar'])
+    tool_classpath = jdk.find_libs(["tools.jar"])
     potential_deps_classpath = ":".join(cp for cp in potential_deps_classpaths)
 
     args = ["-summary"]
     if potential_deps_classpath:
-      args.extend(['-classpath', potential_deps_classpath])
+      args.extend(["-classpath", potential_deps_classpath])
 
     args.extend(target_artifact_classpaths)
 
     java_executor = SubprocessExecutor(jdk)
-    return java_executor.spawn(classpath=tool_classpath,
-                               main='com.sun.tools.jdeps.Main',
-                               jvm_options=self.get_options().jvm_options,
-                               args=args,
-                               stdout=subprocess.PIPE)
+    return java_executor.spawn(
+      classpath=tool_classpath,
+      main="com.sun.tools.jdeps.Main",
+      jvm_options=self.get_options().jvm_options,
+      args=args,
+      stdout=subprocess.PIPE,
+    )
 
-  def _register_products(self,
-                         target,
-                         jdeps_output_json,
-                         product_deps_by_target):
+  def _register_products(self, target, jdeps_output_json, product_deps_by_target):
     with open(jdeps_output_json) as f:
       product_deps_by_target[target] = json.load(f)

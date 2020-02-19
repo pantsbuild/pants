@@ -34,6 +34,7 @@ class JvmDependencyAnalyzer:
     The runtime classpath for a target must already have been finalized for a target in order
     to compute its provided files.
     """
+
     def gen():
       # Compute src -> target.
       if isinstance(target, JvmTarget):
@@ -53,6 +54,7 @@ class JvmDependencyAnalyzer:
       for coll in [files, jars]:
         for f in coll:
           yield f
+
     return set(gen())
 
   def targets_by_file(self, targets):
@@ -99,7 +101,7 @@ class JvmDependencyAnalyzer:
   def _jar_classfiles(self, jar_file):
     """Returns an iterator over the classfiles inside jar_file."""
     for cls in ClasspathUtil.classpath_entries_contents([jar_file]):
-      if cls.endswith('.class'):
+      if cls.endswith(".class"):
         yield cls
 
   def count_products(self, target):
@@ -118,28 +120,29 @@ class JvmDependencyAnalyzer:
 
   def _find_all_bootstrap_jars(self):
     def get_path(key):
-      return self.distribution.system_properties.get(key, '').split(':')
+      return self.distribution.system_properties.get(key, "").split(":")
 
     def find_jars_in_dirs(dirs):
       ret = []
       for d in dirs:
         if os.path.isdir(d):
-          ret.extend(s for s in os.listdir(d) if s.endswith('.jar'))
+          ret.extend(s for s in os.listdir(d) if s.endswith(".jar"))
       return ret
 
     # Note: assumes HotSpot, or some JVM that supports sun.boot.class.path.
     # TODO: Support other JVMs? Not clear if there's a standard way to do so.
     # May include loose classes dirs.
-    boot_classpath = get_path('sun.boot.class.path')
+    boot_classpath = get_path("sun.boot.class.path")
 
     # Note that per the specs, overrides and extensions must be in jars.
     # Loose class files will not be found by the JVM.
-    override_jars = find_jars_in_dirs(get_path('java.endorsed.dirs'))
-    extension_jars = find_jars_in_dirs(get_path('java.ext.dirs'))
+    override_jars = find_jars_in_dirs(get_path("java.endorsed.dirs"))
+    extension_jars = find_jars_in_dirs(get_path("java.ext.dirs"))
 
     # Note that this order matters: it reflects the classloading order.
-    bootstrap_jars = [jar for jar in override_jars + boot_classpath + extension_jars
-                      if os.path.isfile(jar)]
+    bootstrap_jars = [
+      jar for jar in override_jars + boot_classpath + extension_jars if os.path.isfile(jar)
+    ]
     return bootstrap_jars  # Technically, may include loose class dirs from boot_classpath.
 
   def compute_transitive_deps_by_target(self, targets):
@@ -156,7 +159,7 @@ class JvmDependencyAnalyzer:
 
       # Need to handle the case where a java_sources target has dependencies.
       # In particular if it depends back on the original target.
-      if hasattr(target, 'java_sources'):
+      if hasattr(target, "java_sources"):
         for java_source_target in target.java_sources:
           for transitive_dep in java_source_target.dependencies:
             transitive_deps_by_target[java_source_target].add(transitive_dep)

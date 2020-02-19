@@ -10,7 +10,7 @@ class Files(Target):
 
   @classmethod
   def alias(cls):
-    return 'files'
+    return "files"
 
   def __init__(self, address=None, payload=None, sources=None, **kwargs):
     """
@@ -20,11 +20,13 @@ class Files(Target):
     :type sources: :class:`pants.source.wrapped_globs.FilesetWithSpec` or list of strings
     """
     payload = payload or Payload()
-    payload.add_fields({
-      'sources': self.create_sources_field(sources,
-                                           sources_rel_path=address.spec_path,
-                                           key_arg='sources'),
-    })
+    payload.add_fields(
+      {
+        "sources": self.create_sources_field(
+          sources, sources_rel_path=address.spec_path, key_arg="sources"
+        )
+      }
+    )
     super().__init__(address=address, payload=payload, **kwargs)
 
   def has_sources(self, extension=None):

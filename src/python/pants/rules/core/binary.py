@@ -29,7 +29,8 @@ class CreatedBinary:
 
 class BinaryOptions(LineOriented, GoalSubsystem):
   """Create a runnable binary."""
-  name = 'binary'
+
+  name = "binary"
 
   required_union_implementations = (BinaryTarget,)
 
@@ -67,7 +68,4 @@ async def coordinator_of_binaries(target: HydratedTarget) -> CreatedBinary:
 
 
 def rules():
-  return [
-    create_binary,
-    coordinator_of_binaries,
-  ]
+  return [create_binary, coordinator_of_binaries]

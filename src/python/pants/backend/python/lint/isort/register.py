@@ -9,13 +9,9 @@ from pants.goal.task_registrar import TaskRegistrar as task
 
 
 def rules():
-  return (
-    *isort_rules.rules(),
-    *python_format_target.rules(),
-    *python_lint_target.rules(),
-  )
+  return (*isort_rules.rules(), *python_format_target.rules(), *python_lint_target.rules())
 
 
 def register_goals():
-  task(name='isort-prep', action=IsortPrep).install('fmt')
-  task(name='isort', action=IsortRun).install('fmt')
+  task(name="isort-prep", action=IsortPrep).install("fmt")
+  task(name="isort", action=IsortRun).install("fmt")

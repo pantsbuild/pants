@@ -21,7 +21,7 @@ class ProvideToolsJar(JvmToolTaskMixin):
 
   @classmethod
   def product_types(cls):
-    return ['compile_classpath']
+    return ["compile_classpath"]
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -29,7 +29,7 @@ class ProvideToolsJar(JvmToolTaskMixin):
 
   @classmethod
   def implementation_version(cls):
-    return super().implementation_version() + [('ProvideToolsJar', 2)]
+    return super().implementation_version() + [("ProvideToolsJar", 2)]
 
   @property
   def create_target_dirs(self):
@@ -38,21 +38,24 @@ class ProvideToolsJar(JvmToolTaskMixin):
 
   def execute(self):
     cp_init_func = ClasspathProducts.init_func(self.get_options().pants_workdir)
-    compile_classpath = self.context.products.get_data('compile_classpath', init_func=cp_init_func)
+    compile_classpath = self.context.products.get_data("compile_classpath", init_func=cp_init_func)
 
     with self.invalidated(self.context.targets(is_tools_jar)) as invalidation_check:
       for vt in invalidation_check.all_vts:
         tools_classpath = self._tools_classpath_pairs(vt.results_dir)
         if not vt.valid:
           self._symlink_tools_classpath(tools_classpath)
-        compile_classpath.add_for_target(vt.target,
-                                         [('default', entry) for _, entry in tools_classpath])
+        compile_classpath.add_for_target(
+          vt.target, [("default", entry) for _, entry in tools_classpath]
+        )
 
   def _tools_classpath_pairs(self, dest_dir):
     """Given a destination directory, returns a list of tuples of (src, dst) symlink pairs."""
     tools_classpath = self._tools_classpath
-    return [(entry, os.path.join(dest_dir, f'{idx}-{os.path.basename(entry)}'))
-            for idx, entry in enumerate(tools_classpath)]
+    return [
+      (entry, os.path.join(dest_dir, f"{idx}-{os.path.basename(entry)}"))
+      for idx, entry in enumerate(tools_classpath)
+    ]
 
   @memoized_property
   def _tools_classpath(self):
@@ -66,10 +69,9 @@ class ProvideToolsJar(JvmToolTaskMixin):
       return javac_classpath
 
     self.set_distribution(jdk=True)
-    jars = self.dist.find_libs(['tools.jar'])
+    jars = self.dist.find_libs(["tools.jar"])
     if len(jars) != 1:
-      raise TaskError('Expected a single `tools.jar` entry for {}; got: {}'.format(
-        self.dist, jars))
+      raise TaskError("Expected a single `tools.jar` entry for {}; got: {}".format(self.dist, jars))
     return jars
 
   def _symlink_tools_classpath(self, tools_classpath):

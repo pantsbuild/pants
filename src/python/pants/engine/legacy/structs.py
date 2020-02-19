@@ -44,13 +44,12 @@ class TargetAdaptor(StructWithDeps):
     refactor how deferred sources are implemented.
       see: https://github.com/pantsbuild/pants/issues/2997
     """
-    source = getattr(self, 'source', None)
-    sources = getattr(self, 'sources', None)
+    source = getattr(self, "source", None)
+    sources = getattr(self, "sources", None)
 
     if source is not None and sources is not None:
       raise Target.IllegalArgument(
-        self.address.spec,
-        'Cannot specify both source and sources attribute.'
+        self.address.spec, "Cannot specify both source and sources attribute."
       )
 
     if source is not None:
@@ -58,7 +57,7 @@ class TargetAdaptor(StructWithDeps):
         raise Target.IllegalArgument(
           self.address.spec,
           f"source must be a str containing a path relative to the target, but got {source} of "
-          f"type {type(source)}"
+          f"type {type(source)}",
         )
       sources = [source]
 
@@ -82,7 +81,7 @@ class TargetAdaptor(StructWithDeps):
   @property
   def field_adaptors(self) -> Tuple:
     """Returns a tuple of Fields for captured fields which need additional treatment."""
-    with exception_logging(logger, 'Exception in `field_adaptors` property'):
+    with exception_logging(logger, "Exception in `field_adaptors` property"):
       conjunction_globs = self.get_sources()
       if conjunction_globs is None:
         return tuple()
@@ -94,14 +93,9 @@ class TargetAdaptor(StructWithDeps):
       base_globs = BaseGlobs.from_sources_field(sources, self.address.spec_path)
       path_globs = base_globs.to_path_globs(self.address.spec_path, conjunction_globs.conjunction)
       sources_field = SourcesField(
-        self.address,
-        'sources',
-        base_globs.filespecs,
-        base_globs,
-        path_globs,
-        self.validate_sources,
+        self.address, "sources", base_globs.filespecs, base_globs, path_globs, self.validate_sources
       )
-      return sources_field,
+      return (sources_field,)
 
   @classproperty
   def default_sources_globs(cls):
@@ -147,6 +141,7 @@ class SourcesField:
   :param validate_fn: A function which takes an EagerFilesetWithSpec and throws if it's not
     acceptable. This API will almost certainly change in the near future.
   """
+
   address: Address
   arg: str
   filespecs: wrapped_globs.Filespec
@@ -158,19 +153,21 @@ class SourcesField:
     return hash((self.address, self.arg))
 
   def __repr__(self):
-    return '{}(address={}, input_globs={}, arg={}, filespecs={!r})'.format(
-      type(self).__name__, self.address, self.base_globs, self.arg, self.filespecs)
+    return "{}(address={}, input_globs={}, arg={}, filespecs={!r})".format(
+      type(self).__name__, self.address, self.base_globs, self.arg, self.filespecs
+    )
 
 
 class JvmBinaryAdaptor(TargetAdaptor):
   def validate_sources(self, sources):
     if len(sources.files) > 1:
-      raise Target.IllegalArgument(self.address.spec,
-                'jvm_binary must have exactly 0 or 1 sources (typically used to specify the class '
-                'containing the main method). '
-                'Other sources should instead be placed in a java_library, which '
-                'should be referenced in the jvm_binary\'s dependencies.'
-              )
+      raise Target.IllegalArgument(
+        self.address.spec,
+        "jvm_binary must have exactly 0 or 1 sources (typically used to specify the class "
+        "containing the main method). "
+        "Other sources should instead be placed in a java_library, which "
+        "should be referenced in the jvm_binary's dependencies.",
+      )
 
 
 class PageAdaptor(TargetAdaptor):
@@ -178,16 +175,16 @@ class PageAdaptor(TargetAdaptor):
     if len(sources.files) != 1:
       raise Target.IllegalArgument(
         self.address.spec,
-        'page targets must have exactly 1 source, but found {} ({})'.format(
-          len(sources.files),
-          ', '.join(sources.files),
-        )
+        "page targets must have exactly 1 source, but found {} ({})".format(
+          len(sources.files), ", ".join(sources.files)
+        ),
       )
 
 
 @dataclass(frozen=True)
 class BundlesField:
   """Represents the `bundles` argument, each of which has a PathGlobs to represent its `fileset`."""
+
   address: Address
   bundles: Any
   filespecs_list: List[wrapped_globs.Filespec]
@@ -222,9 +219,9 @@ class AppAdaptor(TargetAdaptor):
 
   @property
   def field_adaptors(self) -> Tuple:
-    with exception_logging(logger, 'Exception in `field_adaptors` property'):
+    with exception_logging(logger, "Exception in `field_adaptors` property"):
       field_adaptors = super().field_adaptors
-      if getattr(self, 'bundles', None) is None:
+      if getattr(self, "bundles", None) is None:
         return field_adaptors
 
       bundles_field = self._construct_bundles_field()
@@ -236,7 +233,7 @@ class AppAdaptor(TargetAdaptor):
     for bundle in self.bundles:
       # NB: if a bundle has a rel_path, then the rel_root of the resulting file globs must be
       # set to that rel_path.
-      rel_root = getattr(bundle, 'rel_path', self.address.spec_path)
+      rel_root = getattr(bundle, "rel_path", self.address.spec_path)
 
       base_globs = BaseGlobs.from_sources_field(bundle.fileset, rel_root)
       path_globs = base_globs.to_path_globs(rel_root, GlobExpansionConjunction.all_match)
@@ -244,18 +241,19 @@ class AppAdaptor(TargetAdaptor):
       filespecs_list.append(base_globs.filespecs)
       path_globs_list.append(path_globs)
 
-    return BundlesField(
-      self.address, self.bundles, filespecs_list, path_globs_list,
-    )
+    return BundlesField(self.address, self.bundles, filespecs_list, path_globs_list)
 
 
-class JvmAppAdaptor(AppAdaptor): pass
+class JvmAppAdaptor(AppAdaptor):
+  pass
 
 
-class PythonAppAdaptor(AppAdaptor): pass
+class PythonAppAdaptor(AppAdaptor):
+  pass
 
 
-class ResourcesAdaptor(TargetAdaptor): pass
+class ResourcesAdaptor(TargetAdaptor):
+  pass
 
 
 class RemoteSourcesAdaptor(TargetAdaptor):
@@ -271,44 +269,47 @@ class RemoteSourcesAdaptor(TargetAdaptor):
 class PythonTargetAdaptor(TargetAdaptor):
   @property
   def field_adaptors(self) -> Tuple:
-    with exception_logging(logger, 'Exception in `field_adaptors` property'):
+    with exception_logging(logger, "Exception in `field_adaptors` property"):
       field_adaptors = super().field_adaptors
-      if getattr(self, 'resources', None) is None:
+      if getattr(self, "resources", None) is None:
         return field_adaptors
       base_globs = BaseGlobs.from_sources_field(self.resources, self.address.spec_path)
-      path_globs = base_globs.to_path_globs(self.address.spec_path, GlobExpansionConjunction.all_match)
-      sources_field = SourcesField(self.address,
-                                   'resources',
-                                   base_globs.filespecs,
-                                   base_globs,
-                                   path_globs,
-                                   lambda _: None)
+      path_globs = base_globs.to_path_globs(
+        self.address.spec_path, GlobExpansionConjunction.all_match
+      )
+      sources_field = SourcesField(
+        self.address, "resources", base_globs.filespecs, base_globs, path_globs, lambda _: None
+      )
       return (*field_adaptors, sources_field)
 
 
 class PythonBinaryAdaptor(PythonTargetAdaptor):
   def validate_sources(self, sources):
     if len(sources.files) > 1:
-      raise Target.IllegalArgument(self.address.spec,
-        'python_binary must have exactly 0 or 1 sources (typically used to specify the file '
-        'containing the entry point). '
-        'Other sources should instead be placed in a python_library, which '
-        'should be referenced in the python_binary\'s dependencies.'
+      raise Target.IllegalArgument(
+        self.address.spec,
+        "python_binary must have exactly 0 or 1 sources (typically used to specify the file "
+        "containing the entry point). "
+        "Other sources should instead be placed in a python_library, which "
+        "should be referenced in the python_binary's dependencies.",
       )
 
 
-class PythonTestsAdaptor(PythonTargetAdaptor): pass
+class PythonTestsAdaptor(PythonTargetAdaptor):
+  pass
 
 
-class PythonAWSLambdaAdaptor(TargetAdaptor): pass
+class PythonAWSLambdaAdaptor(TargetAdaptor):
+  pass
 
 
-class PythonRequirementLibraryAdaptor(TargetAdaptor): pass
+class PythonRequirementLibraryAdaptor(TargetAdaptor):
+  pass
 
 
 class PantsPluginAdaptor(PythonTargetAdaptor):
   def get_sources(self) -> "GlobsWithConjunction":
-    return GlobsWithConjunction.for_literal_files(['register.py'], self.address.spec_path)
+    return GlobsWithConjunction.for_literal_files(["register.py"], self.address.spec_path)
 
 
 # TODO(#7490): Remove this once we have multiple params support so that rules can do something
@@ -411,7 +412,7 @@ class BaseGlobs(Locatable, metaclass=ABCMeta):
 
   @staticmethod
   def from_sources_field(
-    sources: Union[None, str, Iterable[str], "BaseGlobs"], spec_path: str,
+    sources: Union[None, str, Iterable[str], "BaseGlobs"], spec_path: str
   ) -> "BaseGlobs":
     """Return a BaseGlobs for the given sources field."""
     if sources is None:
@@ -420,12 +421,11 @@ class BaseGlobs(Locatable, metaclass=ABCMeta):
       return sources
     if isinstance(sources, str):
       return Files(sources, spec_path=spec_path)
-    if (
-      isinstance(sources, (MutableSet, MutableSequence, tuple))
-      and all(isinstance(s, str) for s in sources)
+    if isinstance(sources, (MutableSet, MutableSequence, tuple)) and all(
+      isinstance(s, str) for s in sources
     ):
       return Files(*sources, spec_path=spec_path)
-    raise ValueError(f'Expected either a glob or list of literal sources. Got: {sources}')
+    raise ValueError(f"Expected either a glob or list of literal sources. Got: {sources}")
 
   @property
   @abstractmethod
@@ -439,16 +439,16 @@ class BaseGlobs(Locatable, metaclass=ABCMeta):
 
   # TODO: stop accepting an `exclude` argument once we remove `globs` et al.
   def __init__(
-    self, *patterns: str, spec_path: str, exclude: Optional[List[str]] = None, **kwargs,
+    self, *patterns: str, spec_path: str, exclude: Optional[List[str]] = None, **kwargs
   ) -> None:
     self._patterns = patterns
     self._spec_path = spec_path
     self._raw_exclude = exclude
 
     if isinstance(exclude, str):
-      raise ValueError(f'Excludes should be a list of strings. Got: {exclude!r}')
+      raise ValueError(f"Excludes should be a list of strings. Got: {exclude!r}")
     if kwargs:
-      raise ValueError(f'kwargs not supported. Got: {kwargs}')
+      raise ValueError(f"kwargs not supported. Got: {kwargs}")
 
     # TODO: once we remove `globs`, `rglobs`, and `zglobs`, we should change as follows:
     #  * Stop setting `self._parsed_include` and `self._parsed_exclude`. Only save `self._patterns`.
@@ -470,15 +470,15 @@ class BaseGlobs(Locatable, metaclass=ABCMeta):
         else:
           self._parsed_include.append(glob)
     else:
-      self._parsed_include = self.legacy_globs_class.to_filespec(patterns)['globs']
+      self._parsed_include = self.legacy_globs_class.to_filespec(patterns)["globs"]
       self._parsed_exclude = self._parse_exclude(exclude or [])
 
   @property
   def filespecs(self) -> wrapped_globs.Filespec:
     """Return a filespecs dict representing both globs and excludes."""
-    filespecs: wrapped_globs.Filespec = {'globs': self._parsed_include}
+    filespecs: wrapped_globs.Filespec = {"globs": self._parsed_include}
     if self._parsed_exclude:
-      filespecs['exclude'] = [{'globs': self._parsed_exclude}]
+      filespecs["exclude"] = [{"globs": self._parsed_exclude}]
     return filespecs
 
   def to_path_globs(self, relpath: str, conjunction: GlobExpansionConjunction) -> PathGlobs:
@@ -486,7 +486,7 @@ class BaseGlobs(Locatable, metaclass=ABCMeta):
     return PathGlobs(
       globs=(
         *(os.path.join(relpath, glob) for glob in self._parsed_include),
-        *(f"!{os.path.join(relpath, glob)}" for glob in self._parsed_exclude)
+        *(f"!{os.path.join(relpath, glob)}" for glob in self._parsed_exclude),
       ),
       conjunction=conjunction,
     )
@@ -495,31 +495,31 @@ class BaseGlobs(Locatable, metaclass=ABCMeta):
     excluded_patterns: List[str] = []
     for raw_element in raw_exclude:
       exclude_filespecs = BaseGlobs.from_sources_field(raw_element, self._spec_path).filespecs
-      if exclude_filespecs.get('exclude'):
-        raise ValueError('Nested excludes are not supported: got {}'.format(raw_element))
-      excluded_patterns.extend(exclude_filespecs['globs'])
+      if exclude_filespecs.get("exclude"):
+        raise ValueError("Nested excludes are not supported: got {}".format(raw_element))
+      excluded_patterns.extend(exclude_filespecs["globs"])
     return excluded_patterns
 
   def _gen_init_args_str(self) -> str:
     all_arg_strs = []
-    positional_args = ', '.join(repr(p) for p in self._patterns)
+    positional_args = ", ".join(repr(p) for p in self._patterns)
     if positional_args:
       all_arg_strs.append(positional_args)
     all_arg_strs.append(f"spec_path={self._spec_path}")
     if self._raw_exclude:
       all_arg_strs.append(f"exclude={self._raw_exclude}")
-    return ', '.join(all_arg_strs)
+    return ", ".join(all_arg_strs)
 
   def __repr__(self) -> str:
     # TODO: remove this once we finish deprecating `globs` et al. Use the __str__ implementation.
-    return f'{type(self).__name__}({self._gen_init_args_str()})'
+    return f"{type(self).__name__}({self._gen_init_args_str()})"
 
   def __str__(self) -> str:
-    return f'{self.path_globs_kwarg}({self._gen_init_args_str()})'
+    return f"{self.path_globs_kwarg}({self._gen_init_args_str()})"
 
 
 class Files(BaseGlobs):
-  path_globs_kwarg = 'files'
+  path_globs_kwarg = "files"
   legacy_globs_class = wrapped_globs.Globs
 
   def __str__(self) -> str:
@@ -527,17 +527,17 @@ class Files(BaseGlobs):
 
 
 class Globs(BaseGlobs):
-  path_globs_kwarg = 'globs'
+  path_globs_kwarg = "globs"
   legacy_globs_class = wrapped_globs.Globs
 
 
 class RGlobs(BaseGlobs):
-  path_globs_kwarg = 'rglobs'
+  path_globs_kwarg = "rglobs"
   legacy_globs_class = wrapped_globs.RGlobs
 
 
 class ZGlobs(BaseGlobs):
-  path_globs_kwarg = 'zglobs'
+  path_globs_kwarg = "zglobs"
   legacy_globs_class = wrapped_globs.ZGlobs
 
 
@@ -552,7 +552,4 @@ class GlobsWithConjunction:
 
 
 def rules():
-  return [
-    UnionRule(HydrateableField, SourcesField),
-    UnionRule(HydrateableField, BundlesField),
-  ]
+  return [UnionRule(HydrateableField, SourcesField), UnionRule(HydrateableField, BundlesField)]

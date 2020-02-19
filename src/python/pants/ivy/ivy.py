@@ -23,7 +23,9 @@ class Ivy:
   class Error(Exception):
     """Indicates an error executing an ivy command."""
 
-  def __init__(self, classpath, ivy_settings=None, ivy_resolution_cache_dir=None, extra_jvm_options=None):
+  def __init__(
+    self, classpath, ivy_settings=None, ivy_resolution_cache_dir=None, extra_jvm_options=None
+  ):
     """Configures an ivy wrapper for the ivy distribution at the given classpath.
 
     :param ivy_settings: path to find settings.xml file
@@ -33,17 +35,24 @@ class Ivy:
     self._classpath = maybe_list(classpath)
     self._ivy_settings = ivy_settings
     if self._ivy_settings and not isinstance(self._ivy_settings, str):
-      raise ValueError('ivy_settings must be a string, given {} of type {}'.format(
-                         self._ivy_settings, type(self._ivy_settings)))
+      raise ValueError(
+        "ivy_settings must be a string, given {} of type {}".format(
+          self._ivy_settings, type(self._ivy_settings)
+        )
+      )
 
     self._ivy_resolution_cache_dir = ivy_resolution_cache_dir
     if not isinstance(self._ivy_resolution_cache_dir, str):
-      raise ValueError('ivy_resolution_cache_dir must be a string, given {} of type {}'.format(
-                         self._ivy_resolution_cache_dir, type(self._ivy_resolution_cache_dir)))
+      raise ValueError(
+        "ivy_resolution_cache_dir must be a string, given {} of type {}".format(
+          self._ivy_resolution_cache_dir, type(self._ivy_resolution_cache_dir)
+        )
+      )
 
     self._extra_jvm_options = extra_jvm_options or []
     self._lock = OwnerPrintingInterProcessFileLock(
-      os.path.join(self._ivy_resolution_cache_dir, 'pants_ivy.file_lock'))
+      os.path.join(self._ivy_resolution_cache_dir, "pants_ivy.file_lock")
+    )
 
   @property
   def ivy_settings(self):
@@ -65,8 +74,15 @@ class Ivy:
     with self._lock:
       yield
 
-  def execute(self, jvm_options=None, args=None, executor=None,
-              workunit_factory=None, workunit_name=None, workunit_labels=None):
+  def execute(
+    self,
+    jvm_options=None,
+    args=None,
+    executor=None,
+    workunit_factory=None,
+    workunit_name=None,
+    workunit_labels=None,
+  ):
     """Executes the ivy commandline client with the given args.
 
     Raises Ivy.Error if the command fails for any reason.
@@ -82,30 +98,37 @@ class Ivy:
       with self.resolution_lock():
         result = util.execute_runner(runner, workunit_factory, workunit_name, workunit_labels)
       if result != 0:
-        raise self.Error('Ivy command failed with exit code {}{}'.format(
-                           result, ': ' + ' '.join(args) if args else ''))
+        raise self.Error(
+          "Ivy command failed with exit code {}{}".format(
+            result, ": " + " ".join(args) if args else ""
+          )
+        )
     except executor.Error as e:
-      raise self.Error('Problem executing ivy: {}'.format(e))
+      raise self.Error("Problem executing ivy: {}".format(e))
 
   def runner(self, jvm_options=None, args=None, executor=None):
     """Creates an ivy commandline client runner for the given args."""
     args = args or []
-    if self._ivy_settings and '-settings' not in args:
-      args = ['-settings', self._ivy_settings] + args
+    if self._ivy_settings and "-settings" not in args:
+      args = ["-settings", self._ivy_settings] + args
 
     options = list(jvm_options) if jvm_options else []
-    if self._ivy_resolution_cache_dir and '-cache' not in args:
+    if self._ivy_resolution_cache_dir and "-cache" not in args:
       # TODO(John Sirois): Currently this is a magic property to support hand-crafted <caches/> in
       # ivysettings.xml.  Ideally we'd support either simple -caches or these hand-crafted cases
       # instead of just hand-crafted.  Clean this up by taking over ivysettings.xml and generating
       # it from BUILD constructs.
-      options += ['-Divy.cache.dir={}'.format(self._ivy_resolution_cache_dir)]
+      options += ["-Divy.cache.dir={}".format(self._ivy_resolution_cache_dir)]
     options += self._extra_jvm_options
 
     executor = executor or SubprocessExecutor(DistributionLocator.cached())
     if not isinstance(executor, Executor):
-      raise ValueError('The executor argument must be an Executor instance, given {} of type {}'.format(
-                         executor, type(executor)))
+      raise ValueError(
+        "The executor argument must be an Executor instance, given {} of type {}".format(
+          executor, type(executor)
+        )
+      )
 
-    return executor.runner(classpath=self._classpath, main='org.apache.ivy.Main',
-                           jvm_options=options, args=args)
+    return executor.runner(
+      classpath=self._classpath, main="org.apache.ivy.Main", jvm_options=options, args=args
+    )

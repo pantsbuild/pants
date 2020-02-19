@@ -53,7 +53,7 @@ class Setup:
 
 
 def generate_args(
-  *, source_files: TargetSourceFiles, docformatter: Docformatter, check_only: bool,
+  *, source_files: TargetSourceFiles, docformatter: Docformatter, check_only: bool
 ) -> Tuple[str, ...]:
   return (
     "--check" if check_only else "--in-place",
@@ -93,7 +93,7 @@ async def setup(
   )
 
   merged_input_files = await Get[Digest](
-    DirectoriesToMerge(directories=(full_sources_digest, requirements_pex.directory_digest)),
+    DirectoriesToMerge(directories=(full_sources_digest, requirements_pex.directory_digest))
   )
 
   process_request = requirements_pex.create_execute_request(
@@ -101,13 +101,13 @@ async def setup(
     subprocess_encoding_environment=subprocess_encoding_environment,
     pex_path="./docformatter.pex",
     pex_args=generate_args(
-      source_files=specified_source_files, docformatter=docformatter, check_only=request.check_only,
+      source_files=specified_source_files, docformatter=docformatter, check_only=request.check_only
     ),
     input_files=merged_input_files,
     # NB: Even if the user specified to only run on certain files belonging to the target, we
     # still capture in the output all of the source files.
     output_files=adaptor.sources.snapshot.files,
-    description=f'Run docformatter for {adaptor.address.reference()}',
+    description=f"Run docformatter for {adaptor.address.reference()}",
   )
   return Setup(process_request)
 

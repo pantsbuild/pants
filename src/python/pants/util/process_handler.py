@@ -77,6 +77,7 @@ class SubprocessProcessHandler(ProcessHandler):
       def join_and_get_output():
         process.join()
         return queue.get()
+
       return join_and_get_output
 
     stdout = fork_tee(self._process.stdout, sys.stdout)

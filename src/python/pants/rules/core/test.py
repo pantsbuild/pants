@@ -45,7 +45,7 @@ class TestResult:
 
   @staticmethod
   def from_fallible_execute_process_result(
-    process_result: FallibleExecuteProcessResult
+    process_result: FallibleExecuteProcessResult,
   ) -> "TestResult":
     return TestResult(
       status=Status.SUCCESS if process_result.exit_code == 0 else Status.FAILURE,
@@ -75,8 +75,8 @@ class TestTarget:
 
   @staticmethod
   def non_member_error_message(subject):
-    if hasattr(subject, 'address'):
-      return f'{subject.address.reference()} is not a testable target.'
+    if hasattr(subject, "address"):
+      return f"{subject.address.reference()} is not a testable target."
     return None
 
 
@@ -87,13 +87,12 @@ class AddressAndTestResult:
 
   @staticmethod
   def is_testable(
-    adaptor_with_origin: TargetAdaptorWithOrigin, *, union_membership: UnionMembership,
+    adaptor_with_origin: TargetAdaptorWithOrigin, *, union_membership: UnionMembership
   ) -> bool:
     is_test_target = union_membership.is_member(TestTarget, adaptor_with_origin)
     is_not_a_glob = isinstance(adaptor_with_origin.origin, (SingleAddress, FilesystemLiteralSpec))
-    has_sources = (
-      hasattr(adaptor_with_origin.adaptor, "sources")
-      and bool(adaptor_with_origin.adaptor.sources.snapshot.files)
+    has_sources = hasattr(adaptor_with_origin.adaptor, "sources") and bool(
+      adaptor_with_origin.adaptor.sources.snapshot.files
     )
     return has_sources and (is_test_target or is_not_a_glob)
 
@@ -106,6 +105,7 @@ class AddressAndDebugRequest:
 
 class TestOptions(GoalSubsystem):
   """Runs tests."""
+
   name = "test"
 
   required_union_implementations = (TestTarget,)
@@ -117,17 +117,17 @@ class TestOptions(GoalSubsystem):
   def register_options(cls, register) -> None:
     super().register_options(register)
     register(
-      '--debug',
+      "--debug",
       type=bool,
       default=False,
-      help='Run a single test target in an interactive process. This is necessary, for example, when you add '
-           'breakpoints in your code.'
+      help="Run a single test target in an interactive process. This is necessary, for example, when you add "
+      "breakpoints in your code.",
     )
     register(
-      '--run-coverage',
+      "--run-coverage",
       type=bool,
       default=False,
-      help='Generate a coverage report for this test run.',
+      help="Generate a coverage report for this test run.",
     )
 
 
@@ -168,10 +168,10 @@ async def run_tests(
   console.write_stdout("\n")
 
   for address, test_result in filtered_results:
-    console.print_stdout(f'{address.reference():80}.....{test_result.status.value:>10}')
+    console.print_stdout(f"{address.reference():80}.....{test_result.status.value:>10}")
 
   if did_any_fail:
-    console.print_stderr(console.red('\nTests failed'))
+    console.print_stderr(console.red("\nTests failed"))
     exit_code = PANTS_FAILED_EXIT_CODE
   else:
     exit_code = PANTS_SUCCEEDED_EXIT_CODE
@@ -181,7 +181,7 @@ async def run_tests(
 
 @rule
 async def coordinator_of_tests(
-  target_with_origin: HydratedTargetWithOrigin, union_membership: UnionMembership,
+  target_with_origin: HydratedTargetWithOrigin, union_membership: UnionMembership
 ) -> AddressAndTestResult:
   target = target_with_origin.target
   adaptor_with_origin = TargetAdaptorWithOrigin.create(
@@ -220,8 +220,4 @@ async def coordinator_of_debug_tests(
 
 
 def rules():
-  return [
-    coordinator_of_tests,
-    coordinator_of_debug_tests,
-    run_tests,
-  ]
+  return [coordinator_of_tests, coordinator_of_debug_tests, run_tests]

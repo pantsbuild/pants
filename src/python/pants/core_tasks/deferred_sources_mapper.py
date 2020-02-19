@@ -26,10 +26,12 @@ class DeferredSourcesMapper(Task):
 
   class SourcesTargetLookupError(AddressLookupError):
     """Raised when the referenced target cannot be found in the build graph"""
+
     pass
 
   class NoUnpackedSourcesError(AddressLookupError):
     """Raised when there are no files found unpacked from the archive"""
+
     pass
 
   @classmethod
@@ -41,7 +43,7 @@ class DeferredSourcesMapper(Task):
     depend on it just make sure that this task completes first.
     :return:
     """
-    return ['deferred_sources']
+    return ["deferred_sources"]
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -61,19 +63,18 @@ class DeferredSourcesMapper(Task):
       unpacked_archive = unpacked_sources[target.sources_target]
       sources = unpacked_archive.found_files
       rel_unpack_dir = unpacked_archive.rel_unpack_dir
-      self.context.log.debug('target: {}, rel_unpack_dir: {}, sources: {}'
-                             .format(target, rel_unpack_dir, sources))
+      self.context.log.debug(
+        "target: {}, rel_unpack_dir: {}, sources: {}".format(target, rel_unpack_dir, sources)
+      )
       sources_in_dir = tuple(os.path.join(rel_unpack_dir, source) for source in sources)
-      snapshot_specs.append(PathGlobsAndRoot(
-        PathGlobs(sources_in_dir),
-        get_buildroot(),
-      ))
-      filespecs.append({'globs': sources_in_dir})
+      snapshot_specs.append(PathGlobsAndRoot(PathGlobs(sources_in_dir), get_buildroot()))
+      filespecs.append({"globs": sources_in_dir})
       unpack_dirs.append(rel_unpack_dir)
 
     snapshots = self.context._scheduler.capture_snapshots(tuple(snapshot_specs))
-    for target, snapshot, filespec, rel_unpack_dir in \
-      zip(remote_sources_targets, snapshots, filespecs, unpack_dirs):
+    for target, snapshot, filespec, rel_unpack_dir in zip(
+      remote_sources_targets, snapshots, filespecs, unpack_dirs
+    ):
       synthetic_target = self.context.add_new_target(
         address=Address(os.path.relpath(self.workdir, get_buildroot()), target.id),
         target_type=target.destination_target_type,
@@ -82,7 +83,7 @@ class DeferredSourcesMapper(Task):
         derived_from=target,
         **target.destination_target_args
       )
-      self.context.log.debug('synthetic_target: {}'.format(synthetic_target))
+      self.context.log.debug("synthetic_target: {}".format(synthetic_target))
       for dependent in self.context.build_graph.dependents_of(target.address):
         self.context.build_graph.inject_dependency(dependent, synthetic_target.address)
 

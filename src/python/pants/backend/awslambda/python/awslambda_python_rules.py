@@ -29,27 +29,28 @@ class LambdexSetup:
 
 @rule(name="Create Python AWS Lambda")
 async def create_python_awslambda(
-    lambda_tgt_adaptor: PythonAWSLambdaAdaptor,
-    lambdex_setup: LambdexSetup,
-    python_setup: PythonSetup,
-    subprocess_encoding_environment: SubprocessEncodingEnvironment) -> CreatedAWSLambda:
+  lambda_tgt_adaptor: PythonAWSLambdaAdaptor,
+  lambdex_setup: LambdexSetup,
+  python_setup: PythonSetup,
+  subprocess_encoding_environment: SubprocessEncodingEnvironment,
+) -> CreatedAWSLambda:
   # TODO: We must enforce that everything is built for Linux, no matter the local platform.
-  pex_filename = f'{lambda_tgt_adaptor.address.target_name}.pex'
+  pex_filename = f"{lambda_tgt_adaptor.address.target_name}.pex"
   pex_request = CreatePexFromTargetClosure(
     addresses=Addresses([lambda_tgt_adaptor.address]),
     entry_point=None,
-    output_filename=pex_filename
+    output_filename=pex_filename,
   )
 
   pex = await Get[Pex](CreatePexFromTargetClosure, pex_request)
   merged_input_files = await Get[Digest](
-    DirectoriesToMerge(directories=(
-    pex.directory_digest,
-    lambdex_setup.requirements_pex.directory_digest))
+    DirectoriesToMerge(
+      directories=(pex.directory_digest, lambdex_setup.requirements_pex.directory_digest)
+    )
   )
 
   # NB: Lambdex modifies its input pex in-place, so the input file is also the output file.
-  lambdex_args = ('build', '-e', lambda_tgt_adaptor.handler, pex_filename)
+  lambdex_args = ("build", "-e", lambda_tgt_adaptor.handler, pex_filename)
   process_request = lambdex_setup.requirements_pex.create_execute_request(
     python_setup=python_setup,
     subprocess_encoding_environment=subprocess_encoding_environment,
@@ -57,7 +58,7 @@ async def create_python_awslambda(
     pex_args=lambdex_args,
     input_files=merged_input_files,
     output_files=(pex_filename,),
-    description=f'Run Lambdex for {lambda_tgt_adaptor.address.reference()}',
+    description=f"Run Lambdex for {lambda_tgt_adaptor.address.reference()}",
   )
   result = await Get[ExecuteProcessResult](ExecuteProcessRequest, process_request)
   return CreatedAWSLambda(digest=result.output_directory_digest, name=pex_filename)
@@ -75,12 +76,13 @@ async def setup_lambdex(lambdex: Lambdex) -> LambdexSetup:
       entry_point=lambdex.get_entry_point(),
     )
   )
-  return LambdexSetup(
-    requirements_pex=requirements_pex,
-  )
+  return LambdexSetup(requirements_pex=requirements_pex)
 
 
 def rules():
-  return [create_python_awslambda,
-          UnionRule(AWSLambdaTarget, PythonAWSLambdaAdaptor),
-          setup_lambdex, subsystem_rule(Lambdex)]
+  return [
+    create_python_awslambda,
+    UnionRule(AWSLambdaTarget, PythonAWSLambdaAdaptor),
+    setup_lambdex,
+    subsystem_rule(Lambdex),
+  ]

@@ -80,18 +80,18 @@ class ArtifactCache:
     """
     missing_files = [f for f in paths if not os.path.exists(f)]
     if missing_files:
-      raise ArtifactCacheError('Tried to cache nonexistent files {0}'.format(missing_files))
+      raise ArtifactCacheError("Tried to cache nonexistent files {0}".format(missing_files))
 
     if not overwrite:
       if self.has(cache_key):
-        logger.debug('Skipping insert of existing artifact: {0}'.format(cache_key))
+        logger.debug("Skipping insert of existing artifact: {0}".format(cache_key))
         return False
 
     try:
       self.try_insert(cache_key, paths)
       return True
     except NonfatalArtifactCacheError as e:
-      logger.error('Error while writing to artifact cache: {0}'.format(e))
+      logger.error("Error while writing to artifact cache: {0}".format(e))
       return False
 
   def try_insert(self, cache_key, paths):
@@ -149,13 +149,13 @@ def call_use_cached_files(tup):
     cache, key, results_dir = tup
     res = cache.use_cached_files(key, results_dir)
     if res:
-      sys.stderr.write('.')
+      sys.stderr.write(".")
     else:
-      sys.stderr.write(' ')
+      sys.stderr.write(" ")
     sys.stderr.flush()
     return res
   except NonfatalArtifactCacheError as e:
-    logger.warning('Error calling use_cached_files in artifact cache: {0}'.format(e))
+    logger.warning("Error calling use_cached_files in artifact cache: {0}".format(e))
     return False
 
 
@@ -172,5 +172,5 @@ def call_insert(tup):
     cache, key, files, overwrite = tup
     return cache.insert(key, files, overwrite)
   except NonfatalArtifactCacheError as e:
-    logger.warning('Error while inserting into artifact cache: {0}'.format(e))
+    logger.warning("Error while inserting into artifact cache: {0}".format(e))
     return False

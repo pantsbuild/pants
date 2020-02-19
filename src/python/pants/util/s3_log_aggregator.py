@@ -43,7 +43,7 @@ class S3LogAccumulator:
 
   def accumulate(self, logdir):
     for filename in os.listdir(logdir):
-      with open(os.path.join(logdir, filename), 'r') as fp:
+      with open(os.path.join(logdir, filename), "r") as fp:
         for log_entry in parse_log_lines(fp.readlines()):
           m = Measure(1, log_entry.bytes_sent)
           self._path_to_measure[log_entry.s3_key] += m
@@ -53,13 +53,14 @@ class S3LogAccumulator:
     def do_print(heading, data):
       print()
       print(heading)
-      print('=' * len(heading))
+      print("=" * len(heading))
       for key, measure in data[0:n]:
-        print(f'{measure.count} {self._prettyprint_bytes(measure.bytes)} {key}')
-    do_print('Paths by count:', self.get_paths_sorted_by_count())
-    do_print('Paths by bytes:', self.get_paths_sorted_by_bytes())
-    do_print('IPs by count:', self.get_ips_sorted_by_count())
-    do_print('IPs by bytes:', self.get_ips_sorted_by_bytes())
+        print(f"{measure.count} {self._prettyprint_bytes(measure.bytes)} {key}")
+
+    do_print("Paths by count:", self.get_paths_sorted_by_count())
+    do_print("Paths by bytes:", self.get_paths_sorted_by_bytes())
+    do_print("IPs by count:", self.get_ips_sorted_by_count())
+    do_print("IPs by bytes:", self.get_ips_sorted_by_bytes())
     print()
 
   def get_paths_sorted_by_bytes(self):
@@ -86,15 +87,14 @@ class S3LogAccumulator:
 
   @staticmethod
   def _prettyprint_bytes(x):
-    for unit in ['B', 'KB', 'MB', 'GB']:
+    for unit in ["B", "KB", "MB", "GB"]:
       if abs(x) < 1024.0:
-        return f'{x:3.1f}{unit}'
+        return f"{x:3.1f}{unit}"
       x /= 1024.0
-    return f'{x:.1f}TB'
+    return f"{x:.1f}TB"
 
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
   accumulator = S3LogAccumulator()
   for logdir in sys.argv[1:]:
     accumulator.accumulate(logdir)

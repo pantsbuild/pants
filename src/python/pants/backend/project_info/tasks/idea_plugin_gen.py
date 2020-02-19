@@ -20,10 +20,10 @@ from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir
 
 
-_TEMPLATE_BASEDIR = 'templates/idea'
+_TEMPLATE_BASEDIR = "templates/idea"
 
 # Follow `export.py` for versioning strategy.
-IDEA_PLUGIN_VERSION = '0.0.4'
+IDEA_PLUGIN_VERSION = "0.0.4"
 
 
 class IdeaPluginGen(ConsoleTask):
@@ -59,34 +59,68 @@ class IdeaPluginGen(ConsoleTask):
     super().register_options(register)
     # TODO: https://github.com/pantsbuild/pants/issues/3198
     # scala/java-language level should use what Pants already knows.
-    register('--open', type=bool, default=True,
-             help='Attempts to open the generated project in IDEA.')
-    register('--incremental-import', type=int, default=None,
-             help='Enable incremental import of targets with the given graph depth. Supported '
-                  'by IntelliJ Pants plugin versions `>= 1.9.2`.')
-    register('--dep-as-jar', type=bool, default=False,
-             help='If true, treat source dependencies as 3rdparty jars.')
-    register('--java-encoding', default='UTF-8',
-             help='Sets the file encoding for java files in this project.')
-    register('--open-with', type=str, default=None, recursive=True,
-             help='Program used to open the generated IntelliJ project.')
-    register('--debug_port', type=int, default=5005,
-             help='Port to use for launching tasks under the debugger.')
-    register('--java-jdk-name', default=None,
-             help='Sets the jdk used to compile the project\'s java sources. If unset the default '
-                  'jdk name for the --java-language-level is used')
-    register('--java-language-level', type=int, default=8,
-             help='Sets the java language and jdk used to compile the project\'s java sources.')
     register(
-      '--transitive', type=bool, default=True, fingerprint=True,
-      help='If True, use all targets in the build graph, else use only target roots.',
+      "--open", type=bool, default=True, help="Attempts to open the generated project in IDEA."
+    )
+    register(
+      "--incremental-import",
+      type=int,
+      default=None,
+      help="Enable incremental import of targets with the given graph depth. Supported "
+      "by IntelliJ Pants plugin versions `>= 1.9.2`.",
+    )
+    register(
+      "--dep-as-jar",
+      type=bool,
+      default=False,
+      help="If true, treat source dependencies as 3rdparty jars.",
+    )
+    register(
+      "--java-encoding",
+      default="UTF-8",
+      help="Sets the file encoding for java files in this project.",
+    )
+    register(
+      "--open-with",
+      type=str,
+      default=None,
+      recursive=True,
+      help="Program used to open the generated IntelliJ project.",
+    )
+    register(
+      "--debug_port",
+      type=int,
+      default=5005,
+      help="Port to use for launching tasks under the debugger.",
+    )
+    register(
+      "--java-jdk-name",
+      default=None,
+      help="Sets the jdk used to compile the project's java sources. If unset the default "
+      "jdk name for the --java-language-level is used",
+    )
+    register(
+      "--java-language-level",
+      type=int,
+      default=8,
+      help="Sets the java language and jdk used to compile the project's java sources.",
+    )
+    register(
+      "--transitive",
+      type=bool,
+      default=True,
+      fingerprint=True,
+      help="If True, use all targets in the build graph, else use only target roots.",
       removal_version="1.27.0.dev0",
       removal_hint="`idea-plugin` should always act transitively, which is the default. This option "
-                   "will be going away to ensure that Pants always does the right thing.",
+      "will be going away to ensure that Pants always does the right thing.",
     )
-    register('--possible-paths', type=list, default=['/Applications/IntelliJ IDEA CE.app',
-                                                     '/Applications/IntelliJ IDEA.app'],
-             help='Sets the the list of paths for IntelliJ lookup.')
+    register(
+      "--possible-paths",
+      type=list,
+      default=["/Applications/IntelliJ IDEA CE.app", "/Applications/IntelliJ IDEA.app"],
+      help="Sets the the list of paths for IntelliJ lookup.",
+    )
 
   @property
   def act_transitively(self):
@@ -99,35 +133,33 @@ class IdeaPluginGen(ConsoleTask):
     self.open = self.get_options().open
 
     self.java_encoding = self.get_options().java_encoding
-    self.idea_modules_template = os.path.join(_TEMPLATE_BASEDIR,
-                                           'modules-12.mustache')
-    self.idea_workspace_template = os.path.join(_TEMPLATE_BASEDIR,
-                                           'workspace-12.mustache')
+    self.idea_modules_template = os.path.join(_TEMPLATE_BASEDIR, "modules-12.mustache")
+    self.idea_workspace_template = os.path.join(_TEMPLATE_BASEDIR, "workspace-12.mustache")
     self.java_language_level = self.get_options().java_language_level
     self.possible_paths = self.get_options().possible_paths
 
     if self.get_options().java_jdk_name:
       self.java_jdk = self.get_options().java_jdk_name
     else:
-      self.java_jdk = '1.{}'.format(self.java_language_level)
+      self.java_jdk = "1.{}".format(self.java_language_level)
 
     output_dir = os.path.join(get_buildroot(), ".idea", self.__class__.__name__)
     safe_mkdir(output_dir)
 
     with temporary_dir(root_dir=output_dir, cleanup=False) as output_project_dir:
       self.gen_project_workdir = output_project_dir
-      self.idea_workspace_filename = os.path.join(self.gen_project_workdir,
-                                                  ".idea", "workspace.xml")
-      self.idea_modules_filename = os.path.join(self.gen_project_workdir,
-                                                  ".idea", "modules.xml")
-      self.intellij_output_dir = os.path.join(self.gen_project_workdir, 'out')
-      self.intellij_idea_dir = os.path.join(self.gen_project_workdir, '.idea')
+      self.idea_workspace_filename = os.path.join(
+        self.gen_project_workdir, ".idea", "workspace.xml"
+      )
+      self.idea_modules_filename = os.path.join(self.gen_project_workdir, ".idea", "modules.xml")
+      self.intellij_output_dir = os.path.join(self.gen_project_workdir, "out")
+      self.intellij_idea_dir = os.path.join(self.gen_project_workdir, ".idea")
 
   @classmethod
   def get_project_name(cls, target_specs):
-    escaped_name = re.sub('[^0-9a-zA-Z:_]+', '.', '__'.join(target_specs))
+    escaped_name = re.sub("[^0-9a-zA-Z:_]+", ".", "__".join(target_specs))
     # take up to PROJECT_NAME_LIMIT chars as project file name due to filesystem constraint.
-    return escaped_name[:cls.PROJECT_NAME_LIMIT]
+    return escaped_name[: cls.PROJECT_NAME_LIMIT]
 
   # TODO: https://github.com/pantsbuild/pants/issues/3198
   def generate_project(self):
@@ -143,7 +175,7 @@ class IdeaPluginGen(ConsoleTask):
       java=TemplateData(
         encoding=self.java_encoding,
         jdk=self.java_jdk,
-        language_level='JDK_1_{}'.format(self.java_language_level)
+        language_level="JDK_1_{}".format(self.java_language_level),
       ),
       debug_port=self.get_options().debug_port,
     )
@@ -151,7 +183,7 @@ class IdeaPluginGen(ConsoleTask):
     abs_target_specs = [os.path.join(get_buildroot(), spec) for spec in self.context.options.specs]
     configured_workspace = TemplateData(
       targets=json.dumps(abs_target_specs),
-      project_path=os.path.join(get_buildroot(), abs_target_specs[0].split(':')[0]),
+      project_path=os.path.join(get_buildroot(), abs_target_specs[0].split(":")[0]),
       idea_plugin_version=IDEA_PLUGIN_VERSION,
       incremental_import=self.get_options().incremental_import,
       dep_as_jar=self.get_options().dep_as_jar,
@@ -190,8 +222,10 @@ class IdeaPluginGen(ConsoleTask):
     jvm_target_num = len([x for x in self.context.target_roots if isinstance(x, JvmTarget)])
     python_target_num = len([x for x in self.context.target_roots if isinstance(x, PythonTarget)])
     if python_target_num > jvm_target_num:
-      logging.warn('This is likely a python project. Please make sure to '
-                   'select the proper python interpreter as Project SDK in IntelliJ.')
+      logging.warn(
+        "This is likely a python project. Please make sure to "
+        "select the proper python interpreter as Project SDK in IntelliJ."
+      )
 
     ide_file = self.generate_project()
     yield self.gen_project_workdir
@@ -199,7 +233,7 @@ class IdeaPluginGen(ConsoleTask):
     if ide_file and self.get_options().open:
       open_with = self.get_options().open_with
       if open_with:
-        null = open(os.devnull, 'wb')
+        null = open(os.devnull, "wb")
         subprocess.Popen([open_with, ide_file], stdout=null, stderr=null)
       else:
         try:

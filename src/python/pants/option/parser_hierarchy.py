@@ -13,7 +13,8 @@ from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 class InvalidScopeError(Exception):
   pass
 
-_empty_scope_component_re = re.compile(r'\.\.')
+
+_empty_scope_component_re = re.compile(r"\.\.")
 
 
 def _validate_full_scope(scope: str) -> None:
@@ -24,7 +25,7 @@ def _validate_full_scope(scope: str) -> None:
 def enclosing_scope(scope: str) -> str:
   """Utility function to return the scope immediately enclosing a given scope."""
   _validate_full_scope(scope)
-  return scope.rpartition('.')[0]
+  return scope.rpartition(".")[0]
 
 
 def all_enclosing_scopes(scope: str, *, allow_global: bool = True) -> Iterator[str]:
@@ -65,16 +66,18 @@ class ParserHierarchy:
     self._parser_by_scope: Dict[str, Parser] = {}
     for scope_info in scope_infos:
       scope = scope_info.scope
-      parent_parser = (None if scope == GLOBAL_SCOPE else
-                       self._parser_by_scope[enclosing_scope(scope)])
-      self._parser_by_scope[scope] = Parser(env, config, scope_info, parent_parser,
-                                            option_tracker=option_tracker)
+      parent_parser = (
+        None if scope == GLOBAL_SCOPE else self._parser_by_scope[enclosing_scope(scope)]
+      )
+      self._parser_by_scope[scope] = Parser(
+        env, config, scope_info, parent_parser, option_tracker=option_tracker
+      )
 
   def get_parser_by_scope(self, scope: str) -> Parser:
     try:
       return self._parser_by_scope[scope]
     except KeyError:
-      raise Config.ConfigValidationError(f'No such options scope: {scope}')
+      raise Config.ConfigValidationError(f"No such options scope: {scope}")
 
   def walk(self, callback):
     """Invoke callback on each parser, in pre-order depth-first order."""

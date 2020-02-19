@@ -31,7 +31,6 @@ def _ignored_repository(value, repository):
 
 
 class LiteralCredentials(Credentials):
-
   def __init__(self, username=None, password=None, **kwargs):
     """
     :param string name: The name of these credentials.
@@ -41,8 +40,11 @@ class LiteralCredentials(Credentials):
     super().__init__(**kwargs)
 
     if callable(username) or callable(password):
-      raise TargetDefinitionException(self, 'The username and password arguments to credentials() '
-                                            'cannot be callable. Use netrc_credentials() instead.')
+      raise TargetDefinitionException(
+        self,
+        "The username and password arguments to credentials() "
+        "cannot be callable. Use netrc_credentials() instead.",
+      )
 
     self._username = functools.partial(_ignored_repository, username)
     self._password = functools.partial(_ignored_repository, password)

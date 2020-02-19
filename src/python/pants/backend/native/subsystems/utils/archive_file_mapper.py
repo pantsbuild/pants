@@ -16,9 +16,10 @@ class ArchiveFileMapper(Subsystem):
   for a single exact match for each of a set of directory path globs.
   """
 
-  options_scope = 'archive-file-mapper'
+  options_scope = "archive-file-mapper"
 
-  class ArchiveFileMappingError(Exception): pass
+  class ArchiveFileMappingError(Exception):
+    pass
 
   def assert_single_path_by_glob(self, components):
     """Assert that the path components (which are joined into a glob) match exactly one path.
@@ -34,14 +35,12 @@ class ArchiveFileMapper(Subsystem):
       return assert_single_element(expanded_glob)
     except StopIteration as e:
       raise self.ArchiveFileMappingError(
-        "No elements for glob '{}' -- expected exactly one."
-        .format(glob_path_string),
-        e)
+        "No elements for glob '{}' -- expected exactly one.".format(glob_path_string), e
+      )
     except ValueError as e:
       raise self.ArchiveFileMappingError(
-        "Should have exactly one path matching expansion of glob '{}'."
-        .format(glob_path_string),
-        e)
+        "Should have exactly one path matching expansion of glob '{}'.".format(glob_path_string), e
+      )
 
   def map_files(self, base_dir, all_components_list):
     """Apply `assert_single_path_by_glob()` to all elements of `all_components_list`.

@@ -15,8 +15,8 @@ class TaskError(Exception):
     :param int exit_code: an optional exit code (defaults to nonzero)
     :param list failed_targets: an optional list of failed targets (default=[])
     """
-    self._exit_code = kwargs.pop('exit_code', PANTS_FAILED_EXIT_CODE)
-    self._failed_targets = kwargs.pop('failed_targets', [])
+    self._exit_code = kwargs.pop("exit_code", PANTS_FAILED_EXIT_CODE)
+    self._failed_targets = kwargs.pop("failed_targets", [])
     super().__init__(*args, **kwargs)
 
   @property
@@ -48,7 +48,7 @@ class TargetDefinitionException(Exception):
     :param target: the target in question
     :param string msg: a description of the target misconfiguration
     """
-    super().__init__('Invalid target {}: {}'.format(target, msg))
+    super().__init__("Invalid target {}: {}".format(target, msg))
 
 
 class BuildConfigurationError(Exception):

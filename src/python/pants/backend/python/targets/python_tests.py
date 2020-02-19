@@ -13,11 +13,11 @@ class PythonTests(PythonTarget):
   """
 
   # These are the patterns matched by pytest's test discovery, plus pytest's config hook file.
-  default_sources_globs = ('test_*.py', '*_test.py', 'conftest.py')
+  default_sources_globs = ("test_*.py", "*_test.py", "conftest.py")
 
   @classmethod
   def alias(cls):
-    return 'python_tests'
+    return "python_tests"
 
   def __init__(self, coverage=None, timeout=None, **kwargs):
     """

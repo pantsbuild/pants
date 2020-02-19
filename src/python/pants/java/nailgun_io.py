@@ -137,7 +137,7 @@ class NailgunStreamStdinReader(_StoppableDaemonThread):
     # _self_closing_pipe doens't close the write_fd until the pants run is done, and that generates
     # issues around piping stdin to interactive processes such as REPLs.
     pipe = Pipe.create(isatty)
-    reader = NailgunStreamStdinReader(maybe_shutdown_socket, os.fdopen(pipe.write_fd, 'wb'))
+    reader = NailgunStreamStdinReader(maybe_shutdown_socket, os.fdopen(pipe.write_fd, "wb"))
     with reader.running():
       # Instruct the thin client to begin reading and sending stdin.
       with maybe_shutdown_socket.lock:
@@ -149,7 +149,9 @@ class NailgunStreamStdinReader(_StoppableDaemonThread):
 
   def run(self):
     try:
-      for chunk_type, payload in NailgunProtocol.iter_chunks(self._maybe_shutdown_socket, return_bytes=True):
+      for chunk_type, payload in NailgunProtocol.iter_chunks(
+        self._maybe_shutdown_socket, return_bytes=True
+      ):
         if self.is_stopped:
           return
 
@@ -160,7 +162,7 @@ class NailgunStreamStdinReader(_StoppableDaemonThread):
           return
         else:
           raise NailgunProtocol.ProtocolError(
-            'received unexpected chunk {} -> {}'.format(chunk_type, payload)
+            "received unexpected chunk {} -> {}".format(chunk_type, payload)
           )
     finally:
       try:
@@ -180,7 +182,7 @@ class NailgunStreamWriter(_StoppableDaemonThread):
   a pipe and provide its writing end to the caller.
   """
 
-  SELECT_TIMEOUT = .15
+  SELECT_TIMEOUT = 0.15
 
   def __init__(self, in_fds, sock, chunk_types, chunk_eof_type, buf_size=None, select_timeout=None):
     """
@@ -203,7 +205,7 @@ class NailgunStreamWriter(_StoppableDaemonThread):
 
   @classmethod
   def _assert_aligned(self, *iterables):
-    assert len({len(i) for i in iterables}) == 1, 'inputs are not aligned'
+    assert len({len(i) for i in iterables}) == 1, "inputs are not aligned"
 
   def _handle_closed_input_stream(self, fileno):
     # We've reached EOF.
@@ -226,7 +228,9 @@ class NailgunStreamWriter(_StoppableDaemonThread):
       # cannot be easily recreated with selectors (https://stackoverflow.com/a/49563017). See
       # https://github.com/pantsbuild/pants/issues/7880 for why we might want to revisit this code
       # to instead use selectors.
-      readable_fds, _, errored_fds = select.select(self._in_fds, [], self._in_fds, self._select_timeout)
+      readable_fds, _, errored_fds = select.select(
+        self._in_fds, [], self._in_fds, self._select_timeout
+      )
       self.do_run(readable_fds, errored_fds)
 
   def do_run(self, readable_fds, errored_fds):
@@ -237,11 +241,7 @@ class NailgunStreamWriter(_StoppableDaemonThread):
         if not data:
           self._handle_closed_input_stream(fileno)
         else:
-          NailgunProtocol.write_chunk(
-            self._socket,
-            self._fileno_chunk_type_map[fileno],
-            data
-          )
+          NailgunProtocol.write_chunk(self._socket, self._fileno_chunk_type_map[fileno], data)
 
     if errored_fds:
       for fileno in errored_fds:
@@ -281,21 +281,18 @@ class PipedNailgunStreamWriter(NailgunStreamWriter):
   @contextmanager
   def open(cls, sock, chunk_type, isatty, chunk_eof_type=None, buf_size=None, select_timeout=None):
     """Yields the write side of a pipe that will copy appropriately chunked values to a socket."""
-    with cls.open_multi(sock,
-                        (chunk_type,),
-                        (isatty,),
-                        chunk_eof_type,
-                        buf_size,
-                        select_timeout) as ctx:
+    with cls.open_multi(
+      sock, (chunk_type,), (isatty,), chunk_eof_type, buf_size, select_timeout
+    ) as ctx:
       yield ctx
 
   @classmethod
   @contextmanager
-  def open_multi(cls, sock, chunk_types, isattys, chunk_eof_type=None, buf_size=None,
-                 select_timeout=None):
+  def open_multi(
+    cls, sock, chunk_types, isattys, chunk_eof_type=None, buf_size=None, select_timeout=None
+  ):
     """Yields the write sides of pipes that will copy appropriately chunked values to the socket."""
     cls._assert_aligned(chunk_types, isattys)
-
 
     # N.B. This is purely to permit safe handling of a dynamic number of contextmanagers.
     with ExitStack() as stack:
@@ -304,12 +301,7 @@ class PipedNailgunStreamWriter(NailgunStreamWriter):
         (stack.enter_context(Pipe.self_closing(isatty)) for isatty in isattys)
       )
       writer = PipedNailgunStreamWriter(
-        pipes,
-        sock,
-        chunk_types,
-        chunk_eof_type,
-        buf_size=buf_size,
-        select_timeout=select_timeout
+        pipes, sock, chunk_types, chunk_eof_type, buf_size=buf_size, select_timeout=select_timeout
       )
       with writer.running():
         yield pipes, writer

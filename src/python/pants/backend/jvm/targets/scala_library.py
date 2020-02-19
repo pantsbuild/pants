@@ -27,20 +27,28 @@ class ScalaLibrary(ExportableJvmLibrary):
   :API: public
   """
 
-  default_sources_globs = '*.scala'
+  default_sources_globs = "*.scala"
   default_sources_exclude_globs = JUnitTests.scala_test_globs
 
   @classmethod
   def subsystems(cls):
-    return super().subsystems() + (ScalaPlatform, ScoveragePlatform,)
+    return super().subsystems() + (ScalaPlatform, ScoveragePlatform)
 
   @staticmethod
   def skip_instrumentation(**kwargs):
-    return (Target.compute_target_id(kwargs['address']).startswith(".pants.d.gen") or
-            ScoveragePlatform.global_instance().is_blacklisted(kwargs['address'].spec))
+    return Target.compute_target_id(kwargs["address"]).startswith(
+      ".pants.d.gen"
+    ) or ScoveragePlatform.global_instance().is_blacklisted(kwargs["address"].spec)
 
-  def __init__(self, java_sources=None, scalac_plugins=None, scalac_plugin_args=None,
-    compiler_option_sets=None, payload=None, **kwargs):
+  def __init__(
+    self,
+    java_sources=None,
+    scalac_plugins=None,
+    scalac_plugin_args=None,
+    compiler_option_sets=None,
+    payload=None,
+    **kwargs,
+  ):
     """
     :param java_sources: Java libraries this library has a *circular*
       dependency on.
@@ -53,9 +61,9 @@ class ScalaLibrary(ExportableJvmLibrary):
       targets containing resources that belong on this library's classpath.
     """
     payload = payload or Payload()
-    payload.add_fields({
-      'java_sources': PrimitiveField(self.assert_list(java_sources, key_arg='java_sources')),
-    })
+    payload.add_fields(
+      {"java_sources": PrimitiveField(self.assert_list(java_sources, key_arg="java_sources"))}
+    )
 
     scalac_plugins = scalac_plugins or []
     scalac_plugin_args = scalac_plugin_args or {}
@@ -68,17 +76,22 @@ class ScalaLibrary(ExportableJvmLibrary):
 
         scalac_plugin_args.update(
           {
-            "scoverage": ["writeToClasspath:true",
-              f"dataDir:{Target.compute_target_id(kwargs['address'])}"]
-          })
+            "scoverage": [
+              "writeToClasspath:true",
+              f"dataDir:{Target.compute_target_id(kwargs['address'])}",
+            ]
+          }
+        )
 
         compiler_option_sets.update([SCOVERAGE])
 
-    super().__init__(payload=payload,
+    super().__init__(
+      payload=payload,
       scalac_plugins=scalac_plugins,
       scalac_plugin_args=scalac_plugin_args,
       compiler_option_sets=compiler_option_sets,
-      **kwargs)
+      **kwargs,
+    )
 
   @classmethod
   def compute_injectable_address_specs(cls, kwargs=None, payload=None):
@@ -86,7 +99,7 @@ class ScalaLibrary(ExportableJvmLibrary):
       yield address_spec
 
     target_representation = kwargs or payload.as_dict()
-    java_sources_specs = target_representation.get('java_sources', None) or []
+    java_sources_specs = target_representation.get("java_sources", None) or []
     for java_source_spec in java_sources_specs:
       yield java_source_spec
 
@@ -95,11 +108,15 @@ class ScalaLibrary(ExportableJvmLibrary):
     for address_spec in super().compute_dependency_address_specs(kwargs, payload):
       yield address_spec
 
-    for address_spec in ScalaPlatform.global_instance().injectables_address_specs_for_key('scala-library'):
+    for address_spec in ScalaPlatform.global_instance().injectables_address_specs_for_key(
+      "scala-library"
+    ):
       yield address_spec
 
     if ScoveragePlatform.global_instance().get_options().enable_scoverage:
-      for address_spec in ScoveragePlatform.global_instance().injectables_address_specs_for_key('scoverage'):
+      for address_spec in ScoveragePlatform.global_instance().injectables_address_specs_for_key(
+        "scoverage"
+      ):
         yield address_spec
 
   def get_jar_dependencies(self):
@@ -116,6 +133,6 @@ class ScalaLibrary(ExportableJvmLibrary):
       address = Address.parse(spec, relative_to=self.address.spec_path)
       target = self._build_graph.get_target(address)
       if target is None:
-        raise TargetDefinitionException(self, f'No such java target: {spec}')
+        raise TargetDefinitionException(self, f"No such java target: {spec}")
       targets.append(target)
     return targets

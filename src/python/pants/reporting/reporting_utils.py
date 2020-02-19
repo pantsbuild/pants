@@ -24,5 +24,5 @@ def items_to_report_element(items, item_type):
   if n == 0:
     return text
   else:
-    detail = '\n'.join(str(x) for x in items)
+    detail = "\n".join(str(x) for x in items)
     return text, detail

@@ -76,10 +76,12 @@ class Bootstrapper:
     :param bootstrap_workunit_factory: the optional workunit to bootstrap under.
     :raises: Bootstrapper.Error if ivy could not be bootstrapped
     """
-    return Ivy(self._get_classpath(bootstrap_workunit_factory),
-               ivy_settings=self._ivy_subsystem.get_options().ivy_settings,
-               ivy_resolution_cache_dir=self._ivy_subsystem.resolution_cache_dir(),
-               extra_jvm_options=self._ivy_subsystem.extra_jvm_options())
+    return Ivy(
+      self._get_classpath(bootstrap_workunit_factory),
+      ivy_settings=self._ivy_subsystem.get_options().ivy_settings,
+      ivy_resolution_cache_dir=self._ivy_subsystem.resolution_cache_dir(),
+      extra_jvm_options=self._ivy_subsystem.extra_jvm_options(),
+    )
 
   def _get_classpath(self, workunit_factory):
     """Returns the bootstrapped ivy classpath as a list of jar paths.
@@ -91,41 +93,44 @@ class Bootstrapper:
     return self._classpath
 
   def _bootstrap_ivy_classpath(self, workunit_factory, retry=True):
-    ivy_bootstrap_dir = os.path.join(self._ivy_subsystem.get_options().pants_bootstrapdir,
-                                     'tools', 'jvm', 'ivy')
+    ivy_bootstrap_dir = os.path.join(
+      self._ivy_subsystem.get_options().pants_bootstrapdir, "tools", "jvm", "ivy"
+    )
     digest = hashlib.sha1()
     if self._ivyxml and os.path.isfile(self._ivyxml):
-      with open(self._ivyxml, 'rb') as fp:
+      with open(self._ivyxml, "rb") as fp:
         digest.update(fp.read())
     digest.update(self._version.encode())
-    classpath = os.path.join(ivy_bootstrap_dir, f'{digest.hexdigest()}')
+    classpath = os.path.join(ivy_bootstrap_dir, f"{digest.hexdigest()}")
 
     if not os.path.exists(classpath):
       with safe_concurrent_creation(classpath) as safe_classpath:
         ivy = self._bootstrap_ivy()
-        args = ['-confs', 'default', '-cachepath', safe_classpath]
+        args = ["-confs", "default", "-cachepath", safe_classpath]
         if self._ivyxml and os.path.isfile(self._ivyxml):
-          args.extend(['-ivy', self._ivyxml])
+          args.extend(["-ivy", self._ivyxml])
         else:
-          args.extend(['-dependency', 'org.apache.ivy', 'ivy', self._version])
+          args.extend(["-dependency", "org.apache.ivy", "ivy", self._version])
 
         try:
-          ivy.execute(args=args, workunit_factory=workunit_factory, workunit_name='ivy-bootstrap')
+          ivy.execute(args=args, workunit_factory=workunit_factory, workunit_name="ivy-bootstrap")
         except ivy.Error as e:
-          raise self.Error('Failed to bootstrap an ivy classpath! {}'.format(e))
+          raise self.Error("Failed to bootstrap an ivy classpath! {}".format(e))
 
-    with open(classpath, 'r') as fp:
+    with open(classpath, "r") as fp:
       cp = fp.read().strip().split(os.pathsep)
       if not all(map(os.path.exists, cp)):
         safe_delete(classpath)
         if retry:
           return self._bootstrap_ivy_classpath(workunit_factory, retry=False)
-        raise self.Error('Ivy bootstrapping failed - invalid classpath: {}'.format(':'.join(cp)))
+        raise self.Error("Ivy bootstrapping failed - invalid classpath: {}".format(":".join(cp)))
       return cp
 
   def _bootstrap_ivy(self):
     options = self._ivy_subsystem.get_options()
-    return Ivy(self._ivy_subsystem.select(),
-               ivy_settings=options.bootstrap_ivy_settings or options.ivy_settings,
-               ivy_resolution_cache_dir=self._ivy_subsystem.resolution_cache_dir(),
-               extra_jvm_options=self._ivy_subsystem.extra_jvm_options())
+    return Ivy(
+      self._ivy_subsystem.select(),
+      ivy_settings=options.bootstrap_ivy_settings or options.ivy_settings,
+      ivy_resolution_cache_dir=self._ivy_subsystem.resolution_cache_dir(),
+      extra_jvm_options=self._ivy_subsystem.extra_jvm_options(),
+    )

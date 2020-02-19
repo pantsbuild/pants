@@ -14,38 +14,49 @@ class IvySubsystem(Script):
 
   :API: public
   """
-  options_scope = 'ivy'
-  default_version = '2.4.0'
+
+  options_scope = "ivy"
+  default_version = "2.4.0"
 
   _default_urls = [
-      'https://repo1.maven.org/maven2/org/apache/ivy/ivy/{version}/ivy-{version}.jar',
-      'https://maven-central.storage-download.googleapis.com/repos/central/data/org/apache/ivy/ivy/{version}/ivy-{version}.jar',
-    ]
+    "https://repo1.maven.org/maven2/org/apache/ivy/ivy/{version}/ivy-{version}.jar",
+    "https://maven-central.storage-download.googleapis.com/repos/central/data/org/apache/ivy/ivy/{version}/ivy-{version}.jar",
+  ]
 
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--http-proxy', advanced=True,
-             help='Specify a proxy URL for http requests.')
-    register('--https-proxy', advanced=True,
-             help='Specify a proxy URL for https requests.')
-    register('--bootstrap-jar-urls', advanced=True, type=list, default=cls._default_urls,
-             help='List of URLs with templated {version}s to use to download a bootstrap copy of Ivy.')
-    register('--ivy-profile', advanced=True, default=None,
-             help='An ivy.xml file.')
-    register('--cache-dir', advanced=True, default=os.path.expanduser('~/.ivy2/pants'),
-             help='The default directory used for both the Ivy resolution and repository caches.'
-                  'If you want to isolate the resolution cache from the repository cache, we '
-                  'recommend setting both the --resolution-cache-dir and --repository-cache-dir '
-                  'instead of using --cache-dir')
-    register('--resolution-cache-dir', advanced=True,
-             help='Directory to store Ivy resolution artifacts.')
-    register('--repository-cache-dir', advanced=True,
-             help='Directory to store Ivy repository artifacts.')
-    register('--ivy-settings', advanced=True,
-             help='Location of XML configuration file for Ivy settings.')
-    register('--bootstrap-ivy-settings', advanced=True,
-             help='Bootstrap Ivy XML configuration file.')
+    register("--http-proxy", advanced=True, help="Specify a proxy URL for http requests.")
+    register("--https-proxy", advanced=True, help="Specify a proxy URL for https requests.")
+    register(
+      "--bootstrap-jar-urls",
+      advanced=True,
+      type=list,
+      default=cls._default_urls,
+      help="List of URLs with templated {version}s to use to download a bootstrap copy of Ivy.",
+    )
+    register("--ivy-profile", advanced=True, default=None, help="An ivy.xml file.")
+    register(
+      "--cache-dir",
+      advanced=True,
+      default=os.path.expanduser("~/.ivy2/pants"),
+      help="The default directory used for both the Ivy resolution and repository caches."
+      "If you want to isolate the resolution cache from the repository cache, we "
+      "recommend setting both the --resolution-cache-dir and --repository-cache-dir "
+      "instead of using --cache-dir",
+    )
+    register(
+      "--resolution-cache-dir", advanced=True, help="Directory to store Ivy resolution artifacts."
+    )
+    register(
+      "--repository-cache-dir", advanced=True, help="Directory to store Ivy repository artifacts."
+    )
+    register(
+      "--ivy-settings", advanced=True, help="Location of XML configuration file for Ivy settings."
+    )
+    register(
+      "--bootstrap-ivy-settings", advanced=True, help="Bootstrap Ivy XML configuration file."
+    )
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -59,10 +70,10 @@ class IvySubsystem(Script):
 
     Expects a string of the form http://<host>:<port>
     """
-    if os.getenv('HTTP_PROXY'):
-      return os.getenv('HTTP_PROXY')
-    if os.getenv('http_proxy'):
-      return os.getenv('http_proxy')
+    if os.getenv("HTTP_PROXY"):
+      return os.getenv("HTTP_PROXY")
+    if os.getenv("http_proxy"):
+      return os.getenv("http_proxy")
     return self.get_options().http_proxy
 
   def https_proxy(self):
@@ -70,10 +81,10 @@ class IvySubsystem(Script):
 
     Expects a string of the form http://<host>:<port>
     """
-    if os.getenv('HTTPS_PROXY'):
-      return os.getenv('HTTPS_PROXY')
-    if os.getenv('https_proxy'):
-      return os.getenv('https_proxy')
+    if os.getenv("HTTPS_PROXY"):
+      return os.getenv("HTTPS_PROXY")
+    if os.getenv("https_proxy"):
+      return os.getenv("https_proxy")
     return self.get_options().https_proxy
 
   def extra_jvm_options(self):
@@ -81,18 +92,14 @@ class IvySubsystem(Script):
     http_proxy = self.http_proxy()
     if http_proxy:
       host, port = self._parse_proxy_string(http_proxy)
-      extra_options.extend([
-        "-Dhttp.proxyHost={}".format(host),
-        "-Dhttp.proxyPort={}".format(port),
-        ])
+      extra_options.extend(["-Dhttp.proxyHost={}".format(host), "-Dhttp.proxyPort={}".format(port)])
 
     https_proxy = self.https_proxy()
     if https_proxy:
       host, port = self._parse_proxy_string(https_proxy)
-      extra_options.extend([
-        "-Dhttps.proxyHost={}".format(host),
-        "-Dhttps.proxyPort={}".format(port),
-        ])
+      extra_options.extend(
+        ["-Dhttps.proxyHost={}".format(host), "-Dhttps.proxyPort={}".format(port)]
+      )
     return extra_options
 
   def _parse_proxy_string(self, proxy_string):
@@ -113,7 +120,6 @@ class IvySubsystem(Script):
 
 
 class IvyUrlGenerator(BinaryToolUrlGenerator):
-
   def __init__(self, template_urls):
     super().__init__()
     self._template_urls = template_urls

@@ -46,7 +46,7 @@ class ShadedToolFingerprintStrategy(IvyResolveFingerprintStrategy):
     if base_fingerprint is None:
       return None
 
-    hasher.update(b'version=2')
+    hasher.update(b"version=2")
     hasher.update(base_fingerprint.encode())
 
     # NB: this series of updates must always cover the same fields that populate `_tuple`'s slots
@@ -78,18 +78,26 @@ class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):  # type: ignore[m
 
   @classmethod
   def product_types(cls):
-    return ['jvm_build_tools_classpath_callbacks']
+    return ["jvm_build_tools_classpath_callbacks"]
 
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--eager', type=bool, default=False,
-             help='Eagerly bootstrap all known JVM tools, instead of fetching them on-demand. '
-                  'Useful for creating a warm Pants workspace, e.g., for containerizing.')
+    register(
+      "--eager",
+      type=bool,
+      default=False,
+      help="Eagerly bootstrap all known JVM tools, instead of fetching them on-demand. "
+      "Useful for creating a warm Pants workspace, e.g., for containerizing.",
+    )
     # Must be registered with the shader- prefix, as JarTask already registers --jvm-options
     # (indirectly, via NailgunTask).
-    register('--shader-jvm-options', type=list, metavar='<option>...',
-             help='Run the tool shader with these extra jvm options.')
+    register(
+      "--shader-jvm-options",
+      type=list,
+      metavar="<option>...",
+      help="Run the tool shader with these extra jvm options.",
+    )
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -102,23 +110,27 @@ class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):  # type: ignore[m
 
   @classmethod
   def implementation_version(cls):
-    return super().implementation_version() + [('BootstrapJvmTools', 2)]
+    return super().implementation_version() + [("BootstrapJvmTools", 2)]
 
   class ToolResolveError(TaskError):
     """Indicates an error resolving a required JVM tool classpath."""
 
   @classmethod
   def _tool_resolve_error(cls, error, dep_spec, jvm_tool):
-    msg = dedent("""
+    msg = dedent(
+      """
         Failed to resolve target for tool: {tool}. This target was obtained from
         option {option} in scope {scope}. You probably need to add this target to your tools
         BUILD file(s), usually located in BUILD.tools in the workspace root.
         Exception {etype}: {error}
-      """.format(tool=dep_spec,
-                 etype=type(error).__name__,
-                 error=error,
-                 scope=jvm_tool.scope,
-                 option=jvm_tool.key))
+      """.format(
+        tool=dep_spec,
+        etype=type(error).__name__,
+        error=error,
+        scope=jvm_tool.scope,
+        option=jvm_tool.key,
+      )
+    )
     return cls.ToolResolveError(msg)
 
   @classmethod
@@ -142,7 +154,9 @@ class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):  # type: ignore[m
               # The user specified a target spec for this jvm tool that doesn't actually exist.
               # We want to error out here instead of just silently using the default option while
               # appearing to respect their config.
-              raise cls.ToolResolveError(dedent("""
+              raise cls.ToolResolveError(
+                dedent(
+                  """
                   Failed to resolve target for tool: {tool}. This target was obtained from
                   option {option} in scope {scope}.
 
@@ -157,22 +171,30 @@ class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):  # type: ignore[m
                   The default classpath is: {default_classpath}
 
                   Note that tool target addresses in pants.ini should be specified *without* quotes.
-                """).strip().format(tool=dep_spec,
-                                    option=jvm_tool.key,
-                                    scope=jvm_tool.scope,
-                                    default_classpath=':'.join(map(str, jvm_tool.classpath or ()))))
+                """
+                )
+                .strip()
+                .format(
+                  tool=dep_spec,
+                  option=jvm_tool.key,
+                  scope=jvm_tool.scope,
+                  default_classpath=":".join(map(str, jvm_tool.classpath or ())),
+                )
+              )
             if jvm_tool.classpath:
-              tool_classpath_target = JarLibrary(name=dep_address.target_name,
-                                                 address=dep_address,
-                                                 build_graph=build_graph,
-                                                 jars=jvm_tool.classpath)
+              tool_classpath_target = JarLibrary(
+                name=dep_address.target_name,
+                address=dep_address,
+                build_graph=build_graph,
+                jars=jvm_tool.classpath,
+              )
             else:
               # The tool classpath is empty by default, so we just inject a dummy target that
               # ivy resolves as the empty list classpath.  JarLibrary won't do since it requires
               # one or more jars, so we just pick a target type ivy has no resolve work to do for.
-              tool_classpath_target = Target(name=dep_address.target_name,
-                                             address=dep_address,
-                                             build_graph=build_graph)
+              tool_classpath_target = Target(
+                name=dep_address.target_name, address=dep_address, build_graph=build_graph
+              )
             build_graph.inject_target(tool_classpath_target, synthetic=True)
 
     # We use the trick of not returning alternate roots, but instead just filling the dep_spec
@@ -183,14 +205,15 @@ class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):  # type: ignore[m
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
-    self._tool_cache_path = os.path.join(self.workdir, 'tool_cache')
+    self._tool_cache_path = os.path.join(self.workdir, "tool_cache")
 
   def execute(self):
     registered_tools = JvmToolMixin.get_registered_tools()
     if registered_tools:
       # Map of scope -> (map of key -> callback).
-      callback_product_map = self.context.products.get_data('jvm_build_tools_classpath_callbacks',
-                                                            init_func=lambda: defaultdict(dict))
+      callback_product_map = self.context.products.get_data(
+        "jvm_build_tools_classpath_callbacks", init_func=lambda: defaultdict(dict)
+      )
       # We leave a callback in the products map because we want these Ivy calls
       # to be done lazily (they might never actually get executed) and we want
       # to hit Task.invalidated (called in Task._ivy_resolve) on the instance of
@@ -203,14 +226,14 @@ class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):  # type: ignore[m
         callback = self.cached_bootstrap_classpath_callback(dep_spec, jvm_tool)
         callback_product_map[jvm_tool.scope][jvm_tool.key] = callback
       if self.get_options().eager:
-        with self.context.new_workunit('eager'):
+        with self.context.new_workunit("eager"):
           for scope, callbacks_by_key in callback_product_map.items():
             for key, callback in callbacks_by_key.items():
               try:
                 callback()
               except self.ToolUnderspecified:
                 pass  # We don't want to fail for placeholder registrations
-                      # (e.g., custom scala platform).
+                # (e.g., custom scala platform).
 
   def _resolve_tool_targets(self, dep_spec, jvm_tool):
     try:
@@ -234,20 +257,28 @@ class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):  # type: ignore[m
     empty_revs = [cp.rev is None for cp in jvm_tool.classpath or []]
 
     if any(empty_revs) and any(synthetic_targets):
-      raise self.ToolUnderspecified(textwrap.dedent("""
+      raise self.ToolUnderspecified(
+        textwrap.dedent(
+          """
         Unable to bootstrap tool: '{}' because no rev was specified.  This usually
         means that the tool was not defined properly in your build files and no
         default option was provided to use for bootstrap.
-        """.format(jvm_tool.key)))
+        """.format(
+            jvm_tool.key
+          )
+        )
+      )
 
   def _bootstrap_classpath(self, jvm_tool, targets):
     self._check_underspecified_tools(jvm_tool, targets)
-    self.context.log.debug(f'Bootstrapping {jvm_tool.key}')
+    self.context.log.debug(f"Bootstrapping {jvm_tool.key}")
     classpath_holder = ClasspathProducts(self.get_options().pants_workdir)
-    if JvmResolveSubsystem.global_instance().get_options().resolver == 'ivy':
+    if JvmResolveSubsystem.global_instance().get_options().resolver == "ivy":
       self.resolve(executor=None, targets=targets, classpath_products=classpath_holder)
     else:
-      CoursierMixin.resolve(self, targets, classpath_holder, sources=False, javadoc=False, executor=None)
+      CoursierMixin.resolve(
+        self, targets, classpath_holder, sources=False, javadoc=False, executor=None
+      )
     return [cp_entry for _, cp_entry in classpath_holder.get_classpath_entries_for_targets(targets)]
 
   @memoized_property
@@ -255,13 +286,16 @@ class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):  # type: ignore[m
     return Shader.Factory.create(self.context)
 
   def _bootstrap_shaded_jvm_tool(self, jvm_tool, targets):
-    fingerprint_strategy = ShadedToolFingerprintStrategy(jvm_tool.main,
-                                                         custom_rules=jvm_tool.custom_rules)
+    fingerprint_strategy = ShadedToolFingerprintStrategy(
+      jvm_tool.main, custom_rules=jvm_tool.custom_rules
+    )
 
-    with self.invalidated(targets,
-                          # We're the only dependent in reality since we shade.
-                          invalidate_dependents=False,
-                          fingerprint_strategy=fingerprint_strategy) as invalidation_check:
+    with self.invalidated(
+      targets,
+      # We're the only dependent in reality since we shade.
+      invalidate_dependents=False,
+      fingerprint_strategy=fingerprint_strategy,
+    ) as invalidation_check:
 
       # If there are no vts, then there are no resolvable targets, so we exit early with an empty
       # classpath.  This supports the optional tool classpath case.
@@ -269,14 +303,14 @@ class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):  # type: ignore[m
         return []
 
       tool_vts = self.tool_vts(invalidation_check)
-      jar_name = f'{jvm_tool.main}-{tool_vts.cache_key.hash}.jar'
-      shaded_jar = os.path.join(self._tool_cache_path, 'shaded_jars', jar_name)
+      jar_name = f"{jvm_tool.main}-{tool_vts.cache_key.hash}.jar"
+      shaded_jar = os.path.join(self._tool_cache_path, "shaded_jars", jar_name)
 
       if not invalidation_check.invalid_vts and os.path.exists(shaded_jar):
         return [self._shaded_jar_as_classpath_entry(shaded_jar)]
 
       # Ensure we have a single binary jar we can shade.
-      binary_jar = os.path.join(self._tool_cache_path, 'binary_jars', jar_name)
+      binary_jar = os.path.join(self._tool_cache_path, "binary_jars", jar_name)
       safe_mkdir_for(binary_jar)
 
       classpath = self._bootstrap_classpath(jvm_tool, targets)
@@ -290,29 +324,37 @@ class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):  # type: ignore[m
 
       # Now shade the binary jar and return that single jar as the safe tool classpath.
       safe_mkdir_for(shaded_jar)
-      with self.shader.binary_shader(shaded_jar,
-                                     jvm_tool.main,
-                                     binary_jar,
-                                     custom_rules=jvm_tool.custom_rules,
-                                     jvm_options=self.get_options().jvm_options) as shader:
+      with self.shader.binary_shader(
+        shaded_jar,
+        jvm_tool.main,
+        binary_jar,
+        custom_rules=jvm_tool.custom_rules,
+        jvm_options=self.get_options().jvm_options,
+      ) as shader:
         try:
-          result = util.execute_runner(shader,
-                                       workunit_factory=self.context.new_workunit,
-                                       workunit_name=f'shade-{jvm_tool.key}')
+          result = util.execute_runner(
+            shader,
+            workunit_factory=self.context.new_workunit,
+            workunit_name=f"shade-{jvm_tool.key}",
+          )
           if result != 0:
-            raise TaskError("Shading of tool '{key}' with main class {main} for {scope} failed "
-                            "with exit code {result}, command run was:\n\t{cmd}"
-                            .format(key=jvm_tool.key,
-                                    main=jvm_tool.main,
-                                    scope=jvm_tool.scope,
-                                    result=result,
-                                    cmd=shader.cmd))
+            raise TaskError(
+              "Shading of tool '{key}' with main class {main} for {scope} failed "
+              "with exit code {result}, command run was:\n\t{cmd}".format(
+                key=jvm_tool.key,
+                main=jvm_tool.main,
+                scope=jvm_tool.scope,
+                result=result,
+                cmd=shader.cmd,
+              )
+            )
         except Executor.Error as e:
-          raise TaskError("Shading of tool '{key}' with main class {main} for {scope} failed "
-                          "with: {exception}".format(key=jvm_tool.key,
-                                                     main=jvm_tool.main,
-                                                     scope=jvm_tool.scope,
-                                                     exception=e))
+          raise TaskError(
+            "Shading of tool '{key}' with main class {main} for {scope} failed "
+            "with: {exception}".format(
+              key=jvm_tool.key, main=jvm_tool.main, scope=jvm_tool.scope, exception=e
+            )
+          )
 
       if self.artifact_cache_writes_enabled():
         self.update_artifact_cache([(tool_vts, [shaded_jar])])
@@ -322,13 +364,13 @@ class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):  # type: ignore[m
   def _shaded_jar_as_classpath_entry(self, shaded_jar):
     # Capture a Snapshot for the jar.
     buildroot = get_buildroot()
-    snapshot = self.context._scheduler.capture_snapshots([
+    snapshot = self.context._scheduler.capture_snapshots(
+      [
         PathGlobsAndRoot(
-          PathGlobs([fast_relpath(shaded_jar, buildroot)]),
-          buildroot,
-          Digest.load(shaded_jar),
+          PathGlobs([fast_relpath(shaded_jar, buildroot)]), buildroot, Digest.load(shaded_jar)
         )
-      ])[0]
+      ]
+    )[0]
     snapshot.directory_digest.dump(shaded_jar)
     return ClasspathEntry(shaded_jar, directory_digest=snapshot.directory_digest)
 
@@ -354,7 +396,8 @@ class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):  # type: ignore[m
 
     def bootstrap_classpath():
       with cache_lock:
-        if 'classpath' not in cache:
-          cache['classpath'] = self._bootstrap_jvm_tool(dep_spec, jvm_tool)
-        return cache['classpath']
+        if "classpath" not in cache:
+          cache["classpath"] = self._bootstrap_jvm_tool(dep_spec, jvm_tool)
+        return cache["classpath"]
+
     return bootstrap_classpath

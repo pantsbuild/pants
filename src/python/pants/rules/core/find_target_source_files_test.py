@@ -43,14 +43,14 @@ class FindTargetSourceFilesTest(TestBase):
     )
 
   def get_target_source_files(
-    self, *, origin: OriginSpec, strip_source_roots: bool = False,
+    self, *, origin: OriginSpec, strip_source_roots: bool = False
   ) -> List[str]:
     adaptor = Mock()
     adaptor.sources = Mock()
     adaptor.address = Address.parse(f"{self.SOURCE_ROOT}:lib")
     adaptor.sources.snapshot = self.make_snapshot({fp: "" for fp in self.TARGET_SOURCES})
     request = FindTargetSourceFilesRequest(
-      TargetAdaptorWithOrigin(adaptor, origin), strip_source_roots=strip_source_roots,
+      TargetAdaptorWithOrigin(adaptor, origin), strip_source_roots=strip_source_roots
     )
     result = self.request_single_product(
       TargetSourceFiles, Params(request, create_options_bootstrapper())
@@ -74,12 +74,17 @@ class FindTargetSourceFilesTest(TestBase):
     glob_spec = FilesystemResolvedGlobSpec(
       f"{self.SOURCE_ROOT}/*.py",
       _snapshot=self.make_snapshot(
-        {fp: "" for fp in [PurePath(self.SOURCE_ROOT, name).as_posix() for name in ["f1.py", "f4.py", "f5.py"]]}
-      )
+        {
+          fp: ""
+          for fp in [
+            PurePath(self.SOURCE_ROOT, name).as_posix() for name in ["f1.py", "f4.py", "f5.py"]
+          ]
+        }
+      ),
     )
     assert self.get_target_source_files(origin=glob_spec) == [self.TARGET_SOURCES[0]]
 
   def test_strip_source_roots(self) -> None:
     assert self.get_target_source_files(
-      origin=SiblingAddresses(self.SOURCE_ROOT), strip_source_roots=True,
+      origin=SiblingAddresses(self.SOURCE_ROOT), strip_source_roots=True
     ) == ["f1.py", "f2.py", "f3.py"]

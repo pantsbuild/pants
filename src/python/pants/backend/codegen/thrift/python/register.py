@@ -11,13 +11,9 @@ from pants.goal.task_registrar import TaskRegistrar as task
 
 
 def build_file_aliases():
-  return BuildFileAliases(
-    targets={
-      'python_thrift_library': PythonThriftLibrary,
-      }
-    )
+  return BuildFileAliases(targets={"python_thrift_library": PythonThriftLibrary})
 
 
 def register_goals():
-  task(name='thrift-py', action=ApacheThriftPyGen).install('gen')
-  task(name='py-thrift-namespace-clash-check', action=PyThriftNamespaceClashCheck).install('gen')
+  task(name="thrift-py", action=ApacheThriftPyGen).install("gen")
+  task(name="py-thrift-namespace-clash-check", action=PyThriftNamespaceClashCheck).install("gen")

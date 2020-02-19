@@ -16,6 +16,7 @@ from pants.util.enums import match
 @dataclass
 class NativeArtifact(PayloadField):
   """A BUILD file object declaring a target can be exported to other languages with a native ABI."""
+
   lib_name: str
 
   def __init__(self, lib_name: str) -> None:
@@ -35,14 +36,14 @@ class NativeArtifact(PayloadField):
   # TODO: This should probably be made into an @classproperty (see PR #5901).
   @classmethod
   def alias(cls):
-    return 'native_artifact'
+    return "native_artifact"
 
   def as_shared_lib(self, platform):
     # TODO: check that the name conforms to some format in the constructor (e.g. no dots?).
-    return match(platform, {
-      Platform.darwin: f"lib{self.lib_name}.dylib",
-      Platform.linux: f"lib{self.lib_name}.so",
-    })
+    return match(
+      platform,
+      {Platform.darwin: f"lib{self.lib_name}.dylib", Platform.linux: f"lib{self.lib_name}.so"},
+    )
 
   def _compute_fingerprint(self):
     # TODO: This fingerprint computation boilerplate is error-prone and could probably be

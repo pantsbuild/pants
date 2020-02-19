@@ -13,7 +13,6 @@ from pants.util.strutil import ensure_text
 
 
 class ClasspathUtil:
-
   @classmethod
   def compute_classpath_entries(cls, targets, classpath_products, extra_classpath_tuples, confs):
     """Return the list of classpath entries for a classpath covering the passed targets.
@@ -29,14 +28,12 @@ class ClasspathUtil:
     :rtype: list of ClasspathEntry
     """
     classpath_iter = cls._classpath_iter(
-      classpath_products.get_classpath_entries_for_targets(targets),
-      confs=confs,
+      classpath_products.get_classpath_entries_for_targets(targets), confs=confs
     )
     total_classpath = OrderedSet(classpath_iter)
 
     filtered_extra_classpath_iter = cls._filtered_classpath_by_confs_iter(
-      extra_classpath_tuples,
-      confs,
+      extra_classpath_tuples, confs
     )
     extra_classpath_iter = cls._entries_iter(filtered_extra_classpath_iter)
     total_classpath.update(extra_classpath_iter)
@@ -51,17 +48,17 @@ class ClasspathUtil:
     As compute_classpath_entries but expects and returns strings, not ClasspathEntries.
     """
     return list(
-      entry.path for entry in
-      cls.compute_classpath_entries(
+      entry.path
+      for entry in cls.compute_classpath_entries(
         targets,
         classpath_products,
         ((scope, ClasspathEntry(path)) for scope, path in extra_classpath_tuples),
-        confs
+        confs,
       )
     )
 
   @classmethod
-  def classpath(cls, targets, classpath_products, confs=('default',)):
+  def classpath(cls, targets, classpath_products, confs=("default",)):
     """Return the classpath as a list of paths covering all the passed targets.
 
     :param targets: Targets to build an aggregated classpath for.
@@ -74,15 +71,14 @@ class ClasspathUtil:
     return list(classpath_iter)
 
   @classmethod
-  def _classpath_iter(cls, classpath_entries_for_targets, confs=('default',)):
+  def _classpath_iter(cls, classpath_entries_for_targets, confs=("default",)):
     filtered_tuples_iter = cls._filtered_classpath_by_confs_iter(
-      classpath_entries_for_targets,
-      confs,
+      classpath_entries_for_targets, confs
     )
     return cls._entries_iter(filtered_tuples_iter)
 
   @classmethod
-  def internal_classpath(cls, targets, classpath_products, confs=('default',)):
+  def internal_classpath(cls, targets, classpath_products, confs=("default",)):
     """Return the list of internal classpath entries for a classpath covering all `targets`.
 
     Any classpath entries contributed by external dependencies will be omitted.
@@ -98,7 +94,7 @@ class ClasspathUtil:
     return [entry.path for entry in cls._entries_iter(filtered_tuples_iter)]
 
   @classmethod
-  def classpath_by_targets(cls, targets, classpath_products, confs=('default',)):
+  def classpath_by_targets(cls, targets, classpath_products, confs=("default",)):
     """Return classpath entries grouped by their targets for the given `targets`.
 
     :param targets: The targets to lookup classpath products for.
@@ -108,8 +104,9 @@ class ClasspathUtil:
     :rtype: OrderedDict
     """
     classpath_target_tuples = classpath_products.get_product_target_mappings_for_targets(targets)
-    filtered_items_iter = filter(cls._accept_conf_filter(confs, lambda x: x[0][0]),
-                                            classpath_target_tuples)
+    filtered_items_iter = filter(
+      cls._accept_conf_filter(confs, lambda x: x[0][0]), classpath_target_tuples
+    )
 
     # group (classpath_entry, target) tuples by targets
     target_to_classpath = OrderedDict()
@@ -140,7 +137,7 @@ class ClasspathUtil:
       yield entry
 
   @classmethod
-  def classpath_contents(cls, targets, classpath_products, confs=('default',)):
+  def classpath_contents(cls, targets, classpath_products, confs=("default",)):
     """Provide a generator over the contents (classes/resources) of a classpath.
 
     :param targets: Targets to iterate the contents classpath for.
@@ -150,10 +147,7 @@ class ClasspathUtil:
               path per iteration step.
     :rtype: :class:`collections.Iterator` of string
     """
-    classpath_iter = cls._classpath_iter(
-      classpath_products.get_for_targets(targets),
-      confs=confs,
-    )
+    classpath_iter = cls._classpath_iter(classpath_products.get_for_targets(targets), confs=confs)
     for f in cls.classpath_entries_contents(classpath_iter):
       yield f
 
@@ -172,16 +166,17 @@ class ClasspathUtil:
     for entry in classpath_entries:
       if cls.is_jar(entry):
         # Walk the jar namelist.
-        with open_zip(entry, mode='r') as jar:
+        with open_zip(entry, mode="r") as jar:
           for name in jar.namelist():
             yield ensure_text(name)
       elif os.path.isdir(entry):
         # Walk the directory, including subdirs.
         def rel_walk_name(abs_sub_dir, name):
           return fast_relpath(os.path.join(abs_sub_dir, name), entry)
+
         for abs_sub_dir, dirnames, filenames in safe_walk(entry):
           for name in dirnames:
-            yield f'{rel_walk_name(abs_sub_dir, name)}/'
+            yield f"{rel_walk_name(abs_sub_dir, name)}/"
           for name in filenames:
             yield rel_walk_name(abs_sub_dir, name)
       else:
@@ -191,14 +186,14 @@ class ClasspathUtil:
   @classmethod
   def classname_for_rel_classfile(cls, class_file_name):
     """Return the class name for the given relative-to-a-classpath-entry file, or None."""
-    if not class_file_name.endswith('.class'):
+    if not class_file_name.endswith(".class"):
       return None
-    return class_file_name[:-len('.class')].replace('/', '.')
+    return class_file_name[: -len(".class")].replace("/", ".")
 
   @classmethod
   def is_jar(cls, path):
     """True if the given path represents an existing jar or zip file."""
-    return path.endswith(('.jar', '.zip')) and os.path.isfile(path)
+    return path.endswith((".jar", ".zip")) and os.path.isfile(path)
 
   @classmethod
   def is_dir(cls, path):

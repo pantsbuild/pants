@@ -11,7 +11,6 @@ from pants.scm.scm import Scm
 
 
 class Version:
-
   @staticmethod
   def parse(version):
     """Attempts to parse the given string as Semver, then falls back to Namedver."""
@@ -35,14 +34,16 @@ class Namedver(Version):
   https://maven.apache.org/enforcer/enforcer-rules/versionRanges.html
   """
 
-  _VALID_NAME = re.compile('^[-_.A-Za-z0-9]+$')
-  _INVALID_NAME = re.compile('^[-_.]*$')
+  _VALID_NAME = re.compile("^[-_.A-Za-z0-9]+$")
+  _INVALID_NAME = re.compile("^[-_.]*$")
 
   @classmethod
   def parse(cls, version):
     # must not contain whitespace
     if not cls._VALID_NAME.match(version):
-      raise ValueError("Named versions must match {}: '{}'".format(cls._VALID_NAME.pattern, version))
+      raise ValueError(
+        "Named versions must match {}: '{}'".format(cls._VALID_NAME.pattern, version)
+      )
     if cls._INVALID_NAME.match(version):
       raise ValueError("Named version must contain at least one alphanumeric character")
 
@@ -67,7 +68,7 @@ class Namedver(Version):
     raise ValueError("{0} is not comparable to {1}".format(self, other))
 
   def __repr__(self):
-    return 'Namedver({0})'.format(self.version())
+    return "Namedver({0})".format(self.version())
 
 
 @total_ordering
@@ -76,7 +77,7 @@ class Semver(Version):
 
   @staticmethod
   def parse(version):
-    components = version.split('.', 3)
+    components = version.split(".", 3)
     if len(components) != 3:
       raise ValueError
     major, minor, patch = components
@@ -85,8 +86,10 @@ class Semver(Version):
       try:
         return int(component)
       except (TypeError, ValueError):
-        raise ValueError('Invalid revision component {} in {} - '
-                         'must be an integer'.format(component, version))
+        raise ValueError(
+          "Invalid revision component {} in {} - " "must be an integer".format(component, version)
+        )
+
     return Semver(to_i(major), to_i(minor), to_i(patch))
 
   def __init__(self, major, minor, patch, snapshot=False):
@@ -103,13 +106,17 @@ class Semver(Version):
     return Semver(self.major, self.minor, self.patch, snapshot=True)
 
   def version(self):
-    return '{}.{}.{}'.format(self.major,
-                             self.minor,
-                             ('{}-SNAPSHOT'.format(self.patch)) if self.snapshot else self.patch)
+    return "{}.{}.{}".format(
+      self.major, self.minor, ("{}-SNAPSHOT".format(self.patch)) if self.snapshot else self.patch
+    )
 
   def __eq__(self, other):
-    return (self.major, self.minor, self.patch, self.snapshot) == \
-           (other.major, other.minor, other.patch, other.snapshot)
+    return (self.major, self.minor, self.patch, self.snapshot) == (
+      other.major,
+      other.minor,
+      other.patch,
+      other.snapshot,
+    )
 
   def __lt__(self, other):
     diff = self.major - other.major
@@ -121,7 +128,7 @@ class Semver(Version):
     return self.snapshot < other.snapshot
 
   def __repr__(self):
-    return 'Semver({})'.format(self.version())
+    return "Semver({})".format(self.version())
 
 
 class ScmPublishMixin:
@@ -146,15 +153,32 @@ class ScmPublishMixin:
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--scm-push-attempts', type=int, default=cls._SCM_PUSH_ATTEMPTS,
-             help='Try pushing the pushdb to the SCM this many times before aborting.')
-    register('--restrict-push-branches', advanced=True, type=list,
-             help='Allow pushes only from one of these branches.')
-    register('--restrict-push-urls', advanced=True, type=list,
-             help='Allow pushes to only one of these urls.')
-    register('--verify-commit', advanced=True, type=bool, default=True,
-             help='Whether or not to "verify" commits made using SCM publishing. For git, this '
-                  'means running commit hooks.')
+    register(
+      "--scm-push-attempts",
+      type=int,
+      default=cls._SCM_PUSH_ATTEMPTS,
+      help="Try pushing the pushdb to the SCM this many times before aborting.",
+    )
+    register(
+      "--restrict-push-branches",
+      advanced=True,
+      type=list,
+      help="Allow pushes only from one of these branches.",
+    )
+    register(
+      "--restrict-push-urls",
+      advanced=True,
+      type=list,
+      help="Allow pushes to only one of these urls.",
+    )
+    register(
+      "--verify-commit",
+      advanced=True,
+      type=bool,
+      default=True,
+      help='Whether or not to "verify" commits made using SCM publishing. For git, this '
+      "means running commit hooks.",
+    )
 
   @property
   def restrict_push_branches(self):
@@ -181,39 +205,49 @@ class ScmPublishMixin:
       if self.restrict_push_branches:
         branch = self.scm.branch_name
         if branch not in self.restrict_push_branches:
-          raise self.InvalidBranchError('Can only push from {}, currently on branch: {}'
-                                        .format(' '.join(sorted(self.restrict_push_branches)),
-                                                branch))
+          raise self.InvalidBranchError(
+            "Can only push from {}, currently on branch: {}".format(
+              " ".join(sorted(self.restrict_push_branches)), branch
+            )
+          )
 
       if self.restrict_push_urls:
         url = self.scm.server_url
         if url not in self.restrict_push_urls:
-          raise self.InvalidRemoteError('Can only push to {}, currently the remote url is: {}'
-                                        .format(' '.join(sorted(self.restrict_push_urls)), url))
+          raise self.InvalidRemoteError(
+            "Can only push to {}, currently the remote url is: {}".format(
+              " ".join(sorted(self.restrict_push_urls)), url
+            )
+          )
 
       changed_files = self.scm.changed_files()
       if changed_files:
-        raise self.DirtyWorkspaceError('Can only push from a clean branch, found : {}'
-                                       .format(' '.join(changed_files)))
+        raise self.DirtyWorkspaceError(
+          "Can only push from a clean branch, found : {}".format(" ".join(changed_files))
+        )
     elif self.scm:
-      self.log.info('Skipping check for a clean {} branch in test mode.'
-                    .format(self.scm.branch_name))
+      self.log.info(
+        "Skipping check for a clean {} branch in test mode.".format(self.scm.branch_name)
+      )
 
   def commit_pushdb(self, coordinates, postscript=None):
     """Commit changes to the pushdb with a message containing the provided coordinates."""
-    self.scm.commit('pants build committing publish data for push of {coordinates}'
-                    '{postscript}'.format(coordinates=coordinates, postscript=postscript or ''),
-                    verify=self.get_options().verify_commit)
+    self.scm.commit(
+      "pants build committing publish data for push of {coordinates}"
+      "{postscript}".format(coordinates=coordinates, postscript=postscript or ""),
+      verify=self.get_options().verify_commit,
+    )
 
-  def publish_pushdb_changes_to_remote_scm(self, pushdb_file, coordinate, tag_name, tag_message,
-                                           postscript=None):
+  def publish_pushdb_changes_to_remote_scm(
+    self, pushdb_file, coordinate, tag_name, tag_message, postscript=None
+  ):
     """Push pushdb changes to the remote scm repository, and then tag the commit if it succeeds."""
 
     self._add_pushdb(pushdb_file)
     self.commit_pushdb(coordinate, postscript=postscript)
     self._push_and_tag_changes(
       tag_name=tag_name,
-      tag_message='{message}{postscript}'.format(message=tag_message, postscript=postscript or '')
+      tag_message="{message}{postscript}".format(message=tag_message, postscript=postscript or ""),
     )
 
   def _add_pushdb(self, pushdb_file):

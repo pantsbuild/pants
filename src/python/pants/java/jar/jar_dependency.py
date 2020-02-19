@@ -40,8 +40,20 @@ class JarDependencyParseContextWrapper:
     """
     self._parse_context = parse_context
 
-  def __call__(self, org, name, rev=None, force=False, ext=None, url=None, apidocs=None,
-              classifier=None, mutable=None, intransitive=False, excludes=None):
+  def __call__(
+    self,
+    org,
+    name,
+    rev=None,
+    force=False,
+    ext=None,
+    url=None,
+    apidocs=None,
+    classifier=None,
+    mutable=None,
+    intransitive=False,
+    excludes=None,
+  ):
     """
     :param string org: The Maven ``groupId`` of this dependency.
     :param string name: The Maven ``artifactId`` of this dependency.
@@ -64,8 +76,20 @@ class JarDependencyParseContextWrapper:
     :param list excludes: Transitive dependencies of this jar to exclude.
     :type excludes: list of :class:`pants.backend.jvm.targets.exclude.Exclude`
     """
-    return JarDependency(org, name, rev, force, ext, url, apidocs, classifier, mutable, intransitive,
-                         excludes, self._parse_context.rel_path)
+    return JarDependency(
+      org,
+      name,
+      rev,
+      force,
+      ext,
+      url,
+      apidocs,
+      classifier,
+      mutable,
+      intransitive,
+      excludes,
+      self._parse_context.rel_path,
+    )
 
 
 @frozen_after_init
@@ -84,6 +108,7 @@ class JarDependency:
 
   :API: public
   """
+
   org: str
   base_name: str
   rev: Optional[str]
@@ -123,21 +148,25 @@ class JarDependency:
     self.mutable = mutable
     self.intransitive = intransitive
     self.excludes = JarDependency._prepare_excludes(excludes)
-    base_path = base_path or '.'
+    base_path = base_path or "."
     if os.path.isabs(base_path):
       base_path = os.path.relpath(base_path, get_buildroot())
     self.base_path = base_path
 
   def __str__(self):
-    return 'JarDependency({})'.format(self.coordinate)
+    return "JarDependency({})".format(self.coordinate)
 
   @staticmethod
   def _prepare_excludes(excludes):
-    return tuple(assert_list(excludes,
-                             expected_type=Exclude,
-                             can_be_none=True,
-                             key_arg='excludes',
-                             allowable=(tuple, list,)))
+    return tuple(
+      assert_list(
+        excludes,
+        expected_type=Exclude,
+        can_be_none=True,
+        key_arg="excludes",
+        allowable=(tuple, list),
+      )
+    )
 
   @property
   def name(self):
@@ -147,14 +176,15 @@ class JarDependency:
   def get_url(self, relative=False):
     if self.url:
       parsed_url = parse.urlparse(self.url)
-      if parsed_url.scheme == 'file':
+      if parsed_url.scheme == "file":
         if relative and os.path.isabs(parsed_url.path):
-          relative_path = os.path.relpath(parsed_url.path,
-                                          os.path.join(get_buildroot(), self.base_path))
-          return 'file:{path}'.format(path=os.path.normpath(relative_path))
+          relative_path = os.path.relpath(
+            parsed_url.path, os.path.join(get_buildroot(), self.base_path)
+          )
+          return "file:{path}".format(path=os.path.normpath(relative_path))
         if not relative and not os.path.isabs(parsed_url.path):
           abs_path = os.path.join(get_buildroot(), self.base_path, parsed_url.path)
-          return 'file://{path}'.format(path=os.path.normpath(abs_path))
+          return "file://{path}".format(path=os.path.normpath(abs_path))
     return self.url
 
   @property
@@ -166,8 +196,8 @@ class JarDependency:
     cls = type(self)
     kwargs = dataclasses.asdict(self)
     kwargs.update(replacements)
-    org = kwargs.pop('org')
-    base_name = kwargs.pop('base_name')
+    org = kwargs.pop("org")
+    base_name = kwargs.pop("base_name")
     # NB: This calls __init__() so will set things up properly for us, such as calling
     # _prepare_excludes.
     return cls(org, base_name, **kwargs)
@@ -178,18 +208,23 @@ class JarDependency:
 
     :rtype: :class:`pants.java.jar.M2Coordinate`
     """
-    return M2Coordinate(org=self.org, name=self.name, rev=self.rev, classifier=self.classifier,
-                        ext=self.ext)
+    return M2Coordinate(
+      org=self.org, name=self.name, rev=self.rev, classifier=self.classifier, ext=self.ext
+    )
 
   def cache_key(self):
     excludes = [(e.org, e.name) for e in self.excludes]
-    return stable_json_sha1(dict(org=self.org,
-                                 name=self.name,
-                                 rev=self.rev,
-                                 force=self.force,
-                                 ext=self.ext,
-                                 url=self.get_url(relative=True),
-                                 classifier=self.classifier,
-                                 transitive=self.transitive,
-                                 mutable=self.mutable,
-                                 excludes=excludes))
+    return stable_json_sha1(
+      dict(
+        org=self.org,
+        name=self.name,
+        rev=self.rev,
+        force=self.force,
+        ext=self.ext,
+        url=self.get_url(relative=True),
+        classifier=self.classifier,
+        transitive=self.transitive,
+        mutable=self.mutable,
+        excludes=excludes,
+      )
+    )

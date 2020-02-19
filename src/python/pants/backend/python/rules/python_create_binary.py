@@ -16,9 +16,9 @@ from pants.rules.core.strip_source_roots import SourceRootStrippedSources
 
 @rule
 async def create_python_binary(python_binary_adaptor: PythonBinaryAdaptor) -> CreatedBinary:
-  #TODO(#8420) This way of calculating the entry point works but is a bit hackish.
+  # TODO(#8420) This way of calculating the entry point works but is a bit hackish.
   entry_point = None
-  if hasattr(python_binary_adaptor, 'entry_point'):
+  if hasattr(python_binary_adaptor, "entry_point"):
     entry_point = python_binary_adaptor.entry_point
   else:
     sources_snapshot = python_binary_adaptor.sources.snapshot
@@ -31,7 +31,7 @@ async def create_python_binary(python_binary_adaptor: PythonBinaryAdaptor) -> Cr
   request = CreatePexFromTargetClosure(
     addresses=Addresses((python_binary_adaptor.address,)),
     entry_point=entry_point,
-    output_filename=f'{python_binary_adaptor.address.target_name}.pex'
+    output_filename=f"{python_binary_adaptor.address.target_name}.pex",
   )
 
   pex = await Get[Pex](CreatePexFromTargetClosure, request)
@@ -39,7 +39,4 @@ async def create_python_binary(python_binary_adaptor: PythonBinaryAdaptor) -> Cr
 
 
 def rules():
-  return [
-    UnionRule(BinaryTarget, PythonBinaryAdaptor),
-    create_python_binary,
-  ]
+  return [UnionRule(BinaryTarget, PythonBinaryAdaptor), create_python_binary]

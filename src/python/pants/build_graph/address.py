@@ -11,13 +11,11 @@ from pants.util.strutil import strip_prefix
 
 
 # @ is reserved for configuring variant, see `addressable.parse_variants`
-BANNED_CHARS_IN_TARGET_NAME = frozenset('@')
+BANNED_CHARS_IN_TARGET_NAME = frozenset("@")
 
 
 def parse_spec(
-  spec: str,
-  relative_to: Optional[str] = None,
-  subproject_roots: Optional[Sequence[str]] = None,
+  spec: str, relative_to: Optional[str] = None, subproject_roots: Optional[Sequence[str]] = None
 ) -> Tuple[str, str]:
   """Parses a target address spec and returns the path from the root of the repo to this Target
   and Target name.
@@ -60,13 +58,12 @@ def parse_spec(
       dependencies=['//:targetname']
     )
   """
+
   def normalize_absolute_refs(ref: str) -> str:
-    return strip_prefix(ref, '//')
+    return strip_prefix(ref, "//")
 
   subproject = (
-    longest_dir_prefix(relative_to, subproject_roots)
-    if relative_to and subproject_roots
-    else None
+    longest_dir_prefix(relative_to, subproject_roots) if relative_to and subproject_roots else None
   )
 
   def prefix_subproject(spec_path: str) -> str:
@@ -77,7 +74,7 @@ def parse_spec(
     else:
       return os.path.normpath(subproject)
 
-  spec_parts = spec.rsplit(':', 1)
+  spec_parts = spec.rsplit(":", 1)
   if len(spec_parts) == 1:
     default_target_spec = spec_parts[0]
     spec_path = prefix_subproject(normalize_absolute_refs(default_target_spec))
@@ -94,7 +91,7 @@ def parse_spec(
 # TODO: this isn't used anywhere in Pants, but it's a public API so we can't delete it immediately.
 # It's unclear, though, in a deprecation warning what should be the alternative that we recommend
 # people use?
-class Addresses(namedtuple('Addresses', ['addresses', 'rel_path'])):
+class Addresses(namedtuple("Addresses", ["addresses", "rel_path"])):
   """ Used as a sentinel type for identifying a list of string specs.
 
   addresses: list of string specs
@@ -133,7 +130,7 @@ class Address:
   """
 
   @classmethod
-  def parse(cls, spec: str, relative_to: str = '', subproject_roots=None) -> "Address":
+  def parse(cls, spec: str, relative_to: str = "", subproject_roots=None) -> "Address":
     """Parses an address from its serialized form.
 
     :param spec: An address in string form <path>:<name>.
@@ -142,41 +139,49 @@ class Address:
     :param list subproject_roots: Paths that correspond with embedded build roots
                                   under the current build root.
     """
-    spec_path, target_name = parse_spec(spec,
-                                        relative_to=relative_to,
-                                        subproject_roots=subproject_roots)
+    spec_path, target_name = parse_spec(
+      spec, relative_to=relative_to, subproject_roots=subproject_roots
+    )
     return cls(spec_path, target_name)
 
   @classmethod
   def sanitize_path(cls, path: str) -> str:
     # A root or relative spec is OK
-    if path == '':
+    if path == "":
       return path
 
     normpath = os.path.normpath(path)
     components = normpath.split(os.sep)
-    if components[0] in ('.', '..') or normpath != path:
+    if components[0] in (".", "..") or normpath != path:
       raise InvalidSpecPath("Address spec has un-normalized path part '{path}'".format(path=path))
-    if components[-1].startswith('BUILD'):
-      raise InvalidSpecPath('Address spec path {path} has {trailing} as the last path part and BUILD is '
-                            'reserved files'.format(path=path, trailing=components[-1]))
+    if components[-1].startswith("BUILD"):
+      raise InvalidSpecPath(
+        "Address spec path {path} has {trailing} as the last path part and BUILD is "
+        "reserved files".format(path=path, trailing=components[-1])
+      )
     if os.path.isabs(path):
-      raise InvalidSpecPath('Address spec has absolute path {path}; expected a path relative '
-                            'to the build root.'.format(path=path))
-    return normpath if normpath != '.' else ''
+      raise InvalidSpecPath(
+        "Address spec has absolute path {path}; expected a path relative "
+        "to the build root.".format(path=path)
+      )
+    return normpath if normpath != "." else ""
 
   @classmethod
   def check_target_name(cls, spec_path: str, name: str) -> None:
     if not name:
-      raise InvalidTargetName('Address spec {spec}:{name} has no name part'
-                                 .format(spec=spec_path, name=name))
+      raise InvalidTargetName(
+        "Address spec {spec}:{name} has no name part".format(spec=spec_path, name=name)
+      )
 
     banned_chars = BANNED_CHARS_IN_TARGET_NAME & set(name)
 
     if banned_chars:
-      raise InvalidTargetName('banned chars found in target name',
-                              '{banned_chars} not allowed in target name: {name}'
-                              .format(banned_chars=banned_chars, name=name))
+      raise InvalidTargetName(
+        "banned chars found in target name",
+        "{banned_chars} not allowed in target name: {name}".format(
+          banned_chars=banned_chars, name=name
+        ),
+      )
 
   def __init__(self, spec_path: str, target_name: str) -> None:
     """
@@ -225,7 +230,7 @@ class Address:
     """
     :API: public
     """
-    return f':{self._target_name}'
+    return f":{self._target_name}"
 
   def reference(self, referencing_path: Optional[str] = None) -> str:
     """How to reference this address in a BUILD file.
@@ -242,8 +247,7 @@ class Address:
   def __eq__(self, other):
     if not isinstance(other, Address):
       return False
-    return (self._spec_path == other._spec_path and
-            self._target_name == other._target_name)
+    return self._spec_path == other._spec_path and self._target_name == other._target_name
 
   def __hash__(self):
     return self._hash
@@ -271,7 +275,7 @@ class BuildFileAddress(Address):
     self,
     build_file: Optional[BuildFile] = None,
     target_name: Optional[str] = None,
-    rel_path: Optional[str] = None
+    rel_path: Optional[str] = None,
   ) -> None:
     """
     :param build_file: The build file that contains the object this address points to.
@@ -300,5 +304,6 @@ class BuildFileAddress(Address):
     return Address(spec_path=self.spec_path, target_name=self.target_name)
 
   def __repr__(self) -> str:
-    return ('BuildFileAddress({rel_path}, {target_name})'
-            .format(rel_path=self.rel_path, target_name=self.target_name))
+    return "BuildFileAddress({rel_path}, {target_name})".format(
+      rel_path=self.rel_path, target_name=self.target_name
+    )

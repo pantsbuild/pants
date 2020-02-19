@@ -26,19 +26,25 @@ class PythonBinary(PythonTarget):
 
   @classmethod
   def alias(cls):
-    return 'python_binary'
+    return "python_binary"
 
   class Defaults(Subsystem):
 
-    options_scope = 'python-binary'
+    options_scope = "python-binary"
 
     @classmethod
     def register_options(cls, register):
       super(PythonBinary.Defaults, cls).register_options(register)
-      register('--pex-emit-warnings', advanced=True, type=bool, default=True, fingerprint=True,
-               help='Whether built pex binaries should emit pex warnings at runtime by default. '
-                    'Can be over-ridden by specifying the `emit_warnings` parameter of individual '
-                    '`{}` targets'.format(PythonBinary.alias()))
+      register(
+        "--pex-emit-warnings",
+        advanced=True,
+        type=bool,
+        default=True,
+        fingerprint=True,
+        help="Whether built pex binaries should emit pex warnings at runtime by default. "
+        "Can be over-ridden by specifying the `emit_warnings` parameter of individual "
+        "`{}` targets".format(PythonBinary.alias()),
+      )
 
     @classmethod
     def should_emit_warnings(cls, override=None):
@@ -50,19 +56,21 @@ class PythonBinary(PythonTarget):
 
   # TODO(wickman) Consider splitting pex options out into a separate PexInfo builder that can be
   # attached to the binary target.  Ideally the PythonBinary target is agnostic about pex mechanics
-  def __init__(self,
-               sources=None,
-               entry_point=None,
-               inherit_path=False,        # pex option
-               zip_safe=True,             # pex option
-               always_write_cache=False,  # pex option
-               repositories=None,         # pex option
-               indices=None,              # pex option
-               ignore_errors=False,       # pex option
-               shebang=None,              # pex option
-               emit_warnings=None,        # pex option
-               platforms=(),
-               **kwargs):
+  def __init__(
+    self,
+    sources=None,
+    entry_point=None,
+    inherit_path=False,  # pex option
+    zip_safe=True,  # pex option
+    always_write_cache=False,  # pex option
+    repositories=None,  # pex option
+    indices=None,  # pex option
+    ignore_errors=False,  # pex option
+    shebang=None,  # pex option
+    emit_warnings=None,  # pex option
+    platforms=(),
+    **kwargs
+  ):
     """
     :param string entry_point: the default entry point for this binary.  if None, drops into the entry
       point that is defined by source. Something like
@@ -91,36 +99,42 @@ class PythonBinary(PythonTarget):
       inherit_path = "false"
 
     payload = Payload()
-    payload.add_fields({
-      'entry_point': PrimitiveField(entry_point),
-      'inherit_path': PrimitiveField(inherit_path),
-      'zip_safe': PrimitiveField(bool(zip_safe)),
-      'always_write_cache': PrimitiveField(bool(always_write_cache)),
-      'repositories': PrimitiveField(maybe_list(repositories or [])),
-      'indices': PrimitiveField(maybe_list(indices or [])),
-      'ignore_errors': PrimitiveField(bool(ignore_errors)),
-      'platforms': PrimitiveField(tuple(maybe_list(platforms or []))),
-      'shebang': PrimitiveField(shebang),
-      'emit_warnings': PrimitiveField(self.Defaults.should_emit_warnings(emit_warnings)),
-    })
+    payload.add_fields(
+      {
+        "entry_point": PrimitiveField(entry_point),
+        "inherit_path": PrimitiveField(inherit_path),
+        "zip_safe": PrimitiveField(bool(zip_safe)),
+        "always_write_cache": PrimitiveField(bool(always_write_cache)),
+        "repositories": PrimitiveField(maybe_list(repositories or [])),
+        "indices": PrimitiveField(maybe_list(indices or [])),
+        "ignore_errors": PrimitiveField(bool(ignore_errors)),
+        "platforms": PrimitiveField(tuple(maybe_list(platforms or []))),
+        "shebang": PrimitiveField(shebang),
+        "emit_warnings": PrimitiveField(self.Defaults.should_emit_warnings(emit_warnings)),
+      }
+    )
 
     super().__init__(sources=sources, payload=payload, **kwargs)
 
     if (not sources or not sources.files) and entry_point is None:
-      raise TargetDefinitionException(self,
-          'A python binary target must specify either a single source or entry_point.')
+      raise TargetDefinitionException(
+        self, "A python binary target must specify either a single source or entry_point."
+      )
 
     if not isinstance(platforms, (list, tuple)) and not isinstance(platforms, str):
-      raise TargetDefinitionException(self, 'platforms must be a list, tuple or str.')
+      raise TargetDefinitionException(self, "platforms must be a list, tuple or str.")
 
     if sources and sources.files and entry_point:
-      entry_point_module = entry_point.split(':', 1)[0]
+      entry_point_module = entry_point.split(":", 1)[0]
       entry_source = list(self.sources_relative_to_source_root())[0]
       source_entry_point = self.translate_source_path_to_py_module_specifier(entry_source)
       if entry_point_module != source_entry_point:
-        raise TargetDefinitionException(self,
-            'Specified both source and entry_point but they do not agree: {} vs {}'.format(
-            source_entry_point, entry_point_module))
+        raise TargetDefinitionException(
+          self,
+          "Specified both source and entry_point but they do not agree: {} vs {}".format(
+            source_entry_point, entry_point_module
+          ),
+        )
 
   @property
   def platforms(self):
@@ -139,7 +153,7 @@ class PythonBinary(PythonTarget):
   @classmethod
   def translate_source_path_to_py_module_specifier(self, source: str) -> str:
     source_base, _ = os.path.splitext(source)
-    return source_base.replace(os.path.sep, '.')
+    return source_base.replace(os.path.sep, ".")
 
   @property
   def entry_point(self):

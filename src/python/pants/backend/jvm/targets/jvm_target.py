@@ -25,27 +25,29 @@ class JvmTarget(Target, Jarable):
   def subsystems(cls):
     return super().subsystems() + (Java, JvmPlatform)
 
-  def __init__(self,
-               address=None,
-               payload=None,
-               sources=None,
-               provides=None,
-               excludes=None,
-               services=None,
-               platform=None,
-               strict_deps=None,
-               exports=None,
-               compiler_option_sets=None,
-               zinc_file_manager=None,
-               # Some subclasses can have both .java and .scala sources
-               # (e.g., JUnitTests, JvmBinary, even ScalaLibrary), so it's convenient
-               # to have both plugins settings here, even though for other subclasses
-               # (e.g., JavaLibrary) only one will be relevant.
-               javac_plugins=None,
-               javac_plugin_args=None,
-               scalac_plugins=None,
-               scalac_plugin_args=None,
-               **kwargs):
+  def __init__(
+    self,
+    address=None,
+    payload=None,
+    sources=None,
+    provides=None,
+    excludes=None,
+    services=None,
+    platform=None,
+    strict_deps=None,
+    exports=None,
+    compiler_option_sets=None,
+    zinc_file_manager=None,
+    # Some subclasses can have both .java and .scala sources
+    # (e.g., JUnitTests, JvmBinary, even ScalaLibrary), so it's convenient
+    # to have both plugins settings here, even though for other subclasses
+    # (e.g., JavaLibrary) only one will be relevant.
+    javac_plugins=None,
+    javac_plugin_args=None,
+    scalac_plugins=None,
+    scalac_plugin_args=None,
+    **kwargs
+  ):
     """
     :API: public
 
@@ -91,21 +93,23 @@ class JvmTarget(Target, Jarable):
 
     self.address = address  # Set in case a TargetDefinitionException is thrown early
     payload = payload or Payload()
-    excludes = ExcludesField(self.assert_list(excludes, expected_type=Exclude, key_arg='excludes'))
-    payload.add_fields({
-      'sources': self.create_sources_field(sources, address.spec_path, key_arg='sources'),
-      'provides': provides,
-      'excludes': excludes,
-      'platform': PrimitiveField(platform),
-      'strict_deps': PrimitiveField(strict_deps),
-      'exports': PrimitivesSetField(exports or []),
-      'compiler_option_sets': PrimitivesSetField(compiler_option_sets),
-      'zinc_file_manager': PrimitiveField(zinc_file_manager),
-      'javac_plugins': PrimitivesSetField(javac_plugins or []),
-      'javac_plugin_args': PrimitiveField(javac_plugin_args),
-      'scalac_plugins': PrimitivesSetField(scalac_plugins or []),
-      'scalac_plugin_args': PrimitiveField(scalac_plugin_args),
-    })
+    excludes = ExcludesField(self.assert_list(excludes, expected_type=Exclude, key_arg="excludes"))
+    payload.add_fields(
+      {
+        "sources": self.create_sources_field(sources, address.spec_path, key_arg="sources"),
+        "provides": provides,
+        "excludes": excludes,
+        "platform": PrimitiveField(platform),
+        "strict_deps": PrimitiveField(strict_deps),
+        "exports": PrimitivesSetField(exports or []),
+        "compiler_option_sets": PrimitivesSetField(compiler_option_sets),
+        "zinc_file_manager": PrimitiveField(zinc_file_manager),
+        "javac_plugins": PrimitivesSetField(javac_plugins or []),
+        "javac_plugin_args": PrimitiveField(javac_plugin_args),
+        "scalac_plugins": PrimitivesSetField(scalac_plugins or []),
+        "scalac_plugin_args": PrimitiveField(scalac_plugin_args),
+      }
+    )
 
     super().__init__(address=address, payload=payload, **kwargs)
 

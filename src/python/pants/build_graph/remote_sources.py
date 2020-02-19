@@ -17,8 +17,9 @@ class RemoteSources(Target):
   additional arguments for the new target go into the `args` parameter.
   """
 
-  def __init__(self, address=None, payload=None, sources_target=None, dest=None, args=None,
-               **kwargs):
+  def __init__(
+    self, address=None, payload=None, sources_target=None, dest=None, args=None, **kwargs
+  ):
     """
     :API: public
 
@@ -30,24 +31,32 @@ class RemoteSources(Target):
     """
     self.address = address
     if not sources_target:
-      raise TargetDefinitionException(self, 'You must specify the address of a target to acquire '
-                                            'sources from via the "sources_target" parameter.')
-    if not dest or not hasattr(dest, 'target_types'):
-      raise TargetDefinitionException(self, 'You must specify a target type for the "dest" '
-                                            'parameter.')
+      raise TargetDefinitionException(
+        self,
+        "You must specify the address of a target to acquire "
+        'sources from via the "sources_target" parameter.',
+      )
+    if not dest or not hasattr(dest, "target_types"):
+      raise TargetDefinitionException(
+        self, 'You must specify a target type for the "dest" ' "parameter."
+      )
     if len(dest.target_types) != 1:
       raise TargetDefinitionException(
         self,
-        'Target alias {} has multiple possible target types {}.'.format(dest, dest.target_types),
+        "Target alias {} has multiple possible target types {}.".format(dest, dest.target_types),
       )
     dest = dest.target_types[0]
     self._dest = dest
     self._dest_args = args
     payload = payload or Payload()
-    payload.add_fields({
-      'sources_target_spec': PrimitiveField(self._sources_target_to_spec(address, sources_target)),
-      'dest': PrimitiveField(dest.__name__),
-    })
+    payload.add_fields(
+      {
+        "sources_target_spec": PrimitiveField(
+          self._sources_target_to_spec(address, sources_target)
+        ),
+        "dest": PrimitiveField(dest.__name__),
+      }
+    )
     super().__init__(address=address, payload=payload, **kwargs)
 
   @staticmethod
@@ -60,13 +69,13 @@ class RemoteSources(Target):
       yield address_spec
 
     if kwargs:
-      address = kwargs.get('address')
-      sources_target = kwargs.get('sources_target')
+      address = kwargs.get("address")
+      sources_target = kwargs.get("sources_target")
       if address and sources_target:
         yield cls._sources_target_to_spec(address, sources_target)
     elif payload:
       payload_dict = payload.as_dict()
-      yield payload_dict['sources_target_spec']
+      yield payload_dict["sources_target_spec"]
 
   @property
   def sources_target(self):

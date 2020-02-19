@@ -20,7 +20,6 @@ from pants.testutil.test_base import TestBase
 
 
 class PrepareChrootedPythonSourcesTest(TestBase):
-
   @classmethod
   def rules(cls):
     return (
@@ -31,7 +30,7 @@ class PrepareChrootedPythonSourcesTest(TestBase):
     )
 
   def make_hydrated_target(
-    self, *, source_paths: List[str], type_alias: Optional[str] = None,
+    self, *, source_paths: List[str], type_alias: Optional[str] = None
   ) -> HydratedTarget:
     adaptor = Mock()
     adaptor.type_alias = type_alias
@@ -42,13 +41,13 @@ class PrepareChrootedPythonSourcesTest(TestBase):
 
   def test_adds_missing_inits_and_strips_source_roots(self) -> None:
     target_with_init = self.make_hydrated_target(
-      source_paths=["src/python/project/lib.py", "src/python/project/__init__.py"],
+      source_paths=["src/python/project/lib.py", "src/python/project/__init__.py"]
     )
     target_without_init = self.make_hydrated_target(
-      source_paths=["tests/python/test_project/f1.py", "tests/python/test_project/f2.py"],
+      source_paths=["tests/python/test_project/f1.py", "tests/python/test_project/f2.py"]
     )
     files_target = self.make_hydrated_target(
-      source_paths=["src/python/project/resources/loose_file.txt"], type_alias=Files.alias(),
+      source_paths=["src/python/project/resources/loose_file.txt"], type_alias=Files.alias()
     )
     result = self.request_single_product(
       ChrootedPythonSources,
@@ -57,11 +56,13 @@ class PrepareChrootedPythonSourcesTest(TestBase):
         create_options_bootstrapper(),
       ),
     )
-    assert sorted(result.snapshot.files) == sorted([
-      "project/lib.py",
-      "project/__init__.py",
-      "test_project/f1.py",
-      "test_project/f2.py",
-      "test_project/__init__.py",
-      "src/python/project/resources/loose_file.txt"
-    ])
+    assert sorted(result.snapshot.files) == sorted(
+      [
+        "project/lib.py",
+        "project/__init__.py",
+        "test_project/f1.py",
+        "test_project/f2.py",
+        "test_project/__init__.py",
+        "src/python/project/resources/loose_file.txt",
+      ]
+    )

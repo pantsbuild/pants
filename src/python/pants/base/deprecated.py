@@ -52,7 +52,7 @@ class BadDecoratorNestingError(DeprecationApplicationError):
 
 
 def get_deprecated_tense(
-  removal_version: str, future_tense: str = 'will be', past_tense: str = 'was'
+  removal_version: str, future_tense: str = "will be", past_tense: str = "was"
 ) -> str:
   """Provides the grammatical tense for a given deprecated version vs the current version."""
   return future_tense if (Version(removal_version) >= PANTS_SEMVER) else past_tense
@@ -70,24 +70,28 @@ def validate_deprecation_semver(version_string: str, version_description: str) -
   :raises DeprecationApplicationError: if the version_string parameter is invalid.
   """
   if version_string is None:
-    raise MissingSemanticVersionError('The {} must be provided.'.format(version_description))
+    raise MissingSemanticVersionError("The {} must be provided.".format(version_description))
   if not isinstance(version_string, str):
-    raise BadSemanticVersionError('The {} must be a version string.'.format(version_description))
+    raise BadSemanticVersionError("The {} must be a version string.".format(version_description))
   try:
     # NB: packaging will see versions like 1.a.0 as 1a0, and are "valid"
     # We explicitly want our versions to be of the form x.y.z.
     v = Version(version_string)
-    if len(v.base_version.split('.')) != 3:
-      raise BadSemanticVersionError('The given {} is not a valid version: '
-                                   '{}'.format(version_description, version_string))
+    if len(v.base_version.split(".")) != 3:
+      raise BadSemanticVersionError(
+        "The given {} is not a valid version: " "{}".format(version_description, version_string)
+      )
     if not v.is_prerelease:
-      raise NonDevSemanticVersionError('The given {} is not a dev version: {}\n'
-                                      'Features should generally be removed in the first `dev` release '
-                                      'of a release cycle.'.format(version_description, version_string))
+      raise NonDevSemanticVersionError(
+        "The given {} is not a dev version: {}\n"
+        "Features should generally be removed in the first `dev` release "
+        "of a release cycle.".format(version_description, version_string)
+      )
     return v
   except InvalidVersion as e:
-    raise BadSemanticVersionError('The given {} {} is not a valid version: '
-                                 '{}'.format(version_description, version_string, e))
+    raise BadSemanticVersionError(
+      "The given {} {} is not a valid version: " "{}".format(version_description, version_string, e)
+    )
 
 
 def _get_frame_info(stacklevel: int) -> inspect.FrameInfo:
@@ -141,21 +145,25 @@ def warn_or_error(
   :raises DeprecationApplicationError: if the removal_version parameter is invalid.
   :raises CodeRemovedError: if the current version is later than the version marked for removal.
   """
-  removal_semver = validate_deprecation_semver(removal_version, 'removal version')
+  removal_semver = validate_deprecation_semver(removal_version, "removal version")
   if deprecation_start_version:
     deprecation_start_semver = validate_deprecation_semver(
-      deprecation_start_version, 'deprecation start version')
+      deprecation_start_version, "deprecation start version"
+    )
     if deprecation_start_semver >= removal_semver:
       raise InvalidSemanticVersionOrderingError(
-        'The deprecation start version {} must be less than the end version {}.'
-        .format(deprecation_start_version, removal_version))
+        "The deprecation start version {} must be less than the end version {}.".format(
+          deprecation_start_version, removal_version
+        )
+      )
     elif PANTS_SEMVER < deprecation_start_semver:
       return
 
-  msg = 'DEPRECATED: {} {} removed in version {}.'.format(deprecated_entity_description,
-      get_deprecated_tense(removal_version), removal_version)
+  msg = "DEPRECATED: {} {} removed in version {}.".format(
+    deprecated_entity_description, get_deprecated_tense(removal_version), removal_version
+  )
   if hint:
-    msg += '\n  {}'.format(hint)
+    msg += "\n  {}".format(hint)
 
   # We need to have filename and line_number for warnings.formatwarning, which appears to be the only
   # way to get a warning message to display to stderr. We get that from frame_info.
@@ -166,17 +174,12 @@ def warn_or_error(
   if removal_semver > PANTS_SEMVER:
     if ensure_stderr:
       # No warning filters can stop us from printing this message directly to stderr.
-      warning_msg = warnings.formatwarning(
-        msg, DeprecationWarning, filename, line_number,
-      )
+      warning_msg = warnings.formatwarning(msg, DeprecationWarning, filename, line_number)
       print(warning_msg, file=sys.stderr)
     elif print_warning:
       # This output is filtered by warning filters.
       warnings.warn_explicit(
-        message=msg,
-        category=DeprecationWarning,
-        filename=filename,
-        lineno=line_number,
+        message=msg, category=DeprecationWarning, filename=filename, lineno=line_number
       )
     return
   else:
@@ -188,7 +191,7 @@ def deprecated_conditional(
   removal_version: str,
   entity_description: str,
   hint_message: Optional[str] = None,
-  stacklevel: int = 4
+  stacklevel: int = 4,
 ) -> None:
   """Marks a certain configuration as deprecated.
 
@@ -202,7 +205,7 @@ def deprecated_conditional(
   :param stacklevel: How far up in the stack do we go to find the calling fn to report
   :raises DeprecationApplicationError if the deprecation is applied improperly.
   """
-  validate_deprecation_semver(removal_version, 'removal version')
+  validate_deprecation_semver(removal_version, "removal version")
   if predicate():
     warn_or_error(removal_version, entity_description, hint_message, stacklevel=stacklevel)
 
@@ -211,7 +214,7 @@ def deprecated(
   removal_version: str,
   hint_message: Optional[str] = None,
   subject: Optional[str] = None,
-  ensure_stderr: bool = False
+  ensure_stderr: bool = False,
 ):
   """Marks a function or method as deprecated.
 
@@ -233,28 +236,30 @@ def deprecated(
   :param ensure_stderr: Forwarded to `ensure_stderr` in warn_or_error().
   :raises DeprecationApplicationError if the @deprecation is applied improperly.
   """
-  validate_deprecation_semver(removal_version, 'removal version')
+  validate_deprecation_semver(removal_version, "removal version")
 
   def decorator(func):
     if not inspect.isfunction(func):
-      raise BadDecoratorNestingError('The @deprecated decorator must be applied innermost of all '
-                                     'decorators.')
+      raise BadDecoratorNestingError(
+        "The @deprecated decorator must be applied innermost of all " "decorators."
+      )
 
-    func_full_name = '{}.{}'.format(func.__module__, func.__name__)
+    func_full_name = "{}.{}".format(func.__module__, func.__name__)
 
     @wraps(func)
     def wrapper(*args, **kwargs):
-      warn_or_error(removal_version, subject or func_full_name, hint_message,
-                    ensure_stderr=ensure_stderr)
+      warn_or_error(
+        removal_version, subject or func_full_name, hint_message, ensure_stderr=ensure_stderr
+      )
       return func(*args, **kwargs)
+
     return wrapper
+
   return decorator
 
 
 def deprecated_module(
-  removal_version: str,
-  hint_message: Optional[str] = None,
-  stacklevel: int = 3
+  removal_version: str, hint_message: Optional[str] = None, stacklevel: int = 3
 ) -> None:
   """Marks an entire module as deprecated.
 
@@ -266,7 +271,7 @@ def deprecated_module(
   :param hint_message: An optional hint pointing to alternatives to the deprecation.
   :param stacklevel: The stacklevel to pass to warnings.warn.
   """
-  warn_or_error(removal_version, 'module', hint_message, stacklevel=stacklevel)
+  warn_or_error(removal_version, "module", hint_message, stacklevel=stacklevel)
 
 
 def resolve_conflicting_options(
@@ -276,7 +281,7 @@ def resolve_conflicting_options(
   old_scope: str,
   new_scope: str,
   old_container: "OptionValueContainer",
-  new_container: "OptionValueContainer"
+  new_container: "OptionValueContainer",
 ):
   """Utility for resolving an option that's been migrated to a new location.
 
@@ -284,8 +289,9 @@ def resolve_conflicting_options(
   old_configured = not old_container.is_default(old_option)
   new_configured = not new_container.is_default(new_option)
   if old_configured and new_configured:
+
     def format_option(*, scope: str, option: str) -> str:
-      return f"`--{scope}-{option}`".replace('_', '-')
+      return f"`--{scope}-{option}`".replace("_", "-")
 
     old_display = format_option(scope=old_scope, option=old_option)
     new_display = format_option(scope=new_scope, option=new_option)

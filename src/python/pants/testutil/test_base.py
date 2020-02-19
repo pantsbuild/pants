@@ -79,10 +79,10 @@ class AbstractTestGenerator(ABC):
     :param callable method: A callable representing the method. This should take a 'self' argument
                             as its first parameter for instance method binding.
     """
-    assert not hasattr(cls, method_name), (
-      f'a test with name `{method_name}` already exists on `{cls.__name__}`!'
-    )
-    assert method_name.startswith('test_'), f'{method_name} is not a valid test name!'
+    assert not hasattr(
+      cls, method_name
+    ), f"a test with name `{method_name}` already exists on `{cls.__name__}`!"
+    assert method_name.startswith("test_"), f"{method_name} is not a valid test name!"
     setattr(cls, method_name, method)
 
 
@@ -101,10 +101,10 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
     :API: public
     """
-    if os.path.basename(relpath).startswith('BUILD'):
+    if os.path.basename(relpath).startswith("BUILD"):
       return relpath
     else:
-      return os.path.join(relpath, 'BUILD')
+      return os.path.join(relpath, "BUILD")
 
   def create_dir(self, relpath):
     """Creates a directory under the buildroot.
@@ -154,7 +154,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     relative_symlink(src, dst)
     self.invalidate_for(reldst)
 
-  def create_file(self, relpath, contents='', mode='w'):
+  def create_file(self, relpath, contents="", mode="w"):
     """Writes to a file under the buildroot.
 
     :API: public
@@ -180,7 +180,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     for f in files:
       self.create_file(os.path.join(path, f), contents=f)
 
-  def create_workdir_file(self, relpath, contents='', mode='w'):
+  def create_workdir_file(self, relpath, contents="", mode="w"):
     """Writes to a file under the work directory.
 
     :API: public
@@ -202,16 +202,18 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     relpath: The relative path to the BUILD file from the build root.
     target:  A string containing the target definition as it would appear in a BUILD file.
     """
-    self.create_file(self.build_path(relpath), target, mode='a')
+    self.create_file(self.build_path(relpath), target, mode="a")
 
-  def make_target(self,
-                  spec='',
-                  target_type=Target,
-                  dependencies=None,
-                  derived_from=None,
-                  synthetic=False,
-                  make_missing_sources=True,
-                  **kwargs):
+  def make_target(
+    self,
+    spec="",
+    target_type=Target,
+    dependencies=None,
+    derived_from=None,
+    synthetic=False,
+    make_missing_sources=True,
+    **kwargs,
+  ):
     """Creates a target and injects it into the test's build graph.
 
     :API: public
@@ -226,23 +228,24 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
     address = Address.parse(spec)
 
-    if make_missing_sources and 'sources' in kwargs:
-      for source in kwargs['sources']:
-        if '*' not in source:
-          self.create_file(os.path.join(address.spec_path, source), mode='a', contents='')
-      kwargs['sources'] = self.sources_for(kwargs['sources'], address.spec_path)
+    if make_missing_sources and "sources" in kwargs:
+      for source in kwargs["sources"]:
+        if "*" not in source:
+          self.create_file(os.path.join(address.spec_path, source), mode="a", contents="")
+      kwargs["sources"] = self.sources_for(kwargs["sources"], address.spec_path)
 
-    target = target_type(name=address.target_name,
-                         address=address,
-                         build_graph=self.build_graph,
-                         **kwargs)
+    target = target_type(
+      name=address.target_name, address=address, build_graph=self.build_graph, **kwargs
+    )
     dependencies = dependencies or []
 
     self.build_graph.apply_injectables([target])
-    self.build_graph.inject_target(target,
-                                   dependencies=[dep.address for dep in dependencies],
-                                   derived_from=derived_from,
-                                   synthetic=synthetic)
+    self.build_graph.inject_target(
+      target,
+      dependencies=[dep.address for dep in dependencies],
+      derived_from=derived_from,
+      synthetic=synthetic,
+    )
 
     # TODO(John Sirois): This re-creates a little bit too much work done by the BuildGraph.
     # Fixup the BuildGraph to deal with non BuildFileAddresses better and just leverage it.
@@ -252,28 +255,30 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
       dependency_address = Address.parse(dependency_spec, relative_to=address.spec_path)
       dependency_target = self.build_graph.get_target(dependency_address)
       if not dependency_target:
-        raise ValueError('Tests must make targets for dependency specs ahead of them '
-                         'being traversed, {} tried to traverse {} which does not exist.'
-                         .format(target, dependency_address))
+        raise ValueError(
+          "Tests must make targets for dependency specs ahead of them "
+          "being traversed, {} tried to traverse {} which does not exist.".format(
+            target, dependency_address
+          )
+        )
       if dependency_target not in target.dependencies:
-        self.build_graph.inject_dependency(dependent=target.address,
-                                           dependency=dependency_address)
+        self.build_graph.inject_dependency(dependent=target.address, dependency=dependency_address)
         target.mark_transitive_invalidation_hash_dirty()
 
     return target
 
   def sources_for(
-    self, package_relative_path_globs: List[str], package_dir: str = '',
+    self, package_relative_path_globs: List[str], package_dir: str = ""
   ) -> EagerFilesetWithSpec:
     sources_field = SourcesField(
       address=BuildFileAddress(
-        rel_path=os.path.join(package_dir, "BUILD"), target_name="_bogus_target_for_test",
+        rel_path=os.path.join(package_dir, "BUILD"), target_name="_bogus_target_for_test"
       ),
-      arg='sources',
-      filespecs={'globs': package_relative_path_globs},
+      arg="sources",
+      filespecs={"globs": package_relative_path_globs},
       base_globs=Files(spec_path=package_dir),
       path_globs=PathGlobs(
-        tuple(os.path.join(package_dir, path) for path in package_relative_path_globs),
+        tuple(os.path.join(package_dir, path) for path in package_relative_path_globs)
       ),
       validate_fn=lambda _: True,
     )
@@ -285,7 +290,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     """
     :API: public
     """
-    return BuildFileAliases(targets={'target': Target})
+    return BuildFileAliases(targets={"target": Target})
 
   @classmethod
   def rules(cls):
@@ -316,21 +321,18 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     BuildRoot().path = self.build_root
     self.addCleanup(BuildRoot().reset)
 
-    self.subprocess_dir = os.path.join(self.build_root, '.pids')
+    self.subprocess_dir = os.path.join(self.build_root, ".pids")
 
     self.options = defaultdict(dict)  # scope -> key-value mapping.
-    self.options[''] = {
-      'pants_workdir': self.pants_workdir,
-      'pants_supportdir': os.path.join(self.build_root, 'build-support'),
-      'pants_distdir': os.path.join(self.build_root, 'dist'),
-      'pants_configdir': os.path.join(self.build_root, 'config'),
-      'pants_subprocessdir': self.subprocess_dir,
-      'cache_key_gen_version': '0-test',
+    self.options[""] = {
+      "pants_workdir": self.pants_workdir,
+      "pants_supportdir": os.path.join(self.build_root, "build-support"),
+      "pants_distdir": os.path.join(self.build_root, "dist"),
+      "pants_configdir": os.path.join(self.build_root, "config"),
+      "pants_subprocessdir": self.subprocess_dir,
+      "cache_key_gen_version": "0-test",
     }
-    self.options['cache'] = {
-      'read_from': [],
-      'write_to': [],
-    }
+    self.options["cache"] = {"read_from": [], "write_to": []}
 
     self._build_configuration = self.build_config()
     self._inited_target = False
@@ -345,10 +347,12 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     :returns: All file paths found.
     :rtype: set
     """
+
     def scan():
-      for root, dirs, files in os.walk(os.path.join(self.build_root, relpath or '')):
+      for root, dirs, files in os.walk(os.path.join(self.build_root, relpath or "")):
         for f in files:
           yield os.path.relpath(os.path.join(root, f), self.build_root)
+
     return set(scan())
 
   def _reset_engine(self):
@@ -384,18 +388,20 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
   @memoized_method
   def _build_root(self):
-    return os.path.realpath(mkdtemp(suffix='_BUILD_ROOT'))
+    return os.path.realpath(mkdtemp(suffix="_BUILD_ROOT"))
 
   @memoized_method
   def _pants_workdir(self):
-    return os.path.join(self._build_root(), '.pants.d')
+    return os.path.join(self._build_root(), ".pants.d")
 
   def _init_engine(self, local_store_dir: Optional[str] = None) -> None:
     if self._scheduler is not None:
       return
 
-    options_bootstrapper = OptionsBootstrapper.create(args=['--pants-config-files=[]'])
-    local_store_dir = local_store_dir or options_bootstrapper.bootstrap_options.for_global_scope().local_store_dir
+    options_bootstrapper = OptionsBootstrapper.create(args=["--pants-config-files=[]"])
+    local_store_dir = (
+      local_store_dir or options_bootstrapper.bootstrap_options.for_global_scope().local_store_dir
+    )
 
     # NB: This uses the long form of initialization because it needs to directly specify
     # `cls.alias_groups` rather than having them be provided by bootstrap options.
@@ -412,7 +418,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     self._scheduler = graph_session.scheduler_session
     self._build_graph, self._address_mapper = graph_session.create_build_graph(
       Specs(address_specs=AddressSpecs([]), filesystem_specs=FilesystemSpecs([])),
-      self._build_root()
+      self._build_root(),
     )
 
   @property
@@ -441,7 +447,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
   def reset_build_graph(self, reset_build_files=False, delete_build_files=False):
     """Start over with a fresh build graph with no targets in it."""
     if delete_build_files or reset_build_files:
-      files = [f for f in self.buildroot_files() if os.path.basename(f) == 'BUILD']
+      files = [f for f in self.buildroot_files() if os.path.basename(f) == "BUILD"]
       if delete_build_files:
         for f in files:
           os.remove(os.path.join(self.build_root, f))
@@ -454,17 +460,24 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
   def request_single_product(
     self, product_type: Type["TestBase._P"], subject: Union[Params, Any]
   ) -> "TestBase._P":
-    result = assert_single_element(
-      self.scheduler.product_request(product_type, [subject])
-    )
+    result = assert_single_element(self.scheduler.product_request(product_type, [subject]))
     return cast(TestBase._P, result)
 
   def set_options_for_scope(self, scope, **kwargs):
     self.options[scope].update(kwargs)
 
-  def context(self, for_task_types=None, for_subsystems=None, options=None,
-              target_roots=None, console_outstream=None, workspace=None,
-              scheduler=None, address_mapper=None, **kwargs):
+  def context(
+    self,
+    for_task_types=None,
+    for_subsystems=None,
+    options=None,
+    target_roots=None,
+    console_outstream=None,
+    workspace=None,
+    scheduler=None,
+    address_mapper=None,
+    **kwargs,
+  ):
     """
     :API: public
 
@@ -475,7 +488,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     for_subsystems = set(for_subsystems or ())
     for subsystem in for_subsystems:
       if subsystem.options_scope is None:
-        raise TaskError('You must set a scope on your subsystem type before using it in tests.')
+        raise TaskError("You must set a scope on your subsystem type before using it in tests.")
 
     optionables = {SourceRootConfig} | self._build_configuration.optionables() | for_subsystems
 
@@ -483,16 +496,23 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     for task_type in for_task_types:
       scope = task_type.options_scope
       if scope is None:
-        raise TaskError('You must set a scope on your task type before using it in tests.')
+        raise TaskError("You must set a scope on your task type before using it in tests.")
       optionables.add(task_type)
       # If task is expected to inherit goal-level options, register those directly on the task,
       # by subclassing the goal options registrar and settings its scope to the task scope.
       if issubclass(task_type, GoalOptionsMixin):
-        subclass_name = 'test_{}_{}_{}'.format(
-          task_type.__name__, task_type.goal_options_registrar_cls.options_scope,
-          task_type.options_scope)
-        optionables.add(type(subclass_name, (task_type.goal_options_registrar_cls, ),
-                             {'options_scope': task_type.options_scope}))
+        subclass_name = "test_{}_{}_{}".format(
+          task_type.__name__,
+          task_type.goal_options_registrar_cls.options_scope,
+          task_type.options_scope,
+        )
+        optionables.add(
+          type(
+            subclass_name,
+            (task_type.goal_options_registrar_cls,),
+            {"options_scope": task_type.options_scope},
+          )
+        )
 
     # Now expand to all deps.
     all_optionables = set()
@@ -506,8 +526,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
       scoped_opts = options.setdefault(s, {})
       scoped_opts.update(opts)
 
-    fake_options = create_options_for_optionables(
-      all_optionables, options=options, **kwargs)
+    fake_options = create_options_for_optionables(all_optionables, options=options, **kwargs)
 
     Subsystem.reset(reset_options=True)
     Subsystem.set_options(fake_options)
@@ -516,14 +535,16 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
     address_mapper = address_mapper or self.address_mapper
 
-    context = create_context_from_options(fake_options,
-                                          target_roots=target_roots,
-                                          build_graph=self.build_graph,
-                                          build_configuration=self._build_configuration,
-                                          address_mapper=address_mapper,
-                                          console_outstream=console_outstream,
-                                          workspace=workspace,
-                                          scheduler=scheduler)
+    context = create_context_from_options(
+      fake_options,
+      target_roots=target_roots,
+      build_graph=self.build_graph,
+      build_configuration=self._build_configuration,
+      address_mapper=address_mapper,
+      console_outstream=console_outstream,
+      workspace=workspace,
+      scheduler=scheduler,
+    )
     return context
 
   def tearDown(self):
@@ -598,32 +619,41 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     """
     if sources:
       self.create_files(path, sources)
-    self.add_to_build_file(path, dedent('''
+    self.add_to_build_file(
+      path,
+      dedent(
+        """
           %(target_type)s(name='%(name)s',
             %(sources)s
             %(java_sources)s
             %(provides)s
             %(dependencies)s
           )
-        ''' % dict(target_type=target_type,
-                   name=name,
-                   sources=('sources=%s,' % repr(sources)
-                              if sources else ''),
-                   java_sources=('java_sources=[%s],'
-                                 % ','.join('"%s"' % str_target for str_target in kwargs.get('java_sources'))
-                                 if 'java_sources' in kwargs else ''),
-                   provides=('provides=%s,' % kwargs.get('provides')
-                              if 'provides' in kwargs else ''),
-                   dependencies=('dependencies=%s,' % kwargs.get('dependencies')
-                              if 'dependencies' in kwargs else ''),
-                   )))
-    return self.target(f'{path}:{name}')
+        """
+        % dict(
+          target_type=target_type,
+          name=name,
+          sources=("sources=%s," % repr(sources) if sources else ""),
+          java_sources=(
+            "java_sources=[%s],"
+            % ",".join('"%s"' % str_target for str_target in kwargs.get("java_sources"))
+            if "java_sources" in kwargs
+            else ""
+          ),
+          provides=("provides=%s," % kwargs.get("provides") if "provides" in kwargs else ""),
+          dependencies=(
+            "dependencies=%s," % kwargs.get("dependencies") if "dependencies" in kwargs else ""
+          ),
+        )
+      ),
+    )
+    return self.target(f"{path}:{name}")
 
   def create_resources(self, path, name, *sources):
     """
     :API: public
     """
-    return self.create_library(path, 'resources', name, sources)
+    return self.create_library(path, "resources", name, sources)
 
   def assertUnorderedPrefixEqual(self, expected, actual_iter):
     """Consumes len(expected) items from the given iter, and asserts that they match, unordered.
@@ -646,7 +676,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     :API: public
     """
 
-    with open(file_path, 'r') as f:
+    with open(file_path, "r") as f:
       content = f.read()
       self.assertIn(string, content, f'"{string}" is not in the file {f.name}:\n{content}')
 
@@ -684,14 +714,14 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     try:
       yield
     except exc_class as e:
-      raise AssertionError(f'section should not have raised, but did: {e}') from e
+      raise AssertionError(f"section should not have raised, but did: {e}") from e
 
   def get_bootstrap_options(self, cli_options=()):
     """Retrieves bootstrap options.
 
     :param cli_options: An iterable of CLI flags to pass as arguments to `OptionsBootstrapper`.
     """
-    args = tuple(['--pants-config-files=[]']) + tuple(cli_options)
+    args = tuple(["--pants-config-files=[]"]) + tuple(cli_options)
     return OptionsBootstrapper.create(args=args).bootstrap_options.for_global_scope()
 
   def make_snapshot(self, files):
@@ -703,9 +733,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     with temporary_dir() as temp_dir:
       for file_name, content in files.items():
         safe_file_dump(os.path.join(temp_dir, file_name), content)
-      return self.scheduler.capture_snapshots((
-        PathGlobsAndRoot(PathGlobs(('**',)), temp_dir),
-      ))[0]
+      return self.scheduler.capture_snapshots((PathGlobsAndRoot(PathGlobs(("**",)), temp_dir),))[0]
 
   class LoggingRecorder:
     """Simple logging handler to record warnings."""
@@ -718,17 +746,20 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
       self._records.append(record)
 
     def _messages_for_level(self, levelname):
-      return [f'{record.name}: {record.getMessage()}'
-              for record in self._records if record.levelname == levelname]
+      return [
+        f"{record.name}: {record.getMessage()}"
+        for record in self._records
+        if record.levelname == levelname
+      ]
 
     def infos(self):
-      return self._messages_for_level('INFO')
+      return self._messages_for_level("INFO")
 
     def warnings(self):
-      return self._messages_for_level('WARNING')
+      return self._messages_for_level("WARNING")
 
     def errors(self):
-      return self._messages_for_level('ERROR')
+      return self._messages_for_level("ERROR")
 
   @contextmanager
   def captured_logging(self, level=None):
@@ -748,7 +779,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
   @contextmanager
   def warnings_catcher(self):
     with warnings.catch_warnings(record=True) as w:
-      warnings.simplefilter('always')
+      warnings.simplefilter("always")
       yield w
 
   def assertWarning(self, w, category, warning_text):
@@ -791,7 +822,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
       target_base = Address.parse(address_spec).spec_path
 
       # Populate the target's owned files from the specification.
-      filemap = unprocessed_kwargs.pop('filemap', {})
+      filemap = unprocessed_kwargs.pop("filemap", {})
       for rel_path, content in filemap.items():
         buildroot_path = os.path.join(target_base, rel_path)
         self.create_file(buildroot_path, content)
@@ -800,15 +831,16 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
       # OrderedDict).
       # The 'key' is used to access the target in `target_dict`, and defaults to `target_spec`.
       target_address = Address.parse(address_spec)
-      key = unprocessed_kwargs.pop('key', target_address.target_name)
+      key = unprocessed_kwargs.pop("key", target_address.target_name)
       dep_targets = []
-      for dep_spec in unprocessed_kwargs.pop('dependencies', []):
-        existing_tgt_key = target_map[dep_spec]['key']
+      for dep_spec in unprocessed_kwargs.pop("dependencies", []):
+        existing_tgt_key = target_map[dep_spec]["key"]
         dep_targets.append(target_dict[existing_tgt_key])
 
       # Register the generated target.
       generated_target = self.make_target(
-        spec=address_spec, dependencies=dep_targets, **unprocessed_kwargs)
+        spec=address_spec, dependencies=dep_targets, **unprocessed_kwargs
+      )
       target_dict[key] = generated_target
 
     return target_dict

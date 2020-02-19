@@ -28,7 +28,7 @@ class Properties:
     :rtype: dict
     """
 
-    if hasattr(data, 'read') and callable(data.read):
+    if hasattr(data, "read") and callable(data.read):
       contents = data.read()
     elif isinstance(data, str):
       contents = data
@@ -37,19 +37,18 @@ class Properties:
 
     return Properties._parse(contents.splitlines())
 
-
   # An unescaped '=' or ':' forms an explicit separator
-  _EXPLICIT_KV_SEP = re.compile(r'(?<!\\)[=:]')
+  _EXPLICIT_KV_SEP = re.compile(r"(?<!\\)[=:]")
 
   @staticmethod
   def _parse(lines):
     def coalesce_lines():
       line_iter = iter(lines)
       try:
-        buffer = ''
+        buffer = ""
         while True:
           line = next(line_iter)
-          if line.strip().endswith('\\'):
+          if line.strip().endswith("\\"):
             # Continuation.
             buffer += line.strip()[:-1]
           else:
@@ -63,22 +62,22 @@ class Properties:
             try:
               yield buffer
             finally:
-              buffer = ''
+              buffer = ""
       except StopIteration:
         pass
 
     def normalize(atom):
-      return re.sub(r'\\([:=\s])', r'\1', atom.strip())
+      return re.sub(r"\\([:=\s])", r"\1", atom.strip())
 
     def parse_line(line):
-      if line and not (line.startswith('#') or line.startswith('!')):
+      if line and not (line.startswith("#") or line.startswith("!")):
         match = Properties._EXPLICIT_KV_SEP.search(line)
         if match:
-          return normalize(line[:match.start()]), normalize(line[match.end():])
+          return normalize(line[: match.start()]), normalize(line[match.end() :])
         else:
-          space_sep = line.find(' ')
+          space_sep = line.find(" ")
           if space_sep == -1:
-            return normalize(line), ''
+            return normalize(line), ""
           else:
             return normalize(line[:space_sep]), normalize(line[space_sep:])
 
@@ -96,17 +95,18 @@ class Properties:
 
     :API: public
     """
+
     def escape(token):
-      return re.sub(r'([=:\s])', r'\\\1', token)
+      return re.sub(r"([=:\s])", r"\\\1", token)
 
     def write(out):
       for k, v in props.items():
-        out.write(f'{escape(str(k))}={escape(str(v))}\n')
+        out.write(f"{escape(str(k))}={escape(str(v))}\n")
 
-    if hasattr(output, 'write') and callable(output.write):
+    if hasattr(output, "write") and callable(output.write):
       write(output)
     elif isinstance(output, str):
-      with open(output, 'w+') as out:
+      with open(output, "w+") as out:
         write(out)
     else:
-      raise TypeError(f'Can only dump data to a path or a writable object, given: {output}')
+      raise TypeError(f"Can only dump data to a path or a writable object, given: {output}")

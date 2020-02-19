@@ -30,7 +30,7 @@ class RelativeToMapper:
     return os.path.relpath(path, self.base)
 
   def __repr__(self):
-    return 'IdentityMapper({})'.format(self.base)
+    return "IdentityMapper({})".format(self.base)
 
   def __hash__(self):
     return hash(self.base)
@@ -51,23 +51,28 @@ class DirectoryReMapper:
     self.base = os.path.abspath(os.path.join(get_buildroot(), base))
     if not os.path.isdir(self.base):
       raise DirectoryReMapper.NonexistentBaseError(
-        'Could not find a directory to bundle relative to {0}'.format(self.base))
+        "Could not find a directory to bundle relative to {0}".format(self.base)
+      )
     self.dest = dest
 
   def __call__(self, path):
     return os.path.join(self.dest, os.path.relpath(path, self.base))
 
   def __repr__(self):
-    return 'DirectoryReMapper({0}, {1})'.format(self.base, self.dest)
+    return "DirectoryReMapper({0}, {1})".format(self.base, self.dest)
 
 
-class BundleProps(namedtuple('_BundleProps', ['rel_path', 'mapper', 'fileset'])):
+class BundleProps(namedtuple("_BundleProps", ["rel_path", "mapper", "fileset"])):
   def _filemap(self, abs_path):
     filemap = OrderedDict()
     if self.fileset is not None:
-      paths = self.fileset() if isinstance(self.fileset, Fileset) \
-        else self.fileset if hasattr(self.fileset, '__iter__') \
+      paths = (
+        self.fileset()
+        if isinstance(self.fileset, Fileset)
+        else self.fileset
+        if hasattr(self.fileset, "__iter__")
         else [self.fileset]
+      )
       for path in paths:
         if abs_path:
           if not os.path.isabs(path):
@@ -136,15 +141,19 @@ class Bundle:
     """
 
     if fileset is None:
-      raise ValueError("In {}:\n  Bare bundle() declarations without a `fileset=` parameter "
-                       "are no longer supported.".format(self._parse_context.rel_path))
+      raise ValueError(
+        "In {}:\n  Bare bundle() declarations without a `fileset=` parameter "
+        "are no longer supported.".format(self._parse_context.rel_path)
+      )
 
     if mapper and relative_to:
       raise ValueError("Must specify exactly one of 'mapper' or 'relative_to'")
 
     if rel_path and isinstance(fileset, FilesetWithSpec) and fileset.rel_root != rel_path:
-      raise ValueError("Must not use a glob for 'fileset' with 'rel_path'."
-                       " Globs are eagerly evaluated and ignore 'rel_path'.")
+      raise ValueError(
+        "Must not use a glob for 'fileset' with 'rel_path'."
+        " Globs are eagerly evaluated and ignore 'rel_path'."
+      )
 
     # A fileset is either a glob, a string or a list of strings.
     if isinstance(fileset, FilesetWithSpec):
@@ -152,7 +161,7 @@ class Bundle:
     elif isinstance(fileset, str):
       fileset = [fileset]
     else:
-      fileset = assert_list(fileset, key_arg='fileset')
+      fileset = assert_list(fileset, key_arg="fileset")
 
     real_rel_path = rel_path or self._parse_context.rel_path
 
@@ -165,10 +174,10 @@ class Bundle:
     return BundleProps(real_rel_path, mapper, fileset)
 
   def create_bundle_props(self, bundle):
-    rel_path = getattr(bundle, 'rel_path', None)
-    mapper = getattr(bundle, 'mapper', None)
-    relative_to = getattr(bundle, 'relative_to', None)
-    fileset = getattr(bundle, 'fileset', None)
+    rel_path = getattr(bundle, "rel_path", None)
+    mapper = getattr(bundle, "mapper", None)
+    relative_to = getattr(bundle, "relative_to", None)
+    fileset = getattr(bundle, "fileset", None)
     return self(rel_path, mapper, relative_to, fileset)
 
 
@@ -188,8 +197,8 @@ class BundleField(tuple, PayloadField):
       hasher.update(bundle.filemap[abs_path].encode())
       if os.path.isfile(abs_path):
         # Update with any additional string to differentiate empty file with non-existing file.
-        hasher.update(b'e')
-        with open(abs_path, 'rb') as f:
+        hasher.update(b"e")
+        with open(abs_path, "rb") as f:
           hasher.update(f.read())
     return hasher.hexdigest()
 
@@ -207,17 +216,13 @@ class AppBase(Target):
 
   :API: public
   """
+
   class InvalidArchiveType(Exception):
     """Raised when archive type defined in Target is invalid"""
 
-  def __init__(self,
-               name=None,
-               payload=None,
-               binary=None,
-               bundles=None,
-               basename=None,
-               archive=None,
-               **kwargs):
+  def __init__(
+    self, name=None, payload=None, binary=None, bundles=None, basename=None, archive=None, **kwargs
+  ):
     """
     :param string binary: Target spec of the ``jvm_binary`` or the ``python_binary``
       that contains the app main.
@@ -231,19 +236,23 @@ class AppBase(Target):
     :param string archive: Create an archive of this type from the bundle.
     """
     if name == basename:
-      raise TargetDefinitionException(self, 'basename must not equal name.')
+      raise TargetDefinitionException(self, "basename must not equal name.")
 
     payload = payload or Payload()
-    payload.add_fields({
-      'basename': PrimitiveField(basename or name),
-      'binary': PrimitiveField(binary),
-      'bundles': BundleField(bundles or []),
-      'archive': PrimitiveField(archive),
-    })
+    payload.add_fields(
+      {
+        "basename": PrimitiveField(basename or name),
+        "binary": PrimitiveField(binary),
+        "bundles": BundleField(bundles or []),
+        "archive": PrimitiveField(archive),
+      }
+    )
     if payload.archive and payload.archive not in Archive.TYPE_NAMES:
       raise self.InvalidArchiveType(
         'Given archive type "{}" is invalid, choose from {}.'.format(
-          payload.archive, list(Archive.TYPE_NAMES)))
+          payload.archive, list(Archive.TYPE_NAMES)
+        )
+      )
     super().__init__(name=name, payload=payload, **kwargs)
 
   def globs_relative_to_buildroot(self):
@@ -253,19 +262,19 @@ class AppBase(Target):
       fileset = bundle.fileset
       if fileset is None:
         continue
-      elif hasattr(fileset, 'filespec'):
-        globs += bundle.fileset.filespec['globs']
+      elif hasattr(fileset, "filespec"):
+        globs += bundle.fileset.filespec["globs"]
       else:
         # NB(nh): filemap is an OrderedDict, so this ordering is stable.
         globs += [fast_relpath(f, buildroot) for f in bundle.filemap.keys()]
     super_globs = super().globs_relative_to_buildroot()
     if super_globs:
-      globs += super_globs['globs']
-    return {'globs': globs}
+      globs += super_globs["globs"]
+    return {"globs": globs}
 
   @classmethod
   def binary_target_type(cls):
-    raise NotImplementedError('Must implement in subclass (e.g.: `return PythonBinary`)')
+    raise NotImplementedError("Must implement in subclass (e.g.: `return PythonBinary`)")
 
   @classmethod
   def compute_dependency_address_specs(cls, kwargs=None, payload=None):
@@ -273,7 +282,7 @@ class AppBase(Target):
       yield address_spec
 
     target_representation = kwargs or payload.as_dict()
-    binary = target_representation.get('binary')
+    binary = target_representation.get("binary")
     if binary:
       yield binary
 
@@ -286,11 +295,14 @@ class AppBase(Target):
     """Returns the binary this target references."""
     dependencies = self.dependencies
     if len(dependencies) != 1:
-      raise TargetDefinitionException(self, 'An app must define exactly one binary '
-                                            'dependency, have: {}'.format(dependencies))
+      raise TargetDefinitionException(
+        self, "An app must define exactly one binary " "dependency, have: {}".format(dependencies)
+      )
     binary = dependencies[0]
     if not isinstance(binary, self.binary_target_type()):
-      raise TargetDefinitionException(self, 'Expected binary dependency to be a {} '
-                                            'target, found {}'.format(self.binary_target_type(),
-                                                                      binary))
+      raise TargetDefinitionException(
+        self,
+        "Expected binary dependency to be a {} "
+        "target, found {}".format(self.binary_target_type(), binary),
+      )
     return binary

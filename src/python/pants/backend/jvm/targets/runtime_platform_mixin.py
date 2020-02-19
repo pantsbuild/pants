@@ -30,9 +30,7 @@ class RuntimePlatformMixin(ABC):
 
   def __init__(self, payload, runtime_platform=None, **kwargs):
     payload = payload or Payload()
-    payload.add_fields({
-      'runtime_platform': PrimitiveField(runtime_platform),
-    })
+    payload.add_fields({"runtime_platform": PrimitiveField(runtime_platform)})
     super(RuntimePlatformMixin, self).__init__(payload=payload, **kwargs)
 
   @property

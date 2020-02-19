@@ -13,25 +13,31 @@ from pants.util.fileutil import atomic_copy
 
 
 class BundleMixin(TaskBase):
-
   @classmethod
   def register_options(cls, register):
     """Register options common to all bundle tasks."""
     super().register_options(register)
-    register('--archive', choices=list(archive.TYPE_NAMES),
-             fingerprint=True,
-             help='Create an archive of this type from the bundle. '
-                  'This option is also defined in app target. '
-                  'Precedence is CLI option > target option > pants.ini option.')
+    register(
+      "--archive",
+      choices=list(archive.TYPE_NAMES),
+      fingerprint=True,
+      help="Create an archive of this type from the bundle. "
+      "This option is also defined in app target. "
+      "Precedence is CLI option > target option > pants.ini option.",
+    )
     # `target.id` ensures global uniqueness, this flag is provided primarily for
     # backward compatibility.
-    register('--use-basename-prefix', advanced=True, type=bool,
-             help='Use target basename to prefix bundle folder or archive; otherwise a unique '
-                  'identifier derived from target will be used.')
+    register(
+      "--use-basename-prefix",
+      advanced=True,
+      type=bool,
+      help="Use target basename to prefix bundle folder or archive; otherwise a unique "
+      "identifier derived from target will be used.",
+    )
 
   @staticmethod
   def get_bundle_dir(name, results_dir):
-    return os.path.join(results_dir, '{}-bundle'.format(name))
+    return os.path.join(results_dir, "{}-bundle".format(name))
 
   # TODO (Benjy): The following CLI > target > config logic
   # should be implemented in the options system.
@@ -72,23 +78,28 @@ class BundleMixin(TaskBase):
           safe_mkdir(bundle_path)
 
       if count == 0:
-        raise TargetDefinitionException(app.target,
-                                        'Bundle index {} of "bundles" field '
-                                        'does not match any files.'.format(bundle_counter))
+        raise TargetDefinitionException(
+          app.target,
+          'Bundle index {} of "bundles" field ' "does not match any files.".format(bundle_counter),
+        )
 
-  def publish_results(self, dist_dir, use_basename_prefix, vt, bundle_dir, archivepath, id, archive_ext):
+  def publish_results(
+    self, dist_dir, use_basename_prefix, vt, bundle_dir, archivepath, id, archive_ext
+  ):
     """Publish a copy of the bundle and archive from the results dir in dist."""
     # TODO (from mateor) move distdir management somewhere more general purpose.
     name = vt.target.basename if use_basename_prefix else id
-    bundle_copy = os.path.join(dist_dir, '{}-bundle'.format(name))
+    bundle_copy = os.path.join(dist_dir, "{}-bundle".format(name))
     absolute_symlink(bundle_dir, bundle_copy)
     self.context.log.info(
-      'created bundle copy {}'.format(os.path.relpath(bundle_copy, get_buildroot())))
+      "created bundle copy {}".format(os.path.relpath(bundle_copy, get_buildroot()))
+    )
 
     if archivepath:
       ext = archive.archive_extensions.get(archive_ext, archive_ext)
-      archive_copy = os.path.join(dist_dir,'{}.{}'.format(name, ext))
+      archive_copy = os.path.join(dist_dir, "{}.{}".format(name, ext))
       safe_mkdir_for(archive_copy)  # Ensure parent dir exists
       atomic_copy(archivepath, archive_copy)
       self.context.log.info(
-        'created archive copy {}'.format(os.path.relpath(archive_copy, get_buildroot())))
+        "created archive copy {}".format(os.path.relpath(archive_copy, get_buildroot()))
+      )

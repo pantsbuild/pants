@@ -35,8 +35,9 @@ class ScmWorkspace(Workspace):
     super().__init__()
 
     if scm is None:
-      raise self.WorkspaceError('Cannot figure out what changed without a configured '
-                                'source-control system.')
+      raise self.WorkspaceError(
+        "Cannot figure out what changed without a configured " "source-control system."
+      )
     self._scm = scm
 
   def touched_files(self, parent):
@@ -44,9 +45,9 @@ class ScmWorkspace(Workspace):
     :API: public
     """
     try:
-      return self._scm.changed_files(from_commit=parent,
-                                     include_untracked=True,
-                                     relative_to=get_buildroot())
+      return self._scm.changed_files(
+        from_commit=parent, include_untracked=True, relative_to=get_buildroot()
+      )
     except Scm.ScmException as e:
       raise self.WorkspaceError("Problem detecting changed files.", e)
 

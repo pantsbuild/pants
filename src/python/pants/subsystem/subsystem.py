@@ -45,13 +45,14 @@ class Subsystem(SubsystemClientMixin, Optionable):
 
   :API: public
   """
+
   options_scope_category = ScopeInfo.SUBSYSTEM
 
   class UninitializedSubsystemError(SubsystemError):
     def __init__(self, class_name, scope):
       super().__init__(
         f'Subsystem "{class_name}" not initialized for scope "{scope}". Is subsystem missing '
-        'from subsystem_dependencies() in a task? '
+        "from subsystem_dependencies() in a task? "
       )
 
   @classmethod
@@ -104,7 +105,9 @@ class Subsystem(SubsystemClientMixin, Optionable):
 
     :returns: The global subsystem instance.
     """
-    return cls._instance_for_scope(cls.options_scope)  # type: ignore[arg-type]  # MyPy is treating cls.options_scope as a Callable, rather than `str`
+    return cls._instance_for_scope(
+      cls.options_scope
+    )  # type: ignore[arg-type]  # MyPy is treating cls.options_scope as a Callable, rather than `str`
 
   @classmethod
   def scoped_instance(cls: Type[_S], optionable: Union[Optionable, Type[Optionable]]) -> _S:
@@ -116,8 +119,11 @@ class Subsystem(SubsystemClientMixin, Optionable):
     :returns: The scoped subsystem instance.
     """
     if not isinstance(optionable, Optionable) and not issubclass(optionable, Optionable):
-      raise TypeError('Can only scope an instance against an Optionable, given {} of type {}.'
-                      .format(optionable, type(optionable)))
+      raise TypeError(
+        "Can only scope an instance against an Optionable, given {} of type {}.".format(
+          optionable, type(optionable)
+        )
+      )
     return cls._instance_for_scope(cls.subscope(optionable.options_scope))
 
   @classmethod
@@ -222,7 +228,9 @@ class Subsystem(SubsystemClientMixin, Optionable):
       try:
         callables.append(subsystem.handle_workunits)
       except AttributeError:
-        logger.warning(f"{subsystem_class} does not have a method named `handle_workunits` defined.")
+        logger.warning(
+          f"{subsystem_class} does not have a method named `handle_workunits` defined."
+        )
         continue
 
     return callables

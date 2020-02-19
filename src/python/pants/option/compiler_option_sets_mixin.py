@@ -15,15 +15,30 @@ class CompilerOptionSetsMixin:
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--compiler-option-sets-enabled-args', advanced=True, type=dict, fingerprint=True,
-             default=cls.get_compiler_option_sets_enabled_default_value,
-             help='Extra compiler args to use for each enabled option set.')
-    register('--compiler-option-sets-disabled-args', advanced=True, type=dict, fingerprint=True,
-             default=cls.get_compiler_option_sets_disabled_default_value,
-             help='Extra compiler args to use for each disabled option set.')
-    register('--default-compiler-option-sets', advanced=True, type=list, fingerprint=True,
-             default=cls.get_default_compiler_option_sets,
-             help="The compiler_option_sets to use for targets which don't declare any.")
+    register(
+      "--compiler-option-sets-enabled-args",
+      advanced=True,
+      type=dict,
+      fingerprint=True,
+      default=cls.get_compiler_option_sets_enabled_default_value,
+      help="Extra compiler args to use for each enabled option set.",
+    )
+    register(
+      "--compiler-option-sets-disabled-args",
+      advanced=True,
+      type=dict,
+      fingerprint=True,
+      default=cls.get_compiler_option_sets_disabled_default_value,
+      help="Extra compiler args to use for each disabled option set.",
+    )
+    register(
+      "--default-compiler-option-sets",
+      advanced=True,
+      type=list,
+      fingerprint=True,
+      default=cls.get_default_compiler_option_sets,
+      help="The compiler_option_sets to use for targets which don't declare any.",
+    )
 
   @classproperty
   def get_compiler_option_sets_enabled_default_value(cls):
@@ -56,7 +71,7 @@ class CompilerOptionSetsMixin:
     # If no option sets are provided, use the default value.
     if not compiler_option_sets:
       compiler_option_sets = self.get_options().default_compiler_option_sets
-      logger.debug(f'using default option sets: {compiler_option_sets}')
+      logger.debug(f"using default option sets: {compiler_option_sets}")
 
     compiler_options = []
 
@@ -74,7 +89,9 @@ class CompilerOptionSetsMixin:
     compiler_options.extend(
       enabled_arg
       for option_set_key in compiler_option_sets
-      for enabled_arg in self.get_options().compiler_option_sets_enabled_args.get(option_set_key, [])
+      for enabled_arg in self.get_options().compiler_option_sets_enabled_args.get(
+        option_set_key, []
+      )
     )
 
     return compiler_options

@@ -32,6 +32,7 @@ class AWSLambdaTarget:
 
 class AWSLambdaOptions(LineOriented, GoalSubsystem):
   """Generate an AWS Lambda."""
+
   name = "awslambda"
 
 
@@ -41,15 +42,15 @@ class AWSLambdaGoal(Goal):
 
 @goal_rule
 async def create_awslambda(
-    addresses: Addresses,
-    console: Console,
-    options: AWSLambdaOptions,
-    distdir: DistDir,
-    workspace: Workspace) -> AWSLambdaGoal:
+  addresses: Addresses,
+  console: Console,
+  options: AWSLambdaOptions,
+  distdir: DistDir,
+  workspace: Workspace,
+) -> AWSLambdaGoal:
   with options.line_oriented(console) as print_stdout:
     print_stdout(f"Generating AWS lambdas in `./{distdir.relpath}`")
-    awslambdas = await MultiGet(Get[CreatedAWSLambda](Address, address)
-                                for address in addresses)
+    awslambdas = await MultiGet(Get[CreatedAWSLambda](Address, address) for address in addresses)
     merged_digest = await Get[Digest](
       DirectoriesToMerge(tuple(awslambda.digest for awslambda in awslambdas))
     )

@@ -68,12 +68,12 @@ class HtmlReporter(Reporter):
 
   def report_path(self):
     """The path to the main report file."""
-    return os.path.join(self._html_dir, 'build.html')
+    return os.path.join(self._html_dir, "build.html")
 
   def open(self):
     """Implementation of Reporter callback."""
     safe_mkdir(os.path.dirname(self._html_dir))
-    self._report_file = open(self.report_path(), 'w')
+    self._report_file = open(self.report_path(), "w")
 
   def close(self):
     """Implementation of Reporter callback."""
@@ -87,7 +87,8 @@ class HtmlReporter(Reporter):
   # To add content to this div, append it to ${'#WORKUNITID-content'}.
   # Note that definitive workunit timing is done in pants, but the client-side timer in the js
   # below allows us to show a running timer in the browser while the workunit is executing.
-  _start_workunit_fmt_string = dedent("""
+  _start_workunit_fmt_string = dedent(
+    """
     <div id="__{id}__content">
       <div id="{id}">
         <div class="toggle-header" id="{id}-header">
@@ -119,9 +120,11 @@ class HtmlReporter(Reporter):
         }}
       }});
     </script>
-  """)
+  """
+  )
 
-  _start_tool_invocation_fmt_string = dedent("""
+  _start_tool_invocation_fmt_string = dedent(
+    """
     <div id="__{id}__tool_invocation">
     {tool_invocation_details}
     </div>
@@ -144,7 +147,8 @@ class HtmlReporter(Reporter):
         }}
       }});
     </script>
-  """)
+  """
+  )
 
   def start_workunit(self, workunit):
     """Implementation of Reporter callback."""
@@ -160,49 +164,54 @@ class HtmlReporter(Reporter):
     s = self._start_workunit_fmt_string.format(
       indent=len(workunit.ancestors()) * 10,
       id=workunit.id,
-      parent_id=workunit.parent.id if workunit.parent
-      and not self.run_tracker.is_background_root_workunit(workunit)
-      else '',
+      parent_id=workunit.parent.id
+      if workunit.parent and not self.run_tracker.is_background_root_workunit(workunit)
+      else "",
       workunit=workunit,
-      icon_caret='down' if initially_open else 'right',
-      display_class='' if initially_open else 'nodisplay',
-      icon='cog' if is_tool else 'cogs' if is_multitool else 'none'
+      icon_caret="down" if initially_open else "right",
+      display_class="" if initially_open else "nodisplay",
+      icon="cog" if is_tool else "cogs" if is_multitool else "none",
     )
     self._emit(s)
 
     if is_tool:
-      tool_invocation_details = '\n'.join([
-        self._render_tool_detail(workunit=workunit, title='cmd', class_prefix='cmd'),
-        # Have test framework stdout open by default, but not that of other tools.
-        # This is an arbitrary choice, but one that turns out to be useful to users in practice.
-        self._render_tool_detail(workunit=workunit, title='stdout', initially_open=is_test),
-        self._render_tool_detail(workunit=workunit, title='stderr'),
-      ])
+      tool_invocation_details = "\n".join(
+        [
+          self._render_tool_detail(workunit=workunit, title="cmd", class_prefix="cmd"),
+          # Have test framework stdout open by default, but not that of other tools.
+          # This is an arbitrary choice, but one that turns out to be useful to users in practice.
+          self._render_tool_detail(workunit=workunit, title="stdout", initially_open=is_test),
+          self._render_tool_detail(workunit=workunit, title="stderr"),
+        ]
+      )
 
-      cmd = workunit.cmd or ''
-      linkified_cmd = linkify(self._buildroot, cmd.replace('$', '\\\\$'), self._linkify_memo)
+      cmd = workunit.cmd or ""
+      linkified_cmd = linkify(self._buildroot, cmd.replace("$", "\\\\$"), self._linkify_memo)
 
       s = self._start_tool_invocation_fmt_string.format(
         tool_invocation_details=tool_invocation_details,
         html_path_base=self._html_path_base,
         id=workunit.id,
-        cmd=linkified_cmd
+        cmd=linkified_cmd,
       )
 
       self._emit(s)
 
   # CSS classes from pants.css that we use to style the header text to reflect the outcome.
-  _outcome_css_classes = ['aborted', 'failure', 'warning', 'success', 'unknown']
+  _outcome_css_classes = ["aborted", "failure", "warning", "success", "unknown"]
 
-  _end_tool_invocation_fmt_string = dedent("""
+  _end_tool_invocation_fmt_string = dedent(
+    """
     <script>
       $('#{id}-header-text').addClass('{status}'); $('#{id}-spinner').hide();
       pants.poller.stopTailing('{id}_stdout');
       pants.poller.stopTailing('{id}_stderr');
     </script>
-  """)
+  """
+  )
 
-  _end_workunit_fmt_string = dedent("""
+  _end_workunit_fmt_string = dedent(
+    """
     <script>
       $('#{id}-header-text').addClass('{status}');
       $('#{id}-spinner').hide();
@@ -216,34 +225,34 @@ class HtmlReporter(Reporter):
         pants.timerManager.stopTimer('{id}');
       }});
     </script>
-  """)
+  """
+  )
 
   def end_workunit(self, workunit):
     """Implementation of Reporter callback."""
     duration = workunit.duration()
-    timing = '{:.3f}'.format(duration)
-    unaccounted_time = ''
+    timing = "{:.3f}".format(duration)
+    unaccounted_time = ""
     # Background work may be idle a lot, no point in reporting that as unaccounted.
     if not self.is_under_background_root(workunit):
       unaccounted_time_secs = workunit.unaccounted_time()
       if unaccounted_time_secs >= 1 and unaccounted_time_secs > 0.05 * duration:
-        unaccounted_time = '{:.3f}'.format(unaccounted_time_secs)
+        unaccounted_time = "{:.3f}".format(unaccounted_time_secs)
 
     status = HtmlReporter._outcome_css_classes[workunit.outcome()]
 
     if workunit.has_label(WorkUnitLabel.TOOL):
-      self._emit(self._end_tool_invocation_fmt_string.format(
-        id=workunit.id,
-        status=status
-      ))
+      self._emit(self._end_tool_invocation_fmt_string.format(id=workunit.id, status=status))
 
-    self._emit(self._end_workunit_fmt_string.format(
-      id=workunit.id,
-      status=status,
-      timing=timing,
-      unaccounted_time=unaccounted_time,
-      aborted='true' if workunit.outcome() == WorkUnit.ABORTED else 'false'
-    ))
+    self._emit(
+      self._end_workunit_fmt_string.format(
+        id=workunit.id,
+        status=status,
+        timing=timing,
+        unaccounted_time=unaccounted_time,
+        aborted="true" if workunit.outcome() == WorkUnit.ABORTED else "false",
+      )
+    )
 
     # If we're a root workunit, force an overwrite, as we may be the last ever write in this run.
     force_overwrite = workunit.parent is None
@@ -252,54 +261,61 @@ class HtmlReporter(Reporter):
     def render_timings(timings):
       timings_dict = timings.get_all()
       for item in timings_dict:
-        item['timing_string'] = '{:.3f}'.format(item['timing'])
+        item["timing_string"] = "{:.3f}".format(item["timing"])
 
-      res = ['<table>']
+      res = ["<table>"]
       for item in timings_dict:
-        res.append("""<tr><td class="timing-string">{timing:.3f}</td>
+        res.append(
+          """<tr><td class="timing-string">{timing:.3f}</td>
                           <td class="timing-label">{label}""".format(
-          timing=item['timing'],
-          label=item['label']
-        ))
-        if item['is_tool']:
+            timing=item["timing"], label=item["label"]
+          )
+        )
+        if item["is_tool"]:
           res.append("""<i class="icon-cog"></i>""")
         res.append("""</td></tr>""")
-      res.append('<table>')
+      res.append("<table>")
 
-      return ''.join(res)
+      return "".join(res)
 
-    self._overwrite('cumulative_timings',
-                    lambda: render_timings(self.run_tracker.cumulative_timings),
-                    force=force_overwrite)
-    self._overwrite('self_timings',
-                    lambda: render_timings(self.run_tracker.self_timings),
-                    force=force_overwrite)
+    self._overwrite(
+      "cumulative_timings",
+      lambda: render_timings(self.run_tracker.cumulative_timings),
+      force=force_overwrite,
+    )
+    self._overwrite(
+      "self_timings", lambda: render_timings(self.run_tracker.self_timings), force=force_overwrite
+    )
 
     # Update the artifact cache stats.
     def render_cache_stats(artifact_cache_stats):
       def fix_detail_id(e, _id):
-        return e if isinstance(e, str) else e + (_id, )
+        return e if isinstance(e, str) else e + (_id,)
 
       msg_elements = []
       for cache_name, stat in artifact_cache_stats.stats_per_cache.items():
         # TODO consider display causes for hit/miss targets
         hit_targets = [tgt for tgt, cause in stat.hit_targets]
         miss_targets = [tgt for tgt, cause in stat.miss_targets]
-        msg_elements.extend([
-          cache_name + ' artifact cache: ',
-          # Explicitly set the detail ids, so their displayed/hidden state survives a refresh.
-          fix_detail_id(items_to_report_element(hit_targets, 'hit'), 'cache-hit-details'),
-          ', ',
-          fix_detail_id(items_to_report_element(miss_targets, 'miss'), 'cache-miss-details'),
-          '.'
-        ])
+        msg_elements.extend(
+          [
+            cache_name + " artifact cache: ",
+            # Explicitly set the detail ids, so their displayed/hidden state survives a refresh.
+            fix_detail_id(items_to_report_element(hit_targets, "hit"), "cache-hit-details"),
+            ", ",
+            fix_detail_id(items_to_report_element(miss_targets, "miss"), "cache-miss-details"),
+            ".",
+          ]
+        )
       if not msg_elements:
-        msg_elements = ['No artifact cache use.']
+        msg_elements = ["No artifact cache use."]
       return self._render_message(*msg_elements)
 
-    self._overwrite('artifact_cache_stats',
-                    lambda: render_cache_stats(self.run_tracker.artifact_cache_stats),
-                    force=force_overwrite)
+    self._overwrite(
+      "artifact_cache_stats",
+      lambda: render_cache_stats(self.run_tracker.artifact_cache_stats),
+      force=force_overwrite,
+    )
 
     for f in self._output_files[workunit.id].values():
       f.close()
@@ -307,10 +323,10 @@ class HtmlReporter(Reporter):
   def handle_output(self, workunit, label, s):
     """Implementation of Reporter callback."""
     if os.path.exists(self._html_dir):  # Make sure we're not immediately after a clean-all.
-      path = os.path.join(self._html_dir, '{}.{}'.format(workunit.id, label))
+      path = os.path.join(self._html_dir, "{}.{}".format(workunit.id, label))
       output_files = self._output_files[workunit.id]
       if path not in output_files:
-        f = open(path, 'w')
+        f = open(path, "w")
         output_files[path] = f
       else:
         f = output_files[path]
@@ -319,47 +335,55 @@ class HtmlReporter(Reporter):
       f.flush()
 
   _log_level_css_map = {
-    Report.FATAL: 'fatal',
-    Report.ERROR: 'error',
-    Report.WARN: 'warn',
-    Report.INFO: 'info',
-    Report.DEBUG: 'debug'
+    Report.FATAL: "fatal",
+    Report.ERROR: "error",
+    Report.WARN: "warn",
+    Report.INFO: "info",
+    Report.DEBUG: "debug",
   }
 
-  _log_fmt_string = dedent("""
+  _log_fmt_string = dedent(
+    """
     <div id="__{content_id}"><span class="{css_class}">{message}</span></div>
     <script>
       $(function(){{
         pants.append('#__{content_id}', '#{workunit_id}-content');
       }});
     </script>
-  """)
+  """
+  )
 
   def do_handle_log(self, workunit, level, *msg_elements):
     """Implementation of Reporter callback."""
     message = self._render_message(*msg_elements)
-    s = self._log_fmt_string.format(content_id=uuid.uuid4(),
-                                    workunit_id=workunit.id,
-                                    css_class=HtmlReporter._log_level_css_map[level],
-                                    message=message)
+    s = self._log_fmt_string.format(
+      content_id=uuid.uuid4(),
+      workunit_id=workunit.id,
+      css_class=HtmlReporter._log_level_css_map[level],
+      message=message,
+    )
 
     # Emit that javascript to the main report body.
     self._emit(s)
 
-  _detail_a_fmt_string = dedent("""
+  _detail_a_fmt_string = dedent(
+    """
       <a href="#" onclick="$('.{detail_class}').not('#{detail_id}').hide();
                            $('#{detail_id}').toggle(); return false;">{text}</a>
-  """)
+  """
+  )
 
-  _detail_div_fmt_string = dedent("""
+  _detail_div_fmt_string = dedent(
+    """
       <div id="{detail_id}" class="{detail_class} {detail_visibility_class}">{detail}</div>
-  """)
+  """
+  )
 
   def _render_message(self, *msg_elements):
     # Identifies all details in this message, so that opening one can close all the others.
     detail_class = str(uuid.uuid4())
 
-    html_fragments = ['<div>']
+    html_fragments = ["<div>"]
 
     detail_divs = []
     for element in msg_elements:
@@ -380,8 +404,10 @@ class HtmlReporter(Reporter):
         element = [element]
 
       # zip_longest assumes None for missing values, so this generator will pick the default for those.
-      default_values = ('', None, None, False)
-      (text, detail, detail_id, detail_initially_visible) = (x or y for x, y in zip_longest(element, default_values))
+      default_values = ("", None, None, False)
+      (text, detail, detail_id, detail_initially_visible) = (
+        x or y for x, y in zip_longest(element, default_values)
+      )
 
       htmlified_text = self._htmlify_text(text)
 
@@ -389,19 +415,27 @@ class HtmlReporter(Reporter):
         html_fragments.append(htmlified_text)
       else:
         detail_id = detail_id or str(uuid.uuid4())
-        detail_visibility_class = '' if detail_initially_visible else 'nodisplay'
-        html_fragments.append(self._detail_a_fmt_string.format(
-            text=htmlified_text, detail_id=detail_id, detail_class=detail_class))
-        detail_divs.append(self._detail_div_fmt_string.format(
-          detail_id=detail_id, detail=detail, detail_class=detail_class,
-          detail_visibility_class=detail_visibility_class
-        ))
+        detail_visibility_class = "" if detail_initially_visible else "nodisplay"
+        html_fragments.append(
+          self._detail_a_fmt_string.format(
+            text=htmlified_text, detail_id=detail_id, detail_class=detail_class
+          )
+        )
+        detail_divs.append(
+          self._detail_div_fmt_string.format(
+            detail_id=detail_id,
+            detail=detail,
+            detail_class=detail_class,
+            detail_visibility_class=detail_visibility_class,
+          )
+        )
     html_fragments.extend(detail_divs)
-    html_fragments.append('</div>')
+    html_fragments.append("</div>")
 
-    return ''.join(html_fragments)
+    return "".join(html_fragments)
 
-  _tool_detail_fmt_string = dedent("""
+  _tool_detail_fmt_string = dedent(
+    """
     <div class="{class_prefix}" id="{id}">
       <div class="{class_prefix}-header toggle-header" id="{id}-header">
         <div class="{class_prefix}-header-icon toggle-header-icon"
@@ -414,14 +448,15 @@ class HtmlReporter(Reporter):
       </div>
       <div class="{class_prefix}-content toggle-content {display_class}" id="{id}-content"></div>
     </div>
-  """)
+  """
+  )
 
-  def _render_tool_detail(self, workunit, title, class_prefix='greyed', initially_open=False):
+  def _render_tool_detail(self, workunit, title, class_prefix="greyed", initially_open=False):
     return self._tool_detail_fmt_string.format(
       class_prefix=class_prefix,
-      id='{}-{}'.format(workunit.id, title),
-      icon_caret='down' if initially_open else 'right',
-      display_class='' if initially_open else 'nodisplay',
+      id="{}-{}".format(workunit.id, title),
+      icon_caret="down" if initially_open else "right",
+      display_class="" if initially_open else "nodisplay",
       title=title,
     )
 
@@ -445,16 +480,16 @@ class HtmlReporter(Reporter):
     # Overwrite only once per second.
     if (now - last_overwrite_time >= 1000) or force:
       if os.path.exists(self._html_dir):  # Make sure we're not immediately after a clean-all.
-        with open(os.path.join(self._html_dir, filename), 'w') as f:
+        with open(os.path.join(self._html_dir, filename), "w") as f:
           f.write(func())
       self._last_overwrite_time[filename] = now
 
   def _htmlify_text(self, s):
     """Make text HTML-friendly."""
     colored = self._handle_ansi_color_codes(html.escape(s))
-    return linkify(self._buildroot, colored, self._linkify_memo).replace('\n', '</br>')
+    return linkify(self._buildroot, colored, self._linkify_memo).replace("\n", "</br>")
 
-  _ANSI_COLOR_CODE_RE = re.compile(r'\033\[((?:\d|;)*)m')
+  _ANSI_COLOR_CODE_RE = re.compile(r"\033\[((?:\d|;)*)m")
 
   def _handle_ansi_color_codes(self, s):
     """Replace ansi escape sequences with spans of appropriately named css classes."""
@@ -465,16 +500,16 @@ class HtmlReporter(Reporter):
     for i in range(0, len(parts), 2):
       ret.append(parts[i])
       if i + 1 < len(parts):
-        for code in parts[i + 1].split(';'):
+        for code in parts[i + 1].split(";"):
           if code == 0:  # Reset.
             while span_depth > 0:
-              ret.append('</span>')
+              ret.append("</span>")
               span_depth -= 1
           else:
             ret.append('<span class="ansi-{}">'.format(code))
             span_depth += 1
     while span_depth > 0:
-      ret.append('</span>')
+      ret.append("</span>")
       span_depth -= 1
 
-    return ''.join(ret)
+    return "".join(ret)

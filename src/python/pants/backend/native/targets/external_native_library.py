@@ -16,7 +16,6 @@ from pants.util.meta import frozen_after_init
 
 # TODO: generalize this to a DatatypeSetField subclass in payload_field.py!
 class ConanRequirementSetField(tuple, PayloadField):
-
   def _compute_fingerprint(self):
     return stable_json_sha1(tuple(hash(req) for req in self))
 
@@ -32,6 +31,7 @@ class ConanRequirement:
   be overridden for the specific package to be resolved. See
   https://docs.conan.io/en/latest/using_packages/conanfile_txt.html#imports for more info.
   """
+
   pkg_spec: str
   include_relpath: str
   lib_relpath: str
@@ -62,11 +62,11 @@ class ConanRequirement:
 
   @classmethod
   def alias(cls):
-    return 'conan_requirement'
+    return "conan_requirement"
 
   def parse_conan_stdout_for_pkg_sha(self, stdout):
     # TODO(#6168): Add a JSON output mode in upstream Conan instead of parsing this.
-    pkg_spec_pattern = re.compile(r'{}:([^\s]+)'.format(re.escape(self.pkg_spec)))
+    pkg_spec_pattern = re.compile(r"{}:([^\s]+)".format(re.escape(self.pkg_spec)))
     return pkg_spec_pattern.search(stdout).group(1)
 
   @memoized_property
@@ -83,7 +83,7 @@ class ConanRequirement:
     For more info on Conan package specifications, see:
       https://docs.conan.io/en/latest/introduction.html
     """
-    return self.pkg_spec.replace('@', '/')
+    return self.pkg_spec.replace("@", "/")
 
 
 class ExternalNativeLibrary(Target):
@@ -91,9 +91,10 @@ class ExternalNativeLibrary(Target):
 
   @classmethod
   def alias(cls):
-    return 'external_native_library'
+    return "external_native_library"
 
-  class _DeprecatedStringPackage(Exception): pass
+  class _DeprecatedStringPackage(Exception):
+    pass
 
   def __init__(self, payload=None, packages=None, **kwargs):
     """
@@ -101,12 +102,14 @@ class ExternalNativeLibrary(Target):
     """
     payload = payload or Payload()
 
-    assert_list(packages, key_arg='packages', expected_type=ConanRequirement,
-                raise_type=self._DeprecatedStringPackage)
+    assert_list(
+      packages,
+      key_arg="packages",
+      expected_type=ConanRequirement,
+      raise_type=self._DeprecatedStringPackage,
+    )
 
-    payload.add_fields({
-      'packages': ConanRequirementSetField(packages),
-    })
+    payload.add_fields({"packages": ConanRequirementSetField(packages)})
     super().__init__(payload=payload, **kwargs)
 
   @property
@@ -120,11 +123,11 @@ class ExternalNativeLibrary(Target):
   # the attributes over.
   @property
   def include_relpath(self):
-    return 'include'
+    return "include"
 
   @property
   def lib_relpath(self):
-    return 'lib'
+    return "lib"
 
   @property
   def native_lib_names(self):

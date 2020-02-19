@@ -37,13 +37,15 @@ class CoverageEngine(ABC):
     The `extra_jvm_options` should be a list of jvm options to include when executing the java
     command.
     """
+
     classpath_prepend: Any
     extra_jvm_options: Any
 
     @classmethod
     def create(cls, classpath_prepend=None, extra_jvm_options=None):
-      return cls(classpath_prepend=classpath_prepend or (),
-                 extra_jvm_options=extra_jvm_options or [])
+      return cls(
+        classpath_prepend=classpath_prepend or (), extra_jvm_options=extra_jvm_options or []
+      )
 
   @abstractmethod
   def instrument(self, output_dir):
@@ -77,8 +79,9 @@ class CoverageEngine(ABC):
     # TODO: Does this actually need to check AnnotationProcessor targets? It does so at present
     # to preserve compatibility while migrating off target labels to type checks, but it seems
     # likely that inclusion of AnnotationProcessor in the past was in error, and unnecessary.
-    return (isinstance(tgt, (AnnotationProcessor, JavaLibrary, ScalaLibrary))
-            and not tgt.is_synthetic)
+    return (
+      isinstance(tgt, (AnnotationProcessor, JavaLibrary, ScalaLibrary)) and not tgt.is_synthetic
+    )
 
 
 class NoCoverage(CoverageEngine):

@@ -49,25 +49,15 @@ class ReplTest(GoalRuleTestBase):
 
   @classmethod
   def alias_groups(cls) -> BuildFileAliases:
-    return BuildFileAliases(
-      targets={
-        "python_library": PythonLibrary,
-      }
-    )
+    return BuildFileAliases(targets={"python_library": PythonLibrary})
 
   def test_repl_with_targets(self):
     library_source = FileContent(path="some_lib.py", content=b"class SomeClass:\n  pass\n")
     self.create_library(
-      name="some_lib",
-      target_type="python_library",
-      path="src/python",
-      sources=["some_lib.py"]
+      name="some_lib", target_type="python_library", path="src/python", sources=["some_lib.py"]
     )
 
-    self.create_file(
-      relpath="src/python/some_lib.py",
-      contents=library_source.content.decode(),
-    )
+    self.create_file(relpath="src/python/some_lib.py", contents=library_source.content.decode())
 
     additional_params = [
       InteractiveRunner(self.scheduler),

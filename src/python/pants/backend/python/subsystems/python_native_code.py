@@ -28,35 +28,46 @@ logger = logging.getLogger(__name__)
 class PythonNativeCode(Subsystem):
   """A subsystem which exposes components of the native backend to the python backend."""
 
-  options_scope = 'python-native-code'
+  options_scope = "python-native-code"
 
-  default_native_source_extensions = ['.c', '.cpp', '.cc']
+  default_native_source_extensions = [".c", ".cpp", ".cc"]
 
-  class PythonNativeCodeError(Exception): pass
+  class PythonNativeCodeError(Exception):
+    pass
 
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
 
-    register('--native-source-extensions', type=list, default=cls.default_native_source_extensions,
-             fingerprint=True, advanced=True,
-             help='The extensions recognized for native source files in `python_dist()` sources.')
+    register(
+      "--native-source-extensions",
+      type=list,
+      default=cls.default_native_source_extensions,
+      fingerprint=True,
+      advanced=True,
+      help="The extensions recognized for native source files in `python_dist()` sources.",
+    )
     # TODO(#7735): move the --cpp-flags and --ld-flags to a general subprocess support subystem.
-    register('--cpp-flags', type=list,
-             default=safe_shlex_split(os.environ.get('CPPFLAGS', '')),
-             fingerprint=True, advanced=True,
-             help="Override the `CPPFLAGS` environment variable for any forked subprocesses.")
-    register('--ld-flags', type=list,
-             default=safe_shlex_split(os.environ.get('LDFLAGS', '')),
-             fingerprint=True, advanced=True,
-             help="Override the `LDFLAGS` environment variable for any forked subprocesses.")
+    register(
+      "--cpp-flags",
+      type=list,
+      default=safe_shlex_split(os.environ.get("CPPFLAGS", "")),
+      fingerprint=True,
+      advanced=True,
+      help="Override the `CPPFLAGS` environment variable for any forked subprocesses.",
+    )
+    register(
+      "--ld-flags",
+      type=list,
+      default=safe_shlex_split(os.environ.get("LDFLAGS", "")),
+      fingerprint=True,
+      advanced=True,
+      help="Override the `LDFLAGS` environment variable for any forked subprocesses.",
+    )
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super().subsystem_dependencies() + (
-      NativeToolchain.scoped(cls),
-      PythonSetup,
-    )
+    return super().subsystem_dependencies() + (NativeToolchain.scoped(cls), PythonSetup)
 
   @memoized_property
   def _native_source_extensions(self):
@@ -106,41 +117,56 @@ class PythonNativeCode(Subsystem):
     platforms_with_sources = pex_build_util.targets_by_platform(targets, self._python_setup)
     platform_names = list(platforms_with_sources.keys())
 
-    if not platform_names or platform_names == ['current']:
+    if not platform_names or platform_names == ["current"]:
       return True
 
     bad_targets = set()
     for platform, targets in platforms_with_sources.items():
-      if platform == 'current':
+      if platform == "current":
         continue
       bad_targets.update(targets)
 
-    raise IncompatiblePlatformsError(dedent("""\
+    raise IncompatiblePlatformsError(
+      dedent(
+        """\
       Pants doesn't currently support cross-compiling native code.
       The following targets set platforms arguments other than ['current'], which is unsupported for this reason.
       Please either remove the platforms argument from these targets, or set them to exactly ['current'].
       Bad targets:
       {}
-      """.format('\n'.join(sorted(target.address.reference() for target in bad_targets)))
-    ))
+      """.format(
+          "\n".join(sorted(target.address.reference() for target in bad_targets))
+        )
+      )
+    )
 
 
 class BuildSetupRequiresPex(ExecutablePexTool):
-  options_scope = 'build-setup-requires-pex'
+  options_scope = "build-setup-requires-pex"
 
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--setuptools-version', advanced=True, fingerprint=True, default='40.6.3',
-             help='The setuptools version to use when executing `setup.py` scripts.')
-    register('--wheel-version', advanced=True, fingerprint=True, default='0.32.3',
-             help='The wheel version to use when executing `setup.py` scripts.')
+    register(
+      "--setuptools-version",
+      advanced=True,
+      fingerprint=True,
+      default="40.6.3",
+      help="The setuptools version to use when executing `setup.py` scripts.",
+    )
+    register(
+      "--wheel-version",
+      advanced=True,
+      fingerprint=True,
+      default="0.32.3",
+      help="The wheel version to use when executing `setup.py` scripts.",
+    )
 
   @property
   def base_requirements(self):
     return [
-      PythonRequirement('setuptools=={}'.format(self.get_options().setuptools_version)),
-      PythonRequirement('wheel=={}'.format(self.get_options().wheel_version)),
+      PythonRequirement("setuptools=={}".format(self.get_options().setuptools_version)),
+      PythonRequirement("wheel=={}".format(self.get_options().wheel_version)),
     ]
 
 
@@ -151,14 +177,13 @@ class PexBuildEnvironment:
 
   @property
   def invocation_environment_dict(self):
-    return {
-      'CPPFLAGS': safe_shlex_join(self.cpp_flags),
-      'LDFLAGS': safe_shlex_join(self.ld_flags),
-    }
+    return {"CPPFLAGS": safe_shlex_join(self.cpp_flags), "LDFLAGS": safe_shlex_join(self.ld_flags)}
 
 
 @rule
-def create_pex_native_build_environment(python_native_code: PythonNativeCode) -> PexBuildEnvironment:
+def create_pex_native_build_environment(
+  python_native_code: PythonNativeCode,
+) -> PexBuildEnvironment:
   return PexBuildEnvironment(
     cpp_flags=python_native_code.get_options().cpp_flags,
     ld_flags=python_native_code.get_options().ld_flags,
@@ -166,7 +191,4 @@ def create_pex_native_build_environment(python_native_code: PythonNativeCode) ->
 
 
 def rules():
-  return [
-    subsystem_rule(PythonNativeCode),
-    create_pex_native_build_environment,
-  ]
+  return [subsystem_rule(PythonNativeCode), create_pex_native_build_environment]

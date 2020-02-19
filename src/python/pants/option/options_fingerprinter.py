@@ -19,7 +19,7 @@ from pants.option.custom_types import (
 class CoercingOptionEncoder(CoercingEncoder):
   def default(self, o):
     if o is UnsetBool:
-      return '_UNSET_BOOL_ENCODING'
+      return "_UNSET_BOOL_ENCODING"
     return super().default(o)
 
 
@@ -34,8 +34,7 @@ class OptionsFingerprinter:
   """
 
   @classmethod
-  def combined_options_fingerprint_for_scope(cls, scope, options,
-                                             build_graph=None, **kwargs):
+  def combined_options_fingerprint_for_scope(cls, scope, options, build_graph=None, **kwargs):
     """Given options and a scope, compute a combined fingerprint for the scope.
 
     :param string scope: The scope to fingerprint.
@@ -56,7 +55,7 @@ class OptionsFingerprinter:
         # This isn't necessarily a good value to be using here, but it preserves behavior from
         # before the commit which added it. I suspect that using the empty string would be
         # reasonable too, but haven't done any archaeology to check.
-        fingerprint = 'None'
+        fingerprint = "None"
       hasher.update(fingerprint.encode())
     return hasher.hexdigest()
 
@@ -93,9 +92,9 @@ class OptionsFingerprinter:
 
   def _fingerprint_target_specs(self, specs):
     """Returns a fingerprint of the targets resolved from given target specs."""
-    assert self._build_graph is not None, (
-      f'cannot fingerprint specs `{specs}` without a `BuildGraph`'
-    )
+    assert (
+      self._build_graph is not None
+    ), f"cannot fingerprint specs `{specs}` without a `BuildGraph`"
     hasher = sha1()
     for spec in sorted(specs):
       for target in sorted(self._build_graph.resolve(spec)):
@@ -116,13 +115,14 @@ class OptionsFingerprinter:
       # If not absolute, assume relative to the build root.
       return os.path.join(root, filepath)
     else:
-      if '..' in os.path.relpath(filepath, root).split(os.path.sep):
+      if ".." in os.path.relpath(filepath, root).split(os.path.sep):
         # The path wasn't in the buildroot. This is an error because it violates the pants being
         # hermetic.
-        raise ValueError('Received a file_option that was not inside the build root:\n'
-                         '  file_option: {filepath}\n'
-                         '  build_root:  {buildroot}\n'
-                         .format(filepath=filepath, buildroot=root))
+        raise ValueError(
+          "Received a file_option that was not inside the build root:\n"
+          "  file_option: {filepath}\n"
+          "  build_root:  {buildroot}\n".format(filepath=filepath, buildroot=root)
+        )
       return filepath
 
   def _fingerprint_dirs(self, dirpaths, topdown=True, onerror=None, followlinks=False):
@@ -134,12 +134,15 @@ class OptionsFingerprinter:
     # Note that we don't sort the dirpaths, as their order may have meaning.
     filepaths = []
     for dirpath in dirpaths:
-      dirs = os.walk(dirpath, topdown=topdown, onerror=onerror,
-                     followlinks=followlinks)
+      dirs = os.walk(dirpath, topdown=topdown, onerror=onerror, followlinks=followlinks)
       sorted_dirs = sorted(dirs, key=lambda d: d[0])
-      filepaths.extend([os.path.join(dirpath, filename)
-                   for dirpath, dirnames, filenames in sorted_dirs
-                   for filename in sorted(filenames)])
+      filepaths.extend(
+        [
+          os.path.join(dirpath, filename)
+          for dirpath, dirnames, filenames in sorted_dirs
+          for filename in sorted(filenames)
+        ]
+      )
     return self._fingerprint_files(filepaths)
 
   def _fingerprint_files(self, filepaths):
@@ -152,7 +155,7 @@ class OptionsFingerprinter:
     for filepath in filepaths:
       filepath = self._assert_in_buildroot(filepath)
       hasher.update(os.path.relpath(filepath, get_buildroot()).encode())
-      with open(filepath, 'rb') as f:
+      with open(filepath, "rb") as f:
         hasher.update(f.read())
     return hasher.hexdigest()
 
@@ -173,9 +176,9 @@ class OptionsFingerprinter:
     """
     final = defaultdict(list)
     for k, v in option_val.items():
-      for sub_value in sorted(v.split(',')):
+      for sub_value in sorted(v.split(",")):
         if os.path.isfile(sub_value):
-          with open(sub_value, 'r') as f:
+          with open(sub_value, "r") as f:
             final[k].append(f.read())
         else:
           final[k].append(sub_value)

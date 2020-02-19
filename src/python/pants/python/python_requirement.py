@@ -36,7 +36,7 @@ class PythonRequirement:
     self._name = name or self._requirement.project_name
     self._use_2to3 = use_2to3
     # TODO(wickman) Unify this with PythonTarget .compatibility
-    self.compatibility = compatibility or ['']
+    self.compatibility = compatibility or [""]
 
   def should_build(self, python, platform):
     """
@@ -105,4 +105,4 @@ class PythonRequirement:
     return str(self._requirement)
 
   def __repr__(self):
-    return 'PythonRequirement({})'.format(self._requirement)
+    return "PythonRequirement({})".format(self._requirement)

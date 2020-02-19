@@ -51,7 +51,7 @@ class ResolveRequirementsTaskBase(Task):
     round_manager.optional_product(PythonRequirementLibrary)  # For local dists.
     # Codegen may inject extra resolvable deps, so make sure we have a product dependency
     # on relevant codegen tasks, if any.
-    round_manager.optional_data('python')
+    round_manager.optional_data("python")
 
   def resolve_requirements(self, interpreter, req_libs):
     """Requirements resolution for PEX files.
@@ -70,16 +70,17 @@ class ResolveRequirementsTaskBase(Task):
       # for this special case.
       if invalidation_check.all_vts:
         target_set_id = VersionedTargetSet.from_versioned_targets(
-            invalidation_check.all_vts).cache_key.hash
+          invalidation_check.all_vts
+        ).cache_key.hash
       else:
-        target_set_id = 'no_targets'
+        target_set_id = "no_targets"
 
       # NB: Since PythonBinaryCreate is the only task that exports python code for use outside the
       # host system, it's the only python task that needs to resolve for non-'current'
       # platforms. PythonBinaryCreate will actually validate the platforms itself when resolving
       # requirements, instead of using this method, so we can always resolve for 'current' here in
       # order to pull in any binary or universal dists needed for the currently executing host.
-      platforms = ['current']
+      platforms = ["current"]
 
       path = os.path.realpath(os.path.join(self.workdir, str(interpreter.identity), target_set_id))
       # Note that we check for the existence of the directory, instead of for invalid_vts,
@@ -88,7 +89,8 @@ class ResolveRequirementsTaskBase(Task):
         with safe_concurrent_creation(path) as safe_path:
           pex_builder = PexBuilderWrapper.Factory.create(
             builder=PEXBuilder(path=safe_path, interpreter=interpreter, copy=True),
-            log=self.context.log)
+            log=self.context.log,
+          )
           pex_builder.add_requirement_libs_from(req_libs, platforms=platforms)
           pex_builder.freeze()
     return PEX(path, interpreter=interpreter)
@@ -97,7 +99,7 @@ class ResolveRequirementsTaskBase(Task):
     """Resolve a list of pip-style requirement strings."""
     requirement_strings = sorted(requirement_strings)
     if len(requirement_strings) == 0:
-      req_strings_id = 'no_requirements'
+      req_strings_id = "no_requirements"
     elif len(requirement_strings) == 1:
       req_strings_id = requirement_strings[0]
     else:
@@ -109,7 +111,8 @@ class ResolveRequirementsTaskBase(Task):
       with safe_concurrent_creation(path) as safe_path:
         pex_builder = PexBuilderWrapper.Factory.create(
           builder=PEXBuilder(path=safe_path, interpreter=interpreter, copy=True),
-          log=self.context.log)
+          log=self.context.log,
+        )
         pex_builder.add_resolved_requirements(reqs)
         pex_builder.freeze()
     return PEX(path, interpreter=interpreter)
@@ -124,7 +127,7 @@ class ResolveRequirementsTaskBase(Task):
     pex_paths = [pex.path() for pex in pexes if pex]
     if pex_paths:
       pex_info = pex_info.copy()
-      pex_info.merge_pex_path(':'.join(pex_paths))
+      pex_info.merge_pex_path(":".join(pex_paths))
 
     with safe_concurrent_creation(path) as safe_path:
       builder = PEXBuilder(safe_path, interpreter, pex_info=pex_info)

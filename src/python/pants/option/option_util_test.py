@@ -7,7 +7,6 @@ from pants.option.option_util import flatten_shlexed_list
 
 
 class OptionUtilTest(TestCase):
-
   def test_flatten_shlexed_list(self) -> None:
     assert flatten_shlexed_list(["arg1", "arg2"]) == ["arg1", "arg2"]
     assert flatten_shlexed_list(["arg1 arg2"]) == ["arg1", "arg2"]

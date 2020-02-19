@@ -33,7 +33,7 @@ class FingerprintStrategy(ABC):
     """Consumers of subclass instances call this to get a fingerprint labeled with the name"""
     fingerprint = self.compute_fingerprint(target)
     if fingerprint:
-      return '{fingerprint}-{name}'.format(fingerprint=fingerprint, name=type(self).__name__)
+      return "{fingerprint}-{name}".format(fingerprint=fingerprint, name=type(self).__name__)
     else:
       return None
 

@@ -17,6 +17,7 @@ class InvalidDistDir(Exception):
 @dataclass(frozen=True)
 class DistDir:
   """The directory to which we write distributable files."""
+
   relpath: Path
 
 
@@ -38,6 +39,4 @@ def validate_distdir(distdir: Path, buildroot: Path) -> DistDir:
 
 
 def rules():
-  return [
-    get_distdir,
-  ]
+  return [get_distdir]

@@ -28,10 +28,10 @@ class ChunkType:
   convert the unicode string literals to ascii before use.
   """
 
-  ARGUMENT = b'A'
-  ENVIRONMENT = b'E'
-  WORKING_DIR = b'D'
-  COMMAND = b'C'
+  ARGUMENT = b"A"
+  ENVIRONMENT = b"E"
+  WORKING_DIR = b"D"
+  COMMAND = b"C"
   # PGRP and PID are custom extensions to the Nailgun protocol spec for transmitting pid info.
   # PGRP is used to allow the client process to try killing the nailgun server and everything in its
   # process group when the thin client receives a signal. PID is used to retrieve logs for fatal
@@ -39,14 +39,14 @@ class ChunkType:
   # TODO(#6579): we should probably move our custom extensions to a ChunkType subclass in
   # nailgun_client.py and differentiate clearly whether the client accepts the pailgun extensions
   # (e.g. by calling it PailgunClient).
-  PGRP = b'G'
-  PID = b'P'
-  STDIN = b'0'
-  STDOUT = b'1'
-  STDERR = b'2'
-  START_READING_INPUT = b'S'
-  STDIN_EOF = b'.'
-  EXIT = b'X'
+  PGRP = b"G"
+  PID = b"P"
+  STDIN = b"0"
+  STDOUT = b"1"
+  STDERR = b"2"
+  START_READING_INPUT = b"S"
+  STDIN_EOF = b"."
+  EXIT = b"X"
   REQUEST_TYPES = (ARGUMENT, ENVIRONMENT, WORKING_DIR, COMMAND)
   EXECUTION_TYPES = (PGRP, PID, STDIN, STDOUT, STDERR, START_READING_INPUT, STDIN_EOF, EXIT)
   VALID_TYPES = REQUEST_TYPES + EXECUTION_TYPES
@@ -76,10 +76,10 @@ class NailgunProtocol:
 
   """
 
-  ENVIRON_SEP = '='
-  TTY_ENV_TMPL = 'NAILGUN_TTY_{}'
-  TTY_PATH_ENV = 'NAILGUN_TTY_PATH_{}'
-  HEADER_FMT = b'>Ic'
+  ENVIRON_SEP = "="
+  TTY_ENV_TMPL = "NAILGUN_TTY_{}"
+  TTY_PATH_ENV = "NAILGUN_TTY_PATH_{}"
+  HEADER_FMT = b">Ic"
   HEADER_BYTES = 5
 
   class ProtocolError(Exception):
@@ -109,9 +109,9 @@ class NailgunProtocol:
       cls.write_chunk(sock, ChunkType.ARGUMENT, argument)
 
     for item_tuple in environment.items():
-      cls.write_chunk(sock,
-                      ChunkType.ENVIRONMENT,
-                      cls.ENVIRON_SEP.join(cls._decode_unicode_seq(item_tuple)))
+      cls.write_chunk(
+        sock, ChunkType.ENVIRONMENT, cls.ENVIRON_SEP.join(cls._decode_unicode_seq(item_tuple))
+      )
 
     cls.write_chunk(sock, ChunkType.WORKING_DIR, working_dir)
     cls.write_chunk(sock, ChunkType.COMMAND, command)
@@ -144,23 +144,23 @@ class NailgunProtocol:
       elif chunk_type == ChunkType.COMMAND:
         command = payload
       else:
-        raise cls.ProtocolError('received non-request chunk before header was fully received!')
+        raise cls.ProtocolError("received non-request chunk before header was fully received!")
 
     return working_dir, command, arguments, environment
 
   @classmethod
-  def write_chunk(cls, sock, chunk_type, payload=b''):
+  def write_chunk(cls, sock, chunk_type, payload=b""):
     """Write a single chunk to the connected client."""
     chunk = cls.construct_chunk(chunk_type, payload)
     sock.sendall(chunk)
 
   @classmethod
-  def construct_chunk(cls, chunk_type, payload, encoding='utf-8'):
+  def construct_chunk(cls, chunk_type, payload, encoding="utf-8"):
     """Construct and return a single chunk."""
     if isinstance(payload, str):
       payload = payload.encode(encoding)
     elif not isinstance(payload, bytes):
-      raise TypeError('cannot encode type: {}'.format(type(payload)))
+      raise TypeError("cannot encode type: {}".format(type(payload)))
 
     header = struct.pack(cls.HEADER_FMT, len(payload), chunk_type)
     return header + payload
@@ -168,12 +168,15 @@ class NailgunProtocol:
   @classmethod
   def _read_until(cls, sock, desired_size):
     """Read a certain amount of content from a socket before returning."""
-    buf = b''
+    buf = b""
     while len(buf) < desired_size:
       recv_bytes = sock.recv(desired_size - len(buf))
       if not recv_bytes:
-        raise cls.TruncatedRead('Expected {} bytes before socket shutdown, instead received {}'
-                                .format(desired_size, len(buf)))
+        raise cls.TruncatedRead(
+          "Expected {} bytes before socket shutdown, instead received {}".format(
+            desired_size, len(buf)
+          )
+        )
       buf += recv_bytes
     return buf
 
@@ -193,7 +196,7 @@ class NailgunProtocol:
       # Read the chunk header from the socket.
       header = cls._read_until(sock, cls.HEADER_BYTES)
     except cls.TruncatedRead as e:
-      raise cls.TruncatedHeaderError('Failed to read nailgun chunk header ({!r}).'.format(e))
+      raise cls.TruncatedHeaderError("Failed to read nailgun chunk header ({!r}).".format(e))
 
     # Unpack the chunk header.
     payload_len, chunk_type = struct.unpack(cls.HEADER_FMT, header)
@@ -202,12 +205,12 @@ class NailgunProtocol:
       # Read the chunk payload.
       payload = cls._read_until(sock, payload_len)
     except cls.TruncatedRead as e:
-      raise cls.TruncatedPayloadError('Failed to read nailgun chunk payload ({!r}).'.format(e))
+      raise cls.TruncatedPayloadError("Failed to read nailgun chunk payload ({!r}).".format(e))
 
     # In the case we get an otherwise well-formed chunk, check the chunk_type for validity _after_
     # we've drained the payload from the socket to avoid subsequent reads of a stale payload.
     if chunk_type not in ChunkType.VALID_TYPES:
-      raise cls.ProtocolError('invalid chunk type: {}'.format(chunk_type))
+      raise cls.ProtocolError("invalid chunk type: {}".format(chunk_type))
     if not return_bytes:
       payload = payload.decode()
 
@@ -238,7 +241,6 @@ class NailgunProtocol:
     interval: float
 
   class TimeoutProvider(ABC):
-
     @abstractmethod
     def maybe_timeout_options(self):
       """Called on every stream iteration to obtain a possible specification for a timeout.
@@ -259,7 +261,7 @@ class NailgunProtocol:
                                                possible timeout.
     :raises: :class:`cls.ProcessStreamTimeout`
     """
-    assert(timeout_object is None or isinstance(timeout_object, cls.TimeoutProvider))
+    assert timeout_object is None or isinstance(timeout_object, cls.TimeoutProvider)
 
     if timeout_object is None:
       deadline = None
@@ -276,8 +278,10 @@ class NailgunProtocol:
         if overtime_seconds > 0:
           original_timestamp = datetime.datetime.fromtimestamp(deadline).isoformat()
           raise cls.ProcessStreamTimeout(
-            "iterating over bytes from nailgun timed out at {}, overtime seconds: {}"
-            .format(original_timestamp, overtime_seconds))
+            "iterating over bytes from nailgun timed out at {}, overtime seconds: {}".format(
+              original_timestamp, overtime_seconds
+            )
+          )
 
       with maybe_shutdown_socket.lock:
         if maybe_shutdown_socket.is_shutdown:
@@ -310,7 +314,7 @@ class NailgunProtocol:
     cls.write_chunk(sock, ChunkType.STDERR, payload)
 
   @classmethod
-  def send_exit(cls, sock, payload=b''):
+  def send_exit(cls, sock, payload=b""):
     """Send the Exit chunk over the specified socket."""
     cls.write_chunk(sock, ChunkType.EXIT, payload)
 
@@ -323,14 +327,14 @@ class NailgunProtocol:
   @classmethod
   def send_pid(cls, sock, pid):
     """Send the PID chunk over the specified socket."""
-    assert(isinstance(pid, Pid) and pid > 0)
+    assert isinstance(pid, Pid) and pid > 0
     encoded_int = cls.encode_int(pid)
     cls.write_chunk(sock, ChunkType.PID, encoded_int)
 
   @classmethod
   def send_pgrp(cls, sock, pgrp):
     """Send the PGRP chunk over the specified socket."""
-    assert(isinstance(pgrp, Pid) and pgrp < 0)
+    assert isinstance(pgrp, Pid) and pgrp < 0
     encoded_int = cls.encode_int(pgrp)
     cls.write_chunk(sock, ChunkType.PGRP, encoded_int)
 
@@ -344,9 +348,12 @@ class NailgunProtocol:
              send_exit().
     """
     if not isinstance(obj, int):
-      raise TypeError("cannot encode non-integer object in encode_int(): object was {} (type '{}')."
-                      .format(obj, type(obj)))
-    return str(obj).encode('ascii')
+      raise TypeError(
+        "cannot encode non-integer object in encode_int(): object was {} (type '{}').".format(
+          obj, type(obj)
+        )
+      )
+    return str(obj).encode("ascii")
 
   @classmethod
   def encode_env_var_value(cls, obj):
@@ -366,12 +373,14 @@ class NailgunProtocol:
     :param file stderr: The stream to check for stderr tty capabilities.
     :returns: A dict containing the tty capability environment variables.
     """
+
     def gen_env_vars():
       for fd_id, fd in zip(STDIO_DESCRIPTORS, (stdin, stdout, stderr)):
         is_atty = fd.isatty()
         yield (cls.TTY_ENV_TMPL.format(fd_id), cls.encode_env_var_value(int(is_atty)))
         if is_atty:
-          yield (cls.TTY_PATH_ENV.format(fd_id), os.ttyname(fd.fileno()) or b'')
+          yield (cls.TTY_PATH_ENV.format(fd_id), os.ttyname(fd.fileno()) or b"")
+
     return dict(gen_env_vars())
 
   @classmethod
@@ -381,11 +390,12 @@ class NailgunProtocol:
     :param dict env: A dictionary representing the environment.
     :returns: A tuple of boolean values indicating istty or not for (stdin, stdout, stderr).
     """
+
     def str_int_bool(i):
       return i.isdigit() and bool(int(i))  # Environment variable values should always be strings.
 
     return tuple(
-      str_int_bool(env.get(cls.TTY_ENV_TMPL.format(fd_id), '0')) for fd_id in STDIO_DESCRIPTORS
+      str_int_bool(env.get(cls.TTY_ENV_TMPL.format(fd_id), "0")) for fd_id in STDIO_DESCRIPTORS
     )
 
   @classmethod

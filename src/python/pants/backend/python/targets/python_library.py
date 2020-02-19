@@ -13,7 +13,7 @@ class PythonLibrary(PythonTarget):
 
   @classmethod
   def alias(cls):
-    return 'python_library'
+    return "python_library"
 
-  default_sources_globs = '*.py'
+  default_sources_globs = "*.py"
   default_sources_exclude_globs = PythonTests.default_sources_globs

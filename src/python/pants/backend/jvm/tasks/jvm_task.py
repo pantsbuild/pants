@@ -32,12 +32,16 @@ class JvmTask(Task):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--confs', type=list, default=['default'],
-             help='Use only these Ivy configurations of external deps.')
+    register(
+      "--confs",
+      type=list,
+      default=["default"],
+      help="Use only these Ivy configurations of external deps.",
+    )
 
   @classmethod
   def prepare(cls, options, round_manager):
-    round_manager.require_data('runtime_classpath')
+    round_manager.require_data("runtime_classpath")
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
@@ -47,8 +51,14 @@ class JvmTask(Task):
     self.confs = self.get_options().confs
     self.synthetic_classpath = self.jvm.get_options().synthetic_classpath
 
-  def classpath(self, targets, classpath_prefix=None, classpath_product=None, exclude_scopes=None,
-                include_scopes=None):
+  def classpath(
+    self,
+    targets,
+    classpath_prefix=None,
+    classpath_product=None,
+    exclude_scopes=None,
+    include_scopes=None,
+  ):
     """Builds a transitive classpath for the given targets.
 
     Optionally includes a classpath prefix or building from a non-default classpath product.
@@ -64,9 +74,14 @@ class JvmTask(Task):
     :return: a list of classpath strings.
     """
     include_scopes = Scopes.JVM_RUNTIME_SCOPES if include_scopes is None else include_scopes
-    classpath_product = classpath_product or self.context.products.get_data('runtime_classpath')
-    closure = BuildGraph.closure(targets, bfs=True, include_scopes=include_scopes,
-                                 exclude_scopes=exclude_scopes, respect_intransitive=True)
+    classpath_product = classpath_product or self.context.products.get_data("runtime_classpath")
+    closure = BuildGraph.closure(
+      targets,
+      bfs=True,
+      include_scopes=include_scopes,
+      exclude_scopes=exclude_scopes,
+      respect_intransitive=True,
+    )
 
     classpath_for_targets = ClasspathUtil.classpath(closure, classpath_product, self.confs)
     classpath = list(classpath_prefix or ())
@@ -75,15 +90,16 @@ class JvmTask(Task):
 
   def preferred_jvm_distribution_for_targets(self, targets, jdk=False, strict=False):
     """Find the preferred jvm distribution for running code from the given targets."""
-    target_platforms = [self._runtime_platform_for_target(target) for target in targets if
-      isinstance(target, JvmTarget)]
+    target_platforms = [
+      self._runtime_platform_for_target(target)
+      for target in targets
+      if isinstance(target, JvmTarget)
+    ]
     if not target_platforms:
       platforms = [JvmPlatform.default_runtime_platform]
     else:
       platforms = target_platforms
-    return self.preferred_jvm_distribution(
-      platforms,
-      jdk=jdk, strict=strict)
+    return self.preferred_jvm_distribution(platforms, jdk=jdk, strict=strict)
 
   def _runtime_platform_for_target(self, target):
     if isinstance(target, RuntimePlatformMixin):

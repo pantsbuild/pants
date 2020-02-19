@@ -17,29 +17,29 @@ from pants.util.strutil import ensure_binary
 class ToolOutputFormat:
   """Configuration item for displaying Tool Output to the console."""
 
-  SUPPRESS =   'SUPPRESS'    # Do not display output from the workunit unless its outcome != SUCCESS
-  INDENT =     'INDENT'      # Indent the output to line up with the indentation of the other log output
-  UNINDENTED = 'UNINDENTED'  # Display the output raw, with no leading indentation
+  SUPPRESS = "SUPPRESS"  # Do not display output from the workunit unless its outcome != SUCCESS
+  INDENT = "INDENT"  # Indent the output to line up with the indentation of the other log output
+  UNINDENTED = "UNINDENTED"  # Display the output raw, with no leading indentation
 
   @classmethod
   @memoized_method
   def keys(cls):
-    return [key for key in dir(cls) if not key.startswith('_') and key.isupper()]
+    return [key for key in dir(cls) if not key.startswith("_") and key.isupper()]
 
 
 class LabelFormat:
   """Configuration item for displaying a workunit label to the console."""
 
-  SUPPRESS = 'SUPPRESS'              # Don't show the label at all
-  DOT = 'DOT'                        # Just output a single '.' with no newline
-  FULL = 'FULL'                      # Show the timestamp and label
-  CHILD_SUPPRESS = 'CHILD_SUPPRESS'  # Suppress labels for all children of this node
-  CHILD_DOT = 'CHILD_DOT'            # Display a dot for all children of this node
+  SUPPRESS = "SUPPRESS"  # Don't show the label at all
+  DOT = "DOT"  # Just output a single '.' with no newline
+  FULL = "FULL"  # Show the timestamp and label
+  CHILD_SUPPRESS = "CHILD_SUPPRESS"  # Suppress labels for all children of this node
+  CHILD_DOT = "CHILD_DOT"  # Display a dot for all children of this node
 
   @classmethod
   @memoized_method
   def keys(cls):
-    return [key for key in dir(cls) if not key.startswith('_') and key.isupper()]
+    return [key for key in dir(cls) if not key.startswith("_") and key.isupper()]
 
 
 class PlainTextReporter(PlainTextReporterBase):
@@ -65,7 +65,7 @@ class PlainTextReporter(PlainTextReporterBase):
     Report.ERROR: red,
     Report.WARN: yellow,
     Report.INFO: green,
-    Report.DEBUG: cyan
+    Report.DEBUG: cyan,
   }
 
   # Format the std output from these workunit types as specified.  If no format is specified, the
@@ -77,7 +77,7 @@ class PlainTextReporter(PlainTextReporterBase):
     WorkUnitLabel.TEST: ToolOutputFormat.INDENT,
     WorkUnitLabel.REPL: ToolOutputFormat.UNINDENTED,
     WorkUnitLabel.RUN: ToolOutputFormat.UNINDENTED,
-    WorkUnitLabel.LINT: ToolOutputFormat.INDENT
+    WorkUnitLabel.LINT: ToolOutputFormat.INDENT,
   }
 
   # Format the labels from these workunit types as specified.  If no format is specified, the
@@ -91,22 +91,34 @@ class PlainTextReporter(PlainTextReporterBase):
     super().__init__(run_tracker, settings)
 
     # We eagerly validate that our output accepts raw bytes.
-    settings.outfile.write(b'')
+    settings.outfile.write(b"")
 
     for key, value in settings.label_format.items():
       if key not in WorkUnitLabel.keys():
-        self.emit('*** Got invalid key {} for --reporting-console-label-format. Expected one of {}\n'
-                  .format(key, WorkUnitLabel.keys()))
+        self.emit(
+          "*** Got invalid key {} for --reporting-console-label-format. Expected one of {}\n".format(
+            key, WorkUnitLabel.keys()
+          )
+        )
       if value not in LabelFormat.keys():
-        self.emit('*** Got invalid value {} for --reporting-console-label-format. Expected one of {}\n'
-                  .format(value, LabelFormat.keys()))
+        self.emit(
+          "*** Got invalid value {} for --reporting-console-label-format. Expected one of {}\n".format(
+            value, LabelFormat.keys()
+          )
+        )
     for key, value in settings.tool_output_format.items():
       if key not in WorkUnitLabel.keys():
-        self.emit('*** Got invalid key {} for --reporting-console-tool-output-format. Expected one of {}\n'
-                  .format(key, WorkUnitLabel.keys()))
+        self.emit(
+          "*** Got invalid key {} for --reporting-console-tool-output-format. Expected one of {}\n".format(
+            key, WorkUnitLabel.keys()
+          )
+        )
       if value not in ToolOutputFormat.keys():
-        self.emit('*** Got invalid value {} for --reporting-console-tool-output-format. Expected one of {}\n'
-                  .format(value, ToolOutputFormat.keys()))
+        self.emit(
+          "*** Got invalid value {} for --reporting-console-tool-output-format. Expected one of {}\n".format(
+            value, ToolOutputFormat.keys()
+          )
+        )
 
     # Mix in the new settings with the defaults.
     self.LABEL_FORMATTING.update(settings.label_format.items())
@@ -133,11 +145,11 @@ class PlainTextReporter(PlainTextReporterBase):
       # Start output on a new line.
       tool_output_format = self._get_tool_output_format(workunit)
       if tool_output_format == ToolOutputFormat.INDENT:
-        self.emit(self._prefix(workunit, '\n'))
+        self.emit(self._prefix(workunit, "\n"))
       elif tool_output_format == ToolOutputFormat.UNINDENTED:
-        self.emit('\n')
+        self.emit("\n")
     elif label_format == LabelFormat.DOT:
-      self.emit('.')
+      self.emit(".")
 
     self.flush()
 
@@ -151,7 +163,7 @@ class PlainTextReporter(PlainTextReporterBase):
       if self._get_label_format(workunit) != LabelFormat.FULL:
         self._emit_indented_workunit_label(workunit)
       for name, outbuf in workunit.outputs().items():
-        self.emit(self._prefix(workunit, '\n==== {} ====\n'.format(name)))
+        self.emit(self._prefix(workunit, "\n==== {} ====\n".format(name)))
         self.emit(self._prefix(workunit, outbuf.read_from(0).decode()))
         self.flush()
 
@@ -163,7 +175,7 @@ class PlainTextReporter(PlainTextReporterBase):
     # If the element is a (msg, detail) pair, we ignore the detail. There's no
     # useful way to display it on the console.
     elements = [e if isinstance(e, str) else e[0] for e in msg_elements]
-    msg = '\n' + ''.join(elements)
+    msg = "\n" + "".join(elements)
     if self.use_color_for_workunit(workunit, self.settings.color):
       msg = self._COLOR_BY_LEVEL.get(level, lambda x: x)(msg)
 
@@ -188,7 +200,7 @@ class PlainTextReporter(PlainTextReporterBase):
     elif dest == ReporterDestination.ERR:
       self.settings.errfile.write(s)
     else:
-      raise Exception('Invalid {}: {}'.format(ReporterDestination, dest))
+      raise Exception("Invalid {}: {}".format(ReporterDestination, dest))
 
   def flush(self):
     self.settings.outfile.flush()
@@ -217,11 +229,14 @@ class PlainTextReporter(PlainTextReporterBase):
     return ToolOutputFormat.SUPPRESS
 
   def _emit_indented_workunit_label(self, workunit):
-    self.emit('\n{} {} {}[{}]'.format(
-      workunit.start_time_string,
-      workunit.start_delta_string,
-      self._indent(workunit),
-      workunit.name if self.settings.indent else workunit.path()))
+    self.emit(
+      "\n{} {} {}[{}]".format(
+        workunit.start_time_string,
+        workunit.start_delta_string,
+        self._indent(workunit),
+        workunit.name if self.settings.indent else workunit.path(),
+      )
+    )
 
   # Emit output from some tools and not others.
   # This is an arbitrary choice, but one that turns out to be useful to users in practice.
@@ -230,23 +245,29 @@ class PlainTextReporter(PlainTextReporterBase):
     return not tool_output_format == ToolOutputFormat.SUPPRESS
 
   def _format_aggregated_timings(self, aggregated_timings):
-    return '\n'.join(['{timing:.3f} {label}'.format(**x) for x in aggregated_timings.get_all()])
+    return "\n".join(["{timing:.3f} {label}".format(**x) for x in aggregated_timings.get_all()])
 
   def _format_artifact_cache_stats(self, artifact_cache_stats):
     stats = artifact_cache_stats.get_all()
-    return 'No artifact cache reads.' if not stats else \
-    '\n'.join(['{cache_name} - Hits: {num_hits} Misses: {num_misses}'.format(**x)
-                for x in stats])
+    return (
+      "No artifact cache reads."
+      if not stats
+      else "\n".join(
+        ["{cache_name} - Hits: {num_hits} Misses: {num_misses}".format(**x) for x in stats]
+      )
+    )
 
   def _indent(self, workunit):
-    return '  ' * (len(workunit.ancestors()) - 1)
+    return "  " * (len(workunit.ancestors()) - 1)
 
-  _time_string_filler = ' ' * len('HH:MM:SS mm:ss ')
+  _time_string_filler = " " * len("HH:MM:SS mm:ss ")
 
   def _prefix(self, workunit, s):
     if self.settings.indent:
+
       def replace(x, c):
         return x.replace(c, c + PlainTextReporter._time_string_filler + self._indent(workunit))
-      return replace(replace(s, '\r'), '\n')
+
+      return replace(replace(s, "\r"), "\n")
     else:
       return PlainTextReporter._time_string_filler + s

@@ -19,7 +19,8 @@ from pants.util.contextutil import temporary_dir
 
 class RunOptions(GoalSubsystem):
   """Runs a runnable target."""
-  name = 'run'
+
+  name = "run"
 
   # NB: To be runnable, you must be a BinaryTarget.
   required_union_implementations = (BinaryTarget,)
@@ -28,9 +29,12 @@ class RunOptions(GoalSubsystem):
   def register_options(cls, register) -> None:
     super().register_options(register)
     register(
-      '--args', type=list, member_type=shell_str, fingerprint=True,
+      "--args",
+      type=list,
+      member_type=shell_str,
+      fingerprint=True,
       help="Arguments to pass directly to the executed target, e.g. "
-           "`--run-args=\"val1 val2 --debug\"`",
+      '`--run-args="val1 val2 --debug"`',
     )
 
 
@@ -59,8 +63,7 @@ async def run(
     console.write_stdout(f"Running target: {address}\n")
     full_path = str(Path(tmpdir, binary.binary_name))
     run_request = InteractiveProcessRequest(
-      argv=(full_path, *options.values.args),
-      run_in_workspace=True,
+      argv=(full_path, *options.values.args), run_in_workspace=True
     )
 
     try:

@@ -29,19 +29,20 @@ class FileDepsTest(GoalRuleTestBase):
   def alias_groups(cls) -> BuildFileAliases:
     return BuildFileAliases(
       targets={
-        'target': Target,
-        'resources': Resources,
-        'java_library': JavaLibrary,
-        'java_thrift_library': JavaThriftLibrary,
-        'jvm_app': JvmApp,
-        'jvm_binary': JvmBinary,
-        'scala_library': ScalaLibrary,
-        'python_library': PythonLibrary,
-      },
+        "target": Target,
+        "resources": Resources,
+        "java_library": JavaLibrary,
+        "java_thrift_library": JavaThriftLibrary,
+        "jvm_app": JvmApp,
+        "jvm_binary": JvmBinary,
+        "scala_library": ScalaLibrary,
+        "python_library": PythonLibrary,
+      }
     )
 
   def create_python_library(
-    self, path: str,
+    self,
+    path: str,
     *,
     sources: Optional[List[str]] = None,
     dependencies: Optional[List[str]] = None
@@ -51,7 +52,7 @@ class FileDepsTest(GoalRuleTestBase):
       target_type="python_library",
       name="target",
       sources=sources or [],
-      dependencies=dependencies or []
+      dependencies=dependencies or [],
     )
 
   def assert_filedeps(self, *, targets: List[str], expected: Set[str], globs: bool = False) -> None:
@@ -77,7 +78,7 @@ class FileDepsTest(GoalRuleTestBase):
     self.create_python_library("some/target", sources=["file1.py", "file2.py"])
     self.assert_filedeps(
       targets=["some/target"],
-      expected={"some/target/BUILD", "some/target/file1.py", "some/target/file2.py"}
+      expected={"some/target/BUILD", "some/target/file1.py", "some/target/file2.py"},
     )
 
   def test_one_target_no_source_one_dep(self) -> None:
@@ -85,7 +86,7 @@ class FileDepsTest(GoalRuleTestBase):
     self.create_python_library("some/target", dependencies=["dep/target"])
     self.assert_filedeps(
       targets=["some/target"],
-      expected={"some/target/BUILD", "dep/target/BUILD", "dep/target/file.py"}
+      expected={"some/target/BUILD", "dep/target/BUILD", "dep/target/file.py"},
     )
 
   def test_one_target_one_source_with_dep(self) -> None:
@@ -94,8 +95,11 @@ class FileDepsTest(GoalRuleTestBase):
     self.assert_filedeps(
       targets=["some/target"],
       expected={
-        "some/target/BUILD", "some/target/file.py", "dep/target/BUILD", "dep/target/file.py"
-      }
+        "some/target/BUILD",
+        "some/target/file.py",
+        "dep/target/BUILD",
+        "dep/target/file.py",
+      },
     )
 
   def test_multiple_targets_one_source(self) -> None:
@@ -104,8 +108,11 @@ class FileDepsTest(GoalRuleTestBase):
     self.assert_filedeps(
       targets=["some/target", "other/target"],
       expected={
-        "some/target/BUILD", "some/target/file.py", "other/target/BUILD", "other/target/file.py"
-      }
+        "some/target/BUILD",
+        "some/target/file.py",
+        "other/target/BUILD",
+        "other/target/file.py",
+      },
     )
 
   def test_multiple_targets_one_source_with_dep(self) -> None:
@@ -124,7 +131,7 @@ class FileDepsTest(GoalRuleTestBase):
         "dep1/target/file.py",
         "dep2/target/BUILD",
         "dep2/target/file.py",
-      }
+      },
     )
 
   def test_multiple_targets_one_source_overlapping(self) -> None:
@@ -140,18 +147,14 @@ class FileDepsTest(GoalRuleTestBase):
         "other/target/file.py",
         "dep/target/BUILD",
         "dep/target/file.py",
-      }
+      },
     )
 
   def test_globs(self) -> None:
     self.create_files("some/target", ["test1.py", "test2.py"])
-    self.add_to_build_file(
-      "some/target", target="target(name='target', sources=globs('test*.py'))"
-    )
+    self.add_to_build_file("some/target", target="target(name='target', sources=globs('test*.py'))")
     self.assert_filedeps(
-      targets=["some/target"],
-      expected={"some/target/BUILD", "some/target/test*.py"},
-      globs=True
+      targets=["some/target"], expected={"some/target/BUILD", "some/target/test*.py"}, globs=True
     )
 
   def test_build_with_file_ext(self) -> None:
@@ -164,8 +167,10 @@ class FileDepsTest(GoalRuleTestBase):
       targets=["src/resources:data"], expected={"src/resources/BUILD", "src/resources/data.json"}
     )
 
-  @skip("V2 does not yet hydrate java_sources for scala_library targets. Once this happens, "
-        "we must teach filedeps.py to check the target_adaptor for java_sources.")
+  @skip(
+    "V2 does not yet hydrate java_sources for scala_library targets. Once this happens, "
+    "we must teach filedeps.py to check the target_adaptor for java_sources."
+  )
   def test_scala_with_java_sources(self) -> None:
     self.create_file("src/java/j.java")
     self.create_file("src/scala/s.scala")
@@ -193,12 +198,12 @@ class FileDepsTest(GoalRuleTestBase):
       sources=["lib1.java"],
       dependencies=["src/thrift/storage"],
     )
-    self.create_file('.pants.d/gen/thrift/java/storage/Angle.java')
+    self.create_file(".pants.d/gen/thrift/java/storage/Angle.java")
     synthetic_java_lib = self.make_target(
-      spec='.pants.d/gen/thrift/java/storage',
+      spec=".pants.d/gen/thrift/java/storage",
       target_type=JavaLibrary,
-      derived_from=self.target('src/thrift/storage'),
-      sources=['Angle.java']
+      derived_from=self.target("src/thrift/storage"),
+      sources=["Angle.java"],
     )
     java_lib.inject_dependency(synthetic_java_lib.address)
     self.assert_filedeps(
@@ -208,11 +213,13 @@ class FileDepsTest(GoalRuleTestBase):
         "src/java/lib/lib1.java",
         "src/thrift/storage/BUILD",
         "src/thrift/storage/data_types.thrift",
-      }
+      },
     )
 
-  @skip("V2 does not yet hydrate bundles or binary attributes for jvm_app. After this is added,"
-        "we must add similar logic to the V1 filedeps goal for jvm_apps.")
+  @skip(
+    "V2 does not yet hydrate bundles or binary attributes for jvm_app. After this is added,"
+    "we must add similar logic to the V1 filedeps goal for jvm_apps."
+  )
   def test_jvm_app(self) -> None:
     self.create_library(
       path="src/thrift/storage",
@@ -233,7 +240,7 @@ class FileDepsTest(GoalRuleTestBase):
       name="bin",
       sources=["main.java"],
       main="bin.Main",
-      dependencies=["src/java/lib"]
+      dependencies=["src/java/lib"],
     )
     self.create_file("project/config/app.yaml")
     self.create_library(
@@ -241,7 +248,7 @@ class FileDepsTest(GoalRuleTestBase):
       target_type="jvm_app",
       name="app",
       binary="src/java/bin",
-      bundles=["bundle(fileset=['config/app.yaml'])"]
+      bundles=["bundle(fileset=['config/app.yaml'])"],
     )
     self.assert_filedeps(
       targets=["project:app"],
@@ -252,6 +259,6 @@ class FileDepsTest(GoalRuleTestBase):
         "src/java/bin/main.java",
         "src/java/lib/BUILD",
         "src/java/lib/lib1.java",
-        "src/thrift/storage/BUILD"
-        "src/thrift/storage/data_types.thrift"
-      })
+        "src/thrift/storage/BUILD" "src/thrift/storage/data_types.thrift",
+      },
+    )

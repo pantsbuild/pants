@@ -28,11 +28,11 @@ class GatherSources(Task):
   code.
   """
 
-  PYTHON_SOURCES = 'python_sources'
+  PYTHON_SOURCES = "python_sources"
 
   @classmethod
   def implementation_version(cls):
-    return super().implementation_version() + [('GatherSources', 5)]
+    return super().implementation_version() + [("GatherSources", 5)]
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -45,7 +45,7 @@ class GatherSources(Task):
   @classmethod
   def prepare(cls, options, round_manager):
     round_manager.require_data(PythonInterpreter)
-    round_manager.optional_data('python')  # For codegen.
+    round_manager.optional_data("python")  # For codegen.
 
   def execute(self):
     targets = self._collect_source_targets()
@@ -66,8 +66,9 @@ class GatherSources(Task):
       if has_python_sources(target) or has_resources(target):
         targets.add(target)
 
-    self.context.build_graph.walk_transitive_dependency_graph(addresses=python_target_addresses,
-                                                              work=collect_source_targets)
+    self.context.build_graph.walk_transitive_dependency_graph(
+      addresses=python_target_addresses, work=collect_source_targets
+    )
 
     return targets
 
@@ -88,8 +89,8 @@ class GatherSources(Task):
 
   def _build_pex(self, interpreter, path, targets):
     pex_builder = PexBuilderWrapper.Factory.create(
-      builder=PEXBuilder(path=path, interpreter=interpreter, copy=True),
-      log=self.context.log)
+      builder=PEXBuilder(path=path, interpreter=interpreter, copy=True), log=self.context.log
+    )
 
     for target in targets:
       pex_builder.add_sources_from(target)

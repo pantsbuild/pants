@@ -56,12 +56,14 @@ class BuildConfigInitializer:
         pkg_resources.fixup_namespace_packages(path)
 
     # Load plugins and backends.
-    return load_backends_and_plugins(self._bootstrap_options.plugins,
-                                     self._bootstrap_options.plugins2,
-                                     self._working_set,
-                                     self._bootstrap_options.backend_packages,
-                                     self._bootstrap_options.backend_packages2,
-                                     BuildConfiguration())
+    return load_backends_and_plugins(
+      self._bootstrap_options.plugins,
+      self._bootstrap_options.plugins2,
+      self._working_set,
+      self._bootstrap_options.backend_packages,
+      self._bootstrap_options.backend_packages2,
+      BuildConfiguration(),
+    )
 
   def setup(self):
     """Load backends and plugins.
@@ -85,17 +87,17 @@ class OptionsInitializer:
     # Gather the optionables that are not scoped to any other.  All known scopes are reachable
     # via these optionables' known_scope_infos() methods.
     top_level_optionables = (
-      {GlobalOptionsRegistrar} |
-      GlobalSubsystems.get() |
-      build_configuration.optionables() |
-      set(Goal.get_optionables())
+      {GlobalOptionsRegistrar}
+      | GlobalSubsystems.get()
+      | build_configuration.optionables()
+      | set(Goal.get_optionables())
     )
 
     # Now that we have the known scopes we can get the full options. `get_full_options` will
     # sort and de-duplicate these for us.
-    known_scope_infos = [si
-                         for optionable in top_level_optionables
-                         for si in optionable.known_scope_infos()]
+    known_scope_infos = [
+      si for optionable in top_level_optionables for si in optionable.known_scope_infos()
+    ]
     return options_bootstrapper.get_full_options(known_scope_infos)
 
   @staticmethod
@@ -115,7 +117,7 @@ class OptionsInitializer:
       # temp workdir is /path/to/<pants_workdir>/tmp/tmp<process_id>.pants.d
       if maybe_rel_path and not re.search("tmp/tmp(.+).pants.d", maybe_rel_path):
         rel_path = maybe_rel_path.rstrip(os.path.sep)
-        pants_ignore.append(f'/{rel_path}')
+        pants_ignore.append(f"/{rel_path}")
 
     add_ignore(global_options.pants_workdir)
     add_ignore(global_options.pants_distdir)
@@ -129,14 +131,16 @@ class OptionsInitializer:
     with those invalidation_globs provided by users.
     """
     invalidation_globs = []
-    globs = bootstrap_options.pythonpath + \
-      bootstrap_options.pants_config_files + \
-      bootstrap_options.pantsd_invalidation_globs
+    globs = (
+      bootstrap_options.pythonpath
+      + bootstrap_options.pants_config_files
+      + bootstrap_options.pantsd_invalidation_globs
+    )
 
     for glob in globs:
       glob_relpath = os.path.relpath(glob, buildroot)
       if glob_relpath and (not glob_relpath.startswith("../")):
-        invalidation_globs.extend([glob_relpath, glob_relpath + '/**'])
+        invalidation_globs.extend([glob_relpath, glob_relpath + "/**"])
       else:
         logging.getLogger(__name__).warning(
           f"Changes to {glob}, outside of the buildroot, will not be invalidated."
@@ -150,8 +154,8 @@ class OptionsInitializer:
 
     if global_bootstrap_options.pants_version != pants_version():
       raise BuildConfigurationError(
-        f'Version mismatch: Requested version was {global_bootstrap_options.pants_version}, '
-        f'our version is {pants_version()}.'
+        f"Version mismatch: Requested version was {global_bootstrap_options.pants_version}, "
+        f"our version is {pants_version()}."
       )
 
     # Parse and register options.

@@ -26,7 +26,7 @@ class LintResult:
 
   @staticmethod
   def from_fallible_execute_process_result(
-    process_result: FallibleExecuteProcessResult
+    process_result: FallibleExecuteProcessResult,
   ) -> "LintResult":
     return LintResult(
       exit_code=process_result.exit_code,
@@ -51,9 +51,8 @@ class LintTarget:
     adaptor_with_origin: TargetAdaptorWithOrigin, *, union_membership: UnionMembership
   ) -> bool:
     is_lint_target = union_membership.is_member(LintTarget, adaptor_with_origin)
-    has_sources = (
-      hasattr(adaptor_with_origin.adaptor, "sources")
-      and bool(adaptor_with_origin.adaptor.sources.snapshot.files)
+    has_sources = hasattr(adaptor_with_origin.adaptor, "sources") and bool(
+      adaptor_with_origin.adaptor.sources.snapshot.files
     )
     return has_sources and is_lint_target
 
@@ -63,7 +62,7 @@ class LintOptions(GoalSubsystem):
 
   # TODO: make this "lint"
   # Blocked on https://github.com/pantsbuild/pants/issues/8351
-  name = 'lint2'
+  name = "lint2"
 
   required_union_implementations = (LintTarget,)
 

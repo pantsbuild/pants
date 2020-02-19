@@ -26,7 +26,6 @@ from pants.testutil.test_base import TestBase
 
 
 class PythonFormatTargetIntegrationTest(TestBase):
-
   def setUp(self):
     super().setUp()
     init_subsystems([download_pex_bin.DownloadedPexBin.Factory])
@@ -45,13 +44,10 @@ class PythonFormatTargetIntegrationTest(TestBase):
       RootRule(download_pex_bin.DownloadedPexBin.Factory),
     )
 
-  def run_black_and_isort(
-    self,
-    source_files: List[FileContent],
-  ) -> AggregatedFmtResults:
+  def run_black_and_isort(self, source_files: List[FileContent]) -> AggregatedFmtResults:
     input_snapshot = self.request_single_product(Snapshot, InputFilesContent(source_files))
     adaptor = TargetAdaptor(
-      sources=EagerFilesetWithSpec('test', {'globs': []}, snapshot=input_snapshot),
+      sources=EagerFilesetWithSpec("test", {"globs": []}, snapshot=input_snapshot),
       address=Address.parse("test:target"),
     )
     origin = SingleAddress(directory="test", name="target")
@@ -63,10 +59,10 @@ class PythonFormatTargetIntegrationTest(TestBase):
         create_options_bootstrapper(
           args=[
             "--backend-packages2=['pants.backend.python.lint.black', 'pants.backend.python.lint.isort']"
-          ],
+          ]
         ),
         download_pex_bin.DownloadedPexBin.Factory.global_instance(),
-      )
+      ),
     )
     return results
 
@@ -75,22 +71,22 @@ class PythonFormatTargetIntegrationTest(TestBase):
 
   def test_multiple_formatters_changing_the_same_file(self) -> None:
     original_source = FileContent(
-      'test/target.py', content=b"from animals import dog, cat\n\nprint('hello')\n",
+      "test/target.py", content=b"from animals import dog, cat\n\nprint('hello')\n"
     )
     fixed_source = FileContent(
-      'test/target.py', content=b"from animals import cat, dog\n\nprint(\"hello\")\n",
+      "test/target.py", content=b'from animals import cat, dog\n\nprint("hello")\n'
     )
     results = self.run_black_and_isort([original_source])
     assert results.combined_digest == self.get_digest([fixed_source])
 
   def test_multiple_formatters_changing_different_files(self) -> None:
     original_sources = [
-      FileContent('test/isort.py', content=b"from animals import dog, cat\n"),
-      FileContent('test/black.py', content=b"print('hello')\n"),
+      FileContent("test/isort.py", content=b"from animals import dog, cat\n"),
+      FileContent("test/black.py", content=b"print('hello')\n"),
     ]
     fixed_sources = [
-      FileContent('test/isort.py', content=b"from animals import cat, dog\n"),
-      FileContent('test/black.py', content=b"print(\"hello\")\n"),
+      FileContent("test/isort.py", content=b"from animals import cat, dog\n"),
+      FileContent("test/black.py", content=b'print("hello")\n'),
     ]
     results = self.run_black_and_isort(original_sources)
     assert results.combined_digest == self.get_digest(fixed_sources)

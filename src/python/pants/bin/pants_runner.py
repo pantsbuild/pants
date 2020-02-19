@@ -37,7 +37,7 @@ class PantsRunner(ExceptionSink.AccessGlobalExiterMixin):
   # This could be a bootstrap option, but it's preferable to keep these very limited to make it
   # easier to make the daemon the default use case. Once the daemon lifecycle is stable enough we
   # should be able to avoid needing to kill it at all.
-  _DAEMON_KILLING_GOALS = frozenset(['kill-pantsd', 'clean-all'])
+  _DAEMON_KILLING_GOALS = frozenset(["kill-pantsd", "clean-all"])
 
   def will_terminate_pantsd(self) -> bool:
     return not frozenset(self._args).isdisjoint(self._DAEMON_KILLING_GOALS)
@@ -67,9 +67,9 @@ class PantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     # If PYTHONPATH was used to set up the Pants runtime environment, its entries are now on our
     # `sys.path` allowing us to run. Do not propagate any of these Pants-specific sys.path entries
     # forward to our subprocesses.
-    pythonpath = os.environ.pop('PYTHONPATH', None)
+    pythonpath = os.environ.pop("PYTHONPATH", None)
     if pythonpath:
-      logger.warning(f'Scrubbed PYTHONPATH={pythonpath} from the environment.')
+      logger.warning(f"Scrubbed PYTHONPATH={pythonpath} from the environment.")
 
   def run(self):
     self.scrub_pythonpath()
@@ -86,7 +86,9 @@ class PantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     # and everything before it will be routed through regular Python logging.
     self._enable_rust_logging(global_bootstrap_options)
 
-    ExceptionSink.reset_should_print_backtrace_to_terminal(global_bootstrap_options.print_exception_stacktrace)
+    ExceptionSink.reset_should_print_backtrace_to_terminal(
+      global_bootstrap_options.print_exception_stacktrace
+    )
     ExceptionSink.reset_log_location(global_bootstrap_options.pants_workdir)
 
     # TODO https://github.com/pantsbuild/pants/issues/7205
@@ -94,7 +96,7 @@ class PantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       try:
         return RemotePantsRunner(self._exiter, self._args, self._env, options_bootstrapper).run()
       except RemotePantsRunner.Fallback as e:
-        logger.warning('caught client exception: {!r}, falling back to non-daemon mode'.format(e))
+        logger.warning("caught client exception: {!r}, falling back to non-daemon mode".format(e))
 
     # N.B. Inlining this import speeds up the python thin client run by about 100ms.
     from pants.bin.local_pants_runner import LocalPantsRunner
@@ -103,9 +105,7 @@ class PantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       logger.debug("Pantsd terminating goal detected: {}".format(self._args))
 
     runner = LocalPantsRunner.create(
-        self._args,
-        self._env,
-        options_bootstrapper=options_bootstrapper
+      self._args, self._env, options_bootstrapper=options_bootstrapper
     )
     runner.set_start_time(self._start_time)
     return runner.run()

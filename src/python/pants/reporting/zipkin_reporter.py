@@ -34,35 +34,48 @@ class AsyncHTTPTransportHandler(BaseTransportHandler):
     try:
       if not os.path.exists(self.zipkin_spans_dir):
         logger.error(
-          "Not uploading Zipkin spans because directory {} got deleted".format(self.zipkin_spans_dir)
+          "Not uploading Zipkin spans because directory {} got deleted".format(
+            self.zipkin_spans_dir
+          )
         )
         return
 
       self.file_count += 1
       file_path_to_store_spans = os.path.join(
-        self.zipkin_spans_dir, 'spans-{}-{}'.format(self.file_count, self.encoding)
+        self.zipkin_spans_dir, "spans-{}-{}".format(self.file_count, self.encoding)
       )
 
-      with open(file_path_to_store_spans, 'w') as f:
+      with open(file_path_to_store_spans, "w") as f:
         f.write(payload)
 
-      args = ['curl', '-v',
-              '-X', 'POST',
-              '-H', 'Content-Type: application/json',
-              # It is a debug flag that ensures that the trace will be retained on the server side.
-              '-H', 'X-B3-Flags: 1',
-              '--data', '@' + file_path_to_store_spans,
-              self.endpoint]
-      file_path_to_stdout_stderr = os.path.join(self.zipkin_spans_dir,
-                                                'stdout_stderr_output_{}'.format(self.file_count))
-      p = subprocess.Popen(args, stdin=subprocess.DEVNULL,
-                           stdout=open(file_path_to_stdout_stderr, 'w'),
-                           stderr=subprocess.STDOUT, close_fds=False)
+      args = [
+        "curl",
+        "-v",
+        "-X",
+        "POST",
+        "-H",
+        "Content-Type: application/json",
+        # It is a debug flag that ensures that the trace will be retained on the server side.
+        "-H",
+        "X-B3-Flags: 1",
+        "--data",
+        "@" + file_path_to_store_spans,
+        self.endpoint,
+      ]
+      file_path_to_stdout_stderr = os.path.join(
+        self.zipkin_spans_dir, "stdout_stderr_output_{}".format(self.file_count)
+      )
+      p = subprocess.Popen(
+        args,
+        stdin=subprocess.DEVNULL,
+        stdout=open(file_path_to_stdout_stderr, "w"),
+        stderr=subprocess.STDOUT,
+        close_fds=False,
+      )
 
       logger.debug("Sending spans to Zipkin server from pid: {}".format(p.pid))
-      logger.debug("stdout and stderr for pid {} are located at '{}'".format(
-        p.pid,
-        file_path_to_stdout_stderr)
+      logger.debug(
+        "stdout and stderr for pid {} are located at '{}'".format(p.pid, file_path_to_stdout_stderr)
       )
 
     except Exception as err:
@@ -74,8 +87,17 @@ class ZipkinReporter(Reporter):
     Reporter that implements Zipkin tracing.
   """
 
-  def __init__(self, run_tracker, settings, endpoint, trace_id, parent_id, sample_rate,
-                service_name_prefix, max_span_batch_size):
+  def __init__(
+    self,
+    run_tracker,
+    settings,
+    endpoint,
+    trace_id,
+    parent_id,
+    sample_rate,
+    service_name_prefix,
+    max_span_batch_size,
+  ):
     """
     When trace_id and parent_id are set a Zipkin trace will be created with given trace_id
     and parent_id. If trace_id and parent_id are set to None, a trace_id will be randomly
@@ -103,7 +125,7 @@ class ZipkinReporter(Reporter):
     self.run_tracker = run_tracker
     self.service_name_prefix = service_name_prefix
     self.max_span_batch_size = max_span_batch_size
-    self.zipkin_spans_dir = os.path.join(self.run_tracker.run_info_dir, 'zipkin')
+    self.zipkin_spans_dir = os.path.join(self.run_tracker.run_info_dir, "zipkin")
     self.handler = AsyncHTTPTransportHandler(endpoint, self.zipkin_spans_dir, self.encoding)
 
     # Directory to store encoded spans.
@@ -135,7 +157,7 @@ class ZipkinReporter(Reporter):
           trace_id=self.trace_id,
           span_id=generate_random_64bit_string(),
           parent_span_id=self.parent_id,
-          flags='0', # flags: stores flags header. Currently unused
+          flags="0",  # flags: stores flags header. Currently unused
           is_sampled=True,
         )
       else:
@@ -143,7 +165,7 @@ class ZipkinReporter(Reporter):
           # trace_id is the same as run_uuid that is created in run_tracker and is the part of
           # pants_run id
           trace_id=self.trace_id,
-          sample_rate=self.sample_rate, # Value between 0.0 and 100.0
+          sample_rate=self.sample_rate,  # Value between 0.0 and 100.0
         )
         # TODO delete this line when parent_id will be passed in v2 engine:
         #  - with ExecutionRequest when Nodes from v2 engine are called by a workunit;
@@ -166,12 +188,11 @@ class ZipkinReporter(Reporter):
         local_tracer.push_zipkin_attrs(parent_attrs)
         local_tracer.set_transport_configured(configured=True)
       span = local_tracer.zipkin_span(
-        service_name=self.service_name_prefix.format(service_name),
-        span_name=workunit.name,
+        service_name=self.service_name_prefix.format(service_name), span_name=workunit.name
       )
     # For all spans except the first span zipkin_attrs for span are created at this point
     span.start()
-    if workunit.name == 'background' and self.run_tracker.is_main_root_workunit(workunit.parent):
+    if workunit.name == "background" and self.run_tracker.is_main_root_workunit(workunit.parent):
       span.zipkin_attrs = span.zipkin_attrs._replace(
         parent_span_id=workunit.parent.zipkin_span.zipkin_attrs.span_id
       )
@@ -198,36 +219,34 @@ class ZipkinReporter(Reporter):
     """End the report."""
     endpoint = self.endpoint.replace("/api/v1/spans", "")
 
-    logger.debug("Zipkin trace may be located at this URL {}/traces/{}".format(endpoint, self.trace_id))
+    logger.debug(
+      "Zipkin trace may be located at this URL {}/traces/{}".format(endpoint, self.trace_id)
+    )
 
   def bulk_record_workunits(self, engine_workunits):
     """A collection of workunits from v2 engine part"""
     for workunit in engine_workunits:
       start_timestamp = from_secs_and_nanos_to_float(
-        workunit['start_secs'],
-        workunit['start_nanos']
+        workunit["start_secs"], workunit["start_nanos"]
       )
-      duration = from_secs_and_nanos_to_float(
-        workunit['duration_secs'],
-        workunit['duration_nanos']
-      )
+      duration = from_secs_and_nanos_to_float(workunit["duration_secs"], workunit["duration_nanos"])
 
       local_tracer = get_default_tracer()
 
       span = local_tracer.zipkin_span(
         service_name=self.service_name_prefix.format("rule"),
-        span_name=workunit['name'],
+        span_name=workunit["name"],
         duration=duration,
       )
       span.start()
       span.zipkin_attrs = ZipkinAttrs(
         trace_id=self.trace_id,
-        span_id=workunit['span_id'],
+        span_id=workunit["span_id"],
         # TODO change it when we properly pass parent_id to the v2 engine Nodes
         # TODO Pass parent_id with ExecutionRequest when v2 engine is called by a workunit
         # TODO pass parent_id when v2 engine Node is called by another v2 engine Node
         parent_span_id=workunit.get("parent_id", self.parent_id),
-        flags='0', # flags: stores flags header. Currently unused
+        flags="0",  # flags: stores flags header. Currently unused
         is_sampled=True,
       )
       span.start_timestamp = start_timestamp
@@ -235,4 +254,4 @@ class ZipkinReporter(Reporter):
 
 
 def from_secs_and_nanos_to_float(secs, nanos):
-  return secs + ( nanos / NANOSECONDS_PER_SECOND )
+  return secs + (nanos / NANOSECONDS_PER_SECOND)

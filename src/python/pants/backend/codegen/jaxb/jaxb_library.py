@@ -9,7 +9,7 @@ from pants.base.payload_field import PrimitiveField
 class JaxbLibrary(JvmTarget):
   """A Java library generated from JAXB xsd files."""
 
-  def __init__(self, payload=None, package=None, language='java', **kwargs):
+  def __init__(self, payload=None, package=None, language="java", **kwargs):
     """
     :param package: java package (com.company.package) in which to generate the output java files.
       If unspecified, Pants guesses it from the file path leading to the schema
@@ -20,15 +20,17 @@ class JaxbLibrary(JvmTarget):
     """
 
     payload = payload or Payload()
-    payload.add_fields({
-      'package': PrimitiveField(package),
-      'jaxb_language': PrimitiveField(language),
-    })
+    payload.add_fields(
+      {"package": PrimitiveField(package), "jaxb_language": PrimitiveField(language)}
+    )
     super().__init__(payload=payload, **kwargs)
 
-    if language != 'java':
-      raise ValueError('Language "{lang}" not supported for {class_type}'
-                       .format(lang=language, class_type=type(self).__name__))
+    if language != "java":
+      raise ValueError(
+        'Language "{lang}" not supported for {class_type}'.format(
+          lang=language, class_type=type(self).__name__
+        )
+      )
 
   @property
   def package(self):

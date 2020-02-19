@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 class BuildConfiguration:
   """Stores the types and helper functions exposed to BUILD files."""
 
-  class ParseState(namedtuple('ParseState', ['parse_context', 'parse_globals'])):
+  class ParseState(namedtuple("ParseState", ["parse_context", "parse_globals"])):
     @property
     def objects(self):
       return self.parse_context._storage.objects
@@ -48,9 +48,9 @@ class BuildConfiguration:
     target_factories_by_alias = self._target_by_alias.copy()
     target_factories_by_alias.update(self._target_macro_factory_by_alias)
     return BuildFileAliases(
-        targets=target_factories_by_alias,
-        objects=self._exposed_object_by_alias.copy(),
-        context_aware_object_factories=self._exposed_context_aware_object_factory_by_alias.copy()
+      targets=target_factories_by_alias,
+      objects=self._exposed_object_by_alias.copy(),
+      context_aware_object_factories=self._exposed_context_aware_object_factory_by_alias.copy(),
     )
 
   def register_aliases(self, aliases):
@@ -60,7 +60,7 @@ class BuildConfiguration:
     :type aliases: :class:`pants.build_graph.build_file_aliases.BuildFileAliases`
     """
     if not isinstance(aliases, BuildFileAliases):
-      raise TypeError('The aliases must be a BuildFileAliases, given {}'.format(aliases))
+      raise TypeError("The aliases must be a BuildFileAliases, given {}".format(aliases))
 
     for alias, target_type in aliases.target_types.items():
       self._register_target_alias(alias, target_type)
@@ -79,14 +79,14 @@ class BuildConfiguration:
   # See: https://github.com/pantsbuild/pants/issues/2151
   def _register_target_alias(self, alias, target_type):
     if alias in self._target_by_alias:
-      logger.debug('Target alias {} has already been registered. Overwriting!'.format(alias))
+      logger.debug("Target alias {} has already been registered. Overwriting!".format(alias))
 
     self._target_by_alias[alias] = target_type
     self.register_optionables(target_type.subsystems())
 
   def _register_target_macro_factory_alias(self, alias, target_macro_factory):
     if alias in self._target_macro_factory_by_alias:
-      logger.debug('TargetMacro alias {} has already been registered. Overwriting!'.format(alias))
+      logger.debug("TargetMacro alias {} has already been registered. Overwriting!".format(alias))
 
     self._target_macro_factory_by_alias[alias] = target_macro_factory
     for target_type in target_macro_factory.target_types:
@@ -94,17 +94,19 @@ class BuildConfiguration:
 
   def _register_exposed_object(self, alias, obj):
     if alias in self._exposed_object_by_alias:
-      logger.debug('Object alias {} has already been registered. Overwriting!'.format(alias))
+      logger.debug("Object alias {} has already been registered. Overwriting!".format(alias))
 
     self._exposed_object_by_alias[alias] = obj
     # obj doesn't implement any common base class, so we have to test for this attr.
-    if hasattr(obj, 'subsystems'):
+    if hasattr(obj, "subsystems"):
       self.register_optionables(obj.subsystems())
 
   def _register_exposed_context_aware_object_factory(self, alias, context_aware_object_factory):
     if alias in self._exposed_context_aware_object_factory_by_alias:
-      logger.debug('This context aware object factory alias {} has already been registered. '
-                   'Overwriting!'.format(alias))
+      logger.debug(
+        "This context aware object factory alias {} has already been registered. "
+        "Overwriting!".format(alias)
+      )
 
     self._exposed_context_aware_object_factory_by_alias[alias] = context_aware_object_factory
 
@@ -116,17 +118,19 @@ class BuildConfiguration:
                        :class:`pants.option.optionable.Optionable` subclasses.
     """
     if not isinstance(optionables, Iterable):
-      raise TypeError('The optionables must be an iterable, given {}'.format(optionables))
+      raise TypeError("The optionables must be an iterable, given {}".format(optionables))
     optionables = tuple(optionables)
     if not optionables:
       return
 
-    invalid_optionables = [s
-                           for s in optionables
-                           if not isinstance(s, type) or not issubclass(s, Optionable)]
+    invalid_optionables = [
+      s for s in optionables if not isinstance(s, type) or not issubclass(s, Optionable)
+    ]
     if invalid_optionables:
-      raise TypeError('The following items from the given optionables are not Optionable '
-                      'subclasses:\n\t{}'.format('\n\t'.join(str(i) for i in invalid_optionables)))
+      raise TypeError(
+        "The following items from the given optionables are not Optionable "
+        "subclasses:\n\t{}".format("\n\t".join(str(i) for i in invalid_optionables))
+      )
 
     self._optionables.update(optionables)
 
@@ -145,7 +149,7 @@ class BuildConfiguration:
                  :class:`pants.engine.rules.Rule` instances.
     """
     if not isinstance(rules, Iterable):
-      raise TypeError('The rules must be an iterable, given {!r}'.format(rules))
+      raise TypeError("The rules must be an iterable, given {!r}".format(rules))
 
     # "Index" the rules to normalize them and expand their dependencies.
     normalized_rules = RuleIndex.create(rules).normalized_rules()
@@ -160,10 +164,12 @@ class BuildConfiguration:
         self._union_rules[union_base] = new_members
       else:
         existing_members.update(new_members)
-    dependency_optionables = {do
-                              for rule in indexed_rules
-                              for do in rule.dependency_optionables
-                              if rule.dependency_optionables}
+    dependency_optionables = {
+      do
+      for rule in indexed_rules
+      for do in rule.dependency_optionables
+      if rule.dependency_optionables
+    }
     self.register_optionables(dependency_optionables)
 
   def rules(self):
@@ -203,10 +209,13 @@ class BuildConfiguration:
     def create_call_proxy(tgt_type, tgt_alias=None):
       def registration_callback(address, addressable):
         parse_context._storage.add(addressable, name=address.target_name)
+
       addressable_factory = self._get_addressable_factory(tgt_type, tgt_alias)
-      return AddressableCallProxy(addressable_factory=addressable_factory,
-                                  build_file=build_file,
-                                  registration_callback=registration_callback)
+      return AddressableCallProxy(
+        addressable_factory=addressable_factory,
+        build_file=build_file,
+        registration_callback=registration_callback,
+      )
 
     # Expose all aliased Target types.
     for alias, target_type in self._target_by_alias.items():

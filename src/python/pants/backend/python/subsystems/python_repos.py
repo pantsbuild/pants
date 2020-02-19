@@ -5,7 +5,7 @@ from pants.base.deprecated import deprecated_module
 from pants.python.python_repos import PythonRepos
 
 
-deprecated_module('1.27.0.dev0', 'Import from pants.python.python_repos instead.')
+deprecated_module("1.27.0.dev0", "Import from pants.python.python_repos instead.")
 
 
 PythonRepos = PythonRepos

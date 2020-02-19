@@ -27,24 +27,22 @@ class PylintIntegrationTest(TestBase):
   # See http://pylint.pycqa.org/en/latest/user_guide/run.html#exit-codes for exit codes.
   source_root = "src/python"
   good_source = FileContent(
-    path=f"{source_root}/good.py", content=b"'''docstring'''\nUPPERCASE_CONSTANT = ''\n",
+    path=f"{source_root}/good.py", content=b"'''docstring'''\nUPPERCASE_CONSTANT = ''\n"
   )
   bad_source = FileContent(
-    path=f"{source_root}/bad.py", content=b"'''docstring'''\nlowercase_constant = ''\n",
+    path=f"{source_root}/bad.py", content=b"'''docstring'''\nlowercase_constant = ''\n"
   )
 
   create_python_library = partialmethod(
-    TestBase.create_library, path=source_root, target_type="python_library", name="target",
+    TestBase.create_library, path=source_root, target_type="python_library", name="target"
   )
 
   def write_file(self, file_content: FileContent) -> None:
-    self.create_file(
-      relpath=file_content.path, contents=file_content.content.decode()
-    )
+    self.create_file(relpath=file_content.path, contents=file_content.content.decode())
 
   @classmethod
   def alias_groups(cls) -> BuildFileAliases:
-    return BuildFileAliases(targets={'python_library': PythonLibrary})
+    return BuildFileAliases(targets={"python_library": PythonLibrary})
 
   @classmethod
   def rules(cls):
@@ -71,7 +69,7 @@ class PylintIntegrationTest(TestBase):
       args.append(f"--pylint-skip")
     input_snapshot = self.request_single_product(Snapshot, InputFilesContent(source_files))
     adaptor = PythonTargetAdaptor(
-      sources=EagerFilesetWithSpec(self.source_root, {'globs': []}, snapshot=input_snapshot),
+      sources=EagerFilesetWithSpec(self.source_root, {"globs": []}, snapshot=input_snapshot),
       address=Address.parse(f"{self.source_root}:target"),
       compatibility=[interpreter_constraints] if interpreter_constraints else None,
     )
@@ -79,7 +77,7 @@ class PylintIntegrationTest(TestBase):
       origin = SingleAddress(directory="test", name="target")
     target = PylintTarget(PythonTargetAdaptorWithOrigin(adaptor, origin))
     return self.request_single_product(
-      LintResult, Params(target, create_options_bootstrapper(args=args)),
+      LintResult, Params(target, create_options_bootstrapper(args=args))
     )
 
   def test_single_passing_source(self) -> None:
@@ -131,7 +129,7 @@ class PylintIntegrationTest(TestBase):
   def test_includes_direct_dependencies(self) -> None:
     self.create_python_library(name="library")
     self.create_python_library(
-      name="dependency", sources=["dependency.py"], dependencies=[":library"],
+      name="dependency", sources=["dependency.py"], dependencies=[":library"]
     )
     self.write_file(
       FileContent(

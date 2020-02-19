@@ -27,7 +27,7 @@ class TestResult:
 
   @memoized_classproperty
   def exception(cls):
-    return cls('EXCEPTION')
+    return cls("EXCEPTION")
 
   @classmethod
   def _map_exit_code(cls, value):
@@ -45,13 +45,13 @@ class TestResult:
   @classmethod
   def rc(cls, value):
     exit_code = cls._map_exit_code(value)
-    return cls('SUCCESS' if exit_code == 0 else 'FAILURE', rc=exit_code)
+    return cls("SUCCESS" if exit_code == 0 else "FAILURE", rc=exit_code)
 
   @classmethod
   def from_error(cls, error):
     if not isinstance(error, TaskError):
       raise AssertionError(
-        f'Can only synthesize a {cls.__name__} from a TaskError, given a {type(error).__name__}'
+        f"Can only synthesize a {cls.__name__} from a TaskError, given a {type(error).__name__}"
       )
     return cls(str(error), rc=error.exit_code, failed_targets=error.failed_targets)
 
@@ -82,9 +82,7 @@ class TestResult:
     :raises: :class:`ErrorWhileTesting` if this result represents a failure
     """
     if not self.success:
-      raise ErrorWhileTesting(self._msg,
-                              exit_code=self._rc,
-                              failed_targets=self._failed_targets)
+      raise ErrorWhileTesting(self._msg, exit_code=self._rc, failed_targets=self._failed_targets)
     return self
 
 
@@ -98,32 +96,50 @@ class TestRunnerTaskMixin:
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--skip', type=bool, help='Skip running tests.')
-    register('--timeouts', type=bool, default=True,
-             help='Enable test target timeouts. If timeouts are enabled then tests with a '
-                  'timeout= parameter set on their target will time out after the given number of '
-                  'seconds if not completed. If no timeout is set, then either the default timeout '
-                  'is used or no timeout is configured. In the current implementation, all the '
-                  'timeouts for the test targets to be run are summed and all tests are run with '
-                  'the total timeout covering the entire run of tests. If a single target in a '
-                  'test run has no timeout and there is no default, the entire run will have no '
-                  'timeout. This should change in the future to provide more granularity.')
-    register('--timeout-default', type=int, advanced=True,
-             help='The default timeout (in seconds) for a test if timeout is not set on the '
-                  'target.')
-    register('--timeout-maximum', type=int, advanced=True,
-             help='The maximum timeout (in seconds) that can be set on a test target.')
-    register('--timeout-terminate-wait', type=int, advanced=True, default=10,
-             help='If a test does not terminate on a SIGTERM, how long to wait (in seconds) before '
-                  'sending a SIGKILL.')
+    register("--skip", type=bool, help="Skip running tests.")
+    register(
+      "--timeouts",
+      type=bool,
+      default=True,
+      help="Enable test target timeouts. If timeouts are enabled then tests with a "
+      "timeout= parameter set on their target will time out after the given number of "
+      "seconds if not completed. If no timeout is set, then either the default timeout "
+      "is used or no timeout is configured. In the current implementation, all the "
+      "timeouts for the test targets to be run are summed and all tests are run with "
+      "the total timeout covering the entire run of tests. If a single target in a "
+      "test run has no timeout and there is no default, the entire run will have no "
+      "timeout. This should change in the future to provide more granularity.",
+    )
+    register(
+      "--timeout-default",
+      type=int,
+      advanced=True,
+      help="The default timeout (in seconds) for a test if timeout is not set on the " "target.",
+    )
+    register(
+      "--timeout-maximum",
+      type=int,
+      advanced=True,
+      help="The maximum timeout (in seconds) that can be set on a test target.",
+    )
+    register(
+      "--timeout-terminate-wait",
+      type=int,
+      advanced=True,
+      default=10,
+      help="If a test does not terminate on a SIGTERM, how long to wait (in seconds) before "
+      "sending a SIGKILL.",
+    )
 
   def execute(self):
     """Run the task."""
 
     # Ensure that the timeout_maximum is higher than the timeout default.
-    if (self.get_options().timeout_maximum is not None
-        and self.get_options().timeout_default is not None
-        and self.get_options().timeout_maximum < self.get_options().timeout_default):
+    if (
+      self.get_options().timeout_maximum is not None
+      and self.get_options().timeout_default is not None
+      and self.get_options().timeout_maximum < self.get_options().timeout_default
+    ):
       message = (
         f"Error: timeout-default: {self.get_options().timeout_maximum} exceeds timeout-maximum: "
         f"{self.get_options().timeout_default}"
@@ -165,7 +181,7 @@ class TestRunnerTaskMixin:
     """
     if target and scope:
       target_type = target.type_alias
-      self.context.run_tracker.report_target_info('GLOBAL', target, ['target_type'], target_type)
+      self.context.run_tracker.report_target_info("GLOBAL", target, ["target_type"], target_type)
       self.context.run_tracker.report_target_info(scope, target, keys, test_info)
 
   @staticmethod
@@ -188,45 +204,45 @@ class TestRunnerTaskMixin:
     tests_in_path = {}
     testcase_attributes = additional_testcase_attributes or []
 
-    SUCCESS = 'success'
-    SKIPPED = 'skipped'
-    FAILURE = 'failure'
-    ERROR = 'error'
+    SUCCESS = "success"
+    SKIPPED = "skipped"
+    FAILURE = "failure"
+    ERROR = "error"
 
-    _XML_MATCHER = re.compile(r'^TEST-.+\.xml$')
+    _XML_MATCHER = re.compile(r"^TEST-.+\.xml$")
 
     class ParseError(Exception):
       """Indicates an error parsing a xml report file."""
 
       def __init__(self, xml_path, cause):
-        super().__init__(f'Error parsing test result file {xml_path}: {cause}')
+        super().__init__(f"Error parsing test result file {xml_path}: {cause}")
         self.xml_path = xml_path
         self.cause = cause
 
     def parse_xml_file(xml_file_path):
       try:
         root = ET.parse(xml_file_path).getroot()
-        for testcase in root.iter('testcase'):
+        for testcase in root.iter("testcase"):
           test_info = {}
 
           try:
-            test_info.update({'time': float(testcase.attrib.get('time'))})
+            test_info.update({"time": float(testcase.attrib.get("time"))})
           except (TypeError, ValueError):
-            test_info.update({'time': None})
+            test_info.update({"time": None})
 
           for attribute in testcase_attributes:
             test_info[attribute] = testcase.attrib.get(attribute)
 
           result = SUCCESS
-          if next(testcase.iter('error'), None) is not None:
+          if next(testcase.iter("error"), None) is not None:
             result = ERROR
-          elif next(testcase.iter('failure'), None) is not None:
+          elif next(testcase.iter("failure"), None) is not None:
             result = FAILURE
-          elif next(testcase.iter('skipped'), None) is not None:
+          elif next(testcase.iter("skipped"), None) is not None:
             result = SKIPPED
-          test_info.update({'result_code': result})
+          test_info.update({"result_code": result})
 
-          tests_in_path.update({testcase.attrib.get('name', ''): test_info})
+          tests_in_path.update({testcase.attrib.get("name", ""): test_info})
 
       except (ET.ParseError, ValueError) as e:
         error_handler(ParseError(xml_file_path, e))
@@ -260,18 +276,21 @@ class TestRunnerTaskMixin:
           process_handler.wait(timeout=wait_time)
         except subprocess.TimeoutExpired:
           self.context.log.warn(
-            'Timed out test did not terminate gracefully after {} seconds, killing...'.format(wait_time))
+            "Timed out test did not terminate gracefully after {} seconds, killing...".format(
+              wait_time
+            )
+          )
           process_handler.kill()
 
       elif polled_result < 0:
-        self.context.log.error('FAILURE: Test was killed by signal {}.'.format(-polled_result))
+        self.context.log.error("FAILURE: Test was killed by signal {}.".format(-polled_result))
 
     try:
       return process_handler.wait(timeout=timeout)
     except subprocess.TimeoutExpired as e:
       # Since we no longer surface the actual underlying exception, we log.error here
       # to ensure the output indicates why the test has suddenly failed.
-      self.context.log.error('FAILURE: Timeout of {} seconds reached.'.format(timeout))
+      self.context.log.error("FAILURE: Timeout of {} seconds reached.".format(timeout))
       raise ErrorWhileTesting(str(e), failed_targets=test_targets)
     finally:
       maybe_terminate(wait_time=self.get_options().timeout_terminate_wait)
@@ -284,15 +303,15 @@ class TestRunnerTaskMixin:
     """
 
   def _timeout_for_target(self, target):
-    timeout = getattr(target, 'timeout', None)
+    timeout = getattr(target, "timeout", None)
     timeout_maximum = self.get_options().timeout_maximum
     if timeout is not None and timeout_maximum is not None:
       if timeout > timeout_maximum:
         self.context.log.warn(
           "Warning: Timeout for {target} ({timeout}s) exceeds {timeout_maximum}s. Capping.".format(
-            target=target.address.spec,
-            timeout=timeout,
-            timeout_maximum=timeout_maximum))
+            target=target.address.spec, timeout=timeout, timeout_maximum=timeout_maximum
+          )
+        )
         return timeout_maximum
 
     return timeout
@@ -396,21 +415,31 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
     # TODO(John Sirois): Implement sanity checks on options wrt caching:
     # https://github.com/pantsbuild/pants/issues/5073
 
-    register('--fast', type=bool, default=False, fingerprint=True,
-             removal_version="1.27.0.dev0",
-             removal_hint="This option is going away for better isolation of tests and in "
-                          "preparation for switching to the V2 test implementation, which provides "
-                          "much better caching and concurrency.\n\n"
-                          "We recommend running a full CI suite with `no-fast` (the default now) "
-                          "to see if any tests fail. If any fail, this likely signals shared state "
-                          "between your test targets.",
-             help='Run all tests in a single invocation. If turned off, each test target '
-                  'will run in its own invocation, which will be slower, but isolates '
-                  'tests from process-wide state created by tests in other targets.')
-    register('--chroot', advanced=True, fingerprint=True, type=bool, default=True,
-             help='Run tests in a chroot. Any loose files tests depend on via `{}` dependencies '
-                  'will be copied to the chroot.'
-             .format(Files.alias()))
+    register(
+      "--fast",
+      type=bool,
+      default=False,
+      fingerprint=True,
+      removal_version="1.27.0.dev0",
+      removal_hint="This option is going away for better isolation of tests and in "
+      "preparation for switching to the V2 test implementation, which provides "
+      "much better caching and concurrency.\n\n"
+      "We recommend running a full CI suite with `no-fast` (the default now) "
+      "to see if any tests fail. If any fail, this likely signals shared state "
+      "between your test targets.",
+      help="Run all tests in a single invocation. If turned off, each test target "
+      "will run in its own invocation, which will be slower, but isolates "
+      "tests from process-wide state created by tests in other targets.",
+    )
+    register(
+      "--chroot",
+      advanced=True,
+      fingerprint=True,
+      type=bool,
+      default=True,
+      help="Run tests in a chroot. Any loose files tests depend on via `{}` dependencies "
+      "will be copied to the chroot.".format(Files.alias()),
+    )
 
   @staticmethod
   def _vts_for_partition(invalidation_check):
@@ -447,12 +476,11 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
     if workdir is not None:
       yield workdir
     else:
-      root_dir = os.path.join(self.workdir, '_chroots')
+      root_dir = os.path.join(self.workdir, "_chroots")
       safe_mkdir(root_dir)
       with temporary_dir(root_dir=root_dir) as chroot:
         self.context.build_graph.walk_transitive_dependency_graph(
-          addresses=[t.address for t in targets],
-          work=functools.partial(self._copy_files, chroot)
+          addresses=[t.address for t in targets], work=functools.partial(self._copy_files, chroot)
         )
         yield chroot
 
@@ -488,21 +516,21 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
         for target in partition:
           if pre_execution_error:
             log = self.context.log.warn
-            result = 'NOT RUN'
+            result = "NOT RUN"
           elif target in failed_targets:
             log = self.context.log.error
             result = rv
           else:
             log = self.context.log.info
             result = self.result_class.successful
-          log('{0:80}.....{1:>10}'.format(target.address.reference(), str(result)))
+          log("{0:80}.....{1:>10}".format(target.address.reference(), str(result)))
 
       msgs = [str(_rv) for _rv in results.values() if not _rv.success]
-      failed_targets = [target
-                        for _rv in results.values() if not _rv.success
-                        for target in _rv.failed_targets]
+      failed_targets = [
+        target for _rv in results.values() if not _rv.success for target in _rv.failed_targets
+      ]
       if len(failed_targets) > 0:
-        raise ErrorWhileTesting('\n'.join(msgs), failed_targets=failed_targets)
+        raise ErrorWhileTesting("\n".join(msgs), failed_targets=failed_targets)
       elif failure:
         # A low-level test execution failure occurred before tests were run.
         raise TaskError()
@@ -542,10 +570,12 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
   # caching is supported, its unlikely to be effective. Caching is best utilized when CI and users
   # run `--no-fast`.
   def _run_partition(self, fail_fast, test_targets, *args):
-    with self.invalidated(targets=test_targets,
-                          fingerprint_strategy=self.fingerprint_strategy(),
-                          # Re-run tests when the code they test (and depend on) changes.
-                          invalidate_dependents=True) as invalidation_check:
+    with self.invalidated(
+      targets=test_targets,
+      fingerprint_strategy=self.fingerprint_strategy(),
+      # Re-run tests when the code they test (and depend on) changes.
+      invalidate_dependents=True,
+    ) as invalidation_check:
 
       # Processing proceeds through:
       # 1.) [iff invalid == 0 and all > 0] cache -> workdir: Done transparently by `invalidated`.
@@ -557,9 +587,11 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
       if not invalidation_check.invalid_vts:
         return TestResult.successful
 
-      invalid_test_tgts = [invalid_test_tgt
-                           for vts in invalidation_check.invalid_vts
-                           for invalid_test_tgt in vts.targets]
+      invalid_test_tgts = [
+        invalid_test_tgt
+        for vts in invalidation_check.invalid_vts
+        for invalid_test_tgt in vts.targets
+      ]
 
       # 2.) Write all results that will be potentially cached to output_dir.
       result = self.run_tests(fail_fast, invalid_test_tgts, *args).checked()

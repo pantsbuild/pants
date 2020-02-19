@@ -15,21 +15,18 @@ class ProcessStillRunning(AssertionError):
 def _safe_iter_matching_processes(name):
   for proc in psutil.process_iter():
     try:
-      if name in ''.join(proc.cmdline()):
+      if name in "".join(proc.cmdline()):
         yield proc
     except (psutil.NoSuchProcess, psutil.AccessDenied):
       pass
 
 
 def _make_process_table(processes):
-  line_tmpl = '{0:>7} {1:>7} {2}'
-  proc_tuples = [(p.pid, p.ppid(), ''.join(p.cmdline())) for p in processes]
-  return '\n'.join(
-    [
-      line_tmpl.format('PID', 'PGID', 'CMDLINE')
-    ] + [
-      line_tmpl.format(*t) for t in sorted(proc_tuples)
-    ]
+  line_tmpl = "{0:>7} {1:>7} {2}"
+  proc_tuples = [(p.pid, p.ppid(), "".join(p.cmdline())) for p in processes]
+  return "\n".join(
+    [line_tmpl.format("PID", "PGID", "CMDLINE")]
+    + [line_tmpl.format(*t) for t in sorted(proc_tuples)]
   )
 
 
@@ -42,8 +39,9 @@ def no_lingering_process_by_command(name):
   delta_processes = context.current_processes()
   if delta_processes:
     raise ProcessStillRunning(
-      '{} {} processes lingered after tests:\n{}'
-      .format(len(delta_processes), name, _make_process_table(delta_processes))
+      "{} {} processes lingered after tests:\n{}".format(
+        len(delta_processes), name, _make_process_table(delta_processes)
+      )
     )
 
 

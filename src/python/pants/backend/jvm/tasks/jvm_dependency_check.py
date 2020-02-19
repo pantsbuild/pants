@@ -26,46 +26,54 @@ class JvmDependencyCheck(Task):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--missing-direct-deps', choices=['off', 'warn', 'fatal'],
-             default='off',
-             fingerprint=True,
-             help='Check for missing direct dependencies in compiled code. Reports actual '
-                  'dependencies A -> B where there is no direct BUILD file dependency path from '
-                  'A to B. This is a very strict check; In practice it is common to rely on '
-                  'transitive, indirect dependencies, e.g., due to type inference or when the main '
-                  'target in a BUILD file is modified to depend on other targets in the same BUILD '
-                  'file, as an implementation detail. However it may still be useful to use this '
-                  'on occasion. ')
+    register(
+      "--missing-direct-deps",
+      choices=["off", "warn", "fatal"],
+      default="off",
+      fingerprint=True,
+      help="Check for missing direct dependencies in compiled code. Reports actual "
+      "dependencies A -> B where there is no direct BUILD file dependency path from "
+      "A to B. This is a very strict check; In practice it is common to rely on "
+      "transitive, indirect dependencies, e.g., due to type inference or when the main "
+      "target in a BUILD file is modified to depend on other targets in the same BUILD "
+      "file, as an implementation detail. However it may still be useful to use this "
+      "on occasion. ",
+    )
 
-    register('--missing-deps-whitelist', type=list, default=[],
-             fingerprint=True,
-             help="Don't report these targets even if they have missing deps.")
+    register(
+      "--missing-deps-whitelist",
+      type=list,
+      default=[],
+      fingerprint=True,
+      help="Don't report these targets even if they have missing deps.",
+    )
 
-    register('--unnecessary-deps', choices=['off', 'warn', 'fatal'], default='off',
-             fingerprint=True,
-             help='Check for declared dependencies in compiled code that are not needed. '
-                  'This is a very strict check. For example, generated code will often '
-                  'legitimately have BUILD dependencies that are unused in practice.')
+    register(
+      "--unnecessary-deps",
+      choices=["off", "warn", "fatal"],
+      default="off",
+      fingerprint=True,
+      help="Check for declared dependencies in compiled code that are not needed. "
+      "This is a very strict check. For example, generated code will often "
+      "legitimately have BUILD dependencies that are unused in practice.",
+    )
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super().subsystem_dependencies() + (
-      DependencyContext,
-      DistributionLocator
-    )
+    return super().subsystem_dependencies() + (DependencyContext, DistributionLocator)
 
   @staticmethod
   def _skip(options):
     """Return true if the task should be entirely skipped, and thus have no product requirements."""
     values = [options.missing_direct_deps, options.unnecessary_deps]
-    return all(v == 'off' for v in values)
+    return all(v == "off" for v in values)
 
   @classmethod
   def prepare(cls, options, round_manager):
     super().prepare(options, round_manager)
     if not cls._skip(options):
-      round_manager.require_data('product_deps_by_target')
-      round_manager.require_data('runtime_classpath')
+      round_manager.require_data("product_deps_by_target")
+      round_manager.require_data("runtime_classpath")
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
@@ -73,10 +81,10 @@ class JvmDependencyCheck(Task):
     # Set up dep checking if needed.
     def munge_flag(flag):
       flag_value = self.get_options().get(flag, None)
-      return None if flag_value == 'off' else flag_value
+      return None if flag_value == "off" else flag_value
 
-    self._check_missing_direct_deps = munge_flag('missing_direct_deps')
-    self._check_unnecessary_deps = munge_flag('unnecessary_deps')
+    self._check_missing_direct_deps = munge_flag("missing_direct_deps")
+    self._check_unnecessary_deps = munge_flag("unnecessary_deps")
     self._target_whitelist = [Address.parse(s) for s in self.get_options().missing_deps_whitelist]
 
   @property
@@ -89,25 +97,28 @@ class JvmDependencyCheck(Task):
 
   @memoized_property
   def _analyzer(self):
-    return JvmDependencyAnalyzer(get_buildroot(),
-                                 self._distribution,
-                                 self.context.products.get_data('runtime_classpath'))
+    return JvmDependencyAnalyzer(
+      get_buildroot(), self._distribution, self.context.products.get_data("runtime_classpath")
+    )
 
   def execute(self):
     if self._skip(self.get_options()):
       return
 
-    classpath_product = self.context.products.get_data('runtime_classpath')
+    classpath_product = self.context.products.get_data("runtime_classpath")
     fingerprint_strategy = DependencyContext.global_instance().create_fingerprint_strategy(
-        classpath_product)
+      classpath_product
+    )
 
-    targets = [target for target in self.context.targets() if hasattr(target, 'strict_deps')]
+    targets = [target for target in self.context.targets() if hasattr(target, "strict_deps")]
 
-    with self.invalidated(targets,
-                          fingerprint_strategy=fingerprint_strategy,
-                          invalidate_dependents=True) as invalidation_check:
+    with self.invalidated(
+      targets, fingerprint_strategy=fingerprint_strategy, invalidate_dependents=True
+    ) as invalidation_check:
       for vt in invalidation_check.invalid_vts:
-        product_deps_for_target = self.context.products.get_data('product_deps_by_target').get(vt.target)
+        product_deps_for_target = self.context.products.get_data("product_deps_by_target").get(
+          vt.target
+        )
         if product_deps_for_target is not None:
           self.check(vt.target, product_deps_for_target)
 
@@ -117,8 +128,7 @@ class JvmDependencyCheck(Task):
     See docstring for _compute_missing_deps for details.
     """
     if self._check_missing_direct_deps or self._check_unnecessary_deps:
-      missing_file_deps, missing_direct_tgt_deps = \
-        self._compute_missing_deps(src_tgt, actual_deps)
+      missing_file_deps, missing_direct_tgt_deps = self._compute_missing_deps(src_tgt, actual_deps)
 
       buildroot = get_buildroot()
 
@@ -138,22 +148,32 @@ class JvmDependencyCheck(Task):
       missing_direct_tgt_deps = filter_whitelisted(missing_direct_tgt_deps)
 
       if self._check_missing_direct_deps and missing_direct_tgt_deps:
-        log_fn = (self.context.log.error if self._check_missing_direct_deps == 'fatal'
-                  else self.context.log.warn)
+        log_fn = (
+          self.context.log.error
+          if self._check_missing_direct_deps == "fatal"
+          else self.context.log.warn
+        )
         for (tgt_pair, evidence) in missing_direct_tgt_deps:
-          evidence_str = '\n'.join(['  {} uses {}'.format(e[0].address.spec, shorten(e[1]))
-                                    for e in evidence])
-          log_fn('Missing direct BUILD dependency {} -> {} because:\n{}'
-                 .format(tgt_pair[0].address.spec, tgt_pair[1].address.spec, evidence_str))
-        if self._check_missing_direct_deps == 'fatal':
-          raise TaskError('Missing direct deps.')
+          evidence_str = "\n".join(
+            ["  {} uses {}".format(e[0].address.spec, shorten(e[1])) for e in evidence]
+          )
+          log_fn(
+            "Missing direct BUILD dependency {} -> {} because:\n{}".format(
+              tgt_pair[0].address.spec, tgt_pair[1].address.spec, evidence_str
+            )
+          )
+        if self._check_missing_direct_deps == "fatal":
+          raise TaskError("Missing direct deps.")
 
       if self._check_unnecessary_deps:
-        log_fn = (self.context.log.error if self._check_unnecessary_deps == 'fatal'
-                  else self.context.log.warn)
+        log_fn = (
+          self.context.log.error
+          if self._check_unnecessary_deps == "fatal"
+          else self.context.log.warn
+        )
         had_unused = self._do_check_unnecessary_deps(src_tgt, actual_deps, log_fn)
-        if had_unused and self._check_unnecessary_deps == 'fatal':
-          raise TaskError('Unnecessary deps.')
+        if had_unused and self._check_unnecessary_deps == "fatal":
+          raise TaskError("Unnecessary deps.")
 
   def _compute_missing_deps(self, src_tgt, actual_deps):
     """Computes deps that are used by the compiler but not specified in a BUILD file.
@@ -186,8 +206,9 @@ class JvmDependencyCheck(Task):
     def must_be_explicit_dep(dep):
       # We don't require explicit deps on the java runtime, so we shouldn't consider that
       # a missing dep.
-      return (dep not in analyzer.bootstrap_jar_classfiles
-              and not dep.startswith(self._distribution.real_home))
+      return dep not in analyzer.bootstrap_jar_classfiles and not dep.startswith(
+        self._distribution.real_home
+      )
 
     def target_or_java_dep_in_targets(target, targets):
       # We want to check if the target is in the targets collection
@@ -223,10 +244,10 @@ class JvmDependencyCheck(Task):
           # listing the src file directly and just list the target which has the transient
           # dep
           missing_direct_tgt_deps_map[(src_tgt, canonical_actual_dep_tgt)].append(
-              (src_tgt, actual_dep))
+            (src_tgt, actual_dep)
+          )
 
-    return (list(missing_file_deps),
-            list(missing_direct_tgt_deps_map.items()))
+    return (list(missing_file_deps), list(missing_direct_tgt_deps_map.items()))
 
   def _do_check_unnecessary_deps(self, target, actual_deps, log_fn):
     replacement_deps = self._compute_unnecessary_deps(target, actual_deps)
@@ -235,20 +256,20 @@ class JvmDependencyCheck(Task):
 
     # Warn or error for unused.
     def joined_dep_msg(deps):
-      return '\n  '.join('\'{}\','.format(dep.address.spec) for dep in sorted(deps))
+      return "\n  ".join("'{}',".format(dep.address.spec) for dep in sorted(deps))
+
     flat_replacements = {r for replacements in replacement_deps.values() for r in replacements}
-    replacements_msg = ''
+    replacements_msg = ""
     if flat_replacements:
-      replacements_msg = f'Suggested replacements:\n  {joined_dep_msg(flat_replacements)}\n'
+      replacements_msg = f"Suggested replacements:\n  {joined_dep_msg(flat_replacements)}\n"
     unused_msg = (
-        'unnecessary BUILD dependencies:\n  {}\n{}'
-        '(If you\'re seeing this message in error, you might need to '
-        'change the `scope` of the dependencies.)'.format(
-          joined_dep_msg(list(replacement_deps.keys())),
-          replacements_msg,
-        )
+      "unnecessary BUILD dependencies:\n  {}\n{}"
+      "(If you're seeing this message in error, you might need to "
+      "change the `scope` of the dependencies.)".format(
+        joined_dep_msg(list(replacement_deps.keys())), replacements_msg
       )
-    log_fn(f'Target {target.address.spec} had {unused_msg}')
+    )
+    log_fn(f"Target {target.address.spec} had {unused_msg}")
     return True
 
   def _compute_unnecessary_deps(self, target, actual_deps):

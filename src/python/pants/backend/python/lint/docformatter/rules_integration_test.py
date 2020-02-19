@@ -43,7 +43,7 @@ class DocformatterIntegrationTest(TestBase):
       args.append(f"--docformatter-skip")
     input_snapshot = self.request_single_product(Snapshot, InputFilesContent(source_files))
     adaptor = TargetAdaptor(
-      sources=EagerFilesetWithSpec('test', {'globs': []}, snapshot=input_snapshot),
+      sources=EagerFilesetWithSpec("test", {"globs": []}, snapshot=input_snapshot),
       address=Address.parse("test:target"),
     )
     if origin is None:
@@ -57,7 +57,7 @@ class DocformatterIntegrationTest(TestBase):
       FmtResult,
       Params(
         DocformatterTarget(
-          adaptor_with_origin, prior_formatter_result_digest=input_snapshot.directory_digest,
+          adaptor_with_origin, prior_formatter_result_digest=input_snapshot.directory_digest
         ),
         options_bootstrapper,
       ),
@@ -94,11 +94,10 @@ class DocformatterIntegrationTest(TestBase):
 
   def test_respects_passthrough_args(self) -> None:
     needs_config = FileContent(
-      path="test/config.py",
-      content=b'"""\nOne line docstring acting like it\'s multiline.\n"""\n',
+      path="test/config.py", content=b'"""\nOne line docstring acting like it\'s multiline.\n"""\n'
     )
     lint_result, fmt_result = self.run_docformatter(
-      [needs_config], passthrough_args="--make-summary-multi-line",
+      [needs_config], passthrough_args="--make-summary-multi-line"
     )
     assert lint_result == LintResult.noop()
     assert fmt_result.digest == self.get_digest([needs_config])

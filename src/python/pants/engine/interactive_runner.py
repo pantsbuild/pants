@@ -27,15 +27,19 @@ class InteractiveProcessRequest:
 
   def __post_init__(self):
     if self.input_files != EMPTY_DIRECTORY_DIGEST and self.run_in_workspace:
-      raise ValueError("InteractiveProessRequest should use the Workspace API to materialize any needed files when it runs in the workspace")
+      raise ValueError(
+        "InteractiveProessRequest should use the Workspace API to materialize any needed files when it runs in the workspace"
+      )
 
 
 @side_effecting
 @dataclass(frozen=True)
 class InteractiveRunner:
-  _scheduler: 'SchedulerSession'
+  _scheduler: "SchedulerSession"
 
-  def run_local_interactive_process(self, request: InteractiveProcessRequest) -> InteractiveProcessResult:
+  def run_local_interactive_process(
+    self, request: InteractiveProcessRequest
+  ) -> InteractiveProcessResult:
     ExceptionSink.toggle_ignoring_sigint_v2_engine(True)
     return self._scheduler.run_local_interactive_process(request)
 

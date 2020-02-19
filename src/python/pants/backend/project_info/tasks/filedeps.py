@@ -20,10 +20,15 @@ class FileDeps(ConsoleTask):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--globs', type=bool,
-             help='Instead of outputting filenames, output globs (ignoring excludes)')
-    register('--absolute', type=bool, default=True,
-             help='If True output with absolute path, else output with path relative to the build root')
+    register(
+      "--globs", type=bool, help="Instead of outputting filenames, output globs (ignoring excludes)"
+    )
+    register(
+      "--absolute",
+      type=bool,
+      default=True,
+      help="If True output with absolute path, else output with path relative to the build root",
+    )
 
   @property
   def act_transitively(self):
@@ -33,11 +38,11 @@ class FileDeps(ConsoleTask):
       entity_description=f"Pants defaulting to `--filedeps-transitive`",
       removal_version="1.28.0.dev0",
       hint_message="Currently, Pants defaults to `--filedeps-transitive`, which means that it "
-                   "will find all transitive files used by the target, rather than only direct "
-                   "file dependencies. This is a useful feature, but surprising to be the default."
-                   "\n\nTo prepare for this change to the default value, set in `pants.ini` under "
-                   "the section `filedeps` the value `transitive: False`. In Pants 1.28.0, "
-                   "you can safely remove the setting."
+      "will find all transitive files used by the target, rather than only direct "
+      "file dependencies. This is a useful feature, but surprising to be the default."
+      "\n\nTo prepare for this change to the default value, set in `pants.ini` under "
+      "the section `filedeps` the value `transitive: False`. In Pants 1.28.0, "
+      "you can safely remove the setting.",
     )
     return self.get_options().transitive
 
@@ -68,7 +73,7 @@ class FileDeps(ConsoleTask):
         if output_globs:
           globs_obj = target.globs_relative_to_buildroot()
           if globs_obj:
-            files.update(self._file_path(src) for src in globs_obj['globs'])
+            files.update(self._file_path(src) for src in globs_obj["globs"])
         else:
           files.update(self._file_path(src) for src in target.sources_relative_to_buildroot())
       # TODO(John Sirois): BundlePayload should expose its sources in a way uniform to

@@ -25,6 +25,7 @@ class PayloadField(ABC):
 
   :API: public
   """
+
   _fingerprint_memo: ClassVar[Optional[str]] = None
 
   def fingerprint(self):
@@ -115,6 +116,7 @@ class PythonRequirementsField(frozenset, PayloadField):
           req.compatibility,
         )
         yield stable_json_sha1(hash_items)
+
     return combine_hashes(fingerprint_iter())
 
 

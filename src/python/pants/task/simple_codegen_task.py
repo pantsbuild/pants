@@ -29,6 +29,7 @@ class SimpleCodegenTask(Task):
 
   :API: public
   """
+
   # Subclasses may override to provide the type of gen targets the target acts on.
   # E.g., JavaThriftLibrary. If not provided, the subclass must implement is_gentarget.
   gentarget_type: Optional[Type[Target]] = None
@@ -55,19 +56,28 @@ class SimpleCodegenTask(Task):
     # to properly run codegen before resolve and compile. It would be more correct to just have each
     # individual codegen class declare what languages it generates, but would cause problems with
     # scala. See https://rbcommons.com/s/twitter/r/2540/.
-    return ['java', 'scala', 'python']
+    return ["java", "scala", "python"]
 
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--allow-empty', type=bool, default=True, fingerprint=True,
-             help='Skip targets with no sources defined.',
-             advanced=True)
-    register('--allow-dups', type=bool, fingerprint=True,
-              help='Allow multiple targets specifying the same sources. If duplicates are '
-                   'allowed, the task will associate generated sources with the least-dependent '
-                   'targets that generate them.',
-              advanced=True)
+    register(
+      "--allow-empty",
+      type=bool,
+      default=True,
+      fingerprint=True,
+      help="Skip targets with no sources defined.",
+      advanced=True,
+    )
+    register(
+      "--allow-dups",
+      type=bool,
+      fingerprint=True,
+      help="Allow multiple targets specifying the same sources. If duplicates are "
+      "allowed, the task will associate generated sources with the least-dependent "
+      "targets that generate them.",
+      advanced=True,
+    )
 
   @classmethod
   def get_fingerprint_strategy(cls):
@@ -111,7 +121,7 @@ class SimpleCodegenTask(Task):
 
   @classmethod
   def implementation_version(cls):
-    return super().implementation_version() + [('SimpleCodegenTask', 2)]
+    return super().implementation_version() + [("SimpleCodegenTask", 2)]
 
   def synthetic_target_extra_exports(self, target, target_workdir):
     """Gets any extra exports generated synthetic targets should have.
@@ -184,7 +194,7 @@ class SimpleCodegenTask(Task):
       return True
     sources = target.sources_relative_to_buildroot()
     if not sources:
-      message = ('Target {} has no sources.'.format(target.address.spec))
+      message = "Target {} has no sources.".format(target.address.spec)
       if not self.get_options().allow_empty:
         raise TaskError(message)
       else:
@@ -210,12 +220,14 @@ class SimpleCodegenTask(Task):
 
     self._validate_sources_globs()
 
-    with self.invalidated(codegen_targets,
-                          invalidate_dependents=True,
-                          topological_order=True,
-                          fingerprint_strategy=self.get_fingerprint_strategy()) as invalidation_check:
+    with self.invalidated(
+      codegen_targets,
+      invalidate_dependents=True,
+      topological_order=True,
+      fingerprint_strategy=self.get_fingerprint_strategy(),
+    ) as invalidation_check:
 
-      with self.context.new_workunit(name='execute', labels=[WorkUnitLabel.MULTITOOL]):
+      with self.context.new_workunit(name="execute", labels=[WorkUnitLabel.MULTITOOL]):
         vts_to_sources = OrderedDict()
         for vt in invalidation_check.all_vts:
 
@@ -244,8 +256,7 @@ class SimpleCodegenTask(Task):
 
   def _mark_transitive_invalidation_hashes_dirty(self, addresses):
     self.context.build_graph.walk_transitive_dependee_graph(
-      addresses,
-      work=lambda t: t.mark_transitive_invalidation_hash_dirty(),
+      addresses, work=lambda t: t.mark_transitive_invalidation_hash_dirty()
     )
 
   @property
@@ -254,7 +265,7 @@ class SimpleCodegenTask(Task):
 
     By default, propagates the provides, scope, and tags attributes.
     """
-    return ['provides', 'tags', 'scope']
+    return ["provides", "tags", "scope"]
 
   def synthetic_target_dir(self, target, target_workdir):
     """
@@ -281,8 +292,7 @@ class SimpleCodegenTask(Task):
       results_dir_relpath = fast_relpath(synthetic_target_dir, get_buildroot())
       buildroot_relative_globs = tuple(os.path.join(results_dir_relpath, file) for file in files)
       buildroot_relative_excludes = tuple(
-        f"!{os.path.join(results_dir_relpath, file)}"
-        for file in self.sources_exclude_globs
+        f"!{os.path.join(results_dir_relpath, file)}" for file in self.sources_exclude_globs
       )
       to_capture.append(
         PathGlobsAndRoot(
@@ -300,11 +310,10 @@ class SimpleCodegenTask(Task):
     for snapshot, vt in zip(snapshots, vts):
       snapshot.directory_digest.dump(vt.current_results_dir)
 
-    return tuple(EagerFilesetWithSpec(
-      results_dir_relpath,
-      filespec,
-      snapshot,
-    ) for (results_dir_relpath, filespec, snapshot) in zip(results_dirs, filespecs, snapshots))
+    return tuple(
+      EagerFilesetWithSpec(results_dir_relpath, filespec, snapshot)
+      for (results_dir_relpath, filespec, snapshot) in zip(results_dirs, filespecs, snapshots)
+    )
 
   def _inject_synthetic_target(self, vt, sources):
     """Create, inject, and return a synthetic target for the given target and workdir.
@@ -318,7 +327,9 @@ class SimpleCodegenTask(Task):
     # rather than the hash-named `vt.current_results_dir`.
     synthetic_target_dir = self.synthetic_target_dir(target, vt.results_dir)
     synthetic_target_type = self.synthetic_target_type(target)
-    synthetic_extra_dependencies = self.synthetic_target_extra_dependencies(target, synthetic_target_dir)
+    synthetic_extra_dependencies = self.synthetic_target_extra_dependencies(
+      target, synthetic_target_dir
+    )
 
     copied_attributes = {}
     for attribute in self._copy_target_attributes:
@@ -328,17 +339,20 @@ class SimpleCodegenTask(Task):
       extra_exports = self.synthetic_target_extra_exports(target, synthetic_target_dir)
 
       extra_exports_not_in_extra_dependencies = set(extra_exports).difference(
-        set(synthetic_extra_dependencies))
+        set(synthetic_extra_dependencies)
+      )
       if len(extra_exports_not_in_extra_dependencies) > 0:
         raise self.MismatchedExtraExports(
-          'Extra synthetic exports included targets not in the extra dependencies: {}. Affected target: {}'
-            .format(extra_exports_not_in_extra_dependencies, target))
+          "Extra synthetic exports included targets not in the extra dependencies: {}. Affected target: {}".format(
+            extra_exports_not_in_extra_dependencies, target
+          )
+        )
 
       extra_export_specs = {e.address.spec for e in extra_exports}
       original_export_specs = self._original_export_specs(target)
       union = set(original_export_specs).union(extra_export_specs)
 
-      copied_attributes['exports'] = sorted(union)
+      copied_attributes["exports"] = sorted(union)
 
     synthetic_target = self.context.add_new_target(
       address=self._get_synthetic_address(target, synthetic_target_dir),
@@ -346,7 +360,7 @@ class SimpleCodegenTask(Task):
       dependencies=synthetic_extra_dependencies,
       sources=sources,
       derived_from=target,
-      **copied_attributes
+      **copied_attributes,
     )
 
     build_graph = self.context.build_graph
@@ -356,14 +370,12 @@ class SimpleCodegenTask(Task):
     # dependency injected.
     for dependent_address in build_graph.dependents_of(target.address):
       build_graph.inject_dependency(
-        dependent=dependent_address,
-        dependency=synthetic_target.address,
+        dependent=dependent_address, dependency=synthetic_target.address
       )
     # NB(pl): See the above comment.  The same note applies.
     for concrete_dependency_address in build_graph.dependencies_of(target.address):
       build_graph.inject_dependency(
-        dependent=synthetic_target.address,
-        dependency=concrete_dependency_address,
+        dependent=synthetic_target.address, dependency=concrete_dependency_address
       )
 
     if target in self.context.target_roots:
@@ -372,7 +384,7 @@ class SimpleCodegenTask(Task):
     return synthetic_target
 
   def _supports_exports(self, target_type):
-    return hasattr(target_type, 'export_specs')
+    return hasattr(target_type, "export_specs")
 
   def _original_export_specs(self, target):
     return [t.spec for t in target.export_addresses]
@@ -386,7 +398,7 @@ class SimpleCodegenTask(Task):
       try:
         deps.update(self.context.resolve(dep))
       except AddressLookupError as e:
-        raise AddressLookupError('{message}\n  on dependency {dep}'.format(message=e, dep=dep))
+        raise AddressLookupError("{message}\n  on dependency {dep}".format(message=e, dep=dep))
     return deps
 
   @abstractmethod
@@ -418,13 +430,18 @@ class SimpleCodegenTask(Task):
     # Walk dependency gentargets and record any sources owned by those targets that are also
     # owned by this target.
     duplicates_by_target = OrderedDict()
+
     def record_duplicates(dep):
       if dep == target or not self.is_gentarget(dep.concrete_derived_from):
         return False
-      duped_sources = [s for s in dep.sources_relative_to_source_root() if s in sources.files and
-                       not self.ignore_dup(target, dep, s)]
+      duped_sources = [
+        s
+        for s in dep.sources_relative_to_source_root()
+        if s in sources.files and not self.ignore_dup(target, dep, s)
+      ]
       if duped_sources:
         duplicates_by_target[dep] = duped_sources
+
     target.walk(record_duplicates)
 
     # If there were no dupes, we're done.
@@ -432,12 +449,15 @@ class SimpleCodegenTask(Task):
       return False
 
     # If there were duplicates warn or error.
-    messages = ['{target} generated sources that had already been generated by dependencies.'
-                .format(target=target.address.spec)]
+    messages = [
+      "{target} generated sources that had already been generated by dependencies.".format(
+        target=target.address.spec
+      )
+    ]
     for dep, duped_sources in duplicates_by_target.items():
-      messages.append('\t{} also generated:'.format(dep.concrete_derived_from.address.spec))
-      messages.extend(['\t\t{}'.format(source) for source in duped_sources])
-    message = '\n'.join(messages)
+      messages.append("\t{} also generated:".format(dep.concrete_derived_from.address.spec))
+      messages.extend(["\t\t{}".format(source) for source in duped_sources])
+    message = "\n".join(messages)
     if self.get_options().allow_dups:
       logger.warning(message)
     else:

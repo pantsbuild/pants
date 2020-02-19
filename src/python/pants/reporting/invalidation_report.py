@@ -11,8 +11,12 @@ class InvalidationReport:
   """Creates a report of all versioned target sets seen in the build."""
 
   class TaskReport:
-    class TaskEntry(namedtuple('TaskEntry', ['targets_hash', 'target_ids', 'cache_key_id',
-                                             'cache_key_hash', 'phase', 'valid'])):
+    class TaskEntry(
+      namedtuple(
+        "TaskEntry",
+        ["targets_hash", "target_ids", "cache_key_id", "cache_key_hash", "phase", "valid"],
+      )
+    ):
       """
       :param targets_hash: A manufactured id for the versioned target set
       :param target_ids: list of string target ids
@@ -29,12 +33,16 @@ class InvalidationReport:
     def add(self, targets, cache_key, valid, phase):
       # Manufacture an id from a hash of the target ids
       targets_hash = Target.identify(targets)
-      self._entries.append(self.TaskEntry(targets_hash=targets_hash,
-                                          target_ids=[t.id for t in targets],
-                                          cache_key_id=cache_key.id,
-                                          cache_key_hash=cache_key.hash,
-                                          valid=valid,
-                                          phase=phase))
+      self._entries.append(
+        self.TaskEntry(
+          targets_hash=targets_hash,
+          target_ids=[t.id for t in targets],
+          cache_key_id=cache_key.id,
+          cache_key_hash=cache_key.hash,
+          valid=valid,
+          phase=phase,
+        )
+      )
 
     def report(self, writer):
       """
@@ -43,16 +51,20 @@ class InvalidationReport:
       for entry in self._entries:
         for target_id in entry.target_ids:
           writer.write(
-              ('{invocation_id},{task},{targets_hash},{target_id},{cache_key_id},{cache_key_hash},'
-               + '{phase},{valid}\n')
-              .format(invocation_id=self._invocation_id,
-                      task=self._task_name,
-                      targets_hash=entry.targets_hash,
-                      target_id=target_id,
-                      cache_key_id=entry.cache_key_id,
-                      cache_key_hash=entry.cache_key_hash,
-                      phase=entry.phase,
-                      valid=entry.valid))
+            (
+              "{invocation_id},{task},{targets_hash},{target_id},{cache_key_id},{cache_key_hash},"
+              + "{phase},{valid}\n"
+            ).format(
+              invocation_id=self._invocation_id,
+              task=self._task_name,
+              targets_hash=entry.targets_hash,
+              target_id=target_id,
+              cache_key_id=entry.cache_key_id,
+              cache_key_hash=entry.cache_key_hash,
+              phase=entry.phase,
+              valid=entry.valid,
+            )
+          )
 
   def __init__(self):
     self._task_reports = {}
@@ -97,9 +109,10 @@ class InvalidationReport:
     filename = filename or self._filename
     if filename:
       # Usually the directory exists from reporting initialization, but not if clean-all was a goal.
-      with safe_open(filename, 'w') as writer:
+      with safe_open(filename, "w") as writer:
         writer.write(
-          'invocation_id,task_name,targets_hash,target_id,cache_key_id,cache_key_hash,phase,valid'
-          + '\n')
+          "invocation_id,task_name,targets_hash,target_id,cache_key_id,cache_key_hash,phase,valid"
+          + "\n"
+        )
         for task_report in self._task_reports.values():
           task_report.report(writer)

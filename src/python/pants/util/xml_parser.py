@@ -21,7 +21,7 @@ class XmlParser:
       parsed_xml = parse(xml_path)
     # Minidom is a frontend for various parsers, only Exception covers ill-formed .xml for them all.
     except Exception as e:
-      raise cls.XmlError(f'Error parsing xml file at {xml_path}: {e!r}')
+      raise cls.XmlError(f"Error parsing xml file at {xml_path}: {e!r}")
     return parsed_xml
 
   @classmethod

@@ -44,25 +44,30 @@ class ToolForPlatform:
 
 @rule
 def translate_host_platform(
-    platform_constraint: PlatformConstraint,
-    binary_util: BinaryUtil,
+  platform_constraint: PlatformConstraint, binary_util: BinaryUtil
 ) -> HostPlatform:
   # This method attempts to provide a uname function to BinaryUtil.host_platform() so that the
   # download urls can be calculated. For platforms that are different than the current host, we try
   # to "spoof" the most appropriate value.
   if Platform.current == Platform.darwin:
     darwin_uname: Any = os.uname
-    linux_uname: Any = lambda: ('linux', None, None, None, 'x86_64')
+    linux_uname: Any = lambda: ("linux", None, None, None, "x86_64")
   else:
     assert Platform.current == Platform.linux
-    darwin_uname = lambda: ('darwin', None, get_closest_mac_host_platform_pair(), None, 'x86_64')
+    darwin_uname = lambda: ("darwin", None, get_closest_mac_host_platform_pair(), None, "x86_64")
     linux_uname = os.uname
 
-  return cast(HostPlatform, match(platform_constraint, {
-    PlatformConstraint.none: lambda: HostPlatform.empty,
-    PlatformConstraint.darwin: lambda: binary_util.host_platform(uname=darwin_uname()),
-    PlatformConstraint.linux: lambda: binary_util.host_platform(uname=linux_uname()),
-  })())
+  return cast(
+    HostPlatform,
+    match(
+      platform_constraint,
+      {
+        PlatformConstraint.none: lambda: HostPlatform.empty,
+        PlatformConstraint.darwin: lambda: binary_util.host_platform(uname=darwin_uname()),
+        PlatformConstraint.linux: lambda: binary_util.host_platform(uname=linux_uname()),
+      },
+    )(),
+  )
 
 
 # TODO: Add integration tests for this file.
@@ -73,6 +78,7 @@ class BinaryToolBase(Subsystem):
 
   :API: public
   """
+
   # Subclasses must set these to appropriate values for the tool they define.
   # They must also set options_scope appropriately.
   platform_dependent: Optional[bool] = None
@@ -87,7 +93,7 @@ class BinaryToolBase(Subsystem):
 
   # Subclasses may set this to a suffix (e.g., '.pex') to add to the computed remote path.
   # Note that setting archive_type will add an appropriate archive suffix after this suffix.
-  suffix = ''
+  suffix = ""
 
   # Subclasses may set these to effect migration from an old --version option to this one.
   # TODO(benjy): Remove these after migration to the mixin is complete.
@@ -107,14 +113,14 @@ class BinaryToolBase(Subsystem):
 
     # TODO: if we need to do more conditional subsystem dependencies, do it declaratively with a
     # dict class field so that we only try to create or access it if we declared a dependency on it.
-    if cls.archive_type == 'txz':
+    if cls.archive_type == "txz":
       sub_deps = sub_deps + (XZ.scoped(cls),)
 
     return sub_deps
 
   @memoized_property
   def _xz(self):
-    if self.archive_type == 'txz':
+    if self.archive_type == "txz":
       return XZ.scoped_instance(self)
     return None
 
@@ -126,7 +132,7 @@ class BinaryToolBase(Subsystem):
     # This forces downloading and extracting the `XZ` archive if any BinaryTool with a 'txz'
     # archive_type is used, but that's fine, because unless the cache is manually changed we won't
     # do more work than necessary.
-    if self.archive_type == 'txz':
+    if self.archive_type == "txz":
       return self._xz.tar_xz_extractor
 
     return create_archiver(self.archive_type)
@@ -150,37 +156,37 @@ class BinaryToolBase(Subsystem):
   def register_options(cls, register):
     super().register_options(register)
 
-    version_registration_kwargs = {
-      'type': str,
-      'default': cls.default_version,
-    }
+    version_registration_kwargs = {"type": str, "default": cls.default_version}
     if cls.extra_version_option_kwargs:
       version_registration_kwargs.update(cls.extra_version_option_kwargs)
-    version_registration_kwargs['help'] = (
-      version_registration_kwargs.get('help') or
-      'Version of the {} {} to use'.format(cls._get_name(),
-                                           'binary' if cls.platform_dependent else 'script')
+    version_registration_kwargs["help"] = version_registration_kwargs.get(
+      "help"
+    ) or "Version of the {} {} to use".format(
+      cls._get_name(), "binary" if cls.platform_dependent else "script"
     )
     # The default for fingerprint in register() is False, but we want to default to True.
-    if 'fingerprint' not in version_registration_kwargs:
-      version_registration_kwargs['fingerprint'] = True
-    register('--version', **version_registration_kwargs)
+    if "fingerprint" not in version_registration_kwargs:
+      version_registration_kwargs["fingerprint"] = True
+    register("--version", **version_registration_kwargs)
 
-    register('--version-digest-mapping', type=dict,
-             default={
-               # "Serialize" the default value dict into "basic" types that can be easily specified
-               # in pants.ini.
-               platform_constraint.value: tool.into_tuple()
-               for platform_constraint, tool in cls.default_versions_and_digests.items()
-             },
-             fingerprint=True,
-             help='A dict mapping <platform constraint> -> (<version>, <fingerprint>, <size_bytes>).'
-                  f'A "platform constraint" is any of {[c.value for c in PlatformConstraint]}, and '
-                  'is the platform to fetch the tool for. A platform-independent tool should '
-                  f'use {PlatformConstraint.none.value}, while a platform-dependent tool should specify '
-                  'all environments it needs to be used for. The "fingerprint" and "size_bytes" '
-                  'arguments are the result printed when running `sha256sum` and `wc -c` on '
-                  'the downloaded file, respectively.')
+    register(
+      "--version-digest-mapping",
+      type=dict,
+      default={
+        # "Serialize" the default value dict into "basic" types that can be easily specified
+        # in pants.ini.
+        platform_constraint.value: tool.into_tuple()
+        for platform_constraint, tool in cls.default_versions_and_digests.items()
+      },
+      fingerprint=True,
+      help="A dict mapping <platform constraint> -> (<version>, <fingerprint>, <size_bytes>)."
+      f'A "platform constraint" is any of {[c.value for c in PlatformConstraint]}, and '
+      "is the platform to fetch the tool for. A platform-independent tool should "
+      f"use {PlatformConstraint.none.value}, while a platform-dependent tool should specify "
+      'all environments it needs to be used for. The "fingerprint" and "size_bytes" '
+      "arguments are the result printed when running `sha256sum` and `wc -c` on "
+      "the downloaded file, respectively.",
+    )
 
   @memoized_method
   def select(self, context=None):
@@ -213,8 +219,10 @@ class BinaryToolBase(Subsystem):
         if old_opts.get(self.replaces_name) and not old_opts.is_default(self.replaces_name):
           return old_opts.get(self.replaces_name)
       else:
-        logger.warning('Cannot resolve version of {} from deprecated option {} in scope {} without a '
-                    'context!'.format(self._get_name(), self.replaces_name, self.replaces_scope))
+        logger.warning(
+          "Cannot resolve version of {} from deprecated option {} in scope {} without a "
+          "context!".format(self._get_name(), self.replaces_name, self.replaces_scope)
+        )
     return self.get_options().version
 
   @memoized_property
@@ -227,11 +235,11 @@ class BinaryToolBase(Subsystem):
 
   @classmethod
   def get_support_dir(cls):
-    return 'bin/{}'.format(cls._get_name())
+    return "bin/{}".format(cls._get_name())
 
   @classmethod
   def _name_to_fetch(cls):
-    return '{}{}'.format(cls._get_name(), cls.suffix)
+    return "{}{}".format(cls._get_name(), cls.suffix)
 
   def make_binary_request(self, version):
     return BinaryRequest(
@@ -240,7 +248,8 @@ class BinaryToolBase(Subsystem):
       name=self._name_to_fetch(),
       platform_dependent=self.platform_dependent,
       external_url_generator=self.get_external_url_generator(),
-      archiver=self._get_archiver())
+      archiver=self._get_archiver(),
+    )
 
   def _select_for_version(self, version):
     binary_request = self.make_binary_request(version)
@@ -250,12 +259,9 @@ class BinaryToolBase(Subsystem):
   def _hackily_snapshot_exclusive(self, context):
     bootstrapdir = self.get_options().pants_bootstrapdir
     relpath = os.path.relpath(self.select(context), bootstrapdir)
-    snapshot = context._scheduler.capture_snapshots((
-      PathGlobsAndRoot(
-        PathGlobs((relpath,)),
-        bootstrapdir,
-      ),
-    ))[0]
+    snapshot = context._scheduler.capture_snapshots(
+      (PathGlobsAndRoot(PathGlobs((relpath,)), bootstrapdir),)
+    )[0]
     return (relpath, snapshot)
 
   def hackily_snapshot(self, context):
@@ -275,6 +281,7 @@ class NativeTool(BinaryToolBase):
 
   :API: public
   """
+
   platform_dependent = True
 
 
@@ -283,43 +290,42 @@ class Script(BinaryToolBase):
 
   :API: public
   """
+
   platform_dependent = False
 
 
 class XZ(NativeTool):
-  options_scope = 'xz'
-  default_version = '5.2.4-3'
-  archive_type = 'tgz'
+  options_scope = "xz"
+  default_version = "5.2.4-3"
+  archive_type = "tgz"
 
   @memoized_property
   def tar_xz_extractor(self):
     return XZCompressedTarArchiver(self._executable_location())
 
   def _executable_location(self):
-    return os.path.join(self.select(), 'bin', 'xz')
+    return os.path.join(self.select(), "bin", "xz")
 
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class VersionDigestMapping:
   """Parse the --version-digest-mapping option back into a dictionary."""
+
   version_digest_mapping: Tuple[Tuple[str, Tuple[str, str, int]], ...]
 
   def __init__(self, version_digest_mapping: Dict[str, List[Union[str, int]]]) -> None:
     self.version_digest_mapping = tuple(
-      (platform_constraint, tuple(data)) # type: ignore[misc]
+      (platform_constraint, tuple(data))  # type: ignore[misc]
       for platform_constraint, data in version_digest_mapping.items()
     )
 
   @memoized_property
-  def _deserialized_mapping(
-      self,
-  ) -> Dict[PlatformConstraint, ToolForPlatform]:
+  def _deserialized_mapping(self) -> Dict[PlatformConstraint, ToolForPlatform]:
     deserialized: Dict[PlatformConstraint, ToolForPlatform] = {}
     for platform_constraint, (version, fingerprint, size_bytes) in self.version_digest_mapping:
       deserialized[PlatformConstraint(platform_constraint)] = ToolForPlatform(
-        version=ToolVersion(version),
-        digest=Digest(fingerprint, size_bytes),
+        version=ToolVersion(version), digest=Digest(fingerprint, size_bytes)
       )
     return deserialized
 
@@ -336,7 +342,8 @@ class BinaryToolUrlSet:
   def get_urls(self) -> List[str]:
     return self.url_generator.generate_urls(
       version=self.tool_for_platform.version.version,
-      host_platform=self.host_platform if self.host_platform != HostPlatform.empty else None)
+      host_platform=self.host_platform if self.host_platform != HostPlatform.empty else None,
+    )
 
 
 @frozen_after_init
@@ -346,9 +353,7 @@ class BinaryToolFetchRequest:
   platform_constraint: PlatformConstraint
 
   def __init__(
-      self,
-      tool: BinaryToolBase,
-      platform_constraint: Optional[PlatformConstraint] = None,
+    self, tool: BinaryToolBase, platform_constraint: Optional[PlatformConstraint] = None
   ) -> None:
     self.tool = tool
     if platform_constraint is None:
@@ -362,8 +367,7 @@ class BinaryToolFetchRequest:
 
 @rule
 async def get_binary_tool_urls(
-    req: BinaryToolFetchRequest,
-    binary_util: BinaryUtil,
+  req: BinaryToolFetchRequest, binary_util: BinaryUtil
 ) -> BinaryToolUrlSet:
   tool = req.tool
   platform_constraint = req.platform_constraint
@@ -377,9 +381,7 @@ async def get_binary_tool_urls(
   host_platform = await Get[HostPlatform](PlatformConstraint, platform_constraint)
 
   return BinaryToolUrlSet(
-    tool_for_platform=tool_for_platform,
-    host_platform=host_platform,
-    url_generator=url_generator,
+    tool_for_platform=tool_for_platform, host_platform=host_platform, url_generator=url_generator
   )
 
 
@@ -389,8 +391,10 @@ async def fetch_binary_tool(req: BinaryToolFetchRequest, url_set: BinaryToolUrlS
   urls = url_set.get_urls()
 
   if not urls:
-    raise ValueError(f'binary tool url generator {url_set.url_generator} produced an empty list of '
-                     f'urls for the request {req}')
+    raise ValueError(
+      f"binary tool url generator {url_set.url_generator} produced an empty list of "
+      f"urls for the request {req}"
+    )
   # TODO: allow fetching a UrlToFetch with failure! Consider FallibleUrlToFetch analog to
   # FallibleExecuteProcessResult!
   url_to_fetch = urls[0]

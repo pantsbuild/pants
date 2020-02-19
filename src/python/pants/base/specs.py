@@ -56,7 +56,7 @@ class AddressSpec(Spec, metaclass=ABCMeta):
 
   @abstractmethod
   def matching_address_families(
-    self, address_families_dict: Dict[str, "AddressFamily"],
+    self, address_families_dict: Dict[str, "AddressFamily"]
   ) -> List["AddressFamily"]:
     """Given a dict of (namespace path) -> AddressFamily, return the values matching this address
     spec.
@@ -73,8 +73,8 @@ class AddressSpec(Spec, metaclass=ABCMeta):
     maybe_af = address_families_dict.get(spec_dir_path, None)
     if maybe_af is None:
       raise cls.AddressFamilyResolutionError(
-        'Path "{}" does not contain any BUILD files.'
-        .format(spec_dir_path))
+        'Path "{}" does not contain any BUILD files.'.format(spec_dir_path)
+      )
     return [maybe_af]
 
   class AddressResolutionError(Exception):
@@ -112,17 +112,18 @@ class AddressSpec(Spec, metaclass=ABCMeta):
 @dataclass(frozen=True)
 class SingleAddress(AddressSpec):
   """An AddressSpec for a single address."""
+
   directory: str
   name: str
 
   def __post_init__(self) -> None:
     if self.directory is None:
-      raise ValueError(f'A SingleAddress must have a directory. Got: {self}')
+      raise ValueError(f"A SingleAddress must have a directory. Got: {self}")
     if self.name is None:
-      raise ValueError(f'A SingleAddress must have a name. Got: {self}')
+      raise ValueError(f"A SingleAddress must have a name. Got: {self}")
 
   def to_spec_string(self) -> str:
-    return '{}:{}'.format(self.directory, self.name)
+    return "{}:{}".format(self.directory, self.name)
 
   def matching_address_families(
     self, address_families_dict: Dict[str, "AddressFamily"]
@@ -144,13 +145,12 @@ class SingleAddress(AddressSpec):
     """
     single_af = assert_single_element(address_families)
     addr_tgt_pairs = [
-      (addr, tgt) for addr, tgt in single_af.addressables.items()
-      if addr.target_name == self.name
+      (addr, tgt) for addr, tgt in single_af.addressables.items() if addr.target_name == self.name
     ]
     if len(addr_tgt_pairs) == 0:
       raise self._SingleAddressResolutionError(single_af, self.name)
     # There will be at most one target with a given name in a single AddressFamily.
-    assert(len(addr_tgt_pairs) == 1)
+    assert len(addr_tgt_pairs) == 1
     return addr_tgt_pairs
 
   def make_glob_patterns(self, address_mapper: "AddressMapper") -> List[str]:
@@ -160,13 +160,14 @@ class SingleAddress(AddressSpec):
 @dataclass(frozen=True)
 class SiblingAddresses(AddressSpec):
   """An AddressSpec representing all addresses located directly within the given directory."""
+
   directory: str
 
   def to_spec_string(self) -> str:
-    return f'{self.directory}:'
+    return f"{self.directory}:"
 
   def matching_address_families(
-    self, address_families_dict: Dict[str, "AddressFamily"],
+    self, address_families_dict: Dict[str, "AddressFamily"]
   ) -> List["AddressFamily"]:
     return self.address_families_for_dir(address_families_dict, self.directory)
 
@@ -180,42 +181,46 @@ class SiblingAddresses(AddressSpec):
 @dataclass(frozen=True)
 class DescendantAddresses(AddressSpec):
   """An AddressSpec representing all addresses located recursively under the given directory."""
+
   directory: str
 
   def to_spec_string(self) -> str:
-    return f'{self.directory}::'
+    return f"{self.directory}::"
 
   def matching_address_families(
-    self, address_families_dict: Dict[str, "AddressFamily"],
+    self, address_families_dict: Dict[str, "AddressFamily"]
   ) -> List["AddressFamily"]:
     return [
-      af for ns, af in address_families_dict.items()
+      af
+      for ns, af in address_families_dict.items()
       if fast_relpath_optional(ns, self.directory) is not None
     ]
 
   def address_target_pairs_from_address_families(self, address_families: Sequence["AddressFamily"]):
     addr_tgt_pairs = self.all_address_target_pairs(address_families)
     if len(addr_tgt_pairs) == 0:
-      raise self.AddressResolutionError('AddressSpec {} does not match any targets.'.format(self))
+      raise self.AddressResolutionError("AddressSpec {} does not match any targets.".format(self))
     return addr_tgt_pairs
 
   def make_glob_patterns(self, address_mapper: "AddressMapper") -> List[str]:
-    return [os.path.join(self.directory, '**', pat) for pat in address_mapper.build_patterns]
+    return [os.path.join(self.directory, "**", pat) for pat in address_mapper.build_patterns]
 
 
 @dataclass(frozen=True)
 class AscendantAddresses(AddressSpec):
   """An AddressSpec representing all addresses located recursively _above_ the given directory."""
+
   directory: str
 
   def to_spec_string(self) -> str:
-    return f'{self.directory}^'
+    return f"{self.directory}^"
 
   def matching_address_families(
-    self, address_families_dict: Dict[str, "AddressFamily"],
+    self, address_families_dict: Dict[str, "AddressFamily"]
   ) -> List["AddressFamily"]:
     return [
-      af for ns, af in address_families_dict.items()
+      af
+      for ns, af in address_families_dict.items()
       if fast_relpath_optional(self.directory, ns) is not None
     ]
 
@@ -235,7 +240,7 @@ _specificity = {
   SiblingAddresses: 1,
   AscendantAddresses: 2,
   DescendantAddresses: 3,
-  type(None): 99
+  type(None): 99,
 }
 
 
@@ -249,10 +254,12 @@ def more_specific(
   """
   # Note that if either of spec1 or spec2 is None, the other will be returned.
   if address_spec1 is None and address_spec2 is None:
-    raise ValueError('internal error: both specs provided to more_specific() were None')
+    raise ValueError("internal error: both specs provided to more_specific() were None")
   return cast(
     AddressSpec,
-    address_spec1 if _specificity[type(address_spec1)] < _specificity[type(address_spec2)] else address_spec2
+    address_spec1
+    if _specificity[type(address_spec1)] < _specificity[type(address_spec2)]
+    else address_spec2,
   )
 
 
@@ -266,11 +273,12 @@ class AddressSpecsMatcher:
   the hash of the class instance in its key, and results in a very large key when used with
   `AddressSpecs` directly).
   """
+
   tags: Tuple[str, ...]
   exclude_patterns: Tuple[str, ...]
 
   def __init__(
-    self, tags: Optional[Iterable[str]] = None, exclude_patterns: Optional[Iterable[str]] = None,
+    self, tags: Optional[Iterable[str]] = None, exclude_patterns: Optional[Iterable[str]] = None
   ) -> None:
     self.tags = tuple(tags or [])
     self.exclude_patterns = tuple(exclude_patterns or [])
@@ -286,6 +294,7 @@ class AddressSpecsMatcher:
   def _target_tag_matches(self):
     def filter_for_tag(tag):
       return lambda t: tag in [str(t_tag) for t_tag in t.kwargs().get("tags", [])]
+
     return wrap_filters(create_filters(self.tags, filter_for_tag))
 
   def matches_target_address_pair(self, address, target):
@@ -303,6 +312,7 @@ class AddressSpecsMatcher:
 class AddressSpecs:
   """A collection of `AddressSpec`s representing AddressSpec subclasses, and a AddressSpecsMatcher
   to filter results."""
+
   dependencies: Tuple[AddressSpec, ...]
   matcher: AddressSpecsMatcher
 
@@ -324,7 +334,6 @@ class FilesystemSpec(Spec, metaclass=ABCMeta):
 
 
 class FilesystemResolvedSpec(FilesystemSpec, metaclass=ABCMeta):
-
   @property
   @abstractmethod
   def resolved_files(self) -> Tuple[str, ...]:
@@ -334,11 +343,12 @@ class FilesystemResolvedSpec(FilesystemSpec, metaclass=ABCMeta):
 @dataclass(frozen=True)
 class FilesystemLiteralSpec(FilesystemResolvedSpec):
   """A literal file name, e.g. `foo.py`."""
+
   file: str
 
   @property
   def resolved_files(self) -> Tuple[str, ...]:
-    return self.file,
+    return (self.file,)
 
   def to_spec_string(self) -> str:
     return self.file
@@ -347,6 +357,7 @@ class FilesystemLiteralSpec(FilesystemResolvedSpec):
 @dataclass(frozen=True)
 class FilesystemGlobSpec(FilesystemSpec):
   """A spec with a glob or globs, e.g. `*.py` and `**/*.java`."""
+
   glob: str
 
   def to_spec_string(self) -> str:
@@ -356,6 +367,7 @@ class FilesystemGlobSpec(FilesystemSpec):
 @dataclass(frozen=True)
 class FilesystemResolvedGlobSpec(FilesystemGlobSpec, FilesystemResolvedSpec):
   """A spec with resolved globs, e.g. `*.py` may resolve to `('f1.py', 'f2.py', '__init__.py')`."""
+
   _snapshot: Snapshot
 
   @property
@@ -366,6 +378,7 @@ class FilesystemResolvedGlobSpec(FilesystemGlobSpec, FilesystemResolvedSpec):
 @dataclass(frozen=True)
 class FilesystemIgnoreSpec(FilesystemSpec):
   """A spec to ignore certain files or globs."""
+
   glob: str
 
   def __post_init__(self) -> None:
@@ -377,11 +390,11 @@ class FilesystemIgnoreSpec(FilesystemSpec):
 
 
 class FilesystemSpecs(Collection[FilesystemSpec]):
-
   @memoized_property
   def includes(self) -> Tuple[Union[FilesystemLiteralSpec, FilesystemGlobSpec], ...]:
     return tuple(
-      spec for spec in self.dependencies
+      spec
+      for spec in self.dependencies
       if isinstance(spec, (FilesystemGlobSpec, FilesystemLiteralSpec))
     )
 
@@ -437,11 +450,7 @@ class Specs:
 
     It is guaranteed that there will only ever be AddressSpecs or FilesystemSpecs, but not both,
     through validation in the constructor."""
-    return (
-      self.filesystem_specs
-      if self.filesystem_specs.dependencies
-      else self.address_specs
-    )
+    return self.filesystem_specs if self.filesystem_specs.dependencies else self.address_specs
 
 
 OriginSpec = Union[AddressSpec, FilesystemResolvedSpec]

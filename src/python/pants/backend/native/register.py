@@ -31,10 +31,7 @@ def build_file_aliases():
       ExternalNativeLibrary.alias(): ExternalNativeLibrary,
       PackagedNativeLibrary.alias(): PackagedNativeLibrary,
     },
-    objects={
-      ConanRequirement.alias(): ConanRequirement,
-      NativeArtifact.alias(): NativeArtifact,
-    }
+    objects={ConanRequirement.alias(): ConanRequirement, NativeArtifact.alias(): NativeArtifact},
   )
 
 
@@ -45,18 +42,18 @@ def global_subsystems():
 def register_goals():
   # TODO(#5962): register these under the 'compile' goal when we eliminate the product transitive
   # dependency from export -> compile.
-  task(name='conan-prep', action=ConanPrep).install('native-compile')
-  task(name='conan-fetch', action=ConanFetch).install('native-compile')
-  task(name='c-for-ctypes', action=CCompile).install('native-compile')
-  task(name='cpp-for-ctypes', action=CppCompile).install('native-compile')
-  task(name='shared-libraries', action=LinkSharedLibraries).install('link')
+  task(name="conan-prep", action=ConanPrep).install("native-compile")
+  task(name="conan-fetch", action=ConanFetch).install("native-compile")
+  task(name="c-for-ctypes", action=CCompile).install("native-compile")
+  task(name="cpp-for-ctypes", action=CppCompile).install("native-compile")
+  task(name="shared-libraries", action=LinkSharedLibraries).install("link")
 
 
 def rules():
   return (
-    create_native_toolchain_rules() +
-    create_xcode_cli_tools_rules() +
-    create_binutils_rules() +
-    create_gcc_rules() +
-    create_llvm_rules()
+    create_native_toolchain_rules()
+    + create_xcode_cli_tools_rules()
+    + create_binutils_rules()
+    + create_gcc_rules()
+    + create_llvm_rules()
   )

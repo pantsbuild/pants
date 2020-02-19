@@ -19,28 +19,40 @@ class NativeLibrary(Target, metaclass=ABCMeta):
   def produces_ctypes_native_library(cls, target):
     return isinstance(target, cls) and bool(target.ctypes_native_library)
 
-  def __init__(self, address, payload=None, sources=None, ctypes_native_library=None,
-               strict_deps=None, fatal_warnings=None, compiler_option_sets=None,
-               toolchain_variant=None,
-               **kwargs):
+  def __init__(
+    self,
+    address,
+    payload=None,
+    sources=None,
+    ctypes_native_library=None,
+    strict_deps=None,
+    fatal_warnings=None,
+    compiler_option_sets=None,
+    toolchain_variant=None,
+    **kwargs
+  ):
 
     if not payload:
       payload = Payload()
-    sources_field = self.create_sources_field(sources, address.spec_path, key_arg='sources')
-    payload.add_fields({
-      'sources': sources_field,
-      'ctypes_native_library': ctypes_native_library,
-      'strict_deps': PrimitiveField(strict_deps),
-      'fatal_warnings': PrimitiveField(fatal_warnings),
-      'compiler_option_sets': PrimitivesSetField(compiler_option_sets),
-      'toolchain_variant': PrimitiveField(toolchain_variant)
-    })
+    sources_field = self.create_sources_field(sources, address.spec_path, key_arg="sources")
+    payload.add_fields(
+      {
+        "sources": sources_field,
+        "ctypes_native_library": ctypes_native_library,
+        "strict_deps": PrimitiveField(strict_deps),
+        "fatal_warnings": PrimitiveField(fatal_warnings),
+        "compiler_option_sets": PrimitivesSetField(compiler_option_sets),
+        "toolchain_variant": PrimitiveField(toolchain_variant),
+      }
+    )
 
     if ctypes_native_library and not isinstance(ctypes_native_library, NativeArtifact):
       raise TargetDefinitionException(
         "Target must provide a valid pants '{}' object. Received an object with type '{}' "
-        "and value: {}."
-        .format(NativeArtifact.alias(), type(ctypes_native_library).__name__, ctypes_native_library))
+        "and value: {}.".format(
+          NativeArtifact.alias(), type(ctypes_native_library).__name__, ctypes_native_library
+        )
+      )
 
     super().__init__(address=address, payload=payload, **kwargs)
 
@@ -75,24 +87,17 @@ class NativeLibrary(Target, metaclass=ABCMeta):
 
 class CLibrary(NativeLibrary):
 
-  default_sources_globs = [
-    '*.h',
-    '*.c',
-  ]
+  default_sources_globs = ["*.h", "*.c"]
 
   @classmethod
   def alias(cls):
-    return 'ctypes_compatible_c_library'
+    return "ctypes_compatible_c_library"
 
 
 class CppLibrary(NativeLibrary):
 
-  default_sources_globs = [
-    '*.h',
-    '*.hpp',
-    '*.cpp',
-  ]
+  default_sources_globs = ["*.h", "*.hpp", "*.cpp"]
 
   @classmethod
   def alias(cls):
-    return 'ctypes_compatible_cpp_library'
+    return "ctypes_compatible_cpp_library"

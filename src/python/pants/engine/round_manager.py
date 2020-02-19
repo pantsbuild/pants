@@ -8,7 +8,7 @@ from twitter.common.collections import OrderedSet
 from pants.goal.goal import Goal
 
 
-class ProducerInfo(namedtuple('ProducerInfo', ['product_type', 'task_type', 'goal'])):
+class ProducerInfo(namedtuple("ProducerInfo", ["product_type", "task_type", "goal"])):
   """Describes the producer of a given product type."""
 
 

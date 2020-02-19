@@ -47,7 +47,12 @@ class Report:
   DEBUG = 4
 
   _log_level_name_map = {
-    'FATAL': FATAL, 'ERROR': ERROR, 'WARN': WARN, 'WARNING': WARN, 'INFO': INFO, 'DEBUG': DEBUG
+    "FATAL": FATAL,
+    "ERROR": ERROR,
+    "WARN": WARN,
+    "WARNING": WARN,
+    "INFO": INFO,
+    "DEBUG": DEBUG,
   }
 
   @staticmethod
@@ -57,7 +62,7 @@ class Report:
 
   def __init__(self):
     # We periodically emit newly gathered output from tool invocations.
-    self._emitter_thread = EmitterThread(report=self, name='output-emitter')
+    self._emitter_thread = EmitterThread(report=self, name="output-emitter")
 
     # Map from workunit id to workunit.
     self._workunits = {}
@@ -102,9 +107,10 @@ class Report:
     # TODO(6742): Once we have enough MyPy coverage, we can rely on MyPy to catch any issues for us,
     # rather than this runtime check.
     # TODO(6071): No longer allow bytes once Py2 is removed.
-    assert all(isinstance(element, (str, bytes, tuple)) for element in msg_elements), \
-      "At least one logged message element is not of type " \
+    assert all(isinstance(element, (str, bytes, tuple)) for element in msg_elements), (
+      "At least one logged message element is not of type "
       "Union[str, bytes, Tuple[str, str]]:\n {}".format(msg_elements)
+    )
     with self._lock:
       for reporter in self._reporters.values():
         reporter.handle_log(workunit, level, *msg_elements)

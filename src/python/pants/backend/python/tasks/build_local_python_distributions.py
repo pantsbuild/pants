@@ -34,26 +34,26 @@ from pants.util.strutil import safe_shlex_join
 class BuildLocalPythonDistributions(Task):
   """Create python distributions (.whl) from python_dist targets."""
 
-  options_scope = 'python-create-distributions'
+  options_scope = "python-create-distributions"
 
   # NB: these are all the immediate subdirectories of the target's results directory.
   # This contains any modules from a setup_requires().
-  _SETUP_REQUIRES_SITE_SUBDIR = 'setup_requires_site'
+  _SETUP_REQUIRES_SITE_SUBDIR = "setup_requires_site"
   # This will contain the sources used to build the python_dist().
-  _DIST_SOURCE_SUBDIR = 'python_dist_subdir'
+  _DIST_SOURCE_SUBDIR = "python_dist_subdir"
 
-  setup_requires_pex_filename = 'setup-requires.pex'
+  setup_requires_pex_filename = "setup-requires.pex"
 
   # This defines the output directory when building the dist, so we know where the output wheel is
   # located. It is a subdirectory of `_DIST_SOURCE_SUBDIR`.
-  _DIST_OUTPUT_DIR = 'dist'
+  _DIST_OUTPUT_DIR = "dist"
 
   @classmethod
   def product_types(cls):
     # Note that we don't actually place the products in the product map. We stitch
     # them into the build graph instead.  This is just to force the round engine
     # to run this task when dists need to be built.
-    return [PythonRequirementLibrary, 'local_wheels']
+    return [PythonRequirementLibrary, "local_wheels"]
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -62,7 +62,7 @@ class BuildLocalPythonDistributions(Task):
 
   @classmethod
   def implementation_version(cls):
-    return super().implementation_version() + [('BuildLocalPythonDistributions', 3)]
+    return super().implementation_version() + [("BuildLocalPythonDistributions", 3)]
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -71,7 +71,8 @@ class BuildLocalPythonDistributions(Task):
       PythonNativeCode.scoped(cls),
     )
 
-  class BuildLocalPythonDistributionsError(TaskError): pass
+  class BuildLocalPythonDistributionsError(TaskError):
+    pass
 
   @memoized_property
   def _python_native_code_settings(self):
@@ -122,10 +123,10 @@ class BuildLocalPythonDistributions(Task):
         for vt in invalidation_check.invalid_vts:
           self._prepare_and_create_dist(interpreter, shared_libs_product, vt)
 
-        local_wheel_products = self.context.products.get('local_wheels')
+        local_wheel_products = self.context.products.get("local_wheels")
         for vt in invalidation_check.all_vts:
           dist = self._get_whl_from_dir(vt.results_dir)
-          req_lib_addr = Address.parse(f'{vt.target.address.spec}__req_lib')
+          req_lib_addr = Address.parse(f"{vt.target.address.spec}__req_lib")
           self._inject_synthetic_dist_requirements(dist, req_lib_addr)
           # Make any target that depends on the dist depend on the synthetic req_lib,
           # for downstream consumption.
@@ -142,8 +143,10 @@ class BuildLocalPythonDistributions(Task):
           raise TargetDefinitionException(
             target,
             "Target '{}' is invalid: the only dependencies allowed in python_dist() targets "
-            "are C or C++ targets with a ctypes_native_library= kwarg."
-            .format(dep_tgt.address.spec))
+            "are C or C++ targets with a ctypes_native_library= kwarg.".format(
+              dep_tgt.address.spec
+            ),
+          )
         native_artifact_targets.append(dep_tgt)
     return native_artifact_targets
 
@@ -155,9 +158,9 @@ class BuildLocalPythonDistributions(Task):
     for src_relative_to_target_base in all_sources:
       src_rel_to_results_dir = os.path.join(dist_target_dir, src_relative_to_target_base)
       safe_mkdir_for(src_rel_to_results_dir)
-      abs_src_path = os.path.join(get_buildroot(),
-                                  dist_tgt.address.spec_path,
-                                  src_relative_to_target_base)
+      abs_src_path = os.path.join(
+        get_buildroot(), dist_tgt.address.spec_path, src_relative_to_target_base
+      )
       shutil.copyfile(abs_src_path, src_rel_to_results_dir)
 
   def _add_artifacts(self, dist_target_dir, shared_libs_product, native_artifact_targets):
@@ -172,7 +175,7 @@ class BuildLocalPythonDistributions(Task):
       basename = os.path.basename(shared_lib.path)
       # NB: We convert everything to .so here so that the setup.py can just
       # declare .so to build for either platform.
-      resolved_outname = re.sub(r'\..*\Z', '.so', basename)
+      resolved_outname = re.sub(r"\..*\Z", ".so", basename)
       dest_path = os.path.join(dist_target_dir, resolved_outname)
       safe_mkdir_for(dest_path)
       shutil.copyfile(shared_lib.path, dest_path)
@@ -189,7 +192,8 @@ class BuildLocalPythonDistributions(Task):
     dist_output_dir = self._get_output_dir(results_dir)
 
     all_native_artifacts = self._add_artifacts(
-      dist_output_dir, shared_libs_product, native_artifact_deps)
+      dist_output_dir, shared_libs_product, native_artifact_deps
+    )
 
     # TODO: remove the triplication all of this validation across _get_native_artifact_deps(),
     # check_build_for_current_platform_only(), and len(all_native_artifacts) > 0!
@@ -198,31 +202,38 @@ class BuildLocalPythonDistributions(Task):
       len(all_native_artifacts) > 0
       or self._python_native_code_settings.check_build_for_current_platform_only(
         # NB: This doesn't reach into transitive dependencies, but that doesn't matter currently.
-        [dist_target] + dist_target.dependencies))
+        [dist_target]
+        + dist_target.dependencies
+      )
+    )
 
     versioned_target_fingerprint = versioned_target.cache_key.hash
 
     setup_requires_dir = os.path.join(results_dir, self._SETUP_REQUIRES_SITE_SUBDIR)
     setup_reqs_to_resolve = self._get_setup_requires_to_resolve(dist_target)
     if setup_reqs_to_resolve:
-      self.context.log.debug('python_dist target(s) with setup_requires detected. '
-                             'Installing setup requirements: {}\n\n'
-                             .format([req.key for req in setup_reqs_to_resolve]))
+      self.context.log.debug(
+        "python_dist target(s) with setup_requires detected. "
+        "Installing setup requirements: {}\n\n".format([req.key for req in setup_reqs_to_resolve])
+      )
 
     setup_reqs_pex_path = os.path.join(
-      setup_requires_dir,
-      f'setup-requires-{versioned_target_fingerprint}.pex')
+      setup_requires_dir, f"setup-requires-{versioned_target_fingerprint}.pex"
+    )
     setup_requires_pex = self._build_setup_requires_pex_settings.bootstrap(
-      interpreter, setup_reqs_pex_path, extra_reqs=setup_reqs_to_resolve)
-    self.context.log.debug('Using pex file as setup.py interpreter: {}'
-                           .format(setup_requires_pex.path()))
+      interpreter, setup_reqs_pex_path, extra_reqs=setup_reqs_to_resolve
+    )
+    self.context.log.debug(
+      "Using pex file as setup.py interpreter: {}".format(setup_requires_pex.path())
+    )
 
     self._create_dist(
       dist_target,
       dist_output_dir,
       setup_requires_pex,
       versioned_target_fingerprint,
-      is_platform_specific)
+      is_platform_specific,
+    )
 
   # NB: "snapshot" refers to a "snapshot release", not a Snapshot.
   def _generate_snapshot_bdist_wheel_argv(self, snapshot_fingerprint, is_platform_specific):
@@ -235,51 +246,51 @@ class BuildLocalPythonDistributions(Task):
 
     NB: adds a '+' before the fingerprint to the build tag!
     """
-    egg_info_snapshot_tag_args = ['egg_info', f'--tag-build=+{snapshot_fingerprint}']
-    bdist_whl_args = ['bdist_wheel']
+    egg_info_snapshot_tag_args = ["egg_info", f"--tag-build=+{snapshot_fingerprint}"]
+    bdist_whl_args = ["bdist_wheel"]
     if is_platform_specific:
-      platform_args = ['--plat-name', pep425tags.get_platform()]
+      platform_args = ["--plat-name", pep425tags.get_platform()]
     else:
       platform_args = []
 
-    dist_dir_args = ['--dist-dir', self._DIST_OUTPUT_DIR]
+    dist_dir_args = ["--dist-dir", self._DIST_OUTPUT_DIR]
 
-    return (['setup.py'] +
-            egg_info_snapshot_tag_args +
-            bdist_whl_args +
-            platform_args +
-            dist_dir_args)
+    return (
+      ["setup.py"] + egg_info_snapshot_tag_args + bdist_whl_args + platform_args + dist_dir_args
+    )
 
-  def _create_dist(self,
-                   dist_tgt,
-                   dist_target_dir,
-                   setup_requires_pex,
-                   snapshot_fingerprint,
-                   is_platform_specific):
+  def _create_dist(
+    self, dist_tgt, dist_target_dir, setup_requires_pex, snapshot_fingerprint, is_platform_specific
+  ):
     """Create a .whl file for the specified python_distribution target."""
     self._copy_sources(dist_tgt, dist_target_dir)
 
     setup_py_snapshot_version_argv = self._generate_snapshot_bdist_wheel_argv(
-      snapshot_fingerprint, is_platform_specific)
+      snapshot_fingerprint, is_platform_specific
+    )
 
     cmd = safe_shlex_join(setup_requires_pex.cmdline(setup_py_snapshot_version_argv))
-    with self.context.new_workunit('setup.py', cmd=cmd, labels=[WorkUnitLabel.TOOL]) as workunit:
+    with self.context.new_workunit("setup.py", cmd=cmd, labels=[WorkUnitLabel.TOOL]) as workunit:
       with pushd(dist_target_dir):
-        result = setup_requires_pex.run(args=setup_py_snapshot_version_argv,
-                                        stdout=workunit.output('stdout'),
-                                        stderr=workunit.output('stderr'))
+        result = setup_requires_pex.run(
+          args=setup_py_snapshot_version_argv,
+          stdout=workunit.output("stdout"),
+          stderr=workunit.output("stderr"),
+        )
         if result != 0:
           raise self.BuildLocalPythonDistributionsError(
             "Installation of python distribution from target {target} into directory {into_dir} "
             "failed (return value of run() was: {rc!r}).\n"
             "The pex with any requirements is located at: {interpreter}.\n"
             "The host system's compiler and linker were used.\n"
-            "The setup command was: {command}."
-            .format(target=dist_tgt,
-                    into_dir=dist_target_dir,
-                    rc=result,
-                    interpreter=setup_requires_pex.path(),
-                    command=setup_py_snapshot_version_argv))
+            "The setup command was: {command}.".format(
+              target=dist_tgt,
+              into_dir=dist_target_dir,
+              rc=result,
+              interpreter=setup_requires_pex.path(),
+              command=setup_py_snapshot_version_argv,
+            )
+          )
 
   # TODO: convert this into a SimpleCodegenTask, which does the exact same thing as this method!
   def _inject_synthetic_dist_requirements(self, dist, req_lib_addr):
@@ -290,24 +301,26 @@ class BuildLocalPythonDistributions(Task):
     :return: a :class: `PythonRequirementLibrary` referencing the locally-built wheel.
     """
     whl_dir, base = split_basename_and_dirname(dist)
-    whl_metadata = base.split('-')
-    req_name = '=='.join([whl_metadata[0], whl_metadata[1]])
+    whl_metadata = base.split("-")
+    req_name = "==".join([whl_metadata[0], whl_metadata[1]])
     req = PythonRequirement(req_name, repository=whl_dir)
-    self.context.build_graph.inject_synthetic_target(req_lib_addr, PythonRequirementLibrary,
-                                                     requirements=[req])
+    self.context.build_graph.inject_synthetic_target(
+      req_lib_addr, PythonRequirementLibrary, requirements=[req]
+    )
 
   @classmethod
   def _get_whl_from_dir(cls, install_dir):
     """Return the absolute path of the whl in a setup.py install directory."""
     dist_dir = cls._get_dist_dir(install_dir)
-    dists = glob.glob(os.path.join(dist_dir, '*.whl'))
+    dists = glob.glob(os.path.join(dist_dir, "*.whl"))
     if len(dists) == 0:
       raise cls.BuildLocalPythonDistributionsError(
-        'No distributions were produced by python_create_distribution task.\n'
-        'dist_dir: {}, install_dir: {}'
-        .format(dist_dir, install_dir))
+        "No distributions were produced by python_create_distribution task.\n"
+        "dist_dir: {}, install_dir: {}".format(dist_dir, install_dir)
+      )
     if len(dists) > 1:
       # TODO: is this ever going to happen?
-      raise cls.BuildLocalPythonDistributionsError('Ambiguous local python distributions found: {}'
-                                                   .format(dists))
+      raise cls.BuildLocalPythonDistributionsError(
+        "Ambiguous local python distributions found: {}".format(dists)
+      )
     return dists[0]

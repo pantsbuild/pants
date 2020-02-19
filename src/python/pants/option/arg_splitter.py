@@ -20,6 +20,7 @@ class ArgSplitterError(Exception):
 @dataclass(frozen=True)
 class SplitArgs:
   """The result of splitting args."""
+
   goals: List[str]  # Explicitly requested goals.
   scope_to_flags: Dict[str, List[str]]  # Scope name -> list of flags in that scope.
   specs: List[str]  # The specifications for what to run against, e.g. the targets or files
@@ -76,21 +77,31 @@ class ArgSplitter:
 
   Handles help and version args specially.
   """
-  _HELP_BASIC_ARGS = ('-h', '--help', 'help')
-  _HELP_ADVANCED_ARGS = ('--help-advanced', 'help-advanced')
-  _HELP_ALL_SCOPES_ARGS = ('--help-all', 'help-all')
-  _HELP_VERSION_ARGS = ('-v', '-V', '--version')
-  _HELP_GOALS_ARGS = ('goals',)
-  _HELP_ARGS = (_HELP_BASIC_ARGS + _HELP_ADVANCED_ARGS + _HELP_ALL_SCOPES_ARGS +
-                _HELP_VERSION_ARGS + _HELP_GOALS_ARGS)
+
+  _HELP_BASIC_ARGS = ("-h", "--help", "help")
+  _HELP_ADVANCED_ARGS = ("--help-advanced", "help-advanced")
+  _HELP_ALL_SCOPES_ARGS = ("--help-all", "help-all")
+  _HELP_VERSION_ARGS = ("-v", "-V", "--version")
+  _HELP_GOALS_ARGS = ("goals",)
+  _HELP_ARGS = (
+    _HELP_BASIC_ARGS
+    + _HELP_ADVANCED_ARGS
+    + _HELP_ALL_SCOPES_ARGS
+    + _HELP_VERSION_ARGS
+    + _HELP_GOALS_ARGS
+  )
 
   def __init__(self, known_scope_infos: Iterable[ScopeInfo]) -> None:
     self._known_scope_infos = known_scope_infos
     # TODO: Get rid of our reliance on known scopes here. We don't really need it now
     # that we heuristically identify target specs based on it containing /, : or being
     # a top-level directory.
-    self._known_scopes = ({si.scope for si in known_scope_infos} |
-                          {'goals', 'help', 'help-advanced', 'help-all'})
+    self._known_scopes = {si.scope for si in known_scope_infos} | {
+      "goals",
+      "help",
+      "help-advanced",
+      "help-all",
+    }
     self._unknown_scopes: List[str] = []
     self._unconsumed_args: List[str] = []  # In reverse order, for efficient popping off the end.
     self._help_request: Optional[HelpRequest] = None  # Will be set if we encounter any help flags.
@@ -99,12 +110,14 @@ class ArgSplitter:
     # cmd line, as an alternative to ... scope --flag-name.
 
     # We check for prefixes in reverse order, so we match the longest prefix first.
-    sorted_scope_infos = sorted([si for si in self._known_scope_infos if si.scope],
-                                key=lambda si: si.scope, reverse=True)
+    sorted_scope_infos = sorted(
+      [si for si in self._known_scope_infos if si.scope], key=lambda si: si.scope, reverse=True
+    )
 
     # List of pairs (prefix, ScopeInfo).
-    self._known_scoping_prefixes = [(f"{si.scope.replace('.', '-')}-", si)
-                                    for si in sorted_scope_infos]
+    self._known_scoping_prefixes = [
+      (f"{si.scope.replace('.', '-')}-", si) for si in sorted_scope_infos
+    ]
 
   @property
   def help_request(self) -> Optional[HelpRequest]:
@@ -168,7 +181,7 @@ class ArgSplitter:
     while scope:
       if not self._check_for_help_request(scope.lower()):
         add_scope(scope)
-        goals.add(scope.partition('.')[0])
+        goals.add(scope.partition(".")[0])
         passthru_owner = scope
         for flag in flags:
           assign_flag_to_scope(flag, scope)
@@ -176,7 +189,7 @@ class ArgSplitter:
 
     while self._unconsumed_args and not self._at_double_dash():
       arg = self._unconsumed_args.pop()
-      if arg.startswith('-'):
+      if arg.startswith("-"):
         # We assume any args here are in global scope.
         if not self._check_for_help_request(arg):
           assign_flag_to_scope(arg, GLOBAL_SCOPE)
@@ -212,8 +225,8 @@ class ArgSplitter:
     In the future we can expand this heuristic to support other kinds of specs, such as URLs.
     """
     return (
-      any(symbol in arg for symbol in (os.path.sep, ':', '*'))
-      or arg.startswith('!')
+      any(symbol in arg for symbol in (os.path.sep, ":", "*"))
+      or arg.startswith("!")
       or Path(arg).exists()
     )
 
@@ -252,7 +265,7 @@ class ArgSplitter:
     returns a pair (scope, flag).
     """
     for scope_prefix, scope_info in self._known_scoping_prefixes:
-      for flag_prefix in ['--', '--no-']:
+      for flag_prefix in ["--", "--no-"]:
         prefix = flag_prefix + scope_prefix
         if flag.startswith(prefix):
           scope = scope_info.scope
@@ -262,16 +275,16 @@ class ArgSplitter:
             # Note that this means that we can't set a task option on the cmd-line if its
             # name happens to start with a subsystem scope.
             # TODO: Either fix this or at least detect such options and warn.
-            task_subsystem_scope = f'{scope_info.scope}.{default_scope}'
+            task_subsystem_scope = f"{scope_info.scope}.{default_scope}"
             if task_subsystem_scope in self._known_scopes:  # Such a task subsystem actually exists.
               scope = task_subsystem_scope
-          return scope, flag_prefix + flag[len(prefix):]
+          return scope, flag_prefix + flag[len(prefix) :]
     return default_scope, flag
 
   def _at_flag(self) -> bool:
     return (
       bool(self._unconsumed_args)
-      and self._unconsumed_args[-1].startswith('-')
+      and self._unconsumed_args[-1].startswith("-")
       and not self._at_double_dash()
     )
 
@@ -279,4 +292,4 @@ class ArgSplitter:
     return bool(self._unconsumed_args) and self._unconsumed_args[-1] in self._known_scopes
 
   def _at_double_dash(self) -> bool:
-    return bool(self._unconsumed_args) and self._unconsumed_args[-1] == '--'
+    return bool(self._unconsumed_args) and self._unconsumed_args[-1] == "--"

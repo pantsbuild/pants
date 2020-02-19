@@ -127,33 +127,30 @@ def _legacy_symbol_table(build_file_aliases: BuildFileAliases) -> SymbolTable:
     # Conveniently, multi-target_type TargetMacro.Factory, and legacy python source parsing, are
     # targeted to be removed in the same version of pants.
     if len(factory.target_types) == 1:
-      table[alias] = _make_target_adaptor(
-        TargetAdaptor,
-        tuple(factory.target_types)[0],
-      )
+      table[alias] = _make_target_adaptor(TargetAdaptor, tuple(factory.target_types)[0])
 
   # TODO: The alias replacement here is to avoid elevating "TargetAdaptors" into the public
   # API until after https://github.com/pantsbuild/pants/issues/3560 has been completed.
   # These should likely move onto Target subclasses as the engine gets deeper into beta
   # territory.
-  table['python_library'] = PythonTargetAdaptor
-  table['jvm_app'] = JvmAppAdaptor
-  table['jvm_binary'] = JvmBinaryAdaptor
-  table['python_app'] = PythonAppAdaptor
-  table['python_tests'] = PythonTestsAdaptor
-  table['python_binary'] = PythonBinaryAdaptor
-  table['python_requirement_library'] = PythonRequirementLibraryAdaptor
-  table['remote_sources'] = RemoteSourcesAdaptor
-  table['resources'] = ResourcesAdaptor
-  table['page'] = PageAdaptor
-  table['python_awslambda'] = PythonAWSLambdaAdaptor
+  table["python_library"] = PythonTargetAdaptor
+  table["jvm_app"] = JvmAppAdaptor
+  table["jvm_binary"] = JvmBinaryAdaptor
+  table["python_app"] = PythonAppAdaptor
+  table["python_tests"] = PythonTestsAdaptor
+  table["python_binary"] = PythonBinaryAdaptor
+  table["python_requirement_library"] = PythonRequirementLibraryAdaptor
+  table["remote_sources"] = RemoteSourcesAdaptor
+  table["resources"] = ResourcesAdaptor
+  table["page"] = PageAdaptor
+  table["python_awslambda"] = PythonAWSLambdaAdaptor
 
   # Note that these don't call _make_target_adaptor because we don't have a handy reference to the
   # types being constructed. They don't have any default_sources behavior, so this should be ok,
   # but if we end up doing more things in _make_target_adaptor, we should make sure they're
   # applied here too.
-  table['pants_plugin'] = PantsPluginAdaptor
-  table['contrib_plugin'] = PantsPluginAdaptor
+  table["pants_plugin"] = PantsPluginAdaptor
+  table["contrib_plugin"] = PantsPluginAdaptor
 
   return SymbolTable(table)
 
@@ -174,6 +171,7 @@ def _make_target_adaptor(base_class, target_type):
 @dataclass(frozen=True)
 class LegacyGraphScheduler:
   """A thin wrapper around a Scheduler configured with @rules for a symbol table."""
+
   scheduler: Any
   build_file_aliases: Any
   goal_map: Any
@@ -188,6 +186,7 @@ class LegacyGraphScheduler:
 @dataclass(frozen=True)
 class LegacyGraphSession:
   """A thin wrapper around a SchedulerSession configured with @rules for a symbol table."""
+
   scheduler_session: SchedulerSession
   build_file_aliases: Any
   goal_map: Any
@@ -219,7 +218,7 @@ class LegacyGraphSession:
 
     console = Console(
       use_colors=global_options.colors,
-      session=self.scheduler_session if global_options.get('v2_ui') else None,
+      session=self.scheduler_session if global_options.get("v2_ui") else None,
     )
     workspace = Workspace(self.scheduler_session)
     interactive_runner = InteractiveRunner(self.scheduler_session)
@@ -227,13 +226,9 @@ class LegacyGraphSession:
     for goal in goals:
       goal_product = self.goal_map[goal]
       params = Params(
-        specs.provided_specs,
-        options_bootstrapper,
-        console,
-        workspace,
-        interactive_runner,
+        specs.provided_specs, options_bootstrapper, console, workspace, interactive_runner
       )
-      logger.debug(f'requesting {goal_product} to satisfy execution of `{goal}` goal')
+      logger.debug(f"requesting {goal_product} to satisfy execution of `{goal}` goal")
       try:
         exit_code = self.scheduler_session.run_goal_rule(goal_product, params)
       finally:
@@ -245,18 +240,18 @@ class LegacyGraphSession:
     return PANTS_SUCCEEDED_EXIT_CODE
 
   def create_build_graph(
-    self, specs: Specs, build_root: Optional[str] = None,
+    self, specs: Specs, build_root: Optional[str] = None
   ) -> Tuple[LegacyBuildGraph, LegacyAddressMapper]:
     """Construct and return a `BuildGraph` given a set of input specs."""
-    logger.debug('specs are: %r', specs)
+    logger.debug("specs are: %r", specs)
     graph = LegacyBuildGraph.create(self.scheduler_session, self.build_file_aliases)
-    logger.debug('build_graph is: %s', graph)
+    logger.debug("build_graph is: %s", graph)
     # Ensure the entire generator is unrolled.
     for _ in graph.inject_roots_closure(specs.address_specs):
       pass
 
     address_mapper = LegacyAddressMapper(self.scheduler_session, build_root or get_buildroot())
-    logger.debug('address_mapper is: %s', address_mapper)
+    logger.debug("address_mapper is: %s", address_mapper)
     return graph, address_mapper
 
 
@@ -270,13 +265,13 @@ class EngineInitializer:
   def _make_goal_map_from_rules(rules):
     goal_map = {}
     for r in rules:
-      output_type = getattr(r, 'output_type', None)
+      output_type = getattr(r, "output_type", None)
       if not output_type or not issubclass(output_type, Goal):
         continue
       goal = r.output_type.name
       if goal in goal_map:
         raise EngineInitializer.GoalMappingError(
-          f'could not map goal `{goal}` to rule `{r}`: already claimed by product `{goal_map[goal]}`'
+          f"could not map goal `{goal}` to rule `{r}`: already claimed by product `{goal_map[goal]}`"
         )
       goal_map[goal] = r.output_type
     return goal_map
@@ -292,16 +287,19 @@ class EngineInitializer:
     bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
 
     glob_expansion_failure_configured = not bootstrap_options.is_default("glob_expansion_failure")
-    files_not_found_behavior_configured = not bootstrap_options.is_default("files_not_found_behavior")
+    files_not_found_behavior_configured = not bootstrap_options.is_default(
+      "files_not_found_behavior"
+    )
     if glob_expansion_failure_configured and files_not_found_behavior_configured:
       raise ValueError(
         "Conflicting options used. You used the new, preferred `--files-not-found-behavior`, but "
         "also used the deprecated `--glob-expansion-failure`.\n\nPlease "
-        "specify only one of these (preferably `--files-not-found-behavior`).")
+        "specify only one of these (preferably `--files-not-found-behavior`)."
+      )
     glob_match_error_behavior = (
       bootstrap_options.files_not_found_behavior.to_glob_match_error_behavior()
-      if files_not_found_behavior_configured else
-      bootstrap_options.glob_expansion_failure
+      if files_not_found_behavior_configured
+      else bootstrap_options.glob_expansion_failure
     )
 
     deprecated_conditional(
@@ -316,7 +314,7 @@ class EngineInitializer:
         "\n\nIf you still need to keep the functionality you have from the import statement, "
         "consider rewriting your code into a Pants plugin: "
         "https://www.pantsbuild.org/howto_plugin.html"
-      )
+      ),
     )
     deprecated_conditional(
       lambda: bootstrap_options.is_default("build_file_imports"),
@@ -330,7 +328,7 @@ class EngineInitializer:
         "`--build-file-imports=error` (we recommend using `error`).\n\nIf you still need to keep "
         "the functionality you have from import statements, consider rewriting your code into a "
         "Pants plugin: https://www.pantsbuild.org/howto_plugin.html"
-      )
+      ),
     )
 
     return EngineInitializer.setup_legacy_graph_extended(
@@ -403,14 +401,14 @@ class EngineInitializer:
 
     # Register "literal" subjects required for these rules.
     parser = LegacyPythonCallbacksParser(
-      symbol_table,
-      build_file_aliases,
-      build_file_imports_behavior
+      symbol_table, build_file_aliases, build_file_imports_behavior
     )
-    address_mapper = AddressMapper(parser=parser,
-                                   build_ignore_patterns=build_ignore_patterns,
-                                   exclude_target_regexps=exclude_target_regexps,
-                                   subproject_roots=subproject_roots)
+    address_mapper = AddressMapper(
+      parser=parser,
+      build_ignore_patterns=build_ignore_patterns,
+      exclude_target_regexps=exclude_target_regexps,
+      subproject_roots=subproject_roots,
+    )
 
     @rule
     def glob_match_error_behavior_singleton() -> GlobMatchErrorBehavior:

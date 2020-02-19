@@ -25,6 +25,7 @@ class TestContext(Context):
   isolate the parts of the interface that a Task is allowed to use vs. the parts that the
   task-running machinery is allowed to use.
   """
+
   class DummyWorkUnit:
     """A workunit stand-in that sends all output to stderr.
 
@@ -41,7 +42,7 @@ class TestContext(Context):
 
     def set_outcome(self, outcome):
       return sys.stderr.buffer.write(
-        f'\nWorkUnit outcome: {WorkUnit.outcome_string(outcome)}\n'.encode()
+        f"\nWorkUnit outcome: {WorkUnit.outcome_string(outcome)}\n".encode()
       )
 
   class DummyRunTracker:
@@ -51,14 +52,16 @@ class TestContext(Context):
       self.logger = RunTrackerLogger(self)
 
     class DummyArtifactCacheStats:
-      def add_hits(self, cache_name, targets): pass
+      def add_hits(self, cache_name, targets):
+        pass
 
-      def add_misses(self, cache_name, targets, causes): pass
+      def add_misses(self, cache_name, targets, causes):
+        pass
 
     artifact_cache_stats = DummyArtifactCacheStats()
 
-    def report_target_info(self, scope, target, keys, val): pass
-
+    def report_target_info(self, scope, target, keys, val):
+      pass
 
   class TestLogger(logging.getLoggerClass()):  # type: ignore[misc] # MyPy does't understand this dynamic base class
     """A logger that converts our structured records into flat ones.
@@ -69,7 +72,7 @@ class TestContext(Context):
     def makeRecord(
       self, name, lvl, fn, lno, msg, args, exc_info, func=None, extra=None, sinfo=None
     ):
-      msg = ''.join([msg] + [a[0] if isinstance(a, (list, tuple)) else a for a in args])
+      msg = "".join([msg] + [a[0] if isinstance(a, (list, tuple)) else a for a in args])
       args = []
       return super().makeRecord(name, lvl, fn, lno, msg, args, exc_info, func, extra, sinfo)
 
@@ -78,16 +81,16 @@ class TestContext(Context):
     logger_cls = logging.getLoggerClass()
     try:
       logging.setLoggerClass(self.TestLogger)
-      self._logger = logging.getLogger('test')
+      self._logger = logging.getLogger("test")
     finally:
       logging.setLoggerClass(logger_cls)
 
   @contextmanager
-  def new_workunit(self, name, labels=None, cmd='', log_config=None):
+  def new_workunit(self, name, labels=None, cmd="", log_config=None):
     """
     :API: public
     """
-    sys.stderr.write(f'\nStarting workunit {name}\n')
+    sys.stderr.write(f"\nStarting workunit {name}\n")
     yield TestContext.DummyWorkUnit()
 
   @property
@@ -114,9 +117,16 @@ class TestContext(Context):
     return list(map(f, items))
 
 
-def create_context_from_options(options, target_roots=None, build_graph=None,
-                                build_configuration=None, address_mapper=None,
-                                console_outstream=None, workspace=None, scheduler=None):
+def create_context_from_options(
+  options,
+  target_roots=None,
+  build_graph=None,
+  build_configuration=None,
+  address_mapper=None,
+  console_outstream=None,
+  workspace=None,
+  scheduler=None,
+):
   """Creates a ``Context`` with the given options and no targets by default.
 
   :param options: An :class:`pants.option.options.Option`-alike object that supports read methods.
@@ -125,7 +135,14 @@ def create_context_from_options(options, target_roots=None, build_graph=None,
   """
   run_tracker = TestContext.DummyRunTracker()
   target_roots = maybe_list(target_roots, Target) if target_roots else []
-  return TestContext(options=options, run_tracker=run_tracker, target_roots=target_roots,
-                     build_graph=build_graph, build_configuration=build_configuration,
-                     address_mapper=address_mapper, console_outstream=console_outstream,
-                     workspace=workspace, scheduler=scheduler)
+  return TestContext(
+    options=options,
+    run_tracker=run_tracker,
+    target_roots=target_roots,
+    build_graph=build_graph,
+    build_configuration=build_configuration,
+    address_mapper=address_mapper,
+    console_outstream=console_outstream,
+    workspace=workspace,
+    scheduler=scheduler,
+  )

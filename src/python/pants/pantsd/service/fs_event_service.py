@@ -16,10 +16,10 @@ class FSEventService(PantsService):
   executed in a configurable threadpool but are generally expected to be short-lived.
   """
 
-  ZERO_DEPTH = ['depth', 'eq', 0]
+  ZERO_DEPTH = ["depth", "eq", 0]
 
-  PANTS_ALL_FILES_SUBSCRIPTION_NAME = 'all_files'
-  PANTS_PID_SUBSCRIPTION_NAME = 'pantsd_pid'
+  PANTS_ALL_FILES_SUBSCRIPTION_NAME = "all_files"
+  PANTS_PID_SUBSCRIPTION_NAME = "pantsd_pid"
 
   def __init__(self, watchman, build_root):
     """
@@ -41,7 +41,7 @@ class FSEventService(PantsService):
     self.register_handler(
       name,
       dict(
-        fields=['name'],
+        fields=["name"],
         # Request events for all file types.
         # NB: Touching a file invalidates its parent directory due to:
         #   https://github.com/facebook/watchman/issues/305
@@ -49,16 +49,16 @@ class FSEventService(PantsService):
         # the parents of any changed files, and we wouldn't see creation/deletion of
         # empty directories.
         expression=[
-          'allof',  # All of the below rules must be true to match.
-          ['not', ['dirname', 'dist', self.ZERO_DEPTH]],  # Exclude the ./dist dir.
+          "allof",  # All of the below rules must be true to match.
+          ["not", ["dirname", "dist", self.ZERO_DEPTH]],  # Exclude the ./dist dir.
           # N.B. 'wholename' ensures we match against the absolute ('x/y/z') vs base path ('z').
-          ['not', ['pcre', r'^\..*', 'wholename']],  # Exclude files in hidden dirs (.pants.d etc).
-          ['not', ['match', '*.pyc']]  # Exclude .pyc files.
+          ["not", ["pcre", r"^\..*", "wholename"]],  # Exclude files in hidden dirs (.pants.d etc).
+          ["not", ["match", "*.pyc"]]  # Exclude .pyc files.
           # TODO(kwlzn): Make exclusions here optionable.
           # Related: https://github.com/pantsbuild/pants/issues/2956
-        ]
+        ],
       ),
-      callback
+      callback,
     )
 
   def register_pidfile_handler(self, pidfile_path, callback):
@@ -71,11 +71,11 @@ class FSEventService(PantsService):
     self.register_handler(
       self.PANTS_PID_SUBSCRIPTION_NAME,
       dict(
-        fields=['name'],
+        fields=["name"],
         expression=[
-          'allof',
-          ['dirname', os.path.dirname(pidfile_path)],
-          ['name', os.path.basename(pidfile_path)],
+          "allof",
+          ["dirname", os.path.dirname(pidfile_path)],
+          ["name", os.path.basename(pidfile_path)],
         ],
       ),
       callback,
@@ -90,10 +90,10 @@ class FSEventService(PantsService):
                           as any required callback fields.
     :param func callback: the callback to execute on each matching filesystem event
     """
-    assert name not in self._handlers, 'duplicate handler name: {}'.format(name)
+    assert name not in self._handlers, "duplicate handler name: {}".format(name)
     assert (
-      isinstance(metadata, dict) and 'fields' in metadata and 'expression' in metadata
-    ), 'invalid handler metadata!'
+      isinstance(metadata, dict) and "fields" in metadata and "expression" in metadata
+    ), "invalid handler metadata!"
     self._handlers[name] = Watchman.EventHandler(name=name, metadata=metadata, callback=callback)
 
   def fire_callback(self, handler_name, event_data):
@@ -104,7 +104,7 @@ class FSEventService(PantsService):
     """Main service entrypoint. Called via Thread.start() via PantsDaemon.run()."""
 
     if not (self._watchman and self._watchman.is_alive()):
-      raise PantsService.ServiceError('watchman is not running, bailing!')
+      raise PantsService.ServiceError("watchman is not running, bailing!")
 
     # Enable watchman for the build root.
     self._watchman.watch_project(self._build_root)

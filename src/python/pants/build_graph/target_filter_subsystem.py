@@ -15,15 +15,19 @@ class TargetFilter(Subsystem):
   :API: public
   """
 
-  options_scope = 'target-filter'
+  options_scope = "target-filter"
 
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
 
-    register('--exclude-tags', type=list,
-             default=[], fingerprint=True,
-             help='Skip targets with given tag(s).')
+    register(
+      "--exclude-tags",
+      type=list,
+      default=[],
+      fingerprint=True,
+      help="Skip targets with given tag(s).",
+    )
 
   def apply(self, targets):
     exclude_tags = set(self.get_options().exclude_tags)

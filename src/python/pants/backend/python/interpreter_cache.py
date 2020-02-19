@@ -24,7 +24,8 @@ logger = logging.getLogger(__name__)
 # TODO: Move under subsystems/ .
 class PythonInterpreterCache(Subsystem):
   """Finds Python interpreters on the local system."""
-  options_scope = 'python-interpreter-cache'
+
+  options_scope = "python-interpreter-cache"
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -85,17 +86,21 @@ class PythonInterpreterCache(Subsystem):
 
     if not allowed_interpreters:
       # Create a helpful error message.
-      all_interpreter_version_strings = sorted({
-        interpreter.version_string
-        # NB: self.setup() requires filters to be passed, or else it will use the global interpreter
-        # constraints. We allow any interpreter other than CPython 3.0-3.3, which is known to choke
-        # with Pants.
-        for interpreter in self.setup(filters=("CPython<3", "CPython>=3.3", "PyPy"))
-      })
+      all_interpreter_version_strings = sorted(
+        {
+          interpreter.version_string
+          # NB: self.setup() requires filters to be passed, or else it will use the global interpreter
+          # constraints. We allow any interpreter other than CPython 3.0-3.3, which is known to choke
+          # with Pants.
+          for interpreter in self.setup(filters=("CPython<3", "CPython>=3.3", "PyPy"))
+        }
+      )
       unique_compatibilities = {tuple(c) for c in tgts_by_compatibilities.keys()}
-      unique_compatibilities_strs = [','.join(x) for x in unique_compatibilities if x]
+      unique_compatibilities_strs = [",".join(x) for x in unique_compatibilities if x]
       tgts_by_compatibilities_strs = [t[0].address.spec for t in tgts_by_compatibilities.values()]
-      raise self.UnsatisfiableInterpreterConstraintsError(dedent("""\
+      raise self.UnsatisfiableInterpreterConstraintsError(
+        dedent(
+          """\
         Unable to detect a suitable interpreter for compatibilities: {} (Conflicting targets: {})
 
         Pants detected these interpreter versions on your system: {}
@@ -104,17 +109,19 @@ class PythonInterpreterCache(Subsystem):
         * Modify your Python interpreter constraints by following https://www.pantsbuild.org/python_readme.html#configure-the-python-version.
         * Ensure the targeted Python version is installed and discoverable.
         * Modify Pants' interpreter search paths via --pants-setup-interpreter-search-paths.""".format(
-          ' && '.join(sorted(unique_compatibilities_strs)),
-          ', '.join(tgts_by_compatibilities_strs),
-          ', '.join(all_interpreter_version_strings)
-        )))
+            " && ".join(sorted(unique_compatibilities_strs)),
+            ", ".join(tgts_by_compatibilities_strs),
+            ", ".join(all_interpreter_version_strings),
+          )
+        )
+      )
     # Return the lowest compatible interpreter.
     return min(allowed_interpreters)
 
   def _interpreter_from_relpath(self, path, filters=()):
     path = os.path.join(self._cache_dir, path)
     try:
-      executable = os.readlink(os.path.join(path, 'python'))
+      executable = os.readlink(os.path.join(path, "python"))
       if not os.path.exists(executable):
         self._purge_interpreter(path)
         return None
@@ -129,7 +136,7 @@ class PythonInterpreterCache(Subsystem):
     cache_target_path = os.path.join(self._cache_dir, identity_str)
     with safe_concurrent_creation(cache_target_path) as safe_path:
       os.mkdir(safe_path)  # Parent will already have been created by safe_concurrent_creation.
-      os.symlink(interpreter.binary, os.path.join(safe_path, 'python'))
+      os.symlink(interpreter.binary, os.path.join(safe_path, "python"))
       return interpreter
 
   def _setup_cached(self, filters=()):
@@ -137,7 +144,7 @@ class PythonInterpreterCache(Subsystem):
     for interpreter_dir in os.listdir(self._cache_dir):
       pi = self._interpreter_from_relpath(interpreter_dir, filters=filters)
       if pi:
-        logger.debug(f'Detected interpreter {pi.binary}: {pi.identity}')
+        logger.debug(f"Detected interpreter {pi.binary}: {pi.identity}")
         yield pi
 
   def _setup_paths(self, paths, filters=()):
@@ -167,34 +174,38 @@ class PythonInterpreterCache(Subsystem):
     setup_paths = self.python_setup.interpreter_search_paths
     logger.debug(
       f"Initializing Python interpreter cache matching filters `{':'.join(filters)}` "
-      f"from paths `{':'.join(setup_paths)}`")
+      f"from paths `{':'.join(setup_paths)}`"
+    )
     interpreters = []
+
     def unsatisfied_filters():
       return [f for f in filters if len(list(self._matching(interpreters, [f]))) == 0]
 
-    with OwnerPrintingInterProcessFileLock(path=os.path.join(self._cache_dir, '.file_lock')):
+    with OwnerPrintingInterProcessFileLock(path=os.path.join(self._cache_dir, ".file_lock")):
       interpreters.extend(self._setup_cached(filters=filters))
       if not interpreters or unsatisfied_filters():
         interpreters.extend(self._setup_paths(setup_paths, filters=filters))
 
     for filt in unsatisfied_filters():
-      logger.debug(f'No valid interpreters found for {filt}!')
+      logger.debug(f"No valid interpreters found for {filt}!")
 
     matches = list(self._matching(interpreters, filters=filters))
     if len(matches) == 0:
-      logger.debug('Found no valid interpreters!')
+      logger.debug("Found no valid interpreters!")
 
     logger.debug(
-      'Initialized Python interpreter cache with {}'.format(', '.join([x.binary for x in matches])))
+      "Initialized Python interpreter cache with {}".format(", ".join([x.binary for x in matches]))
+    )
     return matches
 
   def _purge_interpreter(self, interpreter_dir):
     try:
-      logger.info(f'Detected stale interpreter `{interpreter_dir}` in the interpreter cache, '
-                  f'purging.')
+      logger.info(
+        f"Detected stale interpreter `{interpreter_dir}` in the interpreter cache, " f"purging."
+      )
       shutil.rmtree(interpreter_dir, ignore_errors=True)
     except Exception as e:
       logger.warning(
-        f'Caught exception {e!r} during interpreter purge. '
-        f'Please run `{self.get_options().pants_bin_name} clean-all`!'
+        f"Caught exception {e!r} during interpreter purge. "
+        f"Please run `{self.get_options().pants_bin_name} clean-all`!"
       )

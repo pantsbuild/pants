@@ -51,12 +51,12 @@ class RankedValue:
   FLAG = 5  # The value from the appropriately-named command-line flag.
 
   _RANK_NAMES = {
-    NONE: 'NONE',
-    HARDCODED: 'HARDCODED',
-    CONFIG_DEFAULT: 'CONFIG_DEFAULT',
-    CONFIG: 'CONFIG',
-    ENVIRONMENT: 'ENVIRONMENT',
-    FLAG: 'FLAG'
+    NONE: "NONE",
+    HARDCODED: "HARDCODED",
+    CONFIG_DEFAULT: "CONFIG_DEFAULT",
+    CONFIG: "CONFIG",
+    ENVIRONMENT: "ENVIRONMENT",
+    FLAG: "FLAG",
   }
 
   @classmethod
@@ -66,7 +66,7 @@ class RankedValue:
     :param rank: the integer rank constant (E.g., RankedValue.HARDCODED).
     :returns: the string name of the rank.
     """
-    return cls._RANK_NAMES.get(rank, 'UNKNOWN')
+    return cls._RANK_NAMES.get(rank, "UNKNOWN")
 
   @classmethod
   def get_rank_value(cls, name: str) -> Optional[Rank]:
@@ -128,4 +128,4 @@ class RankedValue:
     return self._rank == other._rank and self._value == other._value
 
   def __repr__(self) -> str:
-    return f'({self.get_rank_name(self._rank)}, {self._value})'
+    return f"({self.get_rank_name(self._rank)}, {self._value})"

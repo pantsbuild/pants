@@ -20,7 +20,7 @@ from pants.python.python_setup import PythonSetup
 
 class PexBinUrlGenerator(BinaryToolUrlGenerator):
   def generate_urls(self, version, host_platform):
-    return [f'https://github.com/pantsbuild/pex/releases/download/{version}/pex']
+    return [f"https://github.com/pantsbuild/pex/releases/download/{version}/pex"]
 
 
 @dataclass(frozen=True)
@@ -36,22 +36,21 @@ class DownloadedPexBin(HermeticPex):
     return self.exe.directory_digest
 
   class Factory(Script):
-    options_scope = 'download-pex-bin'
-    name = 'pex'
-    default_version = 'v1.6.12'
+    options_scope = "download-pex-bin"
+    name = "pex"
+    default_version = "v1.6.12"
 
     default_versions_and_digests = {
       PlatformConstraint.none: ToolForPlatform(
-        digest=Digest('ce64cb72cd23d2123dd48126af54ccf2b718d9ecb98c2ed3045ed1802e89e7e1',
-                      1842359),
-        version=ToolVersion('v1.6.12'),
-      ),
+        digest=Digest("ce64cb72cd23d2123dd48126af54ccf2b718d9ecb98c2ed3045ed1802e89e7e1", 1842359),
+        version=ToolVersion("v1.6.12"),
+      )
     }
 
     def get_external_url_generator(self):
       return PexBinUrlGenerator()
 
-  def create_execute_request(   # type: ignore[override]
+  def create_execute_request(  # type: ignore[override]
     self,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
@@ -61,7 +60,7 @@ class DownloadedPexBin(HermeticPex):
     description: str,
     input_files: Optional[Digest] = None,
     python_repos: Optional[PythonRepos] = None,
-    **kwargs: Any
+    **kwargs: Any,
   ) -> ExecuteProcessRequest:
     """Creates an ExecuteProcessRequest that will run the pex CLI tool hermetically.
 
@@ -81,7 +80,7 @@ class DownloadedPexBin(HermeticPex):
     find_links_args = []
     if python_repos:
       for f in python_repos.repos:
-        find_links_args.extend(['-f', f])
+        find_links_args.extend(["-f", f])
 
     return super().create_execute_request(
       python_setup=python_setup,
@@ -91,7 +90,7 @@ class DownloadedPexBin(HermeticPex):
       description=description,
       input_files=input_files or self.directory_digest,
       env=pex_build_environment.invocation_environment_dict,
-      **kwargs
+      **kwargs,
     )
 
 
@@ -102,7 +101,4 @@ async def download_pex_bin(pex_binary_tool: DownloadedPexBin.Factory) -> Downloa
 
 
 def rules():
-  return [
-    download_pex_bin,
-    subsystem_rule(DownloadedPexBin.Factory),
-  ]
+  return [download_pex_bin, subsystem_rule(DownloadedPexBin.Factory)]

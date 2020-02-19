@@ -6,12 +6,12 @@ import subprocess
 from unittest import skipIf
 
 
-PY_2 = '2'
-PY_3 = '3'
+PY_2 = "2"
+PY_3 = "3"
 
-PY_27 = '2.7'
-PY_36 = '3.6'
-PY_37 = '3.7'
+PY_27 = "2.7"
+PY_36 = "3.6"
+PY_37 = "3.7"
 
 
 def has_python_version(version):
@@ -32,7 +32,7 @@ def python_interpreter_path(version):
   :rtype: string
   """
   try:
-    command = [f'python{version}', '-c', 'import sys; print(sys.executable)']
+    command = [f"python{version}", "-c", "import sys; print(sys.executable)"]
     py_path = subprocess.check_output(command).decode().strip()
     return os.path.realpath(py_path)
   except (subprocess.CalledProcessError, FileNotFoundError):
@@ -46,13 +46,16 @@ def skip_unless_all_pythons_present(*versions):
   """
   missing_versions = [v for v in versions if not has_python_version(v)]
   if len(missing_versions) == 1:
-    return skipIf(True, f'Could not find python {missing_versions[0]} on system. Skipping.')
+    return skipIf(True, f"Could not find python {missing_versions[0]} on system. Skipping.")
   elif len(missing_versions) > 1:
-    return skipIf(True,
-                  'Skipping due to the following missing required pythons: {}'
-                  .format(', '.join(missing_versions)))
+    return skipIf(
+      True,
+      "Skipping due to the following missing required pythons: {}".format(
+        ", ".join(missing_versions)
+      ),
+    )
   else:
-    return skipIf(False, 'All required pythons present, continuing with test!')
+    return skipIf(False, "All required pythons present, continuing with test!")
 
 
 def skip_unless_python27_present(func):

@@ -19,6 +19,7 @@ class IvyImports(IvyTaskMixin, NailgunTask):
   @classmethod
   def product_types(cls):
     return [JarImportProducts]
+
   # TODO https://github.com/pantsbuild/pants/issues/604 product_types finish
 
   @staticmethod
@@ -26,8 +27,9 @@ class IvyImports(IvyTaskMixin, NailgunTask):
     return isinstance(target, ImportJarsMixin) and target.imported_targets
 
   def execute(self):
-    jar_import_products = self.context.products.get_data(JarImportProducts,
-                                                         init_func=JarImportProducts)
+    jar_import_products = self.context.products.get_data(
+      JarImportProducts, init_func=JarImportProducts
+    )
 
     # Gather all targets that are both capable of importing jars and actually declare some imports.
     targets = self.context.targets(predicate=self.has_imports)
@@ -40,10 +42,12 @@ class IvyImports(IvyTaskMixin, NailgunTask):
       all_targets.update(target.imported_targets)
 
     imports_classpath = ClasspathProducts(self.get_options().pants_workdir)
-    self.resolve(executor=self.create_java_executor(),
-                 targets=all_targets,
-                 classpath_products=imports_classpath,
-                 invalidate_dependents=True)
+    self.resolve(
+      executor=self.create_java_executor(),
+      targets=all_targets,
+      classpath_products=imports_classpath,
+      invalidate_dependents=True,
+    )
 
     for target in targets:
       cp_entries = imports_classpath.get_classpath_entries_for_targets(target.closure(bfs=True))

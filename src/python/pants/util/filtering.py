@@ -8,9 +8,9 @@ _identity = lambda x: x
 
 
 def _extract_modifier(modified_param):
-  if modified_param.startswith('+'):
+  if modified_param.startswith("+"):
     return _identity, modified_param[1:]
-  elif modified_param.startswith('-'):
+  elif modified_param.startswith("-"):
     return operator.not_, modified_param[1:]
   else:
     return _identity, modified_param
@@ -45,9 +45,11 @@ def create_filter(predicate_param, predicate_factory):
   # NOTE: Do not inline this into create_filters above. A separate function is necessary
   # in order to capture the different closure on each invocation.
   modifier, param = _extract_modifier(predicate_param)
-  predicates = [predicate_factory(p) for p in param.split(',')]
+  predicates = [predicate_factory(p) for p in param.split(",")]
+
   def filt(x):
     return modifier(any(pred(x) for pred in predicates))
+
   return filt
 
 
@@ -56,9 +58,11 @@ def wrap_filters(filters):
 
   :API: public
   """
+
   def combined_filter(x):
     for filt in filters:
       if not filt(x):
         return False
     return True
+
   return combined_filter

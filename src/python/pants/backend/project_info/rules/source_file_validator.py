@@ -27,6 +27,7 @@ class DetailLevel(Enum):
   nonmatching: Emit details for source files that failed to match at least one required pattern.
   all: Emit details for all source files.
   """
+
   none = "none"
   summary = "summary"
   nonmatching = "nonmatching"
@@ -34,13 +35,17 @@ class DetailLevel(Enum):
 
 
 class ValidateOptions(GoalSubsystem):
-  name = 'validate'
+  name = "validate"
 
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--detail-level', type=DetailLevel, default=DetailLevel.nonmatching,
-             help='How much detail to emit to the console.')
+    register(
+      "--detail-level",
+      type=DetailLevel,
+      default=DetailLevel.nonmatching,
+      help="How much detail to emit to the console.",
+    )
 
 
 class Validate(Goal):
@@ -48,7 +53,7 @@ class Validate(Goal):
 
 
 class SourceFileValidation(Subsystem):
-  options_scope = 'sourcefile-validation'
+  options_scope = "sourcefile-validation"
 
   @classmethod
   def register_options(cls, register):
@@ -80,9 +85,13 @@ class SourceFileValidation(Subsystem):
     #
     # Meaning: if a file matches some path pattern, its content must match all the corresponding
     # content patterns.
-    register('--config', type=dict, fromfile=True,
-             # TODO: Replace "See documentation" with actual URL, once we have some.
-             help='Source file regex matching config.  See documentation for config schema.')
+    register(
+      "--config",
+      type=dict,
+      fromfile=True,
+      # TODO: Replace "See documentation" with actual URL, once we have some.
+      help="Source file regex matching config.  See documentation for config schema.",
+    )
 
   @memoized_method
   def get_multi_matcher(self):
@@ -92,6 +101,7 @@ class SourceFileValidation(Subsystem):
 @dataclass(frozen=True)
 class RegexMatchResult:
   """The result of running regex matches on a source file."""
+
   path: str
   matching: Tuple
   nonmatching: Tuple
@@ -122,7 +132,7 @@ class Matcher:
 class PathMatcher(Matcher):
   """A matcher for matching file paths."""
 
-  def __init__(self, pattern, inverted=False, content_encoding='utf8'):
+  def __init__(self, pattern, inverted=False, content_encoding="utf8"):
     super().__init__(pattern, inverted)
     # The expected encoding of the content of files whose paths match this pattern.
     self.content_encoding = content_encoding
@@ -130,6 +140,7 @@ class PathMatcher(Matcher):
 
 class ContentMatcher(Matcher):
   """A matcher for matching file content."""
+
   pass
 
 
@@ -139,28 +150,34 @@ class MultiMatcher:
 
     :param dict config: Regex matching config (see above).
     """
-    path_patterns = config.get('path_patterns', {})
-    content_patterns = config.get('content_patterns', {})
-    required_matches = config.get('required_matches', {})
+    path_patterns = config.get("path_patterns", {})
+    content_patterns = config.get("content_patterns", {})
+    required_matches = config.get("required_matches", {})
     # Validate the pattern names mentioned in required_matches.
     path_patterns_used = set()
     content_patterns_used = set()
     for k, v in required_matches.items():
       path_patterns_used.add(k)
       if not isinstance(v, (tuple, list)):
-        raise ValueError('Value for path pattern {} in required_matches must be tuple of '
-                         'content pattern names, but was {}'.format(k, v))
+        raise ValueError(
+          "Value for path pattern {} in required_matches must be tuple of "
+          "content pattern names, but was {}".format(k, v)
+        )
       content_patterns_used.update(v)
 
     unknown_path_patterns = path_patterns_used.difference(path_patterns.keys())
     if unknown_path_patterns:
-      raise ValueError('required_matches uses unknown path pattern names: '
-                       '{}'.format(', '.join(sorted(unknown_path_patterns))))
+      raise ValueError(
+        "required_matches uses unknown path pattern names: "
+        "{}".format(", ".join(sorted(unknown_path_patterns)))
+      )
 
     unknown_content_patterns = content_patterns_used.difference(content_patterns.keys())
     if unknown_content_patterns:
-      raise ValueError('required_matches uses unknown content pattern names: '
-                       '{}'.format(', '.join(sorted(unknown_content_patterns))))
+      raise ValueError(
+        "required_matches uses unknown content pattern names: "
+        "{}".format(", ".join(sorted(unknown_content_patterns)))
+      )
 
     self._path_matchers = {k: PathMatcher(**v) for k, v in path_patterns.items()}
     self._content_matchers = {k: ContentMatcher(**v) for k, v in content_patterns.items()}
@@ -208,9 +225,11 @@ class MultiMatcher:
         encodings.add(m.content_encoding)
         applicable_content_pattern_names.update(content_pattern_names)
     if len(encodings) > 1:
-      raise ValueError('Path matched patterns with multiple content encodings ({}): {}'.format(
-        ', '.join(sorted(encodings)), path
-      ))
+      raise ValueError(
+        "Path matched patterns with multiple content encodings ({}): {}".format(
+          ", ".join(sorted(encodings)), path
+        )
+      )
     content_encoding = next(iter(encodings)) if encodings else None
     return applicable_content_pattern_names, content_encoding
 
@@ -219,7 +238,7 @@ class MultiMatcher:
 # to share goal names.
 @goal_rule
 async def validate(
-  console: Console, sources_snapshots: SourcesSnapshots, validate_options: ValidateOptions,
+  console: Console, sources_snapshots: SourcesSnapshots, validate_options: ValidateOptions
 ) -> Validate:
   per_snapshot_rmrs = await MultiGet(
     Get[RegexMatchResults](SourcesSnapshot, source_snapshot)
@@ -235,25 +254,28 @@ async def validate(
     if not rmr.matching and not rmr.nonmatching:
       continue
     if rmr.nonmatching:
-      icon = 'X'
+      icon = "X"
       num_nonmatched_some += 1
     else:
-      icon = 'V'
+      icon = "V"
       num_matched_all += 1
-    matched_msg = ' Matched: {}'.format(','.join(rmr.matching)) if rmr.matching else ''
-    nonmatched_msg = (" Didn't match: {}".format(','.join(rmr.nonmatching))
-                      if rmr.nonmatching else '')
-    if (detail_level == DetailLevel.all or
-        (detail_level == DetailLevel.nonmatching and nonmatched_msg)):
+    matched_msg = " Matched: {}".format(",".join(rmr.matching)) if rmr.matching else ""
+    nonmatched_msg = (
+      " Didn't match: {}".format(",".join(rmr.nonmatching)) if rmr.nonmatching else ""
+    )
+    if detail_level == DetailLevel.all or (
+      detail_level == DetailLevel.nonmatching and nonmatched_msg
+    ):
       console.print_stdout("{} {}:{}{}".format(icon, rmr.path, matched_msg, nonmatched_msg))
 
   if detail_level != DetailLevel.none:
-    console.print_stdout('\n{} files matched all required patterns.'.format(num_matched_all))
-    console.print_stdout('{} files failed to match at least one required pattern.'.format(
-      num_nonmatched_some))
+    console.print_stdout("\n{} files matched all required patterns.".format(num_matched_all))
+    console.print_stdout(
+      "{} files failed to match at least one required pattern.".format(num_nonmatched_some)
+    )
 
   if num_nonmatched_some:
-    console.print_stderr('Files failed validation.')
+    console.print_stderr("Files failed validation.")
     exit_code = PANTS_FAILED_EXIT_CODE
   else:
     exit_code = PANTS_SUCCEEDED_EXIT_CODE
@@ -262,7 +284,7 @@ async def validate(
 
 @rule
 async def match_regexes_for_one_snapshot(
-  sources_snapshot: SourcesSnapshot, source_file_validation: SourceFileValidation,
+  sources_snapshot: SourcesSnapshot, source_file_validation: SourceFileValidation
 ) -> RegexMatchResults:
   multi_matcher = source_file_validation.get_multi_matcher()
   files_content = await Get[FilesContent](Digest, sources_snapshot.snapshot.directory_digest)
@@ -273,8 +295,4 @@ async def match_regexes_for_one_snapshot(
 
 
 def rules():
-  return [
-    validate,
-    match_regexes_for_one_snapshot,
-    subsystem_rule(SourceFileValidation),
-  ]
+  return [validate, match_regexes_for_one_snapshot, subsystem_rule(SourceFileValidation)]

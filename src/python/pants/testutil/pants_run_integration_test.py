@@ -62,7 +62,9 @@ class PantsJoinHandle:
       # It's possibly not worth trying to fix this because the type stubs for subprocess.Popen are
       # very complex and also not very precise, given how many different configurations Popen can
       # take.
-      communicate_fn = SubprocessProcessHandler(self.process).communicate_teeing_stdout_and_stderr  # type: ignore[assignment]
+      communicate_fn = SubprocessProcessHandler(
+        self.process
+      ).communicate_teeing_stdout_and_stderr  # type: ignore[assignment]
     if stdin_data is not None:
       stdin_data = ensure_binary(stdin_data)
     (stdout_data, stderr_data) = communicate_fn(stdin_data)
@@ -76,7 +78,7 @@ class PantsJoinHandle:
       stdout_data=stdout_data.decode(),
       stderr_data=stderr_data.decode(),
       workdir=self.workdir,
-      pid=self.process.pid
+      pid=self.process.pid,
     )
 
 
@@ -88,6 +90,7 @@ def ensure_cached(expected_num_artifacts=None):
                                  assert that the number of artifacts in the cache is
                                  non-zero.
   """
+
   def decorator(test_fn):
     def wrapper(self, *args, **kwargs):
       with temporary_dir() as artifact_cache:
@@ -104,15 +107,20 @@ def ensure_cached(expected_num_artifacts=None):
           self.assertNotEqual(num_artifacts, 0)
         else:
           self.assertEqual(num_artifacts, expected_num_artifacts)
+
     return wrapper
+
   return decorator
 
 
 def ensure_resolver(f):
   """A decorator for running an integration test with ivy and coursier as the resolver."""
+
   def wrapper(self, *args, **kwargs):
-    for env_var_value in ('ivy', 'coursier'):
-      with environment_as(HERMETIC_ENV='PANTS_RESOLVER_RESOLVER', PANTS_RESOLVER_RESOLVER=env_var_value):
+    for env_var_value in ("ivy", "coursier"):
+      with environment_as(
+        HERMETIC_ENV="PANTS_RESOLVER_RESOLVER", PANTS_RESOLVER_RESOLVER=env_var_value
+      ):
         f(self, *args, **kwargs)
 
   return wrapper
@@ -120,56 +128,58 @@ def ensure_resolver(f):
 
 def ensure_daemon(f):
   """A decorator for running an integration test with and without the daemon enabled."""
+
   def wrapper(self, *args, **kwargs):
     for enable_daemon in [False, True]:
       with temporary_dir() as subprocess_dir:
         enable_daemon_str = str(enable_daemon)
         env = {
-            'HERMETIC_ENV': 'PANTS_ENABLE_PANTSD,PANTS_ENABLE_V2_ENGINE,PANTS_SUBPROCESSDIR',
-            'PANTS_ENABLE_PANTSD': enable_daemon_str,
-            'PANTS_ENABLE_V2_ENGINE': enable_daemon_str,
-            'PANTS_SUBPROCESSDIR': subprocess_dir,
-          }
+          "HERMETIC_ENV": "PANTS_ENABLE_PANTSD,PANTS_ENABLE_V2_ENGINE,PANTS_SUBPROCESSDIR",
+          "PANTS_ENABLE_PANTSD": enable_daemon_str,
+          "PANTS_ENABLE_V2_ENGINE": enable_daemon_str,
+          "PANTS_SUBPROCESSDIR": subprocess_dir,
+        }
         with environment_as(**env):
           try:
             f(self, *args, **kwargs)
             if enable_daemon:
-              self.assert_success(self.run_pants(['kill-pantsd']))
+              self.assert_success(self.run_pants(["kill-pantsd"]))
           except Exception:
-            print(f'Test failed with enable-pantsd={enable_daemon}:')
+            print(f"Test failed with enable-pantsd={enable_daemon}:")
             if enable_daemon:
               # If we are already raising, do not attempt to confirm that `kill-pantsd` succeeds.
-              self.run_pants(['kill-pantsd'])
+              self.run_pants(["kill-pantsd"])
             else:
-              print('Skipping run with enable-pantsd=true because it already failed with enable-pantsd=false.')
+              print(
+                "Skipping run with enable-pantsd=true because it already failed with enable-pantsd=false."
+              )
             raise
+
   return wrapper
 
 
 def render_logs(workdir):
   """Renders all potentially relevant logs from the given workdir to stdout."""
-  filenames = list(
-      glob.glob(os.path.join(workdir, 'logs/exceptions*log'))
-    ) + list(
-      glob.glob(os.path.join(workdir, 'pantsd/pantsd.log'))
-    )
+  filenames = list(glob.glob(os.path.join(workdir, "logs/exceptions*log"))) + list(
+    glob.glob(os.path.join(workdir, "pantsd/pantsd.log"))
+  )
   for filename in filenames:
     rel_filename = fast_relpath(filename, workdir)
-    print(f'{rel_filename} +++ ')
+    print(f"{rel_filename} +++ ")
     for line in _read_log(filename):
-      print(f'{rel_filename} >>> {line}')
-    print(f'{rel_filename} --- ')
+      print(f"{rel_filename} >>> {line}")
+    print(f"{rel_filename} --- ")
 
 
 def read_pantsd_log(workdir):
   """Yields all lines from the pantsd log under the given workdir."""
   # Surface the pantsd log for easy viewing via pytest's `-s` (don't capture stdio) option.
-  for line in _read_log(f'{workdir}/pantsd/pantsd.log'):
+  for line in _read_log(f"{workdir}/pantsd/pantsd.log"):
     yield line
 
 
 def _read_log(filename):
-  with open(filename, 'r') as f:
+  with open(filename, "r") as f:
     for line in f:
       yield line.rstrip()
 
@@ -210,15 +220,15 @@ class PantsRunIntegrationTest(unittest.TestCase):
   def hermetic_env_whitelist(cls):
     """A whitelist of environment variables to propagate to tests when hermetic=True."""
     return [
-        # Used in the wrapper script to locate a rust install.
-        'HOME',
-        # Needed to find python interpreters and other binaries.
-        'PATH',
-        'PANTS_PROFILE',
-        # Ensure that the underlying ./pants invocation doesn't run from sources
-        # (and therefore bootstrap) if we don't want it to.
-        'RUN_PANTS_FROM_PEX',
-      ]
+      # Used in the wrapper script to locate a rust install.
+      "HOME",
+      # Needed to find python interpreters and other binaries.
+      "PATH",
+      "PANTS_PROFILE",
+      # Ensure that the underlying ./pants invocation doesn't run from sources
+      # (and therefore bootstrap) if we don't want it to.
+      "RUN_PANTS_FROM_PEX",
+    ]
 
   def setUp(self):
     super().setUp()
@@ -230,12 +240,12 @@ class PantsRunIntegrationTest(unittest.TestCase):
     # in the pantsbuild/pants repo (e.g., that's what we .gitignore in that repo).
     # Grabbing the pants_workdir config would require this pants's config object,
     # which we don't have a reference to here.
-    root = os.path.join(get_buildroot(), '.pants.d', 'tmp')
+    root = os.path.join(get_buildroot(), ".pants.d", "tmp")
     safe_mkdir(root)
-    return temporary_dir(root_dir=root, cleanup=cleanup, suffix='.pants.d')
+    return temporary_dir(root_dir=root, cleanup=cleanup, suffix=".pants.d")
 
   def temporary_cachedir(self):
-    return temporary_dir(suffix='__CACHEDIR')
+    return temporary_dir(suffix="__CACHEDIR")
 
   def temporary_sourcedir(self):
     return temporary_dir(root_dir=get_buildroot())
@@ -250,11 +260,11 @@ class PantsRunIntegrationTest(unittest.TestCase):
         for dir_name in dir_names:
           os.mkdir(os.path.join(clone_dir_path, dir_name))
         for file_name in file_names:
-          with open(os.path.join(dir_path, file_name), 'r') as f:
+          with open(os.path.join(dir_path, file_name), "r") as f:
             content = f.read()
           if BuildFile._is_buildfile_name(file_name):
             content = content.replace(source_dir, target_spec_dir)
-          with open(os.path.join(clone_dir_path, file_name), 'w') as f:
+          with open(os.path.join(clone_dir_path, file_name), "w") as f:
             f.write(content)
 
       yield clone_dir
@@ -272,7 +282,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
       cls._profile_disambiguator += 1
       return ret
 
-  def get_cache_subdir(self, cache_dir, subdir_glob='*/', other_dirs=()):
+  def get_cache_subdir(self, cache_dir, subdir_glob="*/", other_dirs=()):
     """Check that there is only one entry of `cache_dir` which matches the glob
     specified by `subdir_glob`, excluding `other_dirs`, and
     return it.
@@ -296,44 +306,56 @@ class PantsRunIntegrationTest(unittest.TestCase):
     self.assertEqual(len(remaining_dirs), 1)
     return list(remaining_dirs)[0]
 
-  def run_pants_with_workdir_without_waiting(self, command, workdir, config=None, extra_env=None,
-                                             build_root=None, print_exception_stacktrace=True,
-                                             **kwargs) -> PantsJoinHandle:
+  def run_pants_with_workdir_without_waiting(
+    self,
+    command,
+    workdir,
+    config=None,
+    extra_env=None,
+    build_root=None,
+    print_exception_stacktrace=True,
+    **kwargs,
+  ) -> PantsJoinHandle:
     args = [
-      '--no-pantsrc',
-      f'--pants-workdir={workdir}',
-      f'--print-exception-stacktrace={print_exception_stacktrace}',
+      "--no-pantsrc",
+      f"--pants-workdir={workdir}",
+      f"--print-exception-stacktrace={print_exception_stacktrace}",
     ]
     # TODO: If the default value for `--v1` changes to False then this check will
     # Have to change to `if '--v1' in command:`.
-    if '--no-v1' not in command:
-      args.append('--kill-nailguns')
+    if "--no-v1" not in command:
+      args.append("--kill-nailguns")
 
     if self.hermetic():
-      args.extend(['--pants-config-files=[]',
-                   # Turn off cache globally.  A hermetic integration test shouldn't rely on cache,
-                   # or we have no idea if it's actually testing anything.
-                   '--no-cache-read', '--no-cache-write',
-                   # Turn cache on just for tool bootstrapping, for performance.
-                   '--cache-bootstrap-read', '--cache-bootstrap-write'
-                   ])
+      args.extend(
+        [
+          "--pants-config-files=[]",
+          # Turn off cache globally.  A hermetic integration test shouldn't rely on cache,
+          # or we have no idea if it's actually testing anything.
+          "--no-cache-read",
+          "--no-cache-write",
+          # Turn cache on just for tool bootstrapping, for performance.
+          "--cache-bootstrap-read",
+          "--cache-bootstrap-write",
+        ]
+      )
 
     if self.use_pantsd_env_var():
       args.append("--enable-pantsd=True")
       args.append("--no-shutdown-pantsd-after-run")
 
     if config:
-      toml_file_name = os.path.join(workdir, 'pants.toml')
-      with safe_open(toml_file_name, mode='w') as fp:
+      toml_file_name = os.path.join(workdir, "pants.toml")
+      with safe_open(toml_file_name, mode="w") as fp:
         fp.write(TomlSerializer(config).serialize())
-      args.append('--pants-config-files=' + toml_file_name)
+      args.append("--pants-config-files=" + toml_file_name)
 
-    pants_script = [sys.executable, '-m', 'pants']
+    pants_script = [sys.executable, "-m", "pants"]
 
     # Permit usage of shell=True and string-based commands to allow e.g. `./pants | head`.
-    if kwargs.get('shell') is True:
-      assert not isinstance(command, list), 'must pass command as a string when using shell=True'
-      pants_command = ' '.join([*pants_script, ' '.join(args), command])
+    if kwargs.get("shell") is True:
+      assert not isinstance(command, list), "must pass command as a string when using shell=True"
+      pants_command = " ".join([*pants_script, " ".join(args), command])
     else:
       pants_command = pants_script + args + command
 
@@ -343,14 +365,14 @@ class PantsRunIntegrationTest(unittest.TestCase):
       # With an empty environment, we would generally get the true underlying system default
       # encoding, which is unlikely to be what we want (it's generally ASCII, still). So we
       # explicitly set an encoding here.
-      env['LC_ALL'] = 'en_US.UTF-8'
+      env["LC_ALL"] = "en_US.UTF-8"
       for h in self.hermetic_env_whitelist():
         value = os.getenv(h)
         if value is not None:
           env[h] = value
-      hermetic_env = os.getenv('HERMETIC_ENV')
+      hermetic_env = os.getenv("HERMETIC_ENV")
       if hermetic_env:
-        for h in hermetic_env.strip(',').split(','):
+        for h in hermetic_env.strip(",").split(","):
           value = os.getenv(h)
           if value is not None:
             env[h] = value
@@ -361,30 +383,30 @@ class PantsRunIntegrationTest(unittest.TestCase):
     env.update(PYTHONPATH=os.pathsep.join(sys.path))
 
     # Pants command that was called from the test shouldn't have a parent.
-    if 'PANTS_PARENT_BUILD_ID' in env:
-      del env['PANTS_PARENT_BUILD_ID']
+    if "PANTS_PARENT_BUILD_ID" in env:
+      del env["PANTS_PARENT_BUILD_ID"]
 
     # Don't overwrite the profile of this process in the called process.
     # Instead, write the profile into a sibling file.
-    if env.get('PANTS_PROFILE'):
+    if env.get("PANTS_PROFILE"):
       prof = f"{env['PANTS_PROFILE']}.{self._get_profile_disambiguator()}"
-      env['PANTS_PROFILE'] = prof
+      env["PANTS_PROFILE"] = prof
       # Make a note the subprocess command, so the user can correctly interpret the profile files.
-      with open(f'{prof}.cmd', 'w') as fp:
-        fp.write(' '.join(pants_command))
+      with open(f"{prof}.cmd", "w") as fp:
+        fp.write(" ".join(pants_command))
 
     return PantsJoinHandle(
-        command=pants_command,
-        process=subprocess.Popen(
-          pants_command,
-          env=env,
-          stdin=subprocess.PIPE,
-          stdout=subprocess.PIPE,
-          stderr=subprocess.PIPE,
-          **kwargs
-        ),
-        workdir=workdir
-      )
+      command=pants_command,
+      process=subprocess.Popen(
+        pants_command,
+        env=env,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        **kwargs,
+      ),
+      workdir=workdir,
+    )
 
   def run_pants_with_workdir(
     self, command, workdir, config=None, stdin_data=None, tee_output=False, **kwargs
@@ -406,12 +428,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     """
     with self.temporary_workdir() as workdir:
       return self.run_pants_with_workdir(
-        command,
-        workdir,
-        config,
-        stdin_data=stdin_data,
-        extra_env=extra_env,
-        **kwargs
+        command, workdir, config, stdin_data=stdin_data, extra_env=extra_env, **kwargs
       )
 
   @contextmanager
@@ -427,19 +444,20 @@ class PantsRunIntegrationTest(unittest.TestCase):
     """
     with self.temporary_workdir() as workdir:
       yield self.run_pants_with_workdir(
-        command,
-        workdir,
-        config,
-        stdin_data=stdin_data,
-        extra_env=extra_env,
-        **kwargs
+        command, workdir, config, stdin_data=stdin_data, extra_env=extra_env, **kwargs
       )
 
-  def bundle_and_run(self, target, bundle_name, bundle_jar_name=None, bundle_options=None,
-                     args=None,
-                     expected_bundle_jar_content=None,
-                     expected_bundle_content=None,
-                     library_jars_are_symlinks=True):
+  def bundle_and_run(
+    self,
+    target,
+    bundle_name,
+    bundle_jar_name=None,
+    bundle_options=None,
+    args=None,
+    expected_bundle_jar_content=None,
+    expected_bundle_content=None,
+    library_jars_are_symlinks=True,
+  ):
     """Creates the bundle with pants, then does java -jar {bundle_name}.jar to execute the bundle.
 
     :param target: target name to compile
@@ -457,22 +475,22 @@ class PantsRunIntegrationTest(unittest.TestCase):
     """
     bundle_jar_name = bundle_jar_name or bundle_name
     bundle_options = bundle_options or []
-    bundle_options = ['bundle.jvm'] + bundle_options + ['--archive=zip', target]
+    bundle_options = ["bundle.jvm"] + bundle_options + ["--archive=zip", target]
     with self.pants_results(bundle_options) as pants_run:
       self.assert_success(pants_run)
 
-      self.assertTrue(check_symlinks(f'dist/{bundle_name}-bundle/libs', library_jars_are_symlinks))
+      self.assertTrue(check_symlinks(f"dist/{bundle_name}-bundle/libs", library_jars_are_symlinks))
       # TODO(John Sirois): We need a zip here to suck in external library classpath elements
       # pointed to by symlinks in the run_pants ephemeral tmpdir.  Switch run_pants to be a
       # contextmanager that yields its results while the tmpdir workdir is still active and change
       # this test back to using an un-archived bundle.
       with temporary_dir() as workdir:
-        ZIP.extract(f'dist/{bundle_name}.zip', workdir)
+        ZIP.extract(f"dist/{bundle_name}.zip", workdir)
         if expected_bundle_content:
           self.assertTrue(contains_exact_files(workdir, expected_bundle_content))
         if expected_bundle_jar_content:
           with temporary_dir() as check_bundle_jar_dir:
-            bundle_jar = os.path.join(workdir, f'{bundle_jar_name}.jar')
+            bundle_jar = os.path.join(workdir, f"{bundle_jar_name}.jar")
             ZIP.extract(bundle_jar, check_bundle_jar_dir)
             self.assertTrue(contains_exact_files(check_bundle_jar_dir, expected_bundle_jar_content))
 
@@ -480,9 +498,9 @@ class PantsRunIntegrationTest(unittest.TestCase):
         if args:
           optional_args = args
         java_run = subprocess.Popen(
-          ['java', '-jar', f'{bundle_jar_name}.jar'] + optional_args,
+          ["java", "-jar", f"{bundle_jar_name}.jar"] + optional_args,
           stdout=subprocess.PIPE,
-          cwd=workdir
+          cwd=workdir,
         )
 
         stdout, _ = java_run.communicate()
@@ -502,15 +520,15 @@ class PantsRunIntegrationTest(unittest.TestCase):
       return
 
     details = [msg] if msg else []
-    details.append(' '.join(pants_run.command))
-    details.append(f'returncode: {pants_run.returncode}')
+    details.append(" ".join(pants_run.command))
+    details.append(f"returncode: {pants_run.returncode}")
 
     def indent(content):
-      return '\n\t'.join(content.splitlines())
+      return "\n\t".join(content.splitlines())
 
-    details.append(f'stdout:\n\t{indent(pants_run.stdout_data)}')
-    details.append(f'stderr:\n\t{indent(pants_run.stderr_data)}')
-    error_msg = '\n'.join(details)
+    details.append(f"stdout:\n\t{indent(pants_run.stdout_data)}")
+    details.append(f"stderr:\n\t{indent(pants_run.stderr_data)}")
+    error_msg = "\n".join(details)
 
     assertion(value, pants_run.returncode, error_msg)
 
@@ -533,14 +551,14 @@ class PantsRunIntegrationTest(unittest.TestCase):
       self.assertIn(f"{prefix}{pid}{suffix}", log)
 
   def assert_is_file(self, file_path):
-    self.assertTrue(os.path.isfile(file_path), f'file path {file_path} does not exist!')
+    self.assertTrue(os.path.isfile(file_path), f"file path {file_path} does not exist!")
 
   def assert_is_not_file(self, file_path):
-    self.assertFalse(os.path.isfile(file_path), f'file path {file_path} exists!')
+    self.assertFalse(os.path.isfile(file_path), f"file path {file_path} exists!")
 
   def normalize(self, s: str) -> str:
     """Removes escape sequences (e.g. colored output) and all whitespace from string s."""
-    return ''.join(strip_color(s).split())
+    return "".join(strip_color(s).split())
 
   @contextmanager
   def file_renamed(self, prefix, test_name, real_name):
@@ -557,9 +575,10 @@ class PantsRunIntegrationTest(unittest.TestCase):
     """Temporarily write content to a file for the purpose of an integration test."""
     path = os.path.realpath(path)
     assert path.startswith(
-      os.path.realpath(get_buildroot())), 'cannot write paths outside of the buildroot!'
-    assert not os.path.exists(path), 'refusing to overwrite an existing path!'
-    mode = 'wb' if binary_mode else 'w'
+      os.path.realpath(get_buildroot())
+    ), "cannot write paths outside of the buildroot!"
+    assert not os.path.exists(path), "refusing to overwrite an existing path!"
+    mode = "wb" if binary_mode else "w"
     with open(path, mode) as fh:
       fh.write(content)
     try:
@@ -577,17 +596,17 @@ class PantsRunIntegrationTest(unittest.TestCase):
     :param file_path: Absolute path to the file to be reset after the method runs.
     :param temporary_content: Optional content to write into the file.
     """
-    with open(file_path, 'r') as f:
+    with open(file_path, "r") as f:
       file_original_content = f.read()
 
     try:
       if temporary_content is not None:
-        with open(file_path, 'w') as f:
+        with open(file_path, "w") as f:
           f.write(temporary_content)
       yield
 
     finally:
-      with open(file_path, 'w') as f:
+      with open(file_path, "w") as f:
         f.write(file_original_content)
 
   @contextmanager
@@ -602,24 +621,24 @@ class PantsRunIntegrationTest(unittest.TestCase):
 
     # N.B. BUILD.tools, contrib, 3rdparty needs to be copied vs symlinked to avoid
     # symlink prefix check error in v1 and v2 engine.
-    files_to_copy = ('BUILD.tools',)
+    files_to_copy = ("BUILD.tools",)
     files_to_link = (
-      'BUILD_ROOT',
-      '.isort.cfg',
-      '.pants.d',
-      'build-support',
+      "BUILD_ROOT",
+      ".isort.cfg",
+      ".pants.d",
+      "build-support",
       # NB: when running with --chroot or the V2 engine, `pants` refers to the source root-stripped
       # directory src/python/pants, not the script `./pants`.
-      'pants',
-      'pants.pex',
-      'pants-plugins',
-      'pants.toml',
-      'pants.travis-ci.toml',
-      'pyproject.toml',
-      'rust-toolchain',
-      'src',
+      "pants",
+      "pants.pex",
+      "pants-plugins",
+      "pants.toml",
+      "pants.travis-ci.toml",
+      "pyproject.toml",
+      "rust-toolchain",
+      "src",
     )
-    dirs_to_copy = ('3rdparty', 'contrib') + tuple(dirs_to_copy or [])
+    dirs_to_copy = ("3rdparty", "contrib") + tuple(dirs_to_copy or [])
 
     with self.temporary_workdir() as tmp_dir:
       for filename in files_to_copy:
@@ -636,7 +655,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
       def write_file(file_path, contents):
         full_file_path = os.path.join(tmp_dir, *file_path.split(os.pathsep))
         safe_mkdir_for(full_file_path)
-        with open(full_file_path, 'w') as fh:
+        with open(full_file_path, "w") as fh:
           fh.write(contents)
 
       @contextmanager
@@ -652,7 +671,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     :param args: command line arguments used to run pants
     """
     cmd = list(args)
-    success = kwargs.pop('success', True)
+    success = kwargs.pop("success", True)
     pants_run = self.run_pants(cmd, **kwargs)
     if success:
       self.assert_success(pants_run)
@@ -663,7 +682,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
   @contextmanager
   def do_command_yielding_workdir(self, *args, **kwargs):
     cmd = list(args)
-    success = kwargs.pop('success', True)
+    success = kwargs.pop("success", True)
     with self.pants_results(cmd, **kwargs) as pants_run:
       if success:
         self.assert_success(pants_run)

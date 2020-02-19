@@ -55,7 +55,7 @@ class Setup:
 
 
 def generate_args(
-  *, source_files: TargetSourceFiles, isort: Isort, check_only: bool,
+  *, source_files: TargetSourceFiles, isort: Isort, check_only: bool
 ) -> Tuple[str, ...]:
   # NB: isort auto-discovers config files. There is no way to hardcode them via command line
   # flags. So long as the files are in the Pex's input files, isort will use the config.
@@ -114,7 +114,7 @@ async def setup(
         requirements_pex.directory_digest,
         config_snapshot.directory_digest,
       )
-    ),
+    )
   )
 
   process_request = requirements_pex.create_execute_request(
@@ -122,13 +122,13 @@ async def setup(
     subprocess_encoding_environment=subprocess_encoding_environment,
     pex_path="./isort.pex",
     pex_args=generate_args(
-      source_files=specified_source_files, isort=isort, check_only=request.check_only,
+      source_files=specified_source_files, isort=isort, check_only=request.check_only
     ),
     input_files=merged_input_files,
     # NB: Even if the user specified to only run on certain files belonging to the target, we
     # still capture in the output all of the source files.
     output_files=adaptor.sources.snapshot.files,
-    description=f'Run isort for {adaptor.address.reference()}',
+    description=f"Run isort for {adaptor.address.reference()}",
   )
   return Setup(process_request)
 

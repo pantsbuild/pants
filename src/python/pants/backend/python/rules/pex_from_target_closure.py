@@ -21,6 +21,7 @@ from pants.python.python_setup import PythonSetup
 @dataclass(frozen=True)
 class CreatePexFromTargetClosure:
   """Represents a request to create a PEX from the closure of a set of targets."""
+
   addresses: Addresses
   output_filename: str
   entry_point: Optional[str] = None
@@ -30,15 +31,15 @@ class CreatePexFromTargetClosure:
 
 
 @rule(name="Create PEX from targets")
-async def create_pex_from_target_closure(request: CreatePexFromTargetClosure,
-                                         python_setup: PythonSetup) -> Pex:
+async def create_pex_from_target_closure(
+  request: CreatePexFromTargetClosure, python_setup: PythonSetup
+) -> Pex:
   transitive_hydrated_targets = await Get[TransitiveHydratedTargets](Addresses, request.addresses)
   all_targets = transitive_hydrated_targets.closure
   all_target_adaptors = [t.adaptor for t in all_targets]
 
   interpreter_constraints = PexInterpreterConstraints.create_from_adaptors(
-    adaptors=tuple(all_target_adaptors),
-    python_setup=python_setup
+    adaptors=tuple(all_target_adaptors), python_setup=python_setup
   )
 
   chrooted_sources: Optional[ChrootedPythonSources] = None
@@ -46,8 +47,7 @@ async def create_pex_from_target_closure(request: CreatePexFromTargetClosure,
     chrooted_sources = await Get[ChrootedPythonSources](HydratedTargets(all_targets))
 
   requirements = PexRequirements.create_from_adaptors(
-    adaptors=all_target_adaptors,
-    additional_requirements=request.additional_requirements
+    adaptors=all_target_adaptors, additional_requirements=request.additional_requirements
   )
 
   create_pex_request = CreatePex(
@@ -55,9 +55,7 @@ async def create_pex_from_target_closure(request: CreatePexFromTargetClosure,
     requirements=requirements,
     interpreter_constraints=interpreter_constraints,
     entry_point=request.entry_point,
-    input_files_digest=(
-      chrooted_sources.snapshot.directory_digest if chrooted_sources else None
-    ),
+    input_files_digest=(chrooted_sources.snapshot.directory_digest if chrooted_sources else None),
     additional_args=request.additional_args,
   )
 
@@ -66,6 +64,4 @@ async def create_pex_from_target_closure(request: CreatePexFromTargetClosure,
 
 
 def rules():
-  return [
-    create_pex_from_target_closure,
-  ]
+  return [create_pex_from_target_closure]

@@ -17,7 +17,6 @@ from pants.util.dirutil import safe_mkdir_for
 
 
 class PythonInterpreterFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintStrategy):
-
   def __init__(self, python_setup):
     self.python_setup = python_setup
 
@@ -42,7 +41,7 @@ class SelectInterpreter(Task):
   def implementation_version(cls):
     # TODO(John Sirois): Fixup this task to use VTS results_dirs. Right now version bumps aren't
     # effective in dealing with workdir data format changes.
-    return super().implementation_version() + [('SelectInterpreter', 4)]
+    return super().implementation_version() + [("SelectInterpreter", 4)]
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -73,9 +72,9 @@ class SelectInterpreter(Task):
       # the targets, we still go through the motions of selecting an interpreter, to prevent
       # downstream tasks from having to check for this special case.
       target_set_id = (
-        'no_constraints'
-        if not invalidation_check.all_vts else
-        VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts).cache_key.hash
+        "no_constraints"
+        if not invalidation_check.all_vts
+        else VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts).cache_key.hash
       )
       interpreter_path_file = self._interpreter_path_file(target_set_id)
       interpreter = self._get_interpreter(interpreter_path_file, python_tgts)
@@ -85,8 +84,8 @@ class SelectInterpreter(Task):
   def _select_interpreter(self, interpreter_path_file, targets):
     interpreter = self._interpreter_cache.select_interpreter_for_targets(targets)
     safe_mkdir_for(interpreter_path_file)
-    with open(interpreter_path_file, 'w') as outfile:
-      outfile.write(f'{interpreter.binary}\n')
+    with open(interpreter_path_file, "w") as outfile:
+      outfile.write(f"{interpreter.binary}\n")
     return interpreter
 
   def _interpreter_path_file(self, target_set_id):
@@ -96,18 +95,20 @@ class SelectInterpreter(Task):
     # The historical names to avoid:
     # - interpreter.path
     # - interpreter.info
-    return os.path.join(self.workdir, target_set_id, 'interpreter.binary')
+    return os.path.join(self.workdir, target_set_id, "interpreter.binary")
 
   def _get_interpreter(self, interpreter_path_file, targets):
     if os.path.exists(interpreter_path_file):
-      with open(interpreter_path_file, 'r') as infile:
+      with open(interpreter_path_file, "r") as infile:
         binary = infile.read().strip()
       try:
         return PythonInterpreter.from_binary(binary)
       except Executor.ExecutableNotFound:
         # TODO(John Sirois): Trap a more appropriate exception once available:
         #  https://github.com/pantsbuild/pex/issues/672
-        self.context.log.info('Stale interpreter reference detected: {}, removing reference and '
-                              'selecting a new interpreter.'.format(binary))
+        self.context.log.info(
+          "Stale interpreter reference detected: {}, removing reference and "
+          "selecting a new interpreter.".format(binary)
+        )
         os.remove(interpreter_path_file)
     return self._select_interpreter(interpreter_path_file, targets)

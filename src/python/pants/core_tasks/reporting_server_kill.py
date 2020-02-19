@@ -17,14 +17,15 @@ class ReportingServerKill(QuietTaskMixin, Task):
     server = ReportingServerManager(self.context, self.get_options())
 
     if not server.is_alive():
-      logger.info('No server found.')
+      logger.info("No server found.")
       return
 
     pid = server.pid
 
     try:
-      logger.info('Killing server with {pid} at http://localhost:{port}'
-                  .format(pid=pid, port=server.socket))
+      logger.info(
+        "Killing server with {pid} at http://localhost:{port}".format(pid=pid, port=server.socket)
+      )
       server.terminate()
     except ReportingServerManager.NonResponsiveProcess:
-      logger.info('Failed to kill server with pid {pid}!'.format(pid=pid))
+      logger.info("Failed to kill server with pid {pid}!".format(pid=pid))

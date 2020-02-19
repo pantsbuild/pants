@@ -21,9 +21,10 @@ class GCC(NativeTool):
   paths into the distribution of GCC provided on Pantsbuild S3. If we change how we distribute GCC,
   these methods may have to change. They should be stable to version upgrades, however.
   """
-  options_scope = 'gcc'
-  default_version = '7.3.0'
-  archive_type = 'tgz'
+
+  options_scope = "gcc"
+  default_version = "7.3.0"
+  archive_type = "tgz"
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -38,40 +39,29 @@ class GCC(NativeTool):
 
   @memoized_property
   def path_entries(self):
-    return self._filemap([('bin',)])
+    return self._filemap([("bin",)])
 
   @memoized_method
   def _common_lib_dirs(self, platform):
-    lib64_tuples = match(platform, {
-      Platform.darwin: [],
-      Platform.linux: [('lib64',)]
-    })
-    return self._filemap(lib64_tuples + [
-      ('lib',),
-      ('lib/gcc',),
-      ('lib/gcc/*', self.version()),
-    ])
+    lib64_tuples = match(platform, {Platform.darwin: [], Platform.linux: [("lib64",)]})
+    return self._filemap(lib64_tuples + [("lib",), ("lib/gcc",), ("lib/gcc/*", self.version())])
 
   @memoized_property
   def _common_include_dirs(self):
-    return self._filemap([
-      ('include',),
-      ('lib/gcc/*', self.version(), 'include'),
-    ])
+    return self._filemap([("include",), ("lib/gcc/*", self.version(), "include")])
 
   def c_compiler(self, platform: Platform) -> CCompiler:
     return CCompiler(
       path_entries=self.path_entries,
-      exe_filename='gcc',
+      exe_filename="gcc",
       runtime_library_dirs=self._common_lib_dirs(platform),
       include_dirs=self._common_include_dirs,
-      extra_args=())
+      extra_args=(),
+    )
 
   @memoized_property
   def _cpp_include_dirs(self):
-    most_cpp_include_dirs = self._filemap([
-      ('include/c++', self.version()),
-    ])
+    most_cpp_include_dirs = self._filemap([("include/c++", self.version())])
 
     # TODO(#6143): determine whether there is any manual explaining when any of these file paths are
     # necessary.
@@ -79,7 +69,8 @@ class GCC(NativeTool):
     cpp_config_header_path = self._file_mapper.assert_single_path_by_glob(
       # NB: There are multiple paths matching this glob unless we provide the full path to
       # c++config.h, which is why we bypass self._filemap() here.
-      [self.select(), 'include/c++', self.version(), '*/bits/c++config.h'])
+      [self.select(), "include/c++", self.version(), "*/bits/c++config.h"]
+    )
     # Get the directory that makes `#include <bits/c++config.h>` work.
     plat_cpp_header_dir = os.path.dirname(os.path.dirname(cpp_config_header_path))
 
@@ -88,10 +79,11 @@ class GCC(NativeTool):
   def cpp_compiler(self, platform: Platform) -> CppCompiler:
     return CppCompiler(
       path_entries=self.path_entries,
-      exe_filename='g++',
+      exe_filename="g++",
       runtime_library_dirs=self._common_lib_dirs(platform),
       include_dirs=(self._common_include_dirs + self._cpp_include_dirs),
-      extra_args=())
+      extra_args=(),
+    )
 
 
 @rule
@@ -105,7 +97,4 @@ def get_gplusplus(gcc: GCC, platform: Platform) -> CppCompiler:
 
 
 def create_gcc_rules():
-  return [
-    get_gcc,
-    get_gplusplus,
-  ]
+  return [get_gcc, get_gplusplus]

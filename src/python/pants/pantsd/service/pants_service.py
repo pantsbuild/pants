@@ -25,7 +25,8 @@ class PantsService(ABC):
   the service, and the parent process should call `resume()` to cause the service to resume running.
   """
 
-  class ServiceError(Exception): pass
+  class ServiceError(Exception):
+    pass
 
   def __init__(self):
     super().__init__()
@@ -94,10 +95,11 @@ class _ServiceState(object):
   thread wait on a Condition variable while Paused: testing indicates that for multiple Pythons
   on both OSX and Linux, this does not result in poisoning of the associated Lock.
   """
-  _RUNNING = 'Running'
-  _PAUSED = 'Paused'
-  _PAUSING = 'Pausing'
-  _TERMINATING = 'Terminating'
+
+  _RUNNING = "Running"
+  _PAUSED = "Paused"
+  _PAUSING = "Pausing"
+  _TERMINATING = "Terminating"
 
   def __init__(self):
     """Creates a ServiceState in the Running state."""
@@ -107,7 +109,9 @@ class _ServiceState(object):
 
   def _set_state(self, state, *valid_states):
     if valid_states and self._state not in valid_states:
-      raise AssertionError('Cannot move {} to `{}` while it is `{}`.'.format(self, state, self._state))
+      raise AssertionError(
+        "Cannot move {} to `{}` while it is `{}`.".format(self, state, self._state)
+      )
     self._state = state
     self._condition.notify_all()
 
@@ -124,7 +128,11 @@ class _ServiceState(object):
       # Wait until the service transitions out of Pausing.
       while self._state != self._PAUSED:
         if self._state != self._PAUSING:
-          raise AssertionError('Cannot wait for {} to reach `{}` while it is in `{}`.'.format(self, self._PAUSED, self._state))
+          raise AssertionError(
+            "Cannot wait for {} to reach `{}` while it is in `{}`.".format(
+              self, self._PAUSED, self._state
+            )
+          )
         timeout = deadline - time.time() if deadline else None
         if timeout and timeout <= 0:
           return False
@@ -192,6 +200,7 @@ class _ServiceState(object):
 @dataclass(unsafe_hash=True)
 class PantsServices:
   """A registry of PantsServices instances"""
+
   services: Tuple[PantsService, ...]
   port_map: Dict
   lifecycle_lock: Any
@@ -200,7 +209,7 @@ class PantsServices:
     self,
     services: Optional[Tuple[PantsService, ...]] = None,
     port_map: Optional[Dict] = None,
-    lifecycle_lock=None
+    lifecycle_lock=None,
   ) -> None:
     """
     :param port_map: A dict of (port_name -> port_info) for named ports hosted by the services.

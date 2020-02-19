@@ -13,18 +13,19 @@ from pants.util.dirutil import fast_relpath
 
 class ConsolidateClasspath(JvmBinaryTask):
   """Convert loose directories in classpath_products into jars. """
+
   # Directory for both internal and external libraries.
-  LIBS_DIR = 'libs'
+  LIBS_DIR = "libs"
   _target_closure_kwargs = dict(include_scopes=Scopes.JVM_RUNTIME_SCOPES, respect_intransitive=True)
 
   @classmethod
   def implementation_version(cls):
-    return super().implementation_version() + [('ConsolidateClasspath', 2)]
+    return super().implementation_version() + [("ConsolidateClasspath", 2)]
 
   @classmethod
   def prepare(cls, options, round_manager):
     super().prepare(options, round_manager)
-    round_manager.require_data('runtime_classpath')
+    round_manager.require_data("runtime_classpath")
 
   @property
   def cache_target_dirs(self):
@@ -32,13 +33,14 @@ class ConsolidateClasspath(JvmBinaryTask):
 
   @classmethod
   def product_types(cls):
-    return ['consolidated_classpath']
+    return ["consolidated_classpath"]
 
   def execute(self):
     # Clone the runtime_classpath to the consolidated_classpath.
-    runtime_classpath = self.context.products.get_data('runtime_classpath')
+    runtime_classpath = self.context.products.get_data("runtime_classpath")
     consolidated_classpath = self.context.products.get_data(
-      'consolidated_classpath', runtime_classpath.copy)
+      "consolidated_classpath", runtime_classpath.copy
+    )
 
     # TODO: use a smarter filter method we should be able to limit the targets a bit more.
     # https://github.com/pantsbuild/pants/issues/3807
@@ -62,7 +64,7 @@ class ConsolidateClasspath(JvmBinaryTask):
           relpath = fast_relpath(entry.path, self.get_options().pants_workdir)
           suffix = hash_all([relpath])[:6]
           if ClasspathUtil.is_dir(entry.path):
-            jarpath = os.path.join(vt.results_dir, f'output-{suffix}.jar')
+            jarpath = os.path.join(vt.results_dir, f"output-{suffix}.jar")
 
             # Regenerate artifact for invalid vts.
             if not vt.valid:

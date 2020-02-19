@@ -37,7 +37,7 @@ class LinkSharedLibraryRequest:
 
 class LinkSharedLibraries(NativeTask):
 
-  options_scope = 'link-shared-libraries'
+  options_scope = "link-shared-libraries"
 
   @classmethod
   def product_types(cls):
@@ -54,9 +54,10 @@ class LinkSharedLibraries(NativeTask):
 
   @classmethod
   def implementation_version(cls):
-    return super().implementation_version() + [('LinkSharedLibraries', 1)]
+    return super().implementation_version() + [("LinkSharedLibraries", 1)]
 
-  class LinkSharedLibrariesError(TaskError): pass
+  class LinkSharedLibrariesError(TaskError):
+    pass
 
   def linker(self, native_library_target):
     # NB: we are using the C++ toolchain here for linking every type of input, including compiled C
@@ -75,8 +76,9 @@ class LinkSharedLibraries(NativeTask):
 
     all_shared_libs_by_name = {}
 
-    with self.invalidated(targets_providing_artifacts,
-                          invalidate_dependents=True) as invalidation_check:
+    with self.invalidated(
+      targets_providing_artifacts, invalidate_dependents=True
+    ) as invalidation_check:
       for vt in invalidation_check.all_vts:
         if vt.valid:
           shared_library = self._retrieve_shared_lib_from_cache(vt)
@@ -92,10 +94,10 @@ class LinkSharedLibraries(NativeTask):
         if same_name_shared_lib:
           # TODO: test this branch!
           raise self.LinkSharedLibrariesError(
-            "The name '{name}' was used for two shared libraries: {prev} and {cur}."
-            .format(name=shared_library.name,
-                    prev=same_name_shared_lib,
-                    cur=shared_library))
+            "The name '{name}' was used for two shared libraries: {prev} and {cur}.".format(
+              name=shared_library.name, prev=same_name_shared_lib, cur=shared_library
+            )
+          )
         else:
           all_shared_libs_by_name[shared_library.name] = shared_library
 
@@ -103,11 +105,11 @@ class LinkSharedLibraries(NativeTask):
 
   def _retrieve_shared_lib_from_cache(self, vt):
     native_artifact = vt.target.ctypes_native_library
-    path_to_cached_lib = os.path.join(
-      vt.results_dir, native_artifact.as_shared_lib(self.platform))
+    path_to_cached_lib = os.path.join(vt.results_dir, native_artifact.as_shared_lib(self.platform))
     if not os.path.isfile(path_to_cached_lib):
-      raise self.LinkSharedLibrariesError("The shared library at {} does not exist!"
-                                          .format(path_to_cached_lib))
+      raise self.LinkSharedLibrariesError(
+        "The shared library at {} does not exist!".format(path_to_cached_lib)
+      )
     return SharedLibrary(name=native_artifact.lib_name, path=path_to_cached_lib)
 
   def _make_link_request(self, vt, compiled_objects_product):
@@ -119,7 +121,9 @@ class LinkSharedLibraries(NativeTask):
     for dep_tgt in deps:
       if compiled_objects_product.get(dep_tgt):
         self.context.log.debug("dep_tgt: {}".format(dep_tgt))
-        object_files = self._retrieve_single_product_at_target_base(compiled_objects_product, dep_tgt)
+        object_files = self._retrieve_single_product_at_target_base(
+          compiled_objects_product, dep_tgt
+        )
         self.context.log.debug("object_files: {}".format(object_files))
         object_file_paths = object_files.file_paths()
         self.context.log.debug("object_file_paths: {}".format(object_file_paths))
@@ -129,7 +133,8 @@ class LinkSharedLibraries(NativeTask):
     external_lib_names = []
     for ext_dep in self.packaged_native_deps(vt.target):
       external_lib_dirs.append(
-        os.path.join(get_buildroot(), ext_dep._sources_field.rel_path, ext_dep.lib_relpath))
+        os.path.join(get_buildroot(), ext_dep._sources_field.rel_path, ext_dep.lib_relpath)
+      )
 
       native_lib_names = ext_dep.native_lib_names
       if isinstance(native_lib_names, dict):
@@ -145,7 +150,8 @@ class LinkSharedLibraries(NativeTask):
       native_artifact=vt.target.ctypes_native_library,
       output_dir=vt.results_dir,
       external_lib_dirs=tuple(external_lib_dirs),
-      external_lib_names=tuple(external_lib_names))
+      external_lib_names=tuple(external_lib_names),
+    )
 
     self.context.log.debug(repr(link_request))
 
@@ -155,27 +161,27 @@ class LinkSharedLibraries(NativeTask):
     object_files = link_request.object_files
 
     if len(object_files) == 0:
-      raise self.LinkSharedLibrariesError("No object files were provided in request {}!"
-                                          .format(link_request))
+      raise self.LinkSharedLibrariesError(
+        "No object files were provided in request {}!".format(link_request)
+      )
 
     linker = link_request.linker
     native_artifact = link_request.native_artifact
     output_dir = link_request.output_dir
-    resulting_shared_lib_path = os.path.join(output_dir,
-                                             native_artifact.as_shared_lib(self.platform))
+    resulting_shared_lib_path = os.path.join(
+      output_dir, native_artifact.as_shared_lib(self.platform)
+    )
 
     self.context.log.debug("resulting_shared_lib_path: {}".format(resulting_shared_lib_path))
     # We are executing in the results_dir, so get absolute paths for everything.
     cmd = (
-      [linker.exe_filename] +
-      match(self.platform,
-        {Platform.darwin: ['-Wl,-dylib'], Platform.linux: ['-shared']}
-      ) +
-      list(linker.extra_args) +
-      ['-o', os.path.abspath(resulting_shared_lib_path)] +
-      ['-L{}'.format(lib_dir) for lib_dir in link_request.external_lib_dirs] +
-      ['-l{}'.format(lib_name) for lib_name in link_request.external_lib_names] +
-      [os.path.abspath(obj) for obj in object_files]
+      [linker.exe_filename]
+      + match(self.platform, {Platform.darwin: ["-Wl,-dylib"], Platform.linux: ["-shared"]})
+      + list(linker.extra_args)
+      + ["-o", os.path.abspath(resulting_shared_lib_path)]
+      + ["-L{}".format(lib_dir) for lib_dir in link_request.external_lib_dirs]
+      + ["-l{}".format(lib_name) for lib_name in link_request.external_lib_names]
+      + [os.path.abspath(obj) for obj in object_files]
     )
 
     self.context.log.info("selected linker exe name: '{}'".format(linker.exe_filename))
@@ -184,29 +190,33 @@ class LinkSharedLibraries(NativeTask):
     env = linker.invocation_environment_dict
     self.context.log.debug("linker invocation environment: {}".format(env))
 
-    with self.context.new_workunit(name='link-shared-libraries',
-                                   labels=[WorkUnitLabel.LINKER]) as workunit:
+    with self.context.new_workunit(
+      name="link-shared-libraries", labels=[WorkUnitLabel.LINKER]
+    ) as workunit:
       try:
         process = subprocess.Popen(
           cmd,
           cwd=output_dir,
-          stdout=workunit.output('stdout'),
-          stderr=workunit.output('stderr'),
-          env=env)
+          stdout=workunit.output("stdout"),
+          stderr=workunit.output("stderr"),
+          env=env,
+        )
       except OSError as e:
         workunit.set_outcome(WorkUnit.FAILURE)
         raise self.LinkSharedLibrariesError(
           "Error invoking the native linker with command {cmd} and environment {env} "
-          "for request {req}: {err}."
-          .format(cmd=cmd, env=env, req=link_request, err=e),
-          e)
+          "for request {req}: {err}.".format(cmd=cmd, env=env, req=link_request, err=e),
+          e,
+        )
 
       rc = process.wait()
       if rc != 0:
         workunit.set_outcome(WorkUnit.FAILURE)
         raise self.LinkSharedLibrariesError(
           "Error linking native objects with command {cmd} and environment {env} "
-          "for request {req}. Exit code was: {rc}."
-          .format(cmd=cmd, env=env, req=link_request, rc=rc))
+          "for request {req}. Exit code was: {rc}.".format(
+            cmd=cmd, env=env, req=link_request, rc=rc
+          )
+        )
 
     return SharedLibrary(name=native_artifact.lib_name, path=resulting_shared_lib_path)

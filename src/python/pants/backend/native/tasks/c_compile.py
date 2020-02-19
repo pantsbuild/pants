@@ -9,16 +9,16 @@ from pants.util.objects import SubclassesOf
 
 class CCompile(NativeCompile):
 
-  options_scope = 'c-compile'
+  options_scope = "c-compile"
 
   # Compile only C library targets.
   source_target_constraint = SubclassesOf(CLibrary)
 
-  workunit_label = 'c-compile'
+  workunit_label = "c-compile"
 
   @classmethod
   def implementation_version(cls):
-    return super().implementation_version() + [('CCompile', 0)]
+    return super().implementation_version() + [("CCompile", 0)]
 
   @classmethod
   def subsystem_dependencies(cls):

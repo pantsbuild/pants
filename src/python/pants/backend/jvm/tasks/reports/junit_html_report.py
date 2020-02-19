@@ -26,10 +26,11 @@ class ReportTestSuite:
 
   class MergeError(Exception):
     def __init__(self, suites, test_cases):
-      error_message = ('Refusing to merge duplicate test cases in suite {!r} from files {}:'
-                       '\n    {}').format(suites[0].name,
-                                          ', '.join(s.file for s in suites),
-                                          '\n    '.join(map(str, test_cases)))
+      error_message = (
+        "Refusing to merge duplicate test cases in suite {!r} from files {}:" "\n    {}"
+      ).format(
+        suites[0].name, ", ".join(s.file for s in suites), "\n    ".join(map(str, test_cases))
+      )
       super(ReportTestSuite.MergeError, self).__init__(error_message)
 
   @classmethod
@@ -67,10 +68,12 @@ class ReportTestSuite:
           if error_on_conflict:
             raise cls.MergeError(suites, cases)
           else:
-            logger.warning('Found duplicate test case results in suite {!r} from files: {}, '
-                        'using first result:\n -> {}'.format(suite_name,
-                                                             ', '.join(s.file for s in suites),
-                                                             '\n    '.join(map(str, cases))))
+            logger.warning(
+              "Found duplicate test case results in suite {!r} from files: {}, "
+              "using first result:\n -> {}".format(
+                suite_name, ", ".join(s.file for s in suites), "\n    ".join(map(str, cases))
+              )
+            )
         case = next(iter(cases))
         tests += 1
         time += case.time
@@ -82,13 +85,15 @@ class ReportTestSuite:
           skipped += 1
         test_cases.append(case)
 
-      yield cls(name=suite_name,
-                tests=tests,
-                errors=errors,
-                failures=failures,
-                skipped=skipped,
-                time=time,
-                testcases=test_cases)
+      yield cls(
+        name=suite_name,
+        tests=tests,
+        errors=errors,
+        failures=failures,
+        skipped=skipped,
+        time=time,
+        testcases=test_cases,
+      )
 
   def __init__(self, name, tests, errors, failures, skipped, time, testcases, file=None):
     self.name = name
@@ -112,38 +117,43 @@ class ReportTestSuite:
   def success_rate(test_count, error_count, failure_count, skipped_count):
     if test_count:
       unsuccessful_count = error_count + failure_count + skipped_count
-      return f'{(test_count - unsuccessful_count) * 100.0 / test_count:.2f}%'
-    return '0.00%'
+      return f"{(test_count - unsuccessful_count) * 100.0 / test_count:.2f}%"
+    return "0.00%"
 
   @staticmethod
   def icon_class(test_count, error_count, failure_count, skipped_count):
-    icon_class = 'test-passed'
+    icon_class = "test-passed"
     if test_count == skipped_count:
-      icon_class = 'test-skipped'
+      icon_class = "test-skipped"
     elif error_count > 0:
-      icon_class = 'test-error'
+      icon_class = "test-error"
     elif failure_count > 0:
-      icon_class = 'test-failure'
+      icon_class = "test-failure"
     return icon_class
 
   def as_dict(self):
-    d = dict(name=self.name,
-             tests=self.tests,
-             errors=self.errors,
-             failures=self.failures,
-             skipped=self.skipped,
-             time=self.time)
-    d['success'] = ReportTestSuite.success_rate(self.tests, self.errors, self.failures,
-                                                self.skipped)
-    d['icon_class'] = ReportTestSuite.icon_class(self.tests, self.errors, self.failures,
-                                                 self.skipped)
-    d['testcases'] = [tc.as_dict() for tc in self.testcases]
+    d = dict(
+      name=self.name,
+      tests=self.tests,
+      errors=self.errors,
+      failures=self.failures,
+      skipped=self.skipped,
+      time=self.time,
+    )
+    d["success"] = ReportTestSuite.success_rate(
+      self.tests, self.errors, self.failures, self.skipped
+    )
+    d["icon_class"] = ReportTestSuite.icon_class(
+      self.tests, self.errors, self.failures, self.skipped
+    )
+    d["testcases"] = [tc.as_dict() for tc in self.testcases]
     return d
 
 
 @dataclass(frozen=True, order=True)
 class ReportTestCase:
   """Data object for a JUnit test case"""
+
   name: Any
   time: float
   failure: Optional[Any] = None
@@ -152,23 +162,21 @@ class ReportTestCase:
 
   @memoized_property
   def icon_class(self):
-    icon_class = 'test-passed'
+    icon_class = "test-passed"
     if self.skipped:
-      icon_class = 'test-skipped'
+      icon_class = "test-skipped"
     elif self.error:
-      icon_class = 'test-error'
+      icon_class = "test-error"
     elif self.failure:
-      icon_class = 'test-failure'
+      icon_class = "test-failure"
     return icon_class
 
   def as_dict(self):
-    d = dict(name=self.name,
-             time=self.time,
-             icon_class=self.icon_class)
+    d = dict(name=self.name, time=self.time, icon_class=self.icon_class)
     if self.error:
-      d['message'] = self.error
+      d["message"] = self.error
     elif self.failure:
-      d['message'] = self.failure
+      d["message"] = self.failure
     return d
 
 
@@ -196,10 +204,9 @@ class JUnitHtmlReport(JUnitHtmlReportInterface):
 
   @classmethod
   def create(cls, xml_dir, open_report=False, logger=None, error_on_conflict=True):
-    return cls(xml_dir=xml_dir,
-               open_report=open_report,
-               logger=logger,
-               error_on_conflict=error_on_conflict)
+    return cls(
+      xml_dir=xml_dir, open_report=open_report, logger=logger, error_on_conflict=error_on_conflict
+    )
 
   def __init__(self, xml_dir, open_report=False, logger=None, error_on_conflict=True):
     self._xml_dir = xml_dir
@@ -208,13 +215,13 @@ class JUnitHtmlReport(JUnitHtmlReportInterface):
     self._error_on_conflict = error_on_conflict
 
   def report(self, output_dir):
-    self._logger.debug('Generating JUnit HTML report...')
+    self._logger.debug("Generating JUnit HTML report...")
     testsuites = self._parse_xml_files()
-    report_file_path = os.path.join(output_dir, 'reports', 'junit-report.html')
+    report_file_path = os.path.join(output_dir, "reports", "junit-report.html")
     safe_mkdir_for(report_file_path)
-    with open(report_file_path, 'w') as fp:
+    with open(report_file_path, "w") as fp:
       fp.write(self._generate_html(testsuites))
-    self._logger.debug(f'JUnit HTML report generated to {report_file_path}')
+    self._logger.debug(f"JUnit HTML report generated to {report_file_path}")
     if self._open_report:
       return report_file_path
 
@@ -222,11 +229,11 @@ class JUnitHtmlReport(JUnitHtmlReportInterface):
     testsuites = []
     for root, dirs, files in safe_walk(self._xml_dir, topdown=True):
       dirs.sort()  # Ensures a consistent gathering order.
-      for xml_file in sorted(fnmatch.filter(files, 'TEST-*.xml')):
+      for xml_file in sorted(fnmatch.filter(files, "TEST-*.xml")):
         testsuites += self._parse_xml_file(os.path.join(root, xml_file))
-    merged_suites = ReportTestSuite.merged(testsuites,
-                                           logger=self._logger,
-                                           error_on_conflict=self._error_on_conflict)
+    merged_suites = ReportTestSuite.merged(
+      testsuites, logger=self._logger, error_on_conflict=self._error_on_conflict
+    )
     return sorted(merged_suites)
 
   @staticmethod
@@ -235,66 +242,70 @@ class JUnitHtmlReport(JUnitHtmlReportInterface):
     root = ET.parse(xml_file).getroot()
 
     testcases = []
-    for testcase in root.iter('testcase'):
+    for testcase in root.iter("testcase"):
       failure = None
-      for f in testcase.iter('failure'):
+      for f in testcase.iter("failure"):
         failure = f.text
       error = None
-      for e in testcase.iter('error'):
+      for e in testcase.iter("error"):
         error = e.text
       skipped = False
-      for _s in testcase.iter('skipped'):
+      for _s in testcase.iter("skipped"):
         skipped = True
 
-      testcases.append(ReportTestCase(
-        testcase.attrib['name'],
-        float(testcase.attrib.get('time', 0)),
-        failure,
-        error,
-        skipped
-      ))
+      testcases.append(
+        ReportTestCase(
+          testcase.attrib["name"], float(testcase.attrib.get("time", 0)), failure, error, skipped
+        )
+      )
 
-    for testsuite in root.iter('testsuite'):
-      testsuites.append(ReportTestSuite(
-        testsuite.attrib['name'],
-        testsuite.attrib['tests'],
-        testsuite.attrib['errors'],
-        testsuite.attrib['failures'],
-        testsuite.attrib.get('skipped', 0),
-        testsuite.attrib['time'],
-        testcases,
-        file=xml_file,
-      ))
+    for testsuite in root.iter("testsuite"):
+      testsuites.append(
+        ReportTestSuite(
+          testsuite.attrib["name"],
+          testsuite.attrib["tests"],
+          testsuite.attrib["errors"],
+          testsuite.attrib["failures"],
+          testsuite.attrib.get("skipped", 0),
+          testsuite.attrib["time"],
+          testcases,
+          file=xml_file,
+        )
+      )
     return testsuites
 
   @staticmethod
   def _generate_html(testsuites):
     values = {
-      'total_tests': 0,
-      'total_errors': 0,
-      'total_failures': 0,
-      'total_skipped': 0,
-      'total_time': 0.0
+      "total_tests": 0,
+      "total_errors": 0,
+      "total_failures": 0,
+      "total_skipped": 0,
+      "total_time": 0.0,
     }
 
     for testsuite in testsuites:
-      values['total_tests'] += testsuite.tests
-      values['total_errors'] += testsuite.errors
-      values['total_failures'] += testsuite.failures
-      values['total_skipped'] += testsuite.skipped
-      values['total_time'] += testsuite.time
+      values["total_tests"] += testsuite.tests
+      values["total_errors"] += testsuite.errors
+      values["total_failures"] += testsuite.failures
+      values["total_skipped"] += testsuite.skipped
+      values["total_time"] += testsuite.time
 
-    values['total_success'] = ReportTestSuite.success_rate(values['total_tests'],
-                                                           values['total_errors'],
-                                                           values['total_failures'],
-                                                           values['total_skipped'])
-    values['summary_icon_class'] = ReportTestSuite.icon_class(values['total_tests'],
-                                                              values['total_errors'],
-                                                              values['total_failures'],
-                                                              values['total_skipped'])
-    values['testsuites'] = [ts.as_dict() for ts in testsuites]
+    values["total_success"] = ReportTestSuite.success_rate(
+      values["total_tests"],
+      values["total_errors"],
+      values["total_failures"],
+      values["total_skipped"],
+    )
+    values["summary_icon_class"] = ReportTestSuite.icon_class(
+      values["total_tests"],
+      values["total_errors"],
+      values["total_failures"],
+      values["total_skipped"],
+    )
+    values["testsuites"] = [ts.as_dict() for ts in testsuites]
 
-    package_name, _, _ = __name__.rpartition('.')
+    package_name, _, _ = __name__.rpartition(".")
     renderer = MustacheRenderer(package_name=package_name)
-    html = renderer.render_name('junit_report.html', values)
+    html = renderer.render_name("junit_report.html", values)
     return html

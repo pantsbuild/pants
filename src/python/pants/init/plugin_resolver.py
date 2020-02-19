@@ -27,11 +27,11 @@ logger = logging.getLogger(__name__)
 class PluginResolver:
   @staticmethod
   def _is_wheel(path):
-    return os.path.isfile(path) and path.endswith('.whl')
+    return os.path.isfile(path) and path.endswith(".whl")
 
   @classmethod
   def _activate_wheel(cls, wheel_path):
-    install_dir = '{}-install'.format(wheel_path)
+    install_dir = "{}-install".format(wheel_path)
     if not os.path.isdir(install_dir):
       with temporary_dir(root_dir=os.path.dirname(install_dir)) as tmp:
         cls._install_wheel(wheel_path, tmp)
@@ -43,14 +43,16 @@ class PluginResolver:
   @classmethod
   def _install_wheel(cls, wheel_path, install_dir):
     safe_mkdir(install_dir, clean=True)
-    WheelFile(wheel_path).install(force=True,
-                                  overrides={
-                                    'purelib': install_dir,
-                                    'headers': os.path.join(install_dir, 'headers'),
-                                    'scripts': os.path.join(install_dir, 'bin'),
-                                    'platlib': install_dir,
-                                    'data': install_dir
-                                  })
+    WheelFile(wheel_path).install(
+      force=True,
+      overrides={
+        "purelib": install_dir,
+        "headers": os.path.join(install_dir, "headers"),
+        "scripts": os.path.join(install_dir, "bin"),
+        "platlib": install_dir,
+        "data": install_dir,
+      },
+    )
 
   def __init__(self, options_bootstrapper, *, interpreter=None):
     self._options_bootstrapper = options_bootstrapper
@@ -58,7 +60,8 @@ class PluginResolver:
 
     bootstrap_options = self._options_bootstrapper.get_bootstrap_options().for_global_scope()
     self._plugin_requirements = sorted(
-      set(bootstrap_options.plugins) | set(bootstrap_options.plugins2))
+      set(bootstrap_options.plugins) | set(bootstrap_options.plugins2)
+    )
     self._plugin_cache_dir = bootstrap_options.plugin_cache_dir
     self._plugins_force_resolve = bootstrap_options.plugins_force_resolve
 
@@ -87,35 +90,37 @@ class PluginResolver:
     for req in sorted(self._plugin_requirements):
       hasher.update(req.encode())
     resolve_hash = hasher.hexdigest()
-    resolved_plugins_list = os.path.join(self.plugin_cache_dir, f'plugins-{resolve_hash}.txt')
+    resolved_plugins_list = os.path.join(self.plugin_cache_dir, f"plugins-{resolve_hash}.txt")
 
     if self._plugins_force_resolve:
       safe_delete(resolved_plugins_list)
 
     if not os.path.exists(resolved_plugins_list):
-      tmp_plugins_list = f'{resolved_plugins_list}.{uuid.uuid4().hex}'
-      with safe_open(tmp_plugins_list, 'w') as fp:
+      tmp_plugins_list = f"{resolved_plugins_list}.{uuid.uuid4().hex}"
+      with safe_open(tmp_plugins_list, "w") as fp:
         for plugin in self._resolve_plugins():
           fp.write(ensure_text(plugin.location))
-          fp.write('\n')
+          fp.write("\n")
       os.rename(tmp_plugins_list, resolved_plugins_list)
-    with open(resolved_plugins_list, 'r') as fp:
+    with open(resolved_plugins_list, "r") as fp:
       for plugin_location in fp:
         yield plugin_location.strip()
 
   def _resolve_plugins(self):
-    logger.info('Resolving new plugins...:\n  {}'.format('\n  '.join(self._plugin_requirements)))
-    resolved_dists = resolver.resolve(self._plugin_requirements,
-                                      fetchers=self._python_repos.get_fetchers(),
-                                      interpreter=self._interpreter,
-                                      context=self._python_repos.get_network_context(),
-                                      cache=self.plugin_cache_dir,
-                                      # Effectively never expire.
-                                      cache_ttl=10 * 365 * 24 * 60 * 60,
-                                      allow_prereleases=PANTS_SEMVER.is_prerelease,
-                                      # Plugins will all depend on `pantsbuild.pants` which is
-                                      # distributed as a manylinux wheel.
-                                      use_manylinux=True)
+    logger.info("Resolving new plugins...:\n  {}".format("\n  ".join(self._plugin_requirements)))
+    resolved_dists = resolver.resolve(
+      self._plugin_requirements,
+      fetchers=self._python_repos.get_fetchers(),
+      interpreter=self._interpreter,
+      context=self._python_repos.get_network_context(),
+      cache=self.plugin_cache_dir,
+      # Effectively never expire.
+      cache_ttl=10 * 365 * 24 * 60 * 60,
+      allow_prereleases=PANTS_SEMVER.is_prerelease,
+      # Plugins will all depend on `pantsbuild.pants` which is
+      # distributed as a manylinux wheel.
+      use_manylinux=True,
+    )
     return [resolved_dist.distribution for resolved_dist in resolved_dists]
 
   @property
@@ -134,9 +139,11 @@ class PluginResolver:
     # Subsystem facility is wired up.  As a result PluginResolver is not itself a Subsystem with
     # PythonRepos as a dependency.  Instead it does the minimum possible work to hand-roll
     # bootstrapping of the Subsystems it needs.
-    known_scope_infos = [ksi
-                         for optionable in [GlobalOptionsRegistrar, PythonRepos]
-                         for ksi in optionable.known_scope_infos()]
+    known_scope_infos = [
+      ksi
+      for optionable in [GlobalOptionsRegistrar, PythonRepos]
+      for ksi in optionable.known_scope_infos()
+    ]
     options = self._options_bootstrapper.get_full_options(known_scope_infos)
 
     # Ignore command line flags since we'd blow up on any we don't understand (most of them).

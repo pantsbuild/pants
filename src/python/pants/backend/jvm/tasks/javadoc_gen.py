@@ -17,7 +17,7 @@ class JavadocGen(JvmdocGen):
   @classmethod
   @memoized
   def jvmdoc(cls):
-    return Jvmdoc(tool_name='javadoc', product_type='javadoc')
+    return Jvmdoc(tool_name="javadoc", product_type="javadoc")
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -25,7 +25,7 @@ class JavadocGen(JvmdocGen):
 
   def execute(self):
     def is_java(target):
-      return target.has_sources('.java')
+      return target.has_sources(".java")
 
     self.generate_doc(is_java, self.create_javadoc_command)
 
@@ -39,45 +39,54 @@ class JavadocGen(JvmdocGen):
 
     # Without a JDK/tools.jar we have no javadoc tool and cannot proceed, so check/acquire early.
     jdk = self.preferred_jvm_distribution_for_targets(targets, jdk=True)
-    tool_classpath = jdk.find_libs(['tools.jar'])
+    tool_classpath = jdk.find_libs(["tools.jar"])
 
-    args = ['-quiet',
-            '-encoding', 'UTF-8',
-            '-notimestamp',
-            '-use',
-            '-Xmaxerrs', '10000', # the default is 100
-            '-Xmaxwarns', '10000', # the default is 100
-            '-d', gendir]
+    args = [
+      "-quiet",
+      "-encoding",
+      "UTF-8",
+      "-notimestamp",
+      "-use",
+      "-Xmaxerrs",
+      "10000",  # the default is 100
+      "-Xmaxwarns",
+      "10000",  # the default is 100
+      "-d",
+      gendir,
+    ]
 
     # Always provide external linking for java API
-    offlinelinks = {'http://download.oracle.com/javase/8/docs/api/'}
+    offlinelinks = {"http://download.oracle.com/javase/8/docs/api/"}
 
     def link(target):
       for jar in target.jar_dependencies:
         if jar.apidocs:
           offlinelinks.add(jar.apidocs)
+
     for target in targets:
       target.walk(link, lambda t: isinstance(t, (JvmTarget, JarLibrary)))
 
     for link in offlinelinks:
-      args.extend(['-linkoffline', link, link])
+      args.extend(["-linkoffline", link, link])
 
     args.extend(self.args)
 
-    javadoc_classpath_file = os.path.join(self.workdir, f'{os.path.basename(gendir)}.classpath')
-    with open(javadoc_classpath_file, 'w') as f:
-      f.write('-classpath ')
-      f.write(':'.join(classpath))
-    args.extend([f'@{javadoc_classpath_file}'])
+    javadoc_classpath_file = os.path.join(self.workdir, f"{os.path.basename(gendir)}.classpath")
+    with open(javadoc_classpath_file, "w") as f:
+      f.write("-classpath ")
+      f.write(":".join(classpath))
+    args.extend([f"@{javadoc_classpath_file}"])
 
-    javadoc_sources_file = os.path.join(self.workdir, f'{os.path.basename(gendir)}.source.files')
-    with open(javadoc_sources_file, 'w') as f:
-      f.write('\n'.join(sources))
-    args.extend([f'@{javadoc_sources_file}'])
+    javadoc_sources_file = os.path.join(self.workdir, f"{os.path.basename(gendir)}.source.files")
+    with open(javadoc_sources_file, "w") as f:
+      f.write("\n".join(sources))
+    args.extend([f"@{javadoc_sources_file}"])
 
     java_executor = SubprocessExecutor(jdk)
-    runner = java_executor.runner(jvm_options=self.jvm_options,
-                                  classpath=tool_classpath,
-                                  main='com.sun.tools.javadoc.Main',
-                                  args=args)
+    runner = java_executor.runner(
+      jvm_options=self.jvm_options,
+      classpath=tool_classpath,
+      main="com.sun.tools.javadoc.Main",
+      args=args,
+    )
     return runner.command

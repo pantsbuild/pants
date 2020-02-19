@@ -75,7 +75,9 @@ class Context:
     self._products = Products()
     self._buildroot = get_buildroot()
     self._source_roots = SourceRootConfig.global_instance().get_source_roots()
-    self._lock = OwnerPrintingInterProcessFileLock(os.path.join(self._buildroot, '.pants.workdir.file_lock'))
+    self._lock = OwnerPrintingInterProcessFileLock(
+      os.path.join(self._buildroot, ".pants.workdir.file_lock")
+    )
     self._java_sysprops = None  # Computed lazily.
     self.requested_goals = requested_goals or []
     self._console_outstream = console_outstream or sys.stdout.buffer
@@ -156,7 +158,7 @@ class Context:
 
   def __str__(self):
     ident = Target.identify(self.targets())
-    return 'Context(id:{}, targets:{})'.format(ident, self.targets())
+    return "Context(id:{}, targets:{})".format(ident, self.targets())
 
   @contextmanager
   def executing(self):
@@ -190,14 +192,16 @@ class Context:
       # This is slightly funky, but the with-context usage is so pervasive and
       # useful elsewhere that it's worth the funkiness in this one place.
       workunit_parent_ctx = self.run_tracker.new_workunit_under_parent(
-        name=parent_workunit_name, labels=[WorkUnitLabel.MULTITOOL], parent=background_root_workunit)
+        name=parent_workunit_name, labels=[WorkUnitLabel.MULTITOOL], parent=background_root_workunit
+      )
       workunit_parent = workunit_parent_ctx.__enter__()
       done_hook = lambda: workunit_parent_ctx.__exit__(None, None, None)
     else:
       workunit_parent = background_root_workunit  # Run directly under the root.
       done_hook = None
     self.run_tracker.background_worker_pool().submit_async_work_chain(
-      work_chain, workunit_parent=workunit_parent, done_hook=done_hook)
+      work_chain, workunit_parent=workunit_parent, done_hook=done_hook
+    )
 
   def background_worker_pool(self):
     """Returns the pool to which tasks can submit background work.
@@ -223,19 +227,21 @@ class Context:
       while not res.ready():
         res.wait(60)  # Repeatedly wait for up to a minute.
         if not res.ready():
-          self.log.debug('subproc_map result still not ready...')
+          self.log.debug("subproc_map result still not ready...")
       return res.get()
     except KeyboardInterrupt:
       SubprocPool.shutdown(True)
       raise
 
   @contextmanager
-  def new_workunit(self, name, labels=None, cmd='', log_config=None):
+  def new_workunit(self, name, labels=None, cmd="", log_config=None):
     """Create a new workunit under the calling thread's current workunit.
 
     :API: public
     """
-    with self.run_tracker.new_workunit(name=name, labels=labels, cmd=cmd, log_config=log_config) as workunit:
+    with self.run_tracker.new_workunit(
+      name=name, labels=labels, cmd=cmd, log_config=log_config
+    ) as workunit:
       yield workunit
 
   def acquire_lock(self):
@@ -287,8 +293,9 @@ class Context:
     """
     self._targets_cache.clear()
 
-  def add_new_target(self, address, target_type, target_base=None, dependencies=None,
-                     derived_from=None, **kwargs):
+  def add_new_target(
+    self, address, target_type, target_base=None, dependencies=None, derived_from=None, **kwargs
+  ):
     """Creates a new target, adds it to the context and returns it.
 
     This method ensures the target resolves files against the given target_base, creating the
@@ -310,11 +317,13 @@ class Context:
     if dependencies:
       dependencies = [dep.address for dep in dependencies]
 
-    self.build_graph.inject_synthetic_target(address=address,
-                                             target_type=target_type,
-                                             dependencies=dependencies,
-                                             derived_from=derived_from,
-                                             **kwargs)
+    self.build_graph.inject_synthetic_target(
+      address=address,
+      target_type=target_type,
+      dependencies=dependencies,
+      derived_from=derived_from,
+      **kwargs
+    )
     new_target = self.build_graph.get_target(address)
 
     return new_target
@@ -343,10 +352,7 @@ class Context:
 
   def _unfiltered_targets(self, **kwargs):
     def _collect_targets(root_targets, **kwargs):
-      return Target.closure_for_targets(
-        target_roots=root_targets,
-        **kwargs
-      )
+      return Target.closure_for_targets(target_roots=root_targets, **kwargs)
 
     target_set = _collect_targets(self.target_roots, **kwargs)
 
@@ -396,7 +402,9 @@ class Context:
       build_graph.inject_address_closure(address)
     return build_graph
 
-  def execute_process_synchronously_without_raising(self, execute_process_request, name, labels=None):
+  def execute_process_synchronously_without_raising(
+    self, execute_process_request, name, labels=None
+  ):
     """Executes a process (possibly remotely), and returns information about its output.
 
     :param execute_process_request: The ExecuteProcessRequest to run.
@@ -407,11 +415,11 @@ class Context:
     Note that this is an unstable, experimental API, which is subject to change with no notice.
     """
     with self.new_workunit(
-      name=name,
-      labels=labels,
-      cmd=' '.join(execute_process_request.argv),
+      name=name, labels=labels, cmd=" ".join(execute_process_request.argv)
     ) as workunit:
-      result = self._scheduler.product_request(FallibleExecuteProcessResult, [execute_process_request])[0]
+      result = self._scheduler.product_request(
+        FallibleExecuteProcessResult, [execute_process_request]
+      )[0]
       workunit.output("stdout").write(result.stdout)
       workunit.output("stderr").write(result.stderr)
       workunit.set_outcome(WorkUnit.FAILURE if result.exit_code else WorkUnit.SUCCESS)
@@ -422,8 +430,9 @@ class Context:
 
     See execute_process_synchronously for the api docs.
     """
-    fallible_result = self.execute_process_synchronously_without_raising(execute_process_request, name, labels)
+    fallible_result = self.execute_process_synchronously_without_raising(
+      execute_process_request, name, labels
+    )
     return fallible_to_exec_result_or_raise(
-      fallible_result,
-      ProductDescription(execute_process_request.description)
+      fallible_result, ProductDescription(execute_process_request.description)
     )

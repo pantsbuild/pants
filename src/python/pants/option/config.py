@@ -36,6 +36,7 @@ class Config(ABC):
   Supports variable substitution using old-style Python format strings. E.g.,
   %(var_name)s will be replaced with the value of var_name.
   """
+
   DEFAULT_SECTION: ClassVar[str] = configparser.DEFAULTSECT
 
   class ConfigError(Exception):
@@ -46,7 +47,7 @@ class Config(ABC):
 
   @classmethod
   def load_file_contents(
-    cls, file_contents, *, seed_values: Optional[SeedValues] = None,
+    cls, file_contents, *, seed_values: Optional[SeedValues] = None
   ) -> Union["_EmptyConfig", "_ChainedConfig"]:
     """Loads config from the given string payloads, with later payloads taking precedence over
     earlier ones.
@@ -64,7 +65,7 @@ class Config(ABC):
 
   @classmethod
   def load(
-    cls, config_paths: List[str], *, seed_values: Optional[SeedValues] = None,
+    cls, config_paths: List[str], *, seed_values: Optional[SeedValues] = None
   ) -> Union["_EmptyConfig", "_ChainedConfig"]:
     """Loads config from the given paths, with later paths taking precedence over earlier ones.
 
@@ -74,14 +75,14 @@ class Config(ABC):
 
     @contextmanager
     def opener(f):
-      with open(f, 'rb') as fh:
+      with open(f, "rb") as fh:
         yield fh
 
     return cls._meta_load(opener, config_paths, seed_values=seed_values)
 
   @classmethod
   def _meta_load(
-    cls, open_ctx, config_items: Sequence, *, seed_values: Optional[SeedValues] = None,
+    cls, open_ctx, config_items: Sequence, *, seed_values: Optional[SeedValues] = None
   ) -> Union["_EmptyConfig", "_ChainedConfig"]:
     if not config_items:
       return _EmptyConfig()
@@ -106,8 +107,8 @@ class Config(ABC):
 
       single_file_configs.append(
         _SingleFileConfig(
-          config_path=config_path, content_digest=content_digest, values=config_values,
-        ),
+          config_path=config_path, content_digest=content_digest, values=config_values
+        )
       )
     return _ChainedConfig(tuple(reversed(single_file_configs)))
 
@@ -117,22 +118,24 @@ class Config(ABC):
 
     This sets up those defaults and checks if the user overrided any of the values."""
     safe_seed_values = seed_values or {}
-    buildroot = cast(str, safe_seed_values.get('buildroot', get_buildroot()))
+    buildroot = cast(str, safe_seed_values.get("buildroot", get_buildroot()))
 
     all_seed_values: Dict[str, str] = {
-      'buildroot': buildroot,
-      'homedir': os.path.expanduser('~'),
-      'user': getpass.getuser(),
-      'pants_bootstrapdir': get_pants_cachedir(),
-      'pants_configdir': get_pants_configdir(),
+      "buildroot": buildroot,
+      "homedir": os.path.expanduser("~"),
+      "user": getpass.getuser(),
+      "pants_bootstrapdir": get_pants_cachedir(),
+      "pants_configdir": get_pants_configdir(),
     }
 
     def update_seed_values(key: str, *, default_dir: str) -> None:
-      all_seed_values[key] = cast(str, safe_seed_values.get(key, os.path.join(buildroot, default_dir)))
+      all_seed_values[key] = cast(
+        str, safe_seed_values.get(key, os.path.join(buildroot, default_dir))
+      )
 
-    update_seed_values('pants_workdir', default_dir='.pants.d')
-    update_seed_values('pants_supportdir', default_dir='build-support')
-    update_seed_values('pants_distdir', default_dir='dist')
+    update_seed_values("pants_workdir", default_dir=".pants.d")
+    update_seed_values("pants_supportdir", default_dir="build-support")
+    update_seed_values("pants_distdir", default_dir="dist")
 
     return all_seed_values
 
@@ -153,9 +156,10 @@ class Config(ABC):
     if type_ == str or issubclass(type_, str):
       return raw_value
 
-    key = f'{section}.{option}'
-    return parse_expression(name=key, val=raw_value, acceptable_types=type_,
-                            raise_type=self.ConfigError)
+    key = f"{section}.{option}"
+    return parse_expression(
+      name=key, val=raw_value, acceptable_types=type_, raise_type=self.ConfigError
+    )
 
   @abstractmethod
   def configs(self) -> Sequence["_SingleFileConfig"]:
@@ -297,6 +301,7 @@ class _TomlValues(_ConfigValues):
     For example, if the config file was `{'GLOBAL': {'foo': 1}}`, this function would return
     `{'foo': 1}` given `section='GLOBAL'`.
     """
+
     def recurse(mapping: Dict, *, remaining_sections: List[str]) -> Optional[Dict]:
       if not remaining_sections:
         return None
@@ -313,11 +318,12 @@ class _TomlValues(_ConfigValues):
     return recurse(mapping=self.values, remaining_sections=section.split("."))
 
   def _possibly_interpolate_value(
-    self, raw_value: str, *, option: str, section: str, section_values: Dict,
+    self, raw_value: str, *, option: str, section: str, section_values: Dict
   ) -> str:
     """For any values with %(foo)s, substitute it with the corresponding value from
     DEFAULT or the same section.
     """
+
     def format_str(value: str) -> str:
       # Because dictionaries use the symbols `{}`, we must proactively escape the symbols so that
       # .format() does not try to improperly interpolate.
@@ -333,7 +339,7 @@ class _TomlValues(_ConfigValues):
       except KeyError as e:
         bad_reference = e.args[0]
         raise configparser.InterpolationMissingOptionError(
-          option, section, raw_value, bad_reference,
+          option, section, raw_value, bad_reference
         )
 
     def recursively_format_str(value: str) -> str:
@@ -371,6 +377,7 @@ class _TomlValues(_ConfigValues):
       return possibly_interpolate(raw_value) if interpolate else raw_value
 
     if isinstance(raw_value, list):
+
       def stringify_list_member(member: _TomlPrimitve) -> str:
         if not isinstance(member, str):
           return str(member)
@@ -384,7 +391,7 @@ class _TomlValues(_ConfigValues):
 
   def _stringify_val_without_interpolation(self, raw_value: _TomlValue) -> str:
     return self._stringify_val(
-      raw_value, option="", section="", section_values={}, interpolate=False,
+      raw_value, option="", section="", section_values={}, interpolate=False
     )
 
   @property
@@ -423,7 +430,7 @@ class _TomlValues(_ConfigValues):
     if section_values is None:
       raise configparser.NoSectionError(section)
     stringify = partial(
-      self._stringify_val, option=option, section=section, section_values=section_values,
+      self._stringify_val, option=option, section=section, section_values=section_values
     )
     if option not in section_values:
       if option not in self.defaults:
@@ -450,9 +457,7 @@ class _TomlValues(_ConfigValues):
     if section_values is None:
       raise configparser.NoSectionError(section)
     result = [
-      option
-      for option, option_value in section_values.items()
-      if self._is_an_option(option_value)
+      option for option, option_value in section_values.items() if self._is_an_option(option_value)
     ]
     result.extend(
       default_option for default_option in self.defaults.keys() if default_option not in result
@@ -496,6 +501,7 @@ class _EmptyConfig(Config):
 @dataclass(frozen=True, eq=False)
 class _SingleFileConfig(Config):
   """Config read from a single file."""
+
   config_path: str
   content_digest: str
   values: _ConfigValues
@@ -539,6 +545,7 @@ class _ChainedConfig(Config):
   :param chained_configs: A tuple of Config instances to chain. Later instances take precedence
                           over earlier ones.
   """
+
   chained_configs: Tuple[_SingleFileConfig, ...]
 
   @property
@@ -609,6 +616,7 @@ class TomlSerializer:
     }
 
   """
+
   parsed: Dict[str, Dict[str, Union[int, float, str, bool, List, Dict]]]
 
   def normalize(self) -> Dict:

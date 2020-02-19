@@ -21,7 +21,7 @@ from pants.task.simple_codegen_task import SimpleCodegenTask
 
 class ProtobufGen(SimpleCodegenTask):
 
-  sources_globs = ('**/*',)
+  sources_globs = ("**/*",)
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -35,28 +35,46 @@ class ProtobufGen(SimpleCodegenTask):
     # executable environment here.  Plugin authors must include a version in the name for
     # proper invalidation of protobuf products in the face of plugin modification that affects
     # plugin outputs.
-    register('--protoc-plugins', advanced=True, fingerprint=True, type=list,
-             help='Names of protobuf plugins to invoke.  Protoc will look for an executable '
-                  'named protoc-gen-$NAME on PATH.')
-    register('--extra_path', advanced=True, type=list,
-             help='Prepend this path onto PATH in the environment before executing protoc. '
-                  'Intended to help protoc find its plugins.',
-             default=None)
-    register('--javadeps', advanced=True, type=list,
-             help='Dependencies to bootstrap this task for generating java code.  When changing '
-                  'this parameter you may also need to update --version.',
-             default=['3rdparty:protobuf-java'])
-    register('--import-from-root', type=bool, advanced=True,
-             help='If set, add the buildroot to the path protoc searches for imports. '
-                  'This enables using import paths relative to the build root in .proto files, '
-                  'as recommended by the protoc documentation.')
+    register(
+      "--protoc-plugins",
+      advanced=True,
+      fingerprint=True,
+      type=list,
+      help="Names of protobuf plugins to invoke.  Protoc will look for an executable "
+      "named protoc-gen-$NAME on PATH.",
+    )
+    register(
+      "--extra_path",
+      advanced=True,
+      type=list,
+      help="Prepend this path onto PATH in the environment before executing protoc. "
+      "Intended to help protoc find its plugins.",
+      default=None,
+    )
+    register(
+      "--javadeps",
+      advanced=True,
+      type=list,
+      help="Dependencies to bootstrap this task for generating java code.  When changing "
+      "this parameter you may also need to update --version.",
+      default=["3rdparty:protobuf-java"],
+    )
+    register(
+      "--import-from-root",
+      type=bool,
+      advanced=True,
+      help="If set, add the buildroot to the path protoc searches for imports. "
+      "This enables using import paths relative to the build root in .proto files, "
+      "as recommended by the protoc documentation.",
+    )
 
   # TODO https://github.com/pantsbuild/pants/issues/604 prep start
   @classmethod
   def prepare(cls, options, round_manager):
     super().prepare(options, round_manager)
     round_manager.require_data(JarImportProducts)
-    round_manager.optional_data('deferred_sources')
+    round_manager.optional_data("deferred_sources")
+
   # TODO https://github.com/pantsbuild/pants/issues/604 prep finish
 
   def __init__(self, *args, **kwargs):
@@ -92,13 +110,13 @@ class ProtobufGen(SimpleCodegenTask):
     # Note that the root import must come first, otherwise protoc can get confused
     # when trying to resolve imports from the root against the import's source root.
     if self.get_options().import_from_root:
-      bases.add('.')
+      bases.add(".")
     bases.update(sources_by_base.keys())
     bases.update(self._proto_path_imports([target]))
 
-    gen_flag = '--java_out'
+    gen_flag = "--java_out"
 
-    gen = '{0}={1}'.format(gen_flag, target_workdir)
+    gen = "{0}={1}".format(gen_flag, target_workdir)
 
     args = [self.protobuf_binary, gen]
 
@@ -107,27 +125,27 @@ class ProtobufGen(SimpleCodegenTask):
         args.append("--{0}_out={1}".format(plugin, target_workdir))
 
     for base in bases:
-      args.append('--proto_path={0}'.format(base))
+      args.append("--proto_path={0}".format(base))
 
     args.extend(sources)
 
     # Tack on extra path entries. These can be used to find protoc plugins.
     protoc_environ = os.environ.copy()
     if self._extra_paths:
-      protoc_environ['PATH'] = os.pathsep.join(self._extra_paths
-                                               + protoc_environ['PATH'].split(os.pathsep))
+      protoc_environ["PATH"] = os.pathsep.join(
+        self._extra_paths + protoc_environ["PATH"].split(os.pathsep)
+      )
 
     # Note: The test_source_ordering integration test scrapes this output, so modify it with care.
-    self.context.log.debug('Executing: {0}'.format('\\\n  '.join(args)))
-    with self.context.new_workunit(name='protoc',
-                                   labels=[WorkUnitLabel.TOOL],
-                                   cmd=' '.join(args)) as workunit:
-      result = subprocess.call(args,
-                               env=protoc_environ,
-                               stdout=workunit.output('stdout'),
-                               stderr=workunit.output('stderr'))
+    self.context.log.debug("Executing: {0}".format("\\\n  ".join(args)))
+    with self.context.new_workunit(
+      name="protoc", labels=[WorkUnitLabel.TOOL], cmd=" ".join(args)
+    ) as workunit:
+      result = subprocess.call(
+        args, env=protoc_environ, stdout=workunit.output("stdout"), stderr=workunit.output("stderr")
+      )
       if result != 0:
-        raise TaskError('{} ... exited non-zero ({})'.format(self.protobuf_binary, result))
+        raise TaskError("{} ... exited non-zero ({})".format(self.protobuf_binary, result))
 
   def _calculate_sources(self, target):
     gentargets = OrderedSet()
@@ -137,9 +155,8 @@ class ProtobufGen(SimpleCodegenTask):
         gentargets.add(tgt)
 
     self.context.build_graph.walk_transitive_dependency_graph(
-      [target.address],
-      add_to_gentargets,
-      postorder=True)
+      [target.address], add_to_gentargets, postorder=True
+    )
     sources_by_base = OrderedDict()
     for target in gentargets:
       base = target.target_base
@@ -162,16 +179,18 @@ class ProtobufGen(SimpleCodegenTask):
 
   def _extract_jar(self, coordinate, jar_path):
     """Extracts the jar to a subfolder of workdir/extracted and returns the path to it."""
-    with open(jar_path, 'rb') as f:
+    with open(jar_path, "rb") as f:
       sha = sha1(f.read()).hexdigest()
-      outdir = os.path.join(self.workdir, 'extracted', sha)
+      outdir = os.path.join(self.workdir, "extracted", sha)
     if not os.path.exists(outdir):
       ZIP.extract(jar_path, outdir)
-      self.context.log.debug('Extracting jar {jar} at {jar_path}.'
-                             .format(jar=coordinate, jar_path=jar_path))
+      self.context.log.debug(
+        "Extracting jar {jar} at {jar_path}.".format(jar=coordinate, jar_path=jar_path)
+      )
     else:
-      self.context.log.debug('Jar {jar} already extracted at {jar_path}.'
-                             .format(jar=coordinate, jar_path=jar_path))
+      self.context.log.debug(
+        "Jar {jar} already extracted at {jar_path}.".format(jar=coordinate, jar_path=jar_path)
+      )
     return outdir
 
   def _proto_path_imports(self, proto_targets):

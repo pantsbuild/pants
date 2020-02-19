@@ -23,6 +23,7 @@ class RunPrepCommandBase(Task):
 
   :API: public
   """
+
   goal: Optional[str] = None
 
   @classmethod
@@ -41,69 +42,74 @@ class RunPrepCommandBase(Task):
 
   def execute(self):
     if self.goal not in PrepCommand.allowed_goals():
-      raise AssertionError('Got goal "{}". Expected goal to be one of {}'.format(
-          self.goal, PrepCommand.goals()))
+      raise AssertionError(
+        'Got goal "{}". Expected goal to be one of {}'.format(self.goal, PrepCommand.goals())
+      )
 
     targets = self.context.targets(postorder=True, predicate=self.runnable_prep_cmd)
-    Cmdline = namedtuple('Cmdline', ['cmdline', 'environ'])
+    Cmdline = namedtuple("Cmdline", ["cmdline", "environ"])
 
     def make_cmdline(target):
-      executable = target.payload.get_field_value('prep_command_executable')
-      args = target.payload.get_field_value('prep_command_args', [])
-      prep_environ = target.payload.get_field_value('prep_environ')
+      executable = target.payload.get_field_value("prep_command_executable")
+      args = target.payload.get_field_value("prep_command_args", [])
+      prep_environ = target.payload.get_field_value("prep_environ")
       cmdline = [executable]
       cmdline.extend(args)
       return Cmdline(cmdline=tuple(cmdline), environ=prep_environ)
 
     def has_prep(target):
-      return target.payload.get_field_value('prep_command_executable')
+      return target.payload.get_field_value("prep_command_executable")
 
     cmdlines = [make_cmdline(target) for target in targets if has_prep(target)]
 
     if not cmdlines:
       return
 
-    with self.context.new_workunit(name='prep_command', labels=[WorkUnitLabel.PREP]) as workunit:
+    with self.context.new_workunit(name="prep_command", labels=[WorkUnitLabel.PREP]) as workunit:
       completed_cmdlines = set()
       for item in cmdlines:
         cmdline = item.cmdline
         environ = item.environ
         if not cmdline in completed_cmdlines:
           completed_cmdlines.add(cmdline)
-          stderr = workunit.output('stderr') if workunit else None
+          stderr = workunit.output("stderr") if workunit else None
           try:
             process = subprocess.Popen(cmdline, stdout=subprocess.PIPE, stderr=stderr)
           except OSError as e:
             workunit.set_outcome(WorkUnit.FAILURE)
-            raise TaskError('RunPrepCommand failed to execute {cmdline}: {error}'.format(
-              cmdline=cmdline, error=e))
+            raise TaskError(
+              "RunPrepCommand failed to execute {cmdline}: {error}".format(cmdline=cmdline, error=e)
+            )
           stdout, _ = process.communicate()
 
           if environ:
             if not process.returncode:
-              environment_vars = stdout.decode().split('\0')
+              environment_vars = stdout.decode().split("\0")
               for kvpair in environment_vars:
-                var, value = kvpair.split('=', 1)
+                var, value = kvpair.split("=", 1)
                 os.environ[var] = value
           else:
             if workunit:
-              workunit.output('stdout').write(stdout)
+              workunit.output("stdout").write(stdout)
 
           workunit.set_outcome(WorkUnit.FAILURE if process.returncode else WorkUnit.SUCCESS)
           if process.returncode:
-            raise TaskError('RunPrepCommand failed to run {cmdline}'.format(cmdline=cmdline))
+            raise TaskError("RunPrepCommand failed to run {cmdline}".format(cmdline=cmdline))
 
 
 class RunBinaryPrepCommand(RunPrepCommandBase):
   """Run a shell command before other tasks in the binary goal."""
-  goal = 'binary'
+
+  goal = "binary"
 
 
 class RunTestPrepCommand(RunPrepCommandBase):
   """Run a shell command before other tasks in the test goal."""
-  goal = 'test'
+
+  goal = "test"
 
 
 class RunCompilePrepCommand(RunPrepCommandBase):
   """Run a shell command before other tasks in the compile goal."""
-  goal = 'compile'
+
+  goal = "compile"

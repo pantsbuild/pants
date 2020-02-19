@@ -38,7 +38,7 @@ class Fetcher:
     def __init__(self, value=None, response_code=None):
       super(Fetcher.PermanentError, self).__init__(value)
       if response_code and not isinstance(response_code, int):
-        raise ValueError('response_code must be an integer, got {}'.format(response_code))
+        raise ValueError("response_code must be an integer, got {}".format(response_code))
       self._response_code = response_code
 
     @property
@@ -100,8 +100,8 @@ class Fetcher:
 
       :param fh: a file handle open for writing
       """
-      if not fh or not hasattr(fh, 'write'):
-        raise ValueError('fh must be an open file handle, given {}'.format(fh))
+      if not fh or not hasattr(fh, "write"):
+        raise ValueError("fh must be an open file handle, given {}".format(fh))
       self._fh = fh
 
     def recv_chunk(self, data):
@@ -135,7 +135,7 @@ class Fetcher:
       :raises: ValueError if accessed before this listener is finished
       """
       if self._checksum is None:
-        raise ValueError('The checksum cannot be accessed before this listener is finished.')
+        raise ValueError("The checksum cannot be accessed before this listener is finished.")
       return self._checksum
 
   class ProgressListener(Listener):
@@ -152,7 +152,7 @@ class Fetcher:
       """
       self._width = width or 50
       if not isinstance(self._width, int):
-        raise ValueError('The width must be an integer, given {}'.format(self._width))
+        raise ValueError("The width must be an integer, given {}".format(self._width))
       self._chunk_size_bytes = chunk_size_bytes or 10 * 1024
       self._stream = stream or sys.stderr.buffer
       self._start = time.time()
@@ -175,9 +175,9 @@ class Fetcher:
       if chunk_count > self.chunks:
         self.chunks = chunk_count
         if self.size:
-          self._stream.write(b'\r')
-          self._stream.write(f'{int(self.read * 1.0 / self.size * 100):3}% '.encode())
-        self._stream.write(b'.' * self.chunks)
+          self._stream.write(b"\r")
+          self._stream.write(f"{int(self.read * 1.0 / self.size * 100):3}% ".encode())
+        self._stream.write(b"." * self.chunks)
         if self.size:
           size_width = len(str(self.download_size))
           downloaded = int(self.read / 1024)
@@ -188,7 +188,7 @@ class Fetcher:
 
     def finished(self):
       if self.chunks > 0:
-        self._stream.write(f' {time.time() - self._start:.3f}s\n'.encode())
+        self._stream.write(f" {time.time() - self._start:.3f}s\n".encode())
         self._stream.flush()
 
   def __init__(self, root_dir, requests_api=None):
@@ -240,9 +240,12 @@ class Fetcher:
 
     @classmethod
     def as_fetcher_error(cls, url, e):
-      exception_factory = (Fetcher.TransientError if isinstance(e, cls._TRANSIENT_EXCEPTION_TYPES)
-                           else Fetcher.PermanentError)
-      return exception_factory('Problem GETing data from {}: {}'.format(url, e))
+      exception_factory = (
+        Fetcher.TransientError
+        if isinstance(e, cls._TRANSIENT_EXCEPTION_TYPES)
+        else Fetcher.PermanentError
+      )
+      return exception_factory("Problem GETing data from {}: {}".format(url, e))
 
     def __init__(self, url, resp):
       self._url = url
@@ -258,7 +261,7 @@ class Fetcher:
 
     @property
     def size(self):
-      size = self._resp.headers.get('content-length')
+      size = self._resp.headers.get("content-length")
       return int(size) if size else None
 
     def iter_content(self, chunk_size_bytes):
@@ -284,14 +287,14 @@ class Fetcher:
         stat = os.fstat(self._fp.fileno())
         return stat.st_size
       except OSError as e:
-        raise Fetcher.PermanentError('Problem stating {} for its size: {}'.format(self._fp.name, e))
+        raise Fetcher.PermanentError("Problem stating {} for its size: {}".format(self._fp.name, e))
 
     def iter_content(self, chunk_size_bytes):
       while True:
         try:
           data = self._fp.read(chunk_size_bytes)
         except IOError as e:
-          raise Fetcher.PermanentError('Problem reading chunk from {}: {}'.format(self._fp.name, e))
+          raise Fetcher.PermanentError("Problem reading chunk from {}: {}".format(self._fp.name, e))
         if not data:
           break
         yield data
@@ -300,10 +303,10 @@ class Fetcher:
       self._fp.close()
 
   def _as_local_file_path(self, url):
-    path = re.sub(r'^//', '', strip_prefix(url, 'file:'))
-    if path.startswith('/'):
+    path = re.sub(r"^//", "", strip_prefix(url, "file:"))
+    if path.startswith("/"):
       return path
-    elif url.startswith('file:'):
+    elif url.startswith("file:"):
       return os.path.join(self._root_dir, path)
     else:
       return None
@@ -312,10 +315,10 @@ class Fetcher:
     path = self._as_local_file_path(url)
     if path:
       try:
-        fp = open(path, 'rb')
+        fp = open(path, "rb")
         return self._LocalFileResponse(fp)
       except IOError as e:
-        raise self.PermanentError('Problem reading data from {}: {}'.format(path, e))
+        raise self.PermanentError("Problem reading data from {}: {}".format(path, e))
     else:
       try:
         resp = self._requests.get(url, stream=True, timeout=timeout_secs, allow_redirects=True)
@@ -333,7 +336,7 @@ class Fetcher:
     :raises: Fetcher.Error if there was a problem fetching all data from the given url
     """
     if not isinstance(listener, self.Listener):
-      raise ValueError('listener must be a Listener instance, given {}'.format(listener))
+      raise ValueError("listener must be a Listener instance, given {}".format(listener))
 
     chunk_size_bytes = chunk_size_bytes or 10 * 1024
     timeout_secs = timeout_secs or 1.0
@@ -341,13 +344,14 @@ class Fetcher:
     with closing(self._fetch(url, timeout_secs=timeout_secs)) as resp:
       if resp.status_code != requests.codes.ok:
         listener.status(resp.status_code)
-        raise self.PermanentError('Fetch of {} failed with status code {}'
-                                  .format(url, resp.status_code),
-                                  response_code=resp.status_code)
+        raise self.PermanentError(
+          "Fetch of {} failed with status code {}".format(url, resp.status_code),
+          response_code=resp.status_code,
+        )
       listener.status(resp.status_code, content_length=resp.size)
 
-      content_encoding = resp.headers.get('content-encoding') if hasattr(resp, 'headers') else None
-      compressed_transfer = content_encoding == 'gzip' or content_encoding == 'deflate'
+      content_encoding = resp.headers.get("content-encoding") if hasattr(resp, "headers") else None
+      compressed_transfer = content_encoding == "gzip" or content_encoding == "deflate"
 
       read_bytes = 0
       for data in resp.iter_content(chunk_size_bytes=chunk_size_bytes):
@@ -355,7 +359,7 @@ class Fetcher:
         read_bytes += len(data)
 
       if resp.size and read_bytes != resp.size and not compressed_transfer:
-        raise self.Error('Expected {} bytes, read {}'.format(resp.size, read_bytes))
+        raise self.Error("Expected {} bytes, read {}".format(resp.size, read_bytes))
 
       listener.finished()
 
@@ -372,6 +376,7 @@ class Fetcher:
     :returns: the path to the file data was downloaded to.
     :raises: Fetcher.Error if there was a problem downloading all data from the given url.
     """
+
     @contextmanager
     def download_fp(_path_or_fd):
       if _path_or_fd and not isinstance(_path_or_fd, str):
@@ -380,7 +385,7 @@ class Fetcher:
         if not _path_or_fd:
           fd, _path_or_fd = tempfile.mkstemp()
           os.close(fd)
-        with safe_open(_path_or_fd, 'wb') as fp:
+        with safe_open(_path_or_fd, "wb") as fp:
           yield fp, _path_or_fd
 
     with download_fp(path_or_fd) as (fp, path):

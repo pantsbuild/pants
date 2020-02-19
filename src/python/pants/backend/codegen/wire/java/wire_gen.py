@@ -23,28 +23,27 @@ logger = logging.getLogger(__name__)
 
 class WireGen(NailgunTaskBase, SimpleCodegenTask):
 
-  sources_globs = ('**/*',)
+  sources_globs = ("**/*",)
 
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
 
-
     def wire_jar(name):
-      return JarDependency(org='com.squareup.wire', name=name, rev='1.8.0')
+      return JarDependency(org="com.squareup.wire", name=name, rev="1.8.0")
 
-    cls.register_jvm_tool(register,
-                          'javadeps',
-                          classpath=[
-                            wire_jar(name='wire-runtime')
-                          ],
-                          classpath_spec='//:wire-runtime',
-                          help='Runtime dependencies for wire-using Java code.')
-    cls.register_jvm_tool(register, 'wire-compiler', classpath=[wire_jar(name='wire-compiler')])
+    cls.register_jvm_tool(
+      register,
+      "javadeps",
+      classpath=[wire_jar(name="wire-runtime")],
+      classpath_spec="//:wire-runtime",
+      help="Runtime dependencies for wire-using Java code.",
+    )
+    cls.register_jvm_tool(register, "wire-compiler", classpath=[wire_jar(name="wire-compiler")])
 
   @classmethod
   def is_wire_compiler_jar(cls, jar):
-    return 'com.squareup.wire' == jar.org and 'wire-compiler' == jar.name
+    return "com.squareup.wire" == jar.org and "wire-compiler" == jar.name
 
   def __init__(self, *args, **kwargs):
     """Generates Java files from .proto files using the Wire protobuf compiler."""
@@ -71,20 +70,23 @@ class WireGen(NailgunTaskBase, SimpleCodegenTask):
       source_roots.add(source_root.path)
       return fast_relpath(source, source_root.path)
 
-    if target.payload.get_field_value('ordered_sources'):
+    if target.payload.get_field_value("ordered_sources"):
       # Re-match the filespecs against the sources in order to apply them in the literal order
       # they were specified in.
       filespec = target.globs_relative_to_buildroot()
-      excludes = filespec.get('excludes', [])
-      for filespec in filespec.get('globs', []):
-        sources = [s for s in target.sources_relative_to_buildroot()
-                   if globs_matches([s], [filespec], excludes)]
+      excludes = filespec.get("excludes", [])
+      for filespec in filespec.get("globs", []):
+        sources = [
+          s
+          for s in target.sources_relative_to_buildroot()
+          if globs_matches([s], [filespec], excludes)
+        ]
         if len(sources) != 1:
           raise TargetDefinitionException(
-              target,
-              'With `ordered_sources=True`, expected one match for each file literal, '
-              'but got: {} for literal `{}`.'.format(sources, filespec)
-            )
+            target,
+            "With `ordered_sources=True`, expected one match for each file literal, "
+            "but got: {} for literal `{}`.".format(sources, filespec),
+          )
         relative_sources.add(capture_and_relativize_to_source_root(sources[0]))
     else:
       # Otherwise, use the default (unspecified) snapshot ordering.
@@ -95,34 +97,34 @@ class WireGen(NailgunTaskBase, SimpleCodegenTask):
   def format_args_for_target(self, target, target_workdir):
     """Calculate the arguments to pass to the command line for a single target."""
 
-    args = ['--java_out={0}'.format(target_workdir)]
+    args = ["--java_out={0}".format(target_workdir)]
 
     # Add all params in payload to args
 
     relative_sources, source_roots = self._compute_sources(target)
 
-    if target.payload.get_field_value('no_options'):
-      args.append('--no_options')
+    if target.payload.get_field_value("no_options"):
+      args.append("--no_options")
 
     if target.payload.service_writer:
-      args.append('--service_writer={}'.format(target.payload.service_writer))
+      args.append("--service_writer={}".format(target.payload.service_writer))
       if target.payload.service_writer_options:
         for opt in target.payload.service_writer_options:
-          args.append('--service_writer_opt')
+          args.append("--service_writer_opt")
           args.append(opt)
 
     registry_class = target.payload.registry_class
     if registry_class:
-      args.append('--registry_class={0}'.format(registry_class))
+      args.append("--registry_class={0}".format(registry_class))
 
     if target.payload.roots:
-      args.append('--roots={0}'.format(','.join(target.payload.roots)))
+      args.append("--roots={0}".format(",".join(target.payload.roots)))
 
     if target.payload.enum_options:
-      args.append('--enum_options={0}'.format(','.join(target.payload.enum_options)))
+      args.append("--enum_options={0}".format(",".join(target.payload.enum_options)))
 
     for source_root in source_roots:
-      args.append('--proto_path={0}'.format(os.path.join(get_buildroot(), source_root)))
+      args.append("--proto_path={0}".format(os.path.join(get_buildroot(), source_root)))
 
     args.extend(relative_sources)
     return args
@@ -130,10 +132,12 @@ class WireGen(NailgunTaskBase, SimpleCodegenTask):
   def execute_codegen(self, target, target_workdir):
     args = self.format_args_for_target(target, target_workdir)
     if args:
-      result = self.runjava(classpath=self.tool_classpath('wire-compiler'),
-                            main='com.squareup.wire.WireCompiler',
-                            args=args,
-                            workunit_name='compile',
-                            workunit_labels=[WorkUnitLabel.TOOL])
+      result = self.runjava(
+        classpath=self.tool_classpath("wire-compiler"),
+        main="com.squareup.wire.WireCompiler",
+        args=args,
+        workunit_name="compile",
+        workunit_labels=[WorkUnitLabel.TOOL],
+      )
       if result != 0:
-        raise TaskError('Wire compiler exited non-zero ({0})'.format(result))
+        raise TaskError("Wire compiler exited non-zero ({0})".format(result))

@@ -10,19 +10,21 @@ from pants.option.option_value_container import OptionValueContainer
 if TYPE_CHECKING:
   from pants.option.optionable import Optionable  # noqa: F401
 
-GLOBAL_SCOPE = ''
-GLOBAL_SCOPE_CONFIG_SECTION = 'GLOBAL'
+GLOBAL_SCOPE = ""
+GLOBAL_SCOPE_CONFIG_SECTION = "GLOBAL"
 
 
 @dataclass(frozen=True)
 class Scope:
   """An options scope."""
+
   scope: str
 
 
 @dataclass(frozen=True, order=True)
 class ScopeInfo:
   """Information about a scope."""
+
   scope: str
   category: str
   optionable_cls: Optional[Type["Optionable"]] = None
@@ -34,25 +36,27 @@ class ScopeInfo:
   removal_hint: Optional[str] = None
 
   # Symbolic constants for different categories of scope.
-  GLOBAL: ClassVar[str] = 'GLOBAL'
-  GOAL: ClassVar[str] = 'GOAL'
-  GOAL_V1: ClassVar[str] = 'GOAL_V1'
-  TASK: ClassVar[str] = 'TASK'
-  SUBSYSTEM: ClassVar[str] = 'SUBSYSTEM'
-  INTERMEDIATE: ClassVar[str] = 'INTERMEDIATE'  # Scope added automatically to fill out the scope hierarchy.
+  GLOBAL: ClassVar[str] = "GLOBAL"
+  GOAL: ClassVar[str] = "GOAL"
+  GOAL_V1: ClassVar[str] = "GOAL_V1"
+  TASK: ClassVar[str] = "TASK"
+  SUBSYSTEM: ClassVar[str] = "SUBSYSTEM"
+  INTERMEDIATE: ClassVar[
+    str
+  ] = "INTERMEDIATE"  # Scope added automatically to fill out the scope hierarchy.
 
   @property
   def description(self) -> str:
-    return cast(str, self._optionable_cls_attr('get_description', lambda: '')())
+    return cast(str, self._optionable_cls_attr("get_description", lambda: "")())
 
   @property
   def deprecated_scope(self) -> Optional[str]:
-    return cast(Optional[str], self._optionable_cls_attr('deprecated_options_scope'))
+    return cast(Optional[str], self._optionable_cls_attr("deprecated_options_scope"))
 
   @property
   def deprecated_scope_removal_version(self) -> Optional[str]:
     return cast(
-      Optional[str], self._optionable_cls_attr('deprecated_options_scope_removal_version'),
+      Optional[str], self._optionable_cls_attr("deprecated_options_scope_removal_version")
     )
 
   def _optionable_cls_attr(self, name: str, default=None):
@@ -62,5 +66,6 @@ class ScopeInfo:
 @dataclass(frozen=True)
 class ScopedOptions:
   """A wrapper around options selected for a particular Scope."""
+
   scope: Scope
   options: OptionValueContainer

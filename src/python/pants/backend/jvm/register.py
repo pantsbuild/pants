@@ -86,148 +86,150 @@ from pants.java.jar.jar_dependency import JarDependencyParseContextWrapper
 def build_file_aliases():
   return BuildFileAliases(
     targets={
-      'annotation_processor': AnnotationProcessor,
-      'benchmark': Benchmark,
-      'credentials': LiteralCredentials,
-      'jar_library': JarLibrary,
-      'java_agent': JavaAgent,
-      'java_library': JavaLibrary,
-      'javac_plugin': JavacPlugin,
-      'junit_tests': JUnitTests,
-      'jvm_app': JvmApp,
-      'jvm_binary': JvmBinary,
-      'jvm_prep_command' : JvmPrepCommand,
-      'managed_jar_dependencies' : ManagedJarDependencies,
-      'netrc_credentials': NetrcCredentials,
-      'scala_library': ScalaLibrary,
-      'scalac_plugin': ScalacPlugin,
-      'unpacked_jars': UnpackedJars,
+      "annotation_processor": AnnotationProcessor,
+      "benchmark": Benchmark,
+      "credentials": LiteralCredentials,
+      "jar_library": JarLibrary,
+      "java_agent": JavaAgent,
+      "java_library": JavaLibrary,
+      "javac_plugin": JavacPlugin,
+      "junit_tests": JUnitTests,
+      "jvm_app": JvmApp,
+      "jvm_binary": JvmBinary,
+      "jvm_prep_command": JvmPrepCommand,
+      "managed_jar_dependencies": ManagedJarDependencies,
+      "netrc_credentials": NetrcCredentials,
+      "scala_library": ScalaLibrary,
+      "scalac_plugin": ScalacPlugin,
+      "unpacked_jars": UnpackedJars,
     },
     objects={
-      'artifact': Artifact,
-      'scala_artifact': ScalaArtifact,
-      'ossrh': OSSRHPublicationMetadata,
-      'license': License,
-      'scm': Scm,
-      'developer': Developer,
-      'github': Scm.github,
-      'DirectoryReMapper': DirectoryReMapper,
-      'Duplicate': Duplicate,
-      'exclude': Exclude,
-      'scala_jar': ScalaJarDependency,
-      'scala_exclude': ScalaExclude,
-      'jar_rules': JarRules,
-      'repository': repo,
-      'Skip': Skip,
-      'shading_relocate': Shading.create_relocate,
-      'shading_exclude': Shading.create_exclude,
-      'shading_keep': Shading.create_keep,
-      'shading_zap': Shading.create_zap,
-      'shading_relocate_package': Shading.create_relocate_package,
-      'shading_exclude_package': Shading.create_exclude_package,
-      'shading_keep_package': Shading.create_keep_package,
-      'shading_zap_package': Shading.create_zap_package,
+      "artifact": Artifact,
+      "scala_artifact": ScalaArtifact,
+      "ossrh": OSSRHPublicationMetadata,
+      "license": License,
+      "scm": Scm,
+      "developer": Developer,
+      "github": Scm.github,
+      "DirectoryReMapper": DirectoryReMapper,
+      "Duplicate": Duplicate,
+      "exclude": Exclude,
+      "scala_jar": ScalaJarDependency,
+      "scala_exclude": ScalaExclude,
+      "jar_rules": JarRules,
+      "repository": repo,
+      "Skip": Skip,
+      "shading_relocate": Shading.create_relocate,
+      "shading_exclude": Shading.create_exclude,
+      "shading_keep": Shading.create_keep,
+      "shading_zap": Shading.create_zap,
+      "shading_relocate_package": Shading.create_relocate_package,
+      "shading_exclude_package": Shading.create_exclude_package,
+      "shading_keep_package": Shading.create_keep_package,
+      "shading_zap_package": Shading.create_zap_package,
     },
     context_aware_object_factories={
-      'bundle': Bundle,
-      'jar': JarDependencyParseContextWrapper,
-      'managed_jar_libraries': ManagedJarLibraries,
-    }
+      "bundle": Bundle,
+      "jar": JarDependencyParseContextWrapper,
+      "managed_jar_libraries": ManagedJarLibraries,
+    },
   )
 
 
 def global_subsystems():
-  return (ScalaPlatform, ScoveragePlatform, )
+  return (ScalaPlatform, ScoveragePlatform)
 
 
 # TODO https://github.com/pantsbuild/pants/issues/604 register_goals
 def register_goals():
-  ng_killall = task(name='ng-killall', action=NailgunKillall)
+  ng_killall = task(name="ng-killall", action=NailgunKillall)
   ng_killall.install()
 
-  Goal.by_name('invalidate').install(ng_killall, first=True)
-  Goal.by_name('clean-all').install(ng_killall, first=True)
+  Goal.by_name("invalidate").install(ng_killall, first=True)
+  Goal.by_name("clean-all").install(ng_killall, first=True)
 
-  task(name='jar-dependency-management', action=JarDependencyManagementSetup).install('bootstrap')
+  task(name="jar-dependency-management", action=JarDependencyManagementSetup).install("bootstrap")
 
-  task(name='jvm-platform-explain', action=JvmPlatformExplain).install('jvm-platform-explain')
-  task(name='jvm-platform-validate', action=JvmPlatformValidate).install('jvm-platform-validate')
+  task(name="jvm-platform-explain", action=JvmPlatformExplain).install("jvm-platform-explain")
+  task(name="jvm-platform-validate", action=JvmPlatformValidate).install("jvm-platform-validate")
 
-  task(name='bootstrap-jvm-tools', action=BootstrapJvmTools).install('bootstrap')
-  task(name='provide-tools-jar', action=ProvideToolsJar).install('bootstrap')
+  task(name="bootstrap-jvm-tools", action=BootstrapJvmTools).install("bootstrap")
+  task(name="provide-tools-jar", action=ProvideToolsJar).install("bootstrap")
 
   # Compile
-  task(name='rsc', action=RscCompile).install('compile')
-  task(name='javac', action=JavacCompile).install('compile')
+  task(name="rsc", action=RscCompile).install("compile")
+  task(name="javac", action=JavacCompile).install("compile")
 
   # Analysis extraction.
-  task(name='zinc', action=AnalysisExtraction).install('analysis')
+  task(name="zinc", action=AnalysisExtraction).install("analysis")
 
   # Dependency resolution.
-  task(name='ivy', action=IvyResolve).install('resolve', first=True)
-  task(name='coursier', action=CoursierResolve).install('resolve')
-  task(name='ivy-imports', action=IvyImports).install('imports')
-  task(name='unpack-jars', action=UnpackJars).install()
-  task(name='ivy', action=IvyOutdated).install('outdated')
+  task(name="ivy", action=IvyResolve).install("resolve", first=True)
+  task(name="coursier", action=CoursierResolve).install("resolve")
+  task(name="ivy-imports", action=IvyImports).install("imports")
+  task(name="unpack-jars", action=UnpackJars).install()
+  task(name="ivy", action=IvyOutdated).install("outdated")
 
   # Resource preparation.
-  task(name='prepare', action=PrepareResources).install('resources')
-  task(name='services', action=PrepareServices).install('resources')
+  task(name="prepare", action=PrepareResources).install("resources")
+  task(name="services", action=PrepareServices).install("resources")
 
-  task(name='export-classpath', action=RuntimeClasspathPublisher).install()
+  task(name="export-classpath", action=RuntimeClasspathPublisher).install()
 
   # This goal affects the contents of the runtime_classpath, and should not be
   # combined with any other goals on the command line.
-  task(name='export-dep-as-jar', action=ExportDepAsJar).install()
+  task(name="export-dep-as-jar", action=ExportDepAsJar).install()
 
-  task(name='jvm', action=JvmDependencyUsage).install('dep-usage')
+  task(name="jvm", action=JvmDependencyUsage).install("dep-usage")
 
-  task(name='classmap', action=ClassmapTask).install('classmap')
+  task(name="classmap", action=ClassmapTask).install("classmap")
 
   # Generate documentation.
-  task(name='javadoc', action=JavadocGen).install('doc')
-  task(name='scaladoc', action=ScaladocGen).install('doc')
+  task(name="javadoc", action=JavadocGen).install("doc")
+  task(name="scaladoc", action=ScaladocGen).install("doc")
 
   # Bundling.
-  task(name='create', action=JarCreate).install('jar')
-  detect_duplicates = task(name='dup', action=DuplicateDetector)
+  task(name="create", action=JarCreate).install("jar")
+  detect_duplicates = task(name="dup", action=DuplicateDetector)
 
-  task(name='jvm', action=BinaryCreate).install('binary')
-  detect_duplicates.install('binary')
+  task(name="jvm", action=BinaryCreate).install("binary")
+  detect_duplicates.install("binary")
 
-  task(name='consolidate-classpath', action=ConsolidateClasspath).install('bundle')
-  task(name='jvm', action=BundleCreate).install('bundle')
-  detect_duplicates.install('bundle')
+  task(name="consolidate-classpath", action=ConsolidateClasspath).install("bundle")
+  task(name="jvm", action=BundleCreate).install("bundle")
+  detect_duplicates.install("bundle")
 
-  task(name='detect-duplicates', action=DuplicateDetector).install()
+  task(name="detect-duplicates", action=DuplicateDetector).install()
 
   # Publishing.
-  task(name='check-published-deps', action=CheckPublishedDeps).install('check-published-deps')
+  task(name="check-published-deps", action=CheckPublishedDeps).install("check-published-deps")
 
-  task(name='jar', action=JarPublish).install('publish')
+  task(name="jar", action=JarPublish).install("publish")
 
   # Testing.
-  task(name='junit', action=JUnitRun).install('test')
-  task(name='bench', action=BenchmarkRun).install('bench')
+  task(name="junit", action=JUnitRun).install("test")
+  task(name="bench", action=BenchmarkRun).install("bench")
 
   # Linting.
-  task(name='scalafix', action=ScalaFixCheck).install('lint')
-  task(name='scalafmt', action=ScalaFmtCheckFormat, serialize=False).install('lint')
-  task(name='scalastyle', action=ScalastyleTask, serialize=False).install('lint')
-  task(name='checkstyle', action=Checkstyle, serialize=False).install('lint')
-  task(name='jvm-dep-check', action=JvmDependencyCheck, serialize=False).install('lint')
+  task(name="scalafix", action=ScalaFixCheck).install("lint")
+  task(name="scalafmt", action=ScalaFmtCheckFormat, serialize=False).install("lint")
+  task(name="scalastyle", action=ScalastyleTask, serialize=False).install("lint")
+  task(name="checkstyle", action=Checkstyle, serialize=False).install("lint")
+  task(name="jvm-dep-check", action=JvmDependencyCheck, serialize=False).install("lint")
 
   # Formatting.
   # Scalafix has to go before scalafmt in order not to
   # further change Scala files after scalafmt.
-  task(name='scalafix', action=ScalaFixFix).install('fmt')
-  task(name='scalafmt', action=ScalaFmtFormat, serialize=False).install('fmt')
+  task(name="scalafix", action=ScalaFixFix).install("fmt")
+  task(name="scalafmt", action=ScalaFmtFormat, serialize=False).install("fmt")
 
   # Running.
-  task(name='jvm', action=JvmRun, serialize=False).install('run')
-  task(name='jvm-dirty', action=JvmRun, serialize=False).install('run-dirty')
-  task(name='scala', action=ScalaRepl, serialize=False).install('repl')
-  task(name='scala-dirty', action=ScalaRepl, serialize=False).install('repl-dirty')
-  task(name='test-jvm-prep-command', action=RunTestJvmPrepCommand).install('test', first=True)
-  task(name='binary-jvm-prep-command', action=RunBinaryJvmPrepCommand).install('binary', first=True)
-  task(name='compile-jvm-prep-command', action=RunCompileJvmPrepCommand).install('compile', first=True)
+  task(name="jvm", action=JvmRun, serialize=False).install("run")
+  task(name="jvm-dirty", action=JvmRun, serialize=False).install("run-dirty")
+  task(name="scala", action=ScalaRepl, serialize=False).install("repl")
+  task(name="scala-dirty", action=ScalaRepl, serialize=False).install("repl-dirty")
+  task(name="test-jvm-prep-command", action=RunTestJvmPrepCommand).install("test", first=True)
+  task(name="binary-jvm-prep-command", action=RunBinaryJvmPrepCommand).install("binary", first=True)
+  task(name="compile-jvm-prep-command", action=RunCompileJvmPrepCommand).install(
+    "compile", first=True
+  )

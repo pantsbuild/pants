@@ -62,7 +62,9 @@ class JvmToolTaskMixin(JvmToolMixin, TaskBase):
     :returns: A list of paths.
     :rtype: list
     """
-    return self.tool_classpath_entries_from_products(self.context.products, key, scope=self._scope(scope))
+    return self.tool_classpath_entries_from_products(
+      self.context.products, key, scope=self._scope(scope)
+    )
 
   def _scope(self, scope=None):
     return scope or self.options_scope

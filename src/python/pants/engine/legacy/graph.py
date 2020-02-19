@@ -61,7 +61,7 @@ def target_types_from_build_file_aliases(aliases: BuildFileAliases) -> Dict[str,
   """Given BuildFileAliases, return the concrete target types constructed for each alias."""
   target_types = dict(aliases.target_types)
   for alias, factory in aliases.target_macro_factories.items():
-    target_type, = factory.target_types
+    (target_type,) = factory.target_types
     target_types[alias] = target_type
   return target_types
 
@@ -72,6 +72,7 @@ class _DestWrapper:
 
   This is only used when instantiating RemoteSources target.
   """
+
   target_types: Any
 
 
@@ -154,9 +155,10 @@ class LegacyBuildGraph(BuildGraph):
     for dependency in legacy_hydrated_target.dependencies:
       if dependency in self._target_dependencies_by_address[address]:
         raise self.DuplicateAddressError(
-          'Addresses in dependencies must be unique. '
-          "'{spec}' is referenced more than once by target '{target}'."
-          .format(spec=dependency.spec, target=address.spec)
+          "Addresses in dependencies must be unique. "
+          "'{spec}' is referenced more than once by target '{target}'.".format(
+            spec=dependency.spec, target=address.spec
+          )
         )
       # Link its declared dependencies, which will be indexed independently.
       self._target_dependencies_by_address[address].add(dependency)
@@ -169,7 +171,7 @@ class LegacyBuildGraph(BuildGraph):
     try:
       # Pop dependencies, which were already consumed during construction.
       kwargs = legacy_hydrated_target.adaptor.kwargs()
-      kwargs.pop('dependencies')
+      kwargs.pop("dependencies")
 
       # Replace the `address` field of type `Address` with type `BuildFileAddress`.
       kwargs["address"] = legacy_hydrated_target.address
@@ -185,23 +187,22 @@ class LegacyBuildGraph(BuildGraph):
     except Exception as e:
       raise TargetDefinitionException(
         legacy_hydrated_target.address,
-        'Failed to instantiate Target with type {}: {}'.format(target_cls, e),
+        "Failed to instantiate Target with type {}: {}".format(target_cls, e),
       )
 
   def _instantiate_app(self, target_cls: Type[Target], kwargs) -> Target:
     """For App targets, convert BundleAdaptor to BundleProps."""
-    parse_context = ParseContext(kwargs['address'].spec_path, dict())
+    parse_context = ParseContext(kwargs["address"].spec_path, dict())
     bundleprops_factory = Bundle(parse_context)
-    kwargs['bundles'] = [
-      bundleprops_factory.create_bundle_props(bundle)
-      for bundle in kwargs['bundles']
+    kwargs["bundles"] = [
+      bundleprops_factory.create_bundle_props(bundle) for bundle in kwargs["bundles"]
     ]
 
     return target_cls(build_graph=self, **kwargs)
 
   def _instantiate_remote_sources(self, kwargs) -> RemoteSources:
     """For RemoteSources target, convert "dest" field to its real target type."""
-    kwargs['dest'] = _DestWrapper((self._target_types[kwargs['dest']],))
+    kwargs["dest"] = _DestWrapper((self._target_types[kwargs["dest"]],))
     return RemoteSources(build_graph=self, **kwargs)
 
   def inject_address_closure(self, address: Address) -> None:
@@ -216,13 +217,13 @@ class LegacyBuildGraph(BuildGraph):
       pass
 
   def inject_roots_closure(
-    self, address_specs: AddressSpecs, fail_fast=None,
+    self, address_specs: AddressSpecs, fail_fast=None
   ) -> Iterator[BuildFileAddress]:
     for address in self._inject_address_specs(address_specs):
       yield address
 
   def inject_address_specs_closure(
-    self, address_specs: Iterable[AddressSpec], fail_fast=None,
+    self, address_specs: Iterable[AddressSpec], fail_fast=None
   ) -> Iterator[BuildFileAddress]:
     # Request loading of these address specs.
     for address in self._inject_address_specs(AddressSpecs(address_specs)):
@@ -239,7 +240,7 @@ class LegacyBuildGraph(BuildGraph):
       yield
     except Exception as e:
       raise AddressLookupError(
-        'Build graph construction failed: {} {}'.format(type(e).__name__, str(e))
+        "Build graph construction failed: {} {}".format(type(e).__name__, str(e))
       )
 
   def _inject_address_specs(self, address_specs: AddressSpecs) -> Iterator[BuildFileAddress]:
@@ -250,9 +251,9 @@ class LegacyBuildGraph(BuildGraph):
     if not address_specs:
       return
 
-    logger.debug('Injecting address specs to %s: %s', self, address_specs)
+    logger.debug("Injecting address specs to %s: %s", self, address_specs)
     with self._resolve_context():
-      thts, = self._scheduler.product_request(LegacyTransitiveHydratedTargets, [address_specs])
+      (thts,) = self._scheduler.product_request(LegacyTransitiveHydratedTargets, [address_specs])
 
     self._index(thts.closure)
 
@@ -305,9 +306,8 @@ class _DependentGraph:
     for dependency, dependents in self._dependent_address_map.items():
       if dependency not in all_valid_addresses:
         raise AddressLookupError(
-            'Dependent graph construction failed: {} did not exist. Was depended on by:\n  {}'.format(
-             dependency.spec,
-             '\n  '.join(d.spec for d in dependents)
+          "Dependent graph construction failed: {} did not exist. Was depended on by:\n  {}".format(
+            dependency.spec, "\n  ".join(d.spec for d in dependents)
           )
         )
 
@@ -316,10 +316,14 @@ class _DependentGraph:
     target_cls = self._target_types[target_adaptor.type_alias]
 
     declared_deps = target_adaptor.dependencies
-    implicit_deps = (Address.parse(s,
-                                   relative_to=target_adaptor.address.spec_path,
-                                   subproject_roots=self._address_mapper.subproject_roots)
-                     for s in target_cls.compute_dependency_address_specs(kwargs=target_adaptor.kwargs()))
+    implicit_deps = (
+      Address.parse(
+        s,
+        relative_to=target_adaptor.address.spec_path,
+        subproject_roots=self._address_mapper.subproject_roots,
+      )
+      for s in target_cls.compute_dependency_address_specs(kwargs=target_adaptor.kwargs())
+    )
     for dep in declared_deps:
       self._dependent_address_map[dep].add(target_adaptor.address)
     for dep in implicit_deps:
@@ -359,6 +363,7 @@ class HydratedTarget:
   Transitive graph walks collect ordered sets of TransitiveHydratedTargets which involve a huge amount
   of hashing: we implement eq/hash via direct usage of an Address field to speed that up.
   """
+
   address: Address
   adaptor: TargetAdaptor
   dependencies: Tuple[Address, ...]
@@ -378,6 +383,7 @@ class HydratedTargets(Collection[HydratedTarget]):
 @dataclass(frozen=True)
 class TransitiveHydratedTarget:
   """A recursive structure wrapping a HydratedTarget root and TransitiveHydratedTarget deps."""
+
   root: HydratedTarget
   dependencies: Tuple["TransitiveHydratedTarget", ...]
 
@@ -385,6 +391,7 @@ class TransitiveHydratedTarget:
 @dataclass(frozen=True)
 class TransitiveHydratedTargets:
   """A set of HydratedTarget roots, and their transitive, flattened, de-duped closure."""
+
   roots: Tuple[HydratedTarget, ...]
   closure: OrderedSet  # TODO: this is an OrderedSet[HydratedTarget]
 
@@ -394,6 +401,7 @@ class LegacyHydratedTarget:
   """A rip on HydratedTarget for the purpose of V1, which must use BuildFileAddress rather than
   Address.
   """
+
   address: BuildFileAddress
   adaptor: TargetAdaptor
   dependencies: Tuple[Address, ...]
@@ -421,6 +429,7 @@ class HydratedTargetWithOrigin:
   This is useful for precise file arguments, where a goal like `./pants test` runs over only the
   specified file arguments rather than the whole target.
   """
+
   target: HydratedTarget
   origin: OriginSpec
 
@@ -437,6 +446,7 @@ class SourcesSnapshot:
   Note that the resolved sources do not need an owning target. Any source resolvable by
   `PathGlobs` is valid here.
   """
+
   snapshot: Snapshot
 
 
@@ -459,6 +469,7 @@ class TopologicallyOrderedTargets:
   execute in the right order automatically. However there can be cases where it's still useful for
   a single rule invocation to know about the order of multiple targets under its consideration.
   """
+
   hydrated_targets: HydratedTargets
 
 
@@ -469,6 +480,7 @@ class InvalidOwnersOfArgs(Exception):
 @dataclass(frozen=True)
 class OwnersRequest:
   """A request for the owners of a set of file paths."""
+
   sources: Tuple[str, ...]
 
   def validate(self, *, pants_bin_name: str) -> None:
@@ -476,7 +488,7 @@ class OwnersRequest:
     # Check for improperly trying to use commas to run against multiple files.
     sources_with_commas = [source for source in self.sources if "," in source]
     if sources_with_commas:
-      offenders = ', '.join(f"`{source}`" for source in sources_with_commas)
+      offenders = ", ".join(f"`{source}`" for source in sources_with_commas)
       raise InvalidOwnersOfArgs(
         "Rather than using a comma with `--owner-of` to specify multiple files, use "
         "Pants list syntax: https://www.pantsbuild.org/options.html#list-options. For example, "
@@ -485,9 +497,9 @@ class OwnersRequest:
       )
     # Validate that users aren't using globs. FilesystemSpecs _do_ support globs via PathGlobs,
     # so it's feasible that a user will then try to also use globs with `--owner-of`.
-    sources_with_globs = [source for source in self.sources if '*' in source]
+    sources_with_globs = [source for source in self.sources if "*" in source]
     if sources_with_globs:
-      offenders = ', '.join(f"`{source}`" for source in sources_with_globs)
+      offenders = ", ".join(f"`{source}`" for source in sources_with_globs)
       raise InvalidOwnersOfArgs(
         "`--owner-of` does not allow globs. Instead, please directly specify the files you want "
         f"to operate on, e.g. `{pants_bin_name} --owner-of=src/python/example/foo.py.\n\n"
@@ -520,7 +532,7 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
     # TODO: This matching logic should be implemented using the rust `fs` crate for two reasons:
     #  1) having two implementations isn't great
     #  2) we're expanding sources via HydratedTarget, but it isn't necessary to do that to match
-    target_sources = target_kwargs.get('sources', None)
+    target_sources = target_kwargs.get("sources", None)
     return target_sources and any_matches_filespec(paths=sources_set, spec=target_sources.filespec)
 
   build_file_addresses = await MultiGet(
@@ -529,8 +541,7 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
   owners = Addresses(
     ht.adaptor.address
     for ht, bfa in zip(candidate_targets, build_file_addresses)
-    if LegacyAddressMapper.any_is_declaring_file(bfa, sources_set)
-    or owns_any_source(ht)
+    if LegacyAddressMapper.any_is_declaring_file(bfa, sources_set) or owns_any_source(ht)
   )
   return Owners(owners)
 
@@ -575,8 +586,7 @@ async def legacy_transitive_hydrated_targets(
   )
   return LegacyTransitiveHydratedTargets(
     roots=tuple(
-      LegacyHydratedTarget.from_hydrated_target(ht, bfa)
-      for ht, bfa in zip(thts.roots, roots_bfas)
+      LegacyHydratedTarget.from_hydrated_target(ht, bfa) for ht, bfa in zip(thts.roots, roots_bfas)
     ),
     closure=OrderedSet(
       LegacyHydratedTarget.from_hydrated_target(ht, bfa)
@@ -587,7 +597,9 @@ async def legacy_transitive_hydrated_targets(
 
 @rule
 async def transitive_hydrated_target(root: HydratedTarget) -> TransitiveHydratedTarget:
-  dependencies = await MultiGet(Get[TransitiveHydratedTarget](Address, d) for d in root.dependencies)
+  dependencies = await MultiGet(
+    Get[TransitiveHydratedTarget](Address, d) for d in root.dependencies
+  )
   return TransitiveHydratedTarget(root, dependencies)
 
 
@@ -621,6 +633,7 @@ def topo_sort(targets: Iterable[HydratedTarget]) -> Tuple[HydratedTarget, ...]:
 @dataclass(frozen=True)
 class HydratedField:
   """A wrapper for a fully constructed replacement kwarg for a HydratedTarget."""
+
   name: str
   value: Any
 
@@ -645,7 +658,7 @@ async def hydrate_target(hydrated_struct: HydratedStruct) -> HydratedTarget:
 
 @rule
 async def hydrate_target_with_origin(
-  address_with_origin: AddressWithOrigin
+  address_with_origin: AddressWithOrigin,
 ) -> HydratedTargetWithOrigin:
   ht = await Get[HydratedTarget](Address, address_with_origin.address)
   return HydratedTargetWithOrigin(target=ht, origin=address_with_origin.origin)
@@ -669,24 +682,24 @@ async def hydrated_targets_with_origins(
 
 
 def _eager_fileset_with_spec(
-  spec_path: str, filespec: Filespec, snapshot: Snapshot, include_dirs: bool = False,
+  spec_path: str, filespec: Filespec, snapshot: Snapshot, include_dirs: bool = False
 ) -> EagerFilesetWithSpec:
-  rel_include_globs = filespec['globs']
+  rel_include_globs = filespec["globs"]
 
   relpath_adjusted_filespec = FilesetRelPathWrapper.to_filespec(rel_include_globs, spec_path)
-  if 'exclude' in filespec:
-    relpath_adjusted_filespec['exclude'] = [FilesetRelPathWrapper.to_filespec(e['globs'], spec_path)
-                                            for e in filespec['exclude']]
+  if "exclude" in filespec:
+    relpath_adjusted_filespec["exclude"] = [
+      FilesetRelPathWrapper.to_filespec(e["globs"], spec_path) for e in filespec["exclude"]
+    ]
 
-  return EagerFilesetWithSpec(spec_path,
-                              relpath_adjusted_filespec,
-                              snapshot,
-                              include_dirs=include_dirs)
+  return EagerFilesetWithSpec(
+    spec_path, relpath_adjusted_filespec, snapshot, include_dirs=include_dirs
+  )
 
 
 @rule
 async def hydrate_sources(
-  sources_field: SourcesField, glob_match_error_behavior: GlobMatchErrorBehavior,
+  sources_field: SourcesField, glob_match_error_behavior: GlobMatchErrorBehavior
 ) -> HydratedField:
   """Given a SourcesField, request a Snapshot for its path_globs and create an EagerFilesetWithSpec.
   """
@@ -700,9 +713,7 @@ async def hydrate_sources(
   )
   snapshot = await Get[Snapshot](PathGlobs, path_globs)
   fileset_with_spec = _eager_fileset_with_spec(
-    spec_path=address.spec_path,
-    filespec=sources_field.filespecs,
-    snapshot=snapshot,
+    spec_path=address.spec_path, filespec=sources_field.filespecs, snapshot=snapshot
   )
   sources_field.validate_fn(fileset_with_spec)
   return HydratedField(sources_field.arg, fileset_with_spec)
@@ -710,7 +721,7 @@ async def hydrate_sources(
 
 @rule
 async def hydrate_bundles(
-  bundles_field: BundlesField, glob_match_error_behavior: GlobMatchErrorBehavior,
+  bundles_field: BundlesField, glob_match_error_behavior: GlobMatchErrorBehavior
 ) -> HydratedField:
   """Given a BundlesField, request Snapshots for each of its filesets and create BundleAdaptors."""
   address = bundles_field.address
@@ -729,21 +740,18 @@ async def hydrate_bundles(
   )
 
   bundles = []
-  zipped = zip(bundles_field.bundles,
-               bundles_field.filespecs_list,
-               snapshot_list)
+  zipped = zip(bundles_field.bundles, bundles_field.filespecs_list, snapshot_list)
   for bundle, filespecs, snapshot in zipped:
-    rel_spec_path = getattr(bundle, 'rel_path', address.spec_path)
+    rel_spec_path = getattr(bundle, "rel_path", address.spec_path)
     kwargs = bundle.kwargs()
     # NB: We `include_dirs=True` because bundle filesets frequently specify directories in order
     # to trigger a (deprecated) default inclusion of their recursive contents. See the related
     # deprecation in `pants.backend.jvm.tasks.bundle_create`.
-    kwargs['fileset'] = _eager_fileset_with_spec(rel_spec_path,
-                                                 filespecs,
-                                                 snapshot,
-                                                 include_dirs=True)
+    kwargs["fileset"] = _eager_fileset_with_spec(
+      rel_spec_path, filespecs, snapshot, include_dirs=True
+    )
     bundles.append(BundleAdaptor(**kwargs))
-  return HydratedField('bundles', bundles)
+  return HydratedField("bundles", bundles)
 
 
 @rule
@@ -783,7 +791,7 @@ async def sources_snapshots_from_filesystem_specs(
 
 @rule
 async def addresses_with_origins_from_filesystem_specs(
-  filesystem_specs: FilesystemSpecs, global_options: GlobalOptions,
+  filesystem_specs: FilesystemSpecs, global_options: GlobalOptions
 ) -> AddressesWithOrigins:
   """Find the owner(s) for each FilesystemSpec while preserving the original FilesystemSpec those
   owners come from.
@@ -803,7 +811,8 @@ async def addresses_with_origins_from_filesystem_specs(
   ):
     if (
       global_options.owners_not_found_behavior != OwnersNotFoundBehavior.ignore
-      and isinstance(spec, FilesystemLiteralSpec) and not owners.addresses
+      and isinstance(spec, FilesystemLiteralSpec)
+      and not owners.addresses
     ):
       file_path = PurePath(spec.to_spec_string())
       msg = (
@@ -819,8 +828,8 @@ async def addresses_with_origins_from_filesystem_specs(
     # more precise in which files they operate on.
     origin = (
       spec
-      if isinstance(spec, FilesystemLiteralSpec) else
-      FilesystemResolvedGlobSpec(glob=spec.glob, _snapshot=snapshot)
+      if isinstance(spec, FilesystemLiteralSpec)
+      else FilesystemResolvedGlobSpec(glob=spec.glob, _snapshot=snapshot)
     )
     result.extend(AddressWithOrigin(address=address, origin=origin) for address in owners.addresses)
   return AddressesWithOrigins(result)

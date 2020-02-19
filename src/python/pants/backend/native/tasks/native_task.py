@@ -21,7 +21,6 @@ from pants.util.objects import Exactly, SubclassesOf
 
 
 class NativeTask(Task):
-
   @classproperty
   @abstractmethod
   def source_target_constraint(cls):
@@ -68,11 +67,11 @@ class NativeTask(Task):
   def prepare(cls, options, round_manager):
     super().prepare(options, round_manager)
     # Allow the deferred_sources_mapping to take place first
-    round_manager.optional_data('deferred_sources')
+    round_manager.optional_data("deferred_sources")
 
   @classmethod
   def implementation_version(cls):
-    return super().implementation_version() + [('NativeTask', 0)]
+    return super().implementation_version() + [("NativeTask", 0)]
 
   @memoized_property
   def _native_build_settings(self):
@@ -88,9 +87,7 @@ class NativeTask(Task):
     return NativeToolchain.scoped_instance(self)
 
   def _toolchain_variant_request(self, variant):
-    return ToolchainVariantRequest(
-      toolchain=self._native_toolchain,
-      variant=variant)
+    return ToolchainVariantRequest(toolchain=self._native_toolchain, variant=variant)
 
   def get_c_toolchain_variant(self, native_library_target):
     return self._get_toolchain_variant(CToolchain, native_library_target)
@@ -100,18 +97,21 @@ class NativeTask(Task):
 
   def _get_toolchain_variant(self, toolchain_type, native_library_target):
     selected_variant = self._native_build_step.get_toolchain_variant_for_target(
-      native_library_target)
+      native_library_target
+    )
     return self._request_single(toolchain_type, self._toolchain_variant_request(selected_variant))
 
   @memoized_method
   def native_deps(self, target):
     return self.strict_deps_for_target(
-      target, predicate=self.dependent_target_constraint.satisfied_by)
+      target, predicate=self.dependent_target_constraint.satisfied_by
+    )
 
   @memoized_method
   def packaged_native_deps(self, target):
     return self.strict_deps_for_target(
-      target, predicate=self.packaged_dependent_constraint.satisfied_by)
+      target, predicate=self.packaged_dependent_constraint.satisfied_by
+    )
 
   def strict_deps_for_target(self, target, predicate=None):
     """Get the dependencies of `target` filtered by `predicate`, accounting for 'strict_deps'.
@@ -131,7 +131,8 @@ class NativeTask(Task):
       deps = [target] + filtered_deps
     else:
       deps = self.context.build_graph.transitive_subgraph_of_addresses(
-        [target.address], predicate=predicate)
+        [target.address], predicate=predicate
+      )
 
     # Filter out the beginning target depending on whether it matches the predicate.
     # TODO: There should be a cleaner way to do this.

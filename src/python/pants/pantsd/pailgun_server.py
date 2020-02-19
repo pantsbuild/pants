@@ -75,13 +75,13 @@ class PailgunHandler(PailgunHandlerBase):
 
     # Prepend the command to our arguments so it aligns with the expected sys.argv format of python
     # (e.g. [list', '::'] -> ['./pants', 'list', '::']).
-    arguments.insert(0, './pants')
+    arguments.insert(0, "./pants")
 
     self.logger.info(f"handling pailgun request: `{' '.join(arguments)}`")
-    self.logger.debug('pailgun request environment: %s', environment)
+    self.logger.debug("pailgun request environment: %s", environment)
 
     # Execute the requested command with optional daemon-side profiling.
-    with maybe_profiled(environment.get('PANTSD_PROFILE')):
+    with maybe_profiled(environment.get("PANTSD_PROFILE")):
       self._run_pants(self.request, arguments, environment)
 
     # NB: This represents the end of pantsd's involvement in the request, but the request will
@@ -102,6 +102,7 @@ class ExclusiveRequestTimeout(Exception):
 
 class PailgunHandleRequestLock:
   """Convenience lock to implement Lock.acquire(timeout), which is not available in Python 2."""
+
   # TODO(#6071): remove and replace for the py3 Lock() when we don't have to support py2 anymore.
 
   def __init__(self):
@@ -149,8 +150,15 @@ class PailgunServer(ThreadingMixIn, TCPServer):
   # Override the ThreadingMixIn default, to minimize the chances of zombie pailgun processes.
   daemon_threads = True
 
-  def __init__(self, server_address, runner_factory, lifecycle_lock, request_complete_callback,
-               handler_class=None, bind_and_activate=True):
+  def __init__(
+    self,
+    server_address,
+    runner_factory,
+    lifecycle_lock,
+    request_complete_callback,
+    handler_class=None,
+    bind_and_activate=True,
+  ):
     """Override of TCPServer.__init__().
 
     N.B. the majority of this function is copied verbatim from TCPServer.__init__().
@@ -171,8 +179,8 @@ class PailgunServer(ThreadingMixIn, TCPServer):
     self.socket = RecvBufferedSocket(socket.socket(self.address_family, self.socket_type))
     self.runner_factory = runner_factory
     self.lifecycle_lock = lifecycle_lock
-    self.allow_reuse_address = True           # Allow quick reuse of TCP_WAIT sockets.
-    self.server_port = None                   # Set during server_bind() once the port is bound.
+    self.allow_reuse_address = True  # Allow quick reuse of TCP_WAIT sockets.
+    self.server_port = None  # Set during server_bind() once the port is bound.
     self.request_complete_callback = request_complete_callback
     self.logger = logging.getLogger(__name__)
     self.free_to_handle_request_lock = PailgunHandleRequestLock()
@@ -247,19 +255,21 @@ class PailgunServer(ThreadingMixIn, TCPServer):
     """
     # TODO add `did_poll` to pantsd metrics
 
-    timeout = float(environment['PANTSD_REQUEST_TIMEOUT_LIMIT'])
+    timeout = float(environment["PANTSD_REQUEST_TIMEOUT_LIMIT"])
 
     @contextmanager
     def yield_and_release(time_waited):
       try:
-        self.logger.debug(f"request lock acquired {('on the first try' if time_waited == 0 else f'in {time_waited} seconds')}.")
+        self.logger.debug(
+          f"request lock acquired {('on the first try' if time_waited == 0 else f'in {time_waited} seconds')}."
+        )
         yield
       finally:
         self.free_to_handle_request_lock.release()
         self.logger.debug("released request lock.")
 
     time_polled = 0.0
-    user_notification_interval = 5.0 # Stop polling to notify the user every second.
+    user_notification_interval = 5.0  # Stop polling to notify the user every second.
     self.logger.debug(f"request {request} is trying to acquire the request lock.")
 
     # NB: Optimistically try to acquire the lock without blocking, in case we are the only request being handled.
@@ -270,20 +280,29 @@ class PailgunServer(ThreadingMixIn, TCPServer):
     else:
       self.logger.debug(f"request {request} didn't acquire the lock on the first try, polling...")
       # We have to wait for another request to finish being handled.
-      self._send_stderr(request, "Another pants invocation is running. "
-                                 "Will wait {} for it to finish before giving up.\n".format(
-        "forever" if self._should_poll_forever(timeout)
-                  else "up to {} seconds".format(timeout)
-      ))
-      self._send_stderr(request, "If you don't want to wait for the first run to finish, please "
-                                 "press Ctrl-C and run this command with PANTS_CONCURRENT=True "
-                                 "in the environment.\n")
+      self._send_stderr(
+        request,
+        "Another pants invocation is running. "
+        "Will wait {} for it to finish before giving up.\n".format(
+          "forever" if self._should_poll_forever(timeout) else "up to {} seconds".format(timeout)
+        ),
+      )
+      self._send_stderr(
+        request,
+        "If you don't want to wait for the first run to finish, please "
+        "press Ctrl-C and run this command with PANTS_CONCURRENT=True "
+        "in the environment.\n",
+      )
       while not self.free_to_handle_request_lock.acquire(timeout=user_notification_interval):
         time_polled += user_notification_interval
         if self._should_keep_polling(timeout, time_polled):
-          self._send_stderr(request, f"Waiting for invocation to finish (waited for {time_polled}s so far)...\n")
-        else: # We have timed out.
-          raise ExclusiveRequestTimeout("Timed out while waiting for another pants invocation to finish.")
+          self._send_stderr(
+            request, f"Waiting for invocation to finish (waited for {time_polled}s so far)...\n"
+          )
+        else:  # We have timed out.
+          raise ExclusiveRequestTimeout(
+            "Timed out while waiting for another pants invocation to finish."
+          )
       with yield_and_release(time_polled):
         yield
 
@@ -302,7 +321,9 @@ class PailgunServer(ThreadingMixIn, TCPServer):
         self.request_complete_callback()
     except BrokenPipeError as e:
       # The client has closed the connection, most likely from a SIGINT
-      self.logger.error(f"Request {request} abruptly closed with {type(e)}, probably because the client crashed or was sent a SIGINT.")
+      self.logger.error(
+        f"Request {request} abruptly closed with {type(e)}, probably because the client crashed or was sent a SIGINT."
+      )
     except Exception as e:
       # If that fails, (synchronously) handle the error with the error handler sans-fork.
       try:

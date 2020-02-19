@@ -13,7 +13,6 @@ from pants.help.build_dictionary_info_extracter import (
 
 
 class BuildDictionaryInfoExtracterTest(unittest.TestCase):
-
   def setUp(self):
     super().setUp()
     self.maxDiff = None
@@ -29,14 +28,17 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
 
       """
 
-    self.assertEqual(('First line.', ['Subsequent', 'lines.', '', '  with indentations']),
-                     BuildDictionaryInfoExtracter.get_description_from_docstring(Test1))
+    self.assertEqual(
+      ("First line.", ["Subsequent", "lines.", "", "  with indentations"]),
+      BuildDictionaryInfoExtracter.get_description_from_docstring(Test1),
+    )
 
     class Test2(object):
       """Only one line."""
 
-    self.assertEqual(('Only one line.', []),
-                     BuildDictionaryInfoExtracter.get_description_from_docstring(Test2))
+    self.assertEqual(
+      ("Only one line.", []), BuildDictionaryInfoExtracter.get_description_from_docstring(Test2)
+    )
 
   def test_get_arg_descriptions_from_docstring(self):
     def func(a, b, c):
@@ -47,8 +49,10 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
       :param c:  Parameter c.
       """
 
-    self.assertEqual({'a': 'Parameter a.', 'b': 'Parameter b.', 'c': 'Parameter c.'},
-                     BuildDictionaryInfoExtracter.get_arg_descriptions_from_docstring(func))
+    self.assertEqual(
+      {"a": "Parameter a.", "b": "Parameter b.", "c": "Parameter c."},
+      BuildDictionaryInfoExtracter.get_arg_descriptions_from_docstring(func),
+    )
 
   def test_get_multiline_arg_descriptions_from_docstring(self):
     # Test multiline parameter descriptions, including where all help is on subsequent line.
@@ -64,10 +68,16 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
       :param e:  Parameter e.
       """
 
-    self.assertEqual({'a': 'Parameter a.', 'b': 'Parameter b.',
-                      'c': 'Parameter c Second line Parameter c.',
-                      'd': 'Parameter d.', 'e': 'Parameter e.'},
-                     BuildDictionaryInfoExtracter.get_arg_descriptions_from_docstring(func))
+    self.assertEqual(
+      {
+        "a": "Parameter a.",
+        "b": "Parameter b.",
+        "c": "Parameter c Second line Parameter c.",
+        "d": "Parameter d.",
+        "e": "Parameter e.",
+      },
+      BuildDictionaryInfoExtracter.get_arg_descriptions_from_docstring(func),
+    )
 
   def test_get_arg_descriptions_with_nonparams_from_docstring(self):
     # Test parameter help where help for items other than parameters is present.
@@ -83,26 +93,36 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
       :returns:  Return.
       """
 
-    self.assertEqual({'a': 'Parameter a.', 'b': 'Parameter b.', 'c': 'Parameter c.'},
-                     BuildDictionaryInfoExtracter.get_arg_descriptions_from_docstring(func))
+    self.assertEqual(
+      {"a": "Parameter a.", "b": "Parameter b.", "c": "Parameter c."},
+      BuildDictionaryInfoExtracter.get_arg_descriptions_from_docstring(func),
+    )
 
   def test_get_function_args(self):
     # Test standalone function.
-    def func(arg1, arg2, arg3=42, arg4=None, arg5='foo'):
+    def func(arg1, arg2, arg3=42, arg4=None, arg5="foo"):
       pass
 
-    self.assertEqual([FunctionArg('arg1', '', False, None), FunctionArg('arg2', '', False, None),
-                      FunctionArg('arg3', '', True, 42), FunctionArg('arg4', '', True, None),
-                      FunctionArg('arg5', '', True, 'foo')],
-      BuildDictionaryInfoExtracter.get_function_args(func))
+    self.assertEqual(
+      [
+        FunctionArg("arg1", "", False, None),
+        FunctionArg("arg2", "", False, None),
+        FunctionArg("arg3", "", True, 42),
+        FunctionArg("arg4", "", True, None),
+        FunctionArg("arg5", "", True, "foo"),
+      ],
+      BuildDictionaryInfoExtracter.get_function_args(func),
+    )
 
     # Test member function.
     class TestCls:
       def __init__(self, arg1, arg2=False):
         pass
 
-    self.assertEqual([FunctionArg('arg1', '', False, None), FunctionArg('arg2', '', True, False)],
-                     BuildDictionaryInfoExtracter.get_function_args(TestCls.__init__))
+    self.assertEqual(
+      [FunctionArg("arg1", "", False, None), FunctionArg("arg2", "", True, False)],
+      BuildDictionaryInfoExtracter.get_function_args(TestCls.__init__),
+    )
 
     # Test *args, **kwargs situation.
     def generic_func(arg1, arg2=42, *args, **kwargs):
@@ -114,12 +134,16 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
       :param arg4: The fourth arg (default: 'Foo').
       """
 
-    self.assertEqual([FunctionArg('arg1', 'The first arg.', False, None),
-                      FunctionArg('arg2', 'The second arg.', True, 42),
-                      FunctionArg('*args', 'Some extra varargs.', False, None),
-                      FunctionArg('arg3', 'The third arg.', True, None),
-                      FunctionArg('arg4', "The fourth arg.", True, "'Foo'")],
-                     BuildDictionaryInfoExtracter.get_function_args(generic_func))
+    self.assertEqual(
+      [
+        FunctionArg("arg1", "The first arg.", False, None),
+        FunctionArg("arg2", "The second arg.", True, 42),
+        FunctionArg("*args", "Some extra varargs.", False, None),
+        FunctionArg("arg3", "The third arg.", True, None),
+        FunctionArg("arg4", "The fourth arg.", True, "'Foo'"),
+      ],
+      BuildDictionaryInfoExtracter.get_function_args(generic_func),
+    )
 
   def test_get_target_args(self):
     class Target1(Target):
@@ -137,52 +161,63 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
       def __init__(self, arg3, arg4=None, **kwargs):
         super(Target1, self).__init__(**kwargs)
 
-    self.assertEqual(sorted(BuildDictionaryInfoExtracter.basic_target_args + [
-                       FunctionArg('arg1', 'The first arg.', False, None),
-                       FunctionArg('arg2', 'The second arg.', True, 42),
-                       FunctionArg('arg3', '', False, None),
-                       FunctionArg('arg4', '', True, None)
-                     ]),
-                     sorted(BuildDictionaryInfoExtracter.get_args_for_target_type(Target3)))
+    self.assertEqual(
+      sorted(
+        BuildDictionaryInfoExtracter.basic_target_args
+        + [
+          FunctionArg("arg1", "The first arg.", False, None),
+          FunctionArg("arg2", "The second arg.", True, 42),
+          FunctionArg("arg3", "", False, None),
+          FunctionArg("arg4", "", True, None),
+        ]
+      ),
+      sorted(BuildDictionaryInfoExtracter.get_args_for_target_type(Target3)),
+    )
 
     # Check a trivial case.
     class Target4(Target):
       pass
 
-    self.assertEqual(BuildDictionaryInfoExtracter.basic_target_args,
-                     BuildDictionaryInfoExtracter.get_args_for_target_type(Target4))
+    self.assertEqual(
+      BuildDictionaryInfoExtracter.basic_target_args,
+      BuildDictionaryInfoExtracter.get_args_for_target_type(Target4),
+    )
 
   def test_get_target_type_info(self):
     class Target1(Target):
       """Target1 docstring."""
+
       pass
 
     class Target2(Target):
       """Target2 docstring."""
+
       pass
 
     class Target3(Target):
       """Target3 docstring."""
+
       pass
 
     # We shouldn't get as far as invoking the context factory, so it can be trivial.
     macro_factory = TargetMacro.Factory.wrap(lambda ctx: None, Target2)
 
-    bfa = BuildFileAliases(targets={
-        'target1': Target1,
-        'target2': macro_factory,
-        'target3': Target3,
-      },
+    bfa = BuildFileAliases(
+      targets={"target1": Target1, "target2": macro_factory, "target3": Target3},
       objects={},
-      context_aware_object_factories={}
+      context_aware_object_factories={},
     )
 
     extracter = BuildDictionaryInfoExtracter(bfa)
     args = BuildDictionaryInfoExtracter.basic_target_args
-    self.assertEqual([BuildSymbolInfo('target1', 'Target1 docstring.', [], args),
-                       BuildSymbolInfo('target2', 'Target2 docstring.', [], args),
-                       BuildSymbolInfo('target3', 'Target3 docstring.', [], args)],
-                      extracter.get_target_type_info())
+    self.assertEqual(
+      [
+        BuildSymbolInfo("target1", "Target1 docstring.", [], args),
+        BuildSymbolInfo("target2", "Target2 docstring.", [], args),
+        BuildSymbolInfo("target3", "Target3 docstring.", [], args),
+      ],
+      extracter.get_target_type_info(),
+    )
 
   def test_get_object_info(self):
     class Foo:
@@ -194,17 +229,22 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
         :param int baz: Baz details.
         """
 
-    bfa = BuildFileAliases(targets={},
-      objects={
-        'foo': Foo
-      },
-      context_aware_object_factories={},
-    )
+    bfa = BuildFileAliases(targets={}, objects={"foo": Foo}, context_aware_object_factories={})
     extracter = BuildDictionaryInfoExtracter(bfa)
-    self.assertEqual([BuildSymbolInfo('foo', 'Foo docstring.', [],
-                                       [FunctionArg('bar', 'Bar details.', False, None),
-                                        FunctionArg('baz', 'Baz details.', True, 42)])],
-                      extracter.get_object_info())
+    self.assertEqual(
+      [
+        BuildSymbolInfo(
+          "foo",
+          "Foo docstring.",
+          [],
+          [
+            FunctionArg("bar", "Bar details.", False, None),
+            FunctionArg("baz", "Baz details.", True, 42),
+          ],
+        )
+      ],
+      extracter.get_object_info(),
+    )
 
   def test_get_object_factory_info(self):
     class Foo:
@@ -216,14 +256,19 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
         :param int baz: Baz details.
         """
 
-    bfa = BuildFileAliases(targets={},
-      objects={},
-      context_aware_object_factories={
-        'foo': Foo
-      }
-    )
+    bfa = BuildFileAliases(targets={}, objects={}, context_aware_object_factories={"foo": Foo})
     extracter = BuildDictionaryInfoExtracter(bfa)
-    self.assertEqual([BuildSymbolInfo('foo', 'Foo docstring.', [],
-                                       [FunctionArg('bar', 'Bar details.', False, None),
-                                        FunctionArg('baz', 'Baz details.', True, 42)])],
-                      extracter.get_object_factory_info())
+    self.assertEqual(
+      [
+        BuildSymbolInfo(
+          "foo",
+          "Foo docstring.",
+          [],
+          [
+            FunctionArg("bar", "Bar details.", False, None),
+            FunctionArg("baz", "Baz details.", True, 42),
+          ],
+        )
+      ],
+      extracter.get_object_factory_info(),
+    )

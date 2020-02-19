@@ -33,9 +33,15 @@ class TransitiveOptionRegistrar:
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--transitive', type=bool, default=True, fingerprint=True, recursive=True,
-             help="If false, act only on the targets directly specified on the command line. "
-                  "If true, act on the transitive dependency closure of those targets.")
+    register(
+      "--transitive",
+      type=bool,
+      default=True,
+      fingerprint=True,
+      recursive=True,
+      help="If false, act only on the targets directly specified on the command line. "
+      "If true, act on the transitive dependency closure of those targets.",
+    )
 
 
 class HasSkipOptionMixin:
@@ -67,7 +73,7 @@ class HasSkipOptionMixin:
     #
     # Skip mypy because this is a temporary hack, and mypy doesn't follow the inheritance chain
     # properly.
-    options = self.get_options() # type: ignore
+    options = self.get_options()  # type: ignore
     if hasattr(options, "only"):
       only = options.only
       if only is None:
@@ -75,9 +81,7 @@ class HasSkipOptionMixin:
       elif only == "scalafix":
         only_resolved_as_skip = not self.__class__.__name__.startswith("ScalaFix")
         if skip and not only_resolved_as_skip:
-          raise ValueError(
-            f"Invalid flag combination; cannot specify --only={only} if --skip=True",
-          )
+          raise ValueError(f"Invalid flag combination; cannot specify --only={only} if --skip=True")
         return only_resolved_as_skip
       else:
         raise ValueError("Invalid value for flag --only - must be scalafix or not set at all")
@@ -91,7 +95,7 @@ class HasSkipOptionMixin:
       new_scope=new_scope,
       # Skip mypy because this is a temporary hack, and mypy doesn't follow the inheritance chain
       # properly.
-      old_container=self.get_options(), # type: ignore
+      old_container=self.get_options(),  # type: ignore
       new_container=subsystem.options,
     )
     return self.resolve_only_as_skip(skip)
@@ -103,8 +107,9 @@ class SkipOptionRegistrar:
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--skip', type=bool, default=False, fingerprint=True, recursive=True,
-             help='Skip task.')
+    register(
+      "--skip", type=bool, default=False, fingerprint=True, recursive=True, help="Skip task."
+    )
 
 
 class HasSkipAndTransitiveOptionsMixin(HasSkipOptionMixin, HasTransitiveOptionMixin):
@@ -119,46 +124,50 @@ class SkipAndTransitiveOptionsRegistrar(SkipOptionRegistrar, TransitiveOptionReg
   """Registrar of --skip and --transitive."""
 
 
-class SkipAndTransitiveGoalOptionsRegistrar(SkipAndTransitiveOptionsRegistrar,
-                                            GoalOptionsRegistrar):
+class SkipAndTransitiveGoalOptionsRegistrar(
+  SkipAndTransitiveOptionsRegistrar, GoalOptionsRegistrar
+):
   """Registrar of --skip and --transitive at the goal level."""
 
 
 class DeprecatedSkipAndDeprecatedTransitiveGoalOptionsRegistrar(GoalOptionsRegistrar):
-
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
     register(
-      '--transitive', type=bool, default=False, fingerprint=True, recursive=True,
+      "--transitive",
+      type=bool,
+      default=False,
+      fingerprint=True,
+      recursive=True,
       removal_version="1.27.0.dev0",
       removal_hint="This feature is going away. Instead of relying on the `--transitive` flag, "
-                   "directly specify on the command line every target that you want to format or "
-                   "lint.",
+      "directly specify on the command line every target that you want to format or "
+      "lint.",
       help="If false, act only on the targets directly specified on the command line. "
-           "If true, act on the transitive dependency closure of those targets.",
+      "If true, act on the transitive dependency closure of those targets.",
     )
     deprecated_skip_mapping = {
-      'lint-checkstyle': 'checkstyle',
-      'fmt-javascriptstyle': 'eslint',
-      'lint-javascriptstyle': 'eslint',
-      'fmt-go': 'gofmt',
-      'lint-go': 'gofmt',
-      'fmt-google-java-format': 'google-java-format',
-      'lint-google-java-format': 'google-java-format',
-      'fmt-isort': 'isort',
-      'lint-mypy': 'mypy',
-      'lint-pythonstyle': 'pycheck',
-      'lint-python-eval': 'python-eval',
-      'fmt-scalafix': 'scalafix',
-      'lint-scalafix': 'scalafix',
-      'fmt-scalafmt': 'scalafmt',
-      'lint-scalafmt': 'scalafmt',
-      'lint-scalastyle': 'scalastyle',
-      'lint-thrift': 'scrooge-linter',
+      "lint-checkstyle": "checkstyle",
+      "fmt-javascriptstyle": "eslint",
+      "lint-javascriptstyle": "eslint",
+      "fmt-go": "gofmt",
+      "lint-go": "gofmt",
+      "fmt-google-java-format": "google-java-format",
+      "lint-google-java-format": "google-java-format",
+      "fmt-isort": "isort",
+      "lint-mypy": "mypy",
+      "lint-pythonstyle": "pycheck",
+      "lint-python-eval": "python-eval",
+      "fmt-scalafix": "scalafix",
+      "lint-scalafix": "scalafix",
+      "fmt-scalafmt": "scalafmt",
+      "lint-scalafmt": "scalafmt",
+      "lint-scalastyle": "scalastyle",
+      "lint-thrift": "scrooge-linter",
     }
-    deprecated_skip_mapping_str = '\n'.join(
-      f'* --{old}-skip -> --{new}-skip' for old, new in sorted(deprecated_skip_mapping.items())
+    deprecated_skip_mapping_str = "\n".join(
+      f"* --{old}-skip -> --{new}-skip" for old, new in sorted(deprecated_skip_mapping.items())
     )
     skip_deprecation_message = (
       "`--fmt-skip` and `--lint-skip` are being replaced by options on the linters and formatters "
@@ -168,7 +177,12 @@ class DeprecatedSkipAndDeprecatedTransitiveGoalOptionsRegistrar(GoalOptionsRegis
       f"`./pants fmt` and `./pants lint`."
     )
     register(
-      '--skip', type=bool, default=False, fingerprint=True, recursive=True,
-      removal_version='1.27.0.dev0', removal_hint=skip_deprecation_message,
-      help='Skip task.',
+      "--skip",
+      type=bool,
+      default=False,
+      fingerprint=True,
+      recursive=True,
+      removal_version="1.27.0.dev0",
+      removal_hint=skip_deprecation_message,
+      help="Skip task.",
     )

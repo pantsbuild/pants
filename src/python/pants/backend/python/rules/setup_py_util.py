@@ -24,7 +24,7 @@ PackageDatum = Tuple[str, Tuple[str, ...]]
 def source_root_or_raise(source_roots: SourceRoots, path: str) -> str:
   source_root = source_roots.find_by_path(path)
   if not source_root:
-    raise NoSourceRootError(f'Found no source root for {path}')
+    raise NoSourceRootError(f"Found no source root for {path}")
   return source_root.path
 
 
@@ -45,7 +45,7 @@ def distutils_repr(obj):
     output.write(ensure_text(data))
 
   def _write_repr(o, indent=False, level=0):
-    pad = ' ' * 4 * level
+    pad = " " * 4 * level
     if indent:
       _write(pad)
     level += 1
@@ -56,29 +56,29 @@ def distutils_repr(obj):
       # repr here.
       o_txt = ensure_text(o)
       if linesep in o_txt:
-        _write('"""{}"""'.format(o_txt.replace('"""', r'\"\"\"')))
+        _write('"""{}"""'.format(o_txt.replace('"""', r"\"\"\"")))
       else:
         _write("'{}'".format(o_txt.replace("'", r"\'")))
     elif isinstance(o, abc.Mapping):
-      _write('{' + linesep)
+      _write("{" + linesep)
       for k, v in o.items():
         _write_repr(k, indent=True, level=level)
-        _write(': ')
+        _write(": ")
         _write_repr(v, indent=False, level=level)
-        _write(',' + linesep)
-      _write(pad + '}')
+        _write("," + linesep)
+      _write(pad + "}")
     elif isinstance(o, abc.Iterable):
       if isinstance(o, abc.MutableSequence):
-        open_collection, close_collection = '[]'
+        open_collection, close_collection = "[]"
       elif isinstance(o, abc.Set):
-        open_collection, close_collection = '{}'
+        open_collection, close_collection = "{}"
       else:
-        open_collection, close_collection = '()'
+        open_collection, close_collection = "()"
 
       _write(open_collection + linesep)
       for i in o:
         _write_repr(i, indent=True, level=level)
-        _write(',' + linesep)
+        _write("," + linesep)
       _write(pad + close_collection)
     else:
       _write(repr(o))  # Numbers and bools.
@@ -88,10 +88,10 @@ def distutils_repr(obj):
 
 
 def find_packages(
-    source_roots: SourceRoots,
-    tgts_and_stripped_srcs: Iterable[Tuple[HydratedTarget, SourceRootStrippedSources]],
-    init_py_contents: FilesContent,
-    py2: bool,
+  source_roots: SourceRoots,
+  tgts_and_stripped_srcs: Iterable[Tuple[HydratedTarget, SourceRootStrippedSources]],
+  init_py_contents: FilesContent,
+  py2: bool,
 ) -> Tuple[Tuple[str, ...], Tuple[str, ...], Tuple[PackageDatum, ...]]:
   """Analyze the package structure for the given sources.
 
@@ -105,14 +105,14 @@ def find_packages(
       for file in stripped_srcs.snapshot.files:
         # Python 2: An __init__.py file denotes a package.
         # Python 3: Any directory containing python source files is a package.
-        if not py2 or os.path.basename(file) == '__init__.py':
-          packages.add(os.path.dirname(file).replace(os.path.sep, '.'))
+        if not py2 or os.path.basename(file) == "__init__.py":
+          packages.add(os.path.dirname(file).replace(os.path.sep, "."))
 
   # Add any packages implied by ancestor __init__.py files.
   # Note that init_py_contents includes all __init__.py files, not just ancestors, but
   # that's fine - the others will already have been found in tgts_and_stripped_srcs above.
   for init_py_content in init_py_contents:
-    packages.add(os.path.dirname(init_py_content.path).replace(os.path.sep, '.'))
+    packages.add(os.path.dirname(init_py_content.path).replace(os.path.sep, "."))
 
   # Now find all package_data.
   for tgt, stripped_srcs in tgts_and_stripped_srcs:
@@ -120,14 +120,15 @@ def find_packages(
       source_root = source_root_or_raise(source_roots, tgt.address.spec_path)
       resource_dir_relpath = os.path.relpath(tgt.address.spec_path, source_root)
       # Find the closest enclosing package, if any.  Resources will be loaded relative to that.
-      package: str = resource_dir_relpath.replace(os.path.sep, '.')
+      package: str = resource_dir_relpath.replace(os.path.sep, ".")
       while package and package not in packages:
-        package = package.rpartition('.')[0]
+        package = package.rpartition(".")[0]
       # If resource is not in a package, ignore it. There's no principled way to load it anyway.
       if package:
-        package_dir_relpath = package.replace('.', os.path.sep)
+        package_dir_relpath = package.replace(".", os.path.sep)
         package_data[package].extend(
-          os.path.relpath(file, package_dir_relpath) for file in stripped_srcs.snapshot.files)
+          os.path.relpath(file, package_dir_relpath) for file in stripped_srcs.snapshot.files
+        )
 
   # See which packages are pkg_resources-style namespace packages.
   # Note that implicit PEP 420 namespace packages and pkgutil-style namespace packages
@@ -136,14 +137,17 @@ def find_packages(
   namespace_packages: Set[str] = set()
   init_py_by_path: Dict[str, bytes] = {ipc.path: ipc.content for ipc in init_py_contents}
   for pkg in packages:
-    path = os.path.join(pkg.replace('.', os.path.sep), '__init__.py')
-    if (path in init_py_by_path and
-        declares_pkg_resources_namespace_package(init_py_by_path[path].decode())):
+    path = os.path.join(pkg.replace(".", os.path.sep), "__init__.py")
+    if path in init_py_by_path and declares_pkg_resources_namespace_package(
+      init_py_by_path[path].decode()
+    ):
       namespace_packages.add(pkg)
 
-  return (tuple(sorted(packages)),
-          tuple(sorted(namespace_packages)),
-          tuple((pkg, tuple(sorted(files))) for pkg, files in package_data.items()))
+  return (
+    tuple(sorted(packages)),
+    tuple(sorted(namespace_packages)),
+    tuple((pkg, tuple(sorted(files))) for pkg, files in package_data.items()),
+  )
 
 
 def declares_pkg_resources_namespace_package(python_src: str) -> bool:
@@ -186,8 +190,9 @@ def declares_pkg_resources_namespace_package(python_src: str) -> bool:
   for ast_node in ast.walk(python_src_ast):
     # pkg_resources-style namespace, e.g.,
     #   __import__('pkg_resources').declare_namespace(__name__).
-    if (is_call_to(ast_node, 'declare_namespace') and
-        has_args(cast(ast.Call, ast_node), ('__name__',))):
+    if is_call_to(ast_node, "declare_namespace") and has_args(
+      cast(ast.Call, ast_node), ("__name__",)
+    ):
       return True
   return False
 
@@ -202,7 +207,7 @@ def is_python2(compatibilities: Iterable[Optional[List[str]]], python_setup: Pyt
 
   for req in iter_reqs():
     for python_27_ver in range(0, 17):  # The last python 2.7 version was 2.7.17.
-      if req.specifier.contains(f'2.7.{python_27_ver}'):
+      if req.specifier.contains(f"2.7.{python_27_ver}"):
         # At least one constraint limits us to Python 2, so assume that.
         return True
   return False

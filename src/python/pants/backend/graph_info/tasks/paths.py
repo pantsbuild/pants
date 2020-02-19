@@ -9,7 +9,7 @@ from pants.util.strutil import pluralize
 
 
 def format_path(path):
-  return '[{}]'.format(', '.join([target.address.reference() for target in path]))
+  return "[{}]".format(", ".join([target.address.reference() for target in path]))
 
 
 def find_paths_breadth_first(from_target, to_target, log):
@@ -17,8 +17,11 @@ def find_paths_breadth_first(from_target, to_target, log):
 
   The paths are returned ordered by length, shortest first.
   If there are cycles, it checks visited edges to prevent recrossing them."""
-  log.debug('Looking for all paths from {} to {}'.format(from_target.address.reference(),
-                                                         to_target.address.reference()))
+  log.debug(
+    "Looking for all paths from {} to {}".format(
+      from_target.address.reference(), to_target.address.reference()
+    )
+  )
 
   if from_target == to_target:
     yield [from_target]
@@ -54,8 +57,11 @@ class PathFinder(ConsoleTask):
   def register_options(cls, register):
     super().register_options(register)
     register(
-      '--transitive', type=bool, default=True, fingerprint=True,
-      help='If True, use all targets in the build graph, else use only target roots.',
+      "--transitive",
+      type=bool,
+      default=True,
+      fingerprint=True,
+      help="If True, use all targets in the build graph, else use only target roots.",
       removal_version="1.27.0.dev0",
       removal_hint="This option has no impact on the goals `path` and `paths`.",
     )
@@ -67,7 +73,7 @@ class PathFinder(ConsoleTask):
 
   def validate_target_roots(self):
     if len(self.target_roots) != 2:
-      raise TaskError('Specify two targets please (found {})'.format(len(self.target_roots)))
+      raise TaskError("Specify two targets please (found {})".format(len(self.target_roots)))
 
 
 class Path(PathFinder):
@@ -83,8 +89,9 @@ class Path(PathFinder):
       yield format_path(path)
       break
     else:
-      yield 'No path found from {} to {}!'.format(from_target.address.reference(),
-                                                  to_target.address.reference())
+      yield "No path found from {} to {}!".format(
+        from_target.address.reference(), to_target.address.reference()
+      )
 
 
 class Paths(PathFinder):
@@ -96,8 +103,8 @@ class Paths(PathFinder):
     to_target = self.target_roots[1]
 
     paths = list(find_paths_breadth_first(from_target, to_target, self.log))
-    yield 'Found {}'.format(pluralize(len(paths), 'path'))
+    yield "Found {}".format(pluralize(len(paths), "path"))
     if paths:
-      yield ''
+      yield ""
       for path in paths:
-        yield '\t{}'.format(format_path(path))
+        yield "\t{}".format(format_path(path))

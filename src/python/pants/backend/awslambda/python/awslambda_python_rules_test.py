@@ -28,7 +28,6 @@ from pants.testutil.test_base import TestBase
 
 
 class TestPythonAWSLambdaCreation(TestBase):
-
   def setUp(self):
     super().setUp()
     init_subsystems([download_pex_bin.DownloadedPexBin.Factory])
@@ -61,18 +60,27 @@ class TestPythonAWSLambdaCreation(TestBase):
         download_pex_bin.DownloadedPexBin.Factory.global_instance(),
       ),
     )
-    files_content = list(self.request_single_product(FilesContent,
-                                                     Params(created_awslambda.digest)))
+    files_content = list(
+      self.request_single_product(FilesContent, Params(created_awslambda.digest))
+    )
     assert len(files_content) == 1
     return created_awslambda.name, files_content[0].content
 
   def test_create_hello_world_lambda(self) -> None:
-    self.create_file('src/python/foo/bar/hello_world.py', textwrap.dedent("""
+    self.create_file(
+      "src/python/foo/bar/hello_world.py",
+      textwrap.dedent(
+        """
       def handler(event, context):
         print('Hello, World!')
-    """))
+    """
+      ),
+    )
 
-    self.create_file('src/python/foo/bar/BUILD', textwrap.dedent("""
+    self.create_file(
+      "src/python/foo/bar/BUILD",
+      textwrap.dedent(
+        """
       python_library(
         name='hello_world',
         sources=['hello_world.py']
@@ -83,11 +91,13 @@ class TestPythonAWSLambdaCreation(TestBase):
         dependencies=[':hello_world'],
         handler='foo.bar.hello_world'
       )
-    """))
+    """
+      ),
+    )
 
-    name, content = self.create_python_awslambda('src/python/foo/bar:hello_world_lambda')
-    assert 'hello_world_lambda.pex' == name
+    name, content = self.create_python_awslambda("src/python/foo/bar:hello_world_lambda")
+    assert "hello_world_lambda.pex" == name
     zipfile = ZipFile(BytesIO(content))
     names = set(zipfile.namelist())
-    assert 'lambdex_handler.py' in names
-    assert 'foo/bar/hello_world.py' in names
+    assert "lambdex_handler.py" in names
+    assert "foo/bar/hello_world.py" in names

@@ -20,13 +20,9 @@ class PythonTarget(Target):
   :API: public
   """
 
-  def __init__(self,
-               address=None,
-               payload=None,
-               sources=None,
-               provides=None,
-               compatibility=None,
-               **kwargs):
+  def __init__(
+    self, address=None, payload=None, sources=None, provides=None, compatibility=None, **kwargs
+  ):
     """
     :param dependencies: The addresses of targets that this target depends on.
       These dependencies may
@@ -49,17 +45,22 @@ class PythonTarget(Target):
     """
     self.address = address
     payload = payload or Payload()
-    payload.add_fields({
-      'sources': self.create_sources_field(sources, address.spec_path, key_arg='sources'),
-      'provides': provides,
-      'compatibility': PrimitiveField(maybe_list(compatibility or ())),
-    })
+    payload.add_fields(
+      {
+        "sources": self.create_sources_field(sources, address.spec_path, key_arg="sources"),
+        "provides": provides,
+        "compatibility": PrimitiveField(maybe_list(compatibility or ())),
+      }
+    )
     super().__init__(address=address, payload=payload, **kwargs)
 
     if provides and not isinstance(provides, PythonArtifact):
-      raise TargetDefinitionException(self,
+      raise TargetDefinitionException(
+        self,
         "Target must provide a valid pants setup_py object. Received a '{}' object instead.".format(
-          provides.__class__.__name__))
+          provides.__class__.__name__
+        ),
+      )
 
     self._provides = provides
 
@@ -76,7 +77,7 @@ class PythonTarget(Target):
       yield address_spec
 
     target_representation = kwargs or payload.as_dict()
-    provides = target_representation.get('provides', None) or []
+    provides = target_representation.get("provides", None) or []
     if provides:
       for address_spec in provides._binaries.values():
         yield address_spec
@@ -92,6 +93,7 @@ class PythonTarget(Target):
         for key, binary_spec in self.payload.provides.binaries.items():
           address = Address.parse(binary_spec, relative_to=self.address.spec_path)
           yield (key, self._build_graph.get_target(address))
+
     return dict(binary_iter())
 
   @property

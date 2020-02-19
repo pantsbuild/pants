@@ -8,9 +8,9 @@ class ZincLanguageMixin(MirroredTargetOptionMixin):
   """A mixin for subsystems for languages compiled with Zinc."""
 
   mirrored_target_option_actions = {
-    'strict_deps': lambda tgt: tgt.strict_deps,
-    'compiler_option_sets': lambda tgt: tgt.compiler_option_sets,
-    'zinc_file_manager': lambda tgt: tgt.zinc_file_manager,
+    "strict_deps": lambda tgt: tgt.strict_deps,
+    "compiler_option_sets": lambda tgt: tgt.compiler_option_sets,
+    "zinc_file_manager": lambda tgt: tgt.zinc_file_manager,
   }
 
   @classmethod
@@ -19,17 +19,32 @@ class ZincLanguageMixin(MirroredTargetOptionMixin):
     # NB: This option is fingerprinted because the default value is not included in a target's
     # fingerprint. This also has the effect of invalidating only the relevant tasks: ZincCompile
     # in this case.
-    register('--strict-deps', advanced=True, default=False, fingerprint=True, type=bool,
-             help='The default for the "strict_deps" argument for targets of this language.')
+    register(
+      "--strict-deps",
+      advanced=True,
+      default=False,
+      fingerprint=True,
+      type=bool,
+      help='The default for the "strict_deps" argument for targets of this language.',
+    )
 
-    register('--compiler-option-sets', advanced=True, default=[], type=list,
-             fingerprint=True,
-             help='The default for the "compiler_option_sets" argument '
-                  'for targets of this language.')
+    register(
+      "--compiler-option-sets",
+      advanced=True,
+      default=[],
+      type=list,
+      fingerprint=True,
+      help='The default for the "compiler_option_sets" argument ' "for targets of this language.",
+    )
 
-    register('--zinc-file-manager', advanced=True, default=True, type=bool,
-             fingerprint=True,
-             help='Use zinc provided file manager to ensure transactional rollback.')
+    register(
+      "--zinc-file-manager",
+      advanced=True,
+      default=True,
+      type=bool,
+      fingerprint=True,
+      help="Use zinc provided file manager to ensure transactional rollback.",
+    )
 
   @property
   def strict_deps(self):

@@ -18,8 +18,10 @@ class Xargs:
     """Creates an xargs engine that uses subprocess.call to execute the given cmd array with extra
     arg chunks.
     """
+
     def call(args):
       return subprocess.call(cmd + args, **kwargs)
+
     return cls(call)
 
   def __init__(self, cmd):

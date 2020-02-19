@@ -7,16 +7,14 @@ from pants.base.payload_field import PayloadField
 
 class PythonArtifact(PayloadField):
   """Represents a Python setup.py-based project."""
-  class MissingArgument(Exception): pass
 
-  class UnsupportedArgument(Exception): pass
+  class MissingArgument(Exception):
+    pass
 
-  UNSUPPORTED_ARGS = frozenset({
-    'data_files',
-    'package_dir',
-    'package_data',
-    'packages',
-  })
+  class UnsupportedArgument(Exception):
+    pass
+
+  UNSUPPORTED_ARGS = frozenset({"data_files", "package_dir", "package_data", "packages"})
 
   def __init__(self, **kwargs):
     """
@@ -28,15 +26,17 @@ class PythonArtifact(PayloadField):
     def has(name):
       value = self._kw.get(name)
       if value is None:
-        raise self.MissingArgument('PythonArtifact requires {} to be specified!'.format(name))
+        raise self.MissingArgument("PythonArtifact requires {} to be specified!".format(name))
       return value
 
     def misses(name):
       if name in self._kw:
-        raise self.UnsupportedArgument('PythonArtifact prohibits {} from being specified'.format(name))
+        raise self.UnsupportedArgument(
+          "PythonArtifact prohibits {} from being specified".format(name)
+        )
 
-    self._version = has('version')
-    self._name = has('name')
+    self._version = has("version")
+    self._name = has("name")
     for arg in self.UNSUPPORTED_ARGS:
       misses(arg)
 
@@ -50,7 +50,7 @@ class PythonArtifact(PayloadField):
 
   @property
   def requirement(self):
-    return '{}=={}'.format(self._name, self._version)
+    return "{}=={}".format(self._name, self._version)
 
   @property
   def setup_py_keywords(self):

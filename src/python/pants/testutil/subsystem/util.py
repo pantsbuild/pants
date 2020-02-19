@@ -42,15 +42,16 @@ def init_subsystems(subsystem_types, options=None):
   optionables = set()
   for s in subsystem_types:
     if not Subsystem.is_subsystem_type(s):
-      raise TypeError(f'{s} is not a subclass of `Subsystem`')
+      raise TypeError(f"{s} is not a subclass of `Subsystem`")
     for si in s.known_scope_infos():
       optionables.add(si.optionable_cls)
   if options:
     allowed_scopes = {o.options_scope for o in optionables}
     for scope in options.keys():
-      if scope != '' and scope not in allowed_scopes:
-        raise ValueError('`{}` is not the scope of any of these subsystems: {}'.format(
-          scope, optionables))
+      if scope != "" and scope not in allowed_scopes:
+        raise ValueError(
+          "`{}` is not the scope of any of these subsystems: {}".format(scope, optionables)
+        )
   # Don't trample existing subsystem options, in case a test has set up some
   # other subsystems in some other way.
   updated_options = dict(Subsystem._options.items()) if Subsystem._options else {}

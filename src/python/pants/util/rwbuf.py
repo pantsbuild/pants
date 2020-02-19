@@ -30,7 +30,7 @@ class _RWBuf(object):
 
   def write(self, s):
     if not isinstance(s, bytes):
-      raise ValueError(f'Expected bytes, not {type(s)}, for argument {s}')
+      raise ValueError(f"Expected bytes, not {type(s)}, for argument {s}")
     with self._lock:
       self.do_write(s)
       self._io.flush()
@@ -70,7 +70,7 @@ class FileBackedRWBuf(_RWBuf):
   when you want to poll the output of long-running subprocesses in a separate thread."""
 
   def __init__(self, backing_file):
-    _RWBuf.__init__(self, open(backing_file, 'a+b'))
+    _RWBuf.__init__(self, open(backing_file, "a+b"))
     self.fileno = self._io.fileno
 
   def do_write(self, s):
@@ -96,7 +96,7 @@ class StringWriter:
 
   def write(self, s):
     if not isinstance(s, str):
-      raise ValueError(f'Expected unicode str, not {type(s)}, for argument {s}')
+      raise ValueError(f"Expected unicode str, not {type(s)}, for argument {s}")
     self.buffer.write(s.encode())
 
   def flush(self):

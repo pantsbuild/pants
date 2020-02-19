@@ -18,7 +18,7 @@ class PythonApp(AppBase):
 
   @classmethod
   def alias(cls):
-    return 'python_app'
+    return "python_app"
 
   @classmethod
   def binary_target_type(cls):

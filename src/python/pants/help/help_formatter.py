@@ -10,7 +10,6 @@ from pants.help.help_info_extracter import HelpInfoExtracter, OptionHelpInfo
 
 
 class HelpFormatter:
-
   def __init__(self, *, scope: str, show_recursive: bool, show_advanced: bool, color: bool) -> None:
     self._scope = scope
     self._show_recursive = show_recursive
@@ -42,27 +41,27 @@ class HelpFormatter:
     lines = []
 
     def add_option(ohis, *, category=None):
-      lines.append('')
-      display_scope = scope or 'Global'
+      lines.append("")
+      display_scope = scope or "Global"
       if category:
-        lines.append(self._maybe_green(f'{display_scope} {category}:'))
+        lines.append(self._maybe_green(f"{display_scope} {category}:"))
       else:
-        lines.append(self._maybe_green(f'{display_scope}:'))
+        lines.append(self._maybe_green(f"{display_scope}:"))
         if description:
           lines.append(description)
-      lines.append(' ')
+      lines.append(" ")
       if not ohis:
-        lines.append('No options available.')
+        lines.append("No options available.")
         return
       for ohi in ohis:
         lines.extend(self.format_option(ohi))
 
     add_option(oshi.basic)
     if self._show_recursive:
-      add_option(oshi.recursive, category='recursive')
+      add_option(oshi.recursive, category="recursive")
     if self._show_advanced:
-      add_option(oshi.advanced, category='advanced')
-    return [*lines, '\n']
+      add_option(oshi.advanced, category="advanced")
+    return [*lines, "\n"]
 
   def format_option(self, ohi: OptionHelpInfo) -> List[str]:
     """Format the help output for a single option.
@@ -71,17 +70,17 @@ class HelpFormatter:
     :return: Formatted help text for this option
     """
     lines = []
-    choices = f'one of: [{ohi.choices}] ' if ohi.choices else ''
-    arg_line = '{args} {default}'.format(
-      args=self._maybe_magenta(', '.join(ohi.display_args)),
-      default=self._maybe_cyan(f'({choices}default: {ohi.default})')
+    choices = f"one of: [{ohi.choices}] " if ohi.choices else ""
+    arg_line = "{args} {default}".format(
+      args=self._maybe_magenta(", ".join(ohi.display_args)),
+      default=self._maybe_cyan(f"({choices}default: {ohi.default})"),
     )
-    lines.append(f'  {arg_line}')
+    lines.append(f"  {arg_line}")
 
-    indent = '      '
-    lines.extend([f'{indent}{s}' for s in wrap(ohi.help, 76)])
+    indent = "      "
+    lines.extend([f"{indent}{s}" for s in wrap(ohi.help, 76)])
     if ohi.deprecated_message:
-      lines.append(self._maybe_red(f'{indent}{ohi.deprecated_message}.'))
+      lines.append(self._maybe_red(f"{indent}{ohi.deprecated_message}."))
       if ohi.removal_hint:
-        lines.append(self._maybe_red(f'{indent}{ohi.removal_hint}'))
+        lines.append(self._maybe_red(f"{indent}{ohi.removal_hint}"))
     return lines

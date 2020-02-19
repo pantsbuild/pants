@@ -23,7 +23,7 @@ class SingletonMetaclass(type):
 
   def __call__(cls, *args: Any, **kwargs: Any) -> Any:
     # TODO: convert this into an `@memoized_classproperty`!
-    if not hasattr(cls, 'instance'):
+    if not hasattr(cls, "instance"):
       cls.instance = super().__call__(*args, **kwargs)
     return cls.instance
 
@@ -45,14 +45,16 @@ class ClassPropertyDescriptor:
       objtype = type(obj)
       # Get the callable field for this object, which may be a property.
     callable_field = self.fget.__get__(obj, objtype)
-    if getattr(self.fget.__func__, '__isabstractmethod__', False):
+    if getattr(self.fget.__func__, "__isabstractmethod__", False):
       field_name = self.fget.__func__.fget.__name__  # type: ignore[attr-defined]
-      raise TypeError("""\
+      raise TypeError(
+        """\
 The classproperty '{func_name}' in type '{type_name}' was an abstractproperty, meaning that type \
 {type_name} must override it by setting it as a variable in the class body or defining a method \
-with an @classproperty decorator."""
-                      .format(func_name=field_name,
-                              type_name=objtype.__name__))
+with an @classproperty decorator.""".format(
+          func_name=field_name, type_name=objtype.__name__
+        )
+      )
     return callable_field()
 
 
@@ -130,19 +132,19 @@ class _ClassDecoratorWithSentinelAttribute(ABC):
   """
 
   @abstractmethod
-  def __call__(self, cls: Type) -> Type: ...
+  def __call__(self, cls: Type) -> Type:
+    ...
 
   def define_instance_of(self, obj: Type, **kwargs) -> Type:
-    return type(obj.__name__, (obj,), {
-      '_decorated_type_checkable_type': type(self),
-      **kwargs
-    })
+    return type(obj.__name__, (obj,), {"_decorated_type_checkable_type": type(self), **kwargs})
 
   def is_instance(self, obj: Type) -> bool:
-    return getattr(obj, '_decorated_type_checkable_type', None) is type(self)
+    return getattr(obj, "_decorated_type_checkable_type", None) is type(self)
 
 
-def decorated_type_checkable(decorator: Callable[[Type], Type]) -> _ClassDecoratorWithSentinelAttribute:
+def decorated_type_checkable(
+  decorator: Callable[[Type], Type]
+) -> _ClassDecoratorWithSentinelAttribute:
   """Wraps a class decorator to add a "sentinel attribute" to decorated classes.
 
   A "sentinel attribute" is an attribute added to the wrapped class decorator's result with

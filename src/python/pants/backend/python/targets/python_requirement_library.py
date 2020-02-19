@@ -21,10 +21,8 @@ class PythonRequirementLibrary(Target):
     """
     payload = payload or Payload()
 
-    assert_list(requirements, expected_type=PythonRequirement, key_arg='requirements')
-    payload.add_fields({
-      'requirements': PythonRequirementsField(requirements or []),
-    })
+    assert_list(requirements, expected_type=PythonRequirement, key_arg="requirements")
+    payload.add_fields({"requirements": PythonRequirementsField(requirements or [])})
     super().__init__(payload=payload, **kwargs)
 
   @property

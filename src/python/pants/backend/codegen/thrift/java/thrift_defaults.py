@@ -7,7 +7,8 @@ from pants.subsystem.subsystem import Subsystem
 
 class ThriftDefaults(Subsystem):
   """Tracks defaults for java thrift target attributes that influence code generation."""
-  options_scope = 'thrift-defaults'
+
+  options_scope = "thrift-defaults"
 
   # TODO: These exist to support alternate compilers (specifically scrooge), but this should
   # probably be a scrooge-specific subsystem, tied to a scrooge_thrift_library target type.
@@ -15,16 +16,41 @@ class ThriftDefaults(Subsystem):
   # in some other compiler (they certainly don't in the apache thrift compiler).
   @classmethod
   def register_options(cls, register):
-    register('--compiler', type=str, advanced=True, default='thrift',
-             help='The default compiler to use for java_thrift_library targets.')
-    register('--language', type=str, advanced=True, default='java',
-             help='The default language to generate for java_thrift_library targets.')
-    register('--default-java-namespace', type=str, advanced=True, default=None,
-             help='The default Java namespace to generate for java_thrift_library targets.')
-    register('--namespace-map', type=dict, advanced=True, default={},
-             help='The default namespace map to generate for java_thrift_library targets, {old: new}.')
-    register('--compiler-args', type=list, advanced=True, default=[],
-             help='Extra arguments for the thrift compiler.')
+    register(
+      "--compiler",
+      type=str,
+      advanced=True,
+      default="thrift",
+      help="The default compiler to use for java_thrift_library targets.",
+    )
+    register(
+      "--language",
+      type=str,
+      advanced=True,
+      default="java",
+      help="The default language to generate for java_thrift_library targets.",
+    )
+    register(
+      "--default-java-namespace",
+      type=str,
+      advanced=True,
+      default=None,
+      help="The default Java namespace to generate for java_thrift_library targets.",
+    )
+    register(
+      "--namespace-map",
+      type=dict,
+      advanced=True,
+      default={},
+      help="The default namespace map to generate for java_thrift_library targets, {old: new}.",
+    )
+    register(
+      "--compiler-args",
+      type=list,
+      advanced=True,
+      default=[],
+      help="Extra arguments for the thrift compiler.",
+    )
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
@@ -91,15 +117,19 @@ class ThriftDefaults(Subsystem):
 
   def _check_target(self, target):
     if not isinstance(target, JavaThriftLibrary):
-      raise ValueError('Can only determine defaults for JavaThriftLibrary targets, '
-                       'given {} of type {}'.format(target, type(target)))
+      raise ValueError(
+        "Can only determine defaults for JavaThriftLibrary targets, "
+        "given {} of type {}".format(target, type(target))
+      )
 
   def _tuple(self):
-    return (self._default_compiler,
-            self._default_language,
-            tuple(sorted(self._default_namespace_map.items())),
-            tuple(self._default_compiler_args),  # N.B.: Assume compiler arg order can matter.
-            self._default_default_java_namespace)
+    return (
+      self._default_compiler,
+      self._default_language,
+      tuple(sorted(self._default_namespace_map.items())),
+      tuple(self._default_compiler_args),  # N.B.: Assume compiler arg order can matter.
+      self._default_default_java_namespace,
+    )
 
   def __hash__(self):
     return hash(self._tuple())

@@ -43,21 +43,21 @@ class CmdLineSpecParser:
     self._root_dir = os.path.realpath(root_dir)
 
   def _normalize_spec_path(self, path: str) -> str:
-    is_abs = not path.startswith('//') and os.path.isabs(path)
+    is_abs = not path.startswith("//") and os.path.isabs(path)
     if is_abs:
       path = os.path.realpath(path)
       if os.path.commonprefix([self._root_dir, path]) != self._root_dir:
         raise self.BadSpecError(
-          f'Absolute spec path {path} does not share build root {self._root_dir}'
+          f"Absolute spec path {path} does not share build root {self._root_dir}"
         )
     else:
-      if path.startswith('//'):
+      if path.startswith("//"):
         path = path[2:]
       path = os.path.join(self._root_dir, path)
 
     normalized = os.path.relpath(path, self._root_dir)
-    if normalized == '.':
-      normalized = ''
+    if normalized == ".":
+      normalized = ""
     return normalized
 
   def parse_spec(self, spec: str) -> Union[AddressSpec, FilesystemSpec]:
@@ -65,19 +65,19 @@ class CmdLineSpecParser:
 
     :raises: CmdLineSpecParser.BadSpecError if the address selector could not be parsed.
     """
-    if spec.endswith('::'):
-      spec_path = spec[:-len('::')]
+    if spec.endswith("::"):
+      spec_path = spec[: -len("::")]
       return DescendantAddresses(directory=self._normalize_spec_path(spec_path))
-    if spec.endswith(':'):
-      spec_path = spec[:-len(':')]
+    if spec.endswith(":"):
+      spec_path = spec[: -len(":")]
       return SiblingAddresses(directory=self._normalize_spec_path(spec_path))
-    if ':' in spec:
-      spec_parts = spec.rsplit(':', 1)
+    if ":" in spec:
+      spec_parts = spec.rsplit(":", 1)
       spec_path = self._normalize_spec_path(spec_parts[0])
       return SingleAddress(directory=spec_path, name=spec_parts[1])
-    if spec.startswith('!'):
+    if spec.startswith("!"):
       return FilesystemIgnoreSpec(spec[1:])
-    if '*' in spec:
+    if "*" in spec:
       return FilesystemGlobSpec(spec)
     if PurePath(spec).suffix:
       return FilesystemLiteralSpec(self._normalize_spec_path(spec))

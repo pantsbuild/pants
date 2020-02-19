@@ -54,13 +54,13 @@ class Exiter:
     """
     if msg:
       out = out or sys.stderr
-      if hasattr(out, 'buffer'):
+      if hasattr(out, "buffer"):
         out = out.buffer
 
       msg = ensure_binary(msg)
       try:
         out.write(msg)
-        out.write(b'\n')
+        out.write(b"\n")
         # TODO: Determine whether this call is a no-op because the stream gets flushed on exit, or
         # if we could lose what we just printed, e.g. if we get interrupted by a signal while
         # exiting and the stream is buffered like stdout.
@@ -69,8 +69,10 @@ class Exiter:
         # If the file is already closed, or any other error occurs, just log it and continue to
         # exit.
         if msg:
-          logger.warning("Encountered error when trying to log this message: {}, \n "
-                         "exception: {} \n out: {}".format(msg, e, out))
+          logger.warning(
+            "Encountered error when trying to log this message: {}, \n "
+            "exception: {} \n out: {}".format(msg, e, out)
+          )
           # In pantsd, this won't go anywhere, because there's really nowhere for us to log if we
           # can't log :(
           # Not in pantsd, this will end up in sys.stderr.

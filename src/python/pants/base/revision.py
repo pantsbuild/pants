@@ -13,6 +13,7 @@ class Revision:
 
   :API: public
   """
+
   class BadRevision(Exception):
     """Indicates a problem parsing a revision."""
 
@@ -31,6 +32,7 @@ class Revision:
 
     :API: public
     """
+
     def parse_extra(delimiter, value):
       if not value:
         return None, None
@@ -39,22 +41,22 @@ class Revision:
         return components[0], None if len(components) == 1 else components[1]
 
     def parse_patch(patch):
-      patch, pre_release = parse_extra('-', patch)
+      patch, pre_release = parse_extra("-", patch)
       if pre_release:
-        pre_release, build = parse_extra('+', pre_release)
+        pre_release, build = parse_extra("+", pre_release)
       else:
-        patch, build = parse_extra('+', patch)
+        patch, build = parse_extra("+", patch)
       return patch, pre_release, build
 
     def parse_components(value):
       if not value:
         yield None
       else:
-        for atom in value.split('.'):
+        for atom in value.split("."):
           yield cls._parse_atom(atom)
 
     try:
-      major, minor, patch = rev.split('.', 2)
+      major, minor, patch = rev.split(".", 2)
       patch, pre_release, build = parse_patch(patch)
       components = [int(major), int(minor), int(patch)]
       components.extend(parse_components(pre_release))
@@ -70,9 +72,9 @@ class Revision:
 
     :API: public
     """
-    rev = re.sub(r'(\d)([a-zA-Z])', r'\1.\2', rev)
-    rev = re.sub(r'([a-zA-Z])(\d)', r'\1.\2', rev)
-    return cls(*list(map(cls._parse_atom, re.split(r'[.+_\-]', rev))))
+    rev = re.sub(r"(\d)([a-zA-Z])", r"\1.\2", rev)
+    rev = re.sub(r"([a-zA-Z])(\d)", r"\1.\2", rev)
+    return cls(*list(map(cls._parse_atom, re.split(r"[.+_\-]", rev))))
 
   def __init__(self, *components):
     self._components = components
@@ -86,7 +88,7 @@ class Revision:
     return list(self._components)
 
   def _is_valid_operand(self, other):
-    return hasattr(other, '_components')
+    return hasattr(other, "_components")
 
   def _fill_value_if_missing(self, ours, theirs):
     if theirs is None:
@@ -101,18 +103,18 @@ class Revision:
     return ours, theirs
 
   def __repr__(self):
-    return '{}({})'.format(self.__class__.__name__, ', '.join(map(repr, self._components)))
+    return "{}({})".format(self.__class__.__name__, ", ".join(map(repr, self._components)))
 
   def __eq__(self, other):
     if not self._is_valid_operand(other):
       return False  # TODO(#6071): typically this should return NotImplemented.
-                    # Returning False for now to avoid changing prior API.
+      # Returning False for now to avoid changing prior API.
     return tuple(self._components) == tuple(other._components)
 
   def __lt__(self, other):
     if not self._is_valid_operand(other):
       return AttributeError  # TODO(#6071): typically this should return NotImplemented.
-                             # Returning AttributeError for now to avoid changing prior API.
+      # Returning AttributeError for now to avoid changing prior API.
     for ours, theirs in zip_longest(self._components, other._components, fillvalue=None):
       if ours != theirs:
         ours, theirs = self._fill_value_if_missing(ours, theirs)
@@ -124,4 +126,4 @@ class Revision:
     return hash(self._components)
 
   def __str__(self):
-    return '.'.join(str(c) for c in self._components)
+    return ".".join(str(c) for c in self._components)

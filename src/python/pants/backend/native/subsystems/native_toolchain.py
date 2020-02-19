@@ -38,7 +38,7 @@ class NativeToolchain(Subsystem):
   installation instructions if the XCode tools could not be found.
   """
 
-  options_scope = 'native-toolchain'
+  options_scope = "native-toolchain"
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -77,14 +77,15 @@ class LibcObjects:
 
 
 class LinkerWrapperMixin:
-
   def for_compiler(self, compiler, platform):
     """Return a Linker object which is intended to be compatible with the given `compiler`."""
-    return (self.linker
-            # TODO(#6143): describe why the compiler needs to be first on the PATH!
-            .sequence(compiler, exclude_list_fields=['extra_args', 'path_entries'])
-            .prepend_field('path_entries', compiler.path_entries)
-            .copy(exe_filename=compiler.exe_filename))
+    return (
+      self.linker
+      # TODO(#6143): describe why the compiler needs to be first on the PATH!
+      .sequence(compiler, exclude_list_fields=["extra_args", "path_entries"])
+      .prepend_field("path_entries", compiler.path_entries)
+      .copy(exe_filename=compiler.exe_filename)
+    )
 
 
 @dataclass(frozen=True)
@@ -120,10 +121,13 @@ class LLVMCppToolchain:
 @rule
 async def select_libc_objects(platform: Platform, native_toolchain: NativeToolchain) -> LibcObjects:
   # We use lambdas here to avoid searching for libc on osx, where it will fail.
-  paths = match(platform, {
-    Platform.darwin: lambda: [],
-    Platform.linux: lambda: native_toolchain._libc_dev.get_libc_objects(),
-  })()
+  paths = match(
+    platform,
+    {
+      Platform.darwin: lambda: [],
+      Platform.linux: lambda: native_toolchain._libc_dev.get_libc_objects(),
+    },
+  )()
   return LibcObjects(paths)
 
 
@@ -142,6 +146,7 @@ class BaseLinker:
 
   This represents Linker objects provided by subsystems, but may need additional information to be
   usable by a specific compiler."""
+
   linker: Linker
 
 
@@ -162,7 +167,7 @@ async def select_gcc_linker(native_toolchain: NativeToolchain) -> GCCLinker:
   base_linker = await Get[BaseLinker](NativeToolchain, native_toolchain)
   linker = base_linker.linker
   libc_objects = await Get[LibcObjects](NativeToolchain, native_toolchain)
-  linker_with_libc = linker.append_field('extra_object_files', libc_objects.crti_object_paths)
+  linker_with_libc = linker.append_field("extra_object_files", libc_objects.crti_object_paths)
   return GCCLinker(linker_with_libc)
 
 
@@ -178,12 +183,13 @@ class GCCInstallLocationForLLVM:
   This is only used on Linux. The option --gcc-toolchain stops clang from searching for another gcc
   on the host system. The option appears to only exist on Linux clang and clang++.
   """
+
   toolchain_dir: Any
 
   @property
   def as_clang_argv(self):
     # TODO(#6143): describe exactly what this argument does to the clang/clang++ invocation!
-    return [f'--gcc-toolchain={self.toolchain_dir}']
+    return [f"--gcc-toolchain={self.toolchain_dir}"]
 
 
 @rule
@@ -192,7 +198,9 @@ def select_gcc_install_location(gcc: GCC) -> GCCInstallLocationForLLVM:
 
 
 @rule
-async def select_llvm_c_toolchain(platform: Platform, native_toolchain: NativeToolchain) -> LLVMCToolchain:
+async def select_llvm_c_toolchain(
+  platform: Platform, native_toolchain: NativeToolchain
+) -> LLVMCToolchain:
   provided_clang = await Get[CCompiler](LLVM, native_toolchain._llvm)
 
   if platform == Platform.darwin:
@@ -201,15 +209,13 @@ async def select_llvm_c_toolchain(platform: Platform, native_toolchain: NativeTo
   else:
     gcc_install = await Get[GCCInstallLocationForLLVM](GCC, native_toolchain._gcc)
     provided_gcc = await Get[CCompiler](GCC, native_toolchain._gcc)
-    joined_c_compiler = (provided_clang
-                         .sequence(provided_gcc)
-                         .append_field('extra_args', gcc_install.as_clang_argv)
-                         # We need g++'s version of the GLIBCXX library to be able to run.
-                         .prepend_field('runtime_library_dirs', provided_gcc.runtime_library_dirs))
+    joined_c_compiler = (
+      provided_clang.sequence(provided_gcc).append_field("extra_args", gcc_install.as_clang_argv)
+      # We need g++'s version of the GLIBCXX library to be able to run.
+      .prepend_field("runtime_library_dirs", provided_gcc.runtime_library_dirs)
+    )
 
-  working_c_compiler = joined_c_compiler.prepend_field('extra_args', [
-    '-x', 'c', '-std=c11',
-  ])
+  working_c_compiler = joined_c_compiler.prepend_field("extra_args", ["-x", "c", "-std=c11"])
 
   llvm_linker_wrapper = await Get[LLVMLinker](NativeToolchain, native_toolchain)
   working_linker = llvm_linker_wrapper.for_compiler(working_c_compiler, platform)
@@ -233,38 +239,50 @@ async def select_llvm_cpp_toolchain(
   else:
     gcc_install = await Get[GCCInstallLocationForLLVM](GCC, native_toolchain._gcc)
     provided_gpp = await Get[CppCompiler](GCC, native_toolchain._gcc)
-    joined_cpp_compiler = (provided_clangpp
-                           .sequence(provided_gpp)
-                           # NB: we use g++'s headers on Linux, and therefore their C++ standard
-                           # library.
-                           .copy(include_dirs=provided_gpp.include_dirs)
-                           .append_field('extra_args', gcc_install.as_clang_argv)
-                           # We need g++'s version of the GLIBCXX library to be able to run.
-                           .prepend_field('runtime_library_dirs', provided_gpp.runtime_library_dirs))
-    extra_llvm_linking_library_dirs = provided_gpp.runtime_library_dirs + provided_clangpp.runtime_library_dirs
+    joined_cpp_compiler = (
+      provided_clangpp.sequence(provided_gpp)
+      # NB: we use g++'s headers on Linux, and therefore their C++ standard
+      # library.
+      .copy(include_dirs=provided_gpp.include_dirs).append_field(
+        "extra_args", gcc_install.as_clang_argv
+      )
+      # We need g++'s version of the GLIBCXX library to be able to run.
+      .prepend_field("runtime_library_dirs", provided_gpp.runtime_library_dirs)
+    )
+    extra_llvm_linking_library_dirs = (
+      provided_gpp.runtime_library_dirs + provided_clangpp.runtime_library_dirs
+    )
     # Ensure we use libstdc++, provided by g++, during the linking stage.
-    linker_extra_args = ('-stdlib=libstdc++',)
+    linker_extra_args = ("-stdlib=libstdc++",)
 
-  working_cpp_compiler = joined_cpp_compiler.prepend_field('extra_args', [
-    '-x', 'c++', '-std=c++11',
-    # This flag is intended to avoid using any of the headers from our LLVM distribution's C++
-    # stdlib implementation, or any from the host system, and instead, use include dirs from the
-    # XCodeCLITools or GCC.
-    # TODO(#6143): Determine precisely what this flag does and why it's necessary.
-    '-nostdinc++',
-  ])
+  working_cpp_compiler = joined_cpp_compiler.prepend_field(
+    "extra_args",
+    [
+      "-x",
+      "c++",
+      "-std=c++11",
+      # This flag is intended to avoid using any of the headers from our LLVM distribution's C++
+      # stdlib implementation, or any from the host system, and instead, use include dirs from the
+      # XCodeCLITools or GCC.
+      # TODO(#6143): Determine precisely what this flag does and why it's necessary.
+      "-nostdinc++",
+    ],
+  )
 
   llvm_linker_wrapper = await Get[LLVMLinker](NativeToolchain, native_toolchain)
-  working_linker = (llvm_linker_wrapper
-                    .for_compiler(working_cpp_compiler, platform)
-                    .append_field('linking_library_dirs', extra_llvm_linking_library_dirs)
-                    .prepend_field('extra_args', linker_extra_args))
+  working_linker = (
+    llvm_linker_wrapper.for_compiler(working_cpp_compiler, platform)
+    .append_field("linking_library_dirs", extra_llvm_linking_library_dirs)
+    .prepend_field("extra_args", linker_extra_args)
+  )
 
   return LLVMCppToolchain(CppToolchain(working_cpp_compiler, working_linker))
 
 
 @rule
-async def select_gcc_c_toolchain(platform: Platform, native_toolchain: NativeToolchain) -> GCCCToolchain:
+async def select_gcc_c_toolchain(
+  platform: Platform, native_toolchain: NativeToolchain
+) -> GCCCToolchain:
   provided_gcc = await Get[CCompiler](GCC, native_toolchain._gcc)
 
   if platform == Platform.darwin:
@@ -278,9 +296,9 @@ async def select_gcc_c_toolchain(platform: Platform, native_toolchain: NativeToo
 
   # GCC needs an assembler, so we provide that (platform-specific) tool here.
   assembler = await Get[Assembler](NativeToolchain, native_toolchain)
-  working_c_compiler = joined_c_compiler.sequence(assembler).prepend_field('extra_args', [
-    '-x', 'c', '-std=c11',
-  ])
+  working_c_compiler = joined_c_compiler.sequence(assembler).prepend_field(
+    "extra_args", ["-x", "c", "-std=c11"]
+  )
 
   gcc_linker_wrapper = await Get[GCCLinker](NativeToolchain, native_toolchain)
   working_linker = gcc_linker_wrapper.for_compiler(working_c_compiler, platform)
@@ -307,14 +325,19 @@ async def select_gcc_cpp_toolchain(
 
   # GCC needs an assembler, so we provide that (platform-specific) tool here.
   assembler = await Get[Assembler](NativeToolchain, native_toolchain)
-  working_cpp_compiler = joined_cpp_compiler.sequence(assembler).prepend_field('extra_args', [
-    '-x', 'c++', '-std=c++11',
-    # This flag is intended to avoid using any of the headers from our LLVM distribution's C++
-    # stdlib implementation, or any from the host system, and instead, use include dirs from the
-    # XCodeCLITools or GCC.
-    # TODO(#6143): Determine precisely what this flag does and why it's necessary.
-    '-nostdinc++',
-  ])
+  working_cpp_compiler = joined_cpp_compiler.sequence(assembler).prepend_field(
+    "extra_args",
+    [
+      "-x",
+      "c++",
+      "-std=c++11",
+      # This flag is intended to avoid using any of the headers from our LLVM distribution's C++
+      # stdlib implementation, or any from the host system, and instead, use include dirs from the
+      # XCodeCLITools or GCC.
+      # TODO(#6143): Determine precisely what this flag does and why it's necessary.
+      "-nostdinc++",
+    ],
+  )
 
   gcc_linker_wrapper = await Get[GCCLinker](NativeToolchain, native_toolchain)
   working_linker = gcc_linker_wrapper.for_compiler(working_cpp_compiler, platform)
@@ -333,9 +356,13 @@ async def select_c_toolchain(toolchain_variant_request: ToolchainVariantRequest)
   use_gcc = toolchain_variant_request.variant == ToolchainVariant.gnu
   toolchain_resolved: Union[GCCCToolchain, LLVMCToolchain]
   if use_gcc:
-    toolchain_resolved = await Get[GCCCToolchain](NativeToolchain, toolchain_variant_request.toolchain)
+    toolchain_resolved = await Get[GCCCToolchain](
+      NativeToolchain, toolchain_variant_request.toolchain
+    )
   else:
-    toolchain_resolved = await Get[LLVMCToolchain](NativeToolchain, toolchain_variant_request.toolchain)
+    toolchain_resolved = await Get[LLVMCToolchain](
+      NativeToolchain, toolchain_variant_request.toolchain
+    )
   return toolchain_resolved.c_toolchain
 
 
@@ -344,9 +371,13 @@ async def select_cpp_toolchain(toolchain_variant_request: ToolchainVariantReques
   use_gcc = toolchain_variant_request.variant == ToolchainVariant.gnu
   toolchain_resolved: Union[GCCCppToolchain, LLVMCppToolchain]
   if use_gcc:
-    toolchain_resolved = await Get[GCCCppToolchain](NativeToolchain, toolchain_variant_request.toolchain)
+    toolchain_resolved = await Get[GCCCppToolchain](
+      NativeToolchain, toolchain_variant_request.toolchain
+    )
   else:
-    toolchain_resolved = await Get[LLVMCppToolchain](NativeToolchain, toolchain_variant_request.toolchain)
+    toolchain_resolved = await Get[LLVMCppToolchain](
+      NativeToolchain, toolchain_variant_request.toolchain
+    )
   return toolchain_resolved.cpp_toolchain
 
 

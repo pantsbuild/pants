@@ -34,7 +34,7 @@ def _parse_java_version(name, version):
   if isinstance(version, str):
     version = Revision.lenient(version)
   if version and not isinstance(version, Revision):
-    raise ValueError('{} must be a string or a Revision object, given: {}'.format(name, version))
+    raise ValueError("{} must be a string or a Revision object, given: {}".format(name, version))
   return version
 
 
@@ -58,8 +58,9 @@ class Distribution:
   def _is_executable(path):
     return os.path.isfile(path) and os.access(path, os.X_OK)
 
-  def __init__(self, home_path=None, bin_path=None, minimum_version=None, maximum_version=None,
-               jdk=False):
+  def __init__(
+    self, home_path=None, bin_path=None, minimum_version=None, maximum_version=None, jdk=False
+  ):
     """Creates a distribution wrapping the given `home_path` or `bin_path`.
 
     Only one of `home_path` or `bin_path` should be supplied.
@@ -71,15 +72,17 @@ class Distribution:
     :param bool jdk: ``True`` to require the distribution be a JDK vs a JRE
     """
     if home_path and not os.path.isdir(home_path):
-      raise ValueError('The specified java home path is invalid: {}'.format(home_path))
+      raise ValueError("The specified java home path is invalid: {}".format(home_path))
     if bin_path and not os.path.isdir(bin_path):
-      raise ValueError('The specified binary path is invalid: {}'.format(bin_path))
+      raise ValueError("The specified binary path is invalid: {}".format(bin_path))
     if not bool(home_path) ^ bool(bin_path):
-      raise ValueError('Exactly one of home path or bin path should be supplied, given: '
-                       'home_path={} bin_path={}'.format(home_path, bin_path))
+      raise ValueError(
+        "Exactly one of home path or bin path should be supplied, given: "
+        "home_path={} bin_path={}".format(home_path, bin_path)
+      )
 
     self._home = home_path
-    self._bin_path = bin_path or (os.path.join(home_path, 'bin') if home_path else '/usr/bin')
+    self._bin_path = bin_path or (os.path.join(home_path, "bin") if home_path else "/usr/bin")
 
     self._minimum_version = _parse_java_version("minimum_version", minimum_version)
     self._maximum_version = _parse_java_version("maximum_version", maximum_version)
@@ -117,11 +120,12 @@ class Distribution:
     :return: list of paths to requested libraries
     :raises: `Distribution.Error` if any of the jars could not be found.
     """
+
     def collect_existing_libs():
       def lib_paths():
-        yield os.path.join(self.home, 'lib')
+        yield os.path.join(self.home, "lib")
         if self.jdk:
-          yield os.path.join(self.home, 'jre', 'lib')
+          yield os.path.join(self.home, "jre", "lib")
 
       for name in names:
         for path in lib_paths():
@@ -130,7 +134,7 @@ class Distribution:
             yield lib_path
             break
         else:
-          raise Distribution.Error('Failed to locate {} library'.format(name))
+          raise Distribution.Error("Failed to locate {} library".format(name))
 
     return list(collect_existing_libs())
 
@@ -138,12 +142,12 @@ class Distribution:
   def home(self):
     """Returns the distribution JAVA_HOME."""
     if not self._home:
-      home = self._get_system_properties(self.java)['java.home']
+      home = self._get_system_properties(self.java)["java.home"]
       # The `jre/bin/java` executable in a JDK distribution will report `java.home` as the jre dir,
       # so we check for this and re-locate to the containing jdk dir when present.
-      if os.path.basename(home) == 'jre':
+      if os.path.basename(home) == "jre":
         jdk_dir = os.path.dirname(home)
-        if self._is_executable(os.path.join(jdk_dir, 'bin', 'javac')):
+        if self._is_executable(os.path.join(jdk_dir, "bin", "javac")):
           home = jdk_dir
       self._home = home
     return self._home
@@ -159,7 +163,7 @@ class Distribution:
 
     If this distribution has no valid java command raises Distribution.Error.
     """
-    return self.binary('java')
+    return self.binary("java")
 
   def binary(self, name):
     """Returns the path to the command of the given name for this distribution.
@@ -176,7 +180,7 @@ class Distribution:
     If this distribution is a JDK checks both `bin` and `jre/bin` for the binary.
     """
     if not isinstance(name, str):
-      raise ValueError('name must be a binary name, given {} of type {}'.format(name, type(name)))
+      raise ValueError("name must be a binary name, given {} of type {}".format(name, type(name)))
     self.validate()
     return self._validated_executable(name)
 
@@ -189,29 +193,35 @@ class Distribution:
     if self._validated_binaries:
       return
 
-    with self._valid_executable('java') as java:
+    with self._valid_executable("java") as java:
       if self._minimum_version:
         version = self._get_version(java)
         if version < self._minimum_version:
-          raise self.Error('The java distribution at {} is too old; expecting at least {} and'
-                           ' got {}'.format(java, self._minimum_version, version))
+          raise self.Error(
+            "The java distribution at {} is too old; expecting at least {} and"
+            " got {}".format(java, self._minimum_version, version)
+          )
       if self._maximum_version:
         version = self._get_version(java)
         if version > self._maximum_version:
-          raise self.Error('The java distribution at {} is too new; expecting no older than'
-                           ' {} and got {}'.format(java, self._maximum_version, version))
+          raise self.Error(
+            "The java distribution at {} is too new; expecting no older than"
+            " {} and got {}".format(java, self._maximum_version, version)
+          )
 
     # We might be a JDK discovered by the embedded jre `java` executable.
     # If so reset the bin path to the true JDK home dir for full access to all binaries.
-    self._bin_path = os.path.join(self.home, 'bin')
+    self._bin_path = os.path.join(self.home, "bin")
 
     try:
-      self._validated_executable('javac')  # Calling purely for the check and cache side effects
+      self._validated_executable("javac")  # Calling purely for the check and cache side effects
       self._is_jdk = True
     except self.Error as e:
       if self._jdk:
-        logger.debug('Failed to validate javac executable. Please check you have a JDK '
-                      'installed. Original error: {}'.format(e))
+        logger.debug(
+          "Failed to validate javac executable. Please check you have a JDK "
+          "installed. Original error: {}".format(e)
+        )
         raise
 
   def execute_java(self, *args, **kwargs):
@@ -222,23 +232,25 @@ class Distribution:
 
   @memoized_method
   def _get_version(self, java):
-    return _parse_java_version('java.version', self._get_system_properties(java)['java.version'])
+    return _parse_java_version("java.version", self._get_system_properties(java)["java.version"])
 
   def _get_system_properties(self, java):
     if not self._system_properties:
       with temporary_dir() as classpath:
-        with open(os.path.join(classpath, 'SystemProperties.class'), 'w+b') as fp:
-          fp.write(pkgutil.get_data(__name__, 'SystemProperties.class'))
-        cmd = [java, '-cp', classpath, 'SystemProperties']
+        with open(os.path.join(classpath, "SystemProperties.class"), "w+b") as fp:
+          fp.write(pkgutil.get_data(__name__, "SystemProperties.class"))
+        cmd = [java, "-cp", classpath, "SystemProperties"]
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = process.communicate()
         if process.returncode != 0:
-          raise self.Error('Failed to determine java system properties for {} with {} - exit code'
-                           ' {}: {}'.format(java, ' '.join(cmd), process.returncode, stderr.decode()))
+          raise self.Error(
+            "Failed to determine java system properties for {} with {} - exit code"
+            " {}: {}".format(java, " ".join(cmd), process.returncode, stderr.decode())
+          )
 
       props = {}
       for line in stdout.decode().split(os.linesep):
-        key, _, val = line.partition('=')
+        key, _, val = line.partition("=")
         props[key] = val
       self._system_properties = props
 
@@ -248,14 +260,16 @@ class Distribution:
     def bin_paths():
       yield self._bin_path
       if self._is_jdk:
-        yield os.path.join(self.home, 'jre', 'bin')
+        yield os.path.join(self.home, "jre", "bin")
 
     for bin_path in bin_paths():
       exe = os.path.join(bin_path, name)
       if self._is_executable(exe):
         return exe
-    raise self.Error('Failed to locate the {} executable, {} does not appear to be a'
-                     ' valid {} distribution'.format(name, self, 'JDK' if self._jdk else 'JRE'))
+    raise self.Error(
+      "Failed to locate the {} executable, {} does not appear to be a"
+      " valid {} distribution".format(name, self, "JDK" if self._jdk else "JRE")
+    )
 
   def _validated_executable(self, name):
     exe = self._validated_binaries.get(name)
@@ -271,12 +285,13 @@ class Distribution:
     self._validated_binaries[name] = exe
 
   def __repr__(self):
-    return ('Distribution({!r}, minimum_version={!r}, maximum_version={!r} jdk={!r})'.format(
-            self._bin_path, self._minimum_version, self._maximum_version, self._jdk))
+    return "Distribution({!r}, minimum_version={!r}, maximum_version={!r} jdk={!r})".format(
+      self._bin_path, self._minimum_version, self._maximum_version, self._jdk
+    )
 
 
 class _DistributionEnvironment(ABC):
-  class Location(namedtuple('Location', ['home_path', 'bin_path'])):
+  class Location(namedtuple("Location", ["home_path", "bin_path"])):
     """Represents the location of a java distribution."""
 
     @classmethod
@@ -314,22 +329,22 @@ class _EnvVarEnvironment(_DistributionEnvironment):
       home = os.environ.get(home_env_var)
       return self.Location.from_home(home) if home else None
 
-    jdk_home = env_home('JDK_HOME')
+    jdk_home = env_home("JDK_HOME")
     if jdk_home:
       yield jdk_home
 
-    java_home = env_home('JAVA_HOME')
+    java_home = env_home("JAVA_HOME")
     if java_home:
       yield java_home
 
-    search_path = os.environ.get('PATH')
+    search_path = os.environ.get("PATH")
     if search_path:
       for bin_path in search_path.strip().split(os.pathsep):
         yield self.Location.from_bin(bin_path)
 
 
 class _OSXEnvironment(_DistributionEnvironment):
-  _OSX_JAVA_HOME_EXE = '/usr/libexec/java_home'
+  _OSX_JAVA_HOME_EXE = "/usr/libexec/java_home"
 
   @classmethod
   def standard(cls):
@@ -362,9 +377,9 @@ class _OSXEnvironment(_DistributionEnvironment):
     # </plist>
     if os.path.exists(self._osx_java_home_exe):
       try:
-        plist = subprocess.check_output([self._osx_java_home_exe, '--failfast', '--xml'])
+        plist = subprocess.check_output([self._osx_java_home_exe, "--failfast", "--xml"])
         for distribution in plistlib.loads(plist):
-          home = distribution['JVMHomePath']
+          home = distribution["JVMHomePath"]
           yield self.Location.from_home(home)
       except subprocess.CalledProcessError:
         pass
@@ -373,7 +388,7 @@ class _OSXEnvironment(_DistributionEnvironment):
 class _LinuxEnvironment(_DistributionEnvironment):
   # The `/usr/lib/jvm` dir is a common target of packages built for redhat and debian as well as
   # other more exotic distributions.  SUSE uses lib64
-  _STANDARD_JAVA_DIST_DIRS = ('/usr/lib/jvm', '/usr/lib64/jvm')
+  _STANDARD_JAVA_DIST_DIRS = ("/usr/lib/jvm", "/usr/lib64/jvm")
 
   @classmethod
   def standard(cls):
@@ -381,7 +396,7 @@ class _LinuxEnvironment(_DistributionEnvironment):
 
   def __init__(self, *java_dist_dirs):
     if len(java_dist_dirs) == 0:
-      raise ValueError('Expected at least 1 java dist dir.')
+      raise ValueError("Expected at least 1 java dist dir.")
     self._java_dist_dirs = java_dist_dirs
 
   @property
@@ -408,7 +423,7 @@ class _UnknownEnvironment(_DistributionEnvironment):
   def __init__(self, *possible_environments):
     super(_DistributionEnvironment, self).__init__()
     if len(possible_environments) < 2:
-      raise ValueError('At least two possible environments must be supplied.')
+      raise ValueError("At least two possible environments must be supplied.")
     self._possible_environments = possible_environments
 
   @property
@@ -469,23 +484,21 @@ class _Locator(object):
       return stricter(version_a, version_b)
 
     # Take the tighter constraint of method args and subsystem options.
-    minimum_version = _get_stricter_version(minimum_version,
-                                            self._minimum_version,
-                                            "minimum_version",
-                                            max)
-    maximum_version = _get_stricter_version(maximum_version,
-                                            self._maximum_version,
-                                            "maximum_version",
-                                            min)
+    minimum_version = _get_stricter_version(
+      minimum_version, self._minimum_version, "minimum_version", max
+    )
+    maximum_version = _get_stricter_version(
+      maximum_version, self._maximum_version, "maximum_version", min
+    )
 
     key = (minimum_version, maximum_version, jdk)
     dist = self._cache.get(key)
     if not dist:
       dist = self._scan_constraint_match(minimum_version, maximum_version, jdk)
       if not dist:
-        dist = self._locate(minimum_version=minimum_version,
-                            maximum_version=maximum_version,
-                            jdk=jdk)
+        dist = self._locate(
+          minimum_version=minimum_version, maximum_version=maximum_version, jdk=jdk
+        )
       self._cache[key] = dist
     return dist
 
@@ -501,29 +514,40 @@ class _Locator(object):
     """
     for location in itertools.chain(self._distribution_environment.jvm_locations):
       try:
-        dist = Distribution(home_path=location.home_path,
-                            bin_path=location.bin_path,
-                            minimum_version=minimum_version,
-                            maximum_version=maximum_version,
-                            jdk=jdk)
+        dist = Distribution(
+          home_path=location.home_path,
+          bin_path=location.bin_path,
+          minimum_version=minimum_version,
+          maximum_version=maximum_version,
+          jdk=jdk,
+        )
         dist.validate()
-        logger.debug('Located {} for constraints: minimum_version {}, maximum_version {}, jdk {}'
-                     .format(dist, minimum_version, maximum_version, jdk))
+        logger.debug(
+          "Located {} for constraints: minimum_version {}, maximum_version {}, jdk {}".format(
+            dist, minimum_version, maximum_version, jdk
+          )
+        )
         return dist
       except (ValueError, Distribution.Error) as e:
-        logger.debug('{} is not a valid distribution because: {}'
-                     .format(location.home_path, str(e)))
+        logger.debug(
+          "{} is not a valid distribution because: {}".format(location.home_path, str(e))
+        )
         pass
 
-    if (minimum_version is not None
-        and maximum_version is not None
-        and maximum_version < minimum_version):
-      error_format = ('Pants configuration/options led to impossible constraints for {} '
-                      'distribution: minimum_version {}, maximum_version {}')
+    if (
+      minimum_version is not None
+      and maximum_version is not None
+      and maximum_version < minimum_version
+    ):
+      error_format = (
+        "Pants configuration/options led to impossible constraints for {} "
+        "distribution: minimum_version {}, maximum_version {}"
+      )
     else:
-      error_format = ('Failed to locate a {} distribution with minimum_version {}, '
-                      'maximum_version {}')
-    raise self.Error(error_format.format('JDK' if jdk else 'JRE', minimum_version, maximum_version))
+      error_format = (
+        "Failed to locate a {} distribution with minimum_version {}, " "maximum_version {}"
+      )
+    raise self.Error(error_format.format("JDK" if jdk else "JRE", minimum_version, maximum_version))
 
 
 class DistributionLocator(Subsystem):
@@ -562,27 +586,33 @@ class DistributionLocator(Subsystem):
     :raises: :class:`Distribution.Error` if no suitable java distribution could be found.
     """
     try:
-      return cls.global_instance()._locator().locate(
-          minimum_version=minimum_version,
-          maximum_version=maximum_version,
-          jdk=jdk)
+      return (
+        cls.global_instance()
+        ._locator()
+        .locate(minimum_version=minimum_version, maximum_version=maximum_version, jdk=jdk)
+      )
     except _Locator.Error as e:
-      raise cls.Error('Problem locating a java distribution: {}'.format(e))
+      raise cls.Error("Problem locating a java distribution: {}".format(e))
 
-  options_scope = 'jvm-distributions'
+  options_scope = "jvm-distributions"
 
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    human_readable_os_aliases = ', '.join('{}: [{}]'.format(str(key), ', '.join(sorted(val)))
-                                          for key, val in OS_ALIASES.items())
-    register('--paths', advanced=True, type=dict,
-             help='Map of os names to lists of paths to jdks. These paths will be searched before '
-                  'everything else (before the JDK_HOME, JAVA_HOME, PATH environment variables) '
-                  'when locating a jvm to use. The same OS can be specified via several different '
-                  'aliases, according to this map: {}'.format(human_readable_os_aliases))
-    register('--minimum-version', advanced=True, help='Minimum version of the JVM pants will use')
-    register('--maximum-version', advanced=True, help='Maximum version of the JVM pants will use')
+    human_readable_os_aliases = ", ".join(
+      "{}: [{}]".format(str(key), ", ".join(sorted(val))) for key, val in OS_ALIASES.items()
+    )
+    register(
+      "--paths",
+      advanced=True,
+      type=dict,
+      help="Map of os names to lists of paths to jdks. These paths will be searched before "
+      "everything else (before the JDK_HOME, JAVA_HOME, PATH environment variables) "
+      "when locating a jvm to use. The same OS can be specified via several different "
+      "aliases, according to this map: {}".format(human_readable_os_aliases),
+    )
+    register("--minimum-version", advanced=True, help="Minimum version of the JVM pants will use")
+    register("--maximum-version", advanced=True, help="Maximum version of the JVM pants will use")
 
   def all_jdk_paths(self):
     """Get all explicitly configured JDK paths.
@@ -614,20 +644,19 @@ class DistributionLocator(Subsystem):
       return ()
     os_name = normalize_os_name(os.uname()[0].lower())
     if os_name not in self._normalized_jdk_paths:
-      logger.warning('--jvm-distributions-paths was specified, but has no entry for "{}".'
-                     .format(os_name))
+      logger.warning(
+        '--jvm-distributions-paths was specified, but has no entry for "{}".'.format(os_name)
+      )
     return self._normalized_jdk_paths.get(os_name, ())
 
   def _create_locator(self):
     homes = self._get_explicit_jdk_paths()
     environment = _UnknownEnvironment(
-        _ExplicitEnvironment(*homes),
-        _UnknownEnvironment(
-            _EnvVarEnvironment(),
-            _LinuxEnvironment.standard(),
-            _OSXEnvironment.standard()
-        )
+      _ExplicitEnvironment(*homes),
+      _UnknownEnvironment(
+        _EnvVarEnvironment(), _LinuxEnvironment.standard(), _OSXEnvironment.standard()
+      ),
     )
-    return _Locator(environment,
-                    self.get_options().minimum_version,
-                    self.get_options().maximum_version)
+    return _Locator(
+      environment, self.get_options().minimum_version, self.get_options().maximum_version
+    )

@@ -20,39 +20,43 @@ SCOVERAGE = "scoverage"
 class ScoveragePlatform(InjectablesMixin, Subsystem):
   """The scoverage platform."""
 
-  options_scope = 'scoverage'
+  options_scope = "scoverage"
 
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
     register(
-      '--enable-scoverage',
+      "--enable-scoverage",
       default=False,
       fingerprint=True,
       type=bool,
-      help='Specifies whether to generate scoverage reports for scala test targets. '
-           'Default value is False. If True, '
-           'implies --test-junit-coverage-processor=scoverage.')
+      help="Specifies whether to generate scoverage reports for scala test targets. "
+      "Default value is False. If True, "
+      "implies --test-junit-coverage-processor=scoverage.",
+    )
 
     register(
-      '--blacklist-targets',
+      "--blacklist-targets",
       fingerprint=True,
       type=list,
       member_type=target_option,
-      help='List of targets not to be instrumented. Accepts Regex patterns. All '
-           'targets matching any of the patterns will not be instrumented. If no targets '
-           'are specified, all targets will be instrumented.')
+      help="List of targets not to be instrumented. Accepts Regex patterns. All "
+      "targets matching any of the patterns will not be instrumented. If no targets "
+      "are specified, all targets will be instrumented.",
+    )
 
   def scoverage_jar(self):
-    return [JarDependency(org='com.twitter.scoverage', name='scalac-scoverage-plugin_2.12',
-      rev='1.0.1-twitter'),
-      JarDependency(org='com.twitter.scoverage', name='scalac-scoverage-runtime_2.12',
-        rev='1.0.1-twitter')]
+    return [
+      JarDependency(
+        org="com.twitter.scoverage", name="scalac-scoverage-plugin_2.12", rev="1.0.1-twitter"
+      ),
+      JarDependency(
+        org="com.twitter.scoverage", name="scalac-scoverage-runtime_2.12", rev="1.0.1-twitter"
+      ),
+    ]
 
   def injectables(self, build_graph):
-    specs_to_create = [
-      ('scoverage', self.scoverage_jar),
-    ]
+    specs_to_create = [("scoverage", self.scoverage_jar)]
 
     for spec_key, create_jardep_func in specs_to_create:
       address_spec = self.injectables_address_spec_for_key(spec_key)
@@ -60,10 +64,7 @@ class ScoveragePlatform(InjectablesMixin, Subsystem):
       if not build_graph.contains_address(target_address):
         target_jars = create_jardep_func()
         jars = target_jars if isinstance(target_jars, list) else [target_jars]
-        build_graph.inject_synthetic_target(target_address,
-          JarLibrary,
-          jars=jars,
-          scope='forced')
+        build_graph.inject_synthetic_target(target_address, JarLibrary, jars=jars, scope="forced")
       elif not build_graph.get_target(target_address).is_synthetic:
         raise build_graph.ManualSyntheticTargetError(target_address)
 
@@ -71,7 +72,7 @@ class ScoveragePlatform(InjectablesMixin, Subsystem):
   def injectables_address_spec_mapping(self):
     return {
       # Target spec for scoverage plugin.
-      'scoverage': [f"//:scoverage"],
+      "scoverage": [f"//:scoverage"]
     }
 
   def is_blacklisted(self, target_address_spec) -> bool:

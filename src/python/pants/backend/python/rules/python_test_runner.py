@@ -28,23 +28,19 @@ from pants.rules.core.find_target_source_files import (
 from pants.rules.core.test import TestDebugRequest, TestOptions, TestResult, TestTarget
 
 
-DEFAULT_COVERAGE_CONFIG = dedent(f"""
+DEFAULT_COVERAGE_CONFIG = dedent(
+  f"""
   [run]
   branch = True
   timid = False
   relative_files = True
-  """)
+  """
+)
 
 
 def get_coveragerc_input(coveragerc_content: str) -> InputFilesContent:
   return InputFilesContent(
-    [
-      FileContent(
-        path='.coveragerc',
-        content=coveragerc_content.encode(),
-        is_executable=False,
-      ),
-    ]
+    [FileContent(path=".coveragerc", content=coveragerc_content.encode(), is_executable=False)]
   )
 
 
@@ -82,22 +78,25 @@ class TestTargetSetup:
 
 
 def get_packages_to_cover(
-  target: PythonTestsAdaptor,
-  source_root_stripped_file_paths: Tuple[str, ...],
+  target: PythonTestsAdaptor, source_root_stripped_file_paths: Tuple[str, ...]
 ) -> Tuple[str, ...]:
-  if hasattr(target, 'coverage'):
+  if hasattr(target, "coverage"):
     return tuple(sorted(set(target.coverage)))
-  return tuple(sorted({
-    os.path.dirname(source_root_stripped_source_file_path).replace(os.sep, '.') # Turn file paths into package names.
-    for source_root_stripped_source_file_path in source_root_stripped_file_paths
-  }))
+  return tuple(
+    sorted(
+      {
+        os.path.dirname(source_root_stripped_source_file_path).replace(
+          os.sep, "."
+        )  # Turn file paths into package names.
+        for source_root_stripped_source_file_path in source_root_stripped_file_paths
+      }
+    )
+  )
 
 
 @rule
 async def setup_pytest_for_target(
-  adaptor_with_origin: PythonTestsAdaptorWithOrigin,
-  pytest: PyTest,
-  test_options: TestOptions,
+  adaptor_with_origin: PythonTestsAdaptorWithOrigin, pytest: PyTest, test_options: TestOptions
 ) -> TestTargetSetup:
   adaptor = adaptor_with_origin.adaptor
   # TODO: Rather than consuming the TestOptions subsystem, the TestRunner should pass on coverage
@@ -108,7 +107,7 @@ async def setup_pytest_for_target(
   resolved_requirements_pex = await Get[Pex](
     CreatePexFromTargetClosure(
       addresses=Addresses((adaptor.address,)),
-      output_filename='pytest-with-requirements.pex',
+      output_filename="pytest-with-requirements.pex",
       entry_point="pytest:main",
       additional_requirements=pytest.get_requirement_strings(),
       # NB: We set `--not-zip-safe` because Pytest plugin discovery, which uses
@@ -137,22 +136,26 @@ async def setup_pytest_for_target(
 
   coverage_args = []
   if test_options.values.run_coverage:
-    coveragerc_digest = await Get[Digest](InputFilesContent, get_coveragerc_input(DEFAULT_COVERAGE_CONFIG))
+    coveragerc_digest = await Get[Digest](
+      InputFilesContent, get_coveragerc_input(DEFAULT_COVERAGE_CONFIG)
+    )
     directories_to_merge.append(coveragerc_digest)
     packages_to_cover = get_packages_to_cover(
-      adaptor, source_root_stripped_file_paths=test_file_names,
+      adaptor, source_root_stripped_file_paths=test_file_names
     )
     coverage_args = [
-      '--cov-report=',  # To not generate any output. https://pytest-cov.readthedocs.io/en/latest/config.html
+      "--cov-report="  # To not generate any output. https://pytest-cov.readthedocs.io/en/latest/config.html
     ]
     for package in packages_to_cover:
-      coverage_args.extend(['--cov', package])
+      coverage_args.extend(["--cov", package])
 
-  merged_input_files = await Get[Digest](DirectoriesToMerge(directories=tuple(directories_to_merge)))
+  merged_input_files = await Get[Digest](
+    DirectoriesToMerge(directories=tuple(directories_to_merge))
+  )
 
   timeout_seconds = calculate_timeout_seconds(
     timeouts_enabled=pytest.options.timeouts,
-    target_timeout=getattr(adaptor, 'timeout', None),
+    target_timeout=getattr(adaptor, "timeout", None),
     timeout_default=pytest.options.timeout_default,
     timeout_maximum=pytest.options.timeout_maximum,
   )
@@ -181,11 +184,11 @@ async def run_python_test(
   request = test_setup.requirements_pex.create_execute_request(
     python_setup=python_setup,
     subprocess_encoding_environment=subprocess_encoding_environment,
-    pex_path=f'./{test_setup.requirements_pex.output_filename}',
+    pex_path=f"./{test_setup.requirements_pex.output_filename}",
     pex_args=test_setup.args,
     input_files=test_setup.input_files_digest,
-    output_directories=('.coverage',) if test_options.values.run_coverage else None,
-    description=f'Run Pytest for {target_with_origin.adaptor.address.reference()}',
+    output_directories=(".coverage",) if test_options.values.run_coverage else None,
+    description=f"Run Pytest for {target_with_origin.adaptor.address.reference()}",
     timeout_seconds=test_setup.timeout_seconds if test_setup.timeout_seconds is not None else 9999,
     env=env,
   )
@@ -198,7 +201,7 @@ async def debug_python_test(test_setup: TestTargetSetup) -> TestDebugRequest:
   run_request = InteractiveProcessRequest(
     argv=(test_setup.requirements_pex.output_filename, *test_setup.args),
     run_in_workspace=False,
-    input_files=test_setup.input_files_digest
+    input_files=test_setup.input_files_digest,
   )
   return TestDebugRequest(run_request)
 

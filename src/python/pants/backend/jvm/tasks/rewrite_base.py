@@ -20,14 +20,22 @@ class RewriteBase(NailgunTask, metaclass=ABCMeta):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--target-types',
-             default=cls.target_types(),
-             advanced=True, type=list,
-             help='The target types to apply formatting to.')
+    register(
+      "--target-types",
+      default=cls.target_types(),
+      advanced=True,
+      type=list,
+      help="The target types to apply formatting to.",
+    )
     if cls.sideeffecting:
-      register('--output-dir', advanced=True, type=dir_option, fingerprint=True,
-               help='Path to output directory. Any updated files will be written here. '
-               'If not specified, files will be modified in-place.')
+      register(
+        "--output-dir",
+        advanced=True,
+        type=dir_option,
+        fingerprint=True,
+        help="Path to output directory. Any updated files will be written here. "
+        "If not specified, files will be modified in-place.",
+      )
 
   @classmethod
   def target_types(cls):
@@ -43,9 +51,13 @@ class RewriteBase(NailgunTask, metaclass=ABCMeta):
   def _formatted_target_types(self):
     aliases = set(self.get_options().target_types)
     registered_aliases = self.context.build_configuration.registered_aliases()
-    return tuple({target_type
-                  for alias in aliases
-                  for target_type in registered_aliases.target_types_by_alias[alias]})
+    return tuple(
+      {
+        target_type
+        for alias in aliases
+        for target_type in registered_aliases.target_types_by_alias[alias]
+      }
+    )
 
   @property
   def cache_target_dirs(self):
@@ -70,8 +82,10 @@ class RewriteBase(NailgunTask, metaclass=ABCMeta):
 
     result = Xargs(self._invoke_tool).execute(target_sources)
     if result != 0:
-      raise TaskError('{} is improperly implemented: a failed process '
-                      'should raise an exception earlier.'.format(type(self).__name__))
+      raise TaskError(
+        "{} is improperly implemented: a failed process "
+        "should raise an exception earlier.".format(type(self).__name__)
+      )
 
   def _invoke_tool(self, target_sources):
     buildroot = get_buildroot()
@@ -115,13 +129,18 @@ class RewriteBase(NailgunTask, metaclass=ABCMeta):
     """
 
   def _get_non_synthetic_targets(self, targets):
-    return [target for target in targets
-            if isinstance(target, self._formatted_target_types)
-            and target.has_sources(self.source_extension())
-            and not target.is_synthetic]
+    return [
+      target
+      for target in targets
+      if isinstance(target, self._formatted_target_types)
+      and target.has_sources(self.source_extension())
+      and not target.is_synthetic
+    ]
 
   def _calculate_sources(self, targets):
-    return [(target, os.path.join(get_buildroot(), source))
-            for target in targets
-            for source in target.sources_relative_to_buildroot()
-            if source.endswith(self.source_extension())]
+    return [
+      (target, os.path.join(get_buildroot(), source))
+      for target in targets
+      for source in target.sources_relative_to_buildroot()
+      if source.endswith(self.source_extension())
+    ]

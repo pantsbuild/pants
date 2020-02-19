@@ -22,7 +22,7 @@ class Storage(threading.local):
 
   def add_if_not_exists(self, name, obj_creator):
     if name is None:
-      raise ValueError('Method requires a `name`d object.')
+      raise ValueError("Method requires a `name`d object.")
     obj = self.objects_by_name.get(name)
     if obj is None:
       obj = self.objects_by_name[name] = obj_creator()
@@ -63,7 +63,7 @@ class ParseContext:
     """
     object_type = self._type_aliases.get(alias)
     if object_type is None:
-      raise KeyError('There is no type registered for alias {0}'.format(alias))
+      raise KeyError("There is no type registered for alias {0}".format(alias))
     return object_type(*args, **kwargs)
 
   def create_object_if_not_exists(self, alias, name=None, *args, **kwargs):
@@ -81,11 +81,7 @@ class ParseContext:
     """
     if name is None:
       raise ValueError("Method requires an object `name`.")
-    obj_creator = functools.partial(self.create_object,
-                                    alias,
-                                    name=name,
-                                    *args,
-                                    **kwargs)
+    obj_creator = functools.partial(self.create_object, alias, name=name, *args, **kwargs)
     return self._storage.add_if_not_exists(name, obj_creator)
 
   @property

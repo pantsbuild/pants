@@ -24,6 +24,7 @@ class Reporter:
 
     Subclasses of Reporter should extend their own Settings and add any additional settings they'd
     like."""
+
     log_level: str  # Display log messages up to this level.
 
   def __init__(self, run_tracker, settings):
@@ -85,11 +86,11 @@ class Reporter:
   def level_for_workunit(self, workunit, default_level):
     if workunit.log_config and workunit.log_config.level:
       # The value of the level option is a string defined in global_options.py
-      if workunit.log_config.level == 'warn':
+      if workunit.log_config.level == "warn":
         return Report.WARN
-      if workunit.log_config.level == 'debug':
+      if workunit.log_config.level == "debug":
         return Report.DEBUG
-      if workunit.log_config.level == 'info':
+      if workunit.log_config.level == "info":
         return Report.INFO
     return default_level
 

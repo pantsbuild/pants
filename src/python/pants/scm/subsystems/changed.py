@@ -40,6 +40,7 @@ class ChangedRequest:
 @dataclass(frozen=True)
 class ChangedAddresses:
   """Light wrapper around the addresses referring to the changed targets."""
+
   addresses: Addresses
 
 
@@ -56,10 +57,9 @@ async def find_owners(
     return ChangedAddresses(owners.addresses)
 
   # Otherwise: find dependees.
-  all_addresses = await Get[Addresses](AddressSpecs((DescendantAddresses(''),)))
+  all_addresses = await Get[Addresses](AddressSpecs((DescendantAddresses(""),)))
   all_structs = [
-    s.value for s in
-    await MultiGet(Get[HydratedStruct](Address, a) for a in all_addresses)
+    s.value for s in await MultiGet(Get[HydratedStruct](Address, a) for a in all_addresses)
   ]
 
   bfa = build_configuration.registered_aliases()
@@ -77,6 +77,7 @@ class ChangedOptions:
 
   This is necessary because parsing of these options happens before conventional subsystems are
   configured, so the normal mechanisms like `subsystem_rule` would not work properly."""
+
   changes_since: Optional[str]
   diffspec: Optional[str]
   include_dependees: IncludeDependeesOption
@@ -105,22 +106,38 @@ class Changed(Subsystem):
   This supports the `--changed-*` argument target root replacements, e.g.
   `./pants --changed-parent=HEAD~3 list`.
   """
-  options_scope = 'changed'
+
+  options_scope = "changed"
 
   @classmethod
   def register_options(cls, register):
-    register('--changes-since', '--parent', '--since', type=str, default=None,
-             help='Calculate changes since this tree-ish/scm ref (defaults to current HEAD/tip).')
-    register('--diffspec', type=str, default=None,
-             help='Calculate changes contained within given scm spec (commit range/sha/ref/etc).')
-    register('--include-dependees', type=IncludeDependeesOption, default=IncludeDependeesOption.NONE,
-             help='Include direct or transitive dependees of changed targets.')
-    register('--fast', type=bool, default=False,
-             help='Stop searching for owners once a source is mapped to at least one owning target.')
+    register(
+      "--changes-since",
+      "--parent",
+      "--since",
+      type=str,
+      default=None,
+      help="Calculate changes since this tree-ish/scm ref (defaults to current HEAD/tip).",
+    )
+    register(
+      "--diffspec",
+      type=str,
+      default=None,
+      help="Calculate changes contained within given scm spec (commit range/sha/ref/etc).",
+    )
+    register(
+      "--include-dependees",
+      type=IncludeDependeesOption,
+      default=IncludeDependeesOption.NONE,
+      help="Include direct or transitive dependees of changed targets.",
+    )
+    register(
+      "--fast",
+      type=bool,
+      default=False,
+      help="Stop searching for owners once a source is mapped to at least one owning target.",
+    )
 
 
 def rules():
-  return [
-    find_owners,
-    RootRule(ChangedRequest),
-  ]
+  return [find_owners, RootRule(ChangedRequest)]

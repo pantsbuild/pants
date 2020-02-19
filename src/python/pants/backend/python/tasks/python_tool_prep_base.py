@@ -42,12 +42,14 @@ class PythonToolInstance:
     return safe_shlex_join(self._pex.cmdline(args))
 
   def output(self, args, stdin_payload=None, binary_mode=False, **kwargs):
-    process = self._pex.run(args,
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE,
-                            with_chroot=False,
-                            blocking=False,
-                            **kwargs)
+    process = self._pex.run(
+      args,
+      stdout=subprocess.PIPE,
+      stderr=subprocess.PIPE,
+      with_chroot=False,
+      blocking=False,
+      **kwargs,
+    )
     if stdin_payload is not None:
       stdin_payload = ensure_binary(stdin_payload)
     (stdout, stderr) = process.communicate(input=stdin_payload)
@@ -60,12 +62,14 @@ class PythonToolInstance:
   def run_with(self, workunit_factory, args, **kwargs):
     cmdline = self._pretty_cmdline(args)
     with workunit_factory(cmd=cmdline) as workunit:
-      exit_code = self._pex.run(args,
-                                stdout=workunit.output('stdout'),
-                                stderr=workunit.output('stderr'),
-                                with_chroot=False,
-                                blocking=True,
-                                **kwargs)
+      exit_code = self._pex.run(
+        args,
+        stdout=workunit.output("stdout"),
+        stderr=workunit.output("stderr"),
+        with_chroot=False,
+        blocking=True,
+        **kwargs,
+      )
       yield cmdline, exit_code, workunit
 
   def run(self, *args, **kwargs):
@@ -108,10 +112,10 @@ class PythonToolPrepBase(Task):
   def _build_tool_pex(self, tool_subsystem, interpreter, pex_path):
     with safe_concurrent_creation(pex_path) as chroot:
       pex_builder = PexBuilderWrapper.Factory.create(
-        builder=PEXBuilder(path=chroot, interpreter=interpreter),
-        log=self.context.log)
+        builder=PEXBuilder(path=chroot, interpreter=interpreter), log=self.context.log
+      )
       reqs = [PythonRequirement(r) for r in tool_subsystem.get_requirement_specs()]
-      pex_builder.add_resolved_requirements(reqs=reqs, platforms=['current'])
+      pex_builder.add_resolved_requirements(reqs=reqs, platforms=["current"])
       pex_builder.set_entry_point(tool_subsystem.get_entry_point())
       pex_builder.freeze()
 
@@ -124,10 +128,10 @@ class PythonToolPrepBase(Task):
     specs_fingerprint = stable_json_sha1(tool_subsystem.get_requirement_specs())
     return os.path.join(
       get_pants_cachedir(),
-      'python',
+      "python",
       str(interpreter.identity),
       self.fingerprint,
-      f'{tool_subsystem.options_scope}-{specs_fingerprint}.pex',
+      f"{tool_subsystem.options_scope}-{specs_fingerprint}.pex",
     )
 
   def will_be_invoked(self):
@@ -143,18 +147,22 @@ class PythonToolPrepBase(Task):
     interpreter_cache = PythonInterpreterCache.global_instance()
     interpreters = interpreter_cache.setup(filters=tool_subsystem.get_interpreter_constraints())
     if not interpreters:
-      raise TaskError('Found no Python interpreter capable of running the {} tool with '
-                      'constraints {}'.format(tool_subsystem.options_scope,
-                                              tool_subsystem.get_interpreter_constraints()))
+      raise TaskError(
+        "Found no Python interpreter capable of running the {} tool with "
+        "constraints {}".format(
+          tool_subsystem.options_scope, tool_subsystem.get_interpreter_constraints()
+        )
+      )
     interpreter = min(interpreters)
 
     pex_path = self._generate_fingerprinted_pex_path(tool_subsystem, interpreter)
     if not os.path.exists(pex_path):
-      with self.context.new_workunit(name=f'create-{tool_subsystem.options_scope}-pex',
-                                     labels=[WorkUnitLabel.PREP]):
-        self._build_tool_pex(tool_subsystem=tool_subsystem,
-                             interpreter=interpreter,
-                             pex_path=pex_path)
+      with self.context.new_workunit(
+        name=f"create-{tool_subsystem.options_scope}-pex", labels=[WorkUnitLabel.PREP]
+      ):
+        self._build_tool_pex(
+          tool_subsystem=tool_subsystem, interpreter=interpreter, pex_path=pex_path
+        )
 
     tool_instance = self.tool_instance_cls(pex_path, interpreter)
     self.context.products.register_data(self.tool_instance_cls, tool_instance)

@@ -28,13 +28,14 @@ class AddressableCallProxy(BuildFileTargetFactory):
     # not the root directory), as this is a very common idiom.  If there are multiple targets
     # in the BUILD file,  we'll issue an error saying as much, and the author will have to name all
     # but one of them explicitly.
-    if 'name' not in kwargs:
+    if "name" not in kwargs:
       dirname = os.path.basename(self._build_file.spec_path)
       if dirname:
-        kwargs['name'] = dirname
+        kwargs["name"] = dirname
       else:
         raise Addressable.AddressableInitError(
-            'Targets in root-level BUILD files must be named explicitly.')
+          "Targets in root-level BUILD files must be named explicitly."
+        )
     addressable = self._addressable_factory.capture(*args, **kwargs)
     addressable_name = addressable.addressed_name
     if addressable_name:
@@ -43,8 +44,9 @@ class AddressableCallProxy(BuildFileTargetFactory):
     return addressable
 
   def __repr__(self):
-    return ('AddressableCallProxy(addressable_factory={}, build_file={})'
-            .format(self._addressable_factory, self._build_file))
+    return "AddressableCallProxy(addressable_factory={}, build_file={})".format(
+      self._addressable_factory, self._build_file
+    )
 
 
 class Addressable(ABC):
@@ -62,7 +64,7 @@ class Addressable(ABC):
       """
 
     def __str__(self):
-      return '{}(target_types={})'.format(type(self).__name__, self.target_types)
+      return "{}(target_types={})".format(type(self).__name__, self.target_types)
 
   class AddressableInitError(Exception):
     """Indicates a problem capturing arguments to create a new :class:`Addressable`."""

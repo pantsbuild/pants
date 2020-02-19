@@ -21,7 +21,7 @@ from pants.util.dirutil import safe_mkdir, safe_walk
 from pants.util.memo import memoized_property
 
 
-Jvmdoc = namedtuple('Jvmdoc', ['tool_name', 'product_type'])
+Jvmdoc = namedtuple("Jvmdoc", ["tool_name", "product_type"])
 
 
 # TODO: Shouldn't this be a NailgunTask?
@@ -31,7 +31,6 @@ Jvmdoc = namedtuple('Jvmdoc', ['tool_name', 'product_type'])
 # the round manager.  This may require incremental or windowed flag parsing that happens bit by
 # bit as tasks are recursively prepared vs. the current all-at once style.
 class JvmdocGen(SkipAndTransitiveOptionsRegistrar, HasSkipAndTransitiveOptionsMixin, JvmTask):
-
   @classmethod
   def jvmdoc(cls):
     """Subclasses should return their Jvmdoc configuration."""
@@ -42,24 +41,39 @@ class JvmdocGen(SkipAndTransitiveOptionsRegistrar, HasSkipAndTransitiveOptionsMi
     super().register_options(register)
     tool_name = cls.jvmdoc().tool_name
 
-    register('--include-codegen', type=bool,
-             fingerprint=True,
-             help=f'Create {tool_name} for generated code.')
+    register(
+      "--include-codegen",
+      type=bool,
+      fingerprint=True,
+      help=f"Create {tool_name} for generated code.",
+    )
 
-    register('--combined', type=bool,
-             fingerprint=True,
-             help='Generate {0} for all targets combined, instead of each target '
-                  'individually.'.format(tool_name))
+    register(
+      "--combined",
+      type=bool,
+      fingerprint=True,
+      help="Generate {0} for all targets combined, instead of each target "
+      "individually.".format(tool_name),
+    )
 
-    register('--open', type=bool,
-             help=f'Open the generated {tool_name} in a browser (implies --combined).')
+    register(
+      "--open", type=bool, help=f"Open the generated {tool_name} in a browser (implies --combined)."
+    )
 
-    register('--ignore-failure', type=bool,
-             fingerprint=True,
-             help=f'Do not consider {tool_name} errors to be build errors.')
+    register(
+      "--ignore-failure",
+      type=bool,
+      fingerprint=True,
+      help=f"Do not consider {tool_name} errors to be build errors.",
+    )
 
-    register('--exclude-patterns', type=list, default=[], fingerprint=True,
-             help='Patterns for targets to be excluded from doc generation.')
+    register(
+      "--exclude-patterns",
+      type=list,
+      default=[],
+      fingerprint=True,
+      help="Patterns for targets to be excluded from doc generation.",
+    )
 
   @classmethod
   def product_types(cls):
@@ -90,19 +104,23 @@ class JvmdocGen(SkipAndTransitiveOptionsRegistrar, HasSkipAndTransitiveOptionsMi
     catalog = self.context.products.isrequired(self.jvmdoc().product_type)
     if catalog and self.combined:
       raise TaskError(
-          f'Cannot provide {self.jvmdoc().product_type} target mappings for combined output')
+        f"Cannot provide {self.jvmdoc().product_type} target mappings for combined output"
+      )
 
     def docable(target):
       if not language_predicate(target):
-        self.context.log.debug(f'Skipping [{target.address.spec}] because it is does not pass the language predicate')
+        self.context.log.debug(
+          f"Skipping [{target.address.spec}] because it is does not pass the language predicate"
+        )
         return False
       if not self._include_codegen and target.is_synthetic:
-        self.context.log.debug(f'Skipping [{target.address.spec}] because it is a synthetic target')
+        self.context.log.debug(f"Skipping [{target.address.spec}] because it is a synthetic target")
         return False
       for pattern in self._exclude_patterns:
         if pattern.search(target.address.spec):
           self.context.log.debug(
-            f"Skipping [{target.address.spec}] because it matches exclude pattern '{pattern.pattern}'")
+            f"Skipping [{target.address.spec}] because it matches exclude pattern '{pattern.pattern}'"
+          )
           return False
       return True
 
@@ -111,6 +129,7 @@ class JvmdocGen(SkipAndTransitiveOptionsRegistrar, HasSkipAndTransitiveOptionsMi
       return
 
     with self.invalidated(targets, invalidate_dependents=self.combined) as invalidation_check:
+
       def find_invalid_targets():
         invalid_targets = set()
         for vt in invalidation_check.invalid_vts:
@@ -126,7 +145,7 @@ class JvmdocGen(SkipAndTransitiveOptionsRegistrar, HasSkipAndTransitiveOptionsMi
 
     if self.open and self.combined:
       try:
-        desktop.ui_open(os.path.join(self.workdir, 'combined', 'index.html'))
+        desktop.ui_open(os.path.join(self.workdir, "combined", "index.html"))
       except desktop.OpenError as e:
         raise TaskError(e)
 
@@ -139,7 +158,7 @@ class JvmdocGen(SkipAndTransitiveOptionsRegistrar, HasSkipAndTransitiveOptionsMi
         self.context.products.get(self.jvmdoc().product_type).add(target, gendir, jvmdocs)
 
   def _generate_combined(self, targets, create_jvmdoc_command):
-    gendir = os.path.join(self.workdir, 'combined')
+    gendir = os.path.join(self.workdir, "combined")
     if targets:
       classpath = self.classpath(targets, include_scopes=Scopes.JVM_COMPILE_SCOPES)
       safe_mkdir(gendir, clean=True)
@@ -162,7 +181,8 @@ class JvmdocGen(SkipAndTransitiveOptionsRegistrar, HasSkipAndTransitiveOptionsMi
       # Use ThreadPool as there may be dangling processes that cause identical run id and
       # then buildstats error downstream. https://github.com/pantsbuild/pants/issues/6785
       with contextlib.closing(
-          ThreadPool(processes=min(len(jobs), multiprocessing.cpu_count()))) as pool:
+        ThreadPool(processes=min(len(jobs), multiprocessing.cpu_count()))
+      ) as pool:
         # map would be a preferable api here but fails after the 1st batch with an internal:
         # ...
         #  File "...src/python/pants/backend/jvm/tasks/jar_create.py", line 170, in javadocjar
@@ -176,8 +196,9 @@ class JvmdocGen(SkipAndTransitiveOptionsRegistrar, HasSkipAndTransitiveOptionsMi
         self.context.log.debug("Begin multiprocessing section; output may be misordered or garbled")
         try:
           for gendir, (target, command) in jobs.items():
-            self.context.log.debug("Running create_jvmdoc in {} with {}"
-                                   .format(gendir, " ".join(command)))
+            self.context.log.debug(
+              "Running create_jvmdoc in {} with {}".format(gendir, " ".join(command))
+            )
             futures.append(pool.apply_async(create_jvmdoc, args=(command, gendir)))
 
           for future in futures:
@@ -194,8 +215,9 @@ class JvmdocGen(SkipAndTransitiveOptionsRegistrar, HasSkipAndTransitiveOptionsMi
   def _handle_create_jvmdoc_result(self, targets, result, command):
     if result != 0:
       targetlist = ", ".join(target.address.spec for target in targets)
-      message = 'Failed to process {} for {} [{}]: {}'.format(
-                self.jvmdoc().tool_name, targetlist, result, " ".join(command))
+      message = "Failed to process {} for {} [{}]: {}".format(
+        self.jvmdoc().tool_name, targetlist, result, " ".join(command)
+      )
       if self.ignore_failure:
         self.context.log.warn(message)
       else:

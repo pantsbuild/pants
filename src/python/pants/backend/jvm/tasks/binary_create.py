@@ -17,7 +17,7 @@ class BinaryCreate(JvmBinaryTask):
 
   @classmethod
   def product_types(cls):
-    return ['jvm_binaries']
+    return ["jvm_binaries"]
 
   def execute(self):
     # TODO (peiyu) switch to `target.id` based naming to avoid potential `basename`
@@ -27,10 +27,10 @@ class BinaryCreate(JvmBinaryTask):
 
   def create_binary(self, binary):
     safe_mkdir(self._outdir)
-    binary_jarname = f'{binary.basename}.jar'
+    binary_jarname = f"{binary.basename}.jar"
     binary_jarpath = os.path.join(self._outdir, binary_jarname)
-    self.context.log.info(f'creating {os.path.relpath(binary_jarpath, get_buildroot())}')
-    self.context.products.get('jvm_binaries').add(binary, self._outdir).append(binary_jarname)
+    self.context.log.info(f"creating {os.path.relpath(binary_jarpath, get_buildroot())}")
+    self.context.products.get("jvm_binaries").add(binary, self._outdir).append(binary_jarname)
 
     with self.monolithic_jar(binary, binary_jarpath) as jar:
       self.add_main_manifest_entry(jar, binary)

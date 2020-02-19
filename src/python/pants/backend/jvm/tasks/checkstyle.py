@@ -23,9 +23,9 @@ class Checkstyle(LintTaskMixin, NailgunTask):
   :API: public
   """
 
-  _CHECKSTYLE_MAIN = 'com.puppycrawl.tools.checkstyle.Main'
+  _CHECKSTYLE_MAIN = "com.puppycrawl.tools.checkstyle.Main"
 
-  _JAVA_SOURCE_EXTENSION = '.java'
+  _JAVA_SOURCE_EXTENSION = ".java"
 
   _CHECKSTYLE_BOOTSTRAP_KEY = "checkstyle"
 
@@ -33,8 +33,8 @@ class Checkstyle(LintTaskMixin, NailgunTask):
     return resolve_conflicting_options(
       old_option=old_option,
       new_option=new_option,
-      old_scope='lint-checkstyle',
-      new_scope='checkstyle',
+      old_scope="lint-checkstyle",
+      new_scope="checkstyle",
       old_container=self.get_options(),
       new_container=CheckstyleSubsystem.global_instance().options,
     )
@@ -42,37 +42,53 @@ class Checkstyle(LintTaskMixin, NailgunTask):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--configuration', advanced=True, type=file_option, fingerprint=True,
-             removal_version='1.27.0.dev0',
-             removal_hint='Use `--checkstyle-config` instead of `--lint-checkstyle-configuration`.',
-             help='Path to the checkstyle configuration file.')
-    register('--properties', advanced=True, type=dict_with_files_option, default={},
-             fingerprint=True,
-             help='Dictionary of property mappings to use for checkstyle.properties.')
-    register('--confs', advanced=True, type=list, default=['default'],
-             help='One or more ivy configurations to resolve for this target.')
-    register('--include-user-classpath', type=bool, fingerprint=True,
-             help='Add the user classpath to the checkstyle classpath')
-    cls.register_jvm_tool(register,
-                          'checkstyle',
-                          # Note that checkstyle 7.0 does not run on Java 7 runtimes or below.
-                          classpath=[
-                            JarDependency(org='com.puppycrawl.tools',
-                                          name='checkstyle',
-                                          rev='6.19'),
-                          ],
-                          main=cls._CHECKSTYLE_MAIN,
-                          custom_rules=[
-                              # Checkstyle uses reflection to load checks and has an affordance that
-                              # allows leaving off a check classes' package name.  This affordance
-                              # breaks for built-in checkstyle checks under shading so we ensure all
-                              # checkstyle packages are excluded from shading such that just its
-                              # third party transitive deps (guava and the like), are shaded.
-                              # See the module configuration rules here which describe this:
-                              #   http://checkstyle.sourceforge.net/config.html#Modules
-                              Shader.exclude_package('com.puppycrawl.tools.checkstyle',
-                                                     recursive=True),
-                          ])
+    register(
+      "--configuration",
+      advanced=True,
+      type=file_option,
+      fingerprint=True,
+      removal_version="1.27.0.dev0",
+      removal_hint="Use `--checkstyle-config` instead of `--lint-checkstyle-configuration`.",
+      help="Path to the checkstyle configuration file.",
+    )
+    register(
+      "--properties",
+      advanced=True,
+      type=dict_with_files_option,
+      default={},
+      fingerprint=True,
+      help="Dictionary of property mappings to use for checkstyle.properties.",
+    )
+    register(
+      "--confs",
+      advanced=True,
+      type=list,
+      default=["default"],
+      help="One or more ivy configurations to resolve for this target.",
+    )
+    register(
+      "--include-user-classpath",
+      type=bool,
+      fingerprint=True,
+      help="Add the user classpath to the checkstyle classpath",
+    )
+    cls.register_jvm_tool(
+      register,
+      "checkstyle",
+      # Note that checkstyle 7.0 does not run on Java 7 runtimes or below.
+      classpath=[JarDependency(org="com.puppycrawl.tools", name="checkstyle", rev="6.19")],
+      main=cls._CHECKSTYLE_MAIN,
+      custom_rules=[
+        # Checkstyle uses reflection to load checks and has an affordance that
+        # allows leaving off a check classes' package name.  This affordance
+        # breaks for built-in checkstyle checks under shading so we ensure all
+        # checkstyle packages are excluded from shading such that just its
+        # third party transitive deps (guava and the like), are shaded.
+        # See the module configuration rules here which describe this:
+        #   http://checkstyle.sourceforge.net/config.html#Modules
+        Shader.exclude_package("com.puppycrawl.tools.checkstyle", recursive=True)
+      ],
+    )
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -90,7 +106,7 @@ class Checkstyle(LintTaskMixin, NailgunTask):
   def prepare(cls, options, round_manager):
     super().prepare(options, round_manager)
     if options.include_user_classpath:
-      round_manager.require_data('runtime_classpath')
+      round_manager.require_data("runtime_classpath")
 
   def _is_checked(self, target):
     return target.has_sources(self._JAVA_SOURCE_EXTENSION) and not target.is_synthetic
@@ -107,49 +123,58 @@ class Checkstyle(LintTaskMixin, NailgunTask):
       if sources:
         result = self.checkstyle(invalid_targets, sources)
         if result != 0:
-          raise TaskError('java {main} ... exited non-zero ({result})'.format(
-            main=self._CHECKSTYLE_MAIN, result=result))
+          raise TaskError(
+            "java {main} ... exited non-zero ({result})".format(
+              main=self._CHECKSTYLE_MAIN, result=result
+            )
+          )
 
   def calculate_sources(self, targets):
     sources = set()
     for target in targets:
-      sources.update(source for source in target.sources_relative_to_buildroot()
-                     if source.endswith(self._JAVA_SOURCE_EXTENSION))
+      sources.update(
+        source
+        for source in target.sources_relative_to_buildroot()
+        if source.endswith(self._JAVA_SOURCE_EXTENSION)
+      )
     return sources
 
   def checkstyle(self, targets, sources):
-    union_classpath = OrderedSet(self.tool_classpath('checkstyle'))
+    union_classpath = OrderedSet(self.tool_classpath("checkstyle"))
     if self.get_options().include_user_classpath:
-      runtime_classpaths = self.context.products.get_data('runtime_classpath')
+      runtime_classpaths = self.context.products.get_data("runtime_classpath")
       for target in targets:
         runtime_classpath = runtime_classpaths.get_for_targets(target.closure(bfs=True))
-        union_classpath.update(jar for conf, jar in runtime_classpath
-                               if conf in self.get_options().confs)
+        union_classpath.update(
+          jar for conf, jar in runtime_classpath if conf in self.get_options().confs
+        )
 
     config = self._resolve_conflicting_options(old_option="configuration", new_option="config")
     if not config:
       raise TaskError(
-        'No checkstyle configuration file configured. Configure with `--checkstyle-config`.'
+        "No checkstyle configuration file configured. Configure with `--checkstyle-config`."
       )
 
-    args = [
-      '-c', config,
-      '-f', 'plain'
-    ]
+    args = ["-c", config, "-f", "plain"]
 
     if self.get_options().properties:
-      properties_file = os.path.join(self.workdir, 'checkstyle.properties')
-      with safe_open(properties_file, 'w') as pf:
+      properties_file = os.path.join(self.workdir, "checkstyle.properties")
+      with safe_open(properties_file, "w") as pf:
         for k, v in self.get_options().properties.items():
-          pf.write(f'{k}={v}\n')
-      args.extend(['-p', properties_file])
+          pf.write(f"{k}={v}\n")
+      args.extend(["-p", properties_file])
 
     # We've hit known cases of checkstyle command lines being too long for the system so we guard
     # with Xargs since checkstyle does not accept, for example, @argfile style arguments.
     def call(xargs):
-      return self.runjava(classpath=union_classpath, main=self._CHECKSTYLE_MAIN,
-                          jvm_options=self.get_options().jvm_options,
-                          args=args + xargs, workunit_name='checkstyle')
+      return self.runjava(
+        classpath=union_classpath,
+        main=self._CHECKSTYLE_MAIN,
+        jvm_options=self.get_options().jvm_options,
+        args=args + xargs,
+        workunit_name="checkstyle",
+      )
+
     checks = Xargs(call)
 
     return checks.execute(sources)

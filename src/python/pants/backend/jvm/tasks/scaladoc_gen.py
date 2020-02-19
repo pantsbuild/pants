@@ -14,7 +14,7 @@ class ScaladocGen(JvmdocGen):
   @classmethod
   @memoized
   def jvmdoc(cls):
-    return Jvmdoc(tool_name='scaladoc', product_type='scaladoc')
+    return Jvmdoc(tool_name="scaladoc", product_type="scaladoc")
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -27,7 +27,7 @@ class ScaladocGen(JvmdocGen):
 
   def execute(self):
     def is_scala(target):
-      return target.has_sources('.scala')
+      return target.has_sources(".scala")
 
     self.generate_doc(is_scala, self.create_scaladoc_command)
 
@@ -37,7 +37,7 @@ class ScaladocGen(JvmdocGen):
       sources.extend(target.sources_relative_to_buildroot())
       # TODO(Tejal Desai): pantsbuild/pants/65: Remove java_sources attribute for ScalaLibrary
       # A '.scala' owning target may not have java_sources, eg: junit_tests
-      if hasattr(target, 'java_sources'):
+      if hasattr(target, "java_sources"):
         for java_target in target.java_sources:
           sources.extend(java_target.sources_relative_to_buildroot())
 
@@ -46,20 +46,20 @@ class ScaladocGen(JvmdocGen):
 
     scala_platform = ScalaPlatform.global_instance()
     tool_classpath = [
-        cp_entry.path for cp_entry in scala_platform.compiler_classpath_entries(self.context.products)
-      ]
+      cp_entry.path for cp_entry in scala_platform.compiler_classpath_entries(self.context.products)
+    ]
 
-    args = ['-usejavacp',
-            '-classpath', ':'.join(classpath),
-            '-d', gendir]
+    args = ["-usejavacp", "-classpath", ":".join(classpath), "-d", gendir]
 
     args.extend(self.args)
 
     args.extend(sources)
 
     java_executor = SubprocessExecutor(self.preferred_jvm_distribution_for_targets(targets))
-    runner = java_executor.runner(jvm_options=self.jvm_options,
-                                  classpath=tool_classpath,
-                                  main='scala.tools.nsc.ScalaDoc',
-                                  args=args)
+    runner = java_executor.runner(
+      jvm_options=self.jvm_options,
+      classpath=tool_classpath,
+      main="scala.tools.nsc.ScalaDoc",
+      args=args,
+    )
     return runner.command

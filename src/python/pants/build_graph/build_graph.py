@@ -47,7 +47,8 @@ class BuildGraph(ABC):
 
     def __init__(self, addr):
       super(BuildGraph.ManualSyntheticTargetError, self).__init__(
-          'Found a manually-defined target at synthetic address {}'.format(addr.spec))
+        "Found a manually-defined target at synthetic address {}".format(addr.spec)
+      )
 
   class NoDepPredicateWalk:
     """This is a utility class to aid in graph traversals that don't have predicates on dependency edges."""
@@ -130,7 +131,7 @@ class BuildGraph(ABC):
     self._target_dependencies_by_address = defaultdict(OrderedSet)
     self._target_dependees_by_address = defaultdict(OrderedSet)
     self._derived_from_by_derivative = {}  # Address -> Address.
-    self._derivatives_by_derived_from = defaultdict(list)   # Address -> list of Address.
+    self._derivatives_by_derived_from = defaultdict(list)  # Address -> list of Address.
     self.synthetic_addresses = set()
 
   def add_invalidation_callback(self, callback):
@@ -155,7 +156,7 @@ class BuildGraph(ABC):
     """
     return address in self._target_by_address
 
-  def get_target_from_spec(self, spec, relative_to=''):
+  def get_target_from_spec(self, spec, relative_to=""):
     """Converts `spec` into an address and returns the result of `get_target`
 
     :API: public
@@ -176,9 +177,10 @@ class BuildGraph(ABC):
 
     :API: public
     """
-    assert address in self._target_by_address, (
-      'Cannot retrieve dependencies of {address} because it is not in the BuildGraph.'
-      .format(address=address)
+    assert (
+      address in self._target_by_address
+    ), "Cannot retrieve dependencies of {address} because it is not in the BuildGraph.".format(
+      address=address
     )
     return self._target_dependencies_by_address[address]
 
@@ -189,9 +191,10 @@ class BuildGraph(ABC):
 
     :API: public
     """
-    assert address in self._target_by_address, (
-      'Cannot retrieve dependents of {address} because it is not in the BuildGraph.'
-      .format(address=address)
+    assert (
+      address in self._target_by_address
+    ), "Cannot retrieve dependents of {address} because it is not in the BuildGraph.".format(
+      address=address
     )
     return self._target_dependees_by_address[address]
 
@@ -258,32 +261,36 @@ class BuildGraph(ABC):
     """
     self._invalidated()
     if self.contains_address(target.address):
-      raise ValueError('Attempted to inject synthetic {target} derived from {derived_from}'
-                       ' into the BuildGraph with address {address}, but there is already a Target'
-                       ' {existing_target} with that address'
-                       .format(target=target,
-                               derived_from=derived_from,
-                               address=target.address,
-                               existing_target=self.get_target(target.address)))
+      raise ValueError(
+        "Attempted to inject synthetic {target} derived from {derived_from}"
+        " into the BuildGraph with address {address}, but there is already a Target"
+        " {existing_target} with that address".format(
+          target=target,
+          derived_from=derived_from,
+          address=target.address,
+          existing_target=self.get_target(target.address),
+        )
+      )
 
     dependencies = dependencies or frozenset()
     address = target.address
 
     if address in self._target_by_address:
-      raise ValueError('A Target {existing_target} already exists in the BuildGraph at address'
-                       ' {address}.  Failed to insert {target}.'
-                       .format(existing_target=self._target_by_address[address],
-                               address=address,
-                               target=target))
+      raise ValueError(
+        "A Target {existing_target} already exists in the BuildGraph at address"
+        " {address}.  Failed to insert {target}.".format(
+          existing_target=self._target_by_address[address], address=address, target=target
+        )
+      )
 
     if derived_from:
       if not self.contains_address(derived_from.address):
-        raise ValueError('Attempted to inject synthetic {target} derived from {derived_from}'
-                         ' into the BuildGraph, but {derived_from} was not in the BuildGraph.'
-                         ' Synthetic Targets must be derived from no Target (None) or from a'
-                         ' Target already in the BuildGraph.'
-                         .format(target=target,
-                                 derived_from=derived_from))
+        raise ValueError(
+          "Attempted to inject synthetic {target} derived from {derived_from}"
+          " into the BuildGraph, but {derived_from} was not in the BuildGraph."
+          " Synthetic Targets must be derived from no Target (None) or from a"
+          " Target already in the BuildGraph.".format(target=target, derived_from=derived_from)
+        )
       self._derived_from_by_derivative[target.address] = derived_from.address
       self._derivatives_by_derived_from[derived_from.address].append(target.address)
 
@@ -309,9 +316,10 @@ class BuildGraph(ABC):
     """
     self._invalidated()
     if dependent not in self._target_by_address:
-      raise ValueError('Cannot inject dependency from {dependent} on {dependency} because the'
-                       ' dependent is not in the BuildGraph.'
-                       .format(dependent=dependent, dependency=dependency))
+      raise ValueError(
+        "Cannot inject dependency from {dependent} on {dependency} because the"
+        " dependent is not in the BuildGraph.".format(dependent=dependent, dependency=dependency)
+      )
 
     # TODO(pl): Unfortunately this is an unhelpful time to error due to a cycle.  Instead, we warn
     # and allow the cycle to appear.  It is the caller's responsibility to call sort_targets on the
@@ -322,15 +330,19 @@ class BuildGraph(ABC):
     # performance for inserting new nodes, and also cycle detection on each insert.
 
     if dependency not in self._target_by_address:
-      logger.warning('Injecting dependency from {dependent} on {dependency}, but the dependency'
-                     ' is not in the BuildGraph.  This probably indicates a dependency cycle, but'
-                     ' it is not an error until sort_targets is called on a subgraph containing'
-                     ' the cycle.'
-                     .format(dependent=dependent, dependency=dependency))
+      logger.warning(
+        "Injecting dependency from {dependent} on {dependency}, but the dependency"
+        " is not in the BuildGraph.  This probably indicates a dependency cycle, but"
+        " it is not an error until sort_targets is called on a subgraph containing"
+        " the cycle.".format(dependent=dependent, dependency=dependency)
+      )
 
     if dependency in self.dependencies_of(dependent):
-      logger.debug('{dependent} already depends on {dependency}'
-                   .format(dependent=dependent, dependency=dependency))
+      logger.debug(
+        "{dependent} already depends on {dependency}".format(
+          dependent=dependent, dependency=dependency
+        )
+      )
     else:
       self._target_dependencies_by_address[dependent].add(dependency)
       self._target_dependees_by_address[dependency].add(dependent)
@@ -361,14 +373,16 @@ class BuildGraph(ABC):
       walk = self.NoDepPredicateWalk()
     return walk
 
-  def walk_transitive_dependency_graph(self,
-                                       addresses,
-                                       work,
-                                       predicate=None,
-                                       postorder=False,
-                                       dep_predicate=None,
-                                       prelude=None,
-                                       epilogue=None):
+  def walk_transitive_dependency_graph(
+    self,
+    addresses,
+    work,
+    predicate=None,
+    postorder=False,
+    dep_predicate=None,
+    prelude=None,
+    epilogue=None,
+  ):
     """Given a work function, walks the transitive dependency closure of `addresses` using DFS.
 
     :API: public
@@ -430,13 +444,9 @@ class BuildGraph(ABC):
     for address in addresses:
       _walk_rec(address)
 
-  def walk_transitive_dependee_graph(self,
-                                     addresses,
-                                     work,
-                                     predicate=None,
-                                     postorder=False,
-                                     prelude=None,
-                                     epilogue=None):
+  def walk_transitive_dependee_graph(
+    self, addresses, work, predicate=None, postorder=False, prelude=None, epilogue=None
+  ):
     """Identical to `walk_transitive_dependency_graph`, but walks dependees preorder (or postorder
     if the postorder parameter is True).
 
@@ -462,6 +472,7 @@ class BuildGraph(ABC):
             epilogue(target)
           if postorder:
             work(target)
+
     for address in addresses:
       _walk_rec(address)
 
@@ -478,8 +489,9 @@ class BuildGraph(ABC):
     :param function predicate: The predicate passed through to `walk_transitive_dependee_graph`.
     """
     ret = OrderedSet()
-    self.walk_transitive_dependee_graph(addresses, ret.add, predicate=predicate,
-                                        postorder=postorder)
+    self.walk_transitive_dependee_graph(
+      addresses, ret.add, predicate=predicate, postorder=postorder
+    )
     return ret
 
   def transitive_subgraph_of_addresses(self, addresses, *vargs, **kwargs):
@@ -506,15 +518,10 @@ class BuildGraph(ABC):
       will not be expanded.
     """
     ret = OrderedSet()
-    self.walk_transitive_dependency_graph(addresses, ret.add,
-                                          *vargs,
-                                          **kwargs)
+    self.walk_transitive_dependency_graph(addresses, ret.add, *vargs, **kwargs)
     return ret
 
-  def transitive_subgraph_of_addresses_bfs(self,
-                                           addresses,
-                                           predicate=None,
-                                           dep_predicate=None):
+  def transitive_subgraph_of_addresses_bfs(self, addresses, predicate=None, dep_predicate=None):
     """Returns the transitive dependency closure of `addresses` using BFS.
 
     :API: public
@@ -551,12 +558,9 @@ class BuildGraph(ABC):
           to_walk.append((level + 1, dep_address))
     return ordered_closure
 
-  def inject_synthetic_target(self,
-                              address,
-                              target_type,
-                              dependencies=None,
-                              derived_from=None,
-                              **kwargs):
+  def inject_synthetic_target(
+    self, address, target_type, dependencies=None, derived_from=None, **kwargs
+  ):
     """Constructs and injects Target at `address` with optional `dependencies` and `derived_from`.
 
     This method is useful especially for codegen, where a "derived" Target is injected
@@ -570,14 +574,8 @@ class BuildGraph(ABC):
       from the `derived_from`.
     :param Target derived_from: The Target this Target will derive from.
     """
-    target = target_type(name=address.target_name,
-                         address=address,
-                         build_graph=self,
-                         **kwargs)
-    self.inject_target(target,
-                       dependencies=dependencies,
-                       derived_from=derived_from,
-                       synthetic=True)
+    target = target_type(name=address.target_name, address=address, build_graph=self, **kwargs)
+    self.inject_target(target, dependencies=dependencies, derived_from=derived_from, synthetic=True)
 
   def maybe_inject_address_closure(self, address):
     """If the given address is not already injected to the graph, calls inject_address_closure.
@@ -630,8 +628,8 @@ class BuildGraph(ABC):
       removal_version="1.27.0.dev0",
       deprecated_entity_description="inject_specs_closure()",
       hint="Use `inject_address_specs_closure()` instead. The API is the same as "
-           "before. This change is to prepare for Pants eventually supporting file system specs, "
-           "e.g. `./pants cloc foo.py`. In preparation, we renamed `Spec` to `AddressSpec`."
+      "before. This change is to prepare for Pants eventually supporting file system specs, "
+      "e.g. `./pants cloc foo.py`. In preparation, we renamed `Spec` to `AddressSpec`.",
     )
 
   def resolve(self, spec):
@@ -658,9 +656,9 @@ class CycleException(Exception):
   """
 
   def __init__(self, cycle):
-    super().__init__('Cycle detected:\n\t{}'.format(
-        ' ->\n\t'.join(target.address.spec for target in cycle)
-    ))
+    super().__init__(
+      "Cycle detected:\n\t{}".format(" ->\n\t".join(target.address.spec for target in cycle))
+    )
 
 
 def invert_dependencies(targets):

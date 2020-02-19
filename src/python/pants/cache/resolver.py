@@ -61,7 +61,7 @@ class ResponseParser:
     :API: public
     """
 
-  def __init__(self, format='json_map', encoding='utf-8', index='hostlist'):
+  def __init__(self, format="json_map", encoding="utf-8", index="hostlist"):
     """
     :API: public
     """
@@ -74,7 +74,7 @@ class ResponseParser:
 
     :API: public
     """
-    if self.format == 'json_map':
+    if self.format == "json_map":
       try:
         return assert_list(json.loads(content.decode(self.encoding))[self.index])
       except (KeyError, UnicodeDecodeError, ValueError) as e:
@@ -108,9 +108,9 @@ class RESTfulResolver(Resolver):
       resp = session.get(resolve_from, timeout=self._timeout)
       if resp.status_code == requests.codes.ok:
         return resp.content
-      raise self.ResolverError('Error status_code={0}'.format(resp.status_code))
+      raise self.ResolverError("Error status_code={0}".format(resp.status_code))
     except requests.RequestException:
-      raise self.ResolverError('Request error from {0}'.format(resolve_from))
+      raise self.ResolverError("Request error from {0}".format(resolve_from))
 
   def resolve(self, resolve_from):
     """
@@ -123,6 +123,6 @@ class RESTfulResolver(Resolver):
       parsed_urls = self._response_parser.parse(content)
       if len(parsed_urls) > 0:
         return parsed_urls
-      raise self.ResolverError('Empty result received from {0}'.format(resolve_from))
+      raise self.ResolverError("Empty result received from {0}".format(resolve_from))
     except ResponseParser.ResponseParserError as e:
-      raise self.ResolverError('Error parsing response: {0}'.format(str(e)))
+      raise self.ResolverError("Error parsing response: {0}".format(str(e)))

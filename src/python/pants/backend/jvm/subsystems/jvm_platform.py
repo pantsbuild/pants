@@ -22,7 +22,7 @@ class JvmPlatform(Subsystem):
   # so this list does not go past it.
   SUPPORTED_CONVERSION_VERSIONS = (6, 7, 8)
 
-  _COMPILER_CHOICES = ['zinc', 'javac', 'rsc']
+  _COMPILER_CHOICES = ["zinc", "javac", "rsc"]
 
   class IllegalDefaultPlatform(TaskError):
     """The --default-platform option was set, but isn't defined in --platforms."""
@@ -32,45 +32,76 @@ class JvmPlatform(Subsystem):
 
     def __init__(self, target, platform_name, platforms_by_name):
       scope_name = JvmPlatform.options_scope
-      messages = ['Undefined jvm platform "{}" (referenced by {}).'
-                    .format(platform_name, target.address.spec if target else 'unknown target')]
+      messages = [
+        'Undefined jvm platform "{}" (referenced by {}).'.format(
+          platform_name, target.address.spec if target else "unknown target"
+        )
+      ]
       if not platforms_by_name:
-        messages.append('In fact, no platforms are defined under {0}. These should typically be'
-                        ' specified in [{0}] in pants.ini.'.format(scope_name))
+        messages.append(
+          "In fact, no platforms are defined under {0}. These should typically be"
+          " specified in [{0}] in pants.ini.".format(scope_name)
+        )
       else:
-        messages.append('Perhaps you meant one of:{}'.format(
-          ''.join('\n  {}'.format(name) for name in sorted(platforms_by_name.keys()))
-        ))
-        messages.append('\nThese are typically defined under [{}] in pants.ini.'
-                        .format(scope_name))
-      super(JvmPlatform.UndefinedJvmPlatform, self).__init__(' '.join(messages))
+        messages.append(
+          "Perhaps you meant one of:{}".format(
+            "".join("\n  {}".format(name) for name in sorted(platforms_by_name.keys()))
+          )
+        )
+        messages.append("\nThese are typically defined under [{}] in pants.ini.".format(scope_name))
+      super(JvmPlatform.UndefinedJvmPlatform, self).__init__(" ".join(messages))
 
-  options_scope = 'jvm-platform'
+  options_scope = "jvm-platform"
 
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--platforms', advanced=True, type=dict, default={}, fingerprint=True,
-             help='Compile settings that can be referred to by name in jvm_targets.')
-    register('--default-platform', advanced=True, type=str, default=None, fingerprint=True,
-             help='Name of the default platform to use for compilation. If default-runtime-platform'
-                  ' is None, also applies to runtime. Used when targets leave platform unspecified.'
-            )
-    register('--default-runtime-platform', advanced=True, type=str, default=None, fingerprint=True,
-             help='Name of the default runtime platform. Used when targets leave runtime_platform'
-                  ' unspecified.')
-    register('--compiler', advanced=True, choices=cls._COMPILER_CHOICES, default='rsc', fingerprint=True,
-             help='Java compiler implementation to use.')
+    register(
+      "--platforms",
+      advanced=True,
+      type=dict,
+      default={},
+      fingerprint=True,
+      help="Compile settings that can be referred to by name in jvm_targets.",
+    )
+    register(
+      "--default-platform",
+      advanced=True,
+      type=str,
+      default=None,
+      fingerprint=True,
+      help="Name of the default platform to use for compilation. If default-runtime-platform"
+      " is None, also applies to runtime. Used when targets leave platform unspecified.",
+    )
+    register(
+      "--default-runtime-platform",
+      advanced=True,
+      type=str,
+      default=None,
+      fingerprint=True,
+      help="Name of the default runtime platform. Used when targets leave runtime_platform"
+      " unspecified.",
+    )
+    register(
+      "--compiler",
+      advanced=True,
+      choices=cls._COMPILER_CHOICES,
+      default="rsc",
+      fingerprint=True,
+      help="Java compiler implementation to use.",
+    )
 
   @classmethod
   def subsystem_dependencies(cls):
     return super().subsystem_dependencies() + (DistributionLocator,)
 
   def _parse_platform(self, name, platform):
-    return JvmPlatformSettings(platform.get('source', platform.get('target')),
-                               platform.get('target', platform.get('source')),
-                               platform.get('args', ()),
-                               name=name)
+    return JvmPlatformSettings(
+      platform.get("source", platform.get("target")),
+      platform.get("target", platform.get("source")),
+      platform.get("args", ()),
+      name=name,
+    )
 
   @classmethod
   def preferred_jvm_distribution(cls, platforms, strict=False, jdk=False):
@@ -91,9 +122,8 @@ class JvmPlatform(Subsystem):
     min_version = max(platform.target_level for platform in platforms)
     max_version = Revision(*(min_version.components + [9999])) if strict else None
     return DistributionLocator.cached(
-      minimum_version=min_version,
-      maximum_version=max_version,
-      jdk=jdk)
+      minimum_version=min_version, maximum_version=max_version, jdk=jdk
+    )
 
   @memoized_property
   def platforms_by_name(self):
@@ -102,10 +132,10 @@ class JvmPlatform(Subsystem):
 
   @property
   def _fallback_platform(self):
-    logger.warning('No default jvm platform is defined.')
+    logger.warning("No default jvm platform is defined.")
     source_level = JvmPlatform.parse_java_version(DistributionLocator.cached().version)
     target_level = source_level
-    platform_name = f'(DistributionLocator.cached().version {source_level})'
+    platform_name = f"(DistributionLocator.cached().version {source_level})"
     return JvmPlatformSettings(source_level, target_level, [], name=platform_name)
 
   @memoized_property
@@ -116,9 +146,10 @@ class JvmPlatform(Subsystem):
     platforms_by_name = self.platforms_by_name
     if name not in platforms_by_name:
       raise self.IllegalDefaultPlatform(
-          "The default platform was set to '{0}', but no platform by that name has been "
-          "defined. Typically, this should be defined under [{1}] in pants.ini."
-          .format(name, self.options_scope)
+        "The default platform was set to '{0}', but no platform by that name has been "
+        "defined. Typically, this should be defined under [{1}] in pants.ini.".format(
+          name, self.options_scope
+        )
       )
     return JvmPlatformSettings(*platforms_by_name[name], name=name, by_default=True)
 
@@ -131,8 +162,9 @@ class JvmPlatform(Subsystem):
     if name not in platforms_by_name:
       raise self.IllegalDefaultPlatform(
         "The default runtime platform was set to '{0}', but no platform by that name has been "
-        "defined. Typically, this should be defined under [{1}] in pants.ini."
-          .format(name, self.options_scope)
+        "defined. Typically, this should be defined under [{1}] in pants.ini.".format(
+          name, self.options_scope
+        )
       )
     return JvmPlatformSettings(*platforms_by_name[name], name=name, by_default=True)
 
@@ -163,7 +195,7 @@ class JvmPlatform(Subsystem):
     """
     if not target.payload.platform and target.is_synthetic:
       derived_from = target.derived_from
-      platform = derived_from and getattr(derived_from, 'platform', None)
+      platform = derived_from and getattr(derived_from, "platform", None)
       if platform:
         return platform
     return self.get_platform_by_name(target.payload.platform, target)
@@ -183,13 +215,11 @@ class JvmPlatform(Subsystem):
     target_runtime_platform = target.payload.runtime_platform
     if not target_runtime_platform and target.is_synthetic:
       derived_from = target.derived_from
-      platform = derived_from and getattr(derived_from, 'runtime_platform', None)
+      platform = derived_from and getattr(derived_from, "runtime_platform", None)
       if platform:
         return platform
     if target_runtime_platform:
-      return self.get_platform_by_name(
-        target_runtime_platform,
-        target)
+      return self.get_platform_by_name(target_runtime_platform, target)
     elif self.default_runtime_platform:
       return self.default_runtime_platform
     else:
@@ -208,11 +238,11 @@ class JvmPlatform(Subsystem):
     :return: the parsed and cleaned version, suitable as a javac -source or -target argument.
     :rtype: Revision
     """
-    conversion = {str(i): f'1.{i}' for i in cls.SUPPORTED_CONVERSION_VERSIONS}
+    conversion = {str(i): f"1.{i}" for i in cls.SUPPORTED_CONVERSION_VERSIONS}
     if str(version) in conversion:
       return Revision.lenient(conversion[str(version)])
 
-    if not hasattr(version, 'components'):
+    if not hasattr(version, "components"):
       version = Revision.lenient(version)
     if len(version.components) <= 2:
       return version
@@ -248,10 +278,9 @@ class JvmPlatformSettings:
       else:
         name = self.name
       raise self.IllegalSourceTargetCombination(
-        'Platform {platform} has java source level {source_level} but target level {target_level}.'
-        .format(platform=name,
-                source_level=self.source_level,
-                target_level=self.target_level)
+        "Platform {platform} has java source level {source_level} but target level {target_level}.".format(
+          platform=name, source_level=self.source_level, target_level=self.target_level
+        )
       )
 
   @property
@@ -274,8 +303,6 @@ class JvmPlatformSettings:
     return hash(tuple(self))
 
   def __str__(self):
-    return 'source={source},target={target},args=({args})'.format(
-      source=self.source_level,
-      target=self.target_level,
-      args=' '.join(self.args)
+    return "source={source},target={target},args=({args})".format(
+      source=self.source_level, target=self.target_level, args=" ".join(self.args)
     )

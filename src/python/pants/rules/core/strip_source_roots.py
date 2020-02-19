@@ -16,6 +16,7 @@ from pants.source.source_root import NoSourceRootError, SourceRootConfig
 @dataclass(frozen=True)
 class SourceRootStrippedSources:
   """Wrapper for a snapshot of targets whose source roots have been stripped."""
+
   snapshot: Snapshot
 
 
@@ -31,6 +32,7 @@ class StripSourceRootsRequest:
   https://github.com/pantsbuild/pants/pull/9112#discussion_r377999025 for more context on this
   design.
   """
+
   snapshot: Snapshot
   representative_path: str
 
@@ -47,7 +49,7 @@ class StripSourceRootsRequest:
 
 @rule
 async def strip_source_roots_from_snapshot(
-  request: StripSourceRootsRequest, source_root_config: SourceRootConfig,
+  request: StripSourceRootsRequest, source_root_config: SourceRootConfig
 ) -> SourceRootStrippedSources:
   """Removes source roots from a snapshot,
   e.g. `src/python/pants/util/strutil.py` -> `pants/util/strutil.py`.
@@ -55,8 +57,7 @@ async def strip_source_roots_from_snapshot(
   source_root = request.determine_source_root(source_root_config=source_root_config)
   resulting_digest = await Get[Digest](
     DirectoryWithPrefixToStrip(
-      directory_digest=request.snapshot.directory_digest,
-      prefix=source_root,
+      directory_digest=request.snapshot.directory_digest, prefix=source_root
     )
   )
   resulting_snapshot = await Get[Snapshot](Digest, resulting_digest)
@@ -74,7 +75,7 @@ async def strip_source_roots_from_target(
 
   # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of raising to
   # simplify the hasattr() checks here!
-  if not hasattr(target_adaptor, 'sources'):
+  if not hasattr(target_adaptor, "sources"):
     return SourceRootStrippedSources(snapshot=EMPTY_SNAPSHOT)
 
   # Loose `Files`, as opposed to `Resources` or `Target`s, have no (implied) package

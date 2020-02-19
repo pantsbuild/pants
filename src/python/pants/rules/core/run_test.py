@@ -22,19 +22,15 @@ class MockOptions:
 
 
 class RunTest(TestBase):
-
   def create_mock_binary(self, program_text: bytes) -> CreatedBinary:
-    input_files_content = InputFilesContent((
-      FileContent(path='program.py', content=program_text, is_executable=True),
-    ))
-    digest = self.request_single_product(Digest, input_files_content)
-    return CreatedBinary(
-      binary_name='program.py',
-      digest=digest,
+    input_files_content = InputFilesContent(
+      (FileContent(path="program.py", content=program_text, is_executable=True),)
     )
+    digest = self.request_single_product(Digest, input_files_content)
+    return CreatedBinary(binary_name="program.py", digest=digest)
 
   def single_target_run(
-    self, *, console: MockConsole, program_text: bytes, address_spec: str,
+    self, *, console: MockConsole, program_text: bytes, address_spec: str
   ) -> Run:
     workspace = Workspace(self.scheduler)
     interactive_runner = InteractiveRunner(self.scheduler)
@@ -53,8 +49,8 @@ class RunTest(TestBase):
         MockGet(
           product_type=CreatedBinary,
           subject_type=Address,
-          mock=lambda _: self.create_mock_binary(program_text)
-        ),
+          mock=lambda _: self.create_mock_binary(program_text),
+        )
       ],
     )
     return cast(Run, res)
@@ -63,12 +59,13 @@ class RunTest(TestBase):
     console = MockConsole(use_colors=False)
     program_text = b'#!/usr/bin/python\nprint("hello")'
     res = self.single_target_run(
-      console=console,
-      program_text=program_text,
-      address_spec='some/addr',
+      console=console, program_text=program_text, address_spec="some/addr"
     )
     self.assertEqual(res.exit_code, 0)
-    self.assertEqual(console.stdout.getvalue(), "Running target: some/addr:addr\nsome/addr:addr ran successfully.\n")
+    self.assertEqual(
+      console.stdout.getvalue(),
+      "Running target: some/addr:addr\nsome/addr:addr ran successfully.\n",
+    )
     self.assertEqual(console.stderr.getvalue(), "")
 
   def test_materialize_input_files(self) -> None:
@@ -76,9 +73,7 @@ class RunTest(TestBase):
     binary = self.create_mock_binary(program_text)
     interactive_runner = InteractiveRunner(self.scheduler)
     request = InteractiveProcessRequest(
-      argv=("./program.py",),
-      run_in_workspace=False,
-      input_files=binary.digest,
+      argv=("./program.py",), run_in_workspace=False, input_files=binary.digest
     )
     result = interactive_runner.run_local_interactive_process(request)
     self.assertEqual(result.process_exit_code, 0)
@@ -88,18 +83,14 @@ class RunTest(TestBase):
     binary = self.create_mock_binary(program_text)
     with self.assertRaises(ValueError):
       InteractiveProcessRequest(
-          argv=("/usr/bin/python",),
-          run_in_workspace=True,
-          input_files=binary.digest
+        argv=("/usr/bin/python",), run_in_workspace=True, input_files=binary.digest
       )
 
   def test_failed_run(self) -> None:
     console = MockConsole(use_colors=False)
     program_text = b'#!/usr/bin/python\nraise RuntimeError("foo")'
     res = self.single_target_run(
-      console=console,
-      program_text=program_text,
-      address_spec='some/addr'
+      console=console, program_text=program_text, address_spec="some/addr"
     )
     self.assertEqual(res.exit_code, 1)
     self.assertEqual(console.stdout.getvalue(), "Running target: some/addr:addr\n")

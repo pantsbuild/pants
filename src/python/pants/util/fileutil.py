@@ -46,15 +46,17 @@ def create_size_estimators() -> Dict[str, Callable[[Sequence[str]], int]]:
   builds.
   :returns: Dict of a name to a function that returns an estimated size.
   """
+
   def line_count(filename: str) -> int:
-    with open(filename, 'rb') as fh:
+    with open(filename, "rb") as fh:
       return sum(1 for line in fh)
+
   return {
-    'linecount': lambda srcs: sum(line_count(src) for src in srcs),
-    'filecount': lambda srcs: len(srcs),
-    'filesize': lambda srcs: sum(os.path.getsize(src) for src in srcs),
-    'nosize': lambda srcs: 0,
-    'random': lambda srcs: random.randint(0, 10000),
+    "linecount": lambda srcs: sum(line_count(src) for src in srcs),
+    "filecount": lambda srcs: len(srcs),
+    "filesize": lambda srcs: sum(os.path.getsize(src) for src in srcs),
+    "nosize": lambda srcs: 0,
+    "random": lambda srcs: random.randint(0, 10000),
   }
 
 

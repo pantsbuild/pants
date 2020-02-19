@@ -31,10 +31,7 @@ class MockGet:
 
 
 def run_rule(
-  rule,
-  *,
-  rule_args: Optional[Sequence[Any]] = None,
-  mock_gets: Optional[Sequence[MockGet]] = None
+  rule, *, rule_args: Optional[Sequence[Any]] = None, mock_gets: Optional[Sequence[MockGet]] = None
 ):
   """A test helper function that runs an @rule with a set of arguments and mocked Get providers.
 
@@ -68,31 +65,43 @@ def run_rule(
   :returns: The return value of the completed @rule.
   """
 
-  task_rule = getattr(rule, 'rule', None)
+  task_rule = getattr(rule, "rule", None)
   if task_rule is None:
-    raise TypeError(f'Expected to receive a decorated `@rule`; got: {rule}')
+    raise TypeError(f"Expected to receive a decorated `@rule`; got: {rule}")
 
   if rule_args is not None and len(rule_args) != len(task_rule.input_selectors):
-    raise ValueError('Rule expected to receive arguments of the form: {}; got: {}'.format(
-      task_rule.input_selectors, rule_args))
+    raise ValueError(
+      "Rule expected to receive arguments of the form: {}; got: {}".format(
+        task_rule.input_selectors, rule_args
+      )
+    )
 
   if mock_gets is not None and len(mock_gets) != len(task_rule.input_gets):
-    raise ValueError('Rule expected to receive Get providers for {}; got: {}'.format(
-      task_rule.input_gets, mock_gets))
+    raise ValueError(
+      "Rule expected to receive Get providers for {}; got: {}".format(
+        task_rule.input_gets, mock_gets
+      )
+    )
 
   res = rule(*(rule_args or ()))
   if not isinstance(res, (CoroutineType, GeneratorType)):
     return res
 
   def get(product, subject):
-    provider = next((
-      mock_get.mock
-      for mock_get in mock_gets
-      if mock_get.product_type == product and mock_get.subject_type == type(subject)
-    ), None)
+    provider = next(
+      (
+        mock_get.mock
+        for mock_get in mock_gets
+        if mock_get.product_type == product and mock_get.subject_type == type(subject)
+      ),
+      None,
+    )
     if provider is None:
-      raise AssertionError('Rule requested: Get{}, which cannot be satisfied.'.format(
-        (product, type(subject), subject)))
+      raise AssertionError(
+        "Rule requested: Get{}, which cannot be satisfied.".format(
+          (product, type(subject), subject)
+        )
+      )
     return provider(subject)
 
   rule_coroutine = res
@@ -122,7 +131,7 @@ def create_scheduler(rules, union_rules=None, validate=True, native=None):
   return Scheduler(
     native,
     FileSystemProjectTree(os.getcwd()),
-    './.pants.d',
+    "./.pants.d",
     rules,
     union_rules,
     execution_options=DEFAULT_EXECUTION_OPTIONS,
@@ -140,11 +149,12 @@ class Target(Struct):
     pass
 
 
-TARGET_TABLE = SymbolTable({'struct': Struct, 'target': Target})
+TARGET_TABLE = SymbolTable({"struct": Struct, "target": Target})
 
 
-def assert_equal_with_printing(test_case, expected, actual,
-                               uniform_formatter: Optional[Callable[[str], str]] = None):
+def assert_equal_with_printing(
+  test_case, expected, actual, uniform_formatter: Optional[Callable[[str], str]] = None
+):
   """Asserts equality, but also prints the values so they can be compared on failure.
 
   Usage:
@@ -156,9 +166,9 @@ def assert_equal_with_printing(test_case, expected, actual,
          self.assert_equal_with_printing("a", "b")
   """
   str_actual = str(actual)
-  print('Expected:')
+  print("Expected:")
   print(expected)
-  print('Actual:')
+  print("Actual:")
   print(str_actual)
 
   if uniform_formatter is not None:
@@ -170,9 +180,9 @@ def assert_equal_with_printing(test_case, expected, actual,
 
 def remove_locations_from_traceback(trace):
   location_pattern = re.compile(r'"/.*", line \d+')
-  address_pattern = re.compile(r'0x[0-9a-f]+')
-  new_trace = location_pattern.sub('LOCATION-INFO', trace)
-  new_trace = address_pattern.sub('0xEEEEEEEEE', new_trace)
+  address_pattern = re.compile(r"0x[0-9a-f]+")
+  new_trace = location_pattern.sub("LOCATION-INFO", trace)
+  new_trace = address_pattern.sub("0xEEEEEEEEE", new_trace)
   return new_trace
 
 
@@ -228,9 +238,8 @@ def fmt_rule(rule: Callable, *, gets: Optional[List[Tuple[str, str]]] = None) ->
   params = ", ".join(t.__name__ for t in type_hints.values())
   gets_str = ""
   if gets:
-    get_members = ', '.join(
-      f"Get[{product_subject_pair[0]}]({product_subject_pair[1]})"
-      for product_subject_pair in gets
+    get_members = ", ".join(
+      f"Get[{product_subject_pair[0]}]({product_subject_pair[1]})" for product_subject_pair in gets
     )
     gets_str = f", gets=[{get_members}]"
   return f"@rule({fmt_rust_function(rule)}({params}) -> {product}{gets_str})"

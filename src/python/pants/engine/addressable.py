@@ -19,7 +19,7 @@ def _assert_single_address(addresses: Sequence[Address]) -> None:
   if len(addresses) == 0:
     raise ResolveError("No targets were matched.")
   if len(addresses) > 1:
-    output = '\n  * '.join(address.spec for address in addresses)
+    output = "\n  * ".join(address.spec for address in addresses)
     raise ResolveError(
       "Expected a single target, but was given multiple targets.\n\n"
       f"Did you mean one of:\n  * {output}"
@@ -35,6 +35,7 @@ class Addresses(Collection[Address]):
 @dataclass(frozen=True)
 class AddressWithOrigin:
   """A BuildFileAddress along with the cmd-line spec it was generated from."""
+
   address: Address
   origin: OriginSpec
 
@@ -113,6 +114,7 @@ class AddressableDescriptor:
      Here the `Thing.parent` property is re-assigned with a type-constrained addressable descriptor
      after the class is defined so the class can be referred to in the type constraint.
   """
+
   _descriptors: Set[Tuple[Type, str]] = set()
 
   @classmethod
@@ -134,19 +136,18 @@ class AddressableDescriptor:
 
   def __set__(self, instance, value):
     if not Serializable.is_serializable(instance):
-      raise NotSerializableError('The addressable descriptor {} can only be applied to methods or '
-                                 'properties of Serializable objects, applied to method {} of '
-                                 'type {}'.format(type(self).__name__,
-                                                  self._name,
-                                                  type(instance).__name__))
+      raise NotSerializableError(
+        "The addressable descriptor {} can only be applied to methods or "
+        "properties of Serializable objects, applied to method {} of "
+        "type {}".format(type(self).__name__, self._name, type(instance).__name__)
+      )
 
     instance_dict = instance._asdict()
     if self._name in instance_dict:
-      raise MutationError('Attribute {} of {} has already been set to {}, rejecting attempt to '
-                          're-set with {}'.format(self._name,
-                                                  instance,
-                                                  instance_dict[self._name],
-                                                  value))
+      raise MutationError(
+        "Attribute {} of {} has already been set to {}, rejecting attempt to "
+        "re-set with {}".format(self._name, instance, instance_dict[self._name], value)
+      )
 
     value = self._checked_value(instance, value)
 
@@ -186,9 +187,11 @@ class AddressableDescriptor:
     # This feature allows for more brevity in the JSON form (local type inference) and an alternate
     # construction style in the python forms.
     type_constraint = self._get_type_constraint(instance)
-    if (isinstance(value, dict) and
-        len(type_constraint.types) == 1 and
-        Serializable.is_serializable_type(type_constraint.types[0])):
+    if (
+      isinstance(value, dict)
+      and len(type_constraint.types) == 1
+      and Serializable.is_serializable_type(type_constraint.types[0])
+    ):
       if not value:
         # TODO(John Sirois): Is this the right thing to do?  Or should an empty serializable_type
         # be constructed?
@@ -201,9 +204,8 @@ class AddressableDescriptor:
       return type_constraint.validate_satisfied_by(value)
     except TypeConstraintError as e:
       raise AddressableTypeValidationError(
-        "The value for the {} attribute of {} was invalid"
-        .format(self._name, instance),
-        e)
+        "The value for the {} attribute of {} was invalid".format(self._name, instance), e
+      )
 
   def _resolve_value(self, instance, value):
     if not isinstance(value, Resolvable):
@@ -218,9 +220,11 @@ class AddressableDescriptor:
         return type_constraint.validate_satisfied_by(resolved_value)
       except TypeConstraintError as e:
         raise AddressableTypeValidationError(
-          "The value resolved from {} for the {} property of {} was invalid"
-          .format(value.address, self._name, instance),
-          e)
+          "The value resolved from {} for the {} property of {} was invalid".format(
+            value.address, self._name, instance
+          ),
+          e,
+        )
 
 
 def _addressable_wrapper(addressable_descriptor, type_constraint):
@@ -245,6 +249,7 @@ def _addressable_wrapper(addressable_descriptor, type_constraint):
 
     addressable_accessor = addressable_descriptor(func.__name__, type_constraint)
     return update_wrapper(addressable_accessor, func)
+
   return wrapper
 
 
@@ -281,13 +286,17 @@ class AddressableList(AddressableDescriptor):
       return None
 
     if not isinstance(value, MutableSequence):
-      raise TypeError('The {} property of {} must be a list, given {} of type {}'
-                      .format(self._name, instance, value, type(value).__name__))
+      raise TypeError(
+        "The {} property of {} must be a list, given {} of type {}".format(
+          self._name, instance, value, type(value).__name__
+        )
+      )
     return [super(AddressableList, self)._checked_value(instance, v) for v in value]
 
   def _resolve_value(self, instance, value):
-    return [super(AddressableList, self)._resolve_value(instance, v)
-            for v in value] if value else []
+    return (
+      [super(AddressableList, self)._resolve_value(instance, v) for v in value] if value else []
+    )
 
 
 def addressable_list(type_constraint):
@@ -310,13 +319,19 @@ class AddressableDict(AddressableDescriptor):
       return None
 
     if not isinstance(value, MutableMapping):
-      raise TypeError('The {} property of {} must be a dict, given {} of type {}'
-                      .format(self._name, instance, value, type(value).__name__))
+      raise TypeError(
+        "The {} property of {} must be a dict, given {} of type {}".format(
+          self._name, instance, value, type(value).__name__
+        )
+      )
     return {k: super(AddressableDict, self)._checked_value(instance, v) for k, v in value.items()}
 
   def _resolve_value(self, instance, value):
-    return {k: super(AddressableDict, self)._resolve_value(instance, v)
-            for k, v in value.items()} if value else {}
+    return (
+      {k: super(AddressableDict, self)._resolve_value(instance, v) for k, v in value.items()}
+      if value
+      else {}
+    )
 
 
 def addressable_dict(type_constraint):
@@ -351,17 +366,19 @@ def _extract_variants(address, variants_str):
   :returns: The variants or else `None` if there are none.
   :rtype: tuple of tuples (key, value) strings
   """
+
   def entries():
-    for entry in variants_str.split(','):
-      key, _, value = entry.partition('=')
+    for entry in variants_str.split(","):
+      key, _, value = entry.partition("=")
       if not key or not value:
-        raise ValueError('Invalid variants after the @ in: {}'.format(address))
+        raise ValueError("Invalid variants after the @ in: {}".format(address))
       yield (key, value)
+
   return tuple(entries())
 
 
 def parse_variants(address):
-  target_name, at_sign, variants_str = address.target_name.partition('@')
+  target_name, at_sign, variants_str = address.target_name.partition("@")
   if not at_sign:
     return address, None
   variants = _extract_variants(address, variants_str) if variants_str else None

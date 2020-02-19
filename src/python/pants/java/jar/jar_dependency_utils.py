@@ -33,8 +33,10 @@ class ResolvedJar:
     return hash(self._id)
 
   def __repr__(self):
-    return 'ResolvedJar(coordinate={!r}, cache_path={!r}, pants_path={!r}, ' \
-           'directory_digest={!r})'.format(*self._id)
+    return (
+      "ResolvedJar(coordinate={!r}, cache_path={!r}, pants_path={!r}, "
+      "directory_digest={!r})".format(*self._id)
+    )
 
 
 class M2Coordinate(object):
@@ -64,7 +66,7 @@ class M2Coordinate(object):
 
   @property
   def ext(self):
-    return self._ext or 'jar'
+    return self._ext or "jar"
 
   @classmethod
   def create(cls, jar):
@@ -102,26 +104,29 @@ class M2Coordinate(object):
 
     :rtype: string
     """
-    def maybe_compenent(component):
-      return '-{}'.format(component) if component else ''
 
-    return '{org}-{name}{rev}{classifier}.{ext}'.format(org=self.org,
-                                                        name=self.name,
-                                                        rev=maybe_compenent(self.rev),
-                                                        classifier=maybe_compenent(self.classifier),
-                                                        ext=self.ext)
+    def maybe_compenent(component):
+      return "-{}".format(component) if component else ""
+
+    return "{org}-{name}{rev}{classifier}.{ext}".format(
+      org=self.org,
+      name=self.name,
+      rev=maybe_compenent(self.rev),
+      classifier=maybe_compenent(self.classifier),
+      ext=self.ext,
+    )
 
   @classmethod
   def from_string(cls, string_coord):
     packaging = None
     classifier = None
-    ct = string_coord.count(':')
+    ct = string_coord.count(":")
     if ct == 2:
-      org, name, rev = string_coord.split(':')
+      org, name, rev = string_coord.split(":")
     elif ct == 3:
-      org, name, packaging, rev = string_coord.split(':')
+      org, name, packaging, rev = string_coord.split(":")
     elif ct == 4:
-      org, name, packaging, classifier, rev = string_coord.split(':')
+      org, name, packaging, classifier, rev = string_coord.split(":")
     rev = rev or None
     return M2Coordinate(org=org, name=name, rev=rev, ext=packaging, classifier=classifier)
 
@@ -132,7 +137,7 @@ class M2Coordinate(object):
 
     :return: org:name:version
     """
-    return '{}:{}:{}'.format(self.org, self.name, self.rev)
+    return "{}:{}:{}".format(self.org, self.name, self.rev)
 
   def __eq__(self, other):
     return isinstance(other, M2Coordinate) and self._id == other._id
@@ -148,23 +153,29 @@ class M2Coordinate(object):
     # with the exception that if rev is missing, it adds an extra ':' at the end.
     # for example org=a, name=b, type_=jar -> a:b:jar:
     if self.classifier:
-      components = (self.org, self.name, self.ext or 'jar', self.classifier, self.rev or '')
-    elif self.ext and self.ext != 'jar':
-      components = (self.org, self.name, self.ext, self.rev or '')
+      components = (self.org, self.name, self.ext or "jar", self.classifier, self.rev or "")
+    elif self.ext and self.ext != "jar":
+      components = (self.org, self.name, self.ext, self.rev or "")
     else:
-      components = (self.org, self.name, self.rev or '')
+      components = (self.org, self.name, self.rev or "")
 
-
-    return ':'.join((x or '') for x in components)
+    return ":".join((x or "") for x in components)
 
   def __repr__(self):
-    return ('M2Coordinate(org={!r}, name={!r}, rev={!r}, classifier={!r}, ext={!r})'
-            .format(*self._id))
+    return "M2Coordinate(org={!r}, name={!r}, rev={!r}, classifier={!r}, ext={!r})".format(
+      *self._id
+    )
 
   def copy(self, **replacements):
     """Returns a clone of this M2Coordinate with the given replacements kwargs overlaid."""
     cls = type(self)
-    kwargs = {'org': self.org, 'name': self.name, 'ext': self.ext, 'classifier': self.classifier, 'rev': self.rev}
+    kwargs = {
+      "org": self.org,
+      "name": self.name,
+      "ext": self.ext,
+      "classifier": self.classifier,
+      "rev": self.rev,
+    }
     for key, val in replacements.items():
       kwargs[key] = val
     return cls(**kwargs)

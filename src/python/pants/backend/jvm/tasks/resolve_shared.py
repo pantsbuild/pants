@@ -19,7 +19,7 @@ class JvmResolverBase(TaskBase):
     :return: list[tuple[(Target, list[pants.java.jar.jar_dependency_utils.ResolveJar])]
     """
 
-    targets_and_jars=list(targets_and_jars)
+    targets_and_jars = list(targets_and_jars)
 
     if not targets_and_jars:
       return targets_and_jars
@@ -33,12 +33,9 @@ class JvmResolverBase(TaskBase):
     # if it does not exist.
     snapshots = self.context._scheduler.capture_snapshots(
       tuple(
-        PathGlobsAndRoot(
-          PathGlobs([jar]),
-          get_buildroot(),
-          Digest.load(jar),
-        ) for jar in jar_paths
-      ))
+        PathGlobsAndRoot(PathGlobs([jar]), get_buildroot(), Digest.load(jar)) for jar in jar_paths
+      )
+    )
     for snapshot, jar_path in zip(snapshots, jar_paths):
       snapshot.directory_digest.dump(jar_path)
 
@@ -50,10 +47,15 @@ class JvmResolverBase(TaskBase):
 
     snapshotted_targets_and_jars = []
     for target, jars_to_snapshot in targets_and_jars:
-      snapshotted_jars = [ResolvedJar(coordinate=jar.coordinate,
-                                      cache_path=jar.cache_path,
-                                      pants_path=jar.pants_path,
-                                      directory_digest=next(digest_iterator)) for jar in jars_to_snapshot]
+      snapshotted_jars = [
+        ResolvedJar(
+          coordinate=jar.coordinate,
+          cache_path=jar.cache_path,
+          pants_path=jar.pants_path,
+          directory_digest=next(digest_iterator),
+        )
+        for jar in jars_to_snapshot
+      ]
       snapshotted_targets_and_jars.append((target, snapshotted_jars))
 
     return snapshotted_targets_and_jars

@@ -15,6 +15,7 @@ from pants.util.memo import memoized_method
 
 class InvalidRESTfulCacheProtoError(ArtifactCacheError):
   """Indicates an invalid protocol used in a remote spec."""
+
   pass
 
 
@@ -68,7 +69,7 @@ class Pinger:
 
 
 class BestUrlSelector:
-  SUPPORTED_PROTOCOLS = ('http', 'https')
+  SUPPORTED_PROTOCOLS = ("http", "https")
   MAX_FAILURES = 3
 
   def __init__(self, available_urls, max_failures=MAX_FAILURES):
@@ -78,7 +79,7 @@ class BestUrlSelector:
     """
 
     if len(available_urls) == 0:
-      raise ValueError('BestUrlSelector requires at least one url to select from.')
+      raise ValueError("BestUrlSelector requires at least one url to select from.")
 
     self.parsed_urls = deque(self._parse_urls(available_urls))
     self.unsuccessful_calls = Counter()
@@ -89,7 +90,8 @@ class BestUrlSelector:
     for parsed_url in parsed_urls:
       if not parsed_url.scheme in self.SUPPORTED_PROTOCOLS:
         raise InvalidRESTfulCacheProtoError(
-          'RESTfulArtifactCache only supports HTTP(S). Found: {0}'.format(parsed_url.scheme))
+          "RESTfulArtifactCache only supports HTTP(S). Found: {0}".format(parsed_url.scheme)
+        )
     return parsed_urls
 
   @contextmanager

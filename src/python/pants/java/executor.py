@@ -26,7 +26,7 @@ class Executor(ABC):
   def _scrub_args(classpath, main, jvm_options, args):
     classpath = maybe_list(classpath)
     if not isinstance(main, str) or not main:
-      raise ValueError('A non-empty main classname is required, given: {}'.format(main))
+      raise ValueError("A non-empty main classname is required, given: {}".format(main))
     jvm_options = maybe_list(jvm_options or ())
     args = maybe_list(args or ())
     return classpath, main, jvm_options, args
@@ -52,7 +52,7 @@ class Executor(ABC):
     @property
     def cmd(self):
       """Returns a string representation of the command that will be run."""
-      return ' '.join(self.command)
+      return " ".join(self.command)
 
     @property
     @abstractmethod
@@ -92,9 +92,10 @@ class Executor(ABC):
 
     :param distribution: a validated java distribution to use when launching java programs.
     """
-    if not hasattr(distribution, 'java') or not hasattr(distribution, 'validate'):
-      raise self.InvalidDistribution('A valid distribution is required, given: {}'
-                                     .format(distribution))
+    if not hasattr(distribution, "java") or not hasattr(distribution, "validate"):
+      raise self.InvalidDistribution(
+        "A valid distribution is required, given: {}".format(distribution)
+      )
     distribution.validate()
     self._distribution = distribution
 
@@ -108,8 +109,9 @@ class Executor(ABC):
     classpath, main, jvm_options, args = self._scrub_args(classpath, main, jvm_options, args)
     return self._runner(classpath, main, jvm_options, args)
 
-  def execute(self, classpath, main, jvm_options=None, args=None, stdout=None, stderr=None,
-      cwd=None):
+  def execute(
+    self, classpath, main, jvm_options=None, args=None, stdout=None, stderr=None, cwd=None
+  ):
     """Launches the java program defined by the classpath and main.
 
     :param list classpath: the classpath for the java program
@@ -131,7 +133,7 @@ class Executor(ABC):
   def _create_command(self, classpath, main, jvm_options, args):
     cmd = [self._distribution.java]
     cmd.extend(jvm_options)
-    cmd.extend(['-cp', os.pathsep.join(classpath), main])
+    cmd.extend(["-cp", os.pathsep.join(classpath), main])
     cmd.extend(args)
     return cmd
 
@@ -175,16 +177,15 @@ class SubprocessExecutor(Executor):
   """
 
   _SCRUBBED_ENV = {
-      # We attempt to control the classpath for correctness, caching and invalidation reasons and
-      # allowing CLASSPATH to influence would be a hermeticity leak
-      'CLASSPATH': None,
-
-      # We attempt to control jvm options and give user's explicit control in some cases as well.
-      # In all cases we want predictable behavior - pants defaults, repo defaults, or user tweaks
-      # specified on the command line.  In addition cli options can affect outputs; ie: class debug
-      # info, target classfile version, etc - all breaking hermeticity.
-      '_JAVA_OPTIONS': None,
-      'JAVA_TOOL_OPTIONS': None
+    # We attempt to control the classpath for correctness, caching and invalidation reasons and
+    # allowing CLASSPATH to influence would be a hermeticity leak
+    "CLASSPATH": None,
+    # We attempt to control jvm options and give user's explicit control in some cases as well.
+    # In all cases we want predictable behavior - pants defaults, repo defaults, or user tweaks
+    # specified on the command line.  In addition cli options can affect outputs; ie: class debug
+    # info, target classfile version, etc - all breaking hermeticity.
+    "_JAVA_OPTIONS": None,
+    "JAVA_TOOL_OPTIONS": None,
   }
 
   @classmethod
@@ -193,7 +194,7 @@ class SubprocessExecutor(Executor):
     for env_var in cls._SCRUBBED_ENV:
       value = os.getenv(env_var)
       if value:
-        logger.warning('Scrubbing {env_var}={value}'.format(env_var=env_var, value=value))
+        logger.warning("Scrubbing {env_var}={value}".format(env_var=env_var, value=value))
     with environment_as(**cls._SCRUBBED_ENV):
       yield
 
@@ -238,11 +239,16 @@ class SubprocessExecutor(Executor):
     stdout = stdout or sys.stdout
     stderr = stderr or sys.stderr
     with self._maybe_scrubbed_env():
-      logger.debug('Executing: {cmd} args={args} at cwd={cwd}'
-                   .format(cmd=' '.join(cmd), args=subprocess_args, cwd=cwd))
+      logger.debug(
+        "Executing: {cmd} args={args} at cwd={cwd}".format(
+          cmd=" ".join(cmd), args=subprocess_args, cwd=cwd
+        )
+      )
       try:
-        return subprocess.Popen(cmd, cwd=cwd, stdin=stdin, stdout=stdout, stderr=stderr,
-                                **subprocess_args)
+        return subprocess.Popen(
+          cmd, cwd=cwd, stdin=stdin, stdout=stdout, stderr=stderr, **subprocess_args
+        )
       except OSError as e:
-        raise self.Error('Problem executing {0} at cwd={1}: {2}'
-                         .format(self._distribution.java, cwd, e))
+        raise self.Error(
+          "Problem executing {0} at cwd={1}: {2}".format(self._distribution.java, cwd, e)
+        )

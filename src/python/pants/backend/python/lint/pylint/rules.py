@@ -64,8 +64,7 @@ async def lint(
   # doesn't lint those direct dependencies nor does it care about transitive dependencies.
   hydrated_target = await Get[HydratedTarget](Address, adaptor.address)
   dependencies = await MultiGet(
-    Get[HydratedTarget](Address, dependency)
-    for dependency in hydrated_target.dependencies
+    Get[HydratedTarget](Address, dependency) for dependency in hydrated_target.dependencies
   )
   sources_digest = await Get[ChrootedPythonSources](
     HydratedTargets([hydrated_target, *dependencies])
@@ -76,7 +75,7 @@ async def lint(
   # http://pylint.pycqa.org/en/latest/faq.html#what-versions-of-python-is-pylint-supporting.
   interpreter_constraints = PexInterpreterConstraints.create_from_adaptors(
     adaptors=[adaptor] if isinstance(adaptor, PythonTargetAdaptor) else [],
-    python_setup=python_setup
+    python_setup=python_setup,
   )
   requirements_pex = await Get[Pex](
     CreatePex(
@@ -103,7 +102,7 @@ async def lint(
         config_snapshot.directory_digest,
         sources_digest.snapshot.directory_digest,
       )
-    ),
+    )
   )
 
   source_files = await Get[TargetSourceFiles](
@@ -113,10 +112,10 @@ async def lint(
   request = requirements_pex.create_execute_request(
     python_setup=python_setup,
     subprocess_encoding_environment=subprocess_encoding_environment,
-    pex_path=f'./pylint.pex',
+    pex_path=f"./pylint.pex",
     pex_args=generate_args(source_files=source_files, pylint=pylint),
     input_files=merged_input_files,
-    description=f'Run Pylint for {adaptor.address.reference()}',
+    description=f"Run Pylint for {adaptor.address.reference()}",
   )
   result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, request)
   return LintResult.from_fallible_execute_process_result(result)

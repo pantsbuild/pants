@@ -25,9 +25,10 @@ class LibcDev(Subsystem):
   executable.
   """
 
-  options_scope = 'libc'
+  options_scope = "libc"
 
-  class HostLibcDevResolutionError(Exception): pass
+  class HostLibcDevResolutionError(Exception):
+    pass
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -41,19 +42,37 @@ class LibcDev(Subsystem):
   def register_options(cls, register):
     super().register_options(register)
 
-    register('--enable-libc-search', type=bool, default=False, fingerprint=True, advanced=True,
-             help="Whether to search for the host's libc installation. Set to False if the host "
-                  "does not have a libc install with crti.o -- this file is necessary to create "
-                  "executables on Linux hosts.")
-    register('--libc-dir', type=dir_option, default=None, fingerprint=True, advanced=True,
-             help='A directory containing a host-specific crti.o from libc.')
-    register('--host-compiler', type=str, default='gcc', fingerprint=True, advanced=True,
-             help='The host compiler to invoke with -print-search-dirs to find the host libc.')
+    register(
+      "--enable-libc-search",
+      type=bool,
+      default=False,
+      fingerprint=True,
+      advanced=True,
+      help="Whether to search for the host's libc installation. Set to False if the host "
+      "does not have a libc install with crti.o -- this file is necessary to create "
+      "executables on Linux hosts.",
+    )
+    register(
+      "--libc-dir",
+      type=dir_option,
+      default=None,
+      fingerprint=True,
+      advanced=True,
+      help="A directory containing a host-specific crti.o from libc.",
+    )
+    register(
+      "--host-compiler",
+      type=str,
+      default="gcc",
+      fingerprint=True,
+      advanced=True,
+      help="The host compiler to invoke with -print-search-dirs to find the host libc.",
+    )
 
   # NB: crti.o is required to create executables on Linux. Our provided gcc and clang can find it if
   # the containing directory is within the LIBRARY_PATH environment variable when we invoke the
   # compiler.
-  _LIBC_INIT_OBJECT_FILE = 'crti.o'
+  _LIBC_INIT_OBJECT_FILE = "crti.o"
 
   def _get_host_libc_from_host_compiler(self):
     """Locate the host's libc-dev installation using a specified host compiler's search dirs."""
@@ -78,8 +97,9 @@ class LibcDev(Subsystem):
         "system. For many operating systems, this package is named 'libc-dev' or 'libc6-dev'."
       )
 
-    return HostLibcDev(crti_object=libc_crti_object_file,
-                       fingerprint=hash_file(libc_crti_object_file))
+    return HostLibcDev(
+      crti_object=libc_crti_object_file, fingerprint=hash_file(libc_crti_object_file)
+    )
 
   @memoized_property
   def _host_libc(self):
@@ -88,8 +108,7 @@ class LibcDev(Subsystem):
     if libc_dir_option:
       maybe_libc_crti = os.path.join(libc_dir_option, self._LIBC_INIT_OBJECT_FILE)
       if os.path.isfile(maybe_libc_crti):
-        return HostLibcDev(crti_object=maybe_libc_crti,
-                           fingerprint=hash_file(maybe_libc_crti))
+        return HostLibcDev(crti_object=maybe_libc_crti, fingerprint=hash_file(maybe_libc_crti))
       raise self.HostLibcDevResolutionError(
         f"Could not locate {self._LIBC_INIT_OBJECT_FILE} in directory {libc_dir_option} provided "
         "by the --libc-dir option."

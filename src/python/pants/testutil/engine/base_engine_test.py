@@ -40,9 +40,9 @@ class EngineTestBase(TestBase):
                         name.
     :returns The ``Goal`` object with task installed.
     """
-    return TaskRegistrar(name,
-                         action=action or (lambda: None),
-                         dependencies=dependencies or []).install(goal if goal is not None else None)
+    return TaskRegistrar(
+      name, action=action or (lambda: None), dependencies=dependencies or []
+    ).install(goal if goal is not None else None)
 
   def setUp(self):
     """

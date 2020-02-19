@@ -16,7 +16,7 @@ from pants.util.memo import memoized_property
 class IvyOutdated(NailgunTask):
   """Checks for outdated jar dependencies with Ivy"""
 
-  _IVY_DEPENDENCY_UPDATE_MAIN = 'org.pantsbuild.tools.ivy.DependencyUpdateChecker'
+  _IVY_DEPENDENCY_UPDATE_MAIN = "org.pantsbuild.tools.ivy.DependencyUpdateChecker"
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -25,23 +25,28 @@ class IvyOutdated(NailgunTask):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--confs', type=list, default=['default'],
-             help='Pass a configuration to ivy in addition to the default ones.')
-    register('--exclude-patterns', type=list, default=[],
-             help='Regular expressions matching jars to be excluded from outdated report.')
+    register(
+      "--confs",
+      type=list,
+      default=["default"],
+      help="Pass a configuration to ivy in addition to the default ones.",
+    )
+    register(
+      "--exclude-patterns",
+      type=list,
+      default=[],
+      help="Regular expressions matching jars to be excluded from outdated report.",
+    )
 
-    cls.register_jvm_tool(register,
-                          'dependency-update-checker',
-                          classpath=[
-                            JarDependency(org='org.pantsbuild',
-                                          name='ivy-dependency-update-checker',
-                                          rev='0.0.4'),
-                          ],
-                          main=cls._IVY_DEPENDENCY_UPDATE_MAIN,
-                          custom_rules=[
-                            Shader.exclude_package('org.apache.ivy', recursive=True)
-                          ]
-                          )
+    cls.register_jvm_tool(
+      register,
+      "dependency-update-checker",
+      classpath=[
+        JarDependency(org="org.pantsbuild", name="ivy-dependency-update-checker", rev="0.0.4")
+      ],
+      main=cls._IVY_DEPENDENCY_UPDATE_MAIN,
+      custom_rules=[Shader.exclude_package("org.apache.ivy", recursive=True)],
+    )
 
   @memoized_property
   def _exclude_patterns(self):
@@ -51,7 +56,8 @@ class IvyOutdated(NailgunTask):
     for pattern in self._exclude_patterns:
       if pattern.search(str(coordinate)):
         self.context.log.debug(
-          f"Skipping [{coordinate}] because it matches exclude pattern '{pattern.pattern}'")
+          f"Skipping [{coordinate}] because it matches exclude pattern '{pattern.pattern}'"
+        )
         return False
     return True
 
@@ -60,25 +66,37 @@ class IvyOutdated(NailgunTask):
     jars, global_excludes = IvyUtils.calculate_classpath(targets)
 
     filtered_jars = [jar for jar in jars if self._is_update_coordinate(jar.coordinate)]
-    sorted_jars = sorted((jar for jar in filtered_jars), key=lambda x: (x.org, x.name, x.rev, x.classifier))
+    sorted_jars = sorted(
+      (jar for jar in filtered_jars), key=lambda x: (x.org, x.name, x.rev, x.classifier)
+    )
 
-    ivyxml = os.path.join(self.workdir, 'ivy.xml')
-    IvyUtils.generate_ivy(targets, jars=sorted_jars, excludes=global_excludes, ivyxml=ivyxml, confs=['default'])
+    ivyxml = os.path.join(self.workdir, "ivy.xml")
+    IvyUtils.generate_ivy(
+      targets, jars=sorted_jars, excludes=global_excludes, ivyxml=ivyxml, confs=["default"]
+    )
 
     args = [
-      '-settings', IvySubsystem.global_instance().get_options().ivy_settings,
-      '-ivy', ivyxml,
-      '-confs', ','.join(self.get_options().confs)
+      "-settings",
+      IvySubsystem.global_instance().get_options().ivy_settings,
+      "-ivy",
+      ivyxml,
+      "-confs",
+      ",".join(self.get_options().confs),
     ]
 
-    result = self.runjava(classpath=self.tool_classpath('dependency-update-checker'),
-                          main=self._IVY_DEPENDENCY_UPDATE_MAIN,
-                          jvm_options=self.get_options().jvm_options,
-                          args=args,
-                          workunit_name='dependency-update-checker',
-                          workunit_labels=[WorkUnitLabel.LINT])
+    result = self.runjava(
+      classpath=self.tool_classpath("dependency-update-checker"),
+      main=self._IVY_DEPENDENCY_UPDATE_MAIN,
+      jvm_options=self.get_options().jvm_options,
+      args=args,
+      workunit_name="dependency-update-checker",
+      workunit_labels=[WorkUnitLabel.LINT],
+    )
 
-    self.context.log.debug('java {main} ... exited with result ({result})'.format(
-      main=self._IVY_DEPENDENCY_UPDATE_MAIN, result=result))
+    self.context.log.debug(
+      "java {main} ... exited with result ({result})".format(
+        main=self._IVY_DEPENDENCY_UPDATE_MAIN, result=result
+      )
+    )
 
     return result
