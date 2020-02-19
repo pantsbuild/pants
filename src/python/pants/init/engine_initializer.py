@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Any, Iterable, Optional, Tuple, cast
 
@@ -41,7 +42,6 @@ from pants.engine.legacy.structs import (
   PythonAppAdaptor,
   PythonAWSLambdaAdaptor,
   PythonBinaryAdaptor,
-  PythonRequirementLibraryAdaptor,
   PythonTargetAdaptor,
   PythonTestsAdaptor,
   RemoteSourcesAdaptor,
@@ -112,7 +112,7 @@ _apply_default_sources_globs(PythonTestsAdaptor, PythonTests)
 _apply_default_sources_globs(RemoteSourcesAdaptor, RemoteSources)
 
 
-def _legacy_symbol_table(build_file_aliases: BuildFileAliases) -> SymbolTable:
+def _legacy_symbol_table(build_file_aliases: BuildFileAliases, target_adaptors: OrderedDict) -> SymbolTable:
   """Construct a SymbolTable for the given BuildFileAliases."""
   table = {
     alias: _make_target_adaptor(TargetAdaptor, target_type)
@@ -132,17 +132,14 @@ def _legacy_symbol_table(build_file_aliases: BuildFileAliases) -> SymbolTable:
         tuple(factory.target_types)[0],
       )
 
+  table.update(target_adaptors)
+
   # TODO: The alias replacement here is to avoid elevating "TargetAdaptors" into the public
   # API until after https://github.com/pantsbuild/pants/issues/3560 has been completed.
   # These should likely move onto Target subclasses as the engine gets deeper into beta
   # territory.
-  table['python_library'] = PythonTargetAdaptor
   table['jvm_app'] = JvmAppAdaptor
   table['jvm_binary'] = JvmBinaryAdaptor
-  table['python_app'] = PythonAppAdaptor
-  table['python_tests'] = PythonTestsAdaptor
-  table['python_binary'] = PythonBinaryAdaptor
-  table['python_requirement_library'] = PythonRequirementLibraryAdaptor
   table['remote_sources'] = RemoteSourcesAdaptor
   table['resources'] = ResourcesAdaptor
   table['page'] = PageAdaptor
@@ -394,8 +391,9 @@ class EngineInitializer:
 
     build_file_aliases = build_configuration.registered_aliases()
     rules = build_configuration.rules()
+    target_adaptors = build_configuration.target_adaptors()
 
-    symbol_table = _legacy_symbol_table(build_file_aliases)
+    symbol_table = _legacy_symbol_table(build_file_aliases, target_adaptors)
 
     project_tree = FileSystemProjectTree(build_root, pants_ignore_patterns)
 

@@ -35,6 +35,7 @@ class BuildConfiguration:
     self._optionables = OrderedSet()
     self._rules = OrderedSet()
     self._union_rules = OrderedDict()
+    self._target_adaptors = OrderedDict()
 
   def registered_aliases(self) -> BuildFileAliases:
     """Return the registered aliases exposed in BUILD files.
@@ -166,6 +167,10 @@ class BuildConfiguration:
                               if rule.dependency_optionables}
     self.register_optionables(dependency_optionables)
 
+  def register_target_adaptors(self, adaptors):
+    # TODO: type annotations and runtime validation?
+    self._target_adaptors.update(adaptors)
+
   def rules(self):
     """Returns the registered rules.
 
@@ -179,6 +184,10 @@ class BuildConfiguration:
     :rtype: OrderedDict
     """
     return self._union_rules
+
+  def target_adaptors(self):
+    """???"""
+    return self._target_adaptors
 
   @memoized_method
   def _get_addressable_factory(self, target_type, alias):

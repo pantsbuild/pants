@@ -98,6 +98,9 @@ def load_plugins(build_configuration, plugins, working_set, is_v1_plugin):
       if 'rules' in entries:
         rules = entries['rules'].load()()
         build_configuration.register_rules(rules)
+      if 'target_adaptors' in entries:
+        target_adaptors = entries['target_adaptors'].load()()
+        build_configuration.register_target_adaptors(target_adaptors)
     loaded[dist.as_requirement().key] = dist
 
 
@@ -170,3 +173,6 @@ def load_backend(build_configuration: BuildConfiguration, backend_package: str,
     rules = invoke_entrypoint('rules')
     if rules:
       build_configuration.register_rules(rules)
+    target_adaptors = invoke_entrypoint('target_adaptors')
+    if target_adaptors:
+      build_configuration.register_target_adaptors(target_adaptors)
