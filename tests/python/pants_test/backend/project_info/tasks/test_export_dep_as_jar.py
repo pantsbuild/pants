@@ -399,6 +399,7 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
          },
       ],
       'scope' : 'default',
+      'source_dependencies_in_classpath': ['project_info:jvm_target'],
       'target_type': 'SOURCE',
       'transitive' : True,
       'pants_target_type': 'scala_library',
@@ -640,3 +641,15 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
 
     assert transitive_dependency_library_entry in disabled_result['libraries']
     assert transitive_dependency_library_entry not in enabled_result['libraries']
+
+  def test_transitive_targets(self):
+    # Address of the dependency that shouldn't appear in the strict deps case.
+    # It needs to be a root, otherwise it won't be modulizable.
+    dependency_spec = self.jvm_target_with_sources.address.spec
+
+    enabled_spec = self.strict_deps_enabled.address.spec
+    enabled_result = self.execute_export_json(enabled_spec, dependency_spec)['targets'][enabled_spec]
+    disabled_spec = self.strict_deps_disabled.address.spec
+    disabled_result = self.execute_export_json(disabled_spec, dependency_spec)['targets'][disabled_spec]
+    assert dependency_spec not in enabled_result['source_dependencies_in_classpath']
+    assert dependency_spec in disabled_result['source_dependencies_in_classpath']
