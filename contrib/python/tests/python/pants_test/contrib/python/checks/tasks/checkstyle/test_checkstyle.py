@@ -17,6 +17,7 @@ from pants.util.contextutil import environment_as
 from pants.util.dirutil import safe_mkdtemp, safe_rmtree
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 from parameterized import parameterized
+from pex import resolver
 from pex.interpreter import PythonInterpreter
 
 from pants.contrib.python.checks.tasks.checkstyle.checkstyle import Checkstyle
@@ -51,10 +52,9 @@ class CheckstyleTest(PythonTaskTestBase):
     return str(next(wheel_files))
 
   @staticmethod
-  def install_wheel(wheel, root_dir):
-    subprocess.check_call(['pip', 'install', '--no-input', '--root', root_dir, wheel])
-    importable_path = os.path.join(root_dir, 'install', os.path.basename(wheel))
-    return importable_path
+  def install_wheel(wheel):
+    return [resolved_dist.distribution.location
+            for resolved_dist in resolver.resolve(requirements=[wheel])]
 
   _distdir = None
   _checker_dist = None
@@ -64,7 +64,7 @@ class CheckstyleTest(PythonTaskTestBase):
   def setUpClass(cls):
     cls._distdir = safe_mkdtemp()
     cls._checker_dist = cls.build_checker_wheel(cls._distdir)
-    cls._checker_dist_importable_path = cls.install_wheel(cls._checker_dist, cls._distdir)
+    cls._checker_dist_importable_path = cls.install_wheel(cls._checker_dist)
 
   @classmethod
   def tearDownClass(cls):
@@ -85,7 +85,7 @@ class CheckstyleTest(PythonTaskTestBase):
       self.set_options_for_scope(PythonSetup.options_scope, interpreter_constraints=[constraint])
 
       prior = sys.path[:]
-      sys.path.append(self._checker_dist_importable_path)
+      sys.path.extend(self._checker_dist_importable_path)
       try:
         yield
       finally:
