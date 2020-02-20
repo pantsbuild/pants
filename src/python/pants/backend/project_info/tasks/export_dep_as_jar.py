@@ -168,7 +168,7 @@ class ExportDepAsJar(ConsoleTask):
       predicate=lambda dep: dep not in modulizable_target_set,
       work=lambda dep: dependencies_to_include.add(dep),
     )
-    return dependencies_to_include
+    return list(sorted(dependencies_to_include))
 
   def _extract_arguments_with_prefix_from_zinc_args(self, args, prefix):
     return [option[len(prefix):] for option in args if option.startswith(prefix)]
