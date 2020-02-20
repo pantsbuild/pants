@@ -114,8 +114,8 @@ class ProjectsTestBase(PantsRunIntegrationTest):
 
   @property
   def skipped_target_types(self) -> List[str]:
-    """We don't want to run over every single target, e.g. files() are only used for us to depend
-    on in ITs and it doesn't make sense to run `./pants test` against them."""
+    """We don't want to run over every single target, e.g. files() are only used for us to depend on
+    in ITs and it doesn't make sense to run `./pants test` against them."""
     return [
       # resources / loose files
       "files",

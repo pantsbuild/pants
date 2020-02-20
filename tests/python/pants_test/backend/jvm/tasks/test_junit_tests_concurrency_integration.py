@@ -5,9 +5,7 @@ from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 
 def ensure_experimental(test_fn):
-  """Decorator for running once with and once without the --use-experimental-runner flag.
-
-  """
+  """Decorator for running once with and once without the --use-experimental-runner flag."""
   def wrapper(self, *args, **kwargs):
     JunitTestsConcurrencyIntegrationTest.USE_EXPERIMENTAL_RUNNER = True
     test_fn(self, *args, **kwargs)
@@ -32,7 +30,7 @@ class JunitTestsConcurrencyIntegrationTest(PantsRunIntegrationTest):
 
   @ensure_experimental
   def test_parallel_target(self):
-    """Checks the 'concurrency=parallel_classes' setting in the junit_tests() target"""
+    """Checks the 'concurrency=parallel_classes' setting in the junit_tests() target."""
     with self.temporary_workdir() as workdir:
       pants_run = self.run_pants_with_workdir([
         'test',
@@ -144,7 +142,8 @@ class ExperimentalOnlyJunitTestsConcurrencyIntegrationTest(PantsRunIntegrationTe
   """The following tests only work with the experimental runner."""
 
   def test_concurrency_annotated_test_serial_parallel_both(self):
-    """Checks the @TestSerial annotation with --test-junit-default-concurrency=PARALLEL_CLASSES_AND_METHODS."""
+    """Checks the @TestSerial annotation with --test-junit-default-
+    concurrency=PARALLEL_CLASSES_AND_METHODS."""
     with self.temporary_workdir() as workdir:
       pants_run = self.run_pants_with_workdir([
         'test',

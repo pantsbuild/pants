@@ -12,7 +12,7 @@ from pants.contrib.buildrefactor.meta_rename import MetaRename
 
 
 class MetaRenameTest(TaskTestBase):
-  """Test renaming in MetaRename"""
+  """Test renaming in MetaRename."""
 
   @classmethod
   def task_type(cls):

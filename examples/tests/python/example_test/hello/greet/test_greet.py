@@ -9,7 +9,7 @@ from example.hello.greet.greet import greet
 
 class GreetTest(unittest.TestCase):
   def test_greeting_mentions_addressee(self):
-    """Fancy formatting should not omit the person we're greeting"""
+    """Fancy formatting should not omit the person we're greeting."""
     assert('foo' in greet('foo'))
 
   def test_prereq_run(self):

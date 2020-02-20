@@ -34,8 +34,7 @@ async def format_python_target(
   concrete_target: _ConcretePythonFormatTarget, union_membership: UnionMembership
 ) -> AggregatedFmtResults:
   """This aggregator allows us to have multiple formatters safely operate over the same Python
-  targets, even if they modify the same files.
-  """
+  targets, even if they modify the same files."""
   adaptor_with_origin = concrete_target.adaptor_with_origin
   prior_formatter_result_digest = adaptor_with_origin.adaptor.sources.snapshot.directory_digest
   results: List[FmtResult] = []

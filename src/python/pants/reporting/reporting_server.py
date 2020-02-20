@@ -367,13 +367,13 @@ class ReportingServer:
                                          'allowed_clients'])):
     """Reporting server settings.
 
-       info_dir: path to dir containing RunInfo files.
-       template_dir: location of mustache template files. If None, the templates
-                     embedded in our package are used.
-       assets_dir: location of assets (js, css etc.) If None, the assets
-                   embedded in our package are used.
-       root: build root.
-       allowed_clients: list of ips or ['ALL'].
+    info_dir: path to dir containing RunInfo files.
+    template_dir: location of mustache template files. If None, the templates
+                  embedded in our package are used.
+    assets_dir: location of assets (js, css etc.) If None, the assets
+                embedded in our package are used.
+    root: build root.
+    allowed_clients: list of ips or ['ALL'].
     """
 
   def __init__(self, port, settings):

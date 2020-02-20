@@ -116,7 +116,7 @@ class TestArtifactCache(TestBase):
       self.assertFalse(artifact_cache.has(key))
 
   def test_local_backed_remote_cache(self):
-    """make sure that the combined cache finds what it should and that it backfills"""
+    """make sure that the combined cache finds what it should and that it backfills."""
     with self.setup_server() as server:
       with self.setup_local_cache() as local:
         tmp = TempLocalArtifactCache(local.artifact_root, 0)

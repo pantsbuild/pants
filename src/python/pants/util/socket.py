@@ -18,6 +18,7 @@ def teardown_socket(s):
 
 def is_readable(fileobj, *, timeout=None):
   """Check that the file-like resource is readable within the given timeout via polling.
+
   :param Union[int, SupportsFileNo] fileobj:
   :param Optional[int] timeout: (in seconds)
   :return bool

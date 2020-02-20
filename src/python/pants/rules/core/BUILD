@@ -51,6 +51,8 @@ python_tests(
   sources=['*_integration_test.py'],
   dependencies=[
     'src/python/pants/testutil:int-test',
+    'src/python/pants/backend/python/rules',
+    'src/python/pants/testutil:goal_rule_test_base',
     'examples/src/java/org/pantsbuild/example:hello_directory',
     'examples/src/scala/org/pantsbuild/example:hello_directory',
     'examples/src/resources/org/pantsbuild/example:hello_directory',

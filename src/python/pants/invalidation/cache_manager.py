@@ -13,12 +13,12 @@ from pants.util.memo import memoized_method
 
 
 class VersionedTargetSet:
-  """Represents a list of targets, a corresponding CacheKey, and a flag determining whether the
-  list of targets is currently valid.
+  """Represents a list of targets, a corresponding CacheKey, and a flag determining whether the list
+  of targets is currently valid.
 
-  When invalidating a single target, this can be used to represent that target as a singleton.
-  When checking the artifact cache, this can also be used to represent a list of targets that are
-  built together into a single artifact.
+  When invalidating a single target, this can be used to represent that target as a singleton. When
+  checking the artifact cache, this can also be used to represent a list of targets that are built
+  together into a single artifact.
   """
 
   class IllegalResultsDir(Exception):
@@ -99,8 +99,8 @@ class VersionedTargetSet:
   def results_dir(self):
     """The directory that stores results for these targets.
 
-    The results_dir is represented by a stable symlink to the current_results_dir: consumers
-    should generally prefer to access the stable directory.
+    The results_dir is represented by a stable symlink to the current_results_dir: consumers should
+    generally prefer to access the stable directory.
     """
     if self._results_dir is None:
       raise ValueError('No results_dir was created for {}'.format(self))
@@ -108,8 +108,7 @@ class VersionedTargetSet:
 
   @property
   def current_results_dir(self):
-    """A unique directory that stores results for this version of these targets.
-    """
+    """A unique directory that stores results for this version of these targets."""
     if self._current_results_dir is None:
       raise ValueError('No results_dir was created for {}'.format(self))
     return self._current_results_dir
@@ -190,7 +189,8 @@ class VersionedTarget(VersionedTargetSet):
     return super().cacheable and not self.target.no_cache
 
   def create_results_dir(self):
-    """Ensure that the empty results directory and a stable symlink exist for these versioned targets."""
+    """Ensure that the empty results directory and a stable symlink exist for these versioned
+    targets."""
     self._current_results_dir = self._cache_manager._results_dir_path(self.cache_key, stable=False)
     self._results_dir = self._cache_manager._results_dir_path(self.cache_key, stable=True)
 
@@ -204,8 +204,8 @@ class VersionedTarget(VersionedTargetSet):
   def copy_previous_results(self):
     """Use the latest valid results_dir as the starting contents of the current results_dir.
 
-    Should be called after the cache is checked, since previous_results are not useful if there is
-    a cached artifact.
+    Should be called after the cache is checked, since previous_results are not useful if there is a
+    cached artifact.
     """
     # TODO(mateo): This should probably be managed by the task, which manages the rest of the
     # incremental support.
@@ -248,8 +248,9 @@ class InvalidationCheck:
 
 
 class InvalidationCacheManager:
-  """Manages cache checks, updates and invalidation keeping track of basic change
-  and invalidation statistics.
+  """Manages cache checks, updates and invalidation keeping track of basic change and invalidation
+  statistics.
+
   Note that this is distinct from the ArtifactCache concept, and should probably be renamed.
   """
 

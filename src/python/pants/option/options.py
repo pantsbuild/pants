@@ -249,10 +249,11 @@ class Options:
 
   @memoized_property
   def goals_by_version(self) -> Tuple[Tuple[str, ...], Tuple[str, ...], Tuple[str, ...]]:
-    """Goals organized into three tuples by whether they are v1, ambiguous, or v2 goals (respectively).
+    """Goals organized into three tuples by whether they are v1, ambiguous, or v2 goals
+    (respectively).
 
-    It's possible for a goal to be implemented with both v1 and v2, in which case a consumer
-    should use the `--v1` and `--v2` global flags to disambiguate.
+    It's possible for a goal to be implemented with both v1 and v2, in which case a consumer should
+    use the `--v1` and `--v2` global flags to disambiguate.
     """
     v1, ambiguous, v2 = [], [], []
     for goal in self._goals:
@@ -450,8 +451,8 @@ class Options:
   def _all_scoped_flag_names_for_fuzzy_matching(self):
     """A list of all registered flags in all their registered scopes.
 
-    This list is used for fuzzy matching against unrecognized option names across registered
-    scopes on the command line.
+    This list is used for fuzzy matching against unrecognized option names across registered scopes
+    on the command line.
     """
     all_scoped_flag_names = []
     def register_all_scoped_names(parser):

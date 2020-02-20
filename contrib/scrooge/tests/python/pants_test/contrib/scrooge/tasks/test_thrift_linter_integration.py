@@ -31,7 +31,8 @@ class ThriftLinterTest(PantsRunIntegrationTest):
     Because these tests use files that intentionally should fail linting, the goal `./pants lint ::`
     we use in CI would complain about these files. To avoid this, we rename BUILD to TEST_BUILD.
 
-    However, these tests require us to temporarily rename TEST_BUILD back to BUILD. """
+    However, these tests require us to temporarily rename TEST_BUILD back to BUILD.
+    """
     @wraps(func)
     def wrapper(self, *args, **kwargs):
       with self.file_renamed(self.thrift_folder_root, test_name='TEST_BUILD', real_name='BUILD'):

@@ -63,6 +63,5 @@ class JUnit(JvmToolMixin, InjectablesMixin, Subsystem):
     }
 
   def runner_classpath(self, context):
-    """Returns an iterable of classpath elements for the runner.
-    """
+    """Returns an iterable of classpath elements for the runner."""
     return self.tool_classpath_from_products(context.products, 'junit', self.options_scope)

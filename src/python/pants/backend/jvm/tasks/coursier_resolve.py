@@ -38,8 +38,7 @@ class CoursierResultNotFound(Exception):
 
 
 class CoursierMixin(JvmResolverBase):
-  """
-  Experimental 3rdparty resolver using coursier.
+  """Experimental 3rdparty resolver using coursier.
 
   TODO(wisechengyi):
   1. Add relative url support
@@ -69,9 +68,8 @@ class CoursierMixin(JvmResolverBase):
 
   @staticmethod
   def _compute_jars_to_resolve_and_pin(raw_jars, artifact_set, manager):
-    """
-    This method provides settled lists of jar dependencies and coordinates
-    based on conflict management.
+    """This method provides settled lists of jar dependencies and coordinates based on conflict
+    management.
 
     :param raw_jars: a collection of `JarDependencies`
     :param artifact_set: PinnedJarArtifactSet
@@ -102,8 +100,7 @@ class CoursierMixin(JvmResolverBase):
     return jar_list, untouched_pinned_artifact
 
   def resolve(self, targets, compile_classpath, sources, javadoc, executor):
-    """
-    This is the core function for coursier resolve.
+    """This is the core function for coursier resolve.
 
     Validation strategy:
 
@@ -199,9 +196,7 @@ class CoursierMixin(JvmResolverBase):
       return None
 
   def _prepare_vts_results_dir(self, vts):
-    """
-    Given a `VergetTargetSet`, prepare its results dir.
-    """
+    """Given a `VergetTargetSet`, prepare its results dir."""
     vt_set_results_dir = os.path.join(self.versioned_workdir, 'results', vts.cache_key.hash)
     safe_mkdir(vt_set_results_dir)
     return vt_set_results_dir
@@ -214,8 +209,7 @@ class CoursierMixin(JvmResolverBase):
 
   def _get_result_from_coursier(self, jars_to_resolve, global_excludes, pinned_coords,
                                 coursier_cache_path, sources, javadoc, executor):
-    """
-    Calling coursier and return the result per invocation.
+    """Calling coursier and return the result per invocation.
 
     If coursier was called once for classifier '' and once for classifier 'tests', then the return value
     would be: {'default': [<first coursier output>, <second coursier output>]}
@@ -430,8 +424,7 @@ class CoursierMixin(JvmResolverBase):
 
   def _load_json_result(self, conf, compile_classpath, coursier_cache_path, invalidation_check,
                         pants_jar_path_base, result, override_classifiers=None):
-    """
-    Given a coursier run result, load it into compile_classpath by target.
+    """Given a coursier run result, load it into compile_classpath by target.
 
     :param compile_classpath: `ClasspathProducts` that will be modified
     :param coursier_cache_path: cache location that is managed by coursier
@@ -505,8 +498,8 @@ class CoursierMixin(JvmResolverBase):
 
   def _load_from_results_dir(self, compile_classpath, vts_results_dir,
                              coursier_cache_path, invalidation_check, pants_jar_path_base):
-    """
-    Given vts_results_dir, load the results which can be from multiple runs of coursier into compile_classpath.
+    """Given vts_results_dir, load the results which can be from multiple runs of coursier into
+    compile_classpath.
 
     :return: True if success; False if any of the classpath is not valid anymore.
     """
@@ -533,9 +526,8 @@ class CoursierMixin(JvmResolverBase):
 
   @classmethod
   def _extract_dependencies_by_root(cls, result):
-    """
-    Only extracts the transitive dependencies for the given coursier resolve.
-    Note the "dependencies" field is already transitive.
+    """Only extracts the transitive dependencies for the given coursier resolve. Note the
+    "dependencies" field is already transitive.
 
     Example:
     {
@@ -573,8 +565,7 @@ class CoursierMixin(JvmResolverBase):
 
   @classmethod
   def _map_coord_to_resolved_jars(cls, result, coursier_cache_path, pants_jar_path_base):
-    """
-    Map resolved files to each org:name:version
+    """Map resolved files to each org:name:version.
 
     Example:
     {
@@ -649,8 +640,7 @@ class CoursierMixin(JvmResolverBase):
 
   @classmethod
   def _get_path_to_jar(cls, coursier_cache_path, pants_jar_path_base, jar_path):
-    """
-    Create the path to the jar that will live in .pants.d
+    """Create the path to the jar that will live in .pants.d.
 
     :param coursier_cache_path: coursier cache location
     :param pants_jar_path_base: location under pants workdir to store the hardlink to the coursier cache
@@ -693,9 +683,8 @@ class CoursierResolve(CoursierMixin, NailgunTask):
     return super().implementation_version() + [('CoursierResolve', 2)]
 
   def execute(self):
-    """Resolves the specified confs for the configured targets and returns an iterator over
-    tuples of (conf, jar path).
-    """
+    """Resolves the specified confs for the configured targets and returns an iterator over tuples
+    of (conf, jar path)."""
 
     jvm_resolve_subsystem = JvmResolveSubsystem.global_instance()
     if jvm_resolve_subsystem.get_options().resolver != 'coursier':

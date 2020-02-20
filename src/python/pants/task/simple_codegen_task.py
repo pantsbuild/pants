@@ -42,8 +42,7 @@ class SimpleCodegenTask(Task):
   sources_exclude_globs = ()
 
   def __init__(self, context, workdir):
-    """
-    Add pass-thru Task Constructor for public API visibility.
+    """Add pass-thru Task Constructor for public API visibility.
 
     :API: public
     """
@@ -116,16 +115,16 @@ class SimpleCodegenTask(Task):
   def synthetic_target_extra_exports(self, target, target_workdir):
     """Gets any extra exports generated synthetic targets should have.
 
-   This method is optional for subclasses to implement, because some code generators may have no
-    extra exports.
-    NB: Extra exports must also be present in the extra dependencies.
-    :param Target target: the Target from which we are generating a synthetic Target. E.g., 'target'
-    might be a JavaProtobufLibrary, whose corresponding synthetic Target would be a JavaLibrary.
-    It may not be necessary to use this parameter depending on the details of the subclass.
+    This method is optional for subclasses to implement, because some code generators may have no
+     extra exports.
+     NB: Extra exports must also be present in the extra dependencies.
+     :param Target target: the Target from which we are generating a synthetic Target. E.g., 'target'
+     might be a JavaProtobufLibrary, whose corresponding synthetic Target would be a JavaLibrary.
+     It may not be necessary to use this parameter depending on the details of the subclass.
 
-    :API: public
+     :API: public
 
-    :return: a list of exported targets.
+     :return: a list of exported targets.
     """
     return []
 

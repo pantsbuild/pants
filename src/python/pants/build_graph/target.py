@@ -71,7 +71,7 @@ class Target(AbstractTarget):
   _MAX_RECURSION_DEPTH = 250
 
   class WrongNumberOfAddresses(Exception):
-    """Internal error, too many elements in Addresses
+    """Internal error, too many elements in Addresses.
 
     :API: public
     """
@@ -555,8 +555,7 @@ class Target(AbstractTarget):
     return len(self._sources_field.sources.files)
 
   def sources_snapshot(self, scheduler=None):
-    """
-    Get a Snapshot of the sources attribute of this target.
+    """Get a Snapshot of the sources attribute of this target.
 
     This API is experimental, and is subject to change.
     """
@@ -828,9 +827,9 @@ class Target(AbstractTarget):
 
   @memoized_property
   def id(self):
-    """A unique and unix safe identifier for the Target.
-    Since other classes use this id to generate new file names and unix system has 255 character
-    limitation on a file name, 200-character limit is chosen as a safe measure.
+    """A unique and unix safe identifier for the Target. Since other classes use this id to generate
+    new file names and unix system has 255 character limitation on a file name, 200-character limit
+    is chosen as a safe measure.
 
     :API: public
     """

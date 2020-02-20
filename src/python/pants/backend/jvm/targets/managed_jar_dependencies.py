@@ -111,7 +111,6 @@ class ManagedJarLibraries:
         jars=[jar('com.example', 'example')],
         managed_dependencies=':managed',
       )
-
   """
 
   class JarLibraryNameCollision(TargetDefinitionException):

@@ -88,8 +88,7 @@ class PythonNativeCode(Subsystem):
     return False
 
   def check_build_for_current_platform_only(self, targets):
-    """
-    Performs a check of whether the current target closure has native sources and if so, ensures
+    """Performs a check of whether the current target closure has native sources and if so, ensures
     that Pants is only targeting the current platform.
 
     :param targets: a list of :class:`Target` objects.

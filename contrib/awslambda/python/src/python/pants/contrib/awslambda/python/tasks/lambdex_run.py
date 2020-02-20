@@ -20,9 +20,9 @@ from pants.contrib.awslambda.python.tasks.lambdex_prep import LambdexPrep
 class LambdexRun(Task):
   """Runs Lambdex to convert pexes to AWS Lambda functions.
 
-  Note that your pex must be built to run on Amazon Linux, e.g., if it contains native code.
-  When deploying the lambda, its handler should be set to `lambdex_handler.handler`, which
-  is a wrapper around the target-specified handler.
+  Note that your pex must be built to run on Amazon Linux, e.g., if it contains native code. When
+  deploying the lambda, its handler should be set to `lambdex_handler.handler`, which is a wrapper
+  around the target-specified handler.
   """
 
   @staticmethod

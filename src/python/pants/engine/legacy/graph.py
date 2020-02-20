@@ -356,8 +356,8 @@ class _DependentGraph:
 class HydratedTarget:
   """A wrapper for a fully hydrated TargetAdaptor object.
 
-  Transitive graph walks collect ordered sets of TransitiveHydratedTargets which involve a huge amount
-  of hashing: we implement eq/hash via direct usage of an Address field to speed that up.
+  Transitive graph walks collect ordered sets of TransitiveHydratedTargets which involve a huge
+  amount of hashing: we implement eq/hash via direct usage of an Address field to speed that up.
   """
   address: Address
   adaptor: TargetAdaptor
@@ -392,8 +392,7 @@ class TransitiveHydratedTargets:
 @dataclass(frozen=True)
 class LegacyHydratedTarget:
   """A rip on HydratedTarget for the purpose of V1, which must use BuildFileAddress rather than
-  Address.
-  """
+  Address."""
   address: BuildFileAddress
   adaptor: TargetAdaptor
   dependencies: Tuple[Address, ...]
@@ -434,8 +433,8 @@ class SourcesSnapshot:
   """Sources matched by command line specs, either directly via FilesystemSpecs or indirectly via
   AddressSpecs.
 
-  Note that the resolved sources do not need an owning target. Any source resolvable by
-  `PathGlobs` is valid here.
+  Note that the resolved sources do not need an owning target. Any source resolvable by `PathGlobs`
+  is valid here.
   """
   snapshot: Snapshot
 
@@ -443,8 +442,8 @@ class SourcesSnapshot:
 class SourcesSnapshots(Collection[SourcesSnapshot]):
   """A collection of sources matched by command line specs.
 
-  `@goal_rule`s may request this when they only need source files to operate and do not need
-  any target information.
+  `@goal_rule`s may request this when they only need source files to operate and do not need any
+  target information.
   """
 
 
@@ -539,10 +538,10 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
 async def transitive_hydrated_targets(addresses: Addresses) -> TransitiveHydratedTargets:
   """Given Addresses, kicks off recursion on expansion of TransitiveHydratedTargets.
 
-  The TransitiveHydratedTarget struct represents a structure-shared graph, which we walk
-  and flatten here. The engine memoizes the computation of TransitiveHydratedTarget, so
-  when multiple TransitiveHydratedTargets objects are being constructed for multiple
-  roots, their structure will be shared.
+  The TransitiveHydratedTarget struct represents a structure-shared graph, which we walk and flatten
+  here. The engine memoizes the computation of TransitiveHydratedTarget, so when multiple
+  TransitiveHydratedTargets objects are being constructed for multiple roots, their structure will
+  be shared.
   """
 
   transitive_hydrated_targets = await MultiGet(
@@ -688,8 +687,8 @@ def _eager_fileset_with_spec(
 async def hydrate_sources(
   sources_field: SourcesField, glob_match_error_behavior: GlobMatchErrorBehavior,
 ) -> HydratedField:
-  """Given a SourcesField, request a Snapshot for its path_globs and create an EagerFilesetWithSpec.
-  """
+  """Given a SourcesField, request a Snapshot for its path_globs and create an
+  EagerFilesetWithSpec."""
   address = sources_field.address
   path_globs = dataclasses.replace(
     sources_field.path_globs,
@@ -786,8 +785,7 @@ async def addresses_with_origins_from_filesystem_specs(
   filesystem_specs: FilesystemSpecs, global_options: GlobalOptions,
 ) -> AddressesWithOrigins:
   """Find the owner(s) for each FilesystemSpec while preserving the original FilesystemSpec those
-  owners come from.
-  """
+  owners come from."""
   pathglobs_per_include = (
     filesystem_specs.path_globs_for_spec(spec) for spec in filesystem_specs.includes
   )

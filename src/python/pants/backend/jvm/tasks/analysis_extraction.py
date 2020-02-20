@@ -64,19 +64,14 @@ class AnalysisExtraction(NailgunTask):
 
   @contextmanager
   def aliased_classpaths(self, classpaths):
-    """
-    Create unique names for each classpath entry as symlinks in
-    a temporary directory.  returns: dict[str -> classpath entry]
-    which maps string paths of symlinks to classpaths.
+    """Create unique names for each classpath entry as symlinks in a temporary directory.  returns:
+    dict[str -> classpath entry] which maps string paths of symlinks to classpaths.
 
-    ClasspathEntries generally point to a .jar of
-    the .class files generated for java_library targets.
-    These jars all have the same basename, z.jar, which
-    confuses the `jdeps` tool. Jdeps expects unique, and
-    descriptive, basenames for jars. When all basenames are
-    the same the deps collide in the jdeps output, some
-    .class files can't be found and the summary output
-    is not complete.
+    ClasspathEntries generally point to a .jar of the .class files generated for java_library
+    targets. These jars all have the same basename, z.jar, which confuses the `jdeps` tool. Jdeps
+    expects unique, and descriptive, basenames for jars. When all basenames are the same the deps
+    collide in the jdeps output, some .class files can't be found and the summary output is not
+    complete.
     """
     with temporary_dir() as tempdir:
       aliases = {}

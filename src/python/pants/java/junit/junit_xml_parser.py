@@ -82,8 +82,7 @@ class RegistryOfTests:
     )
 
   def match_test_spec(self, possible_test_specs):
-    """
-    This matches the user specified test spec with what tests Pants knows.
+    """This matches the user specified test spec with what tests Pants knows.
 
     Each non fully qualified test spec may get matched with multiple targets.
 

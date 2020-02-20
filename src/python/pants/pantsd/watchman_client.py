@@ -15,9 +15,8 @@ class StreamableWatchmanClient(pywatchman.client):
 
   def stream_query(self, commands):
     """A generator of watchman events that allows queries to be pipelined and multiplexed. This
-    continuously yields unilateral events and subscribe events, or None until an error condition
-    or non-unilateral event (aside from subscribe) is received, at which point the generator
-    ceases.
+    continuously yields unilateral events and subscribe events, or None until an error condition or
+    non-unilateral event (aside from subscribe) is received, at which point the generator ceases.
 
     The generator will yield None on socket timeouts unless the client's timeout has been set to
     None, in which case it will block indefinitely waiting on responses.

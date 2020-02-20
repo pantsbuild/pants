@@ -68,8 +68,8 @@ class AddressSpec(Spec, metaclass=ABCMeta):
   def address_families_for_dir(
     cls, address_families_dict: Dict[str, "AddressFamily"], spec_dir_path: str
   ) -> List["AddressFamily"]:
-    """Implementation of `matching_address_families()` for address specs matching at most
-    one directory."""
+    """Implementation of `matching_address_families()` for address specs matching at most one
+    directory."""
     maybe_af = address_families_dict.get(spec_dir_path, None)
     if maybe_af is None:
       raise cls.AddressFamilyResolutionError(
@@ -244,8 +244,8 @@ def more_specific(
 ) -> AddressSpec:
   """Returns which of the two specs is more specific.
 
-  This is useful when a target matches multiple specs, and we want to associate it with
-  the "most specific" one, which will make the most intuitive sense to the user.
+  This is useful when a target matches multiple specs, and we want to associate it with the "most
+  specific" one, which will make the most intuitive sense to the user.
   """
   # Note that if either of spec1 or spec2 is None, the other will be returned.
   if address_spec1 is None and address_spec2 is None:
@@ -261,9 +261,9 @@ def more_specific(
 class AddressSpecsMatcher:
   """Contains filters for the output of a AddressSpecs match.
 
-  This class is separated out from `AddressSpecs` to allow for both stuctural equality of the `tags` and
-  `exclude_patterns`, and for caching of their compiled forms using `@memoized_property` (which uses
-  the hash of the class instance in its key, and results in a very large key when used with
+  This class is separated out from `AddressSpecs` to allow for both stuctural equality of the `tags`
+  and `exclude_patterns`, and for caching of their compiled forms using `@memoized_property` (which
+  uses the hash of the class instance in its key, and results in a very large key when used with
   `AddressSpecs` directly).
   """
   tags: Tuple[str, ...]
@@ -405,8 +405,7 @@ class FilesystemSpecs(Collection[FilesystemSpec]):
     self, spec: Union[FilesystemLiteralSpec, FilesystemGlobSpec]
   ) -> PathGlobs:
     """Generate PathGlobs for the specific spec, automatically including the instance's
-    FilesystemIgnoreSpecs.
-    """
+    FilesystemIgnoreSpecs."""
     return self._generate_path_globs(specs=(spec, *self.ignores))
 
   def to_path_globs(self) -> PathGlobs:
@@ -436,7 +435,8 @@ class Specs:
     """Return whichever types of specs was provided by the user.
 
     It is guaranteed that there will only ever be AddressSpecs or FilesystemSpecs, but not both,
-    through validation in the constructor."""
+    through validation in the constructor.
+    """
     return (
       self.filesystem_specs
       if self.filesystem_specs.dependencies

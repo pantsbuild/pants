@@ -6,7 +6,7 @@ from pkg_resources import Requirement
 
 
 class PythonRequirement:
-  """Pants wrapper around pkg_resources.Requirement
+  """Pants wrapper around pkg_resources.Requirement.
 
   Describes an external dependency as understood by ``easy_install`` or
   ``pip``. It takes

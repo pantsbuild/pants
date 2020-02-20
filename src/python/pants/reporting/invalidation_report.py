@@ -69,7 +69,8 @@ class InvalidationReport:
     return task_report
 
   def add_vts(self, task_name, targets, cache_key, valid, phase):
-    """ Add a single VersionedTargetSet entry to the report.
+    """Add a single VersionedTargetSet entry to the report.
+
     :param InvalidationCacheManager cache_manager:
     :param CacheKey cache_key:
     :param bool valid:
@@ -80,7 +81,8 @@ class InvalidationReport:
     self._task_reports[task_name].add(targets, cache_key, valid, phase)
 
   def report(self, filename=None):
-    """ Write details of each versioned target to file
+    """Write details of each versioned target to file.
+
     :param string filename: file to write out the report to
 
     Fields in the report:

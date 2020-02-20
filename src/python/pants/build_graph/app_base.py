@@ -116,7 +116,6 @@ class Bundle:
     bundles=[
       bundle(relative_to='common', fileset=globs('common/config/*'))
     ]
-
   """
 
   def __init__(self, parse_context):
@@ -198,7 +197,7 @@ class BundleField(tuple, PayloadField):
 
 
 class AppBase(Target):
-  """A base class for deployable application targets
+  """A base class for deployable application targets.
 
   Invoking the ``bundle`` goal on one of these targets creates a
   self-contained artifact suitable for deployment on some other machine.
@@ -208,7 +207,7 @@ class AppBase(Target):
   :API: public
   """
   class InvalidArchiveType(Exception):
-    """Raised when archive type defined in Target is invalid"""
+    """Raised when archive type defined in Target is invalid."""
 
   def __init__(self,
                name=None,

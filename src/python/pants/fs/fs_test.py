@@ -47,9 +47,8 @@ async def workspace_goal_rule(console: Console, workspace: Workspace, msg: Messa
 
 
 class WorkspaceInGoalRuleTest(GoalRuleTestBase):
-  """This test is meant to ensure that the Workspace type successfully
-  invokes the rust FFI function to write to disk in the context of a @goal_rule,
-  without crashing or otherwise failing."""
+  """This test is meant to ensure that the Workspace type successfully invokes the rust FFI function
+  to write to disk in the context of a @goal_rule, without crashing or otherwise failing."""
   goal_cls = MockWorkspaceGoal
 
   @classmethod

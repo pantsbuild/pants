@@ -152,8 +152,8 @@ class CommonTest(unittest.TestCase):
   def test_style_error(self):
     """Test error with actual AST node.
 
-    Verify that when we fetch a node form AST and create an error we get the
-    same result as generating the error manually.
+    Verify that when we fetch a node form AST and create an error we get the same result as
+    generating the error manually.
     """
     plugin = MinimalCheckstylePlugin({}, PythonFile.from_statement(FILE_TEXT))
     import_from = None

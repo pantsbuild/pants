@@ -146,7 +146,7 @@ class DirutilTest(unittest.TestCase):
     self.assertEqual(sorted([unittest.mock.call(DIR1), unittest.mock.call(DIR2)]), sorted(dirutil_safe_rmtree.mock_calls))
 
   def test_safe_walk(self) -> None:
-    """Test that directory names are correctly represented as unicode strings"""
+    """Test that directory names are correctly represented as unicode strings."""
     # This test is unnecessary in python 3 since all strings are unicode there is no
     # unicode constructor.
     with temporary_dir() as tmpdir:

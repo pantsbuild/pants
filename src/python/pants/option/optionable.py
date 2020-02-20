@@ -22,8 +22,8 @@ async def _construct_optionable(optionable_factory):
 class OptionableFactory(ABC):
   """A mixin that provides a method that returns an @rule to construct subclasses of Optionable.
 
-  Optionable subclasses constructed in this manner must have a particular constructor shape, which is
-  loosely defined by `_construct_optionable` and `OptionableFactory.signature`.
+  Optionable subclasses constructed in this manner must have a particular constructor shape, which
+  is loosely defined by `_construct_optionable` and `OptionableFactory.signature`.
   """
 
   @property

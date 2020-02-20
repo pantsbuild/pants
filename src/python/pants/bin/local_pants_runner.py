@@ -343,10 +343,11 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       return PANTS_SUCCEEDED_EXIT_CODE
 
     return self._graph_session.run_goal_rules(
-      self._options_bootstrapper,
-      self._options,
-      goals,
-      self._specs,
+      options_bootstrapper=self._options_bootstrapper,
+      union_membership=self._union_membership,
+      options=self._options,
+      goals=goals,
+      specs=self._specs,
     )
 
   @staticmethod

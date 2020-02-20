@@ -71,9 +71,8 @@ class ConanRequirement:
 
   @memoized_property
   def directory_path(self):
-    """
-    A helper method for converting Conan to package specifications to the data directory
-    path that Conan creates for each package.
+    """A helper method for converting Conan to package specifications to the data directory path
+    that Conan creates for each package.
 
     Example package specification:
       "my_library/1.0.0@pants/stable"

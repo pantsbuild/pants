@@ -15,6 +15,7 @@ from pants.base.exception_sink import ExceptionSink, SignalHandler
 from pants.base.exiter import Exiter
 from pants.bin.daemon_pants_runner import DaemonPantsRunner
 from pants.engine.native import Native
+from pants.engine.rules import UnionMembership
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.logging import init_rust_logger, setup_logging
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
@@ -36,11 +37,11 @@ from pants.util.strutil import ensure_text
 class _LoggerStream(object):
   """A sys.std{out,err} replacement that pipes output to a logger.
 
-  N.B. `logging.Logger` expects unicode. However, most of our outstream logic, such as in `exiter.py`,
-  will use `sys.std{out,err}.buffer` and thus a bytes interface. So, we must provide a `buffer`
-  property, and change the semantics of the buffer to always convert the message to unicode. This
-  is an unfortunate code smell, as `logging` does not expose a bytes interface so this is
-  the best solution we could think of.
+  N.B. `logging.Logger` expects unicode. However, most of our outstream logic, such as in
+  `exiter.py`, will use `sys.std{out,err}.buffer` and thus a bytes interface. So, we must provide a
+  `buffer` property, and change the semantics of the buffer to always convert the message to
+  unicode. This is an unfortunate code smell, as `logging` does not expose a bytes interface so this
+  is the best solution we could think of.
   """
 
   def __init__(self, logger, log_level, handler):
@@ -171,7 +172,8 @@ class PantsDaemon(FingerprintedProcessManager):
           build_root,
           bootstrap_options_values,
           legacy_graph_scheduler,
-          watchman
+          watchman,
+          union_membership=UnionMembership(build_config.union_rules())
         )
       else:
         build_root = None
@@ -189,7 +191,13 @@ class PantsDaemon(FingerprintedProcessManager):
       )
 
     @staticmethod
-    def _setup_services(build_root, bootstrap_options, legacy_graph_scheduler, watchman):
+    def _setup_services(
+      build_root,
+      bootstrap_options,
+      legacy_graph_scheduler,
+      watchman,
+      union_membership: UnionMembership,
+    ):
       """Initialize pantsd services.
 
       :returns: A PantsServices instance.
@@ -212,11 +220,14 @@ class PantsDaemon(FingerprintedProcessManager):
         )
 
       scheduler_service = SchedulerService(
-        fs_event_service,
-        legacy_graph_scheduler,
-        build_root,
-        OptionsInitializer.compute_pantsd_invalidation_globs(build_root, bootstrap_options),
-        pidfile,
+        fs_event_service=fs_event_service,
+        legacy_graph_scheduler=legacy_graph_scheduler,
+        build_root=build_root,
+        invalidation_globs=OptionsInitializer.compute_pantsd_invalidation_globs(
+          build_root, bootstrap_options
+        ),
+        pantsd_pidfile=pidfile,
+        union_membership=union_membership,
       )
 
       pailgun_service = PailgunService(
@@ -298,8 +309,8 @@ class PantsDaemon(FingerprintedProcessManager):
   def _pantsd_logging(self):
     """A context manager that runs with pantsd logging.
 
-    Asserts that stdio (represented by file handles 0, 1, 2) is closed to ensure that
-    we can safely reuse those fd numbers.
+    Asserts that stdio (represented by file handles 0, 1, 2) is closed to ensure that we can safely
+    reuse those fd numbers.
     """
 
     # Ensure that stdio is closed so that we can safely reuse those file descriptors.
@@ -488,9 +499,9 @@ class PantsDaemon(FingerprintedProcessManager):
       self.watchman_launcher.terminate()
 
   def needs_restart(self, option_fingerprint):
-    """
-    Overrides ProcessManager.needs_restart, to account for the case where pantsd is running
-    but we want to shutdown after this run.
+    """Overrides ProcessManager.needs_restart, to account for the case where pantsd is running but
+    we want to shutdown after this run.
+
     :param option_fingerprint: A fingeprint of the global bootstrap options.
     :return: True if the daemon needs to restart.
     """

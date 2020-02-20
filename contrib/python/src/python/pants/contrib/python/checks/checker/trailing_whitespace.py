@@ -22,9 +22,8 @@ class TrailingWhitespace(CheckstylePlugin):
 
   @classmethod
   def build_exception_map(cls, tokens):
-    """Generates a set of ranges where we accept trailing slashes, specifically within comments
-       and strings.
-    """
+    """Generates a set of ranges where we accept trailing slashes, specifically within comments and
+    strings."""
     exception_ranges = defaultdict(list)
     for token in tokens:
       token_type, _, token_start, token_end = token[0:4]

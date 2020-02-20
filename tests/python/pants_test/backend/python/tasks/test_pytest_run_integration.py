@@ -138,9 +138,8 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
 
   @skip_unless_python27_and_python3_present
   def test_pants_test_interpreter_selection_with_pexrc(self):
-    """Test the pants test goal with intepreters selected from a PEX_PYTHON_PATH
-    defined in a pexrc file on disk.
-    """
+    """Test the pants test goal with intepreters selected from a PEX_PYTHON_PATH defined in a pexrc
+    file on disk."""
     py27_path, py3_path = python_interpreter_path(PY_27), python_interpreter_path(PY_3)
     with setup_pexrc_with_pex_python_path([py27_path, py3_path]):
       with temporary_dir() as interpreters_cache:
@@ -166,10 +165,8 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
 
   @skip_unless_python27_present
   def test_pants_test_interpreter_selection_with_option_2(self):
-    """
-    Test that the pants test goal properly constrains the SelectInterpreter task to Python 2
-    using the '--python-setup-interpreter-constraints' option.
-    """
+    """Test that the pants test goal properly constrains the SelectInterpreter task to Python 2
+    using the '--python-setup-interpreter-constraints' option."""
     with temporary_dir() as interpreters_cache:
       pants_ini_config = {
         'python-setup': {
@@ -190,10 +187,8 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
 
   @skip_unless_python3_present
   def test_pants_test_interpreter_selection_with_option_3(self):
-    """
-    Test that the pants test goal properly constrains the SelectInterpreter task to Python 3
-    using the '--python-setup-interpreter-constraints' option.
-    """
+    """Test that the pants test goal properly constrains the SelectInterpreter task to Python 3
+    using the '--python-setup-interpreter-constraints' option."""
     with temporary_dir() as interpreters_cache:
       pants_ini_config = {
         'python-setup': {

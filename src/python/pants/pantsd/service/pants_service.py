@@ -191,7 +191,7 @@ class _ServiceState(object):
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class PantsServices:
-  """A registry of PantsServices instances"""
+  """A registry of PantsServices instances."""
   services: Tuple[PantsService, ...]
   port_map: Dict
   lifecycle_lock: Any

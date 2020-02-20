@@ -7,7 +7,6 @@ import pytest
 
 from pants.backend.python.lint.flake8.rules import Flake8Target
 from pants.backend.python.lint.flake8.rules import rules as flake8_rules
-from pants.backend.python.rules import download_pex_bin
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.address import Address
@@ -20,15 +19,10 @@ from pants.rules.core.lint import LintResult
 from pants.source.wrapped_globs import EagerFilesetWithSpec
 from pants.testutil.interpreter_selection_utils import skip_unless_python27_and_python3_present
 from pants.testutil.option.util import create_options_bootstrapper
-from pants.testutil.subsystem.util import init_subsystems
 from pants.testutil.test_base import TestBase
 
 
 class Flake8IntegrationTest(TestBase):
-
-  def setUp(self):
-    super().setUp()
-    init_subsystems([download_pex_bin.DownloadedPexBin.Factory])
 
   good_source = FileContent(path="test/good.py", content=b"print('Nothing suspicious here..')\n")
   bad_source = FileContent(path="test/bad.py", content=b"import typing\n")  # unused import
@@ -40,13 +34,7 @@ class Flake8IntegrationTest(TestBase):
 
   @classmethod
   def rules(cls):
-    return (
-      *super().rules(),
-      *flake8_rules(),
-      download_pex_bin.download_pex_bin,
-      RootRule(Flake8Target),
-      RootRule(download_pex_bin.DownloadedPexBin.Factory),
-    )
+    return (*super().rules(), *flake8_rules(), RootRule(Flake8Target))
 
   def run_flake8(
     self,
@@ -77,11 +65,7 @@ class Flake8IntegrationTest(TestBase):
       origin = SingleAddress(directory="test", name="target")
     target = Flake8Target(PythonTargetAdaptorWithOrigin(adaptor, origin))
     return self.request_single_product(
-      LintResult, Params(
-        target,
-        create_options_bootstrapper(args=args),
-        download_pex_bin.DownloadedPexBin.Factory.global_instance(),
-      ),
+      LintResult, Params(target, create_options_bootstrapper(args=args)),
     )
 
   def test_single_passing_source(self) -> None:

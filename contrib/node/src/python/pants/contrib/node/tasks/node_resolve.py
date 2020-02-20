@@ -53,8 +53,10 @@ class NodeResolve(NodeTask):
     cls, node_package_type: Type[NodePackage], resolver: Type[NodeResolverBase]
   ) -> None:
     """Register a NodeResolver instance for a particular subclass of NodePackage.
-    Implementation uses a hash on node_package_type, so the resolver will only be used on the
-    exact NodePackage subclass (not further subclasses of it)."""
+
+    Implementation uses a hash on node_package_type, so the resolver will only be used on the exact
+    NodePackage subclass (not further subclasses of it).
+    """
     cls._resolver_by_type[node_package_type] = resolver
 
   @classmethod
@@ -76,7 +78,7 @@ class NodeResolve(NodeTask):
     return isinstance(target, NodePackage) and cls._resolver_for_target(target) is not None
 
   def _topological_sort(self, targets):
-    """Topologically order a list of targets"""
+    """Topologically order a list of targets."""
 
     target_set = set(targets)
     return [t for t in reversed(sort_targets(targets)) if t in target_set]

@@ -37,16 +37,17 @@ class NativeStdErr(NativeWriter):
 
 @side_effecting
 class Console:
-  """Class responsible for writing text to the console while Pants is running. """
+  """Class responsible for writing text to the console while Pants is running."""
   side_effecting = True
 
   def __init__(self, stdout=None, stderr=None, use_colors: bool = True, session: Optional[Any] = None):
-    """`stdout` and `stderr` may be explicitly provided when Console is constructed. 
-    We use this in tests to provide a mock we can write tests against, rather than writing
-    to the system stdout/stderr. If they are not defined, the effective stdout/stderr are
-    proxied to Rust engine intrinsic code if there is a scheduler session provided, or just
-    written to the standard Python-provided stdout/stderr if it is None. A scheduler session
-    is provided if --v2-ui is set."""
+    """`stdout` and `stderr` may be explicitly provided when Console is constructed.
+
+    We use this in tests to provide a mock we can write tests against, rather than writing to the
+    system stdout/stderr. If they are not defined, the effective stdout/stderr are proxied to Rust
+    engine intrinsic code if there is a scheduler session provided, or just written to the standard
+    Python-provided stdout/stderr if it is None. A scheduler session is provided if --v2-ui is set.
+    """
 
     has_scheduler = session is not None
 

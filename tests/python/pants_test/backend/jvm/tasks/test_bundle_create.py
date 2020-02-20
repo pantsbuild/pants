@@ -23,8 +23,7 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
     return BundleCreate
 
   def add_consolidated_bundle(self, context, tgt, files_dict):
-    """Add a bundle to the classpath as if it has been consolidated already.
-    """
+    """Add a bundle to the classpath as if it has been consolidated already."""
     consolidated_classpath = context.products.get_data(
       'consolidated_classpath',
       init_func=ClasspathProducts.init_func(self.pants_workdir)
@@ -44,7 +43,7 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
     consolidated_classpath.add_for_target(tgt, [('default', jarpath)])
 
   def setUp(self):
-    """Prepare targets, context, runtime classpath. """
+    """Prepare targets, context, runtime classpath."""
     super().setUp()
     self.task = self.prepare_execute(self.context())
 
@@ -90,9 +89,8 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
                             **kwargs)
 
   def _setup_classpath(self, task_context):
-    """As a separate prep step because to test different option settings, this needs to rerun
-    after context is re-created.
-    """
+    """As a separate prep step because to test different option settings, this needs to rerun after
+    context is re-created."""
     classpath_products = self.ensure_consolidated_classpath_products(task_context)
     classpath_products.add_jars_for_targets(targets=[self.jar_lib],
                                             conf='default',

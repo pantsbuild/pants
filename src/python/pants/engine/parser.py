@@ -22,8 +22,9 @@ class SymbolTable:
 class HydratedStruct:
   """A wrapper around a Struct subclass post hydration.
 
-  This exists so that the rule graph can statically provide a struct for a target, and rules can depend on this
-  without needing to depend on having a concrete instance of SymbolTable to register their input selectors.
+  This exists so that the rule graph can statically provide a struct for a target, and rules can
+  depend on this without needing to depend on having a concrete instance of SymbolTable to register
+  their input selectors.
   """
   value: Struct
 

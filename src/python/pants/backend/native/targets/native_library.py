@@ -61,8 +61,8 @@ class NativeLibrary(Target, metaclass=ABCMeta):
 
   @property
   def compiler_option_sets(self):
-    """For every element in this list, enable the corresponding flags on compilation
-    of targets.
+    """For every element in this list, enable the corresponding flags on compilation of targets.
+
     :return: See constructor.
     :rtype: list
     """

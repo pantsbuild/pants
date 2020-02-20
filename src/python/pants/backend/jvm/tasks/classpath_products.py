@@ -96,8 +96,8 @@ class ClasspathProducts:
     def prepare_target_output_folder(basedir, target):
       """Prepare directory that will contain canonical classpath for the target.
 
-      This includes creating directories if it does not already exist, cleaning up
-      previous classpath output related to the target.
+      This includes creating directories if it does not already exist, cleaning up previous
+      classpath output related to the target.
       """
       output_dir = basedir
       # TODO(peiyu) improve readability once we deprecate the old naming style.
@@ -347,7 +347,8 @@ class ClasspathProducts:
     self._classpaths.add_for_target(target, elements)
 
   def _validate_classpath_tuples(self, classpath, target):
-    """Validates that all files are located within the working directory, to simplify relativization.
+    """Validates that all files are located within the working directory, to simplify
+    relativization.
 
     :param classpath: The list of classpath tuples. Each tuple is a 2-tuple of ivy_conf and
                       ClasspathEntry.

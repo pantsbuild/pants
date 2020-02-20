@@ -88,8 +88,7 @@ class LocalCachingTarballDereferenceTest(TaskTestBase):
     )
 
   def _prepare_task(self, deference, regular_file, regular_file_in_results_dir):
-    """
-    Define task with caching with certain behaviors.
+    """Define task with caching with certain behaviors.
 
     :param deference: Specify whether task should dereference symlinks for `VersionedTarget`.
     :param regular_file: If True, a regular file will be created with some content as the dst of the symlink.
@@ -119,9 +118,7 @@ class LocalCachingTarballDereferenceTest(TaskTestBase):
     self.task = self.create_task(context)
 
   def _assert_dereferenced_symlink_in_cache(self, all_vts):
-    """
-    Assert symlink is dereferenced when in the cache tarball.
-    """
+    """Assert symlink is dereferenced when in the cache tarball."""
     for vt in all_vts:
       artifact_address = self._get_artifact_path(vt)
       with temporary_dir() as tmpdir:

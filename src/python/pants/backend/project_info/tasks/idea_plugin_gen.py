@@ -176,7 +176,9 @@ class IdeaPluginGen(ConsoleTask):
 
   def _generate_to_tempfile(self, generator):
     """Applies the specified generator to a temp file and returns the path to that file.
-    We generate into a temp file so that we don't lose any manual customizations on error."""
+
+    We generate into a temp file so that we don't lose any manual customizations on error.
+    """
     with temporary_file(cleanup=False, binary_mode=False) as output:
       generator.write(output)
       return output.name

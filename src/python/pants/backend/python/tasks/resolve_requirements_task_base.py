@@ -23,9 +23,8 @@ from pants.util.memo import memoized_property
 class ResolveRequirementsTaskBase(Task):
   """Base class for tasks that resolve 3rd-party Python requirements.
 
-  Creates an (unzipped) PEX on disk containing all the resolved requirements.
-  This PEX can be merged with other PEXes to create a unified Python environment
-  for running the relevant python code.
+  Creates an (unzipped) PEX on disk containing all the resolved requirements. This PEX can be merged
+  with other PEXes to create a unified Python environment for running the relevant python code.
   """
 
   @classmethod

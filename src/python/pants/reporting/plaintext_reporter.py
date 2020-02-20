@@ -45,8 +45,8 @@ class LabelFormat:
 class PlainTextReporter(PlainTextReporterBase):
   """Plain-text reporting to stdout.
 
-  We only report progress for things under the default work root. It gets too
-  confusing to try and show progress for background work too.
+  We only report progress for things under the default work root. It gets too confusing to try and
+  show progress for background work too.
   """
 
   @dataclass(frozen=True)

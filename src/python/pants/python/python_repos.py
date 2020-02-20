@@ -5,7 +5,11 @@ from pants.subsystem.subsystem import Subsystem
 
 
 class PythonRepos(Subsystem):
-  """A python code repository."""
+  """A python code repository.
+
+  Note that this is part of the Pants core, and not the python backend, because it's used to
+  bootstrap Pants plugins.
+  """
   options_scope = 'python-repos'
 
   @classmethod

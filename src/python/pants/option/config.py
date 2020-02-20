@@ -30,11 +30,11 @@ SeedValues = Dict[str, Value]
 
 
 class Config(ABC):
-  """Encapsulates config file loading and access, including encapsulation of support for
-  multiple config files.
+  """Encapsulates config file loading and access, including encapsulation of support for multiple
+  config files.
 
-  Supports variable substitution using old-style Python format strings. E.g.,
-  %(var_name)s will be replaced with the value of var_name.
+  Supports variable substitution using old-style Python format strings. E.g., %(var_name)s will be
+  replaced with the value of var_name.
   """
   DEFAULT_SECTION: ClassVar[str] = configparser.DEFAULTSECT
 
@@ -52,8 +52,9 @@ class Config(ABC):
     earlier ones.
 
     A handful of seed values will be set to act as if specified in the loaded config file's DEFAULT
-    section, and be available for use in substitutions.  The caller may override some of these
-    seed values."""
+    section, and be available for use in substitutions.  The caller may override some of these seed
+    values.
+    """
 
     @contextmanager
     def opener(file_content):
@@ -69,8 +70,9 @@ class Config(ABC):
     """Loads config from the given paths, with later paths taking precedence over earlier ones.
 
     A handful of seed values will be set to act as if specified in the loaded config file's DEFAULT
-    section, and be available for use in substitutions.  The caller may override some of these
-    seed values."""
+    section, and be available for use in substitutions.  The caller may override some of these seed
+    values.
+    """
 
     @contextmanager
     def opener(f):
@@ -115,7 +117,8 @@ class Config(ABC):
   def _determine_seed_values(*, seed_values: Optional[SeedValues] = None) -> Dict[str, str]:
     """We pre-populate several default values to allow %([key-name])s interpolation.
 
-    This sets up those defaults and checks if the user overrided any of the values."""
+    This sets up those defaults and checks if the user overrided any of the values.
+    """
     safe_seed_values = seed_values or {}
     buildroot = cast(str, safe_seed_values.get('buildroot', get_buildroot()))
 
@@ -194,8 +197,8 @@ class Config(ABC):
 class _ConfigValues(ABC):
   """Encapsulates resolving the actual config values specified by the user's config file.
 
-  Due to encapsulation, this allows us to support both TOML and INI config files without any of
-  the rest of the Pants codebase knowing whether the config came from TOML or INI.
+  Due to encapsulation, this allows us to support both TOML and INI config files without any of the
+  rest of the Pants codebase knowing whether the config came from TOML or INI.
   """
 
   @property
@@ -277,8 +280,8 @@ class _TomlValues(_ConfigValues):
     """Determine if the section is truly a defined section, meaning that the user explicitly wrote
     the section in their config file.
 
-    For example, the user may have explicitly defined `cache.java` but never defined `cache`. Due
-    to TOML's representation of the config as a nested dictionary, naively, it would appear that
+    For example, the user may have explicitly defined `cache.java` but never defined `cache`. Due to
+    TOML's representation of the config as a nested dictionary, naively, it would appear that
     `cache` was defined even though the user never explicitly added it to their config.
     """
     at_least_one_option_defined = any(
@@ -315,9 +318,8 @@ class _TomlValues(_ConfigValues):
   def _possibly_interpolate_value(
     self, raw_value: str, *, option: str, section: str, section_values: Dict,
   ) -> str:
-    """For any values with %(foo)s, substitute it with the corresponding value from
-    DEFAULT or the same section.
-    """
+    """For any values with %(foo)s, substitute it with the corresponding value from DEFAULT or the
+    same section."""
     def format_str(value: str) -> str:
       # Because dictionaries use the symbols `{}`, we must proactively escape the symbols so that
       # .format() does not try to improperly interpolate.
@@ -355,11 +357,11 @@ class _TomlValues(_ConfigValues):
     interpolate: bool = True,
     list_prefix: Optional[str] = None,
   ) -> str:
-    """For parity with configparser, we convert all values back to strings, which allows us to
-    avoid upstream changes to files like parser.py.
+    """For parity with configparser, we convert all values back to strings, which allows us to avoid
+    upstream changes to files like parser.py.
 
-    This is clunky. If we drop INI support, we should remove this and use native values (although
-    we must still support interpolation).
+    This is clunky. If we drop INI support, we should remove this and use native values (although we
+    must still support interpolation).
     """
     possibly_interpolate = partial(
       self._possibly_interpolate_value,
@@ -607,7 +609,6 @@ class TomlSerializer:
         },
       },
     }
-
   """
   parsed: Dict[str, Dict[str, Union[int, float, str, bool, List, Dict]]]
 

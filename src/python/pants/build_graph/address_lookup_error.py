@@ -4,7 +4,7 @@
 
 class AddressLookupError(Exception):
   """Raised by various modules when an address can't be resolved.  Use this common base class so
-   other modules can trap the error at each node along the path and construct a useful diagnostic.
+  other modules can trap the error at each node along the path and construct a useful diagnostic.
 
   :API: public
   """

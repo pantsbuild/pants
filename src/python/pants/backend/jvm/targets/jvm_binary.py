@@ -58,7 +58,7 @@ class Duplicate(JarRule):
   """A rule that indicates how duplicate entries should be handled when building a jar."""
 
   class Error(Exception):
-    """Raised by the ``FAIL`` action when a duplicate entry is encountered"""
+    """Raised by the ``FAIL`` action when a duplicate entry is encountered."""
 
     def __init__(self, path):
       """Creates a duplicate entry error for the given path.

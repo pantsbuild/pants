@@ -34,8 +34,8 @@ class SubsystemDependency(OptionableFactory):
   def options_scope(self):
     """The subscope for options of `subsystem_cls` scoped to `scope`.
 
-    This is the scope that option values are read from when initializing the instance
-    indicated by this dependency.
+    This is the scope that option values are read from when initializing the instance indicated by
+    this dependency.
     """
     if self.is_global():
       return self.subsystem_cls.options_scope

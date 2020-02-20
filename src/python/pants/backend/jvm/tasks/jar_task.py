@@ -469,8 +469,8 @@ class JarBuilderTask(JarTask):
     def commit_manifest(self, jar):
       """Updates the manifest in the jar being written to.
 
-      Typically done right before closing the .jar. This gives a chance for all targets to bundle
-      in their contributions to the manifest.
+      Typically done right before closing the .jar. This gives a chance for all targets to bundle in
+      their contributions to the manifest.
       """
       if not self._manifest.is_empty():
         jar.writestr(Manifest.PATH, self._manifest.contents())

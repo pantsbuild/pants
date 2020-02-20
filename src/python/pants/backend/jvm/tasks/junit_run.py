@@ -212,8 +212,8 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
   def execute_java_for_coverage(self, targets, *args, **kwargs):
     """Execute java for targets directly and don't use the test mixin.
 
-    This execution won't be wrapped with timeouts and other test mixin code common
-    across test targets. Used for coverage instrumentation.
+    This execution won't be wrapped with timeouts and other test mixin code common across test
+    targets. Used for coverage instrumentation.
     """
 
     distribution = self.preferred_jvm_distribution_for_targets(

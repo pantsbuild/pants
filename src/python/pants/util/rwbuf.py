@@ -8,8 +8,9 @@ from io import BytesIO
 class _RWBuf(object):
   """An unbounded read-write buffer.
 
-  Can be used as a file-like object for reading and writing.
-  Subclasses implement write functionality."""
+  Can be used as a file-like object for reading and writing. Subclasses implement write
+  functionality.
+  """
 
   def __init__(self, io):
     self._lock = threading.Lock()
@@ -50,7 +51,8 @@ class InMemoryRWBuf(_RWBuf):
   """An unbounded read-write buffer entirely in memory.
 
   Can be used as a file-like object for reading and writing. Note that it can't be used in
-  situations that require a real file (e.g., redirecting stdout/stderr of subprocess.Popen())."""
+  situations that require a real file (e.g., redirecting stdout/stderr of subprocess.Popen()).
+  """
 
   def __init__(self):
     super().__init__(BytesIO())
@@ -65,9 +67,10 @@ class InMemoryRWBuf(_RWBuf):
 class FileBackedRWBuf(_RWBuf):
   """An unbounded read-write buffer backed by a file.
 
-  Can be used as a file-like object for reading and writing the underlying file. Has a fileno,
-  so you can redirect stdout/stderr of subprocess.Popen() etc. to this object. This is useful
-  when you want to poll the output of long-running subprocesses in a separate thread."""
+  Can be used as a file-like object for reading and writing the underlying file. Has a fileno, so
+  you can redirect stdout/stderr of subprocess.Popen() etc. to this object. This is useful when you
+  want to poll the output of long-running subprocesses in a separate thread.
+  """
 
   def __init__(self, backing_file):
     _RWBuf.__init__(self, open(backing_file, 'a+b'))

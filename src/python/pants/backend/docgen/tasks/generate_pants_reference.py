@@ -17,8 +17,8 @@ from pants.util.dirutil import safe_open
 class GeneratePantsReference(Task):
   """Generate Pants reference documentation.
 
-  Specifically, generates two files: a build dictionary detailing all the directive that
-  can appear in BUILD files, and a reference listing all available goals and options.
+  Specifically, generates two files: a build dictionary detailing all the directive that can appear
+  in BUILD files, and a reference listing all available goals and options.
   """
 
   PANTS_REFERENCE_PRODUCT = 'pants_reference_page'

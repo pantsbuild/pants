@@ -24,7 +24,8 @@ from pants.util.socket import teardown_socket
 
 
 class PantsRunFailCheckerExiter(Exiter):
-  """Passed to pants runs triggered from this class, will raise an exception if the pants run failed."""
+  """Passed to pants runs triggered from this class, will raise an exception if the pants run
+  failed."""
 
   def exit(self, result: ExitCode = 0, *args, **kwargs):
     if result != 0:
@@ -87,9 +88,8 @@ class DaemonExiter(Exiter):
 
 
 class _PantsRunFinishedWithFailureException(Exception):
-  """
-  Allows representing a pants run that failed for legitimate reasons
-  (e.g. the target failed to compile).
+  """Allows representing a pants run that failed for legitimate reasons (e.g. the target failed to
+  compile).
 
   Will be raised by the exiter passed to LocalPantsRunner.
   """

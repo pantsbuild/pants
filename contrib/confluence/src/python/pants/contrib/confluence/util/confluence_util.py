@@ -40,6 +40,7 @@ class Confluence:
   @staticmethod
   def login(confluence_url, user=None, api_entrypoint='confluence2'):
     """Prompts the user to log in to confluence, and returns a Confluence object.
+
     :param confluence_url: Base url of wiki, e.g. https://confluence.atlassian.com/
     :param user: Username
     :param api_entrypoint: 'confluence1' or None results in Confluence 3.x. The default
@@ -70,18 +71,19 @@ class Confluence:
 
   @staticmethod
   def get_url(server_url, wiki_space, page_title):
-    """ return the url for a confluence page in a given space and with a given
-    title. """
+    """return the url for a confluence page in a given space and with a given title."""
     return f'{server_url}/display/{wiki_space}/{quote_plus(page_title)}'
 
   def logout(self):
     """Terminates the session and connection to the server.
+
     Upon completion, the invoking instance is no longer usable to communicate with confluence.
     """
     self._api_entrypoint.logout(self._session_token)
 
   def getpage(self, wiki_space, page_title):
-    """ Fetches a page object.
+    """Fetches a page object.
+
     Returns None if the page does not exist or otherwise could not be fetched.
     """
     try:
@@ -92,6 +94,7 @@ class Confluence:
 
   def storepage(self, page):
     """Stores a page object, updating the page if it already exists.
+
     returns the stored page, or None if the page could not be stored.
     """
     try:
@@ -103,6 +106,7 @@ class Confluence:
 
   def removepage(self, page):
     """Deletes a page from confluence.
+
     raises ConfluenceError if the page could not be removed.
     """
     try:
@@ -111,10 +115,11 @@ class Confluence:
       raise ConfluenceError(f'Failed to delete page: {e!r}')
 
   def create(self, space, title, content, parent_page=None, **pageoptions):
-    """ Create a new confluence page with the given title and content.  Additional page options
-    available in the xmlrpc api can be specified as kwargs.
-    returns the created page or None if the page could not be stored.
-    raises ConfluenceError if a parent page was specified but could not be found.
+    """Create a new confluence page with the given title and content.
+
+    Additional page options available in the xmlrpc api can be specified as kwargs. returns the
+    created page or None if the page could not be stored. raises ConfluenceError if a parent page
+    was specified but could not be found.
     """
 
     pagedef = dict(
@@ -150,7 +155,9 @@ class Confluence:
 
   def addattachment(self, page, filename):
     """Add an attachment to an existing page.
-    Note: this will first read the entire file into memory"""
+
+    Note: this will first read the entire file into memory
+    """
     mime_type = mimetypes.guess_type(filename, strict=False)[0]
     if not mime_type:
       raise ConfluenceError(f'Failed to detect MIME type of {filename}')

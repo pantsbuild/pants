@@ -57,9 +57,9 @@ class SubprocessProcessHandler(ProcessHandler):
     return self._process.poll()
 
   def communicate_teeing_stdout_and_stderr(self, stdin=None):
-    """
-    Just like subprocess.communicate, but tees stdout and stderr to both sys.std{out,err} and a
+    """Just like subprocess.communicate, but tees stdout and stderr to both sys.std{out,err} and a
     buffer. Only operates on stdout/stderr if the Popen call send them to subprocess.PIPE.
+
     :param stdin: A string to send to the stdin of the subprocess.
     :return: (stdout, stderr) as strings.
     """

@@ -183,8 +183,10 @@ class Jacoco(CoverageEngine):
 
   def _make_multiple_arg(self, arg_name, arg_list):
     """Jacoco cli allows the specification of multiple values for certain args by repeating the
-    argument with a new value. E.g. --classfiles a.class --classfiles b.class, etc. This method
-    creates a list of strings interleaved with the arg name to satisfy that format.
+    argument with a new value.
+
+    E.g. --classfiles a.class --classfiles b.class, etc. This method creates a list of strings
+    interleaved with the arg name to satisfy that format.
     """
     unique_args = list(set(arg_list))
 
