@@ -215,7 +215,7 @@ pub struct ExecuteProcessRequest {
   /// see https://github.com/pantsbuild/pants/issues/6416.
   ///
   pub jdk_home: Option<PathBuf>,
-  pub target_platform: PlatformConstraint, //TODO I don't think we need this attr here
+  pub target_platform: PlatformConstraint,
 
   pub is_nailgunnable: bool,
 }
