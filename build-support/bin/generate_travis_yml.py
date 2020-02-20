@@ -436,7 +436,7 @@ def lint(python_version: PythonVersion) -> Dict:
     **linux_shard(python_version=python_version, install_travis_wait=True),
     "name": f"Self-checks and lint (Python {python_version.decimal})",
     "script": [
-      "travis-wait-enhanced --timeout 40m --interval 9m ./build-support/bin/ci.py "
+      "travis-wait-enhanced --timeout 40m --interval 9m -- ./build-support/bin/ci.py "
       "--remote-execution-enabled --githooks --sanity-checks --doc-gen --lint "
       f"--python-version {python_version.decimal}"
     ]
