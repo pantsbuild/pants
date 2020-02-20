@@ -7,9 +7,9 @@ from functools import total_ordering
 from pants.base.exceptions import TaskError
 from pants.base.revision import Revision
 from pants.java.distribution.distribution import DistributionLocator
+from pants.option.option_util import flatten_shlexed_list
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
-from pants.option.option_util import flatten_shlexed_list
 
 
 logger = logging.getLogger(__name__)
