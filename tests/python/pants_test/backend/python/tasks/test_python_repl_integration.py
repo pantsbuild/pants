@@ -31,9 +31,8 @@ class PythonReplIntegrationTest(PantsRunIntegrationTest):
 
   @ensure_daemon
   def test_run_repl_with_3(self):
-    # Run a Python 3 repl on a Python 2/3 library target. Avoid some known-to-choke-on interpreters.
+    # Run a Python 3 repl on a Python 2/3 library target.
     command = ['repl',
-               '--python-setup-interpreter-constraints=["CPython>=3.3"]',
                'testprojects/src/python/interpreter_selection:echo_interpreter_version_lib',
                '--quiet']
     program = 'from interpreter_selection.echo_interpreter_version import say_hello; say_hello()'
