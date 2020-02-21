@@ -39,10 +39,11 @@ class DownloadedPexBin(HermeticPex):
     name = 'pex'
     default_version = 'v2.1.4'
 
+    # Note: You can compute the digest and size using:
+    # curl -L $URL | tee >(wc -c) >(shasum -a 256) >/dev/null
     default_versions_and_digests = {
       PlatformConstraint.none: ToolForPlatform(
-        digest=Digest('6c5ae1f6b9aa40c97bd26a154849044b49f4d698a6abb9ac58ce006bda9cbd4a',
-                      2614246),
+        digest=Digest('6c5ae1f6b9aa40c97bd26a154849044b49f4d698a6abb9ac58ce006bda9cbd4a', 2614246),
         version=ToolVersion('v2.1.4'),
       ),
     }
