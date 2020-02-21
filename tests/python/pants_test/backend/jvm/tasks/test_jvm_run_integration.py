@@ -12,7 +12,7 @@ class JvmRunIntegrationTest(PantsRunIntegrationTest):
         :param args: list of arguments to append to the command
         :return: stdout as a string on success, raises an Exception on error
         """
-        command = ["run", target] + list(args)
+        command = ["run", target, *args]
         pants_run = self.run_pants(command)
         self.assert_success(pants_run)
         return pants_run.stdout_data
