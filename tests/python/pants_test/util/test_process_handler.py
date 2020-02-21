@@ -3,6 +3,7 @@
 
 import subprocess
 import unittest
+from textwrap import dedent
 
 from pants.util.process_handler import SubprocessProcessHandler
 
@@ -44,14 +45,20 @@ class TestSubprocessProcessHandler(unittest.TestCase):
         self.assertEqual(
             process_handler.communicate_teeing_stdout_and_stderr(),
             (
-                b"""1out
-                2out
-                3out
-                """,
-                b"""1err
-                2err
-                3err
-                """,
+                dedent(
+                    """\
+                    1out
+                    2out
+                    3out
+                    """
+                ).encode(),
+                dedent(
+                    """\
+                    1err
+                    2err
+                    3err
+                    """
+                ).encode(),
             ),
         )
         # Sadly, this test doesn't test that sys.std{out,err} also receive the output.

@@ -204,7 +204,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
                         File LOCATION-INFO, in nested_raise
                           fn_raises(x)
                         File LOCATION-INFO, in fn_raises
-                          raise Exception(f'An exception for {{type(x).__name__}}')
+                          raise Exception(f"An exception for {{type(x).__name__}}")
                       Exception: An exception for B
                 """
             ).lstrip()

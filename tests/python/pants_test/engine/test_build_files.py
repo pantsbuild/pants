@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-import re
 import unittest
 from typing import Tuple, Type, cast
 
@@ -123,10 +122,7 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
         address_family = AddressFamily("root", {"a": ("root/BUILD", TargetAdaptor())})
         address_specs = AddressSpecs([SingleAddress("root", "b"), SingleAddress("root", "a")])
 
-        expected_rx_str = re.escape(
-            """"b" was not found in namespace "root". Did you mean one of:
-            :a"""
-        )
+        expected_rx_str = r'"b" was not found in namespace "root". Did you mean one of:\n\s+:a'
         with self.assertRaisesRegex(ResolveError, expected_rx_str):
             self._resolve_addresses(
                 address_specs, address_family, self._snapshot(), self._address_mapper()
