@@ -500,14 +500,14 @@ def lint(python_version: PythonVersion) -> Dict:
         "name": f"Self-checks and lint (Python {python_version.decimal})",
         "script": [
             (
-                "travis-wait-enhanced --timeout 60m --interval 9m -- ./build-support/bin/ci.py "
+                "travis-wait-enhanced --timeout 50m --interval 9m -- ./build-support/bin/ci.py "
                 f"--githooks --sanity-checks --doc-gen --python-version {python_version.decimal}"
             ),
             # NB: We split up `--lint` into its own shard because it uses remote execution. The
             # RBE token expires after 60 minutes, so we don't want to generate the token until all
             # local execution has finished.
             (
-                "travis-wait-enhanced --timeout 25m --interval 9m -- ./build-support/bin/ci.py "
+                "travis-wait-enhanced --timeout 40m --interval 9m -- ./build-support/bin/ci.py "
                 f"--remote-execution-enabled --lint --python-version {python_version.decimal}"
             ),
         ],

@@ -19,12 +19,7 @@ class PropertiesTest(unittest.TestCase):
         self.assertLoaded("", {})
         self.assertLoaded(" ", {})
         self.assertLoaded("\t", {})
-        self.assertLoaded(
-            """
-
-    """,
-            {},
-        )
+        self.assertLoaded("\n", {})
 
     def test_comments(self):
         self.assertLoaded(

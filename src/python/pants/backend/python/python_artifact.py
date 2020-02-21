@@ -20,7 +20,7 @@ class PythonArtifact(PayloadField):
         """
         :param kwargs: Passed to `setuptools.setup
           <https://pythonhosted.org/setuptools/setuptools.html>`_.
-       """
+        """
         self._kw = kwargs
         self._binaries = {}
 
