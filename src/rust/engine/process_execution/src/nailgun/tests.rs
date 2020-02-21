@@ -1,5 +1,5 @@
 use crate::nailgun::{CommandRunner, ARGS_TO_START_NAILGUN, NAILGUN_MAIN_CLASS};
-use crate::{ExecuteProcessRequest, ExecuteProcessRequestMetadata, Platform};
+use crate::{ExecuteProcessRequest, ExecuteProcessRequestMetadata, PlatformConstraint};
 use hashing::EMPTY_DIGEST;
 use std::fs::read_link;
 use std::os::unix::fs::symlink;
@@ -43,7 +43,7 @@ fn mock_nailgunnable_request(jdk_home: Option<PathBuf>) -> ExecuteProcessRequest
     description: "".to_string(),
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
     jdk_home: jdk_home,
-    target_platform: Platform::Darwin,
+    target_platform: PlatformConstraint::Darwin,
     is_nailgunnable: true,
   }
 }
@@ -88,7 +88,7 @@ fn creating_nailgun_server_request_updates_the_cli() {
     &NAILGUN_MAIN_CLASS.to_string(),
     Vec::new(),
     PathBuf::from(""),
-    Platform::None,
+    PlatformConstraint::None,
   );
   assert_eq!(req.argv[0], NAILGUN_MAIN_CLASS);
   assert_eq!(req.argv[1..], ARGS_TO_START_NAILGUN);

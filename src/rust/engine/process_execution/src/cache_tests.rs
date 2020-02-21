@@ -1,6 +1,6 @@
 use crate::{
   CommandRunner as CommandRunnerTrait, Context, ExecuteProcessRequest,
-  ExecuteProcessRequestMetadata, FallibleExecuteProcessResult, Platform,
+  ExecuteProcessRequestMetadata, FallibleExecuteProcessResult, PlatformConstraint,
 };
 use hashing::EMPTY_DIGEST;
 use sharded_lmdb::ShardedLmdb;
@@ -58,7 +58,7 @@ fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
       hashing::EMPTY_DIGEST,
     jdk_home: None,
-    target_platform: Platform::None,
+    target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
   };
 

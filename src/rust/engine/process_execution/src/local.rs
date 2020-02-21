@@ -23,7 +23,7 @@ use tokio_process::CommandExt;
 
 use crate::{
   Context, ExecuteProcessRequest, FallibleExecuteProcessResult, MultiPlatformExecuteProcessRequest,
-  Platform,
+  PlatformConstraint,
 };
 
 use bytes::{Bytes, BytesMut};
@@ -35,7 +35,7 @@ pub struct CommandRunner {
   executor: task_executor::Executor,
   work_dir_base: PathBuf,
   cleanup_local_dirs: bool,
-  platform: Platform,
+  platform_constraint: PlatformConstraint,
 }
 
 impl CommandRunner {
@@ -50,7 +50,7 @@ impl CommandRunner {
       executor,
       work_dir_base,
       cleanup_local_dirs,
-      platform: Platform::current_platform().unwrap(),
+      platform_constraint: PlatformConstraint::current_platform_constraint().unwrap(),
     }
   }
 
@@ -215,9 +215,12 @@ impl super::CommandRunner for CommandRunner {
     req: &MultiPlatformExecuteProcessRequest,
   ) -> Option<ExecuteProcessRequest> {
     for compatible_constraint in vec![
-      &(Platform::None, Platform::None),
-      &(self.platform, Platform::None),
-      &(self.platform, Platform::current_platform().unwrap()),
+      &(PlatformConstraint::None, PlatformConstraint::None),
+      &(self.platform_constraint, PlatformConstraint::None),
+      &(
+        self.platform_constraint,
+        PlatformConstraint::current_platform_constraint().unwrap(),
+      ),
     ]
     .iter()
     {

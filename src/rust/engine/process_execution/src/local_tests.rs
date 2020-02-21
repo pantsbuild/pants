@@ -3,7 +3,7 @@ use testutil;
 
 use crate::{
   CommandRunner as CommandRunnerTrait, Context, ExecuteProcessRequest,
-  FallibleExecuteProcessResult, Platform, RelativePath,
+  FallibleExecuteProcessResult, PlatformConstraint, RelativePath,
 };
 use hashing::EMPTY_DIGEST;
 use spectral::{assert_that, string::StrAssertions};
@@ -31,7 +31,7 @@ fn stdout() {
     description: "echo foo".to_string(),
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
     jdk_home: None,
-    target_platform: Platform::None,
+    target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
   });
 
@@ -61,7 +61,7 @@ fn stdout_and_stderr_and_exit_code() {
     description: "echo foo and fail".to_string(),
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
     jdk_home: None,
-    target_platform: Platform::None,
+    target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
   });
 
@@ -92,7 +92,7 @@ fn capture_exit_code_signal() {
     description: "kill self".to_string(),
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
     jdk_home: None,
-    target_platform: Platform::None,
+    target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
   });
 
@@ -126,7 +126,7 @@ fn env() {
     description: "run env".to_string(),
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
     jdk_home: None,
-    target_platform: Platform::None,
+    target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
   });
 
@@ -166,7 +166,7 @@ fn env_is_deterministic() {
       description: "run env".to_string(),
       unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
       jdk_home: None,
-      target_platform: Platform::None,
+      target_platform: PlatformConstraint::None,
       is_nailgunnable: false,
     }
   }
@@ -190,7 +190,7 @@ fn binary_not_found() {
     description: "echo foo".to_string(),
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
     jdk_home: None,
-    target_platform: Platform::None,
+    target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
   })
   .expect_err("Want Err");
@@ -209,7 +209,7 @@ fn output_files_none() {
     description: "bash".to_string(),
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
     jdk_home: None,
-    target_platform: Platform::None,
+    target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
   });
   assert_eq!(
@@ -241,7 +241,7 @@ fn output_files_one() {
     description: "bash".to_string(),
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
     jdk_home: None,
-    target_platform: Platform::None,
+    target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
   });
 
@@ -279,7 +279,7 @@ fn output_dirs() {
     description: "bash".to_string(),
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
     jdk_home: None,
-    target_platform: Platform::None,
+    target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
   });
 
@@ -318,7 +318,7 @@ fn output_files_many() {
     description: "treats-roland".to_string(),
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
     jdk_home: None,
-    target_platform: Platform::None,
+    target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
   });
 
@@ -355,7 +355,7 @@ fn output_files_execution_failure() {
     description: "echo foo".to_string(),
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
     jdk_home: None,
-    target_platform: Platform::None,
+    target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
   });
 
@@ -390,7 +390,7 @@ fn output_files_partial_output() {
     description: "echo-roland".to_string(),
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
     jdk_home: None,
-    target_platform: Platform::None,
+    target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
   });
 
@@ -423,7 +423,7 @@ fn output_overlapping_file_and_dir() {
     description: "bash".to_string(),
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
     jdk_home: None,
-    target_platform: Platform::None,
+    target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
   });
 
@@ -456,7 +456,7 @@ fn jdk_symlink() {
     description: "cat roland".to_string(),
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
     jdk_home: Some(preserved_work_tmpdir.path().to_path_buf()),
-    target_platform: Platform::None,
+    target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
   });
   assert_eq!(
@@ -492,7 +492,7 @@ fn test_directory_preservation() {
       description: "bash".to_string(),
       unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
       jdk_home: None,
-      target_platform: Platform::None,
+      target_platform: PlatformConstraint::None,
       is_nailgunnable: false,
     },
     preserved_work_root.clone(),
@@ -533,7 +533,7 @@ fn test_directory_preservation_error() {
       description: "failing execution".to_string(),
       unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
       jdk_home: None,
-      target_platform: Platform::None,
+      target_platform: PlatformConstraint::None,
       is_nailgunnable: false,
     },
     preserved_work_root.clone(),
@@ -571,7 +571,7 @@ fn all_containing_directories_for_outputs_are_created() {
     description: "create nonoverlapping directories and file".to_string(),
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
     jdk_home: None,
-    target_platform: Platform::None,
+    target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
   });
 
@@ -604,7 +604,7 @@ fn output_empty_dir() {
     description: "bash".to_string(),
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
     jdk_home: None,
-    target_platform: Platform::None,
+    target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
   });
 
@@ -652,7 +652,7 @@ fn local_only_scratch_files_materialized() {
       unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
         roland_directory_digest,
       jdk_home: None,
-      target_platform: Platform::None,
+      target_platform: PlatformConstraint::None,
       is_nailgunnable: false,
     },
     work_dir.path().to_owned(),
@@ -690,7 +690,7 @@ fn timeout() {
     description: "sleepy-cat".to_string(),
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
     jdk_home: None,
-    target_platform: Platform::None,
+    target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
   })
   .unwrap();
@@ -732,7 +732,7 @@ fn working_directory() {
       description: "confused-cat".to_string(),
       unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
       jdk_home: None,
-      target_platform: Platform::None,
+      target_platform: PlatformConstraint::None,
       is_nailgunnable: false,
     },
     work_dir.path().to_owned(),

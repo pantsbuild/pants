@@ -32,7 +32,7 @@ use process_execution;
 
 use clap::{value_t, App, AppSettings, Arg};
 use hashing::{Digest, Fingerprint};
-use process_execution::{Context, ExecuteProcessRequestMetadata, Platform, RelativePath};
+use process_execution::{Context, ExecuteProcessRequestMetadata, PlatformConstraint, RelativePath};
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryFrom;
 use std::iter::{FromIterator, Iterator};
@@ -337,8 +337,10 @@ fn main() {
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
       hashing::EMPTY_DIGEST,
     jdk_home: args.value_of("jdk").map(PathBuf::from),
-    target_platform: Platform::try_from(&args.value_of("target-platform").unwrap().to_string())
-      .expect("invalid value for `target-platform"),
+    target_platform: PlatformConstraint::try_from(
+      &args.value_of("target-platform").unwrap().to_string(),
+    )
+    .expect("invalid value for `target-platform"),
     is_nailgunnable,
   };
 
@@ -369,7 +371,7 @@ fn main() {
           oauth_bearer_token,
           headers,
           store.clone(),
-          Platform::Linux,
+          PlatformConstraint::Linux,
           executor,
           std::time::Duration::from_secs(160),
           std::time::Duration::from_millis(500),

@@ -2,7 +2,7 @@ use crate::remote_tests::echo_foo_request;
 use crate::speculate::SpeculatingCommandRunner;
 use crate::{
   CommandRunner, Context, ExecuteProcessRequest, FallibleExecuteProcessResult,
-  MultiPlatformExecuteProcessRequest, Platform,
+  MultiPlatformExecuteProcessRequest, PlatformConstraint,
 };
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
@@ -234,7 +234,7 @@ impl CommandRunner for DelayedCommandRunner {
       Some(
         req
           .0
-          .get(&(Platform::None, Platform::None))
+          .get(&(PlatformConstraint::None, PlatformConstraint::None))
           .unwrap()
           .clone(),
       )
