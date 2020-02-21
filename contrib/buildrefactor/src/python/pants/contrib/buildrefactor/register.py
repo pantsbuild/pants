@@ -8,5 +8,5 @@ from pants.contrib.buildrefactor.meta_rename import MetaRename
 
 
 def register_goals():
-  task(name='buildozer', action=Buildozer).install('buildozer')
-  task(name='meta-rename', action=MetaRename).install('meta-rename')
+    task(name="buildozer", action=Buildozer).install("buildozer")
+    task(name="meta-rename", action=MetaRename).install("meta-rename")

@@ -353,6 +353,9 @@ matrix:
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
+    - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
+      | tar -zxvf - travis-wait-enhanced
+    - mv travis-wait-enhanced /home/travis/bin/
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
       ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -378,8 +381,10 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --githooks --sanity-checks --doc-gen --lint --python-version
-      3.6
+    - travis-wait-enhanced --timeout 60m --interval 9m -- ./build-support/bin/ci.py
+      --githooks --sanity-checks --doc-gen --python-version 3.6
+    - travis-wait-enhanced --timeout 25m --interval 9m -- ./build-support/bin/ci.py
+      --remote-execution-enabled --lint --python-version 3.6
     stage: Test Pants
     sudo: required
   - addons:
@@ -410,6 +415,9 @@ matrix:
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
+    - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
+      | tar -zxvf - travis-wait-enhanced
+    - mv travis-wait-enhanced /home/travis/bin/
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
       ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -436,8 +444,10 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --githooks --sanity-checks --doc-gen --lint --python-version
-      3.7
+    - travis-wait-enhanced --timeout 60m --interval 9m -- ./build-support/bin/ci.py
+      --githooks --sanity-checks --doc-gen --python-version 3.7
+    - travis-wait-enhanced --timeout 25m --interval 9m -- ./build-support/bin/ci.py
+      --remote-execution-enabled --lint --python-version 3.7
     stage: Test Pants (Cron)
     sudo: required
   - before_cache:

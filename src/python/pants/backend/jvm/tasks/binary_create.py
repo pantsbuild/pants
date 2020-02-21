@@ -9,28 +9,28 @@ from pants.util.dirutil import safe_mkdir
 
 
 class BinaryCreate(JvmBinaryTask):
-  """Creates a runnable monolithic binary deploy jar."""
+    """Creates a runnable monolithic binary deploy jar."""
 
-  def __init__(self, *args, **kwargs):
-    super().__init__(*args, **kwargs)
-    self._outdir = self.get_options().pants_distdir
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._outdir = self.get_options().pants_distdir
 
-  @classmethod
-  def product_types(cls):
-    return ['jvm_binaries']
+    @classmethod
+    def product_types(cls):
+        return ["jvm_binaries"]
 
-  def execute(self):
-    # TODO (peiyu) switch to `target.id` based naming to avoid potential `basename`
-    # conflicts among binary targets.
-    for binary in self.context.targets(self.is_binary):
-      self.create_binary(binary)
+    def execute(self):
+        # TODO (peiyu) switch to `target.id` based naming to avoid potential `basename`
+        # conflicts among binary targets.
+        for binary in self.context.targets(self.is_binary):
+            self.create_binary(binary)
 
-  def create_binary(self, binary):
-    safe_mkdir(self._outdir)
-    binary_jarname = f'{binary.basename}.jar'
-    binary_jarpath = os.path.join(self._outdir, binary_jarname)
-    self.context.log.info(f'creating {os.path.relpath(binary_jarpath, get_buildroot())}')
-    self.context.products.get('jvm_binaries').add(binary, self._outdir).append(binary_jarname)
+    def create_binary(self, binary):
+        safe_mkdir(self._outdir)
+        binary_jarname = f"{binary.basename}.jar"
+        binary_jarpath = os.path.join(self._outdir, binary_jarname)
+        self.context.log.info(f"creating {os.path.relpath(binary_jarpath, get_buildroot())}")
+        self.context.products.get("jvm_binaries").add(binary, self._outdir).append(binary_jarname)
 
-    with self.monolithic_jar(binary, binary_jarpath) as jar:
-      self.add_main_manifest_entry(jar, binary)
+        with self.monolithic_jar(binary, binary_jarpath) as jar:
+            self.add_main_manifest_entry(jar, binary)

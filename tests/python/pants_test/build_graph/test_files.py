@@ -7,18 +7,18 @@ from pants.testutil.test_base import TestBase
 
 
 class FilesTest(TestBase):
-  @staticmethod
-  def sources(rel_path, *globs):
-    return Globs.create_fileset_with_spec(rel_path, *globs)
+    @staticmethod
+    def sources(rel_path, *globs):
+        return Globs.create_fileset_with_spec(rel_path, *globs)
 
-  def test_has_sources(self):
-    self.create_files('files', ['a.txt', 'B.java'])
+    def test_has_sources(self):
+        self.create_files("files", ["a.txt", "B.java"])
 
-    no_files = self.make_target('files:none', Files, sources=self.sources('files', '*.rs'))
-    self.assertFalse(no_files.has_sources())
-    self.assertFalse(no_files.has_sources('.java'))
+        no_files = self.make_target("files:none", Files, sources=self.sources("files", "*.rs"))
+        self.assertFalse(no_files.has_sources())
+        self.assertFalse(no_files.has_sources(".java"))
 
-    files = self.make_target('files:some', Files, sources=self.sources('files', '*.java'))
-    self.assertTrue(files.has_sources())
-    self.assertEqual(['files/B.java'], files.sources_relative_to_buildroot())
-    self.assertFalse(files.has_sources('.java'))
+        files = self.make_target("files:some", Files, sources=self.sources("files", "*.java"))
+        self.assertTrue(files.has_sources())
+        self.assertEqual(["files/B.java"], files.sources_relative_to_buildroot())
+        self.assertFalse(files.has_sources(".java"))

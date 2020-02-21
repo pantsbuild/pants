@@ -7,16 +7,21 @@ from pants.subsystem.subsystem import Subsystem
 
 class Scalastyle(Subsystem):
 
-  options_scope = 'scalastyle'
+    options_scope = "scalastyle"
 
-  @classmethod
-  def register_options(cls, register):
-    super().register_options(register)
-    register(
-      '--config', type=file_option, default=None, fingerprint=True,
-      help="Path to `scalastyle_config.xml` or alternative an Scalastyle config file."
-    )
-    register(
-      '--skip', type=bool, default=False,
-      help="Don't use Scalastyle when running `./pants lint`."
-    )
+    @classmethod
+    def register_options(cls, register):
+        super().register_options(register)
+        register(
+            "--config",
+            type=file_option,
+            default=None,
+            fingerprint=True,
+            help="Path to `scalastyle_config.xml` or alternative an Scalastyle config file.",
+        )
+        register(
+            "--skip",
+            type=bool,
+            default=False,
+            help="Don't use Scalastyle when running `./pants lint`.",
+        )

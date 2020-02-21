@@ -6,6 +6,6 @@ from checksum import checksum
 
 # TODO: validate the checksum's value itself?
 def test_dist_version():
-  assert checksum is not None
-  assert isinstance(checksum, str)
-  assert len(checksum) == 64
+    assert checksum is not None
+    assert isinstance(checksum, str)
+    assert len(checksum) == 64

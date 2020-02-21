@@ -7,4 +7,4 @@ from pants.contrib.confluence.tasks.confluence_publish import ConfluencePublish
 
 
 def register_goals():
-  task(name='confluence', action=ConfluencePublish).install()
+    task(name="confluence", action=ConfluencePublish).install()

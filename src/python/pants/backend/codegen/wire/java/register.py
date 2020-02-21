@@ -8,12 +8,8 @@ from pants.goal.task_registrar import TaskRegistrar as task
 
 
 def build_file_aliases():
-  return BuildFileAliases(
-    targets={
-      'java_wire_library': JavaWireLibrary,
-    }
-  )
+    return BuildFileAliases(targets={"java_wire_library": JavaWireLibrary,})
 
 
 def register_goals():
-  task(name='wire', action=WireGen).install('gen')
+    task(name="wire", action=WireGen).install("gen")

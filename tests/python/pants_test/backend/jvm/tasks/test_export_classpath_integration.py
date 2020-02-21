@@ -10,33 +10,45 @@ from pants.util.contextutil import open_zip
 
 
 class ExportClasspathIntegrationTest(PantsRunIntegrationTest):
-  def test_export_manifest_jar(self):
-    ctimes = []
-    manifest_jar_path = "dist/export-classpath/manifest.jar"
-    for _ in range(2):
-      pants_run = self.run_pants(["export-classpath",
-                                  "--manifest-jar-only",
-                                  "examples/src/java/org/pantsbuild/example/hello/simple"])
-      self.assert_success(pants_run)
-      self.assertTrue(os.path.exists(manifest_jar_path))
-      (mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime) = os.stat(manifest_jar_path)
-      ctimes.append(ctime)
-      # ctime is only accurate to second.
-      time.sleep(1)
+    def test_export_manifest_jar(self):
+        ctimes = []
+        manifest_jar_path = "dist/export-classpath/manifest.jar"
+        for _ in range(2):
+            pants_run = self.run_pants(
+                [
+                    "export-classpath",
+                    "--manifest-jar-only",
+                    "examples/src/java/org/pantsbuild/example/hello/simple",
+                ]
+            )
+            self.assert_success(pants_run)
+            self.assertTrue(os.path.exists(manifest_jar_path))
+            (mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime) = os.stat(
+                manifest_jar_path
+            )
+            ctimes.append(ctime)
+            # ctime is only accurate to second.
+            time.sleep(1)
 
-    self.assertTrue(ctimes[1] > ctimes[0], f"{manifest_jar_path} is not overwritten.")
+        self.assertTrue(ctimes[1] > ctimes[0], f"{manifest_jar_path} is not overwritten.")
 
-  def test_export_classpath_file_with_excludes(self):
-    manifest_jar_path = "dist/export-classpath/manifest.jar"
-    pants_run = self.run_pants(["export-classpath",
-      "--manifest-jar-only",
-      "testprojects/src/java/org/pantsbuild/testproject/exclude:foo"])
-    self.assert_success(pants_run)
-    self.assertTrue(os.path.exists(manifest_jar_path))
+    def test_export_classpath_file_with_excludes(self):
+        manifest_jar_path = "dist/export-classpath/manifest.jar"
+        pants_run = self.run_pants(
+            [
+                "export-classpath",
+                "--manifest-jar-only",
+                "testprojects/src/java/org/pantsbuild/testproject/exclude:foo",
+            ]
+        )
+        self.assert_success(pants_run)
+        self.assertTrue(os.path.exists(manifest_jar_path))
 
-    with open_zip(manifest_jar_path) as synthetic_jar:
-      self.assertListEqual([Manifest.PATH], synthetic_jar.namelist())
-      oneline_classpath = synthetic_jar.read(Manifest.PATH).decode().replace('\n', '').replace(' ', '')
-      self.assertNotIn('sbt-interface', oneline_classpath)
-      self.assertIn('foo', oneline_classpath)
-      self.assertIn('baz', oneline_classpath)
+        with open_zip(manifest_jar_path) as synthetic_jar:
+            self.assertListEqual([Manifest.PATH], synthetic_jar.namelist())
+            oneline_classpath = (
+                synthetic_jar.read(Manifest.PATH).decode().replace("\n", "").replace(" ", "")
+            )
+            self.assertNotIn("sbt-interface", oneline_classpath)
+            self.assertIn("foo", oneline_classpath)
+            self.assertIn("baz", oneline_classpath)

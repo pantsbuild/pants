@@ -7,7 +7,7 @@ from pants.backend.python.lint.pylint import rules as pylint_rules
 
 
 def rules():
-  return (
-    *pylint_rules.rules(),
-    *python_lint_target.rules(),
-  )
+    return (
+        *pylint_rules.rules(),
+        *python_lint_target.rules(),
+    )

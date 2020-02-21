@@ -7,5 +7,5 @@ from pants.contrib.awslambda.python.examples.hello_lib import say_hello
 
 
 def handler(event, context):
-  usa = pycountry.countries.get(alpha_2='US').name
-  say_hello('from the {}'.format(usa))
+    usa = pycountry.countries.get(alpha_2="US").name
+    say_hello("from the {}".format(usa))

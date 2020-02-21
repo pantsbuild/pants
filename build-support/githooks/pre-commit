@@ -52,8 +52,8 @@ echo "* Checking shell scripts via our custom linter"
 # When travis builds a tag, it does so in a shallow clone without master fetched, which
 # fails in pants changed.
 if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
-  echo "* Checking imports"
-  ./pants --changed-parent="${MERGE_BASE}" lint2 || die "To fix import sort order, run \`./pants fmt2 ::\`"
+  echo "* Checking formatting of Python files"
+  ./pants --changed-parent="${MERGE_BASE}" lint2 || die "To fix formatting, run \`./pants fmt2 ::\`"
 
   # TODO(CMLivingston) Make lint use `-q` option again after addressing proper workunit labeling:
   # https://github.com/pantsbuild/pants/issues/6633
@@ -66,7 +66,7 @@ if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
   ./build-support/bin/mypy.py || exit 1
 
   if git diff "${MERGE_BASE}" --name-only | grep '\.rs$' > /dev/null; then
-    echo "* Checking formatting of rust files"
+    echo "* Checking formatting of Rust files"
     ./build-support/bin/check_rust_formatting.sh || exit 1
     # Clippy happens on a different Travis CI shard because of separate caching concerns.
     # The TRAVIS env var is documented here:
@@ -75,7 +75,7 @@ if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
       echo "* Running cargo clippy"
       ./build-support/bin/check_clippy.sh || exit 1
     fi
-    echo "* Checking rust target headers"
+    echo "* Checking Rust target headers"
     build-support/bin/check_rust_target_headers.sh || exit 1
   fi
 

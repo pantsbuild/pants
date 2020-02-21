@@ -8,5 +8,5 @@ from pants.contrib.python.checks.tasks.python_eval import PythonEval
 
 
 def register_goals():
-  task(name='python-eval', action=PythonEval).install('lint')
-  task(name='pythonstyle', action=Checkstyle).install('lint')
+    task(name="python-eval", action=PythonEval).install("lint")
+    task(name="pythonstyle", action=Checkstyle).install("lint")

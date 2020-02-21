@@ -9,23 +9,23 @@ from pants.util.objects import SubclassesOf
 
 class CppCompile(NativeCompile):
 
-  options_scope = 'cpp-compile'
+    options_scope = "cpp-compile"
 
-  # Compile only C++ library targets.
-  source_target_constraint = SubclassesOf(CppLibrary)
+    # Compile only C++ library targets.
+    source_target_constraint = SubclassesOf(CppLibrary)
 
-  workunit_label = 'cpp-compile'
+    workunit_label = "cpp-compile"
 
-  @classmethod
-  def implementation_version(cls):
-    return super().implementation_version() + [('CppCompile', 0)]
+    @classmethod
+    def implementation_version(cls):
+        return super().implementation_version() + [("CppCompile", 0)]
 
-  @classmethod
-  def subsystem_dependencies(cls):
-    return super().subsystem_dependencies() + (CppCompileSettings.scoped(cls),)
+    @classmethod
+    def subsystem_dependencies(cls):
+        return super().subsystem_dependencies() + (CppCompileSettings.scoped(cls),)
 
-  def get_compile_settings(self):
-    return CppCompileSettings.scoped_instance(self)
+    def get_compile_settings(self):
+        return CppCompileSettings.scoped_instance(self)
 
-  def get_compiler(self, native_library_target):
-    return self.get_cpp_toolchain_variant(native_library_target).cpp_compiler
+    def get_compiler(self, native_library_target):
+        return self.get_cpp_toolchain_variant(native_library_target).cpp_compiler

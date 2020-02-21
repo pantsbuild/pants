@@ -16,27 +16,28 @@ from pants.rules.core.distdir import DistDir
 
 
 class AWSLambdaError(Exception):
-  pass
+    pass
 
 
 @dataclass(frozen=True)
 class CreatedAWSLambda:
-  digest: Digest
-  name: str
+    digest: Digest
+    name: str
 
 
 @union
 class AWSLambdaTarget:
-  pass
+    pass
 
 
 class AWSLambdaOptions(LineOriented, GoalSubsystem):
-  """Generate an AWS Lambda."""
-  name = "awslambda"
+    """Generate an AWS Lambda."""
+
+    name = "awslambda"
 
 
 class AWSLambdaGoal(Goal):
-  subsystem_cls = AWSLambdaOptions
+    subsystem_cls = AWSLambdaOptions
 
 
 @goal_rule
@@ -45,27 +46,29 @@ async def create_awslambda(
     console: Console,
     options: AWSLambdaOptions,
     distdir: DistDir,
-    workspace: Workspace) -> AWSLambdaGoal:
-  with options.line_oriented(console) as print_stdout:
-    print_stdout(f"Generating AWS lambdas in `./{distdir.relpath}`")
-    awslambdas = await MultiGet(Get[CreatedAWSLambda](Address, address)
-                                for address in addresses)
-    merged_digest = await Get[Digest](
-      DirectoriesToMerge(tuple(awslambda.digest for awslambda in awslambdas))
-    )
-    result = workspace.materialize_directory(
-      DirectoryToMaterialize(merged_digest, path_prefix=str(distdir.relpath))
-    )
-    for path in result.output_paths:
-      print_stdout(f"Wrote {path}")
-  return AWSLambdaGoal(exit_code=0)
+    workspace: Workspace,
+) -> AWSLambdaGoal:
+    with options.line_oriented(console) as print_stdout:
+        print_stdout(f"Generating AWS lambdas in `./{distdir.relpath}`")
+        awslambdas = await MultiGet(
+            Get[CreatedAWSLambda](Address, address) for address in addresses
+        )
+        merged_digest = await Get[Digest](
+            DirectoriesToMerge(tuple(awslambda.digest for awslambda in awslambdas))
+        )
+        result = workspace.materialize_directory(
+            DirectoryToMaterialize(merged_digest, path_prefix=str(distdir.relpath))
+        )
+        for path in result.output_paths:
+            print_stdout(f"Wrote {path}")
+    return AWSLambdaGoal(exit_code=0)
 
 
 @rule
 async def coordinator_of_lambdas(target: HydratedTarget) -> CreatedAWSLambda:
-  awslambda = await Get[CreatedAWSLambda](AWSLambdaTarget, target.adaptor)
-  return awslambda
+    awslambda = await Get[CreatedAWSLambda](AWSLambdaTarget, target.adaptor)
+    return awslambda
 
 
 def rules():
-  return [create_awslambda, coordinator_of_lambdas]
+    return [create_awslambda, coordinator_of_lambdas]

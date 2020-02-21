@@ -7,10 +7,10 @@ from pants.contrib.errorprone.tasks.errorprone import ErrorProne
 
 
 class ErrorProneTest(NailgunTaskTestBase):
-  @classmethod
-  def task_type(cls):
-    return ErrorProne
+    @classmethod
+    def task_type(cls):
+        return ErrorProne
 
-  def test_no_sources(self):
-    task = self.prepare_execute(self.context())
-    self.assertEqual(None, task.execute())
+    def test_no_sources(self):
+        task = self.prepare_execute(self.context())
+        self.assertEqual(None, task.execute())

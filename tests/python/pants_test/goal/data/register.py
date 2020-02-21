@@ -7,18 +7,18 @@ from pants.goal.task_registrar import TaskRegistrar as task
 
 
 def register_goals():
-  task(name='run-dummy-workunit', action=TestWorkUnitTask).install()
+    task(name="run-dummy-workunit", action=TestWorkUnitTask).install()
 
 
 class TestWorkUnitTask(NailgunTask):
-  @classmethod
-  def register_options(cls, register):
-    super().register_options(register)
-    register('--success', default=False, type=bool)
+    @classmethod
+    def register_options(cls, register):
+        super().register_options(register)
+        register("--success", default=False, type=bool)
 
-  def execute(self):
-    result = WorkUnit.SUCCESS if self.get_options().success else WorkUnit.FAILURE
+    def execute(self):
+        result = WorkUnit.SUCCESS if self.get_options().success else WorkUnit.FAILURE
 
-    # This creates workunit and marks it as failure.
-    with self.context.new_workunit('dummy') as workunit:
-      workunit.set_outcome(result)
+        # This creates workunit and marks it as failure.
+        with self.context.new_workunit("dummy") as workunit:
+            workunit.set_outcome(result)

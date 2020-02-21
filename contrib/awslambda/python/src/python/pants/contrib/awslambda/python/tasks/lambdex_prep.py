@@ -7,9 +7,9 @@ from pants.contrib.awslambda.python.subsystems.lambdex import Lambdex
 
 
 class LambdexInstance(PythonToolInstance):
-  pass
+    pass
 
 
 class LambdexPrep(PythonToolPrepBase):
-  tool_subsystem_cls = Lambdex
-  tool_instance_cls = LambdexInstance
+    tool_subsystem_cls = Lambdex
+    tool_instance_cls = LambdexInstance

@@ -7,7 +7,7 @@ from pants.backend.python.lint.flake8 import rules as flake8_rules
 
 
 def rules():
-  return (
-    *flake8_rules.rules(),
-    *python_lint_target.rules(),
-  )
+    return (
+        *flake8_rules.rules(),
+        *python_lint_target.rules(),
+    )
