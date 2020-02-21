@@ -34,7 +34,7 @@ def main() -> None:
         if args.sanity_checks:
             run_sanity_checks()
         if args.lint:
-            run_lint()
+            run_lint(oauth_token_path=remote_execution_oauth_token_path)
         if args.doc_gen:
             run_doc_gen_tests()
         if args.clippy:
@@ -235,10 +235,7 @@ class TestStrategy(Enum):
             self.v2_local: ["./pants.pex", "--no-v1", "--v2", "test", *sorted(targets)],
             self.v2_remote: [
                 "./pants.pex",
-                "--no-v1",
-                "--v2",
-                "--pants-config-files=pants.remote.toml",
-                f"--remote-oauth-bearer-token-path={oauth_token_path}",
+                *_use_remote_execution(oauth_token_path or ""),
                 "test",
                 *sorted(targets),
             ],
@@ -353,6 +350,15 @@ def check_pants_pex_exists() -> None:
 PYTEST_PASSTHRU_ARGS = ["--", "-q", "-rfa"]
 
 
+def _use_remote_execution(oauth_token_path: str) -> List[str]:
+    return [
+        "--no-v1",
+        "--v2",
+        "--pants-config-files=pants.remote.toml",
+        f"--remote-oauth-bearer-token-path={oauth_token_path}",
+    ]
+
+
 def _run_command(
     command: List[str],
     *,
@@ -407,12 +413,25 @@ def run_sanity_checks() -> None:
             run_check(check)
 
 
-def run_lint() -> None:
+def run_lint(*, oauth_token_path: Optional[str] = None) -> None:
     targets = ["contrib::", "examples::", "src::", "tests::", "zinc::"]
+    command_prefix = ["./pants.pex", "--tag=-nolint"]
+
+    v2_command = (
+        [*command_prefix, "lint2", *targets]
+        if oauth_token_path is None
+        else [*command_prefix, *_use_remote_execution(oauth_token_path), "lint2", *targets]
+    )
     _run_command(
-        ["./pants.pex", "--tag=-nolint", "lint", "lint2", *targets],
-        slug="Lint",
-        start_message="Running lint checks",
+        v2_command,
+        slug="Lint (V2)",
+        start_message="Running V2 lint checks",
+        die_message="Lint check failure.",
+    )
+    _run_command(
+        [*command_prefix, "lint", *targets],
+        slug="Lint (V1)",
+        start_message="Running V1 lint checks",
         die_message="Lint check failure.",
     )
 
