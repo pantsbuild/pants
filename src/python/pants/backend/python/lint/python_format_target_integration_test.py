@@ -1,7 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import List
+from typing import List, Optional
 
 from pants.backend.python.lint.black.rules import BlackTarget
 from pants.backend.python.lint.black.rules import rules as black_rules
@@ -36,7 +36,9 @@ class PythonFormatTargetIntegrationTest(TestBase):
             RootRule(IsortTarget),
         )
 
-    def run_black_and_isort(self, source_files: List[FileContent],) -> AggregatedFmtResults:
+    def run_black_and_isort(
+        self, source_files: List[FileContent], *, extra_args: Optional[List[str]] = None
+    ) -> AggregatedFmtResults:
         input_snapshot = self.request_single_product(Snapshot, InputFilesContent(source_files))
         adaptor = TargetAdaptor(
             sources=EagerFilesetWithSpec("test", {"globs": []}, snapshot=input_snapshot),
@@ -44,16 +46,12 @@ class PythonFormatTargetIntegrationTest(TestBase):
         )
         origin = SingleAddress(directory="test", name="target")
         target = _ConcretePythonFormatTarget(TargetAdaptorWithOrigin(adaptor, origin))
+        args = [
+            "--backend-packages2=['pants.backend.python.lint.black', 'pants.backend.python.lint.isort']",
+            *(extra_args or []),
+        ]
         results = self.request_single_product(
-            AggregatedFmtResults,
-            Params(
-                target,
-                create_options_bootstrapper(
-                    args=[
-                        "--backend-packages2=['pants.backend.python.lint.black', 'pants.backend.python.lint.isort']"
-                    ],
-                ),
-            ),
+            AggregatedFmtResults, Params(target, create_options_bootstrapper(args=args)),
         )
         return results
 
@@ -81,3 +79,14 @@ class PythonFormatTargetIntegrationTest(TestBase):
         ]
         results = self.run_black_and_isort(original_sources)
         assert results.combined_digest == self.get_digest(fixed_sources)
+
+    def test_skipped_formatter(self) -> None:
+        """Ensure that a skipped formatter does not interfere with other formatters."""
+        original_source = FileContent(
+            "test/target.py", content=b"from animals import dog, cat\n\nprint('hello')\n",
+        )
+        fixed_source = FileContent(
+            "test/target.py", content=b"from animals import cat, dog\n\nprint('hello')\n",
+        )
+        results = self.run_black_and_isort([original_source], extra_args=["--black-skip"])
+        assert results.combined_digest == self.get_digest([fixed_source])
