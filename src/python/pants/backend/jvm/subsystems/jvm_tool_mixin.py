@@ -11,216 +11,244 @@ from pants.option.custom_types import target_option
 
 
 class JvmToolMixin:
-  """A mixin for registering and accessing JVM-based tools.
+    """A mixin for registering and accessing JVM-based tools.
 
-  Must be mixed in to something that can register and use options, e.g., a Task or a Subsystem.
+    Must be mixed in to something that can register and use options, e.g., a Task or a Subsystem.
 
-  :API: public
-  """
-  class InvalidToolClasspath(TaskError):
-    """Indicates an invalid jvm tool classpath."""
+    :API: public
+    """
 
-  class JvmTool(namedtuple('JvmTool', ['scope', 'key', 'classpath', 'main', 'custom_rules'])):
-    """Represents a jvm tool classpath request."""
+    class InvalidToolClasspath(TaskError):
+        """Indicates an invalid jvm tool classpath."""
 
-    def dep_spec(self, options):
-      """Returns the target address spec that points to this JVM tool's classpath dependencies.
+    class JvmTool(namedtuple("JvmTool", ["scope", "key", "classpath", "main", "custom_rules"])):
+        """Represents a jvm tool classpath request."""
 
-      :rtype: string
-      """
-      option = self.key.replace('-', '_')
-      dep_spec = options.for_scope(self.scope)[option]
-      if dep_spec.startswith('['):
-        raise ValueError(dedent("""\
+        def dep_spec(self, options):
+            """Returns the target address spec that points to this JVM tool's classpath
+            dependencies.
+
+            :rtype: string
+            """
+            option = self.key.replace("-", "_")
+            dep_spec = options.for_scope(self.scope)[option]
+            if dep_spec.startswith("["):
+                raise ValueError(
+                    dedent(
+                        """\
           JVM tool configuration now expects a single target address, use the
           following in pants.ini:
 
           [{scope}]
           {key}: //tool/classpath:address
-          """.format(scope=self.scope, key=self.key)))
-      return dep_spec
+          """.format(
+                            scope=self.scope, key=self.key
+                        )
+                    )
+                )
+            return dep_spec
 
-    def is_default(self, options):
-      """Return `True` if this option was not set by the user.
+        def is_default(self, options):
+            """Return `True` if this option was not set by the user.
 
-      :rtype: bool
-      """
-      return options.for_scope(self.scope).is_default(self.key.replace('-', '_'))
+            :rtype: bool
+            """
+            return options.for_scope(self.scope).is_default(self.key.replace("-", "_"))
 
-  _jvm_tools: List[JvmTool] = []
+    _jvm_tools: List[JvmTool] = []
 
-  @classmethod
-  def subsystem_dependencies(cls):
-    return super().subsystem_dependencies() + (DistributionLocator,)
+    @classmethod
+    def subsystem_dependencies(cls):
+        return super().subsystem_dependencies() + (DistributionLocator,)
 
-  @classmethod
-  def get_jvm_options_default(cls, bootstrap_option_values):
-    """Subclasses may override to provide different defaults for their JVM options.
+    @classmethod
+    def get_jvm_options_default(cls, bootstrap_option_values):
+        """Subclasses may override to provide different defaults for their JVM options.
 
-    :param bootstrap_option_values: The values of the "bootstrap options" (e.g., pants_workdir).
-                                    Implementations can use these when generating the default.
-                                    See src/python/pants/options/options_bootstrapper.py for
-                                    details.
-    """
-    return ['-Xmx256m']
+        :param bootstrap_option_values: The values of the "bootstrap options" (e.g., pants_workdir).
+                                        Implementations can use these when generating the default.
+                                        See src/python/pants/options/options_bootstrapper.py for
+                                        details.
+        """
+        return ["-Xmx256m"]
 
-  @classmethod
-  def register_options(cls, register):
-    super().register_options(register)
-    register('--jvm-options', type=list,  advanced=True, metavar='<option>...',
-             default=cls.get_jvm_options_default(register.bootstrap),
-             help='Run with these JVM options.')
+    @classmethod
+    def register_options(cls, register):
+        super().register_options(register)
+        register(
+            "--jvm-options",
+            type=list,
+            advanced=True,
+            metavar="<option>...",
+            default=cls.get_jvm_options_default(register.bootstrap),
+            help="Run with these JVM options.",
+        )
 
-  @classmethod
-  def register_jvm_tool(cls,
-                        register,
-                        key,
-                        classpath_spec=None,
-                        main=None,
-                        custom_rules=None,
-                        fingerprint=True,
-                        classpath=None,
-                        help=None,
-                        removal_version=None,
-                        removal_hint=None):
-    """Registers a jvm tool under `key` for lazy classpath resolution.
+    @classmethod
+    def register_jvm_tool(
+        cls,
+        register,
+        key,
+        classpath_spec=None,
+        main=None,
+        custom_rules=None,
+        fingerprint=True,
+        classpath=None,
+        help=None,
+        removal_version=None,
+        removal_hint=None,
+    ):
+        """Registers a jvm tool under `key` for lazy classpath resolution.
 
-    Classpaths can be retrieved in `execute` scope via `tool_classpath_from_products`.
+        Classpaths can be retrieved in `execute` scope via `tool_classpath_from_products`.
 
-    NB: If the tool's `main` class name is supplied the tool classpath will be shaded.
+        NB: If the tool's `main` class name is supplied the tool classpath will be shaded.
 
-    :param register: A function that can register options with the option system.
-    :param unicode key: The key the tool configuration should be registered under.
-    :param unicode classpath_spec: The tool classpath target address spec that can be used to
-                                   override this tool's classpath; by default, `//:[key]`.
-    :param unicode main: The fully qualified class name of the tool's main class if shading of the
-                         tool classpath is desired.
-    :param list custom_rules: An optional list of `Shader.Rule`s to apply before the automatically
-                              generated binary jar shading rules.  This is useful for excluding
-                              classes shared between the tool and the code it runs over.  The
-                              canonical example is the `org.junit.Test` annotation read by junit
-                              runner tools from user code. In this sort of case the shared code must
-                              have a uniform name between the tool and the user code and so the
-                              shared code must be excluded from shading.
-    :param bool fingerprint: Indicates whether to include the jvm tool in the task's fingerprint.
-                             Note that unlike for other options, fingerprinting is enabled for tools
-                             by default.
-    :param list classpath: A list of one or more `JarDependency` objects that form this tool's
-                           default classpath.  If the classpath is optional, supply an empty list;
-                           otherwise the default classpath of `None` indicates the `classpath_spec`
-                           must point to a target defined in a BUILD file that provides the tool
-                           classpath.
-    :param unicode help: An optional custom help string; otherwise a reasonable one is generated.
-    :param string removal_version: A semver at which this tool will be removed.
-    :param unicode removal_hint: A hint on how to migrate away from this tool.
-    """
-    def formulate_help():
-      if classpath:
-        return ('Target address spec for overriding the classpath of the {} jvm tool which is, '
-                'by default: {}'.format(key, classpath))
-      else:
-        return f'Target address spec for specifying the classpath of the {key} jvm tool.'
-    help = help or formulate_help()
+        :param register: A function that can register options with the option system.
+        :param unicode key: The key the tool configuration should be registered under.
+        :param unicode classpath_spec: The tool classpath target address spec that can be used to
+                                       override this tool's classpath; by default, `//:[key]`.
+        :param unicode main: The fully qualified class name of the tool's main class if shading of the
+                             tool classpath is desired.
+        :param list custom_rules: An optional list of `Shader.Rule`s to apply before the automatically
+                                  generated binary jar shading rules.  This is useful for excluding
+                                  classes shared between the tool and the code it runs over.  The
+                                  canonical example is the `org.junit.Test` annotation read by junit
+                                  runner tools from user code. In this sort of case the shared code must
+                                  have a uniform name between the tool and the user code and so the
+                                  shared code must be excluded from shading.
+        :param bool fingerprint: Indicates whether to include the jvm tool in the task's fingerprint.
+                                 Note that unlike for other options, fingerprinting is enabled for tools
+                                 by default.
+        :param list classpath: A list of one or more `JarDependency` objects that form this tool's
+                               default classpath.  If the classpath is optional, supply an empty list;
+                               otherwise the default classpath of `None` indicates the `classpath_spec`
+                               must point to a target defined in a BUILD file that provides the tool
+                               classpath.
+        :param unicode help: An optional custom help string; otherwise a reasonable one is generated.
+        :param string removal_version: A semver at which this tool will be removed.
+        :param unicode removal_hint: A hint on how to migrate away from this tool.
+        """
 
-    register(f'--{key}',
-             advanced=True,
-             type=target_option,
-             default=f'//:{key}' if classpath_spec is None else classpath_spec,
-             help=help,
-             fingerprint=fingerprint,
-             removal_version=removal_version,
-             removal_hint=removal_hint)
+        def formulate_help():
+            if classpath:
+                return (
+                    "Target address spec for overriding the classpath of the {} jvm tool which is, "
+                    "by default: {}".format(key, classpath)
+                )
+            else:
+                return f"Target address spec for specifying the classpath of the {key} jvm tool."
 
-    # TODO(John Sirois): Move towards requiring tool specs point to jvm_binary targets.
-    # These already have a main and are a natural place to house any custom shading rules.  That
-    # would eliminate the need to pass main and custom_rules here.
-    # It is awkward that jars can no longer be inlined as dependencies - this will require 2 targets
-    # for every tool - the jvm_binary, and a jar_library for its dependencies to point to.  It may
-    # be worth creating a JarLibrary subclass - say JarBinary, or else mixing in a Binary interface
-    # to JarLibrary to endow it with main and shade_rules attributes to allow for single-target
-    # definition of resolvable jvm binaries.
-    jvm_tool = cls.JvmTool(register.scope, key, classpath, main, custom_rules)
-    JvmToolMixin._jvm_tools.append(jvm_tool)
+        help = help or formulate_help()
 
-  @classmethod
-  def prepare_tools(cls, round_manager):
-    """Subclasses must call this method to ensure jvm tool products are available."""
-    round_manager.require_data('jvm_build_tools_classpath_callbacks')
+        register(
+            f"--{key}",
+            advanced=True,
+            type=target_option,
+            default=f"//:{key}" if classpath_spec is None else classpath_spec,
+            help=help,
+            fingerprint=fingerprint,
+            removal_version=removal_version,
+            removal_hint=removal_hint,
+        )
 
-  @staticmethod
-  def get_registered_tools() -> List["JvmTool"]:
-    """Returns all registered jvm tools."""
-    return JvmToolMixin._jvm_tools
+        # TODO(John Sirois): Move towards requiring tool specs point to jvm_binary targets.
+        # These already have a main and are a natural place to house any custom shading rules.  That
+        # would eliminate the need to pass main and custom_rules here.
+        # It is awkward that jars can no longer be inlined as dependencies - this will require 2 targets
+        # for every tool - the jvm_binary, and a jar_library for its dependencies to point to.  It may
+        # be worth creating a JarLibrary subclass - say JarBinary, or else mixing in a Binary interface
+        # to JarLibrary to endow it with main and shade_rules attributes to allow for single-target
+        # definition of resolvable jvm binaries.
+        jvm_tool = cls.JvmTool(register.scope, key, classpath, main, custom_rules)
+        JvmToolMixin._jvm_tools.append(jvm_tool)
 
-  @staticmethod
-  def reset_registered_tools() -> None:
-    """Needed only for test isolation."""
-    JvmToolMixin._jvm_tools = []
+    @classmethod
+    def prepare_tools(cls, round_manager):
+        """Subclasses must call this method to ensure jvm tool products are available."""
+        round_manager.require_data("jvm_build_tools_classpath_callbacks")
 
-  def set_distribution(self, minimum_version=None, maximum_version=None, jdk=False):
-    try:
-      self._dist = DistributionLocator.cached(minimum_version=minimum_version,
-                                              maximum_version=maximum_version, jdk=jdk)
-    except DistributionLocator.Error as e:
-      raise TaskError(e)
+    @staticmethod
+    def get_registered_tools() -> List["JvmTool"]:
+        """Returns all registered jvm tools."""
+        return JvmToolMixin._jvm_tools
 
-  @property
-  def dist(self):
-    if getattr(self, '_dist', None) is None:
-      # Use default until told otherwise.
-      self.set_distribution()
-    return self._dist
+    @staticmethod
+    def reset_registered_tools() -> None:
+        """Needed only for test isolation."""
+        JvmToolMixin._jvm_tools = []
 
-  @classmethod
-  def tool_jar_from_products(cls, products, key, scope):
-    """Get the jar for the tool previously registered under key in the given scope.
+    def set_distribution(self, minimum_version=None, maximum_version=None, jdk=False):
+        try:
+            self._dist = DistributionLocator.cached(
+                minimum_version=minimum_version, maximum_version=maximum_version, jdk=jdk
+            )
+        except DistributionLocator.Error as e:
+            raise TaskError(e)
 
-    See tool_jar_entry_from_products.
-    """
-    return cls.tool_jar_entry_from_products(products, key, scope).path
+    @property
+    def dist(self):
+        if getattr(self, "_dist", None) is None:
+            # Use default until told otherwise.
+            self.set_distribution()
+        return self._dist
 
-  @classmethod
-  def tool_jar_entry_from_products(cls, products, key, scope):
-    """Get a ClasspathEntry for the jar for the tool previously registered under key in the given
-    scope.
+    @classmethod
+    def tool_jar_from_products(cls, products, key, scope):
+        """Get the jar for the tool previously registered under key in the given scope.
 
-    :param products: The products of the current pants run.
-    :type products: :class:`pants.goal.products.Products`
-    :param string key: The key the tool configuration was registered under.
-    :param string scope: The scope the tool configuration was registered under.
-    :returns: A single jar path.
-    :rtype: string
-    :raises: `JvmToolMixin.InvalidToolClasspath` when the tool classpath is not composed of exactly
-             one jar.
-    """
-    classpath = cls.tool_classpath_entries_from_products(products, key, scope)
-    if len(classpath) != 1:
-      params = dict(tool=key, scope=scope, count=len(classpath), classpath='\n\t'.join(classpath))
-      raise cls.InvalidToolClasspath('Expected tool {tool} in scope {scope} to resolve to one '
-                                     'jar, instead found {count}:\n\t{classpath}'.format(**params))
-    return classpath[0]
+        See tool_jar_entry_from_products.
+        """
+        return cls.tool_jar_entry_from_products(products, key, scope).path
 
-  @classmethod
-  def tool_classpath_from_products(cls, products, key, scope):
-    """Get a classpath of paths for the tool previously registered under key in the given scope.
+    @classmethod
+    def tool_jar_entry_from_products(cls, products, key, scope):
+        """Get a ClasspathEntry for the jar for the tool previously registered under key in the
+        given scope.
 
-    See tool_classpath_entries_from_products.
-    """
-    return [entry.path for entry in cls.tool_classpath_entries_from_products(products, key, scope)]
+        :param products: The products of the current pants run.
+        :type products: :class:`pants.goal.products.Products`
+        :param string key: The key the tool configuration was registered under.
+        :param string scope: The scope the tool configuration was registered under.
+        :returns: A single jar path.
+        :rtype: string
+        :raises: `JvmToolMixin.InvalidToolClasspath` when the tool classpath is not composed of exactly
+                 one jar.
+        """
+        classpath = cls.tool_classpath_entries_from_products(products, key, scope)
+        if len(classpath) != 1:
+            params = dict(
+                tool=key, scope=scope, count=len(classpath), classpath="\n\t".join(classpath)
+            )
+            raise cls.InvalidToolClasspath(
+                "Expected tool {tool} in scope {scope} to resolve to one "
+                "jar, instead found {count}:\n\t{classpath}".format(**params)
+            )
+        return classpath[0]
 
-  @staticmethod
-  def tool_classpath_entries_from_products(products, key, scope):
-    """Get ClasspathEntries for the tool previously registered under key in the given scope.
+    @classmethod
+    def tool_classpath_from_products(cls, products, key, scope):
+        """Get a classpath of paths for the tool previously registered under key in the given scope.
 
-    :param products: The products of the current pants run.
-    :type products: :class:`pants.goal.products.Products`
-    :param string key: The key the tool configuration was registered under.
-    :param string scope: The scope the tool configuration was registered under.
-    :returns: A list of paths.
-    :rtype: list
-    """
-    callback_product_map = products.get_data('jvm_build_tools_classpath_callbacks') or {}
-    callback = callback_product_map.get(scope, {}).get(key)
-    if not callback:
-      raise TaskError(f'No bootstrap callback registered for {key} in {scope}')
-    return callback()
+        See tool_classpath_entries_from_products.
+        """
+        return [
+            entry.path for entry in cls.tool_classpath_entries_from_products(products, key, scope)
+        ]
+
+    @staticmethod
+    def tool_classpath_entries_from_products(products, key, scope):
+        """Get ClasspathEntries for the tool previously registered under key in the given scope.
+
+        :param products: The products of the current pants run.
+        :type products: :class:`pants.goal.products.Products`
+        :param string key: The key the tool configuration was registered under.
+        :param string scope: The scope the tool configuration was registered under.
+        :returns: A list of paths.
+        :rtype: list
+        """
+        callback_product_map = products.get_data("jvm_build_tools_classpath_callbacks") or {}
+        callback = callback_product_map.get(scope, {}).get(key)
+        if not callback:
+            raise TaskError(f"No bootstrap callback registered for {key} in {scope}")
+        return callback()

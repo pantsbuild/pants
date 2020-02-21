@@ -7,12 +7,10 @@ from pants.backend.python.targets.python_tests import PythonTests
 
 
 class PantsTestutilTests:
+    def __init__(self, parse_context):
+        self._parse_context = parse_context
+        self._pants_test_util = PantsTestutilSubsystem.global_instance()
 
-  def __init__(self, parse_context):
-    self._parse_context = parse_context
-    self._pants_test_util = PantsTestutilSubsystem.global_instance()
-
-  def __call__(self, dependencies=[], **kwargs):
-    dependencies.extend(self._pants_test_util.dependent_target_addrs())
-    self._parse_context.create_object(
-      PythonTests.alias(), dependencies=dependencies, **kwargs)
+    def __call__(self, dependencies=[], **kwargs):
+        dependencies.extend(self._pants_test_util.dependent_target_addrs())
+        self._parse_context.create_object(PythonTests.alias(), dependencies=dependencies, **kwargs)

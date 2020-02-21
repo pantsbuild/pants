@@ -10,190 +10,218 @@ from pants.util.contextutil import temporary_dir
 
 class IvyResolveIntegrationTest(PantsRunIntegrationTest):
 
-  # Override parent method so we can inject resolver config since there is also
-  # the option to select coursier as the resolver, so we want to be explicit.
-  def run_pants(self, command, config=None, stdin_data=None, extra_env=None, **kwargs):
-    config = config or {}
-    config.update(
-      {'resolver': {'resolver': 'ivy'}}
-    )
-    return super().run_pants(
-      command,
-      config,
-      stdin_data,
-      extra_env,
-      **kwargs
-    )
+    # Override parent method so we can inject resolver config since there is also
+    # the option to select coursier as the resolver, so we want to be explicit.
+    def run_pants(self, command, config=None, stdin_data=None, extra_env=None, **kwargs):
+        config = config or {}
+        config.update({"resolver": {"resolver": "ivy"}})
+        return super().run_pants(command, config, stdin_data, extra_env, **kwargs)
 
-  # Override parent method so we can inject resolver config since there is also
-  # the option to select coursier as the resolver, so we want to be explicit.
-  def run_pants_with_workdir(self, command, workdir, config=None, stdin_data=None, extra_env=None,
-                             build_root=None, tee_output=False, **kwargs):
+    # Override parent method so we can inject resolver config since there is also
+    # the option to select coursier as the resolver, so we want to be explicit.
+    def run_pants_with_workdir(
+        self,
+        command,
+        workdir,
+        config=None,
+        stdin_data=None,
+        extra_env=None,
+        build_root=None,
+        tee_output=False,
+        **kwargs,
+    ):
 
-    config = config or {}
-    config.update(
-      {'resolver': {'resolver': 'ivy'}}
-    )
-    return super().run_pants_with_workdir(
-      command,
-      workdir,
-      config,
-      stdin_data=stdin_data,
-      extra_env=extra_env,
-      build_root=build_root,
-      tee_output=tee_output,
-      **kwargs
-    )
+        config = config or {}
+        config.update({"resolver": {"resolver": "ivy"}})
+        return super().run_pants_with_workdir(
+            command,
+            workdir,
+            config,
+            stdin_data=stdin_data,
+            extra_env=extra_env,
+            build_root=build_root,
+            tee_output=tee_output,
+            **kwargs,
+        )
 
-  def test_java_compile_with_ivy_report(self):
-    # Ensure the ivy report file gets generated
-    with self.temporary_workdir() as workdir:
-      ivy_report_dir = f'{workdir}/ivy-report'
-      pants_run = self.run_pants_with_workdir([
-          'compile',
-          'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
-          '--resolve-ivy-report',
-          f'--resolve-ivy-outdir={ivy_report_dir}'],
-          workdir)
-      self.assert_success(pants_run)
+    def test_java_compile_with_ivy_report(self):
+        # Ensure the ivy report file gets generated
+        with self.temporary_workdir() as workdir:
+            ivy_report_dir = f"{workdir}/ivy-report"
+            pants_run = self.run_pants_with_workdir(
+                [
+                    "compile",
+                    "testprojects/src/java/org/pantsbuild/testproject/unicode/main",
+                    "--resolve-ivy-report",
+                    f"--resolve-ivy-outdir={ivy_report_dir}",
+                ],
+                workdir,
+            )
+            self.assert_success(pants_run)
 
-      # Find the ivy report.
-      html_report_file, listdir = self._find_html_report(ivy_report_dir)
-      self.assertIsNotNone(html_report_file,
-                      msg="Couldn't find ivy report in {report_dir} containing files {listdir}"
-                      .format(report_dir=ivy_report_dir, listdir=listdir))
-      with open(os.path.join(ivy_report_dir, html_report_file), 'r') as file:
-        self.assertIn('info.cukes', file.read())
+            # Find the ivy report.
+            html_report_file, listdir = self._find_html_report(ivy_report_dir)
+            self.assertIsNotNone(
+                html_report_file,
+                msg="Couldn't find ivy report in {report_dir} containing files {listdir}".format(
+                    report_dir=ivy_report_dir, listdir=listdir
+                ),
+            )
+            with open(os.path.join(ivy_report_dir, html_report_file), "r") as file:
+                self.assertIn("info.cukes", file.read())
 
-  def test_ivy_args(self):
-    pants_run = self.run_pants([
-        'resolve',
-        '--resolve-ivy-args=-blablabla',
-        'examples/src/scala/org/pantsbuild/example/hello::'
-    ])
-    self.assert_failure(pants_run)
-    self.assertIn('Unrecognized option: -blablabla', pants_run.stdout_data)
+    def test_ivy_args(self):
+        pants_run = self.run_pants(
+            [
+                "resolve",
+                "--resolve-ivy-args=-blablabla",
+                "examples/src/scala/org/pantsbuild/example/hello::",
+            ]
+        )
+        self.assert_failure(pants_run)
+        self.assertIn("Unrecognized option: -blablabla", pants_run.stdout_data)
 
-  def test_ivy_confs_success(self):
-    pants_run = self.run_pants([
-        'resolve',
-        '--resolve-ivy-confs=default',
-        '--resolve-ivy-confs=sources',
-        '--resolve-ivy-confs=javadoc',
-        '3rdparty:junit'
-    ])
-    self.assert_success(pants_run)
+    def test_ivy_confs_success(self):
+        pants_run = self.run_pants(
+            [
+                "resolve",
+                "--resolve-ivy-confs=default",
+                "--resolve-ivy-confs=sources",
+                "--resolve-ivy-confs=javadoc",
+                "3rdparty:junit",
+            ]
+        )
+        self.assert_success(pants_run)
 
-  def test_ivy_confs_failure(self):
-    pants_run = self.run_pants([
-        'resolve',
-        '--resolve-ivy-confs=parampampam',
-        '3rdparty:junit'
-    ])
-    self.assert_failure(pants_run)
+    def test_ivy_confs_failure(self):
+        pants_run = self.run_pants(["resolve", "--resolve-ivy-confs=parampampam", "3rdparty:junit"])
+        self.assert_failure(pants_run)
 
-  def test_ivy_confs_ini_failure(self):
-    pants_ini_config = {'resolve.ivy': {'confs': 'parampampam'}}
-    pants_run = self.run_pants([
-        'resolve',
-        '3rdparty:junit'
-    ], config=pants_ini_config)
-    self.assert_failure(pants_run)
+    def test_ivy_confs_ini_failure(self):
+        pants_ini_config = {"resolve.ivy": {"confs": "parampampam"}}
+        pants_run = self.run_pants(["resolve", "3rdparty:junit"], config=pants_ini_config)
+        self.assert_failure(pants_run)
 
-  def test_ivy_bimodal_resolve_caching(self):
-    # This test covers the case where a successful ivy resolve will drop a generic representation
-    # and cache it. Then, after a clean-all invalidates the workdir, the next run will do a fetch
-    # using the version information from the previous, rather than doing a resolve.
+    def test_ivy_bimodal_resolve_caching(self):
+        # This test covers the case where a successful ivy resolve will drop a generic representation
+        # and cache it. Then, after a clean-all invalidates the workdir, the next run will do a fetch
+        # using the version information from the previous, rather than doing a resolve.
 
-    with self.temporary_workdir() as workdir, temporary_dir() as cache_dir:
-      config = {'cache': {'write_to': [cache_dir],'read_from': [cache_dir]}}
+        with self.temporary_workdir() as workdir, temporary_dir() as cache_dir:
+            config = {"cache": {"write_to": [cache_dir], "read_from": [cache_dir]}}
 
-      def run_pants(command):
-        return self.run_pants_with_workdir(command, workdir, config=config)
+            def run_pants(command):
+                return self.run_pants_with_workdir(command, workdir, config=config)
 
-      first_export_result = run_pants(['export', '3rdparty:junit'])
+            first_export_result = run_pants(["export", "3rdparty:junit"])
 
-      resolve_workdir = self._find_resolve_workdir(workdir)
-      # The first run did a ran ivy in resolve mode, so it doesn't have a fetch-ivy.xml.
-      self.assertNotIn('fetch-ivy.xml', os.listdir(resolve_workdir))
+            resolve_workdir = self._find_resolve_workdir(workdir)
+            # The first run did a ran ivy in resolve mode, so it doesn't have a fetch-ivy.xml.
+            self.assertNotIn("fetch-ivy.xml", os.listdir(resolve_workdir))
 
-      run_pants(['clean-all'])
+            run_pants(["clean-all"])
 
-      run_pants(['export', '3rdparty:junit'])
-      second_export_result = run_pants(['export', '3rdparty:junit'])
+            run_pants(["export", "3rdparty:junit"])
+            second_export_result = run_pants(["export", "3rdparty:junit"])
 
-      # Using the fetch pattern should result in the same export information.
-      self.assertEqual(first_export_result.stdout_data, second_export_result.stdout_data)
+            # Using the fetch pattern should result in the same export information.
+            self.assertEqual(first_export_result.stdout_data, second_export_result.stdout_data)
 
-      # The second run uses the cached resolution information from the first resolve, and
-      # generates a fetch ivy.xml.
-      self.assertIn('fetch-ivy.xml', os.listdir(resolve_workdir))
+            # The second run uses the cached resolution information from the first resolve, and
+            # generates a fetch ivy.xml.
+            self.assertIn("fetch-ivy.xml", os.listdir(resolve_workdir))
 
-  def test_generates_no_report_if_no_resolve_performed(self):
-    with temporary_dir() as ivy_report_dir:
-      run = self.run_pants(['resolve', 'src/java/org/pantsbuild/junit/annotations', '--resolve-ivy-report',
-                             f'--resolve-ivy-outdir={ivy_report_dir}'])
-      self.assert_success(run)
+    def test_generates_no_report_if_no_resolve_performed(self):
+        with temporary_dir() as ivy_report_dir:
+            run = self.run_pants(
+                [
+                    "resolve",
+                    "src/java/org/pantsbuild/junit/annotations",
+                    "--resolve-ivy-report",
+                    f"--resolve-ivy-outdir={ivy_report_dir}",
+                ]
+            )
+            self.assert_success(run)
 
-      html_report_file, listdir = self._find_html_report(ivy_report_dir)
-      self.assertIsNone(html_report_file,
-                        msg="Expected no report file since no resolve was run.")
-      self.assertIn('Not generating a report.', run.stdout_data)
+            html_report_file, listdir = self._find_html_report(ivy_report_dir)
+            self.assertIsNone(
+                html_report_file, msg="Expected no report file since no resolve was run."
+            )
+            self.assertIn("Not generating a report.", run.stdout_data)
 
-  def test_generating_report_from_fetch(self):
-    # Ensure the ivy report file gets generated and populated.
-    with self.temporary_workdir() as workdir, temporary_dir() as cache_dir:
-      config = {'cache': {'write_to': [cache_dir],'read_from': [cache_dir]}}
+    def test_generating_report_from_fetch(self):
+        # Ensure the ivy report file gets generated and populated.
+        with self.temporary_workdir() as workdir, temporary_dir() as cache_dir:
+            config = {"cache": {"write_to": [cache_dir], "read_from": [cache_dir]}}
 
-      def run_pants(command):
-        return self.run_pants_with_workdir(command, workdir, config=config)
-      with temporary_dir() as ivy_report_dir:
-        first_run = run_pants(['resolve', '3rdparty:junit', '--resolve-ivy-report',
-                               f'--resolve-ivy-outdir={ivy_report_dir}'])
-        self.assert_success(first_run)
+            def run_pants(command):
+                return self.run_pants_with_workdir(command, workdir, config=config)
 
-        html_report_file, listdir = self._find_html_report(ivy_report_dir)
-        self.assertIsNotNone(html_report_file,
-                        msg="Couldn't find ivy report in {report_dir} containing files {listdir}"
-                        .format(report_dir=ivy_report_dir, listdir=listdir))
+            with temporary_dir() as ivy_report_dir:
+                first_run = run_pants(
+                    [
+                        "resolve",
+                        "3rdparty:junit",
+                        "--resolve-ivy-report",
+                        f"--resolve-ivy-outdir={ivy_report_dir}",
+                    ]
+                )
+                self.assert_success(first_run)
 
-        with open(os.path.join(ivy_report_dir, html_report_file), 'r') as file:
-          self.assertIn('junit', file.read())
+                html_report_file, listdir = self._find_html_report(ivy_report_dir)
+                self.assertIsNotNone(
+                    html_report_file,
+                    msg="Couldn't find ivy report in {report_dir} containing files {listdir}".format(
+                        report_dir=ivy_report_dir, listdir=listdir
+                    ),
+                )
 
-      run_pants(['clean-all'])
+                with open(os.path.join(ivy_report_dir, html_report_file), "r") as file:
+                    self.assertIn("junit", file.read())
 
-      with temporary_dir() as ivy_report_dir:
-        fetch_run = run_pants(['resolve', '3rdparty:junit', '--resolve-ivy-report',
-                               f'--resolve-ivy-outdir={ivy_report_dir}'])
-        self.assert_success(fetch_run)
+            run_pants(["clean-all"])
 
-        # Find the ivy report.
-        html_report_file, listdir = self._find_html_report(ivy_report_dir)
-        self.assertIsNotNone(html_report_file,
-                        msg="Couldn't find ivy report in {report_dir} containing files {listdir}"
-                        .format(report_dir=ivy_report_dir, listdir=listdir))
+            with temporary_dir() as ivy_report_dir:
+                fetch_run = run_pants(
+                    [
+                        "resolve",
+                        "3rdparty:junit",
+                        "--resolve-ivy-report",
+                        f"--resolve-ivy-outdir={ivy_report_dir}",
+                    ]
+                )
+                self.assert_success(fetch_run)
 
-        with open(os.path.join(ivy_report_dir, html_report_file), 'r') as file:
-          self.assertIn('junit', file.read())
+                # Find the ivy report.
+                html_report_file, listdir = self._find_html_report(ivy_report_dir)
+                self.assertIsNotNone(
+                    html_report_file,
+                    msg="Couldn't find ivy report in {report_dir} containing files {listdir}".format(
+                        report_dir=ivy_report_dir, listdir=listdir
+                    ),
+                )
 
-  def _find_html_report(self, ivy_report_dir):
-    html_report_file = None
-    pattern = re.compile(r'internal-.*-default\.html$')
-    listdir = os.listdir(ivy_report_dir)
-    for f in listdir:
-      if os.path.isfile(os.path.join(ivy_report_dir, f)):
-        if pattern.match(f):
-          html_report_file = f
-          break
-    return html_report_file, listdir
+                with open(os.path.join(ivy_report_dir, html_report_file), "r") as file:
+                    self.assertIn("junit", file.read())
 
-  def _find_resolve_workdir(self, workdir):
-    ivy_dir = os.path.join(workdir, 'export/export/current/ivy')
-    listdir = os.listdir(ivy_dir)
-    listdir.remove('jars')
-    for dir in listdir:
-      potential_workdir = os.path.join(ivy_dir, dir)
-      if os.path.exists(os.path.join(potential_workdir, 'resolution.json')):
-        return potential_workdir
-    else:
-      self.fail("No resolution.json in ivy workdirs")
+    def _find_html_report(self, ivy_report_dir):
+        html_report_file = None
+        pattern = re.compile(r"internal-.*-default\.html$")
+        listdir = os.listdir(ivy_report_dir)
+        for f in listdir:
+            if os.path.isfile(os.path.join(ivy_report_dir, f)):
+                if pattern.match(f):
+                    html_report_file = f
+                    break
+        return html_report_file, listdir
+
+    def _find_resolve_workdir(self, workdir):
+        ivy_dir = os.path.join(workdir, "export/export/current/ivy")
+        listdir = os.listdir(ivy_dir)
+        listdir.remove("jars")
+        for dir in listdir:
+            potential_workdir = os.path.join(ivy_dir, dir)
+            if os.path.exists(os.path.join(potential_workdir, "resolution.json")):
+                return potential_workdir
+        else:
+            self.fail("No resolution.json in ivy workdirs")

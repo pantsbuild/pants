@@ -5,6 +5,5 @@ from pants_test.projects.projects_test_base import ProjectsTestBase
 
 
 class TestMavenLayoutIntegration(ProjectsTestBase):
-
-  def test_maven_layout(self) -> None:
-    self.assert_valid_projects("testprojects/maven_layout::")
+    def test_maven_layout(self) -> None:
+        self.assert_valid_projects("testprojects/maven_layout::")

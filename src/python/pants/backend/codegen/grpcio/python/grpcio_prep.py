@@ -7,16 +7,16 @@ from pants.backend.python.tasks.python_tool_prep_base import PythonToolInstance,
 
 
 class GrpcioInstance(PythonToolInstance):
-  pass
+    pass
 
 
 class GrpcioPrep(PythonToolPrepBase):
-  tool_subsystem_cls = Grpcio
-  tool_instance_cls = GrpcioInstance
+    tool_subsystem_cls = Grpcio
+    tool_instance_cls = GrpcioInstance
 
-  def execute(self):
-    targets = self.get_targets(lambda target: isinstance(target, PythonGrpcioLibrary))
-    if not targets:
-      return 0
+    def execute(self):
+        targets = self.get_targets(lambda target: isinstance(target, PythonGrpcioLibrary))
+        if not targets:
+            return 0
 
-    super().execute()
+        super().execute()

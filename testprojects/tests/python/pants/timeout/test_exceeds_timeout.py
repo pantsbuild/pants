@@ -5,8 +5,8 @@ import time
 
 
 def test_within_timeout():
-  time.sleep(0.1)
+    time.sleep(0.1)
 
 
 def test_exceeds_timeout():
-  time.sleep(1000)
+    time.sleep(1000)

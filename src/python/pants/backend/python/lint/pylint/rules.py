@@ -8,10 +8,10 @@ from pants.backend.python.lint.pylint.subsystem import Pylint
 from pants.backend.python.lint.python_lint_target import PythonLintTarget
 from pants.backend.python.rules import download_pex_bin, pex, prepare_chrooted_python_sources
 from pants.backend.python.rules.pex import (
-  CreatePex,
-  Pex,
-  PexInterpreterConstraints,
-  PexRequirements,
+    CreatePex,
+    Pex,
+    PexInterpreterConstraints,
+    PexRequirements,
 )
 from pants.backend.python.rules.prepare_chrooted_python_sources import ChrootedPythonSources
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
@@ -27,111 +27,110 @@ from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
 from pants.rules.core import find_target_source_files, strip_source_roots
 from pants.rules.core.find_target_source_files import (
-  FindTargetSourceFilesRequest,
-  TargetSourceFiles,
+    FindTargetSourceFilesRequest,
+    TargetSourceFiles,
 )
 from pants.rules.core.lint import LintResult
 
 
 @dataclass(frozen=True)
 class PylintTarget:
-  adaptor_with_origin: TargetAdaptorWithOrigin
+    adaptor_with_origin: TargetAdaptorWithOrigin
 
 
 def generate_args(*, source_files: TargetSourceFiles, pylint: Pylint) -> Tuple[str, ...]:
-  args = []
-  if pylint.options.config is not None:
-    args.append(f"--config={pylint.options.config}")
-  args.extend(pylint.options.args)
-  args.extend(sorted(source_files.snapshot.files))
-  return tuple(args)
+    args = []
+    if pylint.options.config is not None:
+        args.append(f"--config={pylint.options.config}")
+    args.extend(pylint.options.args)
+    args.extend(sorted(source_files.snapshot.files))
+    return tuple(args)
 
 
 @rule(name="Lint using Pylint")
 async def lint(
-  pylint_target: PylintTarget,
-  pylint: Pylint,
-  python_setup: PythonSetup,
-  subprocess_encoding_environment: SubprocessEncodingEnvironment,
+    pylint_target: PylintTarget,
+    pylint: Pylint,
+    python_setup: PythonSetup,
+    subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> LintResult:
-  if pylint.options.skip:
-    return LintResult.noop()
+    if pylint.options.skip:
+        return LintResult.noop()
 
-  adaptor_with_origin = pylint_target.adaptor_with_origin
-  adaptor = adaptor_with_origin.adaptor
+    adaptor_with_origin = pylint_target.adaptor_with_origin
+    adaptor = adaptor_with_origin.adaptor
 
-  # Pylint needs direct dependencies in the chroot to ensure that imports are valid. However, it
-  # doesn't lint those direct dependencies nor does it care about transitive dependencies.
-  hydrated_target = await Get[HydratedTarget](Address, adaptor.address)
-  dependencies = await MultiGet(
-    Get[HydratedTarget](Address, dependency)
-    for dependency in hydrated_target.dependencies
-  )
-  sources_digest = await Get[ChrootedPythonSources](
-    HydratedTargets([hydrated_target, *dependencies])
-  )
-
-  # NB: Pylint output depends upon which Python interpreter version it's run with. We ensure that
-  # each target runs with its own interpreter constraints. See
-  # http://pylint.pycqa.org/en/latest/faq.html#what-versions-of-python-is-pylint-supporting.
-  interpreter_constraints = PexInterpreterConstraints.create_from_adaptors(
-    adaptors=[adaptor] if isinstance(adaptor, PythonTargetAdaptor) else [],
-    python_setup=python_setup
-  )
-  requirements_pex = await Get[Pex](
-    CreatePex(
-      output_filename="pylint.pex",
-      requirements=PexRequirements(requirements=tuple(pylint.get_requirement_specs())),
-      interpreter_constraints=interpreter_constraints,
-      entry_point=pylint.get_entry_point(),
+    # Pylint needs direct dependencies in the chroot to ensure that imports are valid. However, it
+    # doesn't lint those direct dependencies nor does it care about transitive dependencies.
+    hydrated_target = await Get[HydratedTarget](Address, adaptor.address)
+    dependencies = await MultiGet(
+        Get[HydratedTarget](Address, dependency) for dependency in hydrated_target.dependencies
     )
-  )
-
-  config_path: Optional[str] = pylint.options.config
-  config_snapshot = await Get[Snapshot](
-    PathGlobs(
-      globs=tuple([config_path] if config_path else []),
-      glob_match_error_behavior=GlobMatchErrorBehavior.error,
-      description_of_origin="the option `--pylint-config`",
+    sources_digest = await Get[ChrootedPythonSources](
+        HydratedTargets([hydrated_target, *dependencies])
     )
-  )
 
-  merged_input_files = await Get[Digest](
-    DirectoriesToMerge(
-      directories=(
-        requirements_pex.directory_digest,
-        config_snapshot.directory_digest,
-        sources_digest.snapshot.directory_digest,
-      )
-    ),
-  )
+    # NB: Pylint output depends upon which Python interpreter version it's run with. We ensure that
+    # each target runs with its own interpreter constraints. See
+    # http://pylint.pycqa.org/en/latest/faq.html#what-versions-of-python-is-pylint-supporting.
+    interpreter_constraints = PexInterpreterConstraints.create_from_adaptors(
+        adaptors=[adaptor] if isinstance(adaptor, PythonTargetAdaptor) else [],
+        python_setup=python_setup,
+    )
+    requirements_pex = await Get[Pex](
+        CreatePex(
+            output_filename="pylint.pex",
+            requirements=PexRequirements(requirements=tuple(pylint.get_requirement_specs())),
+            interpreter_constraints=interpreter_constraints,
+            entry_point=pylint.get_entry_point(),
+        )
+    )
 
-  source_files = await Get[TargetSourceFiles](
-    FindTargetSourceFilesRequest(adaptor_with_origin, strip_source_roots=True)
-  )
+    config_path: Optional[str] = pylint.options.config
+    config_snapshot = await Get[Snapshot](
+        PathGlobs(
+            globs=tuple([config_path] if config_path else []),
+            glob_match_error_behavior=GlobMatchErrorBehavior.error,
+            description_of_origin="the option `--pylint-config`",
+        )
+    )
 
-  request = requirements_pex.create_execute_request(
-    python_setup=python_setup,
-    subprocess_encoding_environment=subprocess_encoding_environment,
-    pex_path=f'./pylint.pex',
-    pex_args=generate_args(source_files=source_files, pylint=pylint),
-    input_files=merged_input_files,
-    description=f'Run Pylint for {adaptor.address.reference()}',
-  )
-  result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, request)
-  return LintResult.from_fallible_execute_process_result(result)
+    merged_input_files = await Get[Digest](
+        DirectoriesToMerge(
+            directories=(
+                requirements_pex.directory_digest,
+                config_snapshot.directory_digest,
+                sources_digest.snapshot.directory_digest,
+            )
+        ),
+    )
+
+    source_files = await Get[TargetSourceFiles](
+        FindTargetSourceFilesRequest(adaptor_with_origin, strip_source_roots=True)
+    )
+
+    request = requirements_pex.create_execute_request(
+        python_setup=python_setup,
+        subprocess_encoding_environment=subprocess_encoding_environment,
+        pex_path=f"./pylint.pex",
+        pex_args=generate_args(source_files=source_files, pylint=pylint),
+        input_files=merged_input_files,
+        description=f"Run Pylint for {adaptor.address.reference()}",
+    )
+    result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, request)
+    return LintResult.from_fallible_execute_process_result(result)
 
 
 def rules():
-  return [
-    lint,
-    subsystem_rule(Pylint),
-    UnionRule(PythonLintTarget, PylintTarget),
-    *download_pex_bin.rules(),
-    *find_target_source_files.rules(),
-    *pex.rules(),
-    *prepare_chrooted_python_sources.rules(),
-    *strip_source_roots.rules(),
-    *python_native_code.rules(),
-    *subprocess_environment.rules(),
-  ]
+    return [
+        lint,
+        subsystem_rule(Pylint),
+        UnionRule(PythonLintTarget, PylintTarget),
+        *download_pex_bin.rules(),
+        *find_target_source_files.rules(),
+        *pex.rules(),
+        *prepare_chrooted_python_sources.rules(),
+        *strip_source_roots.rules(),
+        *python_native_code.rules(),
+        *subprocess_environment.rules(),
+    ]

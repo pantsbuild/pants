@@ -10,23 +10,23 @@ from pants.util.contextutil import temporary_dir
 
 
 class FakeRunTracker:
-  def register_thread(self, one):
-    pass
+    def register_thread(self, one):
+        pass
 
 
 def keyboard_interrupt_raiser():
-  raise KeyboardInterrupt()
+    raise KeyboardInterrupt()
 
 
 class WorkerPoolTest(unittest.TestCase):
-  def test_keyboard_interrupts_propagated(self):
-    condition = threading.Condition()
-    condition.acquire()
-    with self.assertRaises(KeyboardInterrupt):
-      with temporary_dir() as rundir:
-        pool = WorkerPool(WorkUnit(rundir, None, "work"), FakeRunTracker(), 1, "test")
-        try:
-          pool.submit_async_work(Work(keyboard_interrupt_raiser, [()]))
-          condition.wait(2)
-        finally:
-          pool.abort()
+    def test_keyboard_interrupts_propagated(self):
+        condition = threading.Condition()
+        condition.acquire()
+        with self.assertRaises(KeyboardInterrupt):
+            with temporary_dir() as rundir:
+                pool = WorkerPool(WorkUnit(rundir, None, "work"), FakeRunTracker(), 1, "test")
+                try:
+                    pool.submit_async_work(Work(keyboard_interrupt_raiser, [()]))
+                    condition.wait(2)
+                finally:
+                    pool.abort()

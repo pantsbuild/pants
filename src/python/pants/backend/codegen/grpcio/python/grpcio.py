@@ -5,10 +5,10 @@ from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 
 
 class Grpcio(PythonToolBase):
-  options_scope = 'grpcio'
+    options_scope = "grpcio"
 
-  grpcio_version = '1.17.1'
-  default_version = f'grpcio=={grpcio_version}'
-  default_extra_requirements = [f'grpcio-tools=={grpcio_version}']
+    grpcio_version = "1.17.1"
+    default_version = f"grpcio=={grpcio_version}"
+    default_extra_requirements = [f"grpcio-tools=={grpcio_version}"]
 
-  default_entry_point = 'grpc_tools.protoc'
+    default_entry_point = "grpc_tools.protoc"

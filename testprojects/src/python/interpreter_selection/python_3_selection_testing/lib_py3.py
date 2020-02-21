@@ -3,6 +3,7 @@
 
 # A simple example to include in a python 3 binary target
 
+
 def say_something():
-  print('I am a python 3 library method.')
-  return ascii
+    print("I am a python 3 library method.")
+    return ascii

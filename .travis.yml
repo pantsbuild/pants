@@ -381,9 +381,10 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - travis-wait-enhanced --timeout 40m --interval 9m -- ./build-support/bin/ci.py
-      --remote-execution-enabled --githooks --sanity-checks --doc-gen --lint --python-version
-      3.6
+    - travis-wait-enhanced --timeout 60m --interval 9m -- ./build-support/bin/ci.py
+      --githooks --sanity-checks --doc-gen --python-version 3.6
+    - travis-wait-enhanced --timeout 25m --interval 9m -- ./build-support/bin/ci.py
+      --remote-execution-enabled --lint --python-version 3.6
     stage: Test Pants
     sudo: required
   - addons:
@@ -443,9 +444,10 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - travis-wait-enhanced --timeout 40m --interval 9m -- ./build-support/bin/ci.py
-      --remote-execution-enabled --githooks --sanity-checks --doc-gen --lint --python-version
-      3.7
+    - travis-wait-enhanced --timeout 60m --interval 9m -- ./build-support/bin/ci.py
+      --githooks --sanity-checks --doc-gen --python-version 3.7
+    - travis-wait-enhanced --timeout 25m --interval 9m -- ./build-support/bin/ci.py
+      --remote-execution-enabled --lint --python-version 3.7
     stage: Test Pants (Cron)
     sudo: required
   - before_cache:

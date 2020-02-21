@@ -14,90 +14,115 @@ from pants.testutil.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
 class WireGenTest(NailgunTaskTestBase):
 
-  # A bogus target workdir.
-  TARGET_WORKDIR = ".pants.d/bogus/workdir"
+    # A bogus target workdir.
+    TARGET_WORKDIR = ".pants.d/bogus/workdir"
 
-  @classmethod
-  def task_type(cls):
-    return WireGen
+    @classmethod
+    def task_type(cls):
+        return WireGen
 
-  @classmethod
-  def alias_groups(cls):
-    return register_core().merge(register_codegen())
+    @classmethod
+    def alias_groups(cls):
+        return register_core().merge(register_codegen())
 
-  def _create_fake_wire_tool(self, version='1.8.0'):
-    self.make_target(':wire-compiler', JarLibrary, jars=[
-      JarDependency(org='com.squareup.wire', name='wire-compiler', rev=version),
-    ])
+    def _create_fake_wire_tool(self, version="1.8.0"):
+        self.make_target(
+            ":wire-compiler",
+            JarLibrary,
+            jars=[JarDependency(org="com.squareup.wire", name="wire-compiler", rev=version),],
+        )
 
-  def test_compiler_args(self):
-    self._create_fake_wire_tool()
-    simple_wire_target = self.make_target('src/wire:simple-wire-target', JavaWireLibrary,
-                                          sources=['foo.proto'])
-    context = self.context(target_roots=[simple_wire_target])
-    task = self.create_task(context)
-    self.assertEqual([
-      f'--java_out={self.TARGET_WORKDIR}',
-      f'--proto_path={self.build_root}/src/wire',
-      'foo.proto'],
-      task.format_args_for_target(simple_wire_target, self.TARGET_WORKDIR))
+    def test_compiler_args(self):
+        self._create_fake_wire_tool()
+        simple_wire_target = self.make_target(
+            "src/wire:simple-wire-target", JavaWireLibrary, sources=["foo.proto"]
+        )
+        context = self.context(target_roots=[simple_wire_target])
+        task = self.create_task(context)
+        self.assertEqual(
+            [
+                f"--java_out={self.TARGET_WORKDIR}",
+                f"--proto_path={self.build_root}/src/wire",
+                "foo.proto",
+            ],
+            task.format_args_for_target(simple_wire_target, self.TARGET_WORKDIR),
+        )
 
-  def test_compiler_args_wirev1(self):
-    self._create_fake_wire_tool()
-    wire_targetv1 = self.make_target('src/wire:wire-targetv1', JavaWireLibrary,
-                                     sources=['bar.proto'],
-                                     service_writer='org.pantsbuild.DummyServiceWriter',
-                                     service_writer_options=['opt1', 'opt2'])
-    task = self.create_task(self.context(target_roots=[wire_targetv1]))
-    self.assertEqual([
-      f'--java_out={self.TARGET_WORKDIR}',
-      '--service_writer=org.pantsbuild.DummyServiceWriter',
-      '--service_writer_opt', 'opt1',
-      '--service_writer_opt', 'opt2',
-      f'--proto_path={self.build_root}/src/wire',
-      'bar.proto'],
-      task.format_args_for_target(wire_targetv1, self.TARGET_WORKDIR))
+    def test_compiler_args_wirev1(self):
+        self._create_fake_wire_tool()
+        wire_targetv1 = self.make_target(
+            "src/wire:wire-targetv1",
+            JavaWireLibrary,
+            sources=["bar.proto"],
+            service_writer="org.pantsbuild.DummyServiceWriter",
+            service_writer_options=["opt1", "opt2"],
+        )
+        task = self.create_task(self.context(target_roots=[wire_targetv1]))
+        self.assertEqual(
+            [
+                f"--java_out={self.TARGET_WORKDIR}",
+                "--service_writer=org.pantsbuild.DummyServiceWriter",
+                "--service_writer_opt",
+                "opt1",
+                "--service_writer_opt",
+                "opt2",
+                f"--proto_path={self.build_root}/src/wire",
+                "bar.proto",
+            ],
+            task.format_args_for_target(wire_targetv1, self.TARGET_WORKDIR),
+        )
 
-  @parameterized.expand([(True,), (False,)])
-  def test_compiler_args_all(self, ordered_sources):
-    self._create_fake_wire_tool(version='1.8.0')
-    kitchen_sink = self.make_target('src/wire:kitchen-sink', JavaWireLibrary,
-                                    sources=['foo.proto', 'bar.proto', 'baz.proto'],
-                                    registry_class='org.pantsbuild.Registry',
-                                    service_writer='org.pantsbuild.DummyServiceWriter',
-                                    no_options=True,
-                                    ordered_sources=ordered_sources,
-                                    roots=['root1', 'root2', 'root3'],
-                                    enum_options=['enum1', 'enum2', 'enum3'],)
-    task = self.create_task(self.context(target_roots=[kitchen_sink]))
-    expected = [
-        f'--java_out={self.TARGET_WORKDIR}',
-        '--no_options',
-        '--service_writer=org.pantsbuild.DummyServiceWriter',
-        '--registry_class=org.pantsbuild.Registry',
-        '--roots=root1,root2,root3',
-        '--enum_options=enum1,enum2,enum3',
-        f'--proto_path={self.build_root}/src/wire',
-        'foo.proto',
-        'bar.proto',
-        'baz.proto',
-      ]
-    actual = task.format_args_for_target(kitchen_sink, self.TARGET_WORKDIR)
-    if not ordered_sources:
-      expected = set(expected)
-      actual = set(actual)
-    self.assertEqual(expected, actual)
+    @parameterized.expand([(True,), (False,)])
+    def test_compiler_args_all(self, ordered_sources):
+        self._create_fake_wire_tool(version="1.8.0")
+        kitchen_sink = self.make_target(
+            "src/wire:kitchen-sink",
+            JavaWireLibrary,
+            sources=["foo.proto", "bar.proto", "baz.proto"],
+            registry_class="org.pantsbuild.Registry",
+            service_writer="org.pantsbuild.DummyServiceWriter",
+            no_options=True,
+            ordered_sources=ordered_sources,
+            roots=["root1", "root2", "root3"],
+            enum_options=["enum1", "enum2", "enum3"],
+        )
+        task = self.create_task(self.context(target_roots=[kitchen_sink]))
+        expected = [
+            f"--java_out={self.TARGET_WORKDIR}",
+            "--no_options",
+            "--service_writer=org.pantsbuild.DummyServiceWriter",
+            "--registry_class=org.pantsbuild.Registry",
+            "--roots=root1,root2,root3",
+            "--enum_options=enum1,enum2,enum3",
+            f"--proto_path={self.build_root}/src/wire",
+            "foo.proto",
+            "bar.proto",
+            "baz.proto",
+        ]
+        actual = task.format_args_for_target(kitchen_sink, self.TARGET_WORKDIR)
+        if not ordered_sources:
+            expected = set(expected)
+            actual = set(actual)
+        self.assertEqual(expected, actual)
 
-  def test_compiler_args_proto_paths(self):
-    self._create_fake_wire_tool()
-    parent_target = self.make_target('src/main/wire:parent-target', JavaWireLibrary,
-                                     sources=['bar.proto'])
-    simple_wire_target = self.make_target('src/wire:simple-wire-target', JavaWireLibrary,
-                                          sources=['foo.proto'], dependencies=[parent_target])
-    context = self.context(target_roots=[parent_target, simple_wire_target])
-    task = self.create_task(context)
-    self.assertEqual([
-      f'--java_out={self.TARGET_WORKDIR}',
-      f'--proto_path={self.build_root}/src/wire',
-      'foo.proto'],
-      task.format_args_for_target(simple_wire_target, self.TARGET_WORKDIR))
+    def test_compiler_args_proto_paths(self):
+        self._create_fake_wire_tool()
+        parent_target = self.make_target(
+            "src/main/wire:parent-target", JavaWireLibrary, sources=["bar.proto"]
+        )
+        simple_wire_target = self.make_target(
+            "src/wire:simple-wire-target",
+            JavaWireLibrary,
+            sources=["foo.proto"],
+            dependencies=[parent_target],
+        )
+        context = self.context(target_roots=[parent_target, simple_wire_target])
+        task = self.create_task(context)
+        self.assertEqual(
+            [
+                f"--java_out={self.TARGET_WORKDIR}",
+                f"--proto_path={self.build_root}/src/wire",
+                "foo.proto",
+            ],
+            task.format_args_for_target(simple_wire_target, self.TARGET_WORKDIR),
+        )

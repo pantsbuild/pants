@@ -9,12 +9,8 @@ from pants.contrib.thrifty.java_thrifty_library import JavaThriftyLibrary
 
 
 def build_file_aliases():
-  return BuildFileAliases(
-    targets={
-      'java_thrifty_library': JavaThriftyLibrary,
-    }
-  )
+    return BuildFileAliases(targets={"java_thrifty_library": JavaThriftyLibrary,})
 
 
 def register_goals():
-  task(name='thrifty', action=JavaThriftyGen).install('gen')
+    task(name="thrifty", action=JavaThriftyGen).install("gen")

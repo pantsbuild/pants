@@ -7,8 +7,8 @@ from pants.backend.python.lint.black import rules as black_rules
 
 
 def rules():
-  return (
-    *black_rules.rules(),
-    *python_format_target.rules(),
-    *python_lint_target.rules(),
-  )
+    return (
+        *black_rules.rules(),
+        *python_format_target.rules(),
+        *python_lint_target.rules(),
+    )

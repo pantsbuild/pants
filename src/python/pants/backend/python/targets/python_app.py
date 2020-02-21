@@ -6,24 +6,24 @@ from pants.build_graph.app_base import AppBase
 
 
 class PythonApp(AppBase):
-  """A deployable Python application.
+    """A deployable Python application.
 
-  Invoking the ``bundle`` goal on one of these targets creates a
-  self-contained artifact suitable for deployment on some other machine.
-  The artifact contains the executable pex, its dependencies, and
-  extra files like config files, startup scripts, etc.
+    Invoking the ``bundle`` goal on one of these targets creates a
+    self-contained artifact suitable for deployment on some other machine.
+    The artifact contains the executable pex, its dependencies, and
+    extra files like config files, startup scripts, etc.
 
-  :API: public
-  """
+    :API: public
+    """
 
-  @classmethod
-  def alias(cls):
-    return 'python_app'
+    @classmethod
+    def alias(cls):
+        return "python_app"
 
-  @classmethod
-  def binary_target_type(cls):
-    return PythonBinary
+    @classmethod
+    def binary_target_type(cls):
+        return PythonBinary
 
-  @staticmethod
-  def is_python_app(target):
-    return isinstance(target, PythonApp)
+    @staticmethod
+    def is_python_app(target):
+        return isinstance(target, PythonApp)

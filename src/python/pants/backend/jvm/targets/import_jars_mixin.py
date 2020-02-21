@@ -11,11 +11,11 @@ from pants.util.objects import SubclassesOf
 
 class ImportJarsMixin(ImportRemoteSourcesMixin):
 
-  expected_target_constraint = SubclassesOf(JarLibrary)
+    expected_target_constraint = SubclassesOf(JarLibrary)
 
-  @memoized_property
-  def all_imported_jar_deps(self):
-    jar_deps = OrderedSet()
-    for jar_lib in self.imported_targets:
-      jar_deps.update(jar_lib.jar_dependencies)
-    return list(jar_deps)
+    @memoized_property
+    def all_imported_jar_deps(self):
+        jar_deps = OrderedSet()
+        for jar_lib in self.imported_targets:
+            jar_deps.update(jar_lib.jar_dependencies)
+        return list(jar_deps)

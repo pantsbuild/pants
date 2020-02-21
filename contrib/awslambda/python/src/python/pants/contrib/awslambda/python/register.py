@@ -10,13 +10,9 @@ from pants.contrib.awslambda.python.tasks.lambdex_run import LambdexRun
 
 
 def build_file_aliases():
-  return BuildFileAliases(
-    targets={
-      'python_awslambda': PythonAWSLambda,
-    }
-  )
+    return BuildFileAliases(targets={"python_awslambda": PythonAWSLambda,})
 
 
 def register_goals():
-  task(name='lambdex-prep', action=LambdexPrep).install('bundle')
-  task(name='lambdex-run', action=LambdexRun).install('bundle')
+    task(name="lambdex-prep", action=LambdexPrep).install("bundle")
+    task(name="lambdex-run", action=LambdexRun).install("bundle")

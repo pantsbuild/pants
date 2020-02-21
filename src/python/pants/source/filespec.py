@@ -9,18 +9,18 @@ from pants.source.wrapped_globs import Filespec
 
 
 def globs_matches(
-  paths: Iterable[str], patterns: Iterable[str], exclude_patterns: Iterable[str],
+    paths: Iterable[str], patterns: Iterable[str], exclude_patterns: Iterable[str],
 ) -> bool:
-  path_globs = PathGlobs(globs=(*patterns, *(f"!{e}" for e in exclude_patterns)))
-  return Native().match_path_globs(path_globs, paths)
+    path_globs = PathGlobs(globs=(*patterns, *(f"!{e}" for e in exclude_patterns)))
+    return Native().match_path_globs(path_globs, paths)
 
 
 def matches_filespec(path: str, spec: Filespec) -> bool:
-  return any_matches_filespec([path], spec)
+    return any_matches_filespec([path], spec)
 
 
 def any_matches_filespec(paths: Iterable[str], spec: Filespec) -> bool:
-  exclude_patterns: List[str] = []
-  for exclude_spec in spec.get('exclude', []):
-    exclude_patterns.extend(exclude_spec['globs'])
-  return globs_matches(paths, spec['globs'], exclude_patterns)
+    exclude_patterns: List[str] = []
+    for exclude_spec in spec.get("exclude", []):
+        exclude_patterns.extend(exclude_spec["globs"])
+    return globs_matches(paths, spec["globs"], exclude_patterns)

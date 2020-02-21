@@ -6,5 +6,4 @@ from pants.backend.awslambda.python import awslambda_python_rules
 
 
 def rules():
-  return [*awslambda_common_rules.rules(),
-          *awslambda_python_rules.rules()]
+    return [*awslambda_common_rules.rules(), *awslambda_python_rules.rules()]

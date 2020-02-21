@@ -6,16 +6,16 @@ from pants.testutil.task_test_base import ConsoleTaskTestBase
 
 
 class MockedBashCompletion(BashCompletion):
-  """A version of the BashCompletion, with the help introspection mocked out."""
+    """A version of the BashCompletion, with the help introspection mocked out."""
 
-  def get_autocomplete_options_by_scope(self):
-    return {'': []}
+    def get_autocomplete_options_by_scope(self):
+        return {"": []}
 
 
 class BashCompletionTest(ConsoleTaskTestBase):
-  @classmethod
-  def task_type(cls):
-    return MockedBashCompletion
+    @classmethod
+    def task_type(cls):
+        return MockedBashCompletion
 
-  def test_bash_completion_loads_template(self):
-    self.assert_console_output_contains("# Pants Autocompletion Support")
+    def test_bash_completion_loads_template(self):
+        self.assert_console_output_contains("# Pants Autocompletion Support")

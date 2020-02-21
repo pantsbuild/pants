@@ -8,17 +8,16 @@ from pants.testutil.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 
 
 class BenchmarkRunTest(JvmToolTaskTestBase):
+    @classmethod
+    def task_type(cls):
+        return BenchmarkRun
 
-  @classmethod
-  def task_type(cls):
-    return BenchmarkRun
+    def test_benchmark_complains_on_python_target(self):
+        self.make_target("foo:hello", target_type=Target)
 
-  def test_benchmark_complains_on_python_target(self):
-    self.make_target('foo:hello', target_type=Target)
+        self.set_options(target="<unused, but required>")
+        context = self.context(target_roots=[self.target("foo:hello")])
+        self.populate_runtime_classpath(context)
 
-    self.set_options(target='<unused, but required>')
-    context = self.context(target_roots=[self.target('foo:hello')])
-    self.populate_runtime_classpath(context)
-
-    with self.assertRaises(TaskError):
-      self.execute(context)
+        with self.assertRaises(TaskError):
+            self.execute(context)

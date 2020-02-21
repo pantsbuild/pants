@@ -15,12 +15,6 @@ files(
 )
 
 python_binary(
-  name = 'black',
-  source = 'black.py',
-  tags = {'type_checked'},
-)
-
-python_binary(
   name = 'check_banned_imports',
   source = 'check_banned_imports.py',
   dependencies = [

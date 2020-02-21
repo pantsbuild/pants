@@ -9,18 +9,16 @@ from pants.goal.task_registrar import TaskRegistrar as task
 
 
 def build_file_aliases():
-  return BuildFileAliases(
-    targets={
-      'page': Page,
-    },
-    objects={
-      'wiki_artifact': WikiArtifact,
-      # TODO: Why is this capitalized?
-      'Wiki': Wiki,
-    },
-  )
+    return BuildFileAliases(
+        targets={"page": Page,},
+        objects={
+            "wiki_artifact": WikiArtifact,
+            # TODO: Why is this capitalized?
+            "Wiki": Wiki,
+        },
+    )
 
 
 def register_goals():
-  task(name='markdown', action=MarkdownToHtml).install(),
-  task(name='reference', action=GeneratePantsReference).install()
+    task(name="markdown", action=MarkdownToHtml).install(),
+    task(name="reference", action=GeneratePantsReference).install()

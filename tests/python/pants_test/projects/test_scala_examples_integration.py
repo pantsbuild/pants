@@ -5,6 +5,5 @@ from pants_test.projects.projects_test_base import ProjectsTestBase
 
 
 class TestScalaExamplesIntegration(ProjectsTestBase):
-
-  def test_scala_examples(self) -> None:
-    self.assert_valid_projects("examples/src/scala::", "examples/tests/scala::")
+    def test_scala_examples(self) -> None:
+        self.assert_valid_projects("examples/src/scala::", "examples/tests/scala::")
