@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import sys
-from typing import Dict, Optional, cast
+from typing import Dict, Optional, Set, cast
 
 from typing_extensions import Literal
 
@@ -96,26 +96,36 @@ class HelpPrinter:
             print(f"  {name.rjust(max_width)}: {description}")
         print()
 
-    def _print_options_help(self):
+    def _print_options_help(self) -> None:
         """Print a help screen.
 
         Assumes that self._help_request is an instance of OptionsHelp.
 
         Note: Ony useful if called after options have been registered.
         """
-        show_all_help = self._help_request.all_scopes
-        if show_all_help:
-            help_scopes = list(self._options.known_scope_to_info.keys())
+
+        help_request = cast(OptionsHelp, self._help_request)
+        global_options = self._options.for_global_scope()
+
+        help_scopes: Set[str]
+        if help_request.all_scopes:
+            help_scopes = set(self._options.known_scope_to_info.keys())
         else:
             # The scopes explicitly mentioned by the user on the cmd line.
             help_scopes = set(self._options.scope_to_flags.keys()) - {GLOBAL_SCOPE}
 
-        scope_infos = list(
-            ScopeInfoIterator(self._options.known_scope_to_info).iterate(help_scopes)
+        # If --v1 is enabled at all, don't use v2_help, even if --v2 is also enabled.
+        v2_help = global_options.v2 and not global_options.v1
+
+        scope_info_iterator = ScopeInfoIterator(
+            scope_to_info=self._options.known_scope_to_info, v2_help=v2_help
         )
+
+        scope_infos = list(scope_info_iterator.iterate(help_scopes))
+
         if scope_infos:
             for scope_info in scope_infos:
-                help_str = self._format_help(scope_info)
+                help_str = self._format_help(scope_info, help_request.advanced)
                 if help_str:
                     print(help_str)
             return
@@ -140,9 +150,11 @@ class HelpPrinter:
             print("    dir:: to include all targets found recursively under the directory.")
             print("\nFriendly docs:\n  http://pantsbuild.org/")
 
-            print(self._format_help(ScopeInfo(GLOBAL_SCOPE, ScopeInfo.GLOBAL)))
+            print(
+                self._format_help(ScopeInfo(GLOBAL_SCOPE, ScopeInfo.GLOBAL), help_request.advanced)
+            )
 
-    def _format_help(self, scope_info):
+    def _format_help(self, scope_info: ScopeInfo, show_recursive_and_advanced: bool) -> str:
         """Return a help message for the options registered on this object.
 
         Assumes that self._help_request is an instance of OptionsHelp.
@@ -153,8 +165,8 @@ class HelpPrinter:
         description = scope_info.description
         help_formatter = HelpFormatter(
             scope=scope,
-            show_recursive=self._help_request.advanced,
-            show_advanced=self._help_request.advanced,
+            show_recursive=show_recursive_and_advanced,
+            show_advanced=show_recursive_and_advanced,
             color=sys.stdout.isatty(),
         )
         formatted_lines = help_formatter.format_options(
