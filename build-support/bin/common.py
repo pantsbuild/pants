@@ -26,7 +26,6 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator, NoReturn, Tuple
 
-
 _SCRIPT_START_TIME = time.time()
 
 _CLEAR_LINE = "\x1b[K"
@@ -37,47 +36,50 @@ _COLOR_RESET = "\x1b[0m"
 
 
 def die(message: str) -> NoReturn:
-  raise SystemExit(f"{_COLOR_RED}{message}{_COLOR_RESET}")
+    raise SystemExit(f"{_COLOR_RED}{message}{_COLOR_RESET}")
 
 
 def green(message: str) -> None:
-  print(f"{_COLOR_GREEN}{message}{_COLOR_RESET}")
+    print(f"{_COLOR_GREEN}{message}{_COLOR_RESET}")
 
 
 def banner(message: str) -> None:
-  minutes, seconds = elapsed_time()
-  print(f"{_COLOR_BLUE}[=== {minutes:02d}:{seconds:02d} {message} ===]{_COLOR_RESET}")
+    minutes, seconds = elapsed_time()
+    print(f"{_COLOR_BLUE}[=== {minutes:02d}:{seconds:02d} {message} ===]{_COLOR_RESET}")
 
 
 def elapsed_time() -> Tuple[int, int]:
-  now = time.time()
-  elapsed_seconds = int(now - _SCRIPT_START_TIME)
-  return elapsed_seconds // 60, elapsed_seconds % 60
+    now = time.time()
+    elapsed_seconds = int(now - _SCRIPT_START_TIME)
+    return elapsed_seconds // 60, elapsed_seconds % 60
 
 
 def git_merge_base() -> str:
-  get_tracking_branch = ["git",
-                         "rev-parse",
-                         "--symbolic-full-name",
-                         "--abbrev-ref",
-                         "HEAD@{upstream}"
-                        ]
-  process = subprocess.run(get_tracking_branch, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8")
-  return str(process.stdout.rstrip()) if process.stdout else "master"
+    get_tracking_branch = [
+        "git",
+        "rev-parse",
+        "--symbolic-full-name",
+        "--abbrev-ref",
+        "HEAD@{upstream}",
+    ]
+    process = subprocess.run(
+        get_tracking_branch, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8"
+    )
+    return str(process.stdout.rstrip()) if process.stdout else "master"
 
 
 @contextmanager
 def travis_section(slug: str, message: str) -> Iterator[None]:
-  travis_fold_state_path = Path("/tmp/.travis_fold_current")
+    travis_fold_state_path = Path("/tmp/.travis_fold_current")
 
-  def travis_fold(*, action: str, target: str) -> None:
-    print(f"travis_fold:{action}:{target}\r{_CLEAR_LINE}", end="")
+    def travis_fold(*, action: str, target: str) -> None:
+        print(f"travis_fold:{action}:{target}\r{_CLEAR_LINE}", end="")
 
-  travis_fold(action="start", target=slug)
-  travis_fold_state_path.write_text(slug)
-  banner(message)
-  try:
-    yield
-  finally:
-    travis_fold(action="end", target=travis_fold_state_path.read_text().splitlines()[0])
-    travis_fold_state_path.unlink()
+    travis_fold(action="start", target=slug)
+    travis_fold_state_path.write_text(slug)
+    banner(message)
+    try:
+        yield
+    finally:
+        travis_fold(action="end", target=travis_fold_state_path.read_text().splitlines()[0])
+        travis_fold_state_path.unlink()

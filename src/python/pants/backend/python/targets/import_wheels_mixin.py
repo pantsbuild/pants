@@ -11,12 +11,12 @@ from pants.util.objects import SubclassesOf
 
 class ImportWheelsMixin(ImportRemoteSourcesMixin):
 
-  expected_target_constraint = SubclassesOf(PythonRequirementLibrary)
+    expected_target_constraint = SubclassesOf(PythonRequirementLibrary)
 
-  @memoized_property
-  def all_imported_requirements(self):
-    # TODO: figure out if this OrderedSet is necessary.
-    all_requirements = OrderedSet()
-    for req_lib in self.imported_targets:
-      all_requirements.update(req_lib.requirements)
-    return list(all_requirements)
+    @memoized_property
+    def all_imported_requirements(self):
+        # TODO: figure out if this OrderedSet is necessary.
+        all_requirements = OrderedSet()
+        for req_lib in self.imported_targets:
+            all_requirements.update(req_lib.requirements)
+        return list(all_requirements)

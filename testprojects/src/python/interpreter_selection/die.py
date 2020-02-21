@@ -6,7 +6,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import sys
 
-
 if __name__ == "__main__":
-  print('Exiting with status 57')
-  sys.exit(57)
+    print("Exiting with status 57")
+    sys.exit(57)

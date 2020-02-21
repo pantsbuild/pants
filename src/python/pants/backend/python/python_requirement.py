@@ -4,8 +4,7 @@
 from pants.base.deprecated import deprecated_module
 from pants.python.python_requirement import PythonRequirement
 
-
-deprecated_module('1.27.0.dev0', 'Import from pants.python.python_requirement instead.')
+deprecated_module("1.27.0.dev0", "Import from pants.python.python_requirement instead.")
 
 
 PythonRequirement = PythonRequirement

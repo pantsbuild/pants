@@ -6,9 +6,9 @@ from pants.backend.python.tasks.python_tool_prep_base import PythonToolInstance,
 
 
 class IsortInstance(PythonToolInstance):
-  pass
+    pass
 
 
 class IsortPrep(PythonToolPrepBase):
-  tool_subsystem_cls = Isort
-  tool_instance_cls = IsortInstance
+    tool_subsystem_cls = Isort
+    tool_instance_cls = IsortInstance

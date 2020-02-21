@@ -19,72 +19,74 @@ from pants.util.contextutil import pushd
 
 
 class IsortRun(FmtTaskMixin, Task):
-  """Autoformats Python source files with isort.
+    """Autoformats Python source files with isort.
 
-  Behavior:
-  ./pants fmt.isort <targets> -- <args, e.g. "--recursive ."> will sort the files only related
-    to specified targets, but the way of finding the config(s) is vanilla. If no target is
-    specified or no python source file is found in <targets>, it would be a no-op.
-  """
+    Behavior:
+    ./pants fmt.isort <targets> -- <args, e.g. "--recursive ."> will sort the files only related
+      to specified targets, but the way of finding the config(s) is vanilla. If no target is
+      specified or no python source file is found in <targets>, it would be a no-op.
+    """
 
-  NOOP_MSG_HAS_TARGET_BUT_NO_SOURCE = "No-op: no Python source file found in target(s)."
+    NOOP_MSG_HAS_TARGET_BUT_NO_SOURCE = "No-op: no Python source file found in target(s)."
 
-  _PYTHON_SOURCE_EXTENSION = '.py'
+    _PYTHON_SOURCE_EXTENSION = ".py"
 
-  @classmethod
-  def prepare(cls, options, round_manager):
-    super().prepare(options, round_manager)
-    round_manager.require_data(IsortPrep.tool_instance_cls)
+    @classmethod
+    def prepare(cls, options, round_manager):
+        super().prepare(options, round_manager)
+        round_manager.require_data(IsortPrep.tool_instance_cls)
 
-  def execute(self):
-    targets = self.get_targets(self.is_non_synthetic_python_target)
-    with self.invalidated(targets=targets) as invalidation_check:
-      if not invalidation_check.invalid_vts:
-        logging.debug(self.NOOP_MSG_HAS_TARGET_BUT_NO_SOURCE)
-        return
+    def execute(self):
+        targets = self.get_targets(self.is_non_synthetic_python_target)
+        with self.invalidated(targets=targets) as invalidation_check:
+            if not invalidation_check.invalid_vts:
+                logging.debug(self.NOOP_MSG_HAS_TARGET_BUT_NO_SOURCE)
+                return
 
-      invalid_tgts = [vt.target for vt in invalidation_check.invalid_vts]
-      sources = self._calculate_isortable_python_sources(invalid_tgts)
-      if not sources:
-        logging.debug(self.NOOP_MSG_HAS_TARGET_BUT_NO_SOURCE)
-        return
+            invalid_tgts = [vt.target for vt in invalidation_check.invalid_vts]
+            sources = self._calculate_isortable_python_sources(invalid_tgts)
+            if not sources:
+                logging.debug(self.NOOP_MSG_HAS_TARGET_BUT_NO_SOURCE)
+                return
 
-      isort = self.context.products.get_data(IsortPrep.tool_instance_cls)
-      isort_subsystem = Isort.global_instance()
-      args = [*isort_subsystem.options.args, '--filter-files', *sources]
+            isort = self.context.products.get_data(IsortPrep.tool_instance_cls)
+            isort_subsystem = Isort.global_instance()
+            args = [*isort_subsystem.options.args, "--filter-files", *sources]
 
-      # NB: We execute isort out of process to avoid unwanted side-effects from importing it:
-      #   https://github.com/timothycrosley/isort/issues/456
-      with pushd(get_buildroot()):
-        workunit_factory = functools.partial(self.context.new_workunit,
-                                             name='run-isort',
-                                             labels=[WorkUnitLabel.TOOL, WorkUnitLabel.LINT])
-        cmdline, exit_code = isort.run(workunit_factory, args)
-        if exit_code != 0:
-          raise TaskError(
-            f"Exited with return code {exit_code} while running `{cmdline}`.",
-            exit_code=exit_code
-          )
+            # NB: We execute isort out of process to avoid unwanted side-effects from importing it:
+            #   https://github.com/timothycrosley/isort/issues/456
+            with pushd(get_buildroot()):
+                workunit_factory = functools.partial(
+                    self.context.new_workunit,
+                    name="run-isort",
+                    labels=[WorkUnitLabel.TOOL, WorkUnitLabel.LINT],
+                )
+                cmdline, exit_code = isort.run(workunit_factory, args)
+                if exit_code != 0:
+                    raise TaskError(
+                        f"Exited with return code {exit_code} while running `{cmdline}`.",
+                        exit_code=exit_code,
+                    )
 
-  def _calculate_isortable_python_sources(self, targets):
-    """Generate a set of source files from the given targets."""
-    sources = set()
-    for target in targets:
-      sources.update(
-        source for source in target.sources_relative_to_buildroot()
-        if os.path.splitext(source)[1] == self._PYTHON_SOURCE_EXTENSION
-      )
-    return list(sources)
+    def _calculate_isortable_python_sources(self, targets):
+        """Generate a set of source files from the given targets."""
+        sources = set()
+        for target in targets:
+            sources.update(
+                source
+                for source in target.sources_relative_to_buildroot()
+                if os.path.splitext(source)[1] == self._PYTHON_SOURCE_EXTENSION
+            )
+        return list(sources)
 
-  @staticmethod
-  def is_non_synthetic_python_target(target):
-    return (not target.is_synthetic
-            and isinstance(target, (PythonLibrary, PythonBinary, PythonTests)))
+    @staticmethod
+    def is_non_synthetic_python_target(target):
+        return not target.is_synthetic and isinstance(
+            target, (PythonLibrary, PythonBinary, PythonTests)
+        )
 
-  @property
-  def skip_execution(self):
-    return self.resolve_conflicting_skip_options(
-      old_scope="fmt-isort",
-      new_scope="isort",
-      subsystem=Isort.global_instance(),
-    )
+    @property
+    def skip_execution(self):
+        return self.resolve_conflicting_skip_options(
+            old_scope="fmt-isort", new_scope="isort", subsystem=Isort.global_instance(),
+        )

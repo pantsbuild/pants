@@ -3,4 +3,4 @@
 
 
 class GoalError(Exception):
-  """Raised to indicate a goal has failed."""
+    """Raised to indicate a goal has failed."""

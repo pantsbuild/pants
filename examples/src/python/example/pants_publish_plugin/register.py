@@ -9,4 +9,4 @@ from example.pants_publish_plugin.extra_test_jar_example import ExtraTestJarExam
 # Register this custom task on the 'jar' phase. When the RoundEngine reaches this phase, it will
 # execute all tasks that have previously registered for this phase.
 def register_goals():
-  task(name='extra-test-jar-example', action=ExtraTestJarExample).install('jar')
+    task(name="extra-test-jar-example", action=ExtraTestJarExample).install("jar")

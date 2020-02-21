@@ -7,4 +7,4 @@ from pants.contrib.errorprone.tasks.errorprone import ErrorProne
 
 
 def register_goals():
-  task(name='errorprone', action=ErrorProne).install('compile')
+    task(name="errorprone", action=ErrorProne).install("compile")

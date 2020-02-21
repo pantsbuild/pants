@@ -5,6 +5,5 @@ from pants_test.projects.projects_test_base import ProjectsTestBase
 
 
 class TestWireProjectsIntegration(ProjectsTestBase):
-
-  def test_wire_projects(self) -> None:
-    self.assert_valid_projects("examples/src/wire::")
+    def test_wire_projects(self) -> None:
+        self.assert_valid_projects("examples/src/wire::")

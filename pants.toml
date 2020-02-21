@@ -19,6 +19,7 @@ local_artifact_cache = "%(pants_bootstrapdir)s/artifact_cache"
 # [GLOBAL] should only contain valid options in global scope.
 [GLOBAL]
 print_exception_stacktrace = true
+v2 = false
 
 # Enable our own custom loose-source plugins as well as contribs.
 pythonpath = [
@@ -70,6 +71,7 @@ backend_packages.remove = [
 backend_packages2 = [
   "pants.backend.project_info",
   "pants.backend.python",
+  "pants.backend.python.lint.black",
   "pants.backend.python.lint.docformatter",
   "pants.backend.python.lint.isort",
   "pants.backend.native",
@@ -236,6 +238,9 @@ no_warning_args = [
   '-Xlint:none',
 ]
 
+[black]
+config = "pyproject.toml"
+
 [checkstyle]
 config = "%(pants_supportdir)s/checkstyle/coding_style.xml"
 
@@ -274,22 +279,28 @@ version = "3.4.1"
 [pycheck-class-factoring]
 skip = true
 
-[pycheck-pycodestyle]
+[pycheck-context-manager]
 skip = true
 
 [pycheck-import-order]
 skip = true
 
-[pycheck-variable-names]
+[pycheck-indentation]
+skip = true
+
+[pycheck-newlines]
+skip = true
+
+[pycheck-newstyle-classes]
+skip = true
+
+[pycheck-pycodestyle]
 skip = true
 
 [pycheck-trailing-whitespace]
 skip = true
 
-[pycheck-context-manager]
-skip = true
-
-[pycheck-newstyle-classes]
+[pycheck-variable-names]
 skip = true
 
 [scala]

@@ -10,84 +10,88 @@ from pants.engine.native import Native
 from pants.engine.rules import side_effecting
 
 
-#TODO this needs to be a file-like object/stream
+# TODO this needs to be a file-like object/stream
 class NativeWriter:
-  def __init__(self, session: Any):
-    self._native = Native()
-    self._session = session._session
+    def __init__(self, session: Any):
+        self._native = Native()
+        self._session = session._session
 
-  def write(self, payload: str):
-    raise NotImplementedError
+    def write(self, payload: str):
+        raise NotImplementedError
 
-  #TODO It's not clear yet what this function should do, it depends on how
-  # EngineDisplay in Rust ends up handling text.
-  def flush(self):
-    pass
+    # TODO It's not clear yet what this function should do, it depends on how
+    # EngineDisplay in Rust ends up handling text.
+    def flush(self):
+        pass
 
 
 class NativeStdOut(NativeWriter):
-  def write(self, payload):
-    self._native.write_stdout(self._session, payload)
+    def write(self, payload):
+        self._native.write_stdout(self._session, payload)
 
 
 class NativeStdErr(NativeWriter):
-  def write(self, payload):
-    self._native.write_stderr(self._session, payload)
+    def write(self, payload):
+        self._native.write_stderr(self._session, payload)
 
 
 @side_effecting
 class Console:
-  """Class responsible for writing text to the console while Pants is running."""
-  side_effecting = True
+    """Class responsible for writing text to the console while Pants is running."""
 
-  def __init__(self, stdout=None, stderr=None, use_colors: bool = True, session: Optional[Any] = None):
-    """`stdout` and `stderr` may be explicitly provided when Console is constructed.
+    side_effecting = True
 
-    We use this in tests to provide a mock we can write tests against, rather than writing to the
-    system stdout/stderr. If they are not defined, the effective stdout/stderr are proxied to Rust
-    engine intrinsic code if there is a scheduler session provided, or just written to the standard
-    Python-provided stdout/stderr if it is None. A scheduler session is provided if --v2-ui is set.
-    """
+    def __init__(
+        self, stdout=None, stderr=None, use_colors: bool = True, session: Optional[Any] = None
+    ):
+        """`stdout` and `stderr` may be explicitly provided when Console is constructed.
 
-    has_scheduler = session is not None
+        We use this in tests to provide a mock we can write tests against, rather than writing to
+        the system stdout/stderr. If they are not defined, the effective stdout/stderr are proxied
+        to Rust engine intrinsic code if there is a scheduler session provided, or just written to
+        the standard Python-provided stdout/stderr if it is None. A scheduler session is provided if
+        --v2-ui is set.
+        """
 
-    self._stdout = stdout or (NativeStdOut(session) if has_scheduler else sys.stdout)
-    self._stderr = stderr or (NativeStdErr(session) if has_scheduler else sys.stderr)
-    self._use_colors = use_colors
+        has_scheduler = session is not None
 
-  @property
-  def stdout(self):
-    return self._stdout
+        self._stdout = stdout or (NativeStdOut(session) if has_scheduler else sys.stdout)
+        self._stderr = stderr or (NativeStdErr(session) if has_scheduler else sys.stderr)
+        self._use_colors = use_colors
 
-  @property
-  def stderr(self):
-    return self._stderr
+    @property
+    def stdout(self):
+        return self._stdout
 
-  def write_stdout(self, payload):
-    self.stdout.write(payload)
+    @property
+    def stderr(self):
+        return self._stderr
 
-  def write_stderr(self, payload):
-    self.stderr.write(payload)
+    def write_stdout(self, payload):
+        self.stdout.write(payload)
 
-  def print_stdout(self, payload, end='\n'):
-    print(payload, file=self.stdout, end=end)
+    def write_stderr(self, payload):
+        self.stderr.write(payload)
 
-  def print_stderr(self, payload, end='\n'):
-    print(payload, file=self.stderr, end=end)
+    def print_stdout(self, payload, end="\n"):
+        print(payload, file=self.stdout, end=end)
 
-  def flush(self):
-    self.stdout.flush()
-    self.stderr.flush()
+    def print_stderr(self, payload, end="\n"):
+        print(payload, file=self.stderr, end=end)
 
-  def _safe_color(self, text, color):
-    """We should only output color when the global flag --colors is enabled."""
-    return color(text) if self._use_colors else text
+    def flush(self):
+        self.stdout.flush()
+        self.stderr.flush()
 
-  def blue(self, text):
-    return self._safe_color(text, blue)
+    def _safe_color(self, text, color):
+        """We should only output color when the global flag --colors is enabled."""
+        return color(text) if self._use_colors else text
 
-  def green(self, text):
-    return self._safe_color(text, green)
+    def blue(self, text):
+        return self._safe_color(text, blue)
 
-  def red(self, text):
-    return self._safe_color(text, red)
+    def green(self, text):
+        return self._safe_color(text, green)
+
+    def red(self, text):
+        return self._safe_color(text, red)

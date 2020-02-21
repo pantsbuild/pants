@@ -8,12 +8,8 @@ from pants.goal.task_registrar import TaskRegistrar as task
 
 
 def build_file_aliases():
-  return BuildFileAliases(
-    targets={
-      'java_thrift_library': JavaThriftLibrary,
-      }
-    )
+    return BuildFileAliases(targets={"java_thrift_library": JavaThriftLibrary,})
 
 
 def register_goals():
-  task(name='thrift-java', action=ApacheThriftJavaGen).install('gen')
+    task(name="thrift-java", action=ApacheThriftJavaGen).install("gen")

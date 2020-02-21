@@ -6,12 +6,12 @@ from pants.base.payload import Payload
 
 
 class JavaAvroLibrary(JvmTarget):
-  """Defines a target that builds Java code from Avro schema, protocol, or IDL files."""
+    """Defines a target that builds Java code from Avro schema, protocol, or IDL files."""
 
-  def __init__(self, payload=None, **kwargs):
-    payload = payload or Payload()
-    super().__init__(payload=payload, **kwargs)
+    def __init__(self, payload=None, **kwargs):
+        payload = payload or Payload()
+        super().__init__(payload=payload, **kwargs)
 
-  @classmethod
-  def alias(cls):
-    return 'java_avro_library'
+    @classmethod
+    def alias(cls):
+        return "java_avro_library"

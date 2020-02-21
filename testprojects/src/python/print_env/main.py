@@ -4,7 +4,6 @@
 import os
 import sys
 
-
-if __name__ == '__main__':
-  # Print the content of the env var given on the command line.
-  print(os.environ[sys.argv[1]])
+if __name__ == "__main__":
+    # Print the content of the env var given on the command line.
+    print(os.environ[sys.argv[1]])

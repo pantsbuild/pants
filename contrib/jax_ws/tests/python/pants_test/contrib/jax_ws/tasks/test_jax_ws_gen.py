@@ -7,10 +7,10 @@ from pants.contrib.jax_ws.tasks.jax_ws_gen import JaxWsGen
 
 
 class JaxWsGenTest(NailgunTaskTestBase):
-  @classmethod
-  def task_type(cls):
-    return JaxWsGen
+    @classmethod
+    def task_type(cls):
+        return JaxWsGen
 
-  def test_no_sources(self):
-    task = self.prepare_execute(self.context())
-    self.assertEqual(None, task.execute())
+    def test_no_sources(self):
+        task = self.prepare_execute(self.context())
+        self.assertEqual(None, task.execute())

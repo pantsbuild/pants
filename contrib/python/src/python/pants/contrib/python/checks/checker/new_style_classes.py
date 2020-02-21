@@ -10,13 +10,13 @@ from pants.contrib.python.checks.checker.common import CheckstylePlugin
 
 
 class NewStyleClasses(CheckstylePlugin):
-  """Enforce the use of new-style classes."""
+    """Enforce the use of new-style classes."""
 
-  @classmethod
-  def name(cls):
-    return 'newstyle-classes'
+    @classmethod
+    def name(cls):
+        return "newstyle-classes"
 
-  def nits(self):
-    for class_def in self.iter_ast_types(ast.ClassDef):
-      if not class_def.bases:
-        yield self.error('T606', 'Classes must be new-style classes.', class_def)
+    def nits(self):
+        for class_def in self.iter_ast_types(ast.ClassDef):
+            if not class_def.bases:
+                yield self.error("T606", "Classes must be new-style classes.", class_def)
