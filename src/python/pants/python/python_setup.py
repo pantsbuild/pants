@@ -106,7 +106,7 @@ class PythonSetup(Subsystem):
             type=bool,
             default=False,
             fingerprint=True,
-            removal_version="1.27.0.dev2",
+            removal_version="1.28.0.dev2",
             removal_hint="Use --resolver-manylinux=<manylinux spec upper bound> instead.",
             help="Whether to consider manylinux wheels when resolving requirements for foreign"
             "linux platforms.",

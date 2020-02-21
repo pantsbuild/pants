@@ -69,7 +69,7 @@ class UnpackedWheels(ImportWheelsMixin, Target):
         """
         deprecated_conditional(
             lambda: type(within_data_subdir) not in (bool, type(None)),
-            removal_version="1.27.0.dev2",
+            removal_version="1.28.0.dev2",
             entity_description="A non-boolean value for `within_data_subdir`",
             hint_message="The location of the .data subdirectory will be inferred from the module name!",
         )

@@ -27,7 +27,7 @@ class SetupPyRunner:
     class Factory(ExecutablePexTool):
         options_scope = "setup-py-runner"
         deprecated_options_scope = "build-setup-requires-pex"
-        deprecated_options_scope_removal_version = "1.27.0.dev2"
+        deprecated_options_scope_removal_version = "1.28.0.dev2"
 
         @classmethod
         def register_options(cls, register: Callable[..., None]) -> None:
