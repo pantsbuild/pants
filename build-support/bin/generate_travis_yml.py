@@ -499,9 +499,17 @@ def lint(python_version: PythonVersion) -> Dict:
         **linux_shard(python_version=python_version, install_travis_wait=True),
         "name": f"Self-checks and lint (Python {python_version.decimal})",
         "script": [
-            "travis-wait-enhanced --timeout 40m --interval 9m -- ./build-support/bin/ci.py "
-            "--remote-execution-enabled --githooks --sanity-checks --doc-gen --lint "
-            f"--python-version {python_version.decimal}"
+            (
+                "travis-wait-enhanced --timeout 60m --interval 9m -- ./build-support/bin/ci.py "
+                f"--githooks --sanity-checks --doc-gen --python-version {python_version.decimal}"
+            ),
+            # NB: We split up `--lint` into its own shard because it uses remote execution. The
+            # RBE token expires after 60 minutes, so we don't want to generate the token until all
+            # local execution has finished.
+            (
+                "travis-wait-enhanced --timeout 25m --interval 9m -- ./build-support/bin/ci.py "
+                f"--remote-execution-enabled --lint --python-version {python_version.decimal}"
+            ),
         ],
     }
     safe_append(shard, "env", f"CACHE_NAME=lint.py{python_version.number}")
