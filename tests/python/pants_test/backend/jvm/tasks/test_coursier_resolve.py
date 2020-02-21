@@ -108,7 +108,7 @@ class CoursierResolveTest(NailgunTaskTestBase):
         task.resolve([jar_lib, scala_lib], compile_classpath, sources=True, javadoc=True, executor=None)
 
         # Both javadoc and sources jars are added to the classpath product
-        self.assertEqual(['default', 'src_doc', 'src_doc'],
+        self.assertEqual(sorted(['default', 'sources', 'javadoc']),
          sorted([c[0] for c in compile_classpath.get_for_target(jar_lib)]))
         self.assertEqual(0, len(compile_classpath.get_for_target(scala_lib)))
 

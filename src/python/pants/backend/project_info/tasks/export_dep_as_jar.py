@@ -48,9 +48,13 @@ class ExportDepAsJar(ConsoleTask):
   def register_options(cls, register):
     super().register_options(register)
     register('--formatted', type=bool, implicit_value=False,
-      help='Causes output to be a single line of JSON.')
+             help='Causes output to be a single line of JSON.')
     register('--sources', type=bool,
-      help='Causes the sources of dependencies to be zipped and included in the project.')
+             help='Causes the sources of dependencies to be zipped and included in the project.')
+    register('--libraries-sources', type=bool,
+             help='Causes 3rdparty libraries with sources to be output.')
+    register('--libraries-javadocs', type=bool,
+             help='Causes 3rdparty libraries with javadocs to be output.')
     register(
       '--transitive', type=bool, default=True, fingerprint=True,
       help='If True, use all targets in the build graph, else use only target roots.',
@@ -71,6 +75,10 @@ class ExportDepAsJar(ConsoleTask):
     round_manager.require_data('zinc_args')
     round_manager.require_data('runtime_classpath')
     round_manager.require_data('export_dep_as_jar_signal')
+    if options.libraries_sources:
+      round_manager.require_data('resolve_sources_signal')
+    if options.libraries_javadocs:
+      round_manager.require_data('resolve_javadocs_signal')
 
   @property
   def _output_folder(self):
@@ -385,8 +393,9 @@ class ExportDepAsJar(ConsoleTask):
 
     The return dictionary is suitable for serialization by json.dumps.
     :param all_targets: The list of targets to generate the map for.
-    :param classpath_products: Optional classpath_products. If not provided when the --libraries
-      option is `True`, this task will perform its own jar resolution.
+    :param runtime_classpath: ClasspathProducts containing entries for all the resolved and compiled
+      dependencies.
+    :param zinc_args_for_all_targets: Map from zinc compiled targets to the args used to compile them.
     """
     target_roots_set = set(self.context.target_roots)
 

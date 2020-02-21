@@ -61,7 +61,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
 
   @classmethod
   def product_types(cls):
-    return ['compile_classpath']
+    return ['compile_classpath', 'resolve_sources_signal', 'resolve_javadocs_signal']
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -106,12 +106,20 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
         self.context.log.info("Not generating a report. No resolution performed.")
       return
 
+    confs = self.get_options().confs
+    if "sources" not in confs and self.context.products.is_required_data("resolve_sources_signal"):
+      confs.append("sources")
+
+    if "javadoc" not in confs and self.context.products.is_required_data("resolve_javadocs_signal"):
+      confs.append("javadoc")
+
     executor = self.create_java_executor()
     results = self.resolve(executor=executor,
-                                      targets=targets,
-                                      classpath_products=compile_classpath,
-                                      confs=self.get_options().confs,
-                                      extra_args=self._args)
+                           targets=targets,
+                           classpath_products=compile_classpath,
+                           confs=confs,
+                           invalidate_dependents=True,
+                           extra_args=self._args)
     if self._report:
       results_with_resolved_artifacts = [r for r in results if r.has_resolved_artifacts]
 
