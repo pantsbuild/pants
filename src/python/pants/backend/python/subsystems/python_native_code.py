@@ -125,12 +125,12 @@ class PythonNativeCode(Subsystem):
         raise IncompatiblePlatformsError(
             dedent(
                 """\
-      Pants doesn't currently support cross-compiling native code.
-      The following targets set platforms arguments other than ['current'], which is unsupported for this reason.
-      Please either remove the platforms argument from these targets, or set them to exactly ['current'].
-      Bad targets:
-      {}
-      """.format(
+                Pants doesn't currently support cross-compiling native code.
+                The following targets set platforms arguments other than ['current'], which is unsupported for this reason.
+                Please either remove the platforms argument from these targets, or set them to exactly ['current'].
+                Bad targets:
+                {}
+                """.format(
                     "\n".join(sorted(target.address.reference() for target in bad_targets))
                 )
             )

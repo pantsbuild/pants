@@ -71,11 +71,11 @@ class PluginResolverTest(unittest.TestCase):
         source_dir.joinpath("setup.py").write_text(
             dedent(
                 f"""
-        from setuptools import setup
+                from setuptools import setup
 
 
-        setup(name="{plugin}", version="{version or cls.DEFAULT_VERSION}")
-      """
+                setup(name="{plugin}", version="{version or cls.DEFAULT_VERSION}")
+                """
             )
         )
         packager_cls = packager_cls or SdistInstaller

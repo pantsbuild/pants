@@ -68,14 +68,14 @@ class ApacheThriftPyGenTest(TaskTestBase):
             "src/thrift/com/foo/one.thrift",
             contents=dedent(
                 """
-    namespace py foo.bar
+                namespace py foo.bar
 
-    const i32 THINGCONSTANT = 42
+                const i32 THINGCONSTANT = 42
 
-    struct Thing {}
+                struct Thing {}
 
-    service ThingService {}
-    """
+                service ThingService {}
+                """
             ),
         )
         one = self.make_target(
@@ -102,17 +102,17 @@ class ApacheThriftPyGenTest(TaskTestBase):
             "src/thrift/com/foo/one.thrift",
             contents=dedent(
                 """
-    namespace py foo.bar
-    /**
-     * This comment has a unicode string:	🐈
-     * That is a cat, and it's used for testing purposes.
-     * When this is compiled, the thrift compiler should include the "coding=UTF-8".
-     * at the beginning of the python file.
-     **/
-    struct Foo {
-      1: i64 id,
-    }(persisted='true')
-    """
+                namespace py foo.bar
+                /**
+                 * This comment has a unicode string:	🐈
+                 * That is a cat, and it's used for testing purposes.
+                 * When this is compiled, the thrift compiler should include the "coding=UTF-8".
+                 * at the beginning of the python file.
+                 **/
+                struct Foo {
+                  1: i64 id,
+                }(persisted='true')
+                """
             ),
         )
         one = self.make_target(
@@ -130,20 +130,20 @@ class ApacheThriftPyGenTest(TaskTestBase):
             "src/thrift/com/foo/one.thrift",
             contents=dedent(
                 """
-    namespace py foo.bar
+                namespace py foo.bar
 
-    struct One {}
-    """
+                struct One {}
+                """
             ),
         )
         self.create_file(
             "src/thrift/com/foo/bar/two.thrift",
             contents=dedent(
                 """
-    namespace py foo.bar.baz
+                namespace py foo.bar.baz
 
-    struct Two {}
-    """
+                struct Two {}
+                """
             ),
         )
         one = self.make_target(
@@ -173,10 +173,10 @@ class ApacheThriftPyGenTest(TaskTestBase):
             "src/thrift/com/foo/one.thrift",
             contents=dedent(
                 """
-    namespace py foo.bar
+                namespace py foo.bar
 
-    struct One {}
-    """
+                struct One {}
+                """
             ),
         )
         one = self.make_target(
@@ -188,10 +188,10 @@ class ApacheThriftPyGenTest(TaskTestBase):
             "src/thrift2/com/foo/two.thrift",
             contents=dedent(
                 """
-    namespace py foo.baz
+                namespace py foo.baz
 
-    struct Two {}
-    """
+                struct Two {}
+                """
             ),
         )
         two = self.make_target(

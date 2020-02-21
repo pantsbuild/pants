@@ -712,18 +712,18 @@ Interrupted by user over pailgun client!
     def test_dependencies_swap(self):
         template = dedent(
             """
-        python_library(
-          name = 'A',
-          source = 'A.py',
-          {a_deps}
-        )
-
-        python_library(
-          name = 'B',
-          source = 'B.py',
-          {b_deps}
-        )
-        """
+            python_library(
+              name = 'A',
+              source = 'A.py',
+              {a_deps}
+            )
+    
+            python_library(
+              name = 'B',
+              source = 'B.py',
+              {b_deps}
+            )
+            """
         )
         with self.pantsd_successful_run_context() as (pantsd_run, checker, _, _):
             with temporary_dir(".") as directory:

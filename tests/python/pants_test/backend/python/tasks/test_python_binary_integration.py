@@ -147,19 +147,19 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
                 test_build,
                 dedent(
                     """
-        python_binary(
-          source='main.py',
-          dependencies=[':numpy'],
-          {target_platforms}
-        )
-        python_requirement_library(
-          name='numpy',
-          requirements=[
-            python_requirement('p537==1.0.4')
-          ]
-        )
-
-        """.format(
+                    python_binary(
+                      source='main.py',
+                      dependencies=[':numpy'],
+                      {target_platforms}
+                    )
+                    python_requirement_library(
+                      name='numpy',
+                      requirements=[
+                        python_requirement('p537==1.0.4')
+                      ]
+                    )
+            
+                    """.format(
                         target_platforms="platforms = [{}],".format(
                             ", ".join(["'{}'".format(p) for p in target_platforms])
                         )
@@ -200,12 +200,12 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
         self.assertIn(
             dedent(
                 """\
-      Pants doesn't currently support cross-compiling native code.
-      The following targets set platforms arguments other than ['current'], which is unsupported for this reason.
-      Please either remove the platforms argument from these targets, or set them to exactly ['current'].
-      Bad targets:
-      testprojects/src/python/python_distribution/ctypes:with_platforms
-    """
+                Pants doesn't currently support cross-compiling native code.
+                The following targets set platforms arguments other than ['current'], which is unsupported for this reason.
+                Please either remove the platforms argument from these targets, or set them to exactly ['current'].
+                Bad targets:
+                testprojects/src/python/python_distribution/ctypes:with_platforms
+                """
             ),
             result.stderr_data,
         )

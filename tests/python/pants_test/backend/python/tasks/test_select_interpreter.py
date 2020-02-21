@@ -49,11 +49,11 @@ class SelectInterpreterTest(TaskTestBase):
                 fp.write(
                     dedent(
                         f"""
-        #!{PythonInterpreter.get().binary}
-        from __future__ import print_function
+                        #!{PythonInterpreter.get().binary}
+                        from __future__ import print_function
 
-        print({id_str!r})
-        """
+                        print({id_str!r})
+                        """
                     ).strip()
                 )
             chmod_plus_x(binary)
