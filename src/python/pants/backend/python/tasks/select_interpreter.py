@@ -101,12 +101,6 @@ class SelectInterpreter(Task):
     if os.path.exists(interpreter_path_file):
       with open(interpreter_path_file, 'r') as infile:
         binary = infile.read().strip()
-        # TODO: Remove this temporary check once we have https://github.com/pantsbuild/pex/pull/886.
-        if not os.path.exists(binary):
-          self.context.log.info('Stale interpreter reference detected: {}, removing reference and '
-                                'selecting a new interpreter.'.format(binary))
-          os.remove(interpreter_path_file)
-          return self._select_interpreter(interpreter_path_file, targets)
       try:
         return PythonInterpreter.from_binary(binary)
       except PythonInterpreter.Error:

@@ -8,7 +8,6 @@ from textwrap import dedent
 from typing import Tuple
 
 from pex.interpreter import PythonInterpreter
-from pex.variables import ENV
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.targets.python_library import PythonLibrary
@@ -18,7 +17,7 @@ from pants.base.exceptions import TaskError
 from pants.option.ranked_value import RankedValue
 from pants.python.python_setup import PythonSetup
 from pants.testutil.task_test_base import TaskTestBase
-from pants.util.dirutil import chmod_plus_x, safe_mkdtemp, safe_rmtree
+from pants.util.dirutil import chmod_plus_x, safe_mkdtemp
 
 
 class SelectInterpreterTest(TaskTestBase):
@@ -33,9 +32,6 @@ class SelectInterpreterTest(TaskTestBase):
     # only one value no matter what arguments, environment or input stream it has attached. That
     # value is the interpreter identity which is a JSON dict with exactly the following keys:
     # binary, python_tag, abi_tag, platform_tag, version, supported_tags, env_markers.
-
-    # <impl> <abi> <impl_version> <major> <minor> <patch>
-
     def fake_interpreter(python_tag: str, abi_tag: str, version: Tuple[int, int, int]):
       interpreter_dir = safe_mkdtemp()
       binary = os.path.join(interpreter_dir, 'python')
@@ -90,11 +86,6 @@ class SelectInterpreterTest(TaskTestBase):
                             dependencies=dependencies, compatibility=compatibility)
 
   def _select_interpreter(self, target_roots, should_invalidate=None):
-    # TODO: Call PythonInterpreter.clear_cache() instead, when
-    # https://github.com/pantsbuild/pex/pull/885 is available.
-    interpreter_cache_dir = os.path.join(ENV.PEX_ROOT, 'interpreters')
-    safe_rmtree(interpreter_cache_dir)
-
     context = self.context(target_roots=target_roots)
 
     task = self.create_task(context)
