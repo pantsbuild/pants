@@ -42,12 +42,16 @@ class StripSourceRootsTest(TestBase):
 
     def test_strip_snapshot(self) -> None:
         def get_stripped_files_for_snapshot(
-            paths: List[str], *, args: Optional[List[str]] = None
+            paths: List[str],
+            *,
+            use_representative_path: bool = True,
+            args: Optional[List[str]] = None,
         ) -> List[str]:
             input_snapshot = self.make_snapshot({fp: "" for fp in paths})
-            return self.get_stripped_files(
-                StripSourceRootsRequest(input_snapshot, representative_path=paths[0]), args=args,
+            request = StripSourceRootsRequest(
+                input_snapshot, representative_path=paths[0] if use_representative_path else None
             )
+            return self.get_stripped_files(request, args=args)
 
         # Normal source roots
         assert get_stripped_files_for_snapshot(["src/python/project/example.py"]) == [
@@ -72,14 +76,14 @@ class StripSourceRootsTest(TestBase):
             in str(exc.value)
         )
 
-        # We don't support multiple source roots in the same snapshot, but also don't proactively
-        # validate for this situation because we don't expect it to happen in practice and we want to
-        # avoid having to call `SourceRoot.find_by_path` on every single file.
+        # Support for multiple source roots
+        file_names = ["src/python/project/example.py", "src/java/com/project/example.java"]
         with pytest.raises(ExecutionError) as exc:
-            get_stripped_files_for_snapshot(
-                ["src/python/project/example.py", "src/java/com/project/example.java"],
-            )
+            get_stripped_files_for_snapshot(file_names, use_representative_path=True)
         assert "Cannot strip prefix src/python" in str(exc.value)
+        assert sorted(
+            get_stripped_files_for_snapshot(file_names, use_representative_path=False)
+        ) == sorted(["project/example.py", "com/project/example.java"])
 
     def test_strip_target(self) -> None:
         def get_stripped_files_for_target(

@@ -1,15 +1,24 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import itertools
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import cast
+from typing import Optional, cast
 
 from pants.build_graph.files import Files
-from pants.engine.fs import EMPTY_SNAPSHOT, Digest, DirectoryWithPrefixToStrip, Snapshot
+from pants.engine.fs import (
+    EMPTY_SNAPSHOT,
+    Digest,
+    DirectoriesToMerge,
+    DirectoryWithPrefixToStrip,
+    PathGlobs,
+    Snapshot,
+    SnapshotSubset,
+)
 from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.rules import rule, subsystem_rule
-from pants.engine.selectors import Get
+from pants.engine.selectors import Get, MultiGet
 from pants.source.source_root import NoSourceRootError, SourceRootConfig
 
 
@@ -24,29 +33,14 @@ class SourceRootStrippedSources:
 class StripSourceRootsRequest:
     """A request to strip source roots for every file in the snapshot.
 
-    The field `representative_path` is used to determine the source root for the files to be stripped.
-    This assumes that every file shares the same source root, which should be true in practice as the
-    `sources` field for a target always has files in the same source root. We don't proactively
-    validate this assumption because of the performance implications of running
-    `SourceRoots.find_by_path` on every single file in the snapshot, as opposed to only one file. See
-    https://github.com/pantsbuild/pants/pull/9112#discussion_r377999025 for more context on this
-    design.
+    The call site may optionally give the field `representative_path` if it is confident that all
+    the files in the snapshot will only have one source root. Using `representative_path` results in
+    better performance because we only need to call `SourceRoots.find_by_path()` on one single file
+    rather than every file.
     """
 
     snapshot: Snapshot
-    representative_path: str
-
-    def determine_source_root(self, *, source_root_config: SourceRootConfig) -> str:
-        source_roots_object = source_root_config.get_source_roots()
-        source_root = source_roots_object.safe_find_by_path(self.representative_path)
-        if source_root is not None:
-            return cast(str, source_root.path)
-        if source_root_config.options.unmatched == "fail":
-            raise NoSourceRootError(
-                f"Could not find a source root for `{self.representative_path}`."
-            )
-        # Otherwise, create a source root by using the parent directory.
-        return PurePath(self.representative_path).parent.as_posix()
+    representative_path: Optional[str] = None
 
 
 @rule
@@ -55,14 +49,53 @@ async def strip_source_roots_from_snapshot(
 ) -> SourceRootStrippedSources:
     """Removes source roots from a snapshot, e.g. `src/python/pants/util/strutil.py` ->
     `pants/util/strutil.py`."""
-    source_root = request.determine_source_root(source_root_config=source_root_config)
-    resulting_digest = await Get[Digest](
-        DirectoryWithPrefixToStrip(
-            directory_digest=request.snapshot.directory_digest, prefix=source_root,
+    source_roots_object = source_root_config.get_source_roots()
+
+    def determine_source_root(path: str) -> str:
+        source_root = source_roots_object.safe_find_by_path(path)
+        if source_root is not None:
+            return cast(str, source_root.path)
+        if source_root_config.options.unmatched == "fail":
+            raise NoSourceRootError(f"Could not find a source root for `{path}`.")
+        # Otherwise, create a source root by using the parent directory.
+        return PurePath(path).parent.as_posix()
+
+    if request.representative_path is not None:
+        resulting_digest = await Get[Digest](
+            DirectoryWithPrefixToStrip(
+                directory_digest=request.snapshot.directory_digest,
+                prefix=determine_source_root(request.representative_path),
+            )
         )
+        resulting_snapshot = await Get[Snapshot](Digest, resulting_digest)
+        return SourceRootStrippedSources(snapshot=resulting_snapshot)
+
+    files_grouped_by_source_root = {
+        source_root: tuple(files)
+        for source_root, files in itertools.groupby(
+            request.snapshot.files, key=determine_source_root
+        )
+    }
+    snapshot_subsets = await MultiGet(
+        Get[Snapshot](
+            SnapshotSubset(
+                directory_digest=request.snapshot.directory_digest, globs=PathGlobs(files),
+            )
+        )
+        for files in files_grouped_by_source_root.values()
     )
-    resulting_snapshot = await Get[Snapshot](Digest, resulting_digest)
-    return SourceRootStrippedSources(snapshot=resulting_snapshot)
+    resulting_digests = await MultiGet(
+        Get[Digest](
+            DirectoryWithPrefixToStrip(
+                directory_digest=snapshot.directory_digest, prefix=source_root
+            )
+        )
+        for snapshot, source_root in zip(snapshot_subsets, files_grouped_by_source_root.keys())
+    )
+
+    merged_result = await Get[Digest](DirectoriesToMerge(resulting_digests))
+    resulting_snapshot = await Get[Snapshot](Digest, merged_result)
+    return SourceRootStrippedSources(resulting_snapshot)
 
 
 @rule
