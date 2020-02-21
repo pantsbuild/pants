@@ -7,9 +7,10 @@ from typing import Set
 from pants.engine.addressable import Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
-from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
+from pants.engine.legacy.graph import HydratedTarget, HydratedTargets, TransitiveHydratedTargets
 from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get
+from pants.engine.legacy.structs import PythonRequirementLibraryAdaptor
 
 
 class DependencyType(Enum):
@@ -78,12 +79,20 @@ async def dependencies(
   options: DependenciesOptions,
 ) -> Dependencies:
   addresses: Set[str] = set()
+  third_party_targets: Set[HydratedTarget] = set()
   if options.values.transitive:
     transitive_targets = await Get[TransitiveHydratedTargets](
       BuildFileAddresses, build_file_addresses,
     )
     transitive_dependencies = transitive_targets.closure - set(transitive_targets.roots)
-    addresses.update(hydrated_target.address.spec for hydrated_target in transitive_dependencies)
+    for hydrated_target in transitive_dependencies:
+      address = hydrated_target.address.spec
+      if address.startswith('3rdparty'):
+        third_party_targets.add(hydrated_target)
+      else:
+        addresses.add(address)
+    # targets.update(transitive_dependencies)
+    # addresses.update(hydrated_target.address.spec for hydrated_target in transitive_dependencies)
   else:
     hydrated_targets = await Get[HydratedTargets](BuildFileAddresses, build_file_addresses)
     addresses.update(
@@ -99,6 +108,12 @@ async def dependencies(
   if options.values.type in [DependencyType.THIRD_PARTY, DependencyType.SOURCE_AND_THIRD_PARTY]:
     # TODO(John Sirois): We need an external payload abstraction at which point knowledge
     # of jar and requirement payloads can go and this hairball will be untangled.
+
+    for hydrated_target in third_party_targets:
+      if isinstance(hydrated_target.adaptor, PythonRequirementLibraryAdaptor):
+        for requirement in hydrated_target.adaptor.requirements:
+          with options.line_oriented(console) as print_stdout:
+            print_stdout(requirement.requirement)
     import pdb; pdb.set_trace()
     # if isinstance(tgt.payload.get_field('requirements'), PythonRequirementsField):
     #   for requirement in tgt.payload.requirements:
