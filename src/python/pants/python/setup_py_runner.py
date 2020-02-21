@@ -9,8 +9,8 @@ from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_info import PexInfo
 
-from pants.python.executable_pex_tool import ExecutablePexTool
 from pants.option.optionable import Optionable
+from pants.python.executable_pex_tool import ExecutablePexTool
 from pants.python.python_requirement import PythonRequirement
 from pants.util.contextutil import pushd
 from pants.util.dirutil import safe_mkdtemp
