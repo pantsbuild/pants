@@ -218,7 +218,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
             "--v2",
             advanced=True,
             type=bool,
-            default=False,
+            default=True,
             help="Enables execution of v2 @goal_rules.",
         )
 
