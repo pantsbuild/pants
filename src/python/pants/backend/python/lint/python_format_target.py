@@ -46,7 +46,8 @@ async def format_python_target(
             ),
         )
         results.append(result)
-        prior_formatter_result_digest = result.digest
+        if result != FmtResult.noop():
+            prior_formatter_result_digest = result.digest
     return AggregatedFmtResults(tuple(results), combined_digest=prior_formatter_result_digest)
 
 
