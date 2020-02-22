@@ -2,13 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import configparser
-import functools
 import os
 from contextlib import contextmanager
 from textwrap import dedent
 
 import coverage
 
+from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.gather_sources import GatherSources
 from pants.backend.python.tasks.pytest_prep import PytestPrep
@@ -52,6 +52,16 @@ class PytestTestBase(PythonTaskTestBase, DeclarativeTaskTestMixin):
         PytestPrepCoverageVersionPinned,
     ]
 
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.resolver_cache_dir = safe_mkdtemp()
+
+    def set_other_options(self):
+        self.set_options_for_scope(
+            PythonSetup.options_scope, resolver_cache_dir=self.resolver_cache_dir,
+        )
+
     _CONFTEST_CONTENT = "# I am an existing root-level conftest file."
 
     _default_test_options = {
@@ -69,12 +79,14 @@ class PytestTestBase(PythonTaskTestBase, DeclarativeTaskTestMixin):
     def run_tests(self, targets, *passthru_args, **options):
         """Run the tests in the specified targets, with the specified PytestRun task options."""
         self.set_options(**self._augment_options(options))
+        self.set_other_options()
         with pushd(self.build_root):
             result = self.invoke_tasks(target_roots=targets, passthru_args=list(passthru_args),)
             return result.context
 
     def run_failing_tests(self, targets, failed_targets, *passthru_args, **options):
         self.set_options(**self._augment_options(options))
+        self.set_other_options()
         with self.assertRaises(ErrorWhileTesting) as cm:
             with pushd(self.build_root):
                 self.invoke_tasks(
@@ -977,105 +989,6 @@ python_tests(
 
         with self.assertRaises(PytestRun.InvalidShardSpecification):
             self.run_tests(targets=[self.green], test_shard="1/a")
-
-    @contextmanager
-    def marking_tests(self):
-        init_subsystem(Target.Arguments)
-        init_subsystem(SourceRootConfig)
-
-        with temporary_dir() as marker_dir:
-            self.create_file(
-                "test/python/passthru/test_passthru.py",
-                dedent(
-                    """
-                    import inspect
-                    import os
-                    import pytest
-                    import unittest
-        
-        
-                    class PassthruTest(unittest.TestCase):
-                      def touch(self, path):
-                        with open(path, 'wb') as fp:
-                          fp.close()
-        
-                      def mark_test_run(self):
-                        caller_frame_record = inspect.stack()[1]
-        
-                        # For the slot breakdown of a frame record tuple, see:
-                        #   https://docs.python.org/2/library/inspect.html#the-interpreter-stack
-                        _, _, _, caller_func_name, _, _ = caller_frame_record
-        
-                        marker_file = os.path.join({marker_dir!r}, caller_func_name)
-                        self.touch(marker_file)
-        
-                      def test_one(self):
-                        self.mark_test_run()
-        
-                      @pytest.mark.purple
-                      def test_two(self):
-                        self.mark_test_run()
-        
-                      def test_three(self):
-                        self.mark_test_run()
-        
-                      @pytest.mark.red
-                      def test_four(self):
-                        self.mark_test_run()
-        
-                      @pytest.mark.green
-                      def test_five(self):
-                        self.mark_test_run()
-                    """.format(
-                        marker_dir=marker_dir
-                    )
-                ),
-            )
-
-            def assert_mark(exists, name):
-                message = f"{('Expected' if exists else 'Did not expect')} {name!r} to be executed."
-                marker_file = os.path.join(marker_dir, name)
-                self.assertEqual(exists, os.path.exists(marker_file), message)
-
-            self.add_to_build_file("test/python/passthru", "python_tests()")
-            test = self.target("test/python/passthru")
-            yield test, functools.partial(assert_mark, True), functools.partial(assert_mark, False)
-
-    def test_passthrough_args_facility_single_style(self):
-        with self.marking_tests() as (target, assert_test_run, assert_test_not_run):
-            self.run_tests([target], "-ktest_one or test_two")
-            assert_test_run("test_one")
-            assert_test_run("test_two")
-            assert_test_not_run("test_three")
-            assert_test_not_run("test_four")
-            assert_test_not_run("test_five")
-
-    def test_passthrough_args_facility_plus_arg_style(self):
-        with self.marking_tests() as (target, assert_test_run, assert_test_not_run):
-            self.run_tests([target], "-m", "purple or red")
-            assert_test_not_run("test_one")
-            assert_test_run("test_two")
-            assert_test_not_run("test_three")
-            assert_test_run("test_four")
-            assert_test_not_run("test_five")
-
-    def test_passthrough_added_after_options(self):
-        with self.marking_tests() as (target, assert_test_run, assert_test_not_run):
-            self.run_tests([target], "-m", "purple or red", "-k", "two")
-            assert_test_not_run("test_one")
-            assert_test_run("test_two")
-            assert_test_not_run("test_three")
-            assert_test_not_run("test_four")
-            assert_test_not_run("test_five")
-
-    def test_options_shlexed(self):
-        with self.marking_tests() as (target, assert_test_run, assert_test_not_run):
-            self.run_tests([target], "-m", "purple or red")
-            assert_test_not_run("test_one")
-            assert_test_run("test_two")
-            assert_test_not_run("test_three")
-            assert_test_run("test_four")
-            assert_test_not_run("test_five")
 
     @contextmanager
     def run_with_junit_xml_dir(self, targets):

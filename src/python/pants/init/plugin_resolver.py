@@ -10,12 +10,10 @@ import uuid
 from pex import resolver
 from pex.interpreter import PythonInterpreter
 from pkg_resources import working_set as global_working_set
-from wheel.install import WheelFile
 
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.python.python_repos import PythonRepos
-from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_delete, safe_mkdir, safe_open
+from pants.util.dirutil import safe_delete, safe_open
 from pants.util.memo import memoized_property
 from pants.util.strutil import ensure_text
 from pants.version import PANTS_SEMVER
@@ -27,31 +25,6 @@ class PluginResolver:
     @staticmethod
     def _is_wheel(path):
         return os.path.isfile(path) and path.endswith(".whl")
-
-    @classmethod
-    def _activate_wheel(cls, wheel_path):
-        install_dir = "{}-install".format(wheel_path)
-        if not os.path.isdir(install_dir):
-            with temporary_dir(root_dir=os.path.dirname(install_dir)) as tmp:
-                cls._install_wheel(wheel_path, tmp)
-                os.rename(tmp, install_dir)
-        # Activate any .pth files installed above.
-        site.addsitedir(install_dir)
-        return install_dir
-
-    @classmethod
-    def _install_wheel(cls, wheel_path, install_dir):
-        safe_mkdir(install_dir, clean=True)
-        WheelFile(wheel_path).install(
-            force=True,
-            overrides={
-                "purelib": install_dir,
-                "headers": os.path.join(install_dir, "headers"),
-                "scripts": os.path.join(install_dir, "bin"),
-                "platlib": install_dir,
-                "data": install_dir,
-            },
-        )
 
     def __init__(self, options_bootstrapper, *, interpreter=None):
         self._options_bootstrapper = options_bootstrapper
@@ -73,10 +46,11 @@ class PluginResolver:
         """
         working_set = working_set or global_working_set
         if self._plugin_requirements:
-            for plugin_location in self._resolve_plugin_locations():
-                if self._is_wheel(plugin_location):
-                    plugin_location = self._activate_wheel(plugin_location)
-                working_set.add_entry(plugin_location)
+            for resolved_plugin_location in self._resolve_plugin_locations():
+                site.addsitedir(
+                    resolved_plugin_location
+                )  # Activate any .pth files plugin wheels may have.
+                working_set.add_entry(resolved_plugin_location)
         return working_set
 
     def _resolve_plugin_locations(self):
@@ -111,16 +85,11 @@ class PluginResolver:
         )
         resolved_dists = resolver.resolve(
             self._plugin_requirements,
-            fetchers=self._python_repos.get_fetchers(),
+            indexes=self._python_repos.indexes,
+            find_links=self._python_repos.repos,
             interpreter=self._interpreter,
-            context=self._python_repos.get_network_context(),
             cache=self.plugin_cache_dir,
-            # Effectively never expire.
-            cache_ttl=10 * 365 * 24 * 60 * 60,
             allow_prereleases=PANTS_SEMVER.is_prerelease,
-            # Plugins will all depend on `pantsbuild.pants` which is
-            # distributed as a manylinux wheel.
-            use_manylinux=True,
         )
         return [resolved_dist.distribution for resolved_dist in resolved_dists]
 

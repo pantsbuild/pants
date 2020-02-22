@@ -3,7 +3,7 @@
 
 import re
 import shlex
-from typing import Any, Dict, List, Optional, Sequence, Union
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Union
 
 
 def ensure_binary(text_or_binary: Union[bytes, str]) -> bytes:
@@ -54,7 +54,7 @@ def shell_quote(s: str) -> str:
     return "'" + s.replace("'", "'\"'\"'") + "'"
 
 
-def safe_shlex_join(arg_list: Sequence[str]) -> str:
+def safe_shlex_join(arg_list: Iterable[str]) -> str:
     """Join a list of strings into a shlex-able string.
 
     Shell-quotes each argument with `shell_quote()`.

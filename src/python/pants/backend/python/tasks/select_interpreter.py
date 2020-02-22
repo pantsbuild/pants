@@ -4,7 +4,6 @@
 import hashlib
 import os
 
-from pex.executor import Executor
 from pex.interpreter import PythonInterpreter
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
@@ -106,9 +105,7 @@ class SelectInterpreter(Task):
                 binary = infile.read().strip()
             try:
                 return PythonInterpreter.from_binary(binary)
-            except Executor.ExecutableNotFound:
-                # TODO(John Sirois): Trap a more appropriate exception once available:
-                #  https://github.com/pantsbuild/pex/issues/672
+            except PythonInterpreter.Error:
                 self.context.log.info(
                     "Stale interpreter reference detected: {}, removing reference and "
                     "selecting a new interpreter.".format(binary)

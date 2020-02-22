@@ -25,12 +25,12 @@ def has_python_sources(tgt: Target) -> bool:
     return is_python_target(tgt) and tgt.has_sources()
 
 
-def is_local_python_dist(tgt: Target) -> bool:
-    return isinstance(tgt, PythonDistribution)
-
-
 def has_resources(tgt: Target) -> bool:
     return isinstance(tgt, Files) and tgt.has_sources()
+
+
+def is_local_python_dist(tgt: Target) -> bool:
+    return isinstance(tgt, PythonDistribution)
 
 
 def has_python_requirements(tgt: Target) -> bool:

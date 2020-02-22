@@ -20,6 +20,8 @@ class PythonSetup(Subsystem):
 
     options_scope = "python-setup"
 
+    _DEFAULT_MANYLINUX_UPPER_BOUND = "manylinux2014"
+
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
@@ -76,8 +78,9 @@ class PythonSetup(Subsystem):
             type=int,
             metavar="<seconds>",
             default=10 * 365 * 86400,  # 10 years.
-            help="The time in seconds before we consider re-resolving an open-ended requirement, "
-            'e.g. "flask>=0.2" if a matching distribution is available on disk.',
+            removal_version="1.28.0.dev2",
+            removal_hint="This option is now unused, please remove configuration of it.",
+            help="DEPRECATED: This option is unused.",
         )
         register(
             "--resolver-allow-prereleases",
@@ -111,10 +114,30 @@ class PythonSetup(Subsystem):
             "--resolver-use-manylinux",
             advanced=True,
             type=bool,
-            default=True,
+            default=False,
             fingerprint=True,
-            help="Whether to consider manylinux wheels when resolving requirements for linux "
-            "platforms.",
+            removal_version="1.28.0.dev2",
+            removal_hint="Use --resolver-manylinux=<manylinux spec upper bound> instead.",
+            help="Whether to consider manylinux wheels when resolving requirements for foreign"
+            "linux platforms.",
+        )
+        register(
+            "--resolver-manylinux",
+            advanced=True,
+            type=str,
+            default=cls._DEFAULT_MANYLINUX_UPPER_BOUND,
+            fingerprint=True,
+            help="Whether to allow resolution of manylinux wheels when resolving requirements for "
+            "foreign linux platforms. The value should be a manylinux platform upper bound, "
+            "e.g.: manylinux2010, or else [Ff]alse, [Nn]o or [Nn]one to disallow.",
+        )
+        register(
+            "--resolver-jobs",
+            type=int,
+            default=None,
+            advanced=True,
+            fingerprint=True,
+            help="The maximum number of concurrent jobs to resolve wheels with.",
         )
 
     @property
@@ -146,16 +169,31 @@ class PythonSetup(Subsystem):
         )
 
     @property
-    def resolver_cache_ttl(self):
-        return self.get_options().resolver_cache_ttl
-
-    @property
     def resolver_allow_prereleases(self):
         return self.get_options().resolver_allow_prereleases
 
     @property
-    def use_manylinux(self):
-        return self.get_options().resolver_use_manylinux
+    def manylinux(self):
+        if self.get_options().resolver_manylinux:
+            manylinux = self.get_options().resolver_manylinux
+            if manylinux.lower() in ("false", "no", "none"):
+                if self.get_options().resolver_use_manylinux:
+                    logger.warning(
+                        "The [{scope}] manylinux option is explicitly set to {manylinux} "
+                        "over-riding the [{scope}] use_manylinux option.".format(
+                            scope=self.options_scope, manylinux=manylinux
+                        )
+                    )
+                return None
+            return manylinux
+        elif self.get_options().resolver_use_manylinux:
+            return self._DEFAULT_MANYLINUX_UPPER_BOUND
+        else:
+            return None
+
+    @property
+    def resolver_jobs(self):
+        return self.get_options().resolver_jobs
 
     @property
     def artifact_cache_dir(self):

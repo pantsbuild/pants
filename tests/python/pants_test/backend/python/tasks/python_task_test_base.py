@@ -4,34 +4,11 @@
 import os
 from textwrap import dedent
 
-from pex import pep425tags
-
 from pants.backend.python.register import build_file_aliases as register_python
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.build_graph.address import Address
 from pants.testutil.subsystem.util import init_subsystem
 from pants.testutil.task_test_base import TaskTestBase
-
-
-def normalize_platform_tag(platform_tag):
-    return platform_tag.replace("-", "_")
-
-
-def name_and_platform(whl):
-    # The wheel filename is of the format
-    # {distribution}-{version}(-{build tag})?-{python tag}-{abi tag}-{platform tag}.whl
-    # See https://www.python.org/dev/peps/pep-0425/.
-    # We don't care about the python or abi versions (they depend on what we're currently
-    # running on), we just want to make sure we have all the platforms we expect.
-    parts = os.path.splitext(whl)[0].split("-")
-    dist = parts[0]
-    version = parts[1]
-    platform_tag = parts[-1]
-    return dist, version, normalize_platform_tag(platform_tag)
-
-
-def normalized_current_platform():
-    return normalize_platform_tag(pep425tags.get_platform())
 
 
 class PythonTaskTestBase(TaskTestBase):

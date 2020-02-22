@@ -6,6 +6,7 @@ import logging
 from twitter.common.collections import maybe_list
 
 from pants.backend.python.targets.import_wheels_mixin import ImportWheelsMixin
+from pants.base.deprecated import deprecated_conditional
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.build_graph.target import Target
@@ -57,15 +58,21 @@ class UnpackedWheels(ImportWheelsMixin, Target):
         :param compatibility: Python interpreter constraints used to create the pex for the requirement
                               target. If unset, the default interpreter constraints are used. This
                               argument is unnecessary unless the native code depends on libpython.
-        :param str within_data_subdir: If provided, descend into '<name>-<version>.data/<subdir>' when
-                                       matching `include_patterns`. For python wheels which declare any
-                                       non-code data, this is usually needed to extract that without
-                                       manually specifying the relative path, including the package
-                                       version. For example, when `data_files` is used in a setup.py,
-                                       `within_data_subdir='data'` will allow specifying
-                                       `include_patterns` matching exactly what is specified in the
-                                       setup.py.
+        :param bool within_data_subdir: If True, descend into '<name>-<version>.data/' when matching
+                                        `include_patterns`. For python wheels which declare any non-code
+                                        data, this is usually needed to extract that without manually
+                                        specifying the relative path, including the package version. For
+                                        example, when `data_files` is used in a setup.py,
+                                        `within_data_subdir=True` will allow specifying
+                                        `include_patterns` matching exactly what is specified in the
+                                        setup.py.
         """
+        deprecated_conditional(
+            lambda: type(within_data_subdir) not in (bool, type(None)),
+            removal_version="1.28.0.dev2",
+            entity_description="A non-boolean value for `within_data_subdir`",
+            hint_message="The location of the .data subdirectory will be inferred from the module name!",
+        )
         payload = payload or Payload()
         payload.add_fields(
             {

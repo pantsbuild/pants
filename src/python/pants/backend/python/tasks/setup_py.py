@@ -9,8 +9,9 @@ import subprocess
 import textwrap
 from abc import ABC, abstractmethod
 from collections import OrderedDict, defaultdict
+from pathlib import Path
+from typing import Dict
 
-from pex.installer import Packager, WheelInstaller
 from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
@@ -30,6 +31,7 @@ from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import sort_targets
 from pants.build_graph.resources import Resources
+from pants.python.setup_py_runner import SetupPyRunner
 from pants.task.task import Task
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_concurrent_creation, safe_rmtree, safe_walk
@@ -44,17 +46,6 @@ from setuptools import setup
 
 setup(**{setup_dict})
 """
-
-
-class SetupPyRunner(WheelInstaller):
-    # We extend WheelInstaller to make sure `setuptools` and `wheel` are available to setup.py.
-
-    def __init__(self, source_dir, setup_command, **kw):
-        self._setup_command = setup_command
-        super().__init__(source_dir, **kw)
-
-    def setup_command(self):
-        return self._setup_command
 
 
 class TargetAncestorIterator:
@@ -360,6 +351,10 @@ class SetupPy(Task):
                     yield binary
 
     @classmethod
+    def subsystem_dependencies(cls):
+        return super().subsystem_dependencies() + (SetupPyRunner.Factory.scoped(cls),)
+
+    @classmethod
     def prepare(cls, options, round_manager):
         round_manager.require_data(PythonInterpreter)
 
@@ -661,7 +656,7 @@ class SetupPy(Task):
         # phase to ensure an exported target is, for example (--run="sdist upload"), uploaded before any
         # exported target that depends on it is uploaded.
 
-        created = {}
+        created: Dict[PythonTarget, Path] = {}
 
         def create(exported_python_target):
             if exported_python_target not in created:
@@ -672,7 +667,7 @@ class SetupPy(Task):
                     exported_python_target, exported_python_target
                 )
                 setup_dir, dependencies = self.create_setup_py(subject, dist_dir)
-                created[exported_python_target] = setup_dir
+                created[exported_python_target] = Path(setup_dir)
                 if self._recursive:
                     for dep in dependencies:
                         if is_exported_python_target(dep):
@@ -683,23 +678,31 @@ class SetupPy(Task):
 
         interpreter = self.context.products.get_data(PythonInterpreter)
         python_dists = self.context.products.register_data(self.PYTHON_DISTS_PRODUCT, {})
+
+        setup_runner = SetupPyRunner.Factory.create(
+            scope=self,
+            interpreter=interpreter,
+            pex_file_path=os.path.join(self.workdir, self.fingerprint, "setup-py-runner.pex"),
+        )
         for exported_python_target in reversed(sort_targets(list(created.keys()))):
             setup_dir = created.get(exported_python_target)
             if setup_dir:
                 if not self._run:
-                    self.context.log.info("Running packager against {}".format(setup_dir))
-                    setup_runner = Packager(setup_dir, interpreter=interpreter)
-                    tgz_name = os.path.basename(setup_runner.sdist())
+                    self.context.log.info("Running sdist against {}".format(setup_dir))
+                    sdist = setup_runner.sdist(setup_dir)
+                    tgz_name = sdist.name
                     sdist_path = os.path.join(dist_dir, tgz_name)
                     self.context.log.info("Writing {}".format(sdist_path))
-                    shutil.move(setup_runner.sdist(), sdist_path)
-                    safe_rmtree(setup_dir)
+                    shutil.move(sdist, sdist_path)
+                    safe_rmtree(str(setup_dir))
                     python_dists[exported_python_target] = sdist_path
                 else:
                     self.context.log.info("Running {} against {}".format(self._run, setup_dir))
                     split_command = safe_shlex_split(self._run)
-                    setup_runner = SetupPyRunner(setup_dir, split_command, interpreter=interpreter)
-                    installed = setup_runner.run()
-                    if not installed:
-                        raise TaskError("Install failed.")
+                    try:
+                        setup_runner.run_setup_command(
+                            source_dir=setup_dir, setup_command=split_command
+                        )
+                    except SetupPyRunner.CommandFailure as e:
+                        raise TaskError(f"Install failed: {e}")
                     python_dists[exported_python_target] = setup_dir

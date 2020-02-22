@@ -3,8 +3,6 @@ beautifulsoup4>=4.6.0,<4.7
 cffi==1.13.2
 contextlib2==0.5.5
 coverage>=4.5,<4.6
-# TODO remove this pin once we resolve https://github.com/pantsbuild/pants/issues/8502
-cryptography==2.7
 dataclasses==0.6
 docutils==0.14
 fasteners==0.15.0
@@ -12,7 +10,7 @@ Markdown==2.1.1
 packaging==16.8
 parameterized==0.6.1
 pathspec==0.5.9
-pex==1.6.12
+pex==2.1.4
 psutil==5.6.3
 Pygments==2.3.1
 pyopenssl==17.3.0
@@ -24,8 +22,8 @@ py_zipkin==0.18.4
 requests[security]>=2.20.1
 responses==0.10.4
 setproctitle==1.1.10
-setuptools==40.6.3
+setuptools==44.0.0
 toml==0.10.0
 typing-extensions==3.7.4
-wheel==0.31.1
+wheel==0.33.6
 www-authenticate==0.9.2

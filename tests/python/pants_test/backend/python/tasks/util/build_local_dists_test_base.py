@@ -18,8 +18,8 @@ from pants.testutil.task_test_base import DeclarativeTaskTestMixin
 from pants.util.collections import assert_single_element
 from pants.util.enums import match
 from pants.util.meta import classproperty
-from pants_test.backend.python.tasks.python_task_test_base import (
-    PythonTaskTestBase,
+from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
+from pants_test.backend.python.tasks.util.wheel import (
     name_and_platform,
     normalized_current_platform,
 )

@@ -17,7 +17,7 @@ from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import is_executable, read_file, safe_file_dump
 from pants.util.enums import match
-from pants_test.backend.python.tasks.python_task_test_base import name_and_platform
+from pants_test.backend.python.tasks.util.wheel import name_and_platform
 
 
 def invoke_pex_for_output(pex_file_to_run):
@@ -215,6 +215,11 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
         and (2) a different platform than the one we are currently running on. The python_binary()
         target below is declared with `platforms="current"`.
         """
+
+        # The implementation abbreviation of 'dne' (does not exist), is ~guaranteed not to match our
+        # current platform while still providing an overall valid platform identifier string.
+        foreign_platform = "macosx-10.5-x86_64-dne-37-m"
+
         command = ["run", "testprojects/src/python/python_distribution/ctypes:bin"]
         # TODO(#6848): we need to provide the libstdc++.so.6.dylib which comes with gcc on osx in the
         # DYLD_LIBRARY_PATH during the 'run' goal somehow.
@@ -222,7 +227,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
             command=command,
             config={
                 "native-build-step": {"toolchain_variant": "llvm",},
-                "python-setup": {"platforms": ["current", "this_platform_does_not_exist"]},
+                "python-setup": {"platforms": ["current", foreign_platform]},
             },
         )
         self.assert_success(pants_run)

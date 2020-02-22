@@ -36,12 +36,17 @@ process_execution_speculation_delay = 15
 # TODO(#7735): This config is not ideal, that we must specify the PATH for both local and remote
 # platforms. This should be replaced by a proper mechanism to differentiate between the two.
 interpreter_search_paths = [
+  # These are the interpreter paths we set up on the remote container, plus `/usr/bin`, so that
+  # pip can find `ld` if necessary.
+  "/pyenv-docker-build/versions/3.7.3/bin:/pyenv-docker-build/versions/3.6.8/bin:/pyenv-docker-build/versions/2.7.15/bin:/usr/bin",
   # We include the host PATH and PEXRC values so that speculation still works.
-  "<PATH>",
-  "<PEXRC>",
-  # This is the $PATH of the docker container, obtained by locally running `$ docker run --tag
-  # rbe-remote-execution sh -c 'echo $PATH'`.
-  "/pyenv-docker-build/versions/3.7.3/bin:/pyenv-docker-build/versions/3.6.8/bin:/pyenv-docker-build/versions/2.7.15/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/go/bin",
+  # NOTE: These come after the remote paths. Putting them before the remote paths means generic
+  # bin dirs like /usr/bin will be on the PATH ahead of the pyenv dirs we actually want to use
+  # on the remote side.  The /pyenv-docker-build/ paths are unlikely to exist on local systems,
+  # and so will not interfere with interpreter discovery there. This emphasizes
+  # that we should fix #7735, and not commingle the paths of two unrelated systems.
+  '<PATH>',
+  '<PEXRC>',
 ]
 
 [python-native-code]

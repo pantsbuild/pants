@@ -238,7 +238,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
                 command=[
                     "test",
                     f"{os.path.join(self.testproject, 'python_3_selection_testing')}:test_py3",
-                    '--python-setup-interpreter-constraints=["CPython>=3"]',
+                    '--python-setup-interpreter-constraints=["CPython>=3.6"]',
                 ],
                 config=pants_ini_config,
             )

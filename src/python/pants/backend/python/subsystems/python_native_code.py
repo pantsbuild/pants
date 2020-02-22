@@ -10,11 +10,9 @@ from typing import Tuple
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.python.subsystems import pex_build_util
-from pants.backend.python.subsystems.executable_pex_tool import ExecutablePexTool
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.base.exceptions import IncompatiblePlatformsError
 from pants.engine.rules import rule, subsystem_rule
-from pants.python.python_requirement import PythonRequirement
 from pants.python.python_setup import PythonSetup
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
@@ -137,35 +135,6 @@ class PythonNativeCode(Subsystem):
                 )
             )
         )
-
-
-class BuildSetupRequiresPex(ExecutablePexTool):
-    options_scope = "build-setup-requires-pex"
-
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--setuptools-version",
-            advanced=True,
-            fingerprint=True,
-            default="40.6.3",
-            help="The setuptools version to use when executing `setup.py` scripts.",
-        )
-        register(
-            "--wheel-version",
-            advanced=True,
-            fingerprint=True,
-            default="0.32.3",
-            help="The wheel version to use when executing `setup.py` scripts.",
-        )
-
-    @property
-    def base_requirements(self):
-        return [
-            PythonRequirement("setuptools=={}".format(self.get_options().setuptools_version)),
-            PythonRequirement("wheel=={}".format(self.get_options().wheel_version)),
-        ]
 
 
 @dataclass(frozen=True)

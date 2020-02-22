@@ -17,18 +17,21 @@ from pants.util.contextutil import environment_as
 from pants.util.dirutil import safe_mkdtemp, safe_rmtree
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 from parameterized import parameterized
+from pex import resolver
 from pex.interpreter import PythonInterpreter
-from wheel.install import WheelFile
 
 from pants.contrib.python.checks.tasks.checkstyle.checkstyle import Checkstyle
 
 CHECKER_RESOLVE_METHOD = [("sys.path", True), ("resolve", False)]
 
 
+# IMPORTANT NOTE: This test fails if run in a chroot.
+# To run it, use `./pants test.pytest --no-chroot`.
+# One more reason to kill this plugin...
 class CheckstyleTest(PythonTaskTestBase):
 
     py2_constraint = "CPython>=2.7,<3"
-    py3_constraint = "CPython>=3.4,<3.6"
+    py3_constraint = "CPython>=3.6,<3.8"
 
     @staticmethod
     def build_checker_wheel(root_dir: str) -> str:
@@ -48,13 +51,11 @@ class CheckstyleTest(PythonTaskTestBase):
         return str(next(wheel_files))
 
     @staticmethod
-    def install_wheel(wheel, root_dir):
-        importable_path = os.path.join(root_dir, "install", os.path.basename(wheel))
-        overrides = {
-            path: importable_path for path in ("purelib", "platlib", "headers", "scripts", "data")
-        }
-        WheelFile(wheel).install(force=True, overrides=overrides)
-        return importable_path
+    def install_wheel(wheel):
+        return [
+            resolved_dist.distribution.location
+            for resolved_dist in resolver.resolve(requirements=[wheel])
+        ]
 
     _distdir = None
     _checker_dist = None
@@ -64,7 +65,7 @@ class CheckstyleTest(PythonTaskTestBase):
     def setUpClass(cls):
         cls._distdir = safe_mkdtemp()
         cls._checker_dist = cls.build_checker_wheel(cls._distdir)
-        cls._checker_dist_importable_path = cls.install_wheel(cls._checker_dist, cls._distdir)
+        cls._checker_dist_importable_path = cls.install_wheel(cls._checker_dist)
 
     @classmethod
     def tearDownClass(cls):
@@ -87,7 +88,7 @@ class CheckstyleTest(PythonTaskTestBase):
             )
 
             prior = sys.path[:]
-            sys.path.append(self._checker_dist_importable_path)
+            sys.path.extend(self._checker_dist_importable_path)
             try:
                 yield
             finally:

@@ -772,10 +772,7 @@ Interrupted by user over pailgun client!
             checker.assert_running()
             self.assert_failure(result)
             # Assert that the desired exception has been triggered once.
-            self.assertIn(
-                """Exception message: Could not satisfy all requirements for badreq==99.99.99:\n    badreq==99.99.99""",
-                result.stderr_data,
-            )
+            self.assertRegex(result.stderr_data, r"Exception message:.*badreq==99.99.99")
             # Assert that it has only been triggered once.
             self.assertNotIn(
                 "During handling of the above exception, another exception occurred:",

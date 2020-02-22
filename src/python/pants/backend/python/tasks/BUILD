@@ -5,6 +5,7 @@ python_library(
   dependencies=[
     '3rdparty/python:dataclasses',
     '3rdparty/python:pex',
+    '3rdparty/python:wheel',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
     'src/python/pants/backend/native/config',

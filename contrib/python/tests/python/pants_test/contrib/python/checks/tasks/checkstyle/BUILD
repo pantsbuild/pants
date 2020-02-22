@@ -5,7 +5,6 @@ python_tests(
   dependencies=[
     '3rdparty/python:parameterized',
     '3rdparty/python:pex',
-    '3rdparty/python:wheel',
     '//:build_root',
     '//:pants_pex',
     'build-support/regexes',
@@ -20,4 +19,5 @@ python_tests(
     'tests/python/pants_test/backend/python/tasks:python_task_test_base',
   ],
   tags = {'partially_type_checked'},
+  timeout=480,
 )

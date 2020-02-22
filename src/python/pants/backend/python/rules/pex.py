@@ -102,10 +102,16 @@ async def create_pex(
     constraints."""
 
     argv = ["--output-file", request.output_filename]
+    if python_setup.resolver_jobs:
+        argv.extend(["--jobs", python_setup.resolver_jobs])
     if request.entry_point is not None:
         argv.extend(["--entry-point", request.entry_point])
     argv.extend(request.interpreter_constraints.generate_pex_arg_list())
     argv.extend(request.additional_args)
+    if python_setup.manylinux:
+        argv.extend(["--manylinux", python_setup.manylinux])
+    else:
+        argv.append("--no-manylinux")
 
     source_dir_name = "source_files"
     argv.append(f"--sources-directory={source_dir_name}")
@@ -125,8 +131,8 @@ async def create_pex(
     merged_digest = await Get[Digest](DirectoriesToMerge(directories=all_inputs))
 
     # NB: PEX outputs are platform dependent so in order to get a PEX that we can use locally, without
-    # cross-building, we specify that out PEX command be run on the current local platform. When we
-    # support cross-building through CLI flags we can configure requests that build a PEX for out
+    # cross-building, we specify that our PEX command be run on the current local platform. When we
+    # support cross-building through CLI flags we can configure requests that build a PEX for our
     # local platform that are able to execute on a different platform, but for now in order to
     # guarantee correct build we need to restrict this command to execute on the same platform type
     # that the output is intended for. The correct way to interpret the keys
