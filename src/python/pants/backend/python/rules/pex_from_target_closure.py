@@ -8,6 +8,7 @@ from pants.backend.python.rules.pex import (
     CreatePex,
     Pex,
     PexInterpreterConstraints,
+    PexRequirementConstraints,
     PexRequirements,
 )
 from pants.backend.python.rules.prepare_chrooted_python_sources import ChrootedPythonSources
@@ -39,7 +40,10 @@ async def create_pex_from_target_closure(
     all_target_adaptors = [t.adaptor for t in all_targets]
 
     interpreter_constraints = PexInterpreterConstraints.create_from_adaptors(
-        adaptors=tuple(all_target_adaptors), python_setup=python_setup
+        adaptors=all_target_adaptors, python_setup=python_setup
+    )
+    requirement_constraints = PexRequirementConstraints.create_from_adaptors(
+        adaptors=all_target_adaptors, python_setup=python_setup
     )
 
     chrooted_sources: Optional[ChrootedPythonSources] = None
@@ -54,6 +58,7 @@ async def create_pex_from_target_closure(
         output_filename=request.output_filename,
         requirements=requirements,
         interpreter_constraints=interpreter_constraints,
+        requirement_constraints=requirement_constraints,
         entry_point=request.entry_point,
         input_files_digest=(
             chrooted_sources.snapshot.directory_digest if chrooted_sources else None

@@ -11,6 +11,7 @@ from pants.backend.python.rules.pex import (
     CreatePex,
     Pex,
     PexInterpreterConstraints,
+    PexRequirementConstraints,
     PexRequirements,
 )
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
@@ -69,6 +70,9 @@ async def lint(
             output_filename="bandit.pex",
             requirements=PexRequirements(requirements=tuple(bandit.get_requirement_specs())),
             interpreter_constraints=interpreter_constraints,
+            requirement_constraints=PexRequirementConstraints.create_from_global_setup(
+                python_setup
+            ),
             entry_point=bandit.get_entry_point(),
         )
     )

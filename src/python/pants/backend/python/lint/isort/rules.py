@@ -12,6 +12,7 @@ from pants.backend.python.rules.pex import (
     CreatePex,
     Pex,
     PexInterpreterConstraints,
+    PexRequirementConstraints,
     PexRequirements,
 )
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
@@ -83,6 +84,9 @@ async def setup(
             requirements=PexRequirements(requirements=tuple(isort.get_requirement_specs())),
             interpreter_constraints=PexInterpreterConstraints(
                 constraint_set=tuple(isort.default_interpreter_constraints)
+            ),
+            requirement_constraints=PexRequirementConstraints.create_from_global_setup(
+                python_setup
             ),
             entry_point=isort.get_entry_point(),
         )

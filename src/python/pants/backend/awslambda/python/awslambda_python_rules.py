@@ -15,6 +15,7 @@ from pants.backend.python.rules.pex import (
     CreatePex,
     Pex,
     PexInterpreterConstraints,
+    PexRequirementConstraints,
     PexRequirements,
 )
 from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
@@ -73,13 +74,16 @@ async def create_python_awslambda(
 
 
 @rule(name="Set up lambdex")
-async def setup_lambdex(lambdex: Lambdex) -> LambdexSetup:
+async def setup_lambdex(lambdex: Lambdex, python_setup: PythonSetup) -> LambdexSetup:
     requirements_pex = await Get[Pex](
         CreatePex(
             output_filename="lambdex.pex",
             requirements=PexRequirements(requirements=tuple(lambdex.get_requirement_specs())),
             interpreter_constraints=PexInterpreterConstraints(
                 constraint_set=tuple(lambdex.default_interpreter_constraints)
+            ),
+            requirement_constraints=PexRequirementConstraints.create_from_global_setup(
+                python_setup
             ),
             entry_point=lambdex.get_entry_point(),
         )
