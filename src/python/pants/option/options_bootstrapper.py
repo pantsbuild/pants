@@ -4,14 +4,12 @@
 import itertools
 import logging
 import os
-import stat
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple, Type
 
 from pants.base.build_environment import get_default_pants_config_file
-from pants.engine.fs import FileContent
 from pants.option.config import Config
 from pants.option.custom_types import ListValueComponent
 from pants.option.global_options import GlobalOptionsRegistrar
@@ -110,12 +108,14 @@ class OptionsBootstrapper:
         flags = set()
         short_flags = set()
 
-        # TODO: This codepath probably shouldn't be using FileContent, which is a very v2 engine thing.
+        # We can't use pants.engine.fs.FileContent here because it would cause a circular dep.
+        @dataclass(frozen=True)
+        class FileContent:
+            path: str
+            content: bytes
+
         def filecontent_for(path: str) -> FileContent:
-            is_executable = os.stat(path).st_mode & stat.S_IXUSR == stat.S_IXUSR
-            return FileContent(
-                ensure_text(path), read_file(path, binary_mode=True), is_executable=is_executable,
-            )
+            return FileContent(ensure_text(path), read_file(path, binary_mode=True),)
 
         def capture_the_flags(*args: str, **kwargs) -> None:
             for arg in args:
