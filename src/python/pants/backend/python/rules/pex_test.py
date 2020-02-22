@@ -11,6 +11,7 @@ from pants.backend.python.rules.pex import (
     CreatePex,
     Pex,
     PexInterpreterConstraints,
+    PexRequirementConstraints,
     PexRequirements,
 )
 from pants.backend.python.rules.pex import rules as pex_rules
@@ -44,6 +45,7 @@ class PexTest(TestBase):
         requirements=PexRequirements(),
         entry_point=None,
         interpreter_constraints=PexInterpreterConstraints(),
+        requirement_constraints=PexRequirementConstraints(),
         input_files: Optional[Digest] = None,
         additional_args: Tuple[str, ...] = (),
     ) -> Dict:
@@ -51,6 +53,7 @@ class PexTest(TestBase):
             output_filename="test.pex",
             requirements=requirements,
             interpreter_constraints=interpreter_constraints,
+            requirement_constraints=requirement_constraints,
             entry_point=entry_point,
             input_files_digest=input_files,
             additional_args=additional_args,
@@ -77,6 +80,7 @@ class PexTest(TestBase):
         requirements=PexRequirements(),
         entry_point=None,
         interpreter_constraints=PexInterpreterConstraints(),
+        requirement_constraints=PexRequirementConstraints(),
         input_files: Optional[Digest] = None,
         additional_args: Tuple[str, ...] = (),
     ) -> Dict:
@@ -86,6 +90,7 @@ class PexTest(TestBase):
                 requirements=requirements,
                 entry_point=entry_point,
                 interpreter_constraints=interpreter_constraints,
+                requirement_constraints=requirement_constraints,
                 input_files=input_files,
                 additional_args=additional_args,
             )["info"],
@@ -122,22 +127,40 @@ class PexTest(TestBase):
 
     def test_resolves_dependencies(self) -> None:
         requirements = PexRequirements(
-            requirements=("six==1.12.0", "jsonschema==2.6.0", "requests==2.22.0")
+            requirements=("six==1.12.0", "jsonschema==2.6.0", "requests==2.23.0")
         )
         pex_info = self.create_pex_and_get_pex_info(requirements=requirements)
         # NB: We do not check for transitive dependencies, which PEX-INFO will include. We only check
         # that at least the dependencies we requested are included.
-        self.assertTrue(set(requirements.requirements).issubset(pex_info["requirements"]))
+        assert set(requirements.requirements).issubset(pex_info["requirements"]) is True
+
+    def test_requirement_constraints(self) -> None:
+        direct_dep = "requests==2.23.0"
+        # Pin to intentionally old transitive dependencies to ensure the constraints are respected.
+        constrained_transitive_deps = [
+            "certifi==2019.6.16",
+            "chardet==3.0.2",
+            "idna==2.7",
+            "urllib3==1.25.6",
+        ]
+        self.create_file("constraints.txt", "\n".join(constrained_transitive_deps[:2]))
+        constraints = PexRequirementConstraints.create_from_raw_constraints(
+            ["constraints.txt", *constrained_transitive_deps[2:]]
+        )
+        pex_info = self.create_pex_and_get_pex_info(
+            requirements=PexRequirements((direct_dep,)), requirement_constraints=constraints
+        )
+        assert set(pex_info["requirements"]) == {direct_dep, *constrained_transitive_deps}
 
     def test_entry_point(self) -> None:
         entry_point = "pydoc"
         pex_info = self.create_pex_and_get_pex_info(entry_point=entry_point)
-        self.assertEqual(pex_info["entry_point"], entry_point)
+        assert pex_info["entry_point"] == entry_point
 
     def test_interpreter_constraints(self) -> None:
         constraints = PexInterpreterConstraints(constraint_set=("CPython>=2.7,<3", "CPython>=3.6"))
         pex_info = self.create_pex_and_get_pex_info(interpreter_constraints=constraints)
-        self.assertEqual(set(pex_info["interpreter_constraints"]), set(constraints.constraint_set))
+        assert set(pex_info["interpreter_constraints"]) == set(constraints.constraint_set)
 
     def test_additional_args(self) -> None:
         pex_info = self.create_pex_and_get_pex_info(additional_args=("--not-zip-safe",))

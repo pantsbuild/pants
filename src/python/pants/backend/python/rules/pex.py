@@ -1,8 +1,10 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import itertools
 from dataclasses import dataclass
-from typing import Iterable, List, Optional, Tuple
+from pathlib import PurePath
+from typing import ClassVar, Iterable, List, Optional, Tuple
 
 from pants.backend.python.rules.download_pex_bin import DownloadedPexBin
 from pants.backend.python.rules.hermetic_pex import HermeticPex
@@ -13,6 +15,12 @@ from pants.engine.fs import (
     Digest,
     DirectoriesToMerge,
     DirectoryWithPrefixToAdd,
+    FileContent,
+    GlobExpansionConjunction,
+    GlobMatchErrorBehavior,
+    InputFilesContent,
+    PathGlobs,
+    Snapshot,
 )
 from pants.engine.isolated_process import ExecuteProcessResult, MultiPlatformExecuteProcessRequest
 from pants.engine.legacy.structs import PythonTargetAdaptor, TargetAdaptor
@@ -68,12 +76,78 @@ class PexInterpreterConstraints:
 
 
 @dataclass(frozen=True)
+class PexRequirementConstraints:
+    """A collection of paths to constraint files and/or Requirement-style strings."""
+
+    constraint_file_paths: Tuple[str, ...] = ()
+    raw_constraints: Tuple[str, ...] = ()
+    generated_file_name: ClassVar[str] = "requirement_constraints.generated.txt"
+
+    @classmethod
+    def create_from_raw_constraints(cls, constraints: Iterable[str]) -> "PexRequirementConstraints":
+        """The constraints may be paths to constraint .txt files and/or requirement strings."""
+        constraint_file_paths = set()
+        raw_constraints = set()
+        for constraint in constraints:
+            if PurePath(constraint).suffix == ".txt":
+                constraint_file_paths.add(constraint)
+            else:
+                raw_constraints.add(constraint)
+        return PexRequirementConstraints(
+            constraint_file_paths=tuple(sorted(constraint_file_paths)),
+            raw_constraints=tuple(sorted(raw_constraints)),
+        )
+
+    @classmethod
+    def create_from_global_setup(cls, python_setup: PythonSetup) -> "PexRequirementConstraints":
+        return cls.create_from_raw_constraints(python_setup.requirement_constraints)
+
+    @classmethod
+    def create_from_adaptors(
+        cls, adaptors: Iterable[PythonTargetAdaptor], python_setup: PythonSetup
+    ) -> "PexRequirementConstraints":
+        merged_constraints = itertools.chain.from_iterable(
+            python_setup.resolve_requirement_constraints(getattr(adaptor, "constraints", None))
+            for adaptor in adaptors
+        )
+        return cls.create_from_raw_constraints(merged_constraints)
+
+    def generate_pex_arg_list(self) -> List[str]:
+        args = []
+        for fp in sorted(self.constraint_file_paths):
+            args.extend(["--constraints", fp])
+        if self.raw_constraints:
+            args.extend(["--constraints", self.generated_file_name])
+        return args
+
+    def generate_file_for_raw_constraints(self) -> InputFilesContent:
+        if not self.raw_constraints:
+            return InputFilesContent([])
+        generated_file = FileContent(
+            path=self.generated_file_name, content="\n".join(self.raw_constraints).encode()
+        )
+        return InputFilesContent([generated_file])
+
+    def path_globs_for_constraint_file_paths(self) -> PathGlobs:
+        return PathGlobs(
+            self.constraint_file_paths,
+            glob_match_error_behavior=GlobMatchErrorBehavior.error,
+            conjunction=GlobExpansionConjunction.all_match,
+            description_of_origin=(
+                "either the option `--python-setup-requirement-constraints` or a Python target's "
+                "`constraints` field"
+            ),
+        )
+
+
+@dataclass(frozen=True)
 class CreatePex:
     """Represents a generic request to create a PEX from its inputs."""
 
     output_filename: str
     requirements: PexRequirements = PexRequirements()
     interpreter_constraints: PexInterpreterConstraints = PexInterpreterConstraints()
+    requirement_constraints: PexRequirementConstraints = PexRequirementConstraints()
     entry_point: Optional[str] = None
     input_files_digest: Optional[Digest] = None
     additional_args: Tuple[str, ...] = ()
@@ -87,8 +161,6 @@ class Pex(HermeticPex):
     output_filename: str
 
 
-# TODO: This is non-hermetic because the requirements will be resolved on the fly by
-# pex, where it should be hermetically provided in some way.
 @rule(name="Create PEX")
 async def create_pex(
     request: CreatePex,
@@ -98,25 +170,39 @@ async def create_pex(
     pex_build_environment: PexBuildEnvironment,
     platform: Platform,
 ) -> Pex:
-    """Returns a PEX with the given requirements, optional entry point, and optional interpreter
-    constraints."""
+    """Returns a PEX with the given requirements, optional entry point, optional interpreter
+    constraints, and optional requirement constraints."""
 
-    argv = ["--output-file", request.output_filename]
+    argv = [
+        "--output-file",
+        request.output_filename,
+        *request.interpreter_constraints.generate_pex_arg_list(),
+        *request.requirement_constraints.generate_pex_arg_list(),
+        *request.additional_args,
+    ]
+
     if python_setup.resolver_jobs:
         argv.extend(["--jobs", python_setup.resolver_jobs])
-    if request.entry_point is not None:
-        argv.extend(["--entry-point", request.entry_point])
-    argv.extend(request.interpreter_constraints.generate_pex_arg_list())
-    argv.extend(request.additional_args)
+
     if python_setup.manylinux:
         argv.extend(["--manylinux", python_setup.manylinux])
     else:
         argv.append("--no-manylinux")
 
+    if request.entry_point is not None:
+        argv.extend(["--entry-point", request.entry_point])
+
     source_dir_name = "source_files"
     argv.append(f"--sources-directory={source_dir_name}")
 
     argv.extend(request.requirements.requirements)
+
+    constraint_files = await Get[Snapshot](
+        PathGlobs, request.requirement_constraints.path_globs_for_constraint_file_paths()
+    )
+    generated_constraint_file = await Get[Digest](
+        InputFilesContent, request.requirement_constraints.generate_file_for_raw_constraints()
+    )
 
     sources_digest = (
         request.input_files_digest if request.input_files_digest else EMPTY_DIRECTORY_DIGEST
@@ -124,11 +210,17 @@ async def create_pex(
     sources_digest_as_subdir = await Get[Digest](
         DirectoryWithPrefixToAdd(sources_digest, source_dir_name)
     )
-    all_inputs = (
-        pex_bin.directory_digest,
-        sources_digest_as_subdir,
+
+    merged_digest = await Get[Digest](
+        DirectoriesToMerge(
+            directories=(
+                pex_bin.directory_digest,
+                sources_digest_as_subdir,
+                constraint_files.directory_digest,
+                generated_constraint_file,
+            )
+        )
     )
-    merged_digest = await Get[Digest](DirectoriesToMerge(directories=all_inputs))
 
     # NB: PEX outputs are platform dependent so in order to get a PEX that we can use locally, without
     # cross-building, we specify that our PEX command be run on the current local platform. When we

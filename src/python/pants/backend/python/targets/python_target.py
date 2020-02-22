@@ -1,8 +1,10 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from pathlib import PurePath
 
 from pex.interpreter import PythonIdentity
+from pkg_resources import Requirement
 from twitter.common.collections import maybe_list
 
 from pants.backend.python.python_artifact import PythonArtifact
@@ -21,7 +23,14 @@ class PythonTarget(Target):
     """
 
     def __init__(
-        self, address=None, payload=None, sources=None, provides=None, compatibility=None, **kwargs
+        self,
+        address=None,
+        payload=None,
+        sources=None,
+        provides=None,
+        compatibility=None,
+        constraints=None,
+        **kwargs,
     ):
         """
         :param dependencies: The addresses of targets that this target depends on.
@@ -50,6 +59,7 @@ class PythonTarget(Target):
                 "sources": self.create_sources_field(sources, address.spec_path, key_arg="sources"),
                 "provides": provides,
                 "compatibility": PrimitiveField(maybe_list(compatibility or ())),
+                "constraints": PrimitiveField(maybe_list(constraints or ())),
             }
         )
         super().__init__(address=address, payload=payload, **kwargs)
@@ -63,6 +73,19 @@ class PythonTarget(Target):
             )
 
         self._provides = provides
+
+        # Check that the requirement constraints are well-formed.
+        for req in self.payload.constraints:
+            if PurePath(req).suffix == ".txt":
+                continue
+            try:
+                Requirement.parse(req)
+            except ValueError:
+                raise TargetDefinitionException(
+                    self,
+                    f"Invalid requirement constraint `{req}`. Constraints must either be paths to "
+                    "constraint .txt files or valid requirement strings.",
+                )
 
         # Check that the compatibility requirements are well-formed.
         for req in self.payload.compatibility:
@@ -99,6 +122,10 @@ class PythonTarget(Target):
     @property
     def compatibility(self):
         return self.payload.compatibility
+
+    @property
+    def constraints(self):
+        return self.payload.constraints
 
     @property
     def resources(self):
