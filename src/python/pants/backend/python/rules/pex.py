@@ -3,7 +3,6 @@
 
 import itertools
 from dataclasses import dataclass
-from pathlib import PurePath
 from typing import ClassVar, Iterable, List, Optional, Tuple
 
 from pants.backend.python.rules.download_pex_bin import DownloadedPexBin
@@ -85,21 +84,23 @@ class PexRequirementConstraints:
 
     @classmethod
     def create_from_raw_constraints(cls, constraints: Iterable[str]) -> "PexRequirementConstraints":
-        """The constraints may be paths to constraint .txt files and/or requirement strings."""
+        """The constraints may be paths to constraint files and/or requirement strings."""
         constraint_file_paths = set()
         raw_constraints = set()
+        # See https://www.python.org/dev/peps/pep-0440/#version-specifiers.
+        version_specifier_chars = {"=", ">", "<"}
         for constraint in constraints:
-            if PurePath(constraint).suffix == ".txt":
-                constraint_file_paths.add(constraint)
-            else:
+            if any(char in constraint for char in version_specifier_chars):
                 raw_constraints.add(constraint)
+            else:
+                constraint_file_paths.add(constraint)
         return PexRequirementConstraints(
             constraint_file_paths=tuple(sorted(constraint_file_paths)),
             raw_constraints=tuple(sorted(raw_constraints)),
         )
 
     @classmethod
-    def create_from_global_setup(cls, python_setup: PythonSetup) -> "PexRequirementConstraints":
+    def create_from_setup(cls, python_setup: PythonSetup) -> "PexRequirementConstraints":
         return cls.create_from_raw_constraints(python_setup.requirement_constraints)
 
     @classmethod

@@ -85,9 +85,7 @@ async def setup(
             interpreter_constraints=PexInterpreterConstraints(
                 constraint_set=tuple(isort.default_interpreter_constraints)
             ),
-            requirement_constraints=PexRequirementConstraints.create_from_global_setup(
-                python_setup
-            ),
+            requirement_constraints=PexRequirementConstraints.create_from_setup(python_setup),
             entry_point=isort.get_entry_point(),
         )
     )

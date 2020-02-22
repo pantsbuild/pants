@@ -656,9 +656,7 @@ async def setup_setuptools(setuptools: Setuptools, python_setup: PythonSetup) ->
             interpreter_constraints=PexInterpreterConstraints(
                 constraint_set=tuple(setuptools.default_interpreter_constraints)
             ),
-            requirement_constraints=PexRequirementConstraints.create_from_global_setup(
-                python_setup
-            ),
+            requirement_constraints=PexRequirementConstraints.create_from_setup(python_setup),
         )
     )
     return SetuptoolsSetup(requirements_pex=requirements_pex,)

@@ -1,10 +1,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pathlib import PurePath
-
 from pex.interpreter import PythonIdentity
-from pkg_resources import Requirement
 from twitter.common.collections import maybe_list
 
 from pants.backend.python.python_artifact import PythonArtifact
@@ -73,19 +70,6 @@ class PythonTarget(Target):
             )
 
         self._provides = provides
-
-        # Check that the requirement constraints are well-formed.
-        for req in self.payload.constraints:
-            if PurePath(req).suffix == ".txt":
-                continue
-            try:
-                Requirement.parse(req)
-            except ValueError:
-                raise TargetDefinitionException(
-                    self,
-                    f"Invalid requirement constraint `{req}`. Constraints must either be paths to "
-                    "constraint .txt files or valid requirement strings.",
-                )
 
         # Check that the compatibility requirements are well-formed.
         for req in self.payload.compatibility:
