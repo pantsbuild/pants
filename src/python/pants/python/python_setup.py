@@ -73,6 +73,16 @@ class PythonSetup(Subsystem):
             "If unspecified, a standard path under the workdir is used.",
         )
         register(
+            "--resolver-cache-ttl",
+            advanced=True,
+            type=int,
+            metavar="<seconds>",
+            default=10 * 365 * 86400,  # 10 years.
+            removal_version="1.28.0.dev2",
+            removal_hint="This option is now unused, please remove configuration of it.",
+            help="DEPRECATED: This option is unused.",
+        )
+        register(
             "--resolver-allow-prereleases",
             advanced=True,
             type=bool,
