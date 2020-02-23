@@ -55,58 +55,87 @@ levels in different tasks.
 Option Types
 ------------
 
-Option value literal formats are the same on the command-line, environment variables and in `pants.ini`,
-with a couple of extra command-line conveniences.
+Option value formats are the same on the command-line, environment variables and in `pants.toml`, except for list options. There are also a couple of extra command-line conveniences.
 
 ### Boolean Options
 
-The boolean option values are: `false`, `False`, `true`, `True`.
+The boolean option values are `false` and `true`.
 
-On the command line, you can omit the value thus: `--foo-bar` is the same as `--foo-bar=false`,
+With the command line and environment variables, you can omit the value thus: `--foo-bar` is the same as `--foo-bar=false`,
   and `--no-foo-bar` is the same as `--foo-bar=false`.
 
 ### Int and Float Options
 
 Specify values in decimal notation: `--foo=5`, `--bar=4.5`.
 
+    :::toml
+    foo = 5
+    bar = 4.5
+
 ### String Options
 
-Surround strings with single or double quotes if they contain embedded spaces: `--foo="hello, world"`.
+Surround strings with single or double quotes: `--foo="hello, world"`.
+
+    :::toml
+    foo = "hello world"
 
 ### List Options
 
-List options can be appended to and filtered, as well as overridden.
-For example, for an option `--foo` whose default value is `[1, 2]`, then in `pants.ini`:
+List options can be added to and removed, as well as overridden.
+For example, for an option `--foo` whose default value is `[1, 2]`, then in `pants.toml`:
 
-+ `foo: 3` will yield `[1, 2, 3]`.
-+ `foo: +[3, 4]` will yield `[1, 2, 3, 4]`.
-+ `foo: -[1]` will yield `[2]`.
-+ `foo: [3, 4]` will yield `[3, 4]`.
++ `foo = 3` will yield `[1, 2, 3]`.
++ `foo.add = [3, 4]` will yield `[1, 2, 3, 4]`.
++ `foo.remove = [1]` will yield `[2]`.
++ `foo = [3, 4]` will yield `[3, 4]`.
 
-Multiple append and filter expressions may be delimited with commas,
-allowing you to append and filter simultaneously:
+In `pants.toml`, you may both add and remove simultaneously:
 
-+ `foo: +[3,4],-[1]` will yield `[2, 3, 4]`.
+    :::toml
+    # This will yield [2, 3, 4]
+    foo.add = [3, 4]
+    foo.remove = [1]
 
-On the command line you can append single values multiple times:
+Adding a single value and replacing a list works the same as `pants.toml` for the command line and environment variables.
+
++ `--foo=3` will yield `[1, 2, 3]`.
++ `--foo='[3, 4]'` will yield `[3, 4]`.
+
+The syntax is a little different from `pants.toml`, however, when removing values or adding multiple values.
+
++ `--foo='+[3, 4]'` will yield `[1, 2, 3, 4]`.
++ `--foo='-[1]'` will yield `[2]`.
++ `--foo='+[3,4],-[1]'` will yield `[2, 3, 4]`.
+
+On the command line, you can also add single values multiple times:
 
 + `--foo=3 --foo=4` will yield the value `[1, 2, 3, 4]`.
 
-Note that these command line values will be appended to the value determined from the defaults
-plus the values in `pants.ini`. To override the value, use `--foo=[3, 4]`.
+Note that these command line values will be added to the list determined from the defaults
+plus the values in `pants.toml`. To instead override the list, use `--foo='[3, 4]'`.
 
-Filters apply to the entire list constructed so far, and will filter all appearances of the value:
+Removes apply to the entire list constructed so far, and will remove all appearances of the value:
 
-+ `--foo=1 --foo=1 --foo=2 --foo=-[1]` will yield `[2, 2]`.
++ `--foo=1 --foo=1 --foo=2 --foo='-[1]'` will yield `[2, 2]`.
 
-Filters take precedence over appends, so you cannot "add something back in":
+Removes take precedence over adds, so you cannot "add something back in":
 
 + `--foo=-[2] --foo=2` will yield `[1]`.
 
 
 ### Dict Options
 
-Dict option values are Python-style dict literals: `--foo={"a":1,"b":2}`.
+Dict option values are Python-style dict literals: `--foo='{"a": 1,"b": 2}'`.
+
+In `pants.toml`, it often helps to use multiline strings for readability, e.g.:
+
+    :::toml
+    foo = """
+    {
+      "a": 1,
+      "b": 2,
+    }
+    """
 
 ### Available Options
 
@@ -173,44 +202,46 @@ precedence over settings in config files.
 
 ### Config File
 
-The main Pants config file location is `pants.ini` in your source tree's top-level directory.
-If you installed pants [[as recommended|pants('src/docs:install')]] this file should already exist.
+The main Pants config file location is `pants.toml` in your source tree's top-level directory.
+If you installed Pants [[as recommended|pants('src/docs:install')]], this file should already exist.
 
-The `pants.ini` file is an INI file parsed by
-[ConfigParser](http://docs.python.org/library/configparser.html).  See
-[RFC #822](http://tools.ietf.org/html/rfc822.html#section-3.1)
-section 3.1.1 for the full rules python uses to parse ini file
-entries.
+The `pants.toml` file is [a TOML file](https://github.com/toml-lang/toml/blob/master/README.md), with some extra features like string interpolation added by Pants.
 
-A `pants.ini` file looks something like:
+A `pants.toml` file looks something like:
 
-    :::ini
-    [scope]
-    option1: value1
-    option2: value2
+    :::toml
+    [pytest]
+    option1 = "value"
+    option2 = true
+    option3 = 10
+    
+    [cache.java]
+    option1 = ["a", "b"]
 
-Sections in the `.ini` file correspond to the task name or
+Sections in the `.toml` file correspond to the task name or
 subsystem name, or a combination of both.
 
-The `[DEFAULT]` section is special: its values are available in all other sections. E.g.,
+The `[DEFAULT]` section is special: its values are available in all other sections by using `printf`-style string interpolation, e.g.
 
-    :::ini
+    :::toml
     [DEFAULT]
-    thrift_workdir: %(pants_workdir)s/thrift
+    thrift_workdir = "%(pants_workdir)s/thrift"
 
     [GLOBAL]
-    print_exception_stacktrace: True
+    print_exception_stacktrace = true
 
     [gen.thrift]
-    workdir: %(thrift_workdir)s
+    workdir = "%(thrift_workdir)s"
 
     [compile.rsc]
-    args: [
-        '-C-Tnowarnprefixes', '-C%(thrift_workdir)s',
-      ]
+    args = ["-C-Tnowarnprefixes", "-C%(thrift_workdir)s"]
 
-Note that continuation lines of multiple-line values must be indented. For example, the closing
-bracket in the multi-line list above.
+You may also interpolate values from within the same section:
+
+    :::toml
+    [GLOBAL]
+    pants_version = "1.26.0"
+    plugins = ["pantsbuild.pants.contrib.go==%(pants_version)s"]
 
 Settings in config files are overridden by options specified in the
 environment or by command line flags.
@@ -221,35 +252,35 @@ command line:
   - Omit the leading double dash (`--`)
   - Dash characters (`-`) are transposed to underscores (`_`).
   - Boolean flag values are enabled and disabled by setting the value
-    of the option to `True` or `False`
+    of the option to `true` or `false`
   - The prefix for long form options is not specified. Instead, you must organize the options
     into their appropriate sections.
 
 ### Overlaying Config Files
 
-Sometimes it's convenient to keep `.ini` settings in more than one file. Perhaps you usually
+Sometimes it's convenient to keep `.toml` settings in more than one file. Perhaps you usually
 operate Pants in one "mode", but occasionally need to use a tweaked set of settings.
 
-Use the `--pants-config-files` command-line option to specify a second `.ini` file. Each of
-this `.ini` file's values override the corresponding value in `pants.ini`, if any.
-For example, if your `pants.ini` contains the section
+Use the `--pants-config-files` command-line option to specify a second `.toml` file. Each of
+this `.toml` file's values override the corresponding value in `pants.toml`, if any.
+For example, if your `pants.toml` contains the section
 
     [test.junit]
-    coverage_html_open: True
-    debug: False
+    coverage_html_open = true
+    debug = false
 
-...and you invoke `--pants-config-files=quick.ini` and your `quick.ini` says
+...and you invoke `--pants-config-files=quick.toml` and your `quick.toml` says
 
     [test.junit]
-    coverage_html_open: False
-    skip: True
+    coverage_html_open = false
+    skip = true
 
 ...then Pants will act as if you specified
 
     [test.junit]
-    coverage_html_open: False
-    skip: True
-    debug: False
+    coverage_html_open = false
+    skip = true
+    debug = false
 
 Note that `--pants-config-files` is a list-valued option, so all the
 idioms of lists work. You can add a third file with another invocation
@@ -264,14 +295,14 @@ Troubleshooting Config Files
 Section names must correspond to actual option scopes.  Use the correct section name as specified
 in the help output:
 
-    :::ini
+    :::toml
     # Wrong
     [compile]  # The correct scope for the 'warnings' option is compile.rsc
-    zinc_warnings: False
+    zinc_warnings = false
 
     # Right
     [compile.rsc]
-    warnings: False
+    warnings = false
 
 When in doubt, the scope is described in the heading for each option in the help output:
 
@@ -285,30 +316,6 @@ When in doubt, the scope is described in the heading for each option in the help
         Compile with debug symbol enabled.
     ...
 
-### Check the Formatting
+### Validate the TOML
 
-Settings that span multiple lines should be indented.  To minimize problems, follow these
-conventions:
-
-  - Followon lines should be indented four spaces.
-  - The ending bracket for lists and dicts should be indented two spaces.
-
-Here are some examples of correctly and incorrectly formatted values:
-
-    :::ini
-    # Right
-    jvm_options: [ "foo", "bar" ]
-
-    # Right
-    jvm_options: [
-        "foo", "bar"
-      ]
-
-    # Wrong
-    jvm_options: [ "foo",
-    "bar" ]  # Followon line must be indented
-
-    # Wrong
-    jvm_options: [
-        "foo", "bar"
-    ] # closing bracket must be indented
+Most editors will warn when you have invalid TOML. Another useful resource is the website [www.toml-lint.com](https://www.toml-lint.com).
