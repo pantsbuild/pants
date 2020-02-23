@@ -43,7 +43,7 @@ Contrib plugins should generally follow 3 basic setup steps:
    pythonpath = [
      "%(buildroot)s/pants-plugins/src/python",
      "%(buildroot)s/contrib/example/src/python",  # 1
-    ]
+   ]
 
    backend_packages = [
      "internal_backend.repositories",

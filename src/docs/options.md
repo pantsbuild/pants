@@ -125,7 +125,7 @@ Removes take precedence over adds, so you cannot "add something back in":
 
 ### Dict Options
 
-Dict option values are Python-style dict literals: `--foo='{"a": 1,"b": 2}'`.
+Dict option values are Python-style dict literals embedded in a string, e.g: `--foo='{"a": 1,"b": 2}'`.
 
 In `pants.toml`, it often helps to use multiline strings for readability, e.g.:
 
@@ -318,4 +318,6 @@ When in doubt, the scope is described in the heading for each option in the help
 
 ### Validate the TOML
 
-Most editors will warn when you have invalid TOML. Another useful resource is the website [www.toml-lint.com](https://www.toml-lint.com).
+Most editors will warn when you have invalid TOML. For many editors, such as IntelliJ/Pycharm, you must first install a TOML plugin. 
+
+Pants will also provide a useful error message if it fails to parse the TOML file.
