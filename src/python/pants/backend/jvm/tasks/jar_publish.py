@@ -250,7 +250,7 @@ class JarPublish(HasTransitiveOptionMixin, ScmPublishMixin, JarTask):
     publish artifacts to Maven-style repositories. Pants performs prerequisite
     tasks like compiling, creating jars, and generating ``pom.xml`` files then
     invokes Ivy to actually publish the artifacts, so publishing is largely
-    configured in ``ivysettings.xml``. ``BUILD`` and ``pants.ini`` files
+    configured in ``ivysettings.xml``. ``BUILD`` and ``pants.toml`` files
     primarily provide linkage between publishable targets and the
     Ivy ``resolvers`` used to publish them.
 

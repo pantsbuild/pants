@@ -312,7 +312,7 @@ debug them is to disable nailgun by specifying the command line option
 `--execution-strategy=subprocess` or setting `execution_strategy = "subprocess"` in the specific tool
 section or in the `[DEFAULT]` section of `pants.toml`.
 
-    :::ini
+    :::toml
     [DEFAULT]
     execution_strategy = "subprocess"
 

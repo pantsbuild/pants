@@ -39,7 +39,7 @@ class JvmPlatform(Subsystem):
             if not platforms_by_name:
                 messages.append(
                     "In fact, no platforms are defined under {0}. These should typically be"
-                    " specified in [{0}] in pants.ini.".format(scope_name)
+                    " specified in [{0}] in pants.toml.".format(scope_name)
                 )
             else:
                 messages.append(
@@ -48,7 +48,7 @@ class JvmPlatform(Subsystem):
                     )
                 )
                 messages.append(
-                    "\nThese are typically defined under [{}] in pants.ini.".format(scope_name)
+                    "\nThese are typically defined under [{}] in pants.toml.".format(scope_name)
                 )
             super(JvmPlatform.UndefinedJvmPlatform, self).__init__(" ".join(messages))
 
@@ -148,7 +148,7 @@ class JvmPlatform(Subsystem):
         if name not in platforms_by_name:
             raise self.IllegalDefaultPlatform(
                 "The default platform was set to '{0}', but no platform by that name has been "
-                "defined. Typically, this should be defined under [{1}] in pants.ini.".format(
+                "defined. Typically, this should be defined under [{1}] in pants.toml.".format(
                     name, self.options_scope
                 )
             )
@@ -163,7 +163,7 @@ class JvmPlatform(Subsystem):
         if name not in platforms_by_name:
             raise self.IllegalDefaultPlatform(
                 "The default runtime platform was set to '{0}', but no platform by that name has been "
-                "defined. Typically, this should be defined under [{1}] in pants.ini.".format(
+                "defined. Typically, this should be defined under [{1}] in pants.toml.".format(
                     name, self.options_scope
                 )
             )

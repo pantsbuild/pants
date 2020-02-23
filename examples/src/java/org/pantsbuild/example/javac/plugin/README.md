@@ -46,16 +46,16 @@ Using javac plugins
 
 Plugins can be integrated in one of two ways:
 
-- Global plugins: specified in `pants.ini` and used on all Java code.
+- Global plugins: specified in `pants.toml` and used on all Java code.
 - Per-target plugins: specified on a Java target and used only when compiling that target.
 
 #### Global plugins
 
-Global plugins are specified using the `javac_plugins` key in the `compile.rsc` section of `pants.ini`:
+Global plugins are specified using the `javac_plugins` key in the `compile.rsc` section of `pants.toml`:
 
 ```
 [compile.rsc]
-javac_plugins: ['simple_javac_plugin']
+javac_plugins = ['simple_javac_plugin']
 
 ```
 
@@ -63,10 +63,8 @@ Plugins can optionally take arguments, specified like this:
 
 ```
 [compile.rsc]
-javac_plugins: ['simple_javac_plugin]
-javac_plugin_args: {
-    'simple_javac_plugin': ['arg1', 'arg2']
-  }
+javac_plugins = ['simple_javac_plugin]
+javac_plugin_args = "{'simple_javac_plugin': ['arg1', 'arg2']}"
 ```
 
 

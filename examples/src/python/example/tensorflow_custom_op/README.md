@@ -14,4 +14,4 @@ Note that due to a current limitation (see [#6848](https://github.com/pantsbuild
 ./pants --native-build-step-toolchain-variant=llvm test examples/tests/python/example_test/tensorflow_custom_op:: -- -vs
 ```
 
-or by setting the toolchain variant [option in `pants.ini`](https://www.pantsbuild.org/options.html).
+or by setting the toolchain variant [option in `pants.toml`](https://www.pantsbuild.org/options.html).

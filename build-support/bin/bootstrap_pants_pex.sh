@@ -48,7 +48,7 @@ function calculate_pants_pex_current_hash() {
      "${REPO_ROOT}/BUILD" \
      "${REPO_ROOT}/BUILD.tools" \
      "${REPO_ROOT}/BUILD_ROOT" \
-     "${REPO_ROOT}/pants.ini" \
+     "${REPO_ROOT}/pants.toml" \
      "${REPO_ROOT}/3rdparty" \
      "${REPO_ROOT}/build-support/checkstyle" \
      "${REPO_ROOT}/build-support/eslint" \

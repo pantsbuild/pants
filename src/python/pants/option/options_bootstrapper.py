@@ -151,7 +151,7 @@ class OptionsBootstrapper:
         bootstrap_option_values = initial_bootstrap_options.for_global_scope()
 
         # Now re-read the config, post-bootstrapping. Note the order: First whatever we bootstrapped
-        # from (typically pants.ini), then config override, then rcfiles.
+        # from (typically pants.toml), then config override, then rcfiles.
         full_config_paths = pre_bootstrap_config.sources()
         if bootstrap_option_values.pantsrc:
             rcfiles = [

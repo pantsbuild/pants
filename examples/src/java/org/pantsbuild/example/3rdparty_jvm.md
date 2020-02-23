@@ -210,11 +210,11 @@ You can set up your `3rdparty/BUILD` file like so:
       ],
     )
 
-And in `pants.ini`, add:
+And in `pants.toml`, add:
 
     :::ini
     [jar-dependency-management]
-    default_target: 3rdparty:management
+    default_target = "3rdparty:management"
 
 This will force all `jar_library` targets in your repository to use the
 versions of `commons-io` and `jersey-core` referenced by the `management`
