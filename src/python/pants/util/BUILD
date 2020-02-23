@@ -1,6 +1,14 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+python_tests(
+  name='tests',
+  dependencies=[
+    ':ordered_set',
+  ],
+  tags = {'type_checked'},
+)
+
 python_library(
   name = 'argutil',
   sources = ['argutil.py'],
@@ -98,6 +106,12 @@ python_library(
   name = 'objects',
   sources = ['objects.py'],
   tags = {'partially_type_checked'},
+)
+
+python_library(
+  name = 'ordered_set',
+  sources = ['ordered_set.py'],
+  tags = {'type_checked'},
 )
 
 python_library(
