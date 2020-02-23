@@ -19,6 +19,7 @@ import toml
 from typing_extensions import Literal
 
 from pants.base.build_environment import get_buildroot, get_pants_cachedir, get_pants_configdir
+from pants.base.deprecated import warn_or_error
 from pants.option.ranked_value import Value
 from pants.util.eval import parse_expression
 from pants.util.ordered_set import OrderedSet
@@ -105,6 +106,25 @@ class Config(ABC):
                 }
                 config_values = _TomlValues(toml_values)
             else:
+                script_instructions = (
+                    "curl -L -o migrate_to_toml_config.py 'https://git.io/Jv02R' && chmod +x "
+                    f"migrate_to_toml_config.py && ./migrate_to_toml_config.py {config_path}"
+                )
+                warn_or_error(
+                    removal_version="1.28.0.dev0",
+                    deprecation_start_version="1.26.0.dev1",
+                    deprecated_entity_description="INI config files (`pants.ini`)",
+                    hint=(
+                        "Pants recently added support for TOML config files. TOML is inspired by "
+                        "the INI file format, and makes several improvements and removes many "
+                        "gotchas. For example, you no longer need to worry about indentation for "
+                        "list and dict options.\n\nTo migrate, we recommend using our migration "
+                        f"script by running `{script_instructions}`.\n\nSee "
+                        f"https://www.pantsbuild.org/options.html for more information on how to "
+                        f"set each option type, including adding and removing from a list option "
+                        f"and using dict options."
+                    ),
+                )
                 ini_parser = configparser.ConfigParser(defaults=normalized_seed_values)
                 ini_parser.read_string(content.decode())
                 config_values = _IniValues(ini_parser)
