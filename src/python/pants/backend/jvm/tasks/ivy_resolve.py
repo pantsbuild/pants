@@ -133,7 +133,6 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
             targets=targets,
             classpath_products=compile_classpath,
             confs=confs,
-            invalidate_dependents=True,
             extra_args=self._args,
         )
         if self._report:
