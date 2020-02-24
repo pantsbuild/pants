@@ -3,8 +3,6 @@
 
 from collections import defaultdict
 
-from twitter.common.collections import OrderedSet
-
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_library import PythonLibrary
@@ -12,6 +10,7 @@ from pants.backend.python.targets.python_requirement_library import PythonRequir
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.build_graph.files import Files
 from pants.build_graph.target import Target
+from pants.util.ordered_set import OrderedSet
 
 
 def is_python_target(tgt: Target) -> bool:

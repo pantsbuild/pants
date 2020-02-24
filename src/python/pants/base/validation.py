@@ -1,8 +1,9 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from twitter.common.collections import OrderedSet
 from twitter.common.dirutil.fileset import Fileset
+
+from pants.util.ordered_set import OrderedSet
 
 
 def assert_list(

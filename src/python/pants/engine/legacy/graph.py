@@ -10,8 +10,6 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Any, Dict, Iterable, Iterator, List, Set, Tuple, Type, cast
 
-from twitter.common.collections import OrderedSet
-
 from pants.base.exceptions import ResolveError, TargetDefinitionException
 from pants.base.parse_context import ParseContext
 from pants.base.specs import (
@@ -52,6 +50,7 @@ from pants.option.global_options import (
 )
 from pants.source.filespec import any_matches_filespec
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper, Filespec
+from pants.util.ordered_set import OrderedSet
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +117,7 @@ class LegacyBuildGraph(BuildGraph):
 
         # Once the declared dependencies of all targets are indexed, inject their
         # additional "traversable_(dependency_)?specs".
-        deps_to_inject = OrderedSet()
+        deps_to_inject: OrderedSet = OrderedSet()
         addresses_to_inject = set()
 
         def inject(target: Target, dep_spec: str, is_dependency: bool) -> None:
@@ -565,7 +564,7 @@ async def transitive_hydrated_targets(addresses: Addresses) -> TransitiveHydrate
         Get[TransitiveHydratedTarget](Address, a) for a in addresses
     )
 
-    closure = OrderedSet()
+    closure: OrderedSet[HydratedTarget] = OrderedSet()
     to_visit = deque(transitive_hydrated_targets)
 
     while to_visit:

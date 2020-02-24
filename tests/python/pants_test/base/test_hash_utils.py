@@ -10,8 +10,6 @@ from collections import OrderedDict
 from enum import Enum
 from pathlib import Path
 
-from twitter.common.collections import OrderedSet
-
 from pants.base.hash_utils import (
     CoercingEncoder,
     Sharder,
@@ -21,6 +19,7 @@ from pants.base.hash_utils import (
     stable_json_sha1,
 )
 from pants.util.contextutil import temporary_dir, temporary_file, temporary_file_path
+from pants.util.ordered_set import OrderedSet
 
 
 class TestHashUtils(unittest.TestCase):

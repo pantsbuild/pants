@@ -30,9 +30,9 @@ python_library(
   name = 'build_file',
   sources = ['build_file.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:pathspec',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:ordered_set',
     ':project_tree',
   ],
   tags = {'partially_type_checked'},
@@ -107,6 +107,7 @@ python_library(
   dependencies = [
     '3rdparty/python:typing-extensions',
     'src/python/pants/util:strutil',
+    'src/python/pants/util:ordered_set',
   ],
   tags = {'partially_type_checked'},
 )
@@ -136,8 +137,8 @@ python_library(
   name = 'payload_field',
   sources = ['payload_field.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     ':hash_utils',
+    'src/python/pants/util:ordered_set',
   ],
   tags = {'partially_type_checked'},
 )
@@ -212,8 +213,8 @@ python_library(
   name='validation',
   sources=['validation.py'],
   dependencies=[
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
+    'src/python/pants/util:ordered_set',
   ],
   tags = {'partially_type_checked'},
 )

@@ -5,8 +5,6 @@ import logging
 from collections import OrderedDict, namedtuple
 from collections.abc import Iterable
 
-from twitter.common.collections import OrderedSet
-
 from pants.base.parse_context import ParseContext
 from pants.build_graph.addressable import AddressableCallProxy
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -14,6 +12,7 @@ from pants.build_graph.target_addressable import TargetAddressable
 from pants.engine.rules import RuleIndex
 from pants.option.optionable import Optionable
 from pants.util.memo import memoized_method
+from pants.util.ordered_set import OrderedSet
 
 logger = logging.getLogger(__name__)
 

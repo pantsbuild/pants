@@ -6,7 +6,8 @@ from collections import namedtuple
 from difflib import SequenceMatcher
 
 from colors import strip_color
-from twitter.common.collections import OrderedSet
+
+from pants.util.ordered_set import OrderedSet
 
 
 def normalize_classname(classname):

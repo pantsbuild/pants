@@ -11,8 +11,6 @@ from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, get_type_hints
 
-from twitter.common.collections import OrderedSet
-
 from pants.engine.goal import Goal
 from pants.engine.objects import union
 from pants.engine.selectors import Get
@@ -20,6 +18,7 @@ from pants.option.optionable import OptionableFactory
 from pants.util.collections import assert_single_element
 from pants.util.memo import memoized
 from pants.util.meta import frozen_after_init
+from pants.util.ordered_set import OrderedSet
 
 
 def side_effecting(cls):

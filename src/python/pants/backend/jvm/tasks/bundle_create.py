@@ -5,8 +5,6 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
-from twitter.common.collections import OrderedSet
-
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
@@ -17,6 +15,7 @@ from pants.build_graph.bundle_mixin import BundleMixin
 from pants.build_graph.target_scopes import Scopes
 from pants.fs import archive
 from pants.util.dirutil import safe_mkdir
+from pants.util.ordered_set import OrderedSet
 
 
 class BundleCreate(BundleMixin, JvmBinaryTask):

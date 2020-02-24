@@ -4,8 +4,6 @@
 import logging
 import os
 
-from twitter.common.collections import OrderedSet
-
 from pants.backend.codegen.wire.java.java_wire_library import JavaWireLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
@@ -16,6 +14,7 @@ from pants.java.jar.jar_dependency import JarDependency
 from pants.source.filespec import globs_matches
 from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.dirutil import fast_relpath
+from pants.util.ordered_set import OrderedSet
 
 logger = logging.getLogger(__name__)
 

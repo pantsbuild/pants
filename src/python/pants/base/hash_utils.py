@@ -11,9 +11,9 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Optional, Type, Union
 
-from twitter.common.collections import OrderedSet
 from typing_extensions import Protocol
 
+from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import ensure_binary
 
 logger = logging.getLogger(__name__)

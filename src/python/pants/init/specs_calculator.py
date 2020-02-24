@@ -4,8 +4,6 @@
 import logging
 from typing import Iterable, Optional
 
-from twitter.common.collections import OrderedSet
-
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.specs import AddressSpec, AddressSpecs, FilesystemSpecs, SingleAddress, Specs
@@ -13,6 +11,7 @@ from pants.engine.legacy.graph import Owners, OwnersRequest
 from pants.engine.scheduler import SchedulerSession
 from pants.option.options import Options
 from pants.scm.subsystems.changed import ChangedAddresses, ChangedOptions, ChangedRequest
+from pants.util.ordered_set import OrderedSet
 
 logger = logging.getLogger(__name__)
 

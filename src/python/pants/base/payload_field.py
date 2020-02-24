@@ -5,9 +5,8 @@ from abc import ABC, abstractmethod
 from hashlib import sha1
 from typing import ClassVar, Optional
 
-from twitter.common.collections import OrderedSet
-
 from pants.base.hash_utils import stable_json_sha1
+from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import ensure_binary
 
 

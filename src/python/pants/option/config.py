@@ -16,12 +16,12 @@ from pathlib import PurePath
 from typing import Any, ClassVar, Dict, List, Mapping, Optional, Sequence, Tuple, Union, cast
 
 import toml
-from twitter.common.collections import OrderedSet
 from typing_extensions import Literal
 
 from pants.base.build_environment import get_buildroot, get_pants_cachedir, get_pants_configdir
 from pants.option.ranked_value import Value
 from pants.util.eval import parse_expression
+from pants.util.ordered_set import OrderedSet
 
 # A dict with optional override seed values for buildroot, pants_workdir, pants_supportdir and
 # pants_distdir.
@@ -570,7 +570,7 @@ class _ChainedConfig(Config):
         return list(itertools.chain.from_iterable(cfg.sources() for cfg in reversed(self._configs)))
 
     def sections(self) -> List[str]:
-        ret = OrderedSet()
+        ret: OrderedSet[str] = OrderedSet()
         for cfg in self._configs:
             ret.update(cfg.sections())
         return list(ret)

@@ -7,8 +7,6 @@ from collections import defaultdict
 from contextlib import contextmanager
 from typing import Dict
 
-from twitter.common.collections import OrderedSet
-
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.worker_pool import SubprocPool
 from pants.base.workunit import WorkUnit, WorkUnitLabel
@@ -24,6 +22,7 @@ from pants.goal.workspace import ScmWorkspace
 from pants.option.options import Options
 from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.source.source_root import SourceRootConfig
+from pants.util.ordered_set import OrderedSet
 
 
 class Context:

@@ -5,10 +5,10 @@ import importlib
 import traceback
 
 from pkg_resources import Requirement
-from twitter.common.collections import OrderedSet
 
 from pants.base.exceptions import BackendConfigurationError
 from pants.build_graph.build_configuration import BuildConfiguration
+from pants.util.ordered_set import OrderedSet
 
 
 class PluginLoadingError(Exception):

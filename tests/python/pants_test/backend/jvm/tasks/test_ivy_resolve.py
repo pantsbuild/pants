@@ -5,8 +5,6 @@ import glob
 import os
 from contextlib import contextmanager
 
-from twitter.common.collections import OrderedSet
-
 from pants.backend.jvm.ivy_utils import IvyInfo, IvyModule, IvyModuleRef, IvyResolveResult
 from pants.backend.jvm.subsystems.jar_dependency_management import (
     JarDependencyManagement,
@@ -27,6 +25,7 @@ from pants.testutil.subsystem.util import init_subsystem
 from pants.testutil.task_test_base import TaskTestBase, ensure_cached
 from pants.util.contextutil import temporary_dir, temporary_file_path
 from pants.util.dirutil import safe_delete
+from pants.util.ordered_set import OrderedSet
 
 
 def strip_workdir(dir, classpath):

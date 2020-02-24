@@ -7,8 +7,6 @@ import shutil
 import subprocess
 from typing import Dict, Optional
 
-from twitter.common.collections import OrderedSet
-
 from pants.backend.codegen.thrift.lib.thrift import Thrift
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
@@ -16,6 +14,7 @@ from pants.base.workunit import WorkUnitLabel
 from pants.option.custom_types import target_option
 from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.memo import memoized_property
+from pants.util.ordered_set import OrderedSet
 
 
 class ApacheThriftGenBase(SimpleCodegenTask):

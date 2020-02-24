@@ -28,8 +28,6 @@ python_library(
     'unpacked_jars.py',
   ],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python/twitter/commons:twitter.common.dirutil',
     'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/subsystems:java',
     'src/python/pants/backend/jvm/subsystems:junit',
@@ -46,6 +44,7 @@ python_library(
     'src/python/pants/util:memo',
     'src/python/pants/util:netrc',
     'src/python/pants/util:objects',
+    'src/python/pants/util:ordered_set',
   ],
   tags = {"partially_type_checked"},
 )

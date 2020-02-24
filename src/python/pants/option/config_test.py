@@ -9,12 +9,12 @@ from textwrap import dedent
 from typing import Dict
 
 import pytest
-from twitter.common.collections import OrderedSet
 
 from pants.option.config import Config, TomlSerializer
 from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_file
 from pants.util.enums import match
+from pants.util.ordered_set import OrderedSet
 
 
 class ConfigFormat(Enum):

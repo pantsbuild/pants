@@ -1,10 +1,9 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from twitter.common.collections import OrderedSet
-
 from pants.goal.products import UnionProducts
 from pants.testutil.test_base import TestBase
+from pants.util.ordered_set import OrderedSet
 
 
 class UnionProductsTest(TestBase):

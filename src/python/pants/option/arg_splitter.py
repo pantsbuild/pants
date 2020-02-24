@@ -8,9 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
-from twitter.common.collections import OrderedSet
-
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
+from pants.util.ordered_set import OrderedSet
 
 
 class ArgSplitterError(Exception):
@@ -154,7 +153,7 @@ class ArgSplitter:
 
         Returns a SplitArgs tuple.
         """
-        goals = OrderedSet()
+        goals: OrderedSet[str] = OrderedSet()
         scope_to_flags: Dict[str, List[str]] = {}
 
         def add_scope(s: str) -> None:
