@@ -10,7 +10,7 @@ from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 
 
-@dataclass
+@dataclass(frozen=True)
 class ScopeInfoIterator:
     """Provides relevant ScopeInfo instances in a useful order."""
 
