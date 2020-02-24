@@ -8,6 +8,7 @@ from typing import Tuple
 
 from pex.variables import Variables
 
+from pants.build_graph.mirrored_target_option_mixin import MirroredTargetOptionMixin
 from pants.option.custom_types import UnsetBool
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
@@ -15,10 +16,14 @@ from pants.util.memo import memoized_property
 logger = logging.getLogger(__name__)
 
 
-class PythonSetup(Subsystem):
+class PythonSetup(MirroredTargetOptionMixin, Subsystem):
     """A python environment."""
 
     options_scope = "python-setup"
+
+    mirrored_target_option_actions = {
+        "interpreter_constraints": lambda tgt: getattr(tgt, "compatibility", None),
+    }
 
     _DEFAULT_MANYLINUX_UPPER_BOUND = "manylinux2014"
 
@@ -204,15 +209,18 @@ class PythonSetup(Subsystem):
     def scratch_dir(self):
         return os.path.join(self.get_options().pants_workdir, *self.options_scope.split("."))
 
-    def compatibility_or_constraints(self, compatibility):
-        """Return either the given compatibility, or the interpreter constraints. If interpreter
-        constraints are supplied by the CLI flag, return those only.
+    def compatibility_or_default(self, compatibility):
+        """Return the value `compatibility` if non-None, else this subsystem's interpreter
+        constraints."""
+        return self.get_scalar_value_option("interpreter_constraints", compatibility)
 
-        :param compatibility: Optional[List[str]], e.g. None or ['CPython>3'].
+    def compatibility_for_target(self, target):
+        """Return either the given target's interpreter compatibility, or this subsystem's
+        interpreter constraints.
+
+        If interpreter constraints are supplied by the CLI flag, return those only.
         """
-        if self.get_options().is_flagged("interpreter_constraints"):
-            return tuple(self.interpreter_constraints)
-        return tuple(compatibility or self.interpreter_constraints)
+        return tuple(self.get_scalar_mirrored_target_option("interpreter_constraints", target))
 
     @classmethod
     def expand_interpreter_search_paths(cls, interpreter_search_paths, pyenv_root_func=None):

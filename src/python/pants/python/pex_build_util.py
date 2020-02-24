@@ -255,8 +255,7 @@ class PexBuilderWrapper:
         # if they are incompatible because all the sources of the constraints are available.
         # See: https://github.com/pantsbuild/pex/blob/584b6e367939d24bc28aa9fa36eb911c8297dac8/pex/interpreter_constraints.py
         constraint_tuples = {
-            self._python_setup_subsystem.compatibility_or_constraints(tgt.compatibility)
-            for tgt in constraint_tgts
+            self._python_setup_subsystem.compatibility_for_target(tgt) for tgt in constraint_tgts
         }
         for constraint_tuple in constraint_tuples:
             for constraint in constraint_tuple:

@@ -60,9 +60,7 @@ class PexInterpreterConstraints:
         interpreter_constraints = {
             constraint
             for target_adaptor in adaptors
-            for constraint in python_setup.compatibility_or_constraints(
-                getattr(target_adaptor, "compatibility", None)
-            )
+            for constraint in python_setup.compatibility_for_target(target_adaptor)
         }
         return PexInterpreterConstraints(constraint_set=tuple(sorted(interpreter_constraints)))
 

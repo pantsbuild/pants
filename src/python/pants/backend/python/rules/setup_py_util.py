@@ -205,7 +205,7 @@ def is_python2(compatibilities: Iterable[Optional[List[str]]], python_setup: Pyt
 
     def iter_reqs():
         for compatibility in compatibilities:
-            for constraint in python_setup.compatibility_or_constraints(compatibility):
+            for constraint in python_setup.compatibility_or_default(compatibility):
                 yield Requirement.parse(constraint)
 
     for req in iter_reqs():

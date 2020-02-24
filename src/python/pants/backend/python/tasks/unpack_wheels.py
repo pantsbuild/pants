@@ -81,9 +81,7 @@ class UnpackWheels(UnpackRemoteSourcesBase):
 
     @memoized_method
     def _compatible_interpreter(self, unpacked_whls):
-        constraints = PythonSetup.global_instance().compatibility_or_constraints(
-            unpacked_whls.compatibility
-        )
+        constraints = PythonSetup.global_instance().compatibility_for_target(unpacked_whls)
         allowable_interpreters = PythonInterpreterCache.global_instance().setup(filters=constraints)
         return min(allowable_interpreters)
 

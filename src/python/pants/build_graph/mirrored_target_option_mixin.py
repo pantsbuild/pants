@@ -3,8 +3,10 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional, Union
 
+from pants.build_graph.target import Target
+from pants.engine.legacy.structs import TargetAdaptor
 from pants.util.memo import memoized_property
 
 
@@ -94,8 +96,16 @@ class MirroredTargetOptionMixin(ABC):
             for option_name, accessor in self.mirrored_target_option_actions.items()
         }
 
-    def get_scalar_mirrored_target_option(self, option_name, target):
-        """Get the attribute `field_name` from `target` if set, else from this subsystem's
+    def get_scalar_mirrored_target_option(
+        self, option_name: str, target: Union[Target, TargetAdaptor],
+    ) -> Any:
+        """Get the attribute `option_name` from `target` if set, else from this subsystem's
         options."""
         mirrored_option_declaration = self._mirrored_option_declarations[option_name]
         return mirrored_option_declaration.get_mirrored_scalar_option_value(target)
+
+    def get_scalar_value_option(self, option_name: str, value: Optional[Any]) -> Any:
+        """Return `value` if not None;, else `option_name` from this subsystem's options."""
+        if value is not None:
+            return value
+        return getattr(self, option_name)

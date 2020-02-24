@@ -67,7 +67,7 @@ class PythonInterpreterCache(Subsystem):
 
         for target in targets:
             if isinstance(target, PythonTarget):
-                c = self.python_setup.compatibility_or_constraints(target.compatibility)
+                c = self.python_setup.compatibility_for_target(target)
                 tgts_by_compatibilities[c].append(target)
                 filters.update(c)
         return tgts_by_compatibilities, filters
@@ -103,9 +103,9 @@ class PythonInterpreterCache(Subsystem):
                 dedent(
                     """\
                     Unable to detect a suitable interpreter for compatibilities: {} (Conflicting targets: {})
-            
+
                     Pants detected these interpreter versions on your system: {}
-            
+
                     Possible ways to fix this:
                     * Modify your Python interpreter constraints by following https://www.pantsbuild.org/python_readme.html#configure-the-python-version.
                     * Ensure the targeted Python version is installed and discoverable.
