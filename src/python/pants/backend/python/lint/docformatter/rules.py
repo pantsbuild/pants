@@ -26,11 +26,8 @@ from pants.engine.legacy.structs import TargetAdaptorWithOrigin
 from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.python.python_setup import PythonSetup
-from pants.rules.core import find_target_source_files, strip_source_roots
-from pants.rules.core.find_target_source_files import (
-    FindTargetSourceFilesRequest,
-    TargetSourceFiles,
-)
+from pants.rules.core import determine_source_files, strip_source_roots
+from pants.rules.core.determine_source_files import DetermineSourceFilesRequest, SourceFiles
 from pants.rules.core.fmt import FmtResult
 from pants.rules.core.lint import LintResult
 
@@ -53,7 +50,7 @@ class Setup:
 
 
 def generate_args(
-    *, source_files: TargetSourceFiles, docformatter: Docformatter, check_only: bool,
+    *, source_files: SourceFiles, docformatter: Docformatter, check_only: bool,
 ) -> Tuple[str, ...]:
     return (
         "--check" if check_only else "--in-place",
@@ -88,9 +85,7 @@ async def setup(
     full_sources_digest = (
         request.target.prior_formatter_result_digest or adaptor.sources.snapshot.directory_digest
     )
-    specified_source_files = await Get[TargetSourceFiles](
-        FindTargetSourceFilesRequest(adaptor_with_origin)
-    )
+    source_files = await Get[SourceFiles](DetermineSourceFilesRequest(adaptor_with_origin))
 
     merged_input_files = await Get[Digest](
         DirectoriesToMerge(directories=(full_sources_digest, requirements_pex.directory_digest)),
@@ -101,9 +96,7 @@ async def setup(
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path="./docformatter.pex",
         pex_args=generate_args(
-            source_files=specified_source_files,
-            docformatter=docformatter,
-            check_only=request.check_only,
+            source_files=source_files, docformatter=docformatter, check_only=request.check_only,
         ),
         input_files=merged_input_files,
         # NB: Even if the user specified to only run on certain files belonging to the target, we
@@ -141,7 +134,7 @@ def rules():
         UnionRule(PythonFormatTarget, DocformatterTarget),
         UnionRule(PythonLintTarget, DocformatterTarget),
         *download_pex_bin.rules(),
-        *find_target_source_files.rules(),
+        *determine_source_files.rules(),
         *pex.rules(),
         *python_native_code.rules(),
         *strip_source_roots.rules(),

@@ -21,10 +21,7 @@ from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.global_options import GlobalOptions
 from pants.python.python_setup import PythonSetup
-from pants.rules.core.find_target_source_files import (
-    FindTargetSourceFilesRequest,
-    TargetSourceFiles,
-)
+from pants.rules.core.determine_source_files import DetermineSourceFilesRequest, SourceFiles
 from pants.rules.core.test import TestDebugRequest, TestOptions, TestResult, TestTarget
 
 DEFAULT_COVERAGE_CONFIG = dedent(
@@ -134,8 +131,8 @@ async def setup_pytest_for_target(
 
     # Get the file names for the test_target so that we can specify to Pytest precisely which files
     # to test, rather than using auto-discovery.
-    test_files = await Get[TargetSourceFiles](
-        FindTargetSourceFilesRequest(adaptor_with_origin, strip_source_roots=True)
+    test_files = await Get[SourceFiles](
+        DetermineSourceFilesRequest(adaptor_with_origin, strip_source_roots=True)
     )
     test_file_names = test_files.snapshot.files
 

@@ -22,11 +22,8 @@ from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
-from pants.rules.core import find_target_source_files, strip_source_roots
-from pants.rules.core.find_target_source_files import (
-    FindTargetSourceFilesRequest,
-    TargetSourceFiles,
-)
+from pants.rules.core import determine_source_files, strip_source_roots
+from pants.rules.core.determine_source_files import DetermineSourceFilesRequest, SourceFiles
 from pants.rules.core.lint import LintResult
 
 
@@ -35,7 +32,7 @@ class Flake8Target:
     adaptor_with_origin: TargetAdaptorWithOrigin
 
 
-def generate_args(*, source_files: TargetSourceFiles, flake8: Flake8) -> Tuple[str, ...]:
+def generate_args(*, source_files: SourceFiles, flake8: Flake8) -> Tuple[str, ...]:
     args = []
     if flake8.options.config is not None:
         args.append(f"--config={flake8.options.config}")
@@ -92,7 +89,7 @@ async def lint(
         ),
     )
 
-    source_files = await Get[TargetSourceFiles](FindTargetSourceFilesRequest(adaptor_with_origin))
+    source_files = await Get[SourceFiles](DetermineSourceFilesRequest(adaptor_with_origin))
 
     request = requirements_pex.create_execute_request(
         python_setup=python_setup,
@@ -112,7 +109,7 @@ def rules():
         subsystem_rule(Flake8),
         UnionRule(PythonLintTarget, Flake8Target),
         *download_pex_bin.rules(),
-        *find_target_source_files.rules(),
+        *determine_source_files.rules(),
         *pex.rules(),
         *python_native_code.rules(),
         *strip_source_roots.rules(),

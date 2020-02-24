@@ -18,17 +18,14 @@ from pants.build_graph.address import Address
 from pants.engine.legacy.structs import TargetAdaptorWithOrigin
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
-from pants.rules.core.find_target_source_files import (
-    FindTargetSourceFilesRequest,
-    TargetSourceFiles,
-)
-from pants.rules.core.find_target_source_files import rules as find_target_source_files_rules
+from pants.rules.core.determine_source_files import DetermineSourceFilesRequest, SourceFiles
+from pants.rules.core.determine_source_files import rules as determine_source_files_rules
 from pants.rules.core.strip_source_roots import rules as strip_source_roots_rules
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
 
-class FindTargetSourceFilesTest(TestBase):
+class DetermineSourceFilesTest(TestBase):
 
     SOURCE_ROOT = "src/python"
     TARGET_SOURCES = [
@@ -39,9 +36,9 @@ class FindTargetSourceFilesTest(TestBase):
     def rules(cls):
         return (
             *super().rules(),
-            *find_target_source_files_rules(),
+            *determine_source_files_rules(),
             *strip_source_roots_rules(),
-            RootRule(FindTargetSourceFilesRequest),
+            RootRule(DetermineSourceFilesRequest),
         )
 
     def get_target_source_files(
@@ -51,11 +48,11 @@ class FindTargetSourceFilesTest(TestBase):
         adaptor.sources = Mock()
         adaptor.address = Address.parse(f"{self.SOURCE_ROOT}:lib")
         adaptor.sources.snapshot = self.make_snapshot({fp: "" for fp in self.TARGET_SOURCES})
-        request = FindTargetSourceFilesRequest(
+        request = DetermineSourceFilesRequest(
             TargetAdaptorWithOrigin(adaptor, origin), strip_source_roots=strip_source_roots,
         )
         result = self.request_single_product(
-            TargetSourceFiles, Params(request, create_options_bootstrapper())
+            SourceFiles, Params(request, create_options_bootstrapper())
         )
         return sorted(result.snapshot.files)
 

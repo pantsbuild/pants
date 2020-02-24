@@ -13,19 +13,18 @@ from pants.rules.core.strip_source_roots import SourceRootStrippedSources, Strip
 
 
 @dataclass(frozen=True)
-class FindTargetSourceFilesRequest:
+class DetermineSourceFilesRequest:
     adaptor_with_origin: TargetAdaptorWithOrigin
     strip_source_roots: bool = False
 
 
-# NB: This wrapper class is needed to avoid graph ambiguity.
 @dataclass(frozen=True)
-class TargetSourceFiles:
+class SourceFiles:
     snapshot: Snapshot
 
 
 @rule
-async def find_target_source_files(request: FindTargetSourceFilesRequest) -> TargetSourceFiles:
+async def determine_source_files(request: DetermineSourceFilesRequest) -> SourceFiles:
     """Find the `sources` for a target, possibly finding a subset of the original `sources` field if
     the user supplied file arguments."""
     adaptor = request.adaptor_with_origin.adaptor
@@ -43,7 +42,7 @@ async def find_target_source_files(request: FindTargetSourceFilesRequest) -> Tar
             )
         )
     if not request.strip_source_roots:
-        return TargetSourceFiles(resulting_snapshot)
+        return SourceFiles(resulting_snapshot)
     stripped = await Get[SourceRootStrippedSources](
         StripSnapshotRequest(
             resulting_snapshot,
@@ -51,8 +50,8 @@ async def find_target_source_files(request: FindTargetSourceFilesRequest) -> Tar
             representative_path=PurePath(adaptor.address.spec_path, "BUILD").as_posix(),
         )
     )
-    return TargetSourceFiles(stripped.snapshot)
+    return SourceFiles(stripped.snapshot)
 
 
 def rules():
-    return [find_target_source_files, RootRule(FindTargetSourceFilesRequest)]
+    return [determine_source_files, RootRule(DetermineSourceFilesRequest)]
