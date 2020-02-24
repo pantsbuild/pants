@@ -33,8 +33,7 @@ class PlatformConstraint(Enum):
 # which means replacing this singleton rule with a RootRule populated by an option.
 @rule
 def materialize_platform() -> Platform:
-    current: Platform = Platform.current
-    return current
+    return Platform.current
 
 
 def create_platform_rules() -> List[Callable]:

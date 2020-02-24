@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+from typing import List, Tuple
 
 from pants.backend.native.config.environment import CCompiler, CppCompiler
 from pants.backend.native.subsystems.utils.archive_file_mapper import ArchiveFileMapper
@@ -34,7 +35,7 @@ class GCC(NativeTool):
     def _file_mapper(self):
         return ArchiveFileMapper.scoped_instance(self)
 
-    def _filemap(self, all_components_list):
+    def _filemap(self, all_components_list: List[Tuple[str, ...]]):
         return self._file_mapper.map_files(self.select(), all_components_list)
 
     @memoized_property
@@ -42,11 +43,17 @@ class GCC(NativeTool):
         return self._filemap([("bin",)])
 
     @memoized_method
-    def _common_lib_dirs(self, platform):
-        lib64_tuples = match(platform, {Platform.darwin: [], Platform.linux: [("lib64",)]})
-        return self._filemap(
-            lib64_tuples + [("lib",), ("lib/gcc",), ("lib/gcc/*", self.version()),]
+    def _common_lib_dirs(self, platform: Platform):
+        lib64_tuples: List[Tuple[str, ...]] = match(
+            platform, {Platform.darwin: [], Platform.linux: [("lib64",)]}
         )
+        files: List[Tuple[str, ...]] = [
+            *lib64_tuples,
+            ("lib",),
+            ("lib/gcc",),
+            ("lib/gcc/*", self.version()),
+        ]
+        return self._filemap(files)
 
     @memoized_property
     def _common_include_dirs(self):
