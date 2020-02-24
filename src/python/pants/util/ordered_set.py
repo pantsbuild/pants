@@ -182,7 +182,7 @@ class OrderedSet(_AbstractOrderedSet[T], MutableSet[T]):
     This is not safe to use with the V2 engine.
     """
 
-    def __init__(self, iterable: Optional[Iterable[T]] = None):
+    def __init__(self, iterable: Optional[Iterable[T]] = None) -> None:
         self._items_buffer: List[T] = []
         self._map_buffer: Dict[T, int] = {}
         if iterable is not None:
@@ -321,8 +321,14 @@ class FrozenOrderedSet(_AbstractOrderedSet[T]):
     This is safe to use with the V2 engine.
     """
 
-    def __init__(self, iterable: Optional[Iterable[T]] = None):
-        self._items_buffer = tuple(OrderedSet(iterable))
+    def __init__(self, iterable: Optional[Iterable[T]] = None) -> None:
+        # NB: Dictionaries are ordered in Python 3.6+. While this was not formalized until Python
+        # 3.7, Python 3.6 uses this behavior; Pants requires CPython 3.6+ to run, so this
+        # assumption is safe for us to rely on.
+        # Using a dictionary, rather than calling OrderedSet, results in a 25% performance
+        # increase for the constructor.
+        deduplicated_items = {v: None for v in iterable or ()}.keys()
+        self._items_buffer = tuple(deduplicated_items)
         self._map_buffer = {v: i for i, v in enumerate(self._items)}
 
     @property
