@@ -407,13 +407,14 @@ class ExportDepAsJar(ConsoleTask):
         return set(targets)
 
     def _get_targets_to_make_into_modules(
-        self, target_roots_set, resource_target_map, runtime_classpath
+        self, target_roots_set, resource_target_map, runtime_classpath, all_targets
     ):
         target_root_addresses = [t.address for t in target_roots_set]
+
         dependees_of_target_roots = [
             t
             for t in self.context.build_graph.transitive_dependees_of_addresses(
-                target_root_addresses
+                target_root_addresses, predicate=lambda t: t in all_targets
             )
             if self._get_target_type(t, resource_target_map, runtime_classpath)
             is not SourceRootTypes.RESOURCE_GENERATED
@@ -480,7 +481,7 @@ class ExportDepAsJar(ConsoleTask):
                     resource_target_map[dep] = t
 
         modulizable_targets = self._get_targets_to_make_into_modules(
-            target_roots_set, resource_target_map, runtime_classpath
+            target_roots_set, resource_target_map, runtime_classpath, all_targets
         )
         non_modulizable_targets = all_targets.difference(modulizable_targets)
 
@@ -519,7 +520,7 @@ class ExportDepAsJar(ConsoleTask):
 
         if zinc_args_for_all_targets is None:
             raise TaskError(
-                "There was an error compiling the targets - There there are no zing argument entries"
+                "There was an error compiling the targets - There there are no zinc argument entries"
             )
 
         runtime_classpath = self.context.products.get_data("runtime_classpath")

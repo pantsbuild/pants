@@ -184,3 +184,30 @@ class ExportDepAsJarIntegrationTest(ScalacPluginIntegrationTestBase):
                         self.assertIn(conf, entries)
                         for path in entries.values():
                             self.assertTrue(os.path.exists(path), path)
+
+    def test_only_targets_in_build_context_are_exported(self):
+        target_roots = [
+            "examples/src/scala/org/pantsbuild/example/multiple_roots_with_same_dep:A",
+            "examples/src/scala/org/pantsbuild/example/multiple_roots_with_same_dep:D",
+        ]
+        with self.temporary_workdir() as workdir:
+            pants_run = self.run_pants_with_workdir(
+                ["export-dep-as-jar"] + target_roots, workdir, {}
+            )
+            self.assert_success(pants_run)
+            export_output = json.loads(pants_run.stdout_data)
+            self.assertIn(
+                "examples/src/scala/org/pantsbuild/example/multiple_roots_with_same_dep:A",
+                export_output["targets"],
+                export_output,
+            )
+            self.assertIn(
+                "examples.src.scala.org.pantsbuild.example.multiple_roots_with_same_dep.C",
+                export_output["libraries"],
+                export_output,
+            )
+            self.assertNotIn(
+                "examples/src/scala/org/pantsbuild/example/multiple_roots_with_same_dep:B",
+                export_output["targets"],
+                export_output,
+            )

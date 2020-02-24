@@ -11,6 +11,7 @@ target(
     ':scalac_directory',
     ':several_scala_targets_directory',
     ':styleissue_directory',
+    ':multiple_roots_with_same_dep',
   ],
 )
 
@@ -60,6 +61,11 @@ files(
 files(
   name = 'several_scala_targets_directory',
   sources = ['several_scala_targets/**/*'],
+)
+
+files(
+  name = 'multiple_roots_with_same_dep',
+  sources = ['multiple_roots_with_same_dep/**/*'],
 )
 
 files(
