@@ -4,14 +4,12 @@
 import itertools
 import logging
 import os
-import stat
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple, Type
 
 from pants.base.build_environment import get_default_pants_config_file
-from pants.engine.fs import FileContent
 from pants.option.config import Config
 from pants.option.custom_types import ListValueComponent
 from pants.option.global_options import GlobalOptionsRegistrar
@@ -23,6 +21,25 @@ from pants.util.memo import memoized_method, memoized_property
 from pants.util.strutil import ensure_text
 
 logger = logging.getLogger(__name__)
+
+
+# This is a temporary hack that allows us to note the fact that we're in v2-exclusive mode
+# in a static location, as soon as we know it. This way code that cannot access options
+# can still use this information to customize behavior. Again, this is a temporary hack
+# to provide a better v2 experience to users who are not (and possibly never have been)
+# running v1, and should go away ASAP.
+class IsV2Exclusive:
+    def __init__(self):
+        self._value = False
+
+    def set(self):
+        self._value = True
+
+    def __bool__(self):
+        return self._value
+
+
+is_v2_exclusive = IsV2Exclusive()
 
 
 @dataclass(frozen=True)
@@ -91,6 +108,9 @@ class OptionsBootstrapper:
             bootstrap_options.register(GLOBAL_SCOPE, *args, **kwargs)
 
         GlobalOptionsRegistrar.register_bootstrap_options(register_global)
+        opts = bootstrap_options.for_global_scope()
+        if opts.v2 and not opts.v1 and opts.backend_packages == []:
+            is_v2_exclusive.set()
         return bootstrap_options
 
     @classmethod
@@ -110,12 +130,14 @@ class OptionsBootstrapper:
         flags = set()
         short_flags = set()
 
-        # TODO: This codepath probably shouldn't be using FileContent, which is a very v2 engine thing.
+        # We can't use pants.engine.fs.FileContent here because it would cause a circular dep.
+        @dataclass(frozen=True)
+        class FileContent:
+            path: str
+            content: bytes
+
         def filecontent_for(path: str) -> FileContent:
-            is_executable = os.stat(path).st_mode & stat.S_IXUSR == stat.S_IXUSR
-            return FileContent(
-                ensure_text(path), read_file(path, binary_mode=True), is_executable=is_executable,
-            )
+            return FileContent(ensure_text(path), read_file(path, binary_mode=True),)
 
         def capture_the_flags(*args: str, **kwargs) -> None:
             for arg in args:
