@@ -11,7 +11,7 @@ from pants.backend.python.subsystems.ipython import IPython
 from pants.engine.addressable import Addresses
 from pants.engine.legacy.graph import TransitiveHydratedTargets
 from pants.engine.legacy.structs import PythonTargetAdaptor
-from pants.engine.rules import UnionRule, rule
+from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.rules.core.repl import ReplBinary, ReplImplementation
 
@@ -45,13 +45,11 @@ class IPythonRepl:
 
 
 @rule
-async def run_ipython_repl(repl: IPythonRepl) -> ReplBinary:
+async def run_ipython_repl(repl: IPythonRepl, ipython: IPython) -> ReplBinary:
     targets = await Get[TransitiveHydratedTargets](Addresses, repl.addresses)
     python_addresses = Addresses(
         ht.address for ht in targets.closure if isinstance(ht.adaptor, PythonTargetAdaptor)
     )
-
-    ipython = IPython.global_instance()
 
     create_pex = CreatePexFromTargetClosure(
         addresses=python_addresses,
@@ -66,6 +64,7 @@ async def run_ipython_repl(repl: IPythonRepl) -> ReplBinary:
 
 def rules():
     return [
+        subsystem_rule(IPython),
         UnionRule(ReplImplementation, PythonRepl),
         UnionRule(ReplImplementation, IPythonRepl),
         run_python_repl,

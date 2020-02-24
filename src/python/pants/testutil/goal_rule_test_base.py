@@ -38,6 +38,7 @@ class GoalRuleTestBase(TestBase):
     def execute_rule(
         self,
         args: Optional[Iterable[str]] = None,
+        global_args: Optional[Iterable[str]] = None,
         env: Optional[Dict[str, str]] = None,
         exit_code: int = 0,
         additional_params: Optional[Iterable[Any]] = None,
@@ -50,7 +51,7 @@ class GoalRuleTestBase(TestBase):
         """
         # Create an OptionsBootstrapper for these args/env, and a captured Console instance.
         options_bootstrapper = create_options_bootstrapper(
-            args=(self.goal_cls.name, *(args or [])), env=env,
+            args=(*(global_args or []), self.goal_cls.name, *(args or [])), env=env,
         )
         BuildConfigInitializer.get(options_bootstrapper)
         full_options = options_bootstrapper.get_full_options(
