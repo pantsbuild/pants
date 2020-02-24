@@ -61,6 +61,9 @@ New Features
 * [jvm] Introduce runtime_platform; bump export version to 1.1 (#9003)
   `PR #9003 <https://github.com/pantsbuild/pants/pull/9003>`_
 
+* Fetch sources and javadoc jars for 3rd party deps when exporting with 'export-dep-as-jar' (#9168)
+  `PR #9168 <https://github.com/pantsbuild/pants/pull/9168>`_
+
 Bugfixes
 ~~~~~~~~
 
