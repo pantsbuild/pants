@@ -38,9 +38,16 @@ T = TypeVar("T")
 class _AbstractOrderedSet(ABC, AbstractSet[T], Sequence[T]):
     """Common functionality shared between OrderedSet and FrozenOrderedSet."""
 
-    @abstractmethod
     def __init__(self, iterable: Optional[Iterable[T]] = None) -> None:
-        pass
+        # Using a dictionary, rather than using the recipe's original `self |= iterable`, results
+        # in a ~20% performance increase for the constructor.
+        #
+        # NB: Dictionaries are ordered in Python 3.6+. While this was not formalized until Python
+        # 3.7, Python 3.6 uses this behavior; Pants requires CPython 3.6+ to run, so this
+        # assumption is safe for us to rely on.
+        deduplicated_items = {v: None for v in iterable or ()}.keys()
+        self._items_buffer = tuple(deduplicated_items)
+        self._map_buffer = {v: i for i, v in enumerate(self._items)}
 
     @property
     @abstractmethod
@@ -48,10 +55,10 @@ class _AbstractOrderedSet(ABC, AbstractSet[T], Sequence[T]):
         """This stores the de-duplicated elements in order."""
 
     @property
-    @abstractmethod
     def _map(self) -> Dict[T, int]:
         """This maps the elements to their index for O(1) time complexity with .index() and
         __contains__()."""
+        return self._map_buffer
 
     def __len__(self) -> int:
         """Returns the number of unique elements in the set."""
@@ -183,13 +190,8 @@ class OrderedSet(_AbstractOrderedSet[T], MutableSet[T]):
     """
 
     def __init__(self, iterable: Optional[Iterable[T]] = None) -> None:
-        self._items_buffer: List[T] = []
-        self._map_buffer: Dict[T, int] = {}
-        if iterable is not None:
-            # MyPy complains about our use of augmented assignment operators, mostly because
-            # AbstractClass expects the value to be another AbstractClass, even though we allow it
-            # to be any Iterable.
-            self |= iterable  # type: ignore[arg-type, misc]
+        super().__init__(iterable)
+        self._items_buffer = list(self._items_buffer)
 
     @property
     def _items(self) -> List[T]:
@@ -321,23 +323,9 @@ class FrozenOrderedSet(_AbstractOrderedSet[T]):
     This is safe to use with the V2 engine.
     """
 
-    def __init__(self, iterable: Optional[Iterable[T]] = None) -> None:
-        # NB: Dictionaries are ordered in Python 3.6+. While this was not formalized until Python
-        # 3.7, Python 3.6 uses this behavior; Pants requires CPython 3.6+ to run, so this
-        # assumption is safe for us to rely on.
-        # Using a dictionary, rather than calling OrderedSet, results in a 25% performance
-        # increase for the constructor.
-        deduplicated_items = {v: None for v in iterable or ()}.keys()
-        self._items_buffer = tuple(deduplicated_items)
-        self._map_buffer = {v: i for i, v in enumerate(self._items)}
-
     @property
     def _items(self) -> Tuple[T, ...]:
         return self._items_buffer
-
-    @property
-    def _map(self) -> Dict[T, int]:
-        return self._map_buffer
 
     def copy(self) -> "FrozenOrderedSet[T]":
         return cast(FrozenOrderedSet[T], super().copy())
