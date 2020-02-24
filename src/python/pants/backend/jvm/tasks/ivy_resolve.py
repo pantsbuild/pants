@@ -68,7 +68,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
 
     @classmethod
     def product_types(cls):
-        return ["compile_classpath"]
+        return ["compile_classpath", "resolve_sources_signal", "resolve_javadocs_signal"]
 
     @classmethod
     def prepare(cls, options, round_manager):
@@ -116,12 +116,23 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
                 self.context.log.info("Not generating a report. No resolution performed.")
             return
 
+        confs = self.get_options().confs
+        if "sources" not in confs and self.context.products.is_required_data(
+            "resolve_sources_signal"
+        ):
+            confs.append("sources")
+
+        if "javadoc" not in confs and self.context.products.is_required_data(
+            "resolve_javadocs_signal"
+        ):
+            confs.append("javadoc")
+
         executor = self.create_java_executor()
         results = self.resolve(
             executor=executor,
             targets=targets,
             classpath_products=compile_classpath,
-            confs=self.get_options().confs,
+            confs=confs,
             extra_args=self._args,
         )
         if self._report:
@@ -142,7 +153,8 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     def _generate_ivy_report(self, result):
         def make_empty_report(report, organisation, module, conf):
             no_deps_xml_template = dedent(
-                """<?xml version="1.0" encoding="UTF-8"?>
+                """
+                <?xml version="1.0" encoding="UTF-8"?>
                 <?xml-stylesheet type="text/xsl" href="ivy-report.xsl"?>
                 <ivy-report version="1.0">
                   <info

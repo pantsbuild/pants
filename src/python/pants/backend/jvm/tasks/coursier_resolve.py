@@ -611,7 +611,13 @@ class CoursierMixin(JvmResolverBase):
                 jars_per_target.append((t, jars_to_digest))
 
         for target, jars_to_add in self.add_directory_digests_for_jars(jars_per_target):
-            compile_classpath.add_jars_for_targets([target], conf, jars_to_add)
+            if override_classifiers is not None:
+                for jar in jars_to_add:
+                    compile_classpath.add_jars_for_targets(
+                        [target], jar.coordinate.classifier, [jar]
+                    )
+            else:
+                compile_classpath.add_jars_for_targets([target], conf, jars_to_add)
 
     def _populate_results_dir(self, vts_results_dir, results):
         with open(os.path.join(vts_results_dir, self.RESULT_FILENAME), "w") as f:
@@ -792,7 +798,7 @@ class CoursierResolve(CoursierMixin, NailgunTask):
 
     @classmethod
     def product_types(cls):
-        return ["compile_classpath"]
+        return ["compile_classpath", "resolve_sources_signal", "resolve_javadocs_signal"]
 
     @classmethod
     def prepare(cls, options, round_manager):
@@ -827,8 +833,8 @@ class CoursierResolve(CoursierMixin, NailgunTask):
         self.resolve(
             self.context.targets(),
             classpath_products,
-            sources=False,
-            javadoc=False,
+            sources=self.context.products.is_required_data("resolve_sources_signal"),
+            javadoc=self.context.products.is_required_data("resolve_javadocs_signal"),
             executor=executor,
         )
 
