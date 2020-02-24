@@ -17,7 +17,6 @@ from abc import ABC, abstractmethod
 from typing import (
     AbstractSet,
     Any,
-    Dict,
     Iterable,
     Iterator,
     List,
@@ -46,19 +45,12 @@ class _AbstractOrderedSet(ABC, AbstractSet[T], Sequence[T]):
         # 3.7, Python 3.6 uses this behavior; Pants requires CPython 3.6+ to run, so this
         # assumption is safe for us to rely on.
         deduplicated_items = {v: None for v in iterable or ()}.keys()
-        self._items_buffer = tuple(deduplicated_items)
-        self._map_buffer = {v: i for i, v in enumerate(self._items)}
+        self._items_buffer: Sequence[T] = tuple(deduplicated_items)
 
     @property
     @abstractmethod
     def _items(self) -> Sequence[T]:
         """This stores the de-duplicated elements in order."""
-
-    @property
-    def _map(self) -> Dict[T, int]:
-        """This maps the elements to their index for O(1) time complexity with .index() and
-        __contains__()."""
-        return self._map_buffer
 
     def __len__(self) -> int:
         """Returns the number of unique elements in the set."""
@@ -89,18 +81,16 @@ class _AbstractOrderedSet(ABC, AbstractSet[T], Sequence[T]):
 
     def __contains__(self, key: Any) -> bool:
         """Test if the item is in this ordered set."""
-        return key in self._map
+        return key in self._items
 
-    def index(self, key: T, start: int = 0, stop: Optional[int] = None) -> int:
+    def index(self, key: T, start: int = 0, end: Optional[int] = None) -> int:
         """Get the index of a given entry, raising a ValueError if it's not present."""
-        not_found_error = ValueError(f"{key} is not in {self.__class__.__name__}.")
         try:
-            result = self._map[key]
-        except KeyError:
-            raise not_found_error
-        if result < start or (stop and result >= stop):
-            raise not_found_error
-        return result
+            if end is None:
+                return self._items.index(key, start)
+            return self._items.index(key, start, end)
+        except ValueError:
+            raise ValueError(f"{key} is not in {self.__class__.__name__}.")
 
     def __iter__(self) -> Iterator[T]:
         return iter(self._items)
@@ -157,7 +147,7 @@ class _AbstractOrderedSet(ABC, AbstractSet[T], Sequence[T]):
             # Fast check for obvious cases
             if len(self) > len(other):  # type: ignore[arg-type]
                 return False
-        except AttributeError:
+        except TypeError:
             pass
         return all(item in other for item in self)
 
@@ -167,7 +157,7 @@ class _AbstractOrderedSet(ABC, AbstractSet[T], Sequence[T]):
             # Fast check for obvious cases
             if len(self) < len(other):  # type: ignore[arg-type]
                 return False
-        except AttributeError:
+        except TypeError:
             pass
         return all(item in self for item in other)
 
@@ -191,7 +181,7 @@ class OrderedSet(_AbstractOrderedSet[T], MutableSet[T]):
 
     def __init__(self, iterable: Optional[Iterable[T]] = None) -> None:
         super().__init__(iterable)
-        self._items_buffer = list(self._items_buffer)
+        self._items_buffer: List[T] = list(self._items_buffer)
 
     @property
     def _items(self) -> List[T]:
@@ -200,14 +190,6 @@ class OrderedSet(_AbstractOrderedSet[T], MutableSet[T]):
     @_items.setter
     def _items(self, new_items: List[T]) -> None:
         self._items_buffer = new_items
-
-    @property
-    def _map(self) -> Dict[T, int]:
-        return self._map_buffer
-
-    @_map.setter
-    def _map(self, new_map: Dict[T, int]) -> None:
-        self._map_buffer = new_map
 
     def copy(self) -> "OrderedSet[T]":
         return cast(OrderedSet[T], super().copy())
@@ -240,9 +222,8 @@ class OrderedSet(_AbstractOrderedSet[T], MutableSet[T]):
 
     def add(self, key: T) -> None:
         """Add `key` as an item to this OrderedSet."""
-        if key in self._map:
+        if key in self:
             return
-        self._map[key] = len(self._items)
         self._items.append(key)
 
     append = add
@@ -260,38 +241,22 @@ class OrderedSet(_AbstractOrderedSet[T], MutableSet[T]):
         Raises KeyError if the set is empty.
         """
         if not self._items:
-            raise KeyError("Set is empty")
-
-        elem = self._items[-1]
-        del self._items[-1]
-        del self._map[elem]
-        return elem
+            raise KeyError("OrderedSet is empty")
+        return self._items.pop()
 
     def discard(self, key: T) -> None:
-        """Remove an element.  Do not raise an exception if absent.
+        """Remove an element. Do not raise an exception if absent.
 
         The MutableSet mixin uses this to implement the .remove() method, which
         *does* raise an error when asked to remove a non-existent item.
         """
         if key not in self:
             return
-        i = self._map[key]
-        del self._items[i]
-        del self._map[key]
-        for k, v in self._map.items():
-            if v >= i:
-                self._map[k] = v - 1
+        self._items.remove(key)
 
     def clear(self) -> None:
         """Remove all items from this OrderedSet."""
-        del self._items[:]
-        self._map.clear()
-
-    def _update_items(self, items: Iterable[T]) -> None:
-        """Replace the 'items' list of this OrderedSet with a new one, updating self.map
-        accordingly."""
-        self._items = list(items)
-        self._map = {v: i for i, v in enumerate(self._items)}
+        self._items.clear()
 
     def difference_update(self, *others: Iterable[T]) -> None:
         """Update this OrderedSet to remove items from one or more other sets."""
@@ -299,22 +264,20 @@ class OrderedSet(_AbstractOrderedSet[T], MutableSet[T]):
         for other in others:
             items_as_set = set(other)
             items_to_remove |= items_as_set
-        self._update_items(item for item in self._items if item not in items_to_remove)
+        self._items = [item for item in self._items if item not in items_to_remove]
 
     def intersection_update(self, other: Iterable[T]) -> None:
         """Update this OrderedSet to keep only items in another set, preserving their order in this
         set."""
         other = set(other)
-        self._update_items(item for item in self._items if item in other)
+        self._items = [item for item in self._items if item in other]
 
     def symmetric_difference_update(self, other: Iterable[T]) -> None:
         """Update this OrderedSet to remove items from another set, then add items from the other
         set that were not present in this set."""
         items_to_add = [item for item in other if item not in self]
         items_to_remove = cast(Set[T], set(other))
-        self._update_items(
-            [item for item in self._items if item not in items_to_remove] + items_to_add
-        )
+        self._items = [item for item in self._items if item not in items_to_remove] + items_to_add
 
 
 class FrozenOrderedSet(_AbstractOrderedSet[T]):
@@ -325,7 +288,7 @@ class FrozenOrderedSet(_AbstractOrderedSet[T]):
 
     @property
     def _items(self) -> Tuple[T, ...]:
-        return self._items_buffer
+        return cast(Tuple[T, ...], self._items_buffer)
 
     def copy(self) -> "FrozenOrderedSet[T]":
         return cast(FrozenOrderedSet[T], super().copy())

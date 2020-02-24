@@ -72,9 +72,9 @@ def test_find_index(cls: OrderedSetCls) -> None:
     with pytest.raises(ValueError):
         set1.index("a", start=1)
     with pytest.raises(ValueError):
-        set1.index("c", stop=2)
+        set1.index("c", end=2)
     with pytest.raises(ValueError):
-        set1.index("b", start=1, stop=1)
+        set1.index("b", start=1, end=1)
 
 
 @pytest.mark.parametrize("cls", [OrderedSet, FrozenOrderedSet])
