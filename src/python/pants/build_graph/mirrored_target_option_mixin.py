@@ -36,6 +36,15 @@ class MirroredTargetOptionDeclaration:
         """Get the value of this option, separate from any target."""
         return self.options.get(self.option_name)
 
+    def get_value_or_default(self, value):
+        if self.is_flagged:
+            return self.option_value
+
+        if value is not None:
+            return value
+
+        return self.option_value
+
     # TODO(#7183): support list/set options in addition to scalars! We should apply the same
     # precedence order, but also provide some interface for allowing target fields to append or
     # remove an item from a set-valued option instead of completely overwriting it!
@@ -106,6 +115,5 @@ class MirroredTargetOptionMixin(ABC):
 
     def get_scalar_value_option(self, option_name: str, value: Optional[Any]) -> Any:
         """Return `value` if not None;, else `option_name` from this subsystem's options."""
-        if value is not None:
-            return value
-        return getattr(self, option_name)
+        mirrored_option_declaration = self._mirrored_option_declarations[option_name]
+        return mirrored_option_declaration.get_value_or_default(value)
