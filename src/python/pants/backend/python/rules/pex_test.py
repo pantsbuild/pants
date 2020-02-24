@@ -145,7 +145,7 @@ class PexTest(TestBase):
         ]
         self.create_file("constraints.txt", "\n".join(constrained_transitive_deps[:2]))
         constraints = PexRequirementConstraints.create_from_raw_constraints(
-            ["constraints.txt", *constrained_transitive_deps[2:]]
+            ["@constraints.txt", *constrained_transitive_deps[2:]]
         )
         pex_info = self.create_pex_and_get_pex_info(
             requirements=PexRequirements((direct_dep,)), requirement_constraints=constraints

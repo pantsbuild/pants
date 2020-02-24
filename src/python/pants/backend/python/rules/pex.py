@@ -84,16 +84,15 @@ class PexRequirementConstraints:
 
     @classmethod
     def create_from_raw_constraints(cls, constraints: Iterable[str]) -> "PexRequirementConstraints":
-        """The constraints may be paths to constraint files and/or requirement strings."""
+        """The constraints may be paths to constraint files (prefixed with `@`) and/or requirement
+        strings."""
         constraint_file_paths = set()
         raw_constraints = set()
-        # See https://www.python.org/dev/peps/pep-0440/#version-specifiers.
-        version_specifier_chars = {"=", ">", "<"}
         for constraint in constraints:
-            if any(char in constraint for char in version_specifier_chars):
-                raw_constraints.add(constraint)
+            if constraint.startswith("@"):
+                constraint_file_paths.add(constraint[1:])
             else:
-                constraint_file_paths.add(constraint)
+                raw_constraints.add(constraint)
         return PexRequirementConstraints(
             constraint_file_paths=tuple(sorted(constraint_file_paths)),
             raw_constraints=tuple(sorted(raw_constraints)),

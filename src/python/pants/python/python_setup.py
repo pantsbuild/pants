@@ -44,14 +44,14 @@ class PythonSetup(Subsystem):
             fingerprint=True,
             type=list,
             default=[],
-            metavar="<file_path or requirement>",
+            metavar="<requirement or @file_path>",
             help=(
                 "When resolving third-party requirements, use these "
-                "constraints to determine which versions to use.\n\nThis option expects a list of "
-                "paths to constraint files and/or raw requirement strings, e.g. "
-                "`requests==2.23.0` or `pytest>=4.6,<4.7`. See "
+                "constraints to determine which versions to use. This option expects a list of "
+                "raw requirement strings and/or paths to constraint files prefixed with `@`, e.g. "
+                "`['@constraints.txt', 'requests==2.23.0', `pytest>=4.6,<4.7']`. See "
                 "https://pip.pypa.io/en/stable/user_guide/#constraints-files for more information."
-                "\n\nPython targets may also declare constraints through their `constraints` field "
+                "Python targets may also declare constraints through their `constraints` field "
                 "in BUILD files."
             ),
         )
