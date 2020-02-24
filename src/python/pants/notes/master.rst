@@ -22,6 +22,9 @@ API Changes
 * Reapply "Switch to dot idea project type" PR (#9105)
   `PR #9105 <https://github.com/pantsbuild/pants/pull/9105>`_
 
+* [export-dep-as-jar] Include transitive target dependencies in export-dep-as-jar (#9146)
+  `PR #9146 <https://github.com/pantsbuild/pants/pull/9146>`_
+
 * Remove deprecated passthrough args for `login`, `lint.mypy`, and `fmt.isort` (#9134)
   `PR #9134 <https://github.com/pantsbuild/pants/pull/9134>`_
 
@@ -57,9 +60,6 @@ New Features
 
 * [jvm] Introduce runtime_platform; bump export version to 1.1 (#9003)
   `PR #9003 <https://github.com/pantsbuild/pants/pull/9003>`_
-
-* [export-dep-as-jar] Include transitive target dependencies in export-dep-as-jar (#9146)
-  `PR #9146 <https://github.com/pantsbuild/pants/pull/9146>`_
 
 Bugfixes
 ~~~~~~~~
