@@ -46,6 +46,7 @@ class GlobMatchErrorBehavior(Enum):
 class FileNotFoundBehavior(Enum):
     """What to do when globs do not match in BUILD files."""
 
+    ignore = "ignore"
     warn = "warn"
     error = "error"
 
