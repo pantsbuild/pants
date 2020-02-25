@@ -137,7 +137,7 @@ class TestOptions(GoalSubsystem):
 
     name = "test"
 
-    required_union_implementations = (TestTarget, CoverageDataBatch)
+    required_union_implementations = (TestTarget,)
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
@@ -186,6 +186,8 @@ async def run_tests(
     )
 
     if options.values.run_coverage:
+        # TODO: consider warning if a user uses `--coverage` but the language backend does not
+        # provide coverage support. This might be too chatty to be worth doing?
         results_with_coverage = [
             x
             for x in results
