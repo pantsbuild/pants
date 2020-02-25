@@ -11,7 +11,7 @@ from collections import defaultdict
 from contextlib import contextmanager
 from tempfile import mkdtemp
 from textwrap import dedent
-from typing import Any, List, Optional, Type, TypeVar, Union, cast
+from typing import Any, Iterable, List, Optional, Type, TypeVar, Union, cast
 
 from pants.base.build_root import BuildRoot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
@@ -21,7 +21,7 @@ from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
-from pants.engine.fs import PathGlobs, PathGlobsAndRoot
+from pants.engine.fs import PathGlobs, PathGlobsAndRoot, Snapshot
 from pants.engine.legacy.graph import HydratedField
 from pants.engine.legacy.structs import Files, SourcesField
 from pants.engine.rules import RootRule
@@ -747,6 +747,14 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
             return self.scheduler.capture_snapshots(
                 (PathGlobsAndRoot(PathGlobs(("**",)), temp_dir),)
             )[0]
+
+    def make_snapshot_of_empty_files(self, files: Iterable[str]) -> Snapshot:
+        """Makes a snapshot with empty content for each file.
+
+        This is a convenience around `TestBase.make_snapshot`, which allows specifying the content
+        for each file.
+        """
+        return cast(Snapshot, self.make_snapshot({fp: "" for fp in files}))
 
     class LoggingRecorder:
         """Simple logging handler to record warnings."""

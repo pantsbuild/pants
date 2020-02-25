@@ -105,7 +105,7 @@ async def setup(
     full_sources_digest = (
         request.target.prior_formatter_result_digest or adaptor.sources.snapshot.directory_digest
     )
-    source_files = await Get[SourceFiles](DetermineSourceFilesRequest(adaptor_with_origin))
+    source_files = await Get[SourceFiles](DetermineSourceFilesRequest([adaptor_with_origin]))
 
     merged_input_files = await Get[Digest](
         DirectoriesToMerge(

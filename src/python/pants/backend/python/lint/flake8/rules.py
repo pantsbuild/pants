@@ -89,7 +89,7 @@ async def lint(
         ),
     )
 
-    source_files = await Get[SourceFiles](DetermineSourceFilesRequest(adaptor_with_origin))
+    source_files = await Get[SourceFiles](DetermineSourceFilesRequest([adaptor_with_origin]))
 
     request = requirements_pex.create_execute_request(
         python_setup=python_setup,

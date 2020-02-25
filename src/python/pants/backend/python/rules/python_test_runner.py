@@ -132,7 +132,7 @@ async def setup_pytest_for_target(
     # Get the file names for the test_target so that we can specify to Pytest precisely which files
     # to test, rather than using auto-discovery.
     test_files = await Get[SourceFiles](
-        DetermineSourceFilesRequest(adaptor_with_origin, strip_source_roots=True)
+        DetermineSourceFilesRequest([adaptor_with_origin], strip_source_roots=True)
     )
     test_file_names = test_files.snapshot.files
 
