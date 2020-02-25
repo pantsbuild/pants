@@ -1,47 +1,32 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import os
 from dataclasses import dataclass
-from textwrap import dedent
 from typing import Optional, Tuple
 
 from pants.backend.python.rules.pex import Pex
 from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
 from pants.backend.python.rules.prepare_chrooted_python_sources import ChrootedPythonSources
+from pants.backend.python.rules.pytest_coverage import (
+    DEFAULT_COVERAGE_CONFIG,
+    PytestCoverageData,
+    get_coveragerc_input,
+    get_packages_to_cover,
+)
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.addressable import Addresses
-from pants.engine.fs import Digest, DirectoriesToMerge, FileContent, InputFilesContent
+from pants.engine.fs import Digest, DirectoriesToMerge, InputFilesContent
 from pants.engine.interactive_runner import InteractiveProcessRequest
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
-from pants.engine.legacy.structs import PythonTestsAdaptor, PythonTestsAdaptorWithOrigin
+from pants.engine.legacy.structs import PythonTestsAdaptorWithOrigin
 from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.global_options import GlobalOptions
 from pants.python.python_setup import PythonSetup
 from pants.rules.core.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.rules.core.test import TestDebugRequest, TestOptions, TestResult, TestTarget
-
-DEFAULT_COVERAGE_CONFIG = dedent(
-    f"""
-    [run]
-    branch = True
-    timid = False
-    relative_files = True
-    """
-)
-
-
-def get_coveragerc_input(coveragerc_content: str) -> InputFilesContent:
-    return InputFilesContent(
-        [
-            FileContent(
-                path=".coveragerc", content=coveragerc_content.encode(), is_executable=False,
-            ),
-        ]
-    )
 
 
 def calculate_timeout_seconds(
@@ -75,23 +60,6 @@ class TestTargetSetup:
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
-
-
-def get_packages_to_cover(
-    target: PythonTestsAdaptor, source_root_stripped_file_paths: Tuple[str, ...],
-) -> Tuple[str, ...]:
-    if hasattr(target, "coverage"):
-        return tuple(sorted(set(target.coverage)))
-    return tuple(
-        sorted(
-            {
-                os.path.dirname(source_root_stripped_source_file_path).replace(
-                    os.sep, "."
-                )  # Turn file paths into package names.
-                for source_root_stripped_source_file_path in source_root_stripped_file_paths
-            }
-        )
-    )
 
 
 @rule
@@ -143,7 +111,7 @@ async def setup_pytest_for_target(
         )
         directories_to_merge.append(coveragerc_digest)
         packages_to_cover = get_packages_to_cover(
-            adaptor, source_root_stripped_file_paths=specified_source_file_names,
+            target=adaptor, source_root_stripped_file_paths=test_file_names,
         )
         coverage_args = [
             "--cov-report=",  # To not generate any output. https://pytest-cov.readthedocs.io/en/latest/config.html
@@ -197,7 +165,12 @@ async def run_python_test(
         env=env,
     )
     result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, request)
-    return TestResult.from_fallible_execute_process_result(result)
+    return TestResult.from_fallible_execute_process_result(
+        result,
+        coverage_data=PytestCoverageData(result.output_directory_digest)
+        if test_options.values.run_coverage
+        else None,
+    )
 
 
 @rule(name="Run pytest in an interactive process")
