@@ -16,7 +16,7 @@ from pants.backend.python.rules.pex import (
 )
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
-from pants.engine.fs import Digest, DirectoriesToMerge
+from pants.engine.fs import Digest, DirectoriesToMerge, Snapshot
 from pants.engine.isolated_process import (
     ExecuteProcessRequest,
     ExecuteProcessResult,
@@ -27,7 +27,11 @@ from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.python.python_setup import PythonSetup
 from pants.rules.core import determine_source_files, strip_source_roots
-from pants.rules.core.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
+from pants.rules.core.determine_source_files import (
+    AllSourceFilesRequest,
+    SourceFiles,
+    SpecifiedSourceFilesRequest,
+)
 from pants.rules.core.fmt import FmtResult
 from pants.rules.core.lint import LintResult
 
@@ -35,7 +39,7 @@ from pants.rules.core.lint import LintResult
 @dataclass(frozen=True)
 class DocformatterTarget:
     adaptor_with_origin: TargetAdaptorWithOrigin
-    prior_formatter_result_digest: Optional[Digest] = None  # unused by `lint`
+    prior_formatter_result: Optional[Snapshot] = None  # unused by `lint`
 
 
 @dataclass(frozen=True)
@@ -80,17 +84,23 @@ async def setup(
         )
     )
 
-    # NB: We populate the chroot with every source file belonging to the target, but possibly only
-    # tell Docformatter to run over some of those files when given file arguments.
-    full_sources_digest = (
-        request.target.prior_formatter_result_digest or adaptor.sources.snapshot.directory_digest
-    )
+    if request.target.prior_formatter_result is None:
+        all_source_files = await Get[SourceFiles](AllSourceFilesRequest([adaptor]))
+        all_source_files_snapshot = all_source_files.snapshot
+    else:
+        all_source_files_snapshot = request.target.prior_formatter_result
+
     specified_source_files = await Get[SourceFiles](
         SpecifiedSourceFilesRequest([adaptor_with_origin])
     )
 
     merged_input_files = await Get[Digest](
-        DirectoriesToMerge(directories=(full_sources_digest, requirements_pex.directory_digest)),
+        DirectoriesToMerge(
+            directories=(
+                all_source_files_snapshot.directory_digest,
+                requirements_pex.directory_digest,
+            )
+        ),
     )
 
     process_request = requirements_pex.create_execute_request(
@@ -103,9 +113,7 @@ async def setup(
             check_only=request.check_only,
         ),
         input_files=merged_input_files,
-        # NB: Even if the user specified to only run on certain files belonging to the target, we
-        # still capture in the output all of the source files.
-        output_files=adaptor.sources.snapshot.files,
+        output_files=all_source_files_snapshot.files,
         description=f"Run docformatter for {adaptor.address.reference()}",
     )
     return Setup(process_request)

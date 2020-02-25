@@ -29,7 +29,11 @@ from pants.option.custom_types import GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
 from pants.rules.core import determine_source_files, strip_source_roots
-from pants.rules.core.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
+from pants.rules.core.determine_source_files import (
+    AllSourceFilesRequest,
+    SourceFiles,
+    SpecifiedSourceFilesRequest,
+)
 from pants.rules.core.fmt import FmtResult
 from pants.rules.core.lint import LintResult
 
@@ -37,7 +41,7 @@ from pants.rules.core.lint import LintResult
 @dataclass(frozen=True)
 class IsortTarget:
     adaptor_with_origin: TargetAdaptorWithOrigin
-    prior_formatter_result_digest: Optional[Digest] = None  # unused by `lint`
+    prior_formatter_result: Optional[Snapshot] = None  # unused by `lint`
 
 
 @dataclass(frozen=True)
@@ -95,11 +99,12 @@ async def setup(
         )
     )
 
-    # NB: We populate the chroot with every source file belonging to the target, but possibly only
-    # tell isort to run over some of those files when given file arguments.
-    full_sources_digest = (
-        request.target.prior_formatter_result_digest or adaptor.sources.snapshot.directory_digest
-    )
+    if request.target.prior_formatter_result is None:
+        all_source_files = await Get[SourceFiles](AllSourceFilesRequest([adaptor]))
+        all_source_files_snapshot = all_source_files.snapshot
+    else:
+        all_source_files_snapshot = request.target.prior_formatter_result
+
     specified_source_files = await Get[SourceFiles](
         SpecifiedSourceFilesRequest([adaptor_with_origin])
     )
@@ -107,7 +112,7 @@ async def setup(
     merged_input_files = await Get[Digest](
         DirectoriesToMerge(
             directories=(
-                full_sources_digest,
+                all_source_files_snapshot.directory_digest,
                 requirements_pex.directory_digest,
                 config_snapshot.directory_digest,
             )
@@ -124,9 +129,7 @@ async def setup(
             check_only=request.check_only,
         ),
         input_files=merged_input_files,
-        # NB: Even if the user specified to only run on certain files belonging to the target, we
-        # still capture in the output all of the source files.
-        output_files=adaptor.sources.snapshot.files,
+        output_files=all_source_files_snapshot.files,
         description=f"Run isort for {adaptor.address.reference()}",
     )
     return Setup(process_request)

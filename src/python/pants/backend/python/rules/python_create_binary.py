@@ -9,7 +9,7 @@ from pants.engine.legacy.structs import PythonBinaryAdaptor
 from pants.engine.rules import UnionRule, rule
 from pants.engine.selectors import Get
 from pants.rules.core.binary import BinaryTarget, CreatedBinary
-from pants.rules.core.strip_source_roots import SourceRootStrippedSources, StripTargetRequest
+from pants.rules.core.determine_source_files import AllSourceFilesRequest, SourceFiles
 
 
 @rule
@@ -18,15 +18,16 @@ async def create_python_binary(python_binary_adaptor: PythonBinaryAdaptor) -> Cr
     if hasattr(python_binary_adaptor, "entry_point"):
         entry_point = python_binary_adaptor.entry_point
     else:
-        sources_snapshot = python_binary_adaptor.sources.snapshot
-        # NB: A `python_binary` may have either 0 or 1 source files. This is validated by
+        sources = await Get[SourceFiles](
+            AllSourceFilesRequest([python_binary_adaptor], strip_source_roots=True)
+        )
+        # NB: `python_binary` targets may have 0-1 sources. This is enforced by
         # `PythonBinaryAdaptor`.
-        if not sources_snapshot.files:
-            entry_point = None
-        else:
-            output = await Get[SourceRootStrippedSources](StripTargetRequest(python_binary_adaptor))
-            module_name = output.snapshot.files[0]
+        if len(sources.snapshot.files) == 1:
+            module_name = sources.snapshot.files[0]
             entry_point = PythonBinary.translate_source_path_to_py_module_specifier(module_name)
+        else:
+            entry_point = None
 
     request = CreatePexFromTargetClosure(
         addresses=Addresses((python_binary_adaptor.address,)),

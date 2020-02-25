@@ -23,7 +23,11 @@ from pants.engine.selectors import Get
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
 from pants.rules.core import determine_source_files, strip_source_roots
-from pants.rules.core.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
+from pants.rules.core.determine_source_files import (
+    AllSourceFilesRequest,
+    SourceFiles,
+    SpecifiedSourceFilesRequest,
+)
 from pants.rules.core.lint import LintResult
 
 
@@ -79,18 +83,19 @@ async def lint(
         )
     )
 
+    all_source_files = await Get[SourceFiles](AllSourceFilesRequest([adaptor]))
+    specified_source_files = await Get[SourceFiles](
+        SpecifiedSourceFilesRequest([adaptor_with_origin])
+    )
+
     merged_input_files = await Get[Digest](
         DirectoriesToMerge(
             directories=(
-                adaptor.sources.snapshot.directory_digest,
+                all_source_files.snapshot.directory_digest,
                 requirements_pex.directory_digest,
                 config_snapshot.directory_digest,
             )
         ),
-    )
-
-    specified_source_files = await Get[SourceFiles](
-        SpecifiedSourceFilesRequest([adaptor_with_origin])
     )
 
     request = requirements_pex.create_execute_request(

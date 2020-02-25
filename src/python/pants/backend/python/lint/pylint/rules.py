@@ -63,7 +63,7 @@ async def lint(
     dependencies = await MultiGet(
         Get[HydratedTarget](Address, dependency) for dependency in hydrated_target.dependencies
     )
-    sources_digest = await Get[ChrootedPythonSources](
+    chrooted_python_sources = await Get[ChrootedPythonSources](
         HydratedTargets([hydrated_target, *dependencies])
     )
 
@@ -97,7 +97,7 @@ async def lint(
             directories=(
                 requirements_pex.directory_digest,
                 config_snapshot.directory_digest,
-                sources_digest.snapshot.directory_digest,
+                chrooted_python_sources.snapshot.directory_digest,
             )
         ),
     )

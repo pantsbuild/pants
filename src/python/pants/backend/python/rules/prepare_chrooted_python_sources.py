@@ -5,11 +5,12 @@ from dataclasses import dataclass
 
 from pants.backend.python.rules.inject_init import InitInjectedSnapshot, InjectInitRequest
 from pants.backend.python.rules.inject_init import rules as inject_init_rules
-from pants.engine.fs import DirectoriesToMerge, Snapshot
+from pants.engine.fs import Snapshot
 from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.rules import rule
-from pants.engine.selectors import Get, MultiGet
-from pants.rules.core.strip_source_roots import SourceRootStrippedSources, StripTargetRequest
+from pants.engine.selectors import Get
+from pants.rules.core import determine_source_files
+from pants.rules.core.determine_source_files import AllSourceFilesRequest, SourceFiles
 
 
 @dataclass(frozen=True)
@@ -28,21 +29,12 @@ async def prepare_chrooted_python_sources(
     execute the code, so they can safely operate on the original source files without
     stripping source roots.
     """
-    source_root_stripped_sources = await MultiGet(
-        Get[SourceRootStrippedSources](StripTargetRequest(hydrated_target.adaptor))
-        for hydrated_target in hydrated_targets
+    stripped_sources = await Get[SourceFiles](
+        AllSourceFilesRequest((ht.adaptor for ht in hydrated_targets), strip_source_roots=True)
     )
-    sources_snapshot = await Get[Snapshot](
-        DirectoriesToMerge(
-            directories=tuple(
-                stripped_sources.snapshot.directory_digest
-                for stripped_sources in source_root_stripped_sources
-            )
-        )
-    )
-    result = await Get[InitInjectedSnapshot](InjectInitRequest(sources_snapshot))
-    return ChrootedPythonSources(result.snapshot)
+    init_injected = await Get[InitInjectedSnapshot](InjectInitRequest(stripped_sources.snapshot))
+    return ChrootedPythonSources(init_injected.snapshot)
 
 
 def rules():
-    return [prepare_chrooted_python_sources, *inject_init_rules()]
+    return [prepare_chrooted_python_sources, *determine_source_files.rules(), *inject_init_rules()]

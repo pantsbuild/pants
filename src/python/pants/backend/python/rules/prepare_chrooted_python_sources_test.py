@@ -14,7 +14,6 @@ from pants.build_graph.files import Files
 from pants.engine.legacy.graph import HydratedTarget, HydratedTargets
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
-from pants.rules.core import strip_source_roots
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
@@ -24,7 +23,6 @@ class PrepareChrootedPythonSourcesTest(TestBase):
     def rules(cls):
         return (
             *super().rules(),
-            *strip_source_roots.rules(),
             *prepare_chrooted_python_sources_rules(),
             RootRule(HydratedTargets),
         )
@@ -35,7 +33,7 @@ class PrepareChrootedPythonSourcesTest(TestBase):
         adaptor = Mock()
         adaptor.type_alias = type_alias
         adaptor.sources = Mock()
-        adaptor.sources.snapshot = self.make_snapshot({fp: "" for fp in source_paths})
+        adaptor.sources.snapshot = self.make_snapshot_of_empty_files(source_paths)
         address = Address(
             spec_path=PurePath(source_paths[0]).parent.as_posix(), target_name="target"
         )
