@@ -22,11 +22,8 @@ from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
-from pants.rules.core import determine_specified_source_files, strip_source_roots
-from pants.rules.core.determine_specified_source_files import (
-    SpecifiedSourceFiles,
-    SpecifiedSourceFilesRequest,
-)
+from pants.rules.core import determine_source_files, strip_source_roots
+from pants.rules.core.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.rules.core.lint import LintResult
 
 
@@ -35,12 +32,12 @@ class BanditTarget:
     adaptor_with_origin: TargetAdaptorWithOrigin
 
 
-def generate_args(*, source_files: SpecifiedSourceFiles, bandit: Bandit) -> Tuple[str, ...]:
+def generate_args(*, specified_source_files: SourceFiles, bandit: Bandit) -> Tuple[str, ...]:
     args = []
     if bandit.options.config is not None:
         args.append(f"--config={bandit.options.config}")
     args.extend(bandit.options.args)
-    args.extend(sorted(source_files.snapshot.files))
+    args.extend(sorted(specified_source_files.snapshot.files))
     return tuple(args)
 
 
@@ -92,7 +89,7 @@ async def lint(
         ),
     )
 
-    source_files = await Get[SpecifiedSourceFiles](
+    specified_source_files = await Get[SourceFiles](
         SpecifiedSourceFilesRequest([adaptor_with_origin])
     )
 
@@ -100,7 +97,7 @@ async def lint(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path=f"./bandit.pex",
-        pex_args=generate_args(source_files=source_files, bandit=bandit),
+        pex_args=generate_args(specified_source_files=specified_source_files, bandit=bandit),
         input_files=merged_input_files,
         description=f"Run Bandit for {adaptor.address.reference()}",
     )
@@ -114,7 +111,7 @@ def rules():
         subsystem_rule(Bandit),
         UnionRule(PythonLintTarget, BanditTarget),
         *download_pex_bin.rules(),
-        *determine_specified_source_files.rules(),
+        *determine_source_files.rules(),
         *pex.rules(),
         *python_native_code.rules(),
         *strip_source_roots.rules(),

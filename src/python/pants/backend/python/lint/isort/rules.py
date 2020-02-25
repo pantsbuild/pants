@@ -28,11 +28,8 @@ from pants.engine.selectors import Get
 from pants.option.custom_types import GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
-from pants.rules.core import determine_specified_source_files, strip_source_roots
-from pants.rules.core.determine_specified_source_files import (
-    SpecifiedSourceFiles,
-    SpecifiedSourceFilesRequest,
-)
+from pants.rules.core import determine_source_files, strip_source_roots
+from pants.rules.core.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.rules.core.fmt import FmtResult
 from pants.rules.core.lint import LintResult
 
@@ -55,7 +52,7 @@ class Setup:
 
 
 def generate_args(
-    *, source_files: SpecifiedSourceFiles, isort: Isort, check_only: bool,
+    *, specified_source_files: SourceFiles, isort: Isort, check_only: bool,
 ) -> Tuple[str, ...]:
     # NB: isort auto-discovers config files. There is no way to hardcode them via command line
     # flags. So long as the files are in the Pex's input files, isort will use the config.
@@ -63,7 +60,7 @@ def generate_args(
     if check_only:
         args.append("--check-only")
     args.extend(isort.options.args)
-    args.extend(sorted(source_files.snapshot.files))
+    args.extend(sorted(specified_source_files.snapshot.files))
     return tuple(args)
 
 
@@ -103,7 +100,7 @@ async def setup(
     full_sources_digest = (
         request.target.prior_formatter_result_digest or adaptor.sources.snapshot.directory_digest
     )
-    source_files = await Get[SpecifiedSourceFiles](
+    specified_source_files = await Get[SourceFiles](
         SpecifiedSourceFilesRequest([adaptor_with_origin])
     )
 
@@ -122,7 +119,9 @@ async def setup(
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path="./isort.pex",
         pex_args=generate_args(
-            source_files=source_files, isort=isort, check_only=request.check_only,
+            specified_source_files=specified_source_files,
+            isort=isort,
+            check_only=request.check_only,
         ),
         input_files=merged_input_files,
         # NB: Even if the user specified to only run on certain files belonging to the target, we
@@ -160,7 +159,7 @@ def rules():
         UnionRule(PythonFormatTarget, IsortTarget),
         UnionRule(PythonLintTarget, IsortTarget),
         *download_pex_bin.rules(),
-        *determine_specified_source_files.rules(),
+        *determine_source_files.rules(),
         *pex.rules(),
         *python_native_code.rules(),
         *strip_source_roots.rules(),

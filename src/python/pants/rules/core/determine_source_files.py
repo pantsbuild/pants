@@ -14,6 +14,15 @@ from pants.rules.core.strip_source_roots import SourceRootStrippedSources, Strip
 from pants.util.meta import frozen_after_init
 
 
+@dataclass(frozen=True)
+class SourceFiles:
+    """A merged snapshot of the `sources` fields of multiple targets, possibly containing a subset
+    of the `sources` when using `SpecifiedSourceFilesRequest` (instead of
+    `AllSourceFilesRequest`)."""
+
+    snapshot: Snapshot
+
+
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class SpecifiedSourceFilesRequest:
@@ -30,12 +39,7 @@ class SpecifiedSourceFilesRequest:
         self.strip_source_roots = strip_source_roots
 
 
-@dataclass(frozen=True)
-class SpecifiedSourceFiles:
-    snapshot: Snapshot
-
-
-def determine_for_target(
+def determine_specified_sources_for_target(
     adaptor_with_origin: TargetAdaptorWithOrigin,
 ) -> Union[Snapshot, SnapshotSubset]:
     adaptor = adaptor_with_origin.adaptor
@@ -55,15 +59,13 @@ def determine_for_target(
 
 
 @rule
-async def determine_specified_source_files(
-    request: SpecifiedSourceFilesRequest,
-) -> SpecifiedSourceFiles:
+async def determine_specified_source_files(request: SpecifiedSourceFilesRequest,) -> SourceFiles:
     """Determine the specified `sources` for targets, possibly finding a subset of the original
     `sources` fields if the user supplied file arguments."""
     full_snapshots = []
     snapshot_subset_requests = []
     for adaptor_with_origin in request.adaptors_with_origins:
-        result = determine_for_target(adaptor_with_origin)
+        result = determine_specified_sources_for_target(adaptor_with_origin)
         if isinstance(result, Snapshot):
             full_snapshots.append(result)
         else:
@@ -82,7 +84,7 @@ async def determine_specified_source_files(
     )
 
     if not request.strip_source_roots:
-        return SpecifiedSourceFiles(merged_snapshot)
+        return SourceFiles(merged_snapshot)
 
     # If there is exactly one target in the request, we use a performance optimization for
     # `StripSourceRootsRequest` to pass a `representative_path` so that the rule does not need to
@@ -99,7 +101,7 @@ async def determine_specified_source_files(
     stripped = await Get[SourceRootStrippedSources](
         StripSnapshotRequest(merged_snapshot, representative_path=representative_path)
     )
-    return SpecifiedSourceFiles(stripped.snapshot)
+    return SourceFiles(stripped.snapshot)
 
 
 def rules():

@@ -29,11 +29,8 @@ from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
-from pants.rules.core import determine_specified_source_files, strip_source_roots
-from pants.rules.core.determine_specified_source_files import (
-    SpecifiedSourceFiles,
-    SpecifiedSourceFilesRequest,
-)
+from pants.rules.core import determine_source_files, strip_source_roots
+from pants.rules.core.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.rules.core.fmt import FmtResult
 from pants.rules.core.lint import LintResult
 
@@ -56,7 +53,7 @@ class Setup:
 
 
 def generate_args(
-    *, source_files: SpecifiedSourceFiles, black: Black, check_only: bool,
+    *, specified_source_files: SourceFiles, black: Black, check_only: bool,
 ) -> Tuple[str, ...]:
     args = []
     if check_only:
@@ -69,7 +66,7 @@ def generate_args(
     # Black to run over everything recursively under the directory of our target, as Black should
     # only touch files directly specified. We can use `--include` to ensure that Black only
     # operates on the files we actually care about.
-    files = sorted(source_files.snapshot.files)
+    files = sorted(specified_source_files.snapshot.files)
     args.extend(["--include", "|".join(re.escape(f) for f in files)])
     args.extend(PurePath(f).parent.as_posix() for f in files)
     return tuple(args)
@@ -110,7 +107,7 @@ async def setup(
     full_sources_digest = (
         request.target.prior_formatter_result_digest or adaptor.sources.snapshot.directory_digest
     )
-    source_files = await Get[SpecifiedSourceFiles](
+    specified_source_files = await Get[SourceFiles](
         SpecifiedSourceFilesRequest([adaptor_with_origin])
     )
 
@@ -129,7 +126,9 @@ async def setup(
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path="./black.pex",
         pex_args=generate_args(
-            source_files=source_files, black=black, check_only=request.check_only,
+            specified_source_files=specified_source_files,
+            black=black,
+            check_only=request.check_only,
         ),
         input_files=merged_input_files,
         # NB: Even if the user specified to only run on certain files belonging to the target, we
@@ -167,7 +166,7 @@ def rules():
         UnionRule(PythonFormatTarget, BlackTarget),
         UnionRule(PythonLintTarget, BlackTarget),
         *download_pex_bin.rules(),
-        *determine_specified_source_files.rules(),
+        *determine_source_files.rules(),
         *pex.rules(),
         *python_native_code.rules(),
         *strip_source_roots.rules(),
