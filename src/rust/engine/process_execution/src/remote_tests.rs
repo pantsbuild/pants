@@ -18,7 +18,7 @@ use crate::remote::{CommandRunner, ExecutionError, ExecutionHistory, OperationOr
 use crate::{
   CommandRunner as CommandRunnerTrait, Context, ExecuteProcessRequest,
   ExecuteProcessRequestMetadata, FallibleExecuteProcessResult, MultiPlatformExecuteProcessRequest,
-  PlatformConstraint,
+  Platform, PlatformConstraint,
 };
 use maplit::{btreemap, hashset};
 use mock::execution_server::MockOperation;
@@ -626,6 +626,7 @@ fn successful_execution_after_one_getoperation() {
       exit_code: 0,
       output_directory: EMPTY_DIGEST,
       execution_attempts: vec![],
+      platform: Platform::current().unwrap(),
     }
   );
 
@@ -673,6 +674,7 @@ fn retries_retriable_errors() {
       exit_code: 0,
       output_directory: EMPTY_DIGEST,
       execution_attempts: vec![],
+      platform: Platform::current().unwrap(),
     }
   );
 
@@ -775,7 +777,7 @@ pub fn sends_headers() {
       String::from("cat") => String::from("roland"),
     },
     store,
-    PlatformConstraint::Linux,
+    Platform::Linux,
     runtime.clone(),
     Duration::from_secs(0),
     Duration::from_millis(0),
@@ -849,6 +851,7 @@ fn extract_response_with_digest_stdout() {
       exit_code: 0,
       output_directory: EMPTY_DIGEST,
       execution_attempts: vec![],
+      platform: Platform::current().unwrap(),
     }
   );
 }
@@ -878,6 +881,7 @@ fn extract_response_with_digest_stderr() {
       exit_code: 0,
       output_directory: EMPTY_DIGEST,
       execution_attempts: vec![],
+      platform: Platform::current().unwrap(),
     }
   );
 }
@@ -939,7 +943,7 @@ fn ensure_inline_stdio_is_stored() {
     None,
     BTreeMap::new(),
     store,
-    PlatformConstraint::Linux,
+    Platform::Linux,
     runtime.clone(),
     Duration::from_secs(0),
     Duration::from_millis(0),
@@ -957,6 +961,7 @@ fn ensure_inline_stdio_is_stored() {
       exit_code: 0,
       output_directory: EMPTY_DIGEST,
       execution_attempts: vec![],
+      platform: Platform::current().unwrap(),
     }
   );
 
@@ -1031,6 +1036,7 @@ fn successful_execution_after_four_getoperations() {
       exit_code: 0,
       output_directory: EMPTY_DIGEST,
       execution_attempts: vec![],
+      platform: Platform::current().unwrap(),
     }
   );
 }
@@ -1147,6 +1153,7 @@ fn dropped_request_cancels() {
     exit_code: 0,
     output_directory: EMPTY_DIGEST,
     execution_attempts: vec![],
+    platform: Platform::current().unwrap(),
   };
 
   let run_future = command_runner.run(execute_request.into(), Context::default());
@@ -1214,6 +1221,7 @@ fn retry_for_cancelled_channel() {
       exit_code: 0,
       output_directory: EMPTY_DIGEST,
       execution_attempts: vec![],
+      platform: Platform::current().unwrap(),
     }
   );
 }
@@ -1477,7 +1485,7 @@ fn execute_missing_file_uploads_if_known() {
     None,
     BTreeMap::new(),
     store,
-    PlatformConstraint::Linux,
+    Platform::Linux,
     runtime.clone(),
     Duration::from_secs(0),
     Duration::from_millis(0),
@@ -1496,6 +1504,7 @@ fn execute_missing_file_uploads_if_known() {
       exit_code: 0,
       output_directory: EMPTY_DIGEST,
       execution_attempts: vec![],
+      platform: Platform::current().unwrap(),
     }
   );
   {
@@ -1584,7 +1593,7 @@ fn execute_missing_file_uploads_if_known_status() {
     None,
     BTreeMap::new(),
     store,
-    PlatformConstraint::Linux,
+    Platform::Linux,
     runtime.clone(),
     Duration::from_secs(0),
     Duration::from_millis(0),
@@ -1601,6 +1610,7 @@ fn execute_missing_file_uploads_if_known_status() {
       exit_code: 0,
       output_directory: EMPTY_DIGEST,
       execution_attempts: vec![],
+      platform: Platform::current().unwrap(),
     })
   );
   {
@@ -1664,7 +1674,7 @@ fn execute_missing_file_errors_if_unknown() {
     None,
     BTreeMap::new(),
     store,
-    PlatformConstraint::Linux,
+    Platform::Linux,
     runtime.clone(),
     Duration::from_secs(0),
     Duration::from_millis(0),
@@ -1708,6 +1718,7 @@ fn extract_execute_response_success() {
     exit_code: 17,
     output_directory: TestDirectory::nested().digest(),
     execution_attempts: vec![],
+    platform: Platform::current().unwrap(),
   };
 
   let mut output_file = bazel_protos::remote_execution::OutputFile::new();
@@ -2492,7 +2503,7 @@ fn create_command_runner(
     None,
     BTreeMap::new(),
     store,
-    PlatformConstraint::Linux,
+    Platform::Linux,
     runtime,
     Duration::from_secs(1), // We use a low queue_buffer_time to ensure that tests do not take too long.
     backoff_incremental_wait,

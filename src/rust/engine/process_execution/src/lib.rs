@@ -66,6 +66,25 @@ pub mod nailgun;
 extern crate uname;
 
 #[derive(PartialOrd, Ord, Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub enum Platform {
+  Darwin,
+  Linux,
+}
+
+impl Platform {
+  pub fn current() -> Result<Platform, String> {
+    let platform_info =
+      uname::uname().map_err(|_| "Failed to get local platform info!".to_string())?;
+
+    match platform_info {
+      uname::Info { ref sysname, .. } if sysname.to_lowercase() == "darwin" => Ok(Platform::Darwin),
+      uname::Info { ref sysname, .. } if sysname.to_lowercase() == "linux" => Ok(Platform::Linux),
+      uname::Info { ref sysname, .. } => Err(format!("Found unknown system name {}", sysname)),
+    }
+  }
+}
+
+#[derive(PartialOrd, Ord, Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum PlatformConstraint {
   Darwin,
   Linux,
@@ -74,16 +93,15 @@ pub enum PlatformConstraint {
 
 impl PlatformConstraint {
   pub fn current_platform_constraint() -> Result<PlatformConstraint, String> {
-    let platform_info =
-      uname::uname().map_err(|_| "Failed to get local platform info!".to_string())?;
-    match platform_info {
-      uname::Info { ref sysname, .. } if sysname.to_lowercase() == "darwin" => {
-        Ok(PlatformConstraint::Darwin)
-      }
-      uname::Info { ref sysname, .. } if sysname.to_lowercase() == "linux" => {
-        Ok(PlatformConstraint::Linux)
-      }
-      uname::Info { ref sysname, .. } => Err(format!("Found unknown system name {}", sysname)),
+    Platform::current().map(|p: Platform| p.into())
+  }
+}
+
+impl From<Platform> for PlatformConstraint {
+  fn from(platform: Platform) -> PlatformConstraint {
+    match platform {
+      Platform::Linux => PlatformConstraint::Linux,
+      Platform::Darwin => PlatformConstraint::Darwin,
     }
   }
 }
@@ -103,6 +121,15 @@ impl TryFrom<&String> for PlatformConstraint {
         "Unknown, platform {:?} encountered in parsing",
         other
       )),
+    }
+  }
+}
+
+impl From<Platform> for String {
+  fn from(platform: Platform) -> String {
+    match platform {
+      Platform::Linux => "linux".to_string(),
+      Platform::Darwin => "osx".to_string(),
     }
   }
 }
@@ -284,6 +311,7 @@ pub struct FallibleExecuteProcessResult {
   pub stdout: Bytes,
   pub stderr: Bytes,
   pub exit_code: i32,
+  pub platform: Platform,
 
   // It's unclear whether this should be a Snapshot or a digest of a Directory. A Directory digest
   // is handy, so let's try that out for now.

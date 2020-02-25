@@ -2,7 +2,7 @@ use crate::remote_tests::echo_foo_request;
 use crate::speculate::SpeculatingCommandRunner;
 use crate::{
   CommandRunner, Context, ExecuteProcessRequest, FallibleExecuteProcessResult,
-  MultiPlatformExecuteProcessRequest, PlatformConstraint,
+  MultiPlatformExecuteProcessRequest, Platform, PlatformConstraint,
 };
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
@@ -158,6 +158,7 @@ fn make_delayed_command_runner(
       exit_code: 0,
       output_directory: EMPTY_DIGEST,
       execution_attempts: vec![],
+      platform: Platform::current().unwrap(),
     })
   };
   DelayedCommandRunner::new(

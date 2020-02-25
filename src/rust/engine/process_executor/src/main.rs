@@ -32,7 +32,9 @@ use process_execution;
 
 use clap::{value_t, App, AppSettings, Arg};
 use hashing::{Digest, Fingerprint};
-use process_execution::{Context, ExecuteProcessRequestMetadata, PlatformConstraint, RelativePath};
+use process_execution::{
+  Context, ExecuteProcessRequestMetadata, Platform, PlatformConstraint, RelativePath,
+};
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryFrom;
 use std::iter::{FromIterator, Iterator};
@@ -371,7 +373,7 @@ fn main() {
           oauth_bearer_token,
           headers,
           store.clone(),
-          PlatformConstraint::Linux,
+          Platform::Linux,
           executor,
           std::time::Duration::from_secs(300),
           std::time::Duration::from_millis(500),
