@@ -3,18 +3,12 @@
 
 from dataclasses import dataclass
 
-from pants.engine.fs import (
-    EMPTY_DIRECTORY_DIGEST,
-    Digest,
-    DirectoriesToMerge,
-    FileContent,
-    InputFilesContent,
-    Snapshot,
-)
+from pants.backend.python.rules.inject_init import InitInjectedSnapshot, InjectInitRequest
+from pants.backend.python.rules.inject_init import rules as inject_init_rules
+from pants.engine.fs import DirectoriesToMerge, Snapshot
 from pants.engine.legacy.graph import HydratedTarget, HydratedTargets
 from pants.engine.rules import rule
 from pants.engine.selectors import Get, MultiGet
-from pants.python.pex_build_util import identify_missing_init_files
 from pants.rules.core.strip_source_roots import SourceRootStrippedSources
 
 
@@ -46,19 +40,9 @@ async def prepare_chrooted_python_sources(
             )
         )
     )
-
-    missing_init_files = sorted(identify_missing_init_files(sources_snapshot.files))
-    inits_digest = EMPTY_DIRECTORY_DIGEST
-    if missing_init_files:
-        inits_digest = await Get[Digest](
-            InputFilesContent(FileContent(path=fp, content=b"") for fp in missing_init_files)
-        )
-
-    result = await Get[Snapshot](
-        DirectoriesToMerge(directories=(sources_snapshot.directory_digest, inits_digest))
-    )
-    return ChrootedPythonSources(result)
+    result = await Get[InitInjectedSnapshot](InjectInitRequest(sources_snapshot))
+    return ChrootedPythonSources(result.snapshot)
 
 
 def rules():
-    return [prepare_chrooted_python_sources]
+    return [prepare_chrooted_python_sources, *inject_init_rules()]

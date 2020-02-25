@@ -5,9 +5,9 @@ from pathlib import PurePath
 from typing import List, Optional
 from unittest.mock import Mock
 
+from pants.backend.python.rules.prepare_chrooted_python_sources import ChrootedPythonSources
 from pants.backend.python.rules.prepare_chrooted_python_sources import (
-    ChrootedPythonSources,
-    prepare_chrooted_python_sources,
+    rules as prepare_chrooted_python_sources_rules,
 )
 from pants.build_graph.address import Address
 from pants.build_graph.files import Files
@@ -25,7 +25,7 @@ class PrepareChrootedPythonSourcesTest(TestBase):
         return (
             *super().rules(),
             *strip_source_roots.rules(),
-            prepare_chrooted_python_sources,
+            *prepare_chrooted_python_sources_rules(),
             RootRule(HydratedTargets),
         )
 
