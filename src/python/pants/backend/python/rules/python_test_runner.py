@@ -10,6 +10,7 @@ from pants.backend.python.rules.prepare_chrooted_python_sources import ChrootedP
 from pants.backend.python.rules.pytest_coverage import (
     DEFAULT_COVERAGE_CONFIG,
     PytestCoverageData,
+    get_coverage_plugin_input,
     get_coveragerc_input,
     get_packages_to_cover,
 )
@@ -73,7 +74,7 @@ async def setup_pytest_for_target(
         Addresses((adaptor.address,))
     )
     all_targets = transitive_hydrated_targets.closure
-
+    plugin_file_digest = await Get[Digest](InputFilesContent, get_coverage_plugin_input())
     resolved_requirements_pex = await Get[Pex](
         CreatePexFromTargetClosure(
             addresses=Addresses((adaptor.address,)),
@@ -88,6 +89,7 @@ async def setup_pytest_for_target(
             # and then by Pytest). See https://github.com/jaraco/zipp/pull/26.
             additional_args=("--not-zip-safe",),
             include_source_files=False,
+            additional_input_files=plugin_file_digest if test_options.values.run_coverage else None,
         )
     )
 
