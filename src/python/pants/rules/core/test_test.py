@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+from pathlib import PurePath
 from textwrap import dedent
 from typing import Optional
 from unittest.mock import Mock
@@ -9,7 +10,14 @@ from unittest.mock import Mock
 from pants.base.specs import DescendantAddresses, OriginSpec, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.addressable import AddressesWithOrigins, AddressWithOrigin
-from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Digest, FileContent, InputFilesContent, Snapshot
+from pants.engine.fs import (
+    EMPTY_DIRECTORY_DIGEST,
+    Digest,
+    FileContent,
+    InputFilesContent,
+    Snapshot,
+    Workspace,
+)
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.legacy.graph import HydratedTarget, HydratedTargetWithOrigin
 from pants.engine.legacy.structs import (
@@ -21,6 +29,8 @@ from pants.engine.rules import UnionMembership
 from pants.rules.core.test import (
     AddressAndDebugRequest,
     AddressAndTestResult,
+    CoverageDataBatch,
+    CoverageReport,
     Status,
     TestDebugRequest,
     TestResult,
@@ -71,12 +81,13 @@ class TestTest(TestBase):
 
     def single_target_test(self, result, expected_console_output, success=True, debug=False):
         console = MockConsole(use_colors=False)
-        options = MockOptions(debug=debug)
+        options = MockOptions(debug=debug, run_coverage=False)
         runner = InteractiveRunner(self.scheduler)
+        workspace = Workspace(self.scheduler)
         addr = Address.parse("some/target")
         res = run_rule(
             run_tests,
-            rule_args=[console, options, runner, self.make_addresses_with_origins(addr)],
+            rule_args=[console, options, runner, self.make_addresses_with_origins(addr), workspace],
             mock_gets=[
                 MockGet(
                     product_type=AddressAndTestResult,
@@ -91,6 +102,14 @@ class TestTest(TestBase):
                         TestDebugRequest(
                             ipr=self.make_successful_ipr() if success else self.make_failure_ipr()
                         ),
+                    ),
+                ),
+                MockGet(
+                    product_type=CoverageReport,
+                    subject_type=CoverageDataBatch,
+                    mock=lambda _: CoverageReport(
+                        result_digest=EMPTY_DIRECTORY_DIGEST,
+                        directory_to_materialize_to=PurePath("mockety/mock"),
                     ),
                 ),
             ],
@@ -131,8 +150,9 @@ class TestTest(TestBase):
 
     def test_output_mixed(self) -> None:
         console = MockConsole(use_colors=False)
-        options = MockOptions(debug=False)
+        options = MockOptions(debug=False, run_coverage=False)
         runner = InteractiveRunner(self.scheduler)
+        workspace = Workspace(self.scheduler)
         address1 = Address.parse("testprojects/tests/python/pants/passes")
         address2 = Address.parse("testprojects/tests/python/pants/fails")
 
@@ -160,6 +180,7 @@ class TestTest(TestBase):
                 options,
                 runner,
                 self.make_addresses_with_origins(address1, address2),
+                workspace,
             ],
             mock_gets=[
                 MockGet(
@@ -171,6 +192,14 @@ class TestTest(TestBase):
                     product_type=AddressAndDebugRequest,
                     subject_type=AddressWithOrigin,
                     mock=make_debug_request,
+                ),
+                MockGet(
+                    product_type=CoverageReport,
+                    subject_type=CoverageDataBatch,
+                    mock=lambda _: CoverageReport(
+                        result_digest=EMPTY_DIRECTORY_DIGEST,
+                        directory_to_materialize_to=PurePath("mockety/mock"),
+                    ),
                 ),
             ],
         )
