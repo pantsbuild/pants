@@ -18,8 +18,11 @@ from pants.build_graph.address import Address
 from pants.engine.legacy.structs import TargetAdaptorWithOrigin
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
-from pants.rules.core.determine_source_files import DetermineSourceFilesRequest, SourceFiles
-from pants.rules.core.determine_source_files import rules as determine_source_files_rules
+from pants.rules.core.determine_specified_source_files import (
+    SpecifiedSourceFiles,
+    SpecifiedSourceFilesRequest,
+)
+from pants.rules.core.determine_specified_source_files import rules as determine_source_files_rules
 from pants.rules.core.strip_source_roots import rules as strip_source_roots_rules
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
@@ -34,7 +37,7 @@ class TargetSources(NamedTuple):
         return [PurePath(self.source_root, name).as_posix() for name in self.source_files]
 
 
-class DetermineSourceFilesTest(TestBase):
+class DetermineSpecifiedSourceFilesTest(TestBase):
 
     SOURCES1 = TargetSources("src/python", ["s1.py", "s2.py", "s3.py"])
     SOURCES2 = TargetSources("tests/python", ["t1.py", "t2.java"])
@@ -46,7 +49,7 @@ class DetermineSourceFilesTest(TestBase):
             *super().rules(),
             *determine_source_files_rules(),
             *strip_source_roots_rules(),
-            RootRule(DetermineSourceFilesRequest),
+            RootRule(SpecifiedSourceFilesRequest),
         )
 
     def mock_target(
@@ -68,11 +71,11 @@ class DetermineSourceFilesTest(TestBase):
         *,
         strip_source_roots: bool = False,
     ) -> List[str]:
-        request = DetermineSourceFilesRequest(
+        request = SpecifiedSourceFilesRequest(
             adaptors_with_origins, strip_source_roots=strip_source_roots,
         )
         result = self.request_single_product(
-            SourceFiles, Params(request, create_options_bootstrapper())
+            SpecifiedSourceFiles, Params(request, create_options_bootstrapper())
         )
         return sorted(result.snapshot.files)
 

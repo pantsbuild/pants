@@ -28,8 +28,11 @@ from pants.engine.selectors import Get
 from pants.option.custom_types import GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
-from pants.rules.core import determine_source_files, strip_source_roots
-from pants.rules.core.determine_source_files import DetermineSourceFilesRequest, SourceFiles
+from pants.rules.core import determine_specified_source_files, strip_source_roots
+from pants.rules.core.determine_specified_source_files import (
+    SpecifiedSourceFiles,
+    SpecifiedSourceFilesRequest,
+)
 from pants.rules.core.fmt import FmtResult
 from pants.rules.core.lint import LintResult
 
@@ -51,7 +54,9 @@ class Setup:
     process_request: ExecuteProcessRequest
 
 
-def generate_args(*, source_files: SourceFiles, isort: Isort, check_only: bool,) -> Tuple[str, ...]:
+def generate_args(
+    *, source_files: SpecifiedSourceFiles, isort: Isort, check_only: bool,
+) -> Tuple[str, ...]:
     # NB: isort auto-discovers config files. There is no way to hardcode them via command line
     # flags. So long as the files are in the Pex's input files, isort will use the config.
     args = []
@@ -98,7 +103,9 @@ async def setup(
     full_sources_digest = (
         request.target.prior_formatter_result_digest or adaptor.sources.snapshot.directory_digest
     )
-    source_files = await Get[SourceFiles](DetermineSourceFilesRequest([adaptor_with_origin]))
+    source_files = await Get[SpecifiedSourceFiles](
+        SpecifiedSourceFilesRequest([adaptor_with_origin])
+    )
 
     merged_input_files = await Get[Digest](
         DirectoriesToMerge(
@@ -153,7 +160,7 @@ def rules():
         UnionRule(PythonFormatTarget, IsortTarget),
         UnionRule(PythonLintTarget, IsortTarget),
         *download_pex_bin.rules(),
-        *determine_source_files.rules(),
+        *determine_specified_source_files.rules(),
         *pex.rules(),
         *python_native_code.rules(),
         *strip_source_roots.rules(),

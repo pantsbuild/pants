@@ -16,7 +16,7 @@ from pants.util.meta import frozen_after_init
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class DetermineSourceFilesRequest:
+class SpecifiedSourceFilesRequest:
     adaptors_with_origins: Tuple[TargetAdaptorWithOrigin, ...]
     strip_source_roots: bool = False
 
@@ -31,7 +31,7 @@ class DetermineSourceFilesRequest:
 
 
 @dataclass(frozen=True)
-class SourceFiles:
+class SpecifiedSourceFiles:
     snapshot: Snapshot
 
 
@@ -55,9 +55,11 @@ def determine_for_target(
 
 
 @rule
-async def determine_source_files(request: DetermineSourceFilesRequest) -> SourceFiles:
-    """Find the `sources` for targets, possibly finding a subset of the original `sources` fields if
-    the user supplied file arguments."""
+async def determine_specified_source_files(
+    request: SpecifiedSourceFilesRequest,
+) -> SpecifiedSourceFiles:
+    """Determine the specified `sources` for targets, possibly finding a subset of the original
+    `sources` fields if the user supplied file arguments."""
     full_snapshots = []
     snapshot_subset_requests = []
     for adaptor_with_origin in request.adaptors_with_origins:
@@ -81,7 +83,7 @@ async def determine_source_files(request: DetermineSourceFilesRequest) -> Source
     merged_snapshot = await Get[Snapshot](Digest, merged_digest)
 
     if not request.strip_source_roots:
-        return SourceFiles(merged_snapshot)
+        return SpecifiedSourceFiles(merged_snapshot)
 
     # If there is exactly one target in the request, we use a performance optimization for
     # `StripSourceRootsRequest` to pass a `representative_path` so that the rule does not need to
@@ -98,8 +100,8 @@ async def determine_source_files(request: DetermineSourceFilesRequest) -> Source
     stripped = await Get[SourceRootStrippedSources](
         StripSnapshotRequest(merged_snapshot, representative_path=representative_path)
     )
-    return SourceFiles(stripped.snapshot)
+    return SpecifiedSourceFiles(stripped.snapshot)
 
 
 def rules():
-    return [determine_source_files, RootRule(DetermineSourceFilesRequest)]
+    return [determine_specified_source_files, RootRule(SpecifiedSourceFilesRequest)]

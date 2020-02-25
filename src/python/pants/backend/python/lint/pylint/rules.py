@@ -25,8 +25,11 @@ from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
-from pants.rules.core import determine_source_files, strip_source_roots
-from pants.rules.core.determine_source_files import DetermineSourceFilesRequest, SourceFiles
+from pants.rules.core import determine_specified_source_files, strip_source_roots
+from pants.rules.core.determine_specified_source_files import (
+    SpecifiedSourceFiles,
+    SpecifiedSourceFilesRequest,
+)
 from pants.rules.core.lint import LintResult
 
 
@@ -35,7 +38,7 @@ class PylintTarget:
     adaptor_with_origin: TargetAdaptorWithOrigin
 
 
-def generate_args(*, source_files: SourceFiles, pylint: Pylint) -> Tuple[str, ...]:
+def generate_args(*, source_files: SpecifiedSourceFiles, pylint: Pylint) -> Tuple[str, ...]:
     args = []
     if pylint.options.config is not None:
         args.append(f"--config={pylint.options.config}")
@@ -102,8 +105,8 @@ async def lint(
         ),
     )
 
-    source_files = await Get[SourceFiles](
-        DetermineSourceFilesRequest([adaptor_with_origin], strip_source_roots=True)
+    source_files = await Get[SpecifiedSourceFiles](
+        SpecifiedSourceFilesRequest([adaptor_with_origin], strip_source_roots=True)
     )
 
     request = requirements_pex.create_execute_request(
@@ -124,7 +127,7 @@ def rules():
         subsystem_rule(Pylint),
         UnionRule(PythonLintTarget, PylintTarget),
         *download_pex_bin.rules(),
-        *determine_source_files.rules(),
+        *determine_specified_source_files.rules(),
         *pex.rules(),
         *prepare_chrooted_python_sources.rules(),
         *strip_source_roots.rules(),

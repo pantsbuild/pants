@@ -4,7 +4,7 @@
 from pants.rules.core import (
     binary,
     cloc,
-    determine_source_files,
+    determine_specified_source_files,
     distdir,
     filedeps,
     fmt,
@@ -26,7 +26,7 @@ def rules():
         *lint.rules(),
         *list_roots.rules(),
         *list_targets.rules(),
-        *determine_source_files.rules(),
+        *determine_specified_source_files.rules(),
         *filedeps.rules(),
         *repl.rules(),
         *run.rules(),
