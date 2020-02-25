@@ -769,7 +769,7 @@ class ZincCompile(BaseZincCompile):
 
   @classmethod
   def product_types(cls):
-    return ['runtime_classpath', 'export_dep_as_jar_signal', 'zinc_analysis', 'zinc_args']
+    return super().product_types(cls) + ['runtime_classpath', 'export_dep_as_jar_signal', 'zinc_analysis', 'zinc_args']
 
   @staticmethod
   def select(target):

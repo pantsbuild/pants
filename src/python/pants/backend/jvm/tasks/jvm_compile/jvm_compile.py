@@ -7,7 +7,6 @@ from enum import Enum
 from multiprocessing import cpu_count
 from typing import Optional
 
-from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
@@ -244,6 +243,9 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
   def select_source(self, source_file_path):
     raise NotImplementedError()
 
+  def product_types(cls):
+    return super(JvmCompile, cls).product_types() + ['jvm_modulizable_targets']
+
   def compile(self, ctx, args, dependency_classpath, upstream_analysis,
               settings, compiler_option_sets, zinc_file_manager,
               javac_plugin_map, scalac_plugin_map):
@@ -455,6 +457,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
       relevant_targets = list(set(relevant_targets) - modulizable_targets)
       self.create_extra_products_for_targets(modulizable_targets)
+      self.context.products.get_data('jvm_modulizable_targets', set).update(modulizable_targets)
 
     if relevant_targets:
       # Note, JVM targets are validated (`vts.update()`) as they succeed.  As a result,

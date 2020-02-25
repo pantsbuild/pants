@@ -69,6 +69,7 @@ class ExportDepAsJar(ConsoleTask):
     round_manager.require_data('zinc_args')
     round_manager.require_data('runtime_classpath')
     round_manager.require_data('export_dep_as_jar_signal')
+    round_manager.require_data('jvm_modulizable_targets')
 
   @property
   def _output_folder(self):
@@ -403,6 +404,8 @@ class ExportDepAsJar(ConsoleTask):
     return graph_info
 
   def console_output(self, targets):
+    print('modules!!!')
+    print(self.context.products.get_data('jvm_modulizable_targets'))
     zinc_args_for_all_targets = self.context.products.get_data('zinc_args')
 
     if zinc_args_for_all_targets is None:
