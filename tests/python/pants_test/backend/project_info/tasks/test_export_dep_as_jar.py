@@ -153,7 +153,8 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
 
     self.make_target(
       'project_info:first',
-      target_type=Target,
+      target_type=JvmTarget,
+      sources=['a.scala']
     )
 
     jar_lib = self.make_target(
@@ -291,6 +292,7 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
     }
     options.update(options_overrides)
 
+    # We are only initializing ZincCompile to access the instance method `calculate_jvm_modulizable_targets`
     ZincCompile.options_scope = 'compile.rsc'
     BootstrapJvmTools.options_scope = 'bootstrap-jvm-tools'
     context = self.context(options=options, target_roots=[self.target(spec) for spec in specs],
@@ -303,8 +305,9 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
 
     context.products.safe_create_data('zinc_args', init_func=lambda: MagicMock())
 
+    # This simulates ZincCompile creates the product.
     zinc_compile_task = ZincCompile(context, self.pants_workdir)
-    context.products.safe_create_data('jvm_modulizable_targets', init_func=lambda: zinc_compile_task.calculate_jvm_modulizable_targets())
+    context.products.get_data('jvm_modulizable_targets', init_func=zinc_compile_task.calculate_jvm_modulizable_targets)
 
     bootstrap_task = BootstrapJvmTools(context, self.pants_workdir)
     bootstrap_task.execute()
