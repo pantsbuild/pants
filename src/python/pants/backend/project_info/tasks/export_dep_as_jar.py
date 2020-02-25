@@ -320,12 +320,12 @@ class ExportDepAsJar(ConsoleTask):
     return set(targets)
 
   def _get_targets_to_make_into_modules(self, target_roots_set, resource_target_map, runtime_classpath):
-    target_root_addresses = [t.address for t in target_roots_set]
-    dependees_of_target_roots = [
-      t for t in self.context.build_graph.transitive_dependees_of_addresses(target_root_addresses)
+    jvm_modulizable_targets = self.context.products.get_data('jvm_modulizable_targets')
+    non_generated_resource_jvm_modulizable_targets = [
+      t for t in jvm_modulizable_targets
       if self._get_target_type(t, resource_target_map, runtime_classpath) is not SourceRootTypes.RESOURCE_GENERATED
     ]
-    return dependees_of_target_roots
+    return non_generated_resource_jvm_modulizable_targets
 
   def _make_libraries_entry(self, target, resource_target_map, runtime_classpath):
     # Using resolved path in preparation for VCFS.
@@ -404,8 +404,6 @@ class ExportDepAsJar(ConsoleTask):
     return graph_info
 
   def console_output(self, targets):
-    print('modules!!!')
-    print(self.context.products.get_data('jvm_modulizable_targets'))
     zinc_args_for_all_targets = self.context.products.get_data('zinc_args')
 
     if zinc_args_for_all_targets is None:

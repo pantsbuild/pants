@@ -23,6 +23,8 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
+from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
+from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
 from pants.backend.project_info.tasks.export_dep_as_jar import ExportDepAsJar
 from pants.backend.project_info.tasks.export_version import DEFAULT_EXPORT_VERSION
 from pants.base.exceptions import TaskError
@@ -260,12 +262,13 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
     return runtime_classpath
 
   def execute_export(self, *specs, **options_overrides):
+
     options = {
       ScalaPlatform.options_scope: {
         'version': 'custom'
       },
       JvmResolveSubsystem.options_scope: {
-        'resolver': 'ivy'
+        'resolver': 'coursier'
       },
       JvmPlatform.options_scope: {
         'default_platform': 'java8',
@@ -273,19 +276,35 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
           'java8': {'source': '1.8', 'target': '1.8'}
         }
       },
+      # ZincCompile.options_scope: {
+      #   'jvm_options': [],
+      #   'args': [],
+      #   'warnings': True,
+      #   'warning_args': [],
+      #   'debug_symbols': False,
+      #   'delete_scratch': True,
+      #   'clear_invalid_analysis': True,
+      #   'size_estimator': 'filesize',
+      #   'whitelisted_args': {},
+      #   'execution_strategy': 'subprocess',
+      # }
     }
     options.update(options_overrides)
 
+    ZincCompile.options_scope = 'compile.rsc'
     BootstrapJvmTools.options_scope = 'bootstrap-jvm-tools'
     context = self.context(options=options, target_roots=[self.target(spec) for spec in specs],
                            for_subsystems=[JvmPlatform],
-                           for_task_types=[BootstrapJvmTools])
+                           for_task_types=[BootstrapJvmTools, ZincCompile])
 
     runtime_classpath = self.create_runtime_classpath_for_targets(self.scala_with_source_dep)
     context.products.safe_create_data('runtime_classpath',
                                       init_func=lambda: runtime_classpath)
 
     context.products.safe_create_data('zinc_args', init_func=lambda: MagicMock())
+
+    zinc_compile_task = ZincCompile(context, self.pants_workdir)
+    context.products.safe_create_data('jvm_modulizable_targets', init_func=lambda: zinc_compile_task.calculate_jvm_modulizable_targets())
 
     bootstrap_task = BootstrapJvmTools(context, self.pants_workdir)
     bootstrap_task.execute()

@@ -433,7 +433,6 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     # In case we have no relevant targets and return early, create the requested product maps.
     self.create_empty_extra_products()
 
-    relevant_targets = list(self.context.targets(predicate=self.select))
 
     # Clone the compile_classpath to the runtime_classpath.
     classpath_product = self.create_classpath_product()
@@ -441,14 +440,11 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     fingerprint_strategy = DependencyContext.global_instance().create_fingerprint_strategy(
         classpath_product)
 
+
+    relevant_targets = list(self.context.targets(predicate=self.select))
     # If we are only exporting jars then we can omit some targets from the runtime_classpath.
     if self.context.products.is_required_data("export_dep_as_jar_signal"):
-      target_roots_in_play = set(relevant_targets) & set(self.context.target_roots)
-      target_roots_minus_thrift = set(filter(lambda x: not x.is_synthetic, target_roots_in_play))
-      modulizable_targets = set(
-        t for t in self.context.build_graph.transitive_dependees_of_addresses(t.address for t in target_roots_minus_thrift)
-        if self.select(t)
-      )
+      modulizable_targets = self.calculate_jvm_modulizable_targets()
       synthetic_modulizable_targets = set(filter(lambda x: x.is_synthetic, modulizable_targets))
       if len(synthetic_modulizable_targets) > 0:
         raise TaskError(f'Modulizable targets must not contain synthetic target, but in this case {synthetic_modulizable_targets}.\n'
@@ -485,6 +481,17 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
             for conf in self._confs:
               classpath_product.remove_for_target(cc.target, [(conf, cc.classes_dir)])
               classpath_product.add_for_target(cc.target, [(conf, cc.jar_file)])
+
+  def calculate_jvm_modulizable_targets(self):
+    relevant_targets = list(self.context.targets(predicate=self.select))
+    target_roots_in_play = set(relevant_targets) & set(self.context.target_roots)
+    target_roots_minus_thrift = set(filter(lambda x: not x.is_synthetic, target_roots_in_play))
+    modulizable_targets = set(
+      t for t in self.context.build_graph.transitive_dependees_of_addresses(
+        t.address for t in target_roots_minus_thrift)
+        if self.select(t)
+    )
+    return modulizable_targets
 
   def _classpath_for_context(self, context):
     if self.get_options().use_classpath_jars:
