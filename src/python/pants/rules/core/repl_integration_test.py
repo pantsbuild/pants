@@ -43,7 +43,7 @@ class ReplTest(GoalRuleTestBase):
     def alias_groups(cls) -> BuildFileAliases:
         return BuildFileAliases(targets={"python_library": PythonLibrary,})
 
-    def test_repl_with_targets(self):
+    def setup_python_library(self) -> None:
         library_source = FileContent(path="some_lib.py", content=b"class SomeClass:\n  pass\n")
         self.create_library(
             name="some_lib",
@@ -56,8 +56,31 @@ class ReplTest(GoalRuleTestBase):
             relpath="src/python/some_lib.py", contents=library_source.content.decode(),
         )
 
+    def test_repl_with_targets(self) -> None:
+        self.setup_python_library()
         output = self.execute_rule(
-            args=["--backend-packages2=pants.backend.python", "src/python:some_lib"],
+            global_args=["--backend-packages2=pants.backend.python"],
+            args=["src/python:some_lib"],
             additional_params=[InteractiveRunner(self.scheduler)],
         )
         assert output == "REPL exited successfully."
+
+    def test_repl_ipython(self) -> None:
+        self.setup_python_library()
+        output = self.execute_rule(
+            global_args=["--backend-packages2=pants.backend.python"],
+            args=["--shell=ipython", "src/python:some_lib"],
+            additional_params=[InteractiveRunner(self.scheduler)],
+        )
+        assert output == "REPL exited successfully."
+
+    def test_repl_bogus_repl_name(self) -> None:
+        self.setup_python_library()
+        output = self.execute_rule(
+            global_args=["--backend-packages2=pants.backend.python"],
+            args=["--shell=bogus-repl", "src/python:some_lib"],
+            additional_params=[InteractiveRunner(self.scheduler)],
+            exit_code=-1,
+        )
+
+        assert "bogus-repl is not an installed REPL program. Available REPLs:" in output

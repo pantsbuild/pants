@@ -3,6 +3,7 @@
 
 from dataclasses import dataclass
 from pathlib import PurePath
+from typing import ClassVar
 
 from pants.base.build_root import BuildRoot
 from pants.engine.addressable import Addresses
@@ -22,6 +23,7 @@ class ReplImplementation:
     """This type proxies from the top-level `repl` goal to a specific REPL implementation for a
     specific language or languages."""
 
+    name: ClassVar[str] = ""
     addresses: Addresses
 
 
@@ -30,6 +32,17 @@ class ReplOptions(GoalSubsystem):
 
     name = "repl"
     required_union_implementations = (ReplImplementation,)
+
+    @classmethod
+    def register_options(cls, register) -> None:
+        super().register_options(register)
+        register(
+            "--shell",
+            type=str,
+            default=None,
+            fingerprint=True,
+            help="Override the automatically-detected REPL program for the target(s) specified. ",
+        )
 
 
 class Repl(Goal):
@@ -47,6 +60,7 @@ async def run_repl(
     console: Console,
     workspace: Workspace,
     runner: InteractiveRunner,
+    options: ReplOptions,
     addresses: Addresses,
     build_root: BuildRoot,
     union_membership: UnionMembership,
@@ -56,8 +70,21 @@ async def run_repl(
     # We can guarantee that we will only even enter this `goal_rule` if there exists an implementer
     # of the `ReplImplementation` union because `LegacyGraphSession.run_goal_rules()` will not
     # execute this rule's body if there are no implementations registered.
-    repl_impl = next(iter(union_membership.union_rules[ReplImplementation]))
-    repl_binary = await Get[ReplBinary](ReplImplementation, repl_impl(addresses))
+    membership = union_membership.union_rules[ReplImplementation]
+    implementations = {impl.name: impl for impl in membership}
+
+    default_repl = "python"
+    repl_shell_name: str = options.values.shell or default_repl
+
+    repl_implementation = implementations.get(repl_shell_name)
+    if repl_implementation is None:
+        available = set(implementations.keys())
+        console.write_stdout(
+            f"{repl_shell_name} is not an installed REPL program. Available REPLs: {available}"
+        )
+        return Repl(-1)
+
+    repl_binary = await Get[ReplBinary](ReplImplementation, repl_implementation(addresses))
 
     with temporary_dir(root_dir=global_options.pants_workdir, cleanup=False) as tmpdir:
         path_relative_to_build_root = PurePath(tmpdir).relative_to(build_root.path).as_posix()
