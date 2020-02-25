@@ -33,7 +33,12 @@ class Status(Enum):
     SUCCESS = "SUCCESS"
     FAILURE = "FAILURE"
 
+
 class CoverageData(ABC):
+    """Base class for inputs to a coverage report.
+
+    Subclasses should add whichever fields they require - snapshots of coverage output or xml files, etc.
+    """
     @property
     @abstractmethod
     def batch_cls(self) -> Type["CoverageDataBatch"]:
