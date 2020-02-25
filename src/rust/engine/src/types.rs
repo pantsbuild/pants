@@ -33,4 +33,5 @@ pub struct Types {
   pub interactive_process_request: TypeId,
   pub interactive_process_result: TypeId,
   pub snapshot_subset: TypeId,
+  pub construct_platform: Function,
 }

@@ -1,6 +1,6 @@
 use crate::{
   Context, ExecuteProcessRequest, ExecuteProcessRequestMetadata, FallibleExecuteProcessResult,
-  MultiPlatformExecuteProcessRequest,
+  MultiPlatformExecuteProcessRequest, Platform,
 };
 use std::sync::Arc;
 
@@ -100,6 +100,7 @@ impl CommandRunner {
             execute_response,
             vec![],
             context.workunit_store,
+            Platform::Linux, //TODO lol this is definitely wrong - check maybe_execute_response!
           )
           .map(Some)
           .to_boxed()

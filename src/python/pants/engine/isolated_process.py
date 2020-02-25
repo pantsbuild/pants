@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Dict, Optional, Tuple, Union
 
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Digest
-from pants.engine.platform import PlatformConstraint
+from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.rules import RootRule, rule
 from pants.util.meta import frozen_after_init
 
@@ -118,6 +118,7 @@ class ExecuteProcessResult:
     stdout: bytes
     stderr: bytes
     output_directory_digest: Digest
+    platform: Platform
 
 
 @dataclass(frozen=True)
@@ -131,6 +132,7 @@ class FallibleExecuteProcessResult:
     stderr: bytes
     exit_code: int
     output_directory_digest: Digest
+    platform: Platform
 
 
 class ProcessExecutionFailure(Exception):
@@ -185,7 +187,10 @@ def fallible_to_exec_result_or_raise(
 
     if fallible_result.exit_code == 0:
         return ExecuteProcessResult(
-            fallible_result.stdout, fallible_result.stderr, fallible_result.output_directory_digest
+            fallible_result.stdout,
+            fallible_result.stderr,
+            fallible_result.output_directory_digest,
+            fallible_result.platform,
         )
     else:
         raise ProcessExecutionFailure(

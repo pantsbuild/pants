@@ -22,7 +22,7 @@ use tokio_timer::Delay;
 
 use crate::{
   Context, ExecuteProcessRequest, ExecuteProcessRequestMetadata, ExecutionStats,
-  FallibleExecuteProcessResult, MultiPlatformExecuteProcessRequest, PlatformConstraint,
+  FallibleExecuteProcessResult, MultiPlatformExecuteProcessRequest, Platform, PlatformConstraint,
 };
 use std;
 use std::cmp::min;
@@ -109,7 +109,7 @@ pub struct CommandRunner {
   execution_client: Arc<bazel_protos::remote_execution_grpc::ExecutionClient>,
   operations_client: Arc<bazel_protos::operations_grpc::OperationsClient>,
   store: Store,
-  platform: PlatformConstraint,
+  platform: Platform,
   executor: task_executor::Executor,
   // We use a buffer time for queuing of process requests so that the process's requested timeout more
   // accurately reflects how long the caller intended the process to last.
@@ -150,6 +150,10 @@ impl CommandRunner {
   // our own polling rates.
   // In the future, we may want to remove this behavior if servers reliably support the full stream
   // behavior.
+
+  fn platform(&self) -> Platform {
+    self.platform
+  }
 
   fn oneshot_execute(
     &self,
@@ -199,9 +203,9 @@ impl super::CommandRunner for CommandRunner {
   ) -> Option<ExecuteProcessRequest> {
     for compatible_constraint in vec![
       &(PlatformConstraint::None, PlatformConstraint::None),
-      &(self.platform, PlatformConstraint::None),
+      &(self.platform.into(), PlatformConstraint::None),
       &(
-        self.platform,
+        self.platform.into(),
         PlatformConstraint::current_platform_constraint().unwrap(),
       ),
     ]
@@ -238,6 +242,7 @@ impl super::CommandRunner for CommandRunner {
     req: MultiPlatformExecuteProcessRequest,
     context: Context,
   ) -> BoxFuture<FallibleExecuteProcessResult, String> {
+    let platform = self.platform();
     let compatible_underlying_request = self.extract_compatible_request(&req).unwrap();
     let operations_client = self.operations_client.clone();
     let store = self.store.clone();
@@ -401,6 +406,7 @@ impl super::CommandRunner for CommandRunner {
                                 exit_code: -libc::SIGTERM,
                                 output_directory: hashing::EMPTY_DIGEST,
                                 execution_attempts: attempts,
+                                platform,
                               }))
                                   .to_boxed()
                             } else {
@@ -470,7 +476,7 @@ impl CommandRunner {
     oauth_bearer_token: Option<String>,
     headers: BTreeMap<String, String>,
     store: Store,
-    platform: PlatformConstraint,
+    platform: Platform,
     executor: task_executor::Executor,
     queue_buffer_time: Duration,
     backoff_incremental_wait: Duration,
@@ -656,6 +662,7 @@ impl CommandRunner {
             execute_response,
             execution_attempts,
             workunit_store,
+            self.platform,
           )
           .map_err(ExecutionError::Fatal)
           .to_boxed();
@@ -942,6 +949,7 @@ pub fn populate_fallible_execution_result(
   execute_response: bazel_protos::remote_execution::ExecuteResponse,
   execution_attempts: Vec<ExecutionStats>,
   workunit_store: WorkUnitStore,
+  platform: Platform,
 ) -> impl Future<Item = FallibleExecuteProcessResult, Error = String> {
   extract_stdout(&store, &execute_response, workunit_store.clone())
     .join(extract_stderr(
@@ -961,6 +969,7 @@ pub fn populate_fallible_execution_result(
         exit_code: execute_response.get_result().get_exit_code(),
         output_directory: output_directory,
         execution_attempts: execution_attempts,
+        platform,
       })
     })
 }

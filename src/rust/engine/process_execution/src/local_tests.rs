@@ -3,7 +3,7 @@ use testutil;
 
 use crate::{
   CommandRunner as CommandRunnerTrait, Context, ExecuteProcessRequest,
-  FallibleExecuteProcessResult, PlatformConstraint, RelativePath,
+  FallibleExecuteProcessResult, Platform, PlatformConstraint, RelativePath,
 };
 use hashing::EMPTY_DIGEST;
 use spectral::{assert_that, string::StrAssertions};
@@ -43,6 +43,7 @@ fn stdout() {
       exit_code: 0,
       output_directory: EMPTY_DIGEST,
       execution_attempts: vec![],
+      platform: Platform::current().unwrap(),
     }
   )
 }
@@ -73,6 +74,7 @@ fn stdout_and_stderr_and_exit_code() {
       exit_code: 1,
       output_directory: EMPTY_DIGEST,
       execution_attempts: vec![],
+      platform: Platform::current().unwrap(),
     }
   )
 }
@@ -104,6 +106,7 @@ fn capture_exit_code_signal() {
       exit_code: -15,
       output_directory: EMPTY_DIGEST,
       execution_attempts: vec![],
+      platform: Platform::current().unwrap(),
     }
   )
 }
@@ -220,6 +223,7 @@ fn output_files_none() {
       exit_code: 0,
       output_directory: EMPTY_DIGEST,
       execution_attempts: vec![],
+      platform: Platform::current().unwrap(),
     }
   )
 }
@@ -253,6 +257,7 @@ fn output_files_one() {
       exit_code: 0,
       output_directory: TestDirectory::containing_roland().digest(),
       execution_attempts: vec![],
+      platform: Platform::current().unwrap(),
     }
   )
 }
@@ -291,6 +296,7 @@ fn output_dirs() {
       exit_code: 0,
       output_directory: TestDirectory::recursive().digest(),
       execution_attempts: vec![],
+      platform: Platform::current().unwrap(),
     }
   )
 }
@@ -330,6 +336,7 @@ fn output_files_many() {
       exit_code: 0,
       output_directory: TestDirectory::recursive().digest(),
       execution_attempts: vec![],
+      platform: Platform::current().unwrap(),
     }
   )
 }
@@ -367,6 +374,7 @@ fn output_files_execution_failure() {
       exit_code: 1,
       output_directory: TestDirectory::containing_roland().digest(),
       execution_attempts: vec![],
+      platform: Platform::current().unwrap(),
     }
   )
 }
@@ -402,6 +410,7 @@ fn output_files_partial_output() {
       exit_code: 0,
       output_directory: TestDirectory::containing_roland().digest(),
       execution_attempts: vec![],
+      platform: Platform::current().unwrap(),
     }
   )
 }
@@ -435,6 +444,7 @@ fn output_overlapping_file_and_dir() {
       exit_code: 0,
       output_directory: TestDirectory::nested().digest(),
       execution_attempts: vec![],
+      platform: Platform::current().unwrap(),
     }
   )
 }
@@ -467,6 +477,7 @@ fn jdk_symlink() {
       exit_code: 0,
       output_directory: EMPTY_DIGEST,
       execution_attempts: vec![],
+      platform: Platform::current().unwrap(),
     })
   )
 }
@@ -583,6 +594,7 @@ fn all_containing_directories_for_outputs_are_created() {
       exit_code: 0,
       output_directory: TestDirectory::nested_dir_and_file().digest(),
       execution_attempts: vec![],
+      platform: Platform::current().unwrap(),
     }
   )
 }
@@ -616,6 +628,7 @@ fn output_empty_dir() {
       exit_code: 0,
       output_directory: TestDirectory::containing_falcons_dir().digest(),
       execution_attempts: vec![],
+      platform: Platform::current().unwrap(),
     }
   )
 }
@@ -669,6 +682,7 @@ fn local_only_scratch_files_materialized() {
       exit_code: 0,
       output_directory: roland_directory_digest,
       execution_attempts: vec![],
+      platform: Platform::current().unwrap(),
     }
   );
 }
@@ -749,6 +763,7 @@ fn working_directory() {
       exit_code: 0,
       output_directory: EMPTY_DIGEST,
       execution_attempts: vec![],
+      platform: Platform::current().unwrap(),
     }
   );
 }
