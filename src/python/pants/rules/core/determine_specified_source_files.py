@@ -6,7 +6,7 @@ from pathlib import PurePath
 from typing import Iterable, Tuple, Union, cast
 
 from pants.base.specs import AddressSpec
-from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot, SnapshotSubset
+from pants.engine.fs import DirectoriesToMerge, PathGlobs, Snapshot, SnapshotSubset
 from pants.engine.legacy.structs import TargetAdaptorWithOrigin
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
@@ -75,12 +75,11 @@ async def determine_specified_source_files(
             Get[Snapshot](SnapshotSubset, request) for request in snapshot_subset_requests
         )
 
-    merged_digest = await Get[Digest](
+    merged_snapshot = await Get[Snapshot](
         DirectoriesToMerge(
             tuple(snapshot.directory_digest for snapshot in (*full_snapshots, *snapshot_subsets))
         )
     )
-    merged_snapshot = await Get[Snapshot](Digest, merged_digest)
 
     if not request.strip_source_roots:
         return SpecifiedSourceFiles(merged_snapshot)
