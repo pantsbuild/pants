@@ -193,12 +193,18 @@ async def setup_coverage(coverage: PytestCoverage,) -> CoverageSetup:
 
 
 @dataclass(frozen=True)
+class PytestCoverageDataBatch(CoverageDataBatch):
+    addresses_and_test_results: Tuple[AddressAndTestResult, ...]
+
+
+@dataclass(frozen=True)
 class MergedCoverageData:
     coverage_data: Digest
 
 
 @rule(name="Merge coverage reports")
 async def merge_coverage_reports(
+    data_batch: PytestCoverageDataBatch,
     transitive_targets: TransitiveHydratedTargets,
     python_setup: PythonSetup,
     coverage_setup: CoverageSetup,
@@ -206,10 +212,6 @@ async def merge_coverage_reports(
     addresses: BuildFileAddresses,
 ) -> MergedCoverageData:
     """Takes all python test results and merges their coverage data into a single sql file."""
-    test_results = await MultiGet(
-        Get[AddressAndTestResult](Address, addr.to_address()) for addr in addresses
-    )
-
     coveragerc_digest = await Get[Digest](
         InputFilesContent, get_coveragerc_input(DEFAULT_COVERAGE_CONFIG)
     )
@@ -221,9 +223,9 @@ async def merge_coverage_reports(
                 prefix=result.address.to_address().path_safe_spec,
             )
         )
-        for result in test_results
+        for result in data_batch.addresses_and_test_results
         if result.test_result is not None
-        and result.test_result._python_sqlite_coverage_file is not None
+        and result.test_result.coverage_data is not None
     )
     sources_snapshot = await Get[Snapshot](
         DirectoriesToMerge(
@@ -275,9 +277,6 @@ class PytestCoverageData(CoverageData):
         return PytestCoverageDataBatch
 
 
-@dataclass(frozen=True)
-class PytestCoverageDataBatch(CoverageDataBatch):
-    addresses_and_test_results: Tuple[AddressAndTestResult, ...]
 
 
 @dataclass(frozen=True)
@@ -288,13 +287,13 @@ class PytestCoverageReport:
 
 @rule(name="Generate coverage report")
 async def generate_coverage_report(
+    data_batch: PytestCoverageDataBatch,
     transitive_targets: TransitiveHydratedTargets,
     python_setup: PythonSetup,
     coverage_setup: CoverageSetup,
     merged_coverage_data: MergedCoverageData,
     coverage_toolbase: PytestCoverage,
     source_root_config: SourceRootConfig,
-    data_batch: PytestCoverageDataBatch,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> PytestCoverageReport:
     """Takes all python test results and generates a single coverage report."""
@@ -318,14 +317,18 @@ async def generate_coverage_report(
     coveragerc_digest = await Get[Digest](
         InputFilesContent, get_coveragerc_input(coverage_config_content)
     )
-    sources_digests = [
-        hydrated_target.adaptor.sources.snapshot.directory_digest
-        for hydrated_target in transitive_targets.closure
-        if hasattr(hydrated_target.adaptor, "sources")
-    ]
-    sources_digest = await Get[Digest](DirectoriesToMerge(directories=tuple(sources_digests)))
-    inits_digest = await Get[InitInjectedSnapshot](Digest, sources_digest)
-
+    sources_snapshot = await Get[Snapshot](
+        DirectoriesToMerge(
+            tuple(
+                hydrated_target.adaptor.sources.snapshot.directory_digest
+                for hydrated_target in transitive_targets.closure
+                if hasattr(hydrated_target.adaptor, "sources")
+            )
+        )
+    )
+    sources_with_inits_snapshot = await Get[InitInjectedSnapshot](
+        InjectInitRequest(sources_snapshot)
+    )
     merged_input_files: Digest = await Get(
         Digest,
         DirectoriesToMerge(
@@ -333,8 +336,7 @@ async def generate_coverage_report(
                 merged_coverage_data.coverage_data,
                 coveragerc_digest,
                 requirements_pex.directory_digest,
-                *sources_digests,
-                inits_digest.directory_digest,
+                sources_with_inits_snapshot.snapshot.directory_digest,
             )
         ),
     )
