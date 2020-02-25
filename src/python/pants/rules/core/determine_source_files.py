@@ -2,15 +2,15 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from pathlib import PurePath
 from typing import Iterable, Tuple, Union, cast
 
 from pants.base.specs import AddressSpec
 from pants.engine.fs import DirectoriesToMerge, PathGlobs, Snapshot, SnapshotSubset
-from pants.engine.legacy.structs import TargetAdaptorWithOrigin
+from pants.engine.legacy.structs import TargetAdaptor, TargetAdaptorWithOrigin
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
-from pants.rules.core.strip_source_roots import SourceRootStrippedSources, StripSnapshotRequest
+from pants.rules.core import strip_source_roots
+from pants.rules.core.strip_source_roots import SourceRootStrippedSources, StripTargetRequest
 from pants.util.meta import frozen_after_init
 
 
@@ -21,6 +21,19 @@ class SourceFiles:
     `AllSourceFilesRequest`)."""
 
     snapshot: Snapshot
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class AllSourceFilesRequest:
+    adaptors: Tuple[TargetAdaptor, ...]
+    strip_source_roots: bool = False
+
+    def __init__(
+        self, adaptors: Iterable[TargetAdaptor], *, strip_source_roots: bool = False
+    ) -> None:
+        self.adaptors = tuple(adaptors)
+        self.strip_source_roots = strip_source_roots
 
 
 @frozen_after_init
@@ -37,6 +50,25 @@ class SpecifiedSourceFilesRequest:
     ) -> None:
         self.adaptors_with_origins = tuple(adaptors_with_origins)
         self.strip_source_roots = strip_source_roots
+
+
+@rule
+async def determine_all_source_files(request: AllSourceFilesRequest) -> SourceFiles:
+    """Merge all the `sources` for targets into one snapshot."""
+    if request.strip_source_roots:
+        stripped_snapshots = await MultiGet(
+            Get[SourceRootStrippedSources](StripTargetRequest(adaptor))
+            for adaptor in request.adaptors
+        )
+        input_snapshots = (stripped_snapshot.snapshot for stripped_snapshot in stripped_snapshots)
+    else:
+        input_snapshots = (
+            adaptor.sources.snapshot for adaptor in request.adaptors if hasattr(adaptor, "sources")
+        )
+    result = await Get[Snapshot](
+        DirectoriesToMerge(tuple(snapshot.directory_digest for snapshot in input_snapshots))
+    )
+    return SourceFiles(result)
 
 
 def determine_specified_sources_for_target(
@@ -59,50 +91,48 @@ def determine_specified_sources_for_target(
 
 
 @rule
-async def determine_specified_source_files(request: SpecifiedSourceFilesRequest,) -> SourceFiles:
+async def determine_specified_source_files(request: SpecifiedSourceFilesRequest) -> SourceFiles:
     """Determine the specified `sources` for targets, possibly finding a subset of the original
     `sources` fields if the user supplied file arguments."""
-    full_snapshots = []
-    snapshot_subset_requests = []
+    full_snapshots = {}
+    snapshot_subset_requests = {}
     for adaptor_with_origin in request.adaptors_with_origins:
+        adaptor = adaptor_with_origin.adaptor
+        if not hasattr(adaptor, "sources"):
+            continue
         result = determine_specified_sources_for_target(adaptor_with_origin)
         if isinstance(result, Snapshot):
-            full_snapshots.append(result)
+            full_snapshots[adaptor] = result
         else:
-            snapshot_subset_requests.append(result)
+            snapshot_subset_requests[adaptor] = result
 
     snapshot_subsets: Tuple[Snapshot, ...] = ()
     if snapshot_subset_requests:
         snapshot_subsets = await MultiGet(
-            Get[Snapshot](SnapshotSubset, request) for request in snapshot_subset_requests
+            Get[Snapshot](SnapshotSubset, request) for request in snapshot_subset_requests.values()
         )
 
-    merged_snapshot = await Get[Snapshot](
-        DirectoriesToMerge(
-            tuple(snapshot.directory_digest for snapshot in (*full_snapshots, *snapshot_subsets))
+    all_snapshots: Iterable[Snapshot] = (*full_snapshots.values(), *snapshot_subsets)
+    if request.strip_source_roots:
+        all_adaptors = (*full_snapshots.keys(), *snapshot_subset_requests.keys())
+        stripped_snapshots = await MultiGet(
+            Get[SourceRootStrippedSources](
+                StripTargetRequest(adaptor, specified_files_snapshot=snapshot)
+            )
+            for adaptor, snapshot in zip(all_adaptors, all_snapshots)
         )
+        all_snapshots = (stripped_snapshot.snapshot for stripped_snapshot in stripped_snapshots)
+    result = await Get[Snapshot](
+        DirectoriesToMerge(tuple(snapshot.directory_digest for snapshot in all_snapshots))
     )
-
-    if not request.strip_source_roots:
-        return SourceFiles(merged_snapshot)
-
-    # If there is exactly one target in the request, we use a performance optimization for
-    # `StripSourceRootsRequest` to pass a `representative_path` so that the rule does not need to
-    # determine the source root for every single file, but instead infers it from the
-    # `representative_path`. This is not safe when we have multiple targets because every target
-    # might have a different source root.
-    representative_path = (
-        None
-        if len(request.adaptors_with_origins) != 1
-        else PurePath(
-            request.adaptors_with_origins[0].adaptor.address.spec_path, "BUILD"
-        ).as_posix()
-    )
-    stripped = await Get[SourceRootStrippedSources](
-        StripSnapshotRequest(merged_snapshot, representative_path=representative_path)
-    )
-    return SourceFiles(stripped.snapshot)
+    return SourceFiles(result)
 
 
 def rules():
-    return [determine_specified_source_files, RootRule(SpecifiedSourceFilesRequest)]
+    return [
+        determine_all_source_files,
+        determine_specified_source_files,
+        *strip_source_roots.rules(),
+        RootRule(AllSourceFilesRequest),
+        RootRule(SpecifiedSourceFilesRequest),
+    ]

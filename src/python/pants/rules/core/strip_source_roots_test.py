@@ -87,7 +87,10 @@ class StripSourceRootsTest(TestBase):
 
     def test_strip_target(self) -> None:
         def get_stripped_files_for_target(
-            *, source_paths: Optional[List[str]], type_alias: Optional[str] = None,
+            *,
+            source_paths: Optional[List[str]],
+            type_alias: Optional[str] = None,
+            specified_sources: Optional[List[str]] = None,
         ) -> List[str]:
             adaptor = Mock()
             adaptor.type_alias = type_alias
@@ -100,8 +103,15 @@ class StripSourceRootsTest(TestBase):
                 spec_path=PurePath(source_paths[0]).parent.as_posix(), target_name="target"
             )
             adaptor.sources = Mock()
-            adaptor.sources.snapshot = self.make_snapshot({fp: "" for fp in source_paths})
-            return self.get_stripped_files(StripTargetRequest(adaptor))
+            adaptor.sources.snapshot = self.make_snapshot_of_empty_files(source_paths)
+            specified_sources_snapshot = (
+                None
+                if not specified_sources
+                else self.make_snapshot_of_empty_files(specified_sources)
+            )
+            return self.get_stripped_files(
+                StripTargetRequest(adaptor, specified_files_snapshot=specified_sources_snapshot)
+            )
 
         # normal target
         assert get_stripped_files_for_target(
@@ -115,3 +125,10 @@ class StripSourceRootsTest(TestBase):
         assert get_stripped_files_for_target(
             source_paths=["src/python/project/f1.py"], type_alias=Files.alias(),
         ) == ["src/python/project/f1.py"]
+
+        # When given `specified_files_snapshot`, only strip what is specified, even if that snapshot
+        # has files not belonging to the target! (Validation of ownership would be too costly.)
+        assert get_stripped_files_for_target(
+            source_paths=["src/python/project/f1.py"],
+            specified_sources=["src/python/project/f1.py", "src/python/project/different_owner.py"],
+        ) == sorted(["project/f1.py", "project/different_owner.py"])

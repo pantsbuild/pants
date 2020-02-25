@@ -45,9 +45,15 @@ class StripSnapshotRequest:
 
 @dataclass(frozen=True)
 class StripTargetRequest:
-    """A request to strip source roots for every file in a target's `sources` field."""
+    """A request to strip source roots for every file in a target's `sources` field.
+
+    The call site may optionally give a snapshot to `specified_files_snapshot` to only strip a
+    subset of the target's `sources`, rather than every `sources` file. This is useful when working
+    with precise file arguments.
+    """
 
     adaptor: TargetAdaptor
+    specified_files_snapshot: Optional[Snapshot] = None
 
 
 @rule
@@ -116,20 +122,20 @@ async def strip_source_roots_from_target(request: StripTargetRequest,) -> Source
     if not hasattr(target_adaptor, "sources"):
         return SourceRootStrippedSources(snapshot=EMPTY_SNAPSHOT)
 
+    sources_snapshot = request.specified_files_snapshot or target_adaptor.sources.snapshot
+
     # Loose `Files`, as opposed to `Resources` or `Target`s, have no (implied) package
     # structure and so we do not remove their source root like we normally do, so that filesystem
     # APIs may still access the files. See pex_build_util.py's `_create_source_dumper`.
     if target_adaptor.type_alias == Files.alias():
-        return SourceRootStrippedSources(snapshot=target_adaptor.sources.snapshot)
+        return SourceRootStrippedSources(sources_snapshot)
 
     # NB: We generate a synthetic representative_path for the target as a performance hack so that
     # we don't need to call SourceRoots.find_by_path() on every single file belonging to the
     # target's `sources`.
     representative_path = PurePath(target_adaptor.address.spec_path, "BUILD").as_posix()
     return await Get[SourceRootStrippedSources](
-        StripSnapshotRequest(
-            target_adaptor.sources.snapshot, representative_path=representative_path
-        )
+        StripSnapshotRequest(sources_snapshot, representative_path=representative_path)
     )
 
 
