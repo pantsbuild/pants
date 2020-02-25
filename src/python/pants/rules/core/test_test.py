@@ -2,14 +2,22 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+from pathlib import PurePath
 from textwrap import dedent
 from typing import Optional
 from unittest.mock import Mock
-from pathlib import PurePath
+
 from pants.base.specs import DescendantAddresses, OriginSpec, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.addressable import AddressesWithOrigins, AddressWithOrigin
-from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Digest, FileContent, InputFilesContent, Snapshot, Workspace
+from pants.engine.fs import (
+    EMPTY_DIRECTORY_DIGEST,
+    Digest,
+    FileContent,
+    InputFilesContent,
+    Snapshot,
+    Workspace,
+)
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.legacy.graph import HydratedTarget, HydratedTargetWithOrigin
 from pants.engine.legacy.structs import (
@@ -21,14 +29,14 @@ from pants.engine.rules import UnionMembership
 from pants.rules.core.test import (
     AddressAndDebugRequest,
     AddressAndTestResult,
+    CoverageDataBatch,
+    CoverageReport,
     Status,
     TestDebugRequest,
     TestResult,
     TestTarget,
     coordinator_of_tests,
     run_tests,
-    CoverageReport,
-    CoverageDataBatch,
 )
 from pants.source.wrapped_globs import EagerFilesetWithSpec
 from pants.testutil.engine.util import MockConsole, MockGet, run_rule
@@ -101,8 +109,8 @@ class TestTest(TestBase):
                     subject_type=CoverageDataBatch,
                     mock=lambda _: CoverageReport(
                         result_digest=EMPTY_DIRECTORY_DIGEST,
-                        directory_to_materialize_to=PurePath('mockety/mock'),
-                    )
+                        directory_to_materialize_to=PurePath("mockety/mock"),
+                    ),
                 ),
             ],
         )
@@ -190,7 +198,7 @@ class TestTest(TestBase):
                     subject_type=CoverageDataBatch,
                     mock=lambda _: CoverageReport(
                         result_digest=EMPTY_DIRECTORY_DIGEST,
-                        directory_to_materialize_to=PurePath('mockety/mock')
+                        directory_to_materialize_to=PurePath("mockety/mock"),
                     ),
                 ),
             ],

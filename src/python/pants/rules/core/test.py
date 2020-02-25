@@ -7,15 +7,14 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-
-from typing import Optional, Type, Tuple
+from typing import Optional, Tuple, Type
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import FilesystemLiteralSpec, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.addressable import AddressesWithOrigins, AddressWithOrigin
 from pants.engine.console import Console
-from pants.engine.fs import DirectoryToMaterialize, Workspace, Digest
+from pants.engine.fs import Digest, DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.isolated_process import FallibleExecuteProcessResult
@@ -39,6 +38,7 @@ class CoverageData(ABC):
 
     Subclasses should add whichever fields they require - snapshots of coverage output or xml files, etc.
     """
+
     @property
     @abstractmethod
     def batch_cls(self) -> Type["CoverageDataBatch"]:
@@ -94,7 +94,6 @@ class TestTarget:
         return None
 
 
-
 @dataclass(frozen=True)
 class AddressAndTestResult:
     address: Address
@@ -119,16 +118,19 @@ class AddressAndDebugRequest:
     address: Address
     request: TestDebugRequest
 
+
 @union
-@dataclass(frozen=True)
-class CoverageDataBatch:
-    addresses_and_test_results: Tuple[AddressAndTestResult, ...]
+class CoverageDataBatch(ABC):
+    @abstractmethod
+    def __init__(self, addresses_and_test_results: Tuple[AddressAndTestResult, ...]) -> None:
+        """Subclasses should accept this in their constructor."""
 
 
 @dataclass(frozen=True)
 class CoverageReport:
     result_digest: Digest
     directory_to_materialize_to: PurePath
+
 
 class TestOptions(GoalSubsystem):
     """Runs tests."""
@@ -203,8 +205,7 @@ async def run_tests(
         for report in coverage_reports:
             workspace.materialize_directory(
                 DirectoryToMaterialize(
-                    report.result_digest,
-                    path_prefix=report.directory_to_materialize_to.as_posix(),
+                    report.result_digest, path_prefix=report.directory_to_materialize_to.as_posix(),
                 )
             )
             console.print_stdout(f"Wrote coverage report to `{report.directory_to_materialize_to}`")
