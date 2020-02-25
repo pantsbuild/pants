@@ -43,7 +43,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
 from pants.engine.legacy.graph import TransitiveHydratedTargets
 from pants.engine.legacy.structs import PythonTestsAdaptor
-from pants.engine.rules import UnionRule, goal_rule, rule, subsystem_rule
+from pants.engine.rules import UnionRule, goal_rule, rule, subsystem_rule, RootRule
 from pants.engine.selectors import Get, MultiGet
 from pants.python.pex_build_util import identify_missing_init_files
 from pants.rules.core.distdir import DistDir
@@ -360,4 +360,8 @@ async def generate_coverage_report(
 
 
 def rules():
-    return [generate_coverage_report, UnionRule(CoverageDataBatch, PytestCoverageDataBatch)]
+    return [
+        RootRule(PytestCoverageDataBatch),
+        generate_coverage_report,
+        UnionRule(CoverageDataBatch, PytestCoverageDataBatch)
+    ]
