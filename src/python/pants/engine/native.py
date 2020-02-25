@@ -38,6 +38,7 @@ from pants.engine.isolated_process import (
     MultiPlatformExecuteProcessRequest,
 )
 from pants.engine.objects import union
+from pants.engine.platform import Platform
 from pants.engine.selectors import Get
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import read_file, safe_mkdir, safe_mkdtemp
@@ -588,6 +589,7 @@ class EngineTypes(NamedTuple):
     interactive_process_request: TypeId
     interactive_process_result: TypeId
     snapshot_subset: TypeId
+    construct_platform: Function
 
 
 class PyResult(NamedTuple):
@@ -966,6 +968,7 @@ class Native(metaclass=SingletonMetaclass):
             interactive_process_request=ti(InteractiveProcessRequest),
             interactive_process_result=ti(InteractiveProcessResult),
             snapshot_subset=ti(SnapshotSubset),
+            construct_platform=func(Platform),
         )
 
         scheduler_result = self.lib.scheduler_create(

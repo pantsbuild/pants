@@ -17,7 +17,7 @@ use crate::local::CapturedWorkdir;
 use crate::nailgun::nailgun_pool::NailgunProcessName;
 use crate::{
   Context, ExecuteProcessRequest, ExecuteProcessRequestMetadata, FallibleExecuteProcessResult,
-  MultiPlatformExecuteProcessRequest, PlatformConstraint,
+  MultiPlatformExecuteProcessRequest, Platform, PlatformConstraint,
 };
 
 #[cfg(test)]
@@ -194,6 +194,7 @@ impl super::CommandRunner for CommandRunner {
       executor,
       true,
       &workdir_for_this_nailgun,
+      Platform::current().unwrap(),
     )
   }
 
