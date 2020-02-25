@@ -236,7 +236,7 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
         'project_info:target_type',
         target_type=ScalaLibrary,
         dependencies=[jvm_binary, src_resource],
-        sources=[],
+        sources=['x.scala'],
     )
 
     self.make_target(

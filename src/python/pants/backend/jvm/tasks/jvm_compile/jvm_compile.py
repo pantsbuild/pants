@@ -14,6 +14,7 @@ from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.zinc import Zinc
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
+from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.backend.jvm.tasks.classpath_entry import ClasspathEntry
 from pants.backend.jvm.tasks.jvm_compile.class_not_found_error_patterns import (
@@ -35,6 +36,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import WorkerPool
 from pants.base.workunit import WorkUnitLabel
+from pants.build_graph.resources import Resources
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, PathGlobs, PathGlobsAndRoot
 from pants.java.distribution.distribution import DistributionLocator
 from pants.option.compiler_option_sets_mixin import CompilerOptionSetsMixin
@@ -483,16 +485,21 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
               classpath_product.add_for_target(cc.target, [(conf, cc.jar_file)])
 
   def calculate_jvm_modulizable_targets(self):
-    relevant_targets = list(self.context.targets(predicate=self.select))
-    # import pdb
-    # pdb.set_trace()
-    target_roots_in_play = set(relevant_targets) & set(self.context.target_roots)
-    target_roots_minus_thrift = set(filter(lambda x: not x.is_synthetic, target_roots_in_play))
+    def is_jvm_or_resource_target(t):
+      return not t.is_synthetic and isinstance(t, (JvmTarget, Resources))
+
+    jvm_and_resources_target_roots = set(
+      filter(is_jvm_or_resource_target, self.context.target_roots))
+    jvm_and_resources_target_roots_minus_thrift = set(
+      filter(lambda x: not x.is_synthetic, jvm_and_resources_target_roots))
     modulizable_targets = set(
       t for t in self.context.build_graph.transitive_dependees_of_addresses(
-        t.address for t in target_roots_minus_thrift)
-        if self.select(t)
+        t.address for t in jvm_and_resources_target_roots_minus_thrift)
+        if is_jvm_or_resource_target(t)
     )
+
+    # import pdb
+    # pdb.set_trace()
     return modulizable_targets
 
   def _classpath_for_context(self, context):
