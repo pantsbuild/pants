@@ -23,7 +23,6 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
-from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
 from pants.backend.project_info.tasks.export_dep_as_jar import ExportDepAsJar
 from pants.backend.project_info.tasks.export_version import DEFAULT_EXPORT_VERSION
@@ -219,8 +218,9 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
 
     self.make_target(
       'project_info:top_dependency',
-      target_type=Target,
+      target_type=JvmTarget,
       dependencies=[jvm_binary],
+      sources=['x.scala'],
     )
 
     self.create_file('project_info/a_resource', contents='a')
@@ -248,7 +248,7 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
       'project_info:scala_with_source_dep',
       target_type=ScalaLibrary,
       dependencies=[self.jvm_target_with_sources],
-      sources=[],
+      sources=['x.scala'],
     )
 
     self.linear_build_graph = self.make_linear_graph(['a', 'b', 'c', 'd', 'e'], target_type=ScalaLibrary)
@@ -277,18 +277,6 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
           'java8': {'source': '1.8', 'target': '1.8'}
         }
       },
-      # ZincCompile.options_scope: {
-      #   'jvm_options': [],
-      #   'args': [],
-      #   'warnings': True,
-      #   'warning_args': [],
-      #   'debug_symbols': False,
-      #   'delete_scratch': True,
-      #   'clear_invalid_analysis': True,
-      #   'size_estimator': 'filesize',
-      #   'whitelisted_args': {},
-      #   'execution_strategy': 'subprocess',
-      # }
     }
     options.update(options_overrides)
 
@@ -307,8 +295,11 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
 
     # This simulates ZincCompile creates the product.
     zinc_compile_task = ZincCompile(context, self.pants_workdir)
-    context.products.get_data('jvm_modulizable_targets', init_func=zinc_compile_task.calculate_jvm_modulizable_targets)
+    x = context.products.get_data('jvm_modulizable_targets',
+      init_func=zinc_compile_task.calculate_jvm_modulizable_targets)
 
+    # import pdb
+    # pdb.set_trace()
     bootstrap_task = BootstrapJvmTools(context, self.pants_workdir)
     bootstrap_task.execute()
     task = self.create_task(context)

@@ -173,6 +173,7 @@ class TaskTestBase(TestBase):
       last_target = self.make_target(
         f'project_info:{name}',
         dependencies=[] if last_target is None else [last_target],
+        sources = ['x.scala'],
         **additional_target_args,
       )
       graph[name] = last_target

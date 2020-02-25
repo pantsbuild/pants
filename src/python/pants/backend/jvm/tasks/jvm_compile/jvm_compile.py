@@ -484,6 +484,8 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
   def calculate_jvm_modulizable_targets(self):
     relevant_targets = list(self.context.targets(predicate=self.select))
+    # import pdb
+    # pdb.set_trace()
     target_roots_in_play = set(relevant_targets) & set(self.context.target_roots)
     target_roots_minus_thrift = set(filter(lambda x: not x.is_synthetic, target_roots_in_play))
     modulizable_targets = set(
