@@ -6,10 +6,10 @@ from dataclasses import dataclass
 from pants.backend.python.rules.inject_init import InitInjectedSnapshot, InjectInitRequest
 from pants.backend.python.rules.inject_init import rules as inject_init_rules
 from pants.engine.fs import DirectoriesToMerge, Snapshot
-from pants.engine.legacy.graph import HydratedTarget, HydratedTargets
+from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.rules import rule
 from pants.engine.selectors import Get, MultiGet
-from pants.rules.core.strip_source_roots import SourceRootStrippedSources
+from pants.rules.core.strip_source_roots import SourceRootStrippedSources, StripTargetRequest
 
 
 @dataclass(frozen=True)
@@ -29,7 +29,7 @@ async def prepare_chrooted_python_sources(
     stripping source roots.
     """
     source_root_stripped_sources = await MultiGet(
-        Get[SourceRootStrippedSources](HydratedTarget, hydrated_target)
+        Get[SourceRootStrippedSources](StripTargetRequest(hydrated_target.adaptor))
         for hydrated_target in hydrated_targets
     )
     sources_snapshot = await Get[Snapshot](

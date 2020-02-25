@@ -16,8 +16,8 @@ from pants.engine.fs import (
     Snapshot,
     SnapshotSubset,
 )
-from pants.engine.legacy.graph import HydratedTarget
-from pants.engine.rules import rule, subsystem_rule
+from pants.engine.legacy.structs import TargetAdaptor
+from pants.engine.rules import RootRule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.source.source_root import NoSourceRootError, SourceRootConfig
 
@@ -30,7 +30,7 @@ class SourceRootStrippedSources:
 
 
 @dataclass(frozen=True)
-class StripSourceRootsRequest:
+class StripSnapshotRequest:
     """A request to strip source roots for every file in the snapshot.
 
     The call site may optionally give the field `representative_path` if it is confident that all
@@ -43,9 +43,16 @@ class StripSourceRootsRequest:
     representative_path: Optional[str] = None
 
 
+@dataclass(frozen=True)
+class StripTargetRequest:
+    """A request to strip source roots for every file in a target's `sources` field."""
+
+    adaptor: TargetAdaptor
+
+
 @rule
 async def strip_source_roots_from_snapshot(
-    request: StripSourceRootsRequest, source_root_config: SourceRootConfig,
+    request: StripSnapshotRequest, source_root_config: SourceRootConfig,
 ) -> SourceRootStrippedSources:
     """Removes source roots from a snapshot, e.g. `src/python/pants/util/strutil.py` ->
     `pants/util/strutil.py`."""
@@ -99,12 +106,10 @@ async def strip_source_roots_from_snapshot(
 
 
 @rule
-async def strip_source_roots_from_target(
-    hydrated_target: HydratedTarget,
-) -> SourceRootStrippedSources:
+async def strip_source_roots_from_target(request: StripTargetRequest,) -> SourceRootStrippedSources:
     """Remove source roots from a target, e.g. `src/python/pants/util/strutil.py` ->
     `pants/util/strutil.py`."""
-    target_adaptor = hydrated_target.adaptor
+    target_adaptor = request.adaptor
 
     # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of raising to
     # simplify the hasattr() checks here!
@@ -117,9 +122,14 @@ async def strip_source_roots_from_target(
     if target_adaptor.type_alias == Files.alias():
         return SourceRootStrippedSources(snapshot=target_adaptor.sources.snapshot)
 
-    build_file = PurePath(hydrated_target.address.spec_path, "BUILD").as_posix()
+    # NB: We generate a synthetic representative_path for the target as a performance hack so that
+    # we don't need to call SourceRoots.find_by_path() on every single file belonging to the
+    # target's `sources`.
+    representative_path = PurePath(target_adaptor.address.spec_path, "BUILD").as_posix()
     return await Get[SourceRootStrippedSources](
-        StripSourceRootsRequest(target_adaptor.sources.snapshot, representative_path=build_file)
+        StripSnapshotRequest(
+            target_adaptor.sources.snapshot, representative_path=representative_path
+        )
     )
 
 
@@ -128,4 +138,6 @@ def rules():
         strip_source_roots_from_snapshot,
         strip_source_roots_from_target,
         subsystem_rule(SourceRootConfig),
+        RootRule(StripTargetRequest),
+        RootRule(StripSnapshotRequest),
     ]

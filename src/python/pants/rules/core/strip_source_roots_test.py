@@ -9,11 +9,13 @@ import pytest
 
 from pants.build_graph.address import Address
 from pants.build_graph.files import Files
-from pants.engine.legacy.graph import HydratedTarget
-from pants.engine.rules import RootRule
 from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Params
-from pants.rules.core.strip_source_roots import SourceRootStrippedSources, StripSourceRootsRequest
+from pants.rules.core.strip_source_roots import (
+    SourceRootStrippedSources,
+    StripSnapshotRequest,
+    StripTargetRequest,
+)
 from pants.rules.core.strip_source_roots import rules as strip_source_root_rules
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
@@ -25,13 +27,11 @@ class StripSourceRootsTest(TestBase):
         return (
             *super().rules(),
             *strip_source_root_rules(),
-            RootRule(HydratedTarget),
-            RootRule(StripSourceRootsRequest),
         )
 
     def get_stripped_files(
         self,
-        request: Union[StripSourceRootsRequest, HydratedTarget],
+        request: Union[StripSnapshotRequest, StripTargetRequest],
         *,
         args: Optional[List[str]] = None,
     ) -> List[str]:
@@ -48,7 +48,7 @@ class StripSourceRootsTest(TestBase):
             args: Optional[List[str]] = None,
         ) -> List[str]:
             input_snapshot = self.make_snapshot({fp: "" for fp in paths})
-            request = StripSourceRootsRequest(
+            request = StripSnapshotRequest(
                 input_snapshot, representative_path=paths[0] if use_representative_path else None
             )
             return self.get_stripped_files(request, args=args)
@@ -94,19 +94,14 @@ class StripSourceRootsTest(TestBase):
 
             if source_paths is None:
                 del adaptor.sources
-                return self.get_stripped_files(
-                    HydratedTarget(address=Mock(), adaptor=adaptor, dependencies=()),
-                )
+                return self.get_stripped_files(StripTargetRequest(adaptor))
 
-            adaptor.sources = Mock()
-            adaptor.sources.snapshot = self.make_snapshot({fp: "" for fp in source_paths})
-
-            address = Address(
+            adaptor.address = Address(
                 spec_path=PurePath(source_paths[0]).parent.as_posix(), target_name="target"
             )
-            return self.get_stripped_files(
-                HydratedTarget(address=address, adaptor=adaptor, dependencies=()),
-            )
+            adaptor.sources = Mock()
+            adaptor.sources.snapshot = self.make_snapshot({fp: "" for fp in source_paths})
+            return self.get_stripped_files(StripTargetRequest(adaptor))
 
         # normal target
         assert get_stripped_files_for_target(

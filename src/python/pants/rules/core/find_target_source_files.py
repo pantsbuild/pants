@@ -9,7 +9,7 @@ from pants.engine.fs import PathGlobs, Snapshot, SnapshotSubset
 from pants.engine.legacy.structs import TargetAdaptorWithOrigin
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
-from pants.rules.core.strip_source_roots import SourceRootStrippedSources, StripSourceRootsRequest
+from pants.rules.core.strip_source_roots import SourceRootStrippedSources, StripSnapshotRequest
 
 
 @dataclass(frozen=True)
@@ -45,7 +45,7 @@ async def find_target_source_files(request: FindTargetSourceFilesRequest) -> Tar
     if not request.strip_source_roots:
         return TargetSourceFiles(resulting_snapshot)
     stripped = await Get[SourceRootStrippedSources](
-        StripSourceRootsRequest(
+        StripSnapshotRequest(
             resulting_snapshot,
             # TODO: simply pass `address.spec_path` once `--source-unmatched` is removed.
             representative_path=PurePath(adaptor.address.spec_path, "BUILD").as_posix(),
