@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import inspect
-from collections.abc import MutableMapping, MutableSequence
+from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import update_wrapper
 from typing import Any, Sequence, Set, Tuple, Type
@@ -286,9 +286,9 @@ class AddressableSequence(AddressableDescriptor):
         if value is None:
             return None
 
-        if not isinstance(value, MutableSequence):
+        if not isinstance(value, (list, tuple)):
             raise TypeError(
-                "The {} property of {} must be a list, given {} of type {}".format(
+                "The {} property of {} must be a tuple or list, given {} of type {}".format(
                     self._name, instance, value, type(value).__name__
                 )
             )
@@ -321,7 +321,7 @@ class AddressableDict(AddressableDescriptor):
         if value is None:
             return None
 
-        if not isinstance(value, MutableMapping):
+        if not isinstance(value, Mapping):
             raise TypeError(
                 "The {} property of {} must be a dict, given {} of type {}".format(
                     self._name, instance, value, type(value).__name__
