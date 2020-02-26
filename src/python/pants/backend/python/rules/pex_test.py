@@ -137,18 +137,15 @@ class PexTest(TestBase):
     def test_requirement_constraints(self) -> None:
         direct_dep = "requests==2.23.0"
         # Pin to intentionally old transitive dependencies to ensure the constraints are respected.
-        constrained_transitive_deps = [
+        constrained_transitive_deps = (
             "certifi==2019.6.16",
             "chardet==3.0.2",
             "idna==2.7",
             "urllib3==1.25.6",
-        ]
-        self.create_file("constraints.txt", "\n".join(constrained_transitive_deps[:2]))
-        constraints = PexRequirementConstraints.create_from_raw_constraints(
-            ["@constraints.txt", *constrained_transitive_deps[2:]]
         )
         pex_info = self.create_pex_and_get_pex_info(
-            requirements=PexRequirements((direct_dep,)), requirement_constraints=constraints
+            requirements=PexRequirements((direct_dep,)),
+            requirement_constraints=PexRequirementConstraints(constrained_transitive_deps),
         )
         assert set(pex_info["requirements"]) == {direct_dep, *constrained_transitive_deps}
 

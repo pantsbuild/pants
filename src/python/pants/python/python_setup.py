@@ -43,16 +43,17 @@ class PythonSetup(Subsystem):
             advanced=True,
             fingerprint=True,
             type=list,
+            fromfile=True,
             default=[],
-            metavar="<requirement or @file_path>",
+            metavar="<requirement>",
             help=(
                 "When resolving third-party requirements, use these "
                 "constraints to determine which versions to use. This option expects a list of "
-                "raw requirement strings and/or paths to constraint files prefixed with `@`, e.g. "
-                "`['@constraints.txt', 'requests==2.23.0', `pytest>=4.6,<4.7']`. See "
-                "https://pip.pypa.io/en/stable/user_guide/#constraints-files for more information."
-                "Python targets may also declare constraints through their `constraints` field "
-                "in BUILD files."
+                "raw requirement strings, e.g. `['requests==2.23.0', `pytest>=4.6,<4.7']`. "
+                "Alternatively, you can point to a constraints file by prefixing it with `@`, e.g. "
+                "`--python-setup-requirement-constraints='@constraints.txt'`. See "
+                "https://pip.pypa.io/en/stable/user_guide/#constraints-files for more information "
+                "on how constraints are applied in Pex and Pip."
             ),
         )
         register(
@@ -163,6 +164,7 @@ class PythonSetup(Subsystem):
 
     @property
     def requirement_constraints(self) -> Tuple[str, ...]:
+        """A tuple of raw requirement-style strings, e.g. `foo>=1.2`."""
         return tuple(self.options.requirement_constraints)
 
     @memoized_property
@@ -235,17 +237,6 @@ class PythonSetup(Subsystem):
         if self.get_options().is_flagged("interpreter_constraints"):
             return self.interpreter_constraints
         return tuple(compatibility or self.interpreter_constraints)
-
-    def resolve_requirement_constraints(
-        self, target_constraints_field: Optional[Iterable[str]]
-    ) -> Tuple[str, ...]:
-        """Return either the given `constraints` field or the global `--requirement-constraints`.
-
-        If requirement constraints are supplied by the CLI flag, return those only.
-        """
-        if self.options.is_flagged("requirement_constraints"):
-            return self.requirement_constraints
-        return tuple(target_constraints_field or self.requirement_constraints)
 
     @classmethod
     def expand_interpreter_search_paths(cls, interpreter_search_paths, pyenv_root_func=None):

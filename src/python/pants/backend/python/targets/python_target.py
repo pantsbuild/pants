@@ -20,14 +20,7 @@ class PythonTarget(Target):
     """
 
     def __init__(
-        self,
-        address=None,
-        payload=None,
-        sources=None,
-        provides=None,
-        compatibility=None,
-        constraints=None,
-        **kwargs,
+        self, address=None, payload=None, sources=None, provides=None, compatibility=None, **kwargs
     ):
         """
         :param dependencies: The addresses of targets that this target depends on.
@@ -56,7 +49,6 @@ class PythonTarget(Target):
                 "sources": self.create_sources_field(sources, address.spec_path, key_arg="sources"),
                 "provides": provides,
                 "compatibility": PrimitiveField(maybe_list(compatibility or ())),
-                "constraints": PrimitiveField(maybe_list(constraints or ())),
             }
         )
         super().__init__(address=address, payload=payload, **kwargs)
@@ -106,10 +98,6 @@ class PythonTarget(Target):
     @property
     def compatibility(self):
         return self.payload.compatibility
-
-    @property
-    def constraints(self):
-        return self.payload.constraints
 
     @property
     def resources(self):

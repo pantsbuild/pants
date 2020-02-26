@@ -42,9 +42,7 @@ async def create_pex_from_target_closure(
     interpreter_constraints = PexInterpreterConstraints.create_from_adaptors(
         adaptors=all_target_adaptors, python_setup=python_setup
     )
-    requirement_constraints = PexRequirementConstraints.create_from_adaptors(
-        adaptors=all_target_adaptors, python_setup=python_setup
-    )
+    requirement_constraints = PexRequirementConstraints.create_from_setup(python_setup=python_setup)
 
     chrooted_sources: Optional[ChrootedPythonSources] = None
     if request.include_source_files:
