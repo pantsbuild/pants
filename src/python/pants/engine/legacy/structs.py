@@ -11,7 +11,7 @@ from typing import Any, Callable, Iterable, List, Optional, Sequence, Tuple, Typ
 from pants.base.specs import OriginSpec
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
-from pants.engine.addressable import addressable_list
+from pants.engine.addressable import addressable_sequence
 from pants.engine.fs import GlobExpansionConjunction, PathGlobs
 from pants.engine.objects import Locatable, union
 from pants.engine.rules import UnionRule
@@ -218,7 +218,7 @@ class AppAdaptor(TargetAdaptor):
         super().__init__(**kwargs)
         self.bundles = bundles
 
-    @addressable_list(Exactly(BundleAdaptor))
+    @addressable_sequence(Exactly(BundleAdaptor))
     def bundles(self):
         """The BundleAdaptors for this JvmApp."""
         return self.bundles

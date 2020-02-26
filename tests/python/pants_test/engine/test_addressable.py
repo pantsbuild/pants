@@ -8,7 +8,7 @@ from pants.engine.addressable import (
     NotSerializableError,
     addressable,
     addressable_dict,
-    addressable_list,
+    addressable_sequence,
 )
 from pants.engine.objects import Resolvable, Serializable
 from pants.util.objects import Exactly, TypeConstraintError
@@ -121,11 +121,11 @@ class AddressableListTest(unittest.TestCase):
             super(AddressableListTest.Series, self).__init__()
             self.values = values
 
-        @addressable_list(Exactly(int, float))
+        @addressable_sequence(Exactly(int, float))
         def values(self):
             """Return this series' values.
 
-            :rtype list of int or float
+            :rtype tuple of int or float
             """
 
     def test_none(self):
