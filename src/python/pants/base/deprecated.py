@@ -212,9 +212,13 @@ def deprecated_conditional(
     """
     validate_deprecation_semver(removal_version, "removal version")
     if predicate():
-        warn_or_error(removal_version, entity_description, hint_message,
-                      deprecation_start_version=deprecation_start_version,
-                      stacklevel=stacklevel)
+        warn_or_error(
+            removal_version,
+            entity_description,
+            hint_message,
+            deprecation_start_version=deprecation_start_version,
+            stacklevel=stacklevel,
+        )
 
 
 def deprecated(

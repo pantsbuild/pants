@@ -405,12 +405,9 @@ pub enum StrictGlobMatching {
 impl StrictGlobMatching {
   pub fn create(behavior: &str, description_of_origin: Option<String>) -> Result<Self, String> {
     match (behavior, description_of_origin) {
-      ("ignore", None) => Ok(StrictGlobMatching::Ignore),
+      ("ignore", _) => Ok(StrictGlobMatching::Ignore),
       ("warn", Some(origin)) => Ok(StrictGlobMatching::Warn(origin)),
       ("error", Some(origin)) => Ok(StrictGlobMatching::Error(origin)),
-      ("ignore", Some(_)) => {
-        Err("Provided description_of_origin while ignoring glob match errors".to_string())
-      }
       ("warn", None) | ("error", None) => Err(
         "Must provide a description_of_origin when warning or erroring on glob match errors"
           .to_string(),

@@ -53,14 +53,16 @@ class FileNotFoundBehavior(Enum):
 
     def to_glob_match_error_behavior(self) -> GlobMatchErrorBehavior:
         deprecated_conditional(
-            lambda: self == self.ignore,
-            removal_version='1.28.0.dev2',
-            entity_description='--files-not-found-behavior-option=ignore',
-            hint_message="If you currently set `--files-not-found-behavior=ignore`, you will "
-            "need to instead either set `--files-not-found-behavior=warn` (the "
-            "default) or `--files-not-found-behavior=error`. Ignoring when files are "
-            "not found often results in subtle bugs, so we are removing the option.",
-            deprecation_start_version='1.27.0.dev2',
+            lambda: self == type(self).ignore,
+            removal_version="1.29.0.dev2",
+            entity_description="--files-not-found-behavior-option=ignore",
+            hint_message=(
+                "If you currently set `--files-not-found-behavior=ignore`, you will "
+                "need to instead either set `--files-not-found-behavior=warn` (the "
+                "default) or `--files-not-found-behavior=error`. Ignoring when files are "
+                "not found often results in subtle bugs, so we are removing the option."
+            ),
+            deprecation_start_version="1.27.0.dev0",
         )
         return GlobMatchErrorBehavior(self.value)
 
