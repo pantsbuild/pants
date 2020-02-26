@@ -65,15 +65,12 @@ class IsortIntegrationTest(TestBase):
         adaptor_with_origin = TargetAdaptorWithOrigin(adaptor, origin)
         options_bootstrapper = create_options_bootstrapper(args=args)
         lint_result = self.request_single_product(
-            LintResult, Params(IsortTarget(adaptor_with_origin), options_bootstrapper,)
+            LintResult, Params(IsortTarget(adaptor_with_origin), options_bootstrapper)
         )
         fmt_result = self.request_single_product(
             FmtResult,
             Params(
-                IsortTarget(
-                    adaptor_with_origin,
-                    prior_formatter_result_digest=input_snapshot.directory_digest,
-                ),
+                IsortTarget(adaptor_with_origin, prior_formatter_result=input_snapshot),
                 options_bootstrapper,
             ),
         )

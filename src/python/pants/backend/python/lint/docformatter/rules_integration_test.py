@@ -56,10 +56,7 @@ class DocformatterIntegrationTest(TestBase):
         fmt_result = self.request_single_product(
             FmtResult,
             Params(
-                DocformatterTarget(
-                    adaptor_with_origin,
-                    prior_formatter_result_digest=input_snapshot.directory_digest,
-                ),
+                DocformatterTarget(adaptor_with_origin, prior_formatter_result=input_snapshot),
                 options_bootstrapper,
             ),
         )

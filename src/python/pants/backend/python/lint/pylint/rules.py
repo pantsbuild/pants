@@ -25,11 +25,8 @@ from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
-from pants.rules.core import find_target_source_files, strip_source_roots
-from pants.rules.core.find_target_source_files import (
-    FindTargetSourceFilesRequest,
-    TargetSourceFiles,
-)
+from pants.rules.core import determine_source_files, strip_source_roots
+from pants.rules.core.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.rules.core.lint import LintResult
 
 
@@ -38,12 +35,12 @@ class PylintTarget:
     adaptor_with_origin: TargetAdaptorWithOrigin
 
 
-def generate_args(*, source_files: TargetSourceFiles, pylint: Pylint) -> Tuple[str, ...]:
+def generate_args(*, specified_source_files: SourceFiles, pylint: Pylint) -> Tuple[str, ...]:
     args = []
     if pylint.options.config is not None:
         args.append(f"--config={pylint.options.config}")
     args.extend(pylint.options.args)
-    args.extend(sorted(source_files.snapshot.files))
+    args.extend(sorted(specified_source_files.snapshot.files))
     return tuple(args)
 
 
@@ -66,7 +63,7 @@ async def lint(
     dependencies = await MultiGet(
         Get[HydratedTarget](Address, dependency) for dependency in hydrated_target.dependencies
     )
-    sources_digest = await Get[ChrootedPythonSources](
+    chrooted_python_sources = await Get[ChrootedPythonSources](
         HydratedTargets([hydrated_target, *dependencies])
     )
 
@@ -100,20 +97,20 @@ async def lint(
             directories=(
                 requirements_pex.directory_digest,
                 config_snapshot.directory_digest,
-                sources_digest.snapshot.directory_digest,
+                chrooted_python_sources.snapshot.directory_digest,
             )
         ),
     )
 
-    source_files = await Get[TargetSourceFiles](
-        FindTargetSourceFilesRequest(adaptor_with_origin, strip_source_roots=True)
+    specified_source_files = await Get[SourceFiles](
+        SpecifiedSourceFilesRequest([adaptor_with_origin], strip_source_roots=True)
     )
 
     request = requirements_pex.create_execute_request(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path=f"./pylint.pex",
-        pex_args=generate_args(source_files=source_files, pylint=pylint),
+        pex_args=generate_args(specified_source_files=specified_source_files, pylint=pylint),
         input_files=merged_input_files,
         description=f"Run Pylint for {adaptor.address.reference()}",
     )
@@ -127,7 +124,7 @@ def rules():
         subsystem_rule(Pylint),
         UnionRule(PythonLintTarget, PylintTarget),
         *download_pex_bin.rules(),
-        *find_target_source_files.rules(),
+        *determine_source_files.rules(),
         *pex.rules(),
         *prepare_chrooted_python_sources.rules(),
         *strip_source_roots.rules(),

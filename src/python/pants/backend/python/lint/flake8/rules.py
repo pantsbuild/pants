@@ -22,10 +22,11 @@ from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
-from pants.rules.core import find_target_source_files, strip_source_roots
-from pants.rules.core.find_target_source_files import (
-    FindTargetSourceFilesRequest,
-    TargetSourceFiles,
+from pants.rules.core import determine_source_files, strip_source_roots
+from pants.rules.core.determine_source_files import (
+    AllSourceFilesRequest,
+    SourceFiles,
+    SpecifiedSourceFilesRequest,
 )
 from pants.rules.core.lint import LintResult
 
@@ -35,12 +36,12 @@ class Flake8Target:
     adaptor_with_origin: TargetAdaptorWithOrigin
 
 
-def generate_args(*, source_files: TargetSourceFiles, flake8: Flake8) -> Tuple[str, ...]:
+def generate_args(*, specified_source_files: SourceFiles, flake8: Flake8) -> Tuple[str, ...]:
     args = []
     if flake8.options.config is not None:
         args.append(f"--config={flake8.options.config}")
     args.extend(flake8.options.args)
-    args.extend(sorted(source_files.snapshot.files))
+    args.extend(sorted(specified_source_files.snapshot.files))
     return tuple(args)
 
 
@@ -82,23 +83,26 @@ async def lint(
         )
     )
 
+    all_source_files = await Get[SourceFiles](AllSourceFilesRequest([adaptor]))
+    specified_source_files = await Get[SourceFiles](
+        SpecifiedSourceFilesRequest([adaptor_with_origin])
+    )
+
     merged_input_files = await Get[Digest](
         DirectoriesToMerge(
             directories=(
-                adaptor.sources.snapshot.directory_digest,
+                all_source_files.snapshot.directory_digest,
                 requirements_pex.directory_digest,
                 config_snapshot.directory_digest,
             )
         ),
     )
 
-    source_files = await Get[TargetSourceFiles](FindTargetSourceFilesRequest(adaptor_with_origin))
-
     request = requirements_pex.create_execute_request(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path=f"./flake8.pex",
-        pex_args=generate_args(source_files=source_files, flake8=flake8),
+        pex_args=generate_args(specified_source_files=specified_source_files, flake8=flake8),
         input_files=merged_input_files,
         description=f"Run Flake8 for {adaptor.address.reference()}",
     )
@@ -112,7 +116,7 @@ def rules():
         subsystem_rule(Flake8),
         UnionRule(PythonLintTarget, Flake8Target),
         *download_pex_bin.rules(),
-        *find_target_source_files.rules(),
+        *determine_source_files.rules(),
         *pex.rules(),
         *python_native_code.rules(),
         *strip_source_roots.rules(),

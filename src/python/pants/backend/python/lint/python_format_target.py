@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import List
 
 from pants.backend.python.lint.python_lint_target import PYTHON_TARGET_TYPES
+from pants.engine.fs import Digest, Snapshot
 from pants.engine.legacy.structs import (
     PantsPluginAdaptorWithOrigin,
     PythonAppAdaptorWithOrigin,
@@ -36,19 +37,19 @@ async def format_python_target(
     """This aggregator allows us to have multiple formatters safely operate over the same Python
     targets, even if they modify the same files."""
     adaptor_with_origin = concrete_target.adaptor_with_origin
-    prior_formatter_result_digest = adaptor_with_origin.adaptor.sources.snapshot.directory_digest
+    prior_formatter_result = adaptor_with_origin.adaptor.sources.snapshot
     results: List[FmtResult] = []
     for member in union_membership.union_rules[PythonFormatTarget]:
         result = await Get[FmtResult](
             PythonFormatTarget,
-            member(
-                adaptor_with_origin, prior_formatter_result_digest=prior_formatter_result_digest
-            ),
+            member(adaptor_with_origin, prior_formatter_result=prior_formatter_result),
         )
         results.append(result)
         if result != FmtResult.noop():
-            prior_formatter_result_digest = result.digest
-    return AggregatedFmtResults(tuple(results), combined_digest=prior_formatter_result_digest)
+            prior_formatter_result = await Get[Snapshot](Digest, result.digest)
+    return AggregatedFmtResults(
+        tuple(results), combined_digest=prior_formatter_result.directory_digest
+    )
 
 
 @rule
