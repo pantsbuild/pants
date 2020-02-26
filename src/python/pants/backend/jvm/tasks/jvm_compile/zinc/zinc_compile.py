@@ -324,11 +324,11 @@ class BaseZincCompile(JvmCompile):
         if isinstance(target, ScalacPlugin):
             result[_SCALAC_PLUGIN_INFO_FILE] = textwrap.dedent(
                 """
-                <plugin>
-                  <name>{}</name>
-                  <classname>{}</classname>
-                </plugin>
-                """.format(
+          <plugin>
+            <name>{}</name>
+            <classname>{}</classname>
+          </plugin>
+        """.format(
                     target.plugin, target.classname
                 )
             )
@@ -917,7 +917,12 @@ class ZincCompile(BaseZincCompile):
 
     @classmethod
     def product_types(cls):
-        return ["runtime_classpath", "export_dep_as_jar_signal", "zinc_analysis", "zinc_args"]
+        return super().product_types(cls) + [
+            "runtime_classpath",
+            "export_dep_as_jar_signal",
+            "zinc_analysis",
+            "zinc_args",
+        ]
 
     @staticmethod
     def select(target):

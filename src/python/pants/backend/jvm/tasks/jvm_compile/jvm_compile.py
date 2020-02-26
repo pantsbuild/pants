@@ -14,6 +14,8 @@ from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.zinc import Zinc
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
+from pants.backend.jvm.targets.jvm_app import JvmApp
+from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.backend.jvm.tasks.classpath_entry import ClasspathEntry
 from pants.backend.jvm.tasks.jvm_compile.class_not_found_error_patterns import (
@@ -35,6 +37,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import WorkerPool
 from pants.base.workunit import WorkUnitLabel
+from pants.build_graph.resources import Resources
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, PathGlobs, PathGlobsAndRoot
 from pants.java.distribution.distribution import DistributionLocator
 from pants.option.compiler_option_sets_mixin import CompilerOptionSetsMixin
@@ -318,6 +321,9 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     def select_source(self, source_file_path):
         raise NotImplementedError()
 
+    def product_types(cls):
+        return super(JvmCompile, cls).product_types() + ["jvm_modulizable_targets"]
+
     def compile(
         self,
         ctx,
@@ -529,8 +535,6 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
         # In case we have no relevant targets and return early, create the requested product maps.
         self.create_empty_extra_products()
 
-        relevant_targets = list(self.context.targets(predicate=self.select))
-
         # Clone the compile_classpath to the runtime_classpath.
         classpath_product = self.create_classpath_product()
 
@@ -538,20 +542,24 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
             classpath_product
         )
 
-        dependees_of_target_roots = None
+        relevant_targets = list(self.context.targets(predicate=self.select))
         # If we are only exporting jars then we can omit some targets from the runtime_classpath.
         if self.context.products.is_required_data("export_dep_as_jar_signal"):
-            # Filter modulized targets from invalid targets list.
-            target_roots_in_play = set(relevant_targets) & set(self.context.target_roots)
-            addresses_in_play = [t.address for t in target_roots_in_play]
-            dependees_of_target_roots = set(
-                t
-                for t in self.context.build_graph.transitive_dependees_of_addresses(
-                    addresses_in_play
-                )
-                if self.select(t)
+            modulizable_targets = self.calculate_jvm_modulizable_targets()
+            synthetic_modulizable_targets = set(
+                filter(lambda x: x.is_synthetic, modulizable_targets)
             )
-            relevant_targets = list(set(relevant_targets) - dependees_of_target_roots)
+            if len(synthetic_modulizable_targets) > 0:
+                raise TaskError(
+                    f"Modulizable targets must not contain synthetic target, but in this case {synthetic_modulizable_targets}.\n"
+                    f"It means that certain thrift target(s) depends back onto the targets you want to import to IDE."
+                )
+
+            relevant_targets = list(set(relevant_targets) - modulizable_targets)
+            self.create_extra_products_for_targets(modulizable_targets)
+            self.context.products.get_data("jvm_modulizable_targets", set).update(
+                modulizable_targets
+            )
 
         if relevant_targets:
             # Note, JVM targets are validated (`vts.update()`) as they succeed.  As a result,
@@ -582,8 +590,27 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
                             classpath_product.remove_for_target(cc.target, [(conf, cc.classes_dir)])
                             classpath_product.add_for_target(cc.target, [(conf, cc.jar_file)])
 
-        if dependees_of_target_roots is not None:
-            self.create_extra_products_for_targets(dependees_of_target_roots)
+    def calculate_jvm_modulizable_targets(self):
+        def is_jvm_or_resource_target(t):
+            return isinstance(t, (JvmTarget, JvmApp, Resources))
+
+        jvm_and_resources_target_roots = set(
+            filter(is_jvm_or_resource_target, self.context.target_roots)
+        )
+        jvm_and_resources_target_roots_minus_thrift = set(
+            filter(lambda x: not x.is_synthetic, jvm_and_resources_target_roots)
+        )
+        modulizable_targets = set(
+            t
+            for t in self.context.build_graph.transitive_dependees_of_addresses(
+                t.address for t in jvm_and_resources_target_roots_minus_thrift
+            )
+            if is_jvm_or_resource_target(t)
+        )
+
+        # import pdb
+        # pdb.set_trace()
+        return modulizable_targets
 
     def _classpath_for_context(self, context):
         if self.get_options().use_classpath_jars:

@@ -24,7 +24,6 @@ from pants.java.jar.jar_dependency_utils import M2Coordinate
 from pants.task.console_task import ConsoleTask
 from pants.util.contextutil import temporary_file
 from pants.util.memo import memoized_property
-from pants.util.ordered_set import OrderedSet
 
 
 class ExportDepAsJar(ConsoleTask):
@@ -58,16 +57,6 @@ class ExportDepAsJar(ConsoleTask):
             help="Causes the sources of dependencies to be zipped and included in the project.",
         )
         register(
-            "--libraries-sources",
-            type=bool,
-            help="Causes 3rdparty libraries with sources to be output.",
-        )
-        register(
-            "--libraries-javadocs",
-            type=bool,
-            help="Causes 3rdparty libraries with javadocs to be output.",
-        )
-        register(
             "--transitive",
             type=bool,
             default=True,
@@ -90,10 +79,7 @@ class ExportDepAsJar(ConsoleTask):
         round_manager.require_data("zinc_args")
         round_manager.require_data("runtime_classpath")
         round_manager.require_data("export_dep_as_jar_signal")
-        if options.libraries_sources:
-            round_manager.require_data("resolve_sources_signal")
-        if options.libraries_javadocs:
-            round_manager.require_data("resolve_javadocs_signal")
+        round_manager.require_data("jvm_modulizable_targets")
 
     @property
     def _output_folder(self):
@@ -102,8 +88,8 @@ class ExportDepAsJar(ConsoleTask):
     @staticmethod
     def _source_roots_for_target(target):
         """
-        :type target:pants.build_graph.target.Target
-        """
+    :type target:pants.build_graph.target.Target
+    """
 
         def root_package_prefix(source_file):
             source = os.path.dirname(source_file)
@@ -205,22 +191,16 @@ class ExportDepAsJar(ConsoleTask):
                     )
         return f
 
-    def _dependencies_to_include_in_libraries(
-        self, t, modulizable_target_set, dependencies_needed_in_classpath
-    ):
-        """NB: We need to pass dependencies_needed_in_classpath here to make sure we're being strict_deps-aware
-        when computing the dependencies."""
-
-        dependencies_to_include = []
+    def _dependencies_to_include_in_libraries(self, t, modulizable_target_set):
+        dependencies_to_include = set([])
         self.context.build_graph.walk_transitive_dependency_graph(
             [direct_dep.address for direct_dep in t.dependencies],
             # NB: Dependency graph between modulizable targets is represented with modules,
             #     so we don't need to expand those branches of the dep graph.
-            predicate=lambda dep: (dep not in modulizable_target_set)
-            and (dep in dependencies_needed_in_classpath),
-            work=lambda dep: dependencies_to_include.append(dep),
+            predicate=lambda dep: dep not in modulizable_target_set,
+            work=lambda dep: dependencies_to_include.add(dep),
         )
-        return list(sorted(dependencies_to_include))
+        return dependencies_to_include
 
     def _extract_arguments_with_prefix_from_zinc_args(self, args, prefix):
         return [option[len(prefix) :] for option in args if option.startswith(prefix)]
@@ -234,12 +214,11 @@ class ExportDepAsJar(ConsoleTask):
         zinc_args_for_target,
     ):
         """
-        :type current_target:pants.build_graph.target.Target
-        """
+    :type current_target:pants.build_graph.target.Target
+    """
         info = {
             # this means 'dependencies'
             "targets": [],
-            "source_dependencies_in_classpath": [],
             "libraries": [],
             "roots": [],
             "id": current_target.id,
@@ -260,12 +239,15 @@ class ExportDepAsJar(ConsoleTask):
             "extra_jvm_options": current_target.payload.get_field_value("extra_jvm_options", []),
         }
 
+        if not current_target.is_synthetic:
+            info["globs"] = current_target.globs_relative_to_buildroot()
+
         def iter_transitive_jars(jar_lib):
             """
-            :type jar_lib: :class:`pants.backend.jvm.targets.jar_library.JarLibrary`
-            :rtype: :class:`collections.Iterator` of
-                    :class:`pants.java.jar.M2Coordinate`
-            """
+      :type jar_lib: :class:`pants.backend.jvm.targets.jar_library.JarLibrary`
+      :rtype: :class:`collections.Iterator` of
+              :class:`pants.java.jar.M2Coordinate`
+      """
             if runtime_classpath:
                 jar_products = runtime_classpath.get_artifact_classpath_entries_for_targets(
                     (jar_lib,)
@@ -291,27 +273,11 @@ class ExportDepAsJar(ConsoleTask):
                 libraries.add(target.id)
             return libraries
 
-        if not current_target.is_synthetic:
-            info["globs"] = current_target.globs_relative_to_buildroot()
-
-        def _dependencies_needed_in_classpath(target):
-            if isinstance(target, JvmTarget):
-                return [
-                    dep
-                    for dep in DependencyContext.global_instance().dependencies_respecting_strict_deps(
-                        target
-                    )
-                ]
-            else:
-                return [dep for dep in target.closure()]
-
-        dependencies_needed_in_classpath = _dependencies_needed_in_classpath(current_target)
-
         libraries_for_target = set(
             [self._jar_id(jar) for jar in iter_transitive_jars(current_target)]
         )
         for dep in self._dependencies_to_include_in_libraries(
-            current_target, modulizable_target_set, dependencies_needed_in_classpath
+            current_target, modulizable_target_set
         ):
             libraries_for_target.update(_full_library_set_for_target(dep))
         info["libraries"].extend(libraries_for_target)
@@ -335,18 +301,8 @@ class ExportDepAsJar(ConsoleTask):
         if isinstance(current_target, JvmTarget):
             info["excludes"] = [self._exclude_id(exclude) for exclude in current_target.excludes]
             info["platform"] = current_target.platform.name
-            if hasattr(current_target, "runtime_platform"):
-                info["runtime_platform"] = current_target.runtime_platform.name
-
-        transitive_targets = OrderedSet(
-            [
-                dep.address.spec
-                for dep in dependencies_needed_in_classpath
-                if dep in modulizable_target_set
-            ]
-        )
-        transitive_targets.update(info["targets"])
-        info["source_dependencies_in_classpath"] = [dep for dep in transitive_targets]
+            if hasattr(current_target, "test_platform"):
+                info["test_platform"] = current_target.test_platform.name
 
         return info
 
@@ -408,16 +364,14 @@ class ExportDepAsJar(ConsoleTask):
     def _get_targets_to_make_into_modules(
         self, target_roots_set, resource_target_map, runtime_classpath
     ):
-        target_root_addresses = [t.address for t in target_roots_set]
-        dependees_of_target_roots = [
+        jvm_modulizable_targets = self.context.products.get_data("jvm_modulizable_targets")
+        non_generated_resource_jvm_modulizable_targets = [
             t
-            for t in self.context.build_graph.transitive_dependees_of_addresses(
-                target_root_addresses
-            )
+            for t in jvm_modulizable_targets
             if self._get_target_type(t, resource_target_map, runtime_classpath)
             is not SourceRootTypes.RESOURCE_GENERATED
         ]
-        return dependees_of_target_roots
+        return non_generated_resource_jvm_modulizable_targets
 
     def _make_libraries_entry(self, target, resource_target_map, runtime_classpath):
         # Using resolved path in preparation for VCFS.
@@ -461,9 +415,8 @@ class ExportDepAsJar(ConsoleTask):
 
         The return dictionary is suitable for serialization by json.dumps.
         :param all_targets: The list of targets to generate the map for.
-        :param runtime_classpath: ClasspathProducts containing entries for all the resolved and compiled
-          dependencies.
-        :param zinc_args_for_all_targets: Map from zinc compiled targets to the args used to compile them.
+        :param classpath_products: Optional classpath_products. If not provided when the --libraries
+          option is `True`, this task will perform its own jar resolution.
         """
         target_roots_set = set(self.context.target_roots)
 

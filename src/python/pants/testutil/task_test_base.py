@@ -74,8 +74,8 @@ class TaskTestBase(TestBase):
 
     def setUp(self):
         """
-        :API: public
-        """
+    :API: public
+    """
         super().setUp()
         self._testing_task_type = self.synthesize_task_subtype(self.task_type(), self.options_scope)
         # We locate the workdir below the pants_workdir, which BaseTest locates within the BuildRoot.
@@ -90,8 +90,8 @@ class TaskTestBase(TestBase):
     @property
     def test_workdir(self):
         """
-        :API: public
-        """
+    :API: public
+    """
         return self._test_workdir
 
     def synthesize_task_subtype(self, task_type, options_scope):
@@ -119,22 +119,22 @@ class TaskTestBase(TestBase):
 
     def set_options(self, **kwargs):
         """
-        :API: public
-        """
+    :API: public
+    """
         self.set_options_for_scope(self.options_scope, **kwargs)
 
     def context(self, for_task_types=None, **kwargs):
         """
-        :API: public
-        """
+    :API: public
+    """
         # Add in our task type.
         for_task_types = [self._testing_task_type] + (for_task_types or [])
         return super().context(for_task_types=for_task_types, **kwargs)
 
     def create_task(self, context, workdir=None):
         """
-        :API: public
-        """
+    :API: public
+    """
         if workdir is None:
             workdir = self.test_workdir
         return self._testing_task_type(context, workdir)
@@ -179,6 +179,7 @@ class TaskTestBase(TestBase):
             last_target = self.make_target(
                 f"project_info:{name}",
                 dependencies=[] if last_target is None else [last_target],
+                sources=["x.scala"],
                 **additional_target_args,
             )
             graph[name] = last_target
@@ -193,8 +194,8 @@ class ConsoleTaskTestBase(TaskTestBase):
 
     def setUp(self):
         """
-        :API: public
-        """
+    :API: public
+    """
         Goal.clear()
         super().setUp()
 
