@@ -2,6 +2,7 @@ use crate::{
   Context, ExecuteProcessRequest, ExecuteProcessRequestMetadata, FallibleExecuteProcessResult,
   MultiPlatformExecuteProcessRequest, Platform,
 };
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use bytes::Bytes;
@@ -11,15 +12,40 @@ use protobuf::Message;
 
 use boxfuture::{BoxFuture, Boxable};
 use hashing::Fingerprint;
+use parking_lot::Mutex;
 use sharded_lmdb::ShardedLmdb;
 use store::Store;
 
 #[derive(Clone)]
 pub struct CommandRunner {
-  pub underlying: Arc<dyn crate::CommandRunner>,
-  pub process_execution_store: ShardedLmdb,
-  pub file_store: Store,
-  pub metadata: ExecuteProcessRequestMetadata,
+  underlying: Arc<dyn crate::CommandRunner>,
+  process_execution_store: ShardedLmdb,
+  platform_map: Arc<Mutex<HashMap<Fingerprint, Platform>>>,
+  file_store: Store,
+  metadata: ExecuteProcessRequestMetadata,
+}
+
+impl CommandRunner {
+  pub fn new(
+    underlying: Arc<dyn crate::CommandRunner>,
+    process_execution_store: ShardedLmdb,
+    file_store: Store,
+    metadata: ExecuteProcessRequestMetadata,
+  ) -> CommandRunner {
+    CommandRunner {
+      underlying,
+      process_execution_store,
+      platform_map: Arc::new(Mutex::new(HashMap::new())),
+      file_store,
+      metadata,
+    }
+  }
+
+  #[allow(dead_code)]
+  fn do_thing(&self) {
+    let _x = &self.process_execution_store;
+    panic!("foo");
+  }
 }
 
 impl crate::CommandRunner for CommandRunner {
@@ -83,27 +109,39 @@ impl CommandRunner {
     fingerprint: Fingerprint,
     context: Context,
   ) -> impl Future<Item = Option<FallibleExecuteProcessResult>, Error = String> {
+    use bazel_protos::remote_execution::ExecuteResponse;
     let file_store = self.file_store.clone();
+
+    let platform_lookup_result = self
+      .platform_map
+      .lock()
+      .get(&fingerprint)
+      .cloned()
+      .ok_or_else(|| "Execution platform not found in store".to_string());
+
     self
       .process_execution_store
       .load_bytes_with(fingerprint, |bytes| {
-        let mut execute_response = bazel_protos::remote_execution::ExecuteResponse::new();
+        let mut execute_response = ExecuteResponse::new();
         execute_response
           .merge_from_bytes(&bytes)
           .map_err(|e| format!("Invalid ExecuteResponse: {:?}", e))?;
         Ok(execute_response)
       })
-      .and_then(move |maybe_execute_response| {
+      .and_then(move |maybe_execute_response: Option<ExecuteResponse>| {
         if let Some(execute_response) = maybe_execute_response {
-          crate::remote::populate_fallible_execution_result(
-            file_store,
-            execute_response,
-            vec![],
-            context.workunit_store,
-            Platform::Linux, //TODO lol this is definitely wrong - check maybe_execute_response!
-          )
-          .map(Some)
-          .to_boxed()
+          futures01::future::result(platform_lookup_result)
+            .and_then(|platform: Platform| {
+              crate::remote::populate_fallible_execution_result(
+                file_store,
+                execute_response,
+                vec![],
+                context.workunit_store,
+                platform,
+              )
+              .map(Some)
+            })
+            .to_boxed()
         } else {
           future::ok(None).to_boxed()
         }
@@ -129,6 +167,13 @@ impl CommandRunner {
     // TODO: Should probably have a configurable lease time which is larger than default.
     // (This isn't super urgent because we don't ever actually GC this store. So also...)
     // TODO: GC the local process execution cache.
+    //
+
+    self
+      .platform_map
+      .lock()
+      .insert(fingerprint, result.platform);
+
     self
       .file_store
       .store_file_bytes(result.stdout.clone(), true)
