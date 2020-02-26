@@ -145,7 +145,7 @@ async def hydrate_struct(address_mapper: AddressMapper, address: Address) -> Hyd
     hydrated_inline_dependencies = await MultiGet(
         Get[HydratedStruct](Address, a) for a in inline_dependencies
     )
-    dependencies = [d.value for d in hydrated_inline_dependencies]
+    dependencies = tuple(d.value for d in hydrated_inline_dependencies)
 
     def maybe_consume(outer_key, value):
         if isinstance(value, str):
@@ -182,7 +182,7 @@ async def hydrate_struct(address_mapper: AddressMapper, address: Address) -> Hyd
                     k: maybe_consume(key, v) for k, v in sorted(value.items(), key=_key_func)
                 }
             elif isinstance(value, (list, tuple)):
-                hydrated_args[key] = list(maybe_consume(key, v) for v in value)
+                hydrated_args[key] = tuple(maybe_consume(key, v) for v in value)
             else:
                 hydrated_args[key] = maybe_consume(key, value)
         return _hydrate(type(item), address.spec_path, **hydrated_args)

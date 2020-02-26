@@ -131,23 +131,23 @@ class AddressableListTest(unittest.TestCase):
     def test_none(self):
         series = self.Series(None)
 
-        self.assertEqual([], series.values)
+        self.assertEqual((), series.values)
 
     def test_values(self):
         series = self.Series([42, 1 / 137.0])
 
-        self.assertEqual([42, 1 / 137.0], series.values)
+        self.assertEqual((42, 1 / 137.0,), series.values)
 
     def test_addresses(self):
         series = self.Series(["//:meaning-of-life"])
 
-        self.assertEqual(["//:meaning-of-life"], series.values)
+        self.assertEqual(("//:meaning-of-life",), series.values)
 
     def test_resolvables(self):
         resolvable_value = CountingResolvable("//:fine-structure-constant", 1 / 137.0)
         series = self.Series([resolvable_value])
 
-        self.assertEqual([1 / 137.0], series.values)
+        self.assertEqual((1 / 137.0,), series.values)
         self.assertEqual(1, resolvable_value.resolutions)
 
         self.assertEqual(1 / 137.0, series.values[0])
@@ -159,7 +159,7 @@ class AddressableListTest(unittest.TestCase):
 
         self.assertEqual(0, resolvable_value.resolutions)
 
-        self.assertEqual([42, "//:meaning-of-life", 1 / 137.0], series.values)
+        self.assertEqual((42, "//:meaning-of-life", 1 / 137.0), series.values)
         self.assertEqual(1, resolvable_value.resolutions)
 
         self.assertEqual(1 / 137.0, series.values[2])

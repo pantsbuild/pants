@@ -661,7 +661,7 @@ async def hydrate_target(hydrated_struct: HydratedStruct) -> HydratedTarget:
     return HydratedTarget(
         address=target_adaptor.address,
         adaptor=type(target_adaptor)(**kwargs),
-        dependencies=tuple(target_adaptor.dependencies),
+        dependencies=target_adaptor.dependencies,
     )
 
 

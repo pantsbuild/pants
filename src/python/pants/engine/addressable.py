@@ -296,9 +296,9 @@ class AddressableSequence(AddressableDescriptor):
 
     def _resolve_value(self, instance, value):
         return (
-            [super(AddressableSequence, self)._resolve_value(instance, v) for v in value]
+            tuple(super(AddressableSequence, self)._resolve_value(instance, v) for v in value)
             if value
-            else []
+            else ()
         )
 
 
