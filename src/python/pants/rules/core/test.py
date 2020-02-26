@@ -198,7 +198,7 @@ async def run_tests(
 
         coverage_reports = await MultiGet(
             Get[CoverageReport](
-                CoverageDataBatch, coverage_batch_cls(tuple(addresses_and_test_results))  #type: ignore
+                CoverageDataBatch, coverage_batch_cls(tuple(addresses_and_test_results))  # type: ignore[call-arg]
             )
             for coverage_batch_cls, addresses_and_test_results in coverage_data_collections
         )

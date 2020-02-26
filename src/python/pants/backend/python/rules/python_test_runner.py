@@ -15,7 +15,6 @@ from pants.backend.python.rules.pytest_coverage import (
     get_coveragerc_input,
     get_packages_to_cover,
 )
-
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.addressable import Addresses

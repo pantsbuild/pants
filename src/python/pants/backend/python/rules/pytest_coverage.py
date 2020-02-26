@@ -51,7 +51,7 @@ from pants.source.source_root import SourceRootConfig, SourceRoots
 COVERAGE_PLUGIN_MODULE_NAME = "__coverage_coverage_plugin__"
 
 DEFAULT_COVERAGE_CONFIG = dedent(
-    f"""
+    """
     [run]
     branch = True
     timid = False
@@ -61,12 +61,10 @@ DEFAULT_COVERAGE_CONFIG = dedent(
 
 
 def get_coveragerc_input(coveragerc_content: str) -> InputFilesContent:
-    return InputFilesContent(
-        [FileContent(path=".coveragerc", content=coveragerc_content.encode()),]
-    )
+    return InputFilesContent([FileContent(path=".coveragerc", content=coveragerc_content.encode())])
 
 
-def get_coverage_plugin_input():
+def get_coverage_plugin_input() -> InputFilesContent:
     return InputFilesContent(
         FilesContent(
             (
@@ -103,22 +101,25 @@ def ensure_section(config_parser: configparser.ConfigParser, section: str) -> No
 
 
 def construct_coverage_config(
-    source_roots: SourceRoots, python_files: List[str], test_time: Optional[bool] = False,
+    source_roots: SourceRoots,
+    python_files_with_source_roots: List[str],
+    test_time: Optional[bool] = False,
 ) -> str:
     # A map from source root stripped source to its source root. eg:
     #  {'pants/testutil/subsystem/util.py': 'src/python'}
     # This is so coverage reports referencing /chroot/path/pants/testutil/subsystem/util.py can be mapped
     # back to the actual sources they reference when merging coverage reports.
-    init_files = list(identify_missing_init_files(list(python_files)))
+    init_files = identify_missing_init_files(python_files_with_source_roots)
 
-    def source_root_stripped_source_and_source_root(file_name):
+    def source_root_stripped_source_and_source_root(file_name: str) -> Tuple[str, str]:
         source_root = source_roots.find_by_path(file_name)
-        source_root_stripped_path = file_name[len(source_root.path) + 1 :]
-        return (source_root_stripped_path, source_root.path)
+        source_root_path = source_root.path if source_root is not None else ""
+        source_root_stripped_path = file_name[len(source_root_path) + 1 :]
+        return (source_root_stripped_path, source_root_path)
 
     source_to_target_base = dict(
         source_root_stripped_source_and_source_root(filename)
-        for filename in sorted(python_files) + init_files
+        for filename in sorted([*python_files_with_source_roots, *init_files])
     )
     config_parser = configparser.ConfigParser()
     config_parser.read_file(StringIO(DEFAULT_COVERAGE_CONFIG))
@@ -168,7 +169,7 @@ class CoverageSetup:
 
 
 @rule
-async def setup_coverage(coverage: PytestCoverage,) -> CoverageSetup:
+async def setup_coverage(coverage: PytestCoverage) -> CoverageSetup:
     plugin_file_digest = await Get[Digest](InputFilesContent, get_coverage_plugin_input())
     output_pex_filename = "coverage.pex"
     requirements_pex = await Get[Pex](
