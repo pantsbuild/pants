@@ -1,8 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from twitter.common.collections import OrderedSet
-
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -13,6 +11,7 @@ from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.java.jar.exclude import Exclude
 from pants.util.memo import memoized_property
+from pants.util.ordered_set import OrderedSet
 
 
 class JvmTarget(Target, Jarable):

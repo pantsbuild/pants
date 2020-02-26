@@ -5,10 +5,10 @@ import importlib
 import traceback
 
 from pkg_resources import Requirement
-from twitter.common.collections import OrderedSet
 
 from pants.base.exceptions import BackendConfigurationError
 from pants.build_graph.build_configuration import BuildConfiguration
+from pants.util.ordered_set import FrozenOrderedSet
 
 
 class PluginLoadingError(Exception):
@@ -115,11 +115,11 @@ def load_build_configuration_from_source(build_configuration, backends1, backend
       the build configuration.
     """
     # pants.build_graph and pants.core_task must always be loaded, and before any other backends.
-    backend_packages1 = OrderedSet(["pants.build_graph", "pants.core_tasks", *backends1])
+    backend_packages1 = FrozenOrderedSet(["pants.build_graph", "pants.core_tasks", *backends1])
     for backend_package in backend_packages1:
         load_backend(build_configuration, backend_package, is_v1_backend=True)
 
-    backend_packages2 = OrderedSet(["pants.rules.core", *backends2])
+    backend_packages2 = FrozenOrderedSet(["pants.rules.core", *backends2])
     for backend_package in backend_packages2:
         load_backend(build_configuration, backend_package, is_v1_backend=False)
 

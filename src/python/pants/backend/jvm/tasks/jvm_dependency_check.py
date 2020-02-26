@@ -4,8 +4,6 @@
 import os
 from collections import defaultdict
 
-from twitter.common.collections import OrderedSet
-
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
@@ -18,6 +16,7 @@ from pants.build_graph.target_scopes import Scopes
 from pants.java.distribution.distribution import DistributionLocator
 from pants.task.task import Task
 from pants.util.memo import memoized_property
+from pants.util.ordered_set import OrderedSet
 
 
 class JvmDependencyCheck(Task):

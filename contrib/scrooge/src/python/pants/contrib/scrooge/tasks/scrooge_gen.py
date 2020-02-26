@@ -16,7 +16,7 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.dirutil import safe_mkdir, safe_open
 from pants.util.memo import memoized_method, memoized_property
-from twitter.common.collections import OrderedSet
+from pants.util.ordered_set import OrderedSet
 
 from pants.contrib.scrooge.tasks.java_thrift_library_fingerprint_strategy import (
     JavaThriftLibraryFingerprintStrategy,

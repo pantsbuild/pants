@@ -4,15 +4,21 @@
 import logging
 from typing import Iterable, Optional
 
-from twitter.common.collections import OrderedSet
-
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
-from pants.base.specs import AddressSpec, AddressSpecs, FilesystemSpecs, SingleAddress, Specs
+from pants.base.specs import (
+    AddressSpec,
+    AddressSpecs,
+    FilesystemSpec,
+    FilesystemSpecs,
+    SingleAddress,
+    Specs,
+)
 from pants.engine.legacy.graph import Owners, OwnersRequest
 from pants.engine.scheduler import SchedulerSession
 from pants.option.options import Options
 from pants.scm.subsystems.changed import ChangedAddresses, ChangedOptions, ChangedRequest
+from pants.util.ordered_set import OrderedSet
 
 logger = logging.getLogger(__name__)
 
@@ -36,8 +42,8 @@ class SpecsCalculator:
         build_root = build_root or get_buildroot()
         spec_parser = CmdLineSpecParser(build_root)
 
-        address_specs: OrderedSet = OrderedSet()
-        filesystem_specs: OrderedSet = OrderedSet()
+        address_specs: OrderedSet[AddressSpec] = OrderedSet()
+        filesystem_specs: OrderedSet[FilesystemSpec] = OrderedSet()
         for spec_str in raw_specs:
             parsed_spec = spec_parser.parse_spec(spec_str)
             if isinstance(parsed_spec, AddressSpec):

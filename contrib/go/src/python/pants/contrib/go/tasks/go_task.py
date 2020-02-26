@@ -9,7 +9,7 @@ from collections import namedtuple
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.task.task import Task
 from pants.util.memo import memoized_method, memoized_property
-from twitter.common.collections.orderedset import OrderedSet
+from pants.util.ordered_set import OrderedSet
 
 from pants.contrib.go.subsystems.go_distribution import GoDistribution
 from pants.contrib.go.targets.go_binary import GoBinary

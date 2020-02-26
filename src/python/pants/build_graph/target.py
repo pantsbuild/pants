@@ -7,8 +7,6 @@ import weakref
 from hashlib import sha1
 from typing import Optional, Sequence, Union
 
-from twitter.common.collections import OrderedSet
-
 from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import warn_or_error
 from pants.base.exceptions import TargetDefinitionException
@@ -26,6 +24,7 @@ from pants.source.payload_fields import SourcesField
 from pants.source.wrapped_globs import FilesetWithSpec
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
+from pants.util.ordered_set import OrderedSet
 
 logger = logging.getLogger(__name__)
 

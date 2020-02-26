@@ -4,12 +4,11 @@
 import os
 from collections import OrderedDict, namedtuple
 
-from twitter.common.collections.orderedset import OrderedSet
-
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.engine.legacy_engine import Engine
 from pants.engine.round_manager import RoundManager
+from pants.util.ordered_set import FrozenOrderedSet
 
 
 class GoalExecutor:
@@ -217,7 +216,7 @@ class RoundEngine(Engine):
 
     def sort_goals(self, context, goals):
         goal_info_by_goal = OrderedDict()
-        for goal in reversed(OrderedSet(goals)):
+        for goal in reversed(FrozenOrderedSet(goals)):
             self._visit_goal(goal, context, goal_info_by_goal)
 
         return list(reversed(list(self._topological_sort(goal_info_by_goal))))

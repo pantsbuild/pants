@@ -7,8 +7,6 @@ import xml.etree.ElementTree as ET
 from collections import namedtuple
 from textwrap import dedent
 
-from twitter.common.collections import OrderedSet
-
 from pants.backend.jvm.ivy_utils import (
     FrozenResolution,
     IvyFetchStep,
@@ -32,6 +30,7 @@ from pants.java.jar.jar_dependency_utils import M2Coordinate
 from pants.testutil.subsystem.util import init_subsystem
 from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir, temporary_file, temporary_file_path
+from pants.util.ordered_set import OrderedSet
 
 
 def coord(org, name, classifier=None, rev=None, ext=None):

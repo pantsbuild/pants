@@ -5,8 +5,6 @@ import glob
 import os
 from contextlib import contextmanager
 
-from twitter.common.collections import OrderedSet
-
 from pants.backend.jvm.ivy_utils import IvyInfo, IvyModule, IvyModuleRef, IvyResolveResult
 from pants.backend.jvm.subsystems.jar_dependency_management import (
     JarDependencyManagement,
@@ -140,9 +138,7 @@ class IvyResolveTest(NailgunTaskTestBase):
         winning_cp = compile_classpath.get_for_target(winning_lib)
         self.assertEqual(losing_cp, winning_cp)
         self.assertEqual(
-            OrderedSet(
-                [("default", artifact_path("bogus0")), ("default", artifact_path("bogus1"))]
-            ),
+            [("default", artifact_path("bogus0")), ("default", artifact_path("bogus1"))],
             winning_cp,
         )
 

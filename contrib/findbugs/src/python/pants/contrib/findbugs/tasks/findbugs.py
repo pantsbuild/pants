@@ -16,8 +16,8 @@ from pants.java.jar.jar_dependency import JarDependency
 from pants.option.custom_types import file_option
 from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
+from pants.util.ordered_set import OrderedSet
 from pants.util.xml_parser import XmlParser
-from twitter.common.collections import OrderedSet
 
 
 class FindBugs(NailgunTask):

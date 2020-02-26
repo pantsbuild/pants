@@ -5,8 +5,6 @@ import json
 import os
 from collections import defaultdict
 
-from twitter.common.collections import OrderedSet
-
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.resolve_subsystem import JvmResolveSubsystem
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
@@ -36,6 +34,7 @@ from pants.java.executor import SubprocessExecutor
 from pants.java.jar.jar_dependency_utils import M2Coordinate
 from pants.task.console_task import ConsoleTask
 from pants.util.memo import memoized_property
+from pants.util.ordered_set import OrderedSet
 
 
 class SourceRootTypes:

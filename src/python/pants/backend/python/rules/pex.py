@@ -55,7 +55,7 @@ class PexInterpreterConstraints:
 
     @classmethod
     def create_from_adaptors(
-        cls, adaptors: Iterable[PythonTargetAdaptor], python_setup: PythonSetup
+        cls, adaptors: Iterable[TargetAdaptor], python_setup: PythonSetup
     ) -> "PexInterpreterConstraints":
         interpreter_constraints = {
             constraint
@@ -63,6 +63,7 @@ class PexInterpreterConstraints:
             for constraint in python_setup.compatibility_or_constraints(
                 getattr(target_adaptor, "compatibility", None)
             )
+            if isinstance(target_adaptor, PythonTargetAdaptor)
         }
         return PexInterpreterConstraints(constraint_set=tuple(sorted(interpreter_constraints)))
 

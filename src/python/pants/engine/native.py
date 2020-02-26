@@ -14,7 +14,6 @@ from typing import Any, Iterable, NamedTuple, Tuple, Type, cast
 
 import cffi
 import pkg_resources
-from twitter.common.collections.orderedset import OrderedSet
 
 from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
@@ -44,6 +43,7 @@ from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import read_file, safe_mkdir, safe_mkdtemp
 from pants.util.memo import memoized_classproperty, memoized_property
 from pants.util.meta import SingletonMetaclass
+from pants.util.ordered_set import FrozenOrderedSet
 
 logger = logging.getLogger(__name__)
 
@@ -400,7 +400,7 @@ class _FFISpecification(object):
         """Given storage and an array of Handles, return a new Handle to represent the set."""
         c = self._ffi.from_handle(context_handle)
         return c.to_value(
-            OrderedSet(c.from_value(val[0]) for val in self._ffi.unpack(vals_ptr, vals_len))
+            FrozenOrderedSet(c.from_value(val[0]) for val in self._ffi.unpack(vals_ptr, vals_len))
         )
 
     @_extern_decl("Handle", ["ExternContext*", "Handle**", "uint64_t"])
