@@ -153,7 +153,6 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
     self.make_target(
       'project_info:first',
       target_type=JvmTarget,
-      sources=['a.scala']
     )
 
     jar_lib = self.make_target(
@@ -225,7 +224,6 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
       'project_info:top_dependency',
       target_type=JvmTarget,
       dependencies=[jvm_binary],
-      sources=['x.scala'],
     )
 
     self.create_file('project_info/a_resource', contents='a')
@@ -241,7 +239,7 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
         'project_info:target_type',
         target_type=ScalaLibrary,
         dependencies=[jvm_binary, src_resource],
-        sources=['x.scala'],
+        sources=[],
     )
 
     self.make_target(
@@ -253,7 +251,7 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
       'project_info:scala_with_source_dep',
       target_type=ScalaLibrary,
       dependencies=[self.jvm_target_with_sources],
-      sources=['x.scala'],
+      sources=[],
     )
 
     self.linear_build_graph = self.make_linear_graph(['a', 'b', 'c', 'd', 'e'], target_type=ScalaLibrary)
