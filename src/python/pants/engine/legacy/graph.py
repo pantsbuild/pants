@@ -50,7 +50,7 @@ from pants.option.global_options import (
 )
 from pants.source.filespec import any_matches_filespec
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper, Filespec
-from pants.util.ordered_set import OrderedSet
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 logger = logging.getLogger(__name__)
 
@@ -396,7 +396,7 @@ class TransitiveHydratedTargets:
     """A set of HydratedTarget roots, and their transitive, flattened, de-duped closure."""
 
     roots: Tuple[HydratedTarget, ...]
-    closure: OrderedSet  # TODO: this is an OrderedSet[HydratedTarget]
+    closure: FrozenOrderedSet[HydratedTarget]
 
 
 @dataclass(frozen=True)
@@ -419,7 +419,7 @@ class LegacyHydratedTarget:
 @dataclass(frozen=True)
 class LegacyTransitiveHydratedTargets:
     roots: Tuple[LegacyHydratedTarget, ...]
-    closure: OrderedSet  # TODO: this is an OrderedSet[LegacyHydratedTarget]
+    closure: FrozenOrderedSet[LegacyHydratedTarget]
 
 
 # TODO(#7490): Remove this once we have multiple params support so that rules can do something
@@ -516,8 +516,8 @@ class Owners:
 
 @rule
 async def find_owners(owners_request: OwnersRequest) -> Owners:
-    sources_set = OrderedSet(owners_request.sources)
-    dirs_set = OrderedSet(os.path.dirname(source) for source in sources_set)
+    sources_set = FrozenOrderedSet(owners_request.sources)
+    dirs_set = FrozenOrderedSet(os.path.dirname(source) for source in sources_set)
 
     # Walk up the buildroot looking for targets that would conceivably claim changed sources.
     candidate_specs = tuple(AscendantAddresses(directory=d) for d in dirs_set)
@@ -575,7 +575,7 @@ async def transitive_hydrated_targets(addresses: Addresses) -> TransitiveHydrate
         to_visit.extend(tht.dependencies)
 
     return TransitiveHydratedTargets(
-        tuple(tht.root for tht in transitive_hydrated_targets), closure
+        tuple(tht.root for tht in transitive_hydrated_targets), FrozenOrderedSet(closure)
     )
 
 
@@ -595,7 +595,7 @@ async def legacy_transitive_hydrated_targets(
             LegacyHydratedTarget.from_hydrated_target(ht, bfa)
             for ht, bfa in zip(thts.roots, roots_bfas)
         ),
-        closure=OrderedSet(
+        closure=FrozenOrderedSet(
             LegacyHydratedTarget.from_hydrated_target(ht, bfa)
             for ht, bfa in zip(thts.closure, closure_bfas)
         ),
