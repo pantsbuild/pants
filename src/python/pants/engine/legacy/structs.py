@@ -30,6 +30,12 @@ class TargetAdaptor(StructWithDeps):
     Extends StructWithDeps to add a `dependencies` field marked Addressable.
     """
 
+    # NB: This overridden `__init__()` is weird. We solely have it so that MyPy can infer
+    # `TargetAdaptor.dependencies` as `Tuple[Address, ...]`.
+    def __init__(self, dependencies=None, **kwargs) -> None:
+        super().__init__(dependencies, **kwargs)
+        self.dependencies: Tuple[Address, ...]
+
     @property
     def address(self) -> Address:
         # TODO: this isn't actually safe to override as not being Optional. There are
