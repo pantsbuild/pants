@@ -386,7 +386,8 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
                           'project_info/this/is/a/source/Bar.scala']},
       'libraries': sorted([
         'org.apache:apache-jar:12.12.2012',
-        'org.scala-lang:scala-library:2.10.5'
+        'org.scala-lang:scala-library:2.10.5',
+        'project_info.jvm_target_b',
       ]),
       'id': 'project_info.jvm_target',
       # 'is_code_gen': False,
