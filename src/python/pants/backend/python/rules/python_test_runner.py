@@ -1,6 +1,7 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import itertools
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
@@ -8,12 +9,13 @@ from pants.backend.python.rules.pex import Pex
 from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
 from pants.backend.python.rules.prepare_chrooted_python_sources import ChrootedPythonSources
 from pants.backend.python.rules.pytest_coverage import (
-    DEFAULT_COVERAGE_CONFIG,
     PytestCoverageData,
+    construct_coverage_config,
     get_coverage_plugin_input,
     get_coveragerc_input,
     get_packages_to_cover,
 )
+
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.addressable import Addresses
@@ -28,6 +30,7 @@ from pants.option.global_options import GlobalOptions
 from pants.python.python_setup import PythonSetup
 from pants.rules.core.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.rules.core.test import TestDebugRequest, TestOptions, TestResult, TestTarget
+from pants.source.source_root import SourceRootConfig
 
 
 def calculate_timeout_seconds(
@@ -65,7 +68,10 @@ class TestTargetSetup:
 
 @rule
 async def setup_pytest_for_target(
-    adaptor_with_origin: PythonTestsAdaptorWithOrigin, pytest: PyTest, test_options: TestOptions,
+    adaptor_with_origin: PythonTestsAdaptorWithOrigin,
+    pytest: PyTest,
+    test_options: TestOptions,
+    source_root_config: SourceRootConfig,
 ) -> TestTargetSetup:
     adaptor = adaptor_with_origin.adaptor
     # TODO: Rather than consuming the TestOptions subsystem, the TestRunner should pass on coverage
@@ -107,23 +113,37 @@ async def setup_pytest_for_target(
     specified_source_file_names = specified_source_files.snapshot.files
 
     coverage_args = []
+
     if test_options.values.run_coverage:
+        # TODO(#4535) We need a better way to do this kind of check that covers synthetic targets and rules extensibility.
+        python_targets = [
+            target
+            for target in all_targets
+            if target.adaptor.type_alias in ("python_library", "python_tests")
+        ]
+        sources = itertools.chain.from_iterable(
+            target.adaptor.sources.snapshot.files for target in python_targets
+        )
         coveragerc_digest = await Get[Digest](
-            InputFilesContent, get_coveragerc_input(DEFAULT_COVERAGE_CONFIG)
+            InputFilesContent,
+            get_coveragerc_input(
+                construct_coverage_config(
+                    source_root_config.get_source_roots(), list(sources), test_time=True,
+                )
+            ),
         )
         directories_to_merge.append(coveragerc_digest)
         packages_to_cover = get_packages_to_cover(
-            target=adaptor, source_root_stripped_file_paths=test_file_names,
+            target=adaptor, source_root_stripped_file_paths=specified_source_file_names,
         )
         coverage_args = [
             "--cov-report=",  # To not generate any output. https://pytest-cov.readthedocs.io/en/latest/config.html
         ]
         for package in packages_to_cover:
             coverage_args.extend(["--cov", package])
-
-    merged_input_files = await Get[Digest](
-        DirectoriesToMerge(directories=tuple(directories_to_merge))
-    )
+        merged_input_files = await Get[Digest](
+            DirectoriesToMerge(directories=tuple(directories_to_merge))
+        )
 
     timeout_seconds = calculate_timeout_seconds(
         timeouts_enabled=pytest.options.timeouts,
@@ -167,11 +187,12 @@ async def run_python_test(
         env=env,
     )
     result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, request)
-    coverage_data = PytestCoverageData(result.output_directory_digest) if test_options.values.run_coverage else None
-    return TestResult.from_fallible_execute_process_result(
-        result,
-        coverage_data=coverage_data
+    coverage_data = (
+        PytestCoverageData(result.output_directory_digest)
+        if test_options.values.run_coverage
+        else None
     )
+    return TestResult.from_fallible_execute_process_result(result, coverage_data=coverage_data)
 
 
 @rule(name="Run pytest in an interactive process")

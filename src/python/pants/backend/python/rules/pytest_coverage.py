@@ -8,7 +8,6 @@ import os
 from dataclasses import dataclass
 from enum import Enum
 from io import StringIO
-from pathlib import PurePath
 from textwrap import dedent
 from typing import List, Optional, Tuple, Type
 
@@ -24,26 +23,20 @@ from pants.backend.python.rules.pex import (
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
-from pants.build_graph.address import Address
 from pants.engine.addressable import BuildFileAddresses
-from pants.engine.console import Console
 from pants.engine.fs import (
-    EMPTY_DIRECTORY_DIGEST,
     Digest,
     DirectoriesToMerge,
-    DirectoryToMaterialize,
     DirectoryWithPrefixToAdd,
     FileContent,
     FilesContent,
     InputFilesContent,
     Snapshot,
-    Workspace,
 )
-from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
 from pants.engine.legacy.graph import TransitiveHydratedTargets
 from pants.engine.legacy.structs import PythonTestsAdaptor
-from pants.engine.rules import UnionRule, goal_rule, rule, subsystem_rule, RootRule
+from pants.engine.rules import RootRule, UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.python.pex_build_util import identify_missing_init_files
 from pants.rules.core.distdir import DistDir
@@ -215,17 +208,15 @@ async def merge_coverage_reports(
     coveragerc_digest = await Get[Digest](
         InputFilesContent, get_coveragerc_input(DEFAULT_COVERAGE_CONFIG)
     )
-
     coverage_directory_digests = await MultiGet(
         Get[Digest](
             DirectoryWithPrefixToAdd(
-                directory_digest=result.test_result._python_sqlite_coverage_file,
-                prefix=result.address.to_address().path_safe_spec,
+                directory_digest=result.test_result.coverage_data.digest,  # type: ignore[attr-defined]
+                prefix=result.address.path_safe_spec,
             )
         )
         for result in data_batch.addresses_and_test_results
-        if result.test_result is not None
-        and result.test_result.coverage_data is not None
+        if result.test_result is not None and result.test_result.coverage_data is not None
     )
     sources_snapshot = await Get[Snapshot](
         DirectoriesToMerge(
@@ -252,7 +243,8 @@ async def merge_coverage_reports(
     )
 
     prefixes = [
-        f"{result.address.to_address().path_safe_spec}/.coverage" for result in test_results
+        f"{result.address.path_safe_spec}/.coverage"
+        for result in data_batch.addresses_and_test_results
     ]
     coverage_args = ["combine", *prefixes]
     request = coverage_setup.requirements_pex.create_execute_request(
@@ -268,6 +260,7 @@ async def merge_coverage_reports(
     result = await Get[ExecuteProcessResult](ExecuteProcessRequest, request)
     return MergedCoverageData(coverage_data=result.output_directory_digest)
 
+
 @dataclass(frozen=True)
 class PytestCoverageData(CoverageData):
     digest: Digest
@@ -275,14 +268,6 @@ class PytestCoverageData(CoverageData):
     @property
     def batch_cls(self) -> Type["PytestCoverageDataBatch"]:
         return PytestCoverageDataBatch
-
-
-
-
-@dataclass(frozen=True)
-class PytestCoverageReport:
-    report_directory_digest: Digest
-    directory_to_materialize_to: PurePath
 
 
 @rule(name="Generate coverage report")
@@ -295,15 +280,14 @@ async def generate_coverage_report(
     coverage_toolbase: PytestCoverage,
     source_root_config: SourceRootConfig,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
-) -> PytestCoverageReport:
+) -> CoverageReport:
     """Takes all python test results and generates a single coverage report."""
     requirements_pex = coverage_setup.requirements_pex
     # TODO(#4535) We need a better way to do this kind of check that covers synthetic targets and rules extensibility.
     python_targets = [
         target
         for target in transitive_targets.closure
-        if target.adaptor.type_alias == "python_library"
-        or target.adaptor.type_alias == "python_tests"
+        if target.adaptor.type_alias in ("python_library", "python_tests")
     ]
 
     source_roots = source_root_config.get_source_roots()
@@ -353,15 +337,17 @@ async def generate_coverage_report(
     )
 
     result = await Get[ExecuteProcessResult](ExecuteProcessRequest, request)
-    return PytestCoverageReport(
+    return CoverageReport(
         result.output_directory_digest, coverage_toolbase.options.report_output_path
     )
-
 
 
 def rules():
     return [
         RootRule(PytestCoverageDataBatch),
         generate_coverage_report,
-        UnionRule(CoverageDataBatch, PytestCoverageDataBatch)
+        merge_coverage_reports,
+        subsystem_rule(PytestCoverage),
+        setup_coverage,
+        UnionRule(CoverageDataBatch, PytestCoverageDataBatch),
     ]
