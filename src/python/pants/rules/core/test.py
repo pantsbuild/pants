@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import Optional, Tuple, Type
+from typing import Optional, Type
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import FilesystemLiteralSpec, SingleAddress
@@ -121,9 +121,7 @@ class AddressAndDebugRequest:
 
 @union
 class CoverageDataBatch(ABC):
-    @abstractmethod
-    def __init__(self, addresses_and_test_results: Tuple[AddressAndTestResult, ...]) -> None:
-        """Subclasses should accept this in their constructor."""
+    pass
 
 
 @dataclass(frozen=True)
@@ -200,14 +198,14 @@ async def run_tests(
 
         coverage_reports = await MultiGet(
             Get[CoverageReport](
-                CoverageDataBatch, coverage_batch_cls(tuple(addresses_and_test_results))
+                CoverageDataBatch, coverage_batch_cls(tuple(addresses_and_test_results))  #type: ignore
             )
             for coverage_batch_cls, addresses_and_test_results in coverage_data_collections
         )
         for report in coverage_reports:
             workspace.materialize_directory(
                 DirectoryToMaterialize(
-                    report.result_digest, path_prefix=report.directory_to_materialize_to.as_posix(),
+                    report.result_digest, path_prefix=str(report.directory_to_materialize_to),
                 )
             )
             console.print_stdout(f"Wrote coverage report to `{report.directory_to_materialize_to}`")
