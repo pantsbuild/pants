@@ -193,7 +193,12 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
     self.jvm_target_with_sources = self.make_target(
       'project_info:jvm_target',
       target_type=ScalaLibrary,
-      dependencies=[jar_lib],
+      dependencies=[jar_lib, self.make_target(
+        'project_info:jvm_target_b',
+        target_type=ScalaLibrary,
+        dependencies=[],
+        sources=[]
+      )],
       sources=['this/is/a/source/Foo.scala', 'this/is/a/source/Bar.scala'],
     )
 
@@ -263,13 +268,12 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
     return runtime_classpath
 
   def execute_export(self, *specs, **options_overrides):
-
     options = {
       ScalaPlatform.options_scope: {
         'version': 'custom'
       },
       JvmResolveSubsystem.options_scope: {
-        'resolver': 'coursier'
+        'resolver': 'ivy'
       },
       JvmPlatform.options_scope: {
         'default_platform': 'java8',
@@ -295,11 +299,9 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
 
     # This simulates ZincCompile creates the product.
     zinc_compile_task = ZincCompile(context, self.pants_workdir)
-    x = context.products.get_data('jvm_modulizable_targets',
+    context.products.get_data('jvm_modulizable_targets',
       init_func=zinc_compile_task.calculate_jvm_modulizable_targets)
 
-    # import pdb
-    # pdb.set_trace()
     bootstrap_task = BootstrapJvmTools(context, self.pants_workdir)
     bootstrap_task.execute()
     task = self.create_task(context)
@@ -561,7 +563,7 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
     )
 
   def test_includes_targets_between_roots(self):
-    result = self.execute_export_json('project_info:scala_with_source_dep', 'project_info:jar_lib')
+    result = self.execute_export_json('project_info:scala_with_source_dep', 'project_info:jvm_target_b')
     self.assertIn(
       'project_info:jvm_target',
       result['targets'].keys()
