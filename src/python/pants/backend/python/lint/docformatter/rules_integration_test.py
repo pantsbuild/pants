@@ -3,7 +3,7 @@
 
 from typing import List, Optional, Tuple
 
-from pants.backend.python.lint.docformatter.rules import DocformatterTarget
+from pants.backend.python.lint.docformatter.rules import DocformatterTargets
 from pants.backend.python.lint.docformatter.rules import rules as docformatter_rules
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.address import Address
@@ -26,7 +26,7 @@ class DocformatterIntegrationTest(TestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *docformatter_rules(), RootRule(DocformatterTarget))
+        return (*super().rules(), *docformatter_rules(), RootRule(DocformatterTargets))
 
     def run_docformatter(
         self,
@@ -51,12 +51,12 @@ class DocformatterIntegrationTest(TestBase):
         adaptor_with_origin = TargetAdaptorWithOrigin(adaptor, origin)
         options_bootstrapper = create_options_bootstrapper(args=args)
         lint_result = self.request_single_product(
-            LintResult, Params(DocformatterTarget(adaptor_with_origin), options_bootstrapper)
+            LintResult, Params(DocformatterTargets((adaptor_with_origin,)), options_bootstrapper)
         )
         fmt_result = self.request_single_product(
             FmtResult,
             Params(
-                DocformatterTarget(adaptor_with_origin, prior_formatter_result=input_snapshot),
+                DocformatterTargets((adaptor_with_origin,), prior_formatter_result=input_snapshot),
                 options_bootstrapper,
             ),
         )

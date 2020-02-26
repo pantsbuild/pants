@@ -40,14 +40,14 @@ from pants.rules.core.lint import LintResult
 
 
 @dataclass(frozen=True)
-class BlackTarget:
-    adaptor_with_origin: TargetAdaptorWithOrigin
+class BlackTargets:
+    adaptors_with_origins: Tuple[TargetAdaptorWithOrigin, ...]
     prior_formatter_result: Optional[Snapshot] = None  # unused by `lint`
 
 
 @dataclass(frozen=True)
 class SetupRequest:
-    target: BlackTarget
+    targets: BlackTargets
     check_only: bool
 
 
@@ -83,8 +83,7 @@ async def setup(
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> Setup:
-    adaptor_with_origin = request.target.adaptor_with_origin
-    adaptor = adaptor_with_origin.adaptor
+    adaptors_with_origins = request.targets.adaptors_with_origins
 
     requirements_pex = await Get[Pex](
         CreatePex(
@@ -106,14 +105,18 @@ async def setup(
         )
     )
 
-    if request.target.prior_formatter_result is None:
-        all_source_files = await Get[SourceFiles](AllSourceFilesRequest([adaptor]))
+    if request.targets.prior_formatter_result is None:
+        all_source_files = await Get[SourceFiles](
+            AllSourceFilesRequest(
+                adaptor_with_origin.adaptor for adaptor_with_origin in adaptors_with_origins
+            )
+        )
         all_source_files_snapshot = all_source_files.snapshot
     else:
-        all_source_files_snapshot = request.target.prior_formatter_result
+        all_source_files_snapshot = request.targets.prior_formatter_result
 
     specified_source_files = await Get[SourceFiles](
-        SpecifiedSourceFilesRequest([adaptor_with_origin])
+        SpecifiedSourceFilesRequest(adaptors_with_origins)
     )
 
     merged_input_files = await Get[Digest](
@@ -124,6 +127,13 @@ async def setup(
                 config_snapshot.directory_digest,
             )
         ),
+    )
+
+    address_references = ", ".join(
+        sorted(
+            adaptor_with_origin.adaptor.address.reference()
+            for adaptor_with_origin in adaptors_with_origins
+        )
     )
 
     process_request = requirements_pex.create_execute_request(
@@ -137,25 +147,25 @@ async def setup(
         ),
         input_files=merged_input_files,
         output_files=all_source_files_snapshot.files,
-        description=f"Run black for {adaptor.address.reference()}",
+        description=f"Run black for {address_references}",
     )
     return Setup(process_request)
 
 
 @rule(name="Format using Black")
-async def fmt(black_target: BlackTarget, black: Black) -> FmtResult:
+async def fmt(targets: BlackTargets, black: Black) -> FmtResult:
     if black.options.skip:
         return FmtResult.noop()
-    setup = await Get[Setup](SetupRequest(black_target, check_only=False))
+    setup = await Get[Setup](SetupRequest(targets, check_only=False))
     result = await Get[ExecuteProcessResult](ExecuteProcessRequest, setup.process_request)
     return FmtResult.from_execute_process_result(result)
 
 
 @rule(name="Lint using Black")
-async def lint(black_target: BlackTarget, black: Black) -> LintResult:
+async def lint(targets: BlackTargets, black: Black) -> LintResult:
     if black.options.skip:
         return LintResult.noop()
-    setup = await Get[Setup](SetupRequest(black_target, check_only=True))
+    setup = await Get[Setup](SetupRequest(targets, check_only=True))
     result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, setup.process_request)
     return LintResult.from_fallible_execute_process_result(result)
 
@@ -166,8 +176,8 @@ def rules():
         fmt,
         lint,
         subsystem_rule(Black),
-        UnionRule(PythonFormatTarget, BlackTarget),
-        UnionRule(PythonLintTarget, BlackTarget),
+        UnionRule(PythonFormatTarget, BlackTargets),
+        UnionRule(PythonLintTarget, BlackTargets),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),
         *pex.rules(),

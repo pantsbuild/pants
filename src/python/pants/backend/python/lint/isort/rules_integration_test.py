@@ -3,7 +3,7 @@
 
 from typing import List, Optional, Tuple
 
-from pants.backend.python.lint.isort.rules import IsortTarget
+from pants.backend.python.lint.isort.rules import IsortTargets
 from pants.backend.python.lint.isort.rules import rules as isort_rules
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.address import Address
@@ -36,7 +36,7 @@ class IsortIntegrationTest(TestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *isort_rules(), RootRule(IsortTarget))
+        return (*super().rules(), *isort_rules(), RootRule(IsortTargets))
 
     def run_isort(
         self,
@@ -65,12 +65,12 @@ class IsortIntegrationTest(TestBase):
         adaptor_with_origin = TargetAdaptorWithOrigin(adaptor, origin)
         options_bootstrapper = create_options_bootstrapper(args=args)
         lint_result = self.request_single_product(
-            LintResult, Params(IsortTarget(adaptor_with_origin), options_bootstrapper)
+            LintResult, Params(IsortTargets((adaptor_with_origin,)), options_bootstrapper)
         )
         fmt_result = self.request_single_product(
             FmtResult,
             Params(
-                IsortTarget(adaptor_with_origin, prior_formatter_result=input_snapshot),
+                IsortTargets((adaptor_with_origin,), prior_formatter_result=input_snapshot),
                 options_bootstrapper,
             ),
         )

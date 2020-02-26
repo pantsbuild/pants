@@ -5,7 +5,7 @@ from typing import List, Optional
 
 import pytest
 
-from pants.backend.python.lint.bandit.rules import BanditTarget
+from pants.backend.python.lint.bandit.rules import BanditTargets
 from pants.backend.python.lint.bandit.rules import rules as bandit_rules
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
@@ -33,7 +33,7 @@ class BanditIntegrationTest(TestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *bandit_rules(), RootRule(BanditTarget))
+        return (*super().rules(), *bandit_rules(), RootRule(BanditTargets))
 
     def run_bandit(
         self,
@@ -62,7 +62,7 @@ class BanditIntegrationTest(TestBase):
         )
         if origin is None:
             origin = SingleAddress(directory="test", name="target")
-        target = BanditTarget(PythonTargetAdaptorWithOrigin(adaptor, origin))
+        target = BanditTargets((PythonTargetAdaptorWithOrigin(adaptor, origin),))
         return self.request_single_product(
             LintResult, Params(target, create_options_bootstrapper(args=args)),
         )

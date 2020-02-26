@@ -7,7 +7,7 @@ from typing import List, Optional
 
 import pytest
 
-from pants.backend.python.lint.pylint.rules import PylintTarget
+from pants.backend.python.lint.pylint.rules import PylintTargets
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.specs import OriginSpec, SingleAddress
@@ -46,7 +46,7 @@ class PylintIntegrationTest(TestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *pylint_rules(), RootRule(PylintTarget))
+        return (*super().rules(), *pylint_rules(), RootRule(PylintTargets))
 
     def run_pylint(
         self,
@@ -75,7 +75,7 @@ class PylintIntegrationTest(TestBase):
         )
         if origin is None:
             origin = SingleAddress(directory="test", name="target")
-        target = PylintTarget(PythonTargetAdaptorWithOrigin(adaptor, origin))
+        target = PylintTargets((PythonTargetAdaptorWithOrigin(adaptor, origin),))
         return self.request_single_product(
             LintResult, Params(target, create_options_bootstrapper(args=args)),
         )

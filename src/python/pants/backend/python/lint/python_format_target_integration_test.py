@@ -3,9 +3,9 @@
 
 from typing import List, Optional
 
-from pants.backend.python.lint.black.rules import BlackTarget
+from pants.backend.python.lint.black.rules import BlackTargets
 from pants.backend.python.lint.black.rules import rules as black_rules
-from pants.backend.python.lint.isort.rules import IsortTarget
+from pants.backend.python.lint.isort.rules import IsortTargets
 from pants.backend.python.lint.isort.rules import rules as isort_rules
 from pants.backend.python.lint.python_format_target import (
     _ConcretePythonFormatTarget,
@@ -32,8 +32,8 @@ class PythonFormatTargetIntegrationTest(TestBase):
             *black_rules(),
             *isort_rules(),
             RootRule(_ConcretePythonFormatTarget),
-            RootRule(BlackTarget),
-            RootRule(IsortTarget),
+            RootRule(BlackTargets),
+            RootRule(IsortTargets),
         )
 
     def run_black_and_isort(

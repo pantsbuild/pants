@@ -5,7 +5,7 @@ from typing import List, Optional
 
 import pytest
 
-from pants.backend.python.lint.flake8.rules import Flake8Target
+from pants.backend.python.lint.flake8.rules import Flake8Targets
 from pants.backend.python.lint.flake8.rules import rules as flake8_rules
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
@@ -34,7 +34,7 @@ class Flake8IntegrationTest(TestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *flake8_rules(), RootRule(Flake8Target))
+        return (*super().rules(), *flake8_rules(), RootRule(Flake8Targets))
 
     def run_flake8(
         self,
@@ -63,7 +63,7 @@ class Flake8IntegrationTest(TestBase):
         )
         if origin is None:
             origin = SingleAddress(directory="test", name="target")
-        target = Flake8Target(PythonTargetAdaptorWithOrigin(adaptor, origin))
+        target = Flake8Targets((PythonTargetAdaptorWithOrigin(adaptor, origin),))
         return self.request_single_product(
             LintResult, Params(target, create_options_bootstrapper(args=args)),
         )

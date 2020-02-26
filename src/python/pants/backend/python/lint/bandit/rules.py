@@ -17,7 +17,7 @@ from pants.backend.python.subsystems import python_native_code, subprocess_envir
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
-from pants.engine.legacy.structs import PythonTargetAdaptor, TargetAdaptorWithOrigin
+from pants.engine.legacy.structs import TargetAdaptorWithOrigin
 from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.global_options import GlobMatchErrorBehavior
@@ -32,8 +32,8 @@ from pants.rules.core.lint import LintResult
 
 
 @dataclass(frozen=True)
-class BanditTarget:
-    adaptor_with_origin: TargetAdaptorWithOrigin
+class BanditTargets:
+    adaptors_with_origins: Tuple[TargetAdaptorWithOrigin, ...]
 
 
 def generate_args(*, specified_source_files: SourceFiles, bandit: Bandit) -> Tuple[str, ...]:
@@ -47,7 +47,7 @@ def generate_args(*, specified_source_files: SourceFiles, bandit: Bandit) -> Tup
 
 @rule(name="Lint using Bandit")
 async def lint(
-    bandit_target: BanditTarget,
+    targets: BanditTargets,
     bandit: Bandit,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
@@ -55,14 +55,13 @@ async def lint(
     if bandit.options.skip:
         return LintResult.noop()
 
-    adaptor_with_origin = bandit_target.adaptor_with_origin
-    adaptor = adaptor_with_origin.adaptor
+    adaptors_with_origins = targets.adaptors_with_origins
 
     # NB: Bandit output depends upon which Python interpreter version it's run with. We ensure that
     # each target runs with its own interpreter constraints. See
     # https://github.com/PyCQA/bandit#under-which-version-of-python-should-i-install-bandit.
     interpreter_constraints = PexInterpreterConstraints.create_from_adaptors(
-        adaptors=[adaptor] if isinstance(adaptor, PythonTargetAdaptor) else [],
+        (adaptor_with_origin.adaptor for adaptor_with_origin in adaptors_with_origins),
         python_setup=python_setup,
     )
     requirements_pex = await Get[Pex](
@@ -83,9 +82,13 @@ async def lint(
         )
     )
 
-    all_source_files = await Get[SourceFiles](AllSourceFilesRequest([adaptor]))
+    all_source_files = await Get[SourceFiles](
+        AllSourceFilesRequest(
+            adaptor_with_origin.adaptor for adaptor_with_origin in adaptors_with_origins
+        )
+    )
     specified_source_files = await Get[SourceFiles](
-        SpecifiedSourceFilesRequest([adaptor_with_origin])
+        SpecifiedSourceFilesRequest(adaptors_with_origins)
     )
 
     merged_input_files = await Get[Digest](
@@ -98,13 +101,20 @@ async def lint(
         ),
     )
 
+    address_references = ", ".join(
+        sorted(
+            adaptor_with_origin.adaptor.address.reference()
+            for adaptor_with_origin in adaptors_with_origins
+        )
+    )
+
     request = requirements_pex.create_execute_request(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path=f"./bandit.pex",
         pex_args=generate_args(specified_source_files=specified_source_files, bandit=bandit),
         input_files=merged_input_files,
-        description=f"Run Bandit for {adaptor.address.reference()}",
+        description=f"Run Bandit for {address_references}",
     )
     result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, request)
     return LintResult.from_fallible_execute_process_result(result)
@@ -114,7 +124,7 @@ def rules():
     return [
         lint,
         subsystem_rule(Bandit),
-        UnionRule(PythonLintTarget, BanditTarget),
+        UnionRule(PythonLintTarget, BanditTargets),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),
         *pex.rules(),

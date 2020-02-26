@@ -5,7 +5,7 @@ from typing import List, Optional, Tuple
 
 import pytest
 
-from pants.backend.python.lint.black.rules import BlackTarget
+from pants.backend.python.lint.black.rules import BlackTargets
 from pants.backend.python.lint.black.rules import rules as black_rules
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.address import Address
@@ -31,7 +31,7 @@ class BlackIntegrationTest(TestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *black_rules(), RootRule(BlackTarget))
+        return (*super().rules(), *black_rules(), RootRule(BlackTargets))
 
     def run_black(
         self,
@@ -60,12 +60,12 @@ class BlackIntegrationTest(TestBase):
         adaptor_with_origin = TargetAdaptorWithOrigin(adaptor, origin)
         options_bootstrapper = create_options_bootstrapper(args=args)
         lint_result = self.request_single_product(
-            LintResult, Params(BlackTarget(adaptor_with_origin), options_bootstrapper)
+            LintResult, Params(BlackTargets((adaptor_with_origin,)), options_bootstrapper)
         )
         fmt_result = self.request_single_product(
             FmtResult,
             Params(
-                BlackTarget(adaptor_with_origin, prior_formatter_result=input_snapshot),
+                BlackTargets((adaptor_with_origin,), prior_formatter_result=input_snapshot),
                 options_bootstrapper,
             ),
         )

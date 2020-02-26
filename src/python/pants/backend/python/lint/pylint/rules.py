@@ -1,6 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import itertools
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
@@ -20,7 +21,7 @@ from pants.build_graph.address import Address
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTarget, HydratedTargets
-from pants.engine.legacy.structs import PythonTargetAdaptor, TargetAdaptorWithOrigin
+from pants.engine.legacy.structs import TargetAdaptorWithOrigin
 from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.option.global_options import GlobMatchErrorBehavior
@@ -31,8 +32,8 @@ from pants.rules.core.lint import LintResult
 
 
 @dataclass(frozen=True)
-class PylintTarget:
-    adaptor_with_origin: TargetAdaptorWithOrigin
+class PylintTargets:
+    adaptors_with_origins: Tuple[TargetAdaptorWithOrigin, ...]
 
 
 def generate_args(*, specified_source_files: SourceFiles, pylint: Pylint) -> Tuple[str, ...]:
@@ -46,7 +47,7 @@ def generate_args(*, specified_source_files: SourceFiles, pylint: Pylint) -> Tup
 
 @rule(name="Lint using Pylint")
 async def lint(
-    pylint_target: PylintTarget,
+    targets: PylintTargets,
     pylint: Pylint,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
@@ -54,24 +55,30 @@ async def lint(
     if pylint.options.skip:
         return LintResult.noop()
 
-    adaptor_with_origin = pylint_target.adaptor_with_origin
-    adaptor = adaptor_with_origin.adaptor
+    adaptors_with_origins = targets.adaptors_with_origins
 
     # Pylint needs direct dependencies in the chroot to ensure that imports are valid. However, it
     # doesn't lint those direct dependencies nor does it care about transitive dependencies.
-    hydrated_target = await Get[HydratedTarget](Address, adaptor.address)
+    # TODO: simplify this once there's a way to go from TargetAdaptor -> HydratedTarget.
+    hydrated_targets = await MultiGet(
+        Get[HydratedTarget](Address, adaptor_with_origin.adaptor.address)
+        for adaptor_with_origin in adaptors_with_origins
+    )
     dependencies = await MultiGet(
-        Get[HydratedTarget](Address, dependency) for dependency in hydrated_target.dependencies
+        Get[HydratedTarget](Address, dependency)
+        for dependency in itertools.chain.from_iterable(
+            hydrated_target.dependencies for hydrated_target in hydrated_targets
+        )
     )
     chrooted_python_sources = await Get[ChrootedPythonSources](
-        HydratedTargets([hydrated_target, *dependencies])
+        HydratedTargets([*hydrated_targets, *dependencies])
     )
 
     # NB: Pylint output depends upon which Python interpreter version it's run with. We ensure that
     # each target runs with its own interpreter constraints. See
     # http://pylint.pycqa.org/en/latest/faq.html#what-versions-of-python-is-pylint-supporting.
     interpreter_constraints = PexInterpreterConstraints.create_from_adaptors(
-        adaptors=[adaptor] if isinstance(adaptor, PythonTargetAdaptor) else [],
+        (adaptor_with_origin.adaptor for adaptor_with_origin in adaptors_with_origins),
         python_setup=python_setup,
     )
     requirements_pex = await Get[Pex](
@@ -103,7 +110,14 @@ async def lint(
     )
 
     specified_source_files = await Get[SourceFiles](
-        SpecifiedSourceFilesRequest([adaptor_with_origin], strip_source_roots=True)
+        SpecifiedSourceFilesRequest(adaptors_with_origins, strip_source_roots=True)
+    )
+
+    address_references = ", ".join(
+        sorted(
+            adaptor_with_origin.adaptor.address.reference()
+            for adaptor_with_origin in adaptors_with_origins
+        )
     )
 
     request = requirements_pex.create_execute_request(
@@ -112,7 +126,7 @@ async def lint(
         pex_path=f"./pylint.pex",
         pex_args=generate_args(specified_source_files=specified_source_files, pylint=pylint),
         input_files=merged_input_files,
-        description=f"Run Pylint for {adaptor.address.reference()}",
+        description=f"Run Pylint for {address_references}",
     )
     result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, request)
     return LintResult.from_fallible_execute_process_result(result)
@@ -122,7 +136,7 @@ def rules():
     return [
         lint,
         subsystem_rule(Pylint),
-        UnionRule(PythonLintTarget, PylintTarget),
+        UnionRule(PythonLintTarget, PylintTargets),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),
         *pex.rules(),
