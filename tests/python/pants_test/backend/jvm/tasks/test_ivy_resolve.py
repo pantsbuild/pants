@@ -25,7 +25,6 @@ from pants.testutil.subsystem.util import init_subsystem
 from pants.testutil.task_test_base import TaskTestBase, ensure_cached
 from pants.util.contextutil import temporary_dir, temporary_file_path
 from pants.util.dirutil import safe_delete
-from pants.util.ordered_set import OrderedSet
 
 
 def strip_workdir(dir, classpath):
@@ -139,9 +138,7 @@ class IvyResolveTest(NailgunTaskTestBase):
         winning_cp = compile_classpath.get_for_target(winning_lib)
         self.assertEqual(losing_cp, winning_cp)
         self.assertEqual(
-            OrderedSet(
-                [("default", artifact_path("bogus0")), ("default", artifact_path("bogus1"))]
-            ),
+            [("default", artifact_path("bogus0")), ("default", artifact_path("bogus1"))],
             winning_cp,
         )
 

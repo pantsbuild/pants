@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from hashlib import sha1
 from typing import ClassVar, Optional
 
@@ -130,6 +131,18 @@ class ExcludesField(OrderedSet, PayloadField):
 
     :API: public
     """
+
+    def __eq__(self, other):
+        # NB: Our `pants.util.ordered_set` has strict `__eq__` semantics for the sake of sanity
+        # with the engine. This is different than the original Twitter Common's implementation at
+        # https://github.com/twitter-archive/commons/blob/master/src/python/twitter/common/collections/orderedset.py.
+        # Here, we override `__eq__` to use a tweak on the original Twitter Common's implementation
+        # as this is V1 code so we are okay with the looser equality.
+        if other is None:
+            return False
+        if isinstance(other, Sequence):
+            return len(self) == len(other) and list(self) == list(other)
+        return set(self) == set(other)
 
     def _compute_fingerprint(self):
         return stable_json_sha1(tuple(repr(exclude) for exclude in self))
