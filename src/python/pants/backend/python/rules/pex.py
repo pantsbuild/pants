@@ -85,7 +85,7 @@ class PexRequirementConstraints:
             return []
         return ["--constraints", self.generated_file_name]
 
-    def generate_file_for_raw_constraints(self) -> InputFilesContent:
+    def generate_constraints_file(self) -> InputFilesContent:
         if not self.constraints:
             return InputFilesContent([])
         generated_file = FileContent(
@@ -152,7 +152,7 @@ async def create_pex(
     argv.extend(request.requirements.requirements)
 
     generated_constraint_file = await Get[Digest](
-        InputFilesContent, request.requirement_constraints.generate_file_for_raw_constraints()
+        InputFilesContent, request.requirement_constraints.generate_constraints_file()
     )
 
     sources_digest = (
