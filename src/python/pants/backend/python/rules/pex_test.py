@@ -4,7 +4,7 @@
 import json
 import os.path
 import zipfile
-from typing import Dict, Optional, Tuple, cast
+from typing import Dict, Optional, Set, Tuple, cast
 
 from pants.backend.python.rules import download_pex_bin
 from pants.backend.python.rules.pex import (
@@ -152,23 +152,24 @@ class PexTest(TestBase):
         ]
         self.create_file("c1.txt", "\n".join(constraints_file1))
         self.create_file("c2.txt", "\n".join(constraints_file2))
-        pex_info_f1_then_f2 = self.create_pex_and_get_pex_info(
-            requirements=PexRequirements((direct_dep,)),
-            requirement_constraints=PexRequirementConstraints(("c1.txt", "c2.txt")),
-        )
-        assert set(pex_info_f1_then_f2["requirements"]) == {
-            *constraints_file1,
-            *constraints_file2[1:],
-        }
 
-        pex_info_f2_then_f1 = self.create_pex_and_get_pex_info(
-            requirements=PexRequirements((direct_dep,)),
-            requirement_constraints=PexRequirementConstraints(("c2.txt", "c1.txt")),
+        def assert_constraints_used(
+            *, file_order: Tuple[str, str], expected_constraints: Set[str]
+        ) -> None:
+            pex_info = self.create_pex_and_get_pex_info(
+                requirements=PexRequirements((direct_dep,)),
+                requirement_constraints=PexRequirementConstraints(file_order),
+            )
+            assert set(pex_info["requirements"]) == expected_constraints
+
+        assert_constraints_used(
+            file_order=("c1.txt", "c2.txt"),
+            expected_constraints={*constraints_file1, *constraints_file2[1:]},
         )
-        assert set(pex_info_f2_then_f1["requirements"]) == {
-            *constraints_file1[1:],
-            *constraints_file2,
-        }
+        assert_constraints_used(
+            file_order=("c2.txt", "c1.txt"),
+            expected_constraints={*constraints_file1[1:], *constraints_file2},
+        )
 
     def test_entry_point(self) -> None:
         entry_point = "pydoc"
