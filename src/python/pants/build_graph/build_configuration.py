@@ -2,8 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+import typing
 from collections import OrderedDict, namedtuple
 from collections.abc import Iterable
+from typing import Type
 
 from pants.base.parse_context import ParseContext
 from pants.build_graph.addressable import AddressableCallProxy
@@ -32,7 +34,7 @@ class BuildConfiguration:
         self._exposed_context_aware_object_factory_by_alias = {}
         self._optionables = OrderedSet()
         self._rules = OrderedSet()
-        self._union_rules = OrderedDict()
+        self._union_rules: typing.OrderedDict[Type, OrderedSet[Type]] = OrderedDict()
 
     def registered_aliases(self) -> BuildFileAliases:
         """Return the registered aliases exposed in BUILD files.
@@ -179,11 +181,9 @@ class BuildConfiguration:
         """
         return list(self._rules)
 
-    def union_rules(self):
-        """Returns a mapping of registered union base types -> [OrderedSet of union member types].
-
-        :rtype: OrderedDict
-        """
+    def union_rules(self) -> OrderedDict:
+        """Returns a mapping of registered union base types -> [OrderedSet of union member
+        types]."""
         return self._union_rules
 
     @memoized_method

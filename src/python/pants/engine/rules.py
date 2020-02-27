@@ -9,7 +9,7 @@ import typing
 from abc import ABC, abstractmethod
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type, get_type_hints
+from typing import Callable, Dict, List, Optional, Tuple, Type, get_type_hints
 
 from pants.engine.goal import Goal
 from pants.engine.objects import union
@@ -447,17 +447,23 @@ class RootRule(Rule):
         return tuple()
 
 
+@dataclass(frozen=True)
+class NormalizedRules:
+    rules: FrozenOrderedSet
+    union_rules: typing.OrderedDict[Type, OrderedSet[Type]]
+
+
 # TODO: add typechecking here -- use dicts for `union_rules`.
 @dataclass(frozen=True)
 class RuleIndex:
     """Holds a normalized index of Rules used to instantiate Nodes."""
 
-    rules: Any
-    roots: Any
-    union_rules: Any
+    rules: OrderedDict
+    roots: OrderedSet
+    union_rules: typing.OrderedDict[Type, OrderedSet[Type]]
 
     @classmethod
-    def create(cls, rule_entries, union_rules=None):
+    def create(cls, rule_entries, union_rules=None) -> "RuleIndex":
         """Creates a RuleIndex with tasks indexed by their output type."""
         serializable_rules = OrderedDict()
         serializable_roots = OrderedSet()
@@ -513,16 +519,11 @@ functions decorated with @rule.""".format(
 
         return cls(serializable_rules, serializable_roots, union_rules)
 
-    @dataclass(frozen=True)
-    class NormalizedRules:
-        rules: FrozenOrderedSet
-        union_rules: Any
-
-    def normalized_rules(self):
+    def normalized_rules(self) -> NormalizedRules:
         rules = FrozenOrderedSet(
             (
                 *itertools.chain.from_iterable(ruleset for ruleset in self.rules.values()),
                 *self.roots,
             )
         )
-        return self.NormalizedRules(rules, self.union_rules)
+        return NormalizedRules(rules, self.union_rules)
