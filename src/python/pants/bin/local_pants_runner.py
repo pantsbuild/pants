@@ -14,6 +14,7 @@ from pants.base.specs import Specs
 from pants.base.workunit import WorkUnit
 from pants.bin.goal_runner import GoalRunner
 from pants.build_graph.build_configuration import BuildConfiguration
+from pants.engine.legacy.structs import TargetAdaptor
 from pants.engine.native import Native
 from pants.engine.rules import UnionMembership
 from pants.engine.scheduler import SchedulerSession
@@ -315,6 +316,8 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
 
         if not v1_goals and not ambiguous_goals:
             return PANTS_SUCCEEDED_EXIT_CODE
+
+        TargetAdaptor._use_v1_targets = False
 
         # Setup and run GoalRunner.
         return (

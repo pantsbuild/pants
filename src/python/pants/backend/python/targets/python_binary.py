@@ -120,7 +120,7 @@ class PythonBinary(PythonTarget):
 
         super().__init__(sources=sources, payload=payload, **kwargs)
 
-        if (not sources or not sources.files) and entry_point is None:
+        if not self.is_in_v2_mode and (not sources or not sources.files) and entry_point is None:
             raise TargetDefinitionException(
                 self, "A python binary target must specify either a single source or entry_point."
             )
@@ -128,7 +128,7 @@ class PythonBinary(PythonTarget):
         if not isinstance(platforms, (list, tuple)) and not isinstance(platforms, str):
             raise TargetDefinitionException(self, "platforms must be a list, tuple or str.")
 
-        if sources and sources.files and entry_point:
+        if not self.is_in_v2_mode and sources and sources.files and entry_point:
             entry_point_module = entry_point.split(":", 1)[0]
             entry_source = list(self.sources_relative_to_source_root())[0]
             source_entry_point = self.translate_source_path_to_py_module_specifier(entry_source)

@@ -88,7 +88,7 @@ class Page(Target):
         """
         payload = payload or Payload()
         if not format:
-            if sources.files[0].lower().endswith(".rst"):
+            if sources and sources.files[0].lower().endswith(".rst"):
                 format = "rst"
             else:
                 format = "md"

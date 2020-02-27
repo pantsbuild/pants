@@ -3,7 +3,7 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Iterable, Optional, Tuple, cast
+from typing import Any, Iterable, Optional, Tuple, Type, cast
 
 from pants.backend.docgen.targets.doc import Page
 from pants.backend.jvm.targets.jvm_app import JvmApp
@@ -11,6 +11,7 @@ from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.python.targets.python_app import PythonApp
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
+from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
@@ -23,6 +24,8 @@ from pants.binaries.binary_util import rules as binary_util_rules
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.remote_sources import RemoteSources
+from pants.build_graph.resources import Resources
+from pants.build_graph.target import Target
 from pants.engine.build_files import create_graph_rules
 from pants.engine.console import Console
 from pants.engine.fs import Workspace, create_fs_rules
@@ -102,14 +105,10 @@ def _apply_default_sources_globs(base_class, target_type):
 # TODO: These calls mutate the adaptor classes for some known library types to copy over
 # their default source globs while preserving their concrete types. As with the alias replacement
 # below, this is a delaying tactic to avoid elevating the TargetAdaptor API.
-_apply_default_sources_globs(JvmAppAdaptor, JvmApp)
-_apply_default_sources_globs(PythonAppAdaptor, PythonApp)
-_apply_default_sources_globs(JvmBinaryAdaptor, JvmBinary)
-_apply_default_sources_globs(PageAdaptor, Page)
-_apply_default_sources_globs(PythonBinaryAdaptor, PythonBinary)
-_apply_default_sources_globs(PythonTargetAdaptor, PythonLibrary)
-_apply_default_sources_globs(PythonTestsAdaptor, PythonTests)
-_apply_default_sources_globs(RemoteSourcesAdaptor, RemoteSources)
+def _assign_v1_target_class(v2: Type[TargetAdaptor], v1: Type[Target]) -> Type[TargetAdaptor]:
+    v2._v1_target_class = v1
+    _apply_default_sources_globs(v2, v1)
+    return v2
 
 
 def _legacy_symbol_table(build_file_aliases: BuildFileAliases) -> SymbolTable:
@@ -133,16 +132,18 @@ def _legacy_symbol_table(build_file_aliases: BuildFileAliases) -> SymbolTable:
     # API until after https://github.com/pantsbuild/pants/issues/3560 has been completed.
     # These should likely move onto Target subclasses as the engine gets deeper into beta
     # territory.
-    table["python_library"] = PythonTargetAdaptor
-    table["jvm_app"] = JvmAppAdaptor
-    table["jvm_binary"] = JvmBinaryAdaptor
-    table["python_app"] = PythonAppAdaptor
-    table["python_tests"] = PythonTestsAdaptor
-    table["python_binary"] = PythonBinaryAdaptor
-    table["python_requirement_library"] = PythonRequirementLibraryAdaptor
-    table["remote_sources"] = RemoteSourcesAdaptor
-    table["resources"] = ResourcesAdaptor
-    table["page"] = PageAdaptor
+    table["python_library"] = _assign_v1_target_class(PythonTargetAdaptor, PythonLibrary)
+    table["jvm_app"] = _assign_v1_target_class(JvmAppAdaptor, JvmApp)
+    table["jvm_binary"] = _assign_v1_target_class(JvmBinaryAdaptor, JvmBinary)
+    table["python_app"] = _assign_v1_target_class(PythonAppAdaptor, PythonApp)
+    table["python_tests"] = _assign_v1_target_class(PythonTestsAdaptor, PythonTests)
+    table["python_binary"] = _assign_v1_target_class(PythonBinaryAdaptor, PythonBinary)
+    table["python_requirement_library"] = _assign_v1_target_class(
+        PythonRequirementLibraryAdaptor, PythonRequirementLibrary
+    )
+    table["remote_sources"] = _assign_v1_target_class(RemoteSourcesAdaptor, RemoteSources)
+    table["resources"] = _assign_v1_target_class(ResourcesAdaptor, Resources)
+    table["page"] = _assign_v1_target_class(PageAdaptor, Page)
     table["python_awslambda"] = PythonAWSLambdaAdaptor
 
     # Note that these don't call _make_target_adaptor because we don't have a handy reference to the

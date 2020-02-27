@@ -12,7 +12,7 @@ def assert_list(
     can_be_none=True,
     default=(),
     key_arg=None,
-    allowable=(list, Fileset, OrderedSet, set, tuple),
+    allowable=(list, Fileset, OrderedSet, frozenset, set, tuple),
     raise_type=ValueError,
 ):
     """This function is used to ensure that parameters set by users in BUILD files are of acceptable

@@ -19,9 +19,10 @@ from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.target_addressable import TargetAddressable
 from pants.build_graph.target_scopes import Scope
+from pants.engine.fs import EMPTY_SNAPSHOT
 from pants.fs.fs import safe_filename
 from pants.source.payload_fields import SourcesField
-from pants.source.wrapped_globs import FilesetWithSpec
+from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetWithSpec, Filespec
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.ordered_set import OrderedSet
@@ -62,6 +63,11 @@ class Target(AbstractTarget):
     :API: public
     """
 
+    def is_in_v2_mode(self) -> bool:
+        from pants.engine.legacy.structs import TargetAdaptor
+
+        return TargetAdaptor._use_v1_targets
+
     class RecursiveDepthError(AddressLookupError):
         """Raised when there are too many recursive calls to calculate the fingerprint."""
 
@@ -99,13 +105,13 @@ class Target(AbstractTarget):
             )
 
         @classmethod
-        def check(cls, target, kwargs):
+        def check(cls, target, kwargs, raise_on_unknown: bool = True):
             """
             :API: public
             """
-            cls.global_instance().check_unknown(target, kwargs)
+            cls.global_instance().check_unknown(target, kwargs, raise_on_unknown=raise_on_unknown)
 
-        def check_unknown(self, target, kwargs):
+        def check_unknown(self, target, kwargs, raise_on_unknown: bool = True):
             """
             :API: public
             """
@@ -116,6 +122,7 @@ class Target(AbstractTarget):
             # `source` as a named kwarg; it would be nice to error rather than silently swallow the value,
             # if there were such a way.
             ignore_params.add("source")
+            ignore_params.add("dependencies")
             unknown_args = {arg: value for arg, value in kwargs.items() if arg not in ignore_params}
             ignored_args = {arg: value for arg, value in kwargs.items() if arg in ignore_params}
             if ignored_args:
@@ -129,7 +136,7 @@ class Target(AbstractTarget):
                 )
             if unknown_args:
                 error_message = "{target_type} received unknown arguments: {args}"
-                raise self.UnknownArgumentError(
+                exc = self.UnknownArgumentError(
                     target.address.spec,
                     error_message.format(
                         target_type=type(target).__name__,
@@ -138,6 +145,9 @@ class Target(AbstractTarget):
                         ),
                     ),
                 )
+                if raise_on_unknown:
+                    raise exc
+                logger.debug(exc)
 
     class TagAssignments(Subsystem):
         """Tags to add to targets in addition to any defined in their BUILD files."""
@@ -367,7 +377,9 @@ class Target(AbstractTarget):
         self.payload.freeze()
         self.name = name
         self.address = address
-        self._build_graph = weakref.proxy(build_graph)
+
+        self._build_graph = weakref.proxy(build_graph) if build_graph is not None else None
+
         self._type_alias = type_alias
         self._tags = set(tags or []).union(self.TagAssignments.tags_for(address.spec))
         self.description = description
@@ -379,7 +391,7 @@ class Target(AbstractTarget):
         self._cached_exports_addresses = None
         self._no_cache = no_cache
         if kwargs:
-            self.Arguments.check(self, kwargs)
+            self.Arguments.check(self, kwargs, raise_on_unknown=(not self.is_in_v2_mode))
 
     @property
     def scope(self):
@@ -991,6 +1003,16 @@ class Target(AbstractTarget):
         """
         if not sources:
             sources = FilesetWithSpec.empty(sources_rel_path)
+        elif isinstance(sources, SourcesField):
+            sources = sources.sources
+        elif isinstance(sources, (list, tuple)):
+            sources = EagerFilesetWithSpec(
+                rel_root=sources_rel_path,
+                filespec=Filespec(
+                    {"globs": [os.path.join(sources_rel_path, s) for s in sources], "exclude": [],}
+                ),
+                snapshot=EMPTY_SNAPSHOT,
+            )
         elif not isinstance(sources, FilesetWithSpec):
             key_arg_section = "'{}' to be ".format(key_arg) if key_arg else ""
             raise TargetDefinitionException(

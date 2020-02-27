@@ -8,6 +8,7 @@ from pants.backend.python.rules.download_pex_bin import DownloadedPexBin
 from pants.backend.python.rules.hermetic_pex import HermeticPex
 from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.base.payload_field import PythonRequirementsField
 from pants.engine.fs import (
     EMPTY_DIRECTORY_DIGEST,
     Digest,
@@ -32,13 +33,18 @@ class PexRequirements:
     ) -> "PexRequirements":
         all_target_requirements = set()
         for maybe_python_req_lib in adaptors:
+            maybe_requirement = maybe_python_req_lib.get_field(
+                "requirement", PythonRequirementsField
+            )()
             # This is a python_requirement()-like target.
-            if hasattr(maybe_python_req_lib, "requirement"):
-                all_target_requirements.add(str(maybe_python_req_lib.requirement))
+            if maybe_requirement:
+                all_target_requirements.add(str(maybe_requirement.requirement))
             # This is a python_requirement_library()-like target.
-            if hasattr(maybe_python_req_lib, "requirements"):
-                for py_req in maybe_python_req_lib.requirements:
-                    all_target_requirements.add(str(py_req.requirement))
+            multiple_requirements = (
+                maybe_python_req_lib.get_field("requirements", PythonRequirementsField)() or []
+            )
+            for py_req in multiple_requirements:
+                all_target_requirements.add(str(py_req.requirement))
         all_target_requirements.update(additional_requirements)
         return PexRequirements(requirements=tuple(sorted(all_target_requirements)))
 

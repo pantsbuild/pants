@@ -6,7 +6,21 @@ import os.path
 from abc import ABCMeta, abstractmethod
 from collections.abc import MutableSequence, MutableSet
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, List, Optional, Sequence, Tuple, Type, Union, cast
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Generic,
+    Iterable,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+    cast,
+)
 
 from pants.base.specs import OriginSpec
 from pants.build_graph.address import Address
@@ -18,10 +32,27 @@ from pants.engine.rules import UnionRule
 from pants.engine.struct import Struct, StructWithDeps
 from pants.source import wrapped_globs
 from pants.util.contextutil import exception_logging
+from pants.util.memo import memoized_method
 from pants.util.meta import classproperty
 from pants.util.objects import Exactly
 
 logger = logging.getLogger(__name__)
+
+
+_T = TypeVar("_T")
+
+
+@dataclass(frozen=True)
+class _OptionalFieldExtractor(Generic[_T]):
+    typ: Type[_T]
+    value: Optional[_T]
+
+    def __call__(self) -> Optional[_T]:
+        ret = self.value
+        if ret is None:
+            return None
+        assert isinstance(ret, self.typ), f"{self=}, {ret=}"
+        return ret
 
 
 class TargetAdaptor(StructWithDeps):
@@ -29,6 +60,27 @@ class TargetAdaptor(StructWithDeps):
 
     Extends StructWithDeps to add a `dependencies` field marked Addressable.
     """
+
+    _use_v1_targets: bool = True
+    _v1_target_class: Optional[Type[Target]] = None
+
+    def _make_v1_target(self, **kwargs) -> Target:
+        merged_kwargs = dict(build_graph=None, sources=None)
+        merged_kwargs.update(**kwargs)
+        return self._v1_target_class(**merged_kwargs)
+
+    def get_field(self, name: str, typ: Type[_T]) -> _OptionalFieldExtractor[_T]:
+        maybe_value = self.kwargs().get(name, None)
+        return _OptionalFieldExtractor(typ=typ, value=maybe_value)
+
+    @memoized_method
+    def kwargs(self) -> Dict[str, Any]:
+        all_kwargs = super().kwargs()
+        if self._use_v1_targets and self._v1_target_class:
+            v1_target = self._make_v1_target(**all_kwargs)
+            if v1_target:
+                all_kwargs.update(**v1_target.payload.as_dict())
+        return all_kwargs
 
     @property
     def address(self) -> Address:
