@@ -35,168 +35,242 @@ from pants.util.strutil import pluralize
 
 
 class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
-  """
+    """
   :API: public
   """
 
-  @classmethod
-  def implementation_version(cls):
-    return super().implementation_version() + [('JUnitRun', 3)]
+    @classmethod
+    def implementation_version(cls):
+        return super().implementation_version() + [("JUnitRun", 3)]
 
-  _BATCH_ALL = sys.maxsize
+    _BATCH_ALL = sys.maxsize
 
-  @classmethod
-  def register_options(cls, register):
-    super().register_options(register)
+    @classmethod
+    def register_options(cls, register):
+        super().register_options(register)
 
-    register('--batch-size', advanced=True, type=int, default=cls._BATCH_ALL, fingerprint=True,
-             help='Run at most this many tests in a single test process.')
-    register('--test', type=list, fingerprint=True,
-             help='Force running of just these tests. Tests can be specified using any of: '
-                  '[classname], [classname]#[methodname], [fully qualified classname], '
-                  '[fully qualified classname]#[methodname]. If classname is not fully qualified, '
-                  'all matching tests will be run. For example, if `foo.bar.TestClass` and '
-                  '`foo.baz.TestClass` exist and `TestClass` is supplied, then both will run.')
-    register('--per-test-timer', type=bool, help='Show progress and timer for each test.')
-    register('--default-concurrency', advanced=True, fingerprint=True,
-             choices=JUnitTests.VALID_CONCURRENCY_OPTS, default=JUnitTests.CONCURRENCY_SERIAL,
-             help='Set the default concurrency mode for running tests not annotated with'
-                  ' @TestParallel or @TestSerial.')
-    register('--parallel-threads', advanced=True, type=int, default=0, fingerprint=True,
-             help='Number of threads to run tests in parallel. 0 for autoset.')
-    register('--test-shard', advanced=True, fingerprint=True,
-             help='Subset of tests to run, in the form M/N, 0 <= M < N. '
-                  'For example, 1/3 means run tests number 2, 5, 8, 11, ...')
-    register('--output-mode', choices=['ALL', 'FAILURE_ONLY', 'NONE'], default='NONE',
-             help='Specify what part of output should be passed to stdout. '
-                  'In case of FAILURE_ONLY and parallel tests execution '
-                  'output can be partial or even wrong. '
-                  'All tests output also redirected to files in .pants.d/test/junit.')
-    register('--cwd', advanced=True, fingerprint=True,
-             help='Set the working directory. If no argument is passed, use the build root. '
-                  'If cwd is set on a target, it will supersede this option. It is an error to '
-                  'use this option in combination with `--chroot`')
-    register('--strict-jvm-version', type=bool, advanced=True, fingerprint=True,
-             help='If true, will strictly require running junits with the same version of java as '
-                  'the platform -target level. Otherwise, the platform -target level will be '
-                  'treated as the minimum jvm to run.')
-    register('--failure-summary', type=bool, default=True,
-             help='If true, includes a summary of which test-cases failed at the end of a failed '
-                  'junit run.')
-    register('--allow-empty-sources', type=bool, advanced=True, fingerprint=True,
-             help='Allows a junit_tests() target to be defined with no sources.  Otherwise,'
-                  'such a target will raise an error during the test run.')
-    register('--use-experimental-runner', type=bool, advanced=True, fingerprint=True,
-             help='Use experimental junit-runner logic for more options for parallelism.')
-    register('--html-report', type=bool, fingerprint=True,
-             help='If true, generate an html summary report of tests that were run.')
-    register('--html-report-error-on-conflict', type=bool, default=True,
-             help='If true, error when duplicate test cases are found in html results')
-    register('--open', type=bool,
-             help='Attempt to open the html summary report in a browser (implies --html-report)')
+        register(
+            "--batch-size",
+            advanced=True,
+            type=int,
+            default=cls._BATCH_ALL,
+            fingerprint=True,
+            help="Run at most this many tests in a single test process.",
+        )
+        register(
+            "--test",
+            type=list,
+            fingerprint=True,
+            help="Force running of just these tests. Tests can be specified using any of: "
+            "[classname], [classname]#[methodname], [fully qualified classname], "
+            "[fully qualified classname]#[methodname]. If classname is not fully qualified, "
+            "all matching tests will be run. For example, if `foo.bar.TestClass` and "
+            "`foo.baz.TestClass` exist and `TestClass` is supplied, then both will run.",
+        )
+        register("--per-test-timer", type=bool, help="Show progress and timer for each test.")
+        register(
+            "--default-concurrency",
+            advanced=True,
+            fingerprint=True,
+            choices=JUnitTests.VALID_CONCURRENCY_OPTS,
+            default=JUnitTests.CONCURRENCY_SERIAL,
+            help="Set the default concurrency mode for running tests not annotated with"
+            " @TestParallel or @TestSerial.",
+        )
+        register(
+            "--parallel-threads",
+            advanced=True,
+            type=int,
+            default=0,
+            fingerprint=True,
+            help="Number of threads to run tests in parallel. 0 for autoset.",
+        )
+        register(
+            "--test-shard",
+            advanced=True,
+            fingerprint=True,
+            help="Subset of tests to run, in the form M/N, 0 <= M < N. "
+            "For example, 1/3 means run tests number 2, 5, 8, 11, ...",
+        )
+        register(
+            "--output-mode",
+            choices=["ALL", "FAILURE_ONLY", "NONE"],
+            default="NONE",
+            help="Specify what part of output should be passed to stdout. "
+            "In case of FAILURE_ONLY and parallel tests execution "
+            "output can be partial or even wrong. "
+            "All tests output also redirected to files in .pants.d/test/junit.",
+        )
+        register(
+            "--cwd",
+            advanced=True,
+            fingerprint=True,
+            help="Set the working directory. If no argument is passed, use the build root. "
+            "If cwd is set on a target, it will supersede this option. It is an error to "
+            "use this option in combination with `--chroot`",
+        )
+        register(
+            "--strict-jvm-version",
+            type=bool,
+            advanced=True,
+            fingerprint=True,
+            help="If true, will strictly require running junits with the same version of java as "
+            "the platform -target level. Otherwise, the platform -target level will be "
+            "treated as the minimum jvm to run.",
+        )
+        register(
+            "--failure-summary",
+            type=bool,
+            default=True,
+            help="If true, includes a summary of which test-cases failed at the end of a failed "
+            "junit run.",
+        )
+        register(
+            "--allow-empty-sources",
+            type=bool,
+            advanced=True,
+            fingerprint=True,
+            help="Allows a junit_tests() target to be defined with no sources.  Otherwise,"
+            "such a target will raise an error during the test run.",
+        )
+        register(
+            "--use-experimental-runner",
+            type=bool,
+            advanced=True,
+            fingerprint=True,
+            help="Use experimental junit-runner logic for more options for parallelism.",
+        )
+        register(
+            "--html-report",
+            type=bool,
+            fingerprint=True,
+            help="If true, generate an html summary report of tests that were run.",
+        )
+        register(
+            "--html-report-error-on-conflict",
+            type=bool,
+            default=True,
+            help="If true, error when duplicate test cases are found in html results",
+        )
+        register(
+            "--open",
+            type=bool,
+            help="Attempt to open the html summary report in a browser (implies --html-report)",
+        )
 
-    # TODO(jtrobec): Remove direct register when coverage steps are moved to their own subsystem.
-    CodeCoverage.register_junit_options(register, cls.register_jvm_tool)
+        # TODO(jtrobec): Remove direct register when coverage steps are moved to their own subsystem.
+        CodeCoverage.register_junit_options(register, cls.register_jvm_tool)
 
-  @classmethod
-  def subsystem_dependencies(cls):
-    return super().subsystem_dependencies() + (CodeCoverage, JUnit)
+    @classmethod
+    def subsystem_dependencies(cls):
+        return super().subsystem_dependencies() + (CodeCoverage, JUnit)
 
-  @classmethod
-  def prepare(cls, options, round_manager):
-    super().prepare(options, round_manager)
+    @classmethod
+    def prepare(cls, options, round_manager):
+        super().prepare(options, round_manager)
 
-    # Compilation and resource preparation must have completed.
-    round_manager.require_data('runtime_classpath')
+        # Compilation and resource preparation must have completed.
+        round_manager.require_data("runtime_classpath")
 
-  class OptionError(TaskError):
-    """Indicates an invalid combination of options for this task."""
+    class OptionError(TaskError):
+        """Indicates an invalid combination of options for this task."""
 
-  def __init__(self, *args, **kwargs):
-    super().__init__(*args, **kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-    options = self.get_options()
-    self._tests_to_run = options.test
-    self._batch_size = options.batch_size
+        options = self.get_options()
+        self._tests_to_run = options.test
+        self._batch_size = options.batch_size
 
-    if options.cwd and self.run_tests_in_chroot:
-      raise self.OptionError('Cannot set both `cwd` ({}) and ask for a `chroot` at the same time.'
-                             .format(options.cwd))
+        if options.cwd and self.run_tests_in_chroot:
+            raise self.OptionError(
+                "Cannot set both `cwd` ({}) and ask for a `chroot` at the same time.".format(
+                    options.cwd
+                )
+            )
 
-    if self.run_tests_in_chroot:
-      self._working_dir = None
-    else:
-      self._working_dir = options.cwd or get_buildroot()
+        if self.run_tests_in_chroot:
+            self._working_dir = None
+        else:
+            self._working_dir = options.cwd or get_buildroot()
 
-    self._strict_jvm_version = options.strict_jvm_version
-    self._failure_summary = options.failure_summary
-    self._open = options.open
-    self._html_report = self._open or options.html_report
+        self._strict_jvm_version = options.strict_jvm_version
+        self._failure_summary = options.failure_summary
+        self._open = options.open
+        self._html_report = self._open or options.html_report
 
-  @memoized_method
-  def _args(self, fail_fast, output_dir):
-    args = self.args[:]
+    @memoized_method
+    def _args(self, fail_fast, output_dir):
+        args = self.args[:]
 
-    options = self.get_options()
-    if options.output_mode == 'ALL':
-      args.append('-output-mode=ALL')
-    elif options.output_mode == 'FAILURE_ONLY':
-      args.append('-output-mode=FAILURE_ONLY')
-    else:
-      args.append('-output-mode=NONE')
+        options = self.get_options()
+        if options.output_mode == "ALL":
+            args.append("-output-mode=ALL")
+        elif options.output_mode == "FAILURE_ONLY":
+            args.append("-output-mode=FAILURE_ONLY")
+        else:
+            args.append("-output-mode=NONE")
 
-    if fail_fast:
-      args.append('-fail-fast')
-    args.append('-outdir')
-    args.append(output_dir)
-    if options.per_test_timer:
-      args.append('-per-test-timer')
+        if fail_fast:
+            args.append("-fail-fast")
+        args.append("-outdir")
+        args.append(output_dir)
+        if options.per_test_timer:
+            args.append("-per-test-timer")
 
-    if options.default_concurrency == JUnitTests.CONCURRENCY_PARALLEL_CLASSES_AND_METHODS:
-      if not options.use_experimental_runner:
-        self.context.log.warn('--default-concurrency=PARALLEL_CLASSES_AND_METHODS is '
-                              'experimental, use --use-experimental-runner.')
-      args.append('-default-concurrency')
-      args.append('PARALLEL_CLASSES_AND_METHODS')
-    elif options.default_concurrency == JUnitTests.CONCURRENCY_PARALLEL_METHODS:
-      if not options.use_experimental_runner:
-        self.context.log.warn('--default-concurrency=PARALLEL_METHODS is experimental, use '
-                              '--use-experimental-runner.')
-      if options.test_shard:
-        # NB(zundel): The experimental junit runner doesn't support test sharding natively.  The
-        # legacy junit runner allows both methods and classes to run in parallel with this option.
-        self.context.log.warn('--default-concurrency=PARALLEL_METHODS with test sharding will '
-                              'run classes in parallel too.')
-      args.append('-default-concurrency')
-      args.append('PARALLEL_METHODS')
-    elif options.default_concurrency == JUnitTests.CONCURRENCY_PARALLEL_CLASSES:
-      args.append('-default-concurrency')
-      args.append('PARALLEL_CLASSES')
-    elif options.default_concurrency == JUnitTests.CONCURRENCY_SERIAL:
-      args.append('-default-concurrency')
-      args.append('SERIAL')
+        if options.default_concurrency == JUnitTests.CONCURRENCY_PARALLEL_CLASSES_AND_METHODS:
+            if not options.use_experimental_runner:
+                self.context.log.warn(
+                    "--default-concurrency=PARALLEL_CLASSES_AND_METHODS is "
+                    "experimental, use --use-experimental-runner."
+                )
+            args.append("-default-concurrency")
+            args.append("PARALLEL_CLASSES_AND_METHODS")
+        elif options.default_concurrency == JUnitTests.CONCURRENCY_PARALLEL_METHODS:
+            if not options.use_experimental_runner:
+                self.context.log.warn(
+                    "--default-concurrency=PARALLEL_METHODS is experimental, use "
+                    "--use-experimental-runner."
+                )
+            if options.test_shard:
+                # NB(zundel): The experimental junit runner doesn't support test sharding natively.  The
+                # legacy junit runner allows both methods and classes to run in parallel with this option.
+                self.context.log.warn(
+                    "--default-concurrency=PARALLEL_METHODS with test sharding will "
+                    "run classes in parallel too."
+                )
+            args.append("-default-concurrency")
+            args.append("PARALLEL_METHODS")
+        elif options.default_concurrency == JUnitTests.CONCURRENCY_PARALLEL_CLASSES:
+            args.append("-default-concurrency")
+            args.append("PARALLEL_CLASSES")
+        elif options.default_concurrency == JUnitTests.CONCURRENCY_SERIAL:
+            args.append("-default-concurrency")
+            args.append("SERIAL")
 
-    args.append('-parallel-threads')
-    args.append(str(options.parallel_threads))
+        args.append("-parallel-threads")
+        args.append(str(options.parallel_threads))
 
-    if options.test_shard:
-      args.append('-test-shard')
-      args.append(options.test_shard)
+        if options.test_shard:
+            args.append("-test-shard")
+            args.append(options.test_shard)
 
-    if options.use_experimental_runner:
-      self.context.log.info('Using experimental junit-runner logic.')
-      args.append('-use-experimental-runner')
+        if options.use_experimental_runner:
+            self.context.log.info("Using experimental junit-runner logic.")
+            args.append("-use-experimental-runner")
 
-    return args
+        return args
 
-  def classpath(self, targets, classpath_product=None, **kwargs):
-    return super().classpath(targets,
-                             classpath_product=classpath_product,
-                             include_scopes=Scopes.JVM_TEST_SCOPES,
-                             **kwargs)
+    def classpath(self, targets, classpath_product=None, **kwargs):
+        return super().classpath(
+            targets,
+            classpath_product=classpath_product,
+            include_scopes=Scopes.JVM_TEST_SCOPES,
+            **kwargs,
+        )
 
-  def _spawn(self, distribution, executor=None, *args, **kwargs):
-    """Returns a processhandler to a process executing java.
+    def _spawn(self, distribution, executor=None, *args, **kwargs):
+        """Returns a processhandler to a process executing java.
 
     :param Executor executor: the java subprocess executor to use. If not specified, construct
       using the distribution.
@@ -204,26 +278,24 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     :rtype: ProcessHandler
     """
 
-    actual_executor = executor or SubprocessExecutor(distribution)
-    return distribution.execute_java_async(*args,
-                                           executor=actual_executor,
-                                           **kwargs)
+        actual_executor = executor or SubprocessExecutor(distribution)
+        return distribution.execute_java_async(*args, executor=actual_executor, **kwargs)
 
-  def execute_java_for_coverage(self, targets, *args, **kwargs):
-    """Execute java for targets directly and don't use the test mixin.
+    def execute_java_for_coverage(self, targets, *args, **kwargs):
+        """Execute java for targets directly and don't use the test mixin.
 
     This execution won't be wrapped with timeouts and other test mixin code common
     across test targets. Used for coverage instrumentation.
     """
 
-    distribution = self.preferred_jvm_distribution_for_targets(
-      [t for t in targets if isinstance(t, JUnitTests)],
-      strict=self._strict_jvm_version)
-    actual_executor = SubprocessExecutor(distribution)
-    return distribution.execute_java(*args, executor=actual_executor, **kwargs)
+        distribution = self.preferred_jvm_distribution_for_targets(
+            [t for t in targets if isinstance(t, JUnitTests)], strict=self._strict_jvm_version
+        )
+        actual_executor = SubprocessExecutor(distribution)
+        return distribution.execute_java(*args, executor=actual_executor, **kwargs)
 
-  def _collect_test_targets(self, targets):
-    """Return a test registry mapping the tests found in the given targets.
+    def _collect_test_targets(self, targets):
+        """Return a test registry mapping the tests found in the given targets.
 
     If `self._tests_to_run` is set, return a registry of explicitly specified tests instead.
 
@@ -231,178 +303,216 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     :rtype: :class:`pants.java.junit.junit_xml_parser.Test.RegistryOfTests`
     """
 
-    test_registry = RegistryOfTests(tuple(self._calculate_tests_from_targets(targets)))
+        test_registry = RegistryOfTests(tuple(self._calculate_tests_from_targets(targets)))
 
-    if targets and self._tests_to_run:
-      matched_spec_to_target, unknown_tests = test_registry.match_test_spec(
-        self._get_possible_tests_to_run())
-      if len(unknown_tests) > 0:
-        raise TaskError("No target found for test specifier(s):\n\n  '{}'\n\nPlease change "
-                        "specifier or bring in the proper target(s)."
-                        .format("'\n  '".join(t.render_test_spec() for t in unknown_tests)))
-
-      return RegistryOfTests(matched_spec_to_target)
-    else:
-      return test_registry
-
-  @property
-  def _batched(self):
-    return self._batch_size != self._BATCH_ALL
-
-  def run_tests(self, fail_fast, test_targets, output_dir, coverage, complete_test_registry):
-    test_registry = complete_test_registry.filter(test_targets)
-    if test_registry.empty:
-      return TestResult.successful
-
-    coverage.instrument(output_dir)
-
-    def parse_error_handler(parse_error):
-      # Just log and move on since the result is only used to characterize failures, and raising
-      # an error here would just distract from the underlying test failures.
-      self.context.log.error('Error parsing test result file {path}: {cause}'
-                             .format(path=parse_error.xml_path, cause=parse_error.cause))
-
-    # The 'instrument_classpath' product below below will be `None` if not set, and we'll default
-    # back to runtime_classpath
-    classpath_product = self.context.products.get_data('instrument_classpath')
-
-    result = 0
-    for batch_id, (properties, batch) in enumerate(self._iter_batches(test_registry)):
-      (workdir, platform, target_jvm_options, target_env_vars, concurrency, threads) = properties
-
-      batch_output_dir = output_dir
-      if self._batched:
-        batch_output_dir = os.path.join(batch_output_dir, f'batch-{batch_id}')
-
-      run_modifications = coverage.run_modifications(batch_output_dir)
-      self.context.log.debug(f'run_modifications: {run_modifications}')
-
-      extra_jvm_options = run_modifications.extra_jvm_options
-
-      # Batches of test classes will likely exist within the same targets: dedupe them.
-      relevant_targets = {test_registry.get_owning_target(t) for t in batch}
-
-      complete_classpath = OrderedSet()
-      complete_classpath.update(run_modifications.classpath_prepend)
-      complete_classpath.update(JUnit.global_instance().runner_classpath(self.context))
-      complete_classpath.update(self.classpath(relevant_targets,
-                                               classpath_product=classpath_product))
-
-      distribution = self.preferred_jvm_distribution([platform], self._strict_jvm_version)
-
-      # Override cmdline args with values from junit_test() target that specify concurrency:
-      args = self._args(fail_fast, batch_output_dir) + [u'-xmlreport']
-
-      if concurrency is not None:
-        args = remove_arg(args, '-default-parallel')
-        if concurrency == JUnitTests.CONCURRENCY_SERIAL:
-          args = ensure_arg(args, '-default-concurrency', param='SERIAL')
-        elif concurrency == JUnitTests.CONCURRENCY_PARALLEL_CLASSES:
-          args = ensure_arg(args, '-default-concurrency', param='PARALLEL_CLASSES')
-        elif concurrency == JUnitTests.CONCURRENCY_PARALLEL_METHODS:
-          args = ensure_arg(args, '-default-concurrency', param='PARALLEL_METHODS')
-        elif concurrency == JUnitTests.CONCURRENCY_PARALLEL_CLASSES_AND_METHODS:
-          args = ensure_arg(args, '-default-concurrency', param='PARALLEL_CLASSES_AND_METHODS')
-
-      if threads is not None:
-        args = remove_arg(args, '-parallel-threads', has_param=True)
-        args += ['-parallel-threads', str(threads)]
-
-      batch_test_specs = [test.render_test_spec() for test in batch]
-      with argfile.safe_args(batch_test_specs, self.get_options()) as batch_tests:
-        with self.chroot(relevant_targets, workdir) as chroot:
-          self.context.log.debug(f'CWD = {chroot}')
-          self.context.log.debug(f'platform = {platform}')
-          with environment_as(**dict(target_env_vars)):
-            subprocess_result = self.spawn_and_wait(
-              relevant_targets,
-              executor=SubprocessExecutor(distribution),
-              distribution=distribution,
-              classpath=complete_classpath,
-              main=JUnit.RUNNER_MAIN,
-              jvm_options=self.jvm_options + list(platform.jvm_options) + extra_jvm_options + list(
-                target_jvm_options),
-              args=args + batch_tests,
-              workunit_factory=self.context.new_workunit,
-              workunit_name='run',
-              workunit_labels=[WorkUnitLabel.TEST],
-              cwd=chroot,
-              synthetic_jar_dir=batch_output_dir,
-              create_synthetic_jar=self.synthetic_classpath,
+        if targets and self._tests_to_run:
+            matched_spec_to_target, unknown_tests = test_registry.match_test_spec(
+                self._get_possible_tests_to_run()
             )
-            self.context.log.debug('JUnit subprocess exited with result ({})'
-                                   .format(subprocess_result))
-            result += abs(subprocess_result)
+            if len(unknown_tests) > 0:
+                raise TaskError(
+                    "No target found for test specifier(s):\n\n  '{}'\n\nPlease change "
+                    "specifier or bring in the proper target(s).".format(
+                        "'\n  '".join(t.render_test_spec() for t in unknown_tests)
+                    )
+                )
 
-        tests_info = self.parse_test_info(batch_output_dir, parse_error_handler, ['classname'])
-        for test_name, test_info in tests_info.items():
-          test_item = Test(test_info['classname'], test_name)
-          test_target = test_registry.get_owning_target(test_item)
-          self.report_all_info_for_single_test(self.options_scope, test_target,
-                                               test_name, test_info)
+            return RegistryOfTests(matched_spec_to_target)
+        else:
+            return test_registry
 
-        if result != 0 and fail_fast:
-          break
+    @property
+    def _batched(self):
+        return self._batch_size != self._BATCH_ALL
 
-    if result == 0:
-      return TestResult.successful
+    def run_tests(self, fail_fast, test_targets, output_dir, coverage, complete_test_registry):
+        test_registry = complete_test_registry.filter(test_targets)
+        if test_registry.empty:
+            return TestResult.successful
 
-    # NB: If the TestRegistry fails to find the owning target of a failed test, the target key in
-    # this dictionary will be None: helper methods in this block account for that.
-    target_to_failed_test = parse_failed_targets(test_registry, output_dir, parse_error_handler)
+        coverage.instrument(output_dir)
 
-    def sort_owning_target(t):
-      return t.address.spec if t else ''
+        def parse_error_handler(parse_error):
+            # Just log and move on since the result is only used to characterize failures, and raising
+            # an error here would just distract from the underlying test failures.
+            self.context.log.error(
+                "Error parsing test result file {path}: {cause}".format(
+                    path=parse_error.xml_path, cause=parse_error.cause
+                )
+            )
 
-    failed_targets = sorted(target_to_failed_test, key=sort_owning_target)
-    error_message_lines = []
-    if self._failure_summary:
-      def render_owning_target(t):
-        return t.address.reference() if t else '<Unknown Target>'
+        # The 'instrument_classpath' product below below will be `None` if not set, and we'll default
+        # back to runtime_classpath
+        classpath_product = self.context.products.get_data("instrument_classpath")
 
-      for target in failed_targets:
-        error_message_lines.append(f"\n{(' ' * 4)}{render_owning_target(target)}")
-        for test in sorted(target_to_failed_test[target]):
-          error_message_lines.append(f"{' ' * 8}{test.classname}#{test.methodname}")
-    error_message_lines.append(
-      '\njava {main} ... exited non-zero ({code}); {failed} failed {targets}.'
-        .format(main=JUnit.RUNNER_MAIN, code=result, failed=len(failed_targets),
-                targets=pluralize(len(failed_targets), 'target'))
-    )
-    return TestResult(msg='\n'.join(error_message_lines), rc=result, failed_targets=failed_targets)
+        result = 0
+        for batch_id, (properties, batch) in enumerate(self._iter_batches(test_registry)):
+            (
+                workdir,
+                platform,
+                target_jvm_options,
+                target_env_vars,
+                concurrency,
+                threads,
+            ) = properties
 
-  def _iter_batches(self, test_registry):
-    tests_by_properties = test_registry.index(
-      lambda tgt: tgt.cwd if tgt.cwd is not None else self._working_dir,
-      lambda tgt: tgt.runtime_platform,
-      lambda tgt: tgt.payload.extra_jvm_options,
-      lambda tgt: tgt.payload.extra_env_vars,
-      lambda tgt: tgt.concurrency,
-      lambda tgt: tgt.threads)
+            batch_output_dir = output_dir
+            if self._batched:
+                batch_output_dir = os.path.join(batch_output_dir, f"batch-{batch_id}")
 
-    # NB: Python 3 does not allow comparisons between None and other types like str. Several
-    # of the properties, which act as dictionary keys, may have None values, whereas another
-    # may have a non-None value for the same property, so comparison when sorting would fail.
-    # We provide this custom key function to avoid such invalid comparisons, while still
-    # allowing us to use None to represent non-present properties.
-    def _sort_properties(properties_with_tests):
-      workdir, platform, extra_jvm_options, extra_env_vars, concurrency, threads = properties_with_tests[0]
-      return (
-        workdir or '',
-        platform,
-        extra_jvm_options,  # Will always be a tuple.
-        extra_env_vars,  # Will always be a tuple.
-        concurrency or "",
-        threads or 0)
+            run_modifications = coverage.run_modifications(batch_output_dir)
+            self.context.log.debug(f"run_modifications: {run_modifications}")
 
-    for properties, tests in sorted(tests_by_properties.items(), key=_sort_properties):
-      sorted_tests = sorted(tests)
-      stride = min(self._batch_size, len(sorted_tests))
-      for i in range(0, len(sorted_tests), stride):
-        yield properties, sorted_tests[i:i + stride]
+            extra_jvm_options = run_modifications.extra_jvm_options
 
-  def _parse(self, test_spec_str):
-    """Parses a test specification string into an object that can yield corresponding tests.
+            # Batches of test classes will likely exist within the same targets: dedupe them.
+            relevant_targets = {test_registry.get_owning_target(t) for t in batch}
+
+            complete_classpath = OrderedSet()
+            complete_classpath.update(run_modifications.classpath_prepend)
+            complete_classpath.update(JUnit.global_instance().runner_classpath(self.context))
+            complete_classpath.update(
+                self.classpath(relevant_targets, classpath_product=classpath_product)
+            )
+
+            distribution = self.preferred_jvm_distribution([platform], self._strict_jvm_version)
+
+            # Override cmdline args with values from junit_test() target that specify concurrency:
+            args = self._args(fail_fast, batch_output_dir) + ["-xmlreport"]
+
+            if concurrency is not None:
+                args = remove_arg(args, "-default-parallel")
+                if concurrency == JUnitTests.CONCURRENCY_SERIAL:
+                    args = ensure_arg(args, "-default-concurrency", param="SERIAL")
+                elif concurrency == JUnitTests.CONCURRENCY_PARALLEL_CLASSES:
+                    args = ensure_arg(args, "-default-concurrency", param="PARALLEL_CLASSES")
+                elif concurrency == JUnitTests.CONCURRENCY_PARALLEL_METHODS:
+                    args = ensure_arg(args, "-default-concurrency", param="PARALLEL_METHODS")
+                elif concurrency == JUnitTests.CONCURRENCY_PARALLEL_CLASSES_AND_METHODS:
+                    args = ensure_arg(
+                        args, "-default-concurrency", param="PARALLEL_CLASSES_AND_METHODS"
+                    )
+
+            if threads is not None:
+                args = remove_arg(args, "-parallel-threads", has_param=True)
+                args += ["-parallel-threads", str(threads)]
+
+            batch_test_specs = [test.render_test_spec() for test in batch]
+            with argfile.safe_args(batch_test_specs, self.get_options()) as batch_tests:
+                with self.chroot(relevant_targets, workdir) as chroot:
+                    self.context.log.debug(f"CWD = {chroot}")
+                    self.context.log.debug(f"platform = {platform}")
+                    with environment_as(**dict(target_env_vars)):
+                        subprocess_result = self.spawn_and_wait(
+                            relevant_targets,
+                            executor=SubprocessExecutor(distribution),
+                            distribution=distribution,
+                            classpath=complete_classpath,
+                            main=JUnit.RUNNER_MAIN,
+                            jvm_options=self.jvm_options
+                            + list(platform.jvm_options)
+                            + extra_jvm_options
+                            + list(target_jvm_options),
+                            args=args + batch_tests,
+                            workunit_factory=self.context.new_workunit,
+                            workunit_name="run",
+                            workunit_labels=[WorkUnitLabel.TEST],
+                            cwd=chroot,
+                            synthetic_jar_dir=batch_output_dir,
+                            create_synthetic_jar=self.synthetic_classpath,
+                        )
+                        self.context.log.debug(
+                            "JUnit subprocess exited with result ({})".format(subprocess_result)
+                        )
+                        result += abs(subprocess_result)
+
+                tests_info = self.parse_test_info(
+                    batch_output_dir, parse_error_handler, ["classname"]
+                )
+                for test_name, test_info in tests_info.items():
+                    test_item = Test(test_info["classname"], test_name)
+                    test_target = test_registry.get_owning_target(test_item)
+                    self.report_all_info_for_single_test(
+                        self.options_scope, test_target, test_name, test_info
+                    )
+
+                if result != 0 and fail_fast:
+                    break
+
+        if result == 0:
+            return TestResult.successful
+
+        # NB: If the TestRegistry fails to find the owning target of a failed test, the target key in
+        # this dictionary will be None: helper methods in this block account for that.
+        target_to_failed_test = parse_failed_targets(test_registry, output_dir, parse_error_handler)
+
+        def sort_owning_target(t):
+            return t.address.spec if t else ""
+
+        failed_targets = sorted(target_to_failed_test, key=sort_owning_target)
+        error_message_lines = []
+        if self._failure_summary:
+
+            def render_owning_target(t):
+                return t.address.reference() if t else "<Unknown Target>"
+
+            for target in failed_targets:
+                error_message_lines.append(f"\n{(' ' * 4)}{render_owning_target(target)}")
+                for test in sorted(target_to_failed_test[target]):
+                    error_message_lines.append(f"{' ' * 8}{test.classname}#{test.methodname}")
+        error_message_lines.append(
+            "\njava {main} ... exited non-zero ({code}); {failed} failed {targets}.".format(
+                main=JUnit.RUNNER_MAIN,
+                code=result,
+                failed=len(failed_targets),
+                targets=pluralize(len(failed_targets), "target"),
+            )
+        )
+        return TestResult(
+            msg="\n".join(error_message_lines), rc=result, failed_targets=failed_targets
+        )
+
+    def _iter_batches(self, test_registry):
+        tests_by_properties = test_registry.index(
+            lambda tgt: tgt.cwd if tgt.cwd is not None else self._working_dir,
+            lambda tgt: tgt.runtime_platform,
+            lambda tgt: tgt.payload.extra_jvm_options,
+            lambda tgt: tgt.payload.extra_env_vars,
+            lambda tgt: tgt.concurrency,
+            lambda tgt: tgt.threads,
+        )
+
+        # NB: Python 3 does not allow comparisons between None and other types like str. Several
+        # of the properties, which act as dictionary keys, may have None values, whereas another
+        # may have a non-None value for the same property, so comparison when sorting would fail.
+        # We provide this custom key function to avoid such invalid comparisons, while still
+        # allowing us to use None to represent non-present properties.
+        def _sort_properties(properties_with_tests):
+            (
+                workdir,
+                platform,
+                extra_jvm_options,
+                extra_env_vars,
+                concurrency,
+                threads,
+            ) = properties_with_tests[0]
+            return (
+                workdir or "",
+                platform,
+                extra_jvm_options,  # Will always be a tuple.
+                extra_env_vars,  # Will always be a tuple.
+                concurrency or "",
+                threads or 0,
+            )
+
+        for properties, tests in sorted(tests_by_properties.items(), key=_sort_properties):
+            sorted_tests = sorted(tests)
+            stride = min(self._batch_size, len(sorted_tests))
+            for i in range(0, len(sorted_tests), stride):
+                yield properties, sorted_tests[i : i + stride]
+
+    def _parse(self, test_spec_str):
+        """Parses a test specification string into an object that can yield corresponding tests.
 
     Tests can be specified in one of four forms:
 
@@ -415,159 +525,173 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     :returns: A Test object.
     :rtype: :class:`Test`
     """
-    components = test_spec_str.split('#', 2)
-    classname = components[0]
-    methodname = components[1] if len(components) == 2 else None
+        components = test_spec_str.split("#", 2)
+        classname = components[0]
+        methodname = components[1] if len(components) == 2 else None
 
-    return Test(classname=classname, methodname=methodname)
+        return Test(classname=classname, methodname=methodname)
 
-  def _get_possible_tests_to_run(self):
-    for test_spec_str in self._tests_to_run:
-      yield self._parse(test_spec_str)
+    def _get_possible_tests_to_run(self):
+        for test_spec_str in self._tests_to_run:
+            yield self._parse(test_spec_str)
 
-  def _calculate_tests_from_targets(self, targets):
-    """
+    def _calculate_tests_from_targets(self, targets):
+        """
     :param list targets: list of targets to calculate test classes for.
     generates tuples (Test, Target).
     """
-    classpath_products = self.context.products.get_data('runtime_classpath')
-    for target in targets:
-      contents = ClasspathUtil.classpath_contents((target,), classpath_products, confs=self.confs)
-      for f in contents:
-        classname = ClasspathUtil.classname_for_rel_classfile(f)
-        if classname:
-          yield Test(classname=classname), target
+        classpath_products = self.context.products.get_data("runtime_classpath")
+        for target in targets:
+            contents = ClasspathUtil.classpath_contents(
+                (target,), classpath_products, confs=self.confs
+            )
+            for f in contents:
+                classname = ClasspathUtil.classname_for_rel_classfile(f)
+                if classname:
+                    yield Test(classname=classname), target
 
-  def _test_target_filter(self):
-    def target_filter(target):
-      return isinstance(target, JUnitTests)
-    return target_filter
+    def _test_target_filter(self):
+        def target_filter(target):
+            return isinstance(target, JUnitTests)
 
-  def _validate_target(self, target):
-    # TODO: move this check to an optional phase in goal_runner, so
-    # that missing sources can be detected early.
-    if not target.payload.sources.source_paths and not self.get_options().allow_empty_sources:
-      msg = 'JUnitTests target must include a non-empty set of sources.'
-      raise TargetDefinitionException(target, msg)
+        return target_filter
 
-  def collect_files(self, output_dir, coverage, _complete_test_registry):
-    def files_iter():
-      for dir_path, _, file_names in os.walk(output_dir):
-        for filename in file_names:
-          yield os.path.join(dir_path, filename)
-    return list(files_iter())
+    def _validate_target(self, target):
+        # TODO: move this check to an optional phase in goal_runner, so
+        # that missing sources can be detected early.
+        if not target.payload.sources.source_paths and not self.get_options().allow_empty_sources:
+            msg = "JUnitTests target must include a non-empty set of sources."
+            raise TargetDefinitionException(target, msg)
 
-  @contextmanager
-  def partitions(self, per_target, all_targets, test_targets):
-    complete_test_registry = self._collect_test_targets(test_targets)
-    with self._isolation(per_target, all_targets) as (output_dir, reports, coverage):
-      if per_target:
-        def iter_partitions():
-          for test_target in test_targets:
-            partition = (test_target,)
-            args = (os.path.join(output_dir, test_target.id), coverage, complete_test_registry)
-            yield partition, args
-      else:
-        def iter_partitions():
-          if test_targets:
-            partition = tuple(test_targets)
-            args = (output_dir, coverage, complete_test_registry)
-            yield partition, args
+    def collect_files(self, output_dir, coverage, _complete_test_registry):
+        def files_iter():
+            for dir_path, _, file_names in os.walk(output_dir):
+                for filename in file_names:
+                    yield os.path.join(dir_path, filename)
 
-      try:
-        yield iter_partitions
-      finally:
-        _, error, _ = sys.exc_info()
-        reports.generate(output_dir, exc=error)
+        return list(files_iter())
 
-  class Reports:
-    def __init__(self, junit_html_report, coverage):
-      self._junit_html_report = junit_html_report
-      self._coverage = coverage
+    @contextmanager
+    def partitions(self, per_target, all_targets, test_targets):
+        complete_test_registry = self._collect_test_targets(test_targets)
+        with self._isolation(per_target, all_targets) as (output_dir, reports, coverage):
+            if per_target:
 
-    def generate(self, output_dir, exc=None):
-      junit_report_path = self._junit_html_report.report(output_dir)
-      self._maybe_open_report(junit_report_path)
+                def iter_partitions():
+                    for test_target in test_targets:
+                        partition = (test_target,)
+                        args = (
+                            os.path.join(output_dir, test_target.id),
+                            coverage,
+                            complete_test_registry,
+                        )
+                        yield partition, args
 
-      coverage_report_path = self._coverage.report(output_dir, execution_failed_exception=exc)
-      self._maybe_open_report(coverage_report_path)
+            else:
 
-    def _maybe_open_report(self, report_file_path):
-      if report_file_path:
-        try:
-          desktop.ui_open(report_file_path)
-        except desktop.OpenError as e:
-          raise TaskError(e)
+                def iter_partitions():
+                    if test_targets:
+                        partition = tuple(test_targets)
+                        args = (output_dir, coverage, complete_test_registry)
+                        yield partition, args
 
-  @contextmanager
-  def _isolation(self, per_target, all_targets):
-    run_dir = '_runs'
-    mode_dir = 'isolated' if per_target else 'combined'
-    batch_dir = str(self._batch_size) if self._batched else 'all'
-    output_dir = os.path.join(self.workdir,
-                              run_dir,
-                              Target.identify(all_targets),
-                              mode_dir,
-                              batch_dir)
-    safe_mkdir(output_dir, clean=False)
+            try:
+                yield iter_partitions
+            finally:
+                _, error, _ = sys.exc_info()
+                reports.generate(output_dir, exc=error)
 
-    if self._html_report:
-      junit_html_report = JUnitHtmlReport.create(xml_dir=output_dir,
-                                                 open_report=self.get_options().open,
-                                                 logger=self.context.log,
-                                                 error_on_conflict=self.get_options().html_report_error_on_conflict)
-    else:
-      junit_html_report = NoJunitHtmlReport()
+    class Reports:
+        def __init__(self, junit_html_report, coverage):
+            self._junit_html_report = junit_html_report
+            self._coverage = coverage
 
-    coverage = CodeCoverage.global_instance().get_coverage_engine(
-      self,
-      output_dir,
-      all_targets,
-      self.execute_java_for_coverage)
+        def generate(self, output_dir, exc=None):
+            junit_report_path = self._junit_html_report.report(output_dir)
+            self._maybe_open_report(junit_report_path)
 
-    reports = self.Reports(junit_html_report, coverage)
+            coverage_report_path = self._coverage.report(output_dir, execution_failed_exception=exc)
+            self._maybe_open_report(coverage_report_path)
 
-    self.context.release_lock()
-    try:
-      yield output_dir, reports, coverage
-    finally:
-      lock_file = '.file_lock'
-      preserve = (run_dir, lock_file)
-      dist_dir = os.path.join(self.get_options().pants_distdir,
-                              os.path.relpath(self.workdir, self.get_options().pants_workdir))
+        def _maybe_open_report(self, report_file_path):
+            if report_file_path:
+                try:
+                    desktop.ui_open(report_file_path)
+                except desktop.OpenError as e:
+                    raise TaskError(e)
 
-      with OwnerPrintingInterProcessFileLock(os.path.join(dist_dir, lock_file)):
-        self._link_current_reports(report_dir=output_dir, link_dir=dist_dir,
-                                   preserve=preserve)
+    @contextmanager
+    def _isolation(self, per_target, all_targets):
+        run_dir = "_runs"
+        mode_dir = "isolated" if per_target else "combined"
+        batch_dir = str(self._batch_size) if self._batched else "all"
+        output_dir = os.path.join(
+            self.workdir, run_dir, Target.identify(all_targets), mode_dir, batch_dir
+        )
+        safe_mkdir(output_dir, clean=False)
 
-  def _link_current_reports(self, report_dir, link_dir, preserve):
-    # Kill everything not preserved.
-    for name in os.listdir(link_dir):
-      path = os.path.join(link_dir, name)
-      if name not in preserve:
-        if os.path.isdir(path):
-          safe_rmtree(path)
+        if self._html_report:
+            junit_html_report = JUnitHtmlReport.create(
+                xml_dir=output_dir,
+                open_report=self.get_options().open,
+                logger=self.context.log,
+                error_on_conflict=self.get_options().html_report_error_on_conflict,
+            )
         else:
-          os.unlink(path)
+            junit_html_report = NoJunitHtmlReport()
 
-    # Link ~all the isolated run/ dir contents back up to the stable workdir
-    # NB: When batching is enabled, files can be emitted under different subdirs. If those files
-    # have the like-names, the last file with a like-name will be the one that is used. This may
-    # result in a loss of information from the ignored files. We're OK with this because:
-    # a) We're planning on deprecating this loss of information.
-    # b) It is the same behavior as existed before batching was added.
-    for root, dirs, files in safe_walk(report_dir, topdown=True):
-      dirs.sort()  # Ensure a consistent walk order for sanity sake.
-      for f in itertools.chain(fnmatch.filter(files, '*.err.txt'),
-                               fnmatch.filter(files, '*.out.txt'),
-                               fnmatch.filter(files, 'TEST-*.xml')):
-        src = os.path.join(root, f)
-        dst = os.path.join(link_dir, f)
-        safe_delete(dst)
-        os.symlink(src, dst)
+        coverage = CodeCoverage.global_instance().get_coverage_engine(
+            self, output_dir, all_targets, self.execute_java_for_coverage
+        )
 
-    for path in os.listdir(report_dir):
-      if path in ('coverage', 'reports'):
-        src = os.path.join(report_dir, path)
-        dst = os.path.join(link_dir, path)
-        os.symlink(src, dst)
+        reports = self.Reports(junit_html_report, coverage)
+
+        self.context.release_lock()
+        try:
+            yield output_dir, reports, coverage
+        finally:
+            lock_file = ".file_lock"
+            preserve = (run_dir, lock_file)
+            dist_dir = os.path.join(
+                self.get_options().pants_distdir,
+                os.path.relpath(self.workdir, self.get_options().pants_workdir),
+            )
+
+            with OwnerPrintingInterProcessFileLock(os.path.join(dist_dir, lock_file)):
+                self._link_current_reports(
+                    report_dir=output_dir, link_dir=dist_dir, preserve=preserve
+                )
+
+    def _link_current_reports(self, report_dir, link_dir, preserve):
+        # Kill everything not preserved.
+        for name in os.listdir(link_dir):
+            path = os.path.join(link_dir, name)
+            if name not in preserve:
+                if os.path.isdir(path):
+                    safe_rmtree(path)
+                else:
+                    os.unlink(path)
+
+        # Link ~all the isolated run/ dir contents back up to the stable workdir
+        # NB: When batching is enabled, files can be emitted under different subdirs. If those files
+        # have the like-names, the last file with a like-name will be the one that is used. This may
+        # result in a loss of information from the ignored files. We're OK with this because:
+        # a) We're planning on deprecating this loss of information.
+        # b) It is the same behavior as existed before batching was added.
+        for root, dirs, files in safe_walk(report_dir, topdown=True):
+            dirs.sort()  # Ensure a consistent walk order for sanity sake.
+            for f in itertools.chain(
+                fnmatch.filter(files, "*.err.txt"),
+                fnmatch.filter(files, "*.out.txt"),
+                fnmatch.filter(files, "TEST-*.xml"),
+            ):
+                src = os.path.join(root, f)
+                dst = os.path.join(link_dir, f)
+                safe_delete(dst)
+                os.symlink(src, dst)
+
+        for path in os.listdir(report_dir):
+            if path in ("coverage", "reports"):
+                src = os.path.join(report_dir, path)
+                dst = os.path.join(link_dir, path)
+                os.symlink(src, dst)
