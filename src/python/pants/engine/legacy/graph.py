@@ -625,7 +625,9 @@ async def hydrate_sources(
     glob_match_error_behavior=glob_match_error_behavior,
     # TODO(#9012): add line number referring to the sources field.
     description_of_origin=(
-      f"{address.rel_path} for target {address.relative_spec}'s `{sources_field.arg}` field"
+        f"{address}'s `{sources_field.arg}` field"
+        if glob_match_error_behavior != GlobMatchErrorBehavior.ignore
+        else None
     ),
   )
   snapshot = await Get[Snapshot](PathGlobs, path_globs)
@@ -649,7 +651,11 @@ async def hydrate_bundles(
       pg,
       glob_match_error_behavior=glob_match_error_behavior,
       # TODO(#9012): add line number referring to the bundles field.
-      description_of_origin=f"{address.rel_path} for target {address.relative_spec}'s `bundles` field",
+      description_of_origin=(
+          f"{address}'s `bundles` field"
+          if glob_match_error_behavior != GlobMatchErrorBehavior.ignore
+          else None
+      ),
     )
     for pg in bundles_field.path_globs_list
   ]

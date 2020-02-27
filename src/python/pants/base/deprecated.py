@@ -188,6 +188,7 @@ def deprecated_conditional(
   removal_version: str,
   entity_description: str,
   hint_message: Optional[str] = None,
+  deprecation_start_version: Optional[str] = None,
   stacklevel: int = 4
 ) -> None:
   """Marks a certain configuration as deprecated.
@@ -204,7 +205,13 @@ def deprecated_conditional(
   """
   validate_deprecation_semver(removal_version, 'removal version')
   if predicate():
-    warn_or_error(removal_version, entity_description, hint_message, stacklevel=stacklevel)
+    warn_or_error(
+      removal_version,
+      entity_description,
+      hint_message,
+      deprecation_start_version=deprecation_start_version,
+      stacklevel=stacklevel,
+    )
 
 
 def deprecated(
