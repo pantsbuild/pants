@@ -8,7 +8,7 @@ from pants.backend.jvm.subsystems.zinc import Zinc
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
-from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import BaseZincCompile
+from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import BaseZincCompile, ZincCompile
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.build_environment import get_buildroot
 from pants.testutil.jvm.nailgun_task_test_base import NailgunTaskTestBase
@@ -23,6 +23,9 @@ class DummyJvmCompile(JvmCompile):
 
     def do_compile(self, invalidation_check, compile_contexts, classpath_product):
         pass
+
+    def product_types(cls):
+        return ZincCompile.product_types()
 
 
 class JvmCompileTest(NailgunTaskTestBase):
