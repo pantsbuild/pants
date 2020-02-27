@@ -406,14 +406,13 @@ class ExportDepAsJar(ConsoleTask):
         targets.extend(additional_java_targets)
         return set(targets)
 
-    def _get_targets_to_make_into_modules(
-      self, resource_target_map, runtime_classpath
-    ):
-        jvm_modulizable_targets = self.context.products.get_data('jvm_modulizable_targets')
+    def _get_targets_to_make_into_modules(self, resource_target_map, runtime_classpath):
+        jvm_modulizable_targets = self.context.products.get_data("jvm_modulizable_targets")
         non_generated_resource_jvm_modulizable_targets = [
-            t for t in jvm_modulizable_targets
-            if self._get_target_type(t, resource_target_map,
-                runtime_classpath) is not SourceRootTypes.RESOURCE_GENERATED
+            t
+            for t in jvm_modulizable_targets
+            if self._get_target_type(t, resource_target_map, runtime_classpath)
+            is not SourceRootTypes.RESOURCE_GENERATED
         ]
         return non_generated_resource_jvm_modulizable_targets
 

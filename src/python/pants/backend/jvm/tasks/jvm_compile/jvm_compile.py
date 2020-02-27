@@ -546,7 +546,10 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
         relevant_targets = list(self.context.targets(predicate=self.select))
         # If we are only exporting jars then we can omit some targets from the runtime_classpath.
         modulizable_targets = None
-        if self.context.products.is_required_data("export_dep_as_jar_signal") and "jvm_modulizable_targets" in self.product_types():
+        if (
+            self.context.products.is_required_data("export_dep_as_jar_signal")
+            and "jvm_modulizable_targets" in self.product_types()
+        ):
             modulizable_targets = self.calculate_jvm_modulizable_targets()
             synthetic_modulizable_targets = set(
                 filter(lambda x: x.is_synthetic, modulizable_targets)
