@@ -807,7 +807,7 @@ class Parser:
             if type_arg == file_option:
                 check_file_exists(val)
             if type_arg == dir_option:
-                check_dir_option(val)
+                check_dir_exists(val)
 
         def check_file_exists(val) -> None:
             error_prefix = f"File value `{val}` for option `{dest}` in `{self._scope_str()}`"
@@ -819,7 +819,7 @@ class Parser:
             if not path.is_file() and not path_with_buildroot.is_file():
                 raise ParseError(f"{error_prefix} does not exist.")
 
-        def check_dir_option(val) -> None:
+        def check_dir_exists(val) -> None:
             error_prefix = f"Directory value `{val}` for option `{dest}` in `{self._scope_str()}`"
             try:
                 path = Path(val)
