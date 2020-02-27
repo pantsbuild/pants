@@ -3,8 +3,6 @@
 
 from typing import List, Optional
 
-import pytest
-
 from pants.backend.python.lint.bandit.rules import BanditTarget
 from pants.backend.python.lint.bandit.rules import rules as bandit_rules
 from pants.backend.python.targets.python_library import PythonLibrary
@@ -47,7 +45,6 @@ class BanditIntegrationTest(TestBase):
     ) -> LintResult:
         args = ["--backend-packages2=pants.backend.python.lint.bandit"]
         if config:
-            # TODO(#9148): The config file exists but parser.py cannot find it
             self.create_file(relpath=".bandit", contents=config)
             args.append("--bandit-config=.bandit")
         if passthrough_args:
@@ -89,7 +86,6 @@ class BanditIntegrationTest(TestBase):
         assert result.exit_code == 0
         assert "No issues identified." in result.stdout
 
-    @pytest.mark.skip(reason="#9148: The config file exists but parser.py cannot find it")
     def test_respects_config_file(self) -> None:
         result = self.run_bandit([self.bad_source], config="skips: ['B303']\n")
         assert result.exit_code == 0
