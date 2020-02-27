@@ -460,6 +460,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
             "--pants-ignore",
             advanced=True,
             type=list,
+            member_type=str,
             default=[".*/", default_rel_distdir],
             help="Paths to ignore for all filesystem operations performed by pants "
             "(e.g. BUILD file scanning, glob matching, etc). "

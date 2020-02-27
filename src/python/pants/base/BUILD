@@ -15,7 +15,7 @@ python_library(
 
 python_library(
   name = 'project_tree',
-  sources = ['file_system_project_tree.py', 'project_tree.py', 'project_tree_factory.py'],
+  sources = ['file_system_project_tree.py', 'project_tree.py'],
   dependencies = [
     '3rdparty/python:dataclasses',
     '3rdparty/python:pathspec',
