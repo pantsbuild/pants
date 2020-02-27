@@ -7,40 +7,52 @@ import os
 import shutil
 import site
 import uuid
+from typing import Iterable, Iterator, List, Optional, Tuple, Type, TypeVar, cast
 
 from pex import resolver
 from pex.interpreter import PythonInterpreter
-from pkg_resources import Distribution
+from pkg_resources import Distribution, WorkingSet
 from pkg_resources import working_set as global_working_set
 
 from pants.option.global_options import GlobalOptionsRegistrar
+from pants.option.optionable import Optionable
+from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.option.scope import ScopeInfo
 from pants.python.python_repos import PythonRepos
+from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_concurrent_rename, safe_delete, safe_open
 from pants.util.memo import memoized_property
-from pants.util.strutil import ensure_text
 from pants.version import PANTS_SEMVER
 
 logger = logging.getLogger(__name__)
 
 
+S = TypeVar("S", bound=Subsystem)
+
+
 class PluginResolver:
     @staticmethod
-    def _is_wheel(path):
+    def _is_wheel(path) -> bool:
         return os.path.isfile(path) and path.endswith(".whl")
 
-    def __init__(self, options_bootstrapper, *, interpreter=None):
+    def __init__(
+        self,
+        options_bootstrapper: OptionsBootstrapper,
+        *,
+        interpreter: Optional[PythonInterpreter] = None,
+    ) -> None:
         self._options_bootstrapper = options_bootstrapper
         self._interpreter = interpreter or PythonInterpreter.get()
 
         bootstrap_options = self._options_bootstrapper.get_bootstrap_options().for_global_scope()
-        self._plugin_requirements = sorted(
+        self._plugin_requirements: List[str] = sorted(
             set(bootstrap_options.plugins) | set(bootstrap_options.plugins2)
         )
-        self._plugin_cache_dir = bootstrap_options.plugin_cache_dir
-        self._plugins_force_resolve = bootstrap_options.plugins_force_resolve
+        self._plugin_cache_dir: str = bootstrap_options.plugin_cache_dir
+        self._plugins_force_resolve: bool = bootstrap_options.plugins_force_resolve
 
-    def resolve(self, working_set=None):
+    def resolve(self, working_set: Optional[WorkingSet] = None) -> WorkingSet:
         """Resolves any configured plugins and adds them to the global working set.
 
         :param working_set: The working set to add the resolved plugins to instead of the global
@@ -56,7 +68,7 @@ class PluginResolver:
                 working_set.add_entry(resolved_plugin_location)
         return working_set
 
-    def _resolve_plugin_locations(self):
+    def _resolve_plugin_locations(self) -> Iterator[str]:
         hasher = hashlib.sha1()
 
         # Assume we have platform-specific plugin requirements and pessimistically mix the ABI
@@ -75,16 +87,14 @@ class PluginResolver:
             tmp_plugins_list = f"{resolved_plugins_list}.{uuid.uuid4().hex}"
             with safe_open(tmp_plugins_list, "w") as fp:
                 for plugin in self._resolve_plugins():
-                    fp.write(ensure_text(plugin))
-                    fp.write("\n")
+                    fp.write(f"{plugin}\n")
             os.rename(tmp_plugins_list, resolved_plugins_list)
         with open(resolved_plugins_list, "r") as fp:
             for plugin in fp:
                 plugin_path = plugin.strip()
-                plugin_location = f"{self._plugin_location(plugin_path)}"
-                yield plugin_location
+                yield self._plugin_location(plugin_path)
 
-    def _resolve_plugins(self):
+    def _resolve_plugins(self) -> Iterable[str]:
         logger.info(
             "Resolving new plugins...:\n  {}".format("\n  ".join(self._plugin_requirements))
         )
@@ -101,10 +111,10 @@ class PluginResolver:
         ]
 
     @classmethod
-    def _plugin_location(cls, plugin_path):
+    def _plugin_location(cls, plugin_path: str) -> str:
         return f"{plugin_path}-install"
 
-    def _install_plugin(self, distribution: Distribution):
+    def _install_plugin(self, distribution: Distribution) -> str:
         # We don't actually install the distribution. It's installed for us by the Pex resolver in
         # a chroot. We just copy that chroot out of the Pex cache to a location we control.
         # Historically though, Pex did not install wheels it resolved and we did this here by hand.
@@ -153,25 +163,24 @@ class PluginResolver:
             return plugin_path
 
     @property
-    def plugin_cache_dir(self):
+    def plugin_cache_dir(self) -> str:
         """The path of the directory pants plugins bdists are cached in."""
         return self._plugin_cache_dir
 
     @memoized_property
-    def _python_repos(self):
+    def _python_repos(self) -> PythonRepos:
         return self._create_global_subsystem(PythonRepos)
 
-    def _create_global_subsystem(self, subsystem_type):
-        options_scope = subsystem_type.options_scope
+    def _create_global_subsystem(self, subsystem_type: Type[S]) -> S:
+        options_scope = cast(str, subsystem_type.options_scope)
 
         # NB: The PluginResolver runs very early in the pants startup sequence before the standard
         # Subsystem facility is wired up.  As a result PluginResolver is not itself a Subsystem with
         # PythonRepos as a dependency.  Instead it does the minimum possible work to hand-roll
         # bootstrapping of the Subsystems it needs.
-        known_scope_infos = [
-            ksi
-            for optionable in [GlobalOptionsRegistrar, PythonRepos]
-            for ksi in optionable.known_scope_infos()
+        optionables: Tuple[Type[Optionable], ...] = (GlobalOptionsRegistrar, PythonRepos)
+        known_scope_infos: List[ScopeInfo] = [
+            ksi for optionable in optionables for ksi in optionable.known_scope_infos()
         ]
         options = self._options_bootstrapper.get_full_options(known_scope_infos)
 
