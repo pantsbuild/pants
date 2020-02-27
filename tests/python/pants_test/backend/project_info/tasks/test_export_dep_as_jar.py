@@ -184,15 +184,7 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
         self.jvm_target_with_sources = self.make_target(
             "project_info:jvm_target",
             target_type=ScalaLibrary,
-            dependencies=[
-                jar_lib,
-                self.make_target(
-                    "project_info:jvm_target_b",
-                    target_type=ScalaLibrary,
-                    dependencies=[],
-                    sources=[],
-                ),
-            ],
+            dependencies=[jar_lib],
             sources=["this/is/a/source/Foo.scala", "this/is/a/source/Bar.scala"],
         )
 
@@ -376,11 +368,7 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
                 ]
             },
             "libraries": sorted(
-                [
-                    "org.apache:apache-jar:12.12.2012",
-                    "org.scala-lang:scala-library:2.10.5",
-                    "project_info.jvm_target_b",
-                ]
+                ["org.apache:apache-jar:12.12.2012", "org.scala-lang:scala-library:2.10.5"]
             ),
             "id": "project_info.jvm_target",
             # 'is_code_gen': False,
@@ -396,6 +384,7 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
                 },
             ],
             "scope": "default",
+            "source_dependencies_in_classpath": ["project_info:jvm_target"],
             "target_type": "SOURCE",
             "transitive": True,
             "pants_target_type": "scala_library",
@@ -552,7 +541,7 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
 
     def test_includes_targets_between_roots(self):
         result = self.execute_export_json(
-            "project_info:scala_with_source_dep", "project_info:jvm_target_b"
+            "project_info:scala_with_source_dep", "project_info:jar_lib"
         )
         self.assertIn("project_info:jvm_target", result["targets"].keys())
 

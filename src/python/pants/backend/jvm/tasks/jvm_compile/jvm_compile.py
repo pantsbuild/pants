@@ -13,6 +13,7 @@ from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.zinc import Zinc
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
+from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_target import JvmTarget
@@ -592,7 +593,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
     def calculate_jvm_modulizable_targets(self):
         def is_jvm_or_resource_target(t):
-            return isinstance(t, (JvmTarget, JvmApp, Resources))
+            return isinstance(t, (JvmTarget, JvmApp, JarLibrary, Resources))
 
         jvm_and_resources_target_roots = set(
             filter(is_jvm_or_resource_target, self.context.target_roots)
