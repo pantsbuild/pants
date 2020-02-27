@@ -67,6 +67,7 @@ class Scheduler:
         *,
         native,
         ignore_patterns: List[str],
+        use_gitignore: bool,
         build_root: str,
         local_store_dir: str,
         rules: Tuple[Rule, ...],
@@ -79,6 +80,7 @@ class Scheduler:
         """
         :param native: An instance of engine.native.Native.
         :param ignore_patterns: A list of gitignore-style file patterns for pants to ignore.
+        :param use_gitignore: If set, pay attention to .gitignore files.
         :param build_root: The build root as a string.
         :param work_dir: The pants work dir.
         :param local_store_dir: The directory to use for storing the engine's LMDB store in.
@@ -106,6 +108,7 @@ class Scheduler:
             build_root=build_root,
             local_store_dir=local_store_dir,
             ignore_patterns=ignore_patterns,
+            use_gitignore=use_gitignore,
             execution_options=execution_options,
         )
 

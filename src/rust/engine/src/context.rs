@@ -65,6 +65,7 @@ impl Core {
     types: Types,
     build_root: PathBuf,
     ignore_patterns: &[String],
+    use_gitignore: bool,
     local_store_dir: PathBuf,
     remote_execution: bool,
     remote_store_servers: Vec<String>,
@@ -240,6 +241,7 @@ impl Core {
     let http_client = reqwest::Client::new();
     let rule_graph = RuleGraph::new(tasks.as_map(), root_subject_types);
 
+    let _ = use_gitignore;
     let ignorer = GitignoreStyleExcludes::create(&ignore_patterns).map_err(|e| {
       format!(
         "Could not parse build ignore inputs {:?}: {:?}",

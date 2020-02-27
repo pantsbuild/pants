@@ -438,6 +438,14 @@ class GlobalOptions(Subsystem):
             "The `--pants-distdir` and `--pants-workdir` locations are inherently ignored.",
         )
         register(
+            "--pants-gitignore",
+            advanced=True,
+            type=bool,
+            default=False,
+            help="Make use of .gitignore files when determining whether to ignore filesystem "
+            "operations performed by pants. This may be used together with `--pants-ignore`.",
+        )
+        register(
             "--owners-not-found-behavior",
             advanced=True,
             type=OwnersNotFoundBehavior,
