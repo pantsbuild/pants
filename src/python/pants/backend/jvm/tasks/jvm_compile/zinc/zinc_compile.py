@@ -922,6 +922,7 @@ class ZincCompile(BaseZincCompile):
             "export_dep_as_jar_signal",
             "zinc_analysis",
             "zinc_args",
+            "jvm_modulizable_targets",
         ]
 
     @staticmethod

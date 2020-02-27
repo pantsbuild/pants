@@ -323,7 +323,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
         raise NotImplementedError()
 
     def product_types(cls):
-        return super(JvmCompile, cls).product_types() + ["jvm_modulizable_targets"]
+        return super(JvmCompile, cls).product_types()
 
     def compile(
         self,
@@ -545,7 +545,8 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
         relevant_targets = list(self.context.targets(predicate=self.select))
         # If we are only exporting jars then we can omit some targets from the runtime_classpath.
-        if self.context.products.is_required_data("export_dep_as_jar_signal"):
+        modulizable_targets = None
+        if self.context.products.is_required_data("export_dep_as_jar_signal") and "jvm_modulizable_targets" in self.product_types():
             modulizable_targets = self.calculate_jvm_modulizable_targets()
             synthetic_modulizable_targets = set(
                 filter(lambda x: x.is_synthetic, modulizable_targets)
@@ -557,11 +558,9 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
                 )
 
             relevant_targets = list(set(relevant_targets) - modulizable_targets)
-            self.create_extra_products_for_targets(modulizable_targets)
             self.context.products.get_data("jvm_modulizable_targets", set).update(
                 modulizable_targets
             )
-            self.create_extra_products_for_targets(modulizable_targets)
 
         if relevant_targets:
             # Note, JVM targets are validated (`vts.update()`) as they succeed.  As a result,
@@ -573,7 +572,6 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
                 fingerprint_strategy=fingerprint_strategy,
                 topological_order=True,
             ) as invalidation_check:
-
                 compile_contexts = {
                     vt.target: self.create_compile_context(vt.target, vt.results_dir)
                     for vt in invalidation_check.all_vts
@@ -592,6 +590,9 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
                             classpath_product.remove_for_target(cc.target, [(conf, cc.classes_dir)])
                             classpath_product.add_for_target(cc.target, [(conf, cc.jar_file)])
 
+        if modulizable_targets is not None:
+            self.create_extra_products_for_targets(modulizable_targets)
+
     def calculate_jvm_modulizable_targets(self):
         def is_jvm_or_resource_target(t):
             return isinstance(t, (JvmTarget, JvmApp, JarLibrary, Resources))
@@ -609,9 +610,6 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
             )
             if is_jvm_or_resource_target(t)
         )
-
-        # import pdb
-        # pdb.set_trace()
         return modulizable_targets
 
     def _classpath_for_context(self, context):
