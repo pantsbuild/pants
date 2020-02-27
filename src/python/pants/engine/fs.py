@@ -55,8 +55,8 @@ class PathGlobs:
 
     The syntax supported is roughly Git's glob syntax.
 
-    NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to
-    be aware of any changes to this object's definition.
+    NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need
+    to be aware of any changes to this object's definition.
     """
 
     globs: Tuple[str, ...]
@@ -76,9 +76,9 @@ class PathGlobs:
                       with `!`, e.g. `!ignore.py`.
         :param glob_match_error_behavior: whether to warn or error upon match failures
         :param conjunction: whether all `include`s must match or only at least one must match
-        :param description_of_origin: a human-friendly description of where this PathGlobs request is
-                                      coming from, used to improve the error message for unmatched
-                                      globs. For example, this might be
+        :param description_of_origin: a human-friendly description of where this PathGlobs request
+                                      is coming from, used to improve the error message for
+                                      unmatched globs. For example, this might be the text string
                                       "the option `--isort-config`".
         """
         self.globs = tuple(globs)
