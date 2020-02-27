@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from abc import ABCMeta, abstractmethod
+from collections import OrderedDict
 from typing import Iterable, List, Tuple, Type
 from unittest.mock import Mock
 
@@ -13,6 +14,7 @@ from pants.rules.core.fmt_test import FmtTest
 from pants.rules.core.lint import Lint, Linter, LintResult, lint
 from pants.testutil.engine.util import MockConsole, MockGet, run_rule
 from pants.testutil.test_base import TestBase
+from pants.util.ordered_set import OrderedSet
 
 
 # TODO(#9141): replace this with a proper util to create `GoalSubsystem`s
@@ -100,7 +102,7 @@ class LintTest(TestBase):
         per_target_caching: bool,
     ) -> Tuple[int, str]:
         console = MockConsole(use_colors=False)
-        union_membership = UnionMembership({Linter: linters})
+        union_membership = UnionMembership(OrderedDict({Linter: OrderedSet(linters)}))
         result: Lint = run_rule(
             lint,
             rule_args=[
