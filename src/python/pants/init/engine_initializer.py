@@ -453,14 +453,12 @@ class EngineInitializer:
         # Create a Scheduler containing graph and filesystem rules, with no installed goals. The
         # LegacyBuildGraph will explicitly request the products it needs.
         rules = (
-            *(
-                RootRule(Console),
-                glob_match_error_behavior_singleton,
-                build_configuration_singleton,
-                symbol_table_singleton,
-                union_membership_singleton,
-                build_root_singleton,
-            ),
+            RootRule(Console),
+            glob_match_error_behavior_singleton,
+            build_configuration_singleton,
+            symbol_table_singleton,
+            union_membership_singleton,
+            build_root_singleton,
             *create_legacy_graph_tasks(),
             *create_fs_rules(),
             *create_interactive_runner_rules(),

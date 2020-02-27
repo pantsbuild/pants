@@ -7,9 +7,10 @@ import os
 import sys
 import time
 import traceback
+import typing
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Type
 
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE
@@ -24,11 +25,12 @@ from pants.engine.fs import (
 from pants.engine.native import Function, TypeId
 from pants.engine.nodes import Return, Throw
 from pants.engine.objects import Collection, union
-from pants.engine.rules import RuleIndex, TaskRule
+from pants.engine.rules import Rule, RuleIndex, TaskRule
 from pants.engine.selectors import Params
 from pants.option.global_options import ExecutionOptions
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import check_no_overlapping_paths
+from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import pluralize
 
 if TYPE_CHECKING:
@@ -67,8 +69,8 @@ class Scheduler:
         native,
         project_tree: ProjectTree,
         local_store_dir: str,
-        rules,
-        union_rules,
+        rules: Tuple[Rule],
+        union_rules: typing.OrderedDict[Type, OrderedSet[Type]],
         execution_options: ExecutionOptions,
         include_trace_on_error: bool = True,
         validate: bool = True,

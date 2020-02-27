@@ -182,7 +182,7 @@ class BuildConfiguration:
         """
         return list(self._rules)
 
-    def union_rules(self) -> OrderedDict:
+    def union_rules(self) -> typing.OrderedDict[Type, OrderedSet[Type]]:
         """Returns a mapping of registered union base types -> [OrderedSet of union member
         types]."""
         return self._union_rules
