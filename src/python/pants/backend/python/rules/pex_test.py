@@ -135,19 +135,40 @@ class PexTest(TestBase):
         assert set(requirements.requirements).issubset(pex_info["requirements"]) is True
 
     def test_requirement_constraints(self) -> None:
-        direct_dep = "requests==2.23.0"
-        # Pin to intentionally old transitive dependencies to ensure the constraints are respected.
-        constrained_transitive_deps = (
-            "certifi==2019.6.16",
+        # This is intentionally old; a constraint will resolve us to a more modern version.
+        direct_dep = "requests==1.0.0"
+        constraints_file1 = [
             "chardet==3.0.2",
+            "certifi==2019.6.16",
             "idna==2.7",
             "urllib3==1.25.6",
-        )
-        pex_info = self.create_pex_and_get_pex_info(
+        ]
+        constraints_file2 = [
+            # Repeat an earlier requirement to ensure that we properly preserve the order of
+            # constraints.
+            "chardet==3.0.3",
+            # Override the direct dependency
+            "requests==2.23.0",
+        ]
+        self.create_file("c1.txt", "\n".join(constraints_file1))
+        self.create_file("c2.txt", "\n".join(constraints_file2))
+        pex_info_f1_then_f2 = self.create_pex_and_get_pex_info(
             requirements=PexRequirements((direct_dep,)),
-            requirement_constraints=PexRequirementConstraints(constrained_transitive_deps),
+            requirement_constraints=PexRequirementConstraints(("c1.txt", "c2.txt")),
         )
-        assert set(pex_info["requirements"]) == {direct_dep, *constrained_transitive_deps}
+        assert set(pex_info_f1_then_f2["requirements"]) == {
+            *constraints_file1,
+            *constraints_file2[1:],
+        }
+
+        pex_info_f2_then_f1 = self.create_pex_and_get_pex_info(
+            requirements=PexRequirements((direct_dep,)),
+            requirement_constraints=PexRequirementConstraints(("c2.txt", "c1.txt")),
+        )
+        assert set(pex_info_f2_then_f1["requirements"]) == {
+            *constraints_file1[1:],
+            *constraints_file2,
+        }
 
     def test_entry_point(self) -> None:
         entry_point = "pydoc"

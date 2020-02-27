@@ -8,7 +8,7 @@ from typing import Iterable, Optional, Tuple
 
 from pex.variables import Variables
 
-from pants.option.custom_types import UnsetBool
+from pants.option.custom_types import UnsetBool, dir_option, file_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 
@@ -43,17 +43,14 @@ class PythonSetup(Subsystem):
             advanced=True,
             fingerprint=True,
             type=list,
-            fromfile=True,
+            member_type=file_option,
             default=[],
-            metavar="<requirement>",
+            metavar="<file>",
             help=(
                 "When resolving third-party requirements, use these "
-                "constraints to determine which versions to use. This option expects a list of "
-                "raw requirement strings, e.g. `['requests==2.23.0', `pytest>=4.6,<4.7']`. "
-                "Alternatively, you can point to a constraints file by prefixing it with `@`, e.g. "
-                "`--python-setup-requirement-constraints='@constraints.txt'`. See "
+                "constraint file(s) to determine which versions to use. See "
                 "https://pip.pypa.io/en/stable/user_guide/#constraints-files for more information "
-                "on how constraints are applied in Pex and Pip."
+                "on the format of constraint files and how constraints are applied in Pex and Pip."
             ),
         )
         register(
@@ -71,6 +68,7 @@ class PythonSetup(Subsystem):
             advanced=True,
             default=None,
             metavar="<dir>",
+            type=dir_option,
             help="The parent directory for the interpreter cache. "
             "If unspecified, a standard path under the workdir is used.",
         )
@@ -79,6 +77,7 @@ class PythonSetup(Subsystem):
             advanced=True,
             default=None,
             metavar="<dir>",
+            type=dir_option,
             help="The parent directory for the chroot cache. "
             "If unspecified, a standard path under the workdir is used.",
         )
@@ -164,7 +163,7 @@ class PythonSetup(Subsystem):
 
     @property
     def requirement_constraints(self) -> Tuple[str, ...]:
-        """A tuple of raw requirement-style strings, e.g. `foo>=1.2`."""
+        """Paths to constraint files."""
         return tuple(self.options.requirement_constraints)
 
     @memoized_property

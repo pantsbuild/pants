@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, List, Optional, Tuple
+from typing import Iterable, List, Optional, Tuple
 
 from pants.backend.python.rules.download_pex_bin import DownloadedPexBin
 from pants.backend.python.rules.hermetic_pex import HermeticPex
@@ -13,8 +13,10 @@ from pants.engine.fs import (
     Digest,
     DirectoriesToMerge,
     DirectoryWithPrefixToAdd,
-    FileContent,
-    InputFilesContent,
+    GlobExpansionConjunction,
+    GlobMatchErrorBehavior,
+    PathGlobs,
+    Snapshot,
 )
 from pants.engine.isolated_process import ExecuteProcessResult, MultiPlatformExecuteProcessRequest
 from pants.engine.legacy.structs import PythonTargetAdaptor, TargetAdaptor
@@ -69,29 +71,31 @@ class PexInterpreterConstraints:
         return PexInterpreterConstraints(constraint_set=tuple(sorted(interpreter_constraints)))
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class PexRequirementConstraints:
-    """A collection of Requirement-style strings."""
+    """A collection of paths to constraint files."""
 
-    constraints: Tuple[str, ...] = ()
-    generated_file_name: ClassVar[str] = "requirement_constraints.generated.txt"
+    constraint_file_paths: Tuple[str, ...] = ()
 
     @classmethod
     def create_from_setup(cls, python_setup: PythonSetup) -> "PexRequirementConstraints":
         return cls(python_setup.requirement_constraints)
 
     def generate_pex_arg_list(self) -> List[str]:
-        if not self.constraints:
-            return []
-        return ["--constraints", self.generated_file_name]
+        # NB: We preserve the order of the constraint files. The order does matter when there are
+        # conflicting versions across files; with Pip, the first seen wins.
+        args = []
+        for fp in self.constraint_file_paths:
+            args.extend(["--constraints", fp])
+        return args
 
-    def generate_constraints_file(self) -> InputFilesContent:
-        if not self.constraints:
-            return InputFilesContent([])
-        generated_file = FileContent(
-            path=self.generated_file_name, content="\n".join(self.constraints).encode()
+    def as_path_globs(self) -> PathGlobs:
+        return PathGlobs(
+            self.constraint_file_paths,
+            glob_match_error_behavior=GlobMatchErrorBehavior.error,
+            conjunction=GlobExpansionConjunction.all_match,
+            description_of_origin="the option `--python-setup-requirement-constraints`",
         )
-        return InputFilesContent([generated_file])
 
 
 @dataclass(frozen=True)
@@ -151,8 +155,8 @@ async def create_pex(
 
     argv.extend(request.requirements.requirements)
 
-    generated_constraint_file = await Get[Digest](
-        InputFilesContent, request.requirement_constraints.generate_constraints_file()
+    constraint_files = await Get[Snapshot](
+        PathGlobs, request.requirement_constraints.as_path_globs()
     )
 
     sources_digest = (
@@ -167,7 +171,7 @@ async def create_pex(
             directories=(
                 pex_bin.directory_digest,
                 sources_digest_as_subdir,
-                generated_constraint_file,
+                constraint_files.directory_digest,
             )
         )
     )
