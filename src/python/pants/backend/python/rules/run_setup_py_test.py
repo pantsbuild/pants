@@ -7,7 +7,6 @@ from typing import Iterable, Type
 
 import pytest
 
-from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.rules.run_setup_py import (
     AmbiguousOwnerError,
     AncestorInitPyFiles,
@@ -31,37 +30,23 @@ from pants.backend.python.rules.run_setup_py import (
     get_sources,
     validate_args,
 )
-from pants.build_graph.address import Address
-from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.backend.python.rules.testutil import PythonTestBase
 from pants.engine.fs import Snapshot
-from pants.engine.legacy.graph import HydratedTarget, HydratedTargets
+from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.rules import RootRule
 from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Params
-from pants.python.python_requirement import PythonRequirement
 from pants.rules.core.strip_source_roots import (
     strip_source_roots_from_snapshot,
     strip_source_roots_from_target,
 )
 from pants.source.source_root import SourceRootConfig
 from pants.testutil.subsystem.util import init_subsystem
-from pants.testutil.test_base import TestBase
 
 _namespace_decl = "__import__('pkg_resources').declare_namespace(__name__)"
 
 
-class TestSetupPyBase(TestBase):
-    @classmethod
-    def alias_groups(cls) -> BuildFileAliases:
-        return BuildFileAliases(
-            objects={"python_requirement": PythonRequirement, "setup_py": PythonArtifact,}
-        )
-
-    def tgt(self, addr: str) -> HydratedTarget:
-        return self.request_single_product(HydratedTarget, Params(Address.parse(addr)))
-
-
-class TestGenerateChroot(TestSetupPyBase):
+class TestGenerateChroot(PythonTestBase):
     @classmethod
     def rules(cls):
         return super().rules() + [
@@ -185,7 +170,7 @@ class TestGenerateChroot(TestSetupPyBase):
         self.assert_error("src/python/invalid_binary:invalid_bin2", InvalidEntryPoint)
 
 
-class TestGetSources(TestSetupPyBase):
+class TestGetSources(PythonTestBase):
     @classmethod
     def rules(cls):
         return super().rules() + [
@@ -303,7 +288,7 @@ class TestGetSources(TestSetupPyBase):
         )
 
 
-class TestGetRequirements(TestSetupPyBase):
+class TestGetRequirements(PythonTestBase):
     @classmethod
     def rules(cls):
         return super().rules() + [
@@ -367,7 +352,7 @@ class TestGetRequirements(TestSetupPyBase):
         self.assert_requirements(["ext3==0.0.1", "bar==9.8.7"], "src/python/foo/corge")
 
 
-class TestGetAncestorInitPy(TestSetupPyBase):
+class TestGetAncestorInitPy(PythonTestBase):
     @classmethod
     def rules(cls):
         return super().rules() + [
@@ -436,7 +421,7 @@ class TestGetAncestorInitPy(TestSetupPyBase):
         )
 
 
-class TestGetOwnedDependencies(TestSetupPyBase):
+class TestGetOwnedDependencies(PythonTestBase):
     @classmethod
     def rules(cls):
         return super().rules() + [
@@ -501,7 +486,7 @@ class TestGetOwnedDependencies(TestSetupPyBase):
         )
 
 
-class TestGetExportingOwner(TestSetupPyBase):
+class TestGetExportingOwner(PythonTestBase):
     @classmethod
     def rules(cls):
         return super().rules() + [

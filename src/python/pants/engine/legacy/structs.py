@@ -51,7 +51,7 @@ class _OptionalFieldExtractor(Generic[_T]):
         ret = self.value
         if ret is None:
             return None
-        assert isinstance(ret, self.typ), f"{self=}, {ret=}"
+        assert isinstance(ret, self.typ), f"{ret} was not an instance of {self.typ}!"
         return ret
 
 
@@ -67,7 +67,7 @@ class TargetAdaptor(StructWithDeps):
     def _make_v1_target(self, **kwargs) -> Target:
         merged_kwargs = dict(build_graph=None, sources=None)
         merged_kwargs.update(**kwargs)
-        return self._v1_target_class(**merged_kwargs)
+        return self._v1_target_class(**merged_kwargs)  # type: ignore[misc]
 
     def get_field(self, name: str, typ: Type[_T]) -> _OptionalFieldExtractor[_T]:
         maybe_value = self.kwargs().get(name, None)

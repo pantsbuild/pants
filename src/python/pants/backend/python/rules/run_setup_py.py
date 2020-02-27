@@ -7,6 +7,7 @@ import os
 from dataclasses import dataclass
 from typing import List, Set, Tuple
 
+from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.rules.pex import (
     CreatePex,
     Pex,
@@ -48,7 +49,7 @@ from pants.engine.legacy.graph import (
     HydratedTargetsWithOrigins,
     TransitiveHydratedTargets,
 )
-from pants.engine.legacy.structs import PythonBinaryAdaptor, PythonTargetAdaptor, ResourcesAdaptor
+from pants.engine.legacy.structs import PythonTargetAdaptor, ResourcesAdaptor
 from pants.engine.objects import Collection
 from pants.engine.rules import goal_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
@@ -295,7 +296,7 @@ async def run_setup_pys(
 
     py2 = is_python2(
         (
-            getattr(target_with_origin.target.adaptor, "compatibility", None)
+            target_with_origin.target.adaptor.get_field("compatibility", List[str])()
             for target_with_origin in targets_with_origins
         ),
         python_setup,
@@ -401,7 +402,7 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
         }
     )
     ht = request.exported_target.hydrated_target
-    key_to_binary_spec = getattr(ht.adaptor.provides, "binaries", {})
+    key_to_binary_spec = ht.adaptor.get_field("provides", PythonArtifact)().binaries  # type: ignore[union-attr]
     keys = list(key_to_binary_spec.keys())
     binaries = await MultiGet(
         Get[HydratedTarget](
@@ -410,16 +411,14 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
         for key in keys
     )
     for key, binary in zip(keys, binaries):
-        if (
-            not isinstance(binary.adaptor, PythonBinaryAdaptor)
-            or getattr(binary.adaptor, "entry_point", None) is None
-        ):
+        entry_point = binary.adaptor.get_field("entry_point", str)()
+        if entry_point is None:
             raise InvalidEntryPoint(
                 f"The binary {key} exported by {ht.address.reference()} is not a valid entry point."
             )
         entry_points = setup_kwargs["entry_points"] = setup_kwargs.get("entry_points", {})
         console_scripts = entry_points["console_scripts"] = entry_points.get("console_scripts", [])
-        console_scripts.append(f"{key}={binary.adaptor.entry_point}")
+        console_scripts.append(f"{key}={entry_point}")
 
     # Generate the setup script.
     setup_py_content = SETUP_BOILERPLATE.format(
@@ -526,7 +525,7 @@ async def get_ancestor_init_py(
 
 
 def _is_exported(target: HydratedTarget) -> bool:
-    return getattr(target.adaptor, "provides", None) is not None
+    return target.adaptor.get_field("provides", PythonArtifact)() is not None
 
 
 @rule(name="Compute distribution's 3rd party requirements")

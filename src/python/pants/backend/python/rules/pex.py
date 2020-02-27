@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Iterable, List, Optional, Tuple
+from typing import Iterable, List, Optional, Set, Tuple
 
 from pants.backend.python.rules.download_pex_bin import DownloadedPexBin
 from pants.backend.python.rules.hermetic_pex import HermeticPex
@@ -16,7 +16,7 @@ from pants.engine.fs import (
     DirectoryWithPrefixToAdd,
 )
 from pants.engine.isolated_process import ExecuteProcessResult, MultiPlatformExecuteProcessRequest
-from pants.engine.legacy.structs import PythonTargetAdaptor, TargetAdaptor
+from pants.engine.legacy.structs import TargetAdaptor
 from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.rules import rule, subsystem_rule
 from pants.engine.selectors import Get
@@ -31,20 +31,15 @@ class PexRequirements:
     def create_from_adaptors(
         cls, adaptors: Iterable[TargetAdaptor], additional_requirements: Iterable[str] = ()
     ) -> "PexRequirements":
-        all_target_requirements = set()
+        all_target_requirements: Set[str] = set()
         for maybe_python_req_lib in adaptors:
-            maybe_requirement = maybe_python_req_lib.get_field(
-                "requirement", PythonRequirementsField
-            )()
-            # This is a python_requirement()-like target.
-            if maybe_requirement:
-                all_target_requirements.add(str(maybe_requirement.requirement))
-            # This is a python_requirement_library()-like target.
-            multiple_requirements = (
-                maybe_python_req_lib.get_field("requirements", PythonRequirementsField)() or []
-            )
-            for py_req in multiple_requirements:
-                all_target_requirements.add(str(py_req.requirement))
+            for field_name in ["requirement", "requirements"]:
+                all_target_requirements |= set(
+                    str(py_req.requirement)
+                    for py_req in (
+                        maybe_python_req_lib.get_field(field_name, PythonRequirementsField)() or []
+                    )
+                )
         all_target_requirements.update(additional_requirements)
         return PexRequirements(requirements=tuple(sorted(all_target_requirements)))
 
@@ -67,9 +62,8 @@ class PexInterpreterConstraints:
             constraint
             for target_adaptor in adaptors
             for constraint in python_setup.compatibility_or_constraints(
-                getattr(target_adaptor, "compatibility", None)
+                target_adaptor.get_field("compatibility", list)()
             )
-            if isinstance(target_adaptor, PythonTargetAdaptor)
         }
         return PexInterpreterConstraints(constraint_set=tuple(sorted(interpreter_constraints)))
 
