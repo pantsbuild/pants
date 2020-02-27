@@ -88,14 +88,21 @@ class PathGlobs:
         self.__post_init__()
 
     def __post_init__(self) -> None:
-        if (
-            not self.description_of_origin
-            and self.glob_match_error_behavior != GlobMatchErrorBehavior.ignore
-        ):
-            raise ValueError(
-                "Please provide a `description_of_origin` so that the error message is more "
-                "helpful to users when their globs fail to match."
-            )
+        if self.glob_match_error_behavior == GlobMatchErrorBehavior.ignore:
+            if self.description_of_origin:
+                raise ValueError(
+                    "You provided a `description_of_origin` value when `glob_match_error_behavior` is set to "
+                    "`ignore`. The `ignore` value means that the engine will never generate an error when "
+                    "the globs are generated, so `description_of_origin` won't end up ever being used. "
+                    "Please either change `glob_match_error_behavior` to `warn` or `error`, or remove "
+                    "`description_of_origin`."
+                )
+        else:
+            if not self.description_of_origin:
+                raise ValueError(
+                    "Please provide a `description_of_origin` so that the error message is more helpful to "
+                    "users when their globs fail to match."
+                )
 
 
 @dataclass(frozen=True)
