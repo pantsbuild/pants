@@ -8,7 +8,7 @@ from typing import Iterable, Optional, Tuple, cast
 
 from pex.variables import Variables
 
-from pants.option.custom_types import UnsetBool, dir_option
+from pants.option.custom_types import UnsetBool, dir_option, file_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 
@@ -42,9 +42,7 @@ class PythonSetup(Subsystem):
             "--requirement-constraints",
             advanced=True,
             fingerprint=True,
-            # TODO(#9148): uncomment out the below line once this is fixed. Right now, using
-            # `file_option` causes the unit test to fail.
-            # type=file_option,
+            type=file_option,
             help=(
                 "When resolving third-party requirements, use this "
                 "constraint file to determine which versions to use. See "
