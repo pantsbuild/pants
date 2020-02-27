@@ -13,7 +13,7 @@ from pants.option.custom_types import target_option
 from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
-from twitter.common.collections import OrderedSet
+from pants.util.ordered_set import OrderedSet
 
 from pants.contrib.go.subsystems.protoc_gen_go import ProtocGenGo
 from pants.contrib.go.targets.go_protobuf_library import GoProtobufGenLibrary, GoProtobufLibrary

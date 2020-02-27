@@ -4,29 +4,30 @@
 from pants.backend.python.rules.pex import Pex
 from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
 from pants.backend.python.targets.python_binary import PythonBinary
-from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses
-from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.legacy.structs import PythonBinaryAdaptor
 from pants.engine.rules import UnionRule, rule
 from pants.engine.selectors import Get
 from pants.rules.core.binary import BinaryTarget, CreatedBinary
-from pants.rules.core.strip_source_roots import SourceRootStrippedSources
+from pants.rules.core.determine_source_files import AllSourceFilesRequest, SourceFiles
 
 
 @rule
 async def create_python_binary(python_binary_adaptor: PythonBinaryAdaptor) -> CreatedBinary:
     # TODO(#8420) This way of calculating the entry point works but is a bit hackish.
-    entry_point = None
     if hasattr(python_binary_adaptor, "entry_point"):
         entry_point = python_binary_adaptor.entry_point
     else:
-        sources_snapshot = python_binary_adaptor.sources.snapshot
-        if len(sources_snapshot.files) == 1:
-            target = await Get[HydratedTarget](Address, python_binary_adaptor.address)
-            output = await Get[SourceRootStrippedSources](HydratedTarget, target)
-            root_filename = output.snapshot.files[0]
-            entry_point = PythonBinary.translate_source_path_to_py_module_specifier(root_filename)
+        sources = await Get[SourceFiles](
+            AllSourceFilesRequest([python_binary_adaptor], strip_source_roots=True)
+        )
+        # NB: `python_binary` targets may have 0-1 sources. This is enforced by
+        # `PythonBinaryAdaptor`.
+        if len(sources.snapshot.files) == 1:
+            module_name = sources.snapshot.files[0]
+            entry_point = PythonBinary.translate_source_path_to_py_module_specifier(module_name)
+        else:
+            entry_point = None
 
     request = CreatePexFromTargetClosure(
         addresses=Addresses((python_binary_adaptor.address,)),

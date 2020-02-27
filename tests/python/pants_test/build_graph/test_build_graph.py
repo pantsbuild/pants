@@ -11,6 +11,7 @@ from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.target import Target
 from pants.java.jar.jar_dependency import JarDependency
 from pants.testutil.test_base import TestBase
+from pants.util.ordered_set import OrderedSet
 
 
 # TODO(Eric Ayers) There are many untested methods in BuildGraph left to be tested.
@@ -183,35 +184,35 @@ class BuildGraphTest(TestBase):
 
     def test_target_closure(self):
         a = self.make_target("a")
-        self.assertEqual([a], a.closure())
+        self.assertEqual(OrderedSet([a]), a.closure())
         b = self.make_target("b", dependencies=[a])
-        self.assertEqual([b, a], b.closure())
+        self.assertEqual(OrderedSet([b, a]), b.closure())
         c = self.make_target("c", dependencies=[b])
-        self.assertEqual([c, b, a], c.closure())
+        self.assertEqual(OrderedSet([c, b, a]), c.closure())
         d = self.make_target("d", dependencies=[a, c])
-        self.assertEqual([d, a, c, b], d.closure())
+        self.assertEqual(OrderedSet([d, a, c, b]), d.closure())
 
     def test_closure(self):
-        self.assertEqual([], BuildGraph.closure([]))
+        self.assertEqual(OrderedSet(), BuildGraph.closure([]))
         a = self.make_target("a")
-        self.assertEqual([a], BuildGraph.closure([a]))
+        self.assertEqual(OrderedSet([a]), BuildGraph.closure([a]))
         b = self.make_target("b", dependencies=[a])
-        self.assertEqual([b, a], BuildGraph.closure([b]))
+        self.assertEqual(OrderedSet([b, a]), BuildGraph.closure([b]))
         c = self.make_target("c", dependencies=[b])
-        self.assertEqual([c, b, a], BuildGraph.closure([c]))
+        self.assertEqual(OrderedSet([c, b, a]), BuildGraph.closure([c]))
         d = self.make_target("d", dependencies=[a, c])
-        self.assertEqual([d, a, c, b], BuildGraph.closure([d]))
+        self.assertEqual(OrderedSet([d, a, c, b]), BuildGraph.closure([d]))
 
         def d_gen():
             yield d
 
-        self.assertEqual([d, a, c, b], BuildGraph.closure(d_gen()))
+        self.assertEqual(OrderedSet([d, a, c, b]), BuildGraph.closure(d_gen()))
 
         def empty_gen():
             return
             yield  # type: ignore[misc] # MyPy complains that this is not reachable
 
-        self.assertEqual([], BuildGraph.closure(empty_gen()))
+        self.assertEqual(OrderedSet([]), BuildGraph.closure(empty_gen()))
 
     def test_closure_bfs(self):
         root = self.inject_graph(

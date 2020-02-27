@@ -3,8 +3,6 @@
 
 import os
 
-from twitter.common.collections import OrderedSet
-
 from pants.backend.jvm.subsystems.checkstyle import Checkstyle as CheckstyleSubsystem
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
@@ -15,6 +13,7 @@ from pants.option.custom_types import dict_with_files_option, file_option
 from pants.process.xargs import Xargs
 from pants.task.lint_task_mixin import LintTaskMixin
 from pants.util.dirutil import safe_open
+from pants.util.ordered_set import OrderedSet
 
 
 class Checkstyle(LintTaskMixin, NailgunTask):

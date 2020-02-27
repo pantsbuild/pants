@@ -1,17 +1,20 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import itertools
 import logging
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
+from pathlib import PurePath
+from typing import Optional, Tuple, Type
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import FilesystemLiteralSpec, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.addressable import AddressesWithOrigins, AddressWithOrigin
 from pants.engine.console import Console
-from pants.engine.fs import Digest
+from pants.engine.fs import Digest, DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.isolated_process import FallibleExecuteProcessResult
@@ -30,14 +33,24 @@ class Status(Enum):
     FAILURE = "FAILURE"
 
 
+class CoverageData(ABC):
+    """Base class for inputs to a coverage report.
+
+    Subclasses should add whichever fields they require - snapshots of coverage output or xml files, etc.
+    """
+
+    @property
+    @abstractmethod
+    def batch_cls(self) -> Type["CoverageDataBatch"]:
+        pass
+
+
 @dataclass(frozen=True)
 class TestResult:
     status: Status
     stdout: str
     stderr: str
-    # TODO: We need a more generic way to handle coverage output across languages.
-    # See #8915 for proposed improvements.
-    _python_sqlite_coverage_file: Optional[Digest] = None
+    coverage_data: Optional[CoverageData] = None
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
@@ -45,12 +58,14 @@ class TestResult:
     @staticmethod
     def from_fallible_execute_process_result(
         process_result: FallibleExecuteProcessResult,
+        *,
+        coverage_data: Optional[CoverageData] = None,
     ) -> "TestResult":
         return TestResult(
             status=Status.SUCCESS if process_result.exit_code == 0 else Status.FAILURE,
             stdout=process_result.stdout.decode(),
             stderr=process_result.stderr.decode(),
-            _python_sqlite_coverage_file=process_result.output_directory_digest,
+            coverage_data=coverage_data,
         )
 
 
@@ -104,6 +119,19 @@ class AddressAndDebugRequest:
     request: TestDebugRequest
 
 
+@union
+class CoverageDataBatch(ABC):
+    @abstractmethod
+    def __init__(self, addresses_and_test_results: Tuple[AddressAndTestResult, ...]) -> None:
+        """Subclasses should accept this in their constructor."""
+
+
+@dataclass(frozen=True)
+class CoverageReport:
+    result_digest: Digest
+    directory_to_materialize_to: PurePath
+
+
 class TestOptions(GoalSubsystem):
     """Runs tests."""
 
@@ -142,6 +170,7 @@ async def run_tests(
     options: TestOptions,
     runner: InteractiveRunner,
     addresses_with_origins: AddressesWithOrigins,
+    workspace: Workspace,
 ) -> Test:
     if options.values.debug:
         address_with_origin = addresses_with_origins.expect_single()
@@ -155,9 +184,36 @@ async def run_tests(
         Get[AddressAndTestResult](AddressWithOrigin, address_with_origin)
         for address_with_origin in addresses_with_origins
     )
+
+    if options.values.run_coverage:
+        # TODO: consider warning if a user uses `--coverage` but the language backend does not
+        # provide coverage support. This might be too chatty to be worth doing?
+        results_with_coverage = [
+            x
+            for x in results
+            if x.test_result is not None and x.test_result.coverage_data is not None
+        ]
+        coverage_data_collections = itertools.groupby(
+            results_with_coverage,
+            lambda address_and_test_result: address_and_test_result.test_result.coverage_data.batch_cls,  # type: ignore[union-attr]
+        )
+
+        coverage_reports = await MultiGet(
+            Get[CoverageReport](
+                CoverageDataBatch, coverage_batch_cls(tuple(addresses_and_test_results))
+            )
+            for coverage_batch_cls, addresses_and_test_results in coverage_data_collections
+        )
+        for report in coverage_reports:
+            workspace.materialize_directory(
+                DirectoryToMaterialize(
+                    report.result_digest, path_prefix=report.directory_to_materialize_to.as_posix(),
+                )
+            )
+            console.print_stdout(f"Wrote coverage report to `{report.directory_to_materialize_to}`")
+
     did_any_fail = False
     filtered_results = [(x.address, x.test_result) for x in results if x.test_result is not None]
-
     for address, test_result in filtered_results:
         if test_result.status == Status.FAILURE:
             did_any_fail = True

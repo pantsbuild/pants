@@ -51,7 +51,7 @@ class ScopeInfoIteratorTest(unittest.TestCase):
         scope_to_infos = dict((x.scope, x) for x in infos)
 
         it = ScopeInfoIterator(scope_to_infos)
-        actual = list(it.iterate([GLOBAL_SCOPE, "goal1", "goal2.task21", "goal3"]))
+        actual = list(it.iterate({GLOBAL_SCOPE, "goal1", "goal2.task21", "goal3"}))
 
         expected_scopes = [
             GLOBAL_SCOPE,

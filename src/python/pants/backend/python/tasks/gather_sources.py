@@ -6,7 +6,6 @@ import os
 from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
-from twitter.common.collections import OrderedSet
 
 from pants.backend.python.subsystems.pex_build_util import (
     has_python_sources,
@@ -18,6 +17,7 @@ from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.python.pex_build_util import PexBuilderWrapper
 from pants.task.task import Task
 from pants.util.dirutil import safe_concurrent_creation
+from pants.util.ordered_set import OrderedSet
 
 
 class GatherSources(Task):

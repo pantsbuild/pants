@@ -8,10 +8,10 @@ from abc import ABC
 from typing import Dict, Tuple
 
 from pathspec import PathSpec
-from twitter.common.collections import OrderedSet
 
 from pants.base.project_tree import ProjectTree
 from pants.util.dirutil import fast_relpath
+from pants.util.ordered_set import OrderedSet
 
 logger = logging.getLogger(__name__)
 

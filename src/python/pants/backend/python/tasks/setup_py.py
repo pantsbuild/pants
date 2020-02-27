@@ -16,7 +16,6 @@ from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
-from twitter.common.collections import OrderedSet
 from twitter.common.dirutil.chroot import Chroot
 
 from pants.backend.python.rules.setup_py_util import distutils_repr
@@ -36,6 +35,7 @@ from pants.task.task import Task
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_concurrent_creation, safe_rmtree, safe_walk
 from pants.util.memo import memoized_property
+from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import ensure_binary, ensure_text, safe_shlex_split
 
 SETUP_BOILERPLATE = """

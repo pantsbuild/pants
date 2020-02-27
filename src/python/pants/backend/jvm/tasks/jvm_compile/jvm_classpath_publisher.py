@@ -3,12 +3,11 @@
 
 import os
 
-from twitter.common.collections import OrderedSet
-
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.java.util import safe_classpath
 from pants.task.task import Task
+from pants.util.ordered_set import OrderedSet
 
 
 class RuntimeClasspathPublisher(Task):

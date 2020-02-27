@@ -10,7 +10,7 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.java.jar.jar_dependency import JarDependency
 from pants.task.simple_codegen_task import SimpleCodegenTask
-from twitter.common.collections import OrderedSet
+from pants.util.ordered_set import OrderedSet
 
 from pants.contrib.thrifty.java_thrifty_library import JavaThriftyLibrary
 

@@ -54,7 +54,7 @@ class GeneratePantsReference(Task):
     def _gen_reference(self):
         def get_scope_data(scope):
             ret = []
-            for si in ScopeInfoIterator(self.context.options.known_scope_to_info).iterate([scope]):
+            for si in ScopeInfoIterator(self.context.options.known_scope_to_info).iterate({scope}):
                 help_info = HelpInfoExtracter(si.scope).get_option_scope_help_info_from_parser(
                     self.context.options.get_parser(si.scope)
                 )

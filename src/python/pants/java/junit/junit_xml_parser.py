@@ -7,11 +7,10 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Optional, Sequence
 
-from twitter.common.collections import OrderedSet
-
 from pants.build_graph.target import Target
 from pants.util.dirutil import safe_walk
 from pants.util.meta import frozen_after_init
+from pants.util.ordered_set import OrderedSet
 from pants.util.xml_parser import XmlParser
 
 

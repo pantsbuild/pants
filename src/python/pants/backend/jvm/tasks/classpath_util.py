@@ -4,11 +4,10 @@
 import os
 from collections import OrderedDict
 
-from twitter.common.collections import OrderedSet
-
 from pants.backend.jvm.tasks.classpath_entry import ClasspathEntry
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import fast_relpath, safe_walk
+from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import ensure_text
 
 

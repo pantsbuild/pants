@@ -6,8 +6,6 @@ import os
 import zipfile
 from collections import defaultdict
 
-from twitter.common.collections import OrderedSet
-
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
@@ -26,6 +24,7 @@ from pants.java.jar.jar_dependency_utils import M2Coordinate
 from pants.task.console_task import ConsoleTask
 from pants.util.contextutil import temporary_file
 from pants.util.memo import memoized_property
+from pants.util.ordered_set import OrderedSet
 
 
 class ExportDepAsJar(ConsoleTask):
@@ -59,6 +58,16 @@ class ExportDepAsJar(ConsoleTask):
             help="Causes the sources of dependencies to be zipped and included in the project.",
         )
         register(
+            "--libraries-sources",
+            type=bool,
+            help="Causes 3rdparty libraries with sources to be output.",
+        )
+        register(
+            "--libraries-javadocs",
+            type=bool,
+            help="Causes 3rdparty libraries with javadocs to be output.",
+        )
+        register(
             "--transitive",
             type=bool,
             default=True,
@@ -81,6 +90,10 @@ class ExportDepAsJar(ConsoleTask):
         round_manager.require_data("zinc_args")
         round_manager.require_data("runtime_classpath")
         round_manager.require_data("export_dep_as_jar_signal")
+        if options.libraries_sources:
+            round_manager.require_data("resolve_sources_signal")
+        if options.libraries_javadocs:
+            round_manager.require_data("resolve_javadocs_signal")
 
     @property
     def _output_folder(self):
@@ -195,10 +208,8 @@ class ExportDepAsJar(ConsoleTask):
     def _dependencies_to_include_in_libraries(
         self, t, modulizable_target_set, dependencies_needed_in_classpath
     ):
-        """
-        NB: We need to pass dependencies_needed_in_classpath here to make sure we're being strict_deps-aware
-            when computing the dependencies.
-        """
+        """NB: We need to pass dependencies_needed_in_classpath here to make sure we're being strict_deps-aware
+        when computing the dependencies."""
 
         dependencies_to_include = []
         self.context.build_graph.walk_transitive_dependency_graph(
@@ -253,7 +264,7 @@ class ExportDepAsJar(ConsoleTask):
             """
             :type jar_lib: :class:`pants.backend.jvm.targets.jar_library.JarLibrary`
             :rtype: :class:`collections.Iterator` of
-                  :class:`pants.java.jar.M2Coordinate`
+                    :class:`pants.java.jar.M2Coordinate`
             """
             if runtime_classpath:
                 jar_products = runtime_classpath.get_artifact_classpath_entries_for_targets(
@@ -450,8 +461,9 @@ class ExportDepAsJar(ConsoleTask):
 
         The return dictionary is suitable for serialization by json.dumps.
         :param all_targets: The list of targets to generate the map for.
-        :param classpath_products: Optional classpath_products. If not provided when the --libraries
-          option is `True`, this task will perform its own jar resolution.
+        :param runtime_classpath: ClasspathProducts containing entries for all the resolved and compiled
+          dependencies.
+        :param zinc_args_for_all_targets: Map from zinc compiled targets to the args used to compile them.
         """
         target_roots_set = set(self.context.target_roots)
 

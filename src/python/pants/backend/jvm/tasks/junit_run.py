@@ -7,8 +7,6 @@ import os
 import sys
 from contextlib import contextmanager
 
-from twitter.common.collections import OrderedSet
-
 from pants.backend.jvm import argfile
 from pants.backend.jvm.subsystems.junit import JUnit
 from pants.backend.jvm.targets.junit_tests import JUnitTests
@@ -31,6 +29,7 @@ from pants.util.argutil import ensure_arg, remove_arg
 from pants.util.contextutil import environment_as
 from pants.util.dirutil import safe_delete, safe_mkdir, safe_rmtree, safe_walk
 from pants.util.memo import memoized_method
+from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import pluralize
 
 

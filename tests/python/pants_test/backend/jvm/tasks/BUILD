@@ -277,7 +277,6 @@ python_tests(
   name = 'ivy_resolve',
   sources = ['test_ivy_resolve.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/jvm/subsystems:jar_dependency_management',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
@@ -287,6 +286,7 @@ python_tests(
     'src/python/pants/java/jar',
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:ordered_set',
     'src/python/pants/testutil/jvm:jvm_tool_task_test_base',
     'src/python/pants/testutil/jvm:nailgun_task_test_base',
     'src/python/pants/testutil/subsystem',
@@ -353,6 +353,7 @@ python_tests(
     'src/python/pants/ivy',
     'src/python/pants/java/jar',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:ordered_set',
     'tests/python/pants_test/backend/jvm/tasks/ivy_utils_resources',
     'src/python/pants/testutil:test_base',
     'src/python/pants/testutil/subsystem',

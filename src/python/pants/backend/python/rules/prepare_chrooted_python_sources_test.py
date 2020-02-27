@@ -5,16 +5,15 @@ from pathlib import PurePath
 from typing import List, Optional
 from unittest.mock import Mock
 
+from pants.backend.python.rules.prepare_chrooted_python_sources import ChrootedPythonSources
 from pants.backend.python.rules.prepare_chrooted_python_sources import (
-    ChrootedPythonSources,
-    prepare_chrooted_python_sources,
+    rules as prepare_chrooted_python_sources_rules,
 )
 from pants.build_graph.address import Address
 from pants.build_graph.files import Files
 from pants.engine.legacy.graph import HydratedTarget, HydratedTargets
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
-from pants.rules.core import strip_source_roots
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
@@ -24,8 +23,7 @@ class PrepareChrootedPythonSourcesTest(TestBase):
     def rules(cls):
         return (
             *super().rules(),
-            *strip_source_roots.rules(),
-            prepare_chrooted_python_sources,
+            *prepare_chrooted_python_sources_rules(),
             RootRule(HydratedTargets),
         )
 
@@ -35,10 +33,11 @@ class PrepareChrootedPythonSourcesTest(TestBase):
         adaptor = Mock()
         adaptor.type_alias = type_alias
         adaptor.sources = Mock()
-        adaptor.sources.snapshot = self.make_snapshot({fp: "" for fp in source_paths})
+        adaptor.sources.snapshot = self.make_snapshot_of_empty_files(source_paths)
         address = Address(
             spec_path=PurePath(source_paths[0]).parent.as_posix(), target_name="target"
         )
+        adaptor.address = address
         return HydratedTarget(address=address, adaptor=adaptor, dependencies=())
 
     def test_adds_missing_inits_and_strips_source_roots(self) -> None:

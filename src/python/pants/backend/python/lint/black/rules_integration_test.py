@@ -65,10 +65,7 @@ class BlackIntegrationTest(TestBase):
         fmt_result = self.request_single_product(
             FmtResult,
             Params(
-                BlackTarget(
-                    adaptor_with_origin,
-                    prior_formatter_result_digest=input_snapshot.directory_digest,
-                ),
+                BlackTarget(adaptor_with_origin, prior_formatter_result=input_snapshot),
                 options_bootstrapper,
             ),
         )

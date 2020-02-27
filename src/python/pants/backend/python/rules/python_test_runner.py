@@ -21,10 +21,7 @@ from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.global_options import GlobalOptions
 from pants.python.python_setup import PythonSetup
-from pants.rules.core.find_target_source_files import (
-    FindTargetSourceFilesRequest,
-    TargetSourceFiles,
-)
+from pants.rules.core.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.rules.core.test import TestDebugRequest, TestOptions, TestResult, TestTarget
 
 DEFAULT_COVERAGE_CONFIG = dedent(
@@ -134,10 +131,10 @@ async def setup_pytest_for_target(
 
     # Get the file names for the test_target so that we can specify to Pytest precisely which files
     # to test, rather than using auto-discovery.
-    test_files = await Get[TargetSourceFiles](
-        FindTargetSourceFilesRequest(adaptor_with_origin, strip_source_roots=True)
+    specified_source_files = await Get[SourceFiles](
+        SpecifiedSourceFilesRequest([adaptor_with_origin], strip_source_roots=True)
     )
-    test_file_names = test_files.snapshot.files
+    specified_source_file_names = specified_source_files.snapshot.files
 
     coverage_args = []
     if test_options.values.run_coverage:
@@ -146,7 +143,7 @@ async def setup_pytest_for_target(
         )
         directories_to_merge.append(coveragerc_digest)
         packages_to_cover = get_packages_to_cover(
-            adaptor, source_root_stripped_file_paths=test_file_names,
+            adaptor, source_root_stripped_file_paths=specified_source_file_names,
         )
         coverage_args = [
             "--cov-report=",  # To not generate any output. https://pytest-cov.readthedocs.io/en/latest/config.html
@@ -167,7 +164,7 @@ async def setup_pytest_for_target(
 
     return TestTargetSetup(
         requirements_pex=resolved_requirements_pex,
-        args=(*pytest.options.args, *coverage_args, *sorted(test_file_names)),
+        args=(*pytest.options.args, *coverage_args, *sorted(specified_source_file_names)),
         input_files_digest=merged_input_files,
         timeout_seconds=timeout_seconds,
     )

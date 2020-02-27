@@ -1,12 +1,11 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from twitter.common.collections import OrderedSet
-
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.build_graph.import_remote_sources_mixin import ImportRemoteSourcesMixin
 from pants.util.memo import memoized_property
 from pants.util.objects import SubclassesOf
+from pants.util.ordered_set import OrderedSet
 
 
 class ImportWheelsMixin(ImportRemoteSourcesMixin):

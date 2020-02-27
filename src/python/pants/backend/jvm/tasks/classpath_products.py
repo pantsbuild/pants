@@ -4,8 +4,6 @@
 import os
 import re
 
-from twitter.common.collections import OrderedSet
-
 from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.classpath_entry import ArtifactClasspathEntry, ClasspathEntry
@@ -15,6 +13,7 @@ from pants.build_graph.build_graph import BuildGraph
 from pants.goal.products import UnionProducts
 from pants.java.jar.exclude import Exclude
 from pants.util.dirutil import safe_delete, safe_open
+from pants.util.ordered_set import OrderedSet
 
 # Re-export for backwards compatibility
 ClasspathEntry = ClasspathEntry

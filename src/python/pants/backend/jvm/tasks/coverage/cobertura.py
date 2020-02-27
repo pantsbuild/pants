@@ -6,8 +6,6 @@ import os
 import shutil
 from collections import defaultdict
 
-from twitter.common.collections import OrderedSet
-
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.coverage.engine import CoverageEngine
 from pants.base.exceptions import TaskError
@@ -18,6 +16,7 @@ from pants.java.util import safe_classpath
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import relativize_paths, safe_mkdir, safe_mkdir_for, safe_walk, touch
+from pants.util.ordered_set import OrderedSet
 
 
 class Cobertura(CoverageEngine):

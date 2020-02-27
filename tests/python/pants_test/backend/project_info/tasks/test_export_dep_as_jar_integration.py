@@ -163,3 +163,24 @@ class ExportDepAsJarIntegrationTest(ScalacPluginIntegrationTestBase):
                     "examples/src/scala/org/pantsbuild/example/several_scala_targets:greet_json"
                 ]["libraries"],
             )
+
+    def test_jars_resolve_sources_javadocs(self):
+        targets_to_test = ["examples/src/scala/org/pantsbuild/example/scalac/plugin:global"]
+        with self.temporary_workdir() as workdir:
+            pants_run = self.run_pants_with_workdir(
+                ["export-dep-as-jar"] + targets_to_test,
+                workdir,
+                {
+                    "resolver": {"resolver": "coursier"},
+                    "export-dep-as-jar": {"libraries_sources": True, "libraries_javadocs": True},
+                },
+            )
+            self.assert_success(pants_run)
+            export_result = json.loads(pants_run.stdout_data)
+            for coord, entries in export_result["libraries"].items():
+                # This is how we differentiate 3rdparty jars from compiled jars for now.
+                if not coord.startswith("examples"):
+                    for conf in ("sources", "javadoc"):
+                        self.assertIn(conf, entries)
+                        for path in entries.values():
+                            self.assertTrue(os.path.exists(path), path)

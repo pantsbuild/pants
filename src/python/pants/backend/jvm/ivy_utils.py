@@ -11,8 +11,6 @@ from abc import abstractmethod
 from collections import OrderedDict, defaultdict, namedtuple
 from functools import total_ordering
 
-from twitter.common.collections import OrderedSet
-
 from pants.backend.jvm.subsystems.jar_dependency_management import (
     JarDependencyManagement,
     PinnedJarArtifactSet,
@@ -29,6 +27,7 @@ from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants.java.util import execute_runner
 from pants.util.dirutil import safe_concurrent_creation, safe_mkdir, safe_open
 from pants.util.fileutil import atomic_copy, safe_hardlink_or_copy
+from pants.util.ordered_set import OrderedSet
 
 
 class IvyResolutionStep:

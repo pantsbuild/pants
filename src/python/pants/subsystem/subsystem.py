@@ -103,6 +103,9 @@ class Subsystem(SubsystemClientMixin, Optionable):
         :API: public
 
         :returns: The global subsystem instance.
+
+        Note that `global_instance` is a v1-idiom only. v2 rules should always request a subsystem as a rule input, rather than
+        trying to call <subsystem>.global_instance() in the body of an `@rule`.
         """
         return cls._instance_for_scope(cls.options_scope)  # type: ignore[arg-type]  # MyPy is treating cls.options_scope as a Callable, rather than `str`
 

@@ -5,8 +5,6 @@ import os.path
 from collections.abc import MutableMapping, MutableSequence
 from typing import Dict
 
-from twitter.common.collections import OrderedSet
-
 from pants.base.exceptions import ResolveError
 from pants.base.project_tree import Dir
 from pants.base.specs import AddressSpec, AddressSpecs, SingleAddress, more_specific
@@ -27,6 +25,7 @@ from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.struct import Struct
 from pants.util.objects import TypeConstraintError
+from pants.util.ordered_set import OrderedSet
 
 
 class ResolvedTypeMismatchError(ResolveError):
@@ -230,7 +229,7 @@ async def addresses_with_origins_from_address_families(
     address_families = await MultiGet(Get[AddressFamily](Dir(d)) for d in dirnames)
     address_family_by_directory = {af.namespace: af for af in address_families}
 
-    matched_addresses = OrderedSet()
+    matched_addresses: OrderedSet[Address] = OrderedSet()
     addr_to_origin: Dict[Address, AddressSpec] = {}
 
     for address_spec in address_specs:

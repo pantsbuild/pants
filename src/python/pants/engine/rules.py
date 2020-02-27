@@ -11,8 +11,6 @@ from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, get_type_hints
 
-from twitter.common.collections import OrderedSet
-
 from pants.engine.goal import Goal
 from pants.engine.objects import union
 from pants.engine.selectors import Get
@@ -20,6 +18,7 @@ from pants.option.optionable import OptionableFactory
 from pants.util.collections import assert_single_element
 from pants.util.memo import memoized
 from pants.util.meta import frozen_after_init
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 
 def side_effecting(cls):
@@ -136,7 +135,6 @@ def _make_rule(
                 )
             return resolved
 
-        gets = OrderedSet()
         rule_func_node = assert_single_element(
             node
             for node in ast.iter_child_nodes(module_ast)
@@ -151,7 +149,8 @@ def _make_rule(
 
         rule_visitor = _RuleVisitor()
         rule_visitor.visit(rule_func_node)
-        gets.update(
+
+        gets = FrozenOrderedSet(
             Get.create_statically_for_rule_graph(resolve_type(p), resolve_type(s))
             for p, s in rule_visitor.gets
         )
@@ -516,10 +515,14 @@ functions decorated with @rule.""".format(
 
     @dataclass(frozen=True)
     class NormalizedRules:
-        rules: Any
+        rules: FrozenOrderedSet
         union_rules: Any
 
     def normalized_rules(self):
-        rules = OrderedSet(rule for ruleset in self.rules.values() for rule in ruleset)
-        rules.update(self.roots)
+        rules = FrozenOrderedSet(
+            (
+                *itertools.chain.from_iterable(ruleset for ruleset in self.rules.values()),
+                *self.roots,
+            )
+        )
         return self.NormalizedRules(rules, self.union_rules)
