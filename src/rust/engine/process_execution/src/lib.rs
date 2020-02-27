@@ -129,7 +129,7 @@ impl From<Platform> for String {
   fn from(platform: Platform) -> String {
     match platform {
       Platform::Linux => "linux".to_string(),
-      Platform::Darwin => "osx".to_string(),
+      Platform::Darwin => "darwin".to_string(),
     }
   }
 }
@@ -138,7 +138,7 @@ impl From<PlatformConstraint> for String {
   fn from(platform: PlatformConstraint) -> String {
     match platform {
       PlatformConstraint::Linux => "linux".to_string(),
-      PlatformConstraint::Darwin => "osx".to_string(),
+      PlatformConstraint::Darwin => "darwin".to_string(),
       PlatformConstraint::None => "none".to_string(),
     }
   }
