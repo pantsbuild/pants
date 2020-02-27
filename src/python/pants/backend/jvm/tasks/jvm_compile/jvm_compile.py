@@ -560,7 +560,9 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
                     f"It means that certain thrift target(s) depends back onto the targets you want to import to IDE."
                 )
 
-            relevant_targets = list(set(relevant_targets) - modulizable_targets)
+            relevant_targets = list(
+                filter(lambda x: self.select(x), set(relevant_targets) - modulizable_targets)
+            )
             self.context.products.get_data("jvm_modulizable_targets", set).update(
                 modulizable_targets
             )
@@ -594,7 +596,10 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
                             classpath_product.add_for_target(cc.target, [(conf, cc.jar_file)])
 
         if modulizable_targets is not None:
-            self.create_extra_products_for_targets(modulizable_targets)
+            compilable_modulizable_targets = set(
+                filter(lambda x: self.select(x), modulizable_targets)
+            )
+            self.create_extra_products_for_targets(compilable_modulizable_targets)
 
     def calculate_jvm_modulizable_targets(self):
         def is_jvm_or_resource_target(t):
@@ -603,13 +608,15 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
         jvm_and_resources_target_roots = set(
             filter(is_jvm_or_resource_target, self.context.target_roots)
         )
-        jvm_and_resources_target_roots_minus_thrift = set(
-            filter(lambda x: not x.is_synthetic, jvm_and_resources_target_roots)
+        jvm_and_resources_target_roots_minus_thrift_addresses = set(
+            t.address for t in filter(lambda x: not x.is_synthetic, jvm_and_resources_target_roots)
         )
+        all_targets = set(self.context.targets())
         modulizable_targets = set(
             t
             for t in self.context.build_graph.transitive_dependees_of_addresses(
-                t.address for t in jvm_and_resources_target_roots_minus_thrift
+                jvm_and_resources_target_roots_minus_thrift_addresses,
+                predicate=lambda x: x in all_targets,
             )
             if is_jvm_or_resource_target(t)
         )
