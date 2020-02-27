@@ -4,16 +4,19 @@
 import hashlib
 import logging
 import os
+import shutil
 import site
 import uuid
 
 from pex import resolver
 from pex.interpreter import PythonInterpreter
+from pkg_resources import Distribution
 from pkg_resources import working_set as global_working_set
 
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.python.python_repos import PythonRepos
-from pants.util.dirutil import safe_delete, safe_open
+from pants.util.contextutil import temporary_dir
+from pants.util.dirutil import safe_concurrent_rename, safe_delete, safe_open
 from pants.util.memo import memoized_property
 from pants.util.strutil import ensure_text
 from pants.version import PANTS_SEMVER
@@ -72,12 +75,14 @@ class PluginResolver:
             tmp_plugins_list = f"{resolved_plugins_list}.{uuid.uuid4().hex}"
             with safe_open(tmp_plugins_list, "w") as fp:
                 for plugin in self._resolve_plugins():
-                    fp.write(ensure_text(plugin.location))
+                    fp.write(ensure_text(plugin))
                     fp.write("\n")
             os.rename(tmp_plugins_list, resolved_plugins_list)
         with open(resolved_plugins_list, "r") as fp:
-            for plugin_location in fp:
-                yield plugin_location.strip()
+            for plugin in fp:
+                plugin_path = plugin.strip()
+                plugin_location = f"{self._plugin_location(plugin_path)}"
+                yield plugin_location
 
     def _resolve_plugins(self):
         logger.info(
@@ -91,7 +96,61 @@ class PluginResolver:
             cache=self.plugin_cache_dir,
             allow_prereleases=PANTS_SEMVER.is_prerelease,
         )
-        return [resolved_dist.distribution for resolved_dist in resolved_dists]
+        return [
+            self._install_plugin(resolved_dist.distribution) for resolved_dist in resolved_dists
+        ]
+
+    @classmethod
+    def _plugin_location(cls, plugin_path):
+        return f"{plugin_path}-install"
+
+    def _install_plugin(self, distribution: Distribution):
+        # We don't actually install the distribution. It's installed for us by the Pex resolver in
+        # a chroot. We just copy that chroot out of the Pex cache to a location we control.
+        # Historically though, Pex did not install wheels it resolved and we did this here by hand.
+        # We retain the terminology and, more importantly, the final resting "install" path and the
+        # contents of plugin-<hash>.txt files to keep the plugin cache forwards and backwards
+        # compatible between Pants releases.
+        #
+        # Concretely:
+        #
+        # 1. In the past Pex resolved the wheel file below and we installed it to the "-install"
+        #    directory:
+        #
+        #    ~/.cache/pants/plugins/
+        #       requests-2.23.0-py2.py3-none-any.whl
+        #       requests-2.23.0-py2.py3-none-any.whl-install/
+        #
+        #    The plugins-<hash>.txt file that records plugin locations contained the un-installed
+        #    wheel file path:
+        #
+        #    $ cat ~/.cache/pants/plugins/plugins-418c36b574edbcf4720b266b0709750ad588c281.txt
+        #    /home/jsirois/.cache/pants/plugins/requests-2.23.0-py2.py3-none-any.whl
+        #
+        # 2. Now Pex resolves an installed wheel chroot directory and we copy that directory to the
+        #    "-install" directory:
+        #
+        #    ~/.cache/pants/plugins/
+        #      installed_wheels/6ce6cd759a2d13badb1f6b9e665e2aded7a012dd/requests-2.23.0-py2.py3-none-any.whl/
+        #      requests-2.23.0-py2.py3-none-any.whl-install/
+        #
+        #    The plugins-<hash>.txt file that records plugin locations now contains the final
+        #    installed wheel path with the "-install" suffix omitted which leads to the same file
+        #    contents as past Pants versions:
+        #
+        #    $ cat ~/.cache/pants/plugins/plugins-418c36b574edbcf4720b266b0709750ad588c281.txt
+        #        /home/jsirois/.cache/pants/plugins/requests-2.23.0-py2.py3-none-any.whl
+        #
+        #    We add the suffix on after reading the file to find the actual installed wheel path.
+
+        wheel_basename = os.path.basename(distribution.location)
+        plugin_path = os.path.join(self.plugin_cache_dir, wheel_basename)
+
+        with temporary_dir() as td:
+            temp_install_dir = os.path.join(td, wheel_basename)
+            shutil.copytree(distribution.location, temp_install_dir)
+            safe_concurrent_rename(temp_install_dir, self._plugin_location(plugin_path))
+            return plugin_path
 
     @property
     def plugin_cache_dir(self):
