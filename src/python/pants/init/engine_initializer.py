@@ -16,7 +16,6 @@ from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
 from pants.base.deprecated import deprecated_conditional
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
-from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.base.specs import Specs
 from pants.binaries.binary_tool import rules as binary_tool_rules
 from pants.binaries.binary_util import rules as binary_util_rules
@@ -367,7 +366,7 @@ class EngineInitializer:
 
     @staticmethod
     def setup_legacy_graph_extended(
-        pants_ignore_patterns,
+        pants_ignore_patterns: List[str],
         local_store_dir,
         build_file_imports_behavior: BuildFileImportsBehavior,
         options_bootstrapper: OptionsBootstrapper,
@@ -383,7 +382,7 @@ class EngineInitializer:
     ) -> LegacyGraphScheduler:
         """Construct and return the components necessary for LegacyBuildGraph construction.
 
-        :param list pants_ignore_patterns: A list of path ignore patterns for FileSystemProjectTree,
+        :param list pants_ignore_patterns: A list of path ignore patterns
                                            usually taken from the '--pants-ignore' global option.
         :param local_store_dir: The directory to use for storing the engine's LMDB store in.
         :param build_file_imports_behavior: How to behave if a BUILD file being parsed tries to use
@@ -414,9 +413,6 @@ class EngineInitializer:
         rules = build_configuration.rules()
 
         symbol_table = _legacy_symbol_table(build_file_aliases)
-
-        project_tree = FileSystemProjectTree(build_root, pants_ignore_patterns)
-
         execution_options = execution_options or DEFAULT_EXECUTION_OPTIONS
 
         # Register "literal" subjects required for these rules.
@@ -480,6 +476,8 @@ class EngineInitializer:
         scheduler = Scheduler(
             native,
             project_tree,
+            build_root,
+            pants_ignore_patterns,
             local_store_dir,
             rules,
             union_rules,

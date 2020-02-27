@@ -14,7 +14,6 @@ from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Type
 
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE
-from pants.base.project_tree import ProjectTree
 from pants.engine.fs import (
     Digest,
     DirectoryToMaterialize,
@@ -67,7 +66,8 @@ class Scheduler:
     def __init__(
         self,
         native,
-        project_tree: ProjectTree,
+        build_root: str,
+        ignore_patterns: List[str],
         local_store_dir: str,
         rules: Tuple[Rule],
         union_rules: typing.OrderedDict[Type, OrderedSet[Type]],
@@ -78,7 +78,8 @@ class Scheduler:
     ):
         """
         :param native: An instance of engine.native.Native.
-        :param project_tree: An instance of ProjectTree for the current build root.
+        :param build_root: The build root
+        :param ignore_patterns: A list of patterns to be ignored for pants file system operations.
         :param work_dir: The pants work dir.
         :param local_store_dir: The directory to use for storing the engine's LMDB store in.
         :param rules: A set of Rules which is used to compute values in the graph.
@@ -105,9 +106,9 @@ class Scheduler:
         self._scheduler = native.new_scheduler(
             tasks=self._tasks,
             root_subject_types=self._root_subject_types,
-            build_root=project_tree.build_root,
+            build_root=build_root,
             local_store_dir=local_store_dir,
-            ignore_patterns=project_tree.ignore_patterns,
+            ignore_patterns=ignore_patterns,
             execution_options=execution_options,
         )
 
