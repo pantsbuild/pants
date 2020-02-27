@@ -27,7 +27,7 @@ DIRS_TO_CHECK=(
 
 # TODO: test all the scripts in this file in test_git_hooks.py, remove uses of `|| exit 1`, and add an
 # integration test!
-set -e
+set -eo pipefail
 
 # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
 # shellcheck disable=SC2207
@@ -53,7 +53,8 @@ echo "* Checking shell scripts via our custom linter"
 # fails in pants changed.
 if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
   echo "* Checking formatting of Python files"
-  ./pants --changed-parent="${MERGE_BASE}" lint2 || die "To fix formatting, run \`./pants fmt2 ::\`"
+  ./build-support/bin/lint_providing_files_to_format.sh "${MERGE_BASE}" \
+    || die
 
   # TODO(CMLivingston) Make lint use `-q` option again after addressing proper workunit labeling:
   # https://github.com/pantsbuild/pants/issues/6633

@@ -17,6 +17,12 @@ from pants.util.dirutil import safe_file_dump, safe_mkdir_for
 
 
 class PreCommitHookTest(unittest.TestCase):
+
+    _common_script = Path("build-support/bin/common.py")
+    _test_packages_script = Path("build-support/bin/check_packages.sh")
+    _get_added_files_script = Path("build-support/bin/get_added_files.sh")
+    _header_check_script = Path("build-support/bin/check_header.py")
+
     @contextmanager
     def _create_tiny_git_repo(self, *, copy_files: Optional[Sequence[Path]] = None):
         with temporary_dir() as gitdir, temporary_dir() as worktree:
@@ -48,8 +54,7 @@ class PreCommitHookTest(unittest.TestCase):
         self.assertEqual(full_expected_output, stdout)
 
     def test_check_packages(self):
-        package_check_script = "build-support/bin/check_packages.sh"
-        with self._create_tiny_git_repo(copy_files=[Path(package_check_script)]) as (
+        with self._create_tiny_git_repo(copy_files=[self._package_check_script]) as (
             _,
             worktree,
             _,
@@ -60,7 +65,7 @@ class PreCommitHookTest(unittest.TestCase):
             safe_file_dump(init_py_path, "asdf")
             self._assert_subprocess_error(
                 worktree,
-                [package_check_script, "subdir"],
+                [self._package_check_script, "subdir"],
                 """\
 ERROR: All '__init__.py' files should be empty or else only contain a namespace
 declaration, but the following contain code:
@@ -71,19 +76,18 @@ subdir/__init__.py
 
             # Check that a valid empty __init__.py succeeds.
             safe_file_dump(init_py_path, "")
-            self._assert_subprocess_success(worktree, [package_check_script, "subdir"])
+            self._assert_subprocess_success(worktree, [self._package_check_script, "subdir"])
 
             # Check that a valid __init__.py with `pkg_resources` setup succeeds.
             safe_file_dump(init_py_path, '__import__("pkg_resources").declare_namespace(__name__)')
-            self._assert_subprocess_success(worktree, [package_check_script, "subdir"])
+            self._assert_subprocess_success(worktree, [self._package_check_script, "subdir"])
 
     # TODO: consider testing the degree to which copies (-C) and moves (-M) are detected by making
     # some small edits to a file, then moving it, and seeing if it is detected as a new file! That's
     # more testing git functionality, but since it's not clear how this is measured, it could be
     # useful if correctly detecting copies and moves ever becomes a concern.
     def test_added_files_correctly_detected(self):
-        get_added_files_script = "build-support/bin/get_added_files.sh"
-        with self._create_tiny_git_repo(copy_files=[Path(get_added_files_script)]) as (
+        with self._create_tiny_git_repo(copy_files=[self._get_added_files_script]) as (
             git,
             worktree,
             _,
@@ -96,24 +100,23 @@ subdir/__init__.py
             git.add(rel_new_file)
             self._assert_subprocess_success_with_output(
                 worktree,
-                [get_added_files_script],
+                [self._get_added_files_script],
                 # This should be the only entry in the index, and it is a newly added file.
                 full_expected_output=f"{rel_new_file}\n",
             )
 
     def test_check_headers(self):
-        header_check_script = "build-support/bin/check_header.py"
         cur_year_num = datetime.datetime.now().year
         cur_year = str(cur_year_num)
         with self._create_tiny_git_repo(
-            copy_files=[Path(header_check_script), "build-support/bin/common.py"]
+            copy_files=[self._header_check_script, self._common_script]
         ) as (_, worktree, _):
             new_py_path = os.path.join(worktree, "subdir/file.py")
 
             def assert_header_check(added_files, expected_excerpt):
                 self._assert_subprocess_error(
                     worktree=worktree,
-                    cmd=[header_check_script, "subdir", "--files-added"] + added_files,
+                    cmd=[self._header_check_script, "subdir", "--files-added"] + added_files,
                     expected_excerpt=expected_excerpt,
                 )
 
@@ -136,7 +139,7 @@ subdir/__init__.py
                     f"""\
                     # Copyright {cur_year} Pants project contributors (see CONTRIBUTORS.md).
                     # Licensed under the MIT License, Version 3.3 (see LICENSE).
-            
+
                     """
                 ),
             )
@@ -152,7 +155,7 @@ subdir/__init__.py
                     """\
                     # Copyright YYYY Pants project contributors (see CONTRIBUTORS.md).
                     # Licensed under the Apache License, Version 2.0 (see LICENSE).
-            
+
                     """
                 ),
             )
@@ -172,7 +175,7 @@ subdir/__init__.py
                     f"""\
                     # Copyright {last_year} Pants project contributors (see CONTRIBUTORS.md).
                     # Licensed under the Apache License, Version 2.0 (see LICENSE).
-            
+
                     """
                 ),
             )
@@ -185,4 +188,4 @@ subdir/__init__.py
             # Check that a file isn't checked against the current year if it is not passed as an
             # arg to the script.
             # Use the same file as last time, with last year's copyright date.
-            self._assert_subprocess_success(worktree, [header_check_script, "subdir"])
+            self._assert_subprocess_success(worktree, [self._header_check_script, "subdir"])

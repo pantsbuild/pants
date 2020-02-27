@@ -128,3 +128,10 @@ def strip_prefix(string: str, prefix: str) -> str:
         return string[len(prefix) :]
     else:
         return string
+
+
+def lines_to_set(str_or_list):
+    if isinstance(str_or_list, list):
+        return set(str_or_list)
+    else:
+        return {x for x in str(str_or_list).split("\n") if x}

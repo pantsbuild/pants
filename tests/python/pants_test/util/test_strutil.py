@@ -3,7 +3,7 @@
 
 import unittest
 
-from pants.util.strutil import camelcase, ensure_binary, ensure_text, pluralize, strip_prefix
+from pants.util.strutil import camelcase, ensure_binary, lines_to_set, ensure_text, pluralize, strip_prefix
 
 
 # TODO(Eric Ayers): Backfill tests for other methods in strutil.py
@@ -53,3 +53,9 @@ class StrutilTest(unittest.TestCase):
         self.assertEqual("//testString", strip_prefix("////testString", "//"))
         self.assertEqual("test//String", strip_prefix("test//String", "//"))
         self.assertEqual("testString//", strip_prefix("testString//", "//"))
+
+    def test_lines_to_set(self):
+        self.assertEqual(lines_to_set(''), set())
+        self.assertEqual(lines_to_set([]), set())
+        self.assertEqual(lines_to_set(['a', 'b', 'b', 'c']), set(['a', 'b', 'c']))
+        self.assertEqual(lines_to_set('a\nb\nb\nc'), set(['a', 'b', 'c']))
