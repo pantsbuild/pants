@@ -561,6 +561,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
             self.context.products.get_data("jvm_modulizable_targets", set).update(
                 modulizable_targets
             )
+            self.create_extra_products_for_targets(modulizable_targets)
 
         if relevant_targets:
             # Note, JVM targets are validated (`vts.update()`) as they succeed.  As a result,
