@@ -75,8 +75,8 @@ class Dependencies(ConsoleTask):
             hint_message="Currently, Pants defaults to `--dependencies-transitive`, which means that it "
             "will find all transitive dependencies for the target, rather than only direct "
             "dependencies. This is a useful feature, but surprising to be the default."
-            "\n\nTo prepare for this change to the default value, set in `pants.ini` under "
-            "the section `dependencies` the value `transitive: False`. In Pants 1.28.0, "
+            "\n\nTo prepare for this change to the default value, set in `pants.toml` under "
+            "the section `dependencies` the value `transitive = false`. In Pants 1.28.0, "
             "you can safely remove the setting.",
         )
         return self.get_options().transitive

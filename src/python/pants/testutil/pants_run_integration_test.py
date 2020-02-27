@@ -420,8 +420,8 @@ class PantsRunIntegrationTest(unittest.TestCase):
         """Runs pants in a subprocess.
 
         :param list command: A list of command line arguments coming after `./pants`.
-        :param config: Optional data for a generated ini file. A map of <section-name> ->
-        map of key -> value. If order in the ini file matters, this should be an OrderedDict.
+        :param config: Optional data for a generated TOML file. A map of <section-name> ->
+        map of key -> value.
         :param kwargs: Extra keyword args to pass to `subprocess.Popen`.
         """
         with self.temporary_workdir() as workdir:
@@ -435,8 +435,8 @@ class PantsRunIntegrationTest(unittest.TestCase):
         callers a chance to do any necessary validations on the workdir.
 
         :param list command: A list of command line arguments coming after `./pants`.
-        :param config: Optional data for a generated ini file. A map of <section-name> ->
-        map of key -> value. If order in the ini file matters, this should be an OrderedDict.
+        :param config: Optional data for a generated TOML file. A map of <section-name> ->
+        map of key -> value.
         :param kwargs: Extra keyword args to pass to `subprocess.Popen`.
         :returns a PantsResult instance.
         """

@@ -28,29 +28,25 @@ To verify that Pants bootstraps correctly, run:
     :::bash
     ./pants --version
 
-Now, run this command to create an initial `pants.ini` config file:
+Now, run this command to create an initial `pants.toml` config file:
 
     :::bash
-    printf "[GLOBAL]\npants_version: $(./pants --version)\n" > pants.ini
+    printf "[GLOBAL]\npants_version = \"$(./pants --version)\"\n" > pants.toml
 
-This config pins the `pants_version`. When you'd like to upgrade Pants, edit the version in `pants.ini` and `./pants` will self-update on the next run.
+This config pins the `pants_version`. When you'd like to upgrade Pants, edit the version in `pants.toml` and `./pants` will self-update on the next run.
 
 To use Pants plugins published to PyPI, add them to a `plugins` list, like so:
 
-    :::ini
+    :::toml
     [GLOBAL]
-    pants_version: ...
+    pants_version = ...
 
     plugins: [
-        'pantsbuild.pants.contrib.go==%(pants_version)s',
-        'pantsbuild.pants.contrib.scrooge==%(pants_version)s',
-      ]
+      "pantsbuild.pants.contrib.go==%(pants_version)s",
+      "pantsbuild.pants.contrib.scrooge==%(pants_version)s",
+    ]
 
 Pants will notice you changed your plugins and will install them the next time you run `./pants`.
-
-Note that the formatting of the plugins list is important; all lines below the `plugins:` line must be
-indented by at least one white space to form logical continuation lines. This is standard for Python
-ini files. See [[Options|pants('src/docs:options')]] for a guide on modifying your `pants.ini`.
 
 The ./pants Runner Script
 -------------------------
@@ -69,10 +65,10 @@ PEX-based Installation
 The virtualenv-based method is the recommended way of installing Pants.
 However in cases where you can't depend on a local pants installation (e.g., your machines
 prohibit software installation), some sites fetch a pre-built executable `pants.pex` using
-the `pants_version` defined in `pants.ini`.  To upgrade pants, they generate a `pants.pex`
+the `pants_version` defined in `pants.toml`.  To upgrade pants, they generate a `pants.pex`
 and upload it to a file server at a location computable  from the version number.
 They then write their own `./pants` script that checks the `pants_version` in
-`pants.ini` and download the appropriate pex from the file server to the correct spot.
+`pants.toml` and download the appropriate pex from the file server to the correct spot.
 
 Troubleshooting
 ---------------

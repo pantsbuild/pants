@@ -53,7 +53,7 @@ See the examples directory for real examples.
 Pants will bootstrap itself with its own copy of Node.js, NPM, and Yarn package manager and use them to run commands.
 It runs those commands with the bootstrapped Node's bin directory at the front of the PATH.
 
-Distribution versions can be modified in `pants.ini`.
+Distribution versions can be modified in `pants.toml`.
 
 ## Package Management
 

@@ -41,7 +41,7 @@ class BundleCreate(BundleMixin, JvmBinaryTask):
             "the bundle's root dir. If unset, all jars will go into the bundle's libs "
             "directory, the root will only contain a synthetic jar with its manifest's "
             "Class-Path set to those jars. This option is also defined in jvm_app target. "
-            "Precedence is CLI option > target option > pants.ini option.",
+            "Precedence is CLI option > target option > pants.toml option.",
         )
 
     @classmethod
