@@ -70,7 +70,8 @@ class ScalaLibrary(ExportableJvmLibrary):
 
         scalac_plugins = scalac_plugins or []
         scalac_plugin_args = scalac_plugin_args or {}
-        compiler_option_sets = compiler_option_sets or set()
+        # Allow lists as well as sets in BUILD files:
+        compiler_option_sets = set(compiler_option_sets) if compiler_option_sets else set()
 
         # Modify these options in case scoverage is enabled.
         if ScoveragePlatform.global_instance().get_options().enable_scoverage:
