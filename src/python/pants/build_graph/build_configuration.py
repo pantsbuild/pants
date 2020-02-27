@@ -5,7 +5,8 @@ import logging
 import typing
 from collections import OrderedDict, namedtuple
 from collections.abc import Iterable
-from typing import Type
+from dataclasses import dataclass, field
+from typing import Any, Dict, Type
 
 from pants.base.parse_context import ParseContext
 from pants.build_graph.addressable import AddressableCallProxy
@@ -19,22 +20,22 @@ from pants.util.ordered_set import OrderedSet
 logger = logging.getLogger(__name__)
 
 
+@dataclass
 class BuildConfiguration:
     """Stores the types and helper functions exposed to BUILD files."""
+
+    _target_by_alias: Dict[Any, Any] = field(default_factory=dict)
+    _target_macro_factory_by_alias: Dict[Any, Any] = field(default_factory=dict)
+    _exposed_object_by_alias: Dict[Any, Any] = field(default_factory=dict)
+    _exposed_context_aware_object_factory_by_alias: Dict[Any, Any] = field(default_factory=dict)
+    _optionables: OrderedSet = OrderedSet()
+    _rules: OrderedSet = OrderedSet()
+    _union_rules: typing.OrderedDict[Type, OrderedSet[Type]] = field(default_factory=OrderedDict)
 
     class ParseState(namedtuple("ParseState", ["parse_context", "parse_globals"])):
         @property
         def objects(self):
             return self.parse_context._storage.objects
-
-    def __init__(self):
-        self._target_by_alias = {}
-        self._target_macro_factory_by_alias = {}
-        self._exposed_object_by_alias = {}
-        self._exposed_context_aware_object_factory_by_alias = {}
-        self._optionables = OrderedSet()
-        self._rules = OrderedSet()
-        self._union_rules: typing.OrderedDict[Type, OrderedSet[Type]] = OrderedDict()
 
     def registered_aliases(self) -> BuildFileAliases:
         """Return the registered aliases exposed in BUILD files.
