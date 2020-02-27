@@ -8,7 +8,7 @@ from typing import Iterable, Optional, Tuple, cast
 
 from pex.variables import Variables
 
-from pants.option.custom_types import UnsetBool, dir_option, file_option
+from pants.option.custom_types import UnsetBool, file_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 
@@ -64,7 +64,7 @@ class PythonSetup(Subsystem):
             "--interpreter-cache-dir",
             advanced=True,
             default=None,
-            type=dir_option,
+            metavar="<dir>",
             help="The parent directory for the interpreter cache. "
             "If unspecified, a standard path under the workdir is used.",
         )
@@ -72,7 +72,7 @@ class PythonSetup(Subsystem):
             "--chroot-cache-dir",
             advanced=True,
             default=None,
-            type=dir_option,
+            metavar="<dir>",
             help="The parent directory for the chroot cache. "
             "If unspecified, a standard path under the workdir is used.",
         )
@@ -80,7 +80,7 @@ class PythonSetup(Subsystem):
             "--resolver-cache-dir",
             advanced=True,
             default=None,
-            type=dir_option,
+            metavar="<dir>",
             help="The parent directory for the requirement resolver cache. "
             "If unspecified, a standard path under the workdir is used.",
         )
@@ -106,7 +106,7 @@ class PythonSetup(Subsystem):
             "--artifact-cache-dir",
             advanced=True,
             default=None,
-            type=dir_option,
+            metavar="<dir>",
             help="The parent directory for the python artifact cache. "
             "If unspecified, a standard path under the workdir is used.",
         )
