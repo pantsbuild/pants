@@ -11,7 +11,6 @@ from pants.backend.python.rules.pex import (
     CreatePex,
     Pex,
     PexInterpreterConstraints,
-    PexRequirementConstraints,
     PexRequirements,
 )
 from pants.backend.python.rules.setup_py_util import (
@@ -646,7 +645,7 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
 
 
 @rule(name="Set up setuptools")
-async def setup_setuptools(setuptools: Setuptools, python_setup: PythonSetup) -> SetuptoolsSetup:
+async def setup_setuptools(setuptools: Setuptools) -> SetuptoolsSetup:
     # Note that this pex has no entrypoint. We use it to run our generated setup.py, which
     # in turn imports from and invokes setuptools.
     requirements_pex = await Get[Pex](
@@ -656,7 +655,6 @@ async def setup_setuptools(setuptools: Setuptools, python_setup: PythonSetup) ->
             interpreter_constraints=PexInterpreterConstraints(
                 constraint_set=tuple(setuptools.default_interpreter_constraints)
             ),
-            requirement_constraints=PexRequirementConstraints.create_from_setup(python_setup),
         )
     )
     return SetuptoolsSetup(requirements_pex=requirements_pex,)

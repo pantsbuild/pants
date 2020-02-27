@@ -11,7 +11,6 @@ from pants.backend.python.rules.pex import (
     CreatePex,
     Pex,
     PexInterpreterConstraints,
-    PexRequirementConstraints,
     PexRequirements,
 )
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
@@ -70,7 +69,6 @@ async def lint(
             output_filename="flake8.pex",
             requirements=PexRequirements(requirements=tuple(flake8.get_requirement_specs())),
             interpreter_constraints=interpreter_constraints,
-            requirement_constraints=PexRequirementConstraints.create_from_setup(python_setup),
             entry_point=flake8.get_entry_point(),
         )
     )

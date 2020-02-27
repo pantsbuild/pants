@@ -4,11 +4,11 @@
 import logging
 import os
 import subprocess
-from typing import Iterable, Optional, Tuple
+from typing import Iterable, Optional, Tuple, cast
 
 from pex.variables import Variables
 
-from pants.option.custom_types import UnsetBool, dir_option, file_option
+from pants.option.custom_types import UnsetBool, dir_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 
@@ -42,13 +42,12 @@ class PythonSetup(Subsystem):
             "--requirement-constraints",
             advanced=True,
             fingerprint=True,
-            type=list,
-            member_type=file_option,
-            default=[],
-            metavar="<file>",
+            # TODO(#9148): uncomment out the below line once this is fixed. Right now, using
+            # `file_option` causes the unit test to fail.
+            # type=file_option,
             help=(
-                "When resolving third-party requirements, use these "
-                "constraint file(s) to determine which versions to use. See "
+                "When resolving third-party requirements, use this "
+                "constraint file to determine which versions to use. See "
                 "https://pip.pypa.io/en/stable/user_guide/#constraints-files for more information "
                 "on the format of constraint files and how constraints are applied in Pex and Pip."
             ),
@@ -67,7 +66,6 @@ class PythonSetup(Subsystem):
             "--interpreter-cache-dir",
             advanced=True,
             default=None,
-            metavar="<dir>",
             type=dir_option,
             help="The parent directory for the interpreter cache. "
             "If unspecified, a standard path under the workdir is used.",
@@ -76,7 +74,6 @@ class PythonSetup(Subsystem):
             "--chroot-cache-dir",
             advanced=True,
             default=None,
-            metavar="<dir>",
             type=dir_option,
             help="The parent directory for the chroot cache. "
             "If unspecified, a standard path under the workdir is used.",
@@ -85,7 +82,7 @@ class PythonSetup(Subsystem):
             "--resolver-cache-dir",
             advanced=True,
             default=None,
-            metavar="<dir>",
+            type=dir_option,
             help="The parent directory for the requirement resolver cache. "
             "If unspecified, a standard path under the workdir is used.",
         )
@@ -111,7 +108,7 @@ class PythonSetup(Subsystem):
             "--artifact-cache-dir",
             advanced=True,
             default=None,
-            metavar="<dir>",
+            type=dir_option,
             help="The parent directory for the python artifact cache. "
             "If unspecified, a standard path under the workdir is used.",
         )
@@ -162,9 +159,9 @@ class PythonSetup(Subsystem):
         return tuple(self.options.interpreter_constraints)
 
     @property
-    def requirement_constraints(self) -> Tuple[str, ...]:
-        """Paths to constraint files."""
-        return tuple(self.options.requirement_constraints)
+    def requirement_constraints(self) -> Optional[str]:
+        """Path to constraint file."""
+        return cast(Optional[str], self.options.requirement_constraints)
 
     @memoized_property
     def interpreter_search_paths(self):

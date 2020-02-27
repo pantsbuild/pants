@@ -10,6 +10,7 @@ from pants.backend.python.subsystems.python_native_code import PexBuildEnvironme
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.fs import (
     EMPTY_DIRECTORY_DIGEST,
+    EMPTY_SNAPSHOT,
     Digest,
     DirectoriesToMerge,
     DirectoryWithPrefixToAdd,
@@ -72,40 +73,12 @@ class PexInterpreterConstraints:
 
 
 @dataclass(frozen=True)
-class PexRequirementConstraints:
-    """A collection of paths to constraint files."""
-
-    constraint_file_paths: Tuple[str, ...] = ()
-
-    @classmethod
-    def create_from_setup(cls, python_setup: PythonSetup) -> "PexRequirementConstraints":
-        return cls(python_setup.requirement_constraints)
-
-    def generate_pex_arg_list(self) -> List[str]:
-        # NB: We preserve the order of the constraint files. The order does matter when there are
-        # conflicting versions across files; with Pip, the first seen wins.
-        args = []
-        for fp in self.constraint_file_paths:
-            args.extend(["--constraints", fp])
-        return args
-
-    def as_path_globs(self) -> PathGlobs:
-        return PathGlobs(
-            self.constraint_file_paths,
-            glob_match_error_behavior=GlobMatchErrorBehavior.error,
-            conjunction=GlobExpansionConjunction.all_match,
-            description_of_origin="the option `--python-setup-requirement-constraints`",
-        )
-
-
-@dataclass(frozen=True)
 class CreatePex:
     """Represents a generic request to create a PEX from its inputs."""
 
     output_filename: str
     requirements: PexRequirements = PexRequirements()
     interpreter_constraints: PexInterpreterConstraints = PexInterpreterConstraints()
-    requirement_constraints: PexRequirementConstraints = PexRequirementConstraints()
     entry_point: Optional[str] = None
     input_files_digest: Optional[Digest] = None
     additional_args: Tuple[str, ...] = ()
@@ -135,7 +108,6 @@ async def create_pex(
         "--output-file",
         request.output_filename,
         *request.interpreter_constraints.generate_pex_arg_list(),
-        *request.requirement_constraints.generate_pex_arg_list(),
         *request.additional_args,
     ]
 
@@ -150,14 +122,24 @@ async def create_pex(
     if request.entry_point is not None:
         argv.extend(["--entry-point", request.entry_point])
 
+    if python_setup.requirement_constraints is not None:
+        argv.extend(["--constraints", python_setup.requirement_constraints])
+
     source_dir_name = "source_files"
     argv.append(f"--sources-directory={source_dir_name}")
 
     argv.extend(request.requirements.requirements)
 
-    constraint_files = await Get[Snapshot](
-        PathGlobs, request.requirement_constraints.as_path_globs()
-    )
+    constraint_file_snapshot = EMPTY_SNAPSHOT
+    if python_setup.requirement_constraints is not None:
+        constraint_file_snapshot = await Get[Snapshot](
+            PathGlobs(
+                [python_setup.requirement_constraints],
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                conjunction=GlobExpansionConjunction.all_match,
+                description_of_origin="the option `--python-setup-requirement-constraints`",
+            )
+        )
 
     sources_digest = (
         request.input_files_digest if request.input_files_digest else EMPTY_DIRECTORY_DIGEST
@@ -171,7 +153,7 @@ async def create_pex(
             directories=(
                 pex_bin.directory_digest,
                 sources_digest_as_subdir,
-                constraint_files.directory_digest,
+                constraint_file_snapshot.directory_digest,
             )
         )
     )

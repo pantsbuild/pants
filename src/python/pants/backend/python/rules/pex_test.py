@@ -4,14 +4,13 @@
 import json
 import os.path
 import zipfile
-from typing import Dict, Optional, Set, Tuple, cast
+from typing import Dict, Optional, Tuple, cast
 
 from pants.backend.python.rules import download_pex_bin
 from pants.backend.python.rules.pex import (
     CreatePex,
     Pex,
     PexInterpreterConstraints,
-    PexRequirementConstraints,
     PexRequirements,
 )
 from pants.backend.python.rules.pex import rules as pex_rules
@@ -45,24 +44,25 @@ class PexTest(TestBase):
         requirements=PexRequirements(),
         entry_point=None,
         interpreter_constraints=PexInterpreterConstraints(),
-        requirement_constraints=PexRequirementConstraints(),
         input_files: Optional[Digest] = None,
-        additional_args: Tuple[str, ...] = (),
+        additional_pants_args: Tuple[str, ...] = (),
+        additional_pex_args: Tuple[str, ...] = (),
     ) -> Dict:
         request = CreatePex(
             output_filename="test.pex",
             requirements=requirements,
             interpreter_constraints=interpreter_constraints,
-            requirement_constraints=requirement_constraints,
             entry_point=entry_point,
             input_files_digest=input_files,
-            additional_args=additional_args,
+            additional_args=additional_pex_args,
         )
         requirements_pex = self.request_single_product(
             Pex,
             Params(
                 request,
-                create_options_bootstrapper(args=["--backend-packages2=pants.backend.python"]),
+                create_options_bootstrapper(
+                    args=["--backend-packages2=pants.backend.python", *additional_pants_args]
+                ),
             ),
         )
         self.scheduler.materialize_directory(
@@ -80,9 +80,9 @@ class PexTest(TestBase):
         requirements=PexRequirements(),
         entry_point=None,
         interpreter_constraints=PexInterpreterConstraints(),
-        requirement_constraints=PexRequirementConstraints(),
         input_files: Optional[Digest] = None,
-        additional_args: Tuple[str, ...] = (),
+        additional_pants_args: Tuple[str, ...] = (),
+        additional_pex_args: Tuple[str, ...] = (),
     ) -> Dict:
         return cast(
             Dict,
@@ -90,9 +90,9 @@ class PexTest(TestBase):
                 requirements=requirements,
                 entry_point=entry_point,
                 interpreter_constraints=interpreter_constraints,
-                requirement_constraints=requirement_constraints,
                 input_files=input_files,
-                additional_args=additional_args,
+                additional_pants_args=additional_pants_args,
+                additional_pex_args=additional_pex_args,
             )["info"],
         )
 
@@ -137,39 +137,20 @@ class PexTest(TestBase):
     def test_requirement_constraints(self) -> None:
         # This is intentionally old; a constraint will resolve us to a more modern version.
         direct_dep = "requests==1.0.0"
-        constraints_file1 = [
-            "chardet==3.0.2",
+        constraints = [
+            "requests==2.23.0",
             "certifi==2019.6.16",
+            "chardet==3.0.2",
             "idna==2.7",
             "urllib3==1.25.6",
         ]
-        constraints_file2 = [
-            # Repeat an earlier requirement to ensure that we properly preserve the order of
-            # constraints.
-            "chardet==3.0.3",
-            # Override the direct dependency
-            "requests==2.23.0",
-        ]
-        self.create_file("c1.txt", "\n".join(constraints_file1))
-        self.create_file("c2.txt", "\n".join(constraints_file2))
+        self.create_file("constraints.txt", "\n".join(constraints))
 
-        def assert_constraints_used(
-            *, file_order: Tuple[str, str], expected_constraints: Set[str]
-        ) -> None:
-            pex_info = self.create_pex_and_get_pex_info(
-                requirements=PexRequirements((direct_dep,)),
-                requirement_constraints=PexRequirementConstraints(file_order),
-            )
-            assert set(pex_info["requirements"]) == expected_constraints
-
-        assert_constraints_used(
-            file_order=("c1.txt", "c2.txt"),
-            expected_constraints={*constraints_file1, *constraints_file2[1:]},
+        pex_info = self.create_pex_and_get_pex_info(
+            requirements=PexRequirements((direct_dep,)),
+            additional_pants_args=("--python-setup-requirement-constraints=constraints.txt",),
         )
-        assert_constraints_used(
-            file_order=("c2.txt", "c1.txt"),
-            expected_constraints={*constraints_file1[1:], *constraints_file2},
-        )
+        assert set(pex_info["requirements"]) == set(constraints)
 
     def test_entry_point(self) -> None:
         entry_point = "pydoc"
@@ -182,5 +163,5 @@ class PexTest(TestBase):
         assert set(pex_info["interpreter_constraints"]) == set(constraints.constraint_set)
 
     def test_additional_args(self) -> None:
-        pex_info = self.create_pex_and_get_pex_info(additional_args=("--not-zip-safe",))
+        pex_info = self.create_pex_and_get_pex_info(additional_pex_args=("--not-zip-safe",))
         assert pex_info["zip_safe"] is False
