@@ -10,9 +10,14 @@ from pants.backend.python.subsystems.python_native_code import PexBuildEnvironme
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.fs import (
     EMPTY_DIRECTORY_DIGEST,
+    EMPTY_SNAPSHOT,
     Digest,
     DirectoriesToMerge,
     DirectoryWithPrefixToAdd,
+    GlobExpansionConjunction,
+    GlobMatchErrorBehavior,
+    PathGlobs,
+    Snapshot,
 )
 from pants.engine.isolated_process import ExecuteProcessResult, MultiPlatformExecuteProcessRequest
 from pants.engine.legacy.structs import PythonTargetAdaptor, TargetAdaptor
@@ -88,8 +93,6 @@ class Pex(HermeticPex):
     output_filename: str
 
 
-# TODO: This is non-hermetic because the requirements will be resolved on the fly by
-# pex, where it should be hermetically provided in some way.
 @rule(name="Create PEX")
 async def create_pex(
     request: CreatePex,
@@ -99,25 +102,45 @@ async def create_pex(
     pex_build_environment: PexBuildEnvironment,
     platform: Platform,
 ) -> Pex:
-    """Returns a PEX with the given requirements, optional entry point, and optional interpreter
-    constraints."""
+    """Returns a PEX with the given requirements, optional entry point, optional interpreter
+    constraints, and optional requirement constraints."""
 
-    argv = ["--output-file", request.output_filename]
+    argv = [
+        "--output-file",
+        request.output_filename,
+        *request.interpreter_constraints.generate_pex_arg_list(),
+        *request.additional_args,
+    ]
+
     if python_setup.resolver_jobs:
         argv.extend(["--jobs", python_setup.resolver_jobs])
-    if request.entry_point is not None:
-        argv.extend(["--entry-point", request.entry_point])
-    argv.extend(request.interpreter_constraints.generate_pex_arg_list())
-    argv.extend(request.additional_args)
+
     if python_setup.manylinux:
         argv.extend(["--manylinux", python_setup.manylinux])
     else:
         argv.append("--no-manylinux")
 
+    if request.entry_point is not None:
+        argv.extend(["--entry-point", request.entry_point])
+
+    if python_setup.requirement_constraints is not None:
+        argv.extend(["--constraints", python_setup.requirement_constraints])
+
     source_dir_name = "source_files"
     argv.append(f"--sources-directory={source_dir_name}")
 
     argv.extend(request.requirements.requirements)
+
+    constraint_file_snapshot = EMPTY_SNAPSHOT
+    if python_setup.requirement_constraints is not None:
+        constraint_file_snapshot = await Get[Snapshot](
+            PathGlobs(
+                [python_setup.requirement_constraints],
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                conjunction=GlobExpansionConjunction.all_match,
+                description_of_origin="the option `--python-setup-requirement-constraints`",
+            )
+        )
 
     sources_digest = (
         request.input_files_digest if request.input_files_digest else EMPTY_DIRECTORY_DIGEST
@@ -125,11 +148,16 @@ async def create_pex(
     sources_digest_as_subdir = await Get[Digest](
         DirectoryWithPrefixToAdd(sources_digest, source_dir_name)
     )
-    all_inputs = (
-        pex_bin.directory_digest,
-        sources_digest_as_subdir,
+
+    merged_digest = await Get[Digest](
+        DirectoriesToMerge(
+            directories=(
+                pex_bin.directory_digest,
+                sources_digest_as_subdir,
+                constraint_file_snapshot.directory_digest,
+            )
+        )
     )
-    merged_digest = await Get[Digest](DirectoriesToMerge(directories=all_inputs))
 
     # NB: PEX outputs are platform dependent so in order to get a PEX that we can use locally, without
     # cross-building, we specify that our PEX command be run on the current local platform. When we

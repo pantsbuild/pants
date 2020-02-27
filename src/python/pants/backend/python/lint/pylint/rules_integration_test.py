@@ -5,8 +5,6 @@ from functools import partialmethod
 from textwrap import dedent
 from typing import List, Optional
 
-import pytest
-
 from pants.backend.python.lint.pylint.rules import PylintTargets
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
 from pants.backend.python.targets.python_library import PythonLibrary
@@ -75,7 +73,6 @@ class PylintIntegrationTest(TestBase):
     ) -> LintResult:
         args = ["--backend-packages2=pants.backend.python.lint.pylint"]
         if config:
-            # TODO(#9148): The config file exists but parser.py cannot find it
             self.create_file(relpath="pylintrc", contents=config)
             args.append("--pylint-config=pylintrc")
         if passthrough_args:
@@ -137,14 +134,13 @@ class PylintIntegrationTest(TestBase):
         assert result.exit_code == 0
         assert "Your code has been rated at 10.00/10" in result.stdout.strip()
 
-    @pytest.mark.skip(reason="#9148: The config file exists but parser.py cannot find it")
     def test_respects_config_file(self) -> None:
         self.create_python_library()
         self.write_file(self.bad_source)
         target = self.make_target_with_origin([self.bad_source])
         result = self.run_pylint([target], config="[pylint]\ndisable = C0103\n")
         assert result.exit_code == 0
-        assert result.stdout.strip() == ""
+        assert "Your code has been rated at 10.00/10" in result.stdout.strip()
 
     def test_respects_passthrough_args(self) -> None:
         self.create_python_library()

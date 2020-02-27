@@ -54,13 +54,14 @@ refers to the `public` repository defined above. (Notice it's a Python object, n
 If you get an error that the repo name (here, `public`) isn't defined, your plugin didn't register
 with Pants successfully. Make sure you bootstrap Pants in a way that loads your `register.py`.
 
-In your `pants.ini` file, set up a `[publish.jar]` section. In that section,
+In your `pants.toml` file, set up a `[publish.jar]` section. In that section,
 create a `dict` called `repos`. It should contain a section for each `Repository` object that you
 defined in your plugin:
 
-    :::ini
+    :::toml
     [publish.jar]
-    repos: {
+    repos = """
+    {
       'public': {  # must match the name of the `Repository` object that you defined in your plugin.
         'resolver': 'maven.example.com', # must match hostname in ~/.netrc and the <url> parameter
                                          # in your custom ivysettings.xml.
@@ -74,6 +75,7 @@ defined in your plugin:
         'help': 'Configure your ~/.netrc for artifactory.example.com access.'
       },
     }
+    """
 
 If your repository requires authentication, add a `~/.netrc` file. Here is a sample file, that
 matches the `repos` specified above:
@@ -101,7 +103,7 @@ with the additional information needed to publish artifacts. Here is an example 
       <settings defaultResolver="chain-repos"/>
       <!-- The ${login} and ${password} values come from a netrc_credentials() object in a BUILD
            file, which is fed by '~/.netrc'.  There must be a '~/.netrc' machine entry which
-           matches a resolver in the "repos" object in 'pants.ini', which also matches the 'host' in
+           matches a resolver in the "repos" object in 'pants.toml', which also matches the 'host' in
            this XML block.
 
            machine <hostname>
@@ -132,12 +134,12 @@ with the additional information needed to publish artifacts. Here is an example 
       </resolvers>
     </ivysettings>
 
-With this file in place, add a `[publish.jar]` section to `pants.ini`, and tell pants to use
+With this file in place, add a `[publish.jar]` section to `pants.toml`, and tell pants to use
 the custom Ivy settings when publishing:
 
-    :::ini
+    :::toml
     [publish.jar]
-    ivy_settings: %(pants_supportdir)s/ivy/ivysettings_for_publishing.xml
+    ivy_settings = "%(pants_supportdir)s/ivy/ivysettings_for_publishing.xml"
 
 <a pantsmark="setup_publish_restrict_branch"> </a>
 
@@ -146,7 +148,7 @@ the custom Ivy settings when publishing:
 Your organization might have a notion of a special "release branch": you want publishing
 to happen on this source control branch, which you maintain extra-carefully.
 You can set this branch using the `restrict_push_branches` option in the
-`[publish.jar]` section of your `pants.ini` file.
+`[publish.jar]` section of your `pants.toml` file.
 
 ### Task to Publish "Extra" Artifacts
 

@@ -86,7 +86,7 @@ class GoCompile(GoWorkspaceTask):
     def _get_build_flags(cls, build_flags_from_option, is_flagged, target):
         """Merge build flags with global < target < command-line order.
 
-        Build flags can be defined as globals (in `pants.ini`), as arguments to a Target, and via
+        Build flags can be defined as globals (in `pants.toml`), as arguments to a Target, and via
         the command-line.
         """
         # If self.get_options().build_flags returns a quoted string, remove the outer quotes,

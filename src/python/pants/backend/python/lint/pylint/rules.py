@@ -39,7 +39,7 @@ class PylintTargets:
 def generate_args(*, specified_source_files: SourceFiles, pylint: Pylint) -> Tuple[str, ...]:
     args = []
     if pylint.options.config is not None:
-        args.append(f"--config={pylint.options.config}")
+        args.append(f"--rcfile={pylint.options.config}")
     args.extend(pylint.options.args)
     args.extend(sorted(specified_source_files.snapshot.files))
     return tuple(args)

@@ -105,17 +105,19 @@ Tags are a set of strings used to describe or categorize targets. They can be in
 
 Tags can be configured for targets in three ways:
 - Directly in the `BUILD` file (`tags={'common'}` in the example above)
-- In `pants.ini`:
+- In `pants.toml`:
 
-```ini
+```toml
 [target-tag-assignments]
-tag_targets_mappings: {
-    'tag1': ['path/to/target:', 'path/to/another/target:bar'],
-    'tag2': ['path/to/another/target:bar']
-  }
+tag_targets_mappings = """
+{
+  'tag1': ['path/to/target:', 'path/to/another/target:bar'],
+  'tag2': ['path/to/another/target:bar']
+}
+"""
 ```
 
-- In a `JSON` file, [[referenced from the `pants.ini` or command line|pants('src/docs:options')]], for example:
+- In a `JSON` file, [[referenced from the `pants.toml` or command line|pants('src/docs:options')]], for example:
 
 ```bash
 ./pants list src/python/pants/base:exceptions --target-tag-assignments-tag-targets-mappings=@/path/to/target_tag_definitions.json

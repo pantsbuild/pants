@@ -209,20 +209,20 @@ If you want help diagnosing some strange Pants behavior, you might want verbose 
 To get this, instead of just invoking `./pants`, set some environment variables and request
 more logging: `PEX_VERBOSE=5 ./pants -ldebug`.
 
-### pants.ini
+### pants.toml
 
 Pants allows you to also specify options in a config file. If you want to always run pants
-with a particular option, you can configure it in a file at the root of the repo named `pants.ini`
+with a particular option, you can configure it in a file at the root of the repo named `pants.toml`
 
-    :::ini
+    :::toml
     [default]
-    jvm_options: ["-Xmx1g", "-Dfile.encoding=UTF8"]
+    jvm_options = ["-Xmx1g", "-Dfile.encoding=UTF8"]
 
     [test.junit]
-    fail-fast: True
+    fail-fast = true
 
-For more information on the `pants.ini` file format, see
-[[Invoking Pants|pants('src/docs:invoking')]].
+For more information on the `pants.toml` file format, see
+[[Options|pants('src/docs:options')]].
 
 BUILD Files
 -----------

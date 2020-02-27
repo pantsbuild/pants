@@ -3,8 +3,6 @@
 
 from typing import List, Optional
 
-import pytest
-
 from pants.backend.python.lint.flake8.rules import Flake8Targets
 from pants.backend.python.lint.flake8.rules import rules as flake8_rules
 from pants.backend.python.targets.python_library import PythonLibrary
@@ -63,7 +61,6 @@ class Flake8IntegrationTest(TestBase):
     ) -> LintResult:
         args = ["--backend-packages2=pants.backend.python.lint.flake8"]
         if config:
-            # TODO(#9148): The config file exists, but parser.py cannot find it
             self.create_file(relpath=".flake8", contents=config)
             args.append("--flake8-config=.flake8")
         if passthrough_args:
@@ -127,7 +124,6 @@ class Flake8IntegrationTest(TestBase):
         assert py3_result.exit_code == 0
         assert py3_result.stdout.strip() == ""
 
-    @pytest.mark.skip(reason="#9148: The config file exists, but parser.py cannot find it")
     def test_respects_config_file(self) -> None:
         target = self.make_target_with_origin([self.bad_source])
         result = self.run_flake8([target], config="[flake8]\nignore = F401\n")
