@@ -52,13 +52,13 @@ class OptionScopeHelpInfo:
     """A container for help information for a scope of options.
 
     scope: The scope of the described options.
-    basic|recursive|advanced: A list of OptionHelpInfo for the options in that group.
+    basic|advanced:deprecated: A list of OptionHelpInfo for the options in that group.
     """
 
     scope: str
     basic: List[OptionHelpInfo]
-    recursive: List[OptionHelpInfo]
     advanced: List[OptionHelpInfo]
+    deprecated: List[OptionHelpInfo]
 
 
 class HelpInfoExtracter:
@@ -93,7 +93,7 @@ class HelpInfoExtracter:
             else:
                 default_str = "{}"
         elif typ == str:
-            default_str = "'{}'".format(default).replace("\n", " ")
+            default_str = default.replace("\n", " ")
         elif inspect.isclass(typ) and issubclass(typ, Enum):
             default_str = default.value
         else:
@@ -131,25 +131,30 @@ class HelpInfoExtracter:
         """Returns an OptionScopeHelpInfo for the options registered with the (args, kwargs)
         pairs."""
         basic_options = []
-        recursive_options = []
         advanced_options = []
+        deprecated_options = []
         # Sort the arguments, so we display the help in alphabetical order.
         for args, kwargs in sorted(option_registrations_iter):
             if kwargs.get("passive"):
                 continue
             ohi = self.get_option_help_info(args, kwargs)
-            if kwargs.get("advanced"):
+            if kwargs.get("removal_version"):
+                deprecated_options.append(ohi)
+            elif kwargs.get("advanced") or (
+                kwargs.get("recursive") and not kwargs.get("recursive_root")
+            ):
+                # In order to keep the regular help output uncluttered, we treat recursive
+                # options as advanced.  The concept of recursive options is not widely used
+                # and not clear to the end user, so it's best not to expose it as a concept.
                 advanced_options.append(ohi)
-            elif kwargs.get("recursive") and not kwargs.get("recursive_root"):
-                recursive_options.append(ohi)
             else:
                 basic_options.append(ohi)
 
         return OptionScopeHelpInfo(
             scope=self._scope,
             basic=basic_options,
-            recursive=recursive_options,
             advanced=advanced_options,
+            deprecated=deprecated_options,
         )
 
     def get_option_help_info(self, args, kwargs):
@@ -178,19 +183,8 @@ class HelpInfoExtracter:
                 metavar = self.compute_metavar(kwargs)
                 display_arg = "{}={}".format(scoped_arg, metavar)
                 if is_list_option(kwargs):
-                    # Show the multi-arg append form.
-                    display_args.append("{arg_str} ({arg_str}) ...".format(arg_str=display_arg))
-                    # Also show the list literal form, both with and without the append operator.
-                    if metavar.startswith('"') and metavar.endswith('"'):
-                        # We quote the entire list literal, so we shouldn't quote the individual members.
-                        metavar = metavar[1:-1]
                     display_args.append(
-                        '{arg}="[{metavar}, {metavar}, ...]"'.format(
-                            arg=scoped_arg, metavar=metavar
-                        )
-                    )
-                    display_args.append(
-                        '{arg}="+[{metavar}, {metavar}, ...]"'.format(
+                        "{arg}=\"['{metavar}', '{metavar}', ...]\"".format(
                             arg=scoped_arg, metavar=metavar
                         )
                     )

@@ -174,30 +174,10 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
         register(
             "-l",
             "--level",
-            choices=["trace", "debug", "info", "warn"],
+            choices=["trace", "debug", "info", "warn", "error"],
             default="info",
             recursive=True,
             help="Set the logging level.",
-        )
-        register(
-            "-q",
-            "--quiet",
-            type=bool,
-            recursive=True,
-            daemon=False,
-            help="Squelches most console output. NOTE: Some tasks default to behaving quietly: "
-            "inverting this option supports making them noisier than they would be otherwise.",
-        )
-        # Not really needed in bootstrap options, but putting it here means it displays right
-        # after -l and -q in help output, which is conveniently contextual.
-        # TODO: This is not true. `./pants help` output appears to be alphabetical.
-        register(
-            "--colors",
-            type=bool,
-            default=sys.stdout.isatty(),
-            recursive=True,
-            daemon=False,
-            help="Set whether log messages are displayed in color.",
         )
 
         register(
@@ -490,7 +470,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
             default=GlobMatchErrorBehavior.warn,
             removal_version="1.27.0.dev0",
             removal_hint="If you currently set `--glob-expansion-failure=error`, instead set "
-            "`--files-not-found-behavior=error`.\n\n"
+            "`--files-not-found-behavior=error`. "
             "If you currently set `--glob-expansion-failure=ignore`, you will "
             "need to instead either set `--files-not-found-behavior=warn` (the "
             "default) or `--files-not-found-behavior=error`. Ignoring when files are "
@@ -529,9 +509,9 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
             removal_hint=(
                 "Use direct file arguments instead, such as "
                 "`./pants list src/python/f1.py src/python/f2.py` or even "
-                "`./pants fmt 'src/python/**/*.py'`.\n\nInstead of `--owner-of=@my_file`, use "
-                "`--spec-file=my_file`.\n\nJust like with `--owner-of`, Pants will "
-                "try to find the owner(s) of the file and then operate on those owning targets.\n\n"
+                "`./pants fmt 'src/python/**/*.py'`. Instead of `--owner-of=@my_file`, use "
+                "`--spec-file=my_file`. Just like with `--owner-of`, Pants will "
+                "try to find the owner(s) of the file and then operate on those owning targets. "
                 "Unlike `--owner-of`, Pants defaults to failing if there is no owning target for "
                 "that file. You may change this through `--owners-not-found-behavior=ignore` or "
                 "`--owners-not-found-behavior=warn`."
@@ -934,6 +914,15 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
         cls.register_bootstrap_options(register)
 
         register(
+            "--colors",
+            type=bool,
+            default=sys.stdout.isatty(),
+            recursive=True,
+            daemon=False,
+            help="Set whether log messages are displayed in color.",
+        )
+
+        register(
             "--tag",
             type=list,
             metavar="[+-]tag1,tag2,...",
@@ -978,6 +967,16 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
         )
         register(
             "-e", "--explain", type=bool, passive=no_v1, help="Explain the execution of goals."
+        )
+        register(
+            "-q",
+            "--quiet",
+            type=bool,
+            recursive=True,
+            daemon=False,
+            passive=no_v1,
+            help="Squelches most console output. NOTE: Some tasks default to behaving quietly: "
+            "inverting this option supports making them noisier than they would be otherwise.",
         )
         # TODO: After moving to the new options system these abstraction leaks can go away.
         register(

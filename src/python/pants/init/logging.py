@@ -59,7 +59,9 @@ def setup_logging_to_stderr(python_logger, level):
 
 def setup_logging_from_options(bootstrap_options):
     # N.B. quiet help says 'Squelches all console output apart from errors'.
-    level = "ERROR" if bootstrap_options.quiet else bootstrap_options.level.upper()
+    level = (
+        "ERROR" if getattr(bootstrap_options, "quiet", False) else bootstrap_options.level.upper()
+    )
     native = Native()
     return setup_logging(
         level,
