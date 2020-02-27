@@ -73,8 +73,9 @@ class PythonSetup(Subsystem):
             advanced=True,
             default=None,
             metavar="<dir>",
-            help="The parent directory for the chroot cache. "
-            "If unspecified, a standard path under the workdir is used.",
+            removal_version="1.28.0.dev2",
+            removal_hint="This option is now unused, please remove configuration of it.",
+            help="DEPRECATED: This option is unused.",
         )
         register(
             "--resolver-cache-dir",
@@ -107,8 +108,9 @@ class PythonSetup(Subsystem):
             advanced=True,
             default=None,
             metavar="<dir>",
-            help="The parent directory for the python artifact cache. "
-            "If unspecified, a standard path under the workdir is used.",
+            removal_version="1.28.0.dev2",
+            removal_hint="This option is now unused, please remove configuration of it.",
+            help="DEPRECATED: This option is unused.",
         )
         register(
             "--interpreter-search-paths",
@@ -176,10 +178,6 @@ class PythonSetup(Subsystem):
         )
 
     @property
-    def chroot_cache_dir(self):
-        return self.get_options().chroot_cache_dir or os.path.join(self.scratch_dir, "chroots")
-
-    @property
     def resolver_cache_dir(self):
         return self.get_options().resolver_cache_dir or os.path.join(
             self.scratch_dir, "resolved_requirements"
@@ -211,11 +209,6 @@ class PythonSetup(Subsystem):
     @property
     def resolver_jobs(self):
         return self.get_options().resolver_jobs
-
-    @property
-    def artifact_cache_dir(self):
-        """Note that this is unrelated to the general pants artifact cache."""
-        return self.get_options().artifact_cache_dir or os.path.join(self.scratch_dir, "artifacts")
 
     @property
     def scratch_dir(self):
