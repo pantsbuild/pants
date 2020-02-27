@@ -113,7 +113,7 @@ class PylintIntegrationTest(TestBase):
         self.write_file(self.bad_source)
         result = self.run_pylint([self.bad_source], config="[pylint]\ndisable = C0103\n")
         assert result.exit_code == 0
-        assert result.stdout.strip() == ""
+        assert "Your code has been rated at 10.00/10" in result.stdout.strip()
 
     def test_respects_passthrough_args(self) -> None:
         self.create_python_library()
