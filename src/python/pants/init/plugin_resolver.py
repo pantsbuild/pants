@@ -7,7 +7,7 @@ import os
 import shutil
 import site
 import uuid
-from typing import Iterable, Iterator, List, Optional, Tuple, Type, TypeVar, cast
+from typing import Iterable, Iterator, List, Optional, Type, TypeVar, cast
 
 from pex import resolver
 from pex.interpreter import PythonInterpreter
@@ -178,7 +178,7 @@ class PluginResolver:
         # Subsystem facility is wired up.  As a result PluginResolver is not itself a Subsystem with
         # PythonRepos as a dependency.  Instead it does the minimum possible work to hand-roll
         # bootstrapping of the Subsystems it needs.
-        optionables: Tuple[Type[Optionable], ...] = (GlobalOptionsRegistrar, PythonRepos)
+        optionables: Iterable[Type[Optionable]] = (GlobalOptionsRegistrar, PythonRepos)
         known_scope_infos: List[ScopeInfo] = [
             ksi for optionable in optionables for ksi in optionable.known_scope_infos()
         ]
