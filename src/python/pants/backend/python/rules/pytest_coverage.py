@@ -142,7 +142,7 @@ class ReportType(Enum):
 
 class PytestCoverage(PythonToolBase):
     options_scope = "pytest-coverage"
-    default_version = "coverage==5.0.3"
+    default_version = "coverage>=5.0.3,<5.1"
     default_entry_point = "coverage"
     default_interpreter_constraints = ["CPython>=3.6"]
 
