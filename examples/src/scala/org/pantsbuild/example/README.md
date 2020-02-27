@@ -188,24 +188,24 @@ In a `BUILD` file at the root of the repo, define the `semanticdb` compiler plug
 
 Note that the explicit full scala version string (`2.11.12`) is required for the semanticdb jar we use here, which is why we can't just use <a pantsref="bdict_jar">`scala_jar`</a> (which would just append e.g. `_2.12` to the name).
 
-Then, reference it from `pants.ini` to load the plugin, and enable semantic rewrites to require
+Then, reference it from `pants.toml` to load the plugin, and enable semantic rewrites to require
 compilation for `fmt` and `lint`:
 
-    :::ini
+    :::toml
     [compile.rsc]
-    args: [
-        # The `-S` prefix here indicates that zinc should pass this option to scalac rather than
-        # to javac (`-C` prefix).
-        '-S-Yrangepos',
-      ]
+    args = [
+      # The `-S` prefix here indicates that zinc should pass this option to scalac rather than
+      # to javac (`-C` prefix).
+      '-S-Yrangepos',
+    ]
 
     [scala]
-    scalac_plugins: [
-        'semanticdb',
-      ]
+    scalac_plugins = [
+      'semanticdb',
+    ]
 
     [lint.scalafix]
-    semantic: True
+    semantic = true
 
     [fmt.scalafix]
-    semantic: True
+    semantic = true

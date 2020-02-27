@@ -104,7 +104,7 @@ class Checkstyle(LintTaskMixin, Task):
             type=list,
             help="A list of interpreter constraints for which matching targets will be linted "
             "in addition to targets that match the global interpreter constraints "
-            "(either from defaults or pants.ini). If the user supplies an empty list, "
+            "(either from defaults or pants.toml). If the user supplies an empty list, "
             "Pants will lint all targets in the target set, irrespective of the working "
             "set of compatibility constraints.",
         )

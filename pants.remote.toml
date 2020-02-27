@@ -6,7 +6,7 @@
 #     --remote-oauth-bearer-token-path=<(gcloud auth application-default print-access-token | perl -p -e 'chomp if eof')
 #     --no-v1 --v2 test tests/python/pants_test/util:strutil
 #
-# Remoting does not work for every goal, so you should not permanently point to this ini file, e.g.
+# Remoting does not work for every goal, so you should not permanently point to this TOML file, e.g.
 # via an env var; only point to it when you want to remote a specific invocation.
 
 [GLOBAL]

@@ -53,7 +53,7 @@ Engine](https://groups.google.com/forum/#!topic/pants-devel/uHGpR2K6FBI)
 
 **Context**<br>
 An API to the state of the world. A Task uses this to find out things
-like the flags the user set on the command line, pants.ini config, and
+like the flags the user set on the command line, pants.toml config, and
 the state of the build cache. The task uses context.products to
 communicate results and requests for build results.
 
