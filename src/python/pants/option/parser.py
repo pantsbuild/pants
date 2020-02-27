@@ -10,6 +10,7 @@ import traceback
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 from typing import (
     Any,
     Callable,
@@ -28,6 +29,7 @@ from typing import (
 import Levenshtein
 import yaml
 
+from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import validate_deprecation_semver, warn_or_error
 from pants.option.config import Config
 from pants.option.custom_types import (
@@ -788,30 +790,44 @@ class Parser:
 
         # Helper function to check various validity constraints on final option values.
         def check(val):
-            if val is not None:
-                choices = kwargs.get("choices")
-                if choices is None and "type" in kwargs:
-                    type_arg = kwargs.get("type")
-                    if inspect.isclass(type_arg) and issubclass(type_arg, Enum):
-                        choices = list(type_arg)
-                # TODO: convert this into an enum() pattern match!
-                if choices is not None and val not in choices:
-                    raise ParseError(
-                        "`{}` is not an allowed value for option {} in {}. "
-                        "Must be one of: {}".format(val, dest, self._scope_str(), choices)
-                    )
-                elif kwargs.get("type") == dir_option and not os.path.isdir(val):
-                    raise ParseError(
-                        "Directory value `{}` for option {} in {} does not exist.".format(
-                            val, dest, self._scope_str()
-                        )
-                    )
-                elif kwargs.get("type") == file_option and not os.path.isfile(val):
-                    raise ParseError(
-                        "File value `{}` for option {} in {} does not exist.".format(
-                            val, dest, self._scope_str()
-                        )
-                    )
+            if val is None:
+                return
+            choices = kwargs.get("choices")
+            type_arg = kwargs.get("type")
+            if choices is None and "type" in kwargs:
+                if inspect.isclass(type_arg) and issubclass(type_arg, Enum):
+                    choices = list(type_arg)
+            # TODO: convert this into an enum() pattern match!
+            if choices is not None and val not in choices:
+                raise ParseError(
+                    "`{}` is not an allowed value for option {} in {}. "
+                    "Must be one of: {}".format(val, dest, self._scope_str(), choices)
+                )
+
+            if type_arg == file_option:
+                check_file_exists(val)
+            if type_arg == dir_option:
+                check_dir_option(val)
+
+        def check_file_exists(val) -> None:
+            error_prefix = f"File value `{val}` for option `{dest}` in `{self._scope_str()}`"
+            try:
+                path = Path(val)
+                path_with_buildroot = Path(get_buildroot(), val)
+            except TypeError:
+                raise ParseError(f"{error_prefix} cannot be parsed as a file path.")
+            if not path.is_file() and not path_with_buildroot.is_file():
+                raise ParseError(f"{error_prefix} does not exist.")
+
+        def check_dir_option(val) -> None:
+            error_prefix = f"Directory value `{val}` for option `{dest}` in `{self._scope_str()}`"
+            try:
+                path = Path(val)
+                path_with_buildroot = Path(get_buildroot(), val)
+            except TypeError:
+                raise ParseError(f"{error_prefix} cannot be parsed as a directory path.")
+            if not path.is_dir() and not path_with_buildroot.is_dir():
+                raise ParseError(f"{error_prefix} does not exist.")
 
         # Generate the final value from all available values, and check that it (or its members,
         # if a list) are in the set of allowed choices.
