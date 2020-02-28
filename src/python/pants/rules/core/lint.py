@@ -51,10 +51,7 @@ class LintTarget:
         adaptor_with_origin: TargetAdaptorWithOrigin, *, union_membership: UnionMembership
     ) -> bool:
         is_lint_target = union_membership.is_member(LintTarget, adaptor_with_origin)
-        has_sources = hasattr(adaptor_with_origin.adaptor, "sources") and bool(
-            adaptor_with_origin.adaptor.sources.snapshot.files
-        )
-        return has_sources and is_lint_target
+        return adaptor_with_origin.adaptor.has_sources() and is_lint_target
 
 
 class LintOptions(GoalSubsystem):
