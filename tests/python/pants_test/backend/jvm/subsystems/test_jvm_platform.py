@@ -212,7 +212,24 @@ class JvmPlatformTest(TestBase):
                             "jvm_options": ["-Dsomething"],
                         },
                         "platform-without-jvm-options": {"target": "8"},
-                        "platform-with-jvm-options-needing-shlex": {
+                    },
+                }
+            },
+        )
+        instance = JvmPlatform.global_instance()
+        with_options = instance.get_platform_by_name("platform-with-jvm-options")
+        without_options = instance.get_platform_by_name("platform-without-jvm-options")
+
+        assert ("-Dsomething",) == with_options.jvm_options
+        assert tuple() == without_options.jvm_options
+
+    def test_jvm_options_from_platform_shlexed(self):
+        init_subsystem(
+            JvmPlatform,
+            options={
+                "jvm-platform": {
+                    "platforms": {
+                        "platform-with-shlexable-vm-options": {
                             "target": "8",
                             "jvm_options": ["-Dsomething -Dsomethingelse"],
                         },
@@ -221,13 +238,8 @@ class JvmPlatformTest(TestBase):
             },
         )
         instance = JvmPlatform.global_instance()
-        with_options = instance.get_platform_by_name("platform-with-jvm-options")
-        without_options = instance.get_platform_by_name("platform-without-jvm-options")
-        need_shlex_options = instance.get_platform_by_name(
-            "platform-with-jvm-options-needing-shlex"
-        )
-        assert ("-Dsomething",) == with_options.jvm_options
-        assert tuple() == without_options.jvm_options
+        need_shlex_options = instance.get_platform_by_name("platform-with-shlexable-vm-options")
+
         assert ("-Dsomething", "-Dsomethingelse") == need_shlex_options.jvm_options
 
     def test_compile_setting_equivalence(self):
