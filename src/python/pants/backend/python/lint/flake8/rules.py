@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Optional, Tuple
 
 from pants.backend.python.lint.flake8.subsystem import Flake8
-from pants.backend.python.lint.python_lint_target import PythonLintTarget
+from pants.backend.python.lint.python_linter import PythonLinter, PythonLintTarget
 from pants.backend.python.rules import download_pex_bin, pex
 from pants.backend.python.rules.pex import (
     CreatePex,
@@ -17,7 +17,6 @@ from pants.backend.python.subsystems import python_native_code, subprocess_envir
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
-from pants.engine.legacy.structs import TargetAdaptorWithOrigin
 from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.global_options import GlobMatchErrorBehavior
@@ -32,8 +31,8 @@ from pants.rules.core.lint import LintResult
 
 
 @dataclass(frozen=True)
-class Flake8Targets:
-    adaptors_with_origins: Tuple[TargetAdaptorWithOrigin, ...]
+class Flake8Linter(PythonLinter):
+    pass
 
 
 def generate_args(*, specified_source_files: SourceFiles, flake8: Flake8) -> Tuple[str, ...]:
@@ -47,7 +46,7 @@ def generate_args(*, specified_source_files: SourceFiles, flake8: Flake8) -> Tup
 
 @rule(name="Lint using Flake8")
 async def lint(
-    targets: Flake8Targets,
+    linter: Flake8Linter,
     flake8: Flake8,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
@@ -55,7 +54,7 @@ async def lint(
     if flake8.options.skip:
         return LintResult.noop()
 
-    adaptors_with_origins = targets.adaptors_with_origins
+    adaptors_with_origins = linter.adaptors_with_origins
 
     # NB: Flake8 output depends upon which Python interpreter version it's run with. We ensure that
     # each target runs with its own interpreter constraints. See
@@ -124,7 +123,7 @@ def rules():
     return [
         lint,
         subsystem_rule(Flake8),
-        UnionRule(PythonLintTarget, Flake8Targets),
+        UnionRule(PythonLintTarget, Flake8Linter),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),
         *pex.rules(),

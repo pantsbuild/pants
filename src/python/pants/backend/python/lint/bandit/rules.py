@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Optional, Tuple
 
 from pants.backend.python.lint.bandit.subsystem import Bandit
-from pants.backend.python.lint.python_lint_target import PythonLintTarget
+from pants.backend.python.lint.python_linter import PythonLinter, PythonLintTarget
 from pants.backend.python.rules import download_pex_bin, pex
 from pants.backend.python.rules.pex import (
     CreatePex,
@@ -17,7 +17,6 @@ from pants.backend.python.subsystems import python_native_code, subprocess_envir
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
-from pants.engine.legacy.structs import TargetAdaptorWithOrigin
 from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.global_options import GlobMatchErrorBehavior
@@ -32,8 +31,8 @@ from pants.rules.core.lint import LintResult
 
 
 @dataclass(frozen=True)
-class BanditTargets:
-    adaptors_with_origins: Tuple[TargetAdaptorWithOrigin, ...]
+class BanditLinter(PythonLinter):
+    pass
 
 
 def generate_args(*, specified_source_files: SourceFiles, bandit: Bandit) -> Tuple[str, ...]:
@@ -47,7 +46,7 @@ def generate_args(*, specified_source_files: SourceFiles, bandit: Bandit) -> Tup
 
 @rule(name="Lint using Bandit")
 async def lint(
-    targets: BanditTargets,
+    linter: BanditLinter,
     bandit: Bandit,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
@@ -55,7 +54,7 @@ async def lint(
     if bandit.options.skip:
         return LintResult.noop()
 
-    adaptors_with_origins = targets.adaptors_with_origins
+    adaptors_with_origins = linter.adaptors_with_origins
 
     # NB: Bandit output depends upon which Python interpreter version it's run with. We ensure that
     # each target runs with its own interpreter constraints. See
@@ -124,7 +123,7 @@ def rules():
     return [
         lint,
         subsystem_rule(Bandit),
-        UnionRule(PythonLintTarget, BanditTargets),
+        UnionRule(PythonLintTarget, BanditLinter),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),
         *pex.rules(),

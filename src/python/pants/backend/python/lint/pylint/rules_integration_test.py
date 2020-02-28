@@ -5,7 +5,7 @@ from functools import partialmethod
 from textwrap import dedent
 from typing import List, Optional
 
-from pants.backend.python.lint.pylint.rules import PylintTargets
+from pants.backend.python.lint.pylint.rules import PylintLinter
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
@@ -41,7 +41,7 @@ class PylintIntegrationTest(TestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *pylint_rules(), RootRule(PylintTargets))
+        return (*super().rules(), *pylint_rules(), RootRule(PylintLinter))
 
     def write_file(self, file_content: FileContent) -> None:
         self.create_file(relpath=file_content.path, contents=file_content.content.decode())
@@ -81,7 +81,7 @@ class PylintIntegrationTest(TestBase):
             args.append(f"--pylint-skip")
         return self.request_single_product(
             LintResult,
-            Params(PylintTargets(tuple(targets)), create_options_bootstrapper(args=args)),
+            Params(PylintLinter(tuple(targets)), create_options_bootstrapper(args=args)),
         )
 
     def test_passing_source(self) -> None:

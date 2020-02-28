@@ -3,7 +3,7 @@
 
 from typing import List, Optional, Tuple
 
-from pants.backend.python.lint.black.rules import BlackTargets
+from pants.backend.python.lint.black.rules import BlackFormatter
 from pants.backend.python.lint.black.rules import rules as black_rules
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.address import Address
@@ -29,7 +29,7 @@ class BlackIntegrationTest(TestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *black_rules(), RootRule(BlackTargets))
+        return (*super().rules(), *black_rules(), RootRule(BlackFormatter))
 
     def make_target_with_origin(
         self, source_files: List[FileContent], *, origin: Optional[OriginSpec] = None,
@@ -61,7 +61,7 @@ class BlackIntegrationTest(TestBase):
             args.append(f"--black-skip")
         options_bootstrapper = create_options_bootstrapper(args=args)
         lint_result = self.request_single_product(
-            LintResult, Params(BlackTargets(tuple(targets)), options_bootstrapper)
+            LintResult, Params(BlackFormatter(tuple(targets)), options_bootstrapper)
         )
         input_snapshot = self.request_single_product(
             Snapshot,
@@ -72,7 +72,7 @@ class BlackIntegrationTest(TestBase):
         fmt_result = self.request_single_product(
             FmtResult,
             Params(
-                BlackTargets(tuple(targets), prior_formatter_result=input_snapshot),
+                BlackFormatter(tuple(targets), prior_formatter_result=input_snapshot),
                 options_bootstrapper,
             ),
         )

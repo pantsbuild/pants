@@ -3,7 +3,7 @@
 
 from typing import List, Optional
 
-from pants.backend.python.lint.bandit.rules import BanditTargets
+from pants.backend.python.lint.bandit.rules import BanditLinter
 from pants.backend.python.lint.bandit.rules import rules as bandit_rules
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
@@ -31,7 +31,7 @@ class BanditIntegrationTest(TestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *bandit_rules(), RootRule(BanditTargets))
+        return (*super().rules(), *bandit_rules(), RootRule(BanditLinter))
 
     def make_target_with_origin(
         self,
@@ -68,7 +68,7 @@ class BanditIntegrationTest(TestBase):
             args.append(f"--bandit-skip")
         return self.request_single_product(
             LintResult,
-            Params(BanditTargets(tuple(targets)), create_options_bootstrapper(args=args)),
+            Params(BanditLinter(tuple(targets)), create_options_bootstrapper(args=args)),
         )
 
     def test_passing_source(self) -> None:

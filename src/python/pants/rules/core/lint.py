@@ -2,7 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
+from abc import ABC
 from dataclasses import dataclass
+from typing import Tuple
 
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
@@ -37,6 +39,11 @@ class LintResult:
 
 class LintResults(Collection[LintResult]):
     """This collection allows us to aggregate multiple `LintResult`s for a language."""
+
+
+@dataclass(frozen=True)
+class Linter(ABC):
+    adaptors_with_origins: Tuple[TargetAdaptorWithOrigin, ...]
 
 
 @union

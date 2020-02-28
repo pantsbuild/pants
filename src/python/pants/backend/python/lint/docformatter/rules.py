@@ -2,11 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Tuple
 
 from pants.backend.python.lint.docformatter.subsystem import Docformatter
-from pants.backend.python.lint.python_format_target import PythonFormatTarget
-from pants.backend.python.lint.python_lint_target import PythonLintTarget
+from pants.backend.python.lint.python_formatter import PythonFormatTarget, PythonFormatter
+from pants.backend.python.lint.python_linter import PythonLintTarget
 from pants.backend.python.rules import download_pex_bin, pex
 from pants.backend.python.rules.pex import (
     CreatePex,
@@ -16,13 +16,12 @@ from pants.backend.python.rules.pex import (
 )
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
-from pants.engine.fs import Digest, DirectoriesToMerge, Snapshot
+from pants.engine.fs import Digest, DirectoriesToMerge
 from pants.engine.isolated_process import (
     ExecuteProcessRequest,
     ExecuteProcessResult,
     FallibleExecuteProcessResult,
 )
-from pants.engine.legacy.structs import TargetAdaptorWithOrigin
 from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.python.python_setup import PythonSetup
@@ -37,14 +36,13 @@ from pants.rules.core.lint import LintResult
 
 
 @dataclass(frozen=True)
-class DocformatterTargets:
-    adaptors_with_origins: Tuple[TargetAdaptorWithOrigin, ...]
-    prior_formatter_result: Optional[Snapshot] = None  # unused by `lint`
+class DocformatterFormatter(PythonFormatter):
+    pass
 
 
 @dataclass(frozen=True)
 class SetupRequest:
-    targets: DocformatterTargets
+    formatter: DocformatterFormatter
     check_only: bool
 
 
@@ -70,7 +68,7 @@ async def setup(
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> Setup:
-    adaptors_with_origins = request.targets.adaptors_with_origins
+    adaptors_with_origins = request.formatter.adaptors_with_origins
 
     requirements_pex = await Get[Pex](
         CreatePex(
@@ -83,7 +81,7 @@ async def setup(
         )
     )
 
-    if request.targets.prior_formatter_result is None:
+    if request.formatter.prior_formatter_result is None:
         all_source_files = await Get[SourceFiles](
             AllSourceFilesRequest(
                 adaptor_with_origin.adaptor for adaptor_with_origin in adaptors_with_origins
@@ -91,7 +89,7 @@ async def setup(
         )
         all_source_files_snapshot = all_source_files.snapshot
     else:
-        all_source_files_snapshot = request.targets.prior_formatter_result
+        all_source_files_snapshot = request.formatter.prior_formatter_result
 
     specified_source_files = await Get[SourceFiles](
         SpecifiedSourceFilesRequest(adaptors_with_origins)
@@ -130,19 +128,19 @@ async def setup(
 
 
 @rule(name="Format Python docstrings with docformatter")
-async def fmt(targets: DocformatterTargets, docformatter: Docformatter) -> FmtResult:
+async def fmt(formatter: DocformatterFormatter, docformatter: Docformatter) -> FmtResult:
     if docformatter.options.skip:
         return FmtResult.noop()
-    setup = await Get[Setup](SetupRequest(targets, check_only=False))
+    setup = await Get[Setup](SetupRequest(formatter, check_only=False))
     result = await Get[ExecuteProcessResult](ExecuteProcessRequest, setup.process_request)
     return FmtResult.from_execute_process_result(result)
 
 
 @rule(name="Lint Python docstrings with docformatter")
-async def lint(targets: DocformatterTargets, docformatter: Docformatter) -> LintResult:
+async def lint(formatter: DocformatterFormatter, docformatter: Docformatter) -> LintResult:
     if docformatter.options.skip:
         return LintResult.noop()
-    setup = await Get[Setup](SetupRequest(targets, check_only=True))
+    setup = await Get[Setup](SetupRequest(formatter, check_only=True))
     result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, setup.process_request)
     return LintResult.from_fallible_execute_process_result(result)
 
@@ -153,8 +151,8 @@ def rules():
         fmt,
         lint,
         subsystem_rule(Docformatter),
-        UnionRule(PythonFormatTarget, DocformatterTargets),
-        UnionRule(PythonLintTarget, DocformatterTargets),
+        UnionRule(PythonFormatTarget, DocformatterFormatter),
+        UnionRule(PythonLintTarget, DocformatterFormatter),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),
         *pex.rules(),

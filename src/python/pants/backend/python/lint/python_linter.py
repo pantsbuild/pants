@@ -1,6 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from abc import ABCMeta
 from dataclasses import dataclass
 
 from pants.engine.legacy.structs import (
@@ -14,13 +15,18 @@ from pants.engine.legacy.structs import (
 from pants.engine.objects import union
 from pants.engine.rules import RootRule, UnionMembership, UnionRule, rule
 from pants.engine.selectors import Get, MultiGet
-from pants.rules.core.lint import LintResult, LintResults, LintTarget
+from pants.rules.core.lint import Linter, LintResult, LintResults, LintTarget
 
 
 @union
 @dataclass(frozen=True)
 class PythonLintTarget:
     adaptor_with_origin: TargetAdaptorWithOrigin
+
+
+@dataclass(frozen=True)
+class PythonLinter(Linter, metaclass=ABCMeta):
+    pass
 
 
 @rule
@@ -32,8 +38,8 @@ async def lint_python_target(
     We do not care if linters overlap in their execution as linters have no side-effects.
     """
     results = await MultiGet(
-        Get[LintResult](PythonLintTarget, member((target.adaptor_with_origin,)))
-        for member in union_membership.union_rules[PythonLintTarget]
+        Get[LintResult](PythonLintTarget, linter((target.adaptor_with_origin,)))
+        for linter in union_membership.union_rules[PythonLintTarget]
     )
     return LintResults(results)
 
