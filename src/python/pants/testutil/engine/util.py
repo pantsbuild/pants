@@ -11,9 +11,10 @@ from typing import Any, Callable, List, Optional, Sequence, Tuple, Type, get_typ
 from colors import blue, green, red
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants.engine.addressable import addressable_list
+from pants.engine.addressable import addressable_sequence
 from pants.engine.native import Native
 from pants.engine.parser import SymbolTable
+from pants.engine.rules import UnionMembership
 from pants.engine.scheduler import Scheduler
 from pants.engine.selectors import Get
 from pants.engine.struct import Struct
@@ -35,11 +36,13 @@ def run_rule(
     *,
     rule_args: Optional[Sequence[Any]] = None,
     mock_gets: Optional[Sequence[MockGet]] = None,
+    union_membership: Optional[UnionMembership] = None,
 ):
     """A test helper function that runs an @rule with a set of arguments and mocked Get providers.
 
     An @rule named `my_rule` that takes one argument and makes no `Get` requests can be invoked
     like so (although you could also just invoke it directly):
+
     ```
     return_value = run_rule(my_rule, rule_args=[arg1])
     ```
@@ -51,6 +54,7 @@ def run_rule(
 
     So in the case of an @rule named `my_co_rule` that takes one argument and makes Get requests
     for a product type `Listing` with subject type `Dir`, the invoke might look like:
+
     ```
     return_value = run_rule(
       my_co_rule,
@@ -64,6 +68,11 @@ def run_rule(
       ],
     )
     ```
+
+    If any of the @rule's Get requests involve union members, you should pass a `UnionMembership`
+    mapping the union base to any union members you'd like to test. For example, if your rule has
+    `await Get[TestResult](TargetAdaptor, target_adaptor)`, you may pass
+    `UnionMembership({TargetAdaptor: PythonTestsTargetAdaptor})` to this function.
 
     :returns: The return value of the completed @rule.
     """
@@ -95,7 +104,14 @@ def run_rule(
             (
                 mock_get.mock
                 for mock_get in mock_gets
-                if mock_get.product_type == product and mock_get.subject_type == type(subject)
+                if mock_get.product_type == product
+                and (
+                    mock_get.subject_type == type(subject)
+                    or (
+                        union_membership
+                        and union_membership.is_member(mock_get.subject_type, subject)
+                    )
+                )
             ),
             None,
         )
@@ -147,7 +163,7 @@ class Target(Struct):
         super().__init__(name=name, **kwargs)
         self.configurations = configurations
 
-    @addressable_list(SubclassesOf(Struct))
+    @addressable_sequence(SubclassesOf(Struct))
     def configurations(self):
         pass
 

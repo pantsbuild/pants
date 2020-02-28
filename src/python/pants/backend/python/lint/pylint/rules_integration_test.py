@@ -5,10 +5,10 @@ from functools import partialmethod
 from textwrap import dedent
 from typing import List, Optional
 
-from pants.backend.python.lint.pylint.rules import PylintTarget
+from pants.backend.python.lint.pylint.rules import PylintLinter
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
 from pants.backend.python.targets.python_library import PythonLibrary
-from pants.base.specs import OriginSpec, SingleAddress
+from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.fs import FileContent, InputFilesContent, Snapshot
@@ -35,26 +35,41 @@ class PylintIntegrationTest(TestBase):
         TestBase.create_library, path=source_root, target_type="python_library", name="target",
     )
 
-    def write_file(self, file_content: FileContent) -> None:
-        self.create_file(relpath=file_content.path, contents=file_content.content.decode())
-
     @classmethod
     def alias_groups(cls) -> BuildFileAliases:
         return BuildFileAliases(targets={"python_library": PythonLibrary})
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *pylint_rules(), RootRule(PylintTarget))
+        return (*super().rules(), *pylint_rules(), RootRule(PylintLinter))
 
-    def run_pylint(
+    def write_file(self, file_content: FileContent) -> None:
+        self.create_file(relpath=file_content.path, contents=file_content.content.decode())
+
+    def make_target_with_origin(
         self,
         source_files: List[FileContent],
         *,
+        interpreter_constraints: Optional[str] = None,
+        origin: Optional[OriginSpec] = None,
+    ) -> PythonTargetAdaptorWithOrigin:
+        input_snapshot = self.request_single_product(Snapshot, InputFilesContent(source_files))
+        adaptor = PythonTargetAdaptor(
+            sources=EagerFilesetWithSpec(self.source_root, {"globs": []}, snapshot=input_snapshot),
+            address=Address.parse(f"{self.source_root}:target"),
+            compatibility=[interpreter_constraints] if interpreter_constraints else None,
+        )
+        if origin is None:
+            origin = SingleAddress(directory=self.source_root, name="target")
+        return PythonTargetAdaptorWithOrigin(adaptor, origin)
+
+    def run_pylint(
+        self,
+        targets: List[PythonTargetAdaptorWithOrigin],
+        *,
         config: Optional[str] = None,
         passthrough_args: Optional[str] = None,
-        interpreter_constraints: Optional[str] = None,
         skip: bool = False,
-        origin: Optional[OriginSpec] = None,
     ) -> LintResult:
         args = ["--backend-packages2=pants.backend.python.lint.pylint"]
         if config:
@@ -64,30 +79,24 @@ class PylintIntegrationTest(TestBase):
             args.append(f"--pylint-args='{passthrough_args}'")
         if skip:
             args.append(f"--pylint-skip")
-        input_snapshot = self.request_single_product(Snapshot, InputFilesContent(source_files))
-        adaptor = PythonTargetAdaptor(
-            sources=EagerFilesetWithSpec(self.source_root, {"globs": []}, snapshot=input_snapshot),
-            address=Address.parse(f"{self.source_root}:target"),
-            compatibility=[interpreter_constraints] if interpreter_constraints else None,
-        )
-        if origin is None:
-            origin = SingleAddress(directory="test", name="target")
-        target = PylintTarget(PythonTargetAdaptorWithOrigin(adaptor, origin))
         return self.request_single_product(
-            LintResult, Params(target, create_options_bootstrapper(args=args)),
+            LintResult,
+            Params(PylintLinter(tuple(targets)), create_options_bootstrapper(args=args)),
         )
 
-    def test_single_passing_source(self) -> None:
+    def test_passing_source(self) -> None:
         self.create_python_library()
         self.write_file(self.good_source)
-        result = self.run_pylint([self.good_source])
+        target = self.make_target_with_origin([self.good_source])
+        result = self.run_pylint([target])
         assert result.exit_code == 0
         assert "Your code has been rated at 10.00/10" in result.stdout.strip()
 
-    def test_single_failing_source(self) -> None:
+    def test_failing_source(self) -> None:
         self.create_python_library()
         self.write_file(self.bad_source)
-        result = self.run_pylint([self.bad_source])
+        target = self.make_target_with_origin([self.bad_source])
+        result = self.run_pylint([target])
         assert result.exit_code == 16  # convention message issued
         assert "bad.py:2:0: C0103" in result.stdout
 
@@ -95,7 +104,21 @@ class PylintIntegrationTest(TestBase):
         self.create_python_library()
         self.write_file(self.good_source)
         self.write_file(self.bad_source)
-        result = self.run_pylint([self.good_source, self.bad_source])
+        target = self.make_target_with_origin([self.good_source, self.bad_source])
+        result = self.run_pylint([target])
+        assert result.exit_code == 16  # convention message issued
+        assert "good.py" not in result.stdout
+        assert "bad.py:2:0: C0103" in result.stdout
+
+    def test_multiple_targets(self) -> None:
+        self.create_python_library()
+        self.write_file(self.good_source)
+        self.write_file(self.bad_source)
+        targets = [
+            self.make_target_with_origin([self.good_source]),
+            self.make_target_with_origin([self.bad_source]),
+        ]
+        result = self.run_pylint(targets)
         assert result.exit_code == 16  # convention message issued
         assert "good.py" not in result.stdout
         assert "bad.py:2:0: C0103" in result.stdout
@@ -104,21 +127,26 @@ class PylintIntegrationTest(TestBase):
         self.create_python_library()
         self.write_file(self.good_source)
         self.write_file(self.bad_source)
-        result = self.run_pylint([self.good_source])
+        target = self.make_target_with_origin(
+            [self.good_source, self.bad_source], origin=FilesystemLiteralSpec(self.good_source.path)
+        )
+        result = self.run_pylint([target])
         assert result.exit_code == 0
         assert "Your code has been rated at 10.00/10" in result.stdout.strip()
 
     def test_respects_config_file(self) -> None:
         self.create_python_library()
         self.write_file(self.bad_source)
-        result = self.run_pylint([self.bad_source], config="[pylint]\ndisable = C0103\n")
+        target = self.make_target_with_origin([self.bad_source])
+        result = self.run_pylint([target], config="[pylint]\ndisable = C0103\n")
         assert result.exit_code == 0
         assert "Your code has been rated at 10.00/10" in result.stdout.strip()
 
     def test_respects_passthrough_args(self) -> None:
         self.create_python_library()
         self.write_file(self.bad_source)
-        result = self.run_pylint([self.bad_source], passthrough_args="--disable=C0103")
+        target = self.make_target_with_origin([self.bad_source])
+        result = self.run_pylint([target], passthrough_args="--disable=C0103")
         assert result.exit_code == 0
         assert "Your code has been rated at 10.00/10" in result.stdout.strip()
 
@@ -151,10 +179,12 @@ class PylintIntegrationTest(TestBase):
         )
         self.create_python_library(sources=["test_dependency.py"], dependencies=[":dependency"])
         self.write_file(source)
-        result = self.run_pylint([source])
+        target = self.make_target_with_origin([source])
+        result = self.run_pylint([target])
         assert result.exit_code == 0
         assert "Your code has been rated at 10.00/10" in result.stdout.strip()
 
     def test_skip(self) -> None:
-        result = self.run_pylint([self.bad_source], skip=True)
+        target = self.make_target_with_origin([self.bad_source])
+        result = self.run_pylint([target], skip=True)
         assert result == LintResult.noop()

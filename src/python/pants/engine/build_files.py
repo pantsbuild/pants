@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os.path
-from collections.abc import MutableMapping, MutableSequence
+from collections.abc import Mapping
 from typing import Dict
 
 from pants.base.exceptions import ResolveError
@@ -128,10 +128,10 @@ async def hydrate_struct(address_mapper: AddressMapper, address: Address) -> Hyd
         for key, value in sorted(item._asdict().items(), key=_key_func):
             if not AddressableDescriptor.is_addressable(item, key):
                 continue
-            if isinstance(value, MutableMapping):
+            if isinstance(value, Mapping):
                 for _, v in sorted(value.items(), key=_key_func):
                     maybe_append(key, v)
-            elif isinstance(value, MutableSequence):
+            elif isinstance(value, (list, tuple)):
                 for v in value:
                     maybe_append(key, v)
             else:
@@ -144,7 +144,7 @@ async def hydrate_struct(address_mapper: AddressMapper, address: Address) -> Hyd
     hydrated_inline_dependencies = await MultiGet(
         Get[HydratedStruct](Address, a) for a in inline_dependencies
     )
-    dependencies = [d.value for d in hydrated_inline_dependencies]
+    dependencies = tuple(d.value for d in hydrated_inline_dependencies)
 
     def maybe_consume(outer_key, value):
         if isinstance(value, str):
@@ -176,14 +176,12 @@ async def hydrate_struct(address_mapper: AddressMapper, address: Address) -> Hyd
                 hydrated_args[key] = value
                 continue
 
-            if isinstance(value, MutableMapping):
-                container_type = type(value)
-                hydrated_args[key] = container_type(
-                    (k, maybe_consume(key, v)) for k, v in sorted(value.items(), key=_key_func)
-                )
-            elif isinstance(value, MutableSequence):
-                container_type = type(value)
-                hydrated_args[key] = container_type(maybe_consume(key, v) for v in value)
+            if isinstance(value, Mapping):
+                hydrated_args[key] = {
+                    k: maybe_consume(key, v) for k, v in sorted(value.items(), key=_key_func)
+                }
+            elif isinstance(value, (list, tuple)):
+                hydrated_args[key] = tuple(maybe_consume(key, v) for v in value)
             else:
                 hydrated_args[key] = maybe_consume(key, value)
         return _hydrate(type(item), address.spec_path, **hydrated_args)
