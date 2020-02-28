@@ -691,7 +691,7 @@ class ExportDepAsJarTestWithCodegenTargets(ExportDepAsJarTest):
                 )
             ],
         )
-        self.project_a = self.make_target(
+        self.make_target(
             "project_info:a",
             target_type=ScalaLibrary,
             sources=["com/foo/Bar.scala", "com/foo/Baz.scala"],
