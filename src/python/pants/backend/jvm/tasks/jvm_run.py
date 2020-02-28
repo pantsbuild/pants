@@ -12,7 +12,6 @@ from pants.fs.fs import expand_path
 from pants.java.executor import CommandLineGrabber
 from pants.util.dirutil import safe_open
 
-
 _CWD_NOT_PRESENT = "CWD NOT PRESENT"
 logger = logging.getLogger(__name__)
 
@@ -101,9 +100,9 @@ class JvmRun(JvmTask):
                     classpath=self.classpath([target]),
                     main=self.get_options().main or binary.main,
                     executor=executor,
-                    jvm_options=(self.jvm_options
-                                 + list(platform.jvm_options)
-                                 + list(extra_jvm_options)),
+                    jvm_options=(
+                        self.jvm_options + list(platform.jvm_options) + list(extra_jvm_options)
+                    ),
                     args=self.args,
                     cwd=working_dir,
                     synthetic_jar_dir=self.workdir,
