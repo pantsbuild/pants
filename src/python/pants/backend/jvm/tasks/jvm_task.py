@@ -15,15 +15,15 @@ from pants.task.task import Task
 class JvmTask(Task):
     """Base class for tasks that whose explicit user-facing purpose is to run code in a JVM.
 
-  Examples are run.jvm, test.junit, repl.scala.  These tasks (and end users) can configure
-  the JVM options, args etc. via the JVM subsystem scoped to the task.
+    Examples are run.jvm, test.junit, repl.scala.  These tasks (and end users) can configure
+    the JVM options, args etc. via the JVM subsystem scoped to the task.
 
-  Note that this is distinct from tasks that happen to run code in a JVM as an implementation
-  detail, such as compile.java, checkstyle, etc.  Hypothetically at least, you could imagine
-  a Java compiler written in a non-JVM language, and then compile.java might not need to
-  run JVM code at all.  In practice that is highly unlikely, but the distinction is still
-  important.  Those JVM-tool-using tasks mix in `pants.backend.jvm.tasks.JvmToolTaskMixin`.
-  """
+    Note that this is distinct from tasks that happen to run code in a JVM as an implementation
+    detail, such as compile.java, checkstyle, etc.  Hypothetically at least, you could imagine
+    a Java compiler written in a non-JVM language, and then compile.java might not need to
+    run JVM code at all.  In practice that is highly unlikely, but the distinction is still
+    important.  Those JVM-tool-using tasks mix in `pants.backend.jvm.tasks.JvmToolTaskMixin`.
+    """
 
     @classmethod
     def subsystem_dependencies(cls):
@@ -65,18 +65,18 @@ class JvmTask(Task):
     ):
         """Builds a transitive classpath for the given targets.
 
-    Optionally includes a classpath prefix or building from a non-default classpath product.
+        Optionally includes a classpath prefix or building from a non-default classpath product.
 
-    :param targets: the targets for which to build the transitive classpath.
-    :param classpath_prefix: optional additional entries to prepend to the classpath.
-    :param classpath_product: an optional ClasspathProduct from which to build the classpath. if not
-    specified, the runtime_classpath will be used.
-    :param :class:`pants.build_graph.target_scopes.Scope` exclude_scopes: Exclude targets which
-      have at least one of these scopes on the classpath.
-    :param :class:`pants.build_graph.target_scopes.Scope` include_scopes: Only include targets which
-      have at least one of these scopes on the classpath. Defaults to Scopes.JVM_RUNTIME_SCOPES.
-    :return: a list of classpath strings.
-    """
+        :param targets: the targets for which to build the transitive classpath.
+        :param classpath_prefix: optional additional entries to prepend to the classpath.
+        :param classpath_product: an optional ClasspathProduct from which to build the classpath. if not
+        specified, the runtime_classpath will be used.
+        :param :class:`pants.build_graph.target_scopes.Scope` exclude_scopes: Exclude targets which
+          have at least one of these scopes on the classpath.
+        :param :class:`pants.build_graph.target_scopes.Scope` include_scopes: Only include targets which
+          have at least one of these scopes on the classpath. Defaults to Scopes.JVM_RUNTIME_SCOPES.
+        :return: a list of classpath strings.
+        """
         include_scopes = Scopes.JVM_RUNTIME_SCOPES if include_scopes is None else include_scopes
         classpath_product = classpath_product or self.context.products.get_data("runtime_classpath")
         closure = BuildGraph.closure(

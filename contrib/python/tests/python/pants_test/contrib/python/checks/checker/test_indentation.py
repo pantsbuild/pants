@@ -7,26 +7,26 @@ from pants.contrib.python.checks.checker.indentation import Indentation
 
 
 class IndentationTest(CheckstylePluginTestBase):
-  plugin_type = Indentation
+    plugin_type = Indentation
 
-  def test_indentation(self):
-    statement = """
-      def foo():
+    def test_indentation(self):
+        statement = """
+        def foo():
+            pass
+        """
+        self.assertNit(statement, "T100")
+
+        statement = """
+        def foo():
           pass
-    """
-    self.assertNit(statement, 'T100')
+        """
+        self.assertNoNits(statement)
 
-    statement = """
-      def foo():
-        pass
-    """
-    self.assertNoNits(statement)
-
-    statement = """
-      def foo():
-        baz = (
-            "this "
-            "is "
-            "ok")
-    """
-    self.assertNoNits(statement)
+        statement = """
+        def foo():
+          baz = (
+              "this "
+              "is "
+              "ok")
+        """
+        self.assertNoNits(statement)

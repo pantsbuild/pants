@@ -31,6 +31,7 @@ python_library(
     'src/python/pants/task',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:fileutil',
+    'src/python/pants/util:ordered_set',
   ],
   tags = {"partially_type_checked"},
 )
@@ -87,7 +88,7 @@ python_library(
   ],
   dependencies = [
     '3rdparty/python:ansicolors',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/util:ordered_set',
   ],
   tags = {"partially_type_checked"},
 )

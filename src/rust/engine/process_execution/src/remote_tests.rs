@@ -18,7 +18,7 @@ use crate::remote::{CommandRunner, ExecutionError, ExecutionHistory, OperationOr
 use crate::{
   CommandRunner as CommandRunnerTrait, Context, ExecuteProcessRequest,
   ExecuteProcessRequestMetadata, FallibleExecuteProcessResult, MultiPlatformExecuteProcessRequest,
-  Platform,
+  PlatformConstraint,
 };
 use maplit::{btreemap, hashset};
 use mock::execution_server::MockOperation;
@@ -72,7 +72,7 @@ fn local_only_scratch_files_ignored() {
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
       hashing::EMPTY_DIGEST,
     jdk_home: None,
-    target_platform: Platform::None,
+    target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
   };
 
@@ -97,7 +97,7 @@ fn local_only_scratch_files_ignored() {
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
       TestDirectory::containing_falcons_dir().digest(),
     jdk_home: None,
-    target_platform: Platform::None,
+    target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
   };
 
@@ -131,7 +131,7 @@ fn make_execute_request() {
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
       hashing::EMPTY_DIGEST,
     jdk_home: None,
-    target_platform: Platform::None,
+    target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
   };
 
@@ -215,7 +215,7 @@ fn make_execute_request_with_instance_name() {
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
       hashing::EMPTY_DIGEST,
     jdk_home: None,
-    target_platform: Platform::None,
+    target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
   };
 
@@ -307,7 +307,7 @@ fn make_execute_request_with_cache_key_gen_version() {
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
       hashing::EMPTY_DIGEST,
     jdk_home: None,
-    target_platform: Platform::None,
+    target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
   };
 
@@ -395,7 +395,7 @@ fn make_execute_request_with_jdk() {
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
       hashing::EMPTY_DIGEST,
     jdk_home: Some(PathBuf::from("/tmp")),
-    target_platform: Platform::None,
+    target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
   };
 
@@ -461,7 +461,7 @@ fn make_execute_request_with_jdk_and_extra_platform_properties() {
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
       hashing::EMPTY_DIGEST,
     jdk_home: Some(PathBuf::from("/tmp")),
-    target_platform: Platform::None,
+    target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
   };
 
@@ -569,7 +569,7 @@ fn server_rejecting_execute_request_gives_error() {
             unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
               hashing::EMPTY_DIGEST,
             jdk_home: None,
-            target_platform: Platform::None,
+            target_platform: PlatformConstraint::None,
             is_nailgunnable: false,
           },
           empty_request_metadata(),
@@ -775,7 +775,7 @@ pub fn sends_headers() {
       String::from("cat") => String::from("roland"),
     },
     store,
-    Platform::Linux,
+    PlatformConstraint::Linux,
     runtime.clone(),
     Duration::from_secs(0),
     Duration::from_millis(0),
@@ -939,7 +939,7 @@ fn ensure_inline_stdio_is_stored() {
     None,
     BTreeMap::new(),
     store,
-    Platform::Linux,
+    PlatformConstraint::Linux,
     runtime.clone(),
     Duration::from_secs(0),
     Duration::from_millis(0),
@@ -1054,7 +1054,7 @@ fn timeout_after_sufficiently_delayed_getoperations() {
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
       hashing::EMPTY_DIGEST,
     jdk_home: None,
-    target_platform: Platform::None,
+    target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
   };
 
@@ -1107,7 +1107,7 @@ fn dropped_request_cancels() {
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
       hashing::EMPTY_DIGEST,
     jdk_home: None,
-    target_platform: Platform::None,
+    target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
   };
 
@@ -1477,7 +1477,7 @@ fn execute_missing_file_uploads_if_known() {
     None,
     BTreeMap::new(),
     store,
-    Platform::Linux,
+    PlatformConstraint::Linux,
     runtime.clone(),
     Duration::from_secs(0),
     Duration::from_millis(0),
@@ -1584,7 +1584,7 @@ fn execute_missing_file_uploads_if_known_status() {
     None,
     BTreeMap::new(),
     store,
-    Platform::Linux,
+    PlatformConstraint::Linux,
     runtime.clone(),
     Duration::from_secs(0),
     Duration::from_millis(0),
@@ -1664,7 +1664,7 @@ fn execute_missing_file_errors_if_unknown() {
     None,
     BTreeMap::new(),
     store,
-    Platform::Linux,
+    PlatformConstraint::Linux,
     runtime.clone(),
     Duration::from_secs(0),
     Duration::from_millis(0),
@@ -2288,7 +2288,7 @@ pub fn echo_foo_request() -> MultiPlatformExecuteProcessRequest {
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
       hashing::EMPTY_DIGEST,
     jdk_home: None,
-    target_platform: Platform::None,
+    target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
   };
   req.into()
@@ -2492,7 +2492,7 @@ fn create_command_runner(
     None,
     BTreeMap::new(),
     store,
-    Platform::Linux,
+    PlatformConstraint::Linux,
     runtime,
     Duration::from_secs(1), // We use a low queue_buffer_time to ensure that tests do not take too long.
     backoff_incremental_wait,
@@ -2602,7 +2602,7 @@ fn cat_roland_request() -> MultiPlatformExecuteProcessRequest {
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
       hashing::EMPTY_DIGEST,
     jdk_home: None,
-    target_platform: Platform::None,
+    target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
   };
   req.into()
@@ -2621,7 +2621,7 @@ fn echo_roland_request() -> MultiPlatformExecuteProcessRequest {
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
       hashing::EMPTY_DIGEST,
     jdk_home: None,
-    target_platform: Platform::None,
+    target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
   };
   req.into()

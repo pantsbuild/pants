@@ -64,6 +64,7 @@ python_tests(
     'src/python/pants/testutil:interpreter_selection_utils',
     'src/python/pants/testutil:test_base',
     'src/python/pants/testutil/subsystem',
+    'src/python/pants/testutil:goal_rule_test_base',
   ],
   tags = {'integration', 'partially_type_checked'},
   timeout = 480,

@@ -3,6 +3,7 @@
 
 python_library(
   dependencies=[
+    '3rdparty/python:wheel',
     'src/python/pants/backend/native',
     'src/python/pants/backend/python/tasks',
     'src/python/pants/python',

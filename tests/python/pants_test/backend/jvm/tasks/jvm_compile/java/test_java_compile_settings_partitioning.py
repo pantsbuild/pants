@@ -229,10 +229,11 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
 
         @contextmanager
         def fake_distributions(versions):
-            """Create a fake JDK for each java version in the input, and yield the list of java_homes.
+            """Create a fake JDK for each java version in the input, and yield the list of
+            java_homes.
 
-      :param list versions: List of java version strings.
-      """
+            :param list versions: List of java version strings.
+            """
             fakes = []
             for version in versions:
                 fakes.append(
@@ -246,9 +247,9 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
         def fake_distribution_locator(*versions):
             """Sets up a fake distribution locator with fake distributions.
 
-      Creates one distribution for each java version passed as an argument, and yields a list of
-      paths to the java homes for each distribution.
-      """
+            Creates one distribution for each java version passed as an argument, and yields a list
+            of paths to the java homes for each distribution.
+            """
             with fake_distributions(versions) as paths:
                 path_options = {DistributionLocator.options_scope: {"paths": {os_name: paths,}}}
                 Subsystem.reset()

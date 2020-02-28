@@ -19,6 +19,7 @@ local_artifact_cache = "%(pants_bootstrapdir)s/artifact_cache"
 # [GLOBAL] should only contain valid options in global scope.
 [GLOBAL]
 print_exception_stacktrace = true
+v2 = false
 
 # Enable our own custom loose-source plugins as well as contribs.
 pythonpath = [
@@ -63,9 +64,15 @@ backend_packages.add = [
   "internal_backend.sitegen",
   "internal_backend.utilities",
 ]
+backend_packages.remove = [
+  # We use the V2 isort implementation.
+  "pants.backend.python.lint.isort",
+]
 backend_packages2 = [
   "pants.backend.project_info",
   "pants.backend.python",
+  "pants.backend.python.lint.black",
+  "pants.backend.python.lint.docformatter",
   "pants.backend.python.lint.isort",
   "pants.backend.native",
   "internal_backend.rules_for_testing",
@@ -231,8 +238,14 @@ no_warning_args = [
   '-Xlint:none',
 ]
 
+[black]
+config = "pyproject.toml"
+
 [checkstyle]
 config = "%(pants_supportdir)s/checkstyle/coding_style.xml"
+
+[docformatter]
+args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
 
 [eslint]
 setupdir = "%(pants_supportdir)s/eslint"
@@ -266,22 +279,28 @@ version = "3.4.1"
 [pycheck-class-factoring]
 skip = true
 
-[pycheck-pycodestyle]
+[pycheck-context-manager]
 skip = true
 
 [pycheck-import-order]
 skip = true
 
-[pycheck-variable-names]
+[pycheck-indentation]
+skip = true
+
+[pycheck-newlines]
+skip = true
+
+[pycheck-newstyle-classes]
+skip = true
+
+[pycheck-pycodestyle]
 skip = true
 
 [pycheck-trailing-whitespace]
 skip = true
 
-[pycheck-context-manager]
-skip = true
-
-[pycheck-newstyle-classes]
+[pycheck-variable-names]
 skip = true
 
 [scala]
@@ -388,7 +407,7 @@ pytest_plugins.add = [
   "pytest-rerunfailures",
   # TODO(#8651): We need this until we switch to implicit namespace packages so that pytest-cov
   #  understands our __init__ files. NB: this version matches 3rdparty/python/requirements.txt.
-  "setuptools==40.6.3",
+  "setuptools==44.0.0",
   "ipdb",
 ]
 

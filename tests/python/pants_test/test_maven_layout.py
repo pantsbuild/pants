@@ -13,28 +13,28 @@ from pants.testutil.test_base import TestBase
 # Note: There is no longer any special maven_layout directive.  Maven layouts should just
 # work out of the box.  This test exists just to prove that statement true.
 class MavenLayoutTest(TestBase):
-  @classmethod
-  def alias_groups(cls):
-    return BuildFileAliases(
-      targets={
-        'java_library': JavaLibrary,
-        'junit_tests': JUnitTests,
-      },
-    )
+    @classmethod
+    def alias_groups(cls):
+        return BuildFileAliases(targets={"java_library": JavaLibrary, "junit_tests": JUnitTests,},)
 
-  def setUp(self):
-    super().setUp()
-    init_subsystems([SourceRootConfig, JUnit])
-    self.add_to_build_file('projectB/src/test/scala',
-                           'junit_tests(name="test", sources=["a/source"])')
+    def setUp(self):
+        super().setUp()
+        init_subsystems([SourceRootConfig, JUnit])
+        self.add_to_build_file(
+            "projectB/src/test/scala", 'junit_tests(name="test", sources=["a/source"])'
+        )
 
-    self.add_to_build_file('projectA/subproject/src/main/java',
-                           'java_library(name="test", sources=[])')
+        self.add_to_build_file(
+            "projectA/subproject/src/main/java", 'java_library(name="test", sources=[])'
+        )
 
-  def test_layout_here(self):
-    self.assertEqual('projectB/src/test/scala',
-                     self.target('projectB/src/test/scala:test').target_base)
+    def test_layout_here(self):
+        self.assertEqual(
+            "projectB/src/test/scala", self.target("projectB/src/test/scala:test").target_base
+        )
 
-  def test_subproject_layout(self):
-    self.assertEqual('projectA/subproject/src/main/java',
-                     self.target('projectA/subproject/src/main/java:test').target_base)
+    def test_subproject_layout(self):
+        self.assertEqual(
+            "projectA/subproject/src/main/java",
+            self.target("projectA/subproject/src/main/java:test").target_base,
+        )

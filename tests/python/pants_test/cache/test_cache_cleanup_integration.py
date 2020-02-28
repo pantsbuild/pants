@@ -11,200 +11,239 @@ from pants.util.dirutil import safe_delete, safe_mkdir, touch
 
 
 class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
+    def _create_platform_args(self, version):
+        return [
+            (f"""--jvm-platform-platforms={{'default': {{'target': '{version}'}}}}"""),
+            "--jvm-platform-default-platform=default",
+        ]
 
-  def _create_platform_args(self, version):
-    return [(f"""--jvm-platform-platforms={{'default': {{'target': '{version}'}}}}"""),
-            '--jvm-platform-default-platform=default']
-
-  def _run_pants_get_artifact_dir(self, args, cache_dir, subdir, num_files_to_insert, expected_num_files, config=None, prev_dirs=[]):
-    """Run Pants with the given `args` and `config`, delete the results, add
-    some files, then run pants again and ensure there are exactly
-    `expected_num_files` in the output.
-
-    Pants needs to be run twice because we don't know what the results directory
-    will be named before we run Pants, and we want to insert files into that
-    specific directory to test cache cleanup procedures.
-    """
-    self.assert_success(self.run_pants(args, config=config))
-
-    artifact_base_dir = self.get_cache_subdir(cache_dir, other_dirs=prev_dirs)
-    artifact_dir = os.path.join(artifact_base_dir, subdir)
-
-    for tgz in glob.glob(os.path.join(artifact_dir, '*.tgz')):
-      safe_delete(tgz)
-    for i in range(0, num_files_to_insert):
-      touch(os.path.join(artifact_dir, f'old_cache_test{(i + 1)}'))
-
-    self.assert_success(self.run_pants(args, config=config))
-    self.assertEqual(len(os.listdir(artifact_dir)), expected_num_files)
-
-    return artifact_base_dir
-
-  def test_buildcache_leave_one(self):
-    """Ensure that max-old of 1 removes all but one files"""
-
-    with temporary_dir() as cache_dir:
-      config = {'cache.compile.rsc': {'write_to': [cache_dir]}}
-
-      java_6_args = self._create_platform_args(6) + [
-        'compile.rsc',
-        'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
-        '--cache-max-entries-per-target=1',
-      ]
-      java_6_artifact_base_dir = self._run_pants_get_artifact_dir(
-        java_6_args,
+    def _run_pants_get_artifact_dir(
+        self,
+        args,
         cache_dir,
-        'testprojects.src.java.org.pantsbuild.testproject.unicode.main.main',
-        num_files_to_insert=5,
-        # One artifact for java 6
-        expected_num_files=1,
-        config=config,
-      )
+        subdir,
+        num_files_to_insert,
+        expected_num_files,
+        config=None,
+        prev_dirs=[],
+    ):
+        """Run Pants with the given `args` and `config`, delete the results, add some files, then
+        run pants again and ensure there are exactly `expected_num_files` in the output.
 
-      # Rerun for java 7
-      java_7_args = self._create_platform_args(7) + [
-        'compile.rsc',
-        'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
-        '--cache-max-entries-per-target=1',
-      ]
-      self._run_pants_get_artifact_dir(
-        java_7_args,
-        cache_dir,
-        'testprojects.src.java.org.pantsbuild.testproject.unicode.main.main',
-        num_files_to_insert=2,
-        # One artifact for java 6
-        expected_num_files=1,
-        config=config,
-        # java 7 platform args should change the name of the cache directory
-        prev_dirs=[java_6_artifact_base_dir],
-      )
+        Pants needs to be run twice because we don't know what the results directory will be named
+        before we run Pants, and we want to insert files into that specific directory to test cache
+        cleanup procedures.
+        """
+        self.assert_success(self.run_pants(args, config=config))
 
-  def test_buildcache_leave_none(self):
-    """Ensure that max-old of zero removes all files
+        artifact_base_dir = self.get_cache_subdir(cache_dir, other_dirs=prev_dirs)
+        artifact_dir = os.path.join(artifact_base_dir, subdir)
 
-    This test should ensure that conditional doesn't change to the simpler test of if max_old since
-    we need to handle zero as well.
-    """
+        for tgz in glob.glob(os.path.join(artifact_dir, "*.tgz")):
+            safe_delete(tgz)
+        for i in range(0, num_files_to_insert):
+            touch(os.path.join(artifact_dir, f"old_cache_test{(i + 1)}"))
 
-    with temporary_dir() as cache_dir:
-      config = {'cache.compile.rsc': {'write_to': [cache_dir]}}
+        self.assert_success(self.run_pants(args, config=config))
+        self.assertEqual(len(os.listdir(artifact_dir)), expected_num_files)
 
-      java_6_args = self._create_platform_args(6) + [
-        'compile.rsc',
-        'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
-        '--cache-max-entries-per-target=0',
-      ]
-      java_6_artifact_base_dir = self._run_pants_get_artifact_dir(
-        java_6_args,
-        cache_dir,
-        'testprojects.src.java.org.pantsbuild.testproject.unicode.main.main',
-        num_files_to_insert=5,
-        # Cache cleanup disabled for 0
-        expected_num_files=6,
-        config=config,
-      )
+        return artifact_base_dir
 
-      # Rerun for java 7
-      java_7_args = self._create_platform_args(7) + [
-        'compile.rsc',
-        'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
-        '--cache-max-entries-per-target=0',
-      ]
-      self._run_pants_get_artifact_dir(
-        java_7_args,
-        cache_dir,
-        'testprojects.src.java.org.pantsbuild.testproject.unicode.main.main',
-        num_files_to_insert=2,
-        # Cache cleanup disabled for 0
-        expected_num_files=3,
-        config=config,
-        # java 7 platform args should change the name of the cache directory
-        prev_dirs=[java_6_artifact_base_dir],
-      )
+    def test_buildcache_leave_one(self):
+        """Ensure that max-old of 1 removes all but one files."""
 
-  def test_workdir_stale_builds_cleanup(self):
-    """Ensure that current and previous build result_dirs and the newest `--workdir-max-build-entries` number of dirs
-    will be kept, and the rest will be purged.
-    """
+        with temporary_dir() as cache_dir:
+            config = {"cache.compile.rsc": {"write_to": [cache_dir]}}
 
-    with self.temporary_workdir() as workdir:
-      self.assert_success(self.run_pants_with_workdir([
-        'compile',
-        'export-classpath',
-        'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
-      ], workdir))
+            java_6_args = self._create_platform_args(6) + [
+                "compile.rsc",
+                "testprojects/src/java/org/pantsbuild/testproject/unicode/main",
+                "--cache-max-entries-per-target=1",
+            ]
+            java_6_artifact_base_dir = self._run_pants_get_artifact_dir(
+                java_6_args,
+                cache_dir,
+                "testprojects.src.java.org.pantsbuild.testproject.unicode.main.main",
+                num_files_to_insert=5,
+                # One artifact for java 6
+                expected_num_files=1,
+                config=config,
+            )
 
-      # Use the static exported classpath symlink to access the artifact in workdir
-      # in order to avoid computing hashed task version used in workdir.
-      classpath = 'dist/export-classpath/testprojects.src.java.org.pantsbuild.testproject.unicode.main.main-0.jar'
+            # Rerun for java 7
+            java_7_args = self._create_platform_args(7) + [
+                "compile.rsc",
+                "testprojects/src/java/org/pantsbuild/testproject/unicode/main",
+                "--cache-max-entries-per-target=1",
+            ]
+            self._run_pants_get_artifact_dir(
+                java_7_args,
+                cache_dir,
+                "testprojects.src.java.org.pantsbuild.testproject.unicode.main.main",
+                num_files_to_insert=2,
+                # One artifact for java 6
+                expected_num_files=1,
+                config=config,
+                # java 7 platform args should change the name of the cache directory
+                prev_dirs=[java_6_artifact_base_dir],
+            )
 
-      # <workdir>/compile/rsc/d4600a981d5d/testprojects.src.java.org.pantsbuild.testproject.unicode.main.main/1a317a2504f6/z.jar'
-      jar_path_in_pantsd = os.path.realpath(classpath)
-      # <workdir>/compile/rsc/d4600a981d5d/testprojects.src.java.org.pantsbuild.testproject.unicode.main.main/
-      target_dir_in_pantsd = os.path.dirname(os.path.dirname(os.path.dirname(jar_path_in_pantsd)))
+    def test_buildcache_leave_none(self):
+        """Ensure that max-old of zero removes all files.
 
-      old_cache_dirnames = {
-        'old_cache_test1_dir/',
-        'old_cache_test2_dir/',
-        'old_cache_test3_dir/',
-      }
-      new_cache_dirnames = {
-        'old_cache_test4_dir/',
-        'old_cache_test5_dir/',
-      }
-      old_cache_entries = {os.path.join(target_dir_in_pantsd, subdir) for subdir in old_cache_dirnames}
-      new_cache_entries = {os.path.join(target_dir_in_pantsd, subdir) for subdir in new_cache_dirnames}
-      for old_entry in old_cache_entries:
-        safe_mkdir(old_entry)
-      # sleep for a bit so these files are all newer than the other ones
-      time.sleep(1.1)
-      for new_entry in new_cache_entries:
-        safe_mkdir(new_entry)
-      expected_dirs = {os.path.join(target_dir_in_pantsd, 'current/')} | old_cache_entries | new_cache_entries
+        This test should ensure that conditional doesn't change to the simpler test of if max_old
+        since we need to handle zero as well.
+        """
 
-      # stable symlink, current version directory, and synthetically created directories.
-      remaining_cache_dir_fingerprinted = self.get_cache_subdir(cache_dir=target_dir_in_pantsd, other_dirs=expected_dirs)
-      fingerprinted_realdir = os.path.realpath(os.path.join(target_dir_in_pantsd, 'current'))
-      self.assertEqual(
-        fingerprinted_realdir,
-        remaining_cache_dir_fingerprinted.rstrip('/'))
+        with temporary_dir() as cache_dir:
+            config = {"cache.compile.rsc": {"write_to": [cache_dir]}}
 
-      max_entries_per_target = 2
-      self.assert_success(self.run_pants_with_workdir([
-        'compile',
-        'export-classpath',
-        'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
-        f'--workdir-max-build-entries={max_entries_per_target}'
-      ], workdir))
+            java_6_args = self._create_platform_args(6) + [
+                "compile.rsc",
+                "testprojects/src/java/org/pantsbuild/testproject/unicode/main",
+                "--cache-max-entries-per-target=0",
+            ]
+            java_6_artifact_base_dir = self._run_pants_get_artifact_dir(
+                java_6_args,
+                cache_dir,
+                "testprojects.src.java.org.pantsbuild.testproject.unicode.main.main",
+                num_files_to_insert=5,
+                # Cache cleanup disabled for 0
+                expected_num_files=6,
+                config=config,
+            )
 
-      # stable (same as before), current, and 2 newest dirs
-      self.assertEqual(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(classpath)))),
-        target_dir_in_pantsd
-      )
-      newest_expected_dirs = expected_dirs - old_cache_entries
-      other_cache_dir_fingerprinted = self.get_cache_subdir(target_dir_in_pantsd, other_dirs=newest_expected_dirs)
-      self.assertEqual(other_cache_dir_fingerprinted, remaining_cache_dir_fingerprinted)
-      self.assertEqual(
-        os.path.realpath(os.path.join(target_dir_in_pantsd, 'current')),
-        fingerprinted_realdir)
+            # Rerun for java 7
+            java_7_args = self._create_platform_args(7) + [
+                "compile.rsc",
+                "testprojects/src/java/org/pantsbuild/testproject/unicode/main",
+                "--cache-max-entries-per-target=0",
+            ]
+            self._run_pants_get_artifact_dir(
+                java_7_args,
+                cache_dir,
+                "testprojects.src.java.org.pantsbuild.testproject.unicode.main.main",
+                num_files_to_insert=2,
+                # Cache cleanup disabled for 0
+                expected_num_files=3,
+                config=config,
+                # java 7 platform args should change the name of the cache directory
+                prev_dirs=[java_6_artifact_base_dir],
+            )
 
-      self.assert_success(self.run_pants_with_workdir([
-        'compile',
-        'export-classpath',
-        'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
-        '--compile-rsc-debug-symbols',
-        f'--workdir-max-build-entries={max_entries_per_target}'
-      ], workdir))
+    def test_workdir_stale_builds_cleanup(self):
+        """Ensure that current and previous build result_dirs and the newest `--workdir-max-build-
+        entries` number of dirs will be kept, and the rest will be purged."""
 
-      # stable, current, and 2 newest dirs
-      self.assertEqual(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(classpath)))),
-        target_dir_in_pantsd
-      )
-      new_cache_dir_fingerprinted = self.get_cache_subdir(target_dir_in_pantsd, other_dirs=newest_expected_dirs)
-      # subsequent run with --compile-rsc-debug-symbols will invalidate previous build thus triggering the clean up.
-      self.assertNotEqual(new_cache_dir_fingerprinted, remaining_cache_dir_fingerprinted)
-      new_fingerprinted_realdir = os.path.realpath(os.path.join(target_dir_in_pantsd, 'current'))
-      self.assertEqual(new_fingerprinted_realdir,
-                       new_cache_dir_fingerprinted.rstrip('/'))
+        with self.temporary_workdir() as workdir:
+            self.assert_success(
+                self.run_pants_with_workdir(
+                    [
+                        "compile",
+                        "export-classpath",
+                        "testprojects/src/java/org/pantsbuild/testproject/unicode/main",
+                    ],
+                    workdir,
+                )
+            )
+
+            # Use the static exported classpath symlink to access the artifact in workdir
+            # in order to avoid computing hashed task version used in workdir.
+            classpath = "dist/export-classpath/testprojects.src.java.org.pantsbuild.testproject.unicode.main.main-0.jar"
+
+            # <workdir>/compile/rsc/d4600a981d5d/testprojects.src.java.org.pantsbuild.testproject.unicode.main.main/1a317a2504f6/z.jar'
+            jar_path_in_pantsd = os.path.realpath(classpath)
+            # <workdir>/compile/rsc/d4600a981d5d/testprojects.src.java.org.pantsbuild.testproject.unicode.main.main/
+            target_dir_in_pantsd = os.path.dirname(
+                os.path.dirname(os.path.dirname(jar_path_in_pantsd))
+            )
+
+            old_cache_dirnames = {
+                "old_cache_test1_dir/",
+                "old_cache_test2_dir/",
+                "old_cache_test3_dir/",
+            }
+            new_cache_dirnames = {
+                "old_cache_test4_dir/",
+                "old_cache_test5_dir/",
+            }
+            old_cache_entries = {
+                os.path.join(target_dir_in_pantsd, subdir) for subdir in old_cache_dirnames
+            }
+            new_cache_entries = {
+                os.path.join(target_dir_in_pantsd, subdir) for subdir in new_cache_dirnames
+            }
+            for old_entry in old_cache_entries:
+                safe_mkdir(old_entry)
+            # sleep for a bit so these files are all newer than the other ones
+            time.sleep(1.1)
+            for new_entry in new_cache_entries:
+                safe_mkdir(new_entry)
+            expected_dirs = (
+                {os.path.join(target_dir_in_pantsd, "current/")}
+                | old_cache_entries
+                | new_cache_entries
+            )
+
+            # stable symlink, current version directory, and synthetically created directories.
+            remaining_cache_dir_fingerprinted = self.get_cache_subdir(
+                cache_dir=target_dir_in_pantsd, other_dirs=expected_dirs
+            )
+            fingerprinted_realdir = os.path.realpath(os.path.join(target_dir_in_pantsd, "current"))
+            self.assertEqual(fingerprinted_realdir, remaining_cache_dir_fingerprinted.rstrip("/"))
+
+            max_entries_per_target = 2
+            self.assert_success(
+                self.run_pants_with_workdir(
+                    [
+                        "compile",
+                        "export-classpath",
+                        "testprojects/src/java/org/pantsbuild/testproject/unicode/main",
+                        f"--workdir-max-build-entries={max_entries_per_target}",
+                    ],
+                    workdir,
+                )
+            )
+
+            # stable (same as before), current, and 2 newest dirs
+            self.assertEqual(
+                os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(classpath)))),
+                target_dir_in_pantsd,
+            )
+            newest_expected_dirs = expected_dirs - old_cache_entries
+            other_cache_dir_fingerprinted = self.get_cache_subdir(
+                target_dir_in_pantsd, other_dirs=newest_expected_dirs
+            )
+            self.assertEqual(other_cache_dir_fingerprinted, remaining_cache_dir_fingerprinted)
+            self.assertEqual(
+                os.path.realpath(os.path.join(target_dir_in_pantsd, "current")),
+                fingerprinted_realdir,
+            )
+
+            self.assert_success(
+                self.run_pants_with_workdir(
+                    [
+                        "compile",
+                        "export-classpath",
+                        "testprojects/src/java/org/pantsbuild/testproject/unicode/main",
+                        "--compile-rsc-debug-symbols",
+                        f"--workdir-max-build-entries={max_entries_per_target}",
+                    ],
+                    workdir,
+                )
+            )
+
+            # stable, current, and 2 newest dirs
+            self.assertEqual(
+                os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(classpath)))),
+                target_dir_in_pantsd,
+            )
+            new_cache_dir_fingerprinted = self.get_cache_subdir(
+                target_dir_in_pantsd, other_dirs=newest_expected_dirs
+            )
+            # subsequent run with --compile-rsc-debug-symbols will invalidate previous build thus triggering the clean up.
+            self.assertNotEqual(new_cache_dir_fingerprinted, remaining_cache_dir_fingerprinted)
+            new_fingerprinted_realdir = os.path.realpath(
+                os.path.join(target_dir_in_pantsd, "current")
+            )
+            self.assertEqual(new_fingerprinted_realdir, new_cache_dir_fingerprinted.rstrip("/"))

@@ -69,7 +69,6 @@ python_library(
   name='graph',
   sources=['graph.py'],
   dependencies=[
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:dataclasses',
     ':address_mapper',
     ':structs',
@@ -85,6 +84,7 @@ python_library(
     'src/python/pants/scm/subsystems:changed',
     'src/python/pants/source',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:ordered_set',
   ],
   tags = {"partially_type_checked"},
 )

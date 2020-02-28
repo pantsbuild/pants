@@ -1,9 +1,8 @@
 import pytest
 
-
 V = {}
 
 
-@pytest.fixture(scope='session', autouse=True)
+@pytest.fixture(scope="session", autouse=True)
 def myfixture():
-  V['ok'] = 1
+    V["ok"] = 1

@@ -25,7 +25,7 @@ This "Hello World" plugin example shows how to register a plugin with Pants. It 
 `hello-world` goal with two tasks. Here's how to create it:
 
 - If you don't have an existing Pants project to work with, create one. Locate its config file,
- typically `pants.ini` in the repo root.
+ typically `pants.toml` in the repo root.
 
 - Create a directory for your plugins. In this example we will use the `plugins/` directory in 
 the repo root, but there is no convention, and you can put them wherever you like.
@@ -74,13 +74,13 @@ the repo root, but there is no convention, and you can put them wherever you lik
  This creates a new goal named `hello-world`, and registers the two tasks to it.
 
 
-- In `pants.ini` place the following content:
+- In `pants.toml` place the following content:
   
-        :::ini
+        :::toml
         [GLOBAL]
-        pants_version: 1.9.0
-        pythonpath: ["%(buildroot)s/plugins"]
-        backend_packages: ["hello"]     
+        pants_version = "1.26.0"
+        pythonpath = ["%(buildroot)s/plugins"]
+        backend_packages = ["hello"]     
 
 `backend_packages` defines which plugins you want to use in your project.
 
@@ -111,23 +111,23 @@ Now you can use your plugin by typing `./pants hello-world`:
 Note that to consume the custom plugin as a published artifact (say on PyPI), instead of 
 directly from the repo, then instead of `backend_packages` and `pythonpath` you would set `plugins`:
 
-        :::ini
+        :::toml
         [GLOBAL]
-        pants_version: 1.9.0
-        plugins: ["myorg.hello==1.7.6"]
+        pants_version = "1.26.0"
+        plugins = ["myorg.hello==1.7.6"]
 
 Similarly, if your custom plugin is consumed directly from the repo, but has dependencies on 
 published artifacts, then you list those in `plugins`:
      
-        :::ini
+        :::toml
         [GLOBAL]
-        pants_version: 1.9.0
-        pythonpath: ["%(buildroot)s/plugins"]
-        backend_packages: ["hello"]
-        plugins: ["some.dependency==4.5.11"]
+        pants_version = "1.26.0"
+        pythonpath = ["%(buildroot)s/plugins"]
+        backend_packages = ["hello"]
+        plugins = ["some.dependency==4.5.11"]
 
 See below for more details. 
-  
+
      
 Simple Configuration
 --------------------
@@ -178,20 +178,16 @@ can consume it specifically but disregard regular `JvmBinary` instances (using `
           )
 
 
-- In `pants.ini`, add your new plugin package to the list of backends to load when pants starts.
+- In `pants.toml`, add your new plugin package to the list of backends to load when pants starts.
   This instructs pants to load a module named `hadoop.register`.
 
-        :::ini
+        :::toml
         [GLOBAL]
-        pythonpath: [
-            '%(buildroot)s/plugins',
-          ]
-        backend_packages: [
-            'hadoop',
-          ]
+        pythonpath = ['%(buildroot)s/plugins']
+        backend_packages = ['hadoop']
 
 Note that you can also set the PYTHONPATH in your `./pants` wrapper script, instead of in
-`pants.ini`, if you have other reasons to do so. Either way, pants will look for a `register.py`
+`pants.toml`, if you have other reasons to do so. Either way, pants will look for a `register.py`
 file for each backend package you list by prefixing that package with the python path; ie roughly
 `pythonpath + backend package + register.py` is tried for each pythonpath prefix until a
 `register.py` is found, in this example `plugins/hadoop/register.py`.
@@ -203,7 +199,7 @@ For an example of a code repo with plugins to add features to Pants when buildin
 take a look at [`twitter/commons`](https://github.com/twitter/commons), especially its
 [`pants-plugins` directory](https://github.com/twitter/commons/tree/32011ab5351fea23e8c70e24e752540b06d1389f/pants-plugins).
 
-The repo's [`pants.ini` file](https://github.com/twitter/commons/blob/32011ab5351fea23e8c70e24e752540b06d1389f/pants.ini) has a
+The repo's [`pants.ini` file](https://github.com/twitter/commons/blob/32011ab5351fea23e8c70e24e752540b06d1389f/pants.ini) (the format used before `pants.toml`) has a
 `backend_packages` entry listing the plugin packages (packages with `register.py` files):
 
     :::ini

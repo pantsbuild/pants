@@ -23,10 +23,10 @@ python_library(
   name = 'legacy_engine',
   sources = ['legacy_engine.py', 'round_engine.py', 'round_manager.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
     'src/python/pants/goal',
+    'src/python/pants/util:ordered_set',
   ],
   tags = {"partially_type_checked"},
 )
@@ -58,7 +58,6 @@ python_library(
   name='fs',
   sources=['fs.py'],
   dependencies=[
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:dataclasses',
     ':objects',
     ':rules',
@@ -100,6 +99,7 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:filtering',
     'src/python/pants/util:objects',
+    'src/python/pants/util:ordered_set',
   ],
   tags = {'partially_type_checked'},
 )
@@ -191,12 +191,12 @@ python_library(
   name='rules',
   sources=['rules.py'],
   dependencies=[
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     ':goal',
     ':selectors',
     'src/python/pants/util:collections',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
+    'src/python/pants/util:ordered_set',
   ],
   tags = {'partially_type_checked'},
 )
@@ -245,6 +245,7 @@ python_library(
     'src/python/pants/binaries',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
+    'src/python/pants/util:ordered_set',
   ],
   tags = {"partially_type_checked"},
 )

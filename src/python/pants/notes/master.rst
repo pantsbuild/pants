@@ -4,6 +4,171 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.26.0.dev1 (02/24/2020)
+------------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Upgrade to Pex 2.1.4 (#8881)
+  `PR #8881 <https://github.com/pantsbuild/pants/pull/8881>`_
+
+* Register `goal2` as `goal` if in v2-exclusive mode. (#9164)
+  `PR #9164 <https://github.com/pantsbuild/pants/pull/9164>`_
+
+* Turn on `--v2` by default now that the V2 backends are not loaded by default (#9007)
+  `PR #9007 <https://github.com/pantsbuild/pants/pull/9007>`_
+
+* Reapply "Switch to dot idea project type" PR (#9105)
+  `PR #9105 <https://github.com/pantsbuild/pants/pull/9105>`_
+
+* [export-dep-as-jar] Include transitive target dependencies in export-dep-as-jar (#9146)
+  `PR #9146 <https://github.com/pantsbuild/pants/pull/9146>`_
+
+* Remove deprecated passthrough args for `login`, `lint.mypy`, and `fmt.isort` (#9134)
+  `PR #9134 <https://github.com/pantsbuild/pants/pull/9134>`_
+
+* Remove pytest passthrough args deprecation. (#9126)
+  `PR #9126 <https://github.com/pantsbuild/pants/pull/9126>`_
+
+* Remove deprecated `--requirements` options in favor of `--version` and `--extra-requirements` (#9118)
+  `PR #9118 <https://github.com/pantsbuild/pants/pull/9118>`_
+
+* Remove deprecated `pantsbuild.pants.testinfra` wheel (#9117)
+  `PR #9117 <https://github.com/pantsbuild/pants/pull/9117>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Respect precise file arguments with V2 `./pants test` (#9120)
+  `PR #9120 <https://github.com/pantsbuild/pants/pull/9120>`_
+
+* Add support for precise file arguments to `fmt2` and `lint2` (#9133)
+  `PR #9133 <https://github.com/pantsbuild/pants/pull/9133>`_
+
+* v2 repl goal for python (#9077)
+  `PR #9077 <https://github.com/pantsbuild/pants/pull/9077>`_
+
+* Add Python `docformatter` auto-formatter (#9139)
+  `PR #9139 <https://github.com/pantsbuild/pants/pull/9139>`_
+
+* Add Pylint as a V2 linter (#8979)
+  `PR #8979 <https://github.com/pantsbuild/pants/pull/8979>`_
+
+* Allow disabling V1 isort by deregistering `pants.backend.python.lint.isort` (#9140)
+  `PR #9140 <https://github.com/pantsbuild/pants/pull/9140>`_
+
+* [jvm] Introduce runtime_platform; bump export version to 1.1 (#9003)
+  `PR #9003 <https://github.com/pantsbuild/pants/pull/9003>`_
+
+* Fetch sources and javadoc jars for 3rd party deps when exporting with 'export-dep-as-jar' (#9168)
+  `PR #9168 <https://github.com/pantsbuild/pants/pull/9168>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix `--skip` option for V2 formatters when multiple formatters enabled (#9159)
+  `PR #9159 <https://github.com/pantsbuild/pants/pull/9159>`_
+
+* Fix setuptools's Python 2 deprecation warning with Python linters (#9131)
+  `PR #9131 <https://github.com/pantsbuild/pants/pull/9131>`_
+
+* Fix TOML config files interpolating options from the same section (#9114)
+  `PR #9114 <https://github.com/pantsbuild/pants/pull/9114>`_
+
+* Fix warnings filtering under pantsd. (#9121)
+  `PR #9121 <https://github.com/pantsbuild/pants/pull/9121>`_
+
+* No-op when V2 goals have no implementation (#9142)
+  `PR #9142 <https://github.com/pantsbuild/pants/pull/9142>`_
+
+* [export-dep-as-jar] Make library ordering deterministic (#9144)
+  `PR #9144 <https://github.com/pantsbuild/pants/pull/9144>`_
+
+* [export-dep-as-jar] Respect strict_deps in `libraries` field (#9145)
+  `PR #9145 <https://github.com/pantsbuild/pants/pull/9145>`_
+
+* Add non-jvm targets with classpath elements to exported modules as libraries. (#9084)
+  `PR #9084 <https://github.com/pantsbuild/pants/pull/9084>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Use Black internally for auto-formatting (#9157)
+  `PR #9157 <https://github.com/pantsbuild/pants/pull/9157>`_
+
+* Use docformatter autoformatter internally (#9137)
+  `PR #9137 <https://github.com/pantsbuild/pants/pull/9137>`_
+
+* Ignore Black and docformatter changes with `git blame` (#9160)
+  `PR #9160 <https://github.com/pantsbuild/pants/pull/9160>`_
+
+* Use remote execution with the lint CI shard (#9156)
+  `PR #9156 <https://github.com/pantsbuild/pants/pull/9156>`_
+
+* Add `OrderedSet` and `FrozenOrderedSet` (#9166)
+  `PR #9166 <https://github.com/pantsbuild/pants/pull/9166>`_
+
+* Update compatible rust dependencies (#9122)
+  `PR #9122 <https://github.com/pantsbuild/pants/pull/9122>`_
+
+* Dirty the dependents of uncacheable nodes (#9015)
+  `PR #9015 <https://github.com/pantsbuild/pants/pull/9015>`_
+
+* Improve the error message when no rules are installed that return a type (#9136)
+  `PR #9136 <https://github.com/pantsbuild/pants/pull/9136>`_
+
+* Minor code cleanup involving some uses of Platform (#9152)
+  `PR #9152 <https://github.com/pantsbuild/pants/pull/9152>`_
+
+* Simplify calculating runtime lib path env var (#9111)
+  `PR #9111 <https://github.com/pantsbuild/pants/pull/9111>`_
+
+* Rename Platform -> PlatformConstraint (#9154)
+  `PR #9154 <https://github.com/pantsbuild/pants/pull/9154>`_
+
+* Add a rule to strip source roots from a `Snapshot` (#9112)
+  `PR #9112 <https://github.com/pantsbuild/pants/pull/9112>`_
+
+* Add `find_target_source_files` rule to generalize precise file arguments (#9127)
+  `PR #9127 <https://github.com/pantsbuild/pants/pull/9127>`_
+
+* Inline `inject_init.py` into `prepare_chrooted_python_sources.py` (#9115)
+  `PR #9115 <https://github.com/pantsbuild/pants/pull/9115>`_
+
+* Tweak `strip_source_roots` to allow multiple source roots in a snapshot (#9147)
+  `PR #9147 <https://github.com/pantsbuild/pants/pull/9147>`_
+
+* Stabilize CI lint shard timing out (#9155)
+  `PR #9155 <https://github.com/pantsbuild/pants/pull/9155>`_
+
+* Don't use FileContent in options parsing. (#9162)
+  `PR #9162 <https://github.com/pantsbuild/pants/pull/9162>`_
+
+* Remove `AddressOriginMap` (#9123)
+  `PR #9123 <https://github.com/pantsbuild/pants/pull/9123>`_
+
+* Cleanup tests handling of `download_pex_bin.py` (#9143)
+  `PR #9143 <https://github.com/pantsbuild/pants/pull/9143>`_
+
+* Add `./v2` script for Pants developers to more easily use V2 (#9125)
+  `PR #9125 <https://github.com/pantsbuild/pants/pull/9125>`_
+
+* Add ipdb for internal Pants tests (#9124)
+  `PR #9124 <https://github.com/pantsbuild/pants/pull/9124>`_
+
+Testing
+~~~~~~~
+
+* add assertDoesNotRaise contextmanager (#9113)
+  `PR #9113 <https://github.com/pantsbuild/pants/pull/9113>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Fix options reference page on pantsbuild.org. (#9138)
+  `PR #9138 <https://github.com/pantsbuild/pants/pull/9138>`_
+
 1.26.0.dev0 (02/11/2020)
 ------------------------
 

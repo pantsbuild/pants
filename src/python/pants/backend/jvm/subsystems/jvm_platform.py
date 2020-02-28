@@ -11,40 +11,39 @@ from pants.option.option_util import flatten_shlexed_list
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
 
-
 logger = logging.getLogger(__name__)
 
 
 class JvmPlatform(Subsystem):
     """Used to keep track of repo compile and runtime settings for jvm targets.
 
-  JvmPlatform covers both compile time and runtime jvm platform settings. A platform is a group of
-  compile time and runtime configurations.
+    JvmPlatform covers both compile time and runtime jvm platform settings. A platform is a group of
+    compile time and runtime configurations.
 
-  For compile time configuration, there are three main attributes, `source`, `target` and `args`.
-  `source` and `target` map directly to the javac arguments of the same name, though they accept
-   more aliases than javac. `args`, allows the platform to specify additional, global to that
-   platform, compile arguments.
+    For compile time configuration, there are three main attributes, `source`, `target` and `args`.
+    `source` and `target` map directly to the javac arguments of the same name, though they accept
+     more aliases than javac. `args`, allows the platform to specify additional, global to that
+     platform, compile arguments.
 
-  For runtime configuration, `target` and `jvm_options` are used. `target` is used to determine the
-  version of the JVM to use. `jvm_options` is used by some tasks to allow platforms to specify
-  platform specific JVM options. These can make transitions between JVM versions smoother by
-  allowing compatibility options to be provided globally.
+    For runtime configuration, `target` and `jvm_options` are used. `target` is used to determine the
+    version of the JVM to use. `jvm_options` is used by some tasks to allow platforms to specify
+    platform specific JVM options. These can make transitions between JVM versions smoother by
+    allowing compatibility options to be provided globally.
 
-  An example pants.toml config might look like this:
+    An example pants.toml config might look like this:
 
-      [jvm-platform]
-      default_platform: java8
-      default_runtime_platform: java10
-      platforms =
-      \"\"\"
-       {
-          'java8': { 'source': '8', 'target': '8', 'args': [] },
-          'java10': {'source': '10', 'target': '10', 'args': [],
-                     'jvm_options': ['-Djava.compat.foo=act-like-java-8'] },
-        }
-     \"\"\"
-  """
+        [jvm-platform]
+        default_platform: java8
+        default_runtime_platform: java10
+        platforms =
+        \"\"\"
+         {
+            'java8': { 'source': '8', 'target': '8', 'args': [] },
+            'java10': {'source': '10', 'target': '10', 'args': [],
+                       'jvm_options': ['-Djava.compat.foo=act-like-java-8'] },
+          }
+       \"\"\"
+    """
 
     # NB: These assume a java version number N can be specified as either 'N' or '1.N'
     # (eg, '7' is equivalent to '1.7'). Java stopped following this convention starting with Java 9,
@@ -69,7 +68,7 @@ class JvmPlatform(Subsystem):
             if not platforms_by_name:
                 messages.append(
                     "In fact, no platforms are defined under {0}. These should typically be"
-                    " specified in [{0}] in pants.ini.".format(scope_name)
+                    " specified in [{0}] in pants.toml.".format(scope_name)
                 )
             else:
                 messages.append(
@@ -78,7 +77,7 @@ class JvmPlatform(Subsystem):
                     )
                 )
                 messages.append(
-                    "\nThese are typically defined under [{}] in pants.ini.".format(scope_name)
+                    "\nThese are typically defined under [{}] in pants.toml.".format(scope_name)
                 )
             super(JvmPlatform.UndefinedJvmPlatform, self).__init__(" ".join(messages))
 
@@ -139,16 +138,16 @@ class JvmPlatform(Subsystem):
     def preferred_jvm_distribution(cls, platforms, strict=False, jdk=False):
         """Returns a jvm Distribution with a version that should work for all the platforms.
 
-    Any one of those distributions whose version is >= all requested platforms' versions
-    can be returned unless strict flag is set.
+        Any one of those distributions whose version is >= all requested platforms' versions
+        can be returned unless strict flag is set.
 
-    :param iterable platforms: An iterable of platform settings.
-    :param bool strict: If true, only distribution whose version matches the minimum
-      required version can be returned, i.e, the max target_level of all the requested
-      platforms.
-    :param bool jdk: If true, the distribution must be a JDK.
-    :returns: Distribution one of the selected distributions.
-    """
+        :param iterable platforms: An iterable of platform settings.
+        :param bool strict: If true, only distribution whose version matches the minimum
+          required version can be returned, i.e, the max target_level of all the requested
+          platforms.
+        :param bool jdk: If true, the distribution must be a JDK.
+        :returns: Distribution one of the selected distributions.
+        """
         if not platforms:
             return DistributionLocator.cached(jdk=jdk)
         min_version = max(platform.target_level for platform in platforms)
@@ -179,7 +178,7 @@ class JvmPlatform(Subsystem):
         if name not in platforms_by_name:
             raise self.IllegalDefaultPlatform(
                 "The default platform was set to '{0}', but no platform by that name has been "
-                "defined. Typically, this should be defined under [{1}] in pants.ini.".format(
+                "defined. Typically, this should be defined under [{1}] in pants.toml.".format(
                     name, self.options_scope
                 )
             )
@@ -194,7 +193,7 @@ class JvmPlatform(Subsystem):
         if name not in platforms_by_name:
             raise self.IllegalDefaultPlatform(
                 "The default runtime platform was set to '{0}', but no platform by that name has been "
-                "defined. Typically, this should be defined under [{1}] in pants.ini.".format(
+                "defined. Typically, this should be defined under [{1}] in pants.toml.".format(
                     name, self.options_scope
                 )
             )
@@ -204,14 +203,14 @@ class JvmPlatform(Subsystem):
     def get_platform_by_name(self, name, for_target=None):
         """Finds the platform with the given name.
 
-    If the name is empty or None, returns the default platform.
-    If not platform with the given name is defined, raises an error.
-    :param str name: name of the platform.
-    :param JvmTarget for_target: optionally specified target we're looking up the platform for.
-      Only used in error message generation.
-    :return: The jvm platform object.
-    :rtype: JvmPlatformSettings
-    """
+        If the name is empty or None, returns the default platform.
+        If not platform with the given name is defined, raises an error.
+        :param str name: name of the platform.
+        :param JvmTarget for_target: optionally specified target we're looking up the platform for.
+          Only used in error message generation.
+        :return: The jvm platform object.
+        :rtype: JvmPlatformSettings
+        """
         if not name:
             return self.default_platform
         if name not in self.platforms_by_name:
@@ -221,10 +220,10 @@ class JvmPlatform(Subsystem):
     def get_platform_for_target(self, target):
         """Find the platform associated with this target.
 
-    :param JvmTarget target: target to query.
-    :return: The jvm platform object.
-    :rtype: JvmPlatformSettings
-    """
+        :param JvmTarget target: target to query.
+        :return: The jvm platform object.
+        :rtype: JvmPlatformSettings
+        """
         if not target.payload.platform and target.is_synthetic:
             derived_from = target.derived_from
             platform = derived_from and getattr(derived_from, "platform", None)
@@ -235,10 +234,10 @@ class JvmPlatform(Subsystem):
     def get_runtime_platform_for_target(self, target):
         """Find the runtime platform associated with this target.
 
-    :param JvmTarget,RuntimePlatformMixin target: target to query.
-    :return: The jvm platform object.
-    :rtype: JvmPlatformSettings
-    """
+        :param JvmTarget,RuntimePlatformMixin target: target to query.
+        :return: The jvm platform object.
+        :rtype: JvmPlatformSettings
+        """
         # Lookup order
         # - target's declared runtime_platform
         # - default runtime_platform
@@ -261,15 +260,15 @@ class JvmPlatform(Subsystem):
     def parse_java_version(cls, version):
         """Parses the java version (given a string or Revision object).
 
-    Handles java version-isms, converting things like '7' -> '1.7' appropriately.
+        Handles java version-isms, converting things like '7' -> '1.7' appropriately.
 
-    Truncates input versions down to just the major and minor numbers (eg, 1.6), ignoring extra
-    versioning information after the second number.
+        Truncates input versions down to just the major and minor numbers (eg, 1.6), ignoring extra
+        versioning information after the second number.
 
-    :param version: the input version, given as a string or Revision object.
-    :return: the parsed and cleaned version, suitable as a javac -source or -target argument.
-    :rtype: Revision
-    """
+        :param version: the input version, given as a string or Revision object.
+        :return: the parsed and cleaned version, suitable as a javac -source or -target argument.
+        :rtype: Revision
+        """
         conversion = {str(i): f"1.{i}" for i in cls.SUPPORTED_CONVERSION_VERSIONS}
         if str(version) in conversion:
             return Revision.lenient(conversion[str(version)])

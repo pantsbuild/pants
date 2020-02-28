@@ -17,11 +17,11 @@ python_library(
   name = 'dependencies',
   sources = ['dependencies.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:payload_field',
     'src/python/pants/task',
+    'src/python/pants/util:ordered_set',
   ],
   tags = {"partially_type_checked"},
 )
@@ -42,7 +42,6 @@ python_library(
   sources = ['export.py'],
   dependencies = [
     ':export_version',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
@@ -61,6 +60,7 @@ python_library(
     'src/python/pants/java:executor',
     'src/python/pants/task',
     'src/python/pants/util:memo',
+    'src/python/pants/util:ordered_set',
   ],
   tags = {'partially_type_checked'},
 )
@@ -70,11 +70,11 @@ python_library(
   sources = ['export_dep_as_jar.py'],
   dependencies = [
     ':export_version',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/jvm/tasks:classpath_products',
+    'src/python/pants/backend/jvm/tasks/jvm_compile:all',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:revision',
@@ -83,6 +83,7 @@ python_library(
     'src/python/pants/java:executor',
     'src/python/pants/task',
     'src/python/pants/util:memo',
+    'src/python/pants/util:ordered_set',
   ],
   tags = {'partially_type_checked'},
 )

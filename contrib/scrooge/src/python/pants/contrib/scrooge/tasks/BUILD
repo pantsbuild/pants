@@ -15,7 +15,6 @@ python_library(
   dependencies=[
     ':java_thrift_library_fingerprint_strategy',
     ':thrift_util',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/codegen/thrift/java',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:scala',
@@ -28,6 +27,7 @@ python_library(
     'src/python/pants/task',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
+    'src/python/pants/util:ordered_set',
   ],
   tags = {"partially_type_checked"},
 )

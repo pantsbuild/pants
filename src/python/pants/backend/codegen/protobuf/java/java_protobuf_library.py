@@ -5,4 +5,4 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 
 
 class JavaProtobufLibrary(JvmTarget):
-  """A Java library generated from Protocol Buffer IDL files."""
+    """A Java library generated from Protocol Buffer IDL files."""

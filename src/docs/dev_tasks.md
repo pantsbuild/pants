@@ -136,7 +136,7 @@ class method and call the passed-in `register` function:
 Option values are available via `self.get_options()`:
 
     :::python
-    # Did user pass in the --my-option CLI flag (or set it in pants.ini)?
+    # Did user pass in the --my-option CLI flag (or set it in pants.toml)?
     if self.get_options().my_option:
 
 ### Scopes
@@ -150,7 +150,7 @@ The scope is used to set options values. E.g., the value of `self.get_options().
 task with scope `scope` is set by, in this order:
   - The value of the cmd-line flag `--scope-my-option`.
   - The value of the environment variable `PANTS_SCOPE_MY_OPTION`.
-  - The value of the pants.ini var `my_option` in section `scope`.
+  - The value of the pants.toml var `my_option` in section `scope`.
 
 Note that if the task being run is specified explicitly on the command line, you can omit the
 scope from the cmd-line flag name. For example, instead of
@@ -167,7 +167,7 @@ will affect the behaviour of the registered option. The most common parameters a
   If not specified, the option will be a string.
 - `default`: Sets a default value that will be used if the option is not specified by the user.
 - `advanced`: Indicates that an option is intended either for use by power users, or for use in
-  only in pants.ini, rather than from the command-line. By default, advanced options are not displayed in `./pants help`.
+  only in pants.toml, rather than from the command-line. By default, advanced options are not displayed in `./pants help`.
 - `fingerprint`: Indicates that the value of the registered option affects the products
   of the task, such that changing the option would result in different products. When `True`,
   changing the option will cause targets built by the task to be invalidated and rebuilt.
@@ -219,7 +219,7 @@ shows some useful idioms for JVM tasks.
 -   Inherit `NailgunTask` to avoid starting up a new JVM.
 -   Specify the tool executable as a Pants `jar`; Pants knows how to
     download and run those.
--   Let organizations/users override the jar in `pants.ini`; it makes it
+-   Let organizations/users override the jar in `pants.toml`; it makes it
     easy to use/test a new version.
 
 Enabling Artifact Caching For Tasks

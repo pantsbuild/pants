@@ -33,13 +33,15 @@ bypass `.netrc` altogether.
 
 ## Required Configuration
 
-The named provider must be configured. E.g., in `pants.ini` you'd have:
+The named provider must be configured. E.g., in `pants.toml` you'd have:
 
-```ini
+```toml
 [basic_auth]
-providers = {
-    'myauthprovider': {
-      'url': 'https://myauthprovider.com/path/to/authentication/endpoint'
-    }
+providers = """
+{
+  'myauthprovider': {
+    'url': 'https://myauthprovider.com/path/to/authentication/endpoint'
   }
+}
+"""
 ```

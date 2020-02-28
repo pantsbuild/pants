@@ -11,23 +11,24 @@ from pants.util.dirutil import safe_mkdir_for
 
 @contextmanager
 def setup_pexrc_with_pex_python_path(interpreter_paths):
-  """A helper function for writing interpreter paths to a PEX_PYTHON_PATH variable in a .pexrc file.
+    """A helper function for writing interpreter paths to a PEX_PYTHON_PATH variable in a .pexrc
+    file.
 
-  NB: Mutates HOME and XDG_CACHE_HOME to ensure a `~/.pexrc` that won't trample any existing file
-  and will also be found.
+    NB: Mutates HOME and XDG_CACHE_HOME to ensure a `~/.pexrc` that won't trample any existing file
+    and will also be found.
 
-  :param list interpreter_paths: a list of paths to interpreter binaries to include on
-                                 PEX_PYTHON_PATH.
-  """
-  cache_dir = get_pants_cachedir()
-  with temporary_dir() as home:
-    xdg_cache_home = os.path.join(home, '.cache')
-    with environment_as(HOME=home, XDG_CACHE_HOME=xdg_cache_home):
-      target = os.path.join(xdg_cache_home, os.path.basename(cache_dir))
-      safe_mkdir_for(target)
-      os.symlink(cache_dir, target)
+    :param list interpreter_paths: a list of paths to interpreter binaries to include on
+                                   PEX_PYTHON_PATH.
+    """
+    cache_dir = get_pants_cachedir()
+    with temporary_dir() as home:
+        xdg_cache_home = os.path.join(home, ".cache")
+        with environment_as(HOME=home, XDG_CACHE_HOME=xdg_cache_home):
+            target = os.path.join(xdg_cache_home, os.path.basename(cache_dir))
+            safe_mkdir_for(target)
+            os.symlink(cache_dir, target)
 
-      with open(os.path.join(home, '.pexrc'), 'w') as pexrc:
-        pexrc.write(f"PEX_PYTHON_PATH={':'.join(interpreter_paths)}")
+            with open(os.path.join(home, ".pexrc"), "w") as pexrc:
+                pexrc.write(f"PEX_PYTHON_PATH={':'.join(interpreter_paths)}")
 
-      yield
+            yield

@@ -3,7 +3,6 @@
 
 python_library(
   dependencies=[
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:dataclasses',
     '3rdparty/python:pex',
     'src/python/pants/backend/native/subsystems',
@@ -17,6 +16,7 @@ python_library(
     'src/python/pants/python',
     'src/python/pants/subsystem',
     'src/python/pants/util:memo',
+    'src/python/pants/util:ordered_set',
   ],
   tags = {"partially_type_checked"},
 )

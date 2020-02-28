@@ -5,6 +5,5 @@ from pants_test.projects.projects_test_base import ProjectsTestBase
 
 
 class TestJavaExamplesIntegration(ProjectsTestBase):
-
-  def test_java_examples(self) -> None:
-    self.assert_valid_projects("examples/src/java::", "examples/tests/java::")
+    def test_java_examples(self) -> None:
+        self.assert_valid_projects("examples/src/java::", "examples/tests/java::")

@@ -20,165 +20,185 @@ from pants.util.memo import memoized_property
 
 
 class ScalafixTask(RewriteBase):
-  """Executes the scalafix tool."""
+    """Executes the scalafix tool."""
 
-  _SCALAFIX_MAIN = 'scalafix.cli.Cli'
+    _SCALAFIX_MAIN = "scalafix.cli.Cli"
 
-  def _resolve_conflicting_options(self, *, old_option: str, new_option: str):
-    return resolve_conflicting_options(
-      old_option=old_option,
-      new_option=new_option,
-      old_scope='fmt-scalafix',
-      new_scope='scalafix',
-      old_container=self.get_options(),
-      new_container=Scalafix.global_instance().options,
-    )
+    def _resolve_conflicting_options(self, *, old_option: str, new_option: str):
+        return resolve_conflicting_options(
+            old_option=old_option,
+            new_option=new_option,
+            old_scope="fmt-scalafix",
+            new_scope="scalafix",
+            old_container=self.get_options(),
+            new_container=Scalafix.global_instance().options,
+        )
 
-  def _resolve_conflicting_skip(self, *, old_scope: str):
-    # Skip mypy because this is a temporary hack, and mypy doesn't follow the inheritance chain
-    # properly.
-    return self.resolve_conflicting_skip_options( # type: ignore
-      old_scope=old_scope,
-      new_scope='scalafix',
-      subsystem=Scalafix.global_instance(),
-    )
+    def _resolve_conflicting_skip(self, *, old_scope: str):
+        # Skip mypy because this is a temporary hack, and mypy doesn't follow the inheritance chain
+        # properly.
+        return self.resolve_conflicting_skip_options(  # type: ignore
+            old_scope=old_scope, new_scope="scalafix", subsystem=Scalafix.global_instance(),
+        )
 
-  @classmethod
-  def subsystem_dependencies(cls):
-    return super().subsystem_dependencies() + (Scalafix,)
+    @classmethod
+    def subsystem_dependencies(cls):
+        return super().subsystem_dependencies() + (Scalafix,)
 
-  @classmethod
-  def register_options(cls, register):
-    super().register_options(register)
-    register('--configuration', type=file_option, default=None, fingerprint=True,
-             removal_version='1.27.0.dev0', removal_hint='Use `--scalafix-config` instead.',
-             help='The config file to use (in HOCON format).')
-    register('--rules', default='ProcedureSyntax', type=str, fingerprint=True,
-             help='The `rules` arg to scalafix: generally a name like `ProcedureSyntax`.')
-    register('--semantic', type=bool, default=False, fingerprint=True,
-             help='True to enable `semantic` scalafix rules by requesting compilation and '
-                  'providing the target classpath to scalafix. To enable this option, you '
-                  'will need to install the `semanticdb-scalac` compiler plugin. See '
-                  'https://www.pantsbuild.org/scalac_plugins.html for more information.')
-    cls.register_jvm_tool(register,
-                          'scalafix',
-                          classpath=[
-                            JarDependency(org='ch.epfl.scala', name='scalafix-cli_2.12.8', rev='0.9.4'),
-                          ])
-    cls.register_jvm_tool(register, 'scalafix-tool-classpath', classpath=[])
+    @classmethod
+    def register_options(cls, register):
+        super().register_options(register)
+        register(
+            "--configuration",
+            type=file_option,
+            default=None,
+            fingerprint=True,
+            removal_version="1.27.0.dev0",
+            removal_hint="Use `--scalafix-config` instead.",
+            help="The config file to use (in HOCON format).",
+        )
+        register(
+            "--rules",
+            default="ProcedureSyntax",
+            type=str,
+            fingerprint=True,
+            help="The `rules` arg to scalafix: generally a name like `ProcedureSyntax`.",
+        )
+        register(
+            "--semantic",
+            type=bool,
+            default=False,
+            fingerprint=True,
+            help="True to enable `semantic` scalafix rules by requesting compilation and "
+            "providing the target classpath to scalafix. To enable this option, you "
+            "will need to install the `semanticdb-scalac` compiler plugin. See "
+            "https://www.pantsbuild.org/scalac_plugins.html for more information.",
+        )
+        cls.register_jvm_tool(
+            register,
+            "scalafix",
+            classpath=[
+                JarDependency(org="ch.epfl.scala", name="scalafix-cli_2.12.8", rev="0.9.4"),
+            ],
+        )
+        cls.register_jvm_tool(register, "scalafix-tool-classpath", classpath=[])
 
-  @classmethod
-  def target_types(cls):
-    return ['scala_library', 'junit_tests']
+    @classmethod
+    def target_types(cls):
+        return ["scala_library", "junit_tests"]
 
-  @classmethod
-  def source_extension(cls):
-    return '.scala'
+    @classmethod
+    def source_extension(cls):
+        return ".scala"
 
-  @classmethod
-  def prepare(cls, options, round_manager):
-    super().prepare(options, round_manager)
-    # Only request a classpath and zinc_args if semantic checks are enabled.
-    if options.semantic:
-      round_manager.require_data('zinc_args') 
-      round_manager.require_data('runtime_classpath')
+    @classmethod
+    def prepare(cls, options, round_manager):
+        super().prepare(options, round_manager)
+        # Only request a classpath and zinc_args if semantic checks are enabled.
+        if options.semantic:
+            round_manager.require_data("zinc_args")
+            round_manager.require_data("runtime_classpath")
 
-  @memoized_property
-  def _scalac_args(self):
-    if self.get_options().semantic:
-      targets = self.context.targets()
-      targets_to_zinc_args = self.context.products.get_data('zinc_args')
-      
-      for t in targets:
-        zinc_args = targets_to_zinc_args[t]
+    @memoized_property
+    def _scalac_args(self):
+        if self.get_options().semantic:
+            targets = self.context.targets()
+            targets_to_zinc_args = self.context.products.get_data("zinc_args")
+
+            for t in targets:
+                zinc_args = targets_to_zinc_args[t]
+                args = []
+                for arg in zinc_args:
+                    arg = arg.strip()
+                    if arg.startswith("-S"):
+                        args.append(arg[2:])
+                # All targets will get the same scalac args
+                if args:
+                    return args
+
+        return []
+
+    @staticmethod
+    def _compute_classpath(runtime_classpath, targets):
+        closure = BuildGraph.closure(
+            targets, bfs=True, include_scopes=Scopes.JVM_RUNTIME_SCOPES, respect_intransitive=True
+        )
+        classpath_for_targets = ClasspathUtil.classpath(closure, runtime_classpath)
+
+        return classpath_for_targets
+
+    def invoke_tool(self, absolute_root, target_sources):
         args = []
-        for arg in zinc_args:
-          arg = arg.strip()
-          if arg.startswith('-S'):
-            args.append(arg[2:])
-        # All targets will get the same scalac args
-        if args:
-          return args
+        tool_classpath = self.tool_classpath("scalafix-tool-classpath")
+        if tool_classpath:
+            args.append(f"--tool-classpath={os.pathsep.join(tool_classpath)}")
+        if self.get_options().semantic:
+            # If semantic checks are enabled, we need the full classpath for these targets.
+            runtime_classpath = self.context.products.get_data("runtime_classpath")
+            classpath = ScalafixTask._compute_classpath(
+                runtime_classpath, {target for target, _ in target_sources}
+            )
+            args.append(f"--sourceroot={absolute_root}")
+            args.append(f"--classpath={os.pathsep.join(classpath)}")
 
-    return []
+        config = self._resolve_conflicting_options(old_option="configuration", new_option="config")
+        if config:
+            args.append(f"--config={config}")
 
-  @staticmethod
-  def _compute_classpath(runtime_classpath, targets):
-    closure = BuildGraph.closure(targets, bfs=True,
-                                 include_scopes=Scopes.JVM_RUNTIME_SCOPES, respect_intransitive=True)
-    classpath_for_targets = ClasspathUtil.classpath(closure, runtime_classpath)
+        if self.get_options().rules:
+            args.append(f"--rules={self.get_options().rules}")
+        if self.get_options().level == "debug":
+            args.append("--verbose")
 
-    return classpath_for_targets
+        # This is how you pass a list of strings to a single arg key
+        for a in self._scalac_args:
+            args.append("--scalac-options")
+            args.append(a)
 
-  def invoke_tool(self, absolute_root, target_sources):
-    args = []
-    tool_classpath = self.tool_classpath('scalafix-tool-classpath')
-    if tool_classpath:
-      args.append(f'--tool-classpath={os.pathsep.join(tool_classpath)}')
-    if self.get_options().semantic:
-      # If semantic checks are enabled, we need the full classpath for these targets.
-      runtime_classpath = self.context.products.get_data('runtime_classpath')
-      classpath = ScalafixTask._compute_classpath(runtime_classpath, {target for target, _ in target_sources})
-      args.append(f'--sourceroot={absolute_root}')
-      args.append(f'--classpath={os.pathsep.join(classpath)}')
+        args.extend(self.additional_args or [])
 
-    config = self._resolve_conflicting_options(old_option='configuration', new_option='config')
-    if config:
-      args.append(f'--config={config}')
+        args.extend(source for _, source in target_sources)
 
-    if self.get_options().rules:
-      args.append(f'--rules={self.get_options().rules}')
-    if self.get_options().level == 'debug':
-      args.append('--verbose')
+        # Execute.
+        return self.runjava(
+            classpath=self.tool_classpath("scalafix"),
+            main=self._SCALAFIX_MAIN,
+            jvm_options=self.get_options().jvm_options,
+            args=args,
+            workunit_name="scalafix",
+        )
 
-    # This is how you pass a list of strings to a single arg key
-    for a in self._scalac_args:
-      args.append('--scalac-options')
-      args.append(a)
-      
-    args.extend(self.additional_args or [])
-
-    args.extend(source for _, source in target_sources)
-
-    # Execute.
-    return self.runjava(classpath=self.tool_classpath('scalafix'),
-                        main=self._SCALAFIX_MAIN,
-                        jvm_options=self.get_options().jvm_options,
-                        args=args,
-                        workunit_name='scalafix')
-
-  @property
-  @abstractmethod
-  def additional_args(self):
-    """Additional arguments to the Scalafix command."""
+    @property
+    @abstractmethod
+    def additional_args(self):
+        """Additional arguments to the Scalafix command."""
 
 
 class ScalaFixFix(FmtTaskMixin, ScalafixTask):
-  """Applies fixes generated by scalafix."""
+    """Applies fixes generated by scalafix."""
 
-  sideeffecting = True
-  additional_args: List[str] = []
+    sideeffecting = True
+    additional_args: List[str] = []
 
-  @property
-  def skip_execution(self):
-    return super()._resolve_conflicting_skip(old_scope="fmt-scalafix")
+    @property
+    def skip_execution(self):
+        return super()._resolve_conflicting_skip(old_scope="fmt-scalafix")
 
-  def process_result(self, result):
-    if result != 0:
-      raise TaskError(
-          f'{self._SCALAFIX_MAIN} ... failed to fix ({result}) targets.')
+    def process_result(self, result):
+        if result != 0:
+            raise TaskError(f"{self._SCALAFIX_MAIN} ... failed to fix ({result}) targets.")
 
 
 class ScalaFixCheck(LintTaskMixin, ScalafixTask):
-  """Checks whether any fixes were generated by scalafix."""
+    """Checks whether any fixes were generated by scalafix."""
 
-  sideeffecting = False
-  additional_args = ['--test']
+    sideeffecting = False
+    additional_args = ["--test"]
 
-  @property
-  def skip_execution(self):
-    return super()._resolve_conflicting_skip(old_scope="lint-scalafix")
+    @property
+    def skip_execution(self):
+        return super()._resolve_conflicting_skip(old_scope="lint-scalafix")
 
-  def process_result(self, result):
-    if result != 0:
-      raise TaskError(f'Targets failed scalafix checks.')
+    def process_result(self, result):
+        if result != 0:
+            raise TaskError(f"Targets failed scalafix checks.")

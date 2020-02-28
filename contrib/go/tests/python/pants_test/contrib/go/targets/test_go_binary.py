@@ -8,7 +8,6 @@ from pants.contrib.go.targets.go_binary import GoBinary
 
 
 class GoBinaryTest(GoLocalSourceTestBase, TestBase):
-
-  @property
-  def target_type(self):
-    return GoBinary
+    @property
+    def target_type(self):
+        return GoBinary

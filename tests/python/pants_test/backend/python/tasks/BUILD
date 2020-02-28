@@ -252,7 +252,6 @@ python_tests(
   name = 'setup_py',
   sources = ['test_setup_py.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
     '3rdparty/python:pex',
     ':python_task_test_base',
@@ -264,6 +263,7 @@ python_tests(
     'src/python/pants/fs',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:ordered_set',
     'src/python/pants/testutil/subsystem',
     'src/python/pants/testutil:interpreter_selection_utils',
   ],

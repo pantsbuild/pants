@@ -64,15 +64,15 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
                     "FooTest.java",
                     dedent(
                         """
-        import org.junit.Test;
-        import static org.junit.Assert.assertTrue;
-        public class FooTest {
-          @Test
-          public void testFoo() {
-            assertTrue(5 > 3);
-          }
-        }
-      """
+                        import org.junit.Test;
+                        import static org.junit.Assert.assertTrue;
+                        public class FooTest {
+                          @Test
+                          public void testFoo() {
+                            assertTrue(5 > 3);
+                          }
+                        }
+                        """
                     ),
                 )
             ]
@@ -87,15 +87,15 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
                         "FooTest.java",
                         dedent(
                             """
-          import org.junit.Test;
-          import static org.junit.Assert.assertTrue;
-          public class FooTest {
-            @Test
-            public void testFoo() {
-              assertTrue(5 < 3);
-            }
-          }
-        """
+                            import org.junit.Test;
+                            import static org.junit.Assert.assertTrue;
+                            public class FooTest {
+                              @Test
+                              public void testFoo() {
+                                assertTrue(5 < 3);
+                              }
+                            }
+                            """
                         ),
                     )
                 ]
@@ -112,14 +112,14 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
                         "FooTest.java",
                         dedent(
                             """
-          import org.junit.Test;
-          public class FooTest {
-            @Test
-            public void testFoo() {
-              throw new RuntimeException("test error");
-            }
-          }
-        """
+                            import org.junit.Test;
+                            public class FooTest {
+                              @Test
+                              public void testFoo() {
+                                throw new RuntimeException("test error");
+                              }
+                            }
+                            """
                         ),
                     )
                 ]
@@ -201,18 +201,19 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
 
     @ensure_cached(JUnitRun, expected_num_artifacts=0)
     def test_junit_runner_raises_no_error_on_non_junit_target(self):
-        """Run pants against a `python_tests` target, but set an option for the `test.junit` task. This
-    should execute without error.
-    """
+        """Run pants against a `python_tests` target, but set an option for the `test.junit` task.
+
+        This should execute without error.
+        """
         self.add_to_build_file(
             "foo",
             dedent(
                 """
-        python_tests(
-          name='hello',
-          sources=['some_file.py'],
-        )
-        """
+                python_tests(
+                  name='hello',
+                  sources=['some_file.py'],
+                )
+                """
             ),
         )
         self.set_options(test="#abc")
@@ -224,11 +225,11 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
             "foo",
             dedent(
                 """
-        junit_tests(
-          name='empty',
-          sources=[],
-        )
-        """
+                junit_tests(
+                  name='empty',
+                  sources=[],
+                )
+                """
             ),
         )
         task = self.prepare_execute(self.context(target_roots=[self.target("foo:empty")]))
@@ -243,11 +244,11 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
             "foo",
             dedent(
                 """
-        junit_tests(
-          name='empty',
-          sources=[],
-        )
-        """
+                junit_tests(
+                  name='empty',
+                  sources=[],
+                )
+                """
             ),
         )
         self.set_options(allow_empty_sources=True)
@@ -269,17 +270,17 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
                     "FooTest.java",
                     dedent(
                         """
-        package org.pantsbuild.foo;
-        import org.junit.Test;
-        import static org.junit.Assert.assertTrue;
-        public class FooTest {
-          @Test
-          public void testFoo() {
-            String exampleProperty = System.getProperty("example.property");
-            assertTrue(exampleProperty != null && exampleProperty.equals("1"));
-          }
-        }
-      """
+                        package org.pantsbuild.foo;
+                        import org.junit.Test;
+                        import static org.junit.Assert.assertTrue;
+                        public class FooTest {
+                          @Test
+                          public void testFoo() {
+                            String exampleProperty = System.getProperty("example.property");
+                            assertTrue(exampleProperty != null && exampleProperty.equals("1"));
+                          }
+                        }
+                        """
                     ),
                 )
             ],
@@ -312,17 +313,17 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
                     "FooTest.java",
                     dedent(
                         """
-        package org.pantsbuild.foo;
-        import org.junit.Test;
-        import static org.junit.Assert.assertTrue;
-        public class FooTest {
-          @Test
-          public void testFoo() {
-            String exampleProperty = System.getProperty("example.property");
-            assertTrue(exampleProperty != null && exampleProperty.equals("1"));
-          }
-        }
-      """
+                        package org.pantsbuild.foo;
+                        import org.junit.Test;
+                        import static org.junit.Assert.assertTrue;
+                        public class FooTest {
+                          @Test
+                          public void testFoo() {
+                            String exampleProperty = System.getProperty("example.property");
+                            assertTrue(exampleProperty != null && exampleProperty.equals("1"));
+                          }
+                        }
+                        """
                     ),
                 )
             ],
@@ -343,21 +344,21 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
                     "FooTest.java",
                     dedent(
                         """
-        package org.pantsbuild.foo;
-        import org.junit.Test;
-        import static org.junit.Assert.assertTrue;
-        public class FooTest {
-          @Test
-          public void testFoo() {
-            String exampleProperty1 = System.getProperty("example.property1");
-            assertTrue(exampleProperty1 != null && exampleProperty1.equals("1"));
-            String exampleProperty2 = System.getProperty("example.property2");
-            assertTrue(exampleProperty2 != null && exampleProperty2.equals("2"));
-            String exampleProperty3 = System.getProperty("example.property3");
-            assertTrue(exampleProperty3 == null);
-          }
-        }
-      """
+                        package org.pantsbuild.foo;
+                        import org.junit.Test;
+                        import static org.junit.Assert.assertTrue;
+                        public class FooTest {
+                          @Test
+                          public void testFoo() {
+                            String exampleProperty1 = System.getProperty("example.property1");
+                            assertTrue(exampleProperty1 != null && exampleProperty1.equals("1"));
+                            String exampleProperty2 = System.getProperty("example.property2");
+                            assertTrue(exampleProperty2 != null && exampleProperty2.equals("2"));
+                            String exampleProperty3 = System.getProperty("example.property3");
+                            assertTrue(exampleProperty3 == null);
+                          }
+                        }
+                        """
                     ),
                 )
             ],
@@ -387,17 +388,17 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
                     "FooTest.java",
                     dedent(
                         """
-        package org.pantsbuild.foo;
-        import org.junit.Test;
-        import static org.junit.Assert.assertEquals;
-        public class FooTest {
-          @Test
-          public void testFoo() {
-            assertEquals("27", System.getenv().get("HELLO"));
-            assertEquals("32", System.getenv().get("THERE"));
-          }
-        }
-      """
+                        package org.pantsbuild.foo;
+                        import org.junit.Test;
+                        import static org.junit.Assert.assertEquals;
+                        public class FooTest {
+                          @Test
+                          public void testFoo() {
+                            assertEquals("27", System.getenv().get("HELLO"));
+                            assertEquals("32", System.getenv().get("THERE"));
+                          }
+                        }
+                        """
                     ),
                 )
             ],
@@ -411,19 +412,19 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
                     "FooTest.java",
                     dedent(
                         """
-        package org.pantsbuild.foo;
-        import org.junit.Test;
-        import static org.junit.Assert.assertEquals;
-        import static org.junit.Assert.assertFalse;
-        public class FooTest {
-          @Test
-          public void testFoo() {
-            assertEquals("12", System.getenv().get("HELLO"));
-            assertEquals("42", System.getenv().get("THE_ANSWER"));
-            assertFalse(System.getenv().containsKey("THERE"));
-          }
-        }
-      """
+                        package org.pantsbuild.foo;
+                        import org.junit.Test;
+                        import static org.junit.Assert.assertEquals;
+                        import static org.junit.Assert.assertFalse;
+                        public class FooTest {
+                          @Test
+                          public void testFoo() {
+                            assertEquals("12", System.getenv().get("HELLO"));
+                            assertEquals("42", System.getenv().get("THE_ANSWER"));
+                            assertFalse(System.getenv().containsKey("THERE"));
+                          }
+                        }
+                        """
                     ),
                 )
             ],
@@ -447,20 +448,20 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
                         "FooTest.java",
                         dedent(
                             """
-          package org.pantsbuild.foo;
-          import org.junit.Test;
-          import static org.junit.Assert.assertEquals;
-          import static org.junit.Assert.assertFalse;
-          public class FooTest {
-            @Test
-            public void testFoo() {
-              assertEquals("False", System.getenv().get("THERE"));
-              assertEquals("This is a variable.", System.getenv().get("THAT_VARIABLE"));
-              assertFalse(System.getenv().containsKey("HELLO"));
-              assertFalse(System.getenv().containsKey("THIS_VARIABLE"));
-            }
-          }
-        """
+                            package org.pantsbuild.foo;
+                            import org.junit.Test;
+                            import static org.junit.Assert.assertEquals;
+                            import static org.junit.Assert.assertFalse;
+                            public class FooTest {
+                              @Test
+                              public void testFoo() {
+                                assertEquals("False", System.getenv().get("THERE"));
+                                assertEquals("This is a variable.", System.getenv().get("THAT_VARIABLE"));
+                                assertFalse(System.getenv().containsKey("HELLO"));
+                                assertFalse(System.getenv().containsKey("THIS_VARIABLE"));
+                              }
+                            }
+                            """
                         ),
                     )
                 ],
@@ -478,15 +479,15 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
 
             content = dedent(
                 """
-          package org.pantsbuild.foo;
-          import org.junit.Test;
-          import static org.junit.Assert.assertTrue;
-          public class FooTest{}{{
-          @Test
-            public void testFoo() {{
-              int x = 5;
-            }}
-          }}""".format(
+                package org.pantsbuild.foo;
+                import org.junit.Test;
+                import static org.junit.Assert.assertTrue;
+                public class FooTest{}{{
+                @Test
+                  public void testFoo() {{
+                    int x = 5;
+                  }}
+                }}""".format(
                     n
                 )
             )
@@ -517,19 +518,19 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
         )
         content = dedent(
             """
-        package org.pantsbuild.foo;
-        import java.io.File;
-        import org.junit.Test;
-        import static org.junit.Assert.assertFalse;
-        import static org.junit.Assert.assertTrue;
-        public class FooTest {
-          @Test
-          public void testFoo() {
-            assertTrue(new File("config/org/pantsbuild/foo/sentinel").exists());
-            assertFalse(new File("config/org/pantsbuild/foo/another").exists());
-          }
-        }
-      """
+            package org.pantsbuild.foo;
+            import java.io.File;
+            import org.junit.Test;
+            import static org.junit.Assert.assertFalse;
+            import static org.junit.Assert.assertTrue;
+            public class FooTest {
+              @Test
+              public void testFoo() {
+                assertTrue(new File("config/org/pantsbuild/foo/sentinel").exists());
+                assertFalse(new File("config/org/pantsbuild/foo/another").exists());
+              }
+            }
+            """
         )
         self.set_options(chroot=True)
         self._execute_junit_runner(
@@ -561,27 +562,27 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
             )
             content = dedent(
                 """
-        package org.pantsbuild.foo;
-        import java.io.File;
-        import org.junit.Test;
-        import static org.junit.Assert.assertFalse;
-        import static org.junit.Assert.assertTrue;
-        public class FooTest {{
-          @Test
-          public void testFoo() {{
-            assertTrue(new File("target_cwd_sentinel").exists());
-
-            // We declare a Files dependency on this file, but since we run in a CWD not in a
-            // chroot and not in the build root, we can't find it at the expected relative path.
-            assertFalse(new File("config/org/pantsbuild/foo/files_dep_sentinel").exists());
-
-            // As a sanity check, it is at the expected absolute path though.
-            File buildRoot = new File("{}");
-            assertTrue(new File(buildRoot,
-                                "config/org/pantsbuild/foo/files_dep_sentinel").exists());
-          }}
-        }}
-      """.format(
+                package org.pantsbuild.foo;
+                import java.io.File;
+                import org.junit.Test;
+                import static org.junit.Assert.assertFalse;
+                import static org.junit.Assert.assertTrue;
+                public class FooTest {{
+                  @Test
+                  public void testFoo() {{
+                    assertTrue(new File("target_cwd_sentinel").exists());
+        
+                    // We declare a Files dependency on this file, but since we run in a CWD not in a
+                    // chroot and not in the build root, we can't find it at the expected relative path.
+                    assertFalse(new File("config/org/pantsbuild/foo/files_dep_sentinel").exists());
+        
+                    // As a sanity check, it is at the expected absolute path though.
+                    File buildRoot = new File("{}");
+                    assertTrue(new File(buildRoot,
+                                        "config/org/pantsbuild/foo/files_dep_sentinel").exists());
+                  }}
+                }}
+                """.format(
                     self.build_root
                 )
             )
@@ -602,19 +603,19 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
             )
             content = dedent(
                 """
-        package org.pantsbuild.foo;
-        import java.io.File;
-        import org.junit.Test;
-        import static org.junit.Assert.assertFalse;
-        import static org.junit.Assert.assertTrue;
-        public class FooTest {
-          @Test
-          public void testFoo() {
-            assertTrue(new File("target_cwd_sentinel").exists());
-            assertFalse(new File("option_cwd_sentinel").exists());
-          }
-        }
-      """
+                package org.pantsbuild.foo;
+                import java.io.File;
+                import org.junit.Test;
+                import static org.junit.Assert.assertFalse;
+                import static org.junit.Assert.assertTrue;
+                public class FooTest {
+                  @Test
+                  public void testFoo() {
+                    assertTrue(new File("target_cwd_sentinel").exists());
+                    assertFalse(new File("option_cwd_sentinel").exists());
+                  }
+                }
+              """
             )
             touch(os.path.join(target_cwd, "target_cwd_sentinel"))
             with temporary_dir() as option_cwd:
@@ -629,16 +630,16 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     def test_junit_run_with_coverage_caching(self):
         source_under_test_content = dedent(
             """
-      package org.pantsbuild.foo;
-      class Foo {
-        static String foo() {
-          return "foo";
-        }
-        static String bar() {
-          return "bar";
-        }
-      }
-    """
+            package org.pantsbuild.foo;
+            class Foo {
+              static String foo() {
+                return "foo";
+              }
+              static String bar() {
+                return "bar";
+              }
+            }
+            """
         )
         source_under_test = self.make_target(
             spec="tests/java/org/pantsbuild/foo", target_type=JavaLibrary, sources=["Foo.java"]
@@ -646,17 +647,17 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
 
         test_content = dedent(
             """
-      package org.pantsbuild.foo;
-      import org.pantsbuild.foo.Foo;
-      import org.junit.Test;
-      import static org.junit.Assert.assertEquals;
-      public class FooTest {
-        @Test
-        public void testFoo() {
-          assertEquals("foo", Foo.foo());
-        }
-      }
-    """
+            package org.pantsbuild.foo;
+            import org.pantsbuild.foo.Foo;
+            import org.junit.Test;
+            import static org.junit.Assert.assertEquals;
+            public class FooTest {
+              @Test
+              public void testFoo() {
+                assertEquals("foo", Foo.foo());
+              }
+            }
+            """
         )
         self.make_target(
             spec="tests/java/org/pantsbuild/foo:foo_test",
@@ -680,17 +681,17 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
         # successful result run is eligible for caching.
         test_content_edited = dedent(
             """
-      package org.pantsbuild.foo;
-      import org.pantsbuild.foo.Foo;
-      import org.junit.Test;
-      import static org.junit.Assert.assertEquals;
-      public class FooTest {
-        @Test
-        public void testFoo() {
-          assertEquals("bar", Foo.bar());
-        }
-      }
-    """
+            package org.pantsbuild.foo;
+            import org.pantsbuild.foo.Foo;
+            import org.junit.Test;
+            import static org.junit.Assert.assertEquals;
+            public class FooTest {
+              @Test
+              public void testFoo() {
+                assertEquals("bar", Foo.bar());
+              }
+            }
+            """
         )
         self.make_target(
             spec="tests/java/org/pantsbuild/foo:bar_test",

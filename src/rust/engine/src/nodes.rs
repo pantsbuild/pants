@@ -28,7 +28,7 @@ use fs::{
 };
 use hashing;
 use process_execution::{
-  self, ExecuteProcessRequest, MultiPlatformExecuteProcessRequest, Platform, RelativePath,
+  self, ExecuteProcessRequest, MultiPlatformExecuteProcessRequest, PlatformConstraint, RelativePath,
 };
 use rule_graph;
 
@@ -217,7 +217,7 @@ pub struct MultiPlatformExecuteProcess(MultiPlatformExecuteProcessRequest);
 impl MultiPlatformExecuteProcess {
   fn lift_execute_process(
     value: &Value,
-    target_platform: Platform,
+    target_platform: PlatformConstraint,
   ) -> Result<ExecuteProcessRequest, String> {
     let env = externs::project_tuple_encoded_map(&value, "env")?;
 
@@ -297,8 +297,8 @@ impl MultiPlatformExecuteProcess {
       .chunks_exact(2)
       .map(|constraint_key_pair| {
         (
-          Platform::try_from(&constraint_key_pair[0]).unwrap(),
-          Platform::try_from(&constraint_key_pair[1]).unwrap(),
+          PlatformConstraint::try_from(&constraint_key_pair[0]).unwrap(),
+          PlatformConstraint::try_from(&constraint_key_pair[1]).unwrap(),
         )
       })
       .collect();
@@ -311,8 +311,10 @@ impl MultiPlatformExecuteProcess {
       ));
     }
 
-    let mut request_by_constraint: BTreeMap<(Platform, Platform), ExecuteProcessRequest> =
-      BTreeMap::new();
+    let mut request_by_constraint: BTreeMap<
+      (PlatformConstraint, PlatformConstraint),
+      ExecuteProcessRequest,
+    > = BTreeMap::new();
     for (constraint_key, execute_process) in constraint_key_pairs.iter().zip(requests.iter()) {
       let underlying_req =
         MultiPlatformExecuteProcess::lift_execute_process(execute_process, constraint_key.1)?;

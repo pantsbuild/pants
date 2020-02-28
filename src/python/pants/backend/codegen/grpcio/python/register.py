@@ -9,13 +9,9 @@ from pants.goal.task_registrar import TaskRegistrar as task
 
 
 def build_file_aliases():
-  return BuildFileAliases(
-    targets={
-      'python_grpcio_library': PythonGrpcioLibrary,
-    }
-  )
+    return BuildFileAliases(targets={"python_grpcio_library": PythonGrpcioLibrary,})
 
 
 def register_goals():
-  task(name='grpcio-prep', action=GrpcioPrep).install('gen')
-  task(name='grpcio-run', action=GrpcioRun).install('gen')
+    task(name="grpcio-prep", action=GrpcioPrep).install("gen")
+    task(name="grpcio-run", action=GrpcioRun).install("gen")

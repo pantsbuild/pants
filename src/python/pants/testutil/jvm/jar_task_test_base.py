@@ -5,7 +5,7 @@ from pants.testutil.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
 
 class JarTaskTestBase(NailgunTaskTestBase):
-  """Prepares an ephemeral test build root that supports jar tasks.
+    """Prepares an ephemeral test build root that supports jar tasks.
 
-  :API: public
-  """
+    :API: public
+    """

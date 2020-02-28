@@ -10,20 +10,28 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 
 
 class OptionsInitializerTest(unittest.TestCase):
-  def test_invalid_version(self):
-    options_bootstrapper = OptionsBootstrapper.create(
-      args=['--backend-packages=[]', '--backend-packages2=[]', '--pants-version=99.99.9999'])
-    build_config = BuildConfigInitializer.get(options_bootstrapper)
+    def test_invalid_version(self):
+        options_bootstrapper = OptionsBootstrapper.create(
+            args=["--backend-packages=[]", "--backend-packages2=[]", "--pants-version=99.99.9999"]
+        )
+        build_config = BuildConfigInitializer.get(options_bootstrapper)
 
-    with self.assertRaises(BuildConfigurationError):
-      OptionsInitializer.create(options_bootstrapper, build_config)
+        with self.assertRaises(BuildConfigurationError):
+            OptionsInitializer.create(options_bootstrapper, build_config)
 
-  def test_global_options_validation(self):
-    # Specify an invalid combination of options.
-    ob = OptionsBootstrapper.create(
-      args=['--backend-packages=[]', '--backend-packages2=[]',
-            '--v2', '--no-v1', '--loop', '--no-enable-pantsd'])
-    build_config = BuildConfigInitializer.get(ob)
-    with self.assertRaises(OptionsError) as exc:
-      OptionsInitializer.create(ob, build_config)
-    self.assertIn('The `--loop` option requires `--enable-pantsd`', str(exc.exception))
+    def test_global_options_validation(self):
+        # Specify an invalid combination of options.
+        ob = OptionsBootstrapper.create(
+            args=[
+                "--backend-packages=[]",
+                "--backend-packages2=[]",
+                "--v2",
+                "--no-v1",
+                "--loop",
+                "--no-enable-pantsd",
+            ]
+        )
+        build_config = BuildConfigInitializer.get(ob)
+        with self.assertRaises(OptionsError) as exc:
+            OptionsInitializer.create(ob, build_config)
+        self.assertIn("The `--loop` option requires `--enable-pantsd`", str(exc.exception))

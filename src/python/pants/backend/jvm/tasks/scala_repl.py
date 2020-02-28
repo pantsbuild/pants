@@ -14,52 +14,62 @@ from pants.task.repl_task_mixin import ReplTaskMixin
 
 
 class ScalaRepl(JvmToolTaskMixin, ReplTaskMixin, JvmTask):
-  """Operations to create or launch Scala repls.
+    """Operations to create or launch Scala repls.
 
-  :API: public
-  """
+    :API: public
+    """
 
-  _RUNNER_MAIN = 'org.pantsbuild.tools.runner.PantsRunner'
+    _RUNNER_MAIN = "org.pantsbuild.tools.runner.PantsRunner"
 
-  @classmethod
-  def register_options(cls, register):
-    super().register_options(register)
-    register('--main', default='scala.tools.nsc.MainGenericRunner',
-             help='The entry point for running the repl.')
-    cls.register_jvm_tool(register, 'pants-runner', classpath=[
-        JarDependency(org='org.pantsbuild', name='pants-runner', rev='0.0.1'),
-    ], main=ScalaRepl._RUNNER_MAIN)
+    @classmethod
+    def register_options(cls, register):
+        super().register_options(register)
+        register(
+            "--main",
+            default="scala.tools.nsc.MainGenericRunner",
+            help="The entry point for running the repl.",
+        )
+        cls.register_jvm_tool(
+            register,
+            "pants-runner",
+            classpath=[JarDependency(org="org.pantsbuild", name="pants-runner", rev="0.0.1"),],
+            main=ScalaRepl._RUNNER_MAIN,
+        )
 
-  @classmethod
-  def subsystem_dependencies(cls):
-    return super().subsystem_dependencies() + (DistributionLocator, ScalaPlatform)
+    @classmethod
+    def subsystem_dependencies(cls):
+        return super().subsystem_dependencies() + (DistributionLocator, ScalaPlatform)
 
-  @classmethod
-  def select_targets(cls, target):
-    return isinstance(target, (JarLibrary, JvmTarget))
+    @classmethod
+    def select_targets(cls, target):
+        return isinstance(target, (JarLibrary, JvmTarget))
 
-  def setup_repl_session(self, targets):
-    repl_name = ScalaPlatform.global_instance().repl
-    return (self.tool_classpath('pants-runner') +
-            self.tool_classpath(repl_name, scope=ScalaPlatform.options_scope) +
-            self.classpath(targets),
-            self.preferred_jvm_distribution_for_targets(targets))
+    def setup_repl_session(self, targets):
+        repl_name = ScalaPlatform.global_instance().repl
+        return (
+            self.tool_classpath("pants-runner")
+            + self.tool_classpath(repl_name, scope=ScalaPlatform.options_scope)
+            + self.classpath(targets),
+            self.preferred_jvm_distribution_for_targets(targets),
+        )
 
-  def launch_repl(self, session_setup):
-    # The scala repl requires -Dscala.usejavacp=true since Scala 2.8 when launching in the way
-    # we do here (not passing -classpath as a program arg to scala.tools.nsc.MainGenericRunner).
-    classpath, distribution = session_setup
-    jvm_options = self.jvm_options
-    if not any(opt.startswith('-Dscala.usejavacp=') for opt in jvm_options):
-      jvm_options.append('-Dscala.usejavacp=true')
+    def launch_repl(self, session_setup):
+        # The scala repl requires -Dscala.usejavacp=true since Scala 2.8 when launching in the way
+        # we do here (not passing -classpath as a program arg to scala.tools.nsc.MainGenericRunner).
+        classpath, distribution = session_setup
+        jvm_options = self.jvm_options
+        if not any(opt.startswith("-Dscala.usejavacp=") for opt in jvm_options):
+            jvm_options.append("-Dscala.usejavacp=true")
 
-    # NOTE: We execute with no workunit, as capturing REPL output makes it very sluggish.
-    #
-    # NOTE: Using PantsRunner class because the classLoader used by REPL
-    # does not load Class-Path from manifest.
-    distribution.execute_java(classpath=classpath,
-                              main=ScalaRepl._RUNNER_MAIN,
-                              jvm_options=jvm_options,
-                              args=[self.get_options().main] + self.args,
-                              create_synthetic_jar=True,
-                              stdin=sys.stdin)
+        # NOTE: We execute with no workunit, as capturing REPL output makes it very sluggish.
+        #
+        # NOTE: Using PantsRunner class because the classLoader used by REPL
+        # does not load Class-Path from manifest.
+        distribution.execute_java(
+            classpath=classpath,
+            main=ScalaRepl._RUNNER_MAIN,
+            jvm_options=jvm_options,
+            args=[self.get_options().main] + self.args,
+            create_synthetic_jar=True,
+            stdin=sys.stdin,
+        )

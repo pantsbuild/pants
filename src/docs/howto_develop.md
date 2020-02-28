@@ -11,13 +11,13 @@ These instructions assume you've already
 Running from sources
 --------------------
 
-As pants is implemented in python it can be run directly from sources.
+As Pants is implemented in Python it can be run directly from sources.
 
     :::bash
     $ ./pants goals
     <remainder of output omitted for brevity>
 
-If you want to run pants from sources, but in another repo to test changes before a release, you
+If you want to run Pants from sources, but in another repo to test changes before a release, you
 can run it like so:
 
     :::bash
@@ -37,13 +37,13 @@ also be run from pants sources. Explaining each environment variable:
 + `PANTS_PLUGINS`: This should always be as-shown, ie: an empty list.
 + `PANTS_PYTHONPATH`: This is a comma-separated list of PYTHONPATH elements. Note the plus symbol
   before the list - this indicates the given elements should be appended to the PYTHONPATH.
-  The values can be taken from the pants repo pants.ini. You'll need one path per plugin your other
+  The values can be taken from the Pants repo's `pants.toml`. You'll need one path per plugin your other
   repo uses.
 + `PANTS_BACKEND_PACKAGES`: This is a comma-separated list of plugin package names. Note the plus
   symbol before the list - this indicates the given elements should be appended to the PYTHONPATH.
-  These values can also be taken from the pants repo pants.ini. You'll need one package name per
+  These values can also be taken from the Pants repo's `pants.toml`. You'll need one package name per
   plugin your other repo uses.
-+ `PANTS_VERSION`: The version of pants required by the repo.
++ `PANTS_VERSION`: The version of Pants required by the repo.
 
 If your other repo uses plugins but you don't use this environment variable technique, or you do use
 it but miss one or more plugins, pants will still run, but the result can be confusing since the
@@ -95,16 +95,16 @@ You'll need to setup some files one-time in your own repo:
       ]
     )
 
-    $ cat pants-production.ini
+    $ cat pants-production.toml
     [python-repos]
     # You should replace these repos with your own housing pre-built eggs or wheels for the
     # platforms you support.
-    repos: [
-        "https://pantsbuild.github.io/cheeseshop/third_party/python/dist/index.html",
-        "https://pantsbuild.github.io/cheeseshop/third_party/python/index.html"
-      ]
+    repos = [
+      "https://pantsbuild.github.io/cheeseshop/third_party/python/dist/index.html",
+      "https://pantsbuild.github.io/cheeseshop/third_party/python/index.html"
+    ]
 
-    indexes: ["https://pypi.org/simple/"]
+    indexes = ["https://pypi.org/simple/"]
 
 To (re-)generate a `pants.pex` you then run these 2 commands:
 
@@ -116,7 +116,7 @@ To (re-)generate a `pants.pex` you then run these 2 commands:
 2. In your own repo the following command will create a locally built `pants.pex` for all platforms:
 
         :::bash
-        $ /tmp/pantsbuild/pants --pants-config-files=pants-production.ini clean-all binary //:pants
+        $ /tmp/pantsbuild/pants --pants-config-files=pants-production.toml clean-all binary //:pants
 
 The resulting `pants.pex` will be in the `dist/` directory:
 
@@ -301,20 +301,20 @@ dependency found on the local filesystem:
     )
 
 For debugging, append JVM args to turn on the debugger for the appropriate tool in
-`pants.ini`:
+`pants.toml`:
 
-    :::ini
+    :::toml
     [jar-tool]
-    jvm_options: ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
+    jvm_options = ["-Xdebug", "-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005"]
 
 Note that most tools run under nailgun by default. The easiest way to
 debug them is to disable nailgun by specifying the command line option
-`--execution-strategy=subprocess` or setting `execution_strategy: subprocess` in the specific tool
-section or in the `[DEFAULT]` section of `pants.ini`.
+`--execution-strategy=subprocess` or setting `execution_strategy = "subprocess"` in the specific tool
+section or in the `[DEFAULT]` section of `pants.toml`.
 
-    :::ini
+    :::toml
     [DEFAULT]
-    execution_strategy: subprocess
+    execution_strategy = "subprocess"
 
 ###JVM Tool Development Tips
 
