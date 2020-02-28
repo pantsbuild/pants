@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
+from abc import ABCMeta
 from dataclasses import dataclass
 from typing import Tuple
 
@@ -20,6 +21,7 @@ from pants.engine.legacy.structs import TargetAdaptorWithOrigin
 from pants.engine.objects import union
 from pants.engine.rules import UnionMembership, goal_rule
 from pants.engine.selectors import Get, MultiGet
+from pants.rules.core.lint import Linter
 
 
 @dataclass(frozen=True)
@@ -53,6 +55,11 @@ class AggregatedFmtResults:
 
     results: Tuple[FmtResult, ...]
     combined_digest: Digest
+
+
+@dataclass(frozen=True)  # type: ignore[misc]   # https://github.com/python/mypy/issues/5374
+class Formatter(Linter, metaclass=ABCMeta):
+    adaptors_with_origins: Tuple[TargetAdaptorWithOrigin, ...]
 
 
 @union

@@ -7,8 +7,7 @@ from pathlib import PurePath
 from typing import Optional, Tuple
 
 from pants.backend.python.lint.black.subsystem import Black
-from pants.backend.python.lint.python_format_target import PythonFormatTarget
-from pants.backend.python.lint.python_lint_target import PythonLintTarget
+from pants.backend.python.lint.python_formatter import PythonFormatTarget, PythonFormatter
 from pants.backend.python.rules import download_pex_bin, pex
 from pants.backend.python.rules.pex import (
     CreatePex,
@@ -24,7 +23,6 @@ from pants.engine.isolated_process import (
     ExecuteProcessResult,
     FallibleExecuteProcessResult,
 )
-from pants.engine.legacy.structs import TargetAdaptorWithOrigin
 from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.global_options import GlobMatchErrorBehavior
@@ -36,18 +34,17 @@ from pants.rules.core.determine_source_files import (
     SpecifiedSourceFilesRequest,
 )
 from pants.rules.core.fmt import FmtResult
-from pants.rules.core.lint import LintResult
+from pants.rules.core.lint import Linter, LintResult
 
 
 @dataclass(frozen=True)
-class BlackTargets:
-    adaptors_with_origins: Tuple[TargetAdaptorWithOrigin, ...]
-    prior_formatter_result: Optional[Snapshot] = None  # unused by `lint`
+class BlackFormatter(PythonFormatter):
+    pass
 
 
 @dataclass(frozen=True)
 class SetupRequest:
-    targets: BlackTargets
+    formatter: BlackFormatter
     check_only: bool
 
 
@@ -83,7 +80,7 @@ async def setup(
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> Setup:
-    adaptors_with_origins = request.targets.adaptors_with_origins
+    adaptors_with_origins = request.formatter.adaptors_with_origins
 
     requirements_pex = await Get[Pex](
         CreatePex(
@@ -105,7 +102,7 @@ async def setup(
         )
     )
 
-    if request.targets.prior_formatter_result is None:
+    if request.formatter.prior_formatter_result is None:
         all_source_files = await Get[SourceFiles](
             AllSourceFilesRequest(
                 adaptor_with_origin.adaptor for adaptor_with_origin in adaptors_with_origins
@@ -113,7 +110,7 @@ async def setup(
         )
         all_source_files_snapshot = all_source_files.snapshot
     else:
-        all_source_files_snapshot = request.targets.prior_formatter_result
+        all_source_files_snapshot = request.formatter.prior_formatter_result
 
     specified_source_files = await Get[SourceFiles](
         SpecifiedSourceFilesRequest(adaptors_with_origins)
@@ -153,19 +150,19 @@ async def setup(
 
 
 @rule(name="Format using Black")
-async def fmt(targets: BlackTargets, black: Black) -> FmtResult:
+async def fmt(formatter: BlackFormatter, black: Black) -> FmtResult:
     if black.options.skip:
         return FmtResult.noop()
-    setup = await Get[Setup](SetupRequest(targets, check_only=False))
+    setup = await Get[Setup](SetupRequest(formatter, check_only=False))
     result = await Get[ExecuteProcessResult](ExecuteProcessRequest, setup.process_request)
     return FmtResult.from_execute_process_result(result)
 
 
 @rule(name="Lint using Black")
-async def lint(targets: BlackTargets, black: Black) -> LintResult:
+async def lint(formatter: BlackFormatter, black: Black) -> LintResult:
     if black.options.skip:
         return LintResult.noop()
-    setup = await Get[Setup](SetupRequest(targets, check_only=True))
+    setup = await Get[Setup](SetupRequest(formatter, check_only=True))
     result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, setup.process_request)
     return LintResult.from_fallible_execute_process_result(result)
 
@@ -176,8 +173,8 @@ def rules():
         fmt,
         lint,
         subsystem_rule(Black),
-        UnionRule(PythonFormatTarget, BlackTargets),
-        UnionRule(PythonLintTarget, BlackTargets),
+        UnionRule(PythonFormatTarget, BlackFormatter),
+        UnionRule(Linter, BlackFormatter),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),
         *pex.rules(),

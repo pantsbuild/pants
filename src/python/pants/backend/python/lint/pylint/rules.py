@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Optional, Tuple
 
 from pants.backend.python.lint.pylint.subsystem import Pylint
-from pants.backend.python.lint.python_lint_target import PythonLintTarget
+from pants.backend.python.lint.python_linter import PythonLinter
 from pants.backend.python.rules import download_pex_bin, pex, prepare_chrooted_python_sources
 from pants.backend.python.rules.pex import (
     CreatePex,
@@ -21,19 +21,18 @@ from pants.build_graph.address import Address
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTarget, HydratedTargets
-from pants.engine.legacy.structs import TargetAdaptorWithOrigin
 from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
 from pants.rules.core import determine_source_files, strip_source_roots
 from pants.rules.core.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
-from pants.rules.core.lint import LintResult
+from pants.rules.core.lint import Linter, LintResult
 
 
 @dataclass(frozen=True)
-class PylintTargets:
-    adaptors_with_origins: Tuple[TargetAdaptorWithOrigin, ...]
+class PylintLinter(PythonLinter):
+    pass
 
 
 def generate_args(*, specified_source_files: SourceFiles, pylint: Pylint) -> Tuple[str, ...]:
@@ -47,7 +46,7 @@ def generate_args(*, specified_source_files: SourceFiles, pylint: Pylint) -> Tup
 
 @rule(name="Lint using Pylint")
 async def lint(
-    targets: PylintTargets,
+    linter: PylintLinter,
     pylint: Pylint,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
@@ -55,7 +54,7 @@ async def lint(
     if pylint.options.skip:
         return LintResult.noop()
 
-    adaptors_with_origins = targets.adaptors_with_origins
+    adaptors_with_origins = linter.adaptors_with_origins
 
     # Pylint needs direct dependencies in the chroot to ensure that imports are valid. However, it
     # doesn't lint those direct dependencies nor does it care about transitive dependencies.
@@ -136,7 +135,7 @@ def rules():
     return [
         lint,
         subsystem_rule(Pylint),
-        UnionRule(PythonLintTarget, PylintTargets),
+        UnionRule(Linter, PylintLinter),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),
         *pex.rules(),

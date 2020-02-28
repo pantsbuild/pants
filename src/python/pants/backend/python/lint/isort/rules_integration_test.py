@@ -3,7 +3,7 @@
 
 from typing import List, Optional, Tuple
 
-from pants.backend.python.lint.isort.rules import IsortTargets
+from pants.backend.python.lint.isort.rules import IsortFormatter
 from pants.backend.python.lint.isort.rules import rules as isort_rules
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.address import Address
@@ -36,7 +36,7 @@ class IsortIntegrationTest(TestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *isort_rules(), RootRule(IsortTargets))
+        return (*super().rules(), *isort_rules(), RootRule(IsortFormatter))
 
     def make_target_with_origin(
         self, source_files: List[FileContent], *, origin: Optional[OriginSpec] = None,
@@ -68,7 +68,7 @@ class IsortIntegrationTest(TestBase):
             args.append(f"--isort-skip")
         options_bootstrapper = create_options_bootstrapper(args=args)
         lint_result = self.request_single_product(
-            LintResult, Params(IsortTargets(tuple(targets)), options_bootstrapper)
+            LintResult, Params(IsortFormatter(tuple(targets)), options_bootstrapper)
         )
         input_snapshot = self.request_single_product(
             Snapshot,
@@ -79,7 +79,7 @@ class IsortIntegrationTest(TestBase):
         fmt_result = self.request_single_product(
             FmtResult,
             Params(
-                IsortTargets(tuple(targets), prior_formatter_result=input_snapshot),
+                IsortFormatter(tuple(targets), prior_formatter_result=input_snapshot),
                 options_bootstrapper,
             ),
         )

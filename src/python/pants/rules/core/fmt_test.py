@@ -52,15 +52,17 @@ class FmtTest(TestBase):
             files=tuple(["formatted.txt", "fake.txt"] if include_sources else []),
             dirs=(),
         )
+        address = Address.parse(f"src/python:{name}")
         ht = HydratedTarget(
-            address=Address.parse(f"src:{name}"),
+            address=address,
             adaptor=adaptor_type(
-                sources=EagerFilesetWithSpec("src", {"globs": []}, snapshot=mocked_snapshot),
+                sources=EagerFilesetWithSpec("src/python", {"globs": []}, snapshot=mocked_snapshot),
                 name=name,
+                address=address,
             ),
             dependencies=(),
         )
-        return HydratedTargetWithOrigin(ht, SingleAddress(directory="src", name=name))
+        return HydratedTargetWithOrigin(ht, SingleAddress(directory="src/python", name=name))
 
     def run_fmt_rule(self, *, targets: List[HydratedTargetWithOrigin]) -> Tuple[int, str]:
         result_digest = self.request_single_product(

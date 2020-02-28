@@ -2,12 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 
-from pants.backend.python.lint import python_lint_target
+from pants.backend.python.lint import python_linter
 from pants.backend.python.lint.bandit import rules as bandit_rules
 
 
 def rules():
     return (
         *bandit_rules.rules(),
-        *python_lint_target.rules(),
+        *python_linter.rules(),
     )

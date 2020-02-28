@@ -5,8 +5,7 @@ from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
 from pants.backend.python.lint.isort.subsystem import Isort
-from pants.backend.python.lint.python_format_target import PythonFormatTarget
-from pants.backend.python.lint.python_lint_target import PythonLintTarget
+from pants.backend.python.lint.python_formatter import PythonFormatTarget, PythonFormatter
 from pants.backend.python.rules import download_pex_bin, pex
 from pants.backend.python.rules.pex import (
     CreatePex,
@@ -22,7 +21,6 @@ from pants.engine.isolated_process import (
     ExecuteProcessResult,
     FallibleExecuteProcessResult,
 )
-from pants.engine.legacy.structs import TargetAdaptorWithOrigin
 from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.custom_types import GlobExpansionConjunction
@@ -35,18 +33,17 @@ from pants.rules.core.determine_source_files import (
     SpecifiedSourceFilesRequest,
 )
 from pants.rules.core.fmt import FmtResult
-from pants.rules.core.lint import LintResult
+from pants.rules.core.lint import Linter, LintResult
 
 
 @dataclass(frozen=True)
-class IsortTargets:
-    adaptors_with_origins: Tuple[TargetAdaptorWithOrigin, ...]
-    prior_formatter_result: Optional[Snapshot] = None  # unused by `lint`
+class IsortFormatter(PythonFormatter):
+    pass
 
 
 @dataclass(frozen=True)
 class SetupRequest:
-    targets: IsortTargets
+    formatter: IsortFormatter
     check_only: bool
 
 
@@ -75,7 +72,7 @@ async def setup(
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> Setup:
-    adaptors_with_origins = request.targets.adaptors_with_origins
+    adaptors_with_origins = request.formatter.adaptors_with_origins
 
     requirements_pex = await Get[Pex](
         CreatePex(
@@ -98,7 +95,7 @@ async def setup(
         )
     )
 
-    if request.targets.prior_formatter_result is None:
+    if request.formatter.prior_formatter_result is None:
         all_source_files = await Get[SourceFiles](
             AllSourceFilesRequest(
                 adaptor_with_origin.adaptor for adaptor_with_origin in adaptors_with_origins
@@ -106,7 +103,7 @@ async def setup(
         )
         all_source_files_snapshot = all_source_files.snapshot
     else:
-        all_source_files_snapshot = request.targets.prior_formatter_result
+        all_source_files_snapshot = request.formatter.prior_formatter_result
 
     specified_source_files = await Get[SourceFiles](
         SpecifiedSourceFilesRequest(adaptors_with_origins)
@@ -146,19 +143,19 @@ async def setup(
 
 
 @rule(name="Format using isort")
-async def fmt(targets: IsortTargets, isort: Isort) -> FmtResult:
+async def fmt(formatter: IsortFormatter, isort: Isort) -> FmtResult:
     if isort.options.skip:
         return FmtResult.noop()
-    setup = await Get[Setup](SetupRequest(targets, check_only=False))
+    setup = await Get[Setup](SetupRequest(formatter, check_only=False))
     result = await Get[ExecuteProcessResult](ExecuteProcessRequest, setup.process_request)
     return FmtResult.from_execute_process_result(result)
 
 
 @rule(name="Lint using isort")
-async def lint(targets: IsortTargets, isort: Isort) -> LintResult:
+async def lint(formatter: IsortFormatter, isort: Isort) -> LintResult:
     if isort.options.skip:
         return LintResult.noop()
-    setup = await Get[Setup](SetupRequest(targets, check_only=True))
+    setup = await Get[Setup](SetupRequest(formatter, check_only=True))
     result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, setup.process_request)
     return LintResult.from_fallible_execute_process_result(result)
 
@@ -169,8 +166,8 @@ def rules():
         fmt,
         lint,
         subsystem_rule(Isort),
-        UnionRule(PythonFormatTarget, IsortTargets),
-        UnionRule(PythonLintTarget, IsortTargets),
+        UnionRule(PythonFormatTarget, IsortFormatter),
+        UnionRule(Linter, IsortFormatter),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),
         *pex.rules(),
