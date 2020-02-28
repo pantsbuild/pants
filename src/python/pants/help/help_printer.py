@@ -134,17 +134,17 @@ class HelpPrinter:
             print(
                 f"  {self.bin_name} [option ...] [goal ...] [target/file ...]  Attempt the specified goals."
             )
-            print(f"  {self.bin_name} help                                 Get help.")
-            print(f"  {self.bin_name} help [goal]                          Get help for a goal.")
+            print(f"  {self.bin_name} help                                       Get help.")
+            print(f"  {self.bin_name} help [goal]                                Get help for a goal.")
             print(
-                f"  {self.bin_name} help-advanced                        Get help for global advanced options."
+                f"  {self.bin_name} help-advanced                              Get help for global advanced options."
             )
             print(
-                f"  {self.bin_name} help-advanced [goal]                 Get help for a goal's advanced options."
+                f"  {self.bin_name} help-advanced [goal]                       Get help for a goal's advanced options."
             )
-            print(f"  {self.bin_name} help-all                             Get help for all goals.")
+            print(f"  {self.bin_name} help-all                                   Get help for all goals.")
             print(
-                f"  {self.bin_name} goals                                List all installed goals."
+                f"  {self.bin_name} goals                                      List all installed goals."
             )
             print("")
             print("  [file] can be:")
