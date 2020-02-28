@@ -123,6 +123,17 @@ class TargetAdaptor(StructWithDeps):
         :param sources EagerFilesetWithSpec resolved sources.
         """
 
+    # TODO: do we want to support the `extension` parameter from Target.has_sources()? In V1,
+    # it's used to distinguish between Java vs. Scala files. For now, we should leave it off to
+    # keep things as simple as possible, but we may want to add it in the future.
+    def has_sources(self) -> bool:
+        """Return True if the target has `sources` defined with resolved entries.
+
+        This checks after the sources have been resolved, e.g. after any globs have been expanded
+        and any ignores have been applied.
+        """
+        return hasattr(self, "sources") and bool(self.sources.snapshot.files)
+
 
 @union
 class HydrateableField:

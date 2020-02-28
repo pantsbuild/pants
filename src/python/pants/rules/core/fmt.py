@@ -67,10 +67,7 @@ class FormatTarget:
         adaptor_with_origin: TargetAdaptorWithOrigin, *, union_membership: UnionMembership,
     ) -> bool:
         is_fmt_target = union_membership.is_member(FormatTarget, adaptor_with_origin)
-        has_sources = hasattr(adaptor_with_origin.adaptor, "sources") and bool(
-            adaptor_with_origin.adaptor.sources.snapshot.files
-        )
-        return has_sources and is_fmt_target
+        return adaptor_with_origin.adaptor.has_sources() and is_fmt_target
 
 
 class FmtOptions(GoalSubsystem):
