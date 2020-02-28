@@ -30,20 +30,14 @@ class LintTest(TestBase):
                 ]
             )
         console = MockConsole(use_colors=False)
+        union_membership = UnionMembership({LintTarget: [PythonTargetAdaptorWithOrigin]})
         result: Lint = run_rule(
             lint,
-            rule_args=[
-                console,
-                HydratedTargetsWithOrigins(targets),
-                UnionMembership({LintTarget: [PythonTargetAdaptorWithOrigin]}),
-            ],
+            rule_args=[console, HydratedTargetsWithOrigins(targets), union_membership],
             mock_gets=[
-                MockGet(
-                    product_type=LintResults,
-                    subject_type=PythonTargetAdaptorWithOrigin,
-                    mock=mock_linters,
-                ),
+                MockGet(product_type=LintResults, subject_type=LintTarget, mock=mock_linters),
             ],
+            union_membership=union_membership,
         )
         return result, console.stdout.getvalue()
 

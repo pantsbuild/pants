@@ -74,18 +74,19 @@ class FmtTest(TestBase):
             ),
         )
         console = MockConsole(use_colors=False)
+        union_membership = UnionMembership({FormatTarget: [PythonTargetAdaptorWithOrigin]})
         result: Fmt = run_rule(
             fmt,
             rule_args=[
                 console,
                 HydratedTargetsWithOrigins(targets),
                 Workspace(self.scheduler),
-                UnionMembership({FormatTarget: [PythonTargetAdaptorWithOrigin]}),
+                union_membership,
             ],
             mock_gets=[
                 MockGet(
                     product_type=AggregatedFmtResults,
-                    subject_type=PythonTargetAdaptorWithOrigin,
+                    subject_type=FormatTarget,
                     mock=lambda adaptor_with_origin: AggregatedFmtResults(
                         (
                             FmtResult(
@@ -103,6 +104,7 @@ class FmtTest(TestBase):
                     mock=lambda _: result_digest,
                 ),
             ],
+            union_membership=union_membership,
         )
         return result, console.stdout.getvalue()
 
