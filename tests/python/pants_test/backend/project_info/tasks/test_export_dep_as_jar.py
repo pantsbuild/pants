@@ -668,6 +668,7 @@ class ExportDepAsJarTestWithCodegenTargets(ExportDepAsJarTest):
         #      D (thrift)
         #       \
         #        E
+        # i.e. A depends on B, D depends on E.
         c = self.make_target(
             "project_info:c",
             target_type=ScalaLibrary,
@@ -767,6 +768,6 @@ class ExportDepAsJarTestWithCodegenTargets(ExportDepAsJarTest):
 
     def test_export_a_d_e_should_error(self):
         with self.assertRaisesRegex(
-            TaskError, "Modulizable targets must not contain synthetic target*"
+            TaskError, "Modulizable targets must not contain any synthetic target*"
         ):
             self.execute_export_json("project_info:a", "project_info:d", "project_info:e")
