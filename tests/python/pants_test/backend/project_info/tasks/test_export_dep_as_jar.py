@@ -8,6 +8,7 @@ from contextlib import contextmanager
 from unittest.mock import MagicMock
 from zipfile import ZipFile
 
+from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.subsystems.junit import JUnit
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
@@ -48,6 +49,50 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
     @classmethod
     def alias_groups(cls):
         return register_core().merge(register_jvm())
+
+    def execute_export_json(self, *specs, **options):
+        return json.loads("".join(self.execute_export(*specs, **options)))
+
+    def prep_before_export(self, context):
+        raise NotImplementedError
+
+    def execute_export(self, *specs, **options_overrides):
+        options = {
+            ScalaPlatform.options_scope: {"version": "custom"},
+            JvmResolveSubsystem.options_scope: {"resolver": "ivy"},
+            JvmPlatform.options_scope: {
+                "default_platform": "java8",
+                "platforms": {"java8": {"source": "1.8", "target": "1.8"}},
+            },
+        }
+        options.update(options_overrides)
+
+        # We are only initializing ZincCompile to access the instance method `calculate_jvm_modulizable_targets`
+        ZincCompile.options_scope = "compile.rsc"
+        BootstrapJvmTools.options_scope = "bootstrap-jvm-tools"
+        context = self.context(
+            options=options,
+            target_roots=[self.target(spec) for spec in specs],
+            for_subsystems=[JvmPlatform],
+            for_task_types=[BootstrapJvmTools, ZincCompile],
+        )
+
+        context.products.safe_create_data("zinc_args", init_func=lambda: MagicMock())
+        self.prep_before_export(context)
+
+        # This simulates ZincCompile creates the product.
+        zinc_compile_task = ZincCompile(context, self.pants_workdir)
+        context.products.get_data(
+            "jvm_modulizable_targets", init_func=zinc_compile_task.calculate_jvm_modulizable_targets
+        )
+
+        bootstrap_task = BootstrapJvmTools(context, self.pants_workdir)
+        bootstrap_task.execute()
+        task = self.create_task(context)
+        return list(task.console_output(list(task.context.targets())))
+
+
+class ExportDepAsJarTestSuiteOne(ExportDepAsJarTest):
 
     # Version of the scala compiler and libraries used for this test.
     _scala_toolchain_version = "2.10.5"
@@ -263,45 +308,9 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
             )
         return runtime_classpath
 
-    def execute_export(self, *specs, **options_overrides):
-        options = {
-            ScalaPlatform.options_scope: {"version": "custom"},
-            JvmResolveSubsystem.options_scope: {"resolver": "ivy"},
-            JvmPlatform.options_scope: {
-                "default_platform": "java8",
-                "platforms": {"java8": {"source": "1.8", "target": "1.8"}},
-            },
-        }
-        options.update(options_overrides)
-
-        # We are only initializing ZincCompile to access the instance method `calculate_jvm_modulizable_targets`
-        ZincCompile.options_scope = "compile.rsc"
-        BootstrapJvmTools.options_scope = "bootstrap-jvm-tools"
-        context = self.context(
-            options=options,
-            target_roots=[self.target(spec) for spec in specs],
-            for_subsystems=[JvmPlatform],
-            for_task_types=[BootstrapJvmTools, ZincCompile],
-        )
-
+    def prep_before_export(self, context):
         runtime_classpath = self.create_runtime_classpath_for_targets(self.scala_with_source_dep)
         context.products.safe_create_data("runtime_classpath", init_func=lambda: runtime_classpath)
-
-        context.products.safe_create_data("zinc_args", init_func=lambda: MagicMock())
-
-        # This simulates ZincCompile creates the product.
-        zinc_compile_task = ZincCompile(context, self.pants_workdir)
-        context.products.get_data(
-            "jvm_modulizable_targets", init_func=zinc_compile_task.calculate_jvm_modulizable_targets
-        )
-
-        bootstrap_task = BootstrapJvmTools(context, self.pants_workdir)
-        bootstrap_task.execute()
-        task = self.create_task(context)
-        return list(task.console_output(list(task.context.targets())))
-
-    def execute_export_json(self, *specs, **options):
-        return json.loads("".join(self.execute_export(*specs, **options)))
 
     def test_source_globs_java(self):
         self.set_options(globs=True)
@@ -641,3 +650,225 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
         ]
         assert dependency_spec not in enabled_result["source_dependencies_in_classpath"]
         assert dependency_spec in disabled_result["source_dependencies_in_classpath"]
+
+
+class ExportDepAsJarTestWithCodegenTargets(ExportDepAsJarTest):
+
+    # Version of the scala compiler and libraries used for this test.
+    _scala_toolchain_version = "2.10.5"
+
+    def setUp(self):
+        super().setUp()
+
+        # We need an initialized ScalaPlatform in order to make ScalaLibrary targets below.
+        scala_options = {ScalaPlatform.options_scope: {"version": "custom"}}
+        init_subsystems([JUnit, ScalaPlatform, ScoveragePlatform], scala_options)
+
+        self.make_target(
+            ":jar-tool", JarLibrary, jars=[JarDependency("org.pantsbuild", "jar-tool", "0.0.10")]
+        )
+
+        # NB: `test_has_python_requirements` will attempt to inject every possible scala compiler target
+        # spec, for versions 2.10, 2.11, 2.12, and custom, and will error out if they are not
+        # available. This isn't a problem when running pants on the command line, but in unit testing
+        # there's probably some task or subsystem that needs to be initialized to avoid this.
+        for empty_target in [
+            "scalac",
+            "scala-repl",
+            "scala-library",
+            "scala-reflect",
+            "scalastyle",
+        ]:
+            for unused_scala_version in ["2_10", "2_11"]:
+                self.make_target(
+                    f":{empty_target}_{unused_scala_version}", Target,
+                )
+        self.make_target(
+            ":scalac-plugin-dep", Target,
+        )
+
+        self.make_target(
+            ":jarjar",
+            JarLibrary,
+            jars=[JarDependency(org="org.pantsbuild", name="jarjar", rev="1.7.2")],
+        )
+
+        self.make_target(
+            ":scala-library",
+            JarLibrary,
+            jars=[JarDependency("org.scala-lang", "scala-library", self._scala_toolchain_version)],
+        )
+
+        self.make_target(
+            ":scalac",
+            JarLibrary,
+            jars=[JarDependency("org.scala-lang", "scala-compiler", self._scala_toolchain_version)],
+        )
+
+        self.make_target(
+            ":scalac_2_12",
+            JarLibrary,
+            jars=[JarDependency("org.scala-lang", "scala-compiler", "2.12.8")],
+        )
+        self.make_target(
+            ":scala-library_2_12",
+            JarLibrary,
+            jars=[JarDependency("org.scala-lang", "scala-library", "2.12.8")],
+        )
+        self.make_target(
+            ":scala-reflect_2_12",
+            JarLibrary,
+            jars=[JarDependency("org.scala-lang", "scala-reflect", "2.12.8")],
+        )
+        self.make_target(
+            ":scala-repl_2_12",
+            JarLibrary,
+            jars=[JarDependency("org.scala-lang", "scala-repl", "2.12.8")],
+        )
+        self.make_target(
+            ":scalastyle_2_12", Target,
+        )
+        self.make_target(
+            ":scalastyle", Target,
+        )
+
+        self.make_target(
+            ":scala-reflect",
+            JarLibrary,
+            jars=[JarDependency("org.scala-lang", "scala-reflect", self._scala_toolchain_version)],
+        )
+
+        self.make_target(
+            ":scala-repl",
+            JarLibrary,
+            jars=[JarDependency("org.scala-lang", "scala-repl", self._scala_toolchain_version)],
+        )
+
+        self.make_target(
+            ":nailgun-server",
+            JarLibrary,
+            jars=[JarDependency(org="com.martiansoftware", name="nailgun-server", rev="0.9.1"),],
+        )
+
+        self.make_target(
+            "project_info:first", target_type=JvmTarget,
+        )
+
+        # A and B are build graph roots, D is a shared dep.
+        #     A
+        #   /  \
+        #  B    F
+        #   \  /
+        #    C
+        #     \
+        #      D (thrift)
+        #       \
+        #        E
+        c = self.make_target(
+            "project_info:c",
+            target_type=ScalaLibrary,
+            sources=["com/foo/Bar.scala", "com/foo/Baz.scala"],
+            dependencies=[
+                self.make_target(
+                    "project_info:d",
+                    target_type=JavaThriftLibrary,
+                    synthetic=True,
+                    sources=["com/foo/Bar.scala", "com/foo/Baz.scala"],
+                    dependencies=[
+                        self.make_target(
+                            "project_info:e",
+                            target_type=ScalaLibrary,
+                            sources=["com/foo/Bar.scala", "com/foo/Baz.scala"],
+                            dependencies=[],
+                        )
+                    ],
+                )
+            ],
+        )
+        self.project_a = self.make_target(
+            "project_info:a",
+            target_type=ScalaLibrary,
+            sources=["com/foo/Bar.scala", "com/foo/Baz.scala"],
+            dependencies=[
+                self.make_target(
+                    "project_info:b",
+                    target_type=ScalaLibrary,
+                    sources=["com/foo/Bar.scala", "com/foo/Baz.scala"],
+                    dependencies=[c],
+                ),
+                self.make_target(
+                    "project_info:f",
+                    target_type=ScalaLibrary,
+                    sources=["com/foo/Bar.scala", "com/foo/Baz.scala"],
+                    dependencies=[c],
+                ),
+            ],
+        )
+
+    def create_runtime_classpath_for_targets(self, target):
+        def path_to_zjar_with_workdir(address: Address):
+            return os.path.join(self.pants_workdir, address.path_safe_spec, "z.jar")
+
+        runtime_classpath = ClasspathProducts(self.pants_workdir)
+        for dep in target.dependencies:
+            runtime_classpath.add_for_target(
+                dep, [("default", path_to_zjar_with_workdir(dep.address))]
+            )
+        return runtime_classpath
+
+    def prep_before_export(self, context):
+        context.products.safe_create_data(
+            "runtime_classpath", init_func=ClasspathProducts.init_func(self.pants_workdir)
+        )
+
+    def test_export_a(self):
+        result = self.execute_export_json("project_info:a")
+        self.assertEqual({"project_info:a"}, set(result["targets"].keys()))
+        self.assertEqual(
+            {
+                "project_info.b",
+                "project_info.c",
+                "project_info.d",
+                "project_info.e",
+                "project_info.f",
+                "org.scala-lang:scala-library:2.10.5",
+            },
+            set(result["targets"]["project_info:a"]["libraries"]),
+        )
+
+    def test_export_a_c(self):
+        result = self.execute_export_json("project_info:a", "project_info:c")
+        self.assertEqual(
+            {"project_info:a", "project_info:b", "project_info:c", "project_info:f"},
+            set(result["targets"].keys()),
+        )
+        self.assertEqual(
+            {"project_info:b", "project_info:f",},
+            set(result["targets"]["project_info:a"]["targets"]),
+        )
+
+        self.assertEqual(
+            {"project_info.d", "project_info.e", "org.scala-lang:scala-library:2.10.5"},
+            set(result["targets"]["project_info:c"]["libraries"]),
+        )
+
+    def test_export_a_c_d(self):
+        """
+        Becaues d is synthetic, the result should be the exactly the same as `a c` above.
+
+        :return:
+        """
+        result = self.execute_export_json("project_info:a", "project_info:c", "project_info:d")
+        self.assertEqual(
+            {"project_info:a", "project_info:b", "project_info:c", "project_info:f"},
+            set(result["targets"].keys()),
+        )
+        self.assertEqual(
+            {"project_info:b", "project_info:f",},
+            set(result["targets"]["project_info:a"]["targets"]),
+        )
+
+        self.assertEqual(
+            {"project_info.d", "project_info.e", "org.scala-lang:scala-library:2.10.5"},
+            set(result["targets"]["project_info:c"]["libraries"]),
+        )
