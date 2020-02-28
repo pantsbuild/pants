@@ -316,7 +316,7 @@ class JvmPlatformSettings:
     """
         self.source_level = JvmPlatform.parse_java_version(source_level)
         self.target_level = JvmPlatform.parse_java_version(target_level)
-        self.args = tuple(args or ())
+        self.args = tuple(flatten_shlexed_list(args or ()))
         self.jvm_options = tuple(flatten_shlexed_list(jvm_options or ()))
         self.name = name
         self._by_default = by_default
