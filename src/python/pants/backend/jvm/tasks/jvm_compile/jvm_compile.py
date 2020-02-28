@@ -578,13 +578,17 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
                             classpath_product.remove_for_target(cc.target, [(conf, cc.classes_dir)])
                             classpath_product.add_for_target(cc.target, [(conf, cc.jar_file)])
 
-        if modulizable_targets is not None:
+        if modulizable_targets:
             compilable_modulizable_targets = set(
                 filter(lambda x: self.select(x), modulizable_targets)
             )
             self.create_extra_products_for_targets(compilable_modulizable_targets)
 
     def calculate_jvm_modulizable_targets(self) -> Set[Target]:
+        """
+        Used to calculate the targets that should be exported to IDEs as modules and
+        therefore should not be compiled.
+        """
         return set()
 
     def _classpath_for_context(self, context):

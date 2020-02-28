@@ -964,9 +964,13 @@ class ZincCompile(BaseZincCompile):
         )
         synthetic_modulizable_targets = set(filter(lambda x: x.is_synthetic, modulizable_targets))
         if len(synthetic_modulizable_targets) > 0:
+            # TODO(yic): improve the error message to show the dependency chain that caused
+            # a synthetic target depending on a non-synthetic one.
             raise TaskError(
-                f"Modulizable targets must not contain synthetic target, but in this case {synthetic_modulizable_targets}.\n"
-                f"It means that certain thrift target(s) depends back onto the targets you want to import to IDE."
+                f"Modulizable targets must not contain any synthetic target, but in this case the "
+                f"following synthetic targets depend on other non-synthetic modules:\n"
+                f"{synthetic_modulizable_targets}\n"
+                f"One approach that may help is to reduce the scope of the import to further avoid synthetic targets."
             )
 
         self.context.products.get_data("jvm_modulizable_targets", set).update(modulizable_targets)
