@@ -4,6 +4,75 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.26.0.dev2 (02/27/2020)
+------------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Upgrade to Pex 2.1.5. (#9187)
+  `PR #9187 <https://github.com/pantsbuild/pants/pull/9187>`_
+
+* Add back `ignore` for `--files-not-found-behavior` (#9175)
+  `PR #9175 <https://github.com/pantsbuild/pants/pull/9175>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Add support for reading Python lock files in V2 (#9163)
+  `PR #9163 <https://github.com/pantsbuild/pants/pull/9163>`_
+
+* Add support for ipython (#9171)
+  `PR #9171 <https://github.com/pantsbuild/pants/pull/9171>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix plugin resolver cache compatibility. (#9195)
+  `PR #9195 <https://github.com/pantsbuild/pants/pull/9195>`_
+
+* Compiler option sets can be lists or sets (#9182)
+  `PR #9182 <https://github.com/pantsbuild/pants/pull/9182>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Generify rules to determine the source files for multiple targets (#9172)
+  `PR #9172 <https://github.com/pantsbuild/pants/pull/9172>`_
+
+* Refactor `strip_source_roots` to use `TargetAdaptor` rather than `HydratedTarget` (#9178)
+  `PR #9178 <https://github.com/pantsbuild/pants/pull/9178>`_
+
+* Add back `inject_init` rule (#9174)
+  `PR #9174 <https://github.com/pantsbuild/pants/pull/9174>`_
+
+* Fix help printing for v2 goals (#9158)
+  `PR #9158 <https://github.com/pantsbuild/pants/pull/9158>`_
+
+* Use our `OrderedSet` and `FrozenOrderedSet` instead of Twitter Commons (#9181)
+  `PR #9181 <https://github.com/pantsbuild/pants/pull/9181>`_
+
+* Set up infrastructure for generating coverage reports in V2 `./pants test` (#9170)
+  `PR #9170 <https://github.com/pantsbuild/pants/pull/9170>`_
+
+* Don't require V2 test implementations to implement coverage (#9173)
+  `PR #9173 <https://github.com/pantsbuild/pants/pull/9173>`_
+
+* Remove ProjectTreeFactory (#9189)
+  `PR #9189 <https://github.com/pantsbuild/pants/pull/9189>`_
+
+Testing
+~~~~~~~
+
+* Fix `file_option` not working with V2 tests (#9190)
+  `PR #9190 <https://github.com/pantsbuild/pants/pull/9190>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Update docs to use `pants.toml` (#9165)
+  `PR #9165 <https://github.com/pantsbuild/pants/pull/9165>`_
+
 1.26.0.dev1 (02/24/2020)
 ------------------------
 

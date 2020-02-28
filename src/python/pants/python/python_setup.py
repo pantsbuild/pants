@@ -4,11 +4,11 @@
 import logging
 import os
 import subprocess
-from typing import Tuple
+from typing import Iterable, Optional, Tuple, cast
 
 from pex.variables import Variables
 
-from pants.option.custom_types import UnsetBool
+from pants.option.custom_types import UnsetBool, file_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 
@@ -32,11 +32,23 @@ class PythonSetup(Subsystem):
             type=list,
             default=["CPython>=3.6"],
             metavar="<requirement>",
-            help="Constrain the selected Python interpreter.  Specify with requirement syntax, "
+            help="Constrain the selected Python interpreter. Specify with requirement syntax, "
             "e.g. 'CPython>=2.7,<3' (A CPython interpreter with version >=2.7 AND version <3)"
             "or 'PyPy' (A pypy interpreter of any version). Multiple constraint strings will "
             "be ORed together. These constraints are applied in addition to any "
             "compatibilities required by the relevant targets.",
+        )
+        register(
+            "--requirement-constraints",
+            advanced=True,
+            fingerprint=True,
+            type=file_option,
+            help=(
+                "When resolving third-party requirements, use this "
+                "constraint file to determine which versions to use. See "
+                "https://pip.pypa.io/en/stable/user_guide/#constraints-files for more information "
+                "on the format of constraint files and how constraints are applied in Pex and Pip."
+            ),
         )
         register(
             "--platforms",
@@ -142,7 +154,12 @@ class PythonSetup(Subsystem):
 
     @property
     def interpreter_constraints(self) -> Tuple[str, ...]:
-        return tuple(self.get_options().interpreter_constraints)
+        return tuple(self.options.interpreter_constraints)
+
+    @property
+    def requirement_constraints(self) -> Optional[str]:
+        """Path to constraint file."""
+        return cast(Optional[str], self.options.requirement_constraints)
 
     @memoized_property
     def interpreter_search_paths(self):
@@ -204,14 +221,15 @@ class PythonSetup(Subsystem):
     def scratch_dir(self):
         return os.path.join(self.get_options().pants_workdir, *self.options_scope.split("."))
 
-    def compatibility_or_constraints(self, compatibility):
-        """Return either the given compatibility, or the interpreter constraints. If interpreter
-        constraints are supplied by the CLI flag, return those only.
+    def compatibility_or_constraints(
+        self, compatibility: Optional[Iterable[str]]
+    ) -> Tuple[str, ...]:
+        """Return either the given `compatibility` field or the global interpreter constraints.
 
-        :param compatibility: Optional[List[str]], e.g. None or ['CPython>3'].
+        If interpreter constraints are supplied by the CLI flag, return those only.
         """
         if self.get_options().is_flagged("interpreter_constraints"):
-            return tuple(self.interpreter_constraints)
+            return self.interpreter_constraints
         return tuple(compatibility or self.interpreter_constraints)
 
     @classmethod

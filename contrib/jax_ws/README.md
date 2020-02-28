@@ -8,14 +8,14 @@ Web Services Description Language (WSDL) file for calling a JAX-WS web service.
 JAX-WS support is provided by a plugin distributed to [pypi]
 (https://pypi.org/pypi/pantsbuild.pants.contrib.jax_ws).
 Assuming you have already [installed pants](http://www.pantsbuild.org/install.html), you'll need to
-add the JAX-WS plugin in your `pants.ini`, like so:
-```ini
+add the JAX-WS plugin in your `pants.toml`, like so:
+```toml
 [GLOBAL]
-pants_version: 1.0.0
+pants_version = "1.26.0"
 
-plugins: [
-    'pantsbuild.pants.contrib.jax_ws==%(pants_version)s',
-  ]
+plugins = [
+  'pantsbuild.pants.contrib.jax_ws==%(pants_version)s',
+]
 ```
 
 ## Target Example
@@ -35,12 +35,12 @@ and service stubs will be generated for you when you `gen` this target
 $ ./pants gen myproject/src/main/jax_ws:hello-service
 ```
 
-Common jvm_options for jax-rs can be included in your pants.ini file
-```ini
+Common jvm_options for jax-rs can be included in your `pants.toml` file
+```toml
 [gen.jax-ws]
-jvm_options: [
-    '-Djavax.xml.accessExternalSchema=all'
-  ]
+jvm_options = [
+  '-Djavax.xml.accessExternalSchema=all'
+]
 ```
 
 ## Options

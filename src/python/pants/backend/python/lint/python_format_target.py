@@ -20,6 +20,7 @@ from pants.engine.selectors import Get
 from pants.rules.core.fmt import AggregatedFmtResults, FmtResult, FormatTarget
 
 
+# TODO: Change this to be multiple targets.
 @union
 class PythonFormatTarget:
     pass
@@ -42,7 +43,7 @@ async def format_python_target(
     for member in union_membership.union_rules[PythonFormatTarget]:
         result = await Get[FmtResult](
             PythonFormatTarget,
-            member(adaptor_with_origin, prior_formatter_result=prior_formatter_result),
+            member((adaptor_with_origin,), prior_formatter_result=prior_formatter_result),
         )
         results.append(result)
         if result != FmtResult.noop():

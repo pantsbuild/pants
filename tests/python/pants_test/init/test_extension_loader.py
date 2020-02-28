@@ -365,7 +365,7 @@ class LoaderTest(unittest.TestCase):
 
     def test_subsystems(self):
         def global_subsystems():
-            return {DummySubsystem1, DummySubsystem2}
+            return [DummySubsystem1, DummySubsystem2]
 
         with self.create_register(global_subsystems=global_subsystems) as backend_package:
             load_backend(self.build_configuration, backend_package, is_v1_backend=False)

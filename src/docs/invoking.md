@@ -134,7 +134,7 @@ As of `1.4.0`, there is one remaining set of caveats to using the daemon:
 
 ### Usage
 
-To enable the daemon, turn on the `--enable-pantsd` global option via CLI arg, environment variable, or `pants.ini` (see [[Options|pants('src/docs:options')]]).
+To enable the daemon, turn on the `--enable-pantsd` global option via CLI arg, environment variable, or `pants.toml` (see [[Options|pants('src/docs:options')]]).
 
 #### Killing the Daemon
 

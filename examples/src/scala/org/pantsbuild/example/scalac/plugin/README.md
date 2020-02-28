@@ -45,27 +45,25 @@ Using scalac plugins
 
 Plugins can be integrated in one of two ways:
 
-- Global plugins: specified in `pants.ini` and used on all Scala code.
+- Global plugins: specified in `pants.toml` and used on all Scala code.
 - Per-target plugins: specified on a Scala target and used only when compiling that target.
 
 #### Global plugins
 
-Global plugins are specified using the `scalac_plugins` key in the `scala` section of `pants.ini`:
+Global plugins are specified using the `scalac_plugins` key in the `scala` section of `pants.toml`:
 
-```
+```toml
 [scala]
-scalac_plugins: ['simple_scalac_plugin']
+scalac_plugins = ['simple_scalac_plugin']
 
 ```
 
 Plugins can optionally take arguments, specified like this:
 
-```
+```toml
 [scala]
-scalac_plugins: ['simple_scalac_plugin']
-scalac_plugin_args: {
-    'simple_scalac_plugin': ['arg1', 'arg2']
-  }
+scalac_plugins = ['simple_scalac_plugin']
+scalac_plugin_args = "{'simple_scalac_plugin': ['arg1', 'arg2']}"
 ```
 
 

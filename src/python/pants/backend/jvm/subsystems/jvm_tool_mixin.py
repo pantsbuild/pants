@@ -36,12 +36,12 @@ class JvmToolMixin:
                 raise ValueError(
                     dedent(
                         """\
-          JVM tool configuration now expects a single target address, use the
-          following in pants.ini:
+                        JVM tool configuration now expects a single target address, use the
+                        following in pants.toml:
 
-          [{scope}]
-          {key}: //tool/classpath:address
-          """.format(
+                        [{scope}]
+                        {key} = "//tool/classpath:address"
+                        """.format(
                             scope=self.scope, key=self.key
                         )
                     )

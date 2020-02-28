@@ -65,11 +65,11 @@ an interpreter (e.g.: `CPython`, `PyPy`) and version constraint, and that a list
 may be specified.
 
 The most common approach is to configure interpreter constraints for your whole repo.
-For example, to use python3 for the whole repo, update `pants.ini` as follows:
+For example, to use python3 for the whole repo, update `pants.toml` as follows:
 
-```ini
+```toml
 [python-setup]
-interpreter_constraints: ["CPython>=3.5"]
+interpreter_constraints = ["CPython>=3.5"]
 ```
 
 If you require more granularity, the `compatibility` parameter may be specified on

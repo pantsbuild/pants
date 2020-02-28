@@ -36,7 +36,7 @@ async def lint_python_target(
     We do not care if linters overlap in their execution as linters have no side-effects.
     """
     results = await MultiGet(
-        Get[LintResult](PythonLintTarget, member(concrete_target.adaptor_with_origin))
+        Get[LintResult](PythonLintTarget, member((concrete_target.adaptor_with_origin,)))
         for member in union_membership.union_rules[PythonLintTarget]
     )
     return LintResults(results)

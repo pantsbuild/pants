@@ -228,26 +228,26 @@ eventually.
 
 ##### For Pants >= 1.7.x
 
-    :::ini
+    :::toml
     # This will turn on coursier and turn off ivy.
     [resolver]
-    resolver: coursier
+    resolver = "coursier"
 
     [resolve.coursier]
     # jvm option in case of large resolves
-    jvm_options: ['-Xmx4g', '-XX:MaxMetaspaceSize=256m']
+    jvm_options = ['-Xmx4g', '-XX:MaxMetaspaceSize=256m']
 
     [export]
     # Same if needed for large resolves
-    jvm_options: ['-Xmx4g', '-XX:MaxMetaspaceSize=256m']
+    jvm_options = ['-Xmx4g', '-XX:MaxMetaspaceSize=256m']
 
     [coursier]
-    repos: ['https://repo1.maven.org/maven2', 'https://dl.google.com/dl/android/maven2/']
+    repos = ['https://repo1.maven.org/maven2', 'https://dl.google.com/dl/android/maven2/']
 
     # Change the following if you choose to [build coursier jar from scratch](https://github.com/coursier/coursier/blob/master/DEVELOPMENT.md#build-with-pants)
     # or to fetch from different location.
-    bootstrap_jar_url: <url>
-    version: <version>
+    bootstrap_jar_url = "<url>"
+    version = "<version>"
 
 * To inspect the resolve result, specify `--resolver-coursier-report`
 * To show coursier command line invocation, use `-ldebug`
@@ -256,6 +256,8 @@ eventually.
         ./pants --resolver-resolver=coursier resolve.coursier --report examples/tests/scala/org/pantsbuild/example/hello/welcome -ldebug
 
 ##### For Pants <= 1.6.x
+
+Note that this uses `pants.ini` rather than `pants.toml`.
 
     :::ini
     # This will turn on coursier and turn off ivy.
@@ -304,38 +306,42 @@ compilation for Java and Scala.
 Java9 vs Java8, Which Java
 --------------------------
 
-Pants first looks through any JDKs specified by the `paths` map in pants.ini's jvm-distributions
+Pants first looks through any JDKs specified by the `paths` map in pants.toml's jvm-distributions
 section, eg:
 
-    :::ini
+    :::toml
     [jvm-distributions]
-    paths = {
-        'macos': [
-          '/Library/Java/JavaVirtualMachines/jdk-9.0.4.jdk',
-          '/Library/Java/JavaVirtualMachines/jdk1.8.0_45.jdk',
-        ],
-        'linux': [
-          '/usr/java/jdk1.8.0_152',
-        ]
-      }
+    paths = """
+    {
+      'macos': [
+        '/Library/Java/JavaVirtualMachines/jdk-9.0.4.jdk',
+        '/Library/Java/JavaVirtualMachines/jdk1.8.0_45.jdk',
+      ],
+      'linux': [
+        '/usr/java/jdk1.8.0_152',
+      ]
+    }
+    """
 
 If no JVMs are found there, Pants uses the first Java it finds in `JDK_HOME`, `JAVA_HOME`,
-or `PATH`. If no `paths` are specified in pants.ini, you can use JDK_HOME to set the Java version
+or `PATH`. If no `paths` are specified in pants.toml, you can use JDK_HOME to set the Java version
 for just one pants invocation:
 
     :::bash
     $ JDK_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64 ./pants ...
 
 If you sometimes need to compile some code in Java 8 and sometimes Java 9, you can define
-jvm-platforms in pants.ini, and set what targets use which platforms. For example, in pants.ini:
+jvm-platforms in pants.toml, and set what targets use which platforms. For example, in pants.toml:
 
-    :::ini
+    :::toml
     [jvm-platform]
-    default_platform: java8
-    platforms: {
-        'java8': {'source': '8', 'target': '8', 'args': [] },
-        java9': {'source': '9', 'target': '9', 'args': [] },
-      }
+    default_platform = "java8"
+    platforms = """
+    {
+      'java8': {'source': '8', 'target': '8', 'args': [] },
+      'java9': {'source': '9', 'target': '9', 'args': [] },
+    }
+    """
 
 And then in a BUILD file:
 
@@ -354,12 +360,13 @@ If you want to set the `-bootclasspath` (or `-Xbootclasspath`) to use the
 appropriate java distribution, you can use the `$JAVA_HOME` symbol in the
 `args` list. For example:
 
-    :::ini
+    :::toml
     [jvm-platform]
-    default_platform: java8
-    platforms: {
-        'java8': {'source': '8', 'target': '8', 'args': ["-C-bootclasspath:$JAVA_HOME/jre/lib/resources.jar:$JAVA_HOME/jre/lib/rt.jar:$JAVA_HOME/jre/lib/sunrsasign.jar:$JAVA_HOME/jre/lib/jsse.jar:$JAVA_HOME/jre/lib/jce.jar:$JAVA_HOME/jre/lib/charsets.jar:$JAVA_HOME/jre/lib/jfr.jar:$JAVA_HOME/jre/classes"] },
-      }
+    default_platform = "java8"
+    platforms = """
+    {
+      'java8': {'source': '8', 'target': '8', 'args': ["-C-bootclasspath:$JAVA_HOME/jre/lib/resources.jar:$JAVA_HOME/jre/lib/rt.jar:$JAVA_HOME/jre/lib/sunrsasign.jar:$JAVA_HOME/jre/lib/jsse.jar:$JAVA_HOME/jre/lib/jce.jar:$JAVA_HOME/jre/lib/charsets.jar:$JAVA_HOME/jre/lib/jfr.jar:$JAVA_HOME/jre/classes"] },
+    }
 
 Your `-bootclasspath` should be designed to work with any compatible version of
 the JVM that might be used. If you make use of `[jvm-distributions]` and have

@@ -46,7 +46,7 @@ class ExtraTestJarExample(JarTask):
 
             # Create a jar file to be published along with other artifacts for this target.
             # In principle, any extra file type could be created here, and published.
-            # Options in pants.ini allow specifying the file extension.
+            # Options in pants.toml allow specifying the file extension.
             with self.open_jar(jar_path, overwrite=True, compressed=True) as open_jar:
                 # Write the sample file to the jar.
                 open_jar.write(os.path.join(self.workdir, example_file_name), "example.txt")
@@ -54,7 +54,7 @@ class ExtraTestJarExample(JarTask):
             # For this target, add the path to the newly created jar to the product map, under the
             # 'extra_test_jar_example key.
             #
-            # IMPORTANT: this string *must* match the string that you have set in pants.ini. Otherwise,
+            # IMPORTANT: this string *must* match the string that you have set in pants.toml. Otherwise,
             # the code in 'jar_publish.py' won't be able to find this addition to the product map.
             self.context.products.get("extra_test_jar_example").add(target, self.workdir).append(
                 jar_name

@@ -88,7 +88,7 @@ from master the release manager may also need to do a release from a stable bran
        _For example if you were releasing `1.2.0rc0` you would need to
        create `src/python/pants/notes/1.2.x.rst` and include all `1.2.0.devX` release notes._
      * Create a new page() in `src/python/pants/notes/BUILD` corresponding to the new notes.
-     * Add the file to pants.ini in the branch_notes section.
+     * Add the file to pants.toml in the branch_notes section.
      * Add the new notes file to `src/docs/docsite.json` in a few places.
      * Check that the new notes are visible on the docsite by previewing it using
        the [docs reference](http://www.pantsbuild.org/docs#generating-the-site) instructions.

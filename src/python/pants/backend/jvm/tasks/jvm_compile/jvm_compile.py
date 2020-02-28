@@ -462,7 +462,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
         self._targets_to_compile_settings = None
 
         # TODO: self._jvm_options doesn't seem to record changes from `--<scope>-jvm-options` on the
-        # command line (but this might work in pants.ini?)!
+        # command line (but this might work in pants.toml?)!
         # JVM options for running the compiler.
         self._jvm_options = self.get_options().jvm_options
 

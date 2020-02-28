@@ -35,26 +35,22 @@ Contrib plugins should generally follow 3 basic setup steps:
    ```
 
 2. Make the local pants aware of your plugin
-   This involves 2 edits to `pants.ini`.  You'll need to add one entry in each of the
+   This involves 2 edits to `pants.toml`.  You'll need to add one entry in each of the
    `pythonpath` and `backend_packages` lists:
-   ```ini
+   ```toml
    [GLOBAL]
    # Enable our own custom loose-source plugins as well as contribs.
-   pythonpath: [
-       "%(buildroot)s/pants-plugins/src/python",
-       ...
-       "%(buildroot)s/contrib/example/src/python",  # 1
-       ...
-     ]
+   pythonpath = [
+     "%(buildroot)s/pants-plugins/src/python",
+     "%(buildroot)s/contrib/example/src/python",  # 1
+   ]
 
-   backend_packages: [
-       "internal_backend.repositories",
-       "internal_backend.sitegen",
-       "internal_backend.utilities",
-       ...
-       "pants.contrib.example",  # 2
-       ...
-     ]
+   backend_packages = [
+     "internal_backend.repositories",
+     "internal_backend.sitegen",
+     "internal_backend.utilities",
+     "pants.contrib.example",  # 2
+   ]
    ```
 
 3. When you're ready for your plugin to be distributed, convert your main `python_library` plugin

@@ -13,14 +13,14 @@ This plugin uses FindBugs 3.0.1 which requires Java 1.7.0 or later to run.
 FindBugs support is provided by a plugin distributed to [pypi]
 (https://pypi.org/pypi/pantsbuild.pants.contrib.findbugs).
 Assuming you have already [installed pants](http://www.pantsbuild.org/install.html), you'll need to
-add the FindBugs plugin in your `pants.ini`, like so:
-```ini
+add the FindBugs plugin in your `pants.toml`, like so:
+```toml
 [GLOBAL]
-pants_version: 1.0.0
+pants_version = "1.26.0"
 
-plugins: [
-    'pantsbuild.pants.contrib.findbugs==%(pants_version)s',
-  ]
+plugins = [
+  'pantsbuild.pants.contrib.findbugs==%(pants_version)s',
+]
 ```
 
 ## Running
@@ -77,11 +77,11 @@ to filter out specific bug reports.  The format of the exclude file is documente
 
 Here are example settings that fail the build only for highly ranked bugs and exclude all test files
 
-```ini
+```toml
 [compile.findbugs]
-max_rank: 4
-fail_on_error: True
-exclude_patterns: [".*/tests/java/.*"]
+max_rank = 4
+fail_on_error = true
+exclude_patterns = [".*/tests/java/.*"]
 ```
 
 ## Reporting

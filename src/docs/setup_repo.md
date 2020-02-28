@@ -64,11 +64,11 @@ of targets in a special BUILD file named `BUILD.tools` in the repo root.
 
 Pants uses `Ivy` to fetch JVM-based tools.  Ivy requires an XML configuration file.
 By default, pants uses the configuration that ships with Ivy,
-but if you need to change Ivy settings you can specify your own in `pants.ini`:
+but if you need to change Ivy settings you can specify your own in `pants.toml`:
 
     [ivy]
-    ivy_settings: %(pants_supportdir)s/ivy/ivysettings.xml
-    cache_dir: ~/.ivy2/pants
+    ivy_settings = "%(pants_supportdir)s/ivy/ivysettings.xml"
+    cache_dir = "~/.ivy2/pants"
 
 For more information on Ivy settings, see the [Ivy documentation](http://ant.apache.org/ivy/)
 
@@ -79,11 +79,11 @@ Build Cache
 -----------
 
 Pants automatically caches its work locally. But most organizations will want to set up a shared
-remote build cache. To do so, set `cache` options in `pants.ini`:
+remote build cache. To do so, set `cache` options in `pants.toml`:
 
     [cache]
-    read_from: ['https://myserver.co/pantscache']
-    write_to: ['https://myserver.co/pantscache']
+    read_from = ['https://myserver.co/pantscache']
+    write_to = ['https://myserver.co/pantscache']
 
 Note that the read and write cache locations are separate options: you may, for example, only want
 your CI machines, not individual developer builds, to populate the shared cache.
@@ -122,13 +122,11 @@ If you you work with a large engineering organization, you might want to
 gather this information in one place, so it can inform decisions about how
 to improve everybody's build times.
 
-To upload these stats to a server for future analysis set the following option in `pants.ini`:
+To upload these stats to a server for future analysis set the following option in `pants.toml`:
 
-    :::ini
+    :::toml
     [run-tracker]
-    stats_upload_urls: {
-      'http://myorg.org/pantsstats': 'authprovider'
-    }
+    stats_upload_urls = "{'http://myorg.org/pantsstats': 'authprovider'}"
 
 Pants will `POST` JSON data to each key URL.  The `authprovider` is the name of the provider the
 user must auth against in order to post to the corresponding URL.
@@ -198,11 +196,11 @@ export REQUESTS_CA_BUNDLE=/etc/certs/latest.pem
 
 Pants fetches the Ivy tool with an initial manual bootstrapping step using the Python requests library.
 If you do not want to use `HTTP_PROXY` or `HTTPS_PROXY` as described above, you can re-redirect
-this initial download to another URL with a setting in `pants.ini`:
+this initial download to another URL with a setting in `pants.toml`:
 
-    :::ini
+    :::toml
     [ivy]
-    bootstrap_jar_url: https://proxy.corp.example.com/content/groups/public/org/apache/ivy/ivy/2.3.0/ivy-2.3.0.jar
+    bootstrap_jar_url = "https://proxy.corp.example.com/content/groups/public/org/apache/ivy/ivy/2.3.0/ivy-2.3.0.jar"
 
 You may also encounter issues downloading this .jar file if you are using self-signed SSL certificates.
 See the section on Configuring the Python requests library above.
@@ -213,7 +211,7 @@ See the section on Configuring the Python requests library above.
 If your site uses Sonatype Nexus or another reverse proxy for
 artifacts, you do not need to use a separate HTTP proxy.  Contact the
 reverse proxy administrator to setup a proxy for the sites listed in
-`build-support/ivy/settings.xml` and `pants.ini`.  By default these
+`build-support/ivy/settings.xml` and `pants.toml`.  By default these
 are `https://repo1.maven.org/maven2/` and `https://dl.bintray.com/pantsbuild/maven/`:
 
 Here is an excerpt of a modified ivysettings.xml with some possible configurations:
@@ -239,30 +237,30 @@ For the binary support tools like protoc, you will need to setup a
 proxy for the `dl.bintray.com` repo, or create your own repo of build
 tools:
 
-    :::ini
+    :::toml
     binaries_baseurls = [
-        "https://nexus.example.com/content/repositories/dl.bintray.com/pantsbuild/bin/build-support"
-      ]
+      "https://nexus.example.com/content/repositories/dl.bintray.com/pantsbuild/bin/build-support",
+    ]
 
 ### Redirecting python requirements to other servers
 
-For python repos, you need to override the following settings in pants.ini:
+For Python repos, you need to override the following settings in `pants.toml`:
 
-    :::ini
+    :::toml
     [python-repos]
-    repos: [
-        "https://pantsbuild.github.io/cheeseshop/third_party/python/dist/index.html",
-        "https://pantsbuild.github.io/cheeseshop/third_party/python/index.html"
-      ]
+    repos = [
+      "https://pantsbuild.github.io/cheeseshop/third_party/python/dist/index.html",
+      "https://pantsbuild.github.io/cheeseshop/third_party/python/index.html",
+    ]
 
-    indexes: [
-        "https://pypi.org/simple/"
-      ]
+    indexes = [
+      "https://pypi.org/simple/",
+    ]
 
 You can also reference a local repo relative to your project's build root with this pattern:
 
-    :::ini
+    :::toml
     [python-repos]
-    repos: [
-        "%(buildroot)s/repo_path"
-      ]
+    repos = [
+      "%(buildroot)s/repo_path",
+    ]

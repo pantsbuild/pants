@@ -182,7 +182,7 @@ class BinaryToolBase(Subsystem):
             type=dict,
             default={
                 # "Serialize" the default value dict into "basic" types that can be easily specified
-                # in pants.ini.
+                # in pants.toml.
                 platform_constraint.value: tool.into_tuple()
                 for platform_constraint, tool in cls.default_versions_and_digests.items()
             },
