@@ -551,15 +551,6 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
             and "jvm_modulizable_targets" in self.product_types()
         ):
             modulizable_targets = self.calculate_jvm_modulizable_targets()
-            synthetic_modulizable_targets = set(
-                filter(lambda x: x.is_synthetic, modulizable_targets)
-            )
-            if len(synthetic_modulizable_targets) > 0:
-                raise TaskError(
-                    f"Modulizable targets must not contain synthetic target, but in this case {synthetic_modulizable_targets}.\n"
-                    f"It means that certain thrift target(s) depends back onto the targets you want to import to IDE."
-                )
-
             relevant_targets = list(
                 filter(lambda x: self.select(x), set(relevant_targets) - modulizable_targets)
             )
@@ -620,6 +611,12 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
             )
             if is_jvm_or_resource_target(t)
         )
+        synthetic_modulizable_targets = set(filter(lambda x: x.is_synthetic, modulizable_targets))
+        if len(synthetic_modulizable_targets) > 0:
+            raise TaskError(
+                f"Modulizable targets must not contain synthetic target, but in this case {synthetic_modulizable_targets}.\n"
+                f"It means that certain thrift target(s) depends back onto the targets you want to import to IDE."
+            )
         return modulizable_targets
 
     def _classpath_for_context(self, context):
