@@ -625,7 +625,7 @@ async def hydrate_sources(
     glob_match_error_behavior=glob_match_error_behavior,
     # TODO(#9012): add line number referring to the sources field.
     description_of_origin=(
-        f"{address}'s `{sources_field.arg}` field"
+        f"{address.rel_path} for target {address.relative_spec}'s `{sources_field.arg}` field"
         if glob_match_error_behavior != GlobMatchErrorBehavior.ignore
         else None
     ),
@@ -652,7 +652,7 @@ async def hydrate_bundles(
       glob_match_error_behavior=glob_match_error_behavior,
       # TODO(#9012): add line number referring to the bundles field.
       description_of_origin=(
-          f"{address}'s `bundles` field"
+          f"{address.rel_path} for target {address.relative_spec}'s `bundles` field"
           if glob_match_error_behavior != GlobMatchErrorBehavior.ignore
           else None
       ),
