@@ -122,7 +122,7 @@ def get_coverage_plugin_input() -> InputFilesContent:
 
 
 def get_packages_to_cover(
-    *, target: PythonTestsAdaptor, source_root_stripped_file_paths: Tuple[str, ...],
+    *, target: PythonTestsAdaptor, specified_source_files: SourceFiles,
 ) -> Tuple[str, ...]:
     # Assume that tests in some package test the sources in that package.
     # This is the case, e.g., if tests live in the same directories as the sources
@@ -141,10 +141,9 @@ def get_packages_to_cover(
     return tuple(
         sorted(
             {
-                os.path.dirname(source_root_stripped_source_file_path).replace(
-                    os.sep, "."
-                )  # Turn file paths into package names.
-                for source_root_stripped_source_file_path in source_root_stripped_file_paths
+                # Turn file paths into package names.
+                os.path.dirname(source_file).replace(os.sep, ".")
+                for source_file in specified_source_files.snapshot.files
             }
         )
     )

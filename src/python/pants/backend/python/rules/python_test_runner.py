@@ -18,7 +18,7 @@ from pants.backend.python.rules.pytest_coverage import (
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.addressable import Addresses
-from pants.engine.fs import Digest, DirectoriesToMerge, InputFilesContent
+from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Digest, DirectoriesToMerge, InputFilesContent
 from pants.engine.interactive_runner import InteractiveProcessRequest
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
@@ -79,7 +79,10 @@ async def setup_pytest_for_target(
         Addresses((adaptor.address,))
     )
     all_targets = transitive_hydrated_targets.closure
-    plugin_file_digest = await Get[Digest](InputFilesContent, get_coverage_plugin_input())
+    run_coverage = test_options.values.run_coverage
+    plugin_file_digest: Optional[Digest] = (
+        await Get[Digest](InputFilesContent, get_coverage_plugin_input()) if run_coverage else None
+    )
     resolved_requirements_pex = await Get[Pex](
         CreatePexFromTargetClosure(
             addresses=Addresses((adaptor.address,)),
@@ -94,7 +97,7 @@ async def setup_pytest_for_target(
             # and then by Pytest). See https://github.com/jaraco/zipp/pull/26.
             additional_args=("--not-zip-safe",),
             include_source_files=False,
-            additional_input_files=plugin_file_digest if test_options.values.run_coverage else None,
+            additional_input_files=plugin_file_digest,
         )
     )
 
@@ -110,15 +113,15 @@ async def setup_pytest_for_target(
         SpecifiedSourceFilesRequest([adaptor_with_origin], strip_source_roots=True)
     )
     specified_source_file_names = specified_source_files.snapshot.files
-    coverage_args = []
 
-    if test_options.values.run_coverage:
+    coverage_args = []
+    if run_coverage:
         coveragerc = await Get[Coveragerc](
             CoveragercRequest(HydratedTargets(all_targets), test_time=True)
         )
         directories_to_merge.append(coveragerc.digest)
         packages_to_cover = get_packages_to_cover(
-            target=adaptor, source_root_stripped_file_paths=specified_source_file_names,
+            target=adaptor, specified_source_files=specified_source_files,
         )
         coverage_args = [
             "--cov-report=",  # To not generate any output. https://pytest-cov.readthedocs.io/en/latest/config.html
@@ -156,14 +159,14 @@ async def run_python_test(
     """Runs pytest for one target."""
     colors = global_options.colors
     env = {"PYTEST_ADDOPTS": f"--color={'yes' if colors else 'no'}"}
-
+    run_coverage = test_options.values.run_coverage
     request = test_setup.requirements_pex.create_execute_request(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path=f"./{test_setup.requirements_pex.output_filename}",
         pex_args=test_setup.args,
         input_files=test_setup.input_files_digest,
-        output_directories=(".coverage",) if test_options.values.run_coverage else None,
+        output_directories=(".coverage",) if run_coverage else None,
         description=f"Run Pytest for {target_with_origin.adaptor.address.reference()}",
         timeout_seconds=test_setup.timeout_seconds
         if test_setup.timeout_seconds is not None
@@ -171,11 +174,7 @@ async def run_python_test(
         env=env,
     )
     result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, request)
-    coverage_data = (
-        PytestCoverageData(result.output_directory_digest)
-        if test_options.values.run_coverage
-        else None
-    )
+    coverage_data = PytestCoverageData(result.output_directory_digest) if run_coverage else None
     return TestResult.from_fallible_execute_process_result(result, coverage_data=coverage_data)
 
 
