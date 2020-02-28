@@ -57,7 +57,7 @@ class JvmTaskTest(JvmTaskTestBase):
 
     def test_distribution_from_jvm_platform_passed_through(self):
         fake_dist = "a dist"
-        platforms = [JvmPlatformSettings("8", "8", [], [])]
+        platforms = [self.java8_platform()]
         with unittest.mock.patch.object(JvmPlatform, "preferred_jvm_distribution") as plat_mock:
             plat_mock.return_value = fake_dist
             dist = self.task.preferred_jvm_distribution(platforms)
@@ -67,7 +67,7 @@ class JvmTaskTest(JvmTaskTestBase):
 
     def test_distribution_from_targets_passes_through_platforms(self):
         fake_dist = "a dist"
-        java8_platform = JvmPlatformSettings("8", "8", [], [])
+        java8_platform = self.java8_platform()
         targets = [self.make_target("platformed_target", JvmTarget, platform="java8")]
         with unittest.mock.patch.object(JvmPlatform, "preferred_jvm_distribution") as plat_mock:
             with unittest.mock.patch.object(
@@ -82,7 +82,7 @@ class JvmTaskTest(JvmTaskTestBase):
                 self.assertEqual(fake_dist, dist)
 
     def test_runtime_platforms_for_targets(self):
-        java8_platform = JvmPlatformSettings("8", "8", [], [])
+        java8_platform = self.java8_platform()
 
         class OneOffTarget(JvmTarget):
             def __init__(self, platform):
@@ -113,3 +113,6 @@ class JvmTaskTest(JvmTaskTestBase):
             self.assertEqual(
                 [JvmPlatform.default_runtime_platform], self.task.runtime_platforms_for_targets([])
             )
+
+    def java8_platform(self):
+        return JvmPlatformSettings(source_level="8", target_level="8", args=[], jvm_options=[])

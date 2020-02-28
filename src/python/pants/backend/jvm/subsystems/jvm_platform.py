@@ -127,10 +127,10 @@ class JvmPlatform(Subsystem):
 
     def _parse_platform(self, name, platform):
         return JvmPlatformSettings(
-            platform.get("source", platform.get("target")),
-            platform.get("target", platform.get("source")),
-            platform.get("args", ()),
-            platform.get("jvm_options", ()),
+            source_level=platform.get("source", platform.get("target")),
+            target_level=platform.get("target", platform.get("source")),
+            args=platform.get("args", ()),
+            jvm_options=platform.get("jvm_options", ()),
             name=name,
         )
 
@@ -167,7 +167,13 @@ class JvmPlatform(Subsystem):
         source_level = JvmPlatform.parse_java_version(DistributionLocator.cached().version)
         target_level = source_level
         platform_name = f"(DistributionLocator.cached().version {source_level})"
-        return JvmPlatformSettings(source_level, target_level, [], [], name=platform_name)
+        return JvmPlatformSettings(
+            source_level=source_level,
+            target_level=target_level,
+            args=[],
+            jvm_options=[],
+            name=platform_name,
+        )
 
     @memoized_property
     def default_platform(self):
@@ -182,7 +188,7 @@ class JvmPlatform(Subsystem):
                     name, self.options_scope
                 )
             )
-        return JvmPlatformSettings(*platforms_by_name[name], name=name, by_default=True)
+        return JvmPlatformSettings._copy_as_default(platforms_by_name[name], name=name)
 
     @memoized_property
     def default_runtime_platform(self):
@@ -197,7 +203,7 @@ class JvmPlatform(Subsystem):
                     name, self.options_scope
                 )
             )
-        return JvmPlatformSettings(*platforms_by_name[name], name=name, by_default=True)
+        return JvmPlatformSettings._copy_as_default(platforms_by_name[name], name=name)
 
     @memoized_method
     def get_platform_by_name(self, name, for_target=None):
@@ -287,6 +293,18 @@ class JvmPlatformSettings:
     class IllegalSourceTargetCombination(TaskError):
         """Illegal pair of -source and -target flags to compile java."""
 
+    @staticmethod
+    def _copy_as_default(original, name):
+        """Copies the original with a new name, setting by_default to True."""
+        return JvmPlatformSettings(
+            source_level=original.source_level,
+            target_level=original.target_level,
+            args=original.args,
+            jvm_options=original.jvm_options,
+            name=name,
+            by_default=True,
+        )
+
     def __init__(self, source_level, target_level, args, jvm_options, name=None, by_default=False):
         """
     :param source_level: Revision object or string for the java source level.
@@ -319,12 +337,6 @@ class JvmPlatformSettings:
     @property
     def by_default(self):
         return self._by_default
-
-    def __iter__(self):
-        yield self.source_level
-        yield self.target_level
-        yield self.args
-        yield self.jvm_options
 
     def __eq__(self, other):
         return tuple(self) == tuple(other)

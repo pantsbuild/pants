@@ -197,10 +197,10 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
         _, source, _, target, foo, bar, composite, single = tuple(
             self._get_zinc_arguments(
                 JvmPlatformSettings(
-                    "1.8",
-                    "1.8",
-                    ["foo", "bar", "foo:$JAVA_HOME/bar:$JAVA_HOME/foobar", "$JAVA_HOME",],
-                    [],
+                    source_level="1.8",
+                    target_level="1.8",
+                    args=["foo", "bar", "foo:$JAVA_HOME/bar:$JAVA_HOME/foobar", "$JAVA_HOME",],
+                    jvm_options=[],
                 )
             )
         )
@@ -215,7 +215,10 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
 
     def test_java_home_extraction_empty(self):
         init_subsystem(DistributionLocator)
-        result = tuple(self._get_zinc_arguments(JvmPlatformSettings("1.8", "1.8", [], [])))
+        platform_settings = JvmPlatformSettings(
+            source_level="1.8", target_level="1.8", args=[], jvm_options=[]
+        )
+        result = tuple(self._get_zinc_arguments(platform_settings))
         self.assertEqual(
             4, len(result), msg="_get_zinc_arguments did not correctly handle empty args."
         )

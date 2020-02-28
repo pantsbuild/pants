@@ -243,26 +243,32 @@ class JvmPlatformTest(TestBase):
         assert ("-Dsomething", "-Dsomethingelse") == need_shlex_options.jvm_options
 
     def test_compile_setting_equivalence(self):
-        assert JvmPlatformSettings("11", "11", ["-Xfoo:bar"], []) == JvmPlatformSettings(
-            "11", "11", ["-Xfoo:bar"], []
+        assert JvmPlatformSettings(
+            source_level="11", target_level="11", args=["-Xfoo:bar"], jvm_options=[]
+        ) == JvmPlatformSettings(
+            source_level="11", target_level="11", args=["-Xfoo:bar"], jvm_options=[]
         )
-        assert JvmPlatformSettings("11", "11", [], ["-Xfoo:bar -Xbaz"]) == JvmPlatformSettings(
-            "11", "11", [], ["-Xfoo:bar", "-Xbaz"]
+        assert JvmPlatformSettings(
+            source_level="11", target_level="11", args=[], jvm_options=["-Xfoo:bar"]
+        ) == JvmPlatformSettings(
+            source_level="11", target_level="11", args=[], jvm_options=["-Xfoo:bar"]
         )
 
     def test_compile_setting_inequivalence(self):
-        assert JvmPlatformSettings("11", "11", ["-Xfoo:bar"], []) != JvmPlatformSettings(
-            "11", "12", ["-Xfoo:bar"], []
+        assert JvmPlatformSettings(
+            source_level="11", target_level="11", args=[], jvm_options=[]
+        ) != JvmPlatformSettings(source_level="11", target_level="12", args=[], jvm_options=[])
+
+        assert JvmPlatformSettings(
+            source_level="11", target_level="11", args=["-Xfoo:bar"], jvm_options=[]
+        ) != JvmPlatformSettings(
+            source_level="11", target_level="11", args=["-XSomethingElse"], jvm_options=[]
         )
 
-        assert JvmPlatformSettings("11", "11", ["-Xfoo:bar"], []) != JvmPlatformSettings(
-            "11", "11", ["-Xbar:foo"], []
-        )
+        assert JvmPlatformSettings(
+            source_level="11", target_level="9", args=[], jvm_options=[]
+        ) != JvmPlatformSettings(source_level="11", target_level="11", args=[], jvm_options=[])
 
-        assert JvmPlatformSettings("9", "11", ["-Xfoo:bar"], []) != JvmPlatformSettings(
-            "11", "11", ["-Xfoo:bar"], []
-        )
-
-        assert JvmPlatformSettings("11", "11", [], ["-Xvmsomething"]) != JvmPlatformSettings(
-            "11", "11", [], []
-        )
+        assert JvmPlatformSettings(
+            source_level="11", target_level="11", args=[], jvm_options=["-Xvmsomething"]
+        ) != JvmPlatformSettings(source_level="11", target_level="11", args=[], jvm_options=[])
