@@ -1,6 +1,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+
 import logging
 import multiprocessing
 import os
@@ -9,11 +10,10 @@ import time
 import traceback
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Type
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type
 
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE
-from pants.base.project_tree import ProjectTree
 from pants.engine.fs import (
     Digest,
     DirectoryToMaterialize,
@@ -66,19 +66,21 @@ class ExecutionError(Exception):
 class Scheduler:
     def __init__(
         self,
+        *,
         native,
-        project_tree: ProjectTree,
+        ignore_patterns: List[str],
+        build_root: str,
         local_store_dir: str,
         rules: Tuple[Rule, ...],
         union_rules: "OrderedDict[Type, OrderedSet[Type]]",
         execution_options: ExecutionOptions,
         include_trace_on_error: bool = True,
-        validate: bool = True,
         visualize_to_dir: Optional[str] = None,
     ):
         """
         :param native: An instance of engine.native.Native.
-        :param project_tree: An instance of ProjectTree for the current build root.
+        :param ignore_patterns: A list of gitignore-style file patterns for pants to ignore.
+        :param build_root: The build root as a string.
         :param work_dir: The pants work dir.
         :param local_store_dir: The directory to use for storing the engine's LMDB store in.
         :param rules: A set of Rules which is used to compute values in the graph.
@@ -87,7 +89,6 @@ class Scheduler:
         :param execution_options: Execution options for (remote) processes.
         :param include_trace_on_error: Include the trace through the graph upon encountering errors.
         :type include_trace_on_error: bool
-        :param validate: True to assert that the ruleset is valid.
         """
         self._native = native
         self.include_trace_on_error = include_trace_on_error
@@ -105,9 +106,9 @@ class Scheduler:
         self._scheduler = native.new_scheduler(
             tasks=self._tasks,
             root_subject_types=self._root_subject_types,
-            build_root=project_tree.build_root,
+            build_root=build_root,
             local_store_dir=local_store_dir,
-            ignore_patterns=project_tree.ignore_patterns,
+            ignore_patterns=ignore_patterns,
             execution_options=execution_options,
         )
 
@@ -116,8 +117,7 @@ class Scheduler:
             rule_graph_name = "rule_graph.dot"
             self.visualize_rule_graph_to_file(os.path.join(self._visualize_to_dir, rule_graph_name))
 
-        if validate:
-            self._assert_ruleset_valid()
+        self._assert_ruleset_valid()
 
     def _root_type_ids(self):
         return self._to_ids_buf(self._root_subject_types)

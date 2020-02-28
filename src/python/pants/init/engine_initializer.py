@@ -16,7 +16,6 @@ from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
 from pants.base.deprecated import deprecated_conditional
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
-from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.base.specs import Specs
 from pants.binaries.binary_tool import rules as binary_tool_rules
 from pants.binaries.binary_util import rules as binary_util_rules
@@ -383,8 +382,6 @@ class EngineInitializer:
     ) -> LegacyGraphScheduler:
         """Construct and return the components necessary for LegacyBuildGraph construction.
 
-        :param list pants_ignore_patterns: A list of path ignore patterns for FileSystemProjectTree,
-                                           usually taken from the '--pants-ignore' global option.
         :param local_store_dir: The directory to use for storing the engine's LMDB store in.
         :param build_file_imports_behavior: How to behave if a BUILD file being parsed tries to use
                                             import statements.
@@ -414,8 +411,6 @@ class EngineInitializer:
         rules = build_configuration.rules()
 
         symbol_table = _legacy_symbol_table(build_file_aliases)
-
-        project_tree = FileSystemProjectTree(build_root, pants_ignore_patterns)
 
         execution_options = execution_options or DEFAULT_EXECUTION_OPTIONS
 
@@ -478,12 +473,13 @@ class EngineInitializer:
         union_rules = build_configuration.union_rules()
 
         scheduler = Scheduler(
-            native,
-            project_tree,
-            local_store_dir,
-            rules,
-            union_rules,
-            execution_options,
+            native=native,
+            ignore_patterns=pants_ignore_patterns,
+            build_root=build_root,
+            local_store_dir=local_store_dir,
+            rules=rules,
+            union_rules=union_rules,
+            execution_options=execution_options,
             include_trace_on_error=include_trace_on_error,
             visualize_to_dir=bootstrap_options.native_engine_visualize_to,
         )
