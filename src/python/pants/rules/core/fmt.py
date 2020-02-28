@@ -57,7 +57,7 @@ class AggregatedFmtResults:
     combined_digest: Digest
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True)  # type: ignore[misc]   # https://github.com/python/mypy/issues/5374
 class Formatter(Linter, metaclass=ABCMeta):
     adaptors_with_origins: Tuple[TargetAdaptorWithOrigin, ...]
 

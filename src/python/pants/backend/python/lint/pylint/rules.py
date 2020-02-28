@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Optional, Tuple
 
 from pants.backend.python.lint.pylint.subsystem import Pylint
-from pants.backend.python.lint.python_linter import PythonLinter, PythonLintTarget
+from pants.backend.python.lint.python_linter import PythonLinter
 from pants.backend.python.rules import download_pex_bin, pex, prepare_chrooted_python_sources
 from pants.backend.python.rules.pex import (
     CreatePex,
@@ -27,7 +27,7 @@ from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
 from pants.rules.core import determine_source_files, strip_source_roots
 from pants.rules.core.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
-from pants.rules.core.lint import LintResult
+from pants.rules.core.lint import Linter, LintResult
 
 
 @dataclass(frozen=True)
@@ -135,7 +135,7 @@ def rules():
     return [
         lint,
         subsystem_rule(Pylint),
-        UnionRule(PythonLintTarget, PylintLinter),
+        UnionRule(Linter, PylintLinter),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),
         *pex.rules(),

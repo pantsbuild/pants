@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Optional, Tuple
 
 from pants.backend.python.lint.flake8.subsystem import Flake8
-from pants.backend.python.lint.python_linter import PythonLinter, PythonLintTarget
+from pants.backend.python.lint.python_linter import PythonLinter
 from pants.backend.python.rules import download_pex_bin, pex
 from pants.backend.python.rules.pex import (
     CreatePex,
@@ -27,7 +27,7 @@ from pants.rules.core.determine_source_files import (
     SourceFiles,
     SpecifiedSourceFilesRequest,
 )
-from pants.rules.core.lint import LintResult
+from pants.rules.core.lint import Linter, LintResult
 
 
 @dataclass(frozen=True)
@@ -123,7 +123,7 @@ def rules():
     return [
         lint,
         subsystem_rule(Flake8),
-        UnionRule(PythonLintTarget, Flake8Linter),
+        UnionRule(Linter, Flake8Linter),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),
         *pex.rules(),

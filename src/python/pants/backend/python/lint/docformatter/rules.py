@@ -6,7 +6,6 @@ from typing import Tuple
 
 from pants.backend.python.lint.docformatter.subsystem import Docformatter
 from pants.backend.python.lint.python_formatter import PythonFormatTarget, PythonFormatter
-from pants.backend.python.lint.python_linter import PythonLintTarget
 from pants.backend.python.rules import download_pex_bin, pex
 from pants.backend.python.rules.pex import (
     CreatePex,
@@ -32,7 +31,7 @@ from pants.rules.core.determine_source_files import (
     SpecifiedSourceFilesRequest,
 )
 from pants.rules.core.fmt import FmtResult
-from pants.rules.core.lint import LintResult
+from pants.rules.core.lint import Linter, LintResult
 
 
 @dataclass(frozen=True)
@@ -152,7 +151,7 @@ def rules():
         lint,
         subsystem_rule(Docformatter),
         UnionRule(PythonFormatTarget, DocformatterFormatter),
-        UnionRule(PythonLintTarget, DocformatterFormatter),
+        UnionRule(Linter, DocformatterFormatter),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),
         *pex.rules(),

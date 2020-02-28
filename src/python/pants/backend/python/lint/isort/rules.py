@@ -6,7 +6,6 @@ from typing import List, Optional, Tuple
 
 from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.lint.python_formatter import PythonFormatTarget, PythonFormatter
-from pants.backend.python.lint.python_linter import PythonLintTarget
 from pants.backend.python.rules import download_pex_bin, pex
 from pants.backend.python.rules.pex import (
     CreatePex,
@@ -34,7 +33,7 @@ from pants.rules.core.determine_source_files import (
     SpecifiedSourceFilesRequest,
 )
 from pants.rules.core.fmt import FmtResult
-from pants.rules.core.lint import LintResult
+from pants.rules.core.lint import Linter, LintResult
 
 
 @dataclass(frozen=True)
@@ -168,7 +167,7 @@ def rules():
         lint,
         subsystem_rule(Isort),
         UnionRule(PythonFormatTarget, IsortFormatter),
-        UnionRule(PythonLintTarget, IsortFormatter),
+        UnionRule(Linter, IsortFormatter),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),
         *pex.rules(),

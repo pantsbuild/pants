@@ -8,7 +8,6 @@ from typing import Optional, Tuple
 
 from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.lint.python_formatter import PythonFormatTarget, PythonFormatter
-from pants.backend.python.lint.python_linter import PythonLintTarget
 from pants.backend.python.rules import download_pex_bin, pex
 from pants.backend.python.rules.pex import (
     CreatePex,
@@ -35,7 +34,7 @@ from pants.rules.core.determine_source_files import (
     SpecifiedSourceFilesRequest,
 )
 from pants.rules.core.fmt import FmtResult
-from pants.rules.core.lint import LintResult
+from pants.rules.core.lint import Linter, LintResult
 
 
 @dataclass(frozen=True)
@@ -175,7 +174,7 @@ def rules():
         lint,
         subsystem_rule(Black),
         UnionRule(PythonFormatTarget, BlackFormatter),
-        UnionRule(PythonLintTarget, BlackFormatter),
+        UnionRule(Linter, BlackFormatter),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),
         *pex.rules(),
