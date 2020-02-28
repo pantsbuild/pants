@@ -853,8 +853,7 @@ class ExportDepAsJarTestWithCodegenTargets(ExportDepAsJarTest):
         )
 
     def test_export_a_c_d(self):
-        """
-        Because d is synthetic, the result should be the exactly the same as `a c` above.
+        """Because d is synthetic, the result should be the exactly the same as `a c` above.
 
         :return:
         """
@@ -876,5 +875,5 @@ class ExportDepAsJarTestWithCodegenTargets(ExportDepAsJarTest):
     def test_export_a_d_e_should_error(self):
         with self.assertRaisesRegex(
             TaskError, "Modulizable targets must not contain synthetic target*"
-        ) as e:
-            result = self.execute_export_json("project_info:a", "project_info:d", "project_info:e")
+        ):
+            self.execute_export_json("project_info:a", "project_info:d", "project_info:e")
