@@ -9,10 +9,10 @@ from pants.backend.python.rules.pex import Pex
 from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
 from pants.backend.python.rules.prepare_chrooted_python_sources import ChrootedPythonSources
 from pants.backend.python.rules.pytest_coverage import (
+    Coveragerc,
+    CoveragercRequest,
     PytestCoverageData,
-    construct_coverage_config,
     get_coverage_plugin_input,
-    get_coveragerc_input,
     get_packages_to_cover,
 )
 from pants.backend.python.subsystems.pytest import PyTest
@@ -27,9 +27,12 @@ from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.global_options import GlobalOptions
 from pants.python.python_setup import PythonSetup
-from pants.rules.core.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
+from pants.rules.core.determine_source_files import (
+    AllSourceFilesRequest,
+    SourceFiles,
+    SpecifiedSourceFilesRequest,
+)
 from pants.rules.core.test import TestDebugRequest, TestOptions, TestResult, TestTarget
-from pants.source.source_root import SourceRootConfig
 
 
 def calculate_timeout_seconds(
@@ -67,10 +70,7 @@ class TestTargetSetup:
 
 @rule
 async def setup_pytest_for_target(
-    adaptor_with_origin: PythonTestsAdaptorWithOrigin,
-    pytest: PyTest,
-    test_options: TestOptions,
-    source_root_config: SourceRootConfig,
+    adaptor_with_origin: PythonTestsAdaptorWithOrigin, pytest: PyTest, test_options: TestOptions,
 ) -> TestTargetSetup:
     adaptor = adaptor_with_origin.adaptor
     # TODO: Rather than consuming the TestOptions subsystem, the TestRunner should pass on coverage
@@ -110,28 +110,13 @@ async def setup_pytest_for_target(
         SpecifiedSourceFilesRequest([adaptor_with_origin], strip_source_roots=True)
     )
     specified_source_file_names = specified_source_files.snapshot.files
-
     coverage_args = []
 
     if test_options.values.run_coverage:
-        # TODO(#4535) We need a better way to do this kind of check that covers synthetic targets and rules extensibility.
-        python_targets = [
-            target
-            for target in all_targets
-            if target.adaptor.type_alias in ("python_library", "python_tests")
-        ]
-        sources = itertools.chain.from_iterable(
-            target.adaptor.sources.snapshot.files for target in python_targets
+        coveragerc = await Get[Coveragerc](
+            CoveragercRequest(HydratedTargets(all_targets), test_time=True)
         )
-        coveragerc_digest = await Get[Digest](
-            InputFilesContent,
-            get_coveragerc_input(
-                construct_coverage_config(
-                    source_root_config.get_source_roots(), list(sources), test_time=True,
-                )
-            ),
-        )
-        directories_to_merge.append(coveragerc_digest)
+        directories_to_merge.append(coveragerc.digest)
         packages_to_cover = get_packages_to_cover(
             target=adaptor, source_root_stripped_file_paths=specified_source_file_names,
         )
