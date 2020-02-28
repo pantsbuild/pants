@@ -5,7 +5,7 @@ import functools
 import os
 from enum import Enum
 from multiprocessing import cpu_count
-from typing import Optional
+from typing import Optional, Set
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants.backend.jvm.subsystems.java import Java
@@ -13,10 +13,7 @@ from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.zinc import Zinc
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
-from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
-from pants.backend.jvm.targets.jvm_app import JvmApp
-from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.backend.jvm.tasks.classpath_entry import ClasspathEntry
 from pants.backend.jvm.tasks.jvm_compile.class_not_found_error_patterns import (
@@ -38,7 +35,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import WorkerPool
 from pants.base.workunit import WorkUnitLabel
-from pants.build_graph.resources import Resources
+from pants.build_graph.target import Target
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, PathGlobs, PathGlobsAndRoot
 from pants.java.distribution.distribution import DistributionLocator
 from pants.option.compiler_option_sets_mixin import CompilerOptionSetsMixin
@@ -56,6 +53,7 @@ from pants.util.dirutil import (
 from pants.util.enums import match
 from pants.util.fileutil import create_size_estimators
 from pants.util.memo import memoized_method, memoized_property
+
 
 # Well known metadata file to register javac plugins.
 _JAVAC_PLUGIN_INFO_FILE = "META-INF/services/com.sun.source.util.Plugin"
@@ -544,18 +542,12 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
         )
 
         relevant_targets = list(self.context.targets(predicate=self.select))
-        # If we are only exporting jars then we can omit some targets from the runtime_classpath.
-        modulizable_targets = None
-        if (
-            self.context.products.is_required_data("export_dep_as_jar_signal")
-            and "jvm_modulizable_targets" in self.product_types()
-        ):
-            modulizable_targets = self.calculate_jvm_modulizable_targets()
+
+        modulizable_targets = self.calculate_jvm_modulizable_targets()
+        if modulizable_targets:
+            # If we are only exporting jars then we can omit some targets from the runtime_classpath.
             relevant_targets = list(
                 filter(lambda x: self.select(x), set(relevant_targets) - modulizable_targets)
-            )
-            self.context.products.get_data("jvm_modulizable_targets", set).update(
-                modulizable_targets
             )
 
         if relevant_targets:
@@ -592,32 +584,8 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
             )
             self.create_extra_products_for_targets(compilable_modulizable_targets)
 
-    def calculate_jvm_modulizable_targets(self):
-        def is_jvm_or_resource_target(t):
-            return isinstance(t, (JvmTarget, JvmApp, JarLibrary, Resources))
-
-        jvm_and_resources_target_roots = set(
-            filter(is_jvm_or_resource_target, self.context.target_roots)
-        )
-        jvm_and_resources_target_roots_minus_thrift_addresses = set(
-            t.address for t in filter(lambda x: not x.is_synthetic, jvm_and_resources_target_roots)
-        )
-        all_targets = set(self.context.targets())
-        modulizable_targets = set(
-            t
-            for t in self.context.build_graph.transitive_dependees_of_addresses(
-                jvm_and_resources_target_roots_minus_thrift_addresses,
-                predicate=lambda x: x in all_targets,
-            )
-            if is_jvm_or_resource_target(t)
-        )
-        synthetic_modulizable_targets = set(filter(lambda x: x.is_synthetic, modulizable_targets))
-        if len(synthetic_modulizable_targets) > 0:
-            raise TaskError(
-                f"Modulizable targets must not contain synthetic target, but in this case {synthetic_modulizable_targets}.\n"
-                f"It means that certain thrift target(s) depends back onto the targets you want to import to IDE."
-            )
-        return modulizable_targets
+    def calculate_jvm_modulizable_targets(self) -> Set[Target]:
+        return set()
 
     def _classpath_for_context(self, context):
         if self.get_options().use_classpath_jars:

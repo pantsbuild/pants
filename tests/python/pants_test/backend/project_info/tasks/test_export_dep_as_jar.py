@@ -173,10 +173,8 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
         self.prep_before_export(context)
 
         # This simulates ZincCompile creates the product.
-        zinc_compile_task = ZincCompile(context, self.pants_workdir)
-        context.products.get_data(
-            "jvm_modulizable_targets", init_func=zinc_compile_task.calculate_jvm_modulizable_targets
-        )
+        context.products.require_data("export_dep_as_jar_signal")
+        ZincCompile(context, self.pants_workdir).calculate_jvm_modulizable_targets()
 
         bootstrap_task = BootstrapJvmTools(context, self.pants_workdir)
         bootstrap_task.execute()
