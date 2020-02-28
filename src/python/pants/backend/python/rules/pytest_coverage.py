@@ -19,7 +19,6 @@ from pants.backend.python.rules.pex import (
     PexInterpreterConstraints,
     PexRequirements,
 )
-from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.fs import (
@@ -35,6 +34,7 @@ from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
 from pants.engine.legacy.structs import PythonTestsAdaptor
 from pants.engine.rules import RootRule, UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
+from pants.python.python_setup import PythonSetup
 from pants.rules.core.determine_source_files import AllSourceFilesRequest, SourceFiles
 from pants.rules.core.distdir import DistDir
 from pants.rules.core.test import (

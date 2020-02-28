@@ -33,24 +33,12 @@ class Status(Enum):
     FAILURE = "FAILURE"
 
 
-class CoverageData(ABC):
-    """Base class for inputs to a coverage report.
-
-    Subclasses should add whichever fields they require - snapshots of coverage output or xml files, etc.
-    """
-
-    @property
-    @abstractmethod
-    def batch_cls(self) -> Type["CoverageDataBatch"]:
-        pass
-
-
 @dataclass(frozen=True)
 class TestResult:
     status: Status
     stdout: str
     stderr: str
-    coverage_data: Optional[CoverageData] = None
+    coverage_data: Optional["CoverageData"] = None
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
@@ -59,7 +47,7 @@ class TestResult:
     def from_fallible_execute_process_result(
         process_result: FallibleExecuteProcessResult,
         *,
-        coverage_data: Optional[CoverageData] = None,
+        coverage_data: Optional["CoverageData"] = None,
     ) -> "TestResult":
         return TestResult(
             status=Status.SUCCESS if process_result.exit_code == 0 else Status.FAILURE,
@@ -119,8 +107,20 @@ class AddressAndDebugRequest:
     request: TestDebugRequest
 
 
+class CoverageData(ABC):
+    """Base class for inputs to a coverage report.
+
+    Subclasses should add whichever fields they require - snapshots of coverage output or xml files, etc.
+    """
+
+    @property
+    @abstractmethod
+    def batch_cls(self) -> Type["CoverageDataBatch"]:
+        pass
+
+
 @union
-class CoverageDataBatch(ABC):
+class CoverageDataBatch:
     pass
 
 
