@@ -20,24 +20,19 @@ from pants.engine.selectors import Get
 from pants.rules.core.fmt import AggregatedFmtResults, FmtResult, FormatTarget
 
 
-# TODO: Change this to be multiple targets.
 @union
-class PythonFormatTarget:
-    pass
-
-
 @dataclass(frozen=True)
-class _ConcretePythonFormatTarget:
+class PythonFormatTarget:
     adaptor_with_origin: TargetAdaptorWithOrigin
 
 
 @rule
 async def format_python_target(
-    concrete_target: _ConcretePythonFormatTarget, union_membership: UnionMembership
+    target: PythonFormatTarget, union_membership: UnionMembership
 ) -> AggregatedFmtResults:
     """This aggregator allows us to have multiple formatters safely operate over the same Python
     targets, even if they modify the same files."""
-    adaptor_with_origin = concrete_target.adaptor_with_origin
+    adaptor_with_origin = target.adaptor_with_origin
     prior_formatter_result = adaptor_with_origin.adaptor.sources.snapshot
     results: List[FmtResult] = []
     for member in union_membership.union_rules[PythonFormatTarget]:
@@ -54,34 +49,28 @@ async def format_python_target(
 
 
 @rule
-def target_adaptor(
-    adaptor_with_origin: PythonTargetAdaptorWithOrigin,
-) -> _ConcretePythonFormatTarget:
-    return _ConcretePythonFormatTarget(adaptor_with_origin)
+def target_adaptor(adaptor_with_origin: PythonTargetAdaptorWithOrigin) -> PythonFormatTarget:
+    return PythonFormatTarget(adaptor_with_origin)
 
 
 @rule
-def app_adaptor(adaptor_with_origin: PythonAppAdaptorWithOrigin) -> _ConcretePythonFormatTarget:
-    return _ConcretePythonFormatTarget(adaptor_with_origin)
+def app_adaptor(adaptor_with_origin: PythonAppAdaptorWithOrigin) -> PythonFormatTarget:
+    return PythonFormatTarget(adaptor_with_origin)
 
 
 @rule
-def binary_adaptor(
-    adaptor_with_origin: PythonBinaryAdaptorWithOrigin,
-) -> _ConcretePythonFormatTarget:
-    return _ConcretePythonFormatTarget(adaptor_with_origin)
+def binary_adaptor(adaptor_with_origin: PythonBinaryAdaptorWithOrigin) -> PythonFormatTarget:
+    return PythonFormatTarget(adaptor_with_origin)
 
 
 @rule
-def tests_adaptor(adaptor_with_origin: PythonTestsAdaptorWithOrigin) -> _ConcretePythonFormatTarget:
-    return _ConcretePythonFormatTarget(adaptor_with_origin)
+def tests_adaptor(adaptor_with_origin: PythonTestsAdaptorWithOrigin) -> PythonFormatTarget:
+    return PythonFormatTarget(adaptor_with_origin)
 
 
 @rule
-def plugin_adaptor(
-    adaptor_with_origin: PantsPluginAdaptorWithOrigin,
-) -> _ConcretePythonFormatTarget:
-    return _ConcretePythonFormatTarget(adaptor_with_origin)
+def plugin_adaptor(adaptor_with_origin: PantsPluginAdaptorWithOrigin) -> PythonFormatTarget:
+    return PythonFormatTarget(adaptor_with_origin)
 
 
 def rules():

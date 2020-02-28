@@ -7,10 +7,7 @@ from pants.backend.python.lint.black.rules import BlackTargets
 from pants.backend.python.lint.black.rules import rules as black_rules
 from pants.backend.python.lint.isort.rules import IsortTargets
 from pants.backend.python.lint.isort.rules import rules as isort_rules
-from pants.backend.python.lint.python_format_target import (
-    _ConcretePythonFormatTarget,
-    format_python_target,
-)
+from pants.backend.python.lint.python_format_target import PythonFormatTarget, format_python_target
 from pants.base.specs import SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Snapshot
@@ -31,7 +28,7 @@ class PythonFormatTargetIntegrationTest(TestBase):
             format_python_target,
             *black_rules(),
             *isort_rules(),
-            RootRule(_ConcretePythonFormatTarget),
+            RootRule(PythonFormatTarget),
             RootRule(BlackTargets),
             RootRule(IsortTargets),
         )
@@ -45,7 +42,7 @@ class PythonFormatTargetIntegrationTest(TestBase):
             address=Address.parse("test:target"),
         )
         origin = SingleAddress(directory="test", name="target")
-        target = _ConcretePythonFormatTarget(TargetAdaptorWithOrigin(adaptor, origin))
+        target = PythonFormatTarget(TargetAdaptorWithOrigin(adaptor, origin))
         args = [
             "--backend-packages2=['pants.backend.python.lint.black', 'pants.backend.python.lint.isort']",
             *(extra_args or []),
