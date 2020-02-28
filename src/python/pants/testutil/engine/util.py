@@ -11,7 +11,7 @@ from typing import Any, Callable, List, Optional, Sequence, Tuple, Type, get_typ
 from colors import blue, green, red
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants.engine.addressable import addressable_list
+from pants.engine.addressable import addressable_sequence
 from pants.engine.native import Native
 from pants.engine.parser import SymbolTable
 from pants.engine.scheduler import Scheduler
@@ -147,7 +147,7 @@ class Target(Struct):
         super().__init__(name=name, **kwargs)
         self.configurations = configurations
 
-    @addressable_list(SubclassesOf(Struct))
+    @addressable_sequence(SubclassesOf(Struct))
     def configurations(self):
         pass
 

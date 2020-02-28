@@ -5,7 +5,7 @@ from collections.abc import MutableMapping, MutableSequence
 from typing import Any, Dict, Iterable, Optional, cast
 
 from pants.build_graph.address import Address
-from pants.engine.addressable import addressable, addressable_list
+from pants.engine.addressable import addressable, addressable_sequence
 from pants.engine.objects import Serializable, SerializableFactory, Validatable, ValidationError
 from pants.util.objects import SubclassesOf, SuperclassesOf
 
@@ -162,11 +162,11 @@ class Struct(Serializable, SerializableFactory, Validatable):
         :rtype: :class:`Serializable`
         """
 
-    @addressable_list(SuperclassesOf)
+    @addressable_sequence(SuperclassesOf)
     def merges(self):
         """Return the objects this object merges in, if any.
 
-        :rtype: list of :class:`Serializable`
+        :rtype: tuple of :class:`Serializable`
         """
 
     def _asdict(self) -> Dict[str, Any]:
@@ -304,9 +304,9 @@ class StructWithDeps(Struct):
         super().__init__(**kwargs)
         self.dependencies = dependencies
 
-    @addressable_list(SubclassesOf(Struct))
+    @addressable_sequence(SubclassesOf(Struct))
     def dependencies(self):
         """The direct dependencies of this target.
 
-        :rtype: list
+        :rtype: tuple
         """

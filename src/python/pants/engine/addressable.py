@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import inspect
-from collections.abc import MutableMapping, MutableSequence
+from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import update_wrapper
 from typing import Any, Sequence, Set, Tuple, Type
@@ -95,7 +95,7 @@ class AddressableDescriptor:
        else a type constraint class can be given if the type constraint should apply to the type of
        the enclosing class.  This is useful for declaring an addressable property in a baseclass that
        should be type-constrained based on the type of the derived class.
-    2. Decorators for addressables (see `addressable`, `addressable_list` and `addressable_dict`)
+    2. Decorators for addressables (see `addressable`, `addressable_sequence` and `addressable_dict`)
        allow wrapping of either class functions - typical - or @property descriptors.  The property
        descriptor case sets up an idiom for recursive addressables.  The idiom looks like:
 
@@ -281,31 +281,31 @@ def addressable(type_constraint):
     return _addressable_wrapper(AddressableDescriptor, type_constraint)
 
 
-class AddressableList(AddressableDescriptor):
+class AddressableSequence(AddressableDescriptor):
     def _checked_value(self, instance, value):
         if value is None:
             return None
 
-        if not isinstance(value, MutableSequence):
+        if not isinstance(value, (list, tuple)):
             raise TypeError(
-                "The {} property of {} must be a list, given {} of type {}".format(
+                "The {} property of {} must be a tuple or list, given {} of type {}".format(
                     self._name, instance, value, type(value).__name__
                 )
             )
-        return [super(AddressableList, self)._checked_value(instance, v) for v in value]
+        return [super(AddressableSequence, self)._checked_value(instance, v) for v in value]
 
     def _resolve_value(self, instance, value):
         return (
-            [super(AddressableList, self)._resolve_value(instance, v) for v in value]
+            tuple(super(AddressableSequence, self)._resolve_value(instance, v) for v in value)
             if value
-            else []
+            else ()
         )
 
 
-def addressable_list(type_constraint):
-    """Marks a list's values as satisfying a given type constraint.
+def addressable_sequence(type_constraint):
+    """Marks a sequence's values as satisfying a given type constraint.
 
-    Some (or all) elements of the list may be :class:`pants.engine.objects.Resolvable` elements
+    Some (or all) elements of the sequence may be :class:`pants.engine.objects.Resolvable` elements
     to resolve later.
 
     See :class:`AddressableDescriptor` for more details.
@@ -313,7 +313,7 @@ def addressable_list(type_constraint):
     :param type_constraint: The type constraint the list's values must all satisfy.
     :type type_constraint: :class:`TypeConstraint`
     """
-    return _addressable_wrapper(AddressableList, type_constraint)
+    return _addressable_wrapper(AddressableSequence, type_constraint)
 
 
 class AddressableDict(AddressableDescriptor):
@@ -321,7 +321,7 @@ class AddressableDict(AddressableDescriptor):
         if value is None:
             return None
 
-        if not isinstance(value, MutableMapping):
+        if not isinstance(value, Mapping):
             raise TypeError(
                 "The {} property of {} must be a dict, given {} of type {}".format(
                     self._name, instance, value, type(value).__name__
