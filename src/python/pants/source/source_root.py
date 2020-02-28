@@ -5,7 +5,8 @@ import os
 from dataclasses import dataclass
 from typing import Dict, Optional, Sequence, Set, Tuple
 
-from pants.base.project_tree_factory import get_project_tree
+from pants.base.build_environment import get_buildroot
+from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.objects import Collection
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
@@ -120,7 +121,7 @@ class SourceRoots:
         However we don't descend into source roots, once found, so this should be fast in practice.
         Note: Does not follow symlinks.
         """
-        project_tree = get_project_tree(self._options)
+        project_tree = FileSystemProjectTree(get_buildroot(), self._options.pants_ignore)
 
         fixed_roots = set()
         for root, langs, category in self._trie.fixed():

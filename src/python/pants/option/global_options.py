@@ -15,6 +15,7 @@ from pants.base.build_environment import (
     get_pants_configdir,
     pants_version,
 )
+from pants.base.deprecated import deprecated_conditional
 from pants.option.custom_types import dir_option, file_option
 from pants.option.errors import OptionsError
 from pants.option.option_value_container import OptionValueContainer
@@ -46,10 +47,23 @@ class GlobMatchErrorBehavior(Enum):
 class FileNotFoundBehavior(Enum):
     """What to do when globs do not match in BUILD files."""
 
+    ignore = "ignore"
     warn = "warn"
     error = "error"
 
     def to_glob_match_error_behavior(self) -> GlobMatchErrorBehavior:
+        deprecated_conditional(
+            lambda: self == type(self).ignore,
+            removal_version="1.29.0.dev2",
+            entity_description="--files-not-found-behavior-option=ignore",
+            hint_message=(
+                "If you currently set `--files-not-found-behavior=ignore`, you will "
+                "need to instead either set `--files-not-found-behavior=warn` (the "
+                "default) or `--files-not-found-behavior=error`. Ignoring when files are "
+                "not found often results in subtle bugs, so we are removing the option."
+            ),
+            deprecation_start_version="1.27.0.dev0",
+        )
         return GlobMatchErrorBehavior(self.value)
 
 
@@ -440,6 +454,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
             "--pants-ignore",
             advanced=True,
             type=list,
+            member_type=str,
             default=[".*/", default_rel_distdir],
             help="Paths to ignore for all filesystem operations performed by pants "
             "(e.g. BUILD file scanning, glob matching, etc). "
@@ -470,11 +485,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
             default=GlobMatchErrorBehavior.warn,
             removal_version="1.27.0.dev0",
             removal_hint="If you currently set `--glob-expansion-failure=error`, instead set "
-            "`--files-not-found-behavior=error`. "
-            "If you currently set `--glob-expansion-failure=ignore`, you will "
-            "need to instead either set `--files-not-found-behavior=warn` (the "
-            "default) or `--files-not-found-behavior=error`. Ignoring when files are "
-            "not found often results in subtle bugs, so we are removing the option.",
+            "`--files-not-found-behavior=error`.",
             help="What to do when files and globs specified in BUILD files, such as in the "
             "`sources` field, cannot be found. This happens when the files do not exist on "
             "your machine or when they are ignored by the `--pants-ignore` option.",
