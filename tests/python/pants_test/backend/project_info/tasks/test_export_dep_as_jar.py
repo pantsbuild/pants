@@ -183,6 +183,17 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
         task = self.create_task(context)
         return list(task.console_output(list(task.context.targets())))
 
+    def create_runtime_classpath_for_targets(self, target):
+        def path_to_zjar_with_workdir(address: Address):
+            return os.path.join(self.pants_workdir, address.path_safe_spec, "z.jar")
+
+        runtime_classpath = ClasspathProducts(self.pants_workdir)
+        for dep in target.dependencies:
+            runtime_classpath.add_for_target(
+                dep, [("default", path_to_zjar_with_workdir(dep.address))]
+            )
+        return runtime_classpath
+
 
 class ExportDepAsJarTestSuiteOne(ExportDepAsJarTest):
 
@@ -297,17 +308,6 @@ class ExportDepAsJarTestSuiteOne(ExportDepAsJarTest):
             dependencies=[self.scala_with_source_dep],
             strict_deps=False,
         )
-
-    def create_runtime_classpath_for_targets(self, target):
-        def path_to_zjar_with_workdir(address: Address):
-            return os.path.join(self.pants_workdir, address.path_safe_spec, "z.jar")
-
-        runtime_classpath = ClasspathProducts(self.pants_workdir)
-        for dep in target.dependencies:
-            runtime_classpath.add_for_target(
-                dep, [("default", path_to_zjar_with_workdir(dep.address))]
-            )
-        return runtime_classpath
 
     def prep_before_export(self, context):
         runtime_classpath = self.create_runtime_classpath_for_targets(self.scala_with_source_dep)
@@ -710,17 +710,6 @@ class ExportDepAsJarTestWithCodegenTargets(ExportDepAsJarTest):
                 ),
             ],
         )
-
-    def create_runtime_classpath_for_targets(self, target):
-        def path_to_zjar_with_workdir(address: Address):
-            return os.path.join(self.pants_workdir, address.path_safe_spec, "z.jar")
-
-        runtime_classpath = ClasspathProducts(self.pants_workdir)
-        for dep in target.dependencies:
-            runtime_classpath.add_for_target(
-                dep, [("default", path_to_zjar_with_workdir(dep.address))]
-            )
-        return runtime_classpath
 
     def prep_before_export(self, context):
         context.products.safe_create_data(
