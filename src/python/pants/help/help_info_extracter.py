@@ -52,7 +52,7 @@ class OptionScopeHelpInfo:
     """A container for help information for a scope of options.
 
     scope: The scope of the described options.
-    basic|advanced:deprecated: A list of OptionHelpInfo for the options in that group.
+    basic|advanced|deprecated: A list of OptionHelpInfo for the options in that group.
     """
 
     scope: str

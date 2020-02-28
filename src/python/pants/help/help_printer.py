@@ -132,7 +132,7 @@ class HelpPrinter:
             print(pants_release())
             print("\nUsage:")
             print(
-                f"  {self.bin_name} [option ...] [goal ...] [target/fileglob ...]  Attempt the specified goals."
+                f"  {self.bin_name} [option ...] [goal ...] [target/file ...]  Attempt the specified goals."
             )
             print(f"  {self.bin_name} help                                 Get help.")
             print(f"  {self.bin_name} help [goal]                          Get help for a goal.")
@@ -147,7 +147,7 @@ class HelpPrinter:
                 f"  {self.bin_name} goals                                List all installed goals."
             )
             print("")
-            print("  [fileglob] can be:")
+            print("  [file] can be:")
             print("     A path to a file.")
             print("     A path glob, such as '**/*.ext', in quotes to prevent shell expansion.")
             print("  [target] accepts two special forms:")
