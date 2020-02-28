@@ -62,7 +62,7 @@ class FmtTest(TestBase):
         )
         return HydratedTargetWithOrigin(ht, SingleAddress(directory="src", name=name))
 
-    def run_fmt_rule(self, *, targets: List[HydratedTargetWithOrigin]) -> Tuple[Fmt, str]:
+    def run_fmt_rule(self, *, targets: List[HydratedTargetWithOrigin]) -> Tuple[int, str]:
         result_digest = self.request_single_product(
             Digest,
             InputFilesContent(
@@ -106,7 +106,7 @@ class FmtTest(TestBase):
             ],
             union_membership=union_membership,
         )
-        return result, console.stdout.getvalue()
+        return result.exit_code, console.stdout.getvalue()
 
     def assert_workspace_modified(self, *, modified: bool = True) -> None:
         formatted_file = Path(self.build_root, self.formatted_file)
@@ -117,24 +117,24 @@ class FmtTest(TestBase):
         assert formatted_file.read_text() == self.formatted_content
 
     def test_non_union_member_noops(self) -> None:
-        result, stdout = self.run_fmt_rule(
+        exit_code, stdout = self.run_fmt_rule(
             targets=[self.make_hydrated_target_with_origin(adaptor_type=JvmAppAdaptor)]
         )
-        assert result.exit_code == 0
+        assert exit_code == 0
         assert stdout.strip() == ""
         self.assert_workspace_modified(modified=False)
 
     def test_empty_target_noops(self) -> None:
-        result, stdout = self.run_fmt_rule(
+        exit_code, stdout = self.run_fmt_rule(
             targets=[self.make_hydrated_target_with_origin(include_sources=False)]
         )
-        assert result.exit_code == 0
+        assert exit_code == 0
         assert stdout.strip() == ""
         self.assert_workspace_modified(modified=False)
 
     def test_single_target(self) -> None:
-        result, stdout = self.run_fmt_rule(targets=[self.make_hydrated_target_with_origin()])
-        assert result.exit_code == 0
+        exit_code, stdout = self.run_fmt_rule(targets=[self.make_hydrated_target_with_origin()])
+        assert exit_code == 0
         assert stdout.strip() == "Formatted `target`"
         self.assert_workspace_modified()
 
@@ -142,12 +142,12 @@ class FmtTest(TestBase):
         # NB: we do not test the case where AggregatedFmtResults have conflicting changes, as that
         # logic is handled by DirectoriesToMerge and is avoided by each language having its own
         # aggregator rule.
-        result, stdout = self.run_fmt_rule(
+        exit_code, stdout = self.run_fmt_rule(
             targets=[
                 self.make_hydrated_target_with_origin(name="t1"),
                 self.make_hydrated_target_with_origin(name="t2"),
             ]
         )
-        assert result.exit_code == 0
+        assert exit_code == 0
         assert stdout.splitlines() == ["Formatted `t1`", "Formatted `t2`"]
         self.assert_workspace_modified()
