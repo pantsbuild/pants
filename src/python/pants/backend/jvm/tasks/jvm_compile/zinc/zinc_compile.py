@@ -956,6 +956,8 @@ class ZincCompile(BaseZincCompile):
             t
             for t in self.context.build_graph.transitive_dependees_of_addresses(
                 jvm_and_resources_target_roots_minus_synthetic_addresses,
+                # A predicate is required here because it's possible other injected targets
+                # could show up as dependees. (##9179)
                 predicate=lambda x: x in all_targets,
             )
             if is_jvm_or_resource_target(t)
