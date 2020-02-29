@@ -7,14 +7,14 @@ from pants.backend.python.lint.black.rules import BlackFormatter
 from pants.backend.python.lint.black.rules import rules as black_rules
 from pants.backend.python.lint.isort.rules import IsortFormatter
 from pants.backend.python.lint.isort.rules import rules as isort_rules
-from pants.backend.python.lint.python_formatter import PythonFormatTarget, format_python_target
+from pants.backend.python.lint.python_formatter import PythonFormatters, format_python_target
 from pants.base.specs import SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Snapshot
 from pants.engine.legacy.structs import TargetAdaptor, TargetAdaptorWithOrigin
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
-from pants.rules.core.fmt import AggregatedFmtResults
+from pants.rules.core.fmt import LanguageFmtResults
 from pants.source.wrapped_globs import EagerFilesetWithSpec
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
@@ -28,27 +28,27 @@ class PythonFormatterIntegrationTest(TestBase):
             format_python_target,
             *black_rules(),
             *isort_rules(),
-            RootRule(PythonFormatTarget),
+            RootRule(PythonFormatters),
             RootRule(BlackFormatter),
             RootRule(IsortFormatter),
         )
 
     def run_black_and_isort(
         self, source_files: List[FileContent], *, extra_args: Optional[List[str]] = None
-    ) -> AggregatedFmtResults:
+    ) -> LanguageFmtResults:
         input_snapshot = self.request_single_product(Snapshot, InputFilesContent(source_files))
         adaptor = TargetAdaptor(
             sources=EagerFilesetWithSpec("test", {"globs": []}, snapshot=input_snapshot),
             address=Address.parse("test:target"),
         )
         origin = SingleAddress(directory="test", name="target")
-        target = PythonFormatTarget(TargetAdaptorWithOrigin(adaptor, origin))
+        formatters = PythonFormatters((TargetAdaptorWithOrigin(adaptor, origin),))
         args = [
             "--backend-packages2=['pants.backend.python.lint.black', 'pants.backend.python.lint.isort']",
             *(extra_args or []),
         ]
         results = self.request_single_product(
-            AggregatedFmtResults, Params(target, create_options_bootstrapper(args=args)),
+            LanguageFmtResults, Params(formatters, create_options_bootstrapper(args=args)),
         )
         return results
 
