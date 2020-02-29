@@ -748,8 +748,6 @@ class ExportDepAsJarTestWithCodegenTargets(ExportDepAsJarTest):
 
     def test_export_a_c_d(self):
         """Because d is synthetic, the result should be the exactly the same as `a c` above.
-
-        :return:
         """
         result = self.execute_export_json("project_info:a", "project_info:c", "project_info:d")
         self.assertEqual(
