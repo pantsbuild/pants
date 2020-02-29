@@ -118,6 +118,8 @@ class FmtTest(TestBase):
         result_digest: Digest,
     ) -> str:
         console = MockConsole(use_colors=False)
+        # NB: This ensures that the hardcoded digests can actually be found.
+        self.make_snapshot({PYTHON_FILE: PYTHON_CONTENT, JAVA_FILE: JAVA_CONTENT})
         union_membership = UnionMembership(
             OrderedDict({LanguageFormatters: OrderedSet(language_formatters)})
         )
