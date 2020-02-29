@@ -7,7 +7,6 @@ from contextlib import contextmanager
 from textwrap import dedent
 from unittest.mock import Mock
 
-from twitter.common.collections import OrderedSet
 from twitter.common.dirutil.chroot import Chroot
 
 from pants.backend.python.targets.python_library import PythonLibrary
@@ -23,6 +22,7 @@ from pants.testutil.interpreter_selection_utils import skip_unless_python36_pres
 from pants.testutil.subsystem.util import init_subsystem
 from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir
+from pants.util.ordered_set import OrderedSet
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 
 
@@ -95,9 +95,9 @@ class TestSetupPy(SetupPyTestBase):
         self.assertEqual(
             self.dependency_calculator.reduced_dependencies(target_map["baz"]), OrderedSet()
         )
-        self.assert_requirements(target_map["foo"], {"bar==0.0.0"})
-        self.assert_requirements(target_map["bar"], {"baz==0.0.0"})
-        self.assert_requirements(target_map["baz"], set())
+        self.assert_requirements(target_map["foo"], OrderedSet(["bar==0.0.0"]))
+        self.assert_requirements(target_map["bar"], OrderedSet(["baz==0.0.0"]))
+        self.assert_requirements(target_map["baz"], OrderedSet())
 
     def test_execution_reduced_dependencies_1(self):
         dep_map = OrderedDict(foo=["bar"], bar=["baz"], baz=[])
@@ -146,9 +146,9 @@ class TestSetupPy(SetupPyTestBase):
             self.dependency_calculator.reduced_dependencies(target_map["baz"]),
             OrderedSet([target_map["bak"]]),
         )
-        self.assert_requirements(target_map["foo"], {"bar==0.0.0", "baz==0.0.0"})
-        self.assert_requirements(target_map["bar"], {"bak==0.0.0"})
-        self.assert_requirements(target_map["baz"], {"bak==0.0.0"})
+        self.assert_requirements(target_map["foo"], OrderedSet(["bar==0.0.0", "baz==0.0.0"]))
+        self.assert_requirements(target_map["bar"], OrderedSet(["bak==0.0.0"]))
+        self.assert_requirements(target_map["baz"], OrderedSet(["bak==0.0.0"]))
 
     def test_binary_target_injected_into_reduced_dependencies(self):
         foo_bin_dep = self.create_python_library(relpath="foo/dep", name="dep")
@@ -220,7 +220,7 @@ class TestSetupPy(SetupPyTestBase):
         self.assertEqual(
             self.dependency_calculator.reduced_dependencies(bar), OrderedSet([bar_bin, bar_bin_dep])
         )
-        self.assert_requirements(bar, {"bar_bin_dep==0.0.0"})
+        self.assert_requirements(bar, OrderedSet(["bar_bin_dep==0.0.0"]))
         entry_points = dict(SetupPy.iter_entry_points(bar))
         self.assertEqual(entry_points, {"bar_binary": "bar.bin:bar"})
 

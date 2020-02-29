@@ -3,11 +3,11 @@
 
 from typing import List, Optional, Tuple
 
-from pants.backend.python.lint.isort.rules import IsortTarget
+from pants.backend.python.lint.isort.rules import IsortFormatter
 from pants.backend.python.lint.isort.rules import rules as isort_rules
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.address import Address
-from pants.engine.fs import Digest, FileContent, InputFilesContent, Snapshot
+from pants.engine.fs import Digest, DirectoriesToMerge, FileContent, InputFilesContent, Snapshot
 from pants.engine.legacy.structs import TargetAdaptor, TargetAdaptorWithOrigin
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
@@ -36,16 +36,27 @@ class IsortIntegrationTest(TestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *isort_rules(), RootRule(IsortTarget))
+        return (*super().rules(), *isort_rules(), RootRule(IsortFormatter))
+
+    def make_target_with_origin(
+        self, source_files: List[FileContent], *, origin: Optional[OriginSpec] = None,
+    ) -> TargetAdaptorWithOrigin:
+        input_snapshot = self.request_single_product(Snapshot, InputFilesContent(source_files))
+        adaptor = TargetAdaptor(
+            sources=EagerFilesetWithSpec("test", {"globs": []}, snapshot=input_snapshot),
+            address=Address.parse("test:target"),
+        )
+        if origin is None:
+            origin = SingleAddress(directory="test", name="target")
+        return TargetAdaptorWithOrigin(adaptor, origin)
 
     def run_isort(
         self,
-        source_files: List[FileContent],
+        targets: List[TargetAdaptorWithOrigin],
         *,
         config: Optional[str] = None,
         passthrough_args: Optional[str] = None,
         skip: bool = False,
-        origin: Optional[OriginSpec] = None,
     ) -> Tuple[LintResult, FmtResult]:
         args = ["--backend-packages2=pants.backend.python.lint.isort"]
         if config is not None:
@@ -55,22 +66,20 @@ class IsortIntegrationTest(TestBase):
             args.append(f"--isort-args='{passthrough_args}'")
         if skip:
             args.append(f"--isort-skip")
-        input_snapshot = self.request_single_product(Snapshot, InputFilesContent(source_files))
-        adaptor = TargetAdaptor(
-            sources=EagerFilesetWithSpec("test", {"globs": []}, snapshot=input_snapshot),
-            address=Address.parse("test:target"),
-        )
-        if origin is None:
-            origin = SingleAddress(directory="test", name="target")
-        adaptor_with_origin = TargetAdaptorWithOrigin(adaptor, origin)
         options_bootstrapper = create_options_bootstrapper(args=args)
         lint_result = self.request_single_product(
-            LintResult, Params(IsortTarget(adaptor_with_origin), options_bootstrapper)
+            LintResult, Params(IsortFormatter(tuple(targets)), options_bootstrapper)
+        )
+        input_snapshot = self.request_single_product(
+            Snapshot,
+            DirectoriesToMerge(
+                tuple(target.adaptor.sources.snapshot.directory_digest for target in targets)
+            ),
         )
         fmt_result = self.request_single_product(
             FmtResult,
             Params(
-                IsortTarget(adaptor_with_origin, prior_formatter_result=input_snapshot),
+                IsortFormatter(tuple(targets), prior_formatter_result=input_snapshot),
                 options_bootstrapper,
             ),
         )
@@ -79,23 +88,39 @@ class IsortIntegrationTest(TestBase):
     def get_digest(self, source_files: List[FileContent]) -> Digest:
         return self.request_single_product(Digest, InputFilesContent(source_files))
 
-    def test_single_passing_source(self) -> None:
-        lint_result, fmt_result = self.run_isort([self.good_source])
+    def test_passing_source(self) -> None:
+        target = self.make_target_with_origin([self.good_source])
+        lint_result, fmt_result = self.run_isort([target])
         assert lint_result.exit_code == 0
         assert lint_result.stdout == ""
         assert fmt_result.stdout == ""
         assert fmt_result.digest == self.get_digest([self.good_source])
 
-    def test_single_failing_source(self) -> None:
-        lint_result, fmt_result = self.run_isort([self.bad_source])
+    def test_failing_source(self) -> None:
+        target = self.make_target_with_origin([self.bad_source])
+        lint_result, fmt_result = self.run_isort([target])
         assert lint_result.exit_code == 1
         assert "test/bad.py Imports are incorrectly sorted" in lint_result.stdout
         assert "Fixing" in fmt_result.stdout
         assert "test/bad.py" in fmt_result.stdout
         assert fmt_result.digest == self.get_digest([self.fixed_bad_source])
 
-    def test_multiple_mixed_sources(self) -> None:
-        lint_result, fmt_result = self.run_isort([self.good_source, self.bad_source])
+    def test_mixed_sources(self) -> None:
+        target = self.make_target_with_origin([self.good_source, self.bad_source])
+        lint_result, fmt_result = self.run_isort([target])
+        assert lint_result.exit_code == 1
+        assert "test/bad.py Imports are incorrectly sorted" in lint_result.stdout
+        assert "test/good.py" not in lint_result.stdout
+        assert "Fixing" in fmt_result.stdout and "test/bad.py" in fmt_result.stdout
+        assert "test/good.py" not in fmt_result.stdout
+        assert fmt_result.digest == self.get_digest([self.good_source, self.fixed_bad_source])
+
+    def test_multiple_targets(self) -> None:
+        targets = [
+            self.make_target_with_origin([self.good_source]),
+            self.make_target_with_origin([self.bad_source]),
+        ]
+        lint_result, fmt_result = self.run_isort(targets)
         assert lint_result.exit_code == 1
         assert "test/bad.py Imports are incorrectly sorted" in lint_result.stdout
         assert "test/good.py" not in lint_result.stdout
@@ -104,18 +129,19 @@ class IsortIntegrationTest(TestBase):
         assert fmt_result.digest == self.get_digest([self.good_source, self.fixed_bad_source])
 
     def test_precise_file_args(self) -> None:
-        file_arg = FilesystemLiteralSpec(self.good_source.path)
-        lint_result, fmt_result = self.run_isort(
-            [self.good_source, self.bad_source], origin=file_arg
+        target = self.make_target_with_origin(
+            [self.good_source, self.bad_source], origin=FilesystemLiteralSpec(self.good_source.path)
         )
+        lint_result, fmt_result = self.run_isort([target])
         assert lint_result.exit_code == 0
         assert lint_result.stdout == ""
         assert fmt_result.stdout == ""
         assert fmt_result.digest == self.get_digest([self.good_source, self.bad_source])
 
     def test_respects_config_file(self) -> None:
+        target = self.make_target_with_origin([self.needs_config_source])
         lint_result, fmt_result = self.run_isort(
-            [self.needs_config_source], config="[settings]\ncombine_as_imports=True\n",
+            [target], config="[settings]\ncombine_as_imports=True\n",
         )
         assert lint_result.exit_code == 1
         assert "test/config.py Imports are incorrectly sorted" in lint_result.stdout
@@ -124,9 +150,8 @@ class IsortIntegrationTest(TestBase):
         assert fmt_result.digest == self.get_digest([self.fixed_needs_config_source])
 
     def test_respects_passthrough_args(self) -> None:
-        lint_result, fmt_result = self.run_isort(
-            [self.needs_config_source], passthrough_args="--combine-as",
-        )
+        target = self.make_target_with_origin([self.needs_config_source])
+        lint_result, fmt_result = self.run_isort([target], passthrough_args="--combine-as",)
         assert lint_result.exit_code == 1
         assert "test/config.py Imports are incorrectly sorted" in lint_result.stdout
         assert "Fixing" in fmt_result.stdout
@@ -134,6 +159,7 @@ class IsortIntegrationTest(TestBase):
         assert fmt_result.digest == self.get_digest([self.fixed_needs_config_source])
 
     def test_skip(self) -> None:
-        lint_result, fmt_result = self.run_isort([self.bad_source], skip=True)
+        target = self.make_target_with_origin([self.bad_source])
+        lint_result, fmt_result = self.run_isort([target], skip=True)
         assert lint_result == LintResult.noop()
         assert fmt_result == FmtResult.noop()

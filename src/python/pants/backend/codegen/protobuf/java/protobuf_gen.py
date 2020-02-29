@@ -6,8 +6,6 @@ import subprocess
 from collections import OrderedDict
 from hashlib import sha1
 
-from twitter.common.collections import OrderedSet
-
 from pants.backend.codegen.protobuf.java.java_protobuf_library import JavaProtobufLibrary
 from pants.backend.codegen.protobuf.subsystems.protoc import Protoc
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -17,6 +15,7 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.fs.archive import ZIP
 from pants.task.simple_codegen_task import SimpleCodegenTask
+from pants.util.ordered_set import OrderedSet
 
 
 class ProtobufGen(SimpleCodegenTask):

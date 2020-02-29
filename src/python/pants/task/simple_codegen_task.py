@@ -7,8 +7,6 @@ from abc import abstractmethod
 from collections import OrderedDict
 from typing import Optional, Tuple, Type
 
-from twitter.common.collections import OrderedSet
-
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
@@ -19,6 +17,7 @@ from pants.engine.fs import Digest, PathGlobs, PathGlobsAndRoot
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
 from pants.task.task import Task
 from pants.util.dirutil import fast_relpath, safe_delete
+from pants.util.ordered_set import OrderedSet
 
 logger = logging.getLogger(__name__)
 

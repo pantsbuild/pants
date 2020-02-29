@@ -7,8 +7,6 @@ from collections import defaultdict
 from contextlib import contextmanager
 from typing import Dict
 
-from twitter.common.collections import OrderedSet
-
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.worker_pool import SubprocPool
 from pants.base.workunit import WorkUnit, WorkUnitLabel
@@ -24,12 +22,13 @@ from pants.goal.workspace import ScmWorkspace
 from pants.option.options import Options
 from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.source.source_root import SourceRootConfig
+from pants.util.ordered_set import OrderedSet
 
 
 class Context:
     """Contains the context for a single run of pants.
 
-    Task implementations can access configuration data from pants.ini and any flags they have exposed
+    Task implementations can access configuration data from pants.toml and any flags they have exposed
     here as well as information about the targets involved in the run.
 
     Advanced uses of the context include adding new targets to it for upstream or downstream goals to

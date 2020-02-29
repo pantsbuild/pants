@@ -41,7 +41,7 @@ async def create_pex_from_target_closure(
     all_target_adaptors = [t.adaptor for t in all_targets]
 
     interpreter_constraints = PexInterpreterConstraints.create_from_adaptors(
-        adaptors=tuple(all_target_adaptors), python_setup=python_setup
+        adaptors=all_target_adaptors, python_setup=python_setup
     )
 
     input_digests = []

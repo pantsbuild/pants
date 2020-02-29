@@ -45,7 +45,8 @@ class PexTest(TestBase):
         entry_point=None,
         interpreter_constraints=PexInterpreterConstraints(),
         input_files: Optional[Digest] = None,
-        additional_args: Tuple[str, ...] = (),
+        additional_pants_args: Tuple[str, ...] = (),
+        additional_pex_args: Tuple[str, ...] = (),
     ) -> Dict:
         request = CreatePex(
             output_filename="test.pex",
@@ -53,13 +54,15 @@ class PexTest(TestBase):
             interpreter_constraints=interpreter_constraints,
             entry_point=entry_point,
             input_files_digest=input_files,
-            additional_args=additional_args,
+            additional_args=additional_pex_args,
         )
         requirements_pex = self.request_single_product(
             Pex,
             Params(
                 request,
-                create_options_bootstrapper(args=["--backend-packages2=pants.backend.python"]),
+                create_options_bootstrapper(
+                    args=["--backend-packages2=pants.backend.python", *additional_pants_args]
+                ),
             ),
         )
         self.scheduler.materialize_directory(
@@ -78,7 +81,8 @@ class PexTest(TestBase):
         entry_point=None,
         interpreter_constraints=PexInterpreterConstraints(),
         input_files: Optional[Digest] = None,
-        additional_args: Tuple[str, ...] = (),
+        additional_pants_args: Tuple[str, ...] = (),
+        additional_pex_args: Tuple[str, ...] = (),
     ) -> Dict:
         return cast(
             Dict,
@@ -87,7 +91,8 @@ class PexTest(TestBase):
                 entry_point=entry_point,
                 interpreter_constraints=interpreter_constraints,
                 input_files=input_files,
-                additional_args=additional_args,
+                additional_pants_args=additional_pants_args,
+                additional_pex_args=additional_pex_args,
             )["info"],
         )
 
@@ -122,23 +127,41 @@ class PexTest(TestBase):
 
     def test_resolves_dependencies(self) -> None:
         requirements = PexRequirements(
-            requirements=("six==1.12.0", "jsonschema==2.6.0", "requests==2.22.0")
+            requirements=("six==1.12.0", "jsonschema==2.6.0", "requests==2.23.0")
         )
         pex_info = self.create_pex_and_get_pex_info(requirements=requirements)
         # NB: We do not check for transitive dependencies, which PEX-INFO will include. We only check
         # that at least the dependencies we requested are included.
-        self.assertTrue(set(requirements.requirements).issubset(pex_info["requirements"]))
+        assert set(requirements.requirements).issubset(pex_info["requirements"]) is True
+
+    def test_requirement_constraints(self) -> None:
+        # This is intentionally old; a constraint will resolve us to a more modern version.
+        direct_dep = "requests==1.0.0"
+        constraints = [
+            "requests==2.23.0",
+            "certifi==2019.6.16",
+            "chardet==3.0.2",
+            "idna==2.7",
+            "urllib3==1.25.6",
+        ]
+        self.create_file("constraints.txt", "\n".join(constraints))
+
+        pex_info = self.create_pex_and_get_pex_info(
+            requirements=PexRequirements((direct_dep,)),
+            additional_pants_args=("--python-setup-requirement-constraints=constraints.txt",),
+        )
+        assert set(pex_info["requirements"]) == set(constraints)
 
     def test_entry_point(self) -> None:
         entry_point = "pydoc"
         pex_info = self.create_pex_and_get_pex_info(entry_point=entry_point)
-        self.assertEqual(pex_info["entry_point"], entry_point)
+        assert pex_info["entry_point"] == entry_point
 
     def test_interpreter_constraints(self) -> None:
         constraints = PexInterpreterConstraints(constraint_set=("CPython>=2.7,<3", "CPython>=3.6"))
         pex_info = self.create_pex_and_get_pex_info(interpreter_constraints=constraints)
-        self.assertEqual(set(pex_info["interpreter_constraints"]), set(constraints.constraint_set))
+        assert set(pex_info["interpreter_constraints"]) == set(constraints.constraint_set)
 
     def test_additional_args(self) -> None:
-        pex_info = self.create_pex_and_get_pex_info(additional_args=("--not-zip-safe",))
+        pex_info = self.create_pex_and_get_pex_info(additional_pex_args=("--not-zip-safe",))
         assert pex_info["zip_safe"] is False

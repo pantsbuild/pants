@@ -4,8 +4,6 @@
 import os
 from collections import defaultdict
 
-from twitter.common.collections import OrderedSet
-
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
@@ -13,6 +11,7 @@ from pants.build_graph.aliased_target import AliasTarget
 from pants.build_graph.build_graph import sort_targets
 from pants.build_graph.target import Target
 from pants.util.memo import memoized_method, memoized_property
+from pants.util.ordered_set import OrderedSet
 
 
 class JvmDependencyAnalyzer:

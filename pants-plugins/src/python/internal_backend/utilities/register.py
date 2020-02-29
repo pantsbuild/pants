@@ -4,14 +4,13 @@
 import os
 from pathlib import Path
 
-from twitter.common.collections import OrderedSet
-
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.subsystem.subsystem import Subsystem
+from pants.util.ordered_set import OrderedSet
 from pants.version import PANTS_SEMVER, VERSION
 
 

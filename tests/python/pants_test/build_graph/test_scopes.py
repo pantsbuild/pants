@@ -1,11 +1,10 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from twitter.common.collections import OrderedSet
-
 from pants.build_graph.target import Target
 from pants.build_graph.target_scopes import Scope, Scopes
 from pants.testutil.test_base import TestBase
+from pants.util.ordered_set import OrderedSet
 
 
 class ScopesTest(TestBase):

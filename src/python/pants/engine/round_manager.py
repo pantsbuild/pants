@@ -3,9 +3,8 @@
 
 from collections import defaultdict, namedtuple
 
-from twitter.common.collections import OrderedSet
-
 from pants.goal.goal import Goal
+from pants.util.ordered_set import OrderedSet
 
 
 class ProducerInfo(namedtuple("ProducerInfo", ["product_type", "task_type", "goal"])):

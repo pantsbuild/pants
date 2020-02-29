@@ -11,8 +11,6 @@ import sys
 from collections import OrderedDict, defaultdict, namedtuple
 from copy import copy
 
-from twitter.common.collections import OrderedSet
-
 from pants.backend.jvm.ossrh_publication_metadata import OSSRHPublicationMetadata
 from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
 from pants.backend.jvm.targets.jarable import Jarable
@@ -32,6 +30,7 @@ from pants.ivy.ivy import Ivy
 from pants.task.scm_publish_mixin import Namedver, ScmPublishMixin, Semver
 from pants.task.target_restriction_mixins import HasTransitiveOptionMixin
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
+from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import ensure_text
 
 _TEMPLATES_RELPATH = os.path.join("templates", "jar_publish")
@@ -250,7 +249,7 @@ class JarPublish(HasTransitiveOptionMixin, ScmPublishMixin, JarTask):
     publish artifacts to Maven-style repositories. Pants performs prerequisite
     tasks like compiling, creating jars, and generating ``pom.xml`` files then
     invokes Ivy to actually publish the artifacts, so publishing is largely
-    configured in ``ivysettings.xml``. ``BUILD`` and ``pants.ini`` files
+    configured in ``ivysettings.xml``. ``BUILD`` and ``pants.toml`` files
     primarily provide linkage between publishable targets and the
     Ivy ``resolvers`` used to publish them.
 

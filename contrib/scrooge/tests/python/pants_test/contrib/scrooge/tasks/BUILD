@@ -24,6 +24,7 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/goal:context',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:ordered_set',
     'src/python/pants/testutil/jvm:nailgun_task_test_base'
   ],
   tags = {'partially_type_checked'},

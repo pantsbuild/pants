@@ -9,7 +9,6 @@ from typing import Callable, Sequence, Set
 from pex.pex_builder import PEXBuilder
 from pex.resolver import resolve_multi
 from pex.util import DistributionHelper
-from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
@@ -20,6 +19,7 @@ from pants.python.python_requirement import PythonRequirement
 from pants.python.python_setup import PythonSetup
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_file
+from pants.util.ordered_set import OrderedSet
 
 
 def has_resources(tgt: Target) -> bool:

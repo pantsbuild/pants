@@ -11,7 +11,7 @@ from typing import Any, Callable, Iterable, List, Optional, Sequence, Tuple, Typ
 from pants.base.specs import OriginSpec
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
-from pants.engine.addressable import addressable_list
+from pants.engine.addressable import addressable_sequence
 from pants.engine.fs import GlobExpansionConjunction, PathGlobs
 from pants.engine.objects import Locatable, union
 from pants.engine.rules import UnionRule
@@ -29,6 +29,12 @@ class TargetAdaptor(StructWithDeps):
 
     Extends StructWithDeps to add a `dependencies` field marked Addressable.
     """
+
+    # NB: This overridden `__init__()` is weird. We solely have it so that MyPy can infer
+    # `TargetAdaptor.dependencies` as `Tuple[Address, ...]`.
+    def __init__(self, dependencies=None, **kwargs) -> None:
+        super().__init__(dependencies, **kwargs)
+        self.dependencies: Tuple[Address, ...]
 
     @property
     def address(self) -> Address:
@@ -122,6 +128,17 @@ class TargetAdaptor(StructWithDeps):
 
         :param sources EagerFilesetWithSpec resolved sources.
         """
+
+    # TODO: do we want to support the `extension` parameter from Target.has_sources()? In V1,
+    # it's used to distinguish between Java vs. Scala files. For now, we should leave it off to
+    # keep things as simple as possible, but we may want to add it in the future.
+    def has_sources(self) -> bool:
+        """Return True if the target has `sources` defined with resolved entries.
+
+        This checks after the sources have been resolved, e.g. after any globs have been expanded
+        and any ignores have been applied.
+        """
+        return hasattr(self, "sources") and bool(self.sources.snapshot.files)
 
 
 @union
@@ -218,7 +235,7 @@ class AppAdaptor(TargetAdaptor):
         super().__init__(**kwargs)
         self.bundles = bundles
 
-    @addressable_list(Exactly(BundleAdaptor))
+    @addressable_sequence(Exactly(BundleAdaptor))
     def bundles(self):
         """The BundleAdaptors for this JvmApp."""
         return self.bundles

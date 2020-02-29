@@ -9,6 +9,7 @@ import pytest
 
 from pants.build_graph.address import Address
 from pants.build_graph.files import Files
+from pants.engine.legacy.structs import TargetAdaptor
 from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Params
 from pants.rules.core.strip_source_roots import (
@@ -92,25 +93,23 @@ class StripSourceRootsTest(TestBase):
             type_alias: Optional[str] = None,
             specified_sources: Optional[List[str]] = None,
         ) -> List[str]:
-            adaptor = Mock()
-            adaptor.type_alias = type_alias
-
-            if source_paths is None:
-                del adaptor.sources
-                return self.get_stripped_files(StripTargetRequest(adaptor))
-
-            adaptor.address = Address(
-                spec_path=PurePath(source_paths[0]).parent.as_posix(), target_name="target"
+            address = (
+                Address(spec_path=PurePath(source_paths[0]).parent.as_posix(), target_name="target")
+                if source_paths
+                else Address.parse("src/python/project:target")
             )
-            adaptor.sources = Mock()
-            adaptor.sources.snapshot = self.make_snapshot_of_empty_files(source_paths)
+            sources = Mock()
+            sources.snapshot = self.make_snapshot_of_empty_files(source_paths or [])
             specified_sources_snapshot = (
                 None
                 if not specified_sources
                 else self.make_snapshot_of_empty_files(specified_sources)
             )
             return self.get_stripped_files(
-                StripTargetRequest(adaptor, specified_files_snapshot=specified_sources_snapshot)
+                StripTargetRequest(
+                    TargetAdaptor(address=address, type_alias=type_alias, sources=sources),
+                    specified_files_snapshot=specified_sources_snapshot,
+                )
             )
 
         # normal target

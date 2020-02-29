@@ -265,24 +265,28 @@ class TestTest(TestBase):
             if test_target_type
             else PythonBinaryAdaptor(type_alias="python_binary", sources=mocked_fileset)
         )
+        union_membership = UnionMembership(union_rules={TestTarget: [PythonTestsAdaptorWithOrigin]})
         with self.captured_logging(logging.INFO):
             result: AddressAndTestResult = run_rule(
                 coordinator_of_tests,
                 rule_args=[
                     HydratedTargetWithOrigin(
                         target=HydratedTarget(address, target_adaptor, ()),
-                        origin=origin
-                        or SingleAddress(directory=address.spec_path, name=address.target_name),
+                        origin=(
+                            origin
+                            or SingleAddress(directory=address.spec_path, name=address.target_name)
+                        ),
                     ),
-                    UnionMembership(union_rules={TestTarget: [PythonTestsAdaptorWithOrigin]}),
+                    union_membership,
                 ],
                 mock_gets=[
                     MockGet(
                         product_type=TestResult,
-                        subject_type=PythonTestsAdaptorWithOrigin,
+                        subject_type=TestTarget,
                         mock=lambda _: TestResult(status=Status.SUCCESS, stdout="foo", stderr=""),
                     ),
                 ],
+                union_membership=union_membership,
             )
         return result
 

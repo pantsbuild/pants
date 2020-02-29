@@ -10,8 +10,6 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Any, Dict, Iterable, Iterator, List, Set, Tuple, Type, cast
 
-from twitter.common.collections import OrderedSet
-
 from pants.base.exceptions import ResolveError, TargetDefinitionException
 from pants.base.parse_context import ParseContext
 from pants.base.specs import (
@@ -52,6 +50,7 @@ from pants.option.global_options import (
 )
 from pants.source.filespec import any_matches_filespec
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper, Filespec
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +117,7 @@ class LegacyBuildGraph(BuildGraph):
 
         # Once the declared dependencies of all targets are indexed, inject their
         # additional "traversable_(dependency_)?specs".
-        deps_to_inject = OrderedSet()
+        deps_to_inject: OrderedSet = OrderedSet()
         addresses_to_inject = set()
 
         def inject(target: Target, dep_spec: str, is_dependency: bool) -> None:
@@ -397,7 +396,7 @@ class TransitiveHydratedTargets:
     """A set of HydratedTarget roots, and their transitive, flattened, de-duped closure."""
 
     roots: Tuple[HydratedTarget, ...]
-    closure: OrderedSet  # TODO: this is an OrderedSet[HydratedTarget]
+    closure: FrozenOrderedSet[HydratedTarget]
 
 
 @dataclass(frozen=True)
@@ -420,7 +419,7 @@ class LegacyHydratedTarget:
 @dataclass(frozen=True)
 class LegacyTransitiveHydratedTargets:
     roots: Tuple[LegacyHydratedTarget, ...]
-    closure: OrderedSet  # TODO: this is an OrderedSet[LegacyHydratedTarget]
+    closure: FrozenOrderedSet[LegacyHydratedTarget]
 
 
 # TODO(#7490): Remove this once we have multiple params support so that rules can do something
@@ -517,8 +516,8 @@ class Owners:
 
 @rule
 async def find_owners(owners_request: OwnersRequest) -> Owners:
-    sources_set = OrderedSet(owners_request.sources)
-    dirs_set = OrderedSet(os.path.dirname(source) for source in sources_set)
+    sources_set = FrozenOrderedSet(owners_request.sources)
+    dirs_set = FrozenOrderedSet(os.path.dirname(source) for source in sources_set)
 
     # Walk up the buildroot looking for targets that would conceivably claim changed sources.
     candidate_specs = tuple(AscendantAddresses(directory=d) for d in dirs_set)
@@ -565,7 +564,7 @@ async def transitive_hydrated_targets(addresses: Addresses) -> TransitiveHydrate
         Get[TransitiveHydratedTarget](Address, a) for a in addresses
     )
 
-    closure = OrderedSet()
+    closure: OrderedSet[HydratedTarget] = OrderedSet()
     to_visit = deque(transitive_hydrated_targets)
 
     while to_visit:
@@ -576,7 +575,7 @@ async def transitive_hydrated_targets(addresses: Addresses) -> TransitiveHydrate
         to_visit.extend(tht.dependencies)
 
     return TransitiveHydratedTargets(
-        tuple(tht.root for tht in transitive_hydrated_targets), closure
+        tuple(tht.root for tht in transitive_hydrated_targets), FrozenOrderedSet(closure)
     )
 
 
@@ -596,7 +595,7 @@ async def legacy_transitive_hydrated_targets(
             LegacyHydratedTarget.from_hydrated_target(ht, bfa)
             for ht, bfa in zip(thts.roots, roots_bfas)
         ),
-        closure=OrderedSet(
+        closure=FrozenOrderedSet(
             LegacyHydratedTarget.from_hydrated_target(ht, bfa)
             for ht, bfa in zip(thts.closure, closure_bfas)
         ),
@@ -661,7 +660,7 @@ async def hydrate_target(hydrated_struct: HydratedStruct) -> HydratedTarget:
     return HydratedTarget(
         address=target_adaptor.address,
         adaptor=type(target_adaptor)(**kwargs),
-        dependencies=tuple(target_adaptor.dependencies),
+        dependencies=target_adaptor.dependencies,
     )
 
 
@@ -718,7 +717,11 @@ async def hydrate_sources(
         glob_match_error_behavior=glob_match_error_behavior,
         # TODO(#9012): add line number referring to the sources field. When doing this, we'll likely
         # need to `await Get[BuildFileAddress](Address)`.
-        description_of_origin=f"{address}'s `{sources_field.arg}` field",
+        description_of_origin=(
+            f"{address}'s `{sources_field.arg}` field"
+            if glob_match_error_behavior != GlobMatchErrorBehavior.ignore
+            else None
+        ),
     )
     snapshot = await Get[Snapshot](PathGlobs, path_globs)
     fileset_with_spec = _eager_fileset_with_spec(
@@ -741,7 +744,11 @@ async def hydrate_bundles(
             glob_match_error_behavior=glob_match_error_behavior,
             # TODO(#9012): add line number referring to the bundles field. When doing this, we'll likely
             # need to `await Get[BuildFileAddress](Address)`.
-            description_of_origin=f"{address}'s `bundles` field",
+            description_of_origin=(
+                f"{address}'s `bundles` field"
+                if glob_match_error_behavior != GlobMatchErrorBehavior.ignore
+                else None
+            ),
         )
         for pg in bundles_field.path_globs_list
     ]

@@ -13,8 +13,6 @@ from dataclasses import dataclass
 from functools import reduce
 from typing import Any, List, Optional, Tuple, cast
 
-from twitter.common.collections import OrderedSet
-
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.engine.rules import rule
@@ -26,6 +24,7 @@ from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import chmod_plus_x, safe_concurrent_creation, safe_open
 from pants.util.memo import memoized_classproperty, memoized_method, memoized_property
+from pants.util.ordered_set import OrderedSet
 from pants.util.osutil import (
     SUPPORTED_PLATFORM_NORMALIZED_NAMES,
     get_closest_mac_host_platform_pair,
@@ -302,7 +301,7 @@ class BinaryUtil:
         pass
 
     class NoBaseUrlsError(TaskError):
-        """Indicates that no urls were specified in pants.ini."""
+        """Indicates that no URLs were specified in pants.toml."""
 
         pass
 

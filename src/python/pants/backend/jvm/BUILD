@@ -47,7 +47,6 @@ python_library(
   name='ivy_utils',
   sources=['ivy_utils.py'],
   dependencies=[
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     ':ivy_utils_resources',
     'src/python/pants/backend/jvm/subsystems:jar_dependency_management',
     'src/python/pants/backend/jvm/targets:jvm',
@@ -61,6 +60,7 @@ python_library(
     'src/python/pants/java/jar',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:fileutil',
+    'src/python/pants/util:ordered_set',
   ],
   tags = {"partially_type_checked"},
 )

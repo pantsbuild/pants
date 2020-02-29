@@ -64,9 +64,9 @@ python_tests(
   sources = ['test_filesystem_build_file.py'],
   dependencies = [
     '3rdparty/python:pathspec',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_file',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:ordered_set',
   ],
   tags = {"partially_type_checked"},
 )
@@ -95,9 +95,9 @@ python_tests(
   name = 'hash_utils',
   sources = ['test_hash_utils.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:hash_utils',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:ordered_set',
   ],
   tags = {"partially_type_checked"},
 )

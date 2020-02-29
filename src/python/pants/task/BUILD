@@ -4,7 +4,6 @@
 
 python_library(
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:dataclasses',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:deprecated',
@@ -26,6 +25,7 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
+    'src/python/pants/util:ordered_set',
   ],
   tags = {"partially_type_checked"},
 )

@@ -200,8 +200,8 @@ plugin, install a goal that subclasses `ConfluencePublish`:
       # ...
       task(name='confluence', action=ArchieConfluence, dependencies=['markdown']).install()
 
-In your `pants.ini` file, add a section with the url of your wiki server. E.g., if your server
+In your `pants.toml` file, add a section with the url of your wiki server. E.g., if your server
 is at wiki.archie.org, it would look like:
 
     [confluence]
-    url: https://wiki.archie.org
+    url = "https://wiki.archie.org"

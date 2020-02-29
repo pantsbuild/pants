@@ -1,15 +1,16 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import itertools
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import Iterable, Tuple, Type
 
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.isolated_process import FallibleExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargetsWithOrigins
 from pants.engine.legacy.structs import TargetAdaptorWithOrigin
-from pants.engine.objects import Collection, union
+from pants.engine.objects import union
 from pants.engine.rules import UnionMembership, goal_rule
 from pants.engine.selectors import Get, MultiGet
 
@@ -35,26 +36,15 @@ class LintResult:
         )
 
 
-class LintResults(Collection[LintResult]):
-    """This collection allows us to aggregate multiple `LintResult`s for a language."""
-
-
 @union
-class LintTarget:
-    """A union for registration of a lintable target type.
-
-    The union members should be subclasses of TargetAdaptorWithOrigin.
-    """
+@dataclass(frozen=True)  # type: ignore[misc]   # https://github.com/python/mypy/issues/5374
+class Linter(ABC):
+    adaptors_with_origins: Tuple[TargetAdaptorWithOrigin, ...]
 
     @staticmethod
-    def is_lintable(
-        adaptor_with_origin: TargetAdaptorWithOrigin, *, union_membership: UnionMembership
-    ) -> bool:
-        is_lint_target = union_membership.is_member(LintTarget, adaptor_with_origin)
-        has_sources = hasattr(adaptor_with_origin.adaptor, "sources") and bool(
-            adaptor_with_origin.adaptor.sources.snapshot.files
-        )
-        return has_sources and is_lint_target
+    @abstractmethod
+    def is_valid_target(adaptor_with_origin: TargetAdaptorWithOrigin) -> bool:
+        """Return True if the linter can meaningfully operate on this target type."""
 
 
 class LintOptions(GoalSubsystem):
@@ -64,7 +54,30 @@ class LintOptions(GoalSubsystem):
     # Blocked on https://github.com/pantsbuild/pants/issues/8351
     name = "lint2"
 
-    required_union_implementations = (LintTarget,)
+    required_union_implementations = (Linter,)
+
+    @classmethod
+    def register_options(cls, register) -> None:
+        super().register_options(register)
+        register(
+            "--per-target-caching",
+            advanced=True,
+            type=bool,
+            default=False,
+            help=(
+                "Rather than running all targets in a single batch, run each target as a "
+                "separate process. Why do this? You'll get many more cache hits. Additionally, for "
+                "Python users, if you have some targets that only work with Python 2 and some that "
+                "only work with Python 3, `--per-target-caching` will allow you to use the right "
+                "interpreter for each target. Why not do this? Linters both have substantial "
+                "startup overhead and are cheap to add one additional file to the run. On a cold "
+                "cache, it is much faster to use `--no-per-target-caching`. We only recommend "
+                "using `--per-target-caching` if you "
+                "are using a remote cache, or if you have some Python 2-only targets and "
+                "some Python 3-only targets, or if you have benchmarked that this option will be "
+                "faster than `--no-per-target-caching` for your use case."
+            ),
+        )
 
 
 class Lint(Goal):
@@ -75,18 +88,37 @@ class Lint(Goal):
 async def lint(
     console: Console,
     targets_with_origins: HydratedTargetsWithOrigins,
+    options: LintOptions,
     union_membership: UnionMembership,
 ) -> Lint:
-    adaptors_with_origins = [
+    adaptors_with_origins = tuple(
         TargetAdaptorWithOrigin.create(target_with_origin.target.adaptor, target_with_origin.origin)
         for target_with_origin in targets_with_origins
-    ]
-    nested_results = await MultiGet(
-        Get[LintResults](LintTarget, adaptor_with_origin)
-        for adaptor_with_origin in adaptors_with_origins
-        if LintTarget.is_lintable(adaptor_with_origin, union_membership=union_membership)
+        if target_with_origin.target.adaptor.has_sources()
     )
-    results = list(itertools.chain.from_iterable(nested_results))
+
+    linters: Iterable[Type[Linter]] = union_membership.union_rules[Linter]
+    if options.values.per_target_caching:
+        results = await MultiGet(
+            Get[LintResult](Linter, linter((adaptor_with_origin,)))
+            for adaptor_with_origin in adaptors_with_origins
+            for linter in linters
+            if linter.is_valid_target(adaptor_with_origin)
+        )
+    else:
+        linters_with_valid_targets = {
+            linter: tuple(
+                adaptor_with_origin
+                for adaptor_with_origin in adaptors_with_origins
+                if linter.is_valid_target(adaptor_with_origin)
+            )
+            for linter in linters
+        }
+        results = await MultiGet(
+            Get[LintResult](Linter, linter(valid_targets))
+            for linter, valid_targets in linters_with_valid_targets.items()
+            if valid_targets
+        )
 
     if not results:
         return Lint(exit_code=0)

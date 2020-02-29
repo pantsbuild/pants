@@ -4,14 +4,13 @@
 import os
 import shutil
 
-from twitter.common.collections import OrderedSet
-
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.resources_task import ResourcesTask
 from pants.base.build_environment import get_buildroot
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.util.dirutil import safe_mkdir
+from pants.util.ordered_set import OrderedSet
 
 
 class PrepareResources(ResourcesTask):

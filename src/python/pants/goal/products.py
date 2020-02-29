@@ -4,10 +4,9 @@
 import os
 from collections import defaultdict
 
-from twitter.common.collections import OrderedSet
-
 from pants.util.collections import factory_dict
 from pants.util.dirutil import fast_relpath
+from pants.util.ordered_set import OrderedSet
 
 
 class ProductError(Exception):

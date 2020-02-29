@@ -1,8 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from twitter.common.collections import OrderedSet
-
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_target import JvmTarget
@@ -11,6 +9,7 @@ from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.base.payload_field import JarsField, PythonRequirementsField
 from pants.task.console_task import ConsoleTask
+from pants.util.ordered_set import OrderedSet
 
 
 class Dependencies(ConsoleTask):
@@ -76,8 +75,8 @@ class Dependencies(ConsoleTask):
             hint_message="Currently, Pants defaults to `--dependencies-transitive`, which means that it "
             "will find all transitive dependencies for the target, rather than only direct "
             "dependencies. This is a useful feature, but surprising to be the default."
-            "\n\nTo prepare for this change to the default value, set in `pants.ini` under "
-            "the section `dependencies` the value `transitive: False`. In Pants 1.28.0, "
+            "\n\nTo prepare for this change to the default value, set in `pants.toml` under "
+            "the section `dependencies` the value `transitive = false`. In Pants 1.28.0, "
             "you can safely remove the setting.",
         )
         return self.get_options().transitive

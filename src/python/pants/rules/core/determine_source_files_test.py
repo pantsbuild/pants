@@ -16,7 +16,7 @@ from pants.base.specs import (
 )
 from pants.build_graph.address import Address
 from pants.build_graph.files import Files
-from pants.engine.legacy.structs import TargetAdaptorWithOrigin
+from pants.engine.legacy.structs import TargetAdaptor, TargetAdaptorWithOrigin
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.rules.core.determine_source_files import (
@@ -62,16 +62,15 @@ class DetermineSourceFilesTest(TestBase):
         include_sources: bool = True,
         type_alias: Optional[str] = None,
     ) -> TargetAdaptorWithOrigin:
-        adaptor = Mock()
-        adaptor.type_alias = type_alias
-        adaptor.sources = Mock()
-        adaptor.address = Address.parse(f"{sources.source_root}:lib")
-        adaptor.sources = Mock()
-        adaptor.sources.snapshot = self.make_snapshot(
-            {fp: "" for fp in sources.source_file_absolute_paths}
+        sources_field = Mock()
+        sources_field.snapshot = self.make_snapshot(
+            {fp: "" for fp in (sources.source_file_absolute_paths if include_sources else [])}
         )
-        if not include_sources:
-            del adaptor.sources
+        adaptor = TargetAdaptor(
+            address=Address.parse(f"{sources.source_root}:lib"),
+            type_alias=type_alias,
+            sources=sources_field,
+        )
         if origin is None:
             origin = SiblingAddresses(sources.source_root)
         return TargetAdaptorWithOrigin(adaptor, origin)

@@ -106,6 +106,7 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/testutil:test_base',
     'src/python/pants/testutil/subsystem',
+    'src/python/pants/util:ordered_set',
   ],
   tags = {"partially_type_checked"},
 )

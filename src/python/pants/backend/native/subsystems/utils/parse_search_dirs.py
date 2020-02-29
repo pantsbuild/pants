@@ -6,11 +6,10 @@ import os
 import re
 import subprocess
 
-from twitter.common.collections import OrderedSet
-
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import is_readable_dir
 from pants.util.memo import memoized_classproperty
+from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import safe_shlex_join
 
 logger = logging.getLogger(__name__)

@@ -5,10 +5,9 @@
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from twitter.common.collections import OrderedSet
-
 from pants.option.optionable import OptionableFactory
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
+from pants.util.ordered_set import OrderedSet
 
 
 class SubsystemClientError(Exception):

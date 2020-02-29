@@ -85,7 +85,7 @@ target if set for both itself and its dependencies, or will otherwise fall back 
 
 Pants will look for those files in the location specified in the
 [[`python-repos`|pants('src/docs:setup_repo')#redirecting-python-requirements-to-other-servers]] field
-in pants.ini. It can understand either a simple local directory of .whl files or a "find links"-friendly
+in pants.toml. It can understand either a simple local directory of .whl files or a "find links"-friendly
 webpage of links formatted like so:
 
 ```
