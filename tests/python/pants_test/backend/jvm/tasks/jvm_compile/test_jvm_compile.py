@@ -7,15 +7,14 @@ from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.zinc import Zinc
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
-from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
-from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import BaseZincCompile
+from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import BaseZincCompile, ZincCompile
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.build_environment import get_buildroot
 from pants.testutil.jvm.nailgun_task_test_base import NailgunTaskTestBase
 from pants.testutil.subsystem.util import init_subsystems
 
 
-class DummyJvmCompile(JvmCompile):
+class DummyZincCompile(ZincCompile):
     compiler_name = "dummy"
 
     def select(self, *args):
@@ -30,7 +29,7 @@ class JvmCompileTest(NailgunTaskTestBase):
 
     @classmethod
     def task_type(cls):
-        return DummyJvmCompile
+        return DummyZincCompile
 
     def test_if_runtime_classpath_exists(self):
         target = self.make_target(
@@ -82,7 +81,7 @@ class JvmCompileTest(NailgunTaskTestBase):
     def test_modulized_targets_not_compiled_for_export_classpath(self):
         targets = self.make_linear_graph(["a", "b", "c", "d", "e"], target_type=JavaLibrary)
         runtime_classpath = self.create_and_return_classpath_products(
-            targets, ["runtime_classpath", "export_dep_as_jar_signal"]
+            targets, ["runtime_classpath", "jvm_modulizable_targets"]
         )
         # assert none of the modulized targets have classpaths.
         self.assertEqual(
