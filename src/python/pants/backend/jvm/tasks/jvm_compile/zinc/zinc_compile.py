@@ -922,7 +922,6 @@ class ZincCompile(BaseZincCompile):
     def product_types(cls):
         return super().product_types(cls) + [
             "runtime_classpath",
-            "export_dep_as_jar_signal",
             "zinc_analysis",
             "zinc_args",
             "jvm_modulizable_targets",
@@ -940,8 +939,7 @@ class ZincCompile(BaseZincCompile):
         return source_file_path.endswith(".java") or source_file_path.endswith(".scala")
 
     def calculate_jvm_modulizable_targets(self):
-
-        if not self.context.products.is_required_data("export_dep_as_jar_signal"):
+        if not self.context.products.is_required_data("jvm_modulizable_targets"):
             return set()
 
         def is_jvm_or_resource_target(t):

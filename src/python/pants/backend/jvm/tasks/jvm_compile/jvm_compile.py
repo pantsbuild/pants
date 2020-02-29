@@ -54,7 +54,6 @@ from pants.util.enums import match
 from pants.util.fileutil import create_size_estimators
 from pants.util.memo import memoized_method, memoized_property
 
-
 # Well known metadata file to register javac plugins.
 _JAVAC_PLUGIN_INFO_FILE = "META-INF/services/com.sun.source.util.Plugin"
 
@@ -585,10 +584,8 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
             self.create_extra_products_for_targets(compilable_modulizable_targets)
 
     def calculate_jvm_modulizable_targets(self) -> Set[Target]:
-        """
-        Used to calculate the targets that should be exported to IDEs as modules and
-        therefore should not be compiled.
-        """
+        """Used to calculate the targets that should be exported to IDEs as modules and therefore
+        should not be compiled."""
         return set()
 
     def _classpath_for_context(self, context):

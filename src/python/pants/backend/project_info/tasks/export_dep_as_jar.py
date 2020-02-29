@@ -89,7 +89,6 @@ class ExportDepAsJar(ConsoleTask):
         super().prepare(options, round_manager)
         round_manager.require_data("zinc_args")
         round_manager.require_data("runtime_classpath")
-        round_manager.require_data("export_dep_as_jar_signal")
         round_manager.require_data("jvm_modulizable_targets")
         if options.libraries_sources:
             round_manager.require_data("resolve_sources_signal")
