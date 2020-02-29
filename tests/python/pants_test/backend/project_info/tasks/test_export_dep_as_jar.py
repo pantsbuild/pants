@@ -668,7 +668,7 @@ class ExportDepAsJarTestWithCodegenTargets(ExportDepAsJarTest):
         #      D (thrift)
         #       \
         #        E
-        # i.e. A depends on B, D depends on E.
+        # i.e. A depends on B; D depends on E.
         c = self.make_target(
             "project_info:c",
             target_type=ScalaLibrary,
