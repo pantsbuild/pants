@@ -5,7 +5,7 @@ import functools
 import os
 from enum import Enum
 from multiprocessing import cpu_count
-from typing import Optional
+from typing import Optional, Set
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants.backend.jvm.subsystems.java import Java
@@ -35,6 +35,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import WorkerPool
 from pants.base.workunit import WorkUnitLabel
+from pants.build_graph.target import Target
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, PathGlobs, PathGlobsAndRoot
 from pants.java.distribution.distribution import DistributionLocator
 from pants.option.compiler_option_sets_mixin import CompilerOptionSetsMixin
@@ -318,6 +319,9 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     def select_source(self, source_file_path):
         raise NotImplementedError()
 
+    def product_types(cls):
+        return super(JvmCompile, cls).product_types()
+
     def compile(
         self,
         ctx,
@@ -529,8 +533,6 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
         # In case we have no relevant targets and return early, create the requested product maps.
         self.create_empty_extra_products()
 
-        relevant_targets = list(self.context.targets(predicate=self.select))
-
         # Clone the compile_classpath to the runtime_classpath.
         classpath_product = self.create_classpath_product()
 
@@ -538,20 +540,14 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
             classpath_product
         )
 
-        dependees_of_target_roots = None
-        # If we are only exporting jars then we can omit some targets from the runtime_classpath.
-        if self.context.products.is_required_data("export_dep_as_jar_signal"):
-            # Filter modulized targets from invalid targets list.
-            target_roots_in_play = set(relevant_targets) & set(self.context.target_roots)
-            addresses_in_play = [t.address for t in target_roots_in_play]
-            dependees_of_target_roots = set(
-                t
-                for t in self.context.build_graph.transitive_dependees_of_addresses(
-                    addresses_in_play
-                )
-                if self.select(t)
+        relevant_targets = list(self.context.targets(predicate=self.select))
+
+        modulizable_targets = self.calculate_jvm_modulizable_targets()
+        if modulizable_targets:
+            # If we are only exporting jars then we can omit some targets from the runtime_classpath.
+            relevant_targets = list(
+                filter(lambda x: self.select(x), set(relevant_targets) - modulizable_targets)
             )
-            relevant_targets = list(set(relevant_targets) - dependees_of_target_roots)
 
         if relevant_targets:
             # Note, JVM targets are validated (`vts.update()`) as they succeed.  As a result,
@@ -563,7 +559,6 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
                 fingerprint_strategy=fingerprint_strategy,
                 topological_order=True,
             ) as invalidation_check:
-
                 compile_contexts = {
                     vt.target: self.create_compile_context(vt.target, vt.results_dir)
                     for vt in invalidation_check.all_vts
@@ -582,8 +577,16 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
                             classpath_product.remove_for_target(cc.target, [(conf, cc.classes_dir)])
                             classpath_product.add_for_target(cc.target, [(conf, cc.jar_file)])
 
-        if dependees_of_target_roots is not None:
-            self.create_extra_products_for_targets(dependees_of_target_roots)
+        if modulizable_targets:
+            compilable_modulizable_targets = set(
+                filter(lambda x: self.select(x), modulizable_targets)
+            )
+            self.create_extra_products_for_targets(compilable_modulizable_targets)
+
+    def calculate_jvm_modulizable_targets(self) -> Set[Target]:
+        """Used to calculate the targets that should be exported to IDEs as modules and therefore
+        should not be compiled."""
+        return set()
 
     def _classpath_for_context(self, context):
         if self.get_options().use_classpath_jars:

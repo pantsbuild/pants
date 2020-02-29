@@ -90,7 +90,7 @@ class ExportDepAsJar(ConsoleTask):
         super().prepare(options, round_manager)
         round_manager.require_data("zinc_args")
         round_manager.require_data("runtime_classpath")
-        round_manager.require_data("export_dep_as_jar_signal")
+        round_manager.require_data("jvm_modulizable_targets")
         if options.libraries_sources:
             round_manager.require_data("resolve_sources_signal")
         if options.libraries_javadocs:
@@ -406,19 +406,15 @@ class ExportDepAsJar(ConsoleTask):
         targets.extend(additional_java_targets)
         return set(targets)
 
-    def _get_targets_to_make_into_modules(
-        self, target_roots_set, resource_target_map, runtime_classpath
-    ):
-        target_root_addresses = [t.address for t in target_roots_set]
-        dependees_of_target_roots = [
+    def _get_targets_to_make_into_modules(self, resource_target_map, runtime_classpath):
+        jvm_modulizable_targets = self.context.products.get_data("jvm_modulizable_targets")
+        non_generated_resource_jvm_modulizable_targets = [
             t
-            for t in self.context.build_graph.transitive_dependees_of_addresses(
-                target_root_addresses
-            )
+            for t in jvm_modulizable_targets
             if self._get_target_type(t, resource_target_map, runtime_classpath)
             is not SourceRootTypes.RESOURCE_GENERATED
         ]
-        return dependees_of_target_roots
+        return non_generated_resource_jvm_modulizable_targets
 
     def _make_libraries_entry(self, target, resource_target_map, runtime_classpath):
         # Using resolved path in preparation for VCFS.
@@ -466,8 +462,6 @@ class ExportDepAsJar(ConsoleTask):
           dependencies.
         :param zinc_args_for_all_targets: Map from zinc compiled targets to the args used to compile them.
         """
-        target_roots_set = set(self.context.target_roots)
-
         all_targets = self._get_all_targets(targets)
         libraries_map = self._resolve_jars_info(all_targets, runtime_classpath)
 
@@ -480,7 +474,7 @@ class ExportDepAsJar(ConsoleTask):
                     resource_target_map[dep] = t
 
         modulizable_targets = self._get_targets_to_make_into_modules(
-            target_roots_set, resource_target_map, runtime_classpath
+            resource_target_map, runtime_classpath
         )
         non_modulizable_targets = all_targets.difference(modulizable_targets)
 
