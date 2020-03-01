@@ -7,7 +7,7 @@ from enum import Enum
 from typing import List, Optional, Type
 
 from pants.base import deprecated
-from pants.option.option_util import is_list_option
+from pants.option.option_util import is_dict_option, is_list_option
 
 
 @dataclass(frozen=True)
@@ -52,13 +52,13 @@ class OptionScopeHelpInfo:
     """A container for help information for a scope of options.
 
     scope: The scope of the described options.
-    basic|recursive|advanced: A list of OptionHelpInfo for the options in that group.
+    basic|advanced|deprecated: A list of OptionHelpInfo for the options in that group.
     """
 
     scope: str
     basic: List[OptionHelpInfo]
-    recursive: List[OptionHelpInfo]
     advanced: List[OptionHelpInfo]
+    deprecated: List[OptionHelpInfo]
 
 
 class HelpInfoExtracter:
@@ -74,8 +74,7 @@ class HelpInfoExtracter:
 
     @staticmethod
     def compute_default(kwargs) -> str:
-        """Compute the default value to display in help for an option registered with these
-        kwargs."""
+        """Compute the default val for help display for an option registered with these kwargs."""
         ranked_default = kwargs.get("default")
         typ = kwargs.get("type", str)
 
@@ -83,17 +82,24 @@ class HelpInfoExtracter:
         if default is None:
             return "None"
 
-        if typ == list:
-            default_str = "[{}]".format(",".join(["'{}'".format(s) for s in default]))
-        elif typ == dict:
+        if is_list_option(kwargs):
+            member_typ = kwargs.get("member_type", str)
+
+            def member_str(val):
+                return f"'{val}'" if member_typ == str else f"{val}"
+
+            default_str = (
+                f"\"[{', '.join([member_str(val) for val in default])}]\"" if default else "[]"
+            )
+        elif is_dict_option(kwargs):
             if default:
                 default_str = "{{ {} }}".format(
-                    ",".join(["'{}':'{}'".format(k, v) for k, v in default.items()])
+                    ", ".join(["'{}': {}".format(k, v) for k, v in default.items()])
                 )
             else:
                 default_str = "{}"
         elif typ == str:
-            default_str = "'{}'".format(default).replace("\n", " ")
+            default_str = default.replace("\n", " ")
         elif inspect.isclass(typ) and issubclass(typ, Enum):
             default_str = default.value
         else:
@@ -103,14 +109,28 @@ class HelpInfoExtracter:
     @staticmethod
     def compute_metavar(kwargs):
         """Compute the metavar to display in help for an option registered with these kwargs."""
+
+        def stringify(t: Type) -> str:
+            if t == dict:
+                return "{'key1': val1, 'key2': val2, ...}"
+            return f"<{t.__name__}>"
+
         metavar = kwargs.get("metavar")
         if not metavar:
-            typ = kwargs.get("type", str)
-            if typ == list:
-                typ = kwargs.get("member_type", str)
-
-            metavar = f"<{typ.__name__}>" if typ != dict else "\"{'key1':val1,'key2':val2,...}\""
-
+            if is_list_option(kwargs):
+                member_typ = kwargs.get("member_type", str)
+                metavar = stringify(member_typ)
+                # In a cmd-line list literal, string members must be quoted.
+                if member_typ == str:
+                    metavar = f"'{metavar}'"
+            elif is_dict_option(kwargs):
+                metavar = f'"{stringify(dict)}"'
+            else:
+                metavar = stringify(kwargs.get("type", str))
+        if is_list_option(kwargs):
+            # For lists, the metavar (either explicit or deduced) is the representation
+            # of a single list member, so we turn the help string into a list of those here.
+            return f'"[{metavar}, {metavar}, ...]"'
         return metavar
 
     @staticmethod
@@ -131,25 +151,30 @@ class HelpInfoExtracter:
         """Returns an OptionScopeHelpInfo for the options registered with the (args, kwargs)
         pairs."""
         basic_options = []
-        recursive_options = []
         advanced_options = []
+        deprecated_options = []
         # Sort the arguments, so we display the help in alphabetical order.
         for args, kwargs in sorted(option_registrations_iter):
             if kwargs.get("passive"):
                 continue
             ohi = self.get_option_help_info(args, kwargs)
-            if kwargs.get("advanced"):
+            if kwargs.get("removal_version"):
+                deprecated_options.append(ohi)
+            elif kwargs.get("advanced") or (
+                kwargs.get("recursive") and not kwargs.get("recursive_root")
+            ):
+                # In order to keep the regular help output uncluttered, we treat recursive
+                # options as advanced.  The concept of recursive options is not widely used
+                # and not clear to the end user, so it's best not to expose it as a concept.
                 advanced_options.append(ohi)
-            elif kwargs.get("recursive") and not kwargs.get("recursive_root"):
-                recursive_options.append(ohi)
             else:
                 basic_options.append(ohi)
 
         return OptionScopeHelpInfo(
             scope=self._scope,
             basic=basic_options,
-            recursive=recursive_options,
             advanced=advanced_options,
+            deprecated=deprecated_options,
         )
 
     def get_option_help_info(self, args, kwargs):
@@ -176,26 +201,7 @@ class HelpInfoExtracter:
                     display_args.append("--[no-]{}".format(scoped_arg[2:]))
             else:
                 metavar = self.compute_metavar(kwargs)
-                display_arg = "{}={}".format(scoped_arg, metavar)
-                if is_list_option(kwargs):
-                    # Show the multi-arg append form.
-                    display_args.append("{arg_str} ({arg_str}) ...".format(arg_str=display_arg))
-                    # Also show the list literal form, both with and without the append operator.
-                    if metavar.startswith('"') and metavar.endswith('"'):
-                        # We quote the entire list literal, so we shouldn't quote the individual members.
-                        metavar = metavar[1:-1]
-                    display_args.append(
-                        '{arg}="[{metavar}, {metavar}, ...]"'.format(
-                            arg=scoped_arg, metavar=metavar
-                        )
-                    )
-                    display_args.append(
-                        '{arg}="+[{metavar}, {metavar}, ...]"'.format(
-                            arg=scoped_arg, metavar=metavar
-                        )
-                    )
-                else:
-                    display_args.append(display_arg)
+                display_args.append(f"{scoped_arg}={metavar}")
 
         typ = kwargs.get("type", str)
         default = self.compute_default(kwargs)

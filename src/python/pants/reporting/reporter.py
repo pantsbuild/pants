@@ -87,6 +87,8 @@ class Reporter:
     def level_for_workunit(self, workunit, default_level):
         if workunit.log_config and workunit.log_config.level:
             # The value of the level option is a string defined in global_options.py
+            if workunit.log_config.level == "error":
+                return Report.ERROR
             if workunit.log_config.level == "warn":
                 return Report.WARN
             if workunit.log_config.level == "debug":
