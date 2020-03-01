@@ -7,7 +7,7 @@ from enum import Enum
 from typing import List, Optional, Type
 
 from pants.base import deprecated
-from pants.option.option_util import is_list_option
+from pants.option.option_util import is_dict_option, is_list_option
 
 
 @dataclass(frozen=True)
@@ -74,8 +74,7 @@ class HelpInfoExtracter:
 
     @staticmethod
     def compute_default(kwargs) -> str:
-        """Compute the default value to display in help for an option registered with these
-        kwargs."""
+        """Compute the default val for help display for an option registered with these kwargs."""
         ranked_default = kwargs.get("default")
         typ = kwargs.get("type", str)
 
@@ -83,12 +82,15 @@ class HelpInfoExtracter:
         if default is None:
             return "None"
 
-        if typ == list:
-            default_str = "[{}]".format(",".join(["'{}'".format(s) for s in default]))
-        elif typ == dict:
+        if is_list_option(kwargs):
+            member_typ = kwargs.get("member_type", str)
+            def member_str(val):
+                return f"'{val}'" if member_typ == str else f"{val}"
+            default_str = f"\"[{', '.join([member_str(val) for val in default])}]\"" if default else "[]"
+        elif is_dict_option(kwargs):
             if default:
                 default_str = "{{ {} }}".format(
-                    ",".join(["'{}':'{}'".format(k, v) for k, v in default.items()])
+                    ", ".join(["'{}': {}".format(k, v) for k, v in default.items()])
                 )
             else:
                 default_str = "{}"
@@ -103,14 +105,27 @@ class HelpInfoExtracter:
     @staticmethod
     def compute_metavar(kwargs):
         """Compute the metavar to display in help for an option registered with these kwargs."""
+        def stringify(t: Type) -> str:
+            if t == dict:
+                return "{'key1': val1, 'key2': val2, ...}"
+            return f"<{t.__name__}>"
+
         metavar = kwargs.get("metavar")
         if not metavar:
-            typ = kwargs.get("type", str)
-            if typ == list:
-                typ = kwargs.get("member_type", str)
-
-            metavar = f"<{typ.__name__}>" if typ != dict else "\"{'key1':val1,'key2':val2,...}\""
-
+            if is_list_option(kwargs):
+                member_typ = kwargs.get("member_type", str)
+                metavar = stringify(member_typ)
+                # In a cmd-line list literal, string members must be quoted.
+                if member_typ == str:
+                    metavar = f"'{metavar}'"
+            elif is_dict_option(kwargs):
+                metavar = f"\"{stringify(dict)}\""
+            else:
+                metavar = stringify(kwargs.get("type", str))
+        if is_list_option(kwargs):
+            # For lists, the metavar (either explicit or deduced) is the representation
+            # of a single list member, so we turn the help string into a list of those here.
+            return f"\"[{metavar}, {metavar}, ...]\""
         return metavar
 
     @staticmethod
@@ -181,15 +196,7 @@ class HelpInfoExtracter:
                     display_args.append("--[no-]{}".format(scoped_arg[2:]))
             else:
                 metavar = self.compute_metavar(kwargs)
-                display_arg = "{}={}".format(scoped_arg, metavar)
-                if is_list_option(kwargs):
-                    display_args.append(
-                        "{arg}=\"['{metavar}', '{metavar}', ...]\"".format(
-                            arg=scoped_arg, metavar=metavar
-                        )
-                    )
-                else:
-                    display_args.append(display_arg)
+                display_args.append(f"{scoped_arg}={metavar}")
 
         typ = kwargs.get("type", str)
         default = self.compute_default(kwargs)

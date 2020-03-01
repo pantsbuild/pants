@@ -43,9 +43,7 @@ class HelpInfoExtracterTest(unittest.TestCase):
             ["--foo"],
             {"type": list},
             [
-                "--foo=<str> (--foo=<str>) ...",
-                '--foo="[<str>, <str>, ...]"',
-                '--foo="+[<str>, <str>, ...]"',
+                '--foo="[\'<str>\', \'<str>\', ...]"',
             ],
             ["--foo"],
         )
@@ -53,9 +51,7 @@ class HelpInfoExtracterTest(unittest.TestCase):
             ["--foo"],
             {"type": list, "member_type": int},
             [
-                "--foo=<int> (--foo=<int>) ...",
                 '--foo="[<int>, <int>, ...]"',
-                '--foo="+[<int>, <int>, ...]"',
             ],
             ["--foo"],
         )
@@ -63,14 +59,11 @@ class HelpInfoExtracterTest(unittest.TestCase):
             ["--foo"],
             {"type": list, "member_type": dict},
             [
-                "--foo=\"{'key1':val1,'key2':val2,...}\" "
-                "(--foo=\"{'key1':val1,'key2':val2,...}\") ...",
-                "--foo=\"[{'key1':val1,'key2':val2,...}, " "{'key1':val1,'key2':val2,...}, ...]\"",
-                "--foo=\"+[{'key1':val1,'key2':val2,...}, " "{'key1':val1,'key2':val2,...}, ...]\"",
+                "--foo=\"[{'key1': val1, 'key2': val2, ...}, " "{'key1': val1, 'key2': val2, ...}, ...]\"",
             ],
             ["--foo"],
         )
-        do_test(["--foo"], {"type": dict}, ["--foo=\"{'key1':val1,'key2':val2,...}\""], ["--foo"])
+        do_test(["--foo"], {"type": dict}, ["--foo=\"{'key1': val1, 'key2': val2, ...}\""], ["--foo"])
 
         do_test(["--foo", "--bar"], {}, ["--foo=<str>", "--bar=<str>"], ["--foo", "--bar"])
 
@@ -150,23 +143,16 @@ class HelpInfoExtracterTest(unittest.TestCase):
         assert ohi.choices == "info, debug"
 
     def test_grouping(self):
-        def do_test(
-            kwargs, expected_basic=False, expected_recursive=False, expected_advanced=False
-        ):
+        def do_test(kwargs, expected_basic=False, expected_advanced=False):
             def exp_to_len(exp):
                 return int(exp)  # True -> 1, False -> 0.
 
             oshi = HelpInfoExtracter("").get_option_scope_help_info([([], kwargs)])
             self.assertEqual(exp_to_len(expected_basic), len(oshi.basic))
-            self.assertEqual(exp_to_len(expected_recursive), len(oshi.recursive))
             self.assertEqual(exp_to_len(expected_advanced), len(oshi.advanced))
 
         do_test({}, expected_basic=True)
         do_test({"advanced": False}, expected_basic=True)
         do_test({"advanced": True}, expected_advanced=True)
-        do_test({"recursive": True}, expected_recursive=True)
-        do_test({"recursive": True, "recursive_root": True}, expected_basic=True)
-        do_test({"advanced": True, "recursive": True}, expected_advanced=True)
-        do_test(
-            {"advanced": True, "recursive": True, "recursive_root": True}, expected_advanced=True
-        )
+        do_test({"recursive_root": True}, expected_basic=True)
+        do_test({"advanced": True, "recursive_root": True}, expected_advanced=True)
