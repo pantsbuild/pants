@@ -52,3 +52,6 @@ interpreter_search_paths = [
 [python-native-code]
 ld_flags = []
 cpp_flags = []
+
+[lint2]
+per_target_caching = true

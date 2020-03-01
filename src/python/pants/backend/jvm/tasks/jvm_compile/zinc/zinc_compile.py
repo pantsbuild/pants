@@ -16,6 +16,8 @@ from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.zinc import Zinc
+from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.backend.jvm.tasks.classpath_entry import ClasspathEntry
@@ -25,6 +27,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnitLabel
+from pants.build_graph.resources import Resources
 from pants.engine.fs import (
     EMPTY_DIRECTORY_DIGEST,
     DirectoryToMaterialize,
@@ -917,7 +920,12 @@ class ZincCompile(BaseZincCompile):
 
     @classmethod
     def product_types(cls):
-        return ["runtime_classpath", "export_dep_as_jar_signal", "zinc_analysis", "zinc_args"]
+        return super().product_types(cls) + [
+            "runtime_classpath",
+            "zinc_analysis",
+            "zinc_args",
+            "jvm_modulizable_targets",
+        ]
 
     @staticmethod
     def select(target):
@@ -929,3 +937,41 @@ class ZincCompile(BaseZincCompile):
 
     def select_source(self, source_file_path):
         return source_file_path.endswith(".java") or source_file_path.endswith(".scala")
+
+    def calculate_jvm_modulizable_targets(self):
+        if not self.context.products.is_required_data("jvm_modulizable_targets"):
+            return set()
+
+        def is_jvm_or_resource_target(t):
+            return isinstance(t, (JvmTarget, JvmApp, JarLibrary, Resources))
+
+        jvm_and_resources_target_roots = set(
+            filter(is_jvm_or_resource_target, self.context.target_roots)
+        )
+        jvm_and_resources_target_roots_minus_synthetic_addresses = set(
+            t.address for t in filter(lambda x: not x.is_synthetic, jvm_and_resources_target_roots)
+        )
+        all_targets = set(self.context.targets())
+        modulizable_targets = set(
+            t
+            for t in self.context.build_graph.transitive_dependees_of_addresses(
+                jvm_and_resources_target_roots_minus_synthetic_addresses,
+                # A predicate is required here because it's possible other injected targets
+                # could show up as dependees. (##9179)
+                predicate=lambda x: x in all_targets,
+            )
+            if is_jvm_or_resource_target(t)
+        )
+        synthetic_modulizable_targets = set(filter(lambda x: x.is_synthetic, modulizable_targets))
+        if len(synthetic_modulizable_targets) > 0:
+            # TODO(yic): improve the error message to show the dependency chain that caused
+            # a synthetic target depending on a non-synthetic one.
+            raise TaskError(
+                f"Modulizable targets must not contain any synthetic target, but in this case the "
+                f"following synthetic targets depend on other non-synthetic modules:\n"
+                f"{synthetic_modulizable_targets}\n"
+                f"One approach that may help is to reduce the scope of the import to further avoid synthetic targets."
+            )
+
+        self.context.products.get_data("jvm_modulizable_targets", set).update(modulizable_targets)
+        return modulizable_targets
