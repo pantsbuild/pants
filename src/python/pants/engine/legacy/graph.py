@@ -8,7 +8,7 @@ from collections import defaultdict, deque
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any, Dict, Iterable, Iterator, List, Set, Tuple, Type, cast
+from typing import Any, DefaultDict, Dict, Iterable, Iterator, List, Set, Tuple, Type, Union, cast
 
 from pants.base.exceptions import ResolveError, TargetDefinitionException
 from pants.base.parse_context import ParseContext
@@ -17,6 +17,7 @@ from pants.base.specs import (
     AddressSpecs,
     AscendantAddresses,
     FilesystemLiteralSpec,
+    FilesystemMergedSpec,
     FilesystemResolvedGlobSpec,
     FilesystemSpecs,
     OriginSpec,
@@ -811,7 +812,11 @@ async def addresses_with_origins_from_filesystem_specs(
     filesystem_specs: FilesystemSpecs, global_options: GlobalOptions,
 ) -> AddressesWithOrigins:
     """Find the owner(s) for each FilesystemSpec while preserving the original FilesystemSpec those
-    owners come from."""
+    owners come from.
+
+    This will merge FilesystemSpecs that come from the same owning target into a single
+    FilesystemMergedSpec.
+    """
     pathglobs_per_include = (
         filesystem_specs.path_globs_for_spec(spec) for spec in filesystem_specs.includes
     )
@@ -821,7 +826,9 @@ async def addresses_with_origins_from_filesystem_specs(
     owners_per_include = await MultiGet(
         Get[Owners](OwnersRequest(sources=snapshot.files)) for snapshot in snapshot_per_include
     )
-    result: List[AddressWithOrigin] = []
+    addresses_to_specs: DefaultDict[
+        Address, List[Union[FilesystemLiteralSpec, FilesystemResolvedGlobSpec]]
+    ] = defaultdict(list)
     for spec, snapshot, owners in zip(
         filesystem_specs.includes, snapshot_per_include, owners_per_include
     ):
@@ -842,15 +849,19 @@ async def addresses_with_origins_from_filesystem_specs(
                 raise ResolveError(msg)
         # We preserve what literal files any globs resolved to. This allows downstream goals to be
         # more precise in which files they operate on.
-        origin = (
+        origin: Union[FilesystemLiteralSpec, FilesystemResolvedGlobSpec] = (
             spec
             if isinstance(spec, FilesystemLiteralSpec)
             else FilesystemResolvedGlobSpec(glob=spec.glob, _snapshot=snapshot)
         )
-        result.extend(
-            AddressWithOrigin(address=address, origin=origin) for address in owners.addresses
+        for address in owners.addresses:
+            addresses_to_specs[address].append(origin)
+    return AddressesWithOrigins(
+        AddressWithOrigin(
+            address, specs[0] if len(specs) == 1 else FilesystemMergedSpec.create(specs)
         )
-    return AddressesWithOrigins(result)
+        for address, specs in addresses_to_specs.items()
+    )
 
 
 def create_legacy_graph_tasks():

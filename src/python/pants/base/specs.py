@@ -389,6 +389,35 @@ class FilesystemResolvedGlobSpec(FilesystemGlobSpec, FilesystemResolvedSpec):
 
 
 @dataclass(frozen=True)
+class FilesystemMergedSpec(FilesystemResolvedSpec):
+    """When multiple file arguments are given that resolve to the same owning target, this type
+    allows grouping the arguments into a single FilesystemSpec."""
+
+    original_globs: Tuple[str, ...]
+    merged_files: Tuple[str, ...]
+
+    @classmethod
+    def create(
+        cls, original_specs: Iterable[Union[FilesystemLiteralSpec, FilesystemResolvedGlobSpec]]
+    ) -> "FilesystemMergedSpec":
+        original_globs: List[str] = []
+        merged_files: List[str] = []
+        for spec in original_specs:
+            original_globs.append(spec.to_spec_string())
+            merged_files.extend(spec.resolved_files)
+        return cls(
+            original_globs=tuple(sorted(original_globs)), merged_files=tuple(sorted(merged_files))
+        )
+
+    @property
+    def resolved_files(self) -> Tuple[str, ...]:
+        return self.merged_files
+
+    def to_spec_string(self) -> str:
+        return ", ".join(self.original_globs)
+
+
+@dataclass(frozen=True)
 class FilesystemIgnoreSpec(FilesystemSpec):
     """A spec to ignore certain files or globs."""
 
