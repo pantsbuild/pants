@@ -49,6 +49,19 @@ class OptionHelpFormatterTest(unittest.TestCase):
         ).format_options(scope="", description="", option_registrations_iter=[(args, kwargs)])
         assert len(lines) == 10
 
+    def test_suppress_deprecated(self):
+        args = ["--foo"]
+        kwargs = {"removal_version": '33.44.55'}
+        lines = HelpFormatter(
+            scope="", show_advanced=False, show_deprecated=False, color=False
+        ).format_options(scope="", description="", option_registrations_iter=[(args, kwargs)])
+        assert len(lines) == 5
+        assert not any("--foo" in line for line in lines)
+        lines = HelpFormatter(
+            scope="", show_advanced=True, show_deprecated=True, color=False
+        ).format_options(scope="", description="", option_registrations_iter=[(args, kwargs)])
+        assert len(lines) == 15
+
     def test_format_help_choices(self):
         line = self.format_help_for_foo(typ=str, default="kiwi", choices="apple, banana, kiwi")
         assert line.lstrip() == "--foo (one of: [apple, banana, kiwi]; default: kiwi)"
