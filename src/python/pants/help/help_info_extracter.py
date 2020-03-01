@@ -84,9 +84,13 @@ class HelpInfoExtracter:
 
         if is_list_option(kwargs):
             member_typ = kwargs.get("member_type", str)
+
             def member_str(val):
                 return f"'{val}'" if member_typ == str else f"{val}"
-            default_str = f"\"[{', '.join([member_str(val) for val in default])}]\"" if default else "[]"
+
+            default_str = (
+                f"\"[{', '.join([member_str(val) for val in default])}]\"" if default else "[]"
+            )
         elif is_dict_option(kwargs):
             if default:
                 default_str = "{{ {} }}".format(
@@ -105,6 +109,7 @@ class HelpInfoExtracter:
     @staticmethod
     def compute_metavar(kwargs):
         """Compute the metavar to display in help for an option registered with these kwargs."""
+
         def stringify(t: Type) -> str:
             if t == dict:
                 return "{'key1': val1, 'key2': val2, ...}"
@@ -119,13 +124,13 @@ class HelpInfoExtracter:
                 if member_typ == str:
                     metavar = f"'{metavar}'"
             elif is_dict_option(kwargs):
-                metavar = f"\"{stringify(dict)}\""
+                metavar = f'"{stringify(dict)}"'
             else:
                 metavar = stringify(kwargs.get("type", str))
         if is_list_option(kwargs):
             # For lists, the metavar (either explicit or deduced) is the representation
             # of a single list member, so we turn the help string into a list of those here.
-            return f"\"[{metavar}, {metavar}, ...]\""
+            return f'"[{metavar}, {metavar}, ...]"'
         return metavar
 
     @staticmethod

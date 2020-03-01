@@ -51,7 +51,7 @@ class OptionHelpFormatterTest(unittest.TestCase):
 
     def test_suppress_deprecated(self):
         args = ["--foo"]
-        kwargs = {"removal_version": '33.44.55'}
+        kwargs = {"removal_version": "33.44.55"}
         lines = HelpFormatter(
             scope="", show_advanced=False, show_deprecated=False, color=False
         ).format_options(scope="", description="", option_registrations_iter=[(args, kwargs)])

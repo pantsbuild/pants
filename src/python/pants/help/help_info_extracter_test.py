@@ -40,30 +40,26 @@ class HelpInfoExtracterTest(unittest.TestCase):
         do_test(["--foo"], {"metavar": "xx"}, ["--foo=xx"], ["--foo"])
         do_test(["--foo"], {"type": int}, ["--foo=<int>"], ["--foo"])
         do_test(
-            ["--foo"],
-            {"type": list},
-            [
-                '--foo="[\'<str>\', \'<str>\', ...]"',
-            ],
-            ["--foo"],
+            ["--foo"], {"type": list}, ["--foo=\"['<str>', '<str>', ...]\"",], ["--foo"],
         )
         do_test(
             ["--foo"],
             {"type": list, "member_type": int},
-            [
-                '--foo="[<int>, <int>, ...]"',
-            ],
+            ['--foo="[<int>, <int>, ...]"',],
             ["--foo"],
         )
         do_test(
             ["--foo"],
             {"type": list, "member_type": dict},
             [
-                "--foo=\"[{'key1': val1, 'key2': val2, ...}, " "{'key1': val1, 'key2': val2, ...}, ...]\"",
+                "--foo=\"[{'key1': val1, 'key2': val2, ...}, "
+                "{'key1': val1, 'key2': val2, ...}, ...]\"",
             ],
             ["--foo"],
         )
-        do_test(["--foo"], {"type": dict}, ["--foo=\"{'key1': val1, 'key2': val2, ...}\""], ["--foo"])
+        do_test(
+            ["--foo"], {"type": dict}, ["--foo=\"{'key1': val1, 'key2': val2, ...}\""], ["--foo"]
+        )
 
         do_test(["--foo", "--bar"], {}, ["--foo=<str>", "--bar=<str>"], ["--foo", "--bar"])
 
