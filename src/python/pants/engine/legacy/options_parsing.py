@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from pants.engine.rules import RootRule, rule
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
-from pants.option.global_options import GlobalOptions
+from pants.option.global_options import GlobalOptions, GlobalOptionsRegistrar
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.scope import Scope, ScopedOptions
@@ -36,7 +36,9 @@ def scope_options(scope: Scope, options: _Options) -> ScopedOptions:
 
 @rule
 def global_options(options_bootstrapper: OptionsBootstrapper) -> GlobalOptions:
-    global_options = options_bootstrapper.bootstrap_options.for_global_scope()
+    global_options = options_bootstrapper.get_full_options(
+        GlobalOptionsRegistrar.known_scope_infos()
+    ).for_global_scope()
     return GlobalOptions(_inner=global_options)
 
 
