@@ -9,7 +9,13 @@ from unittest.mock import Mock
 
 from pants.base.specs import SingleAddress
 from pants.build_graph.address import Address
-from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Digest, DirectoriesToMerge, Workspace
+from pants.engine.fs import (
+    EMPTY_DIRECTORY_DIGEST,
+    Digest,
+    DirectoriesToMerge,
+    FileContent,
+    Workspace,
+)
 from pants.engine.legacy.graph import (
     HydratedTarget,
     HydratedTargetsWithOrigins,
@@ -26,21 +32,6 @@ from pants.rules.core.fmt import Fmt, FmtResult, LanguageFmtResults, LanguageFor
 from pants.testutil.engine.util import MockConsole, MockGet, run_rule
 from pants.testutil.test_base import TestBase
 from pants.util.ordered_set import OrderedSet
-
-PYTHON_FILE = Path("formatted.py")
-PYTHON_CONTENT = "print('So Pythonic now!')\n"
-PYTHON_DIGEST = Digest(
-    fingerprint="ad01e45511ca88c6449a8d86f04226d5763ffe5de82df71f91599a85b04b6982",
-    serialized_bytes_length=86,
-)
-
-JAVA_FILE = Path("formatted.java")
-JAVA_CONTENT = "System.out.println('Yay pretty verbosity!')\n"
-
-MERGED_DIGEST = Digest(
-    fingerprint="32a24a86de5c8adf8a5c40f8a3c8dace542089abbeefff3d091f4fedf1df5ba5",
-    serialized_bytes_length=174,
-)
 
 
 class MockLanguageFormatters(LanguageFormatters, metaclass=ABCMeta):
@@ -92,6 +83,19 @@ class InvalidFormatters(MockLanguageFormatters):
 
 
 class FmtTest(TestBase):
+    def setUp(self) -> None:
+        super().setUp()
+        self.python_file = FileContent("formatted.py", b"print('So Pythonic now!')\n")
+        self.java_file = FileContent(
+            "formatted.java", b"System.out.println('I may be verbose, but I'm pretty too.')\n"
+        )
+        self.python_digest = self.make_snapshot(
+            {self.python_file.path: self.python_file.content.decode()}
+        ).directory_digest
+        self.merged_digest = self.make_snapshot(
+            {fc.path: fc.content.decode() for fc in (self.python_file, self.java_file)}
+        ).directory_digest
+
     @staticmethod
     def make_hydrated_target_with_origin(
         *,
@@ -118,8 +122,6 @@ class FmtTest(TestBase):
         result_digest: Digest,
     ) -> str:
         console = MockConsole(use_colors=False)
-        # NB: This ensures that the hardcoded digests can actually be found.
-        self.make_snapshot({PYTHON_FILE: PYTHON_CONTENT, JAVA_FILE: JAVA_CONTENT})
         union_membership = UnionMembership(
             OrderedDict({LanguageFormatters: OrderedSet(language_formatters)})
         )
@@ -149,20 +151,20 @@ class FmtTest(TestBase):
         return cast(str, console.stdout.getvalue())
 
     def assert_workspace_modified(self, *, python_formatted: bool, java_formatted: bool) -> None:
-        python_file = Path(self.build_root, PYTHON_FILE)
-        java_file = Path(self.build_root, JAVA_FILE)
+        python_file = Path(self.build_root, self.python_file.path)
+        java_file = Path(self.build_root, self.java_file.path)
         if python_formatted:
             assert python_file.is_file()
-            assert python_file.read_text() == PYTHON_CONTENT
+            assert python_file.read_text() == self.python_file.content.decode()
         if java_formatted:
             assert java_file.is_file()
-            assert java_file.read_text() == JAVA_CONTENT
+            assert java_file.read_text() == self.java_file.content.decode()
 
     def test_empty_target_noops(self) -> None:
         stdout = self.run_fmt_rule(
             language_formatters=[PythonFormatters],
             targets=[self.make_hydrated_target_with_origin(include_sources=False)],
-            result_digest=PYTHON_DIGEST,
+            result_digest=self.python_digest,
         )
         assert stdout.strip() == ""
         self.assert_workspace_modified(python_formatted=False, java_formatted=False)
@@ -171,7 +173,7 @@ class FmtTest(TestBase):
         stdout = self.run_fmt_rule(
             language_formatters=[InvalidFormatters],
             targets=[self.make_hydrated_target_with_origin()],
-            result_digest=PYTHON_DIGEST,
+            result_digest=self.python_digest,
         )
         assert stdout.strip() == ""
         self.assert_workspace_modified(python_formatted=False, java_formatted=False)
@@ -181,7 +183,7 @@ class FmtTest(TestBase):
         stdout = self.run_fmt_rule(
             language_formatters=[PythonFormatters],
             targets=[target_with_origin],
-            result_digest=PYTHON_DIGEST,
+            result_digest=self.python_digest,
         )
         assert stdout.strip() == PythonFormatters.stdout(target_with_origin.target.adaptor.address)
         self.assert_workspace_modified(python_formatted=True, java_formatted=False)
@@ -194,7 +196,7 @@ class FmtTest(TestBase):
         stdout = self.run_fmt_rule(
             language_formatters=[PythonFormatters],
             targets=targets_with_origins,
-            result_digest=PYTHON_DIGEST,
+            result_digest=self.python_digest,
         )
         assert stdout.splitlines() == [
             PythonFormatters.stdout(target_with_origin.target.adaptor.address)
@@ -212,7 +214,7 @@ class FmtTest(TestBase):
         stdout = self.run_fmt_rule(
             language_formatters=[PythonFormatters, JavaFormatters],
             targets=[python_target, java_target],
-            result_digest=MERGED_DIGEST,
+            result_digest=self.merged_digest,
         )
         assert stdout.splitlines() == [
             PythonFormatters.stdout(python_target.target.adaptor.address),
@@ -232,7 +234,7 @@ class FmtTest(TestBase):
         stdout = self.run_fmt_rule(
             language_formatters=[PythonFormatters, JavaFormatters],
             targets=[*python_targets, *java_targets],
-            result_digest=MERGED_DIGEST,
+            result_digest=self.merged_digest,
         )
         assert stdout.splitlines() == [
             *(
