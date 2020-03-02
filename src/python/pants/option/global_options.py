@@ -25,7 +25,7 @@ from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 
 
 @dataclass(frozen=True)
-class GlobalOptions:
+class GlobalOptions(Optionable):
     _inner: OptionValueContainer
 
     def __getattr__(self, key):
@@ -1088,3 +1088,14 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                 "The `--remote-execution-server` option requires also setting "
                 "`--remote-store-server`. Often these have the same value."
             )
+
+    # TODO: It's possible that global options could just be a Subsystem!
+
+    def __init__(self, scope: str, scoped_options: OptionValueContainer) -> None:
+        super().__init__()
+        self._scope = scope
+        self._scoped_options = scoped_options
+
+    @property
+    def options(self) -> OptionValueContainer:
+        return self._scoped_options

@@ -3,7 +3,7 @@
 
 from dataclasses import dataclass
 
-from pants.engine.rules import RootRule, rule
+from pants.engine.rules import RootRule, rule, subsystem_rule
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.option.global_options import GlobalOptions, GlobalOptionsRegistrar
 from pants.option.options import Options
@@ -35,11 +35,8 @@ def scope_options(scope: Scope, options: _Options) -> ScopedOptions:
 
 
 @rule
-def global_options(options_bootstrapper: OptionsBootstrapper) -> GlobalOptions:
-    global_options = options_bootstrapper.get_full_options(
-        GlobalOptionsRegistrar.known_scope_infos()
-    ).for_global_scope()
-    return GlobalOptions(_inner=global_options)
+def global_options(gor: GlobalOptionsRegistrar) -> GlobalOptions:
+    return GlobalOptions(_inner=gor.options)
 
 
 def create_options_parsing_rules():
@@ -47,6 +44,7 @@ def create_options_parsing_rules():
         scope_options,
         parse_options,
         global_options,
+        subsystem_rule(GlobalOptionsRegistrar),
         RootRule(Scope),
         RootRule(OptionsBootstrapper),
     ]
