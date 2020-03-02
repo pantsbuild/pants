@@ -338,17 +338,31 @@ class JvmPlatformSettings:
     def by_default(self):
         return self._by_default
 
+    def _tuple(self):
+        return (
+            self.source_level,
+            self.target_level,
+            self.args,
+            self.jvm_options,
+        )
+
     def __eq__(self, other):
-        return tuple(self) == tuple(other)
+        return self._tuple() == other._tuple()
 
     # TODO(#6071): decide if this should raise NotImplemented on invalid comparisons
     def __lt__(self, other):
-        return tuple(self) < tuple(other)
+        return self._tuple() < other._tuple()
 
     def __hash__(self):
-        return hash(tuple(self))
+        return hash(self._tuple())
 
     def __str__(self):
-        return "source={source},target={target},args=({args})".format(
-            source=self.source_level, target=self.target_level, args=" ".join(self.args)
+        return (
+            "JvmPlatformSettings(source={source},target={target},args=({args}),"
+            "jvm_options={jvm_options})".format(
+                source=self.source_level,
+                target=self.target_level,
+                args=" ".join(self.args),
+                jvm_options=" ".join(self.jvm_options),
+            )
         )
