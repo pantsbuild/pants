@@ -12,7 +12,6 @@ from pants.engine.legacy.structs import (
     PythonTestsAdaptorWithOrigin,
     TargetAdaptorWithOrigin,
 )
-from pants.engine.rules import RootRule
 from pants.rules.core.lint import Linter
 
 
@@ -30,7 +29,3 @@ PYTHON_TARGET_TYPES = (
     PythonTestsAdaptorWithOrigin,
     PantsPluginAdaptorWithOrigin,
 )
-
-
-def rules():
-    return [RootRule(target_type) for target_type in PYTHON_TARGET_TYPES]

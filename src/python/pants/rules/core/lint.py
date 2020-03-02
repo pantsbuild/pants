@@ -43,7 +43,7 @@ class Linter(ABC):
 
     @staticmethod
     @abstractmethod
-    def is_valid_target(adaptor_with_origin: TargetAdaptorWithOrigin) -> bool:
+    def is_valid_target(_: TargetAdaptorWithOrigin) -> bool:
         """Return True if the linter can meaningfully operate on this target type."""
 
 

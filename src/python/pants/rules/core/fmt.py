@@ -2,9 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
-from abc import ABCMeta
+from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
-from typing import Tuple
+from typing import Iterable, List, Tuple, Type
 
 from pants.engine.console import Console
 from pants.engine.fs import (
@@ -44,7 +44,7 @@ class FmtResult:
 
 
 @dataclass(frozen=True)
-class AggregatedFmtResults:
+class LanguageFmtResults:
     """This collection allows us to safely aggregate multiple `FmtResult`s for a language.
 
     The `combined_digest` is used to ensure that none of the formatters overwrite each other. The
@@ -59,22 +59,18 @@ class AggregatedFmtResults:
 
 @dataclass(frozen=True)  # type: ignore[misc]   # https://github.com/python/mypy/issues/5374
 class Formatter(Linter, metaclass=ABCMeta):
-    adaptors_with_origins: Tuple[TargetAdaptorWithOrigin, ...]
+    pass
 
 
 @union
-class FormatTarget:
-    """A union for registration of a formattable target type.
-
-    The union members should be subclasses of TargetAdaptorWithOrigin.
-    """
+@dataclass(frozen=True)  # type: ignore[misc]   # https://github.com/python/mypy/issues/5374
+class LanguageFormatters(ABC):
+    adaptors_with_origins: Tuple[TargetAdaptorWithOrigin, ...]
 
     @staticmethod
-    def is_formattable(
-        adaptor_with_origin: TargetAdaptorWithOrigin, *, union_membership: UnionMembership,
-    ) -> bool:
-        is_fmt_target = union_membership.is_member(FormatTarget, adaptor_with_origin)
-        return adaptor_with_origin.adaptor.has_sources() and is_fmt_target
+    @abstractmethod
+    def belongs_to_language(_: TargetAdaptorWithOrigin) -> bool:
+        pass
 
 
 class FmtOptions(GoalSubsystem):
@@ -84,7 +80,7 @@ class FmtOptions(GoalSubsystem):
     # Blocked on https://github.com/pantsbuild/pants/issues/8351
     name = "fmt2"
 
-    required_union_implementations = (FormatTarget,)
+    required_union_implementations = (LanguageFormatters,)
 
 
 class Fmt(Goal):
@@ -101,15 +97,21 @@ async def fmt(
     adaptors_with_origins = [
         TargetAdaptorWithOrigin.create(target_with_origin.target.adaptor, target_with_origin.origin)
         for target_with_origin in targets_with_origins
+        if target_with_origin.target.adaptor.has_sources()
     ]
-    aggregated_results = await MultiGet(
-        Get[AggregatedFmtResults](FormatTarget, adaptor_with_origin)
+
+    all_language_formatters: Iterable[Type[LanguageFormatters]] = union_membership.union_rules[
+        LanguageFormatters
+    ]
+    per_language_results = await MultiGet(
+        Get[LanguageFmtResults](LanguageFormatters, language_formatters((adaptor_with_origin,)))
         for adaptor_with_origin in adaptors_with_origins
-        if FormatTarget.is_formattable(adaptor_with_origin, union_membership=union_membership)
+        for language_formatters in all_language_formatters
+        if language_formatters.belongs_to_language(adaptor_with_origin)
     )
-    individual_results = list(
+    individual_results: List[FmtResult] = list(
         itertools.chain.from_iterable(
-            aggregated_result.results for aggregated_result in aggregated_results
+            language_result.results for language_result in per_language_results
         )
     )
 
@@ -118,10 +120,10 @@ async def fmt(
 
     # NB: this will fail if there are any conflicting changes, which we want to happen rather than
     # silently having one result override the other. In practicality, this should never happen due
-    # to our use of an aggregator rule for each distinct language.
+    # to us grouping each language's formatters into a single combined_digest.
     merged_formatted_digest = await Get[Digest](
         DirectoriesToMerge(
-            tuple(aggregated_result.combined_digest for aggregated_result in aggregated_results)
+            tuple(language_result.combined_digest for language_result in per_language_results)
         )
     )
     workspace.materialize_directory(DirectoryToMaterialize(merged_formatted_digest))
