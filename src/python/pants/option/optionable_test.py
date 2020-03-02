@@ -46,6 +46,7 @@ class OptionableTest(unittest.TestCase):
         def check_false(s: str) -> None:
             self.assertFalse(Optionable.is_valid_scope_name_component(s))
 
+        check_true("")
         check_true("foo")
         check_true("foo-bar0")
         check_true("foo-bar0-1ba22z")

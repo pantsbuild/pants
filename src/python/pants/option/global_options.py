@@ -4,9 +4,10 @@
 import multiprocessing
 import os
 import sys
-from dataclasses import dataclass
 from enum import Enum
 from typing import Any
+
+from dataclasses import dataclass
 
 from pants.base.build_environment import (
     get_buildroot,
@@ -21,7 +22,7 @@ from pants.option.errors import OptionsError
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.optionable import Optionable
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
-from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
+from pants.subsystem.subsystem import Subsystem
 
 
 @dataclass(frozen=True)
@@ -163,7 +164,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
 )
 
 
-class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
+class GlobalOptionsRegistrar(Subsystem):
     options_scope = GLOBAL_SCOPE
     options_scope_category = ScopeInfo.GLOBAL
 
@@ -1088,14 +1089,3 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                 "The `--remote-execution-server` option requires also setting "
                 "`--remote-store-server`. Often these have the same value."
             )
-
-    # TODO: It's possible that global options could just be a Subsystem!
-
-    def __init__(self, scope: str, scoped_options: OptionValueContainer) -> None:
-        super().__init__()
-        self._scope = scope
-        self._scoped_options = scoped_options
-
-    @property
-    def options(self) -> OptionValueContainer:
-        return self._scoped_options
