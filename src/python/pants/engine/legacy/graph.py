@@ -852,7 +852,7 @@ async def addresses_with_origins_from_filesystem_specs(
         origin: Union[FilesystemLiteralSpec, FilesystemResolvedGlobSpec] = (
             spec
             if isinstance(spec, FilesystemLiteralSpec)
-            else FilesystemResolvedGlobSpec(glob=spec.glob, _snapshot=snapshot)
+            else FilesystemResolvedGlobSpec(glob=spec.glob, files=snapshot.files)
         )
         for address in owners.addresses:
             addresses_to_specs[address].append(origin)

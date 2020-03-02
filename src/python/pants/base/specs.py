@@ -18,7 +18,7 @@ from typing import (
     cast,
 )
 
-from pants.engine.fs import PathGlobs, Snapshot
+from pants.engine.fs import PathGlobs
 from pants.engine.objects import Collection
 from pants.option.custom_types import GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior
@@ -378,43 +378,42 @@ class FilesystemGlobSpec(FilesystemSpec):
 
 @dataclass(frozen=True)
 class FilesystemResolvedGlobSpec(FilesystemGlobSpec, FilesystemResolvedSpec):
-    """A spec with resolved globs, e.g. `*.py` may resolve to `('f1.py', 'f2.py',
-    '__init__.py')`."""
+    """A spec with resolved globs.
 
-    _snapshot: Snapshot
+    For example, `*.py` may resolve to `('f1.py', 'f2.py', '__init__.py')`.
+    """
+
+    files: Tuple[str, ...]
 
     @property
     def resolved_files(self) -> Tuple[str, ...]:
-        return self._snapshot.files
+        return self.files
 
 
 @dataclass(frozen=True)
 class FilesystemMergedSpec(FilesystemResolvedSpec):
-    """When multiple file arguments are given that resolve to the same owning target, this type
-    allows grouping the arguments into a single FilesystemSpec."""
+    """Represents multiple FilesystemSpecs belonging to the same target."""
 
-    original_globs: Tuple[str, ...]
-    merged_files: Tuple[str, ...]
+    globs: Tuple[str, ...]
+    files: Tuple[str, ...]
 
     @classmethod
     def create(
         cls, original_specs: Iterable[Union[FilesystemLiteralSpec, FilesystemResolvedGlobSpec]]
     ) -> "FilesystemMergedSpec":
-        original_globs: List[str] = []
-        merged_files: List[str] = []
+        globs: List[str] = []
+        files: List[str] = []
         for spec in original_specs:
-            original_globs.append(spec.to_spec_string())
-            merged_files.extend(spec.resolved_files)
-        return cls(
-            original_globs=tuple(sorted(original_globs)), merged_files=tuple(sorted(merged_files))
-        )
+            globs.append(spec.to_spec_string())
+            files.extend(spec.resolved_files)
+        return cls(globs=tuple(sorted(globs)), files=tuple(sorted(files)))
 
     @property
     def resolved_files(self) -> Tuple[str, ...]:
-        return self.merged_files
+        return self.files
 
     def to_spec_string(self) -> str:
-        return ", ".join(self.original_globs)
+        return ", ".join(self.globs)
 
 
 @dataclass(frozen=True)
