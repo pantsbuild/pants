@@ -1,10 +1,16 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import functools
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
-from pants.backend.python.rules.pex import Pex
+from pants.backend.python.rules.pex import (
+    CreatePex,
+    Pex,
+    PexInterpreterConstraints,
+    PexRequirements,
+)
 from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
 from pants.backend.python.rules.prepare_chrooted_python_sources import ChrootedPythonSources
 from pants.backend.python.rules.pytest_coverage import (
@@ -54,7 +60,7 @@ def calculate_timeout_seconds(
 
 @dataclass(frozen=True)
 class TestTargetSetup:
-    requirements_pex: Pex
+    test_runner_pex: Pex
     args: Tuple[str, ...]
     input_files_digest: Digest
     timeout_seconds: Optional[int]
@@ -65,41 +71,89 @@ class TestTargetSetup:
 
 @rule
 async def setup_pytest_for_target(
-    adaptor_with_origin: PythonTestsAdaptorWithOrigin, pytest: PyTest, test_options: TestOptions,
+    adaptor_with_origin: PythonTestsAdaptorWithOrigin,
+    pytest: PyTest,
+    test_options: TestOptions,
+    python_setup: PythonSetup,
 ) -> TestTargetSetup:
-    adaptor = adaptor_with_origin.adaptor
     # TODO: Rather than consuming the TestOptions subsystem, the TestRunner should pass on coverage
     # configuration via #7490.
-    transitive_hydrated_targets = await Get[TransitiveHydratedTargets](
-        Addresses((adaptor.address,))
-    )
+
+    adaptor = adaptor_with_origin.adaptor
+    test_addresses = Addresses((adaptor.address,))
+
+    # TODO(John Sirois): PexInterpreterConstraints are gathered in the same way by the
+    #  `create_pex_from_target_closure` rule, factor up.
+    transitive_hydrated_targets = await Get[TransitiveHydratedTargets](Addresses, test_addresses)
     all_targets = transitive_hydrated_targets.closure
+    all_target_adaptors = [t.adaptor for t in all_targets]
+    interpreter_constraints = PexInterpreterConstraints.create_from_adaptors(
+        adaptors=all_target_adaptors, python_setup=python_setup
+    )
+
+    # Ensure all pexes we merge via PEX_PATH to form the test runner use the interpreter constraints
+    # of the tests. This is handled by CreatePexFromTargetClosure, but we must pass this through for
+    # CreatePex requests.
+    create_pex = functools.partial(CreatePex, interpreter_constraints=interpreter_constraints)
+
+    # NB: We set `--not-zip-safe` because Pytest plugin discovery, which uses
+    # `importlib_metadata` and thus `zipp`, does not play nicely when doing import magic directly
+    # from zip files. `zipp` has pathologically bad behavior with large zipfiles.
+    # TODO: this does have a performance cost as the pex must now be expanded to disk. Long term,
+    # it would be better to fix Zipp (whose fix would then need to be used by importlib_metadata
+    # and then by Pytest). See https://github.com/jaraco/zipp/pull/26.
+    additional_args_for_pytest = ("--not-zip-safe",)
+
     run_coverage = test_options.values.run_coverage
     plugin_file_digest: Optional[Digest] = (
         await Get[Digest](InputFilesContent, get_coverage_plugin_input()) if run_coverage else None
     )
-    resolved_requirements_pex = await Get[Pex](
+    pytest_pex = await Get[Pex](
+        CreatePex,
+        create_pex(
+            output_filename="pytest.pex",
+            requirements=PexRequirements(requirements=pytest.get_requirement_strings()),
+            additional_args=additional_args_for_pytest,
+            input_files_digest=plugin_file_digest,
+        ),
+    )
+
+    requirements_pex = await Get[Pex](
         CreatePexFromTargetClosure(
-            addresses=Addresses((adaptor.address,)),
-            output_filename="pytest-with-requirements.pex",
-            entry_point="pytest:main",
-            additional_requirements=pytest.get_requirement_strings(),
-            # NB: We set `--not-zip-safe` because Pytest plugin discovery, which uses
-            # `importlib_metadata` and thus `zipp`, does not play nicely when doing import magic directly
-            # from zip files. `zipp` has pathologically bad behavior with large zipfiles.
-            # TODO: this does have a performance cost as the pex must now be expanded to disk. Long term,
-            # it would be better to fix Zipp (whose fix would then need to be used by importlib_metadata
-            # and then by Pytest). See https://github.com/jaraco/zipp/pull/26.
-            additional_args=("--not-zip-safe",),
+            addresses=test_addresses,
+            output_filename="requirements.pex",
             include_source_files=False,
-            additional_input_files=plugin_file_digest,
+            additional_args=additional_args_for_pytest,
         )
+    )
+
+    test_runner_pex = await Get[Pex](
+        CreatePex,
+        create_pex(
+            output_filename="test_runner.pex",
+            entry_point="pytest:main",
+            interpreter_constraints=interpreter_constraints,
+            additional_args=(
+                "--pex-path",
+                ":".join(
+                    pex_request.output_filename
+                    # TODO(John Sirois): Support shading python binaries:
+                    #   https://github.com/pantsbuild/pants/issues/9206
+                    # Right now any pytest transitive requirements will shadow corresponding user
+                    # requirements which will lead to problems when APIs that are used by either
+                    # `pytest:main` or the tests themselves break between the two versions.
+                    for pex_request in (pytest_pex, requirements_pex)
+                ),
+            ),
+        ),
     )
 
     chrooted_sources = await Get[ChrootedPythonSources](HydratedTargets(all_targets))
     directories_to_merge = [
         chrooted_sources.snapshot.directory_digest,
-        resolved_requirements_pex.directory_digest,
+        requirements_pex.directory_digest,
+        pytest_pex.directory_digest,
+        test_runner_pex.directory_digest,
     ]
 
     # Get the file names for the test_target so that we can specify to Pytest precisely which files
@@ -135,7 +189,7 @@ async def setup_pytest_for_target(
     )
 
     return TestTargetSetup(
-        requirements_pex=resolved_requirements_pex,
+        test_runner_pex=test_runner_pex,
         args=(*pytest.options.args, *coverage_args, *sorted(specified_source_file_names)),
         input_files_digest=merged_input_files,
         timeout_seconds=timeout_seconds,
@@ -155,10 +209,10 @@ async def run_python_test(
     colors = global_options.colors
     env = {"PYTEST_ADDOPTS": f"--color={'yes' if colors else 'no'}"}
     run_coverage = test_options.values.run_coverage
-    request = test_setup.requirements_pex.create_execute_request(
+    request = test_setup.test_runner_pex.create_execute_request(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
-        pex_path=f"./{test_setup.requirements_pex.output_filename}",
+        pex_path=f"./{test_setup.test_runner_pex.output_filename}",
         pex_args=test_setup.args,
         input_files=test_setup.input_files_digest,
         output_directories=(".coverage",) if run_coverage else None,
@@ -176,7 +230,7 @@ async def run_python_test(
 @rule(name="Run pytest in an interactive process")
 async def debug_python_test(test_setup: TestTargetSetup) -> TestDebugRequest:
     run_request = InteractiveProcessRequest(
-        argv=(test_setup.requirements_pex.output_filename, *test_setup.args),
+        argv=(test_setup.test_runner_pex.output_filename, *test_setup.args),
         run_in_workspace=False,
         input_files=test_setup.input_files_digest,
     )
