@@ -154,8 +154,7 @@ class DetermineSourceFilesTest(TestBase):
         target2_all_sources = self.SOURCES2.source_file_absolute_paths
         target2_slice = slice(0, len(target2_all_sources))
         target2_origin = FilesystemResolvedGlobSpec(
-            f"{self.SOURCES2.source_root}/*.py",
-            _snapshot=self.make_snapshot_of_empty_files(target2_all_sources),
+            f"{self.SOURCES2.source_root}/*.py", files=tuple(target2_all_sources)
         )
         target2 = self.mock_target(self.SOURCES2, origin=target2_origin)
 
@@ -165,11 +164,9 @@ class DetermineSourceFilesTest(TestBase):
         target3_slice = slice(0, 1)
         target3_origin = FilesystemResolvedGlobSpec(
             f"{self.SOURCES3.source_root}/*.java",
-            _snapshot=self.make_snapshot_of_empty_files(
-                [
-                    PurePath(self.SOURCES3.source_root, name).as_posix()
-                    for name in [self.SOURCES3.source_files[0], "other_target.java", "j.tmp.java",]
-                ]
+            files=tuple(
+                PurePath(self.SOURCES3.source_root, name).as_posix()
+                for name in [self.SOURCES3.source_files[0], "other_target.java", "j.tmp.java"]
             ),
         )
         target3 = self.mock_target(self.SOURCES3, origin=target3_origin)

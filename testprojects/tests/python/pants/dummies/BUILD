@@ -1,4 +1,4 @@
 python_tests(
-  name = 'passing_target',
-  sources = ['test_pass.py'],
+  name = 'tests',
+  sources = ['test_f1.py', 'test_f2.py'],
 )
