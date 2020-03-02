@@ -305,7 +305,7 @@ class JvmPlatformSettings:
             by_default=True,
         )
 
-    def __init__(self, source_level, target_level, args, jvm_options, name=None, by_default=False):
+    def __init__(self, *, source_level, target_level, args, jvm_options, name=None, by_default=False):
         """
     :param source_level: Revision object or string for the java source level.
     :param target_level: Revision object or string for the java target level.
