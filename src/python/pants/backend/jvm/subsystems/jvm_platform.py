@@ -20,29 +20,7 @@ class JvmPlatform(Subsystem):
     JvmPlatform covers both compile time and runtime jvm platform settings. A platform is a group of
     compile time and runtime configurations.
 
-    For compile time configuration, there are three main attributes, `source`, `target` and `args`.
-    `source` and `target` map directly to the javac arguments of the same name, though they accept
-     more aliases than javac. `args`, allows the platform to specify additional, global to that
-     platform, compile arguments.
-
-    For runtime configuration, `target` and `jvm_options` are used. `target` is used to determine the
-    version of the JVM to use. `jvm_options` is used by some tasks to allow platforms to specify
-    platform specific JVM options. These can make transitions between JVM versions smoother by
-    allowing compatibility options to be provided globally.
-
-    An example pants.toml config might look like this:
-
-        [jvm-platform]
-        default_platform: java8
-        default_runtime_platform: java10
-        platforms =
-        \"\"\"
-         {
-            'java8': { 'source': '8', 'target': '8', 'args': [] },
-            'java10': {'source': '10', 'target': '10', 'args': [],
-                       'jvm_options': ['-Djava.compat.foo=act-like-java-8'] },
-          }
-       \"\"\"
+    See src/docs/common_tasks/multiple_jvm_versions.md for more detail.
     """
 
     # NB: These assume a java version number N can be specified as either 'N' or '1.N'
@@ -305,7 +283,9 @@ class JvmPlatformSettings:
             by_default=True,
         )
 
-    def __init__(self, *, source_level, target_level, args, jvm_options, name=None, by_default=False):
+    def __init__(
+        self, *, source_level, target_level, args, jvm_options, name=None, by_default=False
+    ):
         """
     :param source_level: Revision object or string for the java source level.
     :param target_level: Revision object or string for the java target level.
