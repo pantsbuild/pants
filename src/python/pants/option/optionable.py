@@ -85,7 +85,7 @@ class Optionable(OptionableFactory, metaclass=ABCMeta):
 
     @classmethod
     def is_valid_scope_name_component(cls, s: str) -> bool:
-        return s == '' or cls._scope_name_component_re.match(s) is not None
+        return s == "" or cls._scope_name_component_re.match(s) is not None
 
     @classmethod
     def validate_scope_name_component(cls, s: str) -> None:

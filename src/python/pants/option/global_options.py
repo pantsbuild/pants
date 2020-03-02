@@ -4,10 +4,9 @@
 import multiprocessing
 import os
 import sys
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any
-
-from dataclasses import dataclass
 
 from pants.base.build_environment import (
     get_buildroot,
