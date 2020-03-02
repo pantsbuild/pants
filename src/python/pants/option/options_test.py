@@ -52,6 +52,10 @@ from pants.util.strutil import safe_shlex_join
 _FAKE_CUR_VERSION = "1.0.0.dev0"
 
 
+def global_scope() -> ScopeInfo:
+    return ScopeInfo(GLOBAL_SCOPE, ScopeInfo.GLOBAL, GlobalOptionsRegistrar)
+
+
 def task(scope: str) -> ScopeInfo:
     return ScopeInfo(scope, ScopeInfo.TASK)
 
@@ -97,6 +101,7 @@ class OptionsTest(TestBase):
         return options
 
     _known_scope_infos = [
+        global_scope(),
         intermediate("compile"),
         task("compile.java"),
         task("compile.scala"),
@@ -731,7 +736,10 @@ class OptionsTest(TestBase):
         def assertError(expected_error, *args, **kwargs):
             with self.assertRaises(expected_error):
                 options = Options.create(
-                    args=[], env={}, config=self._create_config(), known_scope_infos=[]
+                    args=[],
+                    env={},
+                    config=self._create_config(),
+                    known_scope_infos=[global_scope()],
                 )
                 options.register(GLOBAL_SCOPE, *args, **kwargs)
                 options.for_global_scope()
@@ -761,7 +769,7 @@ class OptionsTest(TestBase):
         options = Options.create(
             env={},
             config=self._create_config(),
-            known_scope_infos=[task("bar"), intermediate("foo"), task("foo.bar")],
+            known_scope_infos=[global_scope(), task("bar"), intermediate("foo"), task("foo.bar")],
             args=["./pants"],
         )
         options.register("", "--opt1")
@@ -795,7 +803,7 @@ class OptionsTest(TestBase):
         options = Options.create(
             env={},
             config=self._create_config(),
-            known_scope_infos=[subsystem("foo")],
+            known_scope_infos=[global_scope(), subsystem("foo")],
             args=["./pants"],
         )
         # All subsystem options are implicitly recursive (a subscope of subsystem scope represents
@@ -1192,22 +1200,20 @@ class OptionsTest(TestBase):
         self.assertEqual(100, options.for_scope("compile.java").a)
 
     def test_complete_scopes(self) -> None:
-        _global = GlobalOptionsRegistrar.get_scope_info()
         self.assertEqual(
-            {_global, intermediate("foo"), intermediate("foo.bar"), task("foo.bar.baz")},
+            {intermediate("foo"), intermediate("foo.bar"), task("foo.bar.baz")},
             Options.complete_scopes({task("foo.bar.baz")}),
         )
         self.assertEqual(
-            {_global, intermediate("foo"), intermediate("foo.bar"), task("foo.bar.baz")},
+            {global_scope(), intermediate("foo"), intermediate("foo.bar"), task("foo.bar.baz")},
             Options.complete_scopes({GlobalOptionsRegistrar.get_scope_info(), task("foo.bar.baz")}),
         )
         self.assertEqual(
-            {_global, intermediate("foo"), intermediate("foo.bar"), task("foo.bar.baz")},
+            {intermediate("foo"), intermediate("foo.bar"), task("foo.bar.baz")},
             Options.complete_scopes({intermediate("foo"), task("foo.bar.baz")}),
         )
         self.assertEqual(
             {
-                _global,
                 intermediate("foo"),
                 intermediate("foo.bar"),
                 task("foo.bar.baz"),
@@ -1532,6 +1538,7 @@ class OptionsTest(TestBase):
                 }
             ),
             known_scope_infos=[
+                global_scope(),
                 DummyOptionable1.get_scope_info(),
                 DummyOptionable2.get_scope_info(),
             ],
@@ -1593,8 +1600,10 @@ class OptionsTest(TestBase):
                 super().register_options(register)
                 register("--foo")
 
-        known_scope_infos = list(DummyOptionable1.known_scope_infos()) + list(
-            DummyOptionable2.known_scope_infos()
+        known_scope_infos = (
+            [global_scope()]
+            + list(DummyOptionable1.known_scope_infos())
+            + list(DummyOptionable2.known_scope_infos())
         )
 
         options = Options.create(
@@ -1629,7 +1638,7 @@ class OptionsTest(TestBase):
             config=self._create_config(
                 {"DEFAULT": {"foo": "aa"}, DummyOptionable1.options_scope: {"foo": "xx"},}
             ),
-            known_scope_infos=[DummyOptionable1.get_scope_info(),],
+            known_scope_infos=[global_scope(), DummyOptionable1.get_scope_info(),],
             args=shlex.split("./pants"),
         )
 
@@ -1652,6 +1661,7 @@ class OptionsTest(TestBase):
             env={},
             config=self._create_config(),
             known_scope_infos=[
+                global_scope(),
                 DummyOptionable1.get_scope_info(),
                 # A deprecated, scoped dependency on `DummyOptionable1`. This
                 # imitates the construction of SubsystemClientMixin.known_scope_infos.
