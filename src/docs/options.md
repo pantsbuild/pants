@@ -305,7 +305,7 @@ String values should not have quotes around them:
     :::ini
     # Bad
     val = "a"
-    
+
     # Good
     val = a
 
@@ -315,7 +315,7 @@ Dict options should not have quotes around the `{}` symbols, although the elemen
     # Bad
     dict_option = "{'a': 0}"
     dict_option = """{'a': 0}"""
-    
+
     # Good
     dict_option = {'a': 0}
 
@@ -331,7 +331,7 @@ Every line of list and dict values must be indented:
       'a': 0,
       'b': 1,
     }
-    
+
     # Good
     list_option = [
         'a',
@@ -348,7 +348,7 @@ To add or remove to a list option, use the same syntax as the command line:
     # Bad
     list_option.add = ["a", "b"]
     list_option.remove = ["c"]
-    
+
     # Good
     list_option = +["a", "b"],-["c"]
 
