@@ -163,7 +163,7 @@ class Scheduler:
     def _to_utf8_buf(self, string):
         return self._native.context.utf8_buf(string)
 
-    def _register_rules(self, rule_index: RuleIndex) -> Any:
+    def _register_rules(self, rule_index: RuleIndex):
         """Create a native Tasks object, and record the given RuleIndex on it."""
 
         tasks = self._native.new_tasks()
@@ -181,7 +181,9 @@ class Scheduler:
 
         return tasks
 
-    def _register_task(self, tasks: Any, output_type, rule: TaskRule, union_rules) -> None:
+    def _register_task(
+        self, tasks, output_type, rule: TaskRule, union_rules: "OrderedDict[Type, OrderedSet[Type]]"
+    ) -> None:
         """Register the given TaskRule with the native scheduler."""
         func = Function(self._to_key(rule.func))
         self._native.lib.tasks_task_begin(tasks, func, self._to_type(output_type), rule.cacheable)
