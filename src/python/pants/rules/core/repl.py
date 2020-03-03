@@ -14,7 +14,7 @@ from pants.engine.interactive_runner import InteractiveProcessRequest, Interacti
 from pants.engine.objects import union
 from pants.engine.rules import UnionMembership, goal_rule
 from pants.engine.selectors import Get
-from pants.option.global_options import GlobalOptions
+from pants.option.global_options import GlobalOptionsRegistrar
 from pants.util.contextutil import temporary_dir
 
 
@@ -64,7 +64,7 @@ async def run_repl(
     addresses: Addresses,
     build_root: BuildRoot,
     union_membership: UnionMembership,
-    global_options: GlobalOptions,
+    global_options: GlobalOptionsRegistrar,
 ) -> Repl:
 
     # We can guarantee that we will only even enter this `goal_rule` if there exists an implementer
@@ -86,7 +86,7 @@ async def run_repl(
 
     repl_binary = await Get[ReplBinary](ReplImplementation, repl_implementation(addresses))
 
-    with temporary_dir(root_dir=global_options.pants_workdir, cleanup=False) as tmpdir:
+    with temporary_dir(root_dir=global_options.options.pants_workdir, cleanup=False) as tmpdir:
         path_relative_to_build_root = PurePath(tmpdir).relative_to(build_root.path).as_posix()
         workspace.materialize_directory(
             DirectoryToMaterialize(repl_binary.digest, path_prefix=path_relative_to_build_root)

@@ -30,7 +30,7 @@ from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
 from pants.engine.legacy.structs import PythonTestsAdaptorWithOrigin
 from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
-from pants.option.global_options import GlobalOptions
+from pants.option.global_options import GlobalOptionsRegistrar
 from pants.python.python_setup import PythonSetup
 from pants.rules.core.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.rules.core.test import TestDebugRequest, TestOptions, TestResult, TestTarget
@@ -202,12 +202,11 @@ async def run_python_test(
     test_setup: TestTargetSetup,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
-    global_options: GlobalOptions,
+    global_options: GlobalOptionsRegistrar,
     test_options: TestOptions,
 ) -> TestResult:
     """Runs pytest for one target."""
-    colors = global_options.colors
-    env = {"PYTEST_ADDOPTS": f"--color={'yes' if colors else 'no'}"}
+    env = {"PYTEST_ADDOPTS": f"--color={'yes' if global_options.options.colors else 'no'}"}
     run_coverage = test_options.values.run_coverage
     request = test_setup.test_runner_pex.create_execute_request(
         python_setup=python_setup,
