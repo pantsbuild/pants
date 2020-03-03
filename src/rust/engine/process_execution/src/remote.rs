@@ -22,7 +22,8 @@ use tokio_timer::Delay;
 
 use crate::{
   Context, ExecuteProcessRequest, ExecuteProcessRequestMetadata, ExecutionStats,
-  FallibleExecuteProcessResult, MultiPlatformExecuteProcessRequest, Platform, PlatformConstraint,
+  FallibleExecuteProcessResultWithPlatform, MultiPlatformExecuteProcessRequest, Platform,
+  PlatformConstraint,
 };
 use std;
 use std::cmp::min;
@@ -241,7 +242,7 @@ impl super::CommandRunner for CommandRunner {
     &self,
     req: MultiPlatformExecuteProcessRequest,
     context: Context,
-  ) -> BoxFuture<FallibleExecuteProcessResult, String> {
+  ) -> BoxFuture<FallibleExecuteProcessResultWithPlatform, String> {
     let platform = self.platform();
     let compatible_underlying_request = self.extract_compatible_request(&req).unwrap();
     let operations_client = self.operations_client.clone();
@@ -397,7 +398,7 @@ impl super::CommandRunner for CommandRunner {
                               } = history;
                               current_attempt.remote_execution = Some(elapsed);
                               attempts.push(current_attempt);
-                              future::ok(future::Loop::Break(FallibleExecuteProcessResult {
+                              future::ok(future::Loop::Break(FallibleExecuteProcessResultWithPlatform {
                                 stdout: Bytes::from(format!(
                                   "Exceeded timeout of {:?} ({:?} for the process and {:?} for remoting buffer time) with {:?} for operation {}, {}",
                                   total_timeout, timeout, command_runner.queue_buffer_time, elapsed, operation_name, description
@@ -550,7 +551,7 @@ impl CommandRunner {
     operation_or_status: OperationOrStatus,
     attempts: &mut ExecutionHistory,
     workunit_store: WorkUnitStore,
-  ) -> BoxFuture<FallibleExecuteProcessResult, ExecutionError> {
+  ) -> BoxFuture<FallibleExecuteProcessResultWithPlatform, ExecutionError> {
     trace!("Got operation response: {:?}", operation_or_status);
 
     let status = match operation_or_status {
@@ -773,7 +774,7 @@ impl CommandRunner {
     maybe_cancel_remote_exec_token: Option<CancelRemoteExecutionToken>,
   ) -> BoxFuture<
     future::Loop<
-      FallibleExecuteProcessResult,
+      FallibleExecuteProcessResultWithPlatform,
       (
         ExecutionHistory,
         OperationOrStatus,
@@ -950,7 +951,7 @@ pub fn populate_fallible_execution_result(
   execution_attempts: Vec<ExecutionStats>,
   workunit_store: WorkUnitStore,
   platform: Platform,
-) -> impl Future<Item = FallibleExecuteProcessResult, Error = String> {
+) -> impl Future<Item = FallibleExecuteProcessResultWithPlatform, Error = String> {
   extract_stdout(&store, &execute_response, workunit_store.clone())
     .join(extract_stderr(
       &store,
@@ -963,7 +964,7 @@ pub fn populate_fallible_execution_result(
       workunit_store,
     ))
     .and_then(move |((stdout, stderr), output_directory)| {
-      Ok(FallibleExecuteProcessResult {
+      Ok(FallibleExecuteProcessResultWithPlatform {
         stdout: stdout,
         stderr: stderr,
         exit_code: execute_response.get_result().get_exit_code(),

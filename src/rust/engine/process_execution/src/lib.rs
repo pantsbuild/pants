@@ -307,7 +307,7 @@ pub struct ExecuteProcessRequestMetadata {
 /// The result of running a process.
 ///
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct FallibleExecuteProcessResult {
+pub struct FallibleExecuteProcessResultWithPlatform {
   pub stdout: Bytes,
   pub stderr: Bytes,
   pub exit_code: i32,
@@ -321,7 +321,7 @@ pub struct FallibleExecuteProcessResult {
 }
 
 #[cfg(test)]
-impl FallibleExecuteProcessResult {
+impl FallibleExecuteProcessResultWithPlatform {
   pub fn without_execution_attempts(mut self) -> Self {
     self.execution_attempts = vec![];
     self
@@ -363,7 +363,7 @@ pub trait CommandRunner: Send + Sync {
     &self,
     req: MultiPlatformExecuteProcessRequest,
     context: Context,
-  ) -> BoxFuture<FallibleExecuteProcessResult, String>;
+  ) -> BoxFuture<FallibleExecuteProcessResultWithPlatform, String>;
 
   ///
   /// Given a multi platform request which may have some platform
@@ -429,7 +429,7 @@ impl CommandRunner for BoundedCommandRunner {
     &self,
     req: MultiPlatformExecuteProcessRequest,
     context: Context,
-  ) -> BoxFuture<FallibleExecuteProcessResult, String> {
+  ) -> BoxFuture<FallibleExecuteProcessResultWithPlatform, String> {
     let inner = self.inner.clone();
     self
       .inner

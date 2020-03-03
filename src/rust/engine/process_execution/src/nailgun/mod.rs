@@ -16,8 +16,9 @@ use tokio::net::TcpStream;
 use crate::local::CapturedWorkdir;
 use crate::nailgun::nailgun_pool::NailgunProcessName;
 use crate::{
-  Context, ExecuteProcessRequest, ExecuteProcessRequestMetadata, FallibleExecuteProcessResult,
-  MultiPlatformExecuteProcessRequest, Platform, PlatformConstraint,
+  Context, ExecuteProcessRequest, ExecuteProcessRequestMetadata,
+  FallibleExecuteProcessResultWithPlatform, MultiPlatformExecuteProcessRequest, Platform,
+  PlatformConstraint,
 };
 
 #[cfg(test)]
@@ -168,7 +169,7 @@ impl super::CommandRunner for CommandRunner {
     &self,
     req: MultiPlatformExecuteProcessRequest,
     context: Context,
-  ) -> BoxFuture<FallibleExecuteProcessResult, String> {
+  ) -> BoxFuture<FallibleExecuteProcessResultWithPlatform, String> {
     let original_request = self.extract_compatible_request(&req).unwrap();
 
     if !original_request.is_nailgunnable {
