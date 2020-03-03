@@ -620,7 +620,7 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
     # address will effectively sort by closeness of ancestry to the given target.
     exported_ancestor_tgts = sorted(
         [t.adaptor for t in ancestor_tgts if _is_exported(t)],
-        key=lambda t: t.adaptor.address,
+        key=lambda adaptor: adaptor.address,
         reverse=True,
     )
     exported_ancestor_iter = iter(exported_ancestor_tgts)
