@@ -1,5 +1,5 @@
 use crate::{
-  CommandRunner, Context, ExecuteProcessRequest, FallibleExecuteProcessResult,
+  CommandRunner, Context, ExecuteProcessRequest, FallibleExecuteProcessResultWithPlatform,
   MultiPlatformExecuteProcessRequest,
 };
 use boxfuture::{BoxFuture, Boxable};
@@ -33,7 +33,7 @@ impl SpeculatingCommandRunner {
     &self,
     req: MultiPlatformExecuteProcessRequest,
     context: Context,
-  ) -> BoxFuture<FallibleExecuteProcessResult, String> {
+  ) -> BoxFuture<FallibleExecuteProcessResultWithPlatform, String> {
     let delay = Delay::new(Instant::now() + self.speculation_timeout);
     let req2 = req.clone();
     trace!(
@@ -57,11 +57,12 @@ impl SpeculatingCommandRunner {
         Ok(either_success) => {
           // .split() takes out the homogeneous success type for either primary or
           // secondary successes.
-          ok::<FallibleExecuteProcessResult, String>(either_success.split().0).to_boxed()
+          ok::<FallibleExecuteProcessResultWithPlatform, String>(either_success.split().0)
+            .to_boxed()
         }
         Err(Either::A((failed_primary_res, _))) => {
           debug!("primary request FAILED, aborting");
-          err::<FallibleExecuteProcessResult, String>(failed_primary_res).to_boxed()
+          err::<FallibleExecuteProcessResultWithPlatform, String>(failed_primary_res).to_boxed()
         }
         // We handle the case of the secondary failing specially. We only want to show
         // a failure to the user if the primary execution source fails. This maintains
@@ -103,7 +104,7 @@ impl CommandRunner for SpeculatingCommandRunner {
     &self,
     req: MultiPlatformExecuteProcessRequest,
     context: Context,
-  ) -> BoxFuture<FallibleExecuteProcessResult, String> {
+  ) -> BoxFuture<FallibleExecuteProcessResultWithPlatform, String> {
     match (
       self.primary.extract_compatible_request(&req),
       self.secondary.extract_compatible_request(&req),

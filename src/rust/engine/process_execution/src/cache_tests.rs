@@ -1,6 +1,6 @@
 use crate::{
   CommandRunner as CommandRunnerTrait, Context, ExecuteProcessRequest,
-  ExecuteProcessRequestMetadata, FallibleExecuteProcessResult, PlatformConstraint,
+  ExecuteProcessRequestMetadata, FallibleExecuteProcessResultWithPlatform, PlatformConstraint,
 };
 use hashing::EMPTY_DIGEST;
 use sharded_lmdb::ShardedLmdb;
@@ -14,8 +14,8 @@ use tempfile::TempDir;
 use testutil::data::TestData;
 
 struct RoundtripResults {
-  uncached: Result<FallibleExecuteProcessResult, String>,
-  maybe_cached: Result<FallibleExecuteProcessResult, String>,
+  uncached: Result<FallibleExecuteProcessResultWithPlatform, String>,
+  maybe_cached: Result<FallibleExecuteProcessResultWithPlatform, String>,
 }
 
 fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {

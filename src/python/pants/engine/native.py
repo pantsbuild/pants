@@ -34,7 +34,7 @@ from pants.engine.fs import (
 )
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveProcessResult
 from pants.engine.isolated_process import (
-    FallibleExecuteProcessResult,
+    FallibleExecuteProcessResultWithPlatform,
     MultiPlatformExecuteProcessRequest,
 )
 from pants.engine.objects import union
@@ -946,7 +946,7 @@ class Native(metaclass=SingletonMetaclass):
             construct_file_content=func(FileContent),
             construct_files_content=func(FilesContent),
             files_content=ti(FilesContent),
-            construct_process_result=func(FallibleExecuteProcessResult),
+            construct_process_result=func(FallibleExecuteProcessResultWithPlatform),
             construct_materialize_directories_results=func(MaterializeDirectoriesResult),
             construct_materialize_directory_result=func(MaterializeDirectoryResult),
             address=ti(Address),
@@ -959,7 +959,7 @@ class Native(metaclass=SingletonMetaclass):
             file=ti(File),
             link=ti(Link),
             multi_platform_process_request=ti(MultiPlatformExecuteProcessRequest),
-            process_result=ti(FallibleExecuteProcessResult),
+            process_result=ti(FallibleExecuteProcessResultWithPlatform),
             coroutine=ti(CoroutineType),
             url_to_fetch=ti(UrlToFetch),
             string=ti(str),

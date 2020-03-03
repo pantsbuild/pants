@@ -3,7 +3,7 @@ use testutil;
 
 use crate::{
   CommandRunner as CommandRunnerTrait, Context, ExecuteProcessRequest,
-  FallibleExecuteProcessResult, Platform, PlatformConstraint, RelativePath,
+  FallibleExecuteProcessResultWithPlatform, Platform, PlatformConstraint, RelativePath,
 };
 use hashing::EMPTY_DIGEST;
 use spectral::{assert_that, string::StrAssertions};
@@ -37,7 +37,7 @@ fn stdout() {
 
   assert_eq!(
     result.unwrap(),
-    FallibleExecuteProcessResult {
+    FallibleExecuteProcessResultWithPlatform {
       stdout: as_bytes("foo"),
       stderr: as_bytes(""),
       exit_code: 0,
@@ -68,7 +68,7 @@ fn stdout_and_stderr_and_exit_code() {
 
   assert_eq!(
     result.unwrap(),
-    FallibleExecuteProcessResult {
+    FallibleExecuteProcessResultWithPlatform {
       stdout: as_bytes("foo"),
       stderr: as_bytes("bar"),
       exit_code: 1,
@@ -100,7 +100,7 @@ fn capture_exit_code_signal() {
 
   assert_eq!(
     result.unwrap(),
-    FallibleExecuteProcessResult {
+    FallibleExecuteProcessResultWithPlatform {
       stdout: as_bytes(""),
       stderr: as_bytes(""),
       exit_code: -15,
@@ -217,7 +217,7 @@ fn output_files_none() {
   });
   assert_eq!(
     result.unwrap(),
-    FallibleExecuteProcessResult {
+    FallibleExecuteProcessResultWithPlatform {
       stdout: as_bytes(""),
       stderr: as_bytes(""),
       exit_code: 0,
@@ -251,7 +251,7 @@ fn output_files_one() {
 
   assert_eq!(
     result.unwrap(),
-    FallibleExecuteProcessResult {
+    FallibleExecuteProcessResultWithPlatform {
       stdout: as_bytes(""),
       stderr: as_bytes(""),
       exit_code: 0,
@@ -290,7 +290,7 @@ fn output_dirs() {
 
   assert_eq!(
     result.unwrap(),
-    FallibleExecuteProcessResult {
+    FallibleExecuteProcessResultWithPlatform {
       stdout: as_bytes(""),
       stderr: as_bytes(""),
       exit_code: 0,
@@ -330,7 +330,7 @@ fn output_files_many() {
 
   assert_eq!(
     result.unwrap(),
-    FallibleExecuteProcessResult {
+    FallibleExecuteProcessResultWithPlatform {
       stdout: as_bytes(""),
       stderr: as_bytes(""),
       exit_code: 0,
@@ -368,7 +368,7 @@ fn output_files_execution_failure() {
 
   assert_eq!(
     result.unwrap(),
-    FallibleExecuteProcessResult {
+    FallibleExecuteProcessResultWithPlatform {
       stdout: as_bytes(""),
       stderr: as_bytes(""),
       exit_code: 1,
@@ -404,7 +404,7 @@ fn output_files_partial_output() {
 
   assert_eq!(
     result.unwrap(),
-    FallibleExecuteProcessResult {
+    FallibleExecuteProcessResultWithPlatform {
       stdout: as_bytes(""),
       stderr: as_bytes(""),
       exit_code: 0,
@@ -438,7 +438,7 @@ fn output_overlapping_file_and_dir() {
 
   assert_eq!(
     result.unwrap(),
-    FallibleExecuteProcessResult {
+    FallibleExecuteProcessResultWithPlatform {
       stdout: as_bytes(""),
       stderr: as_bytes(""),
       exit_code: 0,
@@ -471,7 +471,7 @@ fn jdk_symlink() {
   });
   assert_eq!(
     result,
-    Ok(FallibleExecuteProcessResult {
+    Ok(FallibleExecuteProcessResultWithPlatform {
       stdout: roland,
       stderr: as_bytes(""),
       exit_code: 0,
@@ -588,7 +588,7 @@ fn all_containing_directories_for_outputs_are_created() {
 
   assert_eq!(
     result.unwrap(),
-    FallibleExecuteProcessResult {
+    FallibleExecuteProcessResultWithPlatform {
       stdout: as_bytes(""),
       stderr: as_bytes(""),
       exit_code: 0,
@@ -622,7 +622,7 @@ fn output_empty_dir() {
 
   assert_eq!(
     result.unwrap(),
-    FallibleExecuteProcessResult {
+    FallibleExecuteProcessResultWithPlatform {
       stdout: as_bytes(""),
       stderr: as_bytes(""),
       exit_code: 0,
@@ -676,7 +676,7 @@ fn local_only_scratch_files_materialized() {
 
   assert_eq!(
     result.unwrap(),
-    FallibleExecuteProcessResult {
+    FallibleExecuteProcessResultWithPlatform {
       stdout: as_bytes(""),
       stderr: as_bytes(""),
       exit_code: 0,
@@ -757,7 +757,7 @@ fn working_directory() {
 
   assert_eq!(
     result.unwrap(),
-    FallibleExecuteProcessResult {
+    FallibleExecuteProcessResultWithPlatform {
       stdout: as_bytes("roland\n"),
       stderr: as_bytes(""),
       exit_code: 0,
@@ -768,7 +768,9 @@ fn working_directory() {
   );
 }
 
-fn run_command_locally(req: ExecuteProcessRequest) -> Result<FallibleExecuteProcessResult, String> {
+fn run_command_locally(
+  req: ExecuteProcessRequest,
+) -> Result<FallibleExecuteProcessResultWithPlatform, String> {
   let work_dir = TempDir::new().unwrap();
   run_command_locally_in_dir_with_cleanup(req, work_dir.path().to_owned())
 }
@@ -776,7 +778,7 @@ fn run_command_locally(req: ExecuteProcessRequest) -> Result<FallibleExecuteProc
 fn run_command_locally_in_dir_with_cleanup(
   req: ExecuteProcessRequest,
   dir: PathBuf,
-) -> Result<FallibleExecuteProcessResult, String> {
+) -> Result<FallibleExecuteProcessResultWithPlatform, String> {
   run_command_locally_in_dir(req, dir, true, None, None)
 }
 
@@ -786,7 +788,7 @@ fn run_command_locally_in_dir(
   cleanup: bool,
   store: Option<Store>,
   executor: Option<task_executor::Executor>,
-) -> Result<FallibleExecuteProcessResult, String> {
+) -> Result<FallibleExecuteProcessResultWithPlatform, String> {
   let store_dir = TempDir::new().unwrap();
   let executor = executor.unwrap_or_else(task_executor::Executor::new);
   let store =
