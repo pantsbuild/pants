@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
 from pants.backend.python.lint.isort.subsystem import Isort
-from pants.backend.python.lint.python_formatter import PythonFormatTarget, PythonFormatter
+from pants.backend.python.lint.python_formatter import PythonFormatter
 from pants.backend.python.rules import download_pex_bin, pex
 from pants.backend.python.rules.pex import (
     CreatePex,
@@ -166,7 +166,7 @@ def rules():
         fmt,
         lint,
         subsystem_rule(Isort),
-        UnionRule(PythonFormatTarget, IsortFormatter),
+        UnionRule(PythonFormatter, IsortFormatter),
         UnionRule(Linter, IsortFormatter),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),

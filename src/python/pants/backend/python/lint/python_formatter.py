@@ -3,90 +3,57 @@
 
 from abc import ABCMeta
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Iterable, List, Optional, Type
 
 from pants.backend.python.lint.python_linter import PYTHON_TARGET_TYPES, PythonLinter
 from pants.engine.fs import Digest, Snapshot
-from pants.engine.legacy.structs import (
-    PantsPluginAdaptorWithOrigin,
-    PythonAppAdaptorWithOrigin,
-    PythonBinaryAdaptorWithOrigin,
-    PythonTargetAdaptorWithOrigin,
-    PythonTestsAdaptorWithOrigin,
-    TargetAdaptorWithOrigin,
-)
+from pants.engine.legacy.structs import TargetAdaptorWithOrigin
 from pants.engine.objects import union
-from pants.engine.rules import RootRule, UnionMembership, UnionRule, rule
+from pants.engine.rules import UnionMembership, UnionRule, rule
 from pants.engine.selectors import Get
-from pants.rules.core.fmt import AggregatedFmtResults, FmtResult, FormatTarget, Formatter
+from pants.rules.core.determine_source_files import AllSourceFilesRequest, SourceFiles
+from pants.rules.core.fmt import FmtResult, Formatter, LanguageFmtResults, LanguageFormatters
 
 
 @union
-@dataclass(frozen=True)
-class PythonFormatTarget:
-    adaptor_with_origin: TargetAdaptorWithOrigin
-
-
 @dataclass(frozen=True)
 class PythonFormatter(Formatter, PythonLinter, metaclass=ABCMeta):
     prior_formatter_result: Optional[Snapshot] = None
 
 
+@dataclass(frozen=True)
+class PythonFormatters(LanguageFormatters):
+    @staticmethod
+    def belongs_to_language(adaptor_with_origin: TargetAdaptorWithOrigin) -> bool:
+        return isinstance(adaptor_with_origin, PYTHON_TARGET_TYPES)
+
+
 @rule
 async def format_python_target(
-    target: PythonFormatTarget, union_membership: UnionMembership
-) -> AggregatedFmtResults:
-    """This aggregator allows us to have multiple formatters safely operate over the same Python
-    targets, even if they modify the same files."""
-    adaptor_with_origin = target.adaptor_with_origin
-    prior_formatter_result = adaptor_with_origin.adaptor.sources.snapshot
-    results: List[FmtResult] = []
-    for formatter in union_membership.union_rules[PythonFormatTarget]:
-        result = await Get[FmtResult](
-            PythonFormatTarget,
-            formatter((adaptor_with_origin,), prior_formatter_result=prior_formatter_result),
+    python_formatters: PythonFormatters, union_membership: UnionMembership
+) -> LanguageFmtResults:
+    adaptors_with_origins = python_formatters.adaptors_with_origins
+    original_sources = await Get[SourceFiles](
+        AllSourceFilesRequest(
+            adaptor_with_origin.adaptor for adaptor_with_origin in adaptors_with_origins
         )
-        results.append(result)
+    )
+    prior_formatter_result = original_sources.snapshot
+
+    results: List[FmtResult] = []
+    formatters: Iterable[Type[PythonFormatter]] = union_membership.union_rules[PythonFormatter]
+    for formatter in formatters:
+        result = await Get[FmtResult](
+            PythonFormatter,
+            formatter(adaptors_with_origins, prior_formatter_result=prior_formatter_result),
+        )
         if result != FmtResult.noop():
+            results.append(result)
             prior_formatter_result = await Get[Snapshot](Digest, result.digest)
-    return AggregatedFmtResults(
+    return LanguageFmtResults(
         tuple(results), combined_digest=prior_formatter_result.directory_digest
     )
 
 
-@rule
-def target_adaptor(adaptor_with_origin: PythonTargetAdaptorWithOrigin) -> PythonFormatTarget:
-    return PythonFormatTarget(adaptor_with_origin)
-
-
-@rule
-def app_adaptor(adaptor_with_origin: PythonAppAdaptorWithOrigin) -> PythonFormatTarget:
-    return PythonFormatTarget(adaptor_with_origin)
-
-
-@rule
-def binary_adaptor(adaptor_with_origin: PythonBinaryAdaptorWithOrigin) -> PythonFormatTarget:
-    return PythonFormatTarget(adaptor_with_origin)
-
-
-@rule
-def tests_adaptor(adaptor_with_origin: PythonTestsAdaptorWithOrigin) -> PythonFormatTarget:
-    return PythonFormatTarget(adaptor_with_origin)
-
-
-@rule
-def plugin_adaptor(adaptor_with_origin: PantsPluginAdaptorWithOrigin) -> PythonFormatTarget:
-    return PythonFormatTarget(adaptor_with_origin)
-
-
 def rules():
-    return [
-        format_python_target,
-        target_adaptor,
-        app_adaptor,
-        binary_adaptor,
-        tests_adaptor,
-        plugin_adaptor,
-        *(RootRule(target_type) for target_type in PYTHON_TARGET_TYPES),
-        *(UnionRule(FormatTarget, target_type) for target_type in PYTHON_TARGET_TYPES),
-    ]
+    return [format_python_target, UnionRule(LanguageFormatters, PythonFormatters)]

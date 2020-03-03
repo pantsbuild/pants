@@ -18,7 +18,7 @@ from typing import (
     cast,
 )
 
-from pants.engine.fs import PathGlobs, Snapshot
+from pants.engine.fs import PathGlobs
 from pants.engine.objects import Collection
 from pants.option.custom_types import GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior
@@ -378,14 +378,42 @@ class FilesystemGlobSpec(FilesystemSpec):
 
 @dataclass(frozen=True)
 class FilesystemResolvedGlobSpec(FilesystemGlobSpec, FilesystemResolvedSpec):
-    """A spec with resolved globs, e.g. `*.py` may resolve to `('f1.py', 'f2.py',
-    '__init__.py')`."""
+    """A spec with resolved globs.
 
-    _snapshot: Snapshot
+    For example, `*.py` may resolve to `('f1.py', 'f2.py', '__init__.py')`.
+    """
+
+    files: Tuple[str, ...]
 
     @property
     def resolved_files(self) -> Tuple[str, ...]:
-        return self._snapshot.files
+        return self.files
+
+
+@dataclass(frozen=True)
+class FilesystemMergedSpec(FilesystemResolvedSpec):
+    """Represents multiple FilesystemSpecs belonging to the same target."""
+
+    globs: Tuple[str, ...]
+    files: Tuple[str, ...]
+
+    @classmethod
+    def create(
+        cls, original_specs: Iterable[Union[FilesystemLiteralSpec, FilesystemResolvedGlobSpec]]
+    ) -> "FilesystemMergedSpec":
+        globs: List[str] = []
+        files: List[str] = []
+        for spec in original_specs:
+            globs.append(spec.to_spec_string())
+            files.extend(spec.resolved_files)
+        return cls(globs=tuple(sorted(globs)), files=tuple(sorted(files)))
+
+    @property
+    def resolved_files(self) -> Tuple[str, ...]:
+        return self.files
+
+    def to_spec_string(self) -> str:
+        return ", ".join(self.globs)
 
 
 @dataclass(frozen=True)

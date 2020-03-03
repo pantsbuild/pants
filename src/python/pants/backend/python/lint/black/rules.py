@@ -7,7 +7,7 @@ from pathlib import PurePath
 from typing import Optional, Tuple
 
 from pants.backend.python.lint.black.subsystem import Black
-from pants.backend.python.lint.python_formatter import PythonFormatTarget, PythonFormatter
+from pants.backend.python.lint.python_formatter import PythonFormatter
 from pants.backend.python.rules import download_pex_bin, pex
 from pants.backend.python.rules.pex import (
     CreatePex,
@@ -173,7 +173,7 @@ def rules():
         fmt,
         lint,
         subsystem_rule(Black),
-        UnionRule(PythonFormatTarget, BlackFormatter),
+        UnionRule(PythonFormatter, BlackFormatter),
         UnionRule(Linter, BlackFormatter),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),

@@ -19,7 +19,7 @@ target(
 # Pants IntelliJ plugin.
 python_tests(
   name = 'secondary_source_file_owner',
-  sources = ['dummies/test_pass.py'],
+  sources = ['dummies/test_f1.py'],
 )
 
 files(
