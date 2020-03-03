@@ -4,6 +4,8 @@
 import logging
 from collections import OrderedDict, namedtuple
 from collections.abc import Iterable
+from dataclasses import dataclass, field
+from typing import Any, Dict, Type
 
 from pants.base.parse_context import ParseContext
 from pants.build_graph.addressable import AddressableCallProxy
@@ -17,22 +19,22 @@ from pants.util.ordered_set import OrderedSet
 logger = logging.getLogger(__name__)
 
 
+@dataclass
 class BuildConfiguration:
     """Stores the types and helper functions exposed to BUILD files."""
+
+    _target_by_alias: Dict[Any, Any] = field(default_factory=dict)
+    _target_macro_factory_by_alias: Dict[Any, Any] = field(default_factory=dict)
+    _exposed_object_by_alias: Dict[Any, Any] = field(default_factory=dict)
+    _exposed_context_aware_object_factory_by_alias: Dict[Any, Any] = field(default_factory=dict)
+    _optionables: OrderedSet = field(default_factory=OrderedSet)
+    _rules: OrderedSet = field(default_factory=OrderedSet)
+    _union_rules: "OrderedDict[Type, OrderedSet[Type]]" = field(default_factory=OrderedDict)
 
     class ParseState(namedtuple("ParseState", ["parse_context", "parse_globals"])):
         @property
         def objects(self):
             return self.parse_context._storage.objects
-
-    def __init__(self):
-        self._target_by_alias = {}
-        self._target_macro_factory_by_alias = {}
-        self._exposed_object_by_alias = {}
-        self._exposed_context_aware_object_factory_by_alias = {}
-        self._optionables = OrderedSet()
-        self._rules = OrderedSet()
-        self._union_rules = OrderedDict()
 
     def registered_aliases(self) -> BuildFileAliases:
         """Return the registered aliases exposed in BUILD files.
@@ -179,11 +181,9 @@ class BuildConfiguration:
         """
         return list(self._rules)
 
-    def union_rules(self):
-        """Returns a mapping of registered union base types -> [OrderedSet of union member types].
-
-        :rtype: OrderedDict
-        """
+    def union_rules(self) -> "OrderedDict[Type, OrderedSet[Type]]":
+        """Returns a mapping of registered union base types -> [OrderedSet of union member
+        types]."""
         return self._union_rules
 
     @memoized_method
