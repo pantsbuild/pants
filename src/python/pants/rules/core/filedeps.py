@@ -59,7 +59,7 @@ async def file_deps(
     ):
         unique_rel_paths.add(build_file_address.rel_path)
         adaptor = hydrated_target.adaptor
-        if hasattr(adaptor, "sources"):
+        if adaptor.has_sources():
             sources_paths = (
                 adaptor.sources.snapshot.files
                 if not options.values.globs

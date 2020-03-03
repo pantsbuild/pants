@@ -8,7 +8,7 @@ from collections import defaultdict, deque
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any, Dict, Iterable, Iterator, List, Set, Tuple, Type, cast
+from typing import Any, DefaultDict, Dict, Iterable, Iterator, List, Set, Tuple, Type, Union, cast
 
 from pants.base.exceptions import ResolveError, TargetDefinitionException
 from pants.base.parse_context import ParseContext
@@ -17,6 +17,7 @@ from pants.base.specs import (
     AddressSpecs,
     AscendantAddresses,
     FilesystemLiteralSpec,
+    FilesystemMergedSpec,
     FilesystemResolvedGlobSpec,
     FilesystemSpecs,
     OriginSpec,
@@ -660,7 +661,7 @@ async def hydrate_target(hydrated_struct: HydratedStruct) -> HydratedTarget:
     return HydratedTarget(
         address=target_adaptor.address,
         adaptor=type(target_adaptor)(**kwargs),
-        dependencies=tuple(target_adaptor.dependencies),
+        dependencies=target_adaptor.dependencies,
     )
 
 
@@ -717,7 +718,11 @@ async def hydrate_sources(
         glob_match_error_behavior=glob_match_error_behavior,
         # TODO(#9012): add line number referring to the sources field. When doing this, we'll likely
         # need to `await Get[BuildFileAddress](Address)`.
-        description_of_origin=f"{address}'s `{sources_field.arg}` field",
+        description_of_origin=(
+            f"{address}'s `{sources_field.arg}` field"
+            if glob_match_error_behavior != GlobMatchErrorBehavior.ignore
+            else None
+        ),
     )
     snapshot = await Get[Snapshot](PathGlobs, path_globs)
     fileset_with_spec = _eager_fileset_with_spec(
@@ -740,7 +745,11 @@ async def hydrate_bundles(
             glob_match_error_behavior=glob_match_error_behavior,
             # TODO(#9012): add line number referring to the bundles field. When doing this, we'll likely
             # need to `await Get[BuildFileAddress](Address)`.
-            description_of_origin=f"{address}'s `bundles` field",
+            description_of_origin=(
+                f"{address}'s `bundles` field"
+                if glob_match_error_behavior != GlobMatchErrorBehavior.ignore
+                else None
+            ),
         )
         for pg in bundles_field.path_globs_list
     ]
@@ -803,7 +812,11 @@ async def addresses_with_origins_from_filesystem_specs(
     filesystem_specs: FilesystemSpecs, global_options: GlobalOptions,
 ) -> AddressesWithOrigins:
     """Find the owner(s) for each FilesystemSpec while preserving the original FilesystemSpec those
-    owners come from."""
+    owners come from.
+
+    This will merge FilesystemSpecs that come from the same owning target into a single
+    FilesystemMergedSpec.
+    """
     pathglobs_per_include = (
         filesystem_specs.path_globs_for_spec(spec) for spec in filesystem_specs.includes
     )
@@ -813,7 +826,9 @@ async def addresses_with_origins_from_filesystem_specs(
     owners_per_include = await MultiGet(
         Get[Owners](OwnersRequest(sources=snapshot.files)) for snapshot in snapshot_per_include
     )
-    result: List[AddressWithOrigin] = []
+    addresses_to_specs: DefaultDict[
+        Address, List[Union[FilesystemLiteralSpec, FilesystemResolvedGlobSpec]]
+    ] = defaultdict(list)
     for spec, snapshot, owners in zip(
         filesystem_specs.includes, snapshot_per_include, owners_per_include
     ):
@@ -834,15 +849,19 @@ async def addresses_with_origins_from_filesystem_specs(
                 raise ResolveError(msg)
         # We preserve what literal files any globs resolved to. This allows downstream goals to be
         # more precise in which files they operate on.
-        origin = (
+        origin: Union[FilesystemLiteralSpec, FilesystemResolvedGlobSpec] = (
             spec
             if isinstance(spec, FilesystemLiteralSpec)
-            else FilesystemResolvedGlobSpec(glob=spec.glob, _snapshot=snapshot)
+            else FilesystemResolvedGlobSpec(glob=spec.glob, files=snapshot.files)
         )
-        result.extend(
-            AddressWithOrigin(address=address, origin=origin) for address in owners.addresses
+        for address in owners.addresses:
+            addresses_to_specs[address].append(origin)
+    return AddressesWithOrigins(
+        AddressWithOrigin(
+            address, specs[0] if len(specs) == 1 else FilesystemMergedSpec.create(specs)
         )
-    return AddressesWithOrigins(result)
+        for address, specs in addresses_to_specs.items()
+    )
 
 
 def create_legacy_graph_tasks():

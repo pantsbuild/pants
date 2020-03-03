@@ -11,6 +11,7 @@ from pants.backend.python.rules import (
     pex,
     pex_from_target_closure,
     prepare_chrooted_python_sources,
+    pytest_coverage,
     python_test_runner,
 )
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
@@ -105,6 +106,7 @@ class PythonTestRunnerIntegrationTest(TestBase):
         return (
             *super().rules(),
             *python_test_runner.rules(),
+            *pytest_coverage.rules(),
             *download_pex_bin.rules(),
             *determine_source_files.rules(),
             *pex.rules(),
@@ -187,7 +189,7 @@ class PythonTestRunnerIntegrationTest(TestBase):
             content=dedent(
                 """\
                 from pants_test.library import add_two
-        
+
                 def test():
                   assert add_two(2) == 4
                 """
@@ -205,7 +207,7 @@ class PythonTestRunnerIntegrationTest(TestBase):
             content=dedent(
                 """\
                 from .library import add_two
-        
+
                 def test():
                   assert add_two(2) == 4
                 """
@@ -239,7 +241,7 @@ class PythonTestRunnerIntegrationTest(TestBase):
             content=dedent(
                 """\
                 from pants_test.transitive_dep import add_four
-        
+
                 def test():
                   assert add_four(2) == 6
                 """

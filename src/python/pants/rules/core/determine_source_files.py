@@ -63,7 +63,7 @@ async def determine_all_source_files(request: AllSourceFilesRequest) -> SourceFi
         input_snapshots = (stripped_snapshot.snapshot for stripped_snapshot in stripped_snapshots)
     else:
         input_snapshots = (
-            adaptor.sources.snapshot for adaptor in request.adaptors if hasattr(adaptor, "sources")
+            adaptor.sources.snapshot for adaptor in request.adaptors if adaptor.has_sources()
         )
     result = await Get[Snapshot](
         DirectoriesToMerge(tuple(snapshot.directory_digest for snapshot in input_snapshots))
@@ -98,7 +98,7 @@ async def determine_specified_source_files(request: SpecifiedSourceFilesRequest)
     snapshot_subset_requests = {}
     for adaptor_with_origin in request.adaptors_with_origins:
         adaptor = adaptor_with_origin.adaptor
-        if not hasattr(adaptor, "sources"):
+        if not adaptor.has_sources():
             continue
         result = determine_specified_sources_for_target(adaptor_with_origin)
         if isinstance(result, Snapshot):

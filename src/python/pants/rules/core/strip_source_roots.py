@@ -117,9 +117,7 @@ async def strip_source_roots_from_target(request: StripTargetRequest,) -> Source
     `pants/util/strutil.py`."""
     target_adaptor = request.adaptor
 
-    # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of raising to
-    # simplify the hasattr() checks here!
-    if not hasattr(target_adaptor, "sources"):
+    if not target_adaptor.has_sources():
         return SourceRootStrippedSources(snapshot=EMPTY_SNAPSHOT)
 
     sources_snapshot = request.specified_files_snapshot or target_adaptor.sources.snapshot

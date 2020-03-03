@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import sys
-from typing import Dict, Optional, Set, cast
+from typing import Dict, Optional, cast
 
 from typing_extensions import Literal
 
@@ -107,7 +107,6 @@ class HelpPrinter:
         help_request = cast(OptionsHelp, self._help_request)
         global_options = self._options.for_global_scope()
 
-        help_scopes: Set[str]
         if help_request.all_scopes:
             help_scopes = set(self._options.known_scope_to_info.keys())
         else:
@@ -133,18 +132,28 @@ class HelpPrinter:
             print(pants_release())
             print("\nUsage:")
             print(
-                f"  {self.bin_name} [option ...] [goal ...] [target...]  Attempt the specified goals."
+                f"  {self.bin_name} [option ...] [goal ...] [target/file ...]  Attempt the specified goals."
             )
-            print(f"  {self.bin_name} help                                 Get help.")
-            print(f"  {self.bin_name} help [goal]                          Get help for a goal.")
+            print(f"  {self.bin_name} help                                       Get help.")
             print(
-                f"  {self.bin_name} help-advanced [goal]                 Get help for a goal's advanced options."
+                f"  {self.bin_name} help [goal]                                Get help for a goal."
             )
-            print(f"  {self.bin_name} help-all                             Get help for all goals.")
             print(
-                f"  {self.bin_name} goals                                List all installed goals."
+                f"  {self.bin_name} help-advanced                              Get help for global advanced options."
+            )
+            print(
+                f"  {self.bin_name} help-advanced [goal]                       Get help for a goal's advanced options."
+            )
+            print(
+                f"  {self.bin_name} help-all                                   Get help for all goals."
+            )
+            print(
+                f"  {self.bin_name} goals                                      List all installed goals."
             )
             print("")
+            print("  [file] can be:")
+            print("     A path to a file.")
+            print("     A path glob, such as '**/*.ext', in quotes to prevent shell expansion.")
             print("  [target] accepts two special forms:")
             print("    dir:  to include all targets in the specified directory.")
             print("    dir:: to include all targets found recursively under the directory.")
@@ -154,7 +163,7 @@ class HelpPrinter:
                 self._format_help(ScopeInfo(GLOBAL_SCOPE, ScopeInfo.GLOBAL), help_request.advanced)
             )
 
-    def _format_help(self, scope_info: ScopeInfo, show_recursive_and_advanced: bool) -> str:
+    def _format_help(self, scope_info: ScopeInfo, show_advanced_and_deprecated: bool) -> str:
         """Return a help message for the options registered on this object.
 
         Assumes that self._help_request is an instance of OptionsHelp.
@@ -165,8 +174,8 @@ class HelpPrinter:
         description = scope_info.description
         help_formatter = HelpFormatter(
             scope=scope,
-            show_recursive=show_recursive_and_advanced,
-            show_advanced=show_recursive_and_advanced,
+            show_advanced=show_advanced_and_deprecated,
+            show_deprecated=show_advanced_and_deprecated,
             color=sys.stdout.isatty(),
         )
         formatted_lines = help_formatter.format_options(

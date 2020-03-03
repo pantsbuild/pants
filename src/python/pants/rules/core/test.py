@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import Optional, Tuple, Type
+from typing import Optional, Type
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import FilesystemLiteralSpec, SingleAddress
@@ -33,24 +33,12 @@ class Status(Enum):
     FAILURE = "FAILURE"
 
 
-class CoverageData(ABC):
-    """Base class for inputs to a coverage report.
-
-    Subclasses should add whichever fields they require - snapshots of coverage output or xml files, etc.
-    """
-
-    @property
-    @abstractmethod
-    def batch_cls(self) -> Type["CoverageDataBatch"]:
-        pass
-
-
 @dataclass(frozen=True)
 class TestResult:
     status: Status
     stdout: str
     stderr: str
-    coverage_data: Optional[CoverageData] = None
+    coverage_data: Optional["CoverageData"] = None
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
@@ -59,7 +47,7 @@ class TestResult:
     def from_fallible_execute_process_result(
         process_result: FallibleExecuteProcessResult,
         *,
-        coverage_data: Optional[CoverageData] = None,
+        coverage_data: Optional["CoverageData"] = None,
     ) -> "TestResult":
         return TestResult(
             status=Status.SUCCESS if process_result.exit_code == 0 else Status.FAILURE,
@@ -107,10 +95,7 @@ class AddressAndTestResult:
         is_not_a_glob = isinstance(
             adaptor_with_origin.origin, (SingleAddress, FilesystemLiteralSpec)
         )
-        has_sources = hasattr(adaptor_with_origin.adaptor, "sources") and bool(
-            adaptor_with_origin.adaptor.sources.snapshot.files
-        )
-        return has_sources and (is_test_target or is_not_a_glob)
+        return adaptor_with_origin.adaptor.has_sources() and (is_test_target or is_not_a_glob)
 
 
 @dataclass(frozen=True)
@@ -119,11 +104,21 @@ class AddressAndDebugRequest:
     request: TestDebugRequest
 
 
-@union
-class CoverageDataBatch(ABC):
+class CoverageData(ABC):
+    """Base class for inputs to a coverage report.
+
+    Subclasses should add whichever fields they require - snapshots of coverage output or xml files, etc.
+    """
+
+    @property
     @abstractmethod
-    def __init__(self, addresses_and_test_results: Tuple[AddressAndTestResult, ...]) -> None:
-        """Subclasses should accept this in their constructor."""
+    def batch_cls(self) -> Type["CoverageDataBatch"]:
+        pass
+
+
+@union
+class CoverageDataBatch:
+    pass
 
 
 @dataclass(frozen=True)
@@ -200,14 +195,14 @@ async def run_tests(
 
         coverage_reports = await MultiGet(
             Get[CoverageReport](
-                CoverageDataBatch, coverage_batch_cls(tuple(addresses_and_test_results))
+                CoverageDataBatch, coverage_batch_cls(tuple(addresses_and_test_results))  # type: ignore[call-arg]
             )
             for coverage_batch_cls, addresses_and_test_results in coverage_data_collections
         )
         for report in coverage_reports:
             workspace.materialize_directory(
                 DirectoryToMaterialize(
-                    report.result_digest, path_prefix=report.directory_to_materialize_to.as_posix(),
+                    report.result_digest, path_prefix=str(report.directory_to_materialize_to),
                 )
             )
             console.print_stdout(f"Wrote coverage report to `{report.directory_to_materialize_to}`")

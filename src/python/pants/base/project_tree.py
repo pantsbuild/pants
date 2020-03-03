@@ -5,6 +5,7 @@ import logging
 import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import List, Optional
 
 from pathspec.pathspec import PathSpec
 from pathspec.patterns.gitwildmatch import GitWildMatchPattern
@@ -26,7 +27,7 @@ class ProjectTree(ABC):
     class AccessIgnoredPathError(Exception):
         """Raised when accessing a path which is ignored by pants."""
 
-    def __init__(self, build_root, ignore_patterns=None):
+    def __init__(self, build_root: str, ignore_patterns: Optional[List[str]] = None):
         if not os.path.isabs(build_root):
             raise self.InvalidBuildRootError(
                 "ProjectTree build_root {} must be an absolute path.".format(build_root)

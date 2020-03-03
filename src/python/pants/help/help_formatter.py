@@ -11,11 +11,11 @@ from pants.help.help_info_extracter import HelpInfoExtracter, OptionHelpInfo
 
 class HelpFormatter:
     def __init__(
-        self, *, scope: str, show_recursive: bool, show_advanced: bool, color: bool
+        self, *, scope: str, show_advanced: bool, show_deprecated: bool, color: bool
     ) -> None:
         self._scope = scope
-        self._show_recursive = show_recursive
         self._show_advanced = show_advanced
+        self._show_deprecated = show_deprecated
         self._color = color
 
     def _maybe_cyan(self, s):
@@ -36,6 +36,8 @@ class HelpFormatter:
     def format_options(self, scope, description, option_registrations_iter):
         """Return a help message for the specified options.
 
+        :param scope: The options scope.
+        :param description: The description of the scope.
         :param option_registrations_iter: An iterator over (args, kwargs) pairs, as passed in to
                                           options registration.
         """
@@ -59,10 +61,10 @@ class HelpFormatter:
                 lines.extend(self.format_option(ohi))
 
         add_option(oshi.basic)
-        if self._show_recursive:
-            add_option(oshi.recursive, category="recursive")
         if self._show_advanced:
             add_option(oshi.advanced, category="advanced")
+        if self._show_deprecated:
+            add_option(oshi.deprecated, category="deprecated")
         return [*lines, "\n"]
 
     def format_option(self, ohi: OptionHelpInfo) -> List[str]:
@@ -72,7 +74,7 @@ class HelpFormatter:
         :return: Formatted help text for this option
         """
         lines = []
-        choices = f"one of: [{ohi.choices}] " if ohi.choices else ""
+        choices = f"one of: [{ohi.choices}]; " if ohi.choices else ""
         arg_line = "{args} {default}".format(
             args=self._maybe_magenta(", ".join(ohi.display_args)),
             default=self._maybe_cyan(f"({choices}default: {ohi.default})"),

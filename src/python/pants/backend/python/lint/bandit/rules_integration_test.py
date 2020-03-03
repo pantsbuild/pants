@@ -3,9 +3,7 @@
 
 from typing import List, Optional
 
-import pytest
-
-from pants.backend.python.lint.bandit.rules import BanditTarget
+from pants.backend.python.lint.bandit.rules import BanditLinter
 from pants.backend.python.lint.bandit.rules import rules as bandit_rules
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
@@ -33,27 +31,15 @@ class BanditIntegrationTest(TestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *bandit_rules(), RootRule(BanditTarget))
+        return (*super().rules(), *bandit_rules(), RootRule(BanditLinter))
 
-    def run_bandit(
+    def make_target_with_origin(
         self,
         source_files: List[FileContent],
         *,
-        config: Optional[str] = None,
-        passthrough_args: Optional[str] = None,
         interpreter_constraints: Optional[str] = None,
-        skip: bool = False,
         origin: Optional[OriginSpec] = None,
-    ) -> LintResult:
-        args = ["--backend-packages2=pants.backend.python.lint.bandit"]
-        if config:
-            # TODO(#9148): The config file exists but parser.py cannot find it
-            self.create_file(relpath=".bandit", contents=config)
-            args.append("--bandit-config=.bandit")
-        if passthrough_args:
-            args.append(f"--bandit-args={passthrough_args}")
-        if skip:
-            args.append(f"--bandit-skip")
+    ) -> PythonTargetAdaptorWithOrigin:
         input_snapshot = self.request_single_product(Snapshot, InputFilesContent(source_files))
         adaptor = PythonTargetAdaptor(
             sources=EagerFilesetWithSpec("test", {"globs": []}, snapshot=input_snapshot),
@@ -62,44 +48,79 @@ class BanditIntegrationTest(TestBase):
         )
         if origin is None:
             origin = SingleAddress(directory="test", name="target")
-        target = BanditTarget(PythonTargetAdaptorWithOrigin(adaptor, origin))
+        return PythonTargetAdaptorWithOrigin(adaptor, origin)
+
+    def run_bandit(
+        self,
+        targets: List[PythonTargetAdaptorWithOrigin],
+        *,
+        config: Optional[str] = None,
+        passthrough_args: Optional[str] = None,
+        skip: bool = False,
+    ) -> LintResult:
+        args = ["--backend-packages2=pants.backend.python.lint.bandit"]
+        if config:
+            self.create_file(relpath=".bandit", contents=config)
+            args.append("--bandit-config=.bandit")
+        if passthrough_args:
+            args.append(f"--bandit-args={passthrough_args}")
+        if skip:
+            args.append(f"--bandit-skip")
         return self.request_single_product(
-            LintResult, Params(target, create_options_bootstrapper(args=args)),
+            LintResult,
+            Params(BanditLinter(tuple(targets)), create_options_bootstrapper(args=args)),
         )
 
-    def test_single_passing_source(self) -> None:
-        result = self.run_bandit([self.good_source])
+    def test_passing_source(self) -> None:
+        target = self.make_target_with_origin([self.good_source])
+        result = self.run_bandit([target])
         assert result.exit_code == 0
         assert "No issues identified." in result.stdout.strip()
 
-    def test_single_failing_source(self) -> None:
-        result = self.run_bandit([self.bad_source])
+    def test_failing_source(self) -> None:
+        target = self.make_target_with_origin([self.bad_source])
+        result = self.run_bandit([target])
         assert result.exit_code == 1
         assert "Issue: [B303:blacklist] Use of insecure MD2, MD4, MD5" in result.stdout
 
     def test_mixed_sources(self) -> None:
-        result = self.run_bandit([self.good_source, self.bad_source])
+        target = self.make_target_with_origin([self.good_source, self.bad_source])
+        result = self.run_bandit([target])
+        assert result.exit_code == 1
+        assert "test/good.py" not in result.stdout
+        assert "Issue: [B303:blacklist] Use of insecure MD2, MD4, MD5" in result.stdout
+
+    def test_multiple_targets(self) -> None:
+        targets = [
+            self.make_target_with_origin([self.good_source]),
+            self.make_target_with_origin([self.bad_source]),
+        ]
+        result = self.run_bandit(targets)
         assert result.exit_code == 1
         assert "test/good.py" not in result.stdout
         assert "Issue: [B303:blacklist] Use of insecure MD2, MD4, MD5" in result.stdout
 
     def test_precise_file_args(self) -> None:
-        file_arg = FilesystemLiteralSpec(self.good_source.path)
-        result = self.run_bandit([self.good_source, self.bad_source], origin=file_arg)
+        target = self.make_target_with_origin(
+            [self.good_source, self.bad_source], origin=FilesystemLiteralSpec(self.good_source.path)
+        )
+        result = self.run_bandit([target])
         assert result.exit_code == 0
         assert "No issues identified." in result.stdout
 
-    @pytest.mark.skip(reason="#9148: The config file exists but parser.py cannot find it")
     def test_respects_config_file(self) -> None:
-        result = self.run_bandit([self.bad_source], config="skips: ['B303']\n")
+        target = self.make_target_with_origin([self.bad_source])
+        result = self.run_bandit([target], config="skips: ['B303']\n")
         assert result.exit_code == 0
         assert "No issues identified." in result.stdout.strip()
 
     def test_respects_passthrough_args(self) -> None:
-        result = self.run_bandit([self.bad_source], passthrough_args="--skip B303")
+        target = self.make_target_with_origin([self.bad_source])
+        result = self.run_bandit([target], passthrough_args="--skip B303")
         assert result.exit_code == 0
         assert "No issues identified." in result.stdout.strip()
 
     def test_skip(self) -> None:
-        result = self.run_bandit([self.bad_source], skip=True)
+        target = self.make_target_with_origin([self.bad_source])
+        result = self.run_bandit([target], skip=True)
         assert result == LintResult.noop()

@@ -16,7 +16,7 @@ from pants.base.specs import (
 )
 from pants.build_graph.address import Address
 from pants.build_graph.files import Files
-from pants.engine.legacy.structs import TargetAdaptorWithOrigin
+from pants.engine.legacy.structs import TargetAdaptor, TargetAdaptorWithOrigin
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.rules.core.determine_source_files import (
@@ -62,16 +62,15 @@ class DetermineSourceFilesTest(TestBase):
         include_sources: bool = True,
         type_alias: Optional[str] = None,
     ) -> TargetAdaptorWithOrigin:
-        adaptor = Mock()
-        adaptor.type_alias = type_alias
-        adaptor.sources = Mock()
-        adaptor.address = Address.parse(f"{sources.source_root}:lib")
-        adaptor.sources = Mock()
-        adaptor.sources.snapshot = self.make_snapshot(
-            {fp: "" for fp in sources.source_file_absolute_paths}
+        sources_field = Mock()
+        sources_field.snapshot = self.make_snapshot(
+            {fp: "" for fp in (sources.source_file_absolute_paths if include_sources else [])}
         )
-        if not include_sources:
-            del adaptor.sources
+        adaptor = TargetAdaptor(
+            address=Address.parse(f"{sources.source_root}:lib"),
+            type_alias=type_alias,
+            sources=sources_field,
+        )
         if origin is None:
             origin = SiblingAddresses(sources.source_root)
         return TargetAdaptorWithOrigin(adaptor, origin)
@@ -155,8 +154,7 @@ class DetermineSourceFilesTest(TestBase):
         target2_all_sources = self.SOURCES2.source_file_absolute_paths
         target2_slice = slice(0, len(target2_all_sources))
         target2_origin = FilesystemResolvedGlobSpec(
-            f"{self.SOURCES2.source_root}/*.py",
-            _snapshot=self.make_snapshot_of_empty_files(target2_all_sources),
+            f"{self.SOURCES2.source_root}/*.py", files=tuple(target2_all_sources)
         )
         target2 = self.mock_target(self.SOURCES2, origin=target2_origin)
 
@@ -166,11 +164,9 @@ class DetermineSourceFilesTest(TestBase):
         target3_slice = slice(0, 1)
         target3_origin = FilesystemResolvedGlobSpec(
             f"{self.SOURCES3.source_root}/*.java",
-            _snapshot=self.make_snapshot_of_empty_files(
-                [
-                    PurePath(self.SOURCES3.source_root, name).as_posix()
-                    for name in [self.SOURCES3.source_files[0], "other_target.java", "j.tmp.java",]
-                ]
+            files=tuple(
+                PurePath(self.SOURCES3.source_root, name).as_posix()
+                for name in [self.SOURCES3.source_files[0], "other_target.java", "j.tmp.java"]
             ),
         )
         target3 = self.mock_target(self.SOURCES3, origin=target3_origin)

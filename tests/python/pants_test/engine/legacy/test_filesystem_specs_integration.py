@@ -8,23 +8,29 @@ from pants.util.dirutil import rm_rf, touch
 
 
 class FilesystemSpecsIntegrationTest(PantsRunIntegrationTest):
+    source_root = "testprojects/tests/python/pants/dummies"
+    expected_owners = {
+        "testprojects/tests/python/pants:dummies_directory",
+        "testprojects/tests/python/pants/dummies:tests",
+        "testprojects/tests/python/pants:secondary_source_file_owner",
+    }
+
     def test_valid_file(self) -> None:
-        pants_run = self.run_pants(["list", "testprojects/tests/python/pants/dummies/test_pass.py"])
+        pants_run = self.run_pants(["list", f"{self.source_root}/test_f1.py"])
         self.assert_success(pants_run)
-        assert {
-            "testprojects/tests/python/pants:dummies_directory",
-            "testprojects/tests/python/pants/dummies:passing_target",
-            "testprojects/tests/python/pants:secondary_source_file_owner",
-        } == set(pants_run.stdout_data.splitlines())
+        assert set(pants_run.stdout_data.splitlines()) == self.expected_owners
 
     def test_valid_glob(self) -> None:
-        pants_run = self.run_pants(["list", "testprojects/tests/python/pants/dummies/*pass.py"])
+        pants_run = self.run_pants(["list", f"{self.source_root}/*f1.py"])
         self.assert_success(pants_run)
-        assert {
-            "testprojects/tests/python/pants:dummies_directory",
-            "testprojects/tests/python/pants/dummies:passing_target",
-            "testprojects/tests/python/pants:secondary_source_file_owner",
-        } == set(pants_run.stdout_data.splitlines())
+        assert set(pants_run.stdout_data.splitlines()) == self.expected_owners
+
+    def test_same_owner_gets_merged_to_one_target(self) -> None:
+        pants_run = self.run_pants(
+            ["list", f"{self.source_root}/test_f1.py", f"{self.source_root}/test_f2.py"]
+        )
+        self.assert_success(pants_run)
+        assert set(pants_run.stdout_data.splitlines()) == self.expected_owners
 
     def test_nonexistent_file(self) -> None:
         pants_run = self.run_pants(["list", "src/fake.py"])

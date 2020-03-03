@@ -67,8 +67,7 @@ class BashCompletion(ConsoleTask):
         def get_from_parser(parser):
             oschi = HelpInfoExtracter.get_option_scope_help_info_from_parser(parser)
             # We ignore advanced options, as they aren't intended to be used on the cmd line.
-            option_help_infos = oschi.basic + oschi.recursive
-            for ohi in option_help_infos:
+            for ohi in oschi.basic:
                 autocomplete_options_by_scope[oschi.scope].update(ohi.unscoped_cmd_line_args)
                 autocomplete_options_by_scope[oschi.scope].update(ohi.scoped_cmd_line_args)
                 # Autocomplete to this option in the enclosing goal scope, but exclude options registered
