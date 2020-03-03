@@ -112,7 +112,7 @@ class LegacyBuildGraph(BuildGraph):
 
         # Index the ProductGraph.
         for legacy_hydrated_target in hydrated_targets:
-            address = legacy_hydrated_target.address
+            address = legacy_hydrated_target.build_file_address
             all_addresses.add(address)
             if address not in self._target_by_address:
                 new_targets.append(self._index_target(legacy_hydrated_target))
@@ -149,7 +149,7 @@ class LegacyBuildGraph(BuildGraph):
         """Instantiate the given LegacyHydratedTarget, index it in the graph, and return a
         Target."""
         # Instantiate the target.
-        address = legacy_hydrated_target.address
+        address = legacy_hydrated_target.build_file_address
         target = self._instantiate_target(legacy_hydrated_target)
         self._target_by_address[address] = target
 
@@ -176,7 +176,7 @@ class LegacyBuildGraph(BuildGraph):
             kwargs.pop("dependencies")
 
             # Replace the `address` field of type `Address` with type `BuildFileAddress`.
-            kwargs["address"] = legacy_hydrated_target.address
+            kwargs["address"] = legacy_hydrated_target.build_file_address
 
             # Instantiate.
             if issubclass(target_cls, AppBase):
@@ -188,7 +188,7 @@ class LegacyBuildGraph(BuildGraph):
             raise
         except Exception as e:
             raise TargetDefinitionException(
-                legacy_hydrated_target.address,
+                legacy_hydrated_target.build_file_address,
                 "Failed to instantiate Target with type {}: {}".format(target_cls, e),
             )
 
@@ -262,7 +262,7 @@ class LegacyBuildGraph(BuildGraph):
         self._index(thts.closure)
 
         for hydrated_target in thts.roots:
-            yield hydrated_target.address
+            yield hydrated_target.build_file_address
 
 
 class _DependentGraph:
@@ -430,20 +430,20 @@ class LegacyHydratedTarget:
     NB: See HydratedTarget for why we override `__hash__` and `__eq__`.
     """
 
-    address: BuildFileAddress
+    build_file_address: BuildFileAddress
     adaptor: TargetAdaptor
 
     def __hash__(self):
-        return hash(self.address)
+        return hash(self.build_file_address)
 
     def __eq__(self, other):
         if not isinstance(other, LegacyHydratedTarget):
             return NotImplemented
-        return (self.address, self.adaptor) == (other.address, other.adaptor)
+        return (self.build_file_address, self.adaptor) == (other.build_file_address, other.adaptor)
 
     @staticmethod
     def from_hydrated_target(ht: HydratedTarget, bfa: BuildFileAddress) -> "LegacyHydratedTarget":
-        return LegacyHydratedTarget(address=bfa, adaptor=ht.adaptor)
+        return LegacyHydratedTarget(build_file_address=bfa, adaptor=ht.adaptor)
 
 
 @dataclass(frozen=True)
