@@ -3,7 +3,7 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Iterable, Optional, Tuple, cast
+from typing import Any, Iterable, List, Optional, Tuple, cast
 
 from pants.backend.docgen.targets.doc import Page
 from pants.backend.jvm.targets.jvm_app import JvmApp
@@ -366,7 +366,7 @@ class EngineInitializer:
 
     @staticmethod
     def setup_legacy_graph_extended(
-        pants_ignore_patterns,
+        pants_ignore_patterns: List[str],
         local_store_dir,
         build_file_imports_behavior: BuildFileImportsBehavior,
         options_bootstrapper: OptionsBootstrapper,
