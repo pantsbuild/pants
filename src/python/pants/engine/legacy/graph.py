@@ -45,7 +45,7 @@ from pants.engine.parser import HydratedStruct
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.option.global_options import (
-    GlobalOptions,
+    GlobalOptionsRegistrar,
     GlobMatchErrorBehavior,
     OwnersNotFoundBehavior,
 )
@@ -809,7 +809,7 @@ async def sources_snapshots_from_filesystem_specs(
 
 @rule
 async def addresses_with_origins_from_filesystem_specs(
-    filesystem_specs: FilesystemSpecs, global_options: GlobalOptions,
+    filesystem_specs: FilesystemSpecs, global_options: GlobalOptionsRegistrar,
 ) -> AddressesWithOrigins:
     """Find the owner(s) for each FilesystemSpec while preserving the original FilesystemSpec those
     owners come from.
@@ -833,7 +833,7 @@ async def addresses_with_origins_from_filesystem_specs(
         filesystem_specs.includes, snapshot_per_include, owners_per_include
     ):
         if (
-            global_options.owners_not_found_behavior != OwnersNotFoundBehavior.ignore
+            global_options.options.owners_not_found_behavior != OwnersNotFoundBehavior.ignore
             and isinstance(spec, FilesystemLiteralSpec)
             and not owners.addresses
         ):
@@ -843,7 +843,7 @@ async def addresses_with_origins_from_filesystem_specs(
                 f"that there is a BUILD file in `{file_path.parent}` with a target whose `sources` field "
                 f"includes `{file_path}`. See https://www.pantsbuild.org/build_files.html."
             )
-            if global_options.owners_not_found_behavior == OwnersNotFoundBehavior.warn:
+            if global_options.options.owners_not_found_behavior == OwnersNotFoundBehavior.warn:
                 logger.warning(msg)
             else:
                 raise ResolveError(msg)
