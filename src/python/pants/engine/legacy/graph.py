@@ -393,7 +393,13 @@ class HydratedTarget:
     def __eq__(self, other):
         if not isinstance(other, HydratedTarget):
             return NotImplemented
-        return self._address == other._address
+        # NB: It's an anti-pattern for `__hash__` to be implemented differently than `__eq__`. We
+        # must use this more rigorous `__eq__`, however, to ensure that we don't reuse stale LMDB
+        # cache entries when target values change across Pants runs (e.g. a user changing the
+        # `compatibility` field). It would be more correct for `__hash__` to use this more rigorous
+        # comparison of all fields, rather than only the address, but we keep it's looser
+        # implementation as an important performance hack.
+        return (self._address, self.adaptor) == (other._address, other.adaptor)
 
 
 class HydratedTargets(Collection[HydratedTarget]):
@@ -419,7 +425,10 @@ class TransitiveHydratedTargets:
 @dataclass(frozen=True)
 class LegacyHydratedTarget:
     """A rip on HydratedTarget for the purpose of V1, which must use BuildFileAddress rather than
-    Address."""
+    Address.
+
+    NB: See HydratedTarget for why we override `__hash__` and `__eq__`.
+    """
 
     address: BuildFileAddress
     adaptor: TargetAdaptor
@@ -430,7 +439,7 @@ class LegacyHydratedTarget:
     def __eq__(self, other):
         if not isinstance(other, LegacyHydratedTarget):
             return NotImplemented
-        return self.address == other.address
+        return (self.address, self.adaptor) == (other.address, other.adaptor)
 
     @staticmethod
     def from_hydrated_target(ht: HydratedTarget, bfa: BuildFileAddress) -> "LegacyHydratedTarget":
