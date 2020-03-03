@@ -38,7 +38,7 @@ class PrepareChrootedPythonSourcesTest(TestBase):
             spec_path=PurePath(source_paths[0]).parent.as_posix(), target_name="target"
         )
         adaptor.address = address
-        return HydratedTarget(address=address, adaptor=adaptor, dependencies=())
+        return HydratedTarget(address=address, adaptor=adaptor)
 
     def test_adds_missing_inits_and_strips_source_roots(self) -> None:
         target_with_init = self.make_hydrated_target(

@@ -556,7 +556,7 @@ async def get_requirements(dep_owner: DependencyOwner) -> ExportedTargetRequirem
     #  true dependencies. Plus, in the specific realm of setup-py, since we must exclude indirect
     #  deps across exported target boundaries, it's not a big stretch to just insist that
     #  requirements must be direct deps.
-    direct_deps_addrs = tuple({dep for ht in owned_by_us for dep in ht.dependencies})
+    direct_deps_addrs = tuple({dep for ht in owned_by_us for dep in ht.adaptor.dependencies})
     direct_deps_tgts = await MultiGet(Get[HydratedTarget](Address, a) for a in direct_deps_addrs)
     reqs = PexRequirements.create_from_adaptors(tgt.adaptor for tgt in direct_deps_tgts)
     req_strs = list(reqs.requirements)
