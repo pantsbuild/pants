@@ -374,6 +374,11 @@ class HydratedTarget:
     def __hash__(self):
         return hash(self.address)
 
+    def __eq__(self, other):
+        if not isinstance(other, HydratedTarget):
+            return NotImplemented
+        return self.address == other.address
+
 
 class HydratedTargets(Collection[HydratedTarget]):
     """An intransitive set of HydratedTarget objects."""
@@ -405,6 +410,11 @@ class LegacyHydratedTarget:
 
     def __hash__(self):
         return hash(self.address)
+
+    def __eq__(self, other):
+        if not isinstance(other, LegacyHydratedTarget):
+            return NotImplemented
+        return self.address == other.address
 
     @staticmethod
     def from_hydrated_target(ht: HydratedTarget, bfa: BuildFileAddress) -> "LegacyHydratedTarget":
