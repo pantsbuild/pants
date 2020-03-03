@@ -51,7 +51,7 @@ async def file_deps(
 ) -> Filedeps:
     unique_rel_paths: Set[str] = set()
     build_file_addresses = await MultiGet(
-        Get[BuildFileAddress](Address, hydrated_target.address)
+        Get[BuildFileAddress](Address, hydrated_target.adaptor.address)
         for hydrated_target in transitive_hydrated_targets.closure
     )
     for hydrated_target, build_file_address in zip(

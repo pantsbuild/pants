@@ -271,7 +271,7 @@ class TestTest(TestBase):
                 coordinator_of_tests,
                 rule_args=[
                     HydratedTargetWithOrigin(
-                        target=HydratedTarget(address, target_adaptor),
+                        target=HydratedTarget(target_adaptor),
                         origin=(
                             origin
                             or SingleAddress(directory=address.spec_path, name=address.target_name)

@@ -280,13 +280,13 @@ async def run_setup_pys(
     if explicit_nonexported_targets:
         raise TargetNotExported(
             "Cannot run setup.py on these targets, because they have no `provides=` clause: "
-            f'{", ".join(so.address.reference() for so in explicit_nonexported_targets)}'
+            f'{", ".join(so.adaptor.address.reference() for so in explicit_nonexported_targets)}'
         )
 
     if options.values.transitive:
         # Expand out to all owners of the entire dep closure.
         tht = await Get[TransitiveHydratedTargets](
-            Addresses(et.hydrated_target.address for et in exported_targets)
+            Addresses(et.hydrated_target.adaptor.address for et in exported_targets)
         )
         owners = await MultiGet(
             Get[ExportedTarget](OwnedDependency(ht)) for ht in tht.closure if is_ownable_target(ht)
@@ -312,7 +312,7 @@ async def run_setup_pys(
         )
 
         for exported_target, setup_py_result in zip(exported_targets, setup_py_results):
-            addr = exported_target.hydrated_target.address.reference()
+            addr = exported_target.hydrated_target.adaptor.address.reference()
             console.print_stderr(f"Writing dist for {addr} under {distdir.relpath}/.")
             workspace.materialize_directory(
                 DirectoryToMaterialize(setup_py_result.output, path_prefix=str(distdir.relpath))
@@ -320,7 +320,7 @@ async def run_setup_pys(
     else:
         # Just dump the chroot.
         for exported_target, chroot in zip(exported_targets, chroots):
-            addr = exported_target.hydrated_target.address.reference()
+            addr = exported_target.hydrated_target.adaptor.address.reference()
             provides = exported_target.hydrated_target.adaptor.provides
             setup_py_dir = distdir.relpath / f"{provides.name}-{provides.version}"
             console.print_stderr(f"Writing setup.py chroot for {addr} to {setup_py_dir}")
@@ -370,7 +370,7 @@ async def run_setup_py(
         # setuptools commands that create dists write them to the distdir.
         # TODO: Could there be other useful files to capture?
         output_directories=(dist_dir,),
-        description=f"Run setuptools for {req.exported_target.hydrated_target.address.reference()}",
+        description=f"Run setuptools for {req.exported_target.hydrated_target.adaptor.address.reference()}",
     )
     result = await Get[ExecuteProcessResult](ExecuteProcessRequest, request)
     output_digest = await Get[Digest](
@@ -400,12 +400,12 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
             "install_requires": requirements.requirement_strs,
         }
     )
-    ht = request.exported_target.hydrated_target
-    key_to_binary_spec = getattr(ht.adaptor.provides, "binaries", {})
+    adaptor = request.exported_target.hydrated_target.adaptor
+    key_to_binary_spec = getattr(adaptor.provides, "binaries", {})
     keys = list(key_to_binary_spec.keys())
     binaries = await MultiGet(
         Get[HydratedTarget](
-            Address, Address.parse(key_to_binary_spec[key], relative_to=ht.address.spec_path)
+            Address, Address.parse(key_to_binary_spec[key], relative_to=adaptor.address.spec_path)
         )
         for key in keys
     )
@@ -415,7 +415,7 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
             or getattr(binary.adaptor, "entry_point", None) is None
         ):
             raise InvalidEntryPoint(
-                f"The binary {key} exported by {ht.address.reference()} is not a valid entry point."
+                f"The binary {key} exported by {adaptor.address.reference()} is not a valid entry point."
             )
         entry_points = setup_kwargs["entry_points"] = setup_kwargs.get("entry_points", {})
         console_scripts = entry_points["console_scripts"] = entry_points.get("console_scripts", [])
@@ -423,7 +423,8 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
 
     # Generate the setup script.
     setup_py_content = SETUP_BOILERPLATE.format(
-        target_address_spec=ht.address.reference(), setup_kwargs_str=distutils_repr(setup_kwargs)
+        target_address_spec=adaptor.address.reference(),
+        setup_kwargs_str=distutils_repr(setup_kwargs),
     ).encode()
     extra_files_digest = await Get[Digest](
         InputFilesContent(
@@ -532,7 +533,7 @@ def _is_exported(target: HydratedTarget) -> bool:
 @rule(name="Compute distribution's 3rd party requirements")
 async def get_requirements(dep_owner: DependencyOwner) -> ExportedTargetRequirements:
     tht = await Get[TransitiveHydratedTargets](
-        Addresses([dep_owner.exported_target.hydrated_target.address])
+        Addresses([dep_owner.exported_target.hydrated_target.adaptor.address])
     )
 
     ownable_tgts = [tgt for tgt in tht.closure if is_ownable_target(tgt)]
@@ -582,7 +583,7 @@ async def get_owned_dependencies(dependency_owner: DependencyOwner) -> OwnedDepe
     Includes dependency_owner itself.
     """
     tht = await Get[TransitiveHydratedTargets](
-        Addresses([dependency_owner.exported_target.hydrated_target.address])
+        Addresses([dependency_owner.exported_target.hydrated_target.adaptor.address])
     )
     ownable_targets = [
         tgt
@@ -612,13 +613,15 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
     and is its ancestor, then there is no owner and an error is raised.
     """
     hydrated_target = owned_dependency.hydrated_target
-    ancestor_addrs = AscendantAddresses(hydrated_target.address.spec_path)
+    ancestor_addrs = AscendantAddresses(hydrated_target.adaptor.address.spec_path)
     ancestor_tgts = await Get[HydratedTargets](AddressSpecs((ancestor_addrs,)))
     # Note that addresses sort by (spec_path, target_name), and all these targets are
     # ancestors of the given target, i.e., their spec_paths are all prefixes. So sorting by
     # address will effectively sort by closeness of ancestry to the given target.
     exported_ancestor_tgts = sorted(
-        [t for t in ancestor_tgts if _is_exported(t)], key=lambda t: t.address, reverse=True
+        [t.adaptor for t in ancestor_tgts if _is_exported(t)],
+        key=lambda t: t.adaptor.address,
+        reverse=True,
     )
     exported_ancestor_iter = iter(exported_ancestor_tgts)
     for exported_ancestor in exported_ancestor_iter:
@@ -636,12 +639,15 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
                 sibling = next(exported_ancestor_iter, None)
             if sibling_owners:
                 raise AmbiguousOwnerError(
-                    f"Exporting owners for {hydrated_target.address.reference()} are ambiguous. Found "
-                    f"{exported_ancestor.address.reference()} and {len(sibling_owners)} others: "
+                    f"Exporting owners for {hydrated_target.adaptor.address.reference()} are "
+                    f"ambiguous. Found {exported_ancestor.address.reference()} and "
+                    f"{len(sibling_owners)} others: "
                     f'{", ".join(so.address.reference() for so in sibling_owners)}'
                 )
-            return ExportedTarget(owner)
-    raise NoOwnerError(f"No exported target owner found for {hydrated_target.address.reference()}")
+            return ExportedTarget(HydratedTarget(owner))
+    raise NoOwnerError(
+        f"No exported target owner found for {hydrated_target.adaptor.address.reference()}"
+    )
 
 
 @rule(name="Set up setuptools")

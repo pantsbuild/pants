@@ -51,6 +51,7 @@ from pants.option.global_options import (
 )
 from pants.source.filespec import any_matches_filespec
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper, Filespec
+from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 logger = logging.getLogger(__name__)
@@ -360,24 +361,39 @@ class _DependentGraph:
         return result
 
 
-@dataclass(frozen=True)
+@frozen_after_init
+@dataclass
 class HydratedTarget:
     """A wrapper for a fully hydrated TargetAdaptor object.
 
+    Why have this type if all information is stored in the underlying TargetAdaptor? We need it for
+    the type-driven graph to work properly. A HydratedTarget is a generic wrapper around different
+    target classes, whereas a TargetAdaptor has different types like PythonTestsAdaptor and
+    PythonLibraryAdaptor. We need to be able to work with targets both generically and depending
+    on their target type (i.e. unions).
+
     Transitive graph walks collect ordered sets of TransitiveHydratedTargets which involve a huge
-    amount of hashing: we implement eq/hash via direct usage of an Address field to speed that up.
+    amount of hashing: we implement eq/hash via a private Address field to speed that up.
     """
 
-    address: Address
     adaptor: TargetAdaptor
 
+    def __init__(self, adaptor: TargetAdaptor) -> None:
+        self.adaptor = adaptor
+        # This field is set for efficient lookup of the address in `__hash__` and `__eq__` during
+        # graph walks. Directly accessing this field, rather than using `adaptor.address` is about
+        # 10x faster. However, rules should still use `adaptor.address` for clarity and because
+        # they do not need to access the address as frequently, so it would be an over-optimization
+        # (we're talking about 0.000_000_1 vs. 0.000_001 seconds here).
+        self._address = adaptor.address
+
     def __hash__(self):
-        return hash(self.address)
+        return hash(self._address)
 
     def __eq__(self, other):
         if not isinstance(other, HydratedTarget):
             return NotImplemented
-        return self.address == other.address
+        return self._address == other._address
 
 
 class HydratedTargets(Collection[HydratedTarget]):
@@ -574,11 +590,9 @@ async def legacy_transitive_hydrated_targets(
     addresses: Addresses,
 ) -> LegacyTransitiveHydratedTargets:
     thts = await Get[TransitiveHydratedTargets](Addresses, addresses)
-    roots_bfas = await MultiGet(
-        Get[BuildFileAddress](Address, hydrated_target.address) for hydrated_target in thts.roots
-    )
+    roots_bfas = await MultiGet(Get[BuildFileAddress](Address, ht._address) for ht in thts.roots)
     closure_bfas = await MultiGet(
-        Get[BuildFileAddress](Address, hydrated_target.address) for hydrated_target in thts.closure
+        Get[BuildFileAddress](Address, ht._address) for ht in thts.closure
     )
     return LegacyTransitiveHydratedTargets(
         roots=tuple(
@@ -620,7 +634,7 @@ async def hydrate_target(hydrated_struct: HydratedStruct) -> HydratedTarget:
     kwargs = target_adaptor.kwargs()
     for field in hydrated_fields:
         kwargs[field.name] = field.value
-    return HydratedTarget(address=target_adaptor.address, adaptor=type(target_adaptor)(**kwargs))
+    return HydratedTarget(adaptor=type(target_adaptor)(**kwargs))
 
 
 @rule

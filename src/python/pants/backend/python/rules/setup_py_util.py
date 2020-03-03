@@ -117,8 +117,8 @@ def find_packages(
     # Now find all package_data.
     for tgt, stripped_srcs in tgts_and_stripped_srcs:
         if isinstance(tgt.adaptor, ResourcesAdaptor):
-            source_root = source_root_or_raise(source_roots, tgt.address.spec_path)
-            resource_dir_relpath = os.path.relpath(tgt.address.spec_path, source_root)
+            source_root = source_root_or_raise(source_roots, tgt.adaptor.address.spec_path)
+            resource_dir_relpath = os.path.relpath(tgt.adaptor.address.spec_path, source_root)
             # Find the closest enclosing package, if any.  Resources will be loaded relative to that.
             package: str = resource_dir_relpath.replace(os.path.sep, ".")
             while package and package not in packages:

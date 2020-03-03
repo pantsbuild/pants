@@ -34,11 +34,10 @@ class PrepareChrootedPythonSourcesTest(TestBase):
         adaptor.type_alias = type_alias
         adaptor.sources = Mock()
         adaptor.sources.snapshot = self.make_snapshot_of_empty_files(source_paths)
-        address = Address(
+        adaptor.address = Address(
             spec_path=PurePath(source_paths[0]).parent.as_posix(), target_name="target"
         )
-        adaptor.address = address
-        return HydratedTarget(address=address, adaptor=adaptor)
+        return HydratedTarget(adaptor)
 
     def test_adds_missing_inits_and_strips_source_roots(self) -> None:
         target_with_init = self.make_hydrated_target(

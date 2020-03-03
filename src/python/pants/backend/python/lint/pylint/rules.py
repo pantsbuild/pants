@@ -59,13 +59,12 @@ async def lint(
     # Pylint needs direct dependencies in the chroot to ensure that imports are valid. However, it
     # doesn't lint those direct dependencies nor does it care about transitive dependencies.
     hydrated_targets = [
-        HydratedTarget(adaptor_with_origin.adaptor.address, adaptor_with_origin.adaptor)
-        for adaptor_with_origin in adaptors_with_origins
+        HydratedTarget(adaptor_with_origin.adaptor) for adaptor_with_origin in adaptors_with_origins
     ]
     dependencies = await MultiGet(
         Get[HydratedTarget](Address, dependency)
         for dependency in itertools.chain.from_iterable(
-            hydrated_target.adaptor.dependencies for hydrated_target in hydrated_targets
+            ht.adaptor.dependencies for ht in hydrated_targets
         )
     )
     chrooted_python_sources = await Get[ChrootedPythonSources](
