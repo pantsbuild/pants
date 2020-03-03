@@ -152,7 +152,7 @@ class LegacyBuildGraph(BuildGraph):
         target = self._instantiate_target(legacy_hydrated_target)
         self._target_by_address[address] = target
 
-        for dependency in legacy_hydrated_target.dependencies:
+        for dependency in legacy_hydrated_target.adaptor.dependencies:
             if dependency in self._target_dependencies_by_address[address]:
                 raise self.DuplicateAddressError(
                     "Addresses in dependencies must be unique. "
@@ -370,11 +370,6 @@ class HydratedTarget:
 
     address: Address
     adaptor: TargetAdaptor
-    dependencies: Tuple[Address, ...]
-
-    @property
-    def addresses(self) -> Tuple:
-        return self.dependencies
 
     def __hash__(self):
         return hash(self.address)
@@ -407,14 +402,13 @@ class LegacyHydratedTarget:
 
     address: BuildFileAddress
     adaptor: TargetAdaptor
-    dependencies: Tuple[Address, ...]
 
     def __hash__(self):
         return hash(self.address)
 
     @staticmethod
     def from_hydrated_target(ht: HydratedTarget, bfa: BuildFileAddress) -> "LegacyHydratedTarget":
-        return LegacyHydratedTarget(address=bfa, adaptor=ht.adaptor, dependencies=ht.dependencies)
+        return LegacyHydratedTarget(address=bfa, adaptor=ht.adaptor)
 
 
 @dataclass(frozen=True)
@@ -459,21 +453,6 @@ class SourcesSnapshots(Collection[SourcesSnapshot]):
     `@goal_rule`s may request this when they only need source files to operate and do not need any
     target information.
     """
-
-
-@dataclass(frozen=True)
-class TopologicallyOrderedTargets:
-    """A set of HydratedTargets, ordered topologically from least to most dependent.
-
-    That is if B depends on A then B follows A in the order.
-
-    Note that most rules won't need to consider target dependency order, as those dependencies
-    usually implicitly create corresponding rule graph dependencies and per-target rules will then
-    execute in the right order automatically. However there can be cases where it's still useful for
-    a single rule invocation to know about the order of multiple targets under its consideration.
-    """
-
-    hydrated_targets: HydratedTargets
 
 
 class InvalidOwnersOfArgs(Exception):
@@ -606,36 +585,9 @@ async def legacy_transitive_hydrated_targets(
 @rule
 async def transitive_hydrated_target(root: HydratedTarget) -> TransitiveHydratedTarget:
     dependencies = await MultiGet(
-        Get[TransitiveHydratedTarget](Address, d) for d in root.dependencies
+        Get[TransitiveHydratedTarget](Address, d) for d in root.adaptor.dependencies
     )
     return TransitiveHydratedTarget(root, dependencies)
-
-
-@rule
-async def sort_targets(targets: HydratedTargets) -> TopologicallyOrderedTargets:
-    return TopologicallyOrderedTargets(HydratedTargets(topo_sort(tuple(targets))))
-
-
-def topo_sort(targets: Iterable[HydratedTarget]) -> Tuple[HydratedTarget, ...]:
-    """Sort the targets so that if B depends on A, B follows A in the order."""
-    visited: Dict[HydratedTarget, bool] = defaultdict(bool)
-    res: List[HydratedTarget] = []
-
-    def recursive_topo_sort(ht):
-        if visited[ht]:
-            return
-        visited[ht] = True
-        for dep in ht.dependencies:
-            recursive_topo_sort(dep)
-        res.append(ht)
-
-    for target in targets:
-        recursive_topo_sort(target)
-
-    # Note that if the input set is not transitively closed then res may contain targets
-    # that aren't in the input set.  We subtract those out here.
-    input_set = set(targets)
-    return tuple(tgt for tgt in res if tgt in input_set)
 
 
 @dataclass(frozen=True)
@@ -658,11 +610,7 @@ async def hydrate_target(hydrated_struct: HydratedStruct) -> HydratedTarget:
     kwargs = target_adaptor.kwargs()
     for field in hydrated_fields:
         kwargs[field.name] = field.value
-    return HydratedTarget(
-        address=target_adaptor.address,
-        adaptor=type(target_adaptor)(**kwargs),
-        dependencies=target_adaptor.dependencies,
-    )
+    return HydratedTarget(address=target_adaptor.address, adaptor=type(target_adaptor)(**kwargs))
 
 
 @rule
@@ -877,7 +825,6 @@ def create_legacy_graph_tasks():
         find_owners,
         hydrate_sources,
         hydrate_bundles,
-        sort_targets,
         hydrate_sources_snapshot,
         addresses_with_origins_from_filesystem_specs,
         sources_snapshots_from_address_specs,
