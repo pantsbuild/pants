@@ -287,6 +287,84 @@ idioms of lists work. You can add a third file with another invocation
 of `--pants-config-files=<path>`, or you can replace the standard one
 entirely with `--pants-config-files=[<list>]`.
 
+### Legacy INI format
+
+Pants also understands config files written in INI. You can safely intermix both TOML and INI config files.
+
+INI is very similar to TOML, but has some important differences.
+
+You may either use `:` or `=` as a delimiter, unlike TOML always using `=`.
+
+    :::ini
+    [section-name]
+    val1 = "a"
+    val2: "a"
+
+String values should not have quotes around them:
+
+    :::ini
+    # Bad
+    val = "a"
+    
+    # Good
+    val = a
+
+Dict options should not have quotes around the `{}` symbols, although the elements must still use quotes:
+
+    :::ini
+    # Bad
+    dict_option = "{'a': 0}"
+    dict_option = """{'a': 0}"""
+    
+    # Good
+    dict_option = {'a': 0}
+
+Every line of list and dict values must be indented:
+
+    :::ini
+    # Bad
+    list_option = [
+      'a',
+      'b',
+    ]
+    dict_option = {
+      'a': 0,
+      'b': 1,
+    }
+    
+    # Good
+    list_option = [
+        'a',
+        'b',
+      ]
+    dict_option = {
+        'a': 0,
+        'b': 1,
+      }
+
+To add or remove to a list option, use the same syntax as the command line:
+
+    :::ini
+    # Bad
+    list_option.add = ["a", "b"]
+    list_option.remove = ["c"]
+    
+    # Good
+    list_option = +["a", "b"],-["c"]
+
+### Migrating from INI to TOML
+
+While Pants will support both INI and TOML config files for some time, we encourage you to write any new config files in TOML and to consider migrating any pre-existing config files to TOML. TOML removes many gotchas and has benefits like validation from your text editor.
+
+To migrate, we wrote a script to automate fixing the majority of issues:
+
+    :::bash
+    $ curl -L -o migrate_to_toml_config.py 'https://git.io/Jv02R' && chmod +x migrate_to_toml_config.py && ./migrate_to_toml_config.py pants.ini
+
+After running this script, open the generated TOML file in your editor to see if there are any issues. (You may need to install a TOML plugin for your editor). You will likely need to fix some issues, especially fixing any multi-line list or dict options.
+
+Then, remove the INI file and run `./pants` to validate that the file is read correctly.
+
 Troubleshooting Config Files
 ----------------------------
 
