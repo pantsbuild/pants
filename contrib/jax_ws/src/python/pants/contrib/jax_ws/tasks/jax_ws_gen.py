@@ -62,7 +62,7 @@ class JaxWsGen(SimpleCodegenTask, NailgunTask):
                     raise TaskError("wsimport exited non-zero {rc}".format(rc=return_code))
 
     def _build_wsimport_cmd(self, target, target_workdir, url):
-        distribution = DistributionLocator.cached(maximum_version='1.10.999', jdk=True)
+        distribution = DistributionLocator.cached(maximum_version="1.10.999", jdk=True)
         # Ported and trimmed down from:
         # https://java.net/projects/jax-ws-commons/sources/svn/content/trunk/
         # jaxws-maven-plugin/src/main/java/org/jvnet/jax_ws_commons/jaxws/WsImportMojo.java?rev=1191
