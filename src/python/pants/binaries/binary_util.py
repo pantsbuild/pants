@@ -18,7 +18,7 @@ from pants.base.exceptions import TaskError
 from pants.engine.rules import rule
 from pants.fs.archive import archiver_for_path
 from pants.net.http.fetcher import Fetcher
-from pants.option.global_options import GlobalOptionsRegistrar
+from pants.option.global_options import GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_file
@@ -534,7 +534,7 @@ def select(argv):
     args = _create_bootstrap_binary_arg_parser().parse_args(argv[1:])
     # Resolve bootstrap options with a fake empty command line.
     options_bootstrapper = OptionsBootstrapper.create(args=[argv[0]])
-    subsystems = (GlobalOptionsRegistrar, BinaryUtil.Factory)
+    subsystems = (GlobalOptions, BinaryUtil.Factory)
     known_scope_infos = reduce(set.union, (ss.known_scope_infos() for ss in subsystems), set())
     options = options_bootstrapper.get_full_options(known_scope_infos)
     # Initialize Subsystems.

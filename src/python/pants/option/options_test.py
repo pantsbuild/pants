@@ -35,7 +35,7 @@ from pants.option.errors import (
     RecursiveSubsystemOption,
     Shadowing,
 )
-from pants.option.global_options import GlobalOptionsRegistrar
+from pants.option.global_options import GlobalOptions
 from pants.option.optionable import Optionable
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -53,7 +53,7 @@ _FAKE_CUR_VERSION = "1.0.0.dev0"
 
 
 def global_scope() -> ScopeInfo:
-    return ScopeInfo(GLOBAL_SCOPE, ScopeInfo.GLOBAL, GlobalOptionsRegistrar)
+    return ScopeInfo(GLOBAL_SCOPE, ScopeInfo.GLOBAL, GlobalOptions)
 
 
 def task(scope: str) -> ScopeInfo:
@@ -1206,7 +1206,7 @@ class OptionsTest(TestBase):
         )
         self.assertEqual(
             {global_scope(), intermediate("foo"), intermediate("foo.bar"), task("foo.bar.baz")},
-            Options.complete_scopes({GlobalOptionsRegistrar.get_scope_info(), task("foo.bar.baz")}),
+            Options.complete_scopes({GlobalOptions.get_scope_info(), task("foo.bar.baz")}),
         )
         self.assertEqual(
             {intermediate("foo"), intermediate("foo.bar"), task("foo.bar.baz")},

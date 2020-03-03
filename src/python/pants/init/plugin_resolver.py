@@ -14,7 +14,7 @@ from pex.interpreter import PythonInterpreter
 from pkg_resources import Distribution, WorkingSet
 from pkg_resources import working_set as global_working_set
 
-from pants.option.global_options import GlobalOptionsRegistrar
+from pants.option.global_options import GlobalOptions
 from pants.option.optionable import Optionable
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.scope import ScopeInfo
@@ -178,7 +178,7 @@ class PluginResolver:
         # Subsystem facility is wired up.  As a result PluginResolver is not itself a Subsystem with
         # PythonRepos as a dependency.  Instead it does the minimum possible work to hand-roll
         # bootstrapping of the Subsystems it needs.
-        optionables: Iterable[Type[Optionable]] = (GlobalOptionsRegistrar, PythonRepos)
+        optionables: Iterable[Type[Optionable]] = (GlobalOptions, PythonRepos)
         known_scope_infos: List[ScopeInfo] = [
             ksi for optionable in optionables for ksi in optionable.known_scope_infos()
         ]

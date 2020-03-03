@@ -153,7 +153,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
 )
 
 
-class GlobalOptionsRegistrar(Subsystem):
+class GlobalOptions(Subsystem):
     options_scope = GLOBAL_SCOPE
     options_scope_category = ScopeInfo.GLOBAL
 

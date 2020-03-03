@@ -14,7 +14,7 @@ from pants.engine.interactive_runner import InteractiveProcessRequest, Interacti
 from pants.engine.objects import union
 from pants.engine.rules import UnionMembership, goal_rule
 from pants.engine.selectors import Get
-from pants.option.global_options import GlobalOptionsRegistrar
+from pants.option.global_options import GlobalOptions
 from pants.util.contextutil import temporary_dir
 
 
@@ -64,7 +64,7 @@ async def run_repl(
     addresses: Addresses,
     build_root: BuildRoot,
     union_membership: UnionMembership,
-    global_options: GlobalOptionsRegistrar,
+    global_options: GlobalOptions,
 ) -> Repl:
 
     # We can guarantee that we will only even enter this `goal_rule` if there exists an implementer
