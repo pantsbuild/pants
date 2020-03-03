@@ -367,6 +367,7 @@ class BaseZincCompile(JvmCompile):
         analysis_cache = self.relative_to_exec_root(ctx.analysis_file)
         classes_dir = self.relative_to_exec_root(ctx.classes_dir.path)
         jar_file = self.relative_to_exec_root(ctx.jar_file.path)
+        diagnostics_out = self.relative_to_exec_root(ctx.diagnostics_out)
         # TODO: Have these produced correctly, rather than having to relativize them here
         relative_classpath = tuple(self.relative_to_exec_root(c) for c in absolute_classpath)
 
@@ -389,6 +390,8 @@ class BaseZincCompile(JvmCompile):
                 classes_dir,
                 "-jar",
                 jar_file,
+                "-diag",
+                diagnostics_out,
             ]
         )
         if not self.get_options().colors:
