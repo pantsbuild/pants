@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+from collections import OrderedDict
 from pathlib import PurePath
 from textwrap import dedent
 from typing import Optional
@@ -41,6 +42,7 @@ from pants.rules.core.test import (
 from pants.source.wrapped_globs import EagerFilesetWithSpec
 from pants.testutil.engine.util import MockConsole, MockGet, run_rule
 from pants.testutil.test_base import TestBase
+from pants.util.ordered_set import OrderedSet
 
 
 # TODO(#9141): replace this with a proper util to create `GoalSubsystem`s
@@ -265,7 +267,10 @@ class TestTest(TestBase):
             if test_target_type
             else PythonBinaryAdaptor(type_alias="python_binary", sources=mocked_fileset)
         )
-        union_membership = UnionMembership(union_rules={TestTarget: [PythonTestsAdaptorWithOrigin]})
+        union_membership = UnionMembership(
+            union_rules=OrderedDict({TestTarget: OrderedSet([PythonTestsAdaptorWithOrigin])})
+        )
+
         with self.captured_logging(logging.INFO):
             result: AddressAndTestResult = run_rule(
                 coordinator_of_tests,

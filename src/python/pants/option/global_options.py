@@ -21,11 +21,11 @@ from pants.option.errors import OptionsError
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.optionable import Optionable
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
-from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
+from pants.subsystem.subsystem import Subsystem
 
 
 @dataclass(frozen=True)
-class GlobalOptions:
+class GlobalOptions(Optionable):
     _inner: OptionValueContainer
 
     def __getattr__(self, key):
@@ -163,7 +163,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
 )
 
 
-class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
+class GlobalOptionsRegistrar(Subsystem):
     options_scope = GLOBAL_SCOPE
     options_scope_category = ScopeInfo.GLOBAL
 
@@ -194,17 +194,6 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
             help="Set the logging level.",
         )
 
-        # TODO: Move these to regular bootstrap options after addressing
-        # https://github.com/pantsbuild/pants/issues/9212
-        register(
-            "--colors",
-            type=bool,
-            default=sys.stdout.isatty(),
-            recursive=True,
-            daemon=False,
-            help="Set whether log messages are displayed in color.",
-        )
-
         register(
             "--log-show-rust-3rdparty",
             type=bool,
@@ -219,6 +208,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
         register(
             "--v1", advanced=True, type=bool, default=True, help="Enables execution of v1 Tasks."
         )
+
         register(
             "--v2",
             advanced=True,
@@ -934,6 +924,15 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
         # won't choke on them on the command line, and also so we can access their values as regular
         # global-scope options, for convenience.
         cls.register_bootstrap_options(register)
+
+        register(
+            "--colors",
+            type=bool,
+            default=sys.stdout.isatty(),
+            recursive=True,
+            daemon=False,
+            help="Set whether log messages are displayed in color.",
+        )
 
         register(
             "--tag",

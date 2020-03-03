@@ -82,6 +82,25 @@ class FmtOptions(GoalSubsystem):
 
     required_union_implementations = (LanguageFormatters,)
 
+    @classmethod
+    def register_options(cls, register) -> None:
+        super().register_options(register)
+        register(
+            "--per-target-caching",
+            advanced=True,
+            type=bool,
+            default=False,
+            help=(
+                "Rather than running all targets in a single batch, run each target as a "
+                "separate process. Why do this? You'll get many more cache hits. Why not do this? "
+                "Formatters both have substantial startup overhead and are cheap to add one "
+                "additional file to the run. On a cold cache, it is much faster to use "
+                "`--no-per-target-caching`. We only recommend using `--per-target-caching` if you "
+                "are using a remote cache or if you have benchmarked that this option will be "
+                "faster than `--no-per-target-caching` for your use case."
+            ),
+        )
+
 
 class Fmt(Goal):
     subsystem_cls = FmtOptions
@@ -91,6 +110,7 @@ class Fmt(Goal):
 async def fmt(
     console: Console,
     targets_with_origins: HydratedTargetsWithOrigins,
+    options: FmtOptions,
     workspace: Workspace,
     union_membership: UnionMembership,
 ) -> Fmt:
@@ -103,12 +123,28 @@ async def fmt(
     all_language_formatters: Iterable[Type[LanguageFormatters]] = union_membership.union_rules[
         LanguageFormatters
     ]
-    per_language_results = await MultiGet(
-        Get[LanguageFmtResults](LanguageFormatters, language_formatters((adaptor_with_origin,)))
-        for adaptor_with_origin in adaptors_with_origins
-        for language_formatters in all_language_formatters
-        if language_formatters.belongs_to_language(adaptor_with_origin)
-    )
+    if options.values.per_target_caching:
+        per_language_results = await MultiGet(
+            Get[LanguageFmtResults](LanguageFormatters, language_formatters((adaptor_with_origin,)))
+            for adaptor_with_origin in adaptors_with_origins
+            for language_formatters in all_language_formatters
+            if language_formatters.belongs_to_language(adaptor_with_origin)
+        )
+    else:
+        language_formatters_with_valid_targets = {
+            language_formatters: tuple(
+                adaptor_with_origin
+                for adaptor_with_origin in adaptors_with_origins
+                if language_formatters.belongs_to_language(adaptor_with_origin)
+            )
+            for language_formatters in all_language_formatters
+        }
+        per_language_results = await MultiGet(
+            Get[LanguageFmtResults](LanguageFormatters, language_formatters(valid_targets))
+            for language_formatters, valid_targets in language_formatters_with_valid_targets.items()
+            if valid_targets
+        )
+
     individual_results: List[FmtResult] = list(
         itertools.chain.from_iterable(
             language_result.results for language_result in per_language_results

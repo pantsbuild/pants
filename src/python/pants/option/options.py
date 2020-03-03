@@ -10,7 +10,6 @@ from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 from pants.base.deprecated import warn_or_error
 from pants.option.arg_splitter import ArgSplitter, HelpRequest
 from pants.option.config import Config
-from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_tracker import OptionTracker
 from pants.option.option_util import is_list_option
 from pants.option.option_value_container import OptionValueContainer
@@ -81,7 +80,7 @@ class Options:
 
         Also adds any deprecated scopes.
         """
-        ret = OrderedSet([GlobalOptionsRegistrar.get_scope_info()])
+        ret: OrderedSet[ScopeInfo] = OrderedSet()
         original_scopes: Dict[str, ScopeInfo] = {}
         for si in sorted(scope_infos, key=lambda si: si.scope):
             ret.add(si)
