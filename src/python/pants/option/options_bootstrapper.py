@@ -18,6 +18,7 @@ from pants.option.options import Options
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
 from pants.util.dirutil import read_file
 from pants.util.memo import memoized_method, memoized_property
+from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import ensure_text
 
 logger = logging.getLogger(__name__)
@@ -213,7 +214,7 @@ class OptionsBootstrapper:
         return self.bootstrap_options
 
     @memoized_method
-    def _full_options(self, known_scope_infos: Tuple[ScopeInfo, ...]) -> Options:
+    def _full_options(self, known_scope_infos: FrozenOrderedSet[ScopeInfo]) -> Options:
         bootstrap_option_values = self.get_bootstrap_options().for_global_scope()
         options = Options.create(
             self.env,
@@ -224,7 +225,7 @@ class OptionsBootstrapper:
         )
 
         distinct_optionable_classes: Set[Type[Optionable]] = set()
-        for ksi in sorted(known_scope_infos, key=lambda si: si.scope):
+        for ksi in known_scope_infos:
             if not ksi.optionable_cls or ksi.optionable_cls in distinct_optionable_classes:
                 continue
             distinct_optionable_classes.add(ksi.optionable_cls)
@@ -239,7 +240,9 @@ class OptionsBootstrapper:
         :returns: A bootrapped Options instance that also carries options for all the supplied known
                   scopes.
         """
-        return self._full_options(tuple(set(known_scope_infos)))
+        return self._full_options(
+            FrozenOrderedSet(sorted(known_scope_infos, key=lambda si: si.scope))
+        )
 
     def verify_configs_against_options(self, options: Options) -> None:
         """Verify all loaded configs have correct scopes and options.
@@ -262,7 +265,7 @@ class OptionsBootstrapper:
                     all_options_under_scope = set(config.values.options(section)) - set(
                         config.values.defaults
                     )
-                    for option in all_options_under_scope:
+                    for option in sorted(all_options_under_scope):
                         if option not in valid_options_under_scope:
                             error_log.append(
                                 f"Invalid option '{option}' under [{section}] in {config.config_path}"
