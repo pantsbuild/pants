@@ -5,11 +5,10 @@ import json
 import os
 import re
 
-from twitter.common.collections import maybe_list
-
 from pants.base.build_environment import get_buildroot
 from pants.build_graph.intermediate_target_factory import hash_target
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest, ensure_resolver
+from pants.util.collections import ensure_str_list
 from pants_test.backend.project_info.tasks.resolve_jars_test_mixin import ResolveJarsTestMixin
 
 
@@ -34,7 +33,7 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
         :rtype: dict
         """
         export_out_file = os.path.join(workdir, "export_out.txt")
-        args = ["export", f"--output-file={export_out_file}"] + maybe_list(test_target)
+        args = ["export", f"--output-file={export_out_file}", *ensure_str_list(test_target)]
         libs_args = ["--no-export-libraries"] if not load_libs else self._confs_args
         if load_libs and only_default:
             libs_args = []

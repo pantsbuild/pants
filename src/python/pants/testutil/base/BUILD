@@ -5,7 +5,6 @@ python_library(
   name = 'context_utils',
   sources = ['context_utils.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:workunit',
     'src/python/pants/build_graph',
     'src/python/pants/goal:context',

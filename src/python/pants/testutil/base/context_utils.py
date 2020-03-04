@@ -5,12 +5,11 @@ import logging
 import sys
 from contextlib import contextmanager
 
-from twitter.common.collections import maybe_list
-
 from pants.base.workunit import WorkUnit
 from pants.build_graph.target import Target
 from pants.goal.context import Context
 from pants.goal.run_tracker import RunTrackerLogger
+from pants.util.collections import ensure_list
 
 
 class TestContext(Context):
@@ -134,7 +133,7 @@ def create_context_from_options(
     Other params are as for ``Context``.
     """
     run_tracker = TestContext.DummyRunTracker()
-    target_roots = maybe_list(target_roots, Target) if target_roots else []
+    target_roots = ensure_list(target_roots, expected_type=Target) if target_roots else []
     return TestContext(
         options=options,
         run_tracker=run_tracker,

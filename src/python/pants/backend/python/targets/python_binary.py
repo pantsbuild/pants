@@ -4,13 +4,13 @@
 import os
 
 from pex.pex_info import PexInfo
-from twitter.common.collections import maybe_list
 
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.subsystem.subsystem import Subsystem
+from pants.util.collections import ensure_str_list
 
 
 class PythonBinary(PythonTarget):
@@ -109,10 +109,10 @@ class PythonBinary(PythonTarget):
                 "inherit_path": PrimitiveField(inherit_path),
                 "zip_safe": PrimitiveField(bool(zip_safe)),
                 "always_write_cache": PrimitiveField(bool(always_write_cache)),
-                "repositories": PrimitiveField(maybe_list(repositories or [])),
-                "indices": PrimitiveField(maybe_list(indices or [])),
+                "repositories": PrimitiveField(ensure_str_list(repositories or [])),
+                "indices": PrimitiveField(ensure_str_list(indices or [])),
                 "ignore_errors": PrimitiveField(bool(ignore_errors)),
-                "platforms": PrimitiveField(tuple(maybe_list(platforms or []))),
+                "platforms": PrimitiveField(tuple(ensure_str_list(platforms or []))),
                 "shebang": PrimitiveField(shebang),
                 "emit_warnings": PrimitiveField(self.Defaults.should_emit_warnings(emit_warnings)),
             }

@@ -5,8 +5,8 @@ python_library(
   name = 'executor',
   sources = ['executor.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_environment',
+    'src/python/pants/util:collections',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
   ],
@@ -54,9 +54,9 @@ python_library(
   dependencies = [
     ':executor',
     ':nailgun_client',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_environment',
     'src/python/pants/pantsd:process_manager',
+    'src/python/pants/util:collections',
     'src/python/pants/util:dirutil',
   ],
   tags = {"partially_type_checked"},

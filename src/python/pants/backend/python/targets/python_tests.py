@@ -1,9 +1,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from twitter.common.collections import maybe_list
-
 from pants.backend.python.targets.python_target import PythonTarget
+from pants.util.collections import ensure_str_list
 
 
 class PythonTests(PythonTarget):
@@ -26,7 +25,7 @@ class PythonTests(PythonTarget):
         :param int timeout: A timeout (in seconds) which covers the total runtime of all tests in this
           target. Only applied if `--test-pytest-timeouts` is set to True.
         """
-        self._coverage = maybe_list(coverage) if coverage is not None else []
+        self._coverage = ensure_str_list(coverage) if coverage is not None else []
         self._timeout = timeout
         super().__init__(**kwargs)
 

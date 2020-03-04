@@ -10,6 +10,7 @@ python_library(
     'src/python/pants/base:payload_field',
     'src/python/pants/build_graph',
     'src/python/pants/python',
+    'src/python/pants/util:collections',
     'src/python/pants/util:ordered_set',
   ],
   tags = {"partially_type_checked"},

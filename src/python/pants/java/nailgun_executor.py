@@ -10,12 +10,11 @@ import threading
 import time
 from contextlib import closing
 
-from twitter.common.collections import maybe_list
-
 from pants.base.build_environment import get_buildroot
 from pants.java.executor import Executor, SubprocessExecutor
 from pants.java.nailgun_client import NailgunClient
 from pants.pantsd.process_manager import FingerprintedProcessManager, ProcessGroup
+from pants.util.collections import ensure_str_list
 from pants.util.dirutil import read_file, safe_file_dump, safe_open
 from pants.util.memo import memoized_classproperty
 
@@ -107,7 +106,7 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
         self._workdir = workdir
         self._ng_stdout = os.path.join(workdir, "stdout")
         self._ng_stderr = os.path.join(workdir, "stderr")
-        self._nailgun_classpath = maybe_list(nailgun_classpath)
+        self._nailgun_classpath = ensure_str_list(nailgun_classpath)
         self._startup_timeout = startup_timeout
         self._connect_timeout = connect_timeout
         self._connect_attempts = connect_attempts

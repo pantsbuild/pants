@@ -7,8 +7,6 @@ import textwrap
 import unittest
 from contextlib import contextmanager
 
-from twitter.common.collections import maybe_list
-
 from pants.base.revision import Revision
 from pants.java.distribution.distribution import (
     Distribution,
@@ -20,6 +18,7 @@ from pants.java.distribution.distribution import (
     _UnknownEnvironment,
 )
 from pants.testutil.subsystem.util import global_subsystem_instance
+from pants.util.collections import ensure_list, ensure_str_list
 from pants.util.contextutil import environment_as, temporary_dir, temporary_file
 from pants.util.dirutil import chmod_plus_x, safe_open, touch
 
@@ -53,9 +52,9 @@ class EXE:
 @contextmanager
 def distribution(files=None, executables=None, java_home=None):
     with temporary_dir() as dist_root:
-        for f in maybe_list(files or ()):
+        for f in ensure_str_list(files or ()):
             touch(os.path.join(dist_root, f))
-        for executable in maybe_list(executables or (), expected_type=EXE):
+        for executable in ensure_list(executables or (), expected_type=EXE):
             path = os.path.join(dist_root, executable.relpath)
             with safe_open(path, "w") as fp:
                 java_home = os.path.join(dist_root, java_home) if java_home else dist_root

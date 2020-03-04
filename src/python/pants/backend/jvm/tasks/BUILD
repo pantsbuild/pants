@@ -363,7 +363,6 @@ python_library(
   name = 'jar_task',
   sources = ['jar_task.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     ':classpath_util',
     ':nailgun_task',
     'src/python/pants/backend/jvm:argfile',
