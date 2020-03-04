@@ -356,7 +356,9 @@ To add or remove to a list option, use the same syntax as the command line:
 
 While Pants will support both INI and TOML config files for some time, we encourage you to write any new config files in TOML and to consider migrating any pre-existing config files to TOML. TOML removes many gotchas and has benefits like validation from your text editor.
 
-To migrate, we wrote a script to automate fixing the majority of issues:
+To migrate, you must be using a modern version of the `./pants` script that understands `pants.toml`. Run `curl -L -O https://pantsbuild.github.io/setup/pants` to pull the latest version of the script. 
+
+We wrote a script to automate fixing the majority of issues:
 
     :::bash
     $ curl -L -o migrate_to_toml_config.py 'https://git.io/Jv02R' && chmod +x migrate_to_toml_config.py && ./migrate_to_toml_config.py pants.ini
