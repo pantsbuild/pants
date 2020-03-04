@@ -1202,15 +1202,15 @@ class OptionsTest(TestBase):
     def test_complete_scopes(self) -> None:
         self.assertEqual(
             {intermediate("foo"), intermediate("foo.bar"), task("foo.bar.baz")},
-            Options.complete_scopes({task("foo.bar.baz")}),
+            set(Options.complete_scopes({task("foo.bar.baz")})),
         )
         self.assertEqual(
             {global_scope(), intermediate("foo"), intermediate("foo.bar"), task("foo.bar.baz")},
-            Options.complete_scopes({GlobalOptions.get_scope_info(), task("foo.bar.baz")}),
+            set(Options.complete_scopes({GlobalOptions.get_scope_info(), task("foo.bar.baz")})),
         )
         self.assertEqual(
             {intermediate("foo"), intermediate("foo.bar"), task("foo.bar.baz")},
-            Options.complete_scopes({intermediate("foo"), task("foo.bar.baz")}),
+            set(Options.complete_scopes({intermediate("foo"), task("foo.bar.baz")})),
         )
         self.assertEqual(
             {
@@ -1220,7 +1220,7 @@ class OptionsTest(TestBase):
                 intermediate("qux"),
                 task("qux.quux"),
             },
-            Options.complete_scopes({task("foo.bar.baz"), task("qux.quux")}),
+            set(Options.complete_scopes({task("foo.bar.baz"), task("qux.quux")})),
         )
 
     def test_get_fingerprintable_for_scope_ignore_passthru(self) -> None:
