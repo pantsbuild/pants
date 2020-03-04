@@ -75,6 +75,7 @@ class Scheduler:
         execution_options: ExecutionOptions,
         include_trace_on_error: bool = True,
         visualize_to_dir: Optional[str] = None,
+        validate: bool = True,
     ):
         """
         :param native: An instance of engine.native.Native.
@@ -88,6 +89,7 @@ class Scheduler:
         :param execution_options: Execution options for (remote) processes.
         :param include_trace_on_error: Include the trace through the graph upon encountering errors.
         :type include_trace_on_error: bool
+        :param validate: True to assert that the ruleset is valid.
         """
         self._native = native
         self.include_trace_on_error = include_trace_on_error
@@ -116,7 +118,8 @@ class Scheduler:
             rule_graph_name = "rule_graph.dot"
             self.visualize_rule_graph_to_file(os.path.join(self._visualize_to_dir, rule_graph_name))
 
-        self._assert_ruleset_valid()
+        if validate:
+            self._assert_ruleset_valid()
 
     def _root_type_ids(self):
         return self._to_ids_buf(self._root_subject_types)

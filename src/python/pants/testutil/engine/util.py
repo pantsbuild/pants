@@ -147,12 +147,14 @@ def init_native():
 def create_scheduler(rules, union_rules=None, validate=True, native=None):
     """Create a Scheduler."""
     native = native or init_native()
+    tree = FileSystemProjectTree(os.getcwd())
     return Scheduler(
-        native,
-        FileSystemProjectTree(os.getcwd()),
-        "./.pants.d",
-        rules,
-        union_rules,
+        native=native,
+        ignore_patterns=tree.ignore_patterns,
+        build_root=tree.build_root,
+        local_store_dir="./.pants.d",
+        rules=rules,
+        union_rules=union_rules,
         execution_options=DEFAULT_EXECUTION_OPTIONS,
         validate=validate,
     )
