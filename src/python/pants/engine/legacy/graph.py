@@ -51,6 +51,7 @@ from pants.option.global_options import (
 )
 from pants.source.filespec import any_matches_filespec
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper, Filespec
+from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 logger = logging.getLogger(__name__)
@@ -111,7 +112,7 @@ class LegacyBuildGraph(BuildGraph):
 
         # Index the ProductGraph.
         for legacy_hydrated_target in hydrated_targets:
-            address = legacy_hydrated_target.address
+            address = legacy_hydrated_target.build_file_address
             all_addresses.add(address)
             if address not in self._target_by_address:
                 new_targets.append(self._index_target(legacy_hydrated_target))
@@ -148,11 +149,11 @@ class LegacyBuildGraph(BuildGraph):
         """Instantiate the given LegacyHydratedTarget, index it in the graph, and return a
         Target."""
         # Instantiate the target.
-        address = legacy_hydrated_target.address
+        address = legacy_hydrated_target.build_file_address
         target = self._instantiate_target(legacy_hydrated_target)
         self._target_by_address[address] = target
 
-        for dependency in legacy_hydrated_target.dependencies:
+        for dependency in legacy_hydrated_target.adaptor.dependencies:
             if dependency in self._target_dependencies_by_address[address]:
                 raise self.DuplicateAddressError(
                     "Addresses in dependencies must be unique. "
@@ -175,7 +176,7 @@ class LegacyBuildGraph(BuildGraph):
             kwargs.pop("dependencies")
 
             # Replace the `address` field of type `Address` with type `BuildFileAddress`.
-            kwargs["address"] = legacy_hydrated_target.address
+            kwargs["address"] = legacy_hydrated_target.build_file_address
 
             # Instantiate.
             if issubclass(target_cls, AppBase):
@@ -187,7 +188,7 @@ class LegacyBuildGraph(BuildGraph):
             raise
         except Exception as e:
             raise TargetDefinitionException(
-                legacy_hydrated_target.address,
+                legacy_hydrated_target.build_file_address,
                 "Failed to instantiate Target with type {}: {}".format(target_cls, e),
             )
 
@@ -261,7 +262,7 @@ class LegacyBuildGraph(BuildGraph):
         self._index(thts.closure)
 
         for hydrated_target in thts.roots:
-            yield hydrated_target.address
+            yield hydrated_target.build_file_address
 
 
 class _DependentGraph:
@@ -360,24 +361,43 @@ class _DependentGraph:
         return result
 
 
-@dataclass(frozen=True)
+@frozen_after_init
+@dataclass
 class HydratedTarget:
     """A wrapper for a fully hydrated TargetAdaptor object.
 
+    Why have this type if all information is stored in the underlying TargetAdaptor? We need it for
+    the type-driven graph to work properly. A HydratedTarget is a generic wrapper around different
+    target classes, whereas a TargetAdaptor has different types like PythonTestsAdaptor and
+    PythonLibraryAdaptor. We need to be able to work with targets both generically and depending
+    on their target type (i.e. unions).
+
     Transitive graph walks collect ordered sets of TransitiveHydratedTargets which involve a huge
-    amount of hashing: we implement eq/hash via direct usage of an Address field to speed that up.
+    amount of hashing: we implement a custom eq/hash to speed that up.
     """
 
-    address: Address
     adaptor: TargetAdaptor
-    dependencies: Tuple[Address, ...]
 
-    @property
-    def addresses(self) -> Tuple:
-        return self.dependencies
+    def __init__(self, adaptor: TargetAdaptor) -> None:
+        self.adaptor = adaptor
+        # This field is set for efficient lookup of the address in `__hash__` and `__eq__` during
+        # graph walks. Directly accessing this field, rather than using `adaptor.address` is about
+        # 10x faster. However, rules should still use `adaptor.address` for clarity and because
+        # they do not need to access the address as frequently, so it would be an over-optimization
+        # (we're talking about 10^-7 vs. 10^-6 seconds here).
+        self._address = adaptor.address
 
     def __hash__(self):
-        return hash(self.address)
+        return hash((self._address, self.adaptor))
+
+    def __eq__(self, other):
+        if not isinstance(other, HydratedTarget):
+            return NotImplemented
+        # NB: This short-circuiting is essential. Without it, constructing the build graph for the
+        # Pants repository takes 71 seconds compared to 4.3 seconds!
+        if self._address != other._address:
+            return False
+        return self.adaptor == other.adaptor
 
 
 class HydratedTargets(Collection[HydratedTarget]):
@@ -405,16 +425,12 @@ class LegacyHydratedTarget:
     """A rip on HydratedTarget for the purpose of V1, which must use BuildFileAddress rather than
     Address."""
 
-    address: BuildFileAddress
+    build_file_address: BuildFileAddress
     adaptor: TargetAdaptor
-    dependencies: Tuple[Address, ...]
-
-    def __hash__(self):
-        return hash(self.address)
 
     @staticmethod
     def from_hydrated_target(ht: HydratedTarget, bfa: BuildFileAddress) -> "LegacyHydratedTarget":
-        return LegacyHydratedTarget(address=bfa, adaptor=ht.adaptor, dependencies=ht.dependencies)
+        return LegacyHydratedTarget(build_file_address=bfa, adaptor=ht.adaptor)
 
 
 @dataclass(frozen=True)
@@ -459,21 +475,6 @@ class SourcesSnapshots(Collection[SourcesSnapshot]):
     `@goal_rule`s may request this when they only need source files to operate and do not need any
     target information.
     """
-
-
-@dataclass(frozen=True)
-class TopologicallyOrderedTargets:
-    """A set of HydratedTargets, ordered topologically from least to most dependent.
-
-    That is if B depends on A then B follows A in the order.
-
-    Note that most rules won't need to consider target dependency order, as those dependencies
-    usually implicitly create corresponding rule graph dependencies and per-target rules will then
-    execute in the right order automatically. However there can be cases where it's still useful for
-    a single rule invocation to know about the order of multiple targets under its consideration.
-    """
-
-    hydrated_targets: HydratedTargets
 
 
 class InvalidOwnersOfArgs(Exception):
@@ -585,11 +586,9 @@ async def legacy_transitive_hydrated_targets(
     addresses: Addresses,
 ) -> LegacyTransitiveHydratedTargets:
     thts = await Get[TransitiveHydratedTargets](Addresses, addresses)
-    roots_bfas = await MultiGet(
-        Get[BuildFileAddress](Address, hydrated_target.address) for hydrated_target in thts.roots
-    )
+    roots_bfas = await MultiGet(Get[BuildFileAddress](Address, ht._address) for ht in thts.roots)
     closure_bfas = await MultiGet(
-        Get[BuildFileAddress](Address, hydrated_target.address) for hydrated_target in thts.closure
+        Get[BuildFileAddress](Address, ht._address) for ht in thts.closure
     )
     return LegacyTransitiveHydratedTargets(
         roots=tuple(
@@ -606,36 +605,9 @@ async def legacy_transitive_hydrated_targets(
 @rule
 async def transitive_hydrated_target(root: HydratedTarget) -> TransitiveHydratedTarget:
     dependencies = await MultiGet(
-        Get[TransitiveHydratedTarget](Address, d) for d in root.dependencies
+        Get[TransitiveHydratedTarget](Address, d) for d in root.adaptor.dependencies
     )
     return TransitiveHydratedTarget(root, dependencies)
-
-
-@rule
-async def sort_targets(targets: HydratedTargets) -> TopologicallyOrderedTargets:
-    return TopologicallyOrderedTargets(HydratedTargets(topo_sort(tuple(targets))))
-
-
-def topo_sort(targets: Iterable[HydratedTarget]) -> Tuple[HydratedTarget, ...]:
-    """Sort the targets so that if B depends on A, B follows A in the order."""
-    visited: Dict[HydratedTarget, bool] = defaultdict(bool)
-    res: List[HydratedTarget] = []
-
-    def recursive_topo_sort(ht):
-        if visited[ht]:
-            return
-        visited[ht] = True
-        for dep in ht.dependencies:
-            recursive_topo_sort(dep)
-        res.append(ht)
-
-    for target in targets:
-        recursive_topo_sort(target)
-
-    # Note that if the input set is not transitively closed then res may contain targets
-    # that aren't in the input set.  We subtract those out here.
-    input_set = set(targets)
-    return tuple(tgt for tgt in res if tgt in input_set)
 
 
 @dataclass(frozen=True)
@@ -658,11 +630,7 @@ async def hydrate_target(hydrated_struct: HydratedStruct) -> HydratedTarget:
     kwargs = target_adaptor.kwargs()
     for field in hydrated_fields:
         kwargs[field.name] = field.value
-    return HydratedTarget(
-        address=target_adaptor.address,
-        adaptor=type(target_adaptor)(**kwargs),
-        dependencies=target_adaptor.dependencies,
-    )
+    return HydratedTarget(adaptor=type(target_adaptor)(**kwargs))
 
 
 @rule
@@ -877,7 +845,6 @@ def create_legacy_graph_tasks():
         find_owners,
         hydrate_sources,
         hydrate_bundles,
-        sort_targets,
         hydrate_sources_snapshot,
         addresses_with_origins_from_filesystem_specs,
         sources_snapshots_from_address_specs,

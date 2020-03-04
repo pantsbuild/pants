@@ -237,40 +237,40 @@ async def run_tests(
 async def coordinator_of_tests(
     target_with_origin: HydratedTargetWithOrigin, union_membership: UnionMembership,
 ) -> AddressAndTestResult:
-    target = target_with_origin.target
+    adaptor = target_with_origin.target.adaptor
     adaptor_with_origin = TargetAdaptorWithOrigin.create(
-        adaptor=target.adaptor, origin=target_with_origin.origin
+        adaptor=adaptor, origin=target_with_origin.origin
     )
 
     if not AddressAndTestResult.is_testable(adaptor_with_origin, union_membership=union_membership):
-        return AddressAndTestResult(target.address, None)
+        return AddressAndTestResult(adaptor.address, None)
 
     # TODO(#6004): when streaming to live TTY, rely on V2 UI for this information. When not a
     # live TTY, periodically dump heavy hitters to stderr. See
     # https://github.com/pantsbuild/pants/issues/6004#issuecomment-492699898.
-    logger.info(f"Starting tests: {target.address.reference()}")
+    logger.info(f"Starting tests: {adaptor.address.reference()}")
     # NB: This has the effect of "casting" a TargetAdaptorWithOrigin to a member of the TestTarget
     # union. If the adaptor is not a member of the union, the engine will fail at runtime with a
     # useful error message.
     result = await Get[TestResult](TestTarget, adaptor_with_origin)
     logger.info(
         f"Tests {'succeeded' if result.status == Status.SUCCESS else 'failed'}: "
-        f"{target.address.reference()}"
+        f"{adaptor.address.reference()}"
     )
-    return AddressAndTestResult(target.address, result)
+    return AddressAndTestResult(adaptor.address, result)
 
 
 @rule
 async def coordinator_of_debug_tests(
     target_with_origin: HydratedTargetWithOrigin,
 ) -> AddressAndDebugRequest:
-    target = target_with_origin.target
+    adaptor = target_with_origin.target.adaptor
     adaptor_with_origin = TargetAdaptorWithOrigin.create(
-        adaptor=target.adaptor, origin=target_with_origin.origin
+        adaptor=adaptor, origin=target_with_origin.origin
     )
-    logger.info(f"Starting tests in debug mode: {target.address.reference()}")
+    logger.info(f"Starting tests in debug mode: {adaptor.address.reference()}")
     request = await Get[TestDebugRequest](TestTarget, adaptor_with_origin)
-    return AddressAndDebugRequest(target.address, request)
+    return AddressAndDebugRequest(adaptor.address, request)
 
 
 def rules():

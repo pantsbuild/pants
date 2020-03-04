@@ -262,21 +262,18 @@ class TestTest(TestBase):
                 dirs=(),
             ),
         )
-        target_adaptor = (
-            PythonTestsAdaptor(type_alias="python_tests", sources=mocked_fileset)
-            if test_target_type
-            else PythonBinaryAdaptor(type_alias="python_binary", sources=mocked_fileset)
-        )
+        adaptor_cls = PythonTestsAdaptor if test_target_type else PythonBinaryAdaptor
+        type_alias = "python_tests" if test_target_type else "python_binary"
+        adaptor = adaptor_cls(address=address, type_alias=type_alias, sources=mocked_fileset)
         union_membership = UnionMembership(
             union_rules=OrderedDict({TestTarget: OrderedSet([PythonTestsAdaptorWithOrigin])})
         )
-
         with self.captured_logging(logging.INFO):
             result: AddressAndTestResult = run_rule(
                 coordinator_of_tests,
                 rule_args=[
                     HydratedTargetWithOrigin(
-                        target=HydratedTarget(address, target_adaptor, ()),
+                        target=HydratedTarget(adaptor),
                         origin=(
                             origin
                             or SingleAddress(directory=address.spec_path, name=address.target_name)

@@ -52,12 +52,14 @@ class PylintIntegrationTest(TestBase):
         *,
         interpreter_constraints: Optional[str] = None,
         origin: Optional[OriginSpec] = None,
+        dependencies: Optional[List[Address]] = None,
     ) -> PythonTargetAdaptorWithOrigin:
         input_snapshot = self.request_single_product(Snapshot, InputFilesContent(source_files))
         adaptor = PythonTargetAdaptor(
             sources=EagerFilesetWithSpec(self.source_root, {"globs": []}, snapshot=input_snapshot),
             address=Address.parse(f"{self.source_root}:target"),
             compatibility=[interpreter_constraints] if interpreter_constraints else None,
+            dependencies=dependencies or [],
         )
         if origin is None:
             origin = SingleAddress(directory=self.source_root, name="target")
@@ -179,7 +181,9 @@ class PylintIntegrationTest(TestBase):
         )
         self.create_python_library(sources=["test_dependency.py"], dependencies=[":dependency"])
         self.write_file(source)
-        target = self.make_target_with_origin([source])
+        target = self.make_target_with_origin(
+            [source], dependencies=[Address.parse(f"{self.source_root}:dependency")]
+        )
         result = self.run_pylint([target])
         assert result.exit_code == 0
         assert "Your code has been rated at 10.00/10" in result.stdout.strip()

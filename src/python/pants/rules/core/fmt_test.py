@@ -115,12 +115,7 @@ class FmtTest(TestBase):
         sources = Mock()
         sources.snapshot = Mock()
         sources.snapshot.files = ("f1",) if include_sources else ()
-        address = Address.parse(f"//:{name}")
-        ht = HydratedTarget(
-            address=address,
-            adaptor=adaptor_type(sources=sources, address=address),
-            dependencies=(),
-        )
+        ht = HydratedTarget(adaptor_type(sources=sources, address=Address.parse(f"//:{name}")))
         return HydratedTargetWithOrigin(ht, SingleAddress(directory="", name=name))
 
     def run_fmt_rule(
