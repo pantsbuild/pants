@@ -87,7 +87,7 @@ async def setup(
             output_filename="black.pex",
             requirements=PexRequirements(black.get_requirement_specs()),
             interpreter_constraints=PexInterpreterConstraints(
-                constraint_set=tuple(black.default_interpreter_constraints)
+                black.default_interpreter_constraints
             ),
             entry_point=black.get_entry_point(),
         )

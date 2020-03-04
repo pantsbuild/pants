@@ -156,9 +156,9 @@ class PexTest(TestBase):
         assert pex_info["entry_point"] == entry_point
 
     def test_interpreter_constraints(self) -> None:
-        constraints = PexInterpreterConstraints(constraint_set=("CPython>=2.7,<3", "CPython>=3.6"))
+        constraints = PexInterpreterConstraints(["CPython>=2.7,<3", "CPython>=3.6"])
         pex_info = self.create_pex_and_get_pex_info(interpreter_constraints=constraints)
-        assert set(pex_info["interpreter_constraints"]) == set(constraints.constraint_set)
+        assert set(pex_info["interpreter_constraints"]) == set(constraints.constraints)
 
     def test_additional_args(self) -> None:
         pex_info = self.create_pex_and_get_pex_info(additional_pex_args=("--not-zip-safe",))

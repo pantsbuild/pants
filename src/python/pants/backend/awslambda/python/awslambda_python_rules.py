@@ -79,7 +79,7 @@ async def setup_lambdex(lambdex: Lambdex) -> LambdexSetup:
             output_filename="lambdex.pex",
             requirements=PexRequirements(lambdex.get_requirement_specs()),
             interpreter_constraints=PexInterpreterConstraints(
-                constraint_set=tuple(lambdex.default_interpreter_constraints)
+                lambdex.default_interpreter_constraints
             ),
             entry_point=lambdex.get_entry_point(),
         )

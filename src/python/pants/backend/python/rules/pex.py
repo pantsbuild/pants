@@ -54,13 +54,17 @@ class PexRequirements:
         return PexRequirements(all_target_requirements)
 
 
-@dataclass(frozen=True)
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class PexInterpreterConstraints:
-    constraint_set: Tuple[str, ...] = ()
+    constraints: FrozenOrderedSet[str]
+
+    def __init__(self, constraints: Optional[Iterable[str]] = None) -> None:
+        self.constraints = FrozenOrderedSet(sorted(constraints or ()))
 
     def generate_pex_arg_list(self) -> List[str]:
         args = []
-        for constraint in sorted(self.constraint_set):
+        for constraint in sorted(self.constraints):
             args.extend(["--interpreter-constraint", constraint])
         return args
 
@@ -68,7 +72,7 @@ class PexInterpreterConstraints:
     def create_from_adaptors(
         cls, adaptors: Iterable[TargetAdaptor], python_setup: PythonSetup
     ) -> "PexInterpreterConstraints":
-        interpreter_constraints = {
+        constraints = {
             constraint
             for target_adaptor in adaptors
             for constraint in python_setup.compatibility_or_constraints(
@@ -76,7 +80,7 @@ class PexInterpreterConstraints:
             )
             if isinstance(target_adaptor, PythonTargetAdaptor)
         }
-        return PexInterpreterConstraints(constraint_set=tuple(sorted(interpreter_constraints)))
+        return PexInterpreterConstraints(constraints)
 
 
 @dataclass(frozen=True)

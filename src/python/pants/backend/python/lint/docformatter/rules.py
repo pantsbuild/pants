@@ -74,7 +74,7 @@ async def setup(
             output_filename="docformatter.pex",
             requirements=PexRequirements(docformatter.get_requirement_specs()),
             interpreter_constraints=PexInterpreterConstraints(
-                constraint_set=tuple(docformatter.default_interpreter_constraints)
+                docformatter.default_interpreter_constraints
             ),
             entry_point=docformatter.get_entry_point(),
         )
