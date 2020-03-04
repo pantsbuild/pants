@@ -251,9 +251,9 @@ async def setup_coverage(coverage: PytestCoverage) -> CoverageSetup:
     requirements_pex = await Get[Pex](
         CreatePex(
             output_filename=output_pex_filename,
-            requirements=PexRequirements(requirements=tuple(coverage.get_requirement_specs())),
+            requirements=PexRequirements(coverage.get_requirement_specs()),
             interpreter_constraints=PexInterpreterConstraints(
-                constraint_set=tuple(coverage.default_interpreter_constraints)
+                coverage.default_interpreter_constraints
             ),
             entry_point=coverage.get_entry_point(),
             input_files_digest=plugin_file_digest,

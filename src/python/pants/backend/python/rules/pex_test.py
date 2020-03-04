@@ -126,9 +126,7 @@ class PexTest(TestBase):
         self.assertEqual(result.stdout, b"from main\n")
 
     def test_resolves_dependencies(self) -> None:
-        requirements = PexRequirements(
-            requirements=("six==1.12.0", "jsonschema==2.6.0", "requests==2.23.0")
-        )
+        requirements = PexRequirements(["six==1.12.0", "jsonschema==2.6.0", "requests==2.23.0"])
         pex_info = self.create_pex_and_get_pex_info(requirements=requirements)
         # NB: We do not check for transitive dependencies, which PEX-INFO will include. We only check
         # that at least the dependencies we requested are included.
@@ -147,7 +145,7 @@ class PexTest(TestBase):
         self.create_file("constraints.txt", "\n".join(constraints))
 
         pex_info = self.create_pex_and_get_pex_info(
-            requirements=PexRequirements((direct_dep,)),
+            requirements=PexRequirements([direct_dep]),
             additional_pants_args=("--python-setup-requirement-constraints=constraints.txt",),
         )
         assert set(pex_info["requirements"]) == set(constraints)
@@ -158,9 +156,9 @@ class PexTest(TestBase):
         assert pex_info["entry_point"] == entry_point
 
     def test_interpreter_constraints(self) -> None:
-        constraints = PexInterpreterConstraints(constraint_set=("CPython>=2.7,<3", "CPython>=3.6"))
+        constraints = PexInterpreterConstraints(["CPython>=2.7,<3", "CPython>=3.6"])
         pex_info = self.create_pex_and_get_pex_info(interpreter_constraints=constraints)
-        assert set(pex_info["interpreter_constraints"]) == set(constraints.constraint_set)
+        assert set(pex_info["interpreter_constraints"]) == set(constraints.constraints)
 
     def test_additional_args(self) -> None:
         pex_info = self.create_pex_and_get_pex_info(additional_pex_args=("--not-zip-safe",))

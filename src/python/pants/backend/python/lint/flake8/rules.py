@@ -66,7 +66,7 @@ async def lint(
     requirements_pex = await Get[Pex](
         CreatePex(
             output_filename="flake8.pex",
-            requirements=PexRequirements(requirements=tuple(flake8.get_requirement_specs())),
+            requirements=PexRequirements(flake8.get_requirement_specs()),
             interpreter_constraints=interpreter_constraints,
             entry_point=flake8.get_entry_point(),
         )
