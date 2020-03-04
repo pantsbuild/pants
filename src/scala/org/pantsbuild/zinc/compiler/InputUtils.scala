@@ -1,11 +1,10 @@
 /**
- * Copyright (C) 2012 Typesafe, Inc. <http://www.typesafe.com>
- */
-
+  * Copyright (C) 2012 Typesafe, Inc. <http://www.typesafe.com>
+  */
 package org.pantsbuild.zinc.compiler
 
 import java.io.{File}
-import java.util.function.{ Function => JFunction }
+import java.util.function.{Function => JFunction}
 
 import scala.compat.java8.OptionConverters._
 
@@ -29,21 +28,28 @@ import org.pantsbuild.zinc.scalautil.ScalaUtils
 import org.pantsbuild.zinc.compiler.CompilerUtils.newScalaCompiler
 
 object InputUtils {
+
   /**
-   * Create Inputs based on command-line settings.
-   */
+    * Create Inputs based on command-line settings.
+    */
   def create(
-    settings: Settings,
-    analysisMap: AnalysisMap,
-    previousResult: PreviousResult,
-    log: Logger
+      settings: Settings,
+      analysisMap: AnalysisMap,
+      previousResult: PreviousResult,
+      log: Logger
   ): Inputs = {
     import settings._
 
     val scalaJars = InputUtils.selectScalaJars(settings.scala)
 
-    val instance = ScalaUtils.scalaInstance(scalaJars.compiler, scalaJars.extra, scalaJars.library)
-    val compilers = ZincUtil.compilers(instance, ClasspathOptionsUtil.auto, settings.javaHome, newScalaCompiler(instance, settings.compiledBridgeJar.get))
+    val instance = ScalaUtils.scalaInstance(scalaJars.compiler,
+                                            scalaJars.extra,
+                                            scalaJars.library)
+    val compilers = ZincUtil.compilers(
+      instance,
+      ClasspathOptionsUtil.auto,
+      settings.javaHome,
+      newScalaCompiler(instance, settings.compiledBridgeJar.get))
 
     // TODO: Remove duplication once on Scala 2.12.x.
     val positionMapper =
@@ -70,17 +76,18 @@ object InputUtils {
 
     val reporter =
       if (settings.consoleLog.useBarebonesLogger) {
-        ReporterUtil.getReporter(
-          BareBonesLogger(settings.consoleLog.logLevel), ReporterManager.getDefaultReporterConfig)
+        ReporterUtil.getReporter(BareBonesLogger(settings.consoleLog.logLevel),
+                                 ReporterManager.getDefaultReporterConfig)
       } else {
         ReporterUtil.getDefault(
-        ReporterUtil.getDefaultReporterConfig()
-          .withMaximumErrors(Int.MaxValue)
-          .withUseColor(settings.consoleLog.color)
-          .withMsgFilters(settings.consoleLog.msgPredicates.toArray)
-          .withFileFilters(settings.consoleLog.filePredicates.toArray)
-          .withLogLevel(settings.consoleLog.javaLogLevel)
-          .withPositionMapper(positionMapper)
+          ReporterUtil
+            .getDefaultReporterConfig()
+            .withMaximumErrors(Int.MaxValue)
+            .withUseColor(settings.consoleLog.color)
+            .withMsgFilters(settings.consoleLog.msgPredicates.toArray)
+            .withFileFilters(settings.consoleLog.filePredicates.toArray)
+            .withLogLevel(settings.consoleLog.javaLogLevel)
+            .withPositionMapper(positionMapper)
         )
       }
     val setup =
@@ -104,17 +111,18 @@ object InputUtils {
   }
 
   /**
-   * Load the analysis for the destination, creating it if necessary.
-   */
+    * Load the analysis for the destination, creating it if necessary.
+    */
   def loadDestinationAnalysis(
-    settings: Settings,
-    analysisMap: AnalysisMap,
-    log: Logger
+      settings: Settings,
+      analysisMap: AnalysisMap,
+      log: Logger
   ): (AnalysisStore, PreviousResult) = {
     def load() = {
       val analysisStore = analysisMap.cachedStore(settings.analysis.cache)
       analysisStore.get().asScala match {
-        case Some(a) => (analysisStore, Some(a.getAnalysis), Some(a.getMiniSetup))
+        case Some(a) =>
+          (analysisStore, Some(a.getAnalysis), Some(a.getMiniSetup))
         case _ => (analysisStore, None, None)
       }
     }
@@ -126,31 +134,38 @@ object InputUtils {
       } catch {
         case e: Throwable if settings.analysis.clearInvalid =>
           // Remove the corrupted analysis and output directory.
-          log.warn(s"Failed to load analysis from ${settings.analysis.cache} ($e): will execute a clean compile.")
+          log.warn(
+            s"Failed to load analysis from ${settings.analysis.cache} ($e): will execute a clean compile.")
           IO.delete(settings.analysis.cache)
           IO.delete(settings.classesDirectory)
           load()
       }
-    (analysisStore, PreviousResult.create(previousAnalysis.asJava, previousSetup.asJava))
+    (analysisStore,
+     PreviousResult.create(previousAnalysis.asJava, previousSetup.asJava))
   }
 
   /**
-   * Automatically add the output directory and scala library to the classpath.
-   */
-  def autoClasspath(classesDirectory: File, allScalaJars: Seq[File], javaOnly: Boolean, classpath: Seq[File]): Seq[File] = {
+    * Automatically add the output directory and scala library to the classpath.
+    */
+  def autoClasspath(classesDirectory: File,
+                    allScalaJars: Seq[File],
+                    javaOnly: Boolean,
+                    classpath: Seq[File]): Seq[File] = {
     if (javaOnly) classesDirectory +: classpath
-    else splitScala(allScalaJars) match {
-      case Some(scalaJars) => classesDirectory +: scalaJars.library +: classpath
-      case None            => classesDirectory +: classpath
-    }
+    else
+      splitScala(allScalaJars) match {
+        case Some(scalaJars) =>
+          classesDirectory +: scalaJars.library +: classpath
+        case None => classesDirectory +: classpath
+      }
   }
 
   /**
-   * Select the scala jars.
-   *
-   * Prefer the explicit scala-compiler, scala-library, and scala-extra settings,
-   * then the scala-path setting, then the scala-home setting. Default to bundled scala.
-   */
+    * Select the scala jars.
+    *
+    * Prefer the explicit scala-compiler, scala-library, and scala-extra settings,
+    * then the scala-path setting, then the scala-home setting. Default to bundled scala.
+    */
   def selectScalaJars(scala: ScalaLocation): ScalaJars = {
     val jars = splitScala(scala.path) getOrElse Defaults.scalaJars
     ScalaJars(
@@ -161,37 +176,45 @@ object InputUtils {
   }
 
   /**
-   * Distinguish the compiler and library jars.
-   */
-  def splitScala(jars: Seq[File], excluded: Set[String] = Set.empty): Option[ScalaJars] = {
+    * Distinguish the compiler and library jars.
+    */
+  def splitScala(jars: Seq[File],
+                 excluded: Set[String] = Set.empty): Option[ScalaJars] = {
     val filtered = jars filterNot (excluded contains _.getName)
     val (compiler, other) = filtered partition (_.getName matches ScalaCompiler.pattern)
     val (library, extra) = other partition (_.getName matches ScalaLibrary.pattern)
-    if (compiler.nonEmpty && library.nonEmpty) Some(ScalaJars(compiler(0), library(0), extra)) else None
+    if (compiler.nonEmpty && library.nonEmpty)
+      Some(ScalaJars(compiler(0), library(0), extra))
+    else None
   }
 
   //
   // Default setup
   //
 
-  val ScalaCompiler            = JarFile("scala-compiler")
-  val ScalaLibrary             = JarFile("scala-library")
-  val ScalaReflect             = JarFile("scala-reflect")
+  val ScalaCompiler = JarFile("scala-compiler")
+  val ScalaLibrary = JarFile("scala-library")
+  val ScalaReflect = JarFile("scala-reflect")
 
   // TODO: The default jar locations here are definitely not helpful, but the existence
   // of "some" value for each of these is assumed in a few places. Should remove and make
   // them optional to more cleanly support Java-only compiles.
   object Defaults {
-    val scalaCompiler        = ScalaCompiler.default
-    val scalaLibrary         = ScalaLibrary.default
-    val scalaExtra           = Seq(ScalaReflect.default)
-    val scalaJars            = ScalaJars(scalaCompiler, scalaLibrary, scalaExtra)
-    val scalaExcluded = Set("jansi.jar", "jline.jar", "scala-partest.jar", "scala-swing.jar", "scalacheck.jar", "scalap.jar")
+    val scalaCompiler = ScalaCompiler.default
+    val scalaLibrary = ScalaLibrary.default
+    val scalaExtra = Seq(ScalaReflect.default)
+    val scalaJars = ScalaJars(scalaCompiler, scalaLibrary, scalaExtra)
+    val scalaExcluded = Set("jansi.jar",
+                            "jline.jar",
+                            "scala-partest.jar",
+                            "scala-swing.jar",
+                            "scalacheck.jar",
+                            "scalap.jar")
   }
 
   /**
-   * Jar file description for locating jars.
-   */
+    * Jar file description for locating jars.
+    */
   case class JarFile(name: String, classifier: Option[String] = None) {
     val versionPattern = "(-.*)?"
     val classifierString = classifier map ("-" + _) getOrElse ""
@@ -201,11 +224,12 @@ object InputUtils {
   }
 
   object JarFile {
-    def apply(name: String, classifier: String): JarFile = JarFile(name, Some(classifier))
+    def apply(name: String, classifier: String): JarFile =
+      JarFile(name, Some(classifier))
   }
 
   /**
-   * The scala jars split into compiler, library, and extra.
-   */
+    * The scala jars split into compiler, library, and extra.
+    */
   case class ScalaJars(compiler: File, library: File, extra: Seq[File])
 }
