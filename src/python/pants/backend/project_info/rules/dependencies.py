@@ -80,7 +80,9 @@ async def dependencies(
                 # TODO(#8762): Support jvm third party deps when there is some sort of JarLibraryAdaptor.
         if should_include_source:
             address_strings.update(
-                hydrated_target.adaptor.address.spec for hydrated_target in hydrated_targets
+                dep.spec
+                for hydrated_target in hydrated_targets
+                for dep in hydrated_target.adaptor.dependencies
             )
 
     with options.line_oriented(console) as print_stdout:
