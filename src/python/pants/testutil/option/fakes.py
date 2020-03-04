@@ -3,7 +3,7 @@
 
 from collections import defaultdict
 
-from pants.option.global_options import GlobalOptionsRegistrar
+from pants.option.global_options import GlobalOptions
 from pants.option.option_util import is_list_option
 from pants.option.parser import Parser
 from pants.option.parser_hierarchy import enclosing_scope
@@ -179,11 +179,11 @@ def create_options_for_optionables(
     # TODO: This sequence is a bit repetitive of the real registration sequence.
 
     # Register bootstrap options and grab their default values for use in subsequent registration.
-    GlobalOptionsRegistrar.register_bootstrap_options(register_func(GLOBAL_SCOPE))
+    GlobalOptions.register_bootstrap_options(register_func(GLOBAL_SCOPE))
     bootstrap_option_values = _FakeOptionValues(all_options[GLOBAL_SCOPE].copy())
 
     # Now register the full global scope options.
-    GlobalOptionsRegistrar.register_options(register_func(GLOBAL_SCOPE))
+    GlobalOptions.register_options(register_func(GLOBAL_SCOPE))
 
     for optionable in optionables:
         optionable.register_options(register_func(optionable.options_scope))

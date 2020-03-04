@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 from typing import Any, Dict, Iterator, List, Set, Type
 
-from pants.option.global_options import GlobalOptionsRegistrar
+from pants.option.global_options import GlobalOptions
 from pants.option.parser_hierarchy import enclosing_scope
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
@@ -75,9 +75,9 @@ class ScopeInfoIterator:
         for scope_info in scope_infos:
             yield scope_info
             if scope_info.optionable_cls is not None:
-                # We don't currently subclass GlobalOptionsRegistrar, and I can't think of any reason why
+                # We don't currently subclass GlobalOptions, and I can't think of any reason why
                 # we would, but might as well be robust.
-                if issubclass(scope_info.optionable_cls, GlobalOptionsRegistrar):
+                if issubclass(scope_info.optionable_cls, GlobalOptions):
                     # We were asked for global help, so also yield for all global subsystems.
                     for scope, info in self.scope_to_info.items():
                         if (

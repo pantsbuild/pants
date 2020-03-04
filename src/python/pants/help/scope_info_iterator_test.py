@@ -4,7 +4,7 @@
 import unittest
 
 from pants.help.scope_info_iterator import ScopeInfoIterator
-from pants.option.global_options import GlobalOptionsRegistrar
+from pants.option.global_options import GlobalOptions
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.subsystem.subsystem import Subsystem
 from pants.subsystem.subsystem_client_mixin import SubsystemDependency
@@ -33,7 +33,7 @@ class ScopeInfoIteratorTest(unittest.TestCase):
                 return (SubsystemDependency(Subsys1, "goal1.task12"),)
 
         infos = [
-            ScopeInfo(GLOBAL_SCOPE, ScopeInfo.GLOBAL, GlobalOptionsRegistrar),
+            ScopeInfo(GLOBAL_SCOPE, ScopeInfo.GLOBAL, GlobalOptions),
             ScopeInfo("subsys2", ScopeInfo.SUBSYSTEM, Subsys2),
             ScopeInfo("subsys1.subsys2", ScopeInfo.SUBSYSTEM, Subsys1),
             ScopeInfo("goal1", ScopeInfo.INTERMEDIATE),

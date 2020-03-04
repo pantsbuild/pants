@@ -45,7 +45,7 @@ from pants.engine.parser import HydratedStruct
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.option.global_options import (
-    GlobalOptionsRegistrar,
+    GlobalOptions,
     GlobMatchErrorBehavior,
     OwnersNotFoundBehavior,
 )
@@ -809,7 +809,7 @@ async def sources_snapshots_from_filesystem_specs(
 
 @rule
 async def addresses_with_origins_from_filesystem_specs(
-    filesystem_specs: FilesystemSpecs, global_options: GlobalOptionsRegistrar,
+    filesystem_specs: FilesystemSpecs, global_options: GlobalOptions,
 ) -> AddressesWithOrigins:
     """Find the owner(s) for each FilesystemSpec while preserving the original FilesystemSpec those
     owners come from.

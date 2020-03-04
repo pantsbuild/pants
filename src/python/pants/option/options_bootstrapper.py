@@ -12,7 +12,7 @@ from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple
 from pants.base.build_environment import get_default_pants_config_file
 from pants.option.config import Config
 from pants.option.custom_types import ListValueComponent
-from pants.option.global_options import GlobalOptionsRegistrar
+from pants.option.global_options import GlobalOptions
 from pants.option.optionable import Optionable
 from pants.option.options import Options
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
@@ -97,17 +97,14 @@ class OptionsBootstrapper:
         env: Mapping[str, str], args: Sequence[str], config: Config
     ) -> Options:
         bootstrap_options = Options.create(
-            env=env,
-            config=config,
-            known_scope_infos=[GlobalOptionsRegistrar.get_scope_info()],
-            args=args,
+            env=env, config=config, known_scope_infos=[GlobalOptions.get_scope_info()], args=args,
         )
 
         def register_global(*args, **kwargs):
             ## Only use of Options.register?
             bootstrap_options.register(GLOBAL_SCOPE, *args, **kwargs)
 
-        GlobalOptionsRegistrar.register_bootstrap_options(register_global)
+        GlobalOptions.register_bootstrap_options(register_global)
         opts = bootstrap_options.for_global_scope()
         if opts.v2 and not opts.v1 and opts.backend_packages == []:
             is_v2_exclusive.set()
@@ -147,7 +144,7 @@ class OptionsBootstrapper:
                 elif kwargs.get("type") == bool:
                     flags.add(f"--no-{arg[2:]}")
 
-        GlobalOptionsRegistrar.register_bootstrap_options(capture_the_flags)
+        GlobalOptions.register_bootstrap_options(capture_the_flags)
 
         def is_bootstrap_option(arg: str) -> bool:
             components = arg.split("=", 1)

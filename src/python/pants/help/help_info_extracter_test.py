@@ -6,7 +6,7 @@ from enum import Enum
 
 from pants.help.help_info_extracter import HelpInfoExtracter
 from pants.option.config import Config
-from pants.option.global_options import GlobalOptionsRegistrar
+from pants.option.global_options import GlobalOptions
 from pants.option.option_tracker import OptionTracker
 from pants.option.parser import Parser
 
@@ -99,7 +99,7 @@ class HelpInfoExtracterTest(unittest.TestCase):
             parser = Parser(
                 env={},
                 config=Config.load([]),
-                scope_info=GlobalOptionsRegistrar.get_scope_info(),
+                scope_info=GlobalOptions.get_scope_info(),
                 parent_parser=None,
                 option_tracker=OptionTracker(),
             )
