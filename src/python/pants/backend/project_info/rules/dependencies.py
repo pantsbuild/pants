@@ -34,7 +34,6 @@ class DependenciesOptions(LineOriented, GoalSubsystem):
             type=bool,
             help="Run dependencies against transitive dependencies of targets specified on the command line.",
         )
-        # TODO(#8762): Wire this up. Currently we only support `internal`.
         register(
             "--type",
             type=DependencyType,
@@ -63,28 +62,33 @@ async def dependencies(
     else:
         hydrated_targets = await Get[HydratedTargets](Addresses, addresses)
 
+    should_include_third_party = options.values.type in [
+        DependencyType.THIRD_PARTY,
+        DependencyType.SOURCE_AND_THIRD_PARTY,
+    ]
+    should_include_source = options.values.type in [
+        DependencyType.SOURCE,
+        DependencyType.SOURCE_AND_THIRD_PARTY,
+    ]
+
     for target in hydrated_targets:
-        address_string = target.address.spec
-        if address_string.startswith("3rdparty"):
+        if should_include_third_party:
             if isinstance(target.adaptor, PythonRequirementLibraryAdaptor):
                 third_party_requirements.update(
                     str(requirement.requirement) for requirement in target.adaptor.requirements
                 )
-            # TODO: Support jvm third party deps when there is some sort of JarLibraryAdaptor.
-        else:
+                # TODO(#8762): Support jvm third party deps when there is some sort of JarLibraryAdaptor.
+        if should_include_source:
             address_strings.update(
-                hydrated_target.address.spec for hydrated_target in hydrated_targets
+                hydrated_target.adaptor.address.spec for hydrated_target in hydrated_targets
             )
 
-    if options.values.type in [DependencyType.SOURCE, DependencyType.SOURCE_AND_THIRD_PARTY]:
-        with options.line_oriented(console) as print_stdout:
-            for address in sorted(address_strings):
-                print_stdout(address)
+    with options.line_oriented(console) as print_stdout:
+        for address in sorted(address_strings):
+            print_stdout(address)
+        for requirement_string in sorted(third_party_requirements):
+            print_stdout(requirement_string)
 
-    if options.values.type in [DependencyType.THIRD_PARTY, DependencyType.SOURCE_AND_THIRD_PARTY]:
-        with options.line_oriented(console) as print_stdout:
-            for requirement_string in sorted(third_party_requirements):
-                print_stdout(requirement_string)
     return Dependencies(exit_code=0)
 
 
