@@ -76,7 +76,7 @@ class PexInterpreterConstraints:
             constraint
             for target_adaptor in adaptors
             for constraint in python_setup.compatibility_or_constraints(
-                getattr(target_adaptor, "compatibility", None)
+                target_adaptor.compatibility
             )
             if isinstance(target_adaptor, PythonTargetAdaptor)
         }
