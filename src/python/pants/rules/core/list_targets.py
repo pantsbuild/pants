@@ -1,12 +1,12 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Optional, Union, cast
+from typing import Union
 
 from pants.engine.addressable import Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
-from pants.engine.legacy.graph import HydratedTarget, HydratedTargets
+from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get
 
@@ -60,10 +60,9 @@ async def list_targets(console: Console, list_options: ListOptions, addresses: A
                 push_db_basedir=lambda adaptor: adaptor.provides.repo.push_db_basedir,
             )
 
-            def print_provides(column_extractors, target: HydratedTarget) -> Optional[str]:
-                if not hasattr(target.adaptor, "provides"):
-                    return None
-                return " ".join(extractor(target.adaptor) for extractor in column_extractors)
+            def print_provides(column_extractors, target):
+                if getattr(target.adaptor, "provides", None):
+                    return " ".join(extractor(target.adaptor) for extractor in column_extractors)
 
             try:
                 column_extractors = [extractors[col] for col in (provides_columns.split(","))]
@@ -76,7 +75,7 @@ async def list_targets(console: Console, list_options: ListOptions, addresses: A
             print_fn = lambda target: print_provides(column_extractors, target)
         else:
 
-            def print_documented(target: HydratedTarget):
+            def print_documented(target):
                 description = getattr(target.adaptor, "description", None)
                 if description:
                     return "{0}\n  {1}".format(
@@ -87,7 +86,7 @@ async def list_targets(console: Console, list_options: ListOptions, addresses: A
     else:
         # Otherwise, we can use only addresses.
         collection = addresses
-        print_fn = lambda address: cast(str, address.spec)
+        print_fn = lambda address: address.spec
 
     with list_options.line_oriented(console) as print_stdout:
         if not collection.dependencies:
