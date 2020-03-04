@@ -25,11 +25,17 @@ from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.rules import rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.python.python_setup import PythonSetup
+from pants.util.meta import frozen_after_init
+from pants.util.ordered_set import FrozenOrderedSet
 
 
-@dataclass(frozen=True)
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class PexRequirements:
-    requirements: Tuple[str, ...] = ()
+    requirements: FrozenOrderedSet[str]
+
+    def __init__(self, requirements: Optional[Iterable[str]] = None) -> None:
+        self.requirements = FrozenOrderedSet(sorted(requirements or ()))
 
     @classmethod
     def create_from_adaptors(
@@ -45,7 +51,7 @@ class PexRequirements:
                 for py_req in maybe_python_req_lib.requirements:
                     all_target_requirements.add(str(py_req.requirement))
         all_target_requirements.update(additional_requirements)
-        return PexRequirements(requirements=tuple(sorted(all_target_requirements)))
+        return PexRequirements(all_target_requirements)
 
 
 @dataclass(frozen=True)

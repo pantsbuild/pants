@@ -77,7 +77,7 @@ async def setup_lambdex(lambdex: Lambdex) -> LambdexSetup:
     requirements_pex = await Get[Pex](
         CreatePex(
             output_filename="lambdex.pex",
-            requirements=PexRequirements(requirements=tuple(lambdex.get_requirement_specs())),
+            requirements=PexRequirements(lambdex.get_requirement_specs()),
             interpreter_constraints=PexInterpreterConstraints(
                 constraint_set=tuple(lambdex.default_interpreter_constraints)
             ),

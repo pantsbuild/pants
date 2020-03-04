@@ -81,7 +81,7 @@ async def lint(
     requirements_pex = await Get[Pex](
         CreatePex(
             output_filename="pylint.pex",
-            requirements=PexRequirements(requirements=tuple(pylint.get_requirement_specs())),
+            requirements=PexRequirements(pylint.get_requirement_specs()),
             interpreter_constraints=interpreter_constraints,
             entry_point=pylint.get_entry_point(),
         )

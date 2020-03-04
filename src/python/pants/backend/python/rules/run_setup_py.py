@@ -657,7 +657,7 @@ async def setup_setuptools(setuptools: Setuptools) -> SetuptoolsSetup:
     requirements_pex = await Get[Pex](
         CreatePex(
             output_filename="setuptools.pex",
-            requirements=PexRequirements(requirements=tuple(setuptools.get_requirement_specs())),
+            requirements=PexRequirements(setuptools.get_requirement_specs()),
             interpreter_constraints=PexInterpreterConstraints(
                 constraint_set=tuple(setuptools.default_interpreter_constraints)
             ),

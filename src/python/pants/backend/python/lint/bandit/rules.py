@@ -66,7 +66,7 @@ async def lint(
     requirements_pex = await Get[Pex](
         CreatePex(
             output_filename="bandit.pex",
-            requirements=PexRequirements(requirements=tuple(bandit.get_requirement_specs())),
+            requirements=PexRequirements(bandit.get_requirement_specs()),
             interpreter_constraints=interpreter_constraints,
             entry_point=bandit.get_entry_point(),
         )

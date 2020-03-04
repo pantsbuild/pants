@@ -77,7 +77,7 @@ async def setup(
     requirements_pex = await Get[Pex](
         CreatePex(
             output_filename="isort.pex",
-            requirements=PexRequirements(requirements=tuple(isort.get_requirement_specs())),
+            requirements=PexRequirements(isort.get_requirement_specs()),
             interpreter_constraints=PexInterpreterConstraints(
                 constraint_set=tuple(isort.default_interpreter_constraints)
             ),
