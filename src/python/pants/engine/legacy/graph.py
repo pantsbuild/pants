@@ -373,7 +373,7 @@ class HydratedTarget:
     on their target type (i.e. unions).
 
     Transitive graph walks collect ordered sets of TransitiveHydratedTargets which involve a huge
-    amount of hashing: we implement eq/hash via a private Address field to speed that up.
+    amount of hashing: we implement a custom eq/hash to speed that up.
     """
 
     adaptor: TargetAdaptor
@@ -384,22 +384,20 @@ class HydratedTarget:
         # graph walks. Directly accessing this field, rather than using `adaptor.address` is about
         # 10x faster. However, rules should still use `adaptor.address` for clarity and because
         # they do not need to access the address as frequently, so it would be an over-optimization
-        # (we're talking about 0.000_000_1 vs. 0.000_001 seconds here).
+        # (we're talking about 10^-7 vs. 10^-6 seconds here).
         self._address = adaptor.address
 
     def __hash__(self):
-        return hash(self._address)
+        return hash((self._address, self.adaptor))
 
     def __eq__(self, other):
         if not isinstance(other, HydratedTarget):
             return NotImplemented
-        # NB: It's an anti-pattern for `__hash__` to be implemented differently than `__eq__`. We
-        # must use this more rigorous `__eq__`, however, to ensure that we don't reuse stale LMDB
-        # cache entries when target values change across Pants runs (e.g. a user changing the
-        # `compatibility` field). It would be more correct for `__hash__` to use this more rigorous
-        # comparison of all fields, rather than only the address, but we keep it's looser
-        # implementation as an important performance hack.
-        return (self._address, self.adaptor) == (other._address, other.adaptor)
+        # NB: This short-circuiting is essential. Without it, constructing the build graph for the
+        # Pants repository takes 71 seconds compared to 4.3 seconds!
+        if self._address != other._address:
+            return False
+        return self.adaptor == other.adaptor
 
 
 class HydratedTargets(Collection[HydratedTarget]):
@@ -425,21 +423,10 @@ class TransitiveHydratedTargets:
 @dataclass(frozen=True)
 class LegacyHydratedTarget:
     """A rip on HydratedTarget for the purpose of V1, which must use BuildFileAddress rather than
-    Address.
-
-    NB: See HydratedTarget for why we override `__hash__` and `__eq__`.
-    """
+    Address."""
 
     build_file_address: BuildFileAddress
     adaptor: TargetAdaptor
-
-    def __hash__(self):
-        return hash(self.build_file_address)
-
-    def __eq__(self, other):
-        if not isinstance(other, LegacyHydratedTarget):
-            return NotImplemented
-        return (self.build_file_address, self.adaptor) == (other.build_file_address, other.adaptor)
 
     @staticmethod
     def from_hydrated_target(ht: HydratedTarget, bfa: BuildFileAddress) -> "LegacyHydratedTarget":
