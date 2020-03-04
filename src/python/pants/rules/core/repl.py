@@ -86,7 +86,7 @@ async def run_repl(
 
     repl_binary = await Get[ReplBinary](ReplImplementation, repl_implementation(addresses))
 
-    with temporary_dir(root_dir=global_options.pants_workdir, cleanup=False) as tmpdir:
+    with temporary_dir(root_dir=global_options.options.pants_workdir, cleanup=False) as tmpdir:
         path_relative_to_build_root = PurePath(tmpdir).relative_to(build_root.path).as_posix()
         workspace.materialize_directory(
             DirectoryToMaterialize(repl_binary.digest, path_prefix=path_relative_to_build_root)

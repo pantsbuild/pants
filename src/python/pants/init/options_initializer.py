@@ -15,7 +15,7 @@ from pants.goal.goal import Goal
 from pants.init.extension_loader import load_backends_and_plugins
 from pants.init.global_subsystems import GlobalSubsystems
 from pants.init.plugin_resolver import PluginResolver
-from pants.option.global_options import GlobalOptionsRegistrar
+from pants.option.global_options import GlobalOptions
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import fast_relpath_optional
 
@@ -86,7 +86,7 @@ class OptionsInitializer:
         # Gather the optionables that are not scoped to any other.  All known scopes are reachable
         # via these optionables' known_scope_infos() methods.
         top_level_optionables = (
-            {GlobalOptionsRegistrar}
+            {GlobalOptions}
             | GlobalSubsystems.get()
             | build_configuration.optionables()
             | set(Goal.get_optionables())
@@ -160,7 +160,7 @@ class OptionsInitializer:
         # Parse and register options.
         options = cls._construct_options(options_bootstrapper, build_configuration)
 
-        GlobalOptionsRegistrar.validate_instance(options.for_global_scope())
+        GlobalOptions.validate_instance(options.for_global_scope())
 
         if init_subsystems:
             Subsystem.set_options(options)

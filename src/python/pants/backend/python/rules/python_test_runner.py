@@ -206,8 +206,7 @@ async def run_python_test(
     test_options: TestOptions,
 ) -> TestResult:
     """Runs pytest for one target."""
-    colors = global_options.colors
-    env = {"PYTEST_ADDOPTS": f"--color={'yes' if colors else 'no'}"}
+    env = {"PYTEST_ADDOPTS": f"--color={'yes' if global_options.options.colors else 'no'}"}
     run_coverage = test_options.values.run_coverage
     request = test_setup.test_runner_pex.create_execute_request(
         python_setup=python_setup,

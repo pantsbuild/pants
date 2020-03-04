@@ -833,7 +833,7 @@ async def addresses_with_origins_from_filesystem_specs(
         filesystem_specs.includes, snapshot_per_include, owners_per_include
     ):
         if (
-            global_options.owners_not_found_behavior != OwnersNotFoundBehavior.ignore
+            global_options.options.owners_not_found_behavior != OwnersNotFoundBehavior.ignore
             and isinstance(spec, FilesystemLiteralSpec)
             and not owners.addresses
         ):
@@ -843,7 +843,7 @@ async def addresses_with_origins_from_filesystem_specs(
                 f"that there is a BUILD file in `{file_path.parent}` with a target whose `sources` field "
                 f"includes `{file_path}`. See https://www.pantsbuild.org/build_files.html."
             )
-            if global_options.owners_not_found_behavior == OwnersNotFoundBehavior.warn:
+            if global_options.options.owners_not_found_behavior == OwnersNotFoundBehavior.warn:
                 logger.warning(msg)
             else:
                 raise ResolveError(msg)
