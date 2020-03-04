@@ -275,6 +275,4 @@ class JvmPlatformTest(TestBase):
 
     def test_incompatible_source_target_level_raises_error(self):
         with self.assertRaises(JvmPlatformSettings.IllegalSourceTargetCombination):
-            JvmPlatformSettings(
-                source_level="11", target_level="9", args=[], jvm_options=[]
-            )
+            JvmPlatformSettings(source_level="11", target_level="9", args=[], jvm_options=[])
