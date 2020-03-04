@@ -2,9 +2,18 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import unittest
+from functools import partial
 from typing import List
 
-from pants.util.collections import assert_single_element, factory_dict, recursively_update
+import pytest
+
+from pants.util.collections import (
+    assert_single_element,
+    ensure_list,
+    ensure_str_list,
+    factory_dict,
+    recursively_update,
+)
 
 
 class TestCollections(unittest.TestCase):
@@ -53,3 +62,38 @@ class TestCollections(unittest.TestCase):
             assert_single_element(too_many_elements)
         expected_msg = "iterable [1, 2] has more than one element."
         self.assertEqual(expected_msg, str(cm.exception))
+
+    def test_ensure_list(self) -> None:
+        # Single elements should be converted to a one-element list
+        assert ensure_list(0, expected_type=int) == [0]
+        assert ensure_list(True, expected_type=bool) == [True]
+        arbitrary_object = object()
+        assert ensure_list(arbitrary_object, expected_type=object) == [arbitrary_object]
+
+        ensure_int_list = partial(ensure_list, expected_type=int)
+
+        # Keep lists as lists
+        assert ensure_int_list([]) == []
+        assert ensure_int_list([0]) == [0]
+        assert ensure_int_list([0, 1, 2]) == [0, 1, 2]
+
+        # Convert other iterable types to a list
+        assert ensure_int_list((0,)) == [0]
+        assert ensure_int_list({0}) == [0]
+        assert ensure_int_list({0: "hello"}) == [0]
+
+        # Perform runtime type checks
+        with pytest.raises(ValueError):
+            ensure_int_list("bad")
+        with pytest.raises(ValueError):
+            ensure_int_list(0.0)
+        with pytest.raises(ValueError):
+            ensure_int_list([0, 1, "sneaky", 2, 3])
+
+    def test_ensure_str_list(self) -> None:
+        assert ensure_str_list("hello") == ["hello"]
+        assert ensure_str_list(["hello", "there"]) == ["hello", "there"]
+        with pytest.raises(ValueError):
+            ensure_str_list(0)  # type: ignore[arg-type]
+        with pytest.raises(ValueError):
+            ensure_str_list([0, 1])  # type: ignore[list-item]
