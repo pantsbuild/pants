@@ -6,13 +6,12 @@ import re
 from contextlib import contextmanager
 from textwrap import dedent
 
-from twitter.common.collections import maybe_list
-
 from pants.backend.jvm.targets.java_agent import JavaAgent
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.jar_task import JarBuilderTask, JarTask
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.testutil.jvm.jar_task_test_base import JarTaskTestBase
+from pants.util.collections import ensure_str_list
 from pants.util.contextutil import open_zip, temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_open, safe_rmtree
 
@@ -173,7 +172,7 @@ class JarTaskTest(BaseJarTaskTest):
                     + "Class-Path: {}\r\n"
                     + "Created-By: org.pantsbuild.tools.jar.JarBuilder\r\n\r\n"
                 )
-                .format(" ".join(maybe_list(classpath)))
+                .format(" ".join(ensure_str_list(classpath)))
                 .encode()
             )
 

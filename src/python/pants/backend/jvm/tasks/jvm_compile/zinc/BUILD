@@ -3,7 +3,6 @@
 
 python_library(
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/jvm/subsystems:java',
     'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/backend/jvm/subsystems:scala_platform',

@@ -3,13 +3,12 @@
 
 import logging
 
-from twitter.common.collections import maybe_list
-
 from pants.backend.python.targets.import_wheels_mixin import ImportWheelsMixin
 from pants.base.deprecated import deprecated_conditional
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.build_graph.target import Target
+from pants.util.collections import ensure_str_list
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +79,7 @@ class UnpackedWheels(ImportWheelsMixin, Target):
                 "module_name": PrimitiveField(module_name),
                 "include_patterns": PrimitiveField(include_patterns or ()),
                 "exclude_patterns": PrimitiveField(exclude_patterns or ()),
-                "compatibility": PrimitiveField(maybe_list(compatibility or ())),
+                "compatibility": PrimitiveField(ensure_str_list(compatibility or ())),
                 "within_data_subdir": PrimitiveField(within_data_subdir),
                 # TODO: consider supporting transitive deps like UnpackedJars!
                 # TODO: consider supporting `platforms` as in PythonBinary!

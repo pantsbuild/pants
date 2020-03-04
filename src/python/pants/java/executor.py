@@ -8,8 +8,7 @@ import sys
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 
-from twitter.common.collections import maybe_list
-
+from pants.util.collections import ensure_str_list
 from pants.util.contextutil import environment_as
 
 logger = logging.getLogger(__name__)
@@ -23,11 +22,11 @@ class Executor(ABC):
 
     @staticmethod
     def _scrub_args(classpath, main, jvm_options, args):
-        classpath = maybe_list(classpath)
+        classpath = ensure_str_list(classpath)
         if not isinstance(main, str) or not main:
             raise ValueError("A non-empty main classname is required, given: {}".format(main))
-        jvm_options = maybe_list(jvm_options or ())
-        args = maybe_list(args or ())
+        jvm_options = ensure_str_list(jvm_options or ())
+        args = ensure_str_list(args or ())
         return classpath, main, jvm_options, args
 
     class Error(Exception):

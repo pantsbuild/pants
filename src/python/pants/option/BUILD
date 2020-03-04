@@ -10,7 +10,6 @@ python_library(
     '3rdparty/python:setuptools',
     '3rdparty/python:toml',
     '3rdparty/python:typing-extensions',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:deprecated',
     'src/python/pants/base:hash_utils',

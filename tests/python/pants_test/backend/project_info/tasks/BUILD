@@ -77,7 +77,6 @@ python_tests(
   name = 'export_integration',
   sources = ['test_export_integration.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     'examples/src/java/org/pantsbuild/example:hello_directory',
     'examples/src/scala/org/pantsbuild/example:scala_with_java_sources_directory',
     'examples/tests/java/org/pantsbuild/example:usethrift_directory',
@@ -85,6 +84,7 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/ivy',
     'src/python/pants/java/distribution',
+    'src/python/pants/util:collections',
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil/subsystem',
     'src/python/pants/testutil:int-test',

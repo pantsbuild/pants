@@ -363,7 +363,6 @@ python_library(
   name = 'jar_task',
   sources = ['jar_task.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     ':classpath_util',
     ':nailgun_task',
     'src/python/pants/backend/jvm:argfile',
@@ -431,7 +430,6 @@ python_library(
   name = 'jvm_binary_task',
   sources = ['jvm_binary_task.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     ':classpath_products',
     ':jar_task',
     'src/python/pants/backend/jvm/subsystems:shader',
@@ -442,6 +440,7 @@ python_library(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:fileutil',
     'src/python/pants/util:memo',
+    'src/python/pants/util:ordered_set',
   ],
   tags = {"partially_type_checked"},
 )

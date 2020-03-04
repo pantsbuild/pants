@@ -3,7 +3,6 @@
 
 python_library(
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_environment',
     'src/python/pants/java/distribution',
     'src/python/pants/java:executor',
@@ -11,6 +10,7 @@ python_library(
     'src/python/pants/net',
     'src/python/pants/process',
     'src/python/pants/subsystem',
+    'src/python/pants/util:collections',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
   ],

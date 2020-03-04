@@ -147,7 +147,6 @@ python_library(
   name='nodes',
   sources=['nodes.py'],
   dependencies=[
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:dataclasses',
     ':addressable',
     ':fs',
@@ -216,7 +215,6 @@ python_library(
   name='scheduler',
   sources=['scheduler.py'],
   dependencies=[
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:dataclasses',
     ':fs',
     ':isolated_process',

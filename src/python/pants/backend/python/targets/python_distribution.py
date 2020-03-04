@@ -1,12 +1,11 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from twitter.common.collections import maybe_list
-
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
+from pants.util.collections import ensure_str_list
 
 
 class PythonDistribution(PythonTarget):
@@ -40,7 +39,9 @@ class PythonDistribution(PythonTarget):
             )
 
         payload = payload or Payload()
-        payload.add_fields({"setup_requires": PrimitiveField(maybe_list(setup_requires or ()))})
+        payload.add_fields(
+            {"setup_requires": PrimitiveField(ensure_str_list(setup_requires or ()))}
+        )
         super().__init__(address=address, payload=payload, sources=sources, **kwargs)
 
     @property

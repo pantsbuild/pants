@@ -3,7 +3,6 @@
 
 
 from pex.interpreter import PythonIdentity
-from twitter.common.collections import maybe_list
 
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.base.exceptions import TargetDefinitionException
@@ -12,6 +11,7 @@ from pants.base.payload_field import PrimitiveField
 from pants.build_graph.address import Address
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
+from pants.util.collections import ensure_str_list
 
 
 class PythonTarget(Target):
@@ -49,7 +49,7 @@ class PythonTarget(Target):
             {
                 "sources": self.create_sources_field(sources, address.spec_path, key_arg="sources"),
                 "provides": provides,
-                "compatibility": PrimitiveField(maybe_list(compatibility or ())),
+                "compatibility": PrimitiveField(ensure_str_list(compatibility or ())),
             }
         )
         super().__init__(address=address, payload=payload, **kwargs)

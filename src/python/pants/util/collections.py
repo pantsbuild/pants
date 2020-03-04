@@ -2,7 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import collections
-from typing import Callable, DefaultDict, Iterable, MutableMapping, TypeVar
+import collections.abc
+from typing import Any, Callable, DefaultDict, Iterable, List, MutableMapping, Type, TypeVar, Union
 
 _K = TypeVar("_K")
 _V = TypeVar("_V")
@@ -64,3 +65,32 @@ def assert_single_element(iterable: Iterable[_T]) -> _T:
         return first_item
 
     raise ValueError(f"iterable {iterable!r} has more than one element.")
+
+
+def ensure_list(val: Union[Any, Iterable[Any]], *, expected_type: Type[_T]) -> List[_T]:
+    """Given either a single value or an iterable of values, always return a list.
+
+    This performs runtime type checking to ensure that every element of the list is the expected
+    type.
+    """
+    if isinstance(val, expected_type):
+        return [val]
+    if not isinstance(val, collections.abc.Iterable):
+        raise ValueError(
+            f"The value {val} (type {type(val)}) did not have the expected type {expected_type} "
+            "nor was it an iterable."
+        )
+    result: List[_T] = []
+    for i, x in enumerate(val):
+        if not isinstance(x, expected_type):
+            raise ValueError(
+                f"Not all elements of the iterable have type {expected_type}. Encountered the "
+                f"element {x} of type {type(x)} at index {i}."
+            )
+        result.append(x)
+    return result
+
+
+def ensure_str_list(val: Union[str, Iterable[str]]) -> List[str]:
+    """Given either a single string or an iterable of strings, always return a list."""
+    return ensure_list(val, expected_type=str)
