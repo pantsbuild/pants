@@ -4,8 +4,6 @@
 import os
 from contextlib import contextmanager
 
-from twitter.common.collections.orderedset import OrderedSet
-
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.jar_task import JarBuilderTask
@@ -15,6 +13,7 @@ from pants.java.util import execute_runner
 from pants.util.contextutil import temporary_dir
 from pants.util.fileutil import atomic_copy
 from pants.util.memo import memoized_property
+from pants.util.ordered_set import OrderedSet
 
 
 class JvmBinaryTask(JarBuilderTask):
