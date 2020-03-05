@@ -200,7 +200,7 @@ class JavascriptStyleBase(NodeTask):
                     bootstrap_dir,
                     files,
                     config=ESLint.global_instance().options.config,
-                    ignore_path=ESLint.global_instance().options.file,
+                    ignore_path=ESLint.global_instance().options.ignore,
                 )
                 if result_code != 0:
                     if self.get_options().fail_slow:
