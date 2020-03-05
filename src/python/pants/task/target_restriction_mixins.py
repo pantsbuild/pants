@@ -118,6 +118,10 @@ class SkipOptionRegistrar:
         )
 
 
+class HasSkipGoalOptionMixin(GoalOptionsMixin, HasSkipOptionMixin):
+    """A mixin for tasks that have a --skip option registered at the goal level."""
+
+
 class HasSkipAndTransitiveOptionsMixin(HasSkipOptionMixin, HasTransitiveOptionMixin):
     """A mixin for tasks that have a --transitive and a --skip option."""
 

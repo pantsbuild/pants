@@ -3,11 +3,11 @@
 
 from pants.task.target_restriction_mixins import (
     DeprecatedSkipGoalOptionsRegistrar,
-    HasSkipOptionMixin,
+    HasSkipGoalOptionMixin,
 )
 
 
-class LintTaskMixin(HasSkipOptionMixin):
+class LintTaskMixin(HasSkipGoalOptionMixin):
     """A mixin to combine with lint tasks."""
 
     goal_options_registrar_cls = DeprecatedSkipGoalOptionsRegistrar

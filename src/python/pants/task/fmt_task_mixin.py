@@ -3,7 +3,7 @@
 
 from pants.task.target_restriction_mixins import (
     DeprecatedSkipGoalOptionsRegistrar,
-    HasSkipOptionMixin,
+    HasSkipGoalOptionMixin,
 )
 
 
@@ -22,7 +22,7 @@ class FmtGoalRegistrar(DeprecatedSkipGoalOptionsRegistrar):
         )
 
 
-class FmtTaskMixin(HasSkipOptionMixin):
+class FmtTaskMixin(HasSkipGoalOptionMixin):
     """A mixin to combine with code formatting tasks."""
 
     goal_options_registrar_cls = FmtGoalRegistrar
