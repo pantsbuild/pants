@@ -42,14 +42,15 @@ class Flake8IntegrationTest(TestBase):
         origin: Optional[OriginSpec] = None,
     ) -> PythonTargetAdaptorWithOrigin:
         input_snapshot = self.request_single_product(Snapshot, InputFilesContent(source_files))
-        adaptor = PythonTargetAdaptor(
+        adaptor_kwargs = dict(
             sources=EagerFilesetWithSpec("test", {"globs": []}, snapshot=input_snapshot),
             address=Address.parse("test:target"),
-            compatibility=[interpreter_constraints] if interpreter_constraints else None,
         )
+        if interpreter_constraints:
+            adaptor_kwargs["compatibility"] = interpreter_constraints
         if origin is None:
             origin = SingleAddress(directory="test", name="target")
-        return PythonTargetAdaptorWithOrigin(adaptor, origin)
+        return PythonTargetAdaptorWithOrigin(PythonTargetAdaptor(**adaptor_kwargs), origin)
 
     def run_flake8(
         self,
