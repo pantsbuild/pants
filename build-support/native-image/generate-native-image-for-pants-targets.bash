@@ -164,7 +164,7 @@ function generate_template_macro_deps_target {
 function add_macro_deps_to_generated_target {
   # NB: dump dependencies to a file, then run `./pants list` to normalize them!
   cat >.tmp-deps
-  ./pants --target-spec-file=.tmp-deps list | sort -u >.tmp-normalized-deps || return "$?"
+  ./pants --spec-file=.tmp-deps list | sort -u >.tmp-normalized-deps || return "$?"
   if [[ -f "$GENERATED_BUILD_FILE" ]]; then
     # If the generated BUILD file exists already, pull down buildozer to idempotently add the new
     # deps!

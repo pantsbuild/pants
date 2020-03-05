@@ -394,28 +394,6 @@ class GlobalOptions(Subsystem):
             help="Add these directories to PYTHONPATH to search for plugins.",
         )
         register(
-            "--target-spec-file",
-            type=list,
-            dest="spec_files",
-            daemon=False,
-            removal_version="1.27.0.dev0",
-            removal_hint="Use `--spec-file` instead. This change is in preparation for Pants "
-            "eventually allowing you to pass file names as arguments, e.g. "
-            "`./pants cloc foo.py`.",
-            help="Read additional specs from this file, one per line",
-        )
-        register(
-            "--positional-arg-file",
-            type=list,
-            dest="spec_files",
-            daemon=False,
-            removal_version="1.27.0.dev0",
-            removal_hint="Use `--spec-file` instead. This change is in preparation for Pants "
-            "eventually allowing you to pass file names as arguments, e.g. "
-            "`./pants cloc foo.py`.",
-            help="Read additional positional args from this file, one per line",
-        )
-        register(
             "--spec-file",
             type=list,
             dest="spec_files",
