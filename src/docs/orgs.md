@@ -55,7 +55,7 @@ dependees=("$(./pants dependees --dependees-transitive --dependees-closed ${chan
 minimized=("$(./pants minimize ${dependees[@]})")
 ./pants filter --filter-type=-jvm_binary ${minimized[@]} | sort > minimized.txt
 
-# In other contexts we can use --target-spec-file to read the list of targets to operate on all at
+# In other contexts we can use --spec-file to read the list of targets to operate on all at
 # once, but that would merge all the classpaths of all the test targets together, which may cause
 # errors. See https://www.pantsbuild.org/3rdparty_jvm.html#managing-transitive-dependencies.
 # TODO(#7480): Background cache activity when running in a loop can sometimes lead to race conditions which
