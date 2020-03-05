@@ -61,36 +61,31 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
             )
 
             resources(
-              name='missing-globs',
-              sources=globs('*.a'),
-            )
-
-            resources(
-              name='missing-rglobs',
-              sources=rglobs('*.a'),
-            )
-
-            resources(
-              name='missing-zglobs',
-              sources=zglobs('**/*.a'),
-            )
-          
-            resources(
               name='missing-literal-files',
               sources=[
                 'nonexistent_test_file.txt',
                 'another_nonexistent_file.txt',
               ],
             )
+
+            resources(
+              name='missing-globs',
+              sources=['*.a'],
+            )
+
+            resources(
+              name='missing-rglobs',
+              sources=['**/*.a'],
+            )
           
             resources(
               name='some-missing-some-not',
-              sources=globs('*.txt', '*.rs'),
+              sources=['*.txt', '*.rs'],
             )
     
             resources(
               name='overlapping-globs',
-              sources=globs('sources.txt', '*.txt'),
+              sources=['sources.txt', '*.txt'],
             )
             """
         )
@@ -108,9 +103,9 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
               binary=':bundle-bin',
               bundles=[
                 bundle(fileset=['a/b/file1.txt']),
-                bundle(fileset=rglobs('*.aaaa', '*.bbbb')),
-                bundle(fileset=globs('*.aaaa')),
-                bundle(fileset=zglobs('**/*.abab')),
+                bundle(fileset=['**/*.aaaa', '**/*.bbbb']),
+                bundle(fileset=['*.aaaa']),
+                bundle(fileset=['**/*.abab']),
                 bundle(fileset=['file1.aaaa', 'file2.aaaa']),
               ],
             )
@@ -123,7 +118,6 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
         target_to_unmatched_globs = {
             "missing-globs": ["*.a"],
             "missing-rglobs": ["**/*.a"],
-            "missing-zglobs": ["**/*.a"],
             "missing-literal-files": ["another_nonexistent_file.txt", "nonexistent_test_file.txt"],
         }
         with self.setup_sources_targets():

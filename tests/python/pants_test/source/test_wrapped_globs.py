@@ -10,13 +10,7 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.files import Files
 from pants.build_graph.target import Target
 from pants.engine.fs import EMPTY_SNAPSHOT
-from pants.source.wrapped_globs import (
-    EagerFilesetWithSpec,
-    Filespec,
-    Globs,
-    LazyFilesetWithSpec,
-    RGlobs,
-)
+from pants.source.wrapped_globs import EagerFilesetWithSpec, Filespec, Globs, LazyFilesetWithSpec
 from pants.testutil.test_base import TestBase
 
 
@@ -33,8 +27,7 @@ class FilesetRelPathWrapperTest(TestBase):
     @classmethod
     def alias_groups(cls):
         return BuildFileAliases(
-            targets={"dummy_target": DummyTarget,},
-            context_aware_object_factories={"globs": Globs, "rglobs": RGlobs,},
+            targets={"dummy_target": DummyTarget}, context_aware_object_factories={"globs": Globs},
         )
 
     def setUp(self) -> None:
@@ -72,24 +65,6 @@ class FilesetRelPathWrapperTest(TestBase):
 
     def test_glob_to_spec_list(self) -> None:
         self._spec_test('["fleem.java", "morx.java"]', {"globs": ["y/fleem.java", "y/morx.java"]})
-
-    def test_rglob_to_spec_one(self) -> None:
-        self._spec_test('rglobs("fleem.java")', {"globs": ["y/fleem.java"]})
-
-    def test_rglob_to_spec_simple(self) -> None:
-        self._spec_test('rglobs("*.java")', {"globs": ["y/**/*.java"]})
-
-    def test_rglob_to_spec_multi(self) -> None:
-        self._spec_test('rglobs("a/**/b/*.java")', {"globs": ["y/a/**/b/**/*.java"]})
-
-    def test_rglob_to_spec_multi_more(self) -> None:
-        self._spec_test('rglobs("a/**/b/**/c/*.java")', {"globs": ["y/a/**/b/**/c/**/*.java"]})
-
-    def test_rglob_to_spec_mid(self) -> None:
-        self._spec_test('rglobs("a/**/b/Fleem.java")', {"globs": ["y/a/**/b/Fleem.java"]})
-
-    def test_rglob_to_spec_explicit(self) -> None:
-        self._spec_test('rglobs("a/**/*.java")', {"globs": ["y/a/**/*.java"]})
 
     def test_glob_exclude(self) -> None:
         self.add_to_build_file(
@@ -260,12 +235,6 @@ class FilesetRelPathWrapperTest(TestBase):
         self.add_to_build_file("y/BUILD", 'dummy_target(name="y", sources=globs("/root/?.scala"))')
         with self.assertRaises(AddressLookupError):
             self.context().scan()
-
-    def test_rglob_follows_symlinked_dirs_by_default(self) -> None:
-        self.add_to_build_file("z/w/BUILD", 'dummy_target(name="w", sources=rglobs("*.java"))')
-        graph = self.context().scan()
-        relative_sources = set(graph.get_target_from_spec("z/w").sources_relative_to_source_root())
-        self.assertEqual({"y/fleem.java", "y/morx.java", "foo.java"}, relative_sources)
 
 
 class FilesetWithSpecTest(TestBase):
