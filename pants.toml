@@ -89,8 +89,6 @@ pants_ignore.add = [
   "/build-support/bin/native/src",
 ]
 
-build_file_imports = "error"
-
 [cache]
 # Caching is on globally by default, but we disable it here for development purposes.
 # It is explicitly re-enabled below for [cache.bootstrap] only.
