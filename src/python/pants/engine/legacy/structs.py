@@ -17,6 +17,7 @@ from pants.engine.objects import Locatable, union
 from pants.engine.rules import UnionRule
 from pants.engine.struct import Struct, StructWithDeps
 from pants.source import wrapped_globs
+from pants.util.collections import ensure_str_list
 from pants.util.contextutil import exception_logging
 from pants.util.meta import classproperty
 from pants.util.objects import Exactly
@@ -309,6 +310,13 @@ class PythonTargetAdaptor(TargetAdaptor):
                 lambda _: None,
             )
             return (*field_adaptors, sources_field)
+
+    # TODO(#4535): remove this once its superseded by the target API.
+    @property
+    def compatibility(self) -> Optional[List[str]]:
+        if "compatibility" not in self._kwargs:
+            return None
+        return ensure_str_list(self._kwargs["compatibility"])
 
 
 class PythonBinaryAdaptor(PythonTargetAdaptor):

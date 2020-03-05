@@ -55,15 +55,16 @@ class PylintIntegrationTest(TestBase):
         dependencies: Optional[List[Address]] = None,
     ) -> PythonTargetAdaptorWithOrigin:
         input_snapshot = self.request_single_product(Snapshot, InputFilesContent(source_files))
-        adaptor = PythonTargetAdaptor(
+        adaptor_kwargs = dict(
             sources=EagerFilesetWithSpec(self.source_root, {"globs": []}, snapshot=input_snapshot),
             address=Address.parse(f"{self.source_root}:target"),
-            compatibility=[interpreter_constraints] if interpreter_constraints else None,
             dependencies=dependencies or [],
         )
+        if interpreter_constraints:
+            adaptor_kwargs["compatibility"] = interpreter_constraints
         if origin is None:
             origin = SingleAddress(directory=self.source_root, name="target")
-        return PythonTargetAdaptorWithOrigin(adaptor, origin)
+        return PythonTargetAdaptorWithOrigin(PythonTargetAdaptor(**adaptor_kwargs), origin)
 
     def run_pylint(
         self,

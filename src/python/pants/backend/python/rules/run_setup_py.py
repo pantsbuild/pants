@@ -295,8 +295,9 @@ async def run_setup_pys(
 
     py2 = is_python2(
         (
-            getattr(target_with_origin.target.adaptor, "compatibility", None)
+            target_with_origin.target.adaptor.compatibility
             for target_with_origin in targets_with_origins
+            if isinstance(target_with_origin.target.adaptor, PythonTargetAdaptor)
         ),
         python_setup,
     )
