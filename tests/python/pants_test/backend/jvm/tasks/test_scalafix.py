@@ -78,7 +78,6 @@ class ScalaFixIntegrationTest(PantsRunIntegrationTest):
             "fmt.scalafix": {
                 "rules": "scala:rsc.rules.RscCompat",
                 "semantic": True,
-                "transitive": True,
                 "scalafix_tool_classpath": f"{TEST_DIR}/rsc_compat:rsc-compat",
             },
         }
