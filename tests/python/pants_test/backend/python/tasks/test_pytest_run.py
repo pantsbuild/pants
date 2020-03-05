@@ -514,10 +514,6 @@ python_tests(
     def test_green(self):
         self.run_tests(targets=[self.green])
 
-    @ensure_cached(PytestRun, expected_num_artifacts=1)
-    def test_caches_greens_fast(self):
-        self.run_tests(targets=[self.green, self.green2, self.green3], fast=True)
-
     @ensure_cached(PytestRun, expected_num_artifacts=3)
     def test_cache_greens(self):
         self.run_tests(targets=[self.green, self.green2, self.green3])
@@ -529,10 +525,6 @@ python_tests(
             timeout_default=3,
         )
 
-    @ensure_cached(PytestRun, expected_num_artifacts=1)
-    def test_out_of_band_deselect_fast_success(self):
-        self.run_tests([self.green, self.red], "-kno_tests_should_match_at_all", fast=True)
-
     # NB: Both red and green are cached. Red because its skipped via deselect and so runs (noops)
     # successfully. This is OK since the -k passthru is part of the task fingerprinting.
     @ensure_cached(PytestRun, expected_num_artifacts=2)
@@ -542,15 +534,6 @@ python_tests(
     @ensure_cached(PytestRun, expected_num_artifacts=0)
     def test_red(self):
         self.run_failing_tests(targets=[self.red], failed_targets=[self.red])
-
-    @ensure_cached(PytestRun, expected_num_artifacts=0)
-    def test_fail_fast_skips_second_red_test_with_single_chroot(self):
-        self.run_failing_tests(
-            targets=[self.red, self.red_in_class],
-            failed_targets=[self.red],
-            fail_fast=True,
-            fast=True,
-        )
 
     @ensure_cached(PytestRun, expected_num_artifacts=0)
     def test_fail_fast_skips_second_red_test(self):
