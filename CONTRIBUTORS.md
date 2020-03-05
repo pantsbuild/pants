@@ -125,6 +125,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Lukasz Jastrzebski
 + Marc Abramowitz
 + Marcin Podolski
++ Marek Żarnowski
 + Marilyn Cruz
 + Marius Eriksen
 + Mark Chu-Carroll
