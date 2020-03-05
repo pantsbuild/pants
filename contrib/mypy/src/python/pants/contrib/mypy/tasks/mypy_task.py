@@ -15,7 +15,6 @@ from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks.resolve_requirements_task_base import ResolveRequirementsTaskBase
 from pants.base import hash_utils
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import resolve_conflicting_options
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.target import Target
@@ -48,16 +47,6 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
     _MYPY_COMPATIBLE_INTERPETER_CONSTRAINT = ">=3.5"
     _PYTHON_SOURCE_EXTENSION = ".py"
 
-    def _resolve_conflicting_options(self, *, old_option: str, new_option: str):
-        return resolve_conflicting_options(
-            old_option=old_option,
-            new_option=new_option,
-            old_scope="lint-mypy",
-            new_scope="mypy",
-            old_container=self.get_options(),
-            new_container=self._mypy_subsystem.options,
-        )
-
     @classmethod
     def prepare(cls, options, round_manager):
         super().prepare(options, round_manager)
@@ -68,30 +57,12 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
     @classmethod
     def register_options(cls, register):
         register(
-            "--version",
-            default="0.740",
-            help="The version of MyPy to use.",
-            removal_version="1.26.0.dev3",
-            removal_hint="Use `--mypy-version` instead and specify the full requirement string. "
-            "For example, rather than `--lint-mypy-version=0.740`, set "
-            "`--mypy-version='mypy==0.740`. This change aligns MyPy with the "
-            "Pants interface for other Python linters like isort, Black, and Flake8.",
-        )
-        register(
             "--include-requirements",
             type=bool,
             default=False,
             help="Whether to include the transitive requirements of targets being checked. This is"
             "useful if those targets depend on mypy plugins or distributions that provide "
             "type stubs that should be active in the check.",
-        )
-        register(
-            "--config-file",
-            default=None,
-            help="Path to MyPy configuration file, relative to buildroot.",
-            removal_version="1.26.0.dev3",
-            removal_hint="Use `--mypy-config` instead. This change aligns MyPy with the Pants "
-            "interface for other Python linters like isort, Black, and Flake8.",
         )
         register(
             "--whitelist-tag-name",
@@ -196,7 +167,7 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
         return MyPy.global_instance()
 
     def _get_mypy_pex(self, py3_interpreter: PythonInterpreter, *extra_pexes: PEX) -> PEX:
-        mypy_version = self._resolve_conflicting_options(old_option="version", new_option="version")
+        mypy_version = self._mypy_subsystem.options.version
         extras_hash = hash_utils.hash_all(
             hash_utils.hash_dir(Path(extra_pex.path())) for extra_pex in extra_pexes
         )
@@ -290,9 +261,7 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
             # Construct the mypy command line.
             cmd = [f"--python-version={interpreter_for_targets.identity.python}"]
 
-            config = self._resolve_conflicting_options(
-                old_option="config_file", new_option="config"
-            )
+            config = self._mypy_subsystem.options.config
             if config:
                 cmd.append(f"--config-file={os.path.join(get_buildroot(), config)}")
             cmd.extend(self._mypy_subsystem.options.args)

@@ -4,6 +4,111 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.26.0rc0 (03/04/2020)
+----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Designate `pants.ini` as legacy, but still supported, in docs (#9194)
+  `PR #9194 <https://github.com/pantsbuild/pants/pull/9194>`_
+
+* Deprecate unused cache options. (#9196)
+  `PR #9196 <https://github.com/pantsbuild/pants/pull/9196>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Add V2 Pytest coverage support (#9176)
+  `PR #9176 <https://github.com/pantsbuild/pants/pull/9176>`_
+
+* Add `--no-fmt-per-target-caching` to run V2 formatters with batched targets (#9218)
+  `PR #9218 <https://github.com/pantsbuild/pants/pull/9218>`_
+
+* Add `--no-lint2-per-target-caching` to run V2 linters with batched targets (#9209)
+  `PR #9209 <https://github.com/pantsbuild/pants/pull/9209>`_
+
+Bugfixes
+~~~~~~~~
+
+* Disable and re-enable async stdin when UI is disabled (#9222)
+  `PR #9222 <https://github.com/pantsbuild/pants/pull/9222>`_
+
+* Limit java version to 10 for jax ws gen (#9216)
+  `PR #9216 <https://github.com/pantsbuild/pants/pull/9216>`_
+
+* Merge filesystem specs that resolve to the same owning target (#9214)
+  `PR #9214 <https://github.com/pantsbuild/pants/pull/9214>`_
+
+* Fix V2 handling of `compatibility` when it's a string rather than list (#9232)
+  `PR #9232 <https://github.com/pantsbuild/pants/pull/9232>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Improve cmd-line help output. (#9199)
+  `PR #9199 <https://github.com/pantsbuild/pants/pull/9199>`_
+
+* Optimization on synthetic targets with export-dep-as-jar (#9186)
+  `PR #9186 <https://github.com/pantsbuild/pants/pull/9186>`_
+
+* Break test runner pex into tool and requirements. (#9208)
+  `PR #9208 <https://github.com/pantsbuild/pants/pull/9208>`_
+
+* Replace Twitter Common's `maybe_list()` with `pants.util.collections.ensure_list()` (#9231)
+  `PR #9231 <https://github.com/pantsbuild/pants/pull/9231>`_
+
+* Use `FrozenOrderedSet` with `PexRequirements` and `PexInterpreterConstraints` (#9229)
+  `PR #9229 <https://github.com/pantsbuild/pants/pull/9229>`_
+
+* Fix flaky `options_bootstrapper_test.py` (#9220)
+  `PR #9220 <https://github.com/pantsbuild/pants/pull/9220>`_
+
+* Rename GlobalOptionsRegistrar to Global Options. (#9224)
+  `PR #9224 <https://github.com/pantsbuild/pants/pull/9224>`_
+
+* Get rid of the GlobalOptions wrapper class. (#9221)
+  `PR #9221 <https://github.com/pantsbuild/pants/pull/9221>`_
+
+* Make GlobalOptions rule provide full options. (#9215)
+  `PR #9215 <https://github.com/pantsbuild/pants/pull/9215>`_
+
+* Make BuildConfiguration a dataclass (#9192)
+  `PR #9192 <https://github.com/pantsbuild/pants/pull/9192>`_
+
+* Make _tasks a local variable on Scheduler constructor (#9223)
+  `PR #9223 <https://github.com/pantsbuild/pants/pull/9223>`_
+
+* Don't use ProjectTree in Scheduler (#9202)
+  `PR #9202 <https://github.com/pantsbuild/pants/pull/9202>`_
+
+* Turn on the v2 UI in the ./v2 script. (#9217)
+  `PR #9217 <https://github.com/pantsbuild/pants/pull/9217>`_
+
+* Simplify `fmt2` grouping of formatters per language (#9211)
+  `PR #9211 <https://github.com/pantsbuild/pants/pull/9211>`_
+
+* Simplify `lint2` to stop grouping by languages (#9207)
+  `PR #9207 <https://github.com/pantsbuild/pants/pull/9207>`_
+
+* Refactor V2 linters to allow batching multiple targets (#9185)
+  `PR #9185 <https://github.com/pantsbuild/pants/pull/9185>`_
+
+* Add `TargetAdaptor.has_sources()` (#9204)
+  `PR #9204 <https://github.com/pantsbuild/pants/pull/9204>`_
+
+* Tweak `TargetAdaptor.dependencies` to be a tuple rather than a list (#9184)
+  `PR #9184 <https://github.com/pantsbuild/pants/pull/9184>`_
+
+* Deduplicate `HydratedTarget` and `TargetAdaptor` (#9219)
+  `PR #9219 <https://github.com/pantsbuild/pants/pull/9219>`_
+
+Testing
+~~~~~~~
+
+* Allow mocking unions in `testutil.engine.util.run_rule()` (#9203)
+  `PR #9203 <https://github.com/pantsbuild/pants/pull/9203>`_
+
 1.26.0.dev2 (02/27/2020)
 ------------------------
 
