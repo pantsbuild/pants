@@ -16,7 +16,7 @@ from pants.base.build_environment import (
     pants_version,
 )
 from pants.base.deprecated import deprecated_conditional
-from pants.option.custom_types import dir_option, file_option
+from pants.option.custom_types import dir_option
 from pants.option.errors import OptionsError
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.subsystem.subsystem import Subsystem
@@ -499,29 +499,6 @@ class GlobalOptions(Subsystem):
             default=[],
             help="Paths that correspond with build roots for any subproject that this "
             "project depends on.",
-        )
-        register(
-            "--owner-of",
-            type=list,
-            member_type=file_option,
-            default=[],
-            daemon=False,
-            metavar="<path>",
-            removal_version="1.27.0.dev0",
-            removal_hint=(
-                "Use direct file arguments instead, such as "
-                "`./pants list src/python/f1.py src/python/f2.py` or even "
-                "`./pants fmt 'src/python/**/*.py'`. Instead of `--owner-of=@my_file`, use "
-                "`--spec-file=my_file`. Just like with `--owner-of`, Pants will "
-                "try to find the owner(s) of the file and then operate on those owning targets. "
-                "Unlike `--owner-of`, Pants defaults to failing if there is no owning target for "
-                "that file. You may change this through `--owners-not-found-behavior=ignore` or "
-                "`--owners-not-found-behavior=warn`."
-            ),
-            help="Select the targets that own these files. "
-            "This is the third target calculation strategy along with the --changed-* "
-            "options and specifying the targets directly. These three types of target "
-            "selection are mutually exclusive.",
         )
 
         # These logging options are registered in the bootstrap phase so that plugins can log during
