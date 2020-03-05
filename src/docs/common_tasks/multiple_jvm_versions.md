@@ -39,7 +39,10 @@ An example pants.toml config might look like this:
      {
         'java8': { 'source': '8', 'target': '8', 'args': [] },
         'java10': {'source': '10', 'target': '10', 'args': [],
-                   'jvm_options': ['-Djava.compat.foo=act-like-java-8'] },
+                   'jvm_options': [
+                       # --add-opens is a 9+ flag
+                       '--add-opens=java.base/java.lang.reflect=ALL-UNNAMED'
+                   ] },
       }
    """
 
