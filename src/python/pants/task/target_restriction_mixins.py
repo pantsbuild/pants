@@ -137,23 +137,10 @@ class SkipAndTransitiveGoalOptionsRegistrar(
     """Registrar of --skip and --transitive at the goal level."""
 
 
-class DeprecatedSkipAndDeprecatedTransitiveGoalOptionsRegistrar(GoalOptionsRegistrar):
+class DeprecatedSkipGoalOptionsRegistrar(GoalOptionsRegistrar):
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
-        register(
-            "--transitive",
-            type=bool,
-            default=False,
-            fingerprint=True,
-            recursive=True,
-            removal_version="1.27.0.dev0",
-            removal_hint="This feature is going away. Instead of relying on the `--transitive` flag, "
-            "directly specify on the command line every target that you want to format or "
-            "lint.",
-            help="If false, act only on the targets directly specified on the command line. "
-            "If true, act on the transitive dependency closure of those targets.",
-        )
         deprecated_skip_mapping = {
             "lint-checkstyle": "checkstyle",
             "fmt-javascriptstyle": "eslint",

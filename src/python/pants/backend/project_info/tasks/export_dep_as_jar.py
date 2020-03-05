@@ -67,22 +67,10 @@ class ExportDepAsJar(ConsoleTask):
             type=bool,
             help="Causes 3rdparty libraries with javadocs to be output.",
         )
-        register(
-            "--transitive",
-            type=bool,
-            default=True,
-            fingerprint=True,
-            help="If True, use all targets in the build graph, else use only target roots.",
-            removal_version="1.27.0.dev0",
-            removal_hint="`export-dep-as-jar` should always act transitively, which is the default. "
-            "This option will be going away to ensure that Pants always does the right "
-            "thing.",
-        )
 
     @property
     def act_transitively(self):
-        # NB: `export-dep-as-jar` should always act transitively
-        return self.get_options().transitive
+        return True
 
     @classmethod
     def prepare(cls, options, round_manager):
