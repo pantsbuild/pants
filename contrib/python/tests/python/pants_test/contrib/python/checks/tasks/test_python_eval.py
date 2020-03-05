@@ -164,7 +164,7 @@ class PythonEvalTest(PythonTaskTestBase):
         self.assertEqual([self.c_library], compiled)
 
     def test_compile_fail_missing_build_dep(self):
-        python_eval = self._create_task(target_roots=[self.b_library, self.a_library])
+        python_eval = self._create_task(target_roots=[self.b_library])
 
         with self.assertRaises(python_eval.Error) as e:
             python_eval.execute()
