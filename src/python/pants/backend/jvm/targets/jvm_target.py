@@ -54,7 +54,7 @@ class JvmTarget(Target, Jarable):
           transitive dependencies against.
         :param sources: Source code files to build. Paths are relative to the BUILD
           file's directory.
-        :type sources: ``Fileset`` (from globs or rglobs) or list of strings
+        :type sources: a list of strings, with excludes prefixed by `!`
         :param services: A dict mapping service interface names to the classes owned by this target
                          that implement them.  Keys are fully qualified service class names, values are
                          lists of strings, each string the fully qualified class name of a class owned

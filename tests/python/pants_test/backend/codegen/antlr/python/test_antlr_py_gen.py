@@ -1,9 +1,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from pathlib import Path
 from textwrap import dedent
-
-from twitter.common.dirutil.fileset import Fileset
 
 from pants.backend.codegen.antlr.python.antlr_py_gen import AntlrPyGen
 from pants.backend.codegen.antlr.python.python_antlr_library import PythonAntlrLibrary
@@ -68,7 +67,7 @@ class AntlrPyGenTest(NailgunTaskTestBase):
 
         # Generate code, then create a synthetic target.
         task.execute_codegen(target, target_workdir)
-        actual_sources = {s for s in Fileset.rglobs("*.py", root=target_workdir)}
+        actual_sources = {str(path) for path in Path(target_workdir).rglob("*.py")}
         self.assertSetEqual(
             {
                 "foo/__init__.py",

@@ -111,7 +111,7 @@ class Bundle:
     and ``scripts`` directories: ::
 
       bundles=[
-        bundle(fileset=[rglobs('config/*', 'scripts/*'), 'my.cfg']),
+        bundle(fileset=[config/**/*', 'scripts/**/*', 'my.cfg']),
       ]
 
     To include files relative to some path component use the ``relative_to`` parameter.

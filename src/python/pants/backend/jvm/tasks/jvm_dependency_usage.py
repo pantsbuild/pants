@@ -281,7 +281,7 @@ class JvmDependencyUsage(Task):
                     continue
                 # Create edge only for those direct or transitive dependencies in order to
                 # disqualify irrelevant targets that happen to share some file in sources,
-                # not uncommon when globs especially rglobs is used.
+                # not uncommon when globs (especially recursive globs) are used.
                 if derived_from not in transitive_deps:
                     continue
                 node.add_edge(_construct_edge(dep_tgt, products_used={product_dep}), derived_from)

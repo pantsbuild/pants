@@ -32,7 +32,7 @@ class NodeModule(NodePackage):
         """
         :param sources: Javascript and other source code files that make up this module; paths are
                         relative to the BUILD file's directory.
-        :type sources: `globs`, `rglobs` or a list of strings
+        :type sources: a list of strings, with excludes prefixed by `!`
 
         :param package_manager: choose among supported package managers (npm or yarn).
         :param build_script: build script name as defined in package.json.  All files that are needed
