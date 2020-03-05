@@ -70,6 +70,9 @@ async def dependencies(
         DependencyType.SOURCE,
         DependencyType.SOURCE_AND_THIRD_PARTY,
     ]
+    print('TARGETS')
+    for target in hydrated_targets:
+        print(target)
 
     for target in hydrated_targets:
         if should_include_third_party:
