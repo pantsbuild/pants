@@ -44,8 +44,8 @@ class GoTestIntegrationTest(PantsRunIntegrationTest):
         self.assertIn("=== RUN   TestAdd", pants_run.stdout_data)
         self.assertIn("PASS", pants_run.stdout_data)
 
-    def test_no_fast(self):
-        args = ["test.go", "--no-fast", "contrib/go/examples/src/go/libA"]
+    def test_partitioned_per_target(self):
+        args = ["test.go", "contrib/go/examples/src/go/libA"]
         pants_run = self.run_pants(args)
         self.assert_success(pants_run)
         # libA depends on libB, so both tests should be run.
