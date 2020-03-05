@@ -216,34 +216,6 @@ class Options:
         return self._specs
 
     @property
-    def target_specs(self):
-        """The targets to operate on.
-
-        :API: public
-        """
-        warn_or_error(
-            removal_version="1.27.0.dev0",
-            deprecated_entity_description=".target_specs",
-            hint="Use .specs instead. This change is in preparation for Pants eventually allowing you to "
-            "pass file names as arguments, e.g. `./pants cloc foo.py`.",
-        )
-        return self._specs
-
-    @property
-    def positional_args(self):
-        """The positional args to operate on.
-
-        :API: public
-        """
-        warn_or_error(
-            removal_version="1.27.0.dev0",
-            deprecated_entity_description=".positional_args",
-            hint="Use .specs instead. This change is in preparation for Pants eventually allowing you to "
-            "pass file names as arguments, e.g. `./pants cloc foo.py`.",
-        )
-        return self._specs
-
-    @property
     def goals(self) -> List[str]:
         """The requested goals, in the order specified on the cmd line.
 
