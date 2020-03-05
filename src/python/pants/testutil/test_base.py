@@ -621,8 +621,8 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
          name: Name of the library target.
          sources: List of source file at the path relative to path.
          **kwargs: Optional attributes that can be set for any library target.
-           Currently it includes support for resources, java_sources, provides
-           and dependencies.
+           Currently it includes support for resources, java_sources, provides,
+           dependencies and requirements.
         """
         if sources:
             self.create_files(path, sources)
@@ -635,6 +635,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
             %(java_sources)s
             %(provides)s
             %(dependencies)s
+            %(requirements)s
           )
         """
                 % dict(
@@ -653,6 +654,11 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
                     dependencies=(
                         "dependencies=%s," % kwargs.get("dependencies")
                         if "dependencies" in kwargs
+                        else ""
+                    ),
+                    requirements=(
+                        "requirements=%s," % kwargs.get("requirements")
+                        if "requirements" in kwargs
                         else ""
                     ),
                 )
