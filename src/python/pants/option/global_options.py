@@ -66,7 +66,6 @@ class OwnersNotFoundBehavior(Enum):
 
 
 class BuildFileImportsBehavior(Enum):
-    allow = "allow"
     warn = "warn"
     error = "error"
 
@@ -690,8 +689,15 @@ class GlobalOptions(Subsystem):
         register(
             "--build-file-imports",
             type=BuildFileImportsBehavior,
-            default=BuildFileImportsBehavior.warn,
+            default=BuildFileImportsBehavior.error,
             advanced=True,
+            removal_version="1.29.0.dev0",
+            removal_hint=(
+                "Import statements should be avoided in BUILD files because they can easily break "
+                "Pants caching and lead to stale results. If you still need to keep the "
+                "functionality you have from import statements, consider rewriting your code into "
+                "a Pants plugin: https://www.pantsbuild.org/howto_plugin.html."
+            ),
             help="Whether to allow import statements in BUILD files",
         )
 
