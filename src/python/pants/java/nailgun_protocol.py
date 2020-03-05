@@ -40,26 +40,14 @@ class ChunkType:
     # (e.g. by calling it PailgunClient).
     PGRP = b"G"
     PID = b"P"
-    CLIENT_BLOCKED = b"B"
     STDIN = b"0"
     STDOUT = b"1"
     STDERR = b"2"
     START_READING_INPUT = b"S"
     STDIN_EOF = b"."
     EXIT = b"X"
-
     REQUEST_TYPES = (ARGUMENT, ENVIRONMENT, WORKING_DIR, COMMAND)
-    EXECUTION_TYPES = (
-        PGRP,
-        PID,
-        STDIN,
-        STDOUT,
-        STDERR,
-        START_READING_INPUT,
-        STDIN_EOF,
-        EXIT,
-        CLIENT_BLOCKED,
-    )
+    EXECUTION_TYPES = (PGRP, PID, STDIN, STDOUT, STDERR, START_READING_INPUT, STDIN_EOF, EXIT)
     VALID_TYPES = REQUEST_TYPES + EXECUTION_TYPES
 
 
@@ -339,11 +327,6 @@ class NailgunProtocol:
     def send_exit(cls, sock, payload=b""):
         """Send the Exit chunk over the specified socket."""
         cls.write_chunk(sock, ChunkType.EXIT, payload)
-
-    @classmethod
-    def send_client_blocked(cls, sock):
-        """Send the Client_Blocked chunk over the specified socket."""
-        cls.write_chunk(sock, ChunkType.CLIENT_BLOCKED, b"")
 
     @classmethod
     def send_exit_with_code(cls, sock, code):

@@ -21,10 +21,6 @@ from pants.util.strutil import ensure_binary, safe_shlex_join
 logger = logging.getLogger(__name__)
 
 
-class RemoteClientFallback(Exception):
-    pass
-
-
 class NailgunClientSession(NailgunProtocol, NailgunProtocol.TimeoutProvider):
     """Handles a single nailgun client session."""
 
@@ -35,14 +31,12 @@ class NailgunClientSession(NailgunProtocol, NailgunProtocol.TimeoutProvider):
         out_file,
         err_file,
         exit_on_broken_pipe=False,
-        fallback_on_client_blocked=False,
         remote_pid_callback=None,
         remote_pgrp_callback=None,
     ):
         """
         :param bool exit_on_broken_pipe: whether or not to exit when `Broken Pipe` errors are
                     encountered
-        :param bool fallback_on_client_blocked: ???
         :param remote_pid_callback: Callback to run when a pid chunk is received from a remote client.
         :param remote_pgrp_callback: Callback to run when a pgrp (process group) chunk is received from
                                      a remote client.
@@ -58,7 +52,6 @@ class NailgunClientSession(NailgunProtocol, NailgunProtocol.TimeoutProvider):
         self._stdout = out_file
         self._stderr = err_file
         self._exit_on_broken_pipe = exit_on_broken_pipe
-        self._fallback_on_client_blocked = fallback_on_client_blocked
         self.remote_pid = None
         self.remote_process_cmdline = None
         self.remote_pgrp = None
@@ -151,9 +144,6 @@ class NailgunClientSession(NailgunProtocol, NailgunProtocol.TimeoutProvider):
                         self._remote_pgrp_callback(self.remote_pgrp)
                 elif chunk_type == ChunkType.START_READING_INPUT:
                     self._maybe_start_input_writer()
-                elif chunk_type == ChunkType.CLIENT_BLOCKED:
-                    if self._fallback_on_client_blocked:
-                        raise RemoteClientFallback()
                 else:
                     raise self.ProtocolError(
                         "received unexpected chunk {} -> {}".format(chunk_type, payload)
@@ -254,7 +244,6 @@ class NailgunClient:
         out=None,
         err=None,
         exit_on_broken_pipe=False,
-        fallback_on_client_blocked=False,
         metadata_base_dir=None,
     ):
         """Creates a nailgun client that can be used to issue zero or more nailgun commands.
@@ -268,7 +257,6 @@ class NailgunClient:
         :param file err: a stream to write command standard error to (defaults to stderr)
         :param bool exit_on_broken_pipe: whether or not to exit when `Broken Pipe` errors are
                                          encountered
-        :param bool fallback_on_client_blocked: ???
         :param string metadata_base_dir: If a PID and PGRP are received from the server (only for
                                          pailgun connections), a file with the remote pid will be
                                          written under this directory. For non-pailgun connections this
@@ -282,7 +270,6 @@ class NailgunClient:
         self._stdout = out or sys.stdout.buffer
         self._stderr = err or sys.stderr.buffer
         self._exit_on_broken_pipe = exit_on_broken_pipe
-        self._fallback_on_client_blocked = fallback_on_client_blocked
         self._metadata_base_dir = metadata_base_dir
         # Mutable session state.
         self._session = None
@@ -387,7 +374,6 @@ class NailgunClient:
             out_file=self._stdout,
             err_file=self._stderr,
             exit_on_broken_pipe=self._exit_on_broken_pipe,
-            fallback_on_client_blocked=self._fallback_on_client_blocked,
             remote_pid_callback=self._receive_remote_pid,
             remote_pgrp_callback=self._receive_remote_pgrp,
         )

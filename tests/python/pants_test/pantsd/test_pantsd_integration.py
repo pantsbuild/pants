@@ -9,6 +9,7 @@ import signal
 import threading
 import time
 import unittest
+from contextlib import contextmanager
 from textwrap import dedent
 
 import pytest
@@ -810,34 +811,43 @@ Interrupted by user over pailgun client!
             self.assert_success(result)
             self.assertNotIn("Another pants invocation is running", result.stderr_data)
 
-    def test_local_client_fallback(self):
-        """Test that running with --pantsd-local-client-fallback will fall back to a non-daemon
-        client."""
-        config = {
-            "GLOBAL": {
-                "enable_pantsd": True,
-                "pantsd_local_client_fallback": True,
-                "watchman_socket_path": f"/tmp/watchman.{os.getpid()}.sock",
-            },
-        }
-
-        with self.temporary_workdir() as workdir:
-            pants_run = self.run_pants_with_workdir(["goals"], workdir=workdir, config=config)
-            self.assert_success(pants_run)
-
+    @contextmanager
+    def _concurrent_pants_invocations(self, extra_config):
+        with self.pantsd_test_context(extra_config=extra_config) as (workdir, config, checker):
+            goals_run = self.run_pants_with_workdir(["goals"], workdir=workdir, config=config)
+            self.assert_success(goals_run)
             checker.assert_started()
 
-            handle = self.run_pants_with_workdir_without_waiting(["list", "::"], workdir, config)
+            handle_1 = self.run_pants_with_workdir_without_waiting(["list", "::"], workdir, config)
 
-            fallback_result = self.run_pants_with_workdir(["list", "::"], workdir, config)
-            self.assert_success(fallback_result)
+            handle_2 = self.run_pants_with_workdir_without_waiting(["list", "::"], workdir, config)
 
+            second_run = handle_2.join()
+            assert "did not acquire the pantsd exclusive lock" in second_run.stderr_data
+
+            first_run = handle_1.join()
+            yield (first_run, second_run)
+
+    def test_yes_require_singleton_daemon(self):
+        """Test that --require-singleton-daemon will raise an exception if pantsd is in use."""
+        config = {"GLOBAL": {"require_singleton_daemon": True}}
+        with self._concurrent_pants_invocations(config) as (first_run, second_run):
+            self.assert_failure(second_run)
+            assert "LockAlreadyAcquired" in second_run.stderr_data
+            assert "and --require-singleton-daemon is ON" in second_run.stderr_data
+            self.assert_success(first_run)
+
+    def test_no_require_singleton_daemon(self):
+        """Test that running with --no-require-singleton-daemon will fall back to a non-daemon
+        client."""
+        config = {"GLOBAL": {"require_singleton_daemon": False}}
+        with self._concurrent_pants_invocations(config) as (first_run, second_run):
+            self.assert_success(second_run)
+            assert "and --require-singleton-daemon is OFF" in second_run.stderr_data
             assert (
                 "[WARN] caught client exception: Fallback(), falling back to non-daemon mode"
-                in fallback_result.stderr_data
+                in second_run.stderr_data
             )
 
-            orig_result = handle.join()
-            self.assert_success(orig_result)
-
-            assert orig_result.stdout_data == fallback_result.stdout_data
+            self.assert_success(first_run)
+            assert first_run.stdout_data == second_run.stdout_data

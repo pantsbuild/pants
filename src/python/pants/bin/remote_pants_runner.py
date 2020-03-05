@@ -10,7 +10,7 @@ from typing import List, Mapping
 
 from pants.base.exception_sink import ExceptionSink, SignalHandler
 from pants.console.stty_utils import STTYSettings
-from pants.java.nailgun_client import NailgunClient, RemoteClientFallback
+from pants.java.nailgun_client import NailgunClient
 from pants.java.nailgun_protocol import NailgunProtocol
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.pants_daemon import PantsDaemon
@@ -63,6 +63,12 @@ class RemotePantsRunner:
 
     class Terminated(Exception):
         """Raised when an active run is terminated mid-flight."""
+
+    class LockAlreadyAcquired(Exception):
+        """Raised when pantsd is already in use by another remote client and.
+
+        --require-singleton-daemon is on.
+        """
 
     PANTS_COMMAND = "pants"
     RECOVERABLE_EXCEPTIONS = (
@@ -127,8 +133,6 @@ class RemotePantsRunner:
             )
             try:
                 return self._connect_and_execute(pantsd_handle)
-            except RemoteClientFallback as e:
-                raise self.Fallback() from e
             except self.RECOVERABLE_EXCEPTIONS as e:
                 if attempt > retries:
                     raise self.Fallback(e)
@@ -161,9 +165,6 @@ class RemotePantsRunner:
             **self._env,
             **ng_env,
             "PANTSD_RUNTRACKER_CLIENT_START_TIME": str(self._start_time),
-            "PANTSD_REQUEST_TIMEOUT_LIMIT": str(
-                self._bootstrap_options.for_global_scope().pantsd_timeout_when_multiple_invocations
-            ),
         }
 
         assert isinstance(port, int), "port {} is not an integer! It has type {}.".format(
@@ -177,7 +178,6 @@ class RemotePantsRunner:
             out=self._stdout,
             err=self._stderr,
             exit_on_broken_pipe=True,
-            fallback_on_client_blocked=self._bootstrap_options.for_global_scope().pantsd_local_client_fallback,
             metadata_base_dir=pantsd_handle.metadata_base_dir,
         )
 
@@ -222,17 +222,28 @@ class RemotePantsRunner:
         return PantsDaemon.Factory.maybe_launch(options_bootstrapper=self._options_bootstrapper)
 
     def run(self, args=None):
-        workdir = self._bootstrap_options.for_global_scope().pants_workdir
+        bootstrap_options = self._bootstrap_options.for_global_scope()
+        workdir = bootstrap_options.pants_workdir
         lock = OwnerPrintingInterProcessFileLock(
             os.path.join(workdir, ".pantsd-restart-check-file-lock")
         )
 
-        if not lock.acquired:
-            lock.acquire()
+        assert not lock.acquired
+        if not lock.acquire(blocking=False):
+            acquisition_failed = f"did not acquire the pantsd exclusive lock at {lock.path_str}"
+            if bootstrap_options.require_singleton_daemon:
+                raise self.LockAlreadyAcquired(
+                    acquisition_failed
+                    +
+                    # TODO: add some utility to inject option names into error message strings
+                    # for DRY!
+                    " and --require-singleton-daemon is ON"
+                )
+            else:
+                raise self.Fallback(acquisition_failed + " and --require-singleton-daemon is OFF")
 
         try:
             pantsd_handle = self._maybe_launch_pantsd()
+            self._run_pants_with_retry(pantsd_handle)
         finally:
             lock.release()
-
-        self._run_pants_with_retry(pantsd_handle)

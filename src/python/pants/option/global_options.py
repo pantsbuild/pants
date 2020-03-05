@@ -509,6 +509,8 @@ class GlobalOptions(Subsystem):
             type=bool,
             default=False,
             daemon=False,
+            removal_version="1.28.0.dev2",
+            removal_hint="Please see the documentation for --pantsd-local-client-fallback.",
             help="Enable concurrent runs of pants. Without this enabled, pants will "
             "start up all concurrent invocations (e.g. in other terminals) without pantsd. "
             "Enabling this option requires parallel pants invocations to block on the first",
@@ -519,7 +521,8 @@ class GlobalOptions(Subsystem):
         # It is automatically set by pants when an inner run is detected.
         # Currently, pants commands with this option set don't use pantsd,
         # but this effect should not be relied upon.
-        # This option allows us to know who was the parent of pants inner runs for informational purposes.
+        # This option allows us to know who was the parent of pants inner runs for informational
+        # purposes.
         register(
             "--parent-build-id",
             advanced=True,
@@ -539,24 +542,14 @@ class GlobalOptions(Subsystem):
             "If pantsd is already running, it will shut it down and spawn a new instance (Beta)",
         )
 
-        # NB: We really don't want this option to invalidate the daemon, because different clients might have
-        # different needs. For instance, an IDE might have a very long timeout because it only wants to refresh
-        # a project in the background, while a user might want a shorter timeout for interactivity.
         register(
-            "--pantsd-timeout-when-multiple-invocations",
-            advanced=True,
-            type=float,
-            default=60.0,
-            daemon=False,
-            help="The maximum amount of time to wait for the invocation to start until "
-            "raising a timeout exception. "
-            "Because pantsd currently does not support parallel runs, "
-            "any prior running Pants command must be finished for the current one to start. "
-            "To never timeout, use the value -1.",
-        )
-        register(
-            "--pantsd-local-client-fallback",
+            "--require-singleton-daemon",
             type=bool,
+            # NB: We really don't want this option to invalidate the daemon, because different
+            # clients might have different needs. For instance, an IDE might have a very long
+            # timeout (???) because it only wants to refresh a project in the background, while a
+            # user might want a shorter timeout (???) for interactivity.
+            daemon=False,
             help="Whether to avoid waiting for exclusive access to pantsd in the case of "
             "concurrent pants invocations and just invoke pants without pantsd.",
         )

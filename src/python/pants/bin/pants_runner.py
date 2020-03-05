@@ -58,7 +58,6 @@ class PantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         return (
             global_bootstrap_options.enable_pantsd
             and not self.will_terminate_pantsd()
-            and not global_bootstrap_options.concurrent
             and not is_inner_run
         )
 

@@ -99,6 +99,7 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
                         "watchman_socket_path": f"/tmp/watchman.{os.getpid()}.sock",
                         "level": log_level,
                         "pants_subprocessdir": pid_dir,
+                        "print_exception_stacktrace": True,
                     }
                 }
 

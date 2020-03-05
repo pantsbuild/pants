@@ -5,7 +5,6 @@ import logging
 import socket
 import threading
 import traceback
-from contextlib import contextmanager
 from socketserver import BaseRequestHandler, BaseServer, TCPServer, ThreadingMixIn
 
 from pants.engine.native import Native
@@ -96,49 +95,6 @@ class PailgunHandler(PailgunHandlerBase):
         NailgunProtocol.send_exit_with_code(self.request, failure_code)
 
 
-class ExclusiveRequestTimeout(Exception):
-    """Represents a timeout while waiting for another request to complete."""
-
-
-class PailgunHandleRequestLock:
-    """Convenience lock to implement Lock.acquire(timeout), which is not available in Python 2."""
-
-    # TODO(#6071): remove and replace for the py3 Lock() when we don't have to support py2 anymore.
-
-    def __init__(self):
-        self.cond = threading.Condition()
-        self.available = True
-
-    def acquire(self, timeout=0.0):
-        """Try to acquire the lock, blocking until the timeout is reached. Will return immediately
-        if the lock is acquired.
-
-        :return True if the lock was acquired, False if the timeout was reached.
-        """
-        self.cond.acquire()
-        if self.available:
-            self.available = False
-            self.cond.release()
-            return True
-        else:
-            self.cond.wait(timeout=timeout)
-            # We have the lock!
-            if not self.available:
-                self.cond.release()
-                return False
-            else:
-                self.available = False
-                self.cond.release()
-                return True
-
-    def release(self):
-        """Release the lock."""
-        self.cond.acquire()
-        self.available = True
-        self.cond.notify()
-        self.cond.release()
-
-
 class PailgunServer(ThreadingMixIn, TCPServer):
     """A pants nailgun server.
 
@@ -183,7 +139,6 @@ class PailgunServer(ThreadingMixIn, TCPServer):
         self.server_port = None  # Set during server_bind() once the port is bound.
         self.request_complete_callback = request_complete_callback
         self.logger = logging.getLogger(__name__)
-        self.free_to_handle_request_lock = PailgunHandleRequestLock()
 
         if bind_and_activate:
             try:
@@ -245,76 +200,6 @@ class PailgunServer(ThreadingMixIn, TCPServer):
     def _send_stderr(self, request, message):
         NailgunProtocol.send_stderr(request, message)
 
-    def _send_client_blocked(self, request):
-        NailgunProtocol.send_client_blocked(request)
-
-    @contextmanager
-    def ensure_request_is_exclusive(self, environment, request):
-        """Ensure that this is the only pants running.
-
-        This class spawns a thread per request via `ThreadingMixIn`: the thread body runs
-        `process_request_thread`, which we override.
-        """
-        # TODO add `did_poll` to pantsd metrics
-
-        timeout = float(environment["PANTSD_REQUEST_TIMEOUT_LIMIT"])
-
-        @contextmanager
-        def yield_and_release(time_waited):
-            try:
-                self.logger.debug(
-                    f"request lock acquired {('on the first try' if time_waited == 0 else f'in {time_waited} seconds')}."
-                )
-                yield
-            finally:
-                self.free_to_handle_request_lock.release()
-                self.logger.debug("released request lock.")
-
-        time_polled = 0.0
-        user_notification_interval = 5.0  # Stop polling to notify the user every second.
-        self.logger.debug(f"request {request} is trying to acquire the request lock.")
-
-        # NB: Optimistically try to acquire the lock without blocking, in case we are the only request being handled.
-        # This could be merged into the `while` loop below, but separating this special case for logging helps.
-        if self.free_to_handle_request_lock.acquire(timeout=0):
-            with yield_and_release(time_polled):
-                yield
-        else:
-            self._send_client_blocked(request)
-
-            self.logger.debug(
-                f"request {request} didn't acquire the lock on the first try, polling..."
-            )
-            # We have to wait for another request to finish being handled.
-            self._send_stderr(
-                request,
-                "Another pants invocation is running. "
-                "Will wait {} for it to finish before giving up.\n".format(
-                    "forever"
-                    if self._should_poll_forever(timeout)
-                    else "up to {} seconds".format(timeout)
-                ),
-            )
-            self._send_stderr(
-                request,
-                "If you don't want to wait for the first run to finish, please "
-                "press Ctrl-C and run this command with PANTS_CONCURRENT=True "
-                "in the environment.\n",
-            )
-            while not self.free_to_handle_request_lock.acquire(timeout=user_notification_interval):
-                time_polled += user_notification_interval
-                if self._should_keep_polling(timeout, time_polled):
-                    self._send_stderr(
-                        request,
-                        f"Waiting for invocation to finish (waited for {time_polled}s so far)...\n",
-                    )
-                else:  # We have timed out.
-                    raise ExclusiveRequestTimeout(
-                        "Timed out while waiting for another pants invocation to finish."
-                    )
-            with yield_and_release(time_polled):
-                yield
-
     def process_request_thread(self, request, client_address):
         """Override of ThreadingMixIn.process_request_thread() that delegates to the request
         handler."""
@@ -325,10 +210,9 @@ class PailgunServer(ThreadingMixIn, TCPServer):
         _, _, _, environment = handler.parsed_request()
 
         try:
-            with self.ensure_request_is_exclusive(environment, request):
-                # Attempt to handle a request with the handler.
-                handler.handle_request()
-                self.request_complete_callback()
+            # Attempt to handle a request with the handler.
+            handler.handle_request()
+            self.request_complete_callback()
         except BrokenPipeError as e:
             # The client has closed the connection, most likely from a SIGINT
             self.logger.error(
