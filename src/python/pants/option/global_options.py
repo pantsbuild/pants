@@ -52,7 +52,6 @@ class FileNotFoundBehavior(Enum):
                 "default) or `--files-not-found-behavior=error`. Ignoring when files are "
                 "not found often results in subtle bugs, so we are removing the option."
             ),
-            deprecation_start_version="1.27.0.dev0",
         )
         return GlobMatchErrorBehavior(self.value)
 
@@ -442,18 +441,6 @@ class GlobalOptions(Subsystem):
             advanced=True,
             type=FileNotFoundBehavior,
             default=FileNotFoundBehavior.warn,
-            help="What to do when files and globs specified in BUILD files, such as in the "
-            "`sources` field, cannot be found. This happens when the files do not exist on "
-            "your machine or when they are ignored by the `--pants-ignore` option.",
-        )
-        register(
-            "--glob-expansion-failure",
-            advanced=True,
-            type=GlobMatchErrorBehavior,
-            default=GlobMatchErrorBehavior.warn,
-            removal_version="1.27.0.dev0",
-            removal_hint="If you currently set `--glob-expansion-failure=error`, instead set "
-            "`--files-not-found-behavior=error`.",
             help="What to do when files and globs specified in BUILD files, such as in the "
             "`sources` field, cannot be found. This happens when the files do not exist on "
             "your machine or when they are ignored by the `--pants-ignore` option.",

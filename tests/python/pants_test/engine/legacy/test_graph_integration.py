@@ -131,7 +131,7 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
                 target_full = f"{self._SOURCES_TARGET_BASE}:{target}"
                 pants_run = self.run_pants(
                     ["filedeps", target_full],
-                    config={GLOBAL_SCOPE_CONFIG_SECTION: {"glob_expansion_failure": "warn",},},
+                    config={GLOBAL_SCOPE_CONFIG_SECTION: {"files_not_found_behavior": "warn"}},
                 )
                 self.assert_success(pants_run)
                 unmatched_globs = target_to_unmatched_globs[target]
@@ -154,7 +154,7 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
         target_full = f"{self._SOURCES_TARGET_BASE}:text"
         pants_run = self.run_pants(
             ["filedeps", target_full],
-            config={GLOBAL_SCOPE_CONFIG_SECTION: {"glob_expansion_failure": "warn",},},
+            config={GLOBAL_SCOPE_CONFIG_SECTION: {"files_not_found_behavior": "warn"}},
         )
         self.assert_success(pants_run)
         assert "[WARN] Unmatched glob" not in pants_run.stderr_data
@@ -165,7 +165,7 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
         with self.setup_bundle_target():
             pants_run = self.run_pants(
                 ["filedeps", target_full],
-                config={GLOBAL_SCOPE_CONFIG_SECTION: {"glob_expansion_failure": "warn",},},
+                config={GLOBAL_SCOPE_CONFIG_SECTION: {"files_not_found_behavior": "warn"}},
             )
         self.assert_success(pants_run)
         unmatched_glob = ["*.aaaa", "**/*.abab"]
@@ -188,7 +188,7 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
         target_full = f"{self._BUNDLE_TARGET_BASE}:mapper"
         pants_run = self.run_pants(
             ["filedeps", target_full],
-            config={GLOBAL_SCOPE_CONFIG_SECTION: {"glob_expansion_failure": "warn",},},
+            config={GLOBAL_SCOPE_CONFIG_SECTION: {"files_not_found_behavior": "warn"}},
         )
         self.assert_success(pants_run)
         self.assertNotIn("[WARN] Unmatched glob", pants_run.stderr_data)
@@ -205,7 +205,7 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
                 expected_excerpts = self._ERR_TARGETS[target]
                 pants_run = self.run_pants(
                     ["filedeps", target],
-                    config={GLOBAL_SCOPE_CONFIG_SECTION: {"glob_expansion_failure": "error",},},
+                    config={GLOBAL_SCOPE_CONFIG_SECTION: {"files_not_found_behavior": "error"}},
                 )
                 self.assert_failure(pants_run)
                 for excerpt in expected_excerpts:

@@ -297,24 +297,6 @@ class EngineInitializer:
         """Construct and return the components necessary for LegacyBuildGraph construction."""
         build_root = get_buildroot()
         bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
-
-        glob_expansion_failure_configured = not bootstrap_options.is_default(
-            "glob_expansion_failure"
-        )
-        files_not_found_behavior_configured = not bootstrap_options.is_default(
-            "files_not_found_behavior"
-        )
-        if glob_expansion_failure_configured and files_not_found_behavior_configured:
-            raise ValueError(
-                "Conflicting options used. You used the new, preferred `--files-not-found-behavior`, but "
-                "also used the deprecated `--glob-expansion-failure`.\n\nPlease "
-                "specify only one of these (preferably `--files-not-found-behavior`)."
-            )
-        glob_match_error_behavior = (
-            bootstrap_options.files_not_found_behavior.to_glob_match_error_behavior()
-            if files_not_found_behavior_configured
-            else bootstrap_options.glob_expansion_failure
-        )
         return EngineInitializer.setup_legacy_graph_extended(
             OptionsInitializer.compute_pants_ignore(build_root, bootstrap_options),
             bootstrap_options.local_store_dir,
@@ -323,7 +305,9 @@ class EngineInitializer:
             build_configuration,
             build_root=build_root,
             native=native,
-            glob_match_error_behavior=glob_match_error_behavior,
+            glob_match_error_behavior=(
+                bootstrap_options.files_not_found_behavior.to_glob_match_error_behavior()
+            ),
             build_ignore_patterns=bootstrap_options.build_ignore,
             exclude_target_regexps=bootstrap_options.exclude_target_regexp,
             subproject_roots=bootstrap_options.subproject_roots,

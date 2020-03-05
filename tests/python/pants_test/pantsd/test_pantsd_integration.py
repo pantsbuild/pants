@@ -52,14 +52,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
     @unittest.skip("Flaky as described in: https://github.com/pantsbuild/pants/issues/7573")
     def test_pantsd_run(self):
-        extra_config = {
-            "GLOBAL": {
-                # Muddies the logs with warnings: once all of the warnings in the repository
-                # are fixed, this can be removed.
-                "glob_expansion_failure": "ignore",
-            }
-        }
-        with self.pantsd_successful_run_context("debug", extra_config=extra_config) as (
+        with self.pantsd_successful_run_context("debug") as (
             pantsd_run,
             checker,
             workdir,
