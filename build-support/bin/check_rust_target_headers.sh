@@ -4,7 +4,7 @@ REPO_ROOT="$(git rev-parse --show-toplevel)"
 
 cargo="${REPO_ROOT}/build-support/bin/native/cargo"
 
-"${cargo}" ensure-installed --package cargo-ensure-prefix --version 0.1.3
+"${cargo}" ensure-installed --package cargo-ensure-prefix --version 0.1.5
 
 if ! out="$("${cargo}" ensure-prefix \
   --manifest-path="${REPO_ROOT}/src/rust/engine/Cargo.toml" \
