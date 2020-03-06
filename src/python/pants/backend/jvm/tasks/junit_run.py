@@ -571,19 +571,28 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
         return list(files_iter())
 
     @contextmanager
-    def partitions(self, all_targets, test_targets):
+    def partitions(self, per_target, all_targets, test_targets):
         complete_test_registry = self._collect_test_targets(test_targets)
-        with self._isolation(all_targets) as (output_dir, reports, coverage):
+        with self._isolation(per_target, all_targets) as (output_dir, reports, coverage):
+            if per_target:
 
-            def iter_partitions():
-                for test_target in test_targets:
-                    partition = (test_target,)
-                    args = (
-                        os.path.join(output_dir, test_target.id),
-                        coverage,
-                        complete_test_registry,
-                    )
-                    yield partition, args
+                def iter_partitions():
+                    for test_target in test_targets:
+                        partition = (test_target,)
+                        args = (
+                            os.path.join(output_dir, test_target.id),
+                            coverage,
+                            complete_test_registry,
+                        )
+                        yield partition, args
+
+            else:
+
+                def iter_partitions():
+                    if test_targets:
+                        partition = tuple(test_targets)
+                        args = (output_dir, coverage, complete_test_registry)
+                        yield partition, args
 
             try:
                 yield iter_partitions
@@ -611,9 +620,9 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
                     raise TaskError(e)
 
     @contextmanager
-    def _isolation(self, all_targets):
+    def _isolation(self, per_target, all_targets):
         run_dir = "_runs"
-        mode_dir = "isolated"
+        mode_dir = "isolated" if per_target else "combined"
         batch_dir = str(self._batch_size) if self._batched else "all"
         output_dir = os.path.join(
             self.workdir, run_dir, Target.identify(all_targets), mode_dir, batch_dir
