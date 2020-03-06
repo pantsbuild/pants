@@ -95,9 +95,11 @@ class AntlrJavaGenTest(NailgunTaskTestBase):
         sources = task._capture_sources((vt,))[0]
         syn_target = task._inject_synthetic_target(vt, sources)
 
-        actual_sources = {str(path) for path in Path(target_workdir).rglob("*.java")}
+        actual_sources = {
+            str(path.relative_to(target_workdir)) for path in Path(target_workdir).rglob("*.java")
+        }
         expected_sources = syn_target.sources_relative_to_source_root()
-        self.assertEqual(set(expected_sources), actual_sources)
+        assert set(expected_sources) == actual_sources
 
         # Check that the synthetic target has a valid source root and the generated sources have the
         # expected java package
