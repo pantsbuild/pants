@@ -397,7 +397,7 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
     # https://github.com/pantsbuild/pants/issues/5073
 
     register('--fast', type=bool, default=False, fingerprint=True,
-             removal_version="1.27.0.dev0",
+             removal_version="1.28.0.dev0",
              removal_hint="This option is going away for better isolation of tests and in "
                           "preparation for switching to the V2 test implementation, which provides "
                           "much better caching and concurrency.\n\n"
