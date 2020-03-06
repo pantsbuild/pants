@@ -373,7 +373,7 @@ fn main() {
           store.clone(),
           PlatformConstraint::Linux,
           executor,
-          std::time::Duration::from_secs(160),
+          std::time::Duration::from_secs(300),
           std::time::Duration::from_millis(500),
           std::time::Duration::from_secs(5),
         )
