@@ -65,21 +65,26 @@ fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
   let local_result = runtime.block_on(local.run(request.clone().into(), Context::default()));
 
   let cache_dir = TempDir::new().unwrap();
-  let caching = crate::cache::CommandRunner {
-    underlying: Arc::new(local),
-    file_store: store.clone(),
-    process_execution_store: ShardedLmdb::new(
-      cache_dir.path().to_owned(),
-      50 * 1024 * 1024,
-      runtime.clone(),
-    )
-    .unwrap(),
-    metadata: ExecuteProcessRequestMetadata {
-      instance_name: None,
-      cache_key_gen_version: None,
-      platform_properties: vec![],
-    },
+
+  let process_execution_store = ShardedLmdb::new(
+    cache_dir.path().to_owned(),
+    50 * 1024 * 1024,
+    runtime.clone(),
+  )
+  .unwrap();
+
+  let metadata = ExecuteProcessRequestMetadata {
+    instance_name: None,
+    cache_key_gen_version: None,
+    platform_properties: vec![],
   };
+
+  let caching = crate::cache::CommandRunner::new(
+    Arc::new(local),
+    process_execution_store,
+    store.clone(),
+    metadata,
+  );
 
   let uncached_result = runtime.block_on(caching.run(request.clone().into(), Context::default()));
 

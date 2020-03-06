@@ -211,12 +211,12 @@ impl Core {
         executor.clone(),
       )
       .map_err(|err| format!("Could not initialize store for process cache: {:?}", err))?;
-      command_runner = Box::new(process_execution::cache::CommandRunner {
-        underlying: command_runner.into(),
+      command_runner = Box::new(process_execution::cache::CommandRunner::new(
+        command_runner.into(),
         process_execution_store,
-        file_store: store.clone(),
-        metadata: process_execution_metadata,
-      })
+        store.clone(),
+        process_execution_metadata,
+      ));
     }
 
     let http_client = reqwest::r#async::Client::new();
