@@ -49,12 +49,14 @@ Bugfixes
 * Fix deprecation warning for `--transitive` for goals that ignore the option (#9076)
   `PR #9076 <https://github.com/pantsbuild/pants/pull/9076>`_
 
-
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 * Trigger warning/error for deprecated Target method overrides. (#9073)
   `PR #9073 <https://github.com/pantsbuild/pants/pull/9073>`_
+
+* Delay removing `--test-fast` from 1.27.0.dev0 to 1.28.0.dev0 (#9250)
+  `PR #9250 <https://github.com/pantsbuild/pants/pull/9250>`_
 
 1.25.0rc0 (02/4/2020)
 ---------------------
