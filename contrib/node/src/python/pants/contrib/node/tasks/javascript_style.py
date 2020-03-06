@@ -229,7 +229,7 @@ class JavascriptStyleLint(LintTaskMixin, JavascriptStyleBase):
 
     @property
     def skip_execution(self):
-        return super()._resolve_conflicting_skip(old_scope="lint-javascriptstyle")
+        return ESLint.global_instance().options.skip
 
 
 class JavascriptStyleFmt(FmtTaskMixin, JavascriptStyleBase):

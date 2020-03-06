@@ -186,7 +186,7 @@ class ScalaFixCheck(LintTaskMixin, ScalafixTask):
 
     @property
     def skip_execution(self):
-        return super()._resolve_conflicting_skip(old_scope="lint-scalafix")
+        return Scalafix.global_instance().options.skip
 
     def process_result(self, result):
         if result != 0:

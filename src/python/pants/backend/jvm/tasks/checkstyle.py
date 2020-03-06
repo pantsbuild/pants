@@ -75,11 +75,7 @@ class Checkstyle(LintTaskMixin, NailgunTask):
 
     @property
     def skip_execution(self):
-        return self.resolve_conflicting_skip_options(
-            old_scope="lint-checkstyle",
-            new_scope="checkstyle",
-            subsystem=CheckstyleSubsystem.global_instance(),
-        )
+        return CheckstyleSubsystem.global_instance().options.skip
 
     @classmethod
     def prepare(cls, options, round_manager):

@@ -100,7 +100,7 @@ class ScalaFmtCheckFormat(LintTaskMixin, ScalafmtTask):
 
     @property
     def skip_execution(self):
-        return super()._resolve_conflicting_skip(old_scope="lint-scalafmt")
+        return Scalafmt.global_instance().options.skip
 
     def process_result(self, result):
         if result != 0:
