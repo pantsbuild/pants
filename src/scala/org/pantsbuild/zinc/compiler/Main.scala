@@ -223,7 +223,7 @@ object Main {
     x - 1
   }
   def toLsp(problems: List[Problem],
-            workingDirectory: File): List[PublishDiagnosticsParams] = {
+            workingDirectory: File): Iterable[PublishDiagnosticsParams] = {
     problems
       .groupBy(problem => problem.position.sourcePath)
       .map {
@@ -233,6 +233,9 @@ object Main {
           // want to be able to cache this data in heterogeneous environments.
           val uri: String = "buildroot://" + file.asScala
             .map(file => Util.relativize(workingDirectory, new File(file)))
+            // Note: while zinc allows the sourcePath to be optional, the LSP enforces an existing
+            // URI. For this reason, we use an empty URI to represent the case where the URI would
+            // be missing from the zinc's output.
             .getOrElse("")
 
           val diagnostics =
@@ -254,27 +257,24 @@ object Main {
           new PublishDiagnosticsParams(uri, diagnostics.asJava)
         }
       }
-      .toList
   }
 
-  def dumpDiagnostics(settings: Settings,
+  def dumpDiagnostics(diagnosticsFile: File,
                       inputs: Inputs,
                       workingDirectory: File,
                       log: Logger): Unit = {
-    settings.diagnosticsOut.map(diagnosticsFile => {
-      val problems = inputs.setup.reporter.problems.toList
-      val serializer = new Gson()
-      val serialized = serializer.toJson(toLsp(problems, workingDirectory))
-      log.debug(
-        "Writing diagnostics report to file: " + diagnosticsFile.toString
-      )
-      val writer = new PrintWriter(diagnosticsFile)
-      try {
-        writer.write(serialized)
-      } finally {
-        writer.close()
-      }
-    })
+    val problems = inputs.setup.reporter.problems.toList
+    val serializer = new Gson()
+    val serialized = serializer.toJson(toLsp(problems, workingDirectory))
+    log.debug(
+      "Writing diagnostics report to file: " + diagnosticsFile.toString
+    )
+    val writer = new PrintWriter(diagnosticsFile)
+    try {
+      writer.write(serialized)
+    } finally {
+      writer.close()
+    }
   }
 
   def mainImpl(settings: Settings,
@@ -320,7 +320,6 @@ object Main {
             .ConcreteAnalysisContents(result.analysis, result.setup)
         )
       }
-      dumpDiagnostics(settings, inputs, workingDirectory, log)
       log.info("Compile success " + Util.timing(startTime))
       // if compile is successful, jar the contents of classesDirectory and copy to outputJar
       if (settings.outputJar.isDefined) {
@@ -334,7 +333,6 @@ object Main {
       }
     } catch {
       case e: CompileFailed =>
-        dumpDiagnostics(settings, inputs, workingDirectory, log)
         log.error("Compile failed " + Util.timing(startTime))
         exit(1)
       case e: Exception =>
@@ -342,6 +340,10 @@ object Main {
         val message = e.getMessage
         if (message ne null) log.error(message)
         exit(1)
+    } finally {
+      settings.diagnosticsOut.map(diagnosticsFile => {
+        dumpDiagnostics(diagnosticsFile, inputs, workingDirectory, log)
+      })
     }
   }
 }
