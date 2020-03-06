@@ -123,10 +123,10 @@ object Main {
     }
   }
 
-  def preprocessArgs(rawArgs: Array[String], nailMainCWD: Option[File]): Array[String] = {
+  def preprocessArgs(rawArgs: Array[String]): Array[String] = {
     val (argFiles, partialArgs) = rawArgs.partition(_.startsWith("@"))
     val args = partialArgs ++ argFiles.flatMap { f =>
-      Files.readLines(Util.normalizeIfExists(nailMainCWD)(new File(f.drop(1))), Charsets.UTF_8).asScala
+      Files.readLines(new File(f.drop(1)), Charsets.UTF_8).asScala
     }
     val fixedArgs = args.flatMap { arg =>
       arg match {
@@ -164,7 +164,7 @@ object Main {
   def main(args: Array[String]): Unit = {
     val startTime = System.currentTimeMillis
 
-    val settings = Settings.SettingsParser.parse(preprocessArgs(args, None), Settings()) match {
+    val settings = Settings.SettingsParser.parse(preprocessArgs(args), Settings()) match {
       case Some(settings) => settings
       case None => {
         println("See zinc-compiler --help for information about options")
@@ -178,10 +178,9 @@ object Main {
   def nailMain(context: NGContext): Unit = {
     val startTime = System.currentTimeMillis
 
-    Settings.SettingsParser.parse(preprocessArgs(context.getArgs, Some(new File(context.getWorkingDirectory))), Settings()) match {
+    Settings.SettingsParser.parse(preprocessArgs(context.getArgs), Settings()) match {
       case Some(settings) =>
-        var settingsWithAbsPath = settings.withAbsolutePaths(new File(context.getWorkingDirectory))
-        mainImpl(settingsWithAbsPath, startTime, n => context.exit(n))
+        mainImpl(settings.withAbsolutePaths(new File(context.getWorkingDirectory)), startTime, n => context.exit(n))
       case None => {
         println("See zinc-compiler --help for information about options")
         context.exit(1)

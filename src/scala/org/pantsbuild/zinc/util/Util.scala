@@ -85,17 +85,6 @@ object Util {
   }
 
   /**
-   * Normalize the files to CWD if the normalized path exists
-   */
-  def normalizeIfExists(cwd: Option[File])(file: File): File = {
-    if (cwd.isDefined) {
-      val normed = normalise(cwd)(file)
-      if (normed.exists()) normed else file
-    }
-    else file
-  }
-
-  /**
    * Fully relativize a path, relative to any other base.
    */
   def relativize(base: File, path: File): String = {
