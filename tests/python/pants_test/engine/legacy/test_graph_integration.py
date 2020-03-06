@@ -30,7 +30,7 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
 
     _ERR_TARGETS = {
         "testprojects/src/python/sources:some-missing-some-not": [
-            "globs('*.txt', '*.rs')",
+            "['*.txt', '*.rs']",
             "Snapshot(PathGlobs(globs=('testprojects/src/python/sources/*.txt', 'testprojects/src/python/sources/*.rs'), glob_match_error_behavior<Exactly(GlobMatchErrorBehavior)>=GlobMatchErrorBehavior(value=error), conjunction<Exactly(GlobExpansionConjunction)>=GlobExpansionConjunction(value=all_match)))",
             'Unmatched glob from testprojects/src/python/sources:some-missing-some-not\'s `sources` field: "testprojects/src/python/sources/*.rs"',
         ],
@@ -41,9 +41,9 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
         ],
         "testprojects/src/java/org/pantsbuild/testproject/bundle:missing-bundle-fileset": [
             "['a/b/file1.txt']",
-            "RGlobs('*.aaaa', '*.bbbb')",
-            "Globs('*.aaaa')",
-            "ZGlobs('**/*.abab')",
+            "['*.aaaa', '*.bbbb']",
+            "['*.aaaa']",
+            "['**/*.abab']",
             "['file1.aaaa', 'file2.aaaa']",
             "Snapshot(PathGlobs(globs=('testprojects/src/java/org/pantsbuild/testproject/bundle/*.aaaa',), glob_match_error_behavior<Exactly(GlobMatchErrorBehavior)>=GlobMatchErrorBehavior(value=error), conjunction<Exactly(GlobExpansionConjunction)>=GlobExpansionConjunction(value=all_match)))",
             'Unmatched glob from testprojects/src/java/org/pantsbuild/testproject/bundle:missing-bundle-fileset\'s `bundles` field:: "testprojects/src/java/org/pantsbuild/testproject/bundle/*.aaaa"',
