@@ -49,12 +49,12 @@ class ScoveragePlatform(InjectablesMixin, Subsystem):
             JarDependency(
                 org="com.twitter.scoverage",
                 name="scalac-scoverage-plugin_2.12",
-                rev="1.0.1-twitter",
+                rev="1.0.2-twitter",
             ),
             JarDependency(
                 org="com.twitter.scoverage",
                 name="scalac-scoverage-runtime_2.12",
-                rev="1.0.1-twitter",
+                rev="1.0.2-twitter",
             ),
         ]
 
