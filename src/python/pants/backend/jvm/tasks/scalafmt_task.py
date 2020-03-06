@@ -19,13 +19,6 @@ class ScalafmtTask(RewriteBase):
     different scalafmt commands.
     """
 
-    def _resolve_conflicting_skip(self, *, old_scope: str):
-        # Skip mypy because this is a temporary hack, and mypy doesn't follow the inheritance chain
-        # properly.
-        return self.resolve_conflicting_skip_options(  # type: ignore
-            old_scope=old_scope, new_scope="scalafmt", subsystem=Scalafmt.global_instance(),
-        )
-
     @classmethod
     def subsystem_dependencies(cls):
         return super().subsystem_dependencies() + (Scalafmt,)
@@ -125,7 +118,7 @@ class ScalaFmtFormat(FmtTaskMixin, ScalafmtTask):
 
     @property
     def skip_execution(self):
-        return super()._resolve_conflicting_skip(old_scope="fmt-scalafmt")
+        return super().determine_if_skipped(formatter_subsystem=Scalafmt.global_instance())
 
     def process_result(self, result):
         # Processes the results of running the scalafmt command.

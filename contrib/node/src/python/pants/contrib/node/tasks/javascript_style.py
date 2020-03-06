@@ -240,4 +240,4 @@ class JavascriptStyleFmt(FmtTaskMixin, JavascriptStyleBase):
 
     @property
     def skip_execution(self):
-        return super()._resolve_conflicting_skip(old_scope="fmt-javascriptstyle")
+        return super().determine_if_skipped(formatter_subsystem=ESLint.global_instance())
