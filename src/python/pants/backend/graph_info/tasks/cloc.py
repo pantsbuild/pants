@@ -14,6 +14,8 @@ from pants.util.contextutil import temporary_dir
 class CountLinesOfCode(ConsoleTask):
     """Print counts of lines of code."""
 
+    _register_console_transitivity_option = False
+
     @classmethod
     def subsystem_dependencies(cls):
         return super().subsystem_dependencies() + (ClocBinary,)
@@ -26,6 +28,19 @@ class CountLinesOfCode(ConsoleTask):
             type=bool,
             fingerprint=True,
             help="Show information about files ignored by cloc.",
+        )
+        register(
+            "--transitive",
+            type=bool,
+            default=False,
+            fingerprint=True,
+            removal_version="1.29.0.dev0",
+            removal_hint=(
+                "This feature is going away. Instead of relying on the `--transitive` flag, "
+                "directly specify on the command line every target that you want to format or "
+                "lint.",
+            ),
+            help="If True, use all targets in the build graph, else use only target roots.",
         )
 
     def console_output(self, targets):

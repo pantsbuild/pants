@@ -108,16 +108,6 @@ class IdeaPluginGen(ConsoleTask):
             help="Sets the java language and jdk used to compile the project's java sources.",
         )
         register(
-            "--transitive",
-            type=bool,
-            default=True,
-            fingerprint=True,
-            help="If True, use all targets in the build graph, else use only target roots.",
-            removal_version="1.27.0.dev0",
-            removal_hint="`idea-plugin` should always act transitively, which is the default. This option "
-            "will be going away to ensure that Pants always does the right thing.",
-        )
-        register(
             "--possible-paths",
             type=list,
             default=["/Applications/IntelliJ IDEA CE.app", "/Applications/IntelliJ IDEA.app"],
@@ -126,8 +116,7 @@ class IdeaPluginGen(ConsoleTask):
 
     @property
     def act_transitively(self):
-        # NB: `idea-plugin` should always act transitively
-        return self.get_options().transitive
+        return True
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

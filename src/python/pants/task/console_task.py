@@ -5,7 +5,6 @@ import errno
 import os
 from contextlib import contextmanager
 
-from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.task.task import QuietTaskMixin, Task
 from pants.util.dirutil import safe_open
@@ -37,27 +36,13 @@ class ConsoleTask(QuietTaskMixin, Task):
             register(
                 "--transitive",
                 type=bool,
-                default=True,
+                default=False,
                 fingerprint=True,
                 help="If True, use all targets in the build graph, else use only target roots.",
             )
 
     @property
     def act_transitively(self):
-        if self._register_console_transitivity_option:
-            deprecated_conditional(
-                lambda: self.get_options().is_default("transitive"),
-                entity_description=f"Pants defaulting to `--transitive` for `{self.options_scope}`",
-                removal_version="1.27.0.dev0",
-                hint_message="Currently, Pants defaults to `--transitive`, which means that it "
-                "will run against transitive dependencies for the targets you specify on the "
-                "command line, rather than only the targets you specify. This is often useful, "
-                "such as running `./pants dependencies --transitive`, but it is surprising "
-                "to have this behavior by default.\n\nTo prepare for this change to the default "
-                f"value, set in `pants.toml` under the section `{self.options_scope}` the value "
-                "`transitive = false`. In Pants 1.27.0, you can safely remove the setting.",
-            )
-            return self.get_options().transitive
         # `Task` defaults to returning `True` in `act_transitively`, so we keep that default value.
         return self.get_options().get("transitive", True)
 

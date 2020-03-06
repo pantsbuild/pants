@@ -2,12 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.task.target_restriction_mixins import (
-    DeprecatedSkipAndDeprecatedTransitiveGoalOptionsRegistrar,
-    HasSkipAndTransitiveGoalOptionsMixin,
+    DeprecatedSkipGoalOptionsRegistrar,
+    HasSkipGoalOptionMixin,
 )
 
 
-class FmtGoalRegistrar(DeprecatedSkipAndDeprecatedTransitiveGoalOptionsRegistrar):
+class FmtGoalRegistrar(DeprecatedSkipGoalOptionsRegistrar):
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
@@ -22,8 +22,12 @@ class FmtGoalRegistrar(DeprecatedSkipAndDeprecatedTransitiveGoalOptionsRegistrar
         )
 
 
-class FmtTaskMixin(HasSkipAndTransitiveGoalOptionsMixin):
+class FmtTaskMixin(HasSkipGoalOptionMixin):
     """A mixin to combine with code formatting tasks."""
 
     goal_options_registrar_cls = FmtGoalRegistrar
     target_filtering_enabled = True
+
+    @property
+    def act_transitively(self):
+        return False
