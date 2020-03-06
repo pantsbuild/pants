@@ -428,13 +428,14 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
             type=bool,
             default=False,
             fingerprint=True,
-            removal_version="1.27.0.dev0",
-            removal_hint="This option is going away for better isolation of tests and in "
-            "preparation for switching to the V2 test implementation, which provides "
-            "much better caching and concurrency.\n\n"
-            "We recommend running a full CI suite with `no-fast` (the default now) "
-            "to see if any tests fail. If any fail, this likely signals shared state "
-            "between your test targets.",
+            removal_version="1.28.0.dev0",
+            removal_hint=(
+                "This option is going away for better isolation of tests, which provides "
+                "better caching. This also prepares for upgrading to the V2 test implementation,"
+                "which provides even better caching and parallelism.\n\nWe recommend running a "
+                "full CI suite with `no-fast` (the default now) to see if any tests fail. If any "
+                "fail, this likely signals shared state between your test targets."
+            ),
             help="Run all tests in a single invocation. If turned off, each test target "
             "will run in its own invocation, which will be slower, but isolates "
             "tests from process-wide state created by tests in other targets.",
