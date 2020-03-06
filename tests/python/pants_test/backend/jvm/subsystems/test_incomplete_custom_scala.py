@@ -37,7 +37,7 @@ class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
         with temporary_dir(root_dir=get_buildroot()) as scalastyle_dir:
             path = os.path.join(scalastyle_dir, "config.xml")
             safe_file_dump(path, """<scalastyle/>""")
-            yield f"--lint-scalastyle-config={path}"
+            yield f"--scalastyle-config={path}"
 
     def pants_run(self, options=None):
         if options is None:

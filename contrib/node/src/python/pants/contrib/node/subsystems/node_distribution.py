@@ -1,17 +1,13 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import filecmp
 import logging
 import os
-import shutil
-from typing import Tuple
 
 from pants.base.exceptions import TaskError
 from pants.binaries.binary_tool import NativeTool
 from pants.binaries.binary_util import BinaryToolUrlGenerator
-from pants.option.custom_types import dir_option, file_option
-from pants.util.dirutil import is_readable_dir, safe_mkdir, safe_rmtree
+from pants.util.dirutil import is_readable_dir
 from pants.util.memo import memoized_method, memoized_property
 
 from pants.contrib.node.subsystems.command import command_gen
@@ -72,44 +68,6 @@ class NodeDistribution(NativeTool):
                 VALID_PACKAGE_MANAGERS
             ),
         )
-        # TODO: remove _configure_eslinter(), eslint_supportdir(), and _eslint_required_files when
-        # removing this option!
-        register(
-            "--eslint-setupdir",
-            advanced=True,
-            type=dir_option,
-            fingerprint=True,
-            removal_version="1.27.0.dev0",
-            removal_hint="Use `--eslint-setupdir` instead of `--node-distribution-eslint-setupdir`",
-            help="Find the package.json and yarn.lock under this dir "
-            "for installing eslint and plugins.",
-        )
-        register(
-            "--eslint-config",
-            advanced=True,
-            type=file_option,
-            fingerprint=True,
-            removal_version="1.27.0.dev0",
-            removal_hint="Use `--eslint-config` instead of `--node-distribution-eslint-config`",
-            help="The path to the global eslint configuration file specifying all the rules",
-        )
-        register(
-            "--eslint-ignore",
-            advanced=True,
-            type=file_option,
-            fingerprint=True,
-            removal_version="1.27.0.dev0",
-            removal_hint="Use `--eslint-ignore` instead of `--node-distribution-eslint-ignore`",
-            help="The path to the global eslint ignore path",
-        )
-        register(
-            "--eslint-version",
-            default="4.15.0",
-            fingerprint=True,
-            removal_version="1.27.0.dev0",
-            removal_hint="Use `--eslint-version` instead of `--node-distribution-eslint-version`",
-            help="Use this ESLint version.",
-        )
         register(
             "--node-scope",
             advanced=True,
@@ -137,22 +95,6 @@ class NodeDistribution(NativeTool):
                 )
             )
         return package_manager_obj
-
-    @memoized_property
-    def eslint_setupdir(self):
-        return self.get_options().eslint_setupdir
-
-    @memoized_property
-    def eslint_version(self):
-        return self.get_options().eslint_version
-
-    @memoized_property
-    def eslint_config(self):
-        return self.get_options().eslint_config
-
-    @memoized_property
-    def eslint_ignore(self):
-        return self.get_options().eslint_ignore
 
     @memoized_property
     def node_scope(self):
@@ -202,54 +144,3 @@ class NodeDistribution(NativeTool):
         # NB: We explicitly allow no args for the `node` command unlike the `npm` command since running
         # `node` with no arguments is useful, it launches a REPL.
         return command_gen([self._install_node], "node", args=args, node_paths=node_paths)
-
-    def _configure_eslinter(self, bootstrapped_support_path: str) -> None:
-        logger.debug(
-            "Copying {setupdir} to bootstrapped dir: {support_path}".format(
-                setupdir=self.eslint_setupdir, support_path=bootstrapped_support_path
-            )
-        )
-        safe_rmtree(bootstrapped_support_path)
-        shutil.copytree(self.eslint_setupdir, bootstrapped_support_path)
-
-    _eslint_required_files = ["yarn.lock", "package.json"]
-
-    def eslint_supportdir(self, task_workdir: str) -> Tuple[str, bool]:
-        """Returns the path where the ESLint is bootstrapped.
-
-        :param task_workdir: The task's working directory
-        :returns: The path where ESLint is bootstrapped and whether or not it is configured
-        """
-        bootstrapped_support_path = os.path.join(task_workdir, "eslint")
-
-        # TODO(nsaechao): Should only have to check if the "eslint" dir exists in the task_workdir
-        # assuming fingerprinting works as intended.
-
-        # If the eslint_setupdir is not provided or missing required files, then
-        # clean up the directory so that Pants can install a pre-defined eslint version later on.
-        # Otherwise, if there is no configurations changes, rely on the cache.
-        # If there is a config change detected, use the new configuration.
-        if self.eslint_setupdir:
-            configured = all(
-                os.path.exists(os.path.join(self.eslint_setupdir, f))
-                for f in self._eslint_required_files
-            )
-        else:
-            configured = False
-        if not configured:
-            safe_mkdir(bootstrapped_support_path, clean=True)
-        else:
-            try:
-                installed = all(
-                    filecmp.cmp(
-                        os.path.join(self.eslint_setupdir, f),
-                        os.path.join(bootstrapped_support_path, f),
-                    )
-                    for f in self._eslint_required_files
-                )
-            except OSError:
-                installed = False
-
-            if not installed:
-                self._configure_eslinter(bootstrapped_support_path)
-        return bootstrapped_support_path, configured

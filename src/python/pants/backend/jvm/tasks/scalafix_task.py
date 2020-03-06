@@ -8,7 +8,6 @@ from typing import List
 from pants.backend.jvm.subsystems.scalafix import Scalafix
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.rewrite_base import RewriteBase
-from pants.base.deprecated import resolve_conflicting_options
 from pants.base.exceptions import TaskError
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.target_scopes import Scopes
@@ -23,16 +22,6 @@ class ScalafixTask(RewriteBase):
     """Executes the scalafix tool."""
 
     _SCALAFIX_MAIN = "scalafix.cli.Cli"
-
-    def _resolve_conflicting_options(self, *, old_option: str, new_option: str):
-        return resolve_conflicting_options(
-            old_option=old_option,
-            new_option=new_option,
-            old_scope="fmt-scalafix",
-            new_scope="scalafix",
-            old_container=self.get_options(),
-            new_container=Scalafix.global_instance().options,
-        )
 
     def _resolve_conflicting_skip(self, *, old_scope: str):
         # Skip mypy because this is a temporary hack, and mypy doesn't follow the inheritance chain
@@ -141,7 +130,7 @@ class ScalafixTask(RewriteBase):
             args.append(f"--sourceroot={absolute_root}")
             args.append(f"--classpath={os.pathsep.join(classpath)}")
 
-        config = self._resolve_conflicting_options(old_option="configuration", new_option="config")
+        config = Scalafix.global_instance().options.config
         if config:
             args.append(f"--config={config}")
 

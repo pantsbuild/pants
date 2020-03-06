@@ -7,7 +7,6 @@ import re
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.scalastyle import Scalastyle
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
-from pants.base.deprecated import resolve_conflicting_options
 from pants.base.exceptions import TaskError
 from pants.build_graph.target import Target
 from pants.option.custom_types import file_option
@@ -59,16 +58,6 @@ class ScalastyleTask(LintTaskMixin, NailgunTask):
 
     _MAIN = "org.scalastyle.Main"
 
-    def _resolve_conflicting_options(self, *, old_option: str, new_option: str):
-        return resolve_conflicting_options(
-            old_option=old_option,
-            new_option=new_option,
-            old_scope="lint-scalastyle",
-            new_scope="scalastyle",
-            old_container=self.get_options(),
-            new_container=Scalastyle.global_instance().options,
-        )
-
     @classmethod
     def subsystem_dependencies(cls):
         return super().subsystem_dependencies() + (ScalaPlatform, Scalastyle)
@@ -76,15 +65,6 @@ class ScalastyleTask(LintTaskMixin, NailgunTask):
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
-        register(
-            "--config",
-            type=file_option,
-            advanced=True,
-            fingerprint=True,
-            removal_version="1.27.0.dev0",
-            removal_hint="Use `--scalastyle-config` instead.",
-            help="Path to scalastyle config file.",
-        )
         register(
             "--excludes",
             type=file_option,
@@ -200,7 +180,7 @@ class ScalastyleTask(LintTaskMixin, NailgunTask):
                     raise TaskError(f"java {ScalastyleTask._MAIN} ... exited non-zero ({result})")
 
     def validate_scalastyle_config(self):
-        config = self._resolve_conflicting_options(old_option="config", new_option="config")
+        config = Scalastyle.global_instance().options.config
         if not config:
             raise ScalastyleTask.UnspecifiedConfig()
         if not os.path.exists(config):

@@ -4,7 +4,6 @@
 import os
 
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import resolve_conflicting_options
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.task.fmt_task_mixin import FmtTaskMixin
@@ -30,16 +29,6 @@ class JavascriptStyleBase(NodeTask):
     _JS_SOURCE_EXTENSION = ".js"
     _JSX_SOURCE_EXTENSION = ".jsx"
     INSTALL_JAVASCRIPTSTYLE_TARGET_NAME = "synthetic-install-javascriptstyle-module"
-
-    def _resolve_conflicting_options(self, *, old_option: str, new_option: str):
-        return resolve_conflicting_options(
-            old_option=old_option,
-            new_option=new_option,
-            old_scope="node-distribution",
-            new_scope="eslint",
-            old_container=self.node_distribution.options,
-            new_container=ESLint.global_instance().options,
-        )
 
     def _resolve_conflicting_skip(self, *, old_scope: str):
         # Skip mypy because this is a temporary hack, and mypy doesn't follow the inheritance chain
@@ -108,9 +97,7 @@ class JavascriptStyleBase(NodeTask):
     @memoized_method
     def _bootstrap_eslinter(self, bootstrap_dir):
         with pushd(bootstrap_dir):
-            eslint_version = self._resolve_conflicting_options(
-                old_option="eslint_version", new_option="version",
-            )
+            eslint_version = ESLint.global_instance().options.version
             eslint = f"eslint@{eslint_version}"
             self.context.log.debug(f"Installing {eslint}...")
             result, add_command = self.add_package(
@@ -212,12 +199,8 @@ class JavascriptStyleBase(NodeTask):
                     target,
                     bootstrap_dir,
                     files,
-                    config=self._resolve_conflicting_options(
-                        old_option="eslint_config", new_option="config"
-                    ),
-                    ignore_path=self._resolve_conflicting_options(
-                        old_option="eslint_ignore", new_option="ignore"
-                    ),
+                    config=ESLint.global_instance().options.config,
+                    ignore_path=ESLint.global_instance().options.ignore,
                 )
                 if result_code != 0:
                     if self.get_options().fail_slow:
