@@ -241,7 +241,7 @@ object Main {
                 val position =
                   new Position(
                     // xsbti uses one-based values for line and "pointer" (i.e: character index)
-                    // the Language ServerProtocol requires one-based values
+                    // the Language ServerProtocol requires zero-based values
                     toZeroBased(problem.position.line.orElse(0)),
                     toZeroBased(problem.position.pointer.orElse(0))
                   )
@@ -259,18 +259,21 @@ object Main {
 
   def dumpDiagnostics(settings: Settings,
                       inputs: Inputs,
-                      workingDirectory: File): Unit = {
-    val problems = inputs.setup.reporter.problems.toList
-    val serializer = new Gson()
-    val serialized = serializer.toJson(toLsp(problems, workingDirectory))
+                      workingDirectory: File,
+                      log: Logger): Unit = {
     settings.diagnosticsOut.map(diagnosticsFile => {
-      val log = mkLogger(settings)
+      val problems = inputs.setup.reporter.problems.toList
+      val serializer = new Gson()
+      val serialized = serializer.toJson(toLsp(problems, workingDirectory))
       log.debug(
         "Writing diagnostics report to file: " + diagnosticsFile.toString
       )
       val writer = new PrintWriter(diagnosticsFile)
-      writer.write(serialized)
-      writer.close()
+      try {
+        writer.write(serialized)
+      } finally {
+        writer.close()
+      }
     })
   }
 
@@ -317,7 +320,7 @@ object Main {
             .ConcreteAnalysisContents(result.analysis, result.setup)
         )
       }
-      dumpDiagnostics(settings, inputs, workingDirectory)
+      dumpDiagnostics(settings, inputs, workingDirectory, log)
       log.info("Compile success " + Util.timing(startTime))
       // if compile is successful, jar the contents of classesDirectory and copy to outputJar
       if (settings.outputJar.isDefined) {
@@ -331,7 +334,7 @@ object Main {
       }
     } catch {
       case e: CompileFailed =>
-        dumpDiagnostics(settings, inputs, workingDirectory)
+        dumpDiagnostics(settings, inputs, workingDirectory, log)
         log.error("Compile failed " + Util.timing(startTime))
         exit(1)
       case e: Exception =>
