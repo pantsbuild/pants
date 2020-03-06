@@ -126,12 +126,11 @@ async def create_pex(
     argv = [
         "--output-file",
         request.output_filename,
+        "--jobs",
+        str(python_setup.resolver_jobs),
         *request.interpreter_constraints.generate_pex_arg_list(),
         *request.additional_args,
     ]
-
-    if python_setup.resolver_jobs:
-        argv.extend(["--jobs", python_setup.resolver_jobs])
 
     if python_setup.manylinux:
         argv.extend(["--manylinux", python_setup.manylinux])

@@ -148,10 +148,18 @@ class PythonSetup(Subsystem):
         register(
             "--resolver-jobs",
             type=int,
-            default=None,
+            default=1,
             advanced=True,
             fingerprint=True,
-            help="The maximum number of concurrent jobs to resolve wheels with.",
+            help=(
+                "The maximum number of concurrent jobs to resolve wheels with. You may want to "
+                "increase the maximum number of parallel jobs to potentially improve the latency "
+                "of resolving wheels at the expense of other processes on your system. If you are "
+                "using the V1 engine, which runs each process sequentially, the total parallelism "
+                "will be `--python-setup-resolver-jobs`. If you are using the V2 engine, which by "
+                "default runs multiple processes in parallel, the total parallelism will be "
+                "`--process-execution-local-parallelism x --python-setup-resolver-jobs`."
+            ),
         )
 
     @property
@@ -207,8 +215,8 @@ class PythonSetup(Subsystem):
             return None
 
     @property
-    def resolver_jobs(self):
-        return self.get_options().resolver_jobs
+    def resolver_jobs(self) -> int:
+        return cast(int, self.get_options().resolver_jobs)
 
     @property
     def scratch_dir(self):
