@@ -605,10 +605,17 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
         return relsrc_to_target.get(relsrc)
 
     @contextmanager
-    def partitions(self, all_targets, test_targets):
-        def iter_partitions():
-            for test_target in test_targets:
-                yield (test_target,)
+    def partitions(self, per_target, all_targets, test_targets):
+        if per_target:
+
+            def iter_partitions():
+                for test_target in test_targets:
+                    yield (test_target,)
+
+        else:
+
+            def iter_partitions():
+                yield tuple(test_targets)
 
         workdir = self.workdir
 

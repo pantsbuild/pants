@@ -407,9 +407,10 @@ class TestRunnerTaskMixin:
 
 
 class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
-    """A mixin for test tasks that support running tests over individual targets.
+    """A mixin for test tasks that support running tests over both individual targets and batches.
 
-    This will partition tests per target and will help to ensure correct caching.
+    Provides support for partitioning via `--fast` (batches) and `--no-fast` (per target) options and
+    helps ensure correct caching behavior in either mode.
 
     It's expected that mixees implement proper chrooting (see `run_tests_in_chroot`) to support
     correct successful test result caching.
@@ -422,6 +423,22 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
         # TODO(John Sirois): Implement sanity checks on options wrt caching:
         # https://github.com/pantsbuild/pants/issues/5073
 
+        register(
+            "--fast",
+            type=bool,
+            default=False,
+            fingerprint=True,
+            removal_version="1.27.0.dev0",
+            removal_hint="This option is going away for better isolation of tests and in "
+            "preparation for switching to the V2 test implementation, which provides "
+            "much better caching and concurrency.\n\n"
+            "We recommend running a full CI suite with `no-fast` (the default now) "
+            "to see if any tests fail. If any fail, this likely signals shared state "
+            "between your test targets.",
+            help="Run all tests in a single invocation. If turned off, each test target "
+            "will run in its own invocation, which will be slower, but isolates "
+            "tests from process-wide state created by tests in other targets.",
+        )
         register(
             "--chroot",
             advanced=True,
@@ -437,8 +454,9 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
         return VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
 
     def check_artifact_cache_for(self, invalidation_check):
-        # Tests generate artifacts, namely junit.xml and coverage reports, that cover the full
-        # target set.
+        # Tests generate artifacts, namely junit.xml and coverage reports, that cover the full target
+        # set whether that is all targets in the context (`--fast`) or each target individually
+        # (`--no-fast`).
         return [self._vts_for_partition(invalidation_check)]
 
     @property
@@ -482,11 +500,12 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
 
         self.context.release_lock()
 
+        per_target = not self.get_options().fast
         fail_fast = self.get_options().fail_fast
 
         results = {}
         failure = False
-        with self.partitions(all_targets, test_targets) as partitions:
+        with self.partitions(per_target, all_targets, test_targets) as partitions:
             for (partition, args) in partitions():
                 try:
                     rv = self._run_partition(fail_fast, partition, *args)
@@ -528,17 +547,40 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
                 # A low-level test execution failure occurred before tests were run.
                 raise TaskError()
 
-    # Here invalidation refers to executing task work in `Task.invalidated` blocks against invalid
-    # targets. Caching refers to storing the results of that work in the artifact cache using
+    # Some notes on invalidation vs caching as used in `run_partition` below. Here invalidation
+    # refers to executing task work in `Task.invalidated` blocks against invalid targets. Caching
+    # refers to storing the results of that work in the artifact cache using
     # `VersionedTargetSet.results_dir`. One further bit of terminology is partition, which is the
-    # name for the set of targets passed to the `Task.invalidated` block. A partition used to
-    # sometimes be multiple targets, but now it always corresponds to one target as we removed the
-    # `--fast` option.
+    # name for the set of targets passed to the `Task.invalidated` block:
     #
-    # The below implementation originally had to handle the case where partitions had more than one
-    # target. This raised issues when some targets in the partition were successful but others were
-    # not, which we tried to mitigate by distinguishing between invalidation vs. caching. We get
-    # much better caching now because a partition is always one single target.
+    # + Caching results for len(partition) > 1: This is trivial iff we always run all targets in
+    #   the partition, but running just invalid targets in the partition is a nicer experience (you
+    #   can whittle away at failures in a loop of `::`-style runs). Running just invalid though
+    #   requires being able to merge prior results for the partition; ie: knowing the details of
+    #   junit xml, coverage data, or using tools that do, to merge data files. The alternative is
+    #   to always run all targets in a partition if even 1 target is invalid. In this way data files
+    #   corresponding to the full partition are always generated, and so on a green partition, the
+    #   cached data files will always represent the full green run.
+    #
+    # The compromise taken here is to only cache when `all_vts == invalid_vts`; ie when the partition
+    # goes green and the run was against the full partition. A common scenario would then be:
+    #
+    # 1. Mary makes changes / adds new code and iterates `./pants test tests/python/stuff::`
+    #    gradually getting greener until finally all test targets in the `tests/python/stuff::` set
+    #    pass. She commits the green change, but there is no cached result for it since green state
+    #    for the partition was approached incrementally.
+    # 2. Jake pulls in Mary's green change and runs `./pants test tests/python/stuff::`. There is a
+    #    cache miss and he does a full local run, but since `tests/python/stuff::` is green,
+    #    `all_vts == invalid_vts` and the result is now cached for others.
+    #
+    # In this scenario, Jake will likely be a CI process, in which case human others will see a
+    # cached result from Mary's commit. It's important to note, that the CI process must run the same
+    # partition as the end user for that end user to benefit and hit the cache. This is unlikely since
+    # the only natural partitions under CI are single target ones (`--no-fast` or all targets
+    # `--fast ::`. Its unlikely an end user in a large repo will want to run `--fast ::` since `::`
+    # is probably a much wider swath of code than they're working on. As such, although `--fast`
+    # caching is supported, its unlikely to be effective. Caching is best utilized when CI and users
+    # run `--no-fast`.
     def _run_partition(self, fail_fast, test_targets, *args):
         with self.invalidated(
             targets=test_targets,
@@ -602,7 +644,7 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
         return None
 
     @abstractmethod
-    def partitions(self, all_targets, test_targets):
+    def partitions(self, per_target, all_targets, test_targets):
         """Return a context manager that can be called to iterate of target partitions.
 
         The iterator should return a 2-tuple with the partitions targets in the first slot and a tuple
