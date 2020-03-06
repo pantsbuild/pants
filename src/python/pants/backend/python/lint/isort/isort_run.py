@@ -87,6 +87,4 @@ class IsortRun(FmtTaskMixin, Task):
 
     @property
     def skip_execution(self):
-        return self.resolve_conflicting_skip_options(
-            old_scope="fmt-isort", new_scope="isort", subsystem=Isort.global_instance(),
-        )
+        return self.determine_if_skipped(formatter_subsystem=Isort.global_instance())

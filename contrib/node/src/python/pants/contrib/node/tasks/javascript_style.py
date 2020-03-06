@@ -182,10 +182,8 @@ class JavascriptStyleBase(NodeTask):
         if not targets:
             return
         failed_targets = []
-        bootstrap_dir, is_preconfigured = (
-            ESLint.global_instance().supportdir(task_workdir=self.workdir)
-            if ESLint.global_instance().options.setupdir
-            else self.node_distribution.eslint_supportdir(self.workdir)
+        bootstrap_dir, is_preconfigured = ESLint.global_instance().supportdir(
+            task_workdir=self.workdir
         )
         if not is_preconfigured:
             self.context.log.debug("ESLint is not pre-configured, bootstrapping with defaults.")
@@ -229,7 +227,7 @@ class JavascriptStyleLint(LintTaskMixin, JavascriptStyleBase):
 
     @property
     def skip_execution(self):
-        return super()._resolve_conflicting_skip(old_scope="lint-javascriptstyle")
+        return ESLint.global_instance().options.skip
 
 
 class JavascriptStyleFmt(FmtTaskMixin, JavascriptStyleBase):
@@ -242,4 +240,4 @@ class JavascriptStyleFmt(FmtTaskMixin, JavascriptStyleBase):
 
     @property
     def skip_execution(self):
-        return super()._resolve_conflicting_skip(old_scope="fmt-javascriptstyle")
+        return super().determine_if_skipped(formatter_subsystem=ESLint.global_instance())

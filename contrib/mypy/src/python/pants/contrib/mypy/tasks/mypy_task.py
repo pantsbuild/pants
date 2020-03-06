@@ -82,9 +82,7 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
 
     @property
     def skip_execution(self):
-        return self.resolve_conflicting_skip_options(
-            old_scope="lint-mypy", new_scope="mypy", subsystem=self._mypy_subsystem,
-        )
+        return self._mypy_subsystem.options.skip
 
     def find_mypy_interpreter(self):
         interpreters = self._interpreter_cache.setup(

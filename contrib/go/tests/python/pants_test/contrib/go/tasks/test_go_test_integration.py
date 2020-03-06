@@ -81,6 +81,6 @@ class GoTestIntegrationTest(PantsRunIntegrationTest):
             pants_run = self.run_pants(args)
             self.assert_failure(pants_run)
 
-            args = ["compile", "lint", "--lint-go-skip", lib_unstyle_dir]
+            args = ["compile", "lint", "--gofmt-skip", lib_unstyle_dir]
             pants_run = self.run_pants(args)
             self.assert_success(pants_run)
