@@ -19,7 +19,6 @@ from pants.core_tasks.substitute_aliased_targets import SubstituteAliasedTargets
 from pants.core_tasks.targets_help import TargetsHelp
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar as task
-from pants.task.fmt_task_mixin import FmtTaskMixin
 
 
 def register_goals():
@@ -43,7 +42,7 @@ def register_goals():
     Goal.register("publish", "Publish a build artifact.")
     Goal.register("dep-usage", "Collect target dependency usage data.")
     Goal.register("lint", "Find formatting errors in source code.")
-    Goal.register("fmt", "Autoformat source code.", FmtTaskMixin.goal_options_registrar_cls)
+    Goal.register("fmt", "Autoformat source code.")
     Goal.register("buildozer", "Manipulate BUILD files.")
 
     # Register tasks.

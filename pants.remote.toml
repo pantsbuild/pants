@@ -53,8 +53,8 @@ interpreter_search_paths = [
 ld_flags = []
 cpp_flags = []
 
-[fmt2]
+[fmt]
 per_target_caching = true
 
-[lint2]
+[lint]
 per_target_caching = true

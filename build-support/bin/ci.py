@@ -417,10 +417,11 @@ def run_lint(*, oauth_token_path: Optional[str] = None) -> None:
     targets = ["contrib::", "examples::", "src::", "tests::", "zinc::"]
     command_prefix = ["./pants.pex", "--tag=-nolint"]
 
+    v2_command_prefix = [*command_prefix, "--no-v1", "--v2"]
     v2_command = (
-        [*command_prefix, "lint2", *targets]
+        [*v2_command_prefix, "lint", *targets]
         if oauth_token_path is None
-        else [*command_prefix, *_use_remote_execution(oauth_token_path), "lint2", *targets]
+        else [*v2_command_prefix, *_use_remote_execution(oauth_token_path), "lint", *targets]
     )
     _run_command(
         v2_command,
