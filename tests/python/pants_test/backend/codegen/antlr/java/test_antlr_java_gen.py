@@ -5,10 +5,9 @@ import os
 import re
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from textwrap import dedent
 from typing import Any
-
-from twitter.common.dirutil.fileset import Fileset
 
 from pants.backend.codegen.antlr.java.antlr_java_gen import AntlrJavaGen
 from pants.backend.codegen.antlr.java.java_antlr_library import JavaAntlrLibrary
@@ -96,9 +95,11 @@ class AntlrJavaGenTest(NailgunTaskTestBase):
         sources = task._capture_sources((vt,))[0]
         syn_target = task._inject_synthetic_target(vt, sources)
 
-        actual_sources = [s for s in Fileset.rglobs("*.java", root=target_workdir)]
+        actual_sources = {
+            str(path.relative_to(target_workdir)) for path in Path(target_workdir).rglob("*.java")
+        }
         expected_sources = syn_target.sources_relative_to_source_root()
-        self.assertEqual(set(expected_sources), set(actual_sources))
+        assert set(expected_sources) == actual_sources
 
         # Check that the synthetic target has a valid source root and the generated sources have the
         # expected java package

@@ -4,9 +4,7 @@
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.payload import Payload, PayloadFieldAlreadyDefinedError, PayloadFrozenError
 from pants.base.payload_field import PrimitiveField
-from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.source.wrapped_globs import Globs
 from pants.testutil.test_base import TestBase
 
 
@@ -18,7 +16,6 @@ class PayloadTest(TestBase):
                 # TODO: Use a dummy task type here, instead of depending on the jvm backend.
                 "java_library": JavaLibrary,
             },
-            context_aware_object_factories={"globs": Globs,},
         )
 
     def test_freeze(self):
@@ -66,15 +63,8 @@ class PayloadTest(TestBase):
         payload2.add_field("foo", PrimitiveField(None))
         self.assertNotEqual(payload.fingerprint(), payload2.fingerprint())
 
-    def test_no_nested_globs(self):
-        # nesting no longer allowed
-        self.add_to_build_file("z/BUILD", 'java_library(name="z", sources=[globs("*")])')
-        with self.assertRaises(AddressLookupError):
-            self.context().scan()
-
-    def test_flat_globs_list(self):
-        # flattened allowed
-        self.add_to_build_file("y/BUILD", 'java_library(name="y", sources=globs("*"))')
+    def test_globs(self):
+        self.add_to_build_file("y/BUILD", 'java_library(name="y", sources=["*"])')
         self.context().scan()
 
     def test_single_source(self):
