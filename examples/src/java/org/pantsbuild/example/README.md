@@ -346,8 +346,9 @@ jvm-platforms in pants.toml, and set what targets use which platforms. For examp
 And then in a BUILD file:
 
     :::python
-    java_library(name='my-library',
-      sources=globs('*.java'),
+    java_library(
+      name='my-library',
+      sources=['*.java'],
       platform='java9',
     )
 

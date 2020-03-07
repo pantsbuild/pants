@@ -37,15 +37,3 @@ python_tests(
   ],
   tags = {'partially_type_checked'},
 )
-
-pants_plugin(
-  name='plugin',
-  dependencies=[
-    ':python',
-  ],
-  tags = {"type_checked"},
-  distribution_name='pantsbuild.pants.awslambda.python',
-  description='Pants plugin for creating deployable AWS Lambdas out of python code.',
-  build_file_aliases=True,
-  register_goals=True,
-)

@@ -23,13 +23,6 @@ class ScalafixTask(RewriteBase):
 
     _SCALAFIX_MAIN = "scalafix.cli.Cli"
 
-    def _resolve_conflicting_skip(self, *, old_scope: str):
-        # Skip mypy because this is a temporary hack, and mypy doesn't follow the inheritance chain
-        # properly.
-        return self.resolve_conflicting_skip_options(  # type: ignore
-            old_scope=old_scope, new_scope="scalafix", subsystem=Scalafix.global_instance(),
-        )
-
     @classmethod
     def subsystem_dependencies(cls):
         return super().subsystem_dependencies() + (Scalafix,)
@@ -171,7 +164,7 @@ class ScalaFixFix(FmtTaskMixin, ScalafixTask):
 
     @property
     def skip_execution(self):
-        return super()._resolve_conflicting_skip(old_scope="fmt-scalafix")
+        return super().determine_if_skipped(formatter_subsystem=Scalafix.global_instance())
 
     def process_result(self, result):
         if result != 0:
@@ -186,7 +179,7 @@ class ScalaFixCheck(LintTaskMixin, ScalafixTask):
 
     @property
     def skip_execution(self):
-        return super()._resolve_conflicting_skip(old_scope="lint-scalafix")
+        return Scalafix.global_instance().options.skip
 
     def process_result(self, result):
         if result != 0:

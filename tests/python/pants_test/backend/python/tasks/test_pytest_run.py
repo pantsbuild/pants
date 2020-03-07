@@ -130,7 +130,7 @@ class PytestTestConftest(PytestTestBase):
                 """
             ),
         )
-        self.add_to_build_file("src/python/base", target='python_library(sources=globs("*.py"))\n')
+        self.add_to_build_file("src/python/base", target='python_library(sources=["*.py"])\n')
 
         self.create_file("src/python/base/app/__init__.py")
         self.create_file(

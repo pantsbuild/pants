@@ -18,7 +18,7 @@ class ScalaJSLibrary(ScalaJSTarget, Target):
         """
         :param sources: Scala source that makes up this module; paths are relative to the BUILD
                         file's directory.
-        :type sources: `globs`, `rglobs` or a list of strings
+        :type sources: a list of strings, with excludes prefixed by `!`
         """
         payload = payload or Payload()
         payload.add_fields(

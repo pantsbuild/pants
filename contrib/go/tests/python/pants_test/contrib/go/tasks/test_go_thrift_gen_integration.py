@@ -44,7 +44,7 @@ class GoThriftGenIntegrationTest(PantsRunIntegrationTest):
                         """
                         go_thrift_library(
                           name='fleem',
-                          sources=globs('*.thrift'),
+                          sources=['*.thrift'],
                         )
                         """
                     ).strip()

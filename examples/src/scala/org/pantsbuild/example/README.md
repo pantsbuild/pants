@@ -50,7 +50,7 @@ The referred-to
 
 (If your circularly-referencing `*.scala` and `*.java` files are in the *same* directory, you don't
 need separate `java_library` and `scala_library` targets. Instead, use
-`scala_library(sources=globs('*.scala', '*.java'),...)`.)
+`scala_library(sources=['*.scala', '*.java'],...)`.)
 
 Scala Version
 -------------

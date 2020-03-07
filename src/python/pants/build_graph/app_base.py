@@ -111,7 +111,7 @@ class Bundle:
     and ``scripts`` directories: ::
 
       bundles=[
-        bundle(fileset=[rglobs('config/*', 'scripts/*'), 'my.cfg']),
+        bundle(fileset=[config/**/*', 'scripts/**/*', 'my.cfg']),
       ]
 
     To include files relative to some path component use the ``relative_to`` parameter.
@@ -119,7 +119,7 @@ class Bundle:
     in the bundle. ::
 
       bundles=[
-        bundle(relative_to='common', fileset=globs('common/config/*'))
+        bundle(relative_to='common', fileset=['common/config/*'])
       ]
     """
 
@@ -134,8 +134,8 @@ class Bundle:
           the source tree, returns a path to use in the resulting bundle. By default, an identity
           mapper.
         :param string relative_to: Set up a simple mapping from source path to bundle path.
-        :param fileset: The set of files to include in the bundle.  A string filename, or list of
-          filenames, or a Fileset object (e.g. globs()).
+        :param fileset: The set of files to include in the bundle.  A string filename or a list of
+          filenames/globs.
           E.g., ``relative_to='common'`` removes that prefix from all files in the application bundle.
         """
 

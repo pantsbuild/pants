@@ -80,7 +80,7 @@ class GoogleJavaFormatLintTask(LintTaskMixin, GoogleJavaFormatBase):
 
     @property
     def skip_execution(self):
-        return super()._resolve_conflicting_skip(old_scope="fmt-google-java-format")
+        return GoogleJavaFormat.global_instance().options.skip
 
     def process_result(self, result):
         if result != 0:
@@ -99,7 +99,7 @@ class GoogleJavaFormatTask(FmtTaskMixin, GoogleJavaFormatBase):
 
     @property
     def skip_execution(self):
-        return super()._resolve_conflicting_skip(old_scope="lint-google-java-format")
+        return super().determine_if_skipped(formatter_subsystem=GoogleJavaFormat.global_instance())
 
     def process_result(self, result):
         if result != 0:

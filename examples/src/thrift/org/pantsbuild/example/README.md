@@ -36,12 +36,13 @@ Thrift; it generates Java.
 
     :::python
     # Target defined in src/thrift/com/twitter/mybird/BUILD:
-    java_thrift_library(name='mybird',
+    java_thrift_library(
+      name='mybird',
       # Specify dependencies for thrift IDL file includes.
       dependencies=[
         'src/thrift/com/twitter/otherbird',
       ],
-      sources=globs('*.thrift')
+      sources=['*.thrift']
     )
 
 Pants knows that before it compiles such a target, it must first
