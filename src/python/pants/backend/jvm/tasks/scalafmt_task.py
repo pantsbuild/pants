@@ -7,7 +7,6 @@ from pants.backend.jvm.subsystems.scalafmt import Scalafmt
 from pants.backend.jvm.tasks.rewrite_base import RewriteBase
 from pants.base.exceptions import TaskError
 from pants.java.jar.jar_dependency import JarDependency
-from pants.option.custom_types import file_option
 from pants.task.fmt_task_mixin import FmtTaskMixin
 from pants.task.lint_task_mixin import LintTaskMixin
 
@@ -26,16 +25,6 @@ class ScalafmtTask(RewriteBase):
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
-        register(
-            "--configuration",
-            advanced=True,
-            type=file_option,
-            fingerprint=True,
-            removal_version="1.27.0.dev0",
-            removal_hint="Use `--scalafmt-config` instead.",
-            help="Path to scalafmt config file, if not specified default scalafmt config used",
-        )
-
         cls.register_jvm_tool(
             register,
             "scalafmt",
