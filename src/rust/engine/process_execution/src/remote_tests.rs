@@ -626,7 +626,7 @@ fn successful_execution_after_one_getoperation() {
       exit_code: 0,
       output_directory: EMPTY_DIGEST,
       execution_attempts: vec![],
-      platform: Platform::current().unwrap(),
+      platform: Platform::Linux,
     }
   );
 
@@ -674,7 +674,7 @@ fn retries_retriable_errors() {
       exit_code: 0,
       output_directory: EMPTY_DIGEST,
       execution_attempts: vec![],
-      platform: Platform::current().unwrap(),
+      platform: Platform::Linux,
     }
   );
 
@@ -841,7 +841,8 @@ fn extract_response_with_digest_stdout() {
       )
       .op
       .unwrap()
-      .unwrap()
+      .unwrap(),
+      Platform::Linux,
     )
     .unwrap()
     .without_execution_attempts(),
@@ -851,7 +852,7 @@ fn extract_response_with_digest_stdout() {
       exit_code: 0,
       output_directory: EMPTY_DIGEST,
       execution_attempts: vec![],
-      platform: Platform::current().unwrap(),
+      platform: Platform::Linux,
     }
   );
 }
@@ -871,7 +872,8 @@ fn extract_response_with_digest_stderr() {
       )
       .op
       .unwrap()
-      .unwrap()
+      .unwrap(),
+      Platform::Linux,
     )
     .unwrap()
     .without_execution_attempts(),
@@ -881,7 +883,38 @@ fn extract_response_with_digest_stderr() {
       exit_code: 0,
       output_directory: EMPTY_DIGEST,
       execution_attempts: vec![],
-      platform: Platform::current().unwrap(),
+      platform: Platform::Linux,
+    }
+  );
+}
+
+#[test]
+fn extract_response_with_digest_stdout_osx_remote() {
+  let op_name = "gimme-foo".to_string();
+  let testdata = TestData::roland();
+  let testdata_empty = TestData::empty();
+  assert_eq!(
+    extract_execute_response(
+      make_successful_operation(
+        &op_name,
+        StdoutType::Digest(testdata.digest()),
+        StderrType::Raw(testdata_empty.string()),
+        0,
+      )
+      .op
+      .unwrap()
+      .unwrap(),
+      Platform::Darwin
+    )
+    .unwrap()
+    .without_execution_attempts(),
+    FallibleExecuteProcessResultWithPlatform {
+      stdout: testdata.bytes(),
+      stderr: testdata_empty.bytes(),
+      exit_code: 0,
+      output_directory: EMPTY_DIGEST,
+      execution_attempts: vec![],
+      platform: Platform::Darwin,
     }
   );
 }
@@ -961,7 +994,7 @@ fn ensure_inline_stdio_is_stored() {
       exit_code: 0,
       output_directory: EMPTY_DIGEST,
       execution_attempts: vec![],
-      platform: Platform::current().unwrap(),
+      platform: Platform::Linux,
     }
   );
 
@@ -1036,7 +1069,7 @@ fn successful_execution_after_four_getoperations() {
       exit_code: 0,
       output_directory: EMPTY_DIGEST,
       execution_attempts: vec![],
-      platform: Platform::current().unwrap(),
+      platform: Platform::Linux,
     }
   );
 }
@@ -1144,6 +1177,7 @@ fn dropped_request_cancels() {
     &cas,
     Duration::from_millis(0),
     Duration::from_secs(0),
+    Platform::Linux,
   );
   let mut runtime = tokio::runtime::Runtime::new().unwrap();
 
@@ -1153,7 +1187,7 @@ fn dropped_request_cancels() {
     exit_code: 0,
     output_directory: EMPTY_DIGEST,
     execution_attempts: vec![],
-    platform: Platform::current().unwrap(),
+    platform: Platform::Linux,
   };
 
   let run_future = command_runner.run(execute_request.into(), Context::default());
@@ -1221,7 +1255,7 @@ fn retry_for_cancelled_channel() {
       exit_code: 0,
       output_directory: EMPTY_DIGEST,
       execution_attempts: vec![],
-      platform: Platform::current().unwrap(),
+      platform: Platform::Linux,
     }
   );
 }
@@ -1504,7 +1538,7 @@ fn execute_missing_file_uploads_if_known() {
       exit_code: 0,
       output_directory: EMPTY_DIGEST,
       execution_attempts: vec![],
-      platform: Platform::current().unwrap(),
+      platform: Platform::Linux,
     }
   );
   {
@@ -1610,7 +1644,7 @@ fn execute_missing_file_uploads_if_known_status() {
       exit_code: 0,
       output_directory: EMPTY_DIGEST,
       execution_attempts: vec![],
-      platform: Platform::current().unwrap(),
+      platform: Platform::Linux,
     })
   );
   {
@@ -1718,7 +1752,7 @@ fn extract_execute_response_success() {
     exit_code: 17,
     output_directory: TestDirectory::nested().digest(),
     execution_attempts: vec![],
-    platform: Platform::current().unwrap(),
+    platform: Platform::Linux,
   };
 
   let mut output_file = bazel_protos::remote_execution::OutputFile::new();
@@ -1745,7 +1779,7 @@ fn extract_execute_response_success() {
   }));
 
   assert_eq!(
-    extract_execute_response(operation)
+    extract_execute_response(operation, Platform::Linux)
       .unwrap()
       .without_execution_attempts(),
     want_result
@@ -1760,7 +1794,7 @@ fn extract_execute_response_pending() {
   operation.set_done(false);
 
   assert_eq!(
-    extract_execute_response(operation),
+    extract_execute_response(operation, Platform::Linux),
     Err(ExecutionError::NotFinished(operation_name))
   );
 }
@@ -1783,7 +1817,7 @@ fn extract_execute_response_missing_digests() {
     .unwrap();
 
   assert_eq!(
-    extract_execute_response(operation),
+    extract_execute_response(operation, Platform::Linux),
     Err(ExecutionError::MissingDigests(missing_files))
   );
 }
@@ -1805,7 +1839,7 @@ fn extract_execute_response_missing_other_things() {
     .unwrap()
     .unwrap();
 
-  match extract_execute_response(operation) {
+  match extract_execute_response(operation, Platform::Linux) {
     Err(ExecutionError::Fatal(err)) => assert_contains(&err, "monkeys"),
     other => assert!(false, "Want fatal error, got {:?}", other),
   };
@@ -1824,7 +1858,7 @@ fn extract_execute_response_other_failed_precondition() {
     .unwrap()
     .unwrap();
 
-  match extract_execute_response(operation) {
+  match extract_execute_response(operation, Platform::Linux) {
     Err(ExecutionError::Fatal(err)) => assert_contains(&err, "OUT_OF_CAPACITY"),
     other => assert!(false, "Want fatal error, got {:?}", other),
   };
@@ -1839,7 +1873,7 @@ fn extract_execute_response_missing_without_list() {
     .unwrap()
     .unwrap();
 
-  match extract_execute_response(operation) {
+  match extract_execute_response(operation, Platform::Linux) {
     Err(ExecutionError::Fatal(err)) => assert_contains(&err.to_lowercase(), "precondition"),
     other => assert!(false, "Want fatal error, got {:?}", other),
   };
@@ -1860,7 +1894,7 @@ fn extract_execute_response_other_status() {
     response
   }));
 
-  match extract_execute_response(operation) {
+  match extract_execute_response(operation, Platform::Linux) {
     Err(ExecutionError::Fatal(err)) => assert_contains(&err, "PermissionDenied"),
     other => assert!(false, "Want fatal error, got {:?}", other),
   };
@@ -1926,6 +1960,7 @@ fn wait_between_request_1_retry() {
       &cas,
       Duration::from_millis(100),
       Duration::from_secs(1),
+      Platform::Linux,
     );
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
     runtime
@@ -1982,6 +2017,7 @@ fn wait_between_request_3_retry() {
       &cas,
       Duration::from_millis(50),
       Duration::from_secs(5),
+      Platform::Linux,
     );
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
     runtime
@@ -2224,6 +2260,7 @@ fn remote_workunits_are_stored() {
     &cas,
     std::time::Duration::from_millis(0),
     std::time::Duration::from_secs(0),
+    Platform::Linux,
   );
 
   let mut runtime = tokio::runtime::Runtime::new().unwrap();
@@ -2482,6 +2519,7 @@ fn run_command_remote(
     &cas,
     Duration::from_millis(0),
     Duration::from_secs(0),
+    Platform::Linux,
   );
   let mut runtime = tokio::runtime::Runtime::new().unwrap();
   runtime.block_on(command_runner.run(request, Context::default()))
@@ -2492,6 +2530,7 @@ fn create_command_runner(
   cas: &mock::StubCAS,
   backoff_incremental_wait: Duration,
   backoff_max_wait: Duration,
+  platform: Platform,
 ) -> CommandRunner {
   let runtime = task_executor::Executor::new();
   let store_dir = TempDir::new().unwrap();
@@ -2503,7 +2542,7 @@ fn create_command_runner(
     None,
     BTreeMap::new(),
     store,
-    Platform::Linux,
+    platform,
     runtime,
     Duration::from_secs(1), // We use a low queue_buffer_time to ensure that tests do not take too long.
     backoff_incremental_wait,
@@ -2532,6 +2571,7 @@ fn make_store(store_dir: &Path, cas: &mock::StubCAS, executor: task_executor::Ex
 
 fn extract_execute_response(
   operation: bazel_protos::operations::Operation,
+  remote_platform: Platform,
 ) -> Result<FallibleExecuteProcessResultWithPlatform, ExecutionError> {
   let cas = mock::StubCAS::builder()
     .file(&TestData::roland())
@@ -2542,6 +2582,7 @@ fn extract_execute_response(
     &cas,
     Duration::from_millis(0),
     Duration::from_secs(0),
+    remote_platform,
   );
 
   let mut runtime = tokio::runtime::Runtime::new().unwrap();
