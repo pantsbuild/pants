@@ -40,12 +40,6 @@ impl CommandRunner {
       metadata,
     }
   }
-
-  #[allow(dead_code)]
-  fn do_thing(&self) {
-    let _x = &self.process_execution_store;
-    panic!("foo");
-  }
 }
 
 impl crate::CommandRunner for CommandRunner {

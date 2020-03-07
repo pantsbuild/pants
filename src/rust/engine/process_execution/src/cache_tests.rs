@@ -65,13 +65,10 @@ fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
   let local_result = runtime.block_on(local.run(request.clone().into(), Context::default()));
 
   let cache_dir = TempDir::new().unwrap();
+  let max_lmdb_size = 50 * 1024 * 1024; //50 MB - I didn't pick that number but it seems reasonable.
 
-  let process_execution_store = ShardedLmdb::new(
-    cache_dir.path().to_owned(),
-    50 * 1024 * 1024,
-    runtime.clone(),
-  )
-  .unwrap();
+  let process_execution_store =
+    ShardedLmdb::new(cache_dir.path().to_owned(), max_lmdb_size, runtime.clone()).unwrap();
 
   let metadata = ExecuteProcessRequestMetadata {
     instance_name: None,
