@@ -15,8 +15,8 @@ from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.classpath_entry import ClasspathEntry
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
-from pants.backend.jvm.tasks.coursier_resolve import CoursierMixin
-from pants.backend.jvm.tasks.ivy_task_mixin import IvyResolveFingerprintStrategy, IvyTaskMixin
+from pants.backend.jvm.tasks.coursier_resolve import CoursierMixin, \
+    CoursierResolveFingerprintStrategy
 from pants.backend.jvm.tasks.jar_task import JarTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
@@ -32,7 +32,7 @@ from pants.util.dirutil import fast_relpath, safe_mkdir_for
 from pants.util.memo import memoized_property
 
 
-class ShadedToolFingerprintStrategy(IvyResolveFingerprintStrategy):
+class ShadedToolFingerprintStrategy(CoursierResolveFingerprintStrategy):
     def __init__(self, main, custom_rules=None):
         # The bootstrapper uses no custom confs in its resolves.
         super().__init__(confs=None)
@@ -72,7 +72,7 @@ class ShadedToolFingerprintStrategy(IvyResolveFingerprintStrategy):
 
 # NB: IvyTaskMixin conflicts with the resolve() method of CoursierMixin. IvyTaskMixin.resolve()
 # will be used because it appears first in the MRO.
-class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):  # type: ignore[misc]
+class BootstrapJvmTools(CoursierMixin, JarTask):  # type: ignore[misc]
     class ToolUnderspecified(Exception):
         pass
 
