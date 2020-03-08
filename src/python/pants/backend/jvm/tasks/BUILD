@@ -16,9 +16,9 @@ target(
     ':coursier_resolve',
     ':detect_duplicates',
     ':ivy_imports',
-    ':ivy_outdated',
-    ':ivy_resolve',
-    ':ivy_task_mixin',
+    # ':ivy_outdated',
+    # ':ivy_resolve',
+    # ':ivy_task_mixin',
     ':jar_create',
     ':jar_import_products',
     ':jar_publish',
@@ -105,7 +105,7 @@ python_library(
   name = 'bootstrap_jvm_tools',
   sources = ['bootstrap_jvm_tools.py'],
   dependencies = [
-    ':ivy_task_mixin',
+    # ':ivy_task_mixin',
     ':jar_task',
     'src/python/pants/backend/jvm/subsystems:jvm_tool_mixin',
     'src/python/pants/backend/jvm/subsystems:shader',
@@ -226,7 +226,7 @@ python_library(
   sources = ['ivy_imports.py'],
   dependencies = [
     ':classpath_products',
-    ':ivy_task_mixin',
+    # ':ivy_task_mixin',
     ':jar_import_products',
     ':nailgun_task',
     'src/python/pants/backend/jvm/targets:jvm'
@@ -234,59 +234,59 @@ python_library(
   tags = {'partially_type_checked'},
 )
 
-python_library(
-  name = 'ivy_resolve',
-  sources = ['ivy_resolve.py'],
-  dependencies = [
-    ':classpath_products',
-    ':ivy_task_mixin',
-    ':nailgun_task',
-    'src/python/pants/backend/jvm:ivy_utils',
-    'src/python/pants/java/jar',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/invalidation',
-    'src/python/pants/util:desktop',
-    'src/python/pants/util:dirutil',
-    'src/python/pants/util:strutil',
-    'src/python/pants/backend/jvm/subsystems:resolve_subsystem'
-  ],
-  tags = {'partially_type_checked'},
-)
-
-python_library(
-  name = 'ivy_task_mixin',
-  sources = ['ivy_task_mixin.py'],
-  dependencies = [
-    'src/python/pants/backend/jvm/subsystems:jar_dependency_management',
-    'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/backend/jvm/tasks:classpath_products',
-    'src/python/pants/backend/jvm:ivy_utils',
-    'src/python/pants/java/jar',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/base:fingerprint_strategy',
-    'src/python/pants/invalidation',
-    'src/python/pants/ivy',
-    'src/python/pants/task',
-    'src/python/pants/util:dirutil',
-    'src/python/pants/util:memo',
-  ],
-  tags = {'partially_type_checked'},
-)
-
-python_library(
-  name = 'ivy_outdated',
-  sources = ['ivy_outdated.py'],
-  dependencies = [
-    ':classpath_products',
-    ':nailgun_task',
-    'src/python/pants/backend/jvm:ivy_utils',
-    'src/python/pants/backend/jvm/subsystems:shader',
-    'src/python/pants/ivy',
-    'src/python/pants/java/jar',
-    'src/python/pants/util:memo',
-  ],
-  tags = {"partially_type_checked"},
-)
+# python_library(
+#   name = 'ivy_resolve',
+#   sources = ['ivy_resolve.py'],
+#   dependencies = [
+#     ':classpath_products',
+#     ':ivy_task_mixin',
+#     ':nailgun_task',
+#     'src/python/pants/backend/jvm:ivy_utils',
+#     'src/python/pants/java/jar',
+#     'src/python/pants/base:exceptions',
+#     'src/python/pants/invalidation',
+#     'src/python/pants/util:desktop',
+#     'src/python/pants/util:dirutil',
+#     'src/python/pants/util:strutil',
+#     'src/python/pants/backend/jvm/subsystems:resolve_subsystem'
+#   ],
+#   tags = {'partially_type_checked'},
+# )
+#
+# python_library(
+#   name = 'ivy_task_mixin',
+#   sources = ['ivy_task_mixin.py'],
+#   dependencies = [
+#     'src/python/pants/backend/jvm/subsystems:jar_dependency_management',
+#     'src/python/pants/backend/jvm/targets:jvm',
+#     'src/python/pants/backend/jvm/tasks:classpath_products',
+#     'src/python/pants/backend/jvm:ivy_utils',
+#     'src/python/pants/java/jar',
+#     'src/python/pants/base:exceptions',
+#     'src/python/pants/base:fingerprint_strategy',
+#     'src/python/pants/invalidation',
+#     'src/python/pants/ivy',
+#     'src/python/pants/task',
+#     'src/python/pants/util:dirutil',
+#     'src/python/pants/util:memo',
+#   ],
+#   tags = {'partially_type_checked'},
+# )
+#
+# python_library(
+#   name = 'ivy_outdated',
+#   sources = ['ivy_outdated.py'],
+#   dependencies = [
+#     ':classpath_products',
+#     ':nailgun_task',
+#     'src/python/pants/backend/jvm:ivy_utils',
+#     'src/python/pants/backend/jvm/subsystems:shader',
+#     'src/python/pants/ivy',
+#     'src/python/pants/java/jar',
+#     'src/python/pants/util:memo',
+#   ],
+#   tags = {"partially_type_checked"},
+# )
 
 python_library(
   name = 'coursier_resolve',
@@ -468,7 +468,7 @@ python_library(
     ':jvm_dependency_analyzer',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
-    'src/python/pants/backend/jvm/tasks:ivy_task_mixin',
+    # 'src/python/pants/backend/jvm/tasks:ivy_task_mixin',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/build_graph',
