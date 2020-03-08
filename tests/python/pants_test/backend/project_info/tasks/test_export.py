@@ -280,7 +280,7 @@ class ExportTest(ConsoleTaskTestBase):
     def execute_export(self, *specs, **options_overrides):
         options = {
             ScalaPlatform.options_scope: {"version": "custom"},
-            JvmResolveSubsystem.options_scope: {"resolver": "ivy"},
+            JvmResolveSubsystem.options_scope: {"resolver": "coursier"},
             JvmPlatform.options_scope: {
                 "default_platform": "java8",
                 "platforms": {"java8": {"source": "1.8", "target": "1.8"}},

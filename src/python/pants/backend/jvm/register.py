@@ -45,6 +45,7 @@ from pants.backend.jvm.tasks.classmap import ClassmapTask
 from pants.backend.jvm.tasks.consolidate_classpath import ConsolidateClasspath
 from pants.backend.jvm.tasks.coursier_resolve import CoursierResolve
 from pants.backend.jvm.tasks.detect_duplicates import DuplicateDetector
+from pants.backend.jvm.tasks.ivy_imports import IvyImports
 from pants.backend.jvm.tasks.ivy_outdated import IvyOutdated
 from pants.backend.jvm.tasks.jar_create import JarCreate
 from pants.backend.jvm.tasks.jar_publish import JarPublish
@@ -166,6 +167,7 @@ def register_goals():
 
     # Dependency resolution.
     task(name="coursier", action=CoursierResolve).install("resolve")
+    task(name="ivy-imports", action=IvyImports).install("imports")
     task(name="unpack-jars", action=UnpackJars).install()
     task(name="ivy", action=IvyOutdated).install("outdated")
 

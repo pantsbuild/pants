@@ -17,7 +17,7 @@ class JvmResolveSubsystem(Subsystem):
     options_scope = "resolver"
 
     # TODO: Convert to an enum.
-    CHOICES = ["ivy", "coursier"]
+    CHOICES = ["coursier"]
 
     @classmethod
     def register_options(cls, register):
@@ -25,6 +25,6 @@ class JvmResolveSubsystem(Subsystem):
         register(
             "--resolver",
             choices=cls.CHOICES,
-            default="ivy",
+            default="coursier",
             help="Resolver to use for external jvm dependencies.",
         )

@@ -15,7 +15,6 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.coursier_resolve import CoursierMixin
-# from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.backend.project_info.tasks.export_version import DEFAULT_EXPORT_VERSION
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.subsystems.pex_build_util import has_python_requirements

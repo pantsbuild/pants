@@ -275,12 +275,9 @@ class BootstrapJvmTools(CoursierMixin, JarTask):  # type: ignore[misc]
         self._check_underspecified_tools(jvm_tool, targets)
         self.context.log.debug(f"Bootstrapping {jvm_tool.key}")
         classpath_holder = ClasspathProducts(self.get_options().pants_workdir)
-        if JvmResolveSubsystem.global_instance().get_options().resolver == "ivy":
-            self.resolve(executor=None, targets=targets, classpath_products=classpath_holder)
-        else:
-            CoursierMixin.resolve(
-                self, targets, classpath_holder, sources=False, javadoc=False, executor=None
-            )
+        CoursierMixin.resolve(
+            self, targets, classpath_holder, sources=False, javadoc=False, executor=None
+        )
         return [
             cp_entry for _, cp_entry in classpath_holder.get_classpath_entries_for_targets(targets)
         ]
