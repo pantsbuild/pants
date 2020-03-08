@@ -7,7 +7,7 @@ import re
 
 from pants.base.build_environment import get_buildroot
 from pants.build_graph.intermediate_target_factory import hash_target
-from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest, ensure_resolver
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.collections import ensure_str_list
 from pants_test.backend.project_info.tasks.resolve_jars_test_mixin import ResolveJarsTestMixin
 
@@ -62,7 +62,6 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
             for path in json_data["libraries"][jar].values():
                 self.assertTrue(os.path.exists(path), f"Expected jar at {path} to actually exist.")
 
-    @ensure_resolver
     def test_export_code_gen(self):
         with self.temporary_workdir() as workdir:
             test_target = "examples/tests/java/org/pantsbuild/example/usethrift:usethrift"
@@ -77,7 +76,6 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
             p = re.compile(codegen_target_regex)
             self.assertTrue(any(p.match(target) for target in json_data.get("targets").keys()))
 
-    @ensure_resolver
     def test_export_json_transitive_jar(self):
         with self.temporary_workdir() as workdir:
             test_target = "examples/tests/java/org/pantsbuild/example/usethrift:usethrift"
@@ -85,7 +83,6 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
             targets = json_data.get("targets")
             self.assertIn("org.hamcrest:hamcrest-core:1.3", targets[test_target]["libraries"])
 
-    @ensure_resolver
     def test_export_jar_path_with_excludes(self):
         with self.temporary_workdir() as workdir:
             test_target = "testprojects/src/java/org/pantsbuild/testproject/exclude:foo"
@@ -98,7 +95,6 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
             )
             self.assertTrue("com.typesafe.sbt:incremental-compiler" in foo_target.get("excludes"))
 
-    @ensure_resolver
     def test_export_jar_path_with_excludes_soft(self):
         with self.temporary_workdir() as workdir:
             test_target = "testprojects/src/java/org/pantsbuild/testproject/exclude:"
@@ -115,7 +111,6 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
             self.assertTrue("com.typesafe.sbt:incremental-compiler" in foo_target.get("excludes"))
             self.assertTrue("org.pantsbuild" in foo_target.get("excludes"))
 
-    @ensure_resolver
     def test_export_jar_path(self):
         with self.temporary_workdir() as workdir:
             test_target = "examples/tests/java/org/pantsbuild/example/usethrift:usethrift"
@@ -126,7 +121,6 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
             self.assertIn("junit-4.12-javadoc.jar", common_lang_lib_info.get("javadoc"))
             self.assertIn("junit-4.12-sources.jar", common_lang_lib_info.get("sources"))
 
-    @ensure_resolver
     def test_dep_map_for_java_sources(self):
         with self.temporary_workdir() as workdir:
             test_target = "examples/src/scala/org/pantsbuild/example/scala_with_java_sources"
@@ -136,7 +130,6 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
                 "examples/src/java/org/pantsbuild/example/java_sources:java_sources", targets
             )
 
-    @ensure_resolver
     def test_sources_and_javadocs(self):
         with self.temporary_workdir() as workdir:
             test_target = "testprojects/src/scala/org/pantsbuild/testproject/unicode/shapeless"
@@ -147,7 +140,6 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
             self.assertIsNotNone(shapeless_lib["sources"])
             self.assertIsNotNone(shapeless_lib["javadoc"])
 
-    @ensure_resolver
     def test_classifiers(self):
         with self.temporary_workdir() as workdir:
             test_target = (
@@ -169,7 +161,6 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
                 "avro-1.7.7-sources.jar", avro_lib_info.get("sources"),
             )
 
-    @ensure_resolver
     def test_distributions_and_platforms(self):
         with self.temporary_workdir() as workdir:
             test_target = "examples/src/java/org/pantsbuild/example/hello/simple"
@@ -204,7 +195,6 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
                 json_data["jvm_platforms"],
             )
 
-    @ensure_resolver
     def test_runtime_platform(self):
         with self.temporary_workdir() as workdir:
             test_target = (
@@ -214,7 +204,6 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
             self.assertEqual("java7", json_data["targets"][test_target]["platform"])
             self.assertEqual("java8", json_data["targets"][test_target]["runtime_platform"])
 
-    @ensure_resolver
     def test_intransitive_and_scope(self):
         with self.temporary_workdir() as workdir:
             test_path = "testprojects/maven_layout/provided_patching/one/src/main/java"
@@ -225,7 +214,6 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
             self.assertEqual(False, json_data["targets"][synthetic_target]["transitive"])
             self.assertEqual("compile test", json_data["targets"][synthetic_target]["scope"])
 
-    @ensure_resolver
     def test_export_properly_marks_target_roots(self):
         with self.temporary_workdir() as workdir:
             # We use this directory because it has subdirectories, so the `::` glob captures multiple

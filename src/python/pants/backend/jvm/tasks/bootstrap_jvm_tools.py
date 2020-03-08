@@ -14,8 +14,10 @@ from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.classpath_entry import ClasspathEntry
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
-from pants.backend.jvm.tasks.coursier_resolve import CoursierMixin, \
-    CoursierResolveFingerprintStrategy
+from pants.backend.jvm.tasks.coursier_resolve import (
+    CoursierMixin,
+    CoursierResolveFingerprintStrategy,
+)
 from pants.backend.jvm.tasks.jar_task import JarTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
