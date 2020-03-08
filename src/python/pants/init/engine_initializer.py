@@ -3,7 +3,7 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Iterable, Optional, Tuple, cast
+from typing import Any, Iterable, List, Optional, Tuple, cast
 
 from pants.backend.docgen.targets.doc import Page
 from pants.backend.jvm.targets.jvm_app import JvmApp
@@ -14,9 +14,7 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
-from pants.base.deprecated import deprecated_conditional
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
-from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.base.specs import Specs
 from pants.binaries.binary_tool import rules as binary_tool_rules
 from pants.binaries.binary_util import rules as binary_util_rules
@@ -299,56 +297,6 @@ class EngineInitializer:
         """Construct and return the components necessary for LegacyBuildGraph construction."""
         build_root = get_buildroot()
         bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
-
-        glob_expansion_failure_configured = not bootstrap_options.is_default(
-            "glob_expansion_failure"
-        )
-        files_not_found_behavior_configured = not bootstrap_options.is_default(
-            "files_not_found_behavior"
-        )
-        if glob_expansion_failure_configured and files_not_found_behavior_configured:
-            raise ValueError(
-                "Conflicting options used. You used the new, preferred `--files-not-found-behavior`, but "
-                "also used the deprecated `--glob-expansion-failure`.\n\nPlease "
-                "specify only one of these (preferably `--files-not-found-behavior`)."
-            )
-        glob_match_error_behavior = (
-            bootstrap_options.files_not_found_behavior.to_glob_match_error_behavior()
-            if files_not_found_behavior_configured
-            else bootstrap_options.glob_expansion_failure
-        )
-
-        deprecated_conditional(
-            lambda: cast(
-                bool, bootstrap_options.build_file_imports == BuildFileImportsBehavior.allow
-            ),
-            removal_version="1.27.0.dev0",
-            entity_description="Using `--build-file-imports=allow`",
-            hint_message=(
-                "Import statements should be avoided in BUILD files because they can easily break Pants "
-                "caching and lead to stale results. It is not safe to ignore warnings of imports, so the "
-                "`allow` option is being removed.\n\nTo prepare for this change, either set "
-                "`--build-file-imports=warn` or `--build-file-imports=error` (we recommend using `error`)."
-                "\n\nIf you still need to keep the functionality you have from the import statement, "
-                "consider rewriting your code into a Pants plugin: "
-                "https://www.pantsbuild.org/howto_plugin.html"
-            ),
-        )
-        deprecated_conditional(
-            lambda: bootstrap_options.is_default("build_file_imports"),
-            removal_version="1.27.0.dev0",
-            entity_description="Defaulting to `--build-file-imports=warn`",
-            hint_message=(
-                "Import statements should be avoided in BUILD files because they can easily break Pants "
-                "caching and lead to stale results. The default behavior will change from warning to "
-                "erroring in 1.27.0.dev0, and the option will be removed in 1.29.0.dev0.\n\nTo prepare for "
-                "this change, please explicitly set the option `--build-file-imports=warn` or "
-                "`--build-file-imports=error` (we recommend using `error`).\n\nIf you still need to keep "
-                "the functionality you have from import statements, consider rewriting your code into a "
-                "Pants plugin: https://www.pantsbuild.org/howto_plugin.html"
-            ),
-        )
-
         return EngineInitializer.setup_legacy_graph_extended(
             OptionsInitializer.compute_pants_ignore(build_root, bootstrap_options),
             bootstrap_options.local_store_dir,
@@ -357,7 +305,9 @@ class EngineInitializer:
             build_configuration,
             build_root=build_root,
             native=native,
-            glob_match_error_behavior=glob_match_error_behavior,
+            glob_match_error_behavior=(
+                bootstrap_options.files_not_found_behavior.to_glob_match_error_behavior()
+            ),
             build_ignore_patterns=bootstrap_options.build_ignore,
             exclude_target_regexps=bootstrap_options.exclude_target_regexp,
             subproject_roots=bootstrap_options.subproject_roots,
@@ -367,7 +317,7 @@ class EngineInitializer:
 
     @staticmethod
     def setup_legacy_graph_extended(
-        pants_ignore_patterns,
+        pants_ignore_patterns: List[str],
         local_store_dir,
         build_file_imports_behavior: BuildFileImportsBehavior,
         options_bootstrapper: OptionsBootstrapper,
@@ -383,8 +333,6 @@ class EngineInitializer:
     ) -> LegacyGraphScheduler:
         """Construct and return the components necessary for LegacyBuildGraph construction.
 
-        :param list pants_ignore_patterns: A list of path ignore patterns for FileSystemProjectTree,
-                                           usually taken from the '--pants-ignore' global option.
         :param local_store_dir: The directory to use for storing the engine's LMDB store in.
         :param build_file_imports_behavior: How to behave if a BUILD file being parsed tries to use
                                             import statements.
@@ -414,8 +362,6 @@ class EngineInitializer:
         rules = build_configuration.rules()
 
         symbol_table = _legacy_symbol_table(build_file_aliases)
-
-        project_tree = FileSystemProjectTree(build_root, pants_ignore_patterns)
 
         execution_options = execution_options or DEFAULT_EXECUTION_OPTIONS
 
@@ -478,12 +424,13 @@ class EngineInitializer:
         union_rules = build_configuration.union_rules()
 
         scheduler = Scheduler(
-            native,
-            project_tree,
-            local_store_dir,
-            rules,
-            union_rules,
-            execution_options,
+            native=native,
+            ignore_patterns=pants_ignore_patterns,
+            build_root=build_root,
+            local_store_dir=local_store_dir,
+            rules=rules,
+            union_rules=union_rules,
+            execution_options=execution_options,
             include_trace_on_error=include_trace_on_error,
             visualize_to_dir=bootstrap_options.native_engine_visualize_to,
         )

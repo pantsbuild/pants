@@ -11,8 +11,7 @@ class CppTarget(Target):
     def __init__(self, address=None, payload=None, sources=None, **kwargs):
         """
         :param sources: Source code files to build. Paths are relative to the BUILD file's directory.
-        :type sources: :class:`pants.source.wrapped_globs.FilesetWithSpec` (from globs or rglobs) or
-                       list of strings
+        :type sources: :class:`pants.source.wrapped_globs.FilesetWithSpec`
         """
         payload = payload or Payload()
         payload.add_field(

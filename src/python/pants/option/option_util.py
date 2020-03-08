@@ -4,11 +4,11 @@
 import shlex
 from typing import List, Sequence, cast
 
-from pants.option.custom_types import dict_with_files_option, list_option
+from pants.option.custom_types import dict_with_files_option
 
 
 def is_list_option(kwargs) -> bool:
-    return cast(bool, kwargs.get("action") == "append" or kwargs.get("type") in [list, list_option])
+    return cast(bool, kwargs.get("action") == "append" or kwargs.get("type") == list)
 
 
 def is_dict_option(kwargs) -> bool:

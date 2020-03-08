@@ -39,12 +39,13 @@ class ConsoleTaskTest(TaskTestBase):
         b = self.make_target("src:b", dependencies=[a])
 
         s = BytesIO()
+        self.set_options_for_scope("print-targets", transitive=True)
         task_transitive = self.PrintTargets(
             self.context(for_task_types=[self.PrintTargets], console_outstream=s, target_roots=[b]),
             self.test_workdir,
         )
         task_transitive.execute()
-        self.assertEqual(s.getvalue().decode("utf-8"), "src:b\nsrc:a\n")
+        self.assertEqual(s.getvalue().decode(), "src:b\nsrc:a\n")
 
         s = BytesIO()
         self.set_options_for_scope("print-targets", transitive=False)
@@ -53,7 +54,7 @@ class ConsoleTaskTest(TaskTestBase):
             self.test_workdir,
         )
         task_intransitive.execute()
-        self.assertEqual(s.getvalue().decode("utf-8"), "src:b\n")
+        self.assertEqual(s.getvalue().decode(), "src:b\n")
 
     def test_sigpipe(self):
         r, w = os.pipe()

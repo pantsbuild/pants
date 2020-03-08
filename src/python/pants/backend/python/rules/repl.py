@@ -28,7 +28,7 @@ class PythonRepl:
 async def run_python_repl(repl: PythonRepl) -> ReplBinary:
     targets = await Get[TransitiveHydratedTargets](Addresses, repl.addresses)
     python_addresses = Addresses(
-        ht.address for ht in targets.closure if isinstance(ht.adaptor, PythonTargetAdaptor)
+        ht.adaptor.address for ht in targets.closure if isinstance(ht.adaptor, PythonTargetAdaptor)
     )
     create_pex = CreatePexFromTargetClosure(
         addresses=python_addresses, output_filename="python-repl.pex",
@@ -48,7 +48,7 @@ class IPythonRepl:
 async def run_ipython_repl(repl: IPythonRepl, ipython: IPython) -> ReplBinary:
     targets = await Get[TransitiveHydratedTargets](Addresses, repl.addresses)
     python_addresses = Addresses(
-        ht.address for ht in targets.closure if isinstance(ht.adaptor, PythonTargetAdaptor)
+        ht.adaptor.address for ht in targets.closure if isinstance(ht.adaptor, PythonTargetAdaptor)
     )
 
     create_pex = CreatePexFromTargetClosure(

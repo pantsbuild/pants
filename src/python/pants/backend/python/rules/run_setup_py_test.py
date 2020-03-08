@@ -447,7 +447,7 @@ class TestGetOwnedDependencies(TestSetupPyBase):
 
     def assert_owned(self, owned: Iterable[str], exported: str):
         assert sorted(owned) == sorted(
-            od.hydrated_target.address.reference()
+            od.hydrated_target.adaptor.address.reference()
             for od in self.request_single_product(
                 OwnedDependencies, Params(DependencyOwner(ExportedTarget(self.tgt(exported))))
             )
@@ -514,7 +514,7 @@ class TestGetExportingOwner(TestSetupPyBase):
             owner
             == self.request_single_product(
                 ExportedTarget, Params(OwnedDependency(self.tgt(owned)))
-            ).hydrated_target.address.reference()
+            ).hydrated_target.adaptor.address.reference()
         )
 
     def assert_error(self, owned: str, exc_cls: Type[Exception]):

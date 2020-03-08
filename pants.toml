@@ -89,8 +89,6 @@ pants_ignore.add = [
   "/build-support/bin/native/src",
 ]
 
-build_file_imports = "error"
-
 [cache]
 # Caching is on globally by default, but we disable it here for development purposes.
 # It is explicitly re-enabled below for [cache.bootstrap] only.
@@ -369,6 +367,7 @@ branch_notes = """
   '1.23.x': 'src/python/pants/notes/1.23.x.rst',
   '1.24.x': 'src/python/pants/notes/1.24.x.rst',
   '1.25.x': 'src/python/pants/notes/1.25.x.rst',
+  '1.26.x': 'src/python/pants/notes/1.26.x.rst',
 }
 """
 

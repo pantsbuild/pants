@@ -36,10 +36,8 @@ from pants.option.custom_types import (
     DictValueComponent,
     ListValueComponent,
     UnsetBool,
-    dict_option,
     dir_option,
     file_option,
-    list_option,
     shell_str,
     target_option,
 )
@@ -536,14 +534,12 @@ class Parser:
         "passive",
     }
 
-    # TODO: Remove dict_option from here after deprecation is complete.
     _allowed_member_types = {
         str,
         int,
         float,
         dict,
         dir_option,
-        dict_option,
         file_option,
         target_option,
         shell_str,
@@ -572,10 +568,7 @@ class Parser:
         if "implicit_value" in kwargs and kwargs["implicit_value"] is None:
             error(ImplicitValIsNone)
 
-        # Note: we check for list here, not list_option, because we validate the provided kwargs,
-        # not the ones we modified.  However we temporarily also allow list_option, until the
-        # deprecation is complete.
-        if "member_type" in kwargs and kwargs.get("type", str) not in [list, list_option]:
+        if "member_type" in kwargs and kwargs.get("type") != list:
             error(MemberTypeNotAllowed, type_=kwargs.get("type", str).__name__)
 
         if kwargs.get("member_type", str) not in self._allowed_member_types:

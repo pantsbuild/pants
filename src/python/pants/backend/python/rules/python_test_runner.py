@@ -112,7 +112,7 @@ async def setup_pytest_for_target(
         CreatePex,
         create_pex(
             output_filename="pytest.pex",
-            requirements=PexRequirements(requirements=pytest.get_requirement_strings()),
+            requirements=PexRequirements(pytest.get_requirement_strings()),
             additional_args=additional_args_for_pytest,
             input_files_digest=plugin_file_digest,
         ),

@@ -56,15 +56,6 @@ class Filter(TargetFilterTaskMixin, ConsoleTask):
             metavar="[+-]regex1,regex2,...",
             help="Filter on targets with tags matching these regexes.",
         )
-        register(
-            "--transitive",
-            type=bool,
-            default=True,
-            fingerprint=True,
-            help="If True, use all targets in the build graph, else use only target roots.",
-            removal_version="1.27.0.dev0",
-            removal_hint="This option has no impact on the goal `filter`.",
-        )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

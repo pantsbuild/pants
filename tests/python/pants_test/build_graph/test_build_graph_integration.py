@@ -51,15 +51,3 @@ class BuildGraphIntegrationTest(PantsRunIntegrationTest):
             self.assert_success(pants_run)
             assert "Hello\n" in pants_run.stdout_data
             assert f"Import used in {dir}/BUILD at line" in pants_run.stderr_data
-
-    def test_allowed_module_import(self):
-        self.allowed_import("testprojects/src/python/build_file_imports_module")
-
-    def test_allowed_function_import(self):
-        self.allowed_import("testprojects/src/python/build_file_imports_function")
-
-    def allowed_import(self, dir):
-        with self.file_renamed(dir, "TEST_BUILD", "BUILD"):
-            pants_run = self.run_pants(["--build-file-imports=allow", "run", f"{dir}:hello",])
-        self.assert_success(pants_run)
-        self.assertIn("Hello\n", pants_run.stdout_data)

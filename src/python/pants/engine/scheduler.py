@@ -9,11 +9,10 @@ import time
 import traceback
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Type
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type
 
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE
-from pants.base.project_tree import ProjectTree
 from pants.engine.fs import (
     Digest,
     DirectoryToMaterialize,
@@ -66,19 +65,22 @@ class ExecutionError(Exception):
 class Scheduler:
     def __init__(
         self,
+        *,
         native,
-        project_tree: ProjectTree,
+        ignore_patterns: List[str],
+        build_root: str,
         local_store_dir: str,
         rules: Tuple[Rule, ...],
         union_rules: "OrderedDict[Type, OrderedSet[Type]]",
         execution_options: ExecutionOptions,
         include_trace_on_error: bool = True,
-        validate: bool = True,
         visualize_to_dir: Optional[str] = None,
+        validate: bool = True,
     ):
         """
         :param native: An instance of engine.native.Native.
-        :param project_tree: An instance of ProjectTree for the current build root.
+        :param ignore_patterns: A list of gitignore-style file patterns for pants to ignore.
+        :param build_root: The build root as a string.
         :param work_dir: The pants work dir.
         :param local_store_dir: The directory to use for storing the engine's LMDB store in.
         :param rules: A set of Rules which is used to compute values in the graph.
@@ -97,17 +99,14 @@ class Scheduler:
         self._root_subject_types = [r.output_type for r in rule_index.roots]
 
         # Create the native Scheduler and Session.
-        # TODO: This `_tasks` reference could be a local variable, since it is not used
-        # after construction.
-        self._tasks = native.new_tasks()
-        self._register_rules(rule_index)
+        tasks = self._register_rules(rule_index)
 
         self._scheduler = native.new_scheduler(
-            tasks=self._tasks,
+            tasks=tasks,
             root_subject_types=self._root_subject_types,
-            build_root=project_tree.build_root,
+            build_root=build_root,
             local_store_dir=local_store_dir,
-            ignore_patterns=project_tree.ignore_patterns,
+            ignore_patterns=ignore_patterns,
             execution_options=execution_options,
         )
 
@@ -164,37 +163,38 @@ class Scheduler:
     def _to_utf8_buf(self, string):
         return self._native.context.utf8_buf(string)
 
-    def _register_rules(self, rule_index):
-        """Record the given RuleIndex on `self._tasks`."""
+    def _register_rules(self, rule_index: RuleIndex):
+        """Create a native Tasks object, and record the given RuleIndex on it."""
+
+        tasks = self._native.new_tasks()
         registered = set()
+
         for output_type, rules in rule_index.rules.items():
             for rule in rules:
                 key = (output_type, rule)
-                if key in registered:
-                    continue
                 registered.add(key)
 
                 if type(rule) is TaskRule:
-                    self._register_task(output_type, rule, rule_index.union_rules)
+                    self._register_task(tasks, output_type, rule, rule_index.union_rules)
                 else:
                     raise ValueError("Unexpected Rule type: {}".format(rule))
 
-    def _register_task(self, output_type, rule: TaskRule, union_rules):
+        return tasks
+
+    def _register_task(
+        self, tasks, output_type, rule: TaskRule, union_rules: "OrderedDict[Type, OrderedSet[Type]]"
+    ) -> None:
         """Register the given TaskRule with the native scheduler."""
         func = Function(self._to_key(rule.func))
-        self._native.lib.tasks_task_begin(
-            self._tasks, func, self._to_type(output_type), rule.cacheable
-        )
+        self._native.lib.tasks_task_begin(tasks, func, self._to_type(output_type), rule.cacheable)
         for selector in rule.input_selectors:
-            self._native.lib.tasks_add_select(self._tasks, self._to_type(selector))
+            self._native.lib.tasks_add_select(tasks, self._to_type(selector))
 
         if rule.name:
-            self._native.lib.tasks_add_display_info(self._tasks, rule.name.encode())
+            self._native.lib.tasks_add_display_info(tasks, rule.name.encode())
 
         def add_get_edge(product, subject):
-            self._native.lib.tasks_add_get(
-                self._tasks, self._to_type(product), self._to_type(subject)
-            )
+            self._native.lib.tasks_add_get(tasks, self._to_type(product), self._to_type(subject))
 
         for the_get in rule.input_gets:
             if union.is_instance(the_get.subject_declared_type):
@@ -205,7 +205,7 @@ class Scheduler:
                 # Otherwise, the Get subject is a "concrete" type, so add a single Get edge.
                 add_get_edge(the_get.product, the_get.subject_declared_type)
 
-        self._native.lib.tasks_task_end(self._tasks)
+        self._native.lib.tasks_task_end(tasks)
 
     def visualize_graph_to_file(self, session, filename):
         res = self._native.lib.graph_visualize(self._scheduler, session, filename.encode())

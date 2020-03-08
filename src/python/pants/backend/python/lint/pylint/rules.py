@@ -58,15 +58,13 @@ async def lint(
 
     # Pylint needs direct dependencies in the chroot to ensure that imports are valid. However, it
     # doesn't lint those direct dependencies nor does it care about transitive dependencies.
-    # TODO: simplify this once there's a way to go from TargetAdaptor -> HydratedTarget.
-    hydrated_targets = await MultiGet(
-        Get[HydratedTarget](Address, adaptor_with_origin.adaptor.address)
-        for adaptor_with_origin in adaptors_with_origins
-    )
+    hydrated_targets = [
+        HydratedTarget(adaptor_with_origin.adaptor) for adaptor_with_origin in adaptors_with_origins
+    ]
     dependencies = await MultiGet(
         Get[HydratedTarget](Address, dependency)
         for dependency in itertools.chain.from_iterable(
-            hydrated_target.dependencies for hydrated_target in hydrated_targets
+            ht.adaptor.dependencies for ht in hydrated_targets
         )
     )
     chrooted_python_sources = await Get[ChrootedPythonSources](
@@ -83,7 +81,7 @@ async def lint(
     requirements_pex = await Get[Pex](
         CreatePex(
             output_filename="pylint.pex",
-            requirements=PexRequirements(requirements=tuple(pylint.get_requirement_specs())),
+            requirements=PexRequirements(pylint.get_requirement_specs()),
             interpreter_constraints=interpreter_constraints,
             entry_point=pylint.get_entry_point(),
         )

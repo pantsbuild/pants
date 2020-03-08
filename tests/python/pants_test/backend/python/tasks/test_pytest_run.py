@@ -8,7 +8,6 @@ from textwrap import dedent
 
 import coverage
 
-from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.gather_sources import GatherSources
 from pants.backend.python.tasks.pytest_prep import PytestPrep
@@ -17,6 +16,7 @@ from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks.select_interpreter import SelectInterpreter
 from pants.base.exceptions import ErrorWhileTesting, TaskError
 from pants.build_graph.target import Target
+from pants.python.python_setup import PythonSetup
 from pants.source.source_root import SourceRootConfig
 from pants.testutil.subsystem.util import init_subsystem
 from pants.testutil.task_test_base import DeclarativeTaskTestMixin, ensure_cached
@@ -130,7 +130,7 @@ class PytestTestConftest(PytestTestBase):
                 """
             ),
         )
-        self.add_to_build_file("src/python/base", target='python_library(sources=globs("*.py"))\n')
+        self.add_to_build_file("src/python/base", target='python_library(sources=["*.py"])\n')
 
         self.create_file("src/python/base/app/__init__.py")
         self.create_file(

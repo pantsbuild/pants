@@ -28,7 +28,7 @@ class Scoverage(CoverageEngine):
 
             def scoverage_jar(name, **kwargs):
                 return JarDependency(
-                    org="com.twitter.scoverage", name=name, rev="1.0.1-twitter", **kwargs
+                    org="com.twitter.scoverage", name=name, rev="1.0.2-twitter", **kwargs
                 )
 
             def slf4j_jar(name):

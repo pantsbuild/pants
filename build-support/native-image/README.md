@@ -45,7 +45,7 @@ Please re-run the script at most two more times. This can occur nondeterministic
 
 This is a developing story. Currently, the script will idempotently create or update a directory in the pwd named `generated-reflect-config/` with the results of the reflection tracing. This directory will contain 5 files -- 4 json config files, and one `BUILD` file. This directory can be checked in and updated over time -- subsequent runs of the script will never remove information from previous runs.
 
-*Note:* the script does *not* need to be run over the whole repo (`::`) at once! Since the compile run with reflection tracing has parallelism set to 1, this initial run can take a long time. Initially, it's possible to run the script over batched sections of your repo (e.g. using `./pants list` and `--target-spec-file`), until all targets are covered.
+*Note:* the script does *not* need to be run over the whole repo (`::`) at once! Since the compile run with reflection tracing has parallelism set to 1, this initial run can take a long time. Initially, it's possible to run the script over batched sections of your repo (e.g. using `./pants list` and `--spec-file`), until all targets are covered.
 
 The image may begin failing to build -- this can happen e.g. if you used to use a macro in your repo, but no longer do, the build will fail when scanning reflect config entries. If this happens, you can always `rm -rfv generated-reflect-config/` and run the script again (although you will have to rebuild it for your whole repo again in this case).
 

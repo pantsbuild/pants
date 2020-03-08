@@ -53,16 +53,16 @@ async def list_targets(console: Console, list_options: ListOptions, addresses: A
         collection = await Get[HydratedTargets](Addresses, addresses)
         if provides:
             extractors = dict(
-                address=lambda target: target.address.spec,
-                artifact_id=lambda target: str(target.adaptor.provides),
-                repo_name=lambda target: target.adaptor.provides.repo.name,
-                repo_url=lambda target: target.adaptor.provides.repo.url,
-                push_db_basedir=lambda target: target.adaptor.provides.repo.push_db_basedir,
+                address=lambda adaptor: adaptor.address.spec,
+                artifact_id=lambda adaptor: str(adaptor.provides),
+                repo_name=lambda adaptor: adaptor.provides.repo.name,
+                repo_url=lambda adaptor: adaptor.provides.repo.url,
+                push_db_basedir=lambda adaptor: adaptor.provides.repo.push_db_basedir,
             )
 
             def print_provides(column_extractors, target):
                 if getattr(target.adaptor, "provides", None):
-                    return " ".join(extractor(target) for extractor in column_extractors)
+                    return " ".join(extractor(target.adaptor) for extractor in column_extractors)
 
             try:
                 column_extractors = [extractors[col] for col in (provides_columns.split(","))]
@@ -79,7 +79,7 @@ async def list_targets(console: Console, list_options: ListOptions, addresses: A
                 description = getattr(target.adaptor, "description", None)
                 if description:
                     return "{0}\n  {1}".format(
-                        target.address.spec, "\n  ".join(description.strip().split("\n"))
+                        target.adaptor.address.spec, "\n  ".join(description.strip().split("\n"))
                     )
 
             print_fn = print_documented

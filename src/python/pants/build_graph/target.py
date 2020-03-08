@@ -8,7 +8,6 @@ from hashlib import sha1
 from typing import Optional, Sequence, Union
 
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import warn_or_error
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.base.hash_utils import hash_all
@@ -676,9 +675,6 @@ class Target(AbstractTarget):
         :param Payload payload: The post-Target.__init__() Payload object.
         :yields: AddressSpec strings representing dependencies of this target.
         """
-
-        if cls.compute_injectable_specs.__func__ is not Target.compute_injectable_specs.__func__:
-            cls._compute_injectable_specs_warn_or_error()
         cls._validate_target_representation_args(kwargs, payload)
         # N.B. This pattern turns this method into a non-yielding generator, which is helpful for
         # subclassing.
@@ -703,68 +699,11 @@ class Target(AbstractTarget):
         :param Payload payload: The post-Target.__init__() Payload object.
         :yields: AddressSpec strings representing dependencies of this target.
         """
-        if cls.compute_dependency_specs.__func__ is not Target.compute_dependency_specs.__func__:
-            cls._compute_dependency_specs_warn_or_error()
         cls._validate_target_representation_args(kwargs, payload)
         # N.B. This pattern turns this method into a non-yielding generator, which is helpful for
         # subclassing.
         return
         yield  # type: ignore[misc] # MyPy doesn't understand this pattern; complains that code is unreachable
-
-    @classmethod
-    def compute_injectable_specs(cls, kwargs=None, payload=None):
-        """Given either pre-Target.__init__() kwargs or a post-Target.__init__() payload, compute
-        the specs to inject as non-dependencies in the same vein as the prior `traversable_specs`.
-
-        :API: public
-
-        :param dict kwargs: The pre-Target.__init__() kwargs dict.
-        :param Payload payload: The post-Target.__init__() Payload object.
-        :yields: AddressSpec strings representing dependencies of this target.
-        """
-        cls._compute_injectable_specs_warn_or_error()
-        cls.compute_injectable_address_specs(kwargs=kwargs, payload=payload)
-
-    @classmethod
-    def _compute_injectable_specs_warn_or_error(cls):
-        warn_or_error(
-            removal_version="1.27.0.dev0",
-            deprecated_entity_description="Target.compute_injectable_specs()",
-            hint="Use `Target.compute_injectable_address_specs()` instead. The API is the same as "
-            "before. This change is to prepare for Pants eventually supporting file system specs, "
-            "e.g. `./pants cloc foo.py`. In preparation, we renamed `Spec` to `AddressSpec`.",
-        )
-
-    @classmethod
-    def compute_dependency_specs(cls, kwargs=None, payload=None):
-        """Given either pre-Target.__init__() kwargs or a post-Target.__init__() payload, compute
-        the full set of dependency specs in the same vein as the prior
-        `traversable_dependency_specs`.
-
-        N.B. This is a temporary bridge to span the gap between v2 "Fields" products vs v1 `BuildGraph`
-        `Target` object representations. See:
-
-          https://github.com/pantsbuild/pants/issues/3560
-          https://github.com/pantsbuild/pants/issues/3561
-
-        :API: public
-
-        :param dict kwargs: The pre-Target.__init__() kwargs dict.
-        :param Payload payload: The post-Target.__init__() Payload object.
-        :yields: AddressSpec strings representing dependencies of this target.
-        """
-        cls._compute_dependency_specs_warn_or_error()
-        cls.compute_dependency_address_specs(kwargs=kwargs, payload=payload)
-
-    @classmethod
-    def _compute_dependency_specs_warn_or_error(cls):
-        warn_or_error(
-            removal_version="1.27.0.dev0",
-            deprecated_entity_description="Target.compute_dependency_specs()",
-            hint="Use `Target.compute_dependency_address_specs()` instead. The API is the same as "
-            "before. This change is to prepare for Pants eventually supporting file system specs, "
-            "e.g. `./pants cloc foo.py`. In preparation, we renamed `Spec` to `AddressSpec`.",
-        )
 
     @property
     def dependencies(self):

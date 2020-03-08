@@ -434,7 +434,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
 
         self._compile_spec(
             compiles,
-            [f"java_library(name='{target_name}', sources=rglobs('*.java', '*.scala'))"],
+            [f"java_library(name='{target_name}', sources=['**/*.java', '**/*.scala'])"],
             [target_name],
             target_name,
             work,

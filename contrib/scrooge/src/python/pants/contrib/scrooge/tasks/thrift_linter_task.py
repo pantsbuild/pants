@@ -1,8 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import multiprocessing
-
 from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.deprecated import resolve_conflicting_options
@@ -43,20 +41,10 @@ class ThriftLinterTask(LintTaskMixin, NailgunTask):
             "--strict",
             type=bool,
             fingerprint=True,
+            removal_version="1.29.0.dev0",
             removal_hint="Use `--scrooge-linter-strict` instead",
             help="Fail the goal if thrift linter errors are found. Overrides the "
             "`strict-default` option.",
-        )
-        register(
-            "--strict-default",
-            default=False,
-            advanced=True,
-            type=bool,
-            fingerprint=True,
-            removal_version="1.27.0.dev0",
-            removal_hint="Use `--scrooge-linter-strict-default` instead",
-            help="Sets the default strictness for targets. The `strict` option overrides "
-            "this value if it is set.",
         )
         register(
             "--ignore-errors",
@@ -65,27 +53,6 @@ class ThriftLinterTask(LintTaskMixin, NailgunTask):
             type=bool,
             fingerprint=True,
             help="Ignore any error so thrift-linter always exit 0.",
-        )
-        register(
-            "--linter-args",
-            default=[],
-            advanced=True,
-            type=list,
-            fingerprint=True,
-            removal_version="1.27.0.dev0",
-            removal_hint="Use `--scrooge-linter-args` instead. Unlike this argument, you can pass "
-            "all the arguments as one string, e.g. "
-            '`--scrooge-linter-args="--disable-rule Namespaces".',
-            help="Additional options passed to the linter.",
-        )
-        register(
-            "--worker-count",
-            default=multiprocessing.cpu_count(),
-            advanced=True,
-            type=int,
-            removal_version="1.27.0.dev0",
-            removal_hint="Use `--scrooge-linter-worker-count` instead.",
-            help="Maximum number of workers to use for linter parallelization.",
         )
         cls.register_jvm_tool(register, "scrooge-linter")
 
@@ -100,11 +67,7 @@ class ThriftLinterTask(LintTaskMixin, NailgunTask):
 
     @property
     def skip_execution(self):
-        return self.resolve_conflicting_skip_options(
-            old_scope="thrift-linter",
-            new_scope="scrooge-linter",
-            subsystem=ScroogeLinter.global_instance(),
-        )
+        return ScroogeLinter.global_instance().options.skip
 
     @property
     def cache_target_dirs(self):
@@ -133,18 +96,12 @@ class ThriftLinterTask(LintTaskMixin, NailgunTask):
         if target.thrift_linter_strict is not None:
             return self._to_bool(target.thrift_linter_strict)
 
-        return self._to_bool(
-            self._resolve_conflicting_options(
-                old_option="strict_default", new_option="strict_default"
-            ),
-        )
+        return self._to_bool(subsystem_options.strict_default)
 
     def _lint(self, target, classpath):
         self.context.log.debug(f"Linting {target.address.spec}")
 
         config_args = []
-
-        config_args.extend(self.get_options().linter_args)
         config_args.extend(ScroogeLinter.global_instance().options.args)
 
         if self._is_strict(target):
@@ -189,9 +146,7 @@ class ThriftLinterTask(LintTaskMixin, NailgunTask):
                 worker_pool = WorkerPool(
                     workunit.parent,
                     self.context.run_tracker,
-                    self._resolve_conflicting_options(
-                        old_option="worker_count", new_option="worker_count"
-                    ),
+                    ScroogeLinter.global_instance().options.worker_count,
                     workunit.name,
                 )
 

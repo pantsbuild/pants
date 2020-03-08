@@ -17,6 +17,10 @@ class FileDeps(ConsoleTask):
     transitive closure of targets are also included.
     """
 
+    # TODO: In 1.28.0.dev0, once we default to `--no-transitive`, remove this and go back to using
+    # ConsoleTask's implementation of `--transitive`.
+    _register_console_transitivity_option = False
+
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
@@ -30,6 +34,13 @@ class FileDeps(ConsoleTask):
             type=bool,
             default=True,
             help="If True output with absolute path, else output with path relative to the build root",
+        )
+        register(
+            "--transitive",
+            type=bool,
+            default=True,
+            fingerprint=True,
+            help="If True, use all targets in the build graph, else use only target roots.",
         )
 
     @property

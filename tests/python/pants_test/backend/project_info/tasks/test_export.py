@@ -225,7 +225,7 @@ class ExportTest(ConsoleTaskTestBase):
         self.add_to_build_file(
             "src/python/x/BUILD",
             """
-            python_library(name="x", sources=globs("*.py"))
+            python_library(name="x", sources=["*.py"])
             """.strip(),
         )
 
@@ -233,24 +233,17 @@ class ExportTest(ConsoleTaskTestBase):
             "src/python/y/BUILD",
             dedent(
                 """
-                python_library(name="y", sources=rglobs("*.py"))
-                python_library(name="y2", sources=rglobs("subdir/*.py"))
-                python_library(name="y3", sources=rglobs("Test*.py"))
+                python_library(name="y", sources=["**/*.py"])
+                python_library(name="y2", sources=["subdir/**/*.py"])
+                python_library(name="y3", sources=["Test*.py"])
                 """
             ),
         )
 
         self.add_to_build_file(
-            "src/python/z/BUILD",
-            """
-            python_library(name="z", sources=zglobs("**/*.py"))
-            """.strip(),
-        )
-
-        self.add_to_build_file(
             "src/python/exclude/BUILD",
             """
-            python_library(name="exclude", sources=globs("*.py", exclude=[['foo.py']]))
+            python_library(name="exclude", sources=["*.py", "!foo.py"])
             """.strip(),
         )
 
@@ -265,7 +258,7 @@ class ExportTest(ConsoleTaskTestBase):
             "src/python/has_reqs/BUILD",
             textwrap.dedent(
                 """
-                python_library(name="has_reqs", sources=globs("*.py"), dependencies=[':six'])
+                python_library(name="has_reqs", sources=["*.py"], dependencies=[':six'])
 
                 python_requirement_library(
                     name='six',
@@ -497,7 +490,7 @@ class ExportTest(ConsoleTaskTestBase):
             result["targets"]["src/python/exclude:exclude"]["globs"],
         )
 
-    def test_source_rglobs(self):
+    def test_source_recursive_globs(self):
         self.set_options(globs=True)
         result = self.execute_export_json("src/python/y")
 
@@ -505,7 +498,7 @@ class ExportTest(ConsoleTaskTestBase):
             {"globs": ["src/python/y/**/*.py"]}, result["targets"]["src/python/y:y"]["globs"]
         )
 
-    def test_source_rglobs_subdir(self):
+    def test_source_recursive_globs_subdir(self):
         self.set_options(globs=True)
         result = self.execute_export_json("src/python/y:y2")
 
@@ -514,20 +507,12 @@ class ExportTest(ConsoleTaskTestBase):
             result["targets"]["src/python/y:y2"]["globs"],
         )
 
-    def test_source_rglobs_noninitial(self):
+    def test_source_recursive_globs_noninitial(self):
         self.set_options(globs=True)
         result = self.execute_export_json("src/python/y:y3")
 
         self.assertEqual(
             {"globs": ["src/python/y/Test*.py"]}, result["targets"]["src/python/y:y3"]["globs"]
-        )
-
-    def test_source_zglobs(self):
-        self.set_options(globs=True)
-        result = self.execute_export_json("src/python/z")
-
-        self.assertEqual(
-            {"globs": ["src/python/z/**/*.py"]}, result["targets"]["src/python/z:z"]["globs"]
         )
 
     def test_has_python_requirements(self):

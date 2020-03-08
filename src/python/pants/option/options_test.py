@@ -861,10 +861,7 @@ class OptionsTest(TestBase):
             )
             tmp.flush()
             # Note that we prevent loading a real pants.toml during get_bootstrap_options().
-            flags = (
-                f'--target-spec-file={tmp.name} --pants-config-files="[]" '
-                "compile morx:tgt fleem:tgt"
-            )
+            flags = f'--spec-file={tmp.name} --pants-config-files="[]" compile morx:tgt fleem:tgt'
             bootstrapper = OptionsBootstrapper.create(args=shlex.split(f"./pants {flags}"))
             bootstrap_options = bootstrapper.bootstrap_options.for_global_scope()
             options = self._parse(flags=flags, bootstrap_option_values=bootstrap_options)
@@ -1202,15 +1199,15 @@ class OptionsTest(TestBase):
     def test_complete_scopes(self) -> None:
         self.assertEqual(
             {intermediate("foo"), intermediate("foo.bar"), task("foo.bar.baz")},
-            Options.complete_scopes({task("foo.bar.baz")}),
+            set(Options.complete_scopes({task("foo.bar.baz")})),
         )
         self.assertEqual(
             {global_scope(), intermediate("foo"), intermediate("foo.bar"), task("foo.bar.baz")},
-            Options.complete_scopes({GlobalOptions.get_scope_info(), task("foo.bar.baz")}),
+            set(Options.complete_scopes({GlobalOptions.get_scope_info(), task("foo.bar.baz")})),
         )
         self.assertEqual(
             {intermediate("foo"), intermediate("foo.bar"), task("foo.bar.baz")},
-            Options.complete_scopes({intermediate("foo"), task("foo.bar.baz")}),
+            set(Options.complete_scopes({intermediate("foo"), task("foo.bar.baz")})),
         )
         self.assertEqual(
             {
@@ -1220,7 +1217,7 @@ class OptionsTest(TestBase):
                 intermediate("qux"),
                 task("qux.quux"),
             },
-            Options.complete_scopes({task("foo.bar.baz"), task("qux.quux")}),
+            set(Options.complete_scopes({task("foo.bar.baz"), task("qux.quux")})),
         )
 
     def test_get_fingerprintable_for_scope_ignore_passthru(self) -> None:

@@ -78,16 +78,6 @@ python_library(
 )
 
 python_library(
-  name = 'python_requirement',
-  sources = ['python_requirement.py'],
-  dependencies = [
-    'src/python/pants/base:deprecated',
-    'src/python/pants/python'
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_library(
   name = 'python_requirements',
   sources = ['python_requirements.py'],
   tags = {"partially_type_checked"},

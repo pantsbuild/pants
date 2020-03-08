@@ -9,19 +9,6 @@ class Filemap(ConsoleTask):
 
     _register_console_transitivity_option = False
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--transitive",
-            type=bool,
-            default=True,
-            fingerprint=True,
-            help="If True, use all targets in the build graph, else use only target roots.",
-            removal_version="1.27.0.dev0",
-            removal_hint="This option has no impact on the goal `filemap`.",
-        )
-
     def console_output(self, _):
         visited = set()
         for target in self.determine_target_roots("filemap"):

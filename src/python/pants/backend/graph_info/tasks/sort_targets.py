@@ -14,15 +14,6 @@ class SortTargets(ConsoleTask):
     def register_options(cls, register):
         super().register_options(register)
         register("--reverse", type=bool, help="Sort least-dependent to most-dependent.")
-        register(
-            "--transitive",
-            type=bool,
-            default=True,
-            fingerprint=True,
-            help="If True, use all targets in the build graph, else use only target roots.",
-            removal_version="1.27.0.dev0",
-            removal_hint="This option has no impact on the goal `sort`.",
-        )
 
     def console_output(self, targets):
         sorted_targets = sort_targets(targets)

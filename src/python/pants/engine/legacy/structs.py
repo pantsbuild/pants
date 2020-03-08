@@ -17,6 +17,7 @@ from pants.engine.objects import Locatable, union
 from pants.engine.rules import UnionRule
 from pants.engine.struct import Struct, StructWithDeps
 from pants.source import wrapped_globs
+from pants.util.collections import ensure_str_list
 from pants.util.contextutil import exception_logging
 from pants.util.meta import classproperty
 from pants.util.objects import Exactly
@@ -310,6 +311,13 @@ class PythonTargetAdaptor(TargetAdaptor):
             )
             return (*field_adaptors, sources_field)
 
+    # TODO(#4535): remove this once its superseded by the target API.
+    @property
+    def compatibility(self) -> Optional[List[str]]:
+        if "compatibility" not in self._kwargs:
+            return None
+        return ensure_str_list(self._kwargs["compatibility"])
+
 
 class PythonBinaryAdaptor(PythonTargetAdaptor):
     def validate_sources(self, sources):
@@ -433,8 +441,7 @@ class PantsPluginAdaptorWithOrigin(TargetAdaptorWithOrigin):
     adaptor: PantsPluginAdaptor
 
 
-# TODO: Remove all the subclasses once we remove globs et al. The only remaining subclass would be
-# Files, which should simply be unified into BaseGlobs.
+# TODO: Consolidate this with `Files`
 class BaseGlobs(Locatable, metaclass=ABCMeta):
     """An adaptor class to allow BUILD file parsing from ContextAwareObjectFactories."""
 
@@ -453,7 +460,7 @@ class BaseGlobs(Locatable, metaclass=ABCMeta):
             isinstance(s, str) for s in sources
         ):
             return Files(*sources, spec_path=spec_path)
-        raise ValueError(f"Expected either a glob or list of literal sources. Got: {sources}")
+        raise ValueError(f"Expected a list of literal sources and globs. Got: {sources}")
 
     @property
     @abstractmethod
@@ -552,21 +559,6 @@ class Files(BaseGlobs):
 
     def __str__(self) -> str:
         return f"[{', '.join(repr(p) for p in self._patterns)}]"
-
-
-class Globs(BaseGlobs):
-    path_globs_kwarg = "globs"
-    legacy_globs_class = wrapped_globs.Globs
-
-
-class RGlobs(BaseGlobs):
-    path_globs_kwarg = "rglobs"
-    legacy_globs_class = wrapped_globs.RGlobs
-
-
-class ZGlobs(BaseGlobs):
-    path_globs_kwarg = "zglobs"
-    legacy_globs_class = wrapped_globs.ZGlobs
 
 
 @dataclass(frozen=True)

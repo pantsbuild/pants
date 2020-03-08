@@ -72,7 +72,8 @@ pub struct EngineDisplay {
   printable_msgs: VecDeque<PrintableMsg>,
   cursor_start: (u16, u16),
   terminal_size: (u16, u16),
-  async_stdin: AsyncReader,
+  async_stdin: Option<AsyncReader>,
+  suspended: bool,
 }
 
 // TODO: Prescribe a threading/polling strategy for callers - or implement a built-in one.
@@ -103,7 +104,8 @@ impl EngineDisplay {
       // as we've done here is the safest way to avoid terminal oddness.
       cursor_start: (1, 1),
       terminal_size: EngineDisplay::get_size(),
-      async_stdin: async_stdin(),
+      async_stdin: Some(async_stdin()),
+      suspended: false,
     }
   }
 
@@ -276,6 +278,9 @@ impl EngineDisplay {
 
   // Paints one screen of rendering.
   pub fn render(&mut self) -> std::result::Result<KeyboardCommand, String> {
+    if self.suspended {
+      return Ok(KeyboardCommand::None);
+    }
     self.set_size();
     self.clear();
     let max_log_rows = self.get_max_log_rows();
@@ -294,9 +299,9 @@ impl EngineDisplay {
     //(See https://docs.rs/termion/1.5.4/src/termion/async.rs.html#69 )
     let mut buf: [u8; 32] = [0; 32];
 
-    match self.async_stdin.read(&mut buf) {
-      Ok(0) => Ok(KeyboardCommand::None),
-      Ok(_) => {
+    match self.async_stdin.as_mut().map(|s| s.read(&mut buf)) {
+      Some(Ok(0)) | None => Ok(KeyboardCommand::None),
+      Some(Ok(_)) => {
         let initial_byte: u8 = buf[0];
         let mut iter = buf[1..].iter().map(|byte| Ok(*byte));
         // TODO: calling `parse_event` in this way means that we will potentially miss keyboard
@@ -313,7 +318,7 @@ impl EngineDisplay {
           _ => Ok(KeyboardCommand::None),
         }
       }
-      Err(err) => Err(format!("EngineDisplay stdin error: {}", err)),
+      Some(Err(err)) => Err(format!("EngineDisplay stdin error: {}", err)),
     }
   }
 
@@ -365,6 +370,8 @@ impl EngineDisplay {
   pub fn suspend(&mut self) {
     {
       self.terminal = Console::Uninitialized;
+      self.suspended = true;
+      self.async_stdin = None;
     }
     println!("{}", termion::cursor::Show);
   }
@@ -375,6 +382,8 @@ impl EngineDisplay {
       Ok(t) => Console::Terminal(t),
       Err(_) => Console::Pipe(stdout()),
     };
+    self.suspended = false;
+    self.async_stdin = Some(async_stdin());
   }
 
   // Initiates one last screen render, then terminates the EngineDisplay and returns the cursor

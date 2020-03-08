@@ -6,7 +6,6 @@ import re
 from enum import Enum
 from typing import Dict, Iterable, List, Pattern, Sequence
 
-from pants.base.deprecated import warn_or_error
 from pants.option.errors import ParseError
 from pants.util.eval import parse_expression
 from pants.util.memo import memoized_method
@@ -27,42 +26,6 @@ class UnsetBool:
         )
 
 
-def dict_option(s: str) -> "DictValueComponent":
-    """An option of type 'dict'.
-
-    The value (on the command-line, in an env var or in the config file) must be eval'able to a dict.
-
-    :API: public
-    """
-    warn_or_error(
-        removal_version="1.27.0.dev0",
-        deprecated_entity_description="pants.option.custom_types.dict_option",
-        hint="Instead of setting an option's type as `type=dict_option`, set `type=dict`.",
-    )
-    return DictValueComponent.create(s)
-
-
-def list_option(s: str) -> "ListValueComponent":
-    """An option of type 'list'.
-
-    The value (on the command-line, in an env var or in the config file) must be one of:
-
-    1. A string eval'able to a list or tuple, which will replace any previous values.
-    2. A plus sign followed by a string eval'able to a list or a tuple, whose values will be
-       appended to any previous values (e.g., those from lower-ranked sources).
-    3. A scalar, that will be appended to any previous values.
-
-
-    :API: public
-    """
-    warn_or_error(
-        removal_version="1.27.0.dev0",
-        deprecated_entity_description="pants.option.custom_types.list_option",
-        hint="Instead of setting an option's type as `type=list_option`, set `type=list`.",
-    )
-    return ListValueComponent.create(s)
-
-
 def target_option(s: str) -> str:
     """Same type as 'str', but indicates a single target spec.
 
@@ -71,22 +34,6 @@ def target_option(s: str) -> str:
     TODO(stuhood): Eagerly convert these to Addresses: see https://rbcommons.com/s/twitter/r/2937/
     """
     return s
-
-
-def target_list_option(s):
-    """Same type as 'list_option', but indicates list contents are target specs.
-
-    :API: public
-
-    TODO(stuhood): Eagerly convert these to Addresses: see https://rbcommons.com/s/twitter/r/2937/
-    """
-    warn_or_error(
-        removal_version="1.27.0.dev0",
-        deprecated_entity_description="pants.option.custom_types.target_list_option",
-        hint="Instead of setting an option's type as `type=target_list_option`, set "
-        "`type=list, member_type=target_option`.",
-    )
-    return _convert(s, (list, tuple))
 
 
 def _normalize_directory_separators(s: str) -> str:

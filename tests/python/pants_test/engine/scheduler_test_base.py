@@ -55,12 +55,13 @@ class SchedulerTestBase:
         project_tree = project_tree or self.mk_fs_tree(work_dir=work_dir)
         local_store_dir = os.path.realpath(safe_mkdtemp())
         scheduler = Scheduler(
-            self._native,
-            project_tree,
-            local_store_dir,
-            rules,
-            union_rules,
-            DEFAULT_EXECUTION_OPTIONS,
+            native=self._native,
+            ignore_patterns=project_tree.ignore_patterns,
+            build_root=project_tree.build_root,
+            local_store_dir=local_store_dir,
+            rules=rules,
+            union_rules=union_rules,
+            execution_options=DEFAULT_EXECUTION_OPTIONS,
             include_trace_on_error=include_trace_on_error,
         )
         return scheduler.new_session(

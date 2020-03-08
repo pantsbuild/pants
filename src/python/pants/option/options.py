@@ -5,7 +5,7 @@ import copy
 import re
 import sys
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple
+from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from pants.base.deprecated import warn_or_error
 from pants.option.arg_splitter import ArgSplitter, HelpRequest
@@ -18,6 +18,7 @@ from pants.option.parser_hierarchy import ParserHierarchy, all_enclosing_scopes,
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import frozen_after_init
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 
 class Options:
@@ -72,16 +73,16 @@ class Options:
         """More than one registration occurred for the same scope."""
 
     @classmethod
-    def complete_scopes(cls, scope_infos: Iterable[ScopeInfo]) -> Set[ScopeInfo]:
+    def complete_scopes(cls, scope_infos: Iterable[ScopeInfo]) -> FrozenOrderedSet[ScopeInfo]:
         """Expand a set of scopes to include all enclosing scopes.
 
         E.g., if the set contains `foo.bar.baz`, ensure that it also contains `foo.bar` and `foo`.
 
         Also adds any deprecated scopes.
         """
-        ret = set()
+        ret: OrderedSet[ScopeInfo] = OrderedSet()
         original_scopes: Dict[str, ScopeInfo] = {}
-        for si in scope_infos:
+        for si in sorted(scope_infos, key=lambda si: si.scope):
             ret.add(si)
             if si.scope in original_scopes:
                 raise cls.DuplicateScopeError(
@@ -101,7 +102,7 @@ class Options:
             for scope in all_enclosing_scopes(si.scope, allow_global=False):
                 if scope not in original_scopes:
                     ret.add(ScopeInfo(scope, ScopeInfo.INTERMEDIATE))
-        return ret
+        return FrozenOrderedSet(ret)
 
     @classmethod
     def create(
@@ -212,34 +213,6 @@ class Options:
 
         :API: public
         """
-        return self._specs
-
-    @property
-    def target_specs(self):
-        """The targets to operate on.
-
-        :API: public
-        """
-        warn_or_error(
-            removal_version="1.27.0.dev0",
-            deprecated_entity_description=".target_specs",
-            hint="Use .specs instead. This change is in preparation for Pants eventually allowing you to "
-            "pass file names as arguments, e.g. `./pants cloc foo.py`.",
-        )
-        return self._specs
-
-    @property
-    def positional_args(self):
-        """The positional args to operate on.
-
-        :API: public
-        """
-        warn_or_error(
-            removal_version="1.27.0.dev0",
-            deprecated_entity_description=".positional_args",
-            hint="Use .specs instead. This change is in preparation for Pants eventually allowing you to "
-            "pass file names as arguments, e.g. `./pants cloc foo.py`.",
-        )
         return self._specs
 
     @property

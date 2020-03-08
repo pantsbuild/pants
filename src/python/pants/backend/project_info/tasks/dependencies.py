@@ -15,6 +15,10 @@ from pants.util.ordered_set import OrderedSet
 class Dependencies(ConsoleTask):
     """Print the target's dependencies."""
 
+    # TODO: In 1.28.0.dev0, once we default to `--no-transitive`, remove this and go back to using
+    # ConsoleTask's implementation of `--transitive`.
+    _register_console_transitivity_option = False
+
     @staticmethod
     def _is_jvm(target):
         return isinstance(target, (JarLibrary, JvmTarget, JvmApp))
@@ -44,6 +48,13 @@ class Dependencies(ConsoleTask):
             "(only external jars).",
             removal_version="1.27.0.dev0",
             removal_hint="Use `--dependencies-type=3rdparty` instead.",
+        )
+        register(
+            "--transitive",
+            type=bool,
+            default=True,
+            fingerprint=True,
+            help="If True, use all targets in the build graph, else use only target roots.",
         )
 
     def __init__(self, *args, **kwargs):

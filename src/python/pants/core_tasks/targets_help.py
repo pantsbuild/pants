@@ -17,14 +17,6 @@ class TargetsHelp(ConsoleTask):
     def register_options(cls, register):
         super().register_options(register)
         register("--details", help="Show details about this target type.")
-        register(
-            "--transitive",
-            type=bool,
-            default=True,
-            fingerprint=True,
-            removal_version="1.27.0.dev0",
-            removal_hint="This option has no impact on the goal `targets`.",
-        )
 
     def console_output(self, targets):
         buildfile_aliases = self.context.build_configuration.registered_aliases()

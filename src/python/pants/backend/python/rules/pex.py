@@ -1,8 +1,10 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import itertools
+from collections import defaultdict
 from dataclasses import dataclass
-from typing import Iterable, List, Optional, Tuple
+from typing import DefaultDict, Iterable, List, Optional, Tuple
 
 from pants.backend.python.rules.download_pex_bin import DownloadedPexBin
 from pants.backend.python.rules.hermetic_pex import HermeticPex
@@ -25,11 +27,17 @@ from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.rules import rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.python.python_setup import PythonSetup
+from pants.util.meta import frozen_after_init
+from pants.util.ordered_set import FrozenOrderedSet
 
 
-@dataclass(frozen=True)
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class PexRequirements:
-    requirements: Tuple[str, ...] = ()
+    requirements: FrozenOrderedSet[str]
+
+    def __init__(self, requirements: Optional[Iterable[str]] = None) -> None:
+        self.requirements = FrozenOrderedSet(sorted(requirements or ()))
 
     @classmethod
     def create_from_adaptors(
@@ -45,16 +53,20 @@ class PexRequirements:
                 for py_req in maybe_python_req_lib.requirements:
                     all_target_requirements.add(str(py_req.requirement))
         all_target_requirements.update(additional_requirements)
-        return PexRequirements(requirements=tuple(sorted(all_target_requirements)))
+        return PexRequirements(all_target_requirements)
 
 
-@dataclass(frozen=True)
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class PexInterpreterConstraints:
-    constraint_set: Tuple[str, ...] = ()
+    constraints: FrozenOrderedSet[str]
+
+    def __init__(self, constraints: Optional[Iterable[str]] = None) -> None:
+        self.constraints = FrozenOrderedSet(sorted(constraints or ()))
 
     def generate_pex_arg_list(self) -> List[str]:
         args = []
-        for constraint in sorted(self.constraint_set):
+        for constraint in sorted(self.constraints):
             args.extend(["--interpreter-constraint", constraint])
         return args
 
@@ -62,15 +74,21 @@ class PexInterpreterConstraints:
     def create_from_adaptors(
         cls, adaptors: Iterable[TargetAdaptor], python_setup: PythonSetup
     ) -> "PexInterpreterConstraints":
-        interpreter_constraints = {
-            constraint
-            for target_adaptor in adaptors
-            for constraint in python_setup.compatibility_or_constraints(
-                getattr(target_adaptor, "compatibility", None)
-            )
-            if isinstance(target_adaptor, PythonTargetAdaptor)
-        }
-        return PexInterpreterConstraints(constraint_set=tuple(sorted(interpreter_constraints)))
+        constraints_to_adaptors: DefaultDict[
+            Tuple[str, ...], List[PythonTargetAdaptor]
+        ] = defaultdict(list)
+        for adaptor in adaptors:
+            if not isinstance(adaptor, PythonTargetAdaptor):
+                continue
+            constraints = python_setup.compatibility_or_constraints(adaptor.compatibility)
+            constraints_to_adaptors[constraints].append(adaptor)
+        # TODO(Pex#914): AND between distinct targets, but OR within targets. Right now, we flatten
+        # every constraint and OR everything. When doing this, use static analysis to produce the
+        # minimum constraints, e.g. simplify `CPython==3.6 AND (CPython==3.6 OR CPython==3.7)`
+        # to `CPython==3.6`.
+        return PexInterpreterConstraints(
+            itertools.chain.from_iterable(constraints_to_adaptors.keys())
+        )
 
 
 @dataclass(frozen=True)

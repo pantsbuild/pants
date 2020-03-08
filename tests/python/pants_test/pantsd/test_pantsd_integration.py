@@ -52,14 +52,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
     @unittest.skip("Flaky as described in: https://github.com/pantsbuild/pants/issues/7573")
     def test_pantsd_run(self):
-        extra_config = {
-            "GLOBAL": {
-                # Muddies the logs with warnings: once all of the warnings in the repository
-                # are fixed, this can be removed.
-                "glob_expansion_failure": "ignore",
-            }
-        }
-        with self.pantsd_successful_run_context("debug", extra_config=extra_config) as (
+        with self.pantsd_successful_run_context("debug") as (
             pantsd_run,
             checker,
             workdir,
@@ -434,13 +427,13 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                 checker.assert_started()
 
                 safe_file_dump(
-                    test_build_file, "python_library(sources=globs('some_non_existent_file.py'))"
+                    test_build_file, "python_library(sources=['some_non_existent_file.py'])"
                 )
                 result = pantsd_run(export_cmd)
                 checker.assert_running()
                 self.assertNotRegex(result.stdout_data, has_source_root_regex)
 
-                safe_file_dump(test_build_file, "python_library(sources=globs('*.py'))")
+                safe_file_dump(test_build_file, "python_library(sources=['*.py'])")
                 result = pantsd_run(export_cmd)
                 checker.assert_running()
                 self.assertNotRegex(result.stdout_data, has_source_root_regex)

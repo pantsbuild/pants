@@ -1,8 +1,6 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.base.deprecated import resolve_conflicting_options
-from pants.subsystem.subsystem import Subsystem
 from pants.task.goal_options_mixin import GoalOptionsMixin, GoalOptionsRegistrar
 
 
@@ -56,55 +54,7 @@ class HasSkipOptionMixin:
 
     @property
     def skip_execution(self):
-        return self.resolve_only_as_skip(self.get_options().skip)
-
-    def resolve_only_as_skip(self, skip: bool):
-        # This flag is defined only on fmt, which is done in FmtTaskMixin.
-        # In v2, we expect to have a --only flag on both fmt and lint which will allow individual
-        # formatters to be selected.
-        #
-        # This is a hacky one-off implementation to help Twitter deal with the fact that they have a
-        # custom Goal called scalafix, which does the equivalent of `fmt --fmt-only=scalafix`, as it
-        # provides them with a forward-compatible way of migrating people off of their scalafix goal.
-        #
-        # When the v2 goal is renamed from fmt2 to fmt, this option should be moved to that Goal, and
-        # its implementation broadened to support all v2 formatters, as well as any v1 formatters we
-        # fancy while we keep them around.
-        #
-        # Skip mypy because this is a temporary hack, and mypy doesn't follow the inheritance chain
-        # properly.
-        options = self.get_options()  # type: ignore
-        if hasattr(options, "only"):
-            only = options.only
-            if only is None:
-                return skip
-            elif only == "scalafix":
-                only_resolved_as_skip = not self.__class__.__name__.startswith("ScalaFix")
-                if skip and not only_resolved_as_skip:
-                    raise ValueError(
-                        f"Invalid flag combination; cannot specify --only={only} if --skip=True",
-                    )
-                return only_resolved_as_skip
-            else:
-                raise ValueError(
-                    "Invalid value for flag --only - must be scalafix or not set at all"
-                )
-        return skip
-
-    def resolve_conflicting_skip_options(
-        self, old_scope: str, new_scope: str, subsystem: Subsystem
-    ):
-        skip = resolve_conflicting_options(
-            old_option="skip",
-            new_option="skip",
-            old_scope=old_scope,
-            new_scope=new_scope,
-            # Skip mypy because this is a temporary hack, and mypy doesn't follow the inheritance chain
-            # properly.
-            old_container=self.get_options(),  # type: ignore
-            new_container=subsystem.options,
-        )
-        return self.resolve_only_as_skip(skip)
+        return self.get_options().skip
 
 
 class SkipOptionRegistrar:
@@ -116,6 +66,10 @@ class SkipOptionRegistrar:
         register(
             "--skip", type=bool, default=False, fingerprint=True, recursive=True, help="Skip task."
         )
+
+
+class HasSkipGoalOptionMixin(GoalOptionsMixin, HasSkipOptionMixin):
+    """A mixin for tasks that have a --skip option registered at the goal level."""
 
 
 class HasSkipAndTransitiveOptionsMixin(HasSkipOptionMixin, HasTransitiveOptionMixin):
@@ -137,23 +91,10 @@ class SkipAndTransitiveGoalOptionsRegistrar(
     """Registrar of --skip and --transitive at the goal level."""
 
 
-class DeprecatedSkipAndDeprecatedTransitiveGoalOptionsRegistrar(GoalOptionsRegistrar):
+class DeprecatedSkipGoalOptionsRegistrar(GoalOptionsRegistrar):
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
-        register(
-            "--transitive",
-            type=bool,
-            default=False,
-            fingerprint=True,
-            recursive=True,
-            removal_version="1.27.0.dev0",
-            removal_hint="This feature is going away. Instead of relying on the `--transitive` flag, "
-            "directly specify on the command line every target that you want to format or "
-            "lint.",
-            help="If false, act only on the targets directly specified on the command line. "
-            "If true, act on the transitive dependency closure of those targets.",
-        )
         deprecated_skip_mapping = {
             "lint-checkstyle": "checkstyle",
             "fmt-javascriptstyle": "eslint",

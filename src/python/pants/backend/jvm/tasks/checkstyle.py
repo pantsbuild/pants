@@ -6,10 +6,9 @@ import os
 from pants.backend.jvm.subsystems.checkstyle import Checkstyle as CheckstyleSubsystem
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
-from pants.base.deprecated import resolve_conflicting_options
 from pants.base.exceptions import TaskError
 from pants.java.jar.jar_dependency import JarDependency
-from pants.option.custom_types import dict_with_files_option, file_option
+from pants.option.custom_types import dict_with_files_option
 from pants.process.xargs import Xargs
 from pants.task.lint_task_mixin import LintTaskMixin
 from pants.util.dirutil import safe_open
@@ -28,28 +27,9 @@ class Checkstyle(LintTaskMixin, NailgunTask):
 
     _CHECKSTYLE_BOOTSTRAP_KEY = "checkstyle"
 
-    def _resolve_conflicting_options(self, *, old_option: str, new_option: str):
-        return resolve_conflicting_options(
-            old_option=old_option,
-            new_option=new_option,
-            old_scope="lint-checkstyle",
-            new_scope="checkstyle",
-            old_container=self.get_options(),
-            new_container=CheckstyleSubsystem.global_instance().options,
-        )
-
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
-        register(
-            "--configuration",
-            advanced=True,
-            type=file_option,
-            fingerprint=True,
-            removal_version="1.27.0.dev0",
-            removal_hint="Use `--checkstyle-config` instead of `--lint-checkstyle-configuration`.",
-            help="Path to the checkstyle configuration file.",
-        )
         register(
             "--properties",
             advanced=True,
@@ -95,11 +75,7 @@ class Checkstyle(LintTaskMixin, NailgunTask):
 
     @property
     def skip_execution(self):
-        return self.resolve_conflicting_skip_options(
-            old_scope="lint-checkstyle",
-            new_scope="checkstyle",
-            subsystem=CheckstyleSubsystem.global_instance(),
-        )
+        return CheckstyleSubsystem.global_instance().options.skip
 
     @classmethod
     def prepare(cls, options, round_manager):
@@ -148,7 +124,7 @@ class Checkstyle(LintTaskMixin, NailgunTask):
                     jar for conf, jar in runtime_classpath if conf in self.get_options().confs
                 )
 
-        config = self._resolve_conflicting_options(old_option="configuration", new_option="config")
+        config = CheckstyleSubsystem.global_instance().options.config
         if not config:
             raise TaskError(
                 "No checkstyle configuration file configured. Configure with `--checkstyle-config`."

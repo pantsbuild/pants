@@ -4,12 +4,11 @@
 import os.path
 from contextlib import contextmanager
 
-from twitter.common.collections import maybe_list
-
 from pants.java import util
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import Executor, SubprocessExecutor
 from pants.process.lock import OwnerPrintingInterProcessFileLock
+from pants.util.collections import ensure_str_list
 from pants.util.dirutil import safe_mkdir
 
 
@@ -32,7 +31,7 @@ class Ivy:
         :param ivy_resolution_cache_dir: path to store downloaded ivy artifacts
         :param extra_jvm_options: list of strings to add to command line when invoking Ivy
         """
-        self._classpath = maybe_list(classpath)
+        self._classpath = ensure_str_list(classpath)
         self._ivy_settings = ivy_settings
         if self._ivy_settings and not isinstance(self._ivy_settings, str):
             raise ValueError(

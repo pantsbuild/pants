@@ -5,7 +5,6 @@
 python_tests(
   sources = ['*.py', '!*_integration.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:parameterized',
     'src/python/pants/backend/codegen/wire/java',
     'src/python/pants/backend/jvm/targets:jvm',

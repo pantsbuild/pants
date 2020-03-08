@@ -16,7 +16,7 @@ from pants.base.build_environment import (
     pants_version,
 )
 from pants.base.deprecated import deprecated_conditional
-from pants.option.custom_types import dir_option, file_option
+from pants.option.custom_types import dir_option
 from pants.option.errors import OptionsError
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.subsystem.subsystem import Subsystem
@@ -52,7 +52,6 @@ class FileNotFoundBehavior(Enum):
                 "default) or `--files-not-found-behavior=error`. Ignoring when files are "
                 "not found often results in subtle bugs, so we are removing the option."
             ),
-            deprecation_start_version="1.27.0.dev0",
         )
         return GlobMatchErrorBehavior(self.value)
 
@@ -66,7 +65,6 @@ class OwnersNotFoundBehavior(Enum):
 
 
 class BuildFileImportsBehavior(Enum):
-    allow = "allow"
     warn = "warn"
     error = "error"
 
@@ -394,28 +392,6 @@ class GlobalOptions(Subsystem):
             help="Add these directories to PYTHONPATH to search for plugins.",
         )
         register(
-            "--target-spec-file",
-            type=list,
-            dest="spec_files",
-            daemon=False,
-            removal_version="1.27.0.dev0",
-            removal_hint="Use `--spec-file` instead. This change is in preparation for Pants "
-            "eventually allowing you to pass file names as arguments, e.g. "
-            "`./pants cloc foo.py`.",
-            help="Read additional specs from this file, one per line",
-        )
-        register(
-            "--positional-arg-file",
-            type=list,
-            dest="spec_files",
-            daemon=False,
-            removal_version="1.27.0.dev0",
-            removal_hint="Use `--spec-file` instead. This change is in preparation for Pants "
-            "eventually allowing you to pass file names as arguments, e.g. "
-            "`./pants cloc foo.py`.",
-            help="Read additional positional args from this file, one per line",
-        )
-        register(
             "--spec-file",
             type=list,
             dest="spec_files",
@@ -469,18 +445,6 @@ class GlobalOptions(Subsystem):
             "`sources` field, cannot be found. This happens when the files do not exist on "
             "your machine or when they are ignored by the `--pants-ignore` option.",
         )
-        register(
-            "--glob-expansion-failure",
-            advanced=True,
-            type=GlobMatchErrorBehavior,
-            default=GlobMatchErrorBehavior.warn,
-            removal_version="1.27.0.dev0",
-            removal_hint="If you currently set `--glob-expansion-failure=error`, instead set "
-            "`--files-not-found-behavior=error`.",
-            help="What to do when files and globs specified in BUILD files, such as in the "
-            "`sources` field, cannot be found. This happens when the files do not exist on "
-            "your machine or when they are ignored by the `--pants-ignore` option.",
-        )
 
         # TODO(#7203): make a regexp option type!
         register(
@@ -499,29 +463,6 @@ class GlobalOptions(Subsystem):
             default=[],
             help="Paths that correspond with build roots for any subproject that this "
             "project depends on.",
-        )
-        register(
-            "--owner-of",
-            type=list,
-            member_type=file_option,
-            default=[],
-            daemon=False,
-            metavar="<path>",
-            removal_version="1.27.0.dev0",
-            removal_hint=(
-                "Use direct file arguments instead, such as "
-                "`./pants list src/python/f1.py src/python/f2.py` or even "
-                "`./pants fmt 'src/python/**/*.py'`. Instead of `--owner-of=@my_file`, use "
-                "`--spec-file=my_file`. Just like with `--owner-of`, Pants will "
-                "try to find the owner(s) of the file and then operate on those owning targets. "
-                "Unlike `--owner-of`, Pants defaults to failing if there is no owning target for "
-                "that file. You may change this through `--owners-not-found-behavior=ignore` or "
-                "`--owners-not-found-behavior=warn`."
-            ),
-            help="Select the targets that own these files. "
-            "This is the third target calculation strategy along with the --changed-* "
-            "options and specifying the targets directly. These three types of target "
-            "selection are mutually exclusive.",
         )
 
         # These logging options are registered in the bootstrap phase so that plugins can log during
@@ -735,8 +676,15 @@ class GlobalOptions(Subsystem):
         register(
             "--build-file-imports",
             type=BuildFileImportsBehavior,
-            default=BuildFileImportsBehavior.warn,
+            default=BuildFileImportsBehavior.error,
             advanced=True,
+            removal_version="1.29.0.dev0",
+            removal_hint=(
+                "Import statements should be avoided in BUILD files because they can easily break "
+                "Pants caching and lead to stale results. If you still need to keep the "
+                "functionality you have from import statements, consider rewriting your code into "
+                "a Pants plugin: https://www.pantsbuild.org/howto_plugin.html."
+            ),
             help="Whether to allow import statements in BUILD files",
         )
 

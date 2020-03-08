@@ -65,15 +65,6 @@ class Depmap(ConsoleTask):
             help="Specifies the separator to use between the org/name/rev components of a "
             "dependency's fully qualified name.",
         )
-        register(
-            "--transitive",
-            type=bool,
-            default=True,
-            fingerprint=True,
-            help="If True, use all targets in the build graph, else use only target roots.",
-            removal_version="1.27.0.dev0",
-            removal_hint="This option has no impact on the goal `depmap`.",
-        )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

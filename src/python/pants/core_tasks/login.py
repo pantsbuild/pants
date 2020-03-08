@@ -35,14 +35,6 @@ class Login(ConsoleTask):
             "could here use the option `--login-to=prod` to login at "
             "`https://app.pantsbuild.org/auth`.",
         )
-        register(
-            "--transitive",
-            type=bool,
-            default=True,
-            fingerprint=True,
-            removal_version="1.27.0.dev0",
-            removal_hint="This option has no impact on the goal `login`.",
-        )
 
     def console_output(self, targets):
         if targets:

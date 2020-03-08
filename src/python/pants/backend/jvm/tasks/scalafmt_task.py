@@ -5,7 +5,6 @@ from abc import abstractmethod
 
 from pants.backend.jvm.subsystems.scalafmt import Scalafmt
 from pants.backend.jvm.tasks.rewrite_base import RewriteBase
-from pants.base.deprecated import resolve_conflicting_options
 from pants.base.exceptions import TaskError
 from pants.java.jar.jar_dependency import JarDependency
 from pants.option.custom_types import file_option
@@ -19,23 +18,6 @@ class ScalafmtTask(RewriteBase):
     Classes that inherit from this should override additional_args and process_result to run
     different scalafmt commands.
     """
-
-    def _resolve_conflicting_options(self, *, old_option: str, new_option: str):
-        return resolve_conflicting_options(
-            old_option=old_option,
-            new_option=new_option,
-            old_scope="fmt-scalafmt",
-            new_scope="scalafmt",
-            old_container=self.get_options(),
-            new_container=Scalafmt.global_instance().options,
-        )
-
-    def _resolve_conflicting_skip(self, *, old_scope: str):
-        # Skip mypy because this is a temporary hack, and mypy doesn't follow the inheritance chain
-        # properly.
-        return self.resolve_conflicting_skip_options(  # type: ignore
-            old_scope=old_scope, new_scope="scalafmt", subsystem=Scalafmt.global_instance(),
-        )
 
     @classmethod
     def subsystem_dependencies(cls):
@@ -74,7 +56,7 @@ class ScalafmtTask(RewriteBase):
 
     def invoke_tool(self, absolute_root, target_sources):
         args = list(self.additional_args)
-        config = self._resolve_conflicting_options(old_option="configuration", new_option="config")
+        config = Scalafmt.global_instance().options.config
         if config is not None:
             args.extend(["--config", config])
         args.extend([source for _target, source in target_sources])
@@ -111,7 +93,7 @@ class ScalaFmtCheckFormat(LintTaskMixin, ScalafmtTask):
 
     @property
     def skip_execution(self):
-        return super()._resolve_conflicting_skip(old_scope="lint-scalafmt")
+        return Scalafmt.global_instance().options.skip
 
     def process_result(self, result):
         if result != 0:
@@ -136,7 +118,7 @@ class ScalaFmtFormat(FmtTaskMixin, ScalafmtTask):
 
     @property
     def skip_execution(self):
-        return super()._resolve_conflicting_skip(old_scope="fmt-scalafmt")
+        return super().determine_if_skipped(formatter_subsystem=Scalafmt.global_instance())
 
     def process_result(self, result):
         # Processes the results of running the scalafmt command.

@@ -56,12 +56,14 @@ async def dependencies(
         transitive_targets = await Get[TransitiveHydratedTargets](Addresses, addresses)
         transitive_dependencies = transitive_targets.closure - set(transitive_targets.roots)
         address_strings.update(
-            hydrated_target.address.spec for hydrated_target in transitive_dependencies
+            hydrated_target.adaptor.address.spec for hydrated_target in transitive_dependencies
         )
     else:
         hydrated_targets = await Get[HydratedTargets](Addresses, addresses)
         address_strings.update(
-            dep.spec for hydrated_target in hydrated_targets for dep in hydrated_target.dependencies
+            dep.spec
+            for hydrated_target in hydrated_targets
+            for dep in hydrated_target.adaptor.dependencies
         )
 
     with options.line_oriented(console) as print_stdout:
