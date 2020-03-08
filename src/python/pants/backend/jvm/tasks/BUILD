@@ -16,7 +16,7 @@ target(
     ':coursier_resolve',
     ':detect_duplicates',
     ':ivy_imports',
-    # ':ivy_outdated',
+    ':ivy_outdated',
     # ':ivy_resolve',
     # ':ivy_task_mixin',
     ':jar_create',
@@ -273,20 +273,20 @@ python_library(
 #   tags = {'partially_type_checked'},
 # )
 #
-# python_library(
-#   name = 'ivy_outdated',
-#   sources = ['ivy_outdated.py'],
-#   dependencies = [
-#     ':classpath_products',
-#     ':nailgun_task',
-#     'src/python/pants/backend/jvm:ivy_utils',
-#     'src/python/pants/backend/jvm/subsystems:shader',
-#     'src/python/pants/ivy',
-#     'src/python/pants/java/jar',
-#     'src/python/pants/util:memo',
-#   ],
-#   tags = {"partially_type_checked"},
-# )
+python_library(
+  name = 'ivy_outdated',
+  sources = ['ivy_outdated.py'],
+  dependencies = [
+    ':classpath_products',
+    ':nailgun_task',
+    'src/python/pants/backend/jvm:ivy_utils',
+    'src/python/pants/backend/jvm/subsystems:shader',
+    'src/python/pants/ivy',
+    'src/python/pants/java/jar',
+    'src/python/pants/util:memo',
+  ],
+  tags = {"partially_type_checked"},
+)
 
 python_library(
   name = 'coursier_resolve',
