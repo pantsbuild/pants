@@ -10,7 +10,6 @@ from collections import defaultdict
 from textwrap import dedent
 
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
-from pants.backend.jvm.subsystems.resolve_subsystem import JvmResolveSubsystem
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.classpath_entry import ClasspathEntry

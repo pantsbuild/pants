@@ -1,12 +1,11 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest, ensure_resolver
+from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import temporary_dir
 
 
 class BootstrapJvmToolsIntegrationTest(PantsRunIntegrationTest):
-    @ensure_resolver
     def test_zinc_tool_reuse_between_scala_and_java(self):
         with temporary_dir() as artifact_cache:
             bootstrap_args = [
