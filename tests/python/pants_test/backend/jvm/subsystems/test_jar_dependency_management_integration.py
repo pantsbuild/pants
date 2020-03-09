@@ -195,7 +195,8 @@ class JarDependencyManagementIntegrationTest(PantsRunIntegrationTest):
                 "testprojects/tests/java/org/pantsbuild/testproject/depman::",
             ]
         )
-        self.assert_success(run)
+        self.assert_failure(run)
+        self.assertIn('Undefined revs for jars unsupported by Coursier', run.stdout_data)
 
     def test_unit_tests_with_different_sets_one_batch(self):
         run = self.run_pants(
@@ -205,4 +206,5 @@ class JarDependencyManagementIntegrationTest(PantsRunIntegrationTest):
                 "testprojects/tests/java/org/pantsbuild/testproject/depman::",
             ]
         )
-        self.assert_success(run)
+        self.assert_failure(run)
+        self.assertIn('Undefined revs for jars unsupported by Coursier', run.stdout_data)
