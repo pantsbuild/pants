@@ -642,13 +642,15 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
         sources_str = f"sources={repr(sources)}," if sources else ""
         if java_sources is not None:
-            formatted_java_sources = ",".join('"{str_target}"' for str_target in java_sources)
+            formatted_java_sources = ",".join(f'"{str_target}"' for str_target in java_sources)
             java_sources_str = f"java_sources=[{formatted_java_sources}],"
         else:
             java_sources_str = ""
+
         provides_str = f"provides={provides}," if provides is not None else ""
         dependencies_str = f"dependencies={dependencies}," if dependencies is not None else ""
         requirements_str = f"requirements={requirements}," if requirements is not None else ""
+
         self.add_to_build_file(
             path,
             dedent(
