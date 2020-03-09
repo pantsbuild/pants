@@ -22,7 +22,8 @@ jar_library(name='args4j',
 jar_library(name='guava',
             jars=[
               jar('com.google.guava', 'guava', '18.0',
-                  apidocs='http://google.github.io/guava/releases/18.0/api/docs/')
+                  apidocs='http://google.github.io/guava/releases/18.0/api/docs/',
+                  force=True)
             ])
 
 jar_library(name='jansi',
