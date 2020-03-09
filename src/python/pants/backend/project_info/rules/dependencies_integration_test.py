@@ -73,8 +73,12 @@ class DependenciesIntegrationTest(GoalRuleTestBase):
         self.create_python_requirement_library(name="foo")
         self.create_python_requirement_library(name="bar")
         self.create_python_library(path="dep/target")
-        self.create_python_library(path="some/target", dependencies=["dep/target", "3rdparty/foo:foo"])
-        self.create_python_library(path="some/other/target", dependencies=["some/target", "3rdparty/bar:bar"])
+        self.create_python_library(
+            path="some/target", dependencies=["dep/target", "3rdparty/foo:foo"]
+        )
+        self.create_python_library(
+            path="some/other/target", dependencies=["some/target", "3rdparty/bar:bar"]
+        )
         self.assert_dependencies(
             target="some/other/target",
             expected=["3rdparty/bar:bar", "some/target:target"],
@@ -86,15 +90,23 @@ class DependenciesIntegrationTest(GoalRuleTestBase):
         self.create_python_requirement_library(name="foo")
         self.create_python_requirement_library(name="bar")
         self.create_python_library(path="dep/target")
-        self.create_python_library(path="some/target", dependencies=["dep/target", "3rdparty/foo:foo"])
-        self.create_python_library(path="some/other/target", dependencies=["some/target", "3rdparty/bar:bar"])
+        self.create_python_library(
+            path="some/target", dependencies=["dep/target", "3rdparty/foo:foo"]
+        )
+        self.create_python_library(
+            path="some/other/target", dependencies=["some/target", "3rdparty/bar:bar"]
+        )
         self.assert_dependencies(
             target="some/other/target",
-            expected=["3rdparty/bar:bar", "some/target:target", "3rdparty/foo:foo", "dep/target:target"],
+            expected=[
+                "3rdparty/bar:bar",
+                "some/target:target",
+                "3rdparty/foo:foo",
+                "dep/target:target",
+            ],
             transitive=True,
             dependency_type="source",
         )
-
 
     def test_dependencies_3rdparty(self):
         self.create_python_requirement_library(name="foo")
@@ -164,28 +176,9 @@ class DependenciesIntegrationTest(GoalRuleTestBase):
                 "dep/target:target",
                 "3rdparty/foo:foo",
                 "3rdparty/bar:bar",
+                "foo==1.0.0",
+                "bar==1.0.0",
             ],
             transitive=True,
             dependency_type="source-and-3rdparty",
         )
-
-
-        self.assert_dependencies(
-            target="some/other/target",
-            expected=["bar==1.0.0"],
-            transitive=False,
-            dependency_type="3rdparty",
-        )
-        self.assert_dependencies(
-            target="some/other/target",
-            expected=["3rdparty/bar:bar", "bar==1.0.0"],
-            transitive=False,
-            dependency_type="source-and-3rdparty",
-        )
-        self.assert_dependencies(
-            target="some/other/target",
-            expected=["some/target:target", "3rdparty/bar"],
-            transitive=False,
-            dependency_type="source-and-3rdparty",
-        )
-

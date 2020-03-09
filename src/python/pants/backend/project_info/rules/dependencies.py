@@ -60,7 +60,13 @@ async def dependencies(
             transitive_targets.closure - set(transitive_targets.roots)
         )
     else:
-        hydrated_targets = await Get[HydratedTargets](Addresses, addresses)
+        targets = await Get[HydratedTargets](Addresses, addresses)
+        direct_dependency_addresses = [
+            dep for target in targets for dep in target.adaptor.dependencies
+        ]
+        hydrated_targets = await Get[HydratedTargets](
+            Addresses, Addresses(direct_dependency_addresses)
+        )
 
     should_include_third_party = options.values.type in [
         DependencyType.THIRD_PARTY,
@@ -70,9 +76,6 @@ async def dependencies(
         DependencyType.SOURCE,
         DependencyType.SOURCE_AND_THIRD_PARTY,
     ]
-    print('TARGETS')
-    for target in hydrated_targets:
-        print(target)
 
     for target in hydrated_targets:
         if should_include_third_party:
@@ -82,16 +85,9 @@ async def dependencies(
                 )
                 # TODO(#8762): Support jvm third party deps when there is some sort of JarLibraryAdaptor.
         if should_include_source:
-            if options.values.transitive:
-                address_strings.update(
-                    target.adaptor.address.spec for hydrated_target in hydrated_targets
-                )
-            else:
-                address_strings.update(
-                    dep.spec
-                    for hydrated_target in hydrated_targets
-                    for dep in hydrated_target.adaptor.dependencies
-                )
+            address_strings.update(
+                target.adaptor.address.spec for hydrated_target in hydrated_targets
+            )
 
     with options.line_oriented(console) as print_stdout:
         for address in sorted(address_strings):
