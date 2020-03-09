@@ -222,21 +222,28 @@ object Main {
   def toZeroBased(x: Int): Int = {
     x - 1
   }
+  def toUri(file: File): java.net.URI = {
+    file.getAbsoluteFile().toPath().toUri()
+  }
   def toLsp(problems: List[Problem],
             workingDirectory: File): Iterable[PublishDiagnosticsParams] = {
+    import scala.tools.nsc.io.Path._
     problems
       .groupBy(problem => problem.position.sourcePath)
       .map {
         case (file, problems) => {
-          // By using a relative path here as opposed to an actual URI, we diverge slightly from
-          // the precise definition of the Language Server Protocol; but this is necessary if we
-          // want to be able to cache this data in heterogeneous environments.
-          val uri: String = "buildroot://" + file.asScala
-            .map(file => Util.relativize(workingDirectory, new File(file)))
-            // Note: while zinc allows the sourcePath to be optional, the LSP enforces an existing
-            // URI. For this reason, we use an empty URI to represent the case where the URI would
-            // be missing from the zinc's output.
-            .getOrElse("")
+          val uri: String =
+            file.asScala
+              .map(filePath => {
+                val rootUri = toUri(workingDirectory)
+                val fileUri = toUri(new File(filePath))
+                rootUri.relativize(fileUri)
+              })
+              .map(relativePath => "buildroot://" + relativePath.toString())
+              // Note: while zinc allows the sourcePath to be optional, the LSP enforces an existing
+              // URI. For this reason, we use an empty URI to represent the case where the URI would
+              // be missing from the zinc's output.
+              .getOrElse("")
 
           val diagnostics =
             problems
