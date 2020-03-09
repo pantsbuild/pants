@@ -26,7 +26,6 @@ Refactoring, Improvements, and Tooling
 * Delay removing `--test-fast` from 1.27.0.dev0 to 1.28.0.dev0 (#9250)
   `PR #9250 <https://github.com/pantsbuild/pants/pull/9250>`_
 
-
 1.26.0rc0 (03/04/2020)
 ----------------------
 
