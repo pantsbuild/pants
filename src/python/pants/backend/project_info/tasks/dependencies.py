@@ -6,7 +6,6 @@ from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.project_info.rules.dependencies import DependencyType
 from pants.base.deprecated import deprecated_conditional
-from pants.base.exceptions import TaskError
 from pants.base.payload_field import JarsField, PythonRequirementsField
 from pants.task.console_task import ConsoleTask
 from pants.util.ordered_set import OrderedSet
@@ -34,47 +33,12 @@ class Dependencies(ConsoleTask):
             "and `3rdparty` means third-party requirements and JARs.",
         )
         register(
-            "--internal-only",
-            type=bool,
-            help="Specifies that only internal dependencies should be included in the graph output "
-            "(no external jars).",
-            removal_version="1.27.0.dev0",
-            removal_hint="Use `--dependencies-type=source` instead.",
-        )
-        register(
-            "--external-only",
-            type=bool,
-            help="Specifies that only external dependencies should be included in the graph output "
-            "(only external jars).",
-            removal_version="1.27.0.dev0",
-            removal_hint="Use `--dependencies-type=3rdparty` instead.",
-        )
-        register(
             "--transitive",
             type=bool,
             default=True,
             fingerprint=True,
             help="If True, use all targets in the build graph, else use only target roots.",
         )
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        opts = self.get_options()
-        type_configured = not opts.is_default("type")
-        if type_configured:
-            self.dependency_type = opts.type
-            return
-        else:
-            if opts.internal_only and opts.external_only:
-                raise TaskError(
-                    "At most one of --internal-only or --external-only can be selected."
-                )
-            if opts.internal_only:
-                self.dependency_type = DependencyType.SOURCE
-            elif opts.external_only:
-                self.dependency_type = DependencyType.THIRD_PARTY
-            else:
-                self.dependency_type = DependencyType.SOURCE_AND_THIRD_PARTY
 
     @property
     def act_transitively(self):
@@ -93,15 +57,6 @@ class Dependencies(ConsoleTask):
         return self.get_options().transitive
 
     def console_output(self, unused_method_argument):
-        opts = self.get_options()
-        deprecated_conditional(
-            lambda: opts.is_default("type") and not opts.internal_only and not opts.external_only,
-            removal_version="1.27.0.dev0",
-            entity_description="The default dependencies output including external dependencies",
-            hint_message="Pants will soon default to `--dependencies-type=source`, rather than "
-            "`--dependencies-type=source-and-3rdparty`. To prepare, run this goal with"
-            " `--dependencies-type=source`.",
-        )
         ordered_closure = OrderedSet()
         for target in self.context.target_roots:
             if self.act_transitively:
@@ -109,16 +64,18 @@ class Dependencies(ConsoleTask):
             else:
                 ordered_closure.update(target.dependencies)
 
+        include_source = self.get_options().type in [
+            DependencyType.SOURCE,
+            DependencyType.SOURCE_AND_THIRD_PARTY,
+        ]
+        include_3rdparty = self.get_options().type in [
+            DependencyType.THIRD_PARTY,
+            DependencyType.SOURCE_AND_THIRD_PARTY,
+        ]
         for tgt in ordered_closure:
-            if self.dependency_type in [
-                DependencyType.SOURCE,
-                DependencyType.SOURCE_AND_THIRD_PARTY,
-            ]:
+            if include_source:
                 yield tgt.address.spec
-            if self.dependency_type in [
-                DependencyType.THIRD_PARTY,
-                DependencyType.SOURCE_AND_THIRD_PARTY,
-            ]:
+            if include_3rdparty:
                 # TODO(John Sirois): We need an external payload abstraction at which point knowledge
                 # of jar and requirement payloads can go and this hairball will be untangled.
                 if isinstance(tgt.payload.get_field("requirements"), PythonRequirementsField):
