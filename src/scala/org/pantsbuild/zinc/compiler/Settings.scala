@@ -34,6 +34,7 @@ case class Settings(
     _postCompileMergeDir: Option[File] = None,
     outputJar: Option[File] = None,
     scala: ScalaLocation = ScalaLocation(),
+    diagnosticsOut: Option[File] = None,
     scalacOptions: Seq[String] = Seq.empty,
     javaHome: Option[File] = None,
     javaOnly: Boolean = false,
@@ -84,6 +85,7 @@ case class Settings(
       _classesDirectory = normaliseOpt(_classesDirectory),
       outputJar = normaliseOpt(outputJar),
       scala = scala.withAbsolutePaths(relativeTo),
+      diagnosticsOut = normaliseOpt(diagnosticsOut),
       javaHome = normaliseOpt(javaHome),
       _incOptions = _incOptions.withAbsolutePaths(relativeTo),
       analysis = analysis.withAbsolutePaths(relativeTo),
@@ -358,6 +360,10 @@ object Settings {
       .valueName("<path>")
       .action((x, c) => c.copy(scala = c.scala.copy(extra = x)))
       .text("Specify extra Scala jars directly")
+    opt[File]("diagnostics-out")
+      .abbr("diag")
+      .action((x, c) => c.copy(diagnosticsOut = Some(x)))
+      .text("File where the report of compilation errors and warnings will be written")
 
     opt[File]("java-home")
       .abbr("java-home")

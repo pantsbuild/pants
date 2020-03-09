@@ -3,20 +3,28 @@
   */
 package org.pantsbuild.zinc.compiler
 
-import java.io.File
+import java.io.{File, PrintWriter}
 import java.nio.file.Paths
 import scala.collection.JavaConverters._
-
+import scala.compat.java8.OptionConverters._
 import sbt.internal.inc.IncrementalCompilerImpl
 import sbt.internal.util.{BasicLogger, ConsoleLogger, ConsoleOut, StackTrace}
 import sbt.io.IO
 import sbt.util.{ControlEvent, Level, LogEvent, Logger}
 import xsbti.CompileFailed
-
+import xsbti.compile.Inputs
+import xsbti.{Problem, Severity}
 import com.martiansoftware.nailgun.NGContext
+import com.google.gson.Gson
 import com.google.common.base.Charsets
 import com.google.common.io.Files
-
+import org.eclipse.lsp4j.{
+  Diagnostic,
+  DiagnosticSeverity,
+  Position,
+  PublishDiagnosticsParams,
+  Range
+}
 import org.pantsbuild.zinc.analysis.AnalysisMap
 import org.pantsbuild.zinc.util.Util
 
@@ -111,10 +119,8 @@ object Main {
     System.setProperty("sbt.log.format", "true")
 
     def mkConsoleLogger(level: Level.Value, color: Boolean): ConsoleLogger = {
-      val cl = ConsoleLogger(
-        out = ConsoleOut.systemOut,
-        ansiCodesSupported = color
-      )
+      val cl =
+        ConsoleLogger(out = ConsoleOut.systemOut, ansiCodesSupported = color)
       cl.setLevel(level)
       cl
     }
@@ -176,9 +182,13 @@ object Main {
         }
       }
 
-    mainImpl(settings.withAbsolutePaths(Paths.get(".").toAbsolutePath.toFile),
-             startTime,
-             n => sys.exit(1))
+    val workingDirectory = Paths.get(".").toAbsolutePath.toFile
+    mainImpl(
+      settings.withAbsolutePaths(workingDirectory),
+      startTime,
+      n => sys.exit(1),
+      workingDirectory
+    )
   }
 
   def nailMain(context: NGContext): Unit = {
@@ -187,10 +197,13 @@ object Main {
     Settings.SettingsParser
       .parse(preprocessArgs(context.getArgs), Settings()) match {
       case Some(settings) =>
+        val workingDirectory = new File(context.getWorkingDirectory)
         mainImpl(
-          settings.withAbsolutePaths(new File(context.getWorkingDirectory)),
+          settings.withAbsolutePaths(workingDirectory),
           startTime,
-          n => context.exit(n))
+          n => context.exit(n),
+          workingDirectory
+        )
       case None => {
         println("See zinc-compiler --help for information about options")
         context.exit(1)
@@ -198,7 +211,76 @@ object Main {
     }
   }
 
-  def mainImpl(settings: Settings, startTime: Long, exit: Int => Unit): Unit = {
+  def toLsp(severity: Severity): DiagnosticSeverity = {
+    severity match {
+      case Severity.Error => DiagnosticSeverity.Error
+      case Severity.Warn  => DiagnosticSeverity.Warning
+      case Severity.Info  => DiagnosticSeverity.Information
+      // Note: DiagnosticSeverity also has a Hint level, but we won't use it here as xsbti doesn't go that far
+    }
+  }
+  def toZeroBased(x: Int): Int = {
+    x - 1
+  }
+  def toLsp(problems: List[Problem],
+            workingDirectory: File): Iterable[PublishDiagnosticsParams] = {
+    problems
+      .groupBy(problem => problem.position.sourcePath)
+      .map {
+        case (file, problems) => {
+          // By using a relative path here as opposed to an actual URI, we diverge slightly from
+          // the precise definition of the Language Server Protocol; but this is necessary if we
+          // want to be able to cache this data in heterogeneous environments.
+          val uri: String = "buildroot://" + file.asScala
+            .map(file => Util.relativize(workingDirectory, new File(file)))
+            // Note: while zinc allows the sourcePath to be optional, the LSP enforces an existing
+            // URI. For this reason, we use an empty URI to represent the case where the URI would
+            // be missing from the zinc's output.
+            .getOrElse("")
+
+          val diagnostics =
+            problems
+              .map(problem => {
+                val position =
+                  new Position(
+                    // xsbti uses one-based values for line and "pointer" (i.e: character index)
+                    // the Language ServerProtocol requires zero-based values
+                    toZeroBased(problem.position.line.orElse(0)),
+                    toZeroBased(problem.position.pointer.orElse(0))
+                  )
+
+                val range = new Range(position, position)
+                val severity = toLsp(problem.severity)
+                val code = problem.category()
+                new Diagnostic(range, problem.message(), severity, "zinc", code)
+              })
+          new PublishDiagnosticsParams(uri, diagnostics.asJava)
+        }
+      }
+  }
+
+  def dumpDiagnostics(diagnosticsFile: File,
+                      inputs: Inputs,
+                      workingDirectory: File,
+                      log: Logger): Unit = {
+    val problems = inputs.setup.reporter.problems.toList
+    val serializer = new Gson()
+    val serialized = serializer.toJson(toLsp(problems, workingDirectory))
+    log.debug(
+      "Writing diagnostics report to file: " + diagnosticsFile.toString
+    )
+    val writer = new PrintWriter(diagnosticsFile)
+    try {
+      writer.write(serialized)
+    } finally {
+      writer.close()
+    }
+  }
+
+  def mainImpl(settings: Settings,
+               startTime: Long,
+               exit: Int => Unit,
+               workingDirectory: File): Unit = {
     val log = mkLogger(settings)
     val isDebug = settings.consoleLog.logLevel <= Level.Debug
 
@@ -224,8 +306,10 @@ object Main {
 
       // post compile merge dir
       if (settings.postCompileMergeDir.isDefined) {
-        IO.copyDirectory(new File(settings.postCompileMergeDir.get.toURI),
-                         new File(settings.classesDirectory.toURI))
+        IO.copyDirectory(
+          new File(settings.postCompileMergeDir.get.toURI),
+          new File(settings.classesDirectory.toURI)
+        )
       }
 
       // Store the output if the result changed.
@@ -236,9 +320,7 @@ object Main {
             .ConcreteAnalysisContents(result.analysis, result.setup)
         )
       }
-
       log.info("Compile success " + Util.timing(startTime))
-
       // if compile is successful, jar the contents of classesDirectory and copy to outputJar
       if (settings.outputJar.isDefined) {
         val outputJarPath = settings.outputJar.get.toPath
@@ -258,6 +340,10 @@ object Main {
         val message = e.getMessage
         if (message ne null) log.error(message)
         exit(1)
+    } finally {
+      settings.diagnosticsOut.map(diagnosticsFile => {
+        dumpDiagnostics(diagnosticsFile, inputs, workingDirectory, log)
+      })
     }
   }
 }
