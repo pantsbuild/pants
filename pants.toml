@@ -463,7 +463,7 @@ repos = [
   'https://maven-central.storage-download.googleapis.com/repos/central/data',
   'https://repo1.maven.org/maven2',
   # Custom repo for Kythe jars, as Google doesn't currently publish them anywhere.
-  'https://raw.githubusercontent.com/toolchainlabs/binhost/master/',
+  'https://github.com/toolchainlabs/binhost/raw/master',
 ]
 
 [cache.resolve.coursier]
