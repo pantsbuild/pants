@@ -16,7 +16,8 @@ class FmtTaskMixin:
         return False
 
     def determine_if_skipped(self, *, formatter_subsystem: Subsystem) -> bool:
-        # TODO: generalize this to work with every formatter, not only scalafix.
+        # TODO: generalize this to work with every formatter, not only scalafix. When doing this,
+        # change the `help` description in `fmt.py`.
         # TODO: expand this to `--lint-only`.
         skipped = cast(bool, formatter_subsystem.options.skip)
         only = self.get_options().only  # type: ignore

@@ -101,6 +101,10 @@ class ScalaFmtCheckFormatTest(ScalaFmtTestBase):
     def task_type(cls):
         return ScalaFmtCheckFormat
 
+    def setUp(self) -> None:
+        super().setUp()
+        self.set_options(only=None)
+
     def test_scalafmt_fail_default_config(self):
         context = self.context(target_roots=self.library)
         with self.assertRaises(TaskError):
