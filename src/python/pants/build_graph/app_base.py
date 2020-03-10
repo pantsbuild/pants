@@ -5,16 +5,13 @@ import os
 from collections import OrderedDict, namedtuple
 from hashlib import sha1
 
-from twitter.common.dirutil import Fileset
-
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PayloadField, PrimitiveField, combine_hashes
-from pants.base.validation import assert_list
 from pants.build_graph.target import Target
 from pants.fs import archive as Archive
-from pants.source.wrapped_globs import FilesetWithSpec
+from pants.util.collections import ensure_str_list
 from pants.util.dirutil import fast_relpath
 from pants.util.memo import memoized_property
 
@@ -65,24 +62,16 @@ class DirectoryReMapper:
 class BundleProps(namedtuple("_BundleProps", ["rel_path", "mapper", "fileset"])):
     def _filemap(self, abs_path):
         filemap = OrderedDict()
-        if self.fileset is not None:
-            paths = (
-                self.fileset()
-                if isinstance(self.fileset, Fileset)
-                else self.fileset
-                if hasattr(self.fileset, "__iter__")
-                else [self.fileset]
-            )
-            for path in paths:
-                if abs_path:
-                    if not os.path.isabs(path):
-                        path = os.path.join(get_buildroot(), self.rel_path, path)
+        for path in self.fileset:
+            if abs_path:
+                if not os.path.isabs(path):
+                    path = os.path.join(get_buildroot(), self.rel_path, path)
+            else:
+                if os.path.isabs(path):
+                    path = fast_relpath(path, get_buildroot())
                 else:
-                    if os.path.isabs(path):
-                        path = fast_relpath(path, get_buildroot())
-                    else:
-                        path = os.path.join(self.rel_path, path)
-                filemap[path] = self.mapper(path)
+                    path = os.path.join(self.rel_path, path)
+            filemap[path] = self.mapper(path)
         return filemap
 
     @memoized_property
@@ -148,19 +137,13 @@ class Bundle:
         if mapper and relative_to:
             raise ValueError("Must specify exactly one of 'mapper' or 'relative_to'")
 
-        if rel_path and isinstance(fileset, FilesetWithSpec) and fileset.rel_root != rel_path:
-            raise ValueError(
-                "Must not use a glob for 'fileset' with 'rel_path'."
-                " Globs are eagerly evaluated and ignore 'rel_path'."
-            )
-
-        # A fileset is either a glob, a string or a list of strings.
-        if isinstance(fileset, FilesetWithSpec):
-            pass
-        elif isinstance(fileset, str):
-            fileset = [fileset]
-        else:
-            fileset = assert_list(fileset, key_arg="fileset")
+        # A fileset is either a string or a list of file paths. All globs are expected to already
+        # have been expanded.
+        fileset = ensure_str_list(fileset)
+        assert all("*" not in fp for fp in fileset), (
+            "All globs should have already been hydrated for the `bundle(fileset=)` field. "
+            f"Given the fileset: {fileset}"
+        )
 
         real_rel_path = rel_path or self._parse_context.rel_path
 
@@ -227,7 +210,7 @@ class AppBase(Target):
         bundles=None,
         basename=None,
         archive=None,
-        **kwargs
+        **kwargs,
     ):
         """
         :param string binary: Target spec of the ``jvm_binary`` or the ``python_binary``
@@ -268,11 +251,7 @@ class AppBase(Target):
             fileset = bundle.fileset
             if fileset is None:
                 continue
-            elif hasattr(fileset, "filespec"):
-                globs += bundle.fileset.filespec["globs"]
-            else:
-                # NB(nh): filemap is an OrderedDict, so this ordering is stable.
-                globs += [fast_relpath(f, buildroot) for f in bundle.filemap.keys()]
+            globs += [fast_relpath(f, buildroot) for f in bundle.filemap.keys()]
         super_globs = super().globs_relative_to_buildroot()
         if super_globs:
             globs += super_globs["globs"]

@@ -10,18 +10,12 @@ from pants.base.exceptions import TargetDefinitionException
 from pants.base.parse_context import ParseContext
 from pants.build_graph.address import Address
 from pants.build_graph.app_base import Bundle, DirectoryReMapper
-from pants.source.wrapped_globs import Globs
 from pants.testutil.test_base import TestBase
 
 
 def _bundle(rel_path):
     pc = ParseContext(rel_path=rel_path, type_aliases={})
     return Bundle(pc)
-
-
-def _globs(rel_path):
-    pc = ParseContext(rel_path=rel_path, type_aliases={})
-    return Globs(pc)
 
 
 class JvmAppTest(TestBase):
@@ -122,7 +116,7 @@ class JvmAppTest(TestBase):
 
 
 class BundleTest(TestBase):
-    def test_bundle_filemap_dest_bypath(self):
+    def test_bundle_filemap_dest(self):
         spec_path = "src/java/org/archimedes/buoyancy"
         densities = self.create_file(os.path.join(spec_path, "config/densities.xml"))
         unused = self.make_target(Address(spec_path, "unused").spec, JvmBinary)
@@ -137,23 +131,6 @@ class BundleTest(TestBase):
         self.assertEqual(1, len(app.bundles))
         # after one big refactor, ../../../../../ snuck into this path:
         self.assertEqual({densities: "config/densities.xml"}, app.bundles[0].filemap)
-
-    def test_bundle_filemap_dest_byglobs(self):
-        spec_path = "src/java/org/archimedes/tub"
-        one = self.create_file(os.path.join(spec_path, "config/one.xml"))
-        two = self.create_file(os.path.join(spec_path, "config/two.xml"))
-        unused = self.make_target(Address(spec_path, "unused").spec, JvmBinary)
-
-        globs = _globs(spec_path)
-        app = self.make_target(
-            spec_path,
-            JvmApp,
-            dependencies=[unused],
-            bundles=[_bundle(spec_path)(fileset=globs("config/*.xml"))],
-        )
-
-        self.assertEqual(1, len(app.bundles))
-        self.assertEqual({one: "config/one.xml", two: "config/two.xml"}, app.bundles[0].filemap)
 
     def test_bundle_filemap_dest_relative(self):
         spec_path = "src/java/org/archimedes/crown"
@@ -254,39 +231,18 @@ class BundleTest(TestBase):
         self.assertEqual(1, len(app2.bundles))
         self.assertEqual({metal_dense: "config/metal/dense.xml"}, app2.bundles[0].filemap)
 
-    def test_globs_relative_to_build_root(self):
-        spec_path = "y"
-        unused = self.make_target(spec_path, JvmBinary)
-
-        globs = _globs(spec_path)
-        app = self.make_target(
-            "y:app",
-            JvmApp,
-            dependencies=[unused],
-            bundles=[_bundle(spec_path)(fileset=globs("z/*")), _bundle(spec_path)(fileset=["a/b"])],
-        )
-
-        self.assertEqual(["y/a/b", "y/z/*"], sorted(app.globs_relative_to_buildroot()["globs"]))
-
-    def test_list_of_globs_fails(self):
-        # It's not allowed according to the docs, and will behave badly.
-
-        spec_path = "y"
-        globs = _globs(spec_path)
-        with self.assertRaises(ValueError):
-            _bundle(spec_path)(fileset=[globs("z/*")])
-
     def test_jvmapp_fingerprinting(self):
         spec_path = "y"
-        globs = _globs(spec_path)
         self.create_file(os.path.join(spec_path, "one.xml"))
         self.create_file(os.path.join(spec_path, "config/two.xml"))
 
-        def calc_fingerprint():
-            # Globs are eagerly, therefore we need to recreate target to recalculate fingerprint.
+        def calc_fingerprint(include_three_xml: bool = False):
             self.reset_build_graph()
+            fileset = ["one.xml", "config/two.xml"]
+            if include_three_xml:
+                fileset.append("three.xml")
             app = self.make_target(
-                "y:app", JvmApp, dependencies=[], bundles=[_bundle(spec_path)(fileset=globs("*"))]
+                "y:app", JvmApp, dependencies=[], bundles=[_bundle(spec_path)(fileset=fileset)]
             )
             return app.payload.fingerprint()
 
@@ -294,7 +250,7 @@ class BundleTest(TestBase):
         os.mkdir(os.path.join(self.build_root, spec_path, "folder_one"))
         self.assertEqual(fingerprint_before, calc_fingerprint())
         self.create_file(os.path.join(spec_path, "three.xml"))
-        self.assertNotEqual(fingerprint_before, calc_fingerprint())
+        self.assertNotEqual(fingerprint_before, calc_fingerprint(include_three_xml=True))
 
     def test_jvmapp_fingerprinting_with_non_existing_files(self):
         spec_path = "y"
@@ -314,28 +270,6 @@ class BundleTest(TestBase):
         self.assertNotEqual(fingerprint_empty_file, fingerprint_non_existing_file)
         self.assertNotEqual(fingerprint_empty_file, fingerprint_file_with_content)
         self.assertNotEqual(fingerprint_file_with_content, fingerprint_empty_file)
-
-    def test_rel_path_with_glob_fails(self):
-        # Globs are treated as eager, so rel_path doesn't affect their meaning.
-        # The effect of this is likely to be confusing, so disallow it.
-
-        spec_path = "y"
-        self.create_file(os.path.join(spec_path, "z", "somefile"))
-        globs = _globs(spec_path)
-        with self.assertRaises(ValueError) as cm:
-            _bundle(spec_path)(rel_path="config", fileset=globs("z/*"))
-        self.assertIn("Must not use a glob for 'fileset' with 'rel_path'.", str(cm.exception))
-
-    def test_allow_globs_when_rel_root_matches_rel_path(self):
-        # If a glob has the same rel_root as the rel_path, then
-        # it will correctly pick up the right files.
-        # We don't allow BUILD files to have declarations with this state.
-        # But filesets can be created this way via macros or pants internals.
-
-        self.create_file(os.path.join("y", "z", "somefile"))
-        bundle = _bundle("y")(rel_path="y/z", fileset=_globs("y/z")("*"))
-
-        self.assertEqual({"globs": [u"y/z/*"]}, bundle.fileset.filespec)
 
     def test_rel_path_overrides_context_rel_path_for_explicit_path(self):
         spec_path = "y"
