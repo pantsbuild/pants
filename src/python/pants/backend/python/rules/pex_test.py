@@ -69,6 +69,24 @@ def test_merge_interpreter_constraints() -> None:
             "CPython>=3.5,==3.7.*",
         ],
     )
+    # A & (B | C | D) & (E | F) & G =>
+    # (A & B & E & G) | (A & B & F & G) | (A & C & E & G) | (A & C & F & G) | (A & D & E & G) | (A & D & F & G)
+    assert_merged(
+        input=[
+            ["CPython==3.6.5"],
+            ["CPython==2.7.14", "CPython==2.7.15", "CPython==2.7.16"],
+            ["CPython>=3.6", "CPython==3.5.10"],
+            ["CPython>3.8"],
+        ],
+        expected=[
+            "CPython==2.7.14,==3.5.10,==3.6.5,>3.8",
+            "CPython==2.7.14,>=3.6,==3.6.5,>3.8",
+            "CPython==2.7.15,==3.5.10,==3.6.5,>3.8",
+            "CPython==2.7.15,>=3.6,==3.6.5,>3.8",
+            "CPython==2.7.16,==3.5.10,==3.6.5,>3.8",
+            "CPython==2.7.16,>=3.6,==3.6.5,>3.8",
+        ],
+    )
 
     # No specifiers
     assert_merged(input=[["CPython"]], expected=["CPython"])
