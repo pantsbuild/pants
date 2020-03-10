@@ -30,6 +30,7 @@ This section of the Pants documentation describes the most common day-to-day Pan
 * [[Specify a File Bundle|pants('src/docs/common_tasks:file_bundles')]]
 * [[Specify JVM Options|pants('src/docs/common_tasks:jvm_options')]]
 * [[Define a Test Suite for Scala or Java|pants('src/docs/common_tasks:jvm_tests')]]
+* [[Run JVM binaries and tests with different JVM versions|pants('src/docs/common_tasks:multiple_jvm_versions')]]
 
 ### Python
 

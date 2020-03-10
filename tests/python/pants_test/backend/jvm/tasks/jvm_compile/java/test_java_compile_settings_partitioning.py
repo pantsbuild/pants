@@ -188,28 +188,6 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
             platforms=platforms,
         )
 
-    def test_compile_setting_equivalence(self):
-        self.assertEqual(
-            JvmPlatformSettings("11", "11", ["-Xfoo:bar"]),
-            JvmPlatformSettings("11", "11", ["-Xfoo:bar"]),
-        )
-
-    def test_compile_setting_inequivalence(self):
-        self.assertNotEqual(
-            JvmPlatformSettings("11", "11", ["-Xfoo:bar"]),
-            JvmPlatformSettings("11", "12", ["-Xfoo:bar"]),
-        )
-
-        self.assertNotEqual(
-            JvmPlatformSettings("11", "11", ["-Xfoo:bar"]),
-            JvmPlatformSettings("11", "11", ["-Xbar:foo"]),
-        )
-
-        self.assertNotEqual(
-            JvmPlatformSettings("9", "11", ["-Xfoo:bar"]),
-            JvmPlatformSettings("11", "11", ["-Xfoo:bar"]),
-        )
-
     def _get_zinc_arguments(self, settings):
         distribution = JvmCompile._local_jvm_distribution(settings=settings)
         return self._format_zinc_arguments(settings, distribution)
@@ -219,9 +197,10 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
         _, source, _, target, foo, bar, composite, single = tuple(
             self._get_zinc_arguments(
                 JvmPlatformSettings(
-                    "1.8",
-                    "1.8",
-                    ["foo", "bar", "foo:$JAVA_HOME/bar:$JAVA_HOME/foobar", "$JAVA_HOME",],
+                    source_level="1.8",
+                    target_level="1.8",
+                    args=["foo", "bar", "foo:$JAVA_HOME/bar:$JAVA_HOME/foobar", "$JAVA_HOME",],
+                    jvm_options=[],
                 )
             )
         )
@@ -236,7 +215,10 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
 
     def test_java_home_extraction_empty(self):
         init_subsystem(DistributionLocator)
-        result = tuple(self._get_zinc_arguments(JvmPlatformSettings("1.8", "1.8", [])))
+        platform_settings = JvmPlatformSettings(
+            source_level="1.8", target_level="1.8", args=[], jvm_options=[]
+        )
+        result = tuple(self._get_zinc_arguments(platform_settings))
         self.assertEqual(
             4, len(result), msg="_get_zinc_arguments did not correctly handle empty args."
         )
@@ -285,6 +267,7 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
                         source_level=farer_future_version,
                         target_level=farer_future_version,
                         args=["$JAVA_HOME/foo"],
+                        jvm_options=[],
                     )
                 )
 
@@ -295,6 +278,7 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
                     source_level=far_future_version,
                     target_level=far_future_version,
                     args=["$JAVA_HOME/foo", "$JAVA_HOME"],
+                    jvm_options=[],
                 )
             )
             self.assertEqual(paths[0], results[-1])
@@ -308,6 +292,7 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
                     source_level=far_future_version,
                     target_level=far_future_version,
                     args=["$JAVA_HOME/foo", "$JAVA_HOME"],
+                    jvm_options=[],
                 )
             )
             self.assertEqual(far_path, results[-1])
@@ -321,6 +306,7 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
                     source_level=farer_future_version,
                     target_level=farer_future_version,
                     args=["$JAVA_HOME/foo", "$JAVA_HOME"],
+                    jvm_options=[],
                 )
             )
             self.assertEqual(farer_path, results[-1])
