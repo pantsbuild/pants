@@ -110,17 +110,18 @@ class PexInterpreterConstraints:
             for parsed_constraint in parsed_constraints:
                 if parsed_constraint.interpreter != expected_interpreter:
                     attempted_interpreters = {
-                        interpreter: [
+                        interpreter: sorted(
                             str(parsed_constraint) for parsed_constraint in parsed_constraints
-                        ]
+                        )
                         for interpreter, parsed_constraints in itertools.groupby(
                             parsed_constraints,
                             key=lambda parsed_constraint: parsed_constraint.interpreter,
                         )
                     }
                     raise ValueError(
-                        "Tried ANDing Python interpreter constraints with different interpreters. "
-                        f"Please use only one interpreter. Got {attempted_interpreters}."
+                        "Tried ANDing Python interpreter constraints with different interpreter "
+                        "types. Please use only one interpreter type. Got "
+                        f"{attempted_interpreters}."
                     )
                 merged_specs.update(parsed_constraint.specs)
             return ParsedConstraint(expected_interpreter, merged_specs)
