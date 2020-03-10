@@ -50,12 +50,13 @@ class ArtifactCache:
     Subclasses implement the methods below to provide this functionality.
     """
 
-    def __init__(self, artifact_root):
+    def __init__(self, artifact_root, artifact_extraction_root=None):
         """Create an ArtifactCache.
 
         All artifacts must be under artifact_root.
         """
         self.artifact_root = artifact_root
+        self.artifact_extraction_root = artifact_extraction_root or artifact_root
 
     def prune(self):
         """Prune stale cache files.
