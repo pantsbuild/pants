@@ -4,7 +4,9 @@
 import json
 import os.path
 import zipfile
-from typing import Dict, Optional, Tuple, cast
+from typing import Dict, List, Optional, Tuple, cast
+
+import pytest
 
 from pants.backend.python.rules import download_pex_bin
 from pants.backend.python.rules.pex import (
@@ -24,6 +26,63 @@ from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.subsystem.util import init_subsystem
 from pants.testutil.test_base import TestBase
 from pants.util.strutil import create_path_env_var
+
+
+def test_merge_interpreter_constraints() -> None:
+    def assert_merged(*, input: List[List[str]], expected: List[str]) -> None:
+        assert PexInterpreterConstraints.merge_constraint_sets(input) == expected
+
+    # Multiple constraint sets get merged so that they are ANDed.
+    # A & B => A & B
+    assert_merged(
+        input=[["CPython==2.7.*"], ["CPython==3.6.*"]], expected=["CPython==2.7.*,==3.6.*"]
+    )
+
+    # Multiple constraints within a single constraint set are kept separate so that they are ORed.
+    # A | B => A | B
+    assert_merged(
+        input=[["CPython==2.7.*", "CPython==3.6.*"]], expected=["CPython==2.7.*", "CPython==3.6.*"]
+    )
+
+    # Input constraints already were ANDed.
+    # A => A
+    assert_merged(input=[["CPython>=2.7,<3"]], expected=["CPython>=2.7,<3"])
+
+    # Both AND and OR.
+    # (A | B) & C => (A & B) | (B & C)
+    assert_merged(
+        input=[["CPython>=2.7,<3", "CPython>=3.5"], ["CPython==3.6.*"]],
+        expected=["CPython>=2.7,<3,==3.6.*", "CPython>=3.5,==3.6.*"],
+    )
+    # A & B & (C | D) => (A & B & C) | (A & B & D)
+    assert_merged(
+        input=[["CPython==2.7.*"], ["CPython==3.6.*"], ["CPython==3.7.*", "CPython==3.8.*"]],
+        expected=["CPython==2.7.*,==3.6.*,==3.7.*", "CPython==2.7.*,==3.6.*,==3.8.*"],
+    )
+    # (A | B) & (C | D) => (A & C) | (A & D) | (B & C) | (B & D)
+    assert_merged(
+        input=[["CPython>=2.7,<3", "CPython>=3.5"], ["CPython==3.6.*", "CPython==3.7.*"]],
+        expected=[
+            "CPython>=2.7,<3,==3.6.*",
+            "CPython>=2.7,<3,==3.7.*",
+            "CPython>=3.5,==3.6.*",
+            "CPython>=3.5,==3.7.*",
+        ],
+    )
+
+    # No specifiers
+    assert_merged(input=[["CPython"]], expected=["CPython"])
+    assert_merged(input=[["CPython"], ["CPython==3.7.*"]], expected=["CPython==3.7.*"])
+
+    # No interpreter is shorthand for CPython, which is how Pex behaves
+    assert_merged(input=[[">=3.5"], ["CPython==3.7.*"]], expected=["CPython>=3.5,==3.7.*"])
+
+    # Different Python interpreters, which are guaranteed to fail when ANDed but are safe when ORed.
+    with pytest.raises(ValueError):
+        PexInterpreterConstraints.merge_constraint_sets([["CPython==3.7.*"], ["PyPy==43.0"]])
+    assert_merged(
+        input=[["CPython==3.7.*", "PyPy==43.0"]], expected=["CPython==3.7.*", "PyPy==43.0"]
+    )
 
 
 class PexTest(TestBase):

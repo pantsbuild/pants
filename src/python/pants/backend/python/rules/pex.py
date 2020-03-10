@@ -2,9 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
-from collections import defaultdict
 from dataclasses import dataclass
-from typing import DefaultDict, Iterable, List, Optional, Tuple
+from typing import Iterable, List, NamedTuple, Optional, Sequence, Set, Tuple
+
+from pkg_resources import Requirement
 
 from pants.backend.python.rules.download_pex_bin import DownloadedPexBin
 from pants.backend.python.rules.hermetic_pex import HermeticPex
@@ -56,6 +57,20 @@ class PexRequirements:
         return PexRequirements(all_target_requirements)
 
 
+Spec = Tuple[str, str]  # e.g. (">=", "3.6")
+
+
+class ParsedConstraint(NamedTuple):
+    interpreter: str
+    specs: Set[Spec]
+
+    def __str__(self) -> str:
+        specs = ",".join(
+            f"{op}{version}" for op, version in sorted(self.specs, key=lambda spec: spec[1])
+        )
+        return f"{self.interpreter}{specs}"
+
+
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class PexInterpreterConstraints:
@@ -64,31 +79,78 @@ class PexInterpreterConstraints:
     def __init__(self, constraints: Optional[Iterable[str]] = None) -> None:
         self.constraints = FrozenOrderedSet(sorted(constraints or ()))
 
-    def generate_pex_arg_list(self) -> List[str]:
-        args = []
-        for constraint in sorted(self.constraints):
-            args.extend(["--interpreter-constraint", constraint])
-        return args
+    @staticmethod
+    def merge_constraint_sets(constraint_sets: Iterable[Iterable[str]]) -> List[str]:
+        """Given a collection of constraints sets, merge by ORing within each individual constraint
+        set and ANDing across each distinct constraint set.
+
+        For example, given `[["CPython>=2.7", "CPython<=3"], ["CPython==3.6.*"]]`, return
+        `["CPython>=2.7,==3.6.*", "CPython<=3,==3.6.*"]`.
+        """
+        # Each element (a List[ParsedConstraint) will get ANDed.
+        parsed_constraint_sets: List[List[ParsedConstraint]] = []
+        for constraint_set in constraint_sets:
+            # Each element (a ParsedConstraint) will get ORed.
+            parsed_constraint_set: List[ParsedConstraint] = []
+            for constraint in constraint_set:
+                try:
+                    parsed_requirement = Requirement.parse(constraint)
+                except ValueError:
+                    # We allow the shorthand `>=3.7`, which gets expanded to `CPython>=3.7`. See
+                    # Pex's interpreter.py's `parse_requirement()`.
+                    parsed_requirement = Requirement.parse(f"CPython{constraint}")
+                interpreter = parsed_requirement.project_name
+                specs = set(parsed_requirement.specs)
+                parsed_constraint_set.append(ParsedConstraint(interpreter, specs))
+            parsed_constraint_sets.append(parsed_constraint_set)
+
+        def and_constraints(parsed_constraints: Sequence[ParsedConstraint]) -> ParsedConstraint:
+            merged_specs = set()
+            expected_interpreter = parsed_constraints[0][0]
+            for parsed_constraint in parsed_constraints:
+                if parsed_constraint.interpreter != expected_interpreter:
+                    attempted_interpreters = {
+                        interpreter: [
+                            str(parsed_constraint) for parsed_constraint in parsed_constraints
+                        ]
+                        for interpreter, parsed_constraints in itertools.groupby(
+                            parsed_constraints,
+                            key=lambda parsed_constraint: parsed_constraint.interpreter,
+                        )
+                    }
+                    raise ValueError(
+                        "Tried ANDing Python interpreter constraints with different interpreters. "
+                        f"Please use only one interpreter. Got {attempted_interpreters}."
+                    )
+                merged_specs.update(parsed_constraint.specs)
+            return ParsedConstraint(expected_interpreter, merged_specs)
+
+        return sorted(
+            {
+                str(and_constraints(constraints_product))
+                for constraints_product in itertools.product(*parsed_constraint_sets)
+            }
+        )
 
     @classmethod
     def create_from_adaptors(
         cls, adaptors: Iterable[TargetAdaptor], python_setup: PythonSetup
     ) -> "PexInterpreterConstraints":
-        constraints_to_adaptors: DefaultDict[
-            Tuple[str, ...], List[PythonTargetAdaptor]
-        ] = defaultdict(list)
+        constraint_sets: Set[Iterable[str]] = set()
         for adaptor in adaptors:
             if not isinstance(adaptor, PythonTargetAdaptor):
                 continue
-            constraints = python_setup.compatibility_or_constraints(adaptor.compatibility)
-            constraints_to_adaptors[constraints].append(adaptor)
-        # TODO(Pex#914): AND between distinct targets, but OR within targets. Right now, we flatten
-        # every constraint and OR everything. When doing this, use static analysis to produce the
-        # minimum constraints, e.g. simplify `CPython==3.6 AND (CPython==3.6 OR CPython==3.7)`
-        # to `CPython==3.6`.
-        return PexInterpreterConstraints(
-            itertools.chain.from_iterable(constraints_to_adaptors.keys())
-        )
+            constraint_set = python_setup.compatibility_or_constraints(adaptor.compatibility)
+            constraint_sets.add(constraint_set)
+        # This will OR within each target and AND across targets.
+        merged_constraints = cls.merge_constraint_sets(constraint_sets)
+        return PexInterpreterConstraints(merged_constraints)
+
+    def generate_pex_arg_list(self) -> List[str]:
+        args = []
+        for constraint in sorted(self.constraints):
+            args.extend(["--interpreter-constraint", constraint])
+        return args
 
 
 @dataclass(frozen=True)
