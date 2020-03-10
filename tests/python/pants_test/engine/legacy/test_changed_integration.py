@@ -321,15 +321,19 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
 
         with create_isolated_git_repo() as worktree:
             with mutated_working_copy([os.path.join(worktree, changed_src)]):
-                pants_run = self.run_pants(
-                    [
-                        "-ldebug",  # This ensures the changed target names show up in the pants output.
-                        f"--exclude-target-regexp={exclude_target_regexp}",
-                        "--changed-parent=HEAD",
-                        "--changed-include-dependees=transitive",
-                        "test",
-                    ]
-                )
+                # Making sure workdir is under buildroot
+                with temporary_dir(root_dir=worktree, suffix=".pants.d") as workdir:
+                    pants_run = self.run_pants_with_workdir(
+                        command=[
+                            "-ldebug",
+                            # This ensures the changed target names show up in the pants output.
+                            f"--exclude-target-regexp={exclude_target_regexp}",
+                            "--changed-parent=HEAD",
+                            "--changed-include-dependees=transitive",
+                            "test",
+                        ],
+                        workdir=workdir,
+                    )
 
             self.assert_success(pants_run)
             for expected_item in expected_set:
@@ -350,15 +354,18 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
 
         with create_isolated_git_repo() as worktree:
             with mutated_working_copy([os.path.join(worktree, changed_src)]):
-                pants_run = self.run_pants(
-                    [
-                        "-ldebug",  # This ensures the changed target names show up in the pants output.
-                        f"--exclude-target-regexp={exclude_target_regexp}",
-                        "--changed-parent=HEAD",
-                        "--changed-include-dependees=transitive",
-                        "test",
-                    ]
-                )
+                # Making sure workdir is under buildroot
+                with temporary_dir(root_dir=worktree, suffix=".pants.d") as workdir:
+                    pants_run = self.run_pants_with_workdir(
+                        [
+                            "-ldebug",  # This ensures the changed target names show up in the pants output.
+                            f"--exclude-target-regexp={exclude_target_regexp}",
+                            "--changed-parent=HEAD",
+                            "--changed-include-dependees=transitive",
+                            "test",
+                        ],
+                        workdir=workdir,
+                    )
 
             self.assert_success(pants_run)
             for expected_item in expected_set:
