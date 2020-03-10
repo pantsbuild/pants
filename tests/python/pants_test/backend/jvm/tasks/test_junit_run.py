@@ -131,7 +131,6 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     ):
         # Create the temporary base test directory
         test_rel_path = "tests/java/org/pantsbuild/foo"
-        test_abs_path = self.create_dir(test_rel_path)
 
         # Create the temporary classes directory under work dir
         test_classes_abs_path = self.create_workdir_dir(test_rel_path)
