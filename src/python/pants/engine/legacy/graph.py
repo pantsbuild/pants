@@ -671,7 +671,9 @@ async def hydrate_sources(
     )
     snapshot = await Get[Snapshot](PathGlobs, path_globs)
     fileset_with_spec = _eager_fileset_with_spec(
-        spec_path=address.spec_path, filespec=sources_field.filespecs, snapshot=snapshot,
+        spec_path=address.spec_path,
+        filespec=sources_field.source_globs.filespecs,
+        snapshot=snapshot,
     )
     sources_field.validate_fn(fileset_with_spec)
     return HydratedField(sources_field.arg, fileset_with_spec)

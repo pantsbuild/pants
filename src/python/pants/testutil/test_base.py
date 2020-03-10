@@ -23,7 +23,7 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
 from pants.engine.fs import PathGlobs, PathGlobsAndRoot, Snapshot
 from pants.engine.legacy.graph import HydratedField
-from pants.engine.legacy.structs import Files, SourcesField
+from pants.engine.legacy.structs import SourceGlobs, SourcesField
 from pants.engine.rules import RootRule
 from pants.engine.scheduler import SchedulerSession
 from pants.engine.selectors import Params
@@ -276,12 +276,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
                 rel_path=os.path.join(package_dir, "BUILD"), target_name="_bogus_target_for_test",
             ),
             arg="sources",
-            filespecs={"globs": package_relative_path_globs},
-            base_globs=Files(spec_path=package_dir),
-            path_globs=PathGlobs(
-                tuple(os.path.join(package_dir, path) for path in package_relative_path_globs),
-            ),
-            validate_fn=lambda _: True,
+            source_globs=SourceGlobs(*package_relative_path_globs),
         )
         field = self.scheduler.product_request(HydratedField, [sources_field])[0]
         return cast(EagerFilesetWithSpec, field.value)
