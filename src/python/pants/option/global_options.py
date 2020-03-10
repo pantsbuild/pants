@@ -298,18 +298,22 @@ class GlobalOptions(Subsystem):
                 "pants.backend.codegen.wire.java",
                 "pants.backend.project_info",
             ],
-            help="Register v1 tasks from these backends. The backend packages must be present on "
-            "the PYTHONPATH, typically because they are in the pants core dist, in a "
-            "plugin dist, or available as sources in the repo.",
+            help=(
+                "Register v1 tasks from these backends. The backend packages must be present on "
+                "the PYTHONPATH, typically because they are in the Pants core dist, in a "
+                "plugin dist, or available as sources in the repo."
+            ),
         )
         register(
             "--backend-packages2",
             advanced=True,
             type=list,
             default=[],
-            help="Register v2 rules from these backends. The backend packages must be present on "
-            "the PYTHONPATH, typically because they are in the pants core dist, in a "
-            "plugin dist, or available as sources in the repo.",
+            help=(
+                "Register v2 rules from these backends. The backend packages must be present on "
+                "the PYTHONPATH, typically because they are in the Pants core dist, in a "
+                "plugin dist, or available as sources in the repo."
+            ),
         )
 
         register(
