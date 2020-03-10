@@ -7,6 +7,7 @@ from functools import total_ordering
 from pants.base.exceptions import TaskError
 from pants.base.revision import Revision
 from pants.java.distribution.distribution import DistributionLocator
+from pants.option.option_util import flatten_shlexed_list
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
 
@@ -14,7 +15,13 @@ logger = logging.getLogger(__name__)
 
 
 class JvmPlatform(Subsystem):
-    """Used to keep track of repo compile and runtime settings for jvm targets."""
+    """Used to keep track of repo compile and runtime settings for jvm targets.
+
+    JvmPlatform covers both compile time and runtime jvm platform settings. A platform is a group of
+    compile time and runtime configurations.
+
+    See src/docs/common_tasks/multiple_jvm_versions.md for more detail.
+    """
 
     # NB: These assume a java version number N can be specified as either 'N' or '1.N'
     # (eg, '7' is equivalent to '1.7'). Java stopped following this convention starting with Java 9,
@@ -98,9 +105,10 @@ class JvmPlatform(Subsystem):
 
     def _parse_platform(self, name, platform):
         return JvmPlatformSettings(
-            platform.get("source", platform.get("target")),
-            platform.get("target", platform.get("source")),
-            platform.get("args", ()),
+            source_level=platform.get("source", platform.get("target")),
+            target_level=platform.get("target", platform.get("source")),
+            args=platform.get("args", ()),
+            jvm_options=platform.get("jvm_options", ()),
             name=name,
         )
 
@@ -137,7 +145,13 @@ class JvmPlatform(Subsystem):
         source_level = JvmPlatform.parse_java_version(DistributionLocator.cached().version)
         target_level = source_level
         platform_name = f"(DistributionLocator.cached().version {source_level})"
-        return JvmPlatformSettings(source_level, target_level, [], name=platform_name)
+        return JvmPlatformSettings(
+            source_level=source_level,
+            target_level=target_level,
+            args=[],
+            jvm_options=[],
+            name=platform_name,
+        )
 
     @memoized_property
     def default_platform(self):
@@ -152,7 +166,7 @@ class JvmPlatform(Subsystem):
                     name, self.options_scope
                 )
             )
-        return JvmPlatformSettings(*platforms_by_name[name], name=name, by_default=True)
+        return JvmPlatformSettings._copy_as_default(platforms_by_name[name], name=name)
 
     @memoized_property
     def default_runtime_platform(self):
@@ -167,7 +181,7 @@ class JvmPlatform(Subsystem):
                     name, self.options_scope
                 )
             )
-        return JvmPlatformSettings(*platforms_by_name[name], name=name, by_default=True)
+        return JvmPlatformSettings._copy_as_default(platforms_by_name[name], name=name)
 
     @memoized_method
     def get_platform_by_name(self, name, for_target=None):
@@ -257,17 +271,33 @@ class JvmPlatformSettings:
     class IllegalSourceTargetCombination(TaskError):
         """Illegal pair of -source and -target flags to compile java."""
 
-    def __init__(self, source_level, target_level, args, name=None, by_default=False):
+    @staticmethod
+    def _copy_as_default(original, name):
+        """Copies the original with a new name, setting by_default to True."""
+        return JvmPlatformSettings(
+            source_level=original.source_level,
+            target_level=original.target_level,
+            args=original.args,
+            jvm_options=original.jvm_options,
+            name=name,
+            by_default=True,
+        )
+
+    def __init__(
+        self, *, source_level, target_level, args, jvm_options, name=None, by_default=False
+    ):
         """
     :param source_level: Revision object or string for the java source level.
     :param target_level: Revision object or string for the java target level.
     :param list args: Additional arguments to pass to the java compiler.
+    :param list jvm_options: Additional jvm options specific to this JVM platform.
     :param str name: name to identify this platform.
     :param by_default: True if this value was inferred by omission of a specific platform setting.
     """
         self.source_level = JvmPlatform.parse_java_version(source_level)
         self.target_level = JvmPlatform.parse_java_version(target_level)
-        self.args = tuple(args or ())
+        self.args = tuple(flatten_shlexed_list(args or ()))
+        self.jvm_options = tuple(flatten_shlexed_list(jvm_options or ()))
         self.name = name
         self._by_default = by_default
         self._validate_source_target()
@@ -288,22 +318,31 @@ class JvmPlatformSettings:
     def by_default(self):
         return self._by_default
 
-    def __iter__(self):
-        yield self.source_level
-        yield self.target_level
-        yield self.args
+    def _tuple(self):
+        return (
+            self.source_level,
+            self.target_level,
+            self.args,
+            self.jvm_options,
+        )
 
     def __eq__(self, other):
-        return tuple(self) == tuple(other)
+        return self._tuple() == other._tuple()
 
     # TODO(#6071): decide if this should raise NotImplemented on invalid comparisons
     def __lt__(self, other):
-        return tuple(self) < tuple(other)
+        return self._tuple() < other._tuple()
 
     def __hash__(self):
-        return hash(tuple(self))
+        return hash(self._tuple())
 
     def __str__(self):
-        return "source={source},target={target},args=({args})".format(
-            source=self.source_level, target=self.target_level, args=" ".join(self.args)
+        return (
+            "JvmPlatformSettings(source={source},target={target},args=({args}),"
+            "jvm_options={jvm_options})".format(
+                source=self.source_level,
+                target=self.target_level,
+                args=" ".join(self.args),
+                jvm_options=" ".join(self.jvm_options),
+            )
         )
