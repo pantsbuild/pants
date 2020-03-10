@@ -79,6 +79,11 @@ page(
 )
 
 page(
+  name='multiple_jvm_versions',
+  source='multiple_jvm_versions.md',
+)
+
+page(
   name='pex',
   source='pex.md',
 )
