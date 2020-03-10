@@ -246,16 +246,11 @@ class FileDepsTest(GoalRuleTestBase):
             target_type="jvm_binary",
             name="bin",
             sources=["main.java"],
-            main="bin.Main",
             dependencies=["src/java/lib"],
         )
         self.create_file("project/config/app.yaml")
         self.create_library(
-            path="project",
-            target_type="jvm_app",
-            name="app",
-            binary="src/java/bin",
-            bundles=["bundle(fileset=['config/app.yaml'])"],
+            path="project", target_type="jvm_app", name="app",
         )
         self.assert_filedeps(
             targets=["project:app"],
