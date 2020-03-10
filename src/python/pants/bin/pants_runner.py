@@ -64,11 +64,13 @@ class PantsRunner(ExceptionSink.AccessGlobalExiterMixin):
 
     @staticmethod
     def scrub_pythonpath() -> None:
-        # If PYTHONPATH was used to set up the Pants runtime environment, its entries are now on our
-        # `sys.path` allowing us to run. Do not propagate any of these Pants-specific sys.path entries
-        # forward to our subprocesses.
+        # Do not propagate any PYTHONPATH that happens to have been set in our environment
+        # to our subprocesses.
+        # Note that don't warn (but still scrub) if RUNNING_PANTS_FROM_SOURCES is set. This allows
+        # scripts that run pants directly from sources, and therefore must set PYTHONPATH, to mute
+        # this warning.
         pythonpath = os.environ.pop("PYTHONPATH", None)
-        if pythonpath:
+        if pythonpath and not os.environ.pop("RUNNING_PANTS_FROM_SOURCES", None):
             logger.warning(f"Scrubbed PYTHONPATH={pythonpath} from the environment.")
 
     def run(self):
