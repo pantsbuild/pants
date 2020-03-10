@@ -30,6 +30,7 @@ extern crate derivative;
 
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryFrom;
 use std::ops::AddAssign;
@@ -65,7 +66,7 @@ pub mod nailgun;
 
 extern crate uname;
 
-#[derive(PartialOrd, Ord, Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[derive(PartialOrd, Ord, Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum Platform {
   Darwin,
   Linux,
