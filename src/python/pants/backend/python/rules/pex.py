@@ -3,7 +3,7 @@
 
 import itertools
 from dataclasses import dataclass
-from typing import Iterable, List, NamedTuple, Optional, Sequence, Set, Tuple
+from typing import FrozenSet, Iterable, List, NamedTuple, Optional, Sequence, Set, Tuple
 
 from pkg_resources import Requirement
 
@@ -62,7 +62,7 @@ Spec = Tuple[str, str]  # e.g. (">=", "3.6")
 
 class ParsedConstraint(NamedTuple):
     interpreter: str
-    specs: Set[Spec]
+    specs: FrozenSet[Spec]
 
     def __str__(self) -> str:
         specs = ",".join(
@@ -87,11 +87,12 @@ class PexInterpreterConstraints:
         For example, given `[["CPython>=2.7", "CPython<=3"], ["CPython==3.6.*"]]`, return
         `["CPython>=2.7,==3.6.*", "CPython<=3,==3.6.*"]`.
         """
-        # Each element (a List[ParsedConstraint) will get ANDed.
-        parsed_constraint_sets: List[List[ParsedConstraint]] = []
+        # Each element (a Set[ParsedConstraint]) will get ANDed. We use sets to deduplicate
+        # identical top-level parsed constraint sets.
+        parsed_constraint_sets: Set[FrozenSet[ParsedConstraint]] = set()
         for constraint_set in constraint_sets:
             # Each element (a ParsedConstraint) will get ORed.
-            parsed_constraint_set: List[ParsedConstraint] = []
+            parsed_constraint_set: Set[ParsedConstraint] = set()
             for constraint in constraint_set:
                 try:
                     parsed_requirement = Requirement.parse(constraint)
@@ -100,12 +101,12 @@ class PexInterpreterConstraints:
                     # Pex's interpreter.py's `parse_requirement()`.
                     parsed_requirement = Requirement.parse(f"CPython{constraint}")
                 interpreter = parsed_requirement.project_name
-                specs = set(parsed_requirement.specs)
-                parsed_constraint_set.append(ParsedConstraint(interpreter, specs))
-            parsed_constraint_sets.append(parsed_constraint_set)
+                specs = frozenset(parsed_requirement.specs)
+                parsed_constraint_set.add(ParsedConstraint(interpreter, specs))
+            parsed_constraint_sets.add(frozenset(parsed_constraint_set))
 
         def and_constraints(parsed_constraints: Sequence[ParsedConstraint]) -> ParsedConstraint:
-            merged_specs = set()
+            merged_specs: Set[Spec] = set()
             expected_interpreter = parsed_constraints[0][0]
             for parsed_constraint in parsed_constraints:
                 if parsed_constraint.interpreter != expected_interpreter:
@@ -124,7 +125,7 @@ class PexInterpreterConstraints:
                         f"{attempted_interpreters}."
                     )
                 merged_specs.update(parsed_constraint.specs)
-            return ParsedConstraint(expected_interpreter, merged_specs)
+            return ParsedConstraint(expected_interpreter, frozenset(merged_specs))
 
         return sorted(
             {

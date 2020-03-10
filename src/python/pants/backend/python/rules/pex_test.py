@@ -88,6 +88,26 @@ def test_merge_interpreter_constraints() -> None:
         ],
     )
 
+    # Deduplicate between constraint_sets
+    # (A | B) & (A | B) => A | B. Naively, this should actually resolve as follows:
+    #   (A | B) & (A | B) => (A & A) | (A & B) | (B & B) => A | (A & B) | B.
+    # But, we first deduplicate each constraint_set.  (A | B) & (A | B) can be rewritten as
+    # X & X => X.
+    assert_merged(
+        input=[["CPython==2.7.*", "CPython==3.6.*"], ["CPython==2.7.*", "CPython==3.6.*"]],
+        expected=["CPython==2.7.*", "CPython==3.6.*"],
+    )
+    # (A | B) & C & (A | B) => (A & C) | (B & C). Alternatively, this can be rewritten as
+    # X & Y & X => X & Y.
+    assert_merged(
+        input=[
+            ["CPython>=2.7,<3", "CPython>=3.5"],
+            ["CPython==3.6.*"],
+            ["CPython>=3.5", "CPython>=2.7,<3"],
+        ],
+        expected=["CPython>=2.7,<3,==3.6.*", "CPython>=3.5,==3.6.*"],
+    )
+
     # No specifiers
     assert_merged(input=[["CPython"]], expected=["CPython"])
     assert_merged(input=[["CPython"], ["CPython==3.7.*"]], expected=["CPython==3.7.*"])
