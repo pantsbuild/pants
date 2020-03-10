@@ -464,6 +464,9 @@ repos = [
   'https://repo1.maven.org/maven2',
   # Custom repo for Kythe jars, as Google doesn't currently publish them anywhere.
   'https://raw.githubusercontent.com/toolchainlabs/binhost/master/',
+  # Specify local default maven repo to support
+  # testing snapshots of 3rdparty jars published locally.
+  'file://%(homedir)s/.m2/repository',
 ]
 
 [cache.resolve.coursier]
