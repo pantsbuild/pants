@@ -99,7 +99,10 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
         with self.temporary_workdir() as workdir:
             test_target = "testprojects/src/java/org/pantsbuild/testproject/exclude:"
             json_data = self.run_export(
-                test_target, workdir, load_libs=True, extra_args=["--no-export-allow-global-excludes"]
+                test_target,
+                workdir,
+                load_libs=True,
+                extra_args=["--no-export-allow-global-excludes"],
             )
             self.assertIsNotNone(
                 json_data.get("libraries").get("com.martiansoftware:nailgun-server:0.9.1")
