@@ -17,7 +17,7 @@ class TestListGoalsIntegration(PantsRunIntegrationTest):
     def test_only_show_implemented_goals(self) -> None:
         # Some core goals, such as `./pants test`, require downstream implementations to work
         # properly. We should only show those goals when an implementation is provided.
-        goals_that_need_implementation = ["binary", "fmt2", "lint2", "run", "test"]
+        goals_that_need_implementation = ["binary", "fmt", "lint", "run", "test"]
         command = ["--pants-config-files=[]", "--no-v1", "--v2", "goals"]
 
         not_implemented_run = self.run_pants(command)
