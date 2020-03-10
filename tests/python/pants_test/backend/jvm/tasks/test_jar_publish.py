@@ -57,10 +57,10 @@ class JarPublishTest(NailgunTaskTestBase):
         targets.append(nail_target)
 
         shoe_target = self.create_library(
-            "b",
-            "java_library",
-            "b",
-            ["B.java"],
+            path="b",
+            target_type="java_library",
+            name="b",
+            sources=["B.java"],
             provides="artifact(org='com.example', name='shoe', repo=internal)",
             dependencies=[nail_target.address.reference()],
         )
@@ -69,17 +69,19 @@ class JarPublishTest(NailgunTaskTestBase):
         shoe_address = shoe_target.address.reference()
         if with_alias:
             # add an alias target between c and b
-            alias_target = self.create_library("z", "target", "z", dependencies=[shoe_address])
+            alias_target = self.create_library(
+                path="z", target_type="target", name="z", dependencies=[shoe_address]
+            )
             targets.append(alias_target)
             horse_deps = [alias_target.address.reference()]
         else:
             horse_deps = [shoe_address]
 
         horse_target = self.create_library(
-            "c",
-            "java_library",
-            "c",
-            ["C.java"],
+            path="c",
+            target_type="java_library",
+            name="c",
+            sources=["C.java"],
             provides="artifact(org='com.example', name='horse', repo=internal)",
             dependencies=horse_deps,
         )
@@ -88,20 +90,20 @@ class JarPublishTest(NailgunTaskTestBase):
 
     def _create_nail_target(self):
         return self.create_library(
-            "a",
-            "java_library",
-            "a",
-            ["A.java"],
+            path="a",
+            target_type="java_library",
+            name="a",
+            sources=["A.java"],
             provides="artifact(org='com.example', name='nail', repo=internal)",
         )
 
     def _prepare_targets_with_duplicates(self):
         targets = list(self._prepare_for_publishing())
         conflict = self.create_library(
-            "conflict",
-            "java_library",
-            "conflict",
-            ["Conflict.java"],
+            path="conflict",
+            target_type="java_library",
+            name="conflict",
+            sources=["Conflict.java"],
             provides="artifact(org='com.example', name='nail', repo=internal)",
         )
         targets.append(conflict)

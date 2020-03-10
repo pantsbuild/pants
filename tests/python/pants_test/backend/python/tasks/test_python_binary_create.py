@@ -75,8 +75,8 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
                 "lib.py": dedent(
                     """
                     import os
-                
-                
+
+
                     def main():
                       os.getcwd()
                     """
@@ -90,7 +90,9 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
         self._assert_pex(binary)
 
     def test_deployable_archive_products_files_deps(self):
-        self.create_library("src/things", "files", "things", sources=["loose_file"])
+        self.create_library(
+            path="src/things", target_type="files", name="things", sources=["loose_file"]
+        )
         self.create_file("src/things/loose_file", "data!")
         self.create_python_library(
             "src/python/lib",
@@ -101,8 +103,8 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
                     import io
                     import os
                     import sys
-                
-                
+
+
                     def main():
                       here = os.path.dirname(__file__)
                       loose_file = os.path.join(here, '../src/things/loose_file')
