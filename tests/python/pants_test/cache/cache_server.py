@@ -92,6 +92,13 @@ class FailRESTHandler(http.server.SimpleHTTPRequestHandler):
     return self._return_failed()
 
 
+class ConnectionErrorRESTHandler(FailRESTHandler):
+    """Fail to connect to all requests."""
+
+    def _return_failed(self):
+        raise Exception("Intentional connection failure!")
+
+
 class TestCacheServer:
   """A wrapper class that represents the underlying REST server.
 
@@ -125,26 +132,28 @@ class TestCacheServer:
 
 
 def _cache_server_process(queue, return_failed, cache_root):
-  """A pickleable top-level function to wrap a SimpleRESTHandler.
+    """A pickleable top-level function to wrap a SimpleRESTHandler.
 
-  We fork a separate process to avoid affecting the `cwd` of the requesting process.
-  """
-  httpd = None
-  try:
-    with temporary_dir() as tmpdir:
-      cache_root = cache_root if cache_root else tmpdir
-      with pushd(cache_root):  # SimpleRESTHandler serves from the cwd.
-        if return_failed:
-          handler = FailRESTHandler
-        else:
-          handler = SimpleRESTHandler
-        httpd = socketserver.TCPServer(('localhost', 0), handler)
-        port = httpd.server_address[1]
-        queue.put(port)
-        httpd.serve_forever()
-  finally:
-    if httpd:
-      httpd.shutdown()
+    We fork a separate process to avoid affecting the `cwd` of the requesting process.
+    """
+    httpd = None
+    try:
+        with temporary_dir() as tmpdir:
+            cache_root = cache_root if cache_root else tmpdir
+            with pushd(cache_root):  # SimpleRESTHandler serves from the cwd.
+                if return_failed is True:
+                    handler = FailRESTHandler
+                elif return_failed is False:
+                    handler = SimpleRESTHandler
+                elif return_failed == "connection-error":
+                    handler = ConnectionErrorRESTHandler
+                httpd = socketserver.TCPServer(("localhost", 0), handler)
+                port = httpd.server_address[1]
+                queue.put(port)
+                httpd.serve_forever()
+    finally:
+        if httpd:
+            httpd.shutdown()
 
 
 @contextmanager

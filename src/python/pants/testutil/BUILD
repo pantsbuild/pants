@@ -33,9 +33,10 @@ python_library(
   dependencies = [
     '//:build_root',
     '//:pants_pex',
-    ':file_test_util',
     '3rdparty/python:ansicolors',
     '3rdparty/python:dataclasses',
+    ':file_test_util',
+    'build-support/pythonstyle',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file',
     'src/python/pants/base:exiter',

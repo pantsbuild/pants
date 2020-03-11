@@ -254,7 +254,9 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                       'pants.backend.codegen.thrift.python',
                       'pants.backend.codegen.grpcio.python',
                       'pants.backend.codegen.wire.java',
-                      'pants.backend.project_info'],
+                      'pants.backend.project_info',
+                      "pants.cache",
+                      ],
              help='Register v1 tasks from these backends. The backend packages must be present on '
                   'the PYTHONPATH, typically because they are in the pants core dist, in a '
                   'plugin dist, or available as sources in the repo.')
