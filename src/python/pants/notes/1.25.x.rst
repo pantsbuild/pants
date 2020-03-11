@@ -10,6 +10,11 @@ The ``1.25.x`` series brings two major changes to Pants:
 
 Please see https://groups.google.com/forum/#!topic/pants-devel/3nmdSeyvwU0 for more information.
 
+1.25.0 (03/10/2020)
+-------------------
+
+The first stable release of the ``1.25.x`` series, with no changes since the previous `rc`!
+
 1.25.0rc1 (03/6/2020)
 ---------------------
 
