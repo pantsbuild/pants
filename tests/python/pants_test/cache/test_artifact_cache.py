@@ -1,8 +1,11 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import logging
 import os
+import unittest.mock
 from contextlib import contextmanager
+from typing import Iterator
 
 import pytest
 
@@ -14,11 +17,13 @@ from pants.cache.artifact_cache import (
 )
 from pants.cache.local_artifact_cache import LocalArtifactCache, TempLocalArtifactCache
 from pants.cache.pinger import BestUrlSelector, InvalidRESTfulCacheProtoError
-from pants.cache.restful_artifact_cache import RESTfulArtifactCache
+from pants.cache.restful_artifact_cache import RequestsSession, RESTfulArtifactCache
 from pants.invalidation.build_invalidator import CacheKey
+from pants.testutil.subsystem.util import init_subsystems
 from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir, temporary_file, temporary_file_path
 from pants.util.dirutil import safe_mkdir
+from pants.util.meta import classproperty
 from pants_test.cache.cache_server import cache_server
 
 TEST_CONTENT1 = b"muppet"
@@ -26,6 +31,10 @@ TEST_CONTENT2 = b"kermit"
 
 
 class TestArtifactCache(TestBase):
+    @classproperty
+    def subsystems(cls):
+        return super().subsystems + (RequestsSession.Factory,)
+
     @contextmanager
     def setup_local_cache(self):
         with temporary_dir() as artifact_root:
@@ -45,6 +54,29 @@ class TestArtifactCache(TestBase):
                 yield RESTfulArtifactCache(artifact_root, BestUrlSelector([server.url]), local)
 
     @contextmanager
+    def restore_max_retries_flag(self) -> Iterator[None]:
+        try:
+            yield
+        finally:
+            RequestsSession._max_retries_exceeded = False
+
+    @contextmanager
+    def override_check_for_max_retry(self, should_check: bool) -> Iterator[None]:
+        patch_opts = dict(autospec=True, spec_set=True)
+        with self.restore_max_retries_flag(), unittest.mock.patch.object(
+            RequestsSession, "should_check_for_max_retry_error", **patch_opts
+        ) as check_max_retry_predicate:
+            check_max_retry_predicate.return_value = should_check
+            yield
+
+    def setUp(self):
+        super().setUp()
+        # Init engine because decompression now goes through native code.
+        self._init_engine()
+        TarballArtifact.NATIVE_BINARY = self._scheduler._scheduler._native
+        init_subsystems([RequestsSession.Factory])
+
+    @contextmanager
     def setup_test_file(self, parent):
         with temporary_file(parent) as f:
             # Write the file.
@@ -52,12 +84,6 @@ class TestArtifactCache(TestBase):
             path = f.name
             f.close()
             yield path
-
-    def setUp(self):
-        super().setUp()
-        # Init engine because decompression now goes through native code.
-        self._init_engine()
-        TarballArtifact.NATIVE_BINARY = self._scheduler._scheduler._native
 
     def test_local_cache(self):
         with self.setup_local_cache() as artifact_cache:
@@ -206,13 +232,13 @@ class TestArtifactCache(TestBase):
             self.assertFalse(call_use_cached_files((cache, key, None)))
             with self.setup_test_file(cache.artifact_root) as path:
                 call_insert((cache, key, [path], False))
-            self.assertTrue(call_use_cached_files((cache, key, None)))
+                self.assertTrue(call_use_cached_files((cache, key, None)))
 
         with self.setup_rest_cache() as cache:
             self.assertFalse(call_use_cached_files((cache, key, None)))
             with self.setup_test_file(cache.artifact_root) as path:
                 call_insert((cache, key, [path], False))
-            self.assertTrue(call_use_cached_files((cache, key, None)))
+                self.assertTrue(call_use_cached_files((cache, key, None)))
 
     def test_failed_multiproc(self):
         key = CacheKey("muppet_key", "fake_hash")
@@ -222,7 +248,44 @@ class TestArtifactCache(TestBase):
             self.assertFalse(call_use_cached_files((cache, key, None)))
             with self.setup_test_file(cache.artifact_root) as path:
                 call_insert((cache, key, [path], False))
+                self.assertFalse(call_use_cached_files((cache, key, None)))
+
+    def test_noops_after_max_retries_exceeded(self):
+        key = CacheKey("muppet_key", "fake_hash")
+
+        with self.setup_rest_cache() as cache:
+            # Assert that the artifact doesn't exist, then insert it and check that it exists.
             self.assertFalse(call_use_cached_files((cache, key, None)))
+            with self.setup_test_file(cache.artifact_root) as path:
+                call_insert((cache, key, [path], False))
+                self.assertTrue(call_use_cached_files((cache, key, None)))
+
+            # No failed requests should have occurred yet, so no retries should have been triggered.
+            self.assertFalse(RequestsSession._max_retries_exceeded)
+
+            # Now assert that when max retries are exceeded, the cache returns 404s.
+            with self.restore_max_retries_flag():
+                RequestsSession._max_retries_exceeded = True
+                self.assertFalse(call_use_cached_files((cache, key, None)))
+            # After the flag is toggled back, the cache successfully finds the entry.
+            self.assertTrue(call_use_cached_files((cache, key, None)))
+
+    def test_max_retries_exceeded(self):
+        key = CacheKey("muppet_key", "fake_hash")
+
+        # Assert that the global "retries exceeded" flag is set when retries are exceeded.
+        with self.override_check_for_max_retry(should_check=True), self.setup_rest_cache(
+            return_failed="connection-error"
+        ) as cache, self.captured_logging(logging.WARNING) as captured:
+
+            self.assertFalse(call_use_cached_files((cache, key, None)))
+            self.assertTrue(RequestsSession._max_retries_exceeded)
+
+            _, retry_warning = tuple(captured.warnings())
+            self.assertIn(
+                "Maximum retries were exceeded for the current connection pool. Avoiding the remote cache for the rest of the pants process lifetime.",
+                retry_warning,
+            )
 
     def test_successful_request_cleans_result_dir(self):
         key = CacheKey("muppet_key", "fake_hash")
