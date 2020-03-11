@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-import select
 from contextlib import contextmanager
 
 from pants.pantsd.pailgun_server import PailgunServer
@@ -77,9 +76,8 @@ class PailgunService(PantsService):
             while not self._state.is_terminating:
                 self.pailgun.handle_request()
                 self._state.maybe_pause()
-        except select.error as e:
-            # SocketServer can throw `error: (9, 'Bad file descriptor')` on teardown. Ignore it.
-            self._logger.warning("pailgun service shutting down due to an error: {}".format(e))
+        except Exception:
+            self._logger.error("pailgun service shutting down due to an error", exc_info=True)
         finally:
             self._logger.info("pailgun service on port {} shutting down".format(self.pailgun_port))
 
