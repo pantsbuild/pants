@@ -3,7 +3,7 @@
 
 from typing import List, Optional
 
-from pants.backend.project_info.rules import dependencies
+from pants.backend.project_info.rules.dependencies import Dependencies, rules
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -12,7 +12,7 @@ from pants.testutil.goal_rule_test_base import GoalRuleTestBase
 
 
 class DependenciesIntegrationTest(GoalRuleTestBase):
-    goal_cls = dependencies.Dependencies
+    goal_cls = Dependencies
 
     @classmethod
     def alias_groups(cls) -> BuildFileAliases:
@@ -26,7 +26,7 @@ class DependenciesIntegrationTest(GoalRuleTestBase):
 
     @classmethod
     def rules(cls):
-        return super().rules() + dependencies.rules()
+        return super().rules() + rules()
 
     def create_python_library(self, path: str, *, dependencies: Optional[List[str]] = None) -> None:
         self.create_library(
