@@ -1,7 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from abc import ABC, abstractmethod
+from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
 from typing import Any, ClassVar, Iterable, List, Optional, Type, Union
 
@@ -16,6 +16,13 @@ class Field(ABC):
     unhydrated: Any
     alias: ClassVar[str]
 
+
+@dataclass(frozen=True)
+class PrimitiveField(Field, metaclass=ABCMeta):
+    """A Field that does not need the engine in order to be hydrated.
+
+    This applies to the majority of fields.
+    """
     @abstractmethod
     @memoized_property
     def hydrated(self) -> Any:
@@ -27,6 +34,17 @@ class Field(ABC):
         This property is memoized because hydration and validation can often be costly. This
         hydration will only happen when a downstream rule explicitly requests this field.
         """
+
+
+@dataclass(frozen=True)
+class AsyncField(Field, metaclass=ABCMeta):
+    """A field that needs the engine in order to be hydrated."""
+
+    # TODO: what should this be?
+    @abstractmethod
+    @memoized_property
+    def hydration_request(self) -> Any:
+        pass
 
 
 class Target(ABC):
@@ -63,14 +81,16 @@ class Target(ABC):
 
 
 @dataclass(frozen=True)
-class Sources(Field):
+class Sources(AsyncField):
     unhydrated: Optional[Iterable[str]] = None
     alias: ClassVar[str] = "sources"
 
-    # TODO: this needs to call the engine. How could we do that?
-    #  Async property and `await my_target.sources`?
     @memoized_property
-    def hydrated(self):
+    def hydration_request(self) -> Any:
+        """Create a request to hydrate self.unhydrated into ...
+
+        Any validation should happen here.
+        """
         return self.unhydrated
 
 
@@ -78,14 +98,14 @@ class Sources(Field):
 class BinarySources(Sources):
 
     @memoized_property
-    def hydrated(self):
+    def hydration_request(self):
         if self.unhydrated is not None and len(list(self.unhydrated)) not in [0, 1]:
-            raise ValueError("TODO")
-        return super().hydrated
+            raise ValueError("Binary targets must have only 0 or 1 source files.")
+        return super().hydration_request
 
 
 @dataclass(frozen=True)
-class Compatibility(Field):
+class Compatibility(PrimitiveField):
     unhydrated: Optional[Union[str, Iterable[str]]] = None
     alias: ClassVar[str] = "compatibility"
 
@@ -97,7 +117,7 @@ class Compatibility(Field):
 
 
 @dataclass(frozen=True)
-class Coverage(Field):
+class Coverage(PrimitiveField):
     unhydrated: Optional[Union[str, Iterable[str]]] = None
     alias: ClassVar[str] = "coverage"
 
@@ -109,7 +129,7 @@ class Coverage(Field):
 
 
 @dataclass(frozen=True)
-class Timeout(Field):
+class Timeout(PrimitiveField):
     unhydrated: Optional[int] = None
     alias: ClassVar[str] = "timeout"
 
@@ -118,14 +138,17 @@ class Timeout(Field):
         if self.unhydrated is None:
             return None
         if not isinstance(self.unhydrated, int):
-            raise ValueError("")
-        if self.unhydrated < 0:
-            raise ValueError("")
+            raise ValueError(
+                f"The `timeout` field must be an `int`. Was {type(self.unhydrated)} "
+                f"({self.unhydrated})."
+            )
+        if self.unhydrated <= 0:
+            raise ValueError(f"The `timeout` field must be > 1. Was {self.unhydrated}.")
         return self.unhydrated
 
 
 @dataclass(frozen=True)
-class EntryPoint(Field):
+class EntryPoint(PrimitiveField):
     unhydrated: Optional[str] = None
     alias: ClassVar[str] = "entry_point"
 
@@ -135,7 +158,7 @@ class EntryPoint(Field):
 
 
 @dataclass(frozen=True)
-class ZipSafe(Field):
+class ZipSafe(PrimitiveField):
     unhydrated: bool = True
     alias: ClassVar[str] = "zip_safe"
 
@@ -145,7 +168,7 @@ class ZipSafe(Field):
 
 
 @dataclass(frozen=True)
-class AlwaysWriteCache(Field):
+class AlwaysWriteCache(PrimitiveField):
     unhydrated: bool = False
     alias: ClassVar[str] = "always_write_cache"
 
