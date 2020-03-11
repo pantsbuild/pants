@@ -14,7 +14,9 @@ python_tests(
   dependencies = [
     ':console',
     ':goal',
+    ':platform',
     ':rules',
+    'src/python/pants/testutil:test_base',
     'src/python/pants/testutil/engine:util',
   ],
 )
