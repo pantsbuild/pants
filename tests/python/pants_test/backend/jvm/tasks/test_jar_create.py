@@ -63,11 +63,23 @@ class JarCreateMiscTest(JarCreateTestBase):
 
 
 class JarCreateExecuteTest(JarCreateTestBase):
-    def java_library(self, path, name, sources, **kwargs):
-        return self.create_library(path, "java_library", name, sources, **kwargs)
+    def java_library(self, path, name, sources, dependencies=None):
+        return self.create_library(
+            path=path,
+            target_type="java_library",
+            name=name,
+            sources=sources,
+            dependencies=dependencies,
+        )
 
-    def scala_library(self, path, name, sources, **kwargs):
-        return self.create_library(path, "scala_library", name, sources, **kwargs)
+    def scala_library(self, path, name, sources, java_sources=None):
+        return self.create_library(
+            path=path,
+            target_type="scala_library",
+            name=name,
+            sources=sources,
+            java_sources=java_sources,
+        )
 
     def jvm_binary(self, path, name, source=None, dependencies=None):
         self.create_files(path, [source])
@@ -86,7 +98,9 @@ class JarCreateExecuteTest(JarCreateTestBase):
         return self.target(f"{path}:{name}")
 
     def java_thrift_library(self, path, name, *sources):
-        return self.create_library(path, "java_thrift_library", name, sources)
+        return self.create_library(
+            path=path, target_type="java_thrift_library", name=name, sources=sources
+        )
 
     def setUp(self):
         super().setUp()
