@@ -261,6 +261,18 @@ python_library(
   tags = {'partially_type_checked'},
 )
 
+python_library(
+  name='target',
+  sources=['target.py'],
+  dependencies=[
+    ':rules',
+    'src/python/pants/util:collections',
+    'src/python/pants/util:meta',
+    'src/python/pants/util:memo',
+  ],
+  tags = {'type_checked'},
+)
+
 resources(
   name='native_engine_shared_library',
   sources=['native_engine.so']
