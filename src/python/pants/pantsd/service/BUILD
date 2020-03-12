@@ -49,3 +49,12 @@ python_library(
   ],
   tags = {"partially_type_checked"},
 )
+
+python_tests(
+  name = 'tests',
+  dependencies = [
+    ':store_gc_service',
+    'src/python/pants/testutil:test_base',
+  ],
+  tags = {"partially_type_checked"},
+)

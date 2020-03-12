@@ -361,6 +361,10 @@ class SchedulerSession:
         self._session = session
         self._run_count = 0
 
+    @property
+    def scheduler(self):
+        return self._scheduler
+
     def poll_workunits(self) -> Tuple[Dict[str, Any], ...]:
         result: Tuple[Dict[str, Any], ...] = self._scheduler.poll_workunits(self._session)
         return result
