@@ -16,6 +16,7 @@ python_tests(
     ':goal',
     ':platform',
     ':rules',
+    ':target',
     'src/python/pants/testutil:test_base',
     'src/python/pants/testutil/engine:util',
   ],
