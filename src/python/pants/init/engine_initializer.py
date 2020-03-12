@@ -171,7 +171,7 @@ def _make_target_adaptor(base_class, target_type):
 class LegacyGraphScheduler:
     """A thin wrapper around a Scheduler configured with @rules for a symbol table."""
 
-    scheduler: Any
+    scheduler: Scheduler
     build_file_aliases: Any
     goal_map: Any
 
