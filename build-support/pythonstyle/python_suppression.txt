@@ -1,3 +1,7 @@
+src/python/pants/cache/artifact.py::indentation
+src/python/pants/cache/cache_setup.py::indentation
+src/python/pants/cache/local_artifact_cache.py::indentation
 src/python/pants/cache/restful_artifact_cache.py::indentation
-tests/python/pants_test/cache/test_artifact_cache.py::indentation
 tests/python/pants_test/cache/cache_server.py::indentation
+tests/python/pants_test/cache/test_artifact.py::indentation
+tests/python/pants_test/cache/test_artifact_cache.py::indentation

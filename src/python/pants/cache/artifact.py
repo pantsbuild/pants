@@ -75,39 +75,48 @@ class DirectoryArtifact(Artifact):
 
 
 class TarballArtifact(Artifact):
-  """An artifact stored in a tarball."""
+    """An artifact stored in a tarball."""
 
-  NATIVE_BINARY = None
+    NATIVE_BINARY = None
 
-  # TODO: Expose `dereference` for tasks.
-  # https://github.com/pantsbuild/pants/issues/3961
-  def __init__(self, artifact_root, tarfile_, compression=9, dereference=True):
-    super().__init__(artifact_root)
-    self._tarfile = tarfile_
-    self._compression = compression
-    self._dereference = dereference
+    # TODO: Expose `dereference` for tasks.
+    # https://github.com/pantsbuild/pants/issues/3961
+    def __init__(
+        self, artifact_root, artifact_extraction_root, tarfile_, compression=9, dereference=True
+    ):
+        super().__init__(artifact_root)
+        self.artifact_extraction_root = artifact_extraction_root
+        self._tarfile = tarfile_
+        self._compression = compression
+        self._dereference = dereference
 
-  def exists(self):
-    return os.path.isfile(self._tarfile)
+    def exists(self):
+        return os.path.isfile(self._tarfile)
 
-  def collect(self, paths):
-    # In our tests, gzip is slightly less compressive than bzip2 on .class files,
-    # but decompression times are much faster.
-    mode = 'w:gz'
+    def collect(self, paths):
+        # In our tests, gzip is slightly less compressive than bzip2 on .class files,
+        # but decompression times are much faster.
+        mode = "w:gz"
 
-    tar_kwargs = {'dereference': self._dereference, 'errorlevel': 2, 'compresslevel': self._compression}
+        tar_kwargs = {
+            "dereference": self._dereference,
+            "errorlevel": 2,
+            "compresslevel": self._compression,
+        }
 
-    with open_tar(self._tarfile, mode, **tar_kwargs) as tarout:
-      for path in paths or ():
-        # Adds dirs recursively.
-        relpath = os.path.relpath(path, self._artifact_root)
-        tarout.add(path, relpath)
-        self._relpaths.add(relpath)
+        with open_tar(self._tarfile, mode, **tar_kwargs) as tarout:
+            for path in paths or ():
+                # Adds dirs recursively.
+                relpath = os.path.relpath(path, self._artifact_root)
+                tarout.add(path, relpath)
+                self._relpaths.add(relpath)
 
-  def extract(self):
-    # Note(yic): unlike the python implementation before, now we do not update self._relpath
-    # after the extraction.
-    try:
-      self.NATIVE_BINARY.decompress_tarball(self._tarfile.encode(), self._artifact_root.encode())
-    except Exception as e:
-      raise ArtifactError("Extracting artifact failed:\n{}".format(e))
+    def extract(self):
+        # Note(yic): unlike the python implementation before, now we do not update self._relpath
+        # after the extraction.
+        try:
+            self.NATIVE_BINARY.decompress_tarball(
+                self._tarfile.encode(), self.artifact_extraction_root.encode()
+            )
+        except Exception as e:
+            raise ArtifactError("Extracting artifact failed:\n{}".format(e))
