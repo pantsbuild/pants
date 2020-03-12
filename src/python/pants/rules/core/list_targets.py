@@ -1,6 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from typing import Union
+
 from pants.engine.addressable import Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
@@ -45,6 +47,7 @@ async def list_targets(console: Console, list_options: ListOptions, addresses: A
     provides = list_options.values.provides
     provides_columns = list_options.values.provides_columns
     documented = list_options.values.documented
+    collection: Union[HydratedTargets, Addresses]
     if provides or documented:
         # To get provides clauses or documentation, we need hydrated targets.
         collection = await Get[HydratedTargets](Addresses, addresses)
