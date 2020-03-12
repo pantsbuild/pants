@@ -81,8 +81,11 @@ class TarballArtifact(Artifact):
 
     # TODO: Expose `dereference` for tasks.
     # https://github.com/pantsbuild/pants/issues/3961
-    def __init__(self, artifact_root, tarfile_, compression=9, dereference=True):
+    def __init__(
+        self, artifact_root, artifact_extraction_root, tarfile_, compression=9, dereference=True
+    ):
         super().__init__(artifact_root)
+        self.artifact_extraction_root = artifact_extraction_root
         self._tarfile = tarfile_
         self._compression = compression
         self._dereference = dereference
@@ -113,7 +116,7 @@ class TarballArtifact(Artifact):
         # after the extraction.
         try:
             self.NATIVE_BINARY.decompress_tarball(
-                self._tarfile.encode(), self._artifact_root.encode()
+                self._tarfile.encode(), self.artifact_extraction_root.encode()
             )
         except Exception as e:
             raise ArtifactError("Extracting artifact failed:\n{}".format(e))
