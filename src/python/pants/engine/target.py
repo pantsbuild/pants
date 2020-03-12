@@ -45,13 +45,51 @@ class PrimitiveField(Field, metaclass=ABCMeta):
 
 
 class AsyncField(Field, metaclass=ABCMeta):
-    """A field that needs the engine in order to be hydrated."""
+    """A field that needs the engine in order to be hydrated.
 
-    # TODO: what should this be?
-    @memoized_property
-    @abstractmethod
-    def value_request(self) -> Any:
-        pass
+    You should create a corresponding Result class and define a rule to go from this AsyncField to
+    the Result. For example:
+
+        class Sources(AsyncField):
+            alias: ClassVar = "sources"
+            raw_value: Optional[List[str]]
+
+        @dataclass(frozen=True)
+        class SourcesResult:
+            snapshot: Snapshot
+
+
+        @rule
+        def hydrate_sources(sources: Sources) -> SourcesResult:
+            sources.validate_pre_hydration()
+            result = await Get[Snapshot](PathGlobs(sources.raw_value))
+            sources.validate_post_hydration()
+            return SourcesResult(result)
+
+
+        def rules():
+            return [hydrate_sources]
+
+    Then, call sites can `await Get` if they need to hydrate the field:
+
+        sources = await Get[SourcesResult](Sources, my_tgt.get(Sources))
+    """
+
+    def validate_pre_hydration(self) -> None:
+        """Any validation that can be done on the original `raw_value`.
+
+        It is cheaper to do any possible validation here, rather than in `validate_post_hydration`,
+        because we can short-circuit if an invariant is violated before incurring the expense of
+        hydration.
+        """
+
+    def validate_post_hydration(self, result: Any) -> None:
+        """Any validation that must be done after hydration by inspecting the result of that
+        hydration.
+
+        For example, a `PythonSources` field may validate that all hydrated source files end in
+        `.py`.
+        """
 
 
 class PluginField:
@@ -59,7 +97,7 @@ class PluginField:
 
     When defining a Target, authors should create a corresponding PluginField class marked with
     `@union`. Then, plugin authors simply need to create whatever new `Field` they want and in a
-    `register.py`'s `rules()` function call. For example, to add a
+    `register.py`'s `rules()` function, call `UnionRule`. For example, to add a
     `TypeChecked` field to `python_library`, register `UnionRule(PythonLibraryField, TypeChecked)`.
 
         @union
@@ -77,9 +115,7 @@ class PluginField:
 
 
         def rules():
-            return [
-                UnionRule(PythonLibraryField, TypeChecked),
-            ]
+            return [UnionRule(PythonLibraryField, TypeChecked)]
     """
 
 
@@ -152,19 +188,16 @@ class Target(ABC):
         # TODO: consider if this should support subclasses. For example, if a target has a
         #  field PythonSources(Sources), then .has_fields(Sources) should still return True. Why?
         #  This allows overriding how fields behave for custom target types, e.g. a `python3_library`
-        #  subclassing the Field Compatibility with its own custom implementation. When adding
-        #  this, be sure to update `.get()` to allow looking up by subclass, too. (Is it possible
-        #  to do that in a performant way?)
+        #  subclassing the Field Compatibility with its own custom Python3Compatibility field.
+        #  When adding this, be sure to update `.get()` to allow looking up by subclass, too.
+        #  (Is it possible to do that in a performant way, i.e. w/o having to iterate over every
+        #  self.field_type (O(n) vs the current O(1))?)
         return all(field in self.field_types for field in fields)
 
 
 class Sources(AsyncField):
     alias: ClassVar = "sources"
     raw_value: Optional[Iterable[str]]
-
-    @memoized_property
-    def value_request(self) -> Any:
-        return self.raw_value
 
 
 class BinarySources(Sources):
