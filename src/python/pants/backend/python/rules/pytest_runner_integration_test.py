@@ -12,7 +12,7 @@ from pants.backend.python.rules import (
     pex_from_target_closure,
     prepare_chrooted_python_sources,
     pytest_coverage,
-    python_test_runner,
+    pytest_runner,
 )
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.targets.python_library import PythonLibrary
@@ -105,8 +105,8 @@ class PythonTestRunnerIntegrationTest(TestBase):
     def rules(cls):
         return (
             *super().rules(),
-            *python_test_runner.rules(),
             *pytest_coverage.rules(),
+            *pytest_runner.rules(),
             *download_pex_bin.rules(),
             *determine_source_files.rules(),
             *pex.rules(),
