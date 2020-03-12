@@ -178,3 +178,64 @@ def test_add_custom_fields() -> None:
 
     default_tgt = HaskellTarget({}, union_membership=union_membership)
     assert default_tgt.get(CustomField).value is False
+
+
+def test_override_preexisting_field_via_new_target() -> None:
+    # To change the behavior of a pre-existing field, you must create a new target as it would not
+    # be safe to allow plugin authors to change the behavior of core target types.
+    #
+    # Because the Target API does not care about the actual target type and we only check that the
+    # target has the required fields via Target.has_fields(), it is safe to create a new target
+    # that still works where the original target was expected.
+    #
+    # However, this means that we must ensure `Target.get()` and `Target.has_fields()` will work
+    # with subclasses of the original `Field`s.
+
+    class CustomHaskellGhcExtensions(HaskellGhcExtensions):
+        banned_extensions: ClassVar = ["GhcBanned"]
+        default_extensions: ClassVar = ["GhcCustomExtension"]
+
+        @memoized_property
+        def value(self) -> List[str]:
+            # Ensure that we avoid certain problematic extensions and always use some defaults.
+            specified_extensions = super().value
+            banned = [
+                extension
+                for extension in specified_extensions
+                if extension in self.banned_extensions
+            ]
+            if banned:
+                raise ValueError(f"Banned extensions used for {self.alias}: {banned}.")
+            return [*specified_extensions, *self.default_extensions]
+
+    class CustomHaskellTarget(Target):
+        alias: ClassVar = "custom_haskell"
+        core_fields: ClassVar = tuple(
+            {*HaskellTarget.core_fields, CustomHaskellGhcExtensions} - {HaskellGhcExtensions}
+        )
+
+    tgt = CustomHaskellTarget({HaskellGhcExtensions.alias: ["GhcNormalExtension"]})
+
+    assert tgt.has_fields([HaskellGhcExtensions]) is True
+    assert tgt.has_fields([CustomHaskellGhcExtensions]) is True
+    assert tgt.has_fields([HaskellGhcExtensions, CustomHaskellGhcExtensions]) is True
+
+    assert tgt.get(HaskellGhcExtensions) == tgt.get(CustomHaskellGhcExtensions)
+    assert tgt.get(HaskellGhcExtensions).value == [
+        "GhcNormalExtension",
+        *CustomHaskellGhcExtensions.default_extensions,
+    ]
+
+    # Check custom default value
+    assert (
+        CustomHaskellTarget({}).get(HaskellGhcExtensions).value
+        == CustomHaskellGhcExtensions.default_extensions
+    )
+
+    # Custom validation
+    bad_tgt = CustomHaskellTarget(
+        {HaskellGhcExtensions.alias: CustomHaskellGhcExtensions.banned_extensions}
+    )
+    with pytest.raises(ValueError) as exc:
+        bad_tgt.get(HaskellGhcExtensions).value
+    assert str(CustomHaskellGhcExtensions.banned_extensions) in str(exc)
