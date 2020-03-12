@@ -59,7 +59,7 @@ class SchedulerService(PantsService):
         # This session is only used for checking whether any invalidation globs have been invalidated.
         # It is not involved with a build itself; just with deciding when we should restart pantsd.
         self._scheduler_session = self._scheduler.new_session(
-            zipkin_trace_v2=False, build_id="background_pantsd_session",
+            zipkin_trace_v2=False, build_id="scheduler_service_session",
         )
         self._logger = logging.getLogger(__name__)
         self._event_queue: queue.Queue = queue.Queue(maxsize=self.QUEUE_SIZE)
