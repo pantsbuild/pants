@@ -7,6 +7,7 @@ python_library(
     '3rdparty/python:setuptools',
     'src/python/pants/backend/python/rules/coverage_plugin:plugin',
     'src/python/pants/backend/python/subsystems',
+    'src/python/pants/backend/python/subsystems/ipex',
     'src/python/pants/build_graph',
     'src/python/pants/engine/legacy:graph',
     'src/python/pants/engine:build_files',
