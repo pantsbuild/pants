@@ -3,7 +3,7 @@
 
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
-from typing import Any, ClassVar, Iterable, List, Optional, Tuple, Type, Union, cast
+from typing import Any, ClassVar, Dict, Iterable, List, Optional, Tuple, Type, TypeVar, Union, cast
 
 from pants.engine.objects import union
 from pants.engine.rules import UnionMembership
@@ -78,6 +78,9 @@ class PluginField:
     """
 
 
+_F = TypeVar("_F", bound=Field)
+
+
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class Target(ABC):
@@ -89,8 +92,14 @@ class Target(ABC):
     # These get calculated in the constructor
     plugin_fields: Tuple[Type[Field], ...]
     field_types: Tuple[Type[Field], ...]
+    field_values: Dict[Type[Field], Any]
 
-    def __init__(self, *, union_membership: Optional[UnionMembership] = None) -> None:
+    def __init__(
+        self,
+        unhydrated_values: Dict[str, Any],
+        *,
+        union_membership: Optional[UnionMembership] = None,
+    ) -> None:
         self.plugin_fields = cast(
             Tuple[Type[Field], ...],
             (
@@ -100,6 +109,21 @@ class Target(ABC):
             ),
         )
         self.field_types = (*self.core_fields, *self.plugin_fields)
+
+        self.field_values = {}
+        for alias, value in unhydrated_values.items():
+            field = next((field for field in self.field_types if field.alias == alias), None)
+            if field is None:
+                raise ValueError(
+                    f"Unrecognized field `{alias}={value}` for target type `{self.alias}`."
+                )
+            self.field_values[field] = field(value)
+        # For missing fields, call their default constructors.
+        for field in set(self.field_types) - set(self.field_values.keys()):
+            self.field_values[field] = field()  # type: ignore[call-arg]
+
+    def get(self, field: Type[_F]) -> _F:
+        return cast(_F, self.field_values[field])
 
 
 @dataclass(frozen=True)
