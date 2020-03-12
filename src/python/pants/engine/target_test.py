@@ -11,7 +11,7 @@ import pytest
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, PathGlobs, Snapshot
 from pants.engine.rules import UnionMembership, rule
 from pants.engine.selectors import Get
-from pants.engine.target import AsyncField, PluginField, PrimitiveField, Target
+from pants.engine.target import AsyncField, PrimitiveField, Target
 from pants.testutil.engine.util import MockGet, run_rule
 from pants.util.collections import ensure_str_list
 from pants.util.memo import memoized_property
@@ -66,14 +66,9 @@ async def hydrate_haskell_sources(sources: HaskellSources) -> HaskellSourcesResu
     return HaskellSourcesResult(result)
 
 
-class HaskellField(PluginField):
-    pass
-
-
 class HaskellTarget(Target):
     alias: ClassVar = "haskell"
     core_fields: ClassVar = (HaskellGhcExtensions, HaskellSources)
-    plugin_field_type: ClassVar = HaskellField
 
 
 def test_invalid_fields_rejected() -> None:
@@ -157,11 +152,10 @@ def test_has_fields() -> None:
 
 
 def test_field_hydration_is_lazy() -> None:
-    bad_extension = "DoesNotStartWithGhc"
     # No error upon creating the Target because validation does not happen until a call site
     # hydrates the specific field.
     tgt = HaskellTarget(
-        {HaskellGhcExtensions.alias: ["GhcExistentialQuantification", bad_extension]}
+        {HaskellGhcExtensions.alias: ["GhcExistentialQuantification", "DoesNotStartWithGhc"]}
     )
     # When hydrating, we expect a failure.
     with pytest.raises(ValueError) as exc:
@@ -180,8 +174,9 @@ def test_add_custom_fields() -> None:
                 return False
             return self.raw_value
 
-    union_membership = UnionMembership(OrderedDict({HaskellField: OrderedSet([CustomField])}))
-    tgt = HaskellTarget({CustomField.alias: True}, union_membership=union_membership)
+    union_membership = UnionMembership(OrderedDict({HaskellTarget: OrderedSet([CustomField])}))
+    tgt_values = {CustomField.alias: True}
+    tgt = HaskellTarget(tgt_values, union_membership=union_membership)
     assert tgt.field_types == (HaskellGhcExtensions, HaskellSources, CustomField)
     assert tgt.core_fields == (HaskellGhcExtensions, HaskellSources)
     assert tgt.plugin_fields == (CustomField,)

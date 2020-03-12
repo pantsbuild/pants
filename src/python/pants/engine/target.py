@@ -91,43 +91,23 @@ class AsyncField(Field, metaclass=ABCMeta):
         """
 
 
-class PluginField:
-    """Allows plugin authors to add new fields to pre-existing target types via UnionRules.
-
-    When defining a Target, authors should create a corresponding PluginField class marked with
-    `@union`. Then, plugin authors simply need to create whatever new `Field` they want and in a
-    `register.py`'s `rules()` function, call `UnionRule`. For example, to add a
-    `TypeChecked` field to `python_library`, register `UnionRule(PythonLibraryField, TypeChecked)`.
-
-        @union
-        class PythonLibraryField(PluginField):
-            pass
-
-
-        class PythonLibrary(Target):
-            core_fields = (Compatibility, PythonSources, ...)
-            plugin_field_type = PythonLibraryField
-
-
-        class TypeChecked(PrimitiveField):
-            ...
-
-
-        def rules():
-            return [UnionRule(PythonLibraryField, TypeChecked)]
-    """
-
-
 _F = TypeVar("_F", bound=Field)
 
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class Target(ABC):
+    """A Target represents a combination of fields that are valid _together_.
+
+    Plugin authors may add additional fields to pre-existing target types by simply registering
+    UnionRules between the `Target` type and the custom field, e.g. `UnionRule(PythonLibrary,
+    TypeChecked)`. The `Target` will then treat `TypeChecked` as a first-class citizen and plugins
+    can use that Field like any other Field.
+    """
+
     # Subclasses must define these
     alias: ClassVar[str]
     core_fields: ClassVar[Tuple[Type[Field], ...]]
-    plugin_field_type: ClassVar[Type[PluginField]]
 
     # These get calculated in the constructor
     plugin_fields: Tuple[Type[Field], ...]
@@ -144,7 +124,7 @@ class Target(ABC):
             (
                 ()
                 if union_membership is None
-                else tuple(union_membership.union_rules.get(self.plugin_field_type, ()))
+                else tuple(union_membership.union_rules.get(self.__class__, ()))
             ),
         )
 
@@ -169,7 +149,6 @@ class Target(ABC):
         return (
             f"{self.__class__}("
             f"alias={repr(self.alias)}, "
-            f"plugin_field_type={self.plugin_field_type}, "
             f"core_fields={list(self.core_fields)}, "
             f"plugin_fields={list(self.plugin_fields)}, "
             f"raw_field_values={list(self.field_values.values())}"
