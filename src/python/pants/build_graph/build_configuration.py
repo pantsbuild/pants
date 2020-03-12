@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-from collections import OrderedDict, namedtuple
+from collections import namedtuple
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any, Dict, Type
@@ -29,7 +29,7 @@ class BuildConfiguration:
     _exposed_context_aware_object_factory_by_alias: Dict[Any, Any] = field(default_factory=dict)
     _optionables: OrderedSet = field(default_factory=OrderedSet)
     _rules: OrderedSet = field(default_factory=OrderedSet)
-    _union_rules: "OrderedDict[Type, OrderedSet[Type]]" = field(default_factory=OrderedDict)
+    _union_rules: Dict[Type, OrderedSet[Type]] = field(default_factory=dict)
 
     class ParseState(namedtuple("ParseState", ["parse_context", "parse_globals"])):
         @property
@@ -181,7 +181,7 @@ class BuildConfiguration:
         """
         return list(self._rules)
 
-    def union_rules(self) -> "OrderedDict[Type, OrderedSet[Type]]":
+    def union_rules(self) -> Dict[Type, OrderedSet[Type]]:
         """Returns a mapping of registered union base types -> [OrderedSet of union member
         types]."""
         return self._union_rules

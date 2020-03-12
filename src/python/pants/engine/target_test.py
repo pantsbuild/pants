@@ -1,7 +1,6 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import ClassVar, List, Optional, Tuple
@@ -168,7 +167,7 @@ def test_add_custom_fields() -> None:
                 return False
             return self.raw_value
 
-    union_membership = UnionMembership(OrderedDict({HaskellTarget: OrderedSet([CustomField])}))
+    union_membership = UnionMembership({HaskellTarget: OrderedSet([CustomField])})
     tgt_values = {CustomField.alias: True}
     tgt = HaskellTarget(tgt_values, union_membership=union_membership)
     assert tgt.field_types == (HaskellGhcExtensions, HaskellSources, CustomField)

@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from abc import ABCMeta, abstractmethod
-from collections import OrderedDict
 from typing import Iterable, List, Tuple, Type
 from unittest.mock import Mock
 
@@ -102,7 +101,7 @@ class LintTest(TestBase):
         per_target_caching: bool,
     ) -> Tuple[int, str]:
         console = MockConsole(use_colors=False)
-        union_membership = UnionMembership(OrderedDict({Linter: OrderedSet(linters)}))
+        union_membership = UnionMembership({Linter: OrderedSet(linters)})
         result: Lint = run_rule(
             lint,
             rule_args=[

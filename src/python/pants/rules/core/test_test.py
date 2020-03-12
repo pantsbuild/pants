@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-from collections import OrderedDict
 from pathlib import PurePath
 from textwrap import dedent
 from typing import Optional
@@ -265,9 +264,7 @@ class TestTest(TestBase):
         adaptor_cls = PythonTestsAdaptor if test_target_type else PythonBinaryAdaptor
         type_alias = "python_tests" if test_target_type else "python_binary"
         adaptor = adaptor_cls(address=address, type_alias=type_alias, sources=mocked_fileset)
-        union_membership = UnionMembership(
-            union_rules=OrderedDict({TestTarget: OrderedSet([PythonTestsAdaptorWithOrigin])})
-        )
+        union_membership = UnionMembership({TestTarget: OrderedSet([PythonTestsAdaptorWithOrigin])})
         with self.captured_logging(logging.INFO):
             result: AddressAndTestResult = run_rule(
                 coordinator_of_tests,

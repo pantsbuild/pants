@@ -7,9 +7,8 @@ import itertools
 import sys
 import typing
 from abc import ABC, abstractmethod
-from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Callable, List, Optional, Tuple, Type, get_type_hints
+from typing import Callable, Dict, List, Optional, Tuple, Type, get_type_hints
 
 from pants.engine.goal import Goal
 from pants.engine.objects import union
@@ -312,7 +311,7 @@ class UnionRule:
 
 @dataclass(frozen=True)
 class UnionMembership:
-    union_rules: "OrderedDict[Type, OrderedSet[Type]]"
+    union_rules: Dict[Type, OrderedSet[Type]]
 
     def is_member(self, union_type, putative_member):
         members = self.union_rules.get(union_type)
@@ -450,24 +449,23 @@ class RootRule(Rule):
 @dataclass(frozen=True)
 class NormalizedRules:
     rules: FrozenOrderedSet
-    union_rules: "OrderedDict[Type, OrderedSet[Type]]"
+    union_rules: Dict[Type, OrderedSet[Type]]
 
 
-# TODO: add typechecking here -- use dicts for `union_rules`.
 @dataclass(frozen=True)
 class RuleIndex:
     """Holds a normalized index of Rules used to instantiate Nodes."""
 
-    rules: OrderedDict
-    roots: OrderedSet
-    union_rules: "OrderedDict[Type, OrderedSet[Type]]"
+    rules: Dict
+    roots: FrozenOrderedSet
+    union_rules: Dict[Type, OrderedSet[Type]]
 
     @classmethod
     def create(cls, rule_entries, union_rules=None) -> "RuleIndex":
         """Creates a RuleIndex with tasks indexed by their output type."""
-        serializable_rules: OrderedDict = OrderedDict()
+        serializable_rules: Dict = {}
         serializable_roots: OrderedSet = OrderedSet()
-        union_rules = OrderedDict(union_rules or ())
+        union_rules = dict(union_rules or ())
 
         def add_task(product_type, rule):
             # TODO(#7311): make a defaultdict-like wrapper for OrderedDict if more widely used.
@@ -517,7 +515,7 @@ functions decorated with @rule.""".format(
                     )
                 )
 
-        return cls(serializable_rules, serializable_roots, union_rules)
+        return cls(serializable_rules, FrozenOrderedSet(serializable_roots), union_rules)
 
     def normalized_rules(self) -> NormalizedRules:
         rules = FrozenOrderedSet(
