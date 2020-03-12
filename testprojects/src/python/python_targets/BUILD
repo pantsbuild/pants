@@ -41,3 +41,18 @@ python_library(
   sources=[],
   dependencies=[':test_library_transitive_dependee_3']
 )
+
+python_binary(
+  name='test-multiplatform-binary',
+  source='main.py',
+  compatibility=['CPython>=3'],
+  platforms=[
+    'linux-x86_64',
+    "macosx-10.13-x86_64",
+  ]
+)
+
+files(
+  name='test-multiplatform-binary-files',
+  sources=['*'],
+)

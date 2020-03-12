@@ -103,6 +103,16 @@ def identify_missing_init_files(sources: Sequence[str]) -> Set[str]:
     return {os.path.join(package, "__init__.py") for package in packages} - set(sources)
 
 
+def _resolve_multipart_platform(interpreter: PythonInterpreter, platform: str) -> Platform:
+    with_interpreter_specific_info = Platform.of_interpreter(interpreter)
+    return Platform(
+        platform=platform,
+        impl=with_interpreter_specific_info.impl,
+        version=with_interpreter_specific_info.version,
+        abi=with_interpreter_specific_info.abi,
+    )
+
+
 class PexBuilderWrapper:
     """Wraps PEXBuilder to provide an API that consumes targets and other BUILD file entities."""
 
@@ -344,10 +354,12 @@ class PexBuilderWrapper:
             requirements_cache_dir = os.path.join(
                 python_setup.resolver_cache_dir, str(interpreter.identity)
             )
+            interpreter_specific_platform = _resolve_multipart_platform(interpreter=interpreter,
+                                                                        platform=platform)
             resolved_dists = resolve(
                 requirements=[str(req.requirement) for req in requirements],
                 interpreter=interpreter,
-                platform=platform,
+                platform=interpreter_specific_platform,
                 indexes=python_repos.indexes,
                 find_links=all_find_links,
                 cache=requirements_cache_dir,
