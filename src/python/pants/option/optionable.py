@@ -5,11 +5,13 @@ import functools
 import inspect
 import re
 from abc import ABC, ABCMeta, abstractmethod
-from typing import Optional, Type
+from types import FunctionType
+from typing import Any, Dict, List, Optional, Tuple, Type
 
 from pants.engine.selectors import Get
 from pants.option.errors import OptionsError
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo
+from pants.util.memo import memoized_classproperty
 from pants.util.meta import classproperty
 from pants.util.objects import get_docstring_summary
 
@@ -18,6 +20,45 @@ async def _construct_optionable(optionable_factory):
     scope = optionable_factory.options_scope
     scoped_options = await Get(ScopedOptions, Scope(str(scope)))
     return optionable_factory.optionable_cls(scope, scoped_options.options)
+
+
+def option(name, **register_kwargs):
+    """A decorator for a `def` instance method which registers it as an option.
+
+    The type for the option is inferred from the return type of the `def`.
+
+    @option() may be further wrapped with @property, which is the typical way to use this
+    decorator, e.g.:
+
+    class A(Optionable):
+
+        @property               # type: ignore[misc]
+        @option('--my-opt', ...)
+        def my_opt(self) -> str:
+            return cast(str, self.get_options().my_opt)
+
+    TODO: avoid having to place a type: ignore[misc] on the @property decorator! According to
+    https://github.com/python/mypy/issues/1362, that is the only way to stack multiple decorators at
+    once!
+
+    TODO: figure out how to avoid the `cast()` to make mypy happy with the return type!
+    """
+
+    def wrapper(orig_func):
+        func = orig_func.fget if isinstance(orig_func, property) else orig_func
+
+        option_type = func.__annotations__["return"]
+        if hasattr(option_type, "__origin__"):
+            option_type = option_type.__origin__
+        if hasattr(option_type, "__extra__"):
+            option_type = option_type.__extra__
+        register_kwargs["type"] = option_type
+
+        func._option_name = name
+        func._option_metadata = register_kwargs
+        return orig_func
+
+    return wrapper
 
 
 class OptionableFactory(ABC):
@@ -131,12 +172,33 @@ class Optionable(OptionableFactory, metaclass=ABCMeta):
     def get_description(cls) -> Optional[str]:
         return get_docstring_summary(cls)
 
+    @memoized_classproperty
+    def _typed_option_registrations(cls) -> List[Tuple[str, Dict[str, Any]]]:
+        ret = []
+        for name, val in cls.__dict__.items():
+            if isinstance(val, property):
+                # If an @option() is defined as a property, get the property's inner function.
+                val = val.fget
+            if isinstance(val, FunctionType):
+                # If this function came from an @option() declaration, get the arguments to the
+                # @option() call!
+                if hasattr(val, "_option_metadata"):
+                    metadata = val._option_metadata  # type: ignore[attr-defined]
+                    name = val._option_name          # type: ignore[attr-defined]
+                    ret.append((name, metadata))
+        return ret
+
     @classmethod
     def register_options(cls, register):
         """Register options for this optionable.
 
         Subclasses may override and call register(*args, **kwargs).
+
+        Any instance methods or properties defined with @option() will automatically be registered
+        by this base class.
         """
+        for name, register_kwargs in cls._typed_option_registrations:
+            register(name, **register_kwargs)
 
     @classmethod
     def register_options_on_scope(cls, options):
