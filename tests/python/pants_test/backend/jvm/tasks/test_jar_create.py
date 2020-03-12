@@ -141,6 +141,7 @@ class JarCreateExecuteTest(JarCreateTestBase):
             dependencies=test_path("src/resources/com/twitter:spam"),
         )
         self.empty_sl = self.scala_library(test_path("src/scala/com/foo"), "foo", ["dupe.scala"])
+        self.dist_root = os.path.join(self.build_root, "dist")
 
     def context(self, **kwargs):
         return super().context(
@@ -203,3 +204,14 @@ class JarCreateExecuteTest(JarCreateTestBase):
         self.execute(context)
 
         self.assertFalse(context.products.get("jars").has(self.empty_sl))
+
+    def test_jars_in_dist(self):
+        context = self.context()
+
+        # Create classpaths for other libraries, in order to initialize the product.
+        self.add_to_runtime_classpath(context, self.res, {"r.txt.transformed": ""})
+
+        self.execute(context)
+
+        self.assertTrue(os.path.isfile(os.path.join(self.dist_root, "foo.jar")))
+        self.assertTrue(os.path.isfile(os.path.join(self.dist_root, "baz.jar")))

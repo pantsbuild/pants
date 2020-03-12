@@ -3,11 +3,13 @@
 
 import os
 from contextlib import contextmanager
+from shutil import copyfile
 
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.jar_task import JarBuilderTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
+from pants.util.dirutil import safe_mkdir
 
 
 def is_jvm_binary(target):
@@ -58,6 +60,7 @@ class JarCreate(JarBuilderTask):
 
         self.compressed = self.get_options().compressed
         self._jars = {}
+        self._outdir = self.get_options().pants_distdir
 
     @property
     def cache_target_dirs(self):
@@ -91,6 +94,11 @@ class JarCreate(JarBuilderTask):
                             with self.create_jar_builder(jarfile) as jar_builder:
                                 if jar_builder.add_target(vt.target):
                                     add_jar_to_products()
+        safe_mkdir(self._outdir)
+        for target, product in self.context.products.get("jars").itermappings():
+            for basedir, jars in product.items():
+                for jar in jars:
+                    copyfile(os.path.join(basedir, jar), os.path.join(self._outdir, jar))
 
     @contextmanager
     def create_jar(self, target, path):
