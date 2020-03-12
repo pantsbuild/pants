@@ -89,6 +89,11 @@ def create_path_env_var(
     return delimiter.join(path_dirs)
 
 
+def module_dirname(module_path: str) -> str:
+    """Return the import path for the parent module of `module_path`."""
+    return ".".join(module_path.split(".")[:-1])
+
+
 def camelcase(string: str) -> str:
     """Convert snake casing (containing - or _ characters) to camel casing."""
     return "".join(word.capitalize() for word in re.split("[-_]", string))

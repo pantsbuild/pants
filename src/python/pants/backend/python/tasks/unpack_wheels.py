@@ -49,9 +49,6 @@ class UnpackWheels(UnpackRemoteSourcesBase):
             PythonSetup,
         )
 
-    class _NativeCodeExtractionSetupFailure(Exception):
-        pass
-
     def _get_matching_wheel(self, pex_path, interpreter, requirements, module_name):
         """Use PexBuilderWrapper to resolve a single wheel from the requirement specs using pex."""
         with self.context.new_workunit("extract-native-wheels"):
@@ -59,8 +56,9 @@ class UnpackWheels(UnpackRemoteSourcesBase):
                 pex_builder = PexBuilderWrapper.Factory.create(
                     builder=PEXBuilder(path=chroot, interpreter=interpreter), log=self.context.log
                 )
+
                 return pex_builder.extract_single_dist_for_current_platform(
-                    requirements, module_name
+                    requirements, dist_key=module_name
                 )
 
     @memoized_method

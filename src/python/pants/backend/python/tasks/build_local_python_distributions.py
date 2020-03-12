@@ -21,6 +21,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.address import Address
+from pants.python.pex_build_util import is_local_python_dist
 from pants.python.python_requirement import PythonRequirement
 from pants.task.task import Task
 from pants.util.collections import assert_single_element

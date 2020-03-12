@@ -37,3 +37,21 @@ ctypes_compatible_cpp_library(
   ],
   ctypes_native_library=native_artifact(lib_name='tensorflow-zero-out-operator'),
 )
+
+
+python_binary(
+  name='show-tf-version',
+  source='show_tf_version.py',
+  dependencies=[
+    'examples/3rdparty/python:tensorflow',
+  ],
+  compatibility=['CPython>=3.6,<4'],
+)
+
+files(
+  name='show-tf-version-files',
+  sources=['**/*'],
+  dependencies=[
+    'examples/3rdparty/python:examples_python_3rdparty',
+  ],
+)

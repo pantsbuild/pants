@@ -2,13 +2,16 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import functools
+import glob
 import os
+import subprocess
 from contextlib import contextmanager
 from textwrap import dedent
 
 from pex.pex_info import PexInfo
 
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
+from pants.util.collections import assert_single_element
 from pants.util.contextutil import open_zip, temporary_dir
 
 _LINUX_PLATFORM = "linux-x86_64"
@@ -158,7 +161,7 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
                         python_requirement('numpy==1.14.5')
                       ]
                     )
-            
+
                     """.format(
                         target_platforms="platforms = [{}],".format(
                             ", ".join(["'{}'".format(p) for p in target_platforms])
@@ -212,3 +215,24 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
         self.assertNotIn(
             "testprojects/src/python/python_distribution/ctypes:bin", result.stderr_data
         )
+
+    def test_generate_ipex_tensorflow(self):
+        with temporary_dir() as tmp_distdir:
+            with self.pants_results(
+                [
+                    f"--pants-distdir={tmp_distdir}",
+                    # tensorflow==1.14.0 has a setuptools>=41.0.0 requirement, so the .ipex resolve fails
+                    # without this override.
+                    f"--pex-builder-wrapper-setuptools-version=41.0.0",
+                    "--binary-py-generate-ipex",
+                    "binary",
+                    "examples/src/python/example/tensorflow_custom_op:show-tf-version",
+                ]
+            ) as pants_run:
+                self.assert_success(pants_run)
+                output_ipex = assert_single_element(glob.glob(os.path.join(tmp_distdir, "*")))
+                ipex_basename = os.path.basename(output_ipex)
+                self.assertEqual(ipex_basename, "show-tf-version.ipex")
+
+                pex_execution_output = subprocess.check_output([output_ipex])
+                assert "tf version: 1.14.0" in pex_execution_output.decode()
