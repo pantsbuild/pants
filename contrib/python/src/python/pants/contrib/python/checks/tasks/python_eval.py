@@ -6,10 +6,6 @@ import os
 import pkgutil
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
-from pants.backend.python.subsystems.pex_build_util import (
-    has_python_requirements,
-    has_python_sources,
-)
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_target import PythonTarget
@@ -17,7 +13,11 @@ from pants.backend.python.tasks.resolve_requirements_task_base import ResolveReq
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
 from pants.base.workunit import WorkUnit, WorkUnitLabel
-from pants.python.pex_build_util import PexBuilderWrapper
+from pants.python.pex_build_util import (
+    PexBuilderWrapper,
+    has_python_requirements,
+    has_python_sources,
+)
 from pants.task.lint_task_mixin import LintTaskMixin
 from pants.util.dirutil import safe_concurrent_creation, safe_mkdir
 from pants.util.memo import memoized_property
