@@ -6,6 +6,7 @@ coverage>=4.5,<4.6
 dataclasses==0.6
 docutils==0.14
 fasteners==0.15.0
+libcst==0.3.3
 Markdown==2.1.1
 packaging==16.8
 parameterized==0.6.1
@@ -17,7 +18,7 @@ pyopenssl==17.3.0
 pystache==0.5.3
 python-Levenshtein==0.12.0
 pywatchman==1.4.1
-PyYAML==5.1.2
+PyYAML==5.2
 py_zipkin==0.18.4
 requests[security]>=2.20.1
 responses==0.10.4

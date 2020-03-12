@@ -81,8 +81,13 @@ def _raise_did_you_mean(address_family: AddressFamily, name: str, source=None) -
 
 
 @rule
+async def find_address_family(address: Address) -> AddressFamily:
+    return await Get[AddressFamily](Dir(address.spec_path))
+
+
+@rule
 async def find_build_file(address: Address) -> BuildFileAddress:
-    address_family = await Get[AddressFamily](Dir(address.spec_path))
+    address_family = await Get[AddressFamily](Address, address)
     if address not in address_family.addressables:
         _raise_did_you_mean(address_family=address_family, name=address.target_name)
     return next(
@@ -293,6 +298,7 @@ def create_graph_rules(address_mapper: AddressMapper):
         # BUILD file parsing.
         hydrate_struct,
         parse_address_family,
+        find_address_family,
         find_build_file,
         find_build_files,
         # AddressSpec handling: locate directories that contain build files, and request

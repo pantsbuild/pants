@@ -313,8 +313,9 @@ class Scheduler:
 
         if remaining_runtime_exceptions_to_capture:
             raise ExecutionError(
-                "Internal logic error in scheduler: expected elements in "
-                "`self._native._peek_cffi_extern_method_runtime_exceptions()`."
+                "Internal logic error in scheduler: expected any elements in "
+                "`self._native._peek_cffi_extern_method_runtime_exceptions()`. ",
+                wrapped_exceptions=remaining_runtime_exceptions_to_capture,
             )
         return roots
 

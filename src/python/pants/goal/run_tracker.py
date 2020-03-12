@@ -350,7 +350,11 @@ class RunTracker(Subsystem):
 
         :API: public
         """
-        parent = self._threadlocal.current_workunit
+        try:
+            parent = self._threadlocal.current_workunit
+        except AttributeError:
+            parent = self._main_root_workunit
+
         with self.new_workunit_under_parent(
             name, parent=parent, labels=labels, cmd=cmd, log_config=log_config
         ) as workunit:

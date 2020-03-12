@@ -107,6 +107,8 @@ class SignalHandler:
 class ExceptionSink:
     """A mutable singleton object representing where exceptions should be logged to."""
 
+    original_excepthook = sys.excepthook
+
     # NB: see the bottom of this file where we call reset_log_location() and other mutators in order
     # to properly setup global state.
     _log_dir = None

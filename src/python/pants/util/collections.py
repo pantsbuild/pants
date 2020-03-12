@@ -3,7 +3,18 @@
 
 import collections
 import collections.abc
-from typing import Any, Callable, DefaultDict, Iterable, List, MutableMapping, Type, TypeVar, Union
+from typing import (
+    Any,
+    Callable,
+    DefaultDict,
+    Iterable,
+    List,
+    MutableMapping,
+    Optional,
+    Type,
+    TypeVar,
+    Union,
+)
 
 _K = TypeVar("_K")
 _V = TypeVar("_V")
@@ -65,6 +76,18 @@ def assert_single_element(iterable: Iterable[_T]) -> _T:
         return first_item
 
     raise ValueError(f"iterable {iterable!r} has more than one element.")
+
+
+def assert_zero_or_one(iterable: Iterable[_T], error_message: str) -> Optional[_T]:
+    all_items = list(iterable)
+    if not all_items:
+        return None
+    assert len(all_items) == 1, error_message
+    return all_items[0]
+
+
+def assert_zero_or_one_kwarg(iterable: Iterable[_T]) -> Optional[_T]:
+    return assert_zero_or_one(iterable, f'kwargs do not repeate names: was {iterable}')
 
 
 def ensure_list(val: Union[Any, Iterable[Any]], *, expected_type: Type[_T]) -> List[_T]:

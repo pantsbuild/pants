@@ -74,6 +74,7 @@ backend_packages2 = [
   "pants.backend.python.lint.flake8",
   "pants.backend.python.lint.isort",
   "pants.backend.native",
+  "pants.rules.build_file_manipulation",
   "internal_backend.rules_for_testing",
 ]
 
