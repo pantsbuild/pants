@@ -52,6 +52,7 @@ class AsyncField(Field, metaclass=ABCMeta):
             alias: ClassVar = "sources"
             raw_value: Optional[List[str]]
 
+
         @dataclass(frozen=True)
         class SourcesResult:
             snapshot: Snapshot
@@ -61,7 +62,7 @@ class AsyncField(Field, metaclass=ABCMeta):
         def hydrate_sources(sources: Sources) -> SourcesResult:
             sources.validate_pre_hydration()
             result = await Get[Snapshot](PathGlobs(sources.raw_value))
-            sources.validate_post_hydration()
+            sources.validate_post_hydration(result)
             return SourcesResult(result)
 
 
