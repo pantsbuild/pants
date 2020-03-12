@@ -19,7 +19,7 @@ class HaskellGhcExtensions(PrimitiveField):
     unhydrated: Optional[List[str]] = None
 
     @memoized_property
-    def hydrated(self) -> List[str]:
+    def value(self) -> List[str]:
         # Add some arbitrary validation to test that hydration works properly.
         for extension in self.unhydrated:
             if not extension.startswith("Ghc"):
@@ -55,7 +55,7 @@ def test_field_hydration_is_lazy() -> None:
     )
     # When hydrating, we expect a failure.
     with pytest.raises(ValueError) as exc:
-        tgt.get(HaskellGhcExtensions).hydrated
+        tgt.get(HaskellGhcExtensions).value
     assert "must be prefixed by `Ghc`" in str(exc)
 
 
@@ -66,7 +66,7 @@ def test_add_custom_fields() -> None:
         unhydrated: bool = False
 
         @memoized_property
-        def hydrated(self) -> bool:
+        def value(self) -> bool:
             return self.unhydrated
 
     union_membership = UnionMembership(OrderedDict({HaskellField: OrderedSet([CustomField])}))
@@ -74,7 +74,7 @@ def test_add_custom_fields() -> None:
     assert tgt.field_types == (HaskellGhcExtensions, CustomField)
     assert tgt.core_fields == (HaskellGhcExtensions,)
     assert tgt.plugin_fields == (CustomField,)
-    assert tgt.get(CustomField).hydrated is True
+    assert tgt.get(CustomField).value is True
 
     default_tgt = HaskellTarget({}, union_membership=union_membership)
-    assert default_tgt.get(CustomField).hydrated is False
+    assert default_tgt.get(CustomField).value is False

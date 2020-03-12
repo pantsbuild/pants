@@ -22,19 +22,20 @@ class Field(ABC):
 class PrimitiveField(Field, metaclass=ABCMeta):
     """A Field that does not need the engine in order to be hydrated.
 
-    This applies to the majority of fields.
+    This should be subclassed by the majority of fields.
     """
 
     @memoized_property
     @abstractmethod
-    def hydrated(self) -> Any:
-        """Validate and hydrate self.unhydrated into a value usable by downstream rules.
+    def value(self) -> Any:
+        """Get the underlying value.
 
-        All validation and hydration should happen here, such as converting a field that might be
-        a single string or a list of strings to always being a list of strings.
+        The value will possibly be first hydrated and/or validated, such as converting a field that
+        might be a single string or a list of strings to always being a list of strings.
 
         This property is memoized because hydration and validation can often be costly. This
-        hydration will only happen when a downstream rule explicitly requests this field.
+        hydration is lazy, i.e. will only happen when a downstream rule explicitly requests this
+        field.
         """
 
 
@@ -45,7 +46,7 @@ class AsyncField(Field, metaclass=ABCMeta):
     # TODO: what should this be?
     @memoized_property
     @abstractmethod
-    def hydration_request(self) -> Any:
+    def value_request(self) -> Any:
         pass
 
 
@@ -132,21 +133,17 @@ class Sources(AsyncField):
     unhydrated: Optional[Iterable[str]] = None
 
     @memoized_property
-    def hydration_request(self) -> Any:
-        """Create a request to hydrate self.unhydrated into ...
-
-        Any validation should happen here.
-        """
+    def value_request(self) -> Any:
         return self.unhydrated
 
 
 @dataclass(frozen=True)
 class BinarySources(Sources):
     @memoized_property
-    def hydration_request(self):
+    def value_request(self):
         if self.unhydrated is not None and len(list(self.unhydrated)) not in [0, 1]:
             raise ValueError("Binary targets must have only 0 or 1 source files.")
-        return super().hydration_request
+        return super().value_request
 
 
 @dataclass(frozen=True)
@@ -155,7 +152,7 @@ class Compatibility(PrimitiveField):
     unhydrated: Optional[Union[str, Iterable[str]]] = None
 
     @memoized_property
-    def hydrated(self) -> Optional[List[str]]:
+    def value(self) -> Optional[List[str]]:
         if self.unhydrated is None:
             return None
         return ensure_str_list(self.unhydrated)
@@ -167,7 +164,7 @@ class Coverage(PrimitiveField):
     unhydrated: Optional[Union[str, Iterable[str]]] = None
 
     @memoized_property
-    def hydrated(self) -> Optional[List[str]]:
+    def value(self) -> Optional[List[str]]:
         if self.unhydrated is None:
             return None
         return ensure_str_list(self.unhydrated)
@@ -179,7 +176,7 @@ class Timeout(PrimitiveField):
     unhydrated: Optional[int] = None
 
     @memoized_property
-    def hydrated(self) -> Optional[int]:
+    def value(self) -> Optional[int]:
         if self.unhydrated is None:
             return None
         if not isinstance(self.unhydrated, int):
@@ -198,7 +195,7 @@ class EntryPoint(PrimitiveField):
     unhydrated: Optional[str] = None
 
     @memoized_property
-    def hydrated(self) -> Optional[str]:
+    def value(self) -> Optional[str]:
         return self.unhydrated
 
 
@@ -208,7 +205,7 @@ class ZipSafe(PrimitiveField):
     unhydrated: bool = True
 
     @memoized_property
-    def hydrated(self) -> bool:
+    def value(self) -> bool:
         return self.unhydrated
 
 
@@ -218,7 +215,7 @@ class AlwaysWriteCache(PrimitiveField):
     unhydrated: bool = False
 
     @memoized_property
-    def hydrated(self) -> bool:
+    def value(self) -> bool:
         return self.unhydrated
 
 
