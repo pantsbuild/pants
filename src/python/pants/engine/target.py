@@ -15,7 +15,7 @@ from pants.util.meta import frozen_after_init
 @dataclass(frozen=True)
 class Field(ABC):
     alias: ClassVar[str]
-    raw_value: Optional[Any] = None  # None indicates that the field was not explicitly defined
+    raw_value: Optional[Any]  # None indicates that the field was not explicitly defined
 
     def __repr__(self) -> str:
         return f"{self.__class__}(alias={repr(self.alias)}, raw_value={self.raw_value})"
@@ -33,13 +33,13 @@ class PrimitiveField(Field, metaclass=ABCMeta):
     @memoized_property
     @abstractmethod
     def value(self) -> Any:
-        """Get the underlying value.
+        """Get the field's value.
 
-        The value will possibly be first hydrated and/or validated, such as converting a field that
-        might be a single string or a list of strings to always being a list of strings.
+        The value will possibly be first hydrated and/or validated, such as using a default value
+        if the field was not defined or ensuring that an int value is positive.
 
         This property is memoized because hydration and validation can often be costly. This
-        hydration is lazy, i.e. will only happen when a downstream rule explicitly requests this
+        hydration is lazy, i.e. it will only happen when a downstream rule explicitly requests this
         field.
         """
 
@@ -114,16 +114,17 @@ class Target(ABC):
         )
 
         self.field_values = {}
+        aliases_to_fields = {field.alias: field for field in self.field_types}
         for alias, value in unhydrated_values.items():
-            field = next((field for field in self.field_types if field.alias == alias), None)
-            if field is None:
+            if alias not in aliases_to_fields:
                 raise ValueError(
                     f"Unrecognized field `{alias}={value}` for target type `{self.alias}`."
                 )
+            field = aliases_to_fields[alias]
             self.field_values[field] = field(value)
-        # For missing fields, call their default constructors.
+        # For undefined fields, mark the raw value as None.
         for field in set(self.field_types) - set(self.field_values.keys()):
-            self.field_values[field] = field()
+            self.field_values[field] = field(raw_value=None)
 
     @property
     def field_types(self) -> Tuple[Type[Field], ...]:
@@ -159,7 +160,7 @@ class Target(ABC):
 
 class Sources(AsyncField):
     alias: ClassVar = "sources"
-    raw_value: Optional[Iterable[str]] = None
+    raw_value: Optional[Iterable[str]]
 
     @memoized_property
     def value_request(self) -> Any:
@@ -176,7 +177,7 @@ class BinarySources(Sources):
 
 class Compatibility(PrimitiveField):
     alias: ClassVar = "compatibility"
-    raw_value: Optional[Union[str, Iterable[str]]] = None
+    raw_value: Optional[Union[str, Iterable[str]]]
 
     @memoized_property
     def value(self) -> Optional[List[str]]:
@@ -187,7 +188,7 @@ class Compatibility(PrimitiveField):
 
 class Coverage(PrimitiveField):
     alias: ClassVar = "coverage"
-    raw_value: Optional[Union[str, Iterable[str]]] = None
+    raw_value: Optional[Union[str, Iterable[str]]]
 
     @memoized_property
     def value(self) -> Optional[List[str]]:
@@ -198,7 +199,7 @@ class Coverage(PrimitiveField):
 
 class Timeout(PrimitiveField):
     alias: ClassVar = "timeout"
-    raw_value: Optional[int] = None
+    raw_value: Optional[int]
 
     @memoized_property
     def value(self) -> Optional[int]:
@@ -216,7 +217,7 @@ class Timeout(PrimitiveField):
 
 class EntryPoint(PrimitiveField):
     alias: ClassVar = "entry_point"
-    raw_value: Optional[str] = None
+    raw_value: Optional[str]
 
     @memoized_property
     def value(self) -> Optional[str]:
@@ -225,7 +226,7 @@ class EntryPoint(PrimitiveField):
 
 class ZipSafe(PrimitiveField):
     alias: ClassVar = "zip_safe"
-    raw_value: Optional[bool] = None
+    raw_value: Optional[bool]
 
     @memoized_property
     def value(self) -> bool:
@@ -236,7 +237,7 @@ class ZipSafe(PrimitiveField):
 
 class AlwaysWriteCache(PrimitiveField):
     alias: ClassVar = "always_write_cache"
-    raw_value: Optional[bool] = None
+    raw_value: Optional[bool]
 
     @memoized_property
     def value(self) -> bool:

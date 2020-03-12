@@ -14,7 +14,7 @@ from pants.util.ordered_set import OrderedSet
 
 class HaskellGhcExtensions(PrimitiveField):
     alias: ClassVar = "ghc_extensions"
-    raw_value: Optional[List[str]] = None
+    raw_value: Optional[List[str]]
 
     @memoized_property
     def value(self) -> List[str]:
@@ -62,7 +62,7 @@ def test_get_field() -> None:
 def test_has_fields() -> None:
     class UnrelatedField(PrimitiveField):
         alias: ClassVar = "unrelated"
-        raw_value: Optional[bool] = None
+        raw_value: Optional[bool]
 
         @memoized_property
         def value(self) -> bool:
@@ -93,7 +93,7 @@ def test_field_hydration_is_lazy() -> None:
 def test_add_custom_fields() -> None:
     class CustomField(PrimitiveField):
         alias: ClassVar = "custom_field"
-        raw_value: Optional[bool] = None
+        raw_value: Optional[bool]
 
         @memoized_property
         def value(self) -> bool:
