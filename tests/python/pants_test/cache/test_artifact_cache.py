@@ -36,10 +36,16 @@ class TestArtifactCache(TestBase):
         return super().subsystems + (RequestsSession.Factory,)
 
     @contextmanager
-    def setup_local_cache(self):
+    def setup_local_cache(self, seperate_extraction_root=False):
         with temporary_dir() as artifact_root:
-            with temporary_dir() as cache_root:
-                yield LocalArtifactCache(artifact_root, cache_root, compression=1)
+            with temporary_dir() as artifact_extraction_root:
+                with temporary_dir() as cache_root:
+                    extraction_root = (
+                        artifact_extraction_root if seperate_extraction_root else artifact_root
+                    )
+                    yield LocalArtifactCache(
+                        artifact_root, extraction_root, cache_root, compression=1
+                    )
 
     @contextmanager
     def setup_server(self, return_failed=False, cache_root=None):
@@ -49,7 +55,7 @@ class TestArtifactCache(TestBase):
     @contextmanager
     def setup_rest_cache(self, local=None, return_failed=False):
         with temporary_dir() as artifact_root:
-            local = local or TempLocalArtifactCache(artifact_root, 0)
+            local = local or TempLocalArtifactCache(artifact_root, artifact_root, 0)
             with self.setup_server(return_failed=return_failed) as server:
                 yield RESTfulArtifactCache(artifact_root, BestUrlSelector([server.url]), local)
 
@@ -89,6 +95,10 @@ class TestArtifactCache(TestBase):
         with self.setup_local_cache() as artifact_cache:
             self.do_test_artifact_cache(artifact_cache)
 
+    def test_local_cache_with_seperate_extraction_root(self):
+        with self.setup_local_cache(seperate_extraction_root=True) as artifact_cache:
+            self.do_test_artifact_cache(artifact_cache)
+
     @pytest.mark.flaky(retries=1)  # https://github.com/pantsbuild/pants/issues/6838
     def test_restful_cache(self):
         with self.assertRaises(InvalidRESTfulCacheProtoError):
@@ -102,7 +112,7 @@ class TestArtifactCache(TestBase):
         bad_url = "http://badhost:123"
 
         with temporary_dir() as artifact_root:
-            local = TempLocalArtifactCache(artifact_root, 0)
+            local = TempLocalArtifactCache(artifact_root, artifact_root, 0)
 
             # With fail-over, rest call second time will succeed
             with self.setup_server() as good_server:
@@ -134,7 +144,10 @@ class TestArtifactCache(TestBase):
             self.assertTrue(bool(artifact_cache.use_cached_files(key)))
 
             # Check that it was recovered correctly.
-            with open(path, "rb") as infile:
+            extracted_file_path = os.path.join(
+                artifact_cache.artifact_extraction_root, os.path.basename(path)
+            )
+            with open(extracted_file_path, "rb") as infile:
                 content = infile.read()
             self.assertEqual(content, TEST_CONTENT1)
 
@@ -146,7 +159,7 @@ class TestArtifactCache(TestBase):
         """make sure that the combined cache finds what it should and that it backfills."""
         with self.setup_server() as server:
             with self.setup_local_cache() as local:
-                tmp = TempLocalArtifactCache(local.artifact_root, 0)
+                tmp = TempLocalArtifactCache(local.artifact_root, local.artifact_extraction_root, 0)
                 remote = RESTfulArtifactCache(
                     local.artifact_root, BestUrlSelector([server.url]), tmp
                 )
@@ -194,7 +207,9 @@ class TestArtifactCache(TestBase):
         with temporary_dir() as remote_cache_dir:
             with self.setup_server(cache_root=remote_cache_dir) as server:
                 with self.setup_local_cache() as local:
-                    tmp = TempLocalArtifactCache(local.artifact_root, compression=1)
+                    tmp = TempLocalArtifactCache(
+                        local.artifact_root, local.artifact_extraction_root, compression=1
+                    )
                     remote = RESTfulArtifactCache(
                         local.artifact_root, BestUrlSelector([server.url]), tmp
                     )
