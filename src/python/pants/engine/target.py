@@ -3,11 +3,9 @@
 
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
-from typing import Any, ClassVar, Dict, Iterable, List, Optional, Tuple, Type, TypeVar, Union, cast
+from typing import Any, ClassVar, Dict, Iterable, Optional, Tuple, Type, TypeVar, cast
 
-from pants.engine.objects import union
 from pants.engine.rules import UnionMembership
-from pants.util.collections import ensure_str_list
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
 
@@ -193,123 +191,3 @@ class Target(ABC):
         #  (Is it possible to do that in a performant way, i.e. w/o having to iterate over every
         #  self.field_type (O(n) vs the current O(1))?)
         return all(field in self.field_types for field in fields)
-
-
-class Sources(AsyncField):
-    alias: ClassVar = "sources"
-    raw_value: Optional[Iterable[str]]
-
-
-class BinarySources(Sources):
-    @memoized_property
-    def value_request(self):
-        if self.raw_value is not None and len(list(self.raw_value)) not in [0, 1]:
-            raise ValueError("Binary targets must have only 0 or 1 source files.")
-        return super().value_request
-
-
-class Compatibility(PrimitiveField):
-    alias: ClassVar = "compatibility"
-    raw_value: Optional[Union[str, Iterable[str]]]
-
-    @memoized_property
-    def value(self) -> Optional[List[str]]:
-        if self.raw_value is None:
-            return None
-        return ensure_str_list(self.raw_value)
-
-
-class Coverage(PrimitiveField):
-    alias: ClassVar = "coverage"
-    raw_value: Optional[Union[str, Iterable[str]]]
-
-    @memoized_property
-    def value(self) -> Optional[List[str]]:
-        if self.raw_value is None:
-            return None
-        return ensure_str_list(self.raw_value)
-
-
-class Timeout(PrimitiveField):
-    alias: ClassVar = "timeout"
-    raw_value: Optional[int]
-
-    @memoized_property
-    def value(self) -> Optional[int]:
-        if self.raw_value is None:
-            return None
-        if not isinstance(self.raw_value, int):
-            raise ValueError(
-                f"The `timeout` field must be an `int`. Was {type(self.raw_value)} "
-                f"({self.raw_value})."
-            )
-        if self.raw_value <= 0:
-            raise ValueError(f"The `timeout` field must be > 1. Was {self.raw_value}.")
-        return self.raw_value
-
-
-class EntryPoint(PrimitiveField):
-    alias: ClassVar = "entry_point"
-    raw_value: Optional[str]
-
-    @memoized_property
-    def value(self) -> Optional[str]:
-        return self.raw_value
-
-
-class ZipSafe(PrimitiveField):
-    alias: ClassVar = "zip_safe"
-    raw_value: Optional[bool]
-
-    @memoized_property
-    def value(self) -> bool:
-        if self.raw_value is None:
-            return True
-        return self.raw_value
-
-
-class AlwaysWriteCache(PrimitiveField):
-    alias: ClassVar = "always_write_cache"
-    raw_value: Optional[bool]
-
-    @memoized_property
-    def value(self) -> bool:
-        if self.raw_value is None:
-            return False
-        return self.raw_value
-
-
-@union
-class PythonBinaryField(PluginField):
-    pass
-
-
-@union
-class PythonLibraryField(PluginField):
-    pass
-
-
-@union
-class PythonTestsField(PluginField):
-    pass
-
-
-PYTHON_TARGET_FIELDS = (Compatibility,)
-
-
-class PythonBinary(Target):
-    alias: ClassVar = "python_binary"
-    core_fields: ClassVar = (*PYTHON_TARGET_FIELDS, EntryPoint, ZipSafe, AlwaysWriteCache)
-    plugin_field_type: ClassVar = PythonBinaryField
-
-
-class PythonLibrary(Target):
-    alias: ClassVar = "python_library"
-    core_fields: ClassVar = PYTHON_TARGET_FIELDS
-    plugin_field_type: ClassVar = PythonLibraryField
-
-
-class PythonTests(Target):
-    alias: ClassVar = "python_tests"
-    core_fields: ClassVar = (*PYTHON_TARGET_FIELDS, Coverage, Timeout)
-    plugin_field_type: ClassVar = PythonTestsField
