@@ -428,16 +428,13 @@ class PexBuilderWrapper:
         self._builder.info.emit_warnings = emit_warnings
 
     def _set_major_minor_interpreter_constraint_for_ipex(
-        self,
-        info: PexInfo,
-        identity: PythonIdentity,
+        self, info: PexInfo, identity: PythonIdentity,
     ) -> PexInfo:
         interpreter_name = identity.requirement.name
         major, minor, _patch = identity.version
-        major_minor_only_constraint = f'{interpreter_name}=={major}.{minor}.*'
+        major_minor_only_constraint = f"{interpreter_name}=={major}.{minor}.*"
         return ipex_launcher.modify_pex_info(
-            info,
-            interpreter_constraints=[str(major_minor_only_constraint)]
+            info, interpreter_constraints=[str(major_minor_only_constraint)]
         )
 
     def _shuffle_underlying_pex_builder(self) -> Tuple[PexInfo, Path]:
@@ -446,8 +443,8 @@ class PexBuilderWrapper:
         # (the exact same interpreter we used to resolve those requirements here). This is the only (?)
         # way to ensure that the ipex bootstrap uses the *exact* same interpreter version.
         self._builder.info = self._set_major_minor_interpreter_constraint_for_ipex(
-            self._builder.info,
-            self._builder.interpreter.identity)
+            self._builder.info, self._builder.interpreter.identity
+        )
 
         orig_info = self._builder.info.copy()
 
@@ -456,8 +453,8 @@ class PexBuilderWrapper:
         # Mutate the PexBuilder object which is manipulated by this subsystem.
         self._builder = PEXBuilder(interpreter=self._builder.interpreter)
         self._builder.info = self._set_major_minor_interpreter_constraint_for_ipex(
-            self._builder.info,
-            self._builder.interpreter.identity)
+            self._builder.info, self._builder.interpreter.identity
+        )
 
         return (orig_info, Path(orig_chroot.path()))
 

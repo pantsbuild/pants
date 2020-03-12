@@ -23,6 +23,7 @@ python_library(
 
 python_tests(
   name='tests',
+  sources=['*_test.py', '!*_integration.py'],
   dependencies=[
     '3rdparty/python:pex',
     ':python',
@@ -34,4 +35,17 @@ python_tests(
     'src/python/pants/testutil:test_base',
   ],
   tags = {'partially_type_checked'},
+)
+
+
+python_tests(
+  name='integration',
+  sources=['*_integration.py'],
+  dependencies=[
+    '3rdparty/python:pex',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/testutil:int-test',
+    'testprojects/src/python:python_targets_directory',
+  ],
+  tags = {'integration', 'partially_type_checked'},
 )
