@@ -2,13 +2,16 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import functools
+import glob
 import os
+import subprocess
 from contextlib import contextmanager
 from textwrap import dedent
 
 from pex.pex_info import PexInfo
 
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
+from pants.util.collections import assert_single_element
 from pants.util.contextutil import open_zip, temporary_dir
 
 
@@ -117,58 +120,65 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
     )
 
   def platforms_test_impl(
-    self,
-    target_platforms,
-    config_platforms,
-    want_present_platforms,
-    want_missing_platforms=(),
+    self, target_platforms, config_platforms, want_present_platforms, want_missing_platforms=(),
   ):
-    def numpy_deps(deps):
-      return [d for d in deps if 'numpy' in d]
-    def assertInAny(substring, collection):
-      self.assertTrue(any(substring in d for d in collection),
-        f'Expected an entry matching "{substring}" in {collection}')
-    def assertNotInAny(substring, collection):
-      self.assertTrue(all(substring not in d for d in collection),
-        f'Expected an entry matching "{substring}" in {collection}')
+    def p537_deps(deps):
+      return [d for d in deps if "p537" in d]
 
-    test_project = 'testprojects/src/python/cache_fields'
-    test_build = os.path.join(test_project, 'BUILD')
-    test_src = os.path.join(test_project, 'main.py')
-    test_pex = 'dist/cache_fields.pex'
+    def assertInAny(substring, collection):
+      self.assertTrue(
+        any(substring in d for d in collection),
+        f'Expected an entry matching "{substring}" in {collection}',
+      )
+
+    def assertNotInAny(substring, collection):
+      self.assertTrue(
+        all(substring not in d for d in collection),
+        f'Expected an entry matching "{substring}" in {collection}',
+      )
+
+    test_project = "testprojects/src/python/cache_fields"
+    test_build = os.path.join(test_project, "BUILD")
+    test_src = os.path.join(test_project, "main.py")
+    test_pex = "dist/cache_fields.pex"
 
     with self.caching_config() as config, self.mock_buildroot() as buildroot, buildroot.pushd():
-      config['python-setup'] = {
-        'platforms': None
-      }
+      config["python-setup"] = {"platforms": []}
 
-      buildroot.write_file(test_src, '')
+      buildroot.write_file(test_src, "")
 
-      buildroot.write_file(test_build,
-        dedent("""
-        python_binary(
-          source='main.py',
-          dependencies=[':numpy'],
-          {target_platforms}
-        )
-        python_requirement_library(
-          name='numpy',
-          requirements=[
-            python_requirement('numpy==1.14.5')
-          ]
-        )
+      buildroot.write_file(
+        test_build,
+        dedent(
+          """
+          python_binary(
+           source='main.py',
+           dependencies=[':numpy'],
+           {target_platforms}
+          )
+          python_requirement_library(
+           name='numpy',
+           requirements=[
+            python_requirement('p537==1.0.4')
+           ]
+          )
 
-        """.format(
-          target_platforms="platforms = [{}],".format(", ".join(["'{}'".format(p) for p in target_platforms])) if target_platforms is not None else "",
-        ))
+          """.format(
+            target_platforms="platforms = [{}],".format(
+              ", ".join(["'{}'".format(p) for p in target_platforms])
+            )
+            if target_platforms is not None
+            else "",
+          )
+        ),
       )
       # When only the linux platform is requested,
       # only linux wheels should end up in the pex.
       if config_platforms is not None:
-        config['python-setup']['platforms'] = config_platforms
+        config["python-setup"]["platforms"] = config_platforms
       result = self.run_pants_with_workdir(
-        command=['binary', test_project],
-        workdir=os.path.join(buildroot.new_buildroot, '.pants.d'),
+        command=["binary", test_project],
+        workdir=os.path.join(buildroot.new_buildroot, ".pants.d"),
         config=config,
         build_root=buildroot.new_buildroot,
         tee_output=True,
@@ -176,24 +186,54 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(result)
 
       with open_zip(test_pex) as z:
-        deps = numpy_deps(z.namelist())
+        deps = p537_deps(z.namelist())
         for platform in want_present_platforms:
           assertInAny(platform, deps)
         for platform in want_missing_platforms:
           assertNotInAny(platform, deps)
 
   def test_platforms_with_native_deps(self):
-    result = self.run_pants([
-      'binary',
-      'testprojects/src/python/python_distribution/ctypes:bin',
-      'testprojects/src/python/python_distribution/ctypes:with_platforms',
-    ])
+    result = self.run_pants(
+      [
+        "binary",
+        "testprojects/src/python/python_distribution/ctypes:bin",
+        "testprojects/src/python/python_distribution/ctypes:with_platforms",
+      ]
+    )
     self.assert_failure(result)
-    self.assertIn(dedent("""\
-      Pants doesn't currently support cross-compiling native code.
-      The following targets set platforms arguments other than ['current'], which is unsupported for this reason.
-      Please either remove the platforms argument from these targets, or set them to exactly ['current'].
-      Bad targets:
-      testprojects/src/python/python_distribution/ctypes:with_platforms
-    """), result.stderr_data)
-    self.assertNotIn('testprojects/src/python/python_distribution/ctypes:bin', result.stderr_data)
+    self.assertIn(
+      dedent(
+        """\
+        Pants doesn't currently support cross-compiling native code.
+        The following targets set platforms arguments other than ['current'], which is unsupported for this reason.
+        Please either remove the platforms argument from these targets, or set them to exactly ['current'].
+        Bad targets:
+        testprojects/src/python/python_distribution/ctypes:with_platforms
+        """
+      ),
+      result.stderr_data,
+    )
+    self.assertNotIn(
+      "testprojects/src/python/python_distribution/ctypes:bin", result.stderr_data
+    )
+
+  def test_generate_ipex_tensorflow(self):
+    with temporary_dir() as tmp_distdir:
+      with self.pants_results(
+        [
+          f"--pants-distdir={tmp_distdir}",
+          # tensorflow==1.14.0 has a setuptools>=41.0.0 requirement, so the .ipex resolve fails
+          # without this override.
+          f"--pex-builder-wrapper-setuptools-version=41.0.0",
+          "--binary-py-generate-ipex",
+          "binary",
+          "examples/src/python/example/tensorflow_custom_op:show-tf-version",
+        ]
+      ) as pants_run:
+        self.assert_success(pants_run)
+        output_ipex = assert_single_element(glob.glob(os.path.join(tmp_distdir, "*")))
+        ipex_basename = os.path.basename(output_ipex)
+        self.assertEqual(ipex_basename, "show-tf-version.ipex")
+
+        pex_execution_output = subprocess.check_output([output_ipex])
+        assert "tf version: 1.14.0" in pex_execution_output.decode()

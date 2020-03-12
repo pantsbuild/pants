@@ -12,7 +12,7 @@ from pex.pex_builder import PEXBuilder
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_requirement import PythonRequirement
-from pants.backend.python.subsystems.pex_build_util import PexBuilderWrapper
+from pants.python.pex_build_util import PexBuilderWrapper
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.base.build_environment import get_pants_cachedir
 from pants.base.exceptions import TaskError

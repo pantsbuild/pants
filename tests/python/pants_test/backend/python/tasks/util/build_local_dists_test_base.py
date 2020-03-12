@@ -13,7 +13,7 @@ from pants.backend.python.tasks.build_local_python_distributions import (
 )
 from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks.select_interpreter import SelectInterpreter
-from pants.python.python_repos import PythonRepos
+from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.testutil.task_test_base import DeclarativeTaskTestMixin
 from pants.util.collections import assert_single_element
 from pants.util.enums import match

@@ -7,7 +7,7 @@ from pathlib import Path
 
 from pants.backend.codegen.grpcio.python.grpcio_prep import GrpcioPrep
 from pants.backend.codegen.grpcio.python.python_grpcio_library import PythonGrpcioLibrary
-from pants.backend.python.subsystems.pex_build_util import identify_missing_init_files
+from pants.python.pex_build_util import identify_missing_init_files
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
