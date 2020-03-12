@@ -46,6 +46,37 @@ def test_invalid_fields_rejected() -> None:
     assert "Unrecognized field `invalid_field=True` for target type `haskell`." in str(exc)
 
 
+def test_get_field() -> None:
+    extensions = ["GhcExistentialQuantification"]
+    extensions_field = HaskellTarget({HaskellGhcExtensions.alias: extensions}).get(
+        HaskellGhcExtensions
+    )
+    assert extensions_field.raw_value == extensions
+    assert extensions_field.value == extensions
+
+    default_extensions_field = HaskellTarget({}).get(HaskellGhcExtensions)
+    assert default_extensions_field.raw_value is None
+    assert default_extensions_field.value == []
+
+
+def test_has_fields() -> None:
+    class UnrelatedField(PrimitiveField):
+        alias: ClassVar = "unrelated"
+        raw_value: Optional[bool] = None
+
+        @memoized_property
+        def value(self) -> bool:
+            if self.raw_value is None:
+                return False
+            return self.raw_value
+
+    tgt = HaskellTarget({})
+    assert tgt.has_fields([]) is True
+    assert tgt.has_fields([HaskellGhcExtensions]) is True
+    assert tgt.has_fields([UnrelatedField]) is False
+    assert tgt.has_fields([HaskellGhcExtensions, UnrelatedField]) is False
+
+
 def test_field_hydration_is_lazy() -> None:
     bad_extension = "DoesNotStartWithGhc"
     # No error upon creating the Target because validation does not happen until a call site

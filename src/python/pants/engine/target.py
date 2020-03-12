@@ -147,6 +147,15 @@ class Target(ABC):
     def get(self, field: Type[_F]) -> _F:
         return cast(_F, self.field_values[field])
 
+    def has_fields(self, fields: Iterable[Type[Field]]) -> bool:
+        # TODO: consider if this should support subclasses. For example, if a target has a
+        #  field PythonSources(Sources), then .has_fields(Sources) should still return True. Why?
+        #  This allows overriding how fields behave for custom target types, e.g. a `python3_library`
+        #  subclassing the Field Compatibility with its own custom implementation. When adding
+        #  this, be sure to update `.get()` to allow looking up by subclass, too. (Is it possible
+        #  to do that in a performant way?)
+        return all(field in self.field_types for field in fields)
+
 
 class Sources(AsyncField):
     alias: ClassVar = "sources"
