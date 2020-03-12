@@ -149,17 +149,17 @@ class Target(ABC):
         )
 
         self.field_values = {}
-        aliases_to_fields = {field.alias: field for field in self.field_types}
+        aliases_to_field_types = {field_type.alias: field_type for field_type in self.field_types}
         for alias, value in unhydrated_values.items():
-            if alias not in aliases_to_fields:
+            if alias not in aliases_to_field_types:
                 raise ValueError(
                     f"Unrecognized field `{alias}={value}` for target type `{self.alias}`."
                 )
-            field = aliases_to_fields[alias]
-            self.field_values[field] = field(value)
+            field_type = aliases_to_field_types[alias]
+            self.field_values[field_type] = field_type(value)
         # For undefined fields, mark the raw value as None.
-        for field in set(self.field_types) - set(self.field_values.keys()):
-            self.field_values[field] = field(raw_value=None)
+        for field_type in set(self.field_types) - set(self.field_values.keys()):
+            self.field_values[field_type] = field_type(raw_value=None)
 
     @property
     def field_types(self) -> Tuple[Type[Field], ...]:
