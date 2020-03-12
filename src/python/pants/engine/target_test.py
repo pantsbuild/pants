@@ -42,16 +42,6 @@ class HaskellSources(AsyncField):
     alias: ClassVar = "sources"
     raw_value: Optional[List[str]]
 
-    def validate_pre_hydration(self) -> None:
-        ensure_str_list(self.raw_value)
-
-    def validate_post_hydration(self, result: Snapshot) -> None:
-        non_haskell_sources = [fp for fp in result.files if PurePath(fp).suffix != ".hs"]
-        if non_haskell_sources:
-            raise ValueError(
-                f"Received non-Haskell sources in {self.alias}: {non_haskell_sources}."
-            )
-
 
 @dataclass(frozen=True)
 class HaskellSourcesResult:
@@ -60,9 +50,13 @@ class HaskellSourcesResult:
 
 @rule
 async def hydrate_haskell_sources(sources: HaskellSources) -> HaskellSourcesResult:
-    sources.validate_pre_hydration()
-    result = await Get[Snapshot](PathGlobs("*.hs"))
-    sources.validate_post_hydration(result)
+    # Validate before hydration
+    ensure_str_list(sources.raw_value)
+    result = await Get[Snapshot](PathGlobs(sources.raw_value))
+    # Validate after hydration
+    non_haskell_sources = [fp for fp in result.files if PurePath(fp).suffix != ".hs"]
+    if non_haskell_sources:
+        raise ValueError(f"Received non-Haskell sources in {sources.alias}: {non_haskell_sources}.")
     return HaskellSourcesResult(result)
 
 

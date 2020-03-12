@@ -60,9 +60,11 @@ class AsyncField(Field, metaclass=ABCMeta):
 
         @rule
         def hydrate_sources(sources: Sources) -> SourcesResult:
-            sources.validate_pre_hydration()
+            # possibly validate `sources.raw_value`
+            ...
             result = await Get[Snapshot](PathGlobs(sources.raw_value))
-            sources.validate_post_hydration(result)
+            # possibly validate `result`
+            ...
             return SourcesResult(result)
 
 
@@ -73,22 +75,6 @@ class AsyncField(Field, metaclass=ABCMeta):
 
         sources = await Get[SourcesResult](Sources, my_tgt.get(Sources))
     """
-
-    def validate_pre_hydration(self) -> None:
-        """Any validation that can be done on the original `raw_value`.
-
-        It is cheaper to do any possible validation here, rather than in `validate_post_hydration`,
-        because we can short-circuit if an invariant is violated before incurring the expense of
-        hydration.
-        """
-
-    def validate_post_hydration(self, result: Any) -> None:
-        """Any validation that must be done after hydration by inspecting the result of that
-        hydration.
-
-        For example, a `PythonSources` field may validate that all hydrated source files end in
-        `.py`.
-        """
 
 
 _F = TypeVar("_F", bound=Field)
