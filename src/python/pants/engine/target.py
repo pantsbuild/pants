@@ -15,15 +15,20 @@ from pants.util.meta import frozen_after_init
 @dataclass(frozen=True)
 class Field(ABC):
     alias: ClassVar[str]
-    unhydrated: Any
+    raw_value: Optional[Any] = None  # None indicates that the field was not explicitly defined
+
+    def __repr__(self) -> str:
+        return f"{self.__class__}(alias={repr(self.alias)}, raw_value={self.raw_value})"
 
 
-@dataclass(frozen=True)  # type: ignore[misc]   # https://github.com/python/mypy/issues/5374
 class PrimitiveField(Field, metaclass=ABCMeta):
     """A Field that does not need the engine in order to be hydrated.
 
     This should be subclassed by the majority of fields.
     """
+
+    def __str__(self) -> str:
+        return f"{self.alias}={self.value}"
 
     @memoized_property
     @abstractmethod
@@ -39,7 +44,6 @@ class PrimitiveField(Field, metaclass=ABCMeta):
         """
 
 
-@dataclass(frozen=True)  # type: ignore[misc]   # https://github.com/python/mypy/issues/5374
 class AsyncField(Field, metaclass=ABCMeta):
     """A field that needs the engine in order to be hydrated."""
 
@@ -92,7 +96,6 @@ class Target(ABC):
 
     # These get calculated in the constructor
     plugin_fields: Tuple[Type[Field], ...]
-    field_types: Tuple[Type[Field], ...]
     field_values: Dict[Type[Field], Any]
 
     def __init__(
@@ -109,7 +112,6 @@ class Target(ABC):
                 else tuple(union_membership.union_rules.get(self.plugin_field_type, ()))
             ),
         )
-        self.field_types = (*self.core_fields, *self.plugin_fields)
 
         self.field_values = {}
         for alias, value in unhydrated_values.items():
@@ -121,102 +123,117 @@ class Target(ABC):
             self.field_values[field] = field(value)
         # For missing fields, call their default constructors.
         for field in set(self.field_types) - set(self.field_values.keys()):
-            self.field_values[field] = field()  # type: ignore[call-arg]
+            self.field_values[field] = field()
+
+    @property
+    def field_types(self) -> Tuple[Type[Field], ...]:
+        return (*self.core_fields, *self.plugin_fields)
+
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__}("
+            f"alias={repr(self.alias)}, "
+            f"plugin_field_type={self.plugin_field_type}, "
+            f"core_fields={list(self.core_fields)}, "
+            f"plugin_fields={list(self.plugin_fields)}, "
+            f"raw_field_values={list(self.field_values.values())}"
+            f")"
+        )
+
+    def __str__(self) -> str:
+        fields = ", ".join(str(field) for field in self.field_values.values())
+        return f"{self.alias}({fields})"
 
     def get(self, field: Type[_F]) -> _F:
         return cast(_F, self.field_values[field])
 
 
-@dataclass(frozen=True)
 class Sources(AsyncField):
     alias: ClassVar = "sources"
-    unhydrated: Optional[Iterable[str]] = None
+    raw_value: Optional[Iterable[str]] = None
 
     @memoized_property
     def value_request(self) -> Any:
-        return self.unhydrated
+        return self.raw_value
 
 
-@dataclass(frozen=True)
 class BinarySources(Sources):
     @memoized_property
     def value_request(self):
-        if self.unhydrated is not None and len(list(self.unhydrated)) not in [0, 1]:
+        if self.raw_value is not None and len(list(self.raw_value)) not in [0, 1]:
             raise ValueError("Binary targets must have only 0 or 1 source files.")
         return super().value_request
 
 
-@dataclass(frozen=True)
 class Compatibility(PrimitiveField):
     alias: ClassVar = "compatibility"
-    unhydrated: Optional[Union[str, Iterable[str]]] = None
+    raw_value: Optional[Union[str, Iterable[str]]] = None
 
     @memoized_property
     def value(self) -> Optional[List[str]]:
-        if self.unhydrated is None:
+        if self.raw_value is None:
             return None
-        return ensure_str_list(self.unhydrated)
+        return ensure_str_list(self.raw_value)
 
 
-@dataclass(frozen=True)
 class Coverage(PrimitiveField):
     alias: ClassVar = "coverage"
-    unhydrated: Optional[Union[str, Iterable[str]]] = None
+    raw_value: Optional[Union[str, Iterable[str]]] = None
 
     @memoized_property
     def value(self) -> Optional[List[str]]:
-        if self.unhydrated is None:
+        if self.raw_value is None:
             return None
-        return ensure_str_list(self.unhydrated)
+        return ensure_str_list(self.raw_value)
 
 
-@dataclass(frozen=True)
 class Timeout(PrimitiveField):
     alias: ClassVar = "timeout"
-    unhydrated: Optional[int] = None
+    raw_value: Optional[int] = None
 
     @memoized_property
     def value(self) -> Optional[int]:
-        if self.unhydrated is None:
+        if self.raw_value is None:
             return None
-        if not isinstance(self.unhydrated, int):
+        if not isinstance(self.raw_value, int):
             raise ValueError(
-                f"The `timeout` field must be an `int`. Was {type(self.unhydrated)} "
-                f"({self.unhydrated})."
+                f"The `timeout` field must be an `int`. Was {type(self.raw_value)} "
+                f"({self.raw_value})."
             )
-        if self.unhydrated <= 0:
-            raise ValueError(f"The `timeout` field must be > 1. Was {self.unhydrated}.")
-        return self.unhydrated
+        if self.raw_value <= 0:
+            raise ValueError(f"The `timeout` field must be > 1. Was {self.raw_value}.")
+        return self.raw_value
 
 
-@dataclass(frozen=True)
 class EntryPoint(PrimitiveField):
     alias: ClassVar = "entry_point"
-    unhydrated: Optional[str] = None
+    raw_value: Optional[str] = None
 
     @memoized_property
     def value(self) -> Optional[str]:
-        return self.unhydrated
+        return self.raw_value
 
 
-@dataclass(frozen=True)
 class ZipSafe(PrimitiveField):
     alias: ClassVar = "zip_safe"
-    unhydrated: bool = True
+    raw_value: Optional[bool] = None
 
     @memoized_property
     def value(self) -> bool:
-        return self.unhydrated
+        if self.raw_value is None:
+            return True
+        return self.raw_value
 
 
-@dataclass(frozen=True)
 class AlwaysWriteCache(PrimitiveField):
     alias: ClassVar = "always_write_cache"
-    unhydrated: bool = False
+    raw_value: Optional[bool] = None
 
     @memoized_property
     def value(self) -> bool:
-        return self.unhydrated
+        if self.raw_value is None:
+            return False
+        return self.raw_value
 
 
 @union
@@ -240,16 +257,16 @@ PYTHON_TARGET_FIELDS = (Compatibility,)
 class PythonBinary(Target):
     alias: ClassVar = "python_binary"
     core_fields: ClassVar = (*PYTHON_TARGET_FIELDS, EntryPoint, ZipSafe, AlwaysWriteCache)
-    plugin_field_type = PythonBinaryField
+    plugin_field_type: ClassVar = PythonBinaryField
 
 
 class PythonLibrary(Target):
     alias: ClassVar = "python_library"
     core_fields: ClassVar = PYTHON_TARGET_FIELDS
-    plugin_field_type = PythonLibraryField
+    plugin_field_type: ClassVar = PythonLibraryField
 
 
 class PythonTests(Target):
     alias: ClassVar = "python_tests"
     core_fields: ClassVar = (*PYTHON_TARGET_FIELDS, Coverage, Timeout)
-    plugin_field_type = PythonTestsField
+    plugin_field_type: ClassVar = PythonTestsField

@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from collections import OrderedDict
-from dataclasses import dataclass
 from typing import ClassVar, List, Optional
 
 import pytest
@@ -13,21 +12,22 @@ from pants.util.memo import memoized_property
 from pants.util.ordered_set import OrderedSet
 
 
-@dataclass(frozen=True)
 class HaskellGhcExtensions(PrimitiveField):
     alias: ClassVar = "ghc_extensions"
-    unhydrated: Optional[List[str]] = None
+    raw_value: Optional[List[str]] = None
 
     @memoized_property
     def value(self) -> List[str]:
         # Add some arbitrary validation to test that hydration works properly.
-        for extension in self.unhydrated:
+        if self.raw_value is None:
+            return []
+        for extension in self.raw_value:
             if not extension.startswith("Ghc"):
                 raise ValueError(
                     f"All elements of `ghc_extensions` must be prefixed by `Ghc`. Received "
                     f"{extension}"
                 )
-        return self.unhydrated
+        return self.raw_value
 
 
 class HaskellField(PluginField):
@@ -60,14 +60,15 @@ def test_field_hydration_is_lazy() -> None:
 
 
 def test_add_custom_fields() -> None:
-    @dataclass(frozen=True)
     class CustomField(PrimitiveField):
         alias: ClassVar = "custom_field"
-        unhydrated: bool = False
+        raw_value: Optional[bool] = None
 
         @memoized_property
         def value(self) -> bool:
-            return self.unhydrated
+            if self.raw_value is None:
+                return False
+            return self.raw_value
 
     union_membership = UnionMembership(OrderedDict({HaskellField: OrderedSet([CustomField])}))
     tgt = HaskellTarget({CustomField.alias: True}, union_membership=union_membership)
