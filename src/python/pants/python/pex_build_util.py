@@ -8,8 +8,8 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Sequence, Set, Tuple
 
-from pex.fetcher import PyPIFetcher, Fetcher
-from pex.interpreter import PythonInterpreter
+from pex.fetcher import Fetcher, PyPIFetcher
+from pex.interpreter import PythonIdentity, PythonInterpreter
 from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
 from pex.platforms import Platform
@@ -30,9 +30,9 @@ from pants.base.exceptions import TaskError
 from pants.build_graph.files import Files
 from pants.build_graph.target import Target
 from pants.option.custom_types import UnsetBool
-from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.subsystems.python_setup import PythonSetup
+from pants.python.python_repos import PythonRepos
 from pants.subsystem.subsystem import Subsystem
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_file
@@ -293,8 +293,8 @@ class PexBuilderWrapper:
             )
           else:
             self._log.debug(
-              f"  Dumping distribution: .../{os.path.basename(dist.location)}"
-            )
+              f"  Dumping distribution: .../{os.path.basename(dist.location)}")
+
             self.add_distribution(dist)
         locations.add(dist.location)
     # In addition to the top-level requirements, we add all the requirements matching the resolved
@@ -435,15 +435,27 @@ class PexBuilderWrapper:
   def set_emit_warnings(self, emit_warnings):
     self._builder.info.emit_warnings = emit_warnings
 
+  def _set_major_minor_interpreter_constraint_for_ipex(
+    self,
+    info: PexInfo,
+    identity: PythonIdentity,
+  ) -> PexInfo:
+    interpreter_name = identity.requirement.name
+    major, minor, _patch = identity.version
+    major_minor_only_constraint = f'{interpreter_name}=={major}.{minor}.*'
+    return ipex_launcher.modify_pex_info(
+      info,
+      interpreter_constraints=[str(major_minor_only_constraint)]
+    )
+
   def _shuffle_underlying_pex_builder(self) -> Tuple[PexInfo, Path]:
     """Replace the original builder with a new one, and just pull files from the old chroot."""
     # Ensure that (the interpreter selected to resolve requirements when the ipex is first run) is
     # (the exact same interpreter we used to resolve those requirements here). This is the only (?)
     # way to ensure that the ipex bootstrap uses the *exact* same interpreter version.
-    self._builder.info = ipex_launcher.modify_pex_info(
+    self._builder.info = self._set_major_minor_interpreter_constraint_for_ipex(
       self._builder.info,
-      interpreter_constraints=[str(self._builder.interpreter.identity.requirement)],
-    )
+      self._builder.interpreter.identity)
 
     orig_info = self._builder.info.copy()
 
@@ -451,6 +463,9 @@ class PexBuilderWrapper:
 
     # Mutate the PexBuilder object which is manipulated by this subsystem.
     self._builder = PEXBuilder(interpreter=self._builder.interpreter)
+    self._builder.info = self._set_major_minor_interpreter_constraint_for_ipex(
+      self._builder.info,
+      self._builder.interpreter.identity)
 
     return (orig_info, Path(orig_chroot.path()))
 
