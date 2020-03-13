@@ -1,7 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.python.rules.python_test_runner import calculate_timeout_seconds
+from pants.backend.python.rules.pytest_runner import calculate_timeout_seconds
 
 
 def test_configured_timeout_greater_than_max():
