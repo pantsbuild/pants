@@ -45,9 +45,9 @@ class ScoveragePlatform(InjectablesMixin, Subsystem):
 
   def scoverage_jar(self):
     return [JarDependency(org='com.twitter.scoverage', name='scalac-scoverage-plugin_2.12',
-      rev='1.0.1-twitter'),
+      rev='1.0.2-twitter'),
       JarDependency(org='com.twitter.scoverage', name='scalac-scoverage-runtime_2.12',
-        rev='1.0.1-twitter')]
+        rev='1.0.2-twitter')]
 
   def injectables(self, build_graph):
     specs_to_create = [
