@@ -27,7 +27,12 @@ from pants.engine.fs import Digest, DirectoriesToMerge, InputFilesContent
 from pants.engine.interactive_runner import InteractiveProcessRequest
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
-from pants.engine.legacy.structs import PythonTestsAdaptorWithOrigin, TargetAdaptorWithOrigin
+from pants.engine.legacy.structs import (
+    PythonTargetAdaptor,
+    PythonTestsAdaptorWithOrigin,
+    ResourcesAdaptor,
+    TargetAdaptorWithOrigin,
+)
 from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.global_options import GlobalOptions
@@ -156,7 +161,13 @@ async def setup_pytest_for_target(
         ),
     )
 
-    chrooted_sources = await Get[ChrootedPythonSources](HydratedTargets(all_targets))
+    # TODO: Replace this with appropriate target API logic.
+    python_targets = [t for t in all_targets if isinstance(t.adaptor, PythonTargetAdaptor)]
+    resource_targets = [t for t in all_targets if isinstance(t.adaptor, ResourcesAdaptor)]
+
+    chrooted_sources = await Get[ChrootedPythonSources](
+        HydratedTargets(python_targets + resource_targets)
+    )
     directories_to_merge = [
         chrooted_sources.snapshot.directory_digest,
         requirements_pex.directory_digest,
@@ -174,7 +185,7 @@ async def setup_pytest_for_target(
     coverage_args = []
     if run_coverage:
         coveragerc = await Get[Coveragerc](
-            CoveragercRequest(HydratedTargets(all_targets), test_time=True)
+            CoveragercRequest(HydratedTargets(python_targets), test_time=True)
         )
         directories_to_merge.append(coveragerc.digest)
         packages_to_cover = get_packages_to_cover(
