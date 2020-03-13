@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import errno
+import json
 import logging
 import os
 import re
@@ -127,6 +128,7 @@ class BaseZincCompile(JvmCompile):
             "-C-Xlint:all",
             "-C-Xlint:-serial",
             "-C-Xlint:-path",
+            "-C-Xlint:unchecked",
             "-S-deprecation",
             "-S-unchecked",
             "-S-Xlint",
@@ -352,6 +354,9 @@ class BaseZincCompile(JvmCompile):
         # TODO: Support workdirs not nested under buildroot by path-rewriting.
         return fast_relpath(path, get_buildroot())
 
+    def _diagnostics_out(self, ctx):
+        return self.relative_to_exec_root(ctx.diagnostics_out)
+
     def create_zinc_args(
         self,
         ctx,
@@ -367,7 +372,6 @@ class BaseZincCompile(JvmCompile):
         analysis_cache = self.relative_to_exec_root(ctx.analysis_file)
         classes_dir = self.relative_to_exec_root(ctx.classes_dir.path)
         jar_file = self.relative_to_exec_root(ctx.jar_file.path)
-        diagnostics_out = self.relative_to_exec_root(ctx.diagnostics_out)
         # TODO: Have these produced correctly, rather than having to relativize them here
         relative_classpath = tuple(self.relative_to_exec_root(c) for c in absolute_classpath)
 
@@ -391,7 +395,7 @@ class BaseZincCompile(JvmCompile):
                 "-jar",
                 jar_file,
                 "-diag",
-                diagnostics_out,
+                self._diagnostics_out(ctx),
             ]
         )
         if not self.get_options().colors:
@@ -540,6 +544,38 @@ class BaseZincCompile(JvmCompile):
                 ),
             },
         )()
+
+    def always_do_after_compile(self, ctx):
+        self._pass_diagnostics_to_buildstats(ctx)
+
+    def _aggregate_diagnostics(self, lsp_data):
+        # Note: this is not arbitrary. It is exactly every value that the LSP's DiagnosticSeverity allows.
+        # See https://microsoft.github.io/language-server-protocol/specification#diagnostic
+        counts = {
+            "Error": 0,
+            "Warning": 0,
+            "Information": 0,
+            "Hint": 0,
+        }
+        for published_diagnostics in lsp_data:
+            for diagnostic in published_diagnostics["diagnostics"]:
+                severity = diagnostic["severity"]
+                counts[severity] += 1
+        return counts
+
+    def _pass_diagnostics_to_buildstats(self, ctx):
+        diagnostics_file = self._diagnostics_out(ctx)
+        if not os.path.exists(diagnostics_file):
+            return
+        with open(diagnostics_file) as json_diagnostics:
+            data = json.load(json_diagnostics)
+            counts = self._aggregate_diagnostics(data)
+            self.context.log.debug(f"Reporting number of diagnostics for: {ctx.target}")
+            for (severity, count) in counts.items():
+                self.context.log.debug(f"    {severity}: {count}")
+                self.context.run_tracker.report_target_info(
+                    self.options_scope, ctx.target, ["n_diagnostics", severity], count
+                )
 
     class ZincCompileError(TaskError):
         """An exception type specifically to signal a failed zinc execution."""
