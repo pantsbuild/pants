@@ -226,7 +226,7 @@ object Main {
     file.getAbsoluteFile().toPath().toUri()
   }
   def toLsp(problems: List[Problem],
-            workingDirectory: File): Iterable[PublishDiagnosticsParams] = {
+            workingDirectory: File): Array[PublishDiagnosticsParams] = {
     import scala.tools.nsc.io.Path._
     problems
       .groupBy(problem => problem.position.sourcePath)
@@ -263,7 +263,7 @@ object Main {
               })
           new PublishDiagnosticsParams(uri, diagnostics.asJava)
         }
-      }
+      }.toArray
   }
 
   def dumpDiagnostics(diagnosticsFile: File,
