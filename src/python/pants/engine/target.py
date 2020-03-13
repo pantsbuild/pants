@@ -148,24 +148,21 @@ class Target(ABC):
         fields = ", ".join(str(field) for field in self.field_values.values())
         return f"{self.alias}({fields})"
 
-    def _find_registered_field_subclass(self, parent_field: Type[_F]) -> Optional[Type[_F]]:
-        """Check if a subclass of the requested Field is registered on this Target.
+    def _find_registered_field_subclass(self, requested_field: Type[_F]) -> Optional[Type[_F]]:
+        """Check if the Target has registered a subclass of the requested Field.
 
         This is necessary to allow targets to override the functionality of common fields like
         `Sources`. For example, Python targets may want to have `PythonSources` to add extra
-        validation that every source file ends in `*.py`. At the same time, we still want to be
-        able to call `my_python_tgt.get(Sources)`, in addition to
-        `my_python_tgt.get(PythonSources)`.
+        validation that every source file ends in `*.py`. At the same time, we still want to be able
+        to call `my_python_tgt.get(Sources)`, in addition to `my_python_tgt.get(PythonSources)`.
         """
-        subclass = (
-            next(
-                (
-                    registered_field
-                    for registered_field in self.field_types
-                    if issubclass(registered_field, parent_field)
-                ),
-                None,
+        subclass = next(
+            (
+                registered_field
+                for registered_field in self.field_types
+                if issubclass(registered_field, requested_field)
             ),
+            None,
         )
         return cast(Optional[Type[_F]], subclass)
 
