@@ -608,6 +608,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
     def create_library(
         self,
+        *,
         path: str,
         target_type: str,
         name: str,
@@ -666,7 +667,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         """
         :API: public
         """
-        return self.create_library(path, "resources", name, sources)
+        return self.create_library(path=path, target_type="resources", name=name, sources=sources,)
 
     def assertUnorderedPrefixEqual(self, expected, actual_iter):
         """Consumes len(expected) items from the given iter, and asserts that they match, unordered.

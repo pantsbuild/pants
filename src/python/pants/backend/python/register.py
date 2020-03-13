@@ -44,11 +44,16 @@ from pants.backend.python.tasks.unpack_wheels import UnpackWheels
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.resources import Resources
 from pants.goal.task_registrar import TaskRegistrar as task
+from pants.python.pex_build_util import PexBuilderWrapper
 from pants.python.python_requirement import PythonRequirement
 
 
 def global_subsystems():
-    return python_native_code.PythonNativeCode, subprocess_environment.SubprocessEnvironment
+    return {
+        python_native_code.PythonNativeCode,
+        subprocess_environment.SubprocessEnvironment,
+        PexBuilderWrapper.Factory,
+    }
 
 
 def build_file_aliases():
@@ -72,6 +77,13 @@ def build_file_aliases():
             "python_requirements": PythonRequirements,
             PantsRequirement.alias: PantsRequirement,
         },
+    )
+
+
+def build_file_aliases2():
+    return BuildFileAliases(
+        objects={"python_requirement": PythonRequirement, "setup_py": PythonArtifact,},
+        context_aware_object_factories={"python_requirements": PythonRequirements,},
     )
 
 
