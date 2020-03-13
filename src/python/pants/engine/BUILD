@@ -16,6 +16,7 @@ python_tests(
     ':goal',
     ':platform',
     ':rules',
+    ':target',
     'src/python/pants/testutil:test_base',
     'src/python/pants/testutil/engine:util',
   ],
@@ -259,6 +260,18 @@ python_library(
     '3rdparty/python:ansicolors',
   ],
   tags = {'partially_type_checked'},
+)
+
+python_library(
+  name='target',
+  sources=['target.py'],
+  dependencies=[
+    ':rules',
+    'src/python/pants/util:collections',
+    'src/python/pants/util:meta',
+    'src/python/pants/util:memo',
+  ],
+  tags = {'type_checked'},
 )
 
 resources(
