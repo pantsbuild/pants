@@ -86,13 +86,7 @@ _F = TypeVar("_F", bound=Field)
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class Target(ABC):
-    """A Target represents a combination of fields that are valid _together_.
-
-    Plugin authors may add additional fields to pre-existing target types by simply registering
-    UnionRules between the `Target` type and the custom field, e.g. `UnionRule(PythonLibrary,
-    TypeChecked)`. The `Target` will then treat `TypeChecked` as a first-class citizen and plugins
-    can use that Field like any other Field.
-    """
+    """A Target represents a combination of fields that are valid _together_."""
 
     # Subclasses must define these
     alias: ClassVar[str]
@@ -113,7 +107,7 @@ class Target(ABC):
             (
                 ()
                 if union_membership is None
-                else tuple(union_membership.union_rules.get(self.__class__, ()))
+                else tuple(union_membership.union_rules.get(self.PluginField, ()))
             ),
         )
 
@@ -133,6 +127,15 @@ class Target(ABC):
     @property
     def field_types(self) -> Tuple[Type[Field], ...]:
         return (*self.core_fields, *self.plugin_fields)
+
+    class PluginField:
+        """A sentinel class to allow plugin authors to add additional fields to this target type.
+
+        Plugin authors may add additional fields by simply registering UnionRules between the
+        `Target.PluginField` and the custom field, e.g. `UnionRule(PythonLibrary.PluginField,
+        TypeChecked)`. The `Target` will then treat `TypeChecked` as a first-class citizen and
+        plugins can use that Field like any other Field.
+        """
 
     def __repr__(self) -> str:
         return (
