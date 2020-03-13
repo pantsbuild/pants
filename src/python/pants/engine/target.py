@@ -76,6 +76,9 @@ class AsyncField(Field, metaclass=ABCMeta):
         sources = await Get[SourcesResult](Sources, my_tgt.get(Sources))
     """
 
+    def __str__(self) -> str:
+        return f"{self.alias}={repr(self.raw_value)}"
+
 
 _F = TypeVar("_F", bound=Field)
 
@@ -97,7 +100,7 @@ class Target(ABC):
 
     # These get calculated in the constructor
     plugin_fields: Tuple[Type[Field], ...]
-    field_values: Dict[Type[Field], Any]
+    field_values: Dict[Type[Field], Field]
 
     def __init__(
         self,
@@ -145,15 +148,42 @@ class Target(ABC):
         fields = ", ".join(str(field) for field in self.field_values.values())
         return f"{self.alias}({fields})"
 
+    def _find_registered_field_subclass(self, requested_field: Type[_F]) -> Optional[Type[_F]]:
+        """Check if the Target has registered a subclass of the requested Field.
+
+        This is necessary to allow targets to override the functionality of common fields like
+        `Sources`. For example, Python targets may want to have `PythonSources` to add extra
+        validation that every source file ends in `*.py`. At the same time, we still want to be able
+        to call `my_python_tgt.get(Sources)`, in addition to `my_python_tgt.get(PythonSources)`.
+        """
+        subclass = next(
+            (
+                registered_field
+                for registered_field in self.field_types
+                if issubclass(registered_field, requested_field)
+            ),
+            None,
+        )
+        return cast(Optional[Type[_F]], subclass)
+
     def get(self, field: Type[_F]) -> _F:
-        return cast(_F, self.field_values[field])
+        result = self.field_values.get(field, None)
+        if result is not None:
+            return cast(_F, result)
+        field_subclass = self._find_registered_field_subclass(field)
+        if field_subclass is not None:
+            return cast(_F, self.field_values[field_subclass])
+        raise KeyError(
+            f"The target `{self}` does not have a field `{field}`. Before calling "
+            f"`my_tgt.get({field.__name__})`, call `my_tgt.has_fields([{field.__name__}])` to "
+            "filter out any irrelevant Targets."
+        )
 
     def has_fields(self, fields: Iterable[Type[Field]]) -> bool:
-        # TODO: consider if this should support subclasses. For example, if a target has a
-        #  field PythonSources(Sources), then .has_fields(Sources) should still return True. Why?
-        #  This allows overriding how fields behave for custom target types, e.g. a `python3_library`
-        #  subclassing the Field Compatibility with its own custom Python3Compatibility field.
-        #  When adding this, be sure to update `.get()` to allow looking up by subclass, too.
-        #  (Is it possible to do that in a performant way, i.e. w/o having to iterate over every
-        #  self.field_type (O(n) vs the current O(1))?)
-        return all(field in self.field_types for field in fields)
+        unrecognized_fields = [field for field in fields if field not in self.field_types]
+        if not unrecognized_fields:
+            return True
+        for unrecognized_field in unrecognized_fields:
+            if self._find_registered_field_subclass(unrecognized_field) is None:
+                return False
+        return True
