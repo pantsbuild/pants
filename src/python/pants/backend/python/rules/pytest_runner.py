@@ -27,13 +27,13 @@ from pants.engine.fs import Digest, DirectoriesToMerge, InputFilesContent
 from pants.engine.interactive_runner import InteractiveProcessRequest
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
-from pants.engine.legacy.structs import PythonTestsAdaptorWithOrigin
+from pants.engine.legacy.structs import PythonTestsAdaptorWithOrigin, TargetAdaptorWithOrigin
 from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.global_options import GlobalOptions
 from pants.python.python_setup import PythonSetup
 from pants.rules.core.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
-from pants.rules.core.test import TestDebugRequest, TestOptions, TestResult, TestTarget
+from pants.rules.core.test import TestDebugRequest, TestOptions, TestResult, TestRunner
 
 
 def calculate_timeout_seconds(
@@ -59,6 +59,13 @@ def calculate_timeout_seconds(
 
 
 @dataclass(frozen=True)
+class PytestRunner(TestRunner):
+    @staticmethod
+    def is_valid_target(adaptor_with_origin: TargetAdaptorWithOrigin) -> bool:
+        return isinstance(adaptor_with_origin, PythonTestsAdaptorWithOrigin)
+
+
+@dataclass(frozen=True)
 class TestTargetSetup:
     test_runner_pex: Pex
     args: Tuple[str, ...]
@@ -71,7 +78,7 @@ class TestTargetSetup:
 
 @rule
 async def setup_pytest_for_target(
-    adaptor_with_origin: PythonTestsAdaptorWithOrigin,
+    pytest_runner: PytestRunner,
     pytest: PyTest,
     test_options: TestOptions,
     python_setup: PythonSetup,
@@ -79,6 +86,7 @@ async def setup_pytest_for_target(
     # TODO: Rather than consuming the TestOptions subsystem, the TestRunner should pass on coverage
     # configuration via #7490.
 
+    adaptor_with_origin = pytest_runner.adaptor_with_origin
     adaptor = adaptor_with_origin.adaptor
     test_addresses = Addresses((adaptor.address,))
 
@@ -198,7 +206,7 @@ async def setup_pytest_for_target(
 
 @rule(name="Run pytest")
 async def run_python_test(
-    target_with_origin: PythonTestsAdaptorWithOrigin,
+    pytest_runner: PytestRunner,
     test_setup: TestTargetSetup,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
@@ -215,10 +223,10 @@ async def run_python_test(
         pex_args=test_setup.args,
         input_files=test_setup.input_files_digest,
         output_directories=(".coverage",) if run_coverage else None,
-        description=f"Run Pytest for {target_with_origin.adaptor.address.reference()}",
-        timeout_seconds=test_setup.timeout_seconds
-        if test_setup.timeout_seconds is not None
-        else 9999,
+        description=f"Run Pytest for {pytest_runner.adaptor_with_origin.adaptor.address.reference()}",
+        timeout_seconds=(
+            test_setup.timeout_seconds if test_setup.timeout_seconds is not None else 9999
+        ),
         env=env,
     )
     result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, request)
@@ -241,7 +249,7 @@ def rules():
         run_python_test,
         debug_python_test,
         setup_pytest_for_target,
-        UnionRule(TestTarget, PythonTestsAdaptorWithOrigin),
+        UnionRule(TestRunner, PytestRunner),
         subsystem_rule(PyTest),
         subsystem_rule(PythonSetup),
     ]

@@ -30,7 +30,12 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
 from pants.build_graph.target import Target
-from pants.engine.addressable import Addresses, AddressesWithOrigins, AddressWithOrigin
+from pants.engine.addressable import (
+    Addresses,
+    AddressesWithOrigins,
+    AddressWithOrigin,
+    assert_single_address,
+)
 from pants.engine.fs import EMPTY_SNAPSHOT, PathGlobs, Snapshot
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.structs import (
@@ -454,7 +459,11 @@ class HydratedTargetWithOrigin:
 
 
 class HydratedTargetsWithOrigins(Collection[HydratedTargetWithOrigin]):
-    pass
+    def expect_single(self) -> HydratedTargetWithOrigin:
+        assert_single_address(
+            [ht_with_origin.target.adaptor.address for ht_with_origin in self.dependencies]
+        )
+        return self.dependencies[0]
 
 
 @dataclass(frozen=True)

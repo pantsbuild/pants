@@ -31,7 +31,7 @@ from pants.engine.fs import (
 )
 from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
-from pants.engine.legacy.structs import PythonTestsAdaptor
+from pants.engine.legacy.structs import TargetAdaptor
 from pants.engine.rules import RootRule, UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.python.python_setup import PythonSetup
@@ -122,7 +122,7 @@ def get_coverage_plugin_input() -> InputFilesContent:
 
 
 def get_packages_to_cover(
-    *, target: PythonTestsAdaptor, specified_source_files: SourceFiles,
+    *, target: TargetAdaptor, specified_source_files: SourceFiles,
 ) -> Tuple[str, ...]:
     # Assume that tests in some package test the sources in that package.
     # This is the case, e.g., if tests live in the same directories as the sources
@@ -291,7 +291,7 @@ async def merge_coverage_data(
             )
         )
         for result in data_batch.addresses_and_test_results
-        if result.test_result is not None and result.test_result.coverage_data is not None
+        if result.test_result.coverage_data is not None
     )
     sources = await Get[SourceFiles](
         AllSourceFilesRequest(
