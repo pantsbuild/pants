@@ -3,12 +3,15 @@
 
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
-from typing import Any, ClassVar, Dict, Iterable, Optional, Tuple, Type, TypeVar, cast
+from typing import Any, ClassVar, Dict, Iterable, List, Optional, Tuple, Type, TypeVar, Union, cast
 
 from typing_extensions import final
 
 from pants.build_graph.address import Address
-from pants.engine.rules import UnionMembership
+from pants.engine.fs import EMPTY_SNAPSHOT, GlobExpansionConjunction, PathGlobs, Snapshot
+from pants.engine.rules import UnionMembership, rule
+from pants.engine.selectors import Get
+from pants.util.collections import ensure_str_list
 from pants.util.meta import frozen_after_init
 
 
@@ -271,3 +274,67 @@ class BoolField(PrimitiveField):
         #  So, the type hint on `raw_value` is technically a lie - while we expect that to be the
         #  raw_value, it could easily be different.
         return self.raw_value
+
+
+class StringField(PrimitiveField):
+    raw_value: Optional[str]
+    value: Optional[str]
+
+    def hydrate(self, *, address: Address) -> Optional[str]:
+        return self.raw_value
+
+
+class StringOrStringListField(PrimitiveField):
+    """The raw_value may either be a string or be a list of strings.
+
+    This is syntactic sugar that we use for certain fields to make BUILD files simpler when the user
+    has no need for more than one element.
+    """
+
+    raw_value: Optional[Union[str, Iterable[str]]]
+    value: Optional[List[str]]
+
+    def hydrate(self, *, address: Address) -> Optional[List[str]]:
+        if self.raw_value is None:
+            return None
+        return ensure_str_list(self.raw_value)
+
+
+class Sources(AsyncField):
+    alias: ClassVar = "sources"
+    default_globs: ClassVar[Optional[Tuple[str, ...]]] = None
+    raw_value: Optional[Iterable[str]]
+
+    @staticmethod
+    def validate_result(_: "SourcesResult") -> None:
+        pass
+
+
+@dataclass(frozen=True)
+class HydrateSourcesRequest:
+    field: Sources
+
+
+@dataclass(frozen=True)
+class SourcesResult:
+    snapshot: Snapshot
+
+
+@rule
+async def hydrate_sources(request: HydrateSourcesRequest) -> SourcesResult:
+    sources_field = request.field
+    if sources_field.raw_value is None:
+        if sources_field.default_globs is None:
+            return SourcesResult(EMPTY_SNAPSHOT)
+        PathGlobs(sources_field.default_globs, conjunction=GlobExpansionConjunction.any_match)
+    sources = ensure_str_list(sources_field.raw_value)
+    PathGlobs(sources, conjunction=GlobExpansionConjunction.all_match)
+
+
+@rule
+async def hydrate_sources_field(sources: Sources) -> SourcesResult:
+    return await Get[SourcesResult](HydrateSourcesRequest(sources))
+
+
+def rules():
+    return [hydrate_sources, hydrate_sources_field]
