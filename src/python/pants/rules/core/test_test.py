@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from abc import ABCMeta, abstractmethod
-from collections import OrderedDict
 from pathlib import PurePath
 from textwrap import dedent
 from typing import List, Tuple, Type
@@ -134,7 +133,7 @@ class TestTest(TestBase):
         options = MockOptions(debug=debug, run_coverage=False)
         interactive_runner = InteractiveRunner(self.scheduler)
         workspace = Workspace(self.scheduler)
-        union_membership = UnionMembership(OrderedDict({TestRunner: OrderedSet([test_runner])}))
+        union_membership = UnionMembership({TestRunner: OrderedSet([test_runner])})
 
         def mock_coordinator_of_tests(
             wrapped_test_runner: WrappedTestRunner,

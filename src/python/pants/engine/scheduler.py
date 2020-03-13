@@ -31,9 +31,8 @@ from pants.util.dirutil import check_no_overlapping_paths
 from pants.util.strutil import pluralize
 
 if TYPE_CHECKING:
-    from collections import OrderedDict
     from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveProcessResult
-    from pants.util.ordered_set import OrderedSet
+    from pants.util.ordered_set import OrderedSet  # noqa
 
 
 logger = logging.getLogger(__name__)
@@ -71,12 +70,12 @@ class Scheduler:
         build_root: str,
         local_store_dir: str,
         rules: Tuple[Rule, ...],
-        union_rules: "OrderedDict[Type, OrderedSet[Type]]",
+        union_rules: Dict[Type, "OrderedSet[Type]"],
         execution_options: ExecutionOptions,
         include_trace_on_error: bool = True,
         visualize_to_dir: Optional[str] = None,
         validate: bool = True,
-    ):
+    ) -> None:
         """
         :param native: An instance of engine.native.Native.
         :param ignore_patterns: A list of gitignore-style file patterns for pants to ignore.
@@ -182,7 +181,7 @@ class Scheduler:
         return tasks
 
     def _register_task(
-        self, tasks, output_type, rule: TaskRule, union_rules: "OrderedDict[Type, OrderedSet[Type]]"
+        self, tasks, output_type, rule: TaskRule, union_rules: Dict[Type, "OrderedSet[Type]"]
     ) -> None:
         """Register the given TaskRule with the native scheduler."""
         func = Function(self._to_key(rule.func))
