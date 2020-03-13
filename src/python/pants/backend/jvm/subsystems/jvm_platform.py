@@ -109,11 +109,12 @@ class JvmPlatform(Subsystem):
             target_level=platform.get("target", platform.get("source")),
             args=platform.get("args", ()),
             jvm_options=platform.get("jvm_options", ()),
+            strict=platform.get("strict", None),
             name=name,
         )
 
     @classmethod
-    def preferred_jvm_distribution(cls, platforms, strict=False, jdk=False):
+    def preferred_jvm_distribution(cls, platforms, strict=None, jdk=False):
         """Returns a jvm Distribution with a version that should work for all the platforms.
 
         Any one of those distributions whose version is >= all requested platforms' versions
@@ -126,13 +127,27 @@ class JvmPlatform(Subsystem):
         :param bool jdk: If true, the distribution must be a JDK.
         :returns: Distribution one of the selected distributions.
         """
-        if not platforms:
-            return DistributionLocator.cached(jdk=jdk)
-        min_version = max(platform.target_level for platform in platforms)
-        max_version = Revision(*(min_version.components + [9999])) if strict else None
         return DistributionLocator.cached(
-            minimum_version=min_version, maximum_version=max_version, jdk=jdk
+            cls._preferred_jvm_distribution_args(platforms, strict, jdk)
         )
+
+    @classmethod
+    def _preferred_jvm_distribution_args(cls, platforms, strict=None, jdk=False):
+        if not platforms:
+            return {"jdk": jdk}
+        if strict is None:
+            strict = all(p.strict for p in platforms)
+        min_version = max(platform.target_level for platform in platforms)
+        if len(min_version.components) <= 2:  # ensure at least three components.
+            min_version = Revision(
+                *(min_version.components + [0] * (3 - len(min_version.components)))
+            )
+
+        if strict:
+            max_version = Revision(*(min_version.components[0:2] + [9999]))
+        else:
+            max_version = None
+        return {"minimum_version": min_version, "maximum_version": max_version, "jdk": jdk}
 
     @memoized_property
     def platforms_by_name(self):
@@ -284,13 +299,23 @@ class JvmPlatformSettings:
         )
 
     def __init__(
-        self, *, source_level, target_level, args, jvm_options, name=None, by_default=False
+        self,
+        *,
+        source_level,
+        target_level,
+        args,
+        jvm_options,
+        strict=False,
+        name=None,
+        by_default=False,
     ):
         """
     :param source_level: Revision object or string for the java source level.
     :param target_level: Revision object or string for the java target level.
     :param list args: Additional arguments to pass to the java compiler.
     :param list jvm_options: Additional jvm options specific to this JVM platform.
+    :param boolean strict: Whether to use the target level as just a lower bound or both a lower and
+    upper when looking up distributions.
     :param str name: name to identify this platform.
     :param by_default: True if this value was inferred by omission of a specific platform setting.
     """
@@ -298,6 +323,7 @@ class JvmPlatformSettings:
         self.target_level = JvmPlatform.parse_java_version(target_level)
         self.args = tuple(flatten_shlexed_list(args or ()))
         self.jvm_options = tuple(flatten_shlexed_list(jvm_options or ()))
+        self.strict = strict
         self.name = name
         self._by_default = by_default
         self._validate_source_target()
@@ -339,10 +365,11 @@ class JvmPlatformSettings:
     def __str__(self):
         return (
             "JvmPlatformSettings(source={source},target={target},args=({args}),"
-            "jvm_options={jvm_options})".format(
+            "jvm_options={jvm_options},strict={strict})".format(
                 source=self.source_level,
                 target=self.target_level,
                 args=" ".join(self.args),
                 jvm_options=" ".join(self.jvm_options),
+                strict=self.strict,
             )
         )

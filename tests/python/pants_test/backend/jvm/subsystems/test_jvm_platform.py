@@ -5,6 +5,7 @@ from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform, JvmPlatformSe
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.runtime_platform_mixin import RuntimePlatformMixin
 from pants.base.payload import Payload
+from pants.base.revision import Revision
 from pants.testutil.subsystem.util import init_subsystem
 from pants.testutil.test_base import TestBase
 
@@ -200,6 +201,52 @@ class JvmPlatformTest(TestBase):
             instance.get_runtime_platform_for_target(synth_just_platform_with_parent_same).name
             == "default-platform"
         )
+
+    def test_strict_usage(self):
+        init_subsystem(
+            JvmPlatform,
+            options={
+                "jvm-platform": {
+                    "platforms": {
+                        "default-platform": {"target": "9"},
+                        "strict-platform": {"target": "8", "strict": True},
+                    },
+                    "default_platform": "default-platform",
+                    "default_runtime_platform": None,
+                }
+            },
+        )
+        instance = JvmPlatform.global_instance()
+        strict_platform = instance.get_platform_by_name("strict-platform")
+        default_platform = instance.default_platform
+        # TODO maybe this should use the runtime platform
+        assert instance._preferred_jvm_distribution_args([]) == {
+            "jdk": False,
+        }
+        assert JvmPlatform._preferred_jvm_distribution_args([default_platform]) == {
+            "minimum_version": Revision.lenient("9.0.0"),
+            "maximum_version": None,
+            "jdk": False,
+        }
+        assert JvmPlatform._preferred_jvm_distribution_args([default_platform], strict=True) == {
+            "minimum_version": Revision.lenient("9.0.0"),
+            "maximum_version": Revision.lenient("9.0.9999"),
+            "jdk": False,
+        }
+        assert instance._preferred_jvm_distribution_args([strict_platform]) == {
+            "minimum_version": Revision.lenient("1.8.0"),
+            "maximum_version": Revision.lenient("1.8.9999"),
+            "jdk": False,
+        }
+        assert instance._preferred_jvm_distribution_args([strict_platform], strict=False) == {
+            "minimum_version": Revision.lenient("1.8.0"),
+            "maximum_version": None,
+            "jdk": False,
+        }
+        # strict/non-strict platform requested together--not strict (maybe should be strict?)
+        assert JvmPlatform._preferred_jvm_distribution_args(
+            [strict_platform, default_platform]
+        ) == {"minimum_version": Revision.lenient("9.0.0"), "maximum_version": None, "jdk": False,}
 
     def test_jvm_options(self):
         init_subsystem(

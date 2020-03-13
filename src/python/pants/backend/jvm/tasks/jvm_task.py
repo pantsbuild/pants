@@ -115,5 +115,5 @@ class JvmTask(Task):
         else:
             return target.platform
 
-    def preferred_jvm_distribution(self, platforms, jdk=False, strict=False):
+    def preferred_jvm_distribution(self, platforms, jdk=False, strict=None):
         return JvmPlatform.preferred_jvm_distribution(platforms, jdk=jdk, strict=strict)

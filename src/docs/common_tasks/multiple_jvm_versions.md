@@ -35,10 +35,11 @@ more aliases than javac. Up to JDK 8, you can use either `1.X` or `X`. For 9 and
 include the `1.`.
  * `args`, allows the platform to specify additional, global to that platform, compile arguments.
 
-For runtime configuration, `target` and `jvm_options` are used. `target` is used to determine the
-version of the JVM to use. `jvm_options` is used by some tasks to allow platforms to specify
-platform specific JVM options. These can make transitions between JVM versions smoother by
-allowing compatibility options to be provided globally.
+For runtime configuration, `target`, `strict` and `jvm_options` are used. `target` is used to
+determine the minimum version of the JVM to use. `strict` makes the max version also use the
+`target` version.`jvm_options` is used by some tasks to allow platforms to specify platform specific
+JVM options. These can make transitions between JVM versions smoother by allowing compatibility
+options to be provided globally.
 
 An example pants.toml config might look like this:
 
@@ -50,6 +51,7 @@ An example pants.toml config might look like this:
      {
         'java8': { 'source': '8', 'target': '8', 'args': [] },
         'java10': {'source': '10', 'target': '10', 'args': [],
+                   'strict': True,
                    'jvm_options': [
                        # --add-opens is a 9+ flag, that doesn't work with 8
                        '--add-opens=java.base/java.lang.reflect=ALL-UNNAMED'
