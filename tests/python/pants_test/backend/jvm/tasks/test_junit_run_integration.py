@@ -144,6 +144,11 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
             args=["--batch-size=2"],
         )
 
+    def test_junit_run_with_coverage_succeeds_cobertura_output(self):
+        self.do_test_junit_run_with_coverage_succeeds_cobertura(
+            args=["--scoverage-report-output-as-cobertura", "--test-junit-coverage"],
+        )
+
     def do_test_junit_run_with_coverage_succeeds_jacoco(self, tests=(), args=()):
         html_path = (
             "test/junit/coverage/reports/html/"

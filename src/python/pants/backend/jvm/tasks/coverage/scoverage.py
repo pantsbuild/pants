@@ -69,6 +69,14 @@ class Scoverage(CoverageEngine):
                 "filter.",
             )
 
+            register(
+                "--output-as-cobertura",
+                type=bool,
+                default=True,
+                fingerprint=False,
+                help="Export cobertura formats which would allow users to merge with cobertura coverage for java targets.",
+            )
+
         def create(self, settings, targets, execute_java_for_targets):
             """
             :param settings: Generic code coverage settings.
