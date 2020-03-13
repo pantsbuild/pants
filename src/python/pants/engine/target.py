@@ -7,15 +7,28 @@ from typing import Any, ClassVar, Dict, Iterable, Optional, Tuple, Type, TypeVar
 
 from typing_extensions import final
 
+from pants.build_graph.address import Address
 from pants.engine.rules import UnionMembership
 from pants.util.meta import frozen_after_init
 
 
 @frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(unsafe_hash=True)  # type: ignore[misc]  # MyPy doesn't like the abstract __init__()
 class Field(ABC):
     alias: ClassVar[str]
     raw_value: Optional[Any]  # None indicates that the field was not explicitly defined
+
+    # This is a little weird to have an abstract __init__(). We do this to ensure that all
+    # subclasses have this exact type signature for their constructor.
+    #
+    # Normally, with dataclasses, each constructor parameter would instead be specified via a
+    # dataclass field declaration. But, we don't want to declare `address` as an actual attribute
+    # because not all subclasses will need to store the value. Instead, we only care that the
+    # constructor accepts `address` so that the `Field` can use it in validation, and can
+    # optionally store the value if it wants to.
+    @abstractmethod
+    def __init__(self, raw_value: Optional[Any], *, address: Address) -> None:
+        pass
 
     def __repr__(self) -> str:
         return f"{self.__class__}(alias={repr(self.alias)}, raw_value={self.raw_value})"
@@ -40,7 +53,7 @@ class PrimitiveField(Field, metaclass=ABCMeta):
             raw_value: Optional[bool]
             value: bool
 
-            def hydrate(self) -> bool:
+            def hydrate(self, *, address: Address) -> bool:
                 if self.raw_value is None:
                     return True
                 return self.raw_value
@@ -49,12 +62,15 @@ class PrimitiveField(Field, metaclass=ABCMeta):
     value: Any
 
     @final
-    def __init__(self, raw_value: Optional[Any]) -> None:
+    def __init__(self, raw_value: Optional[Any], *, address: Address) -> None:
         self.raw_value = raw_value
-        self.value = self.hydrate()
+        # NB: we do not store the `address` as an attribute of the class. We only use the
+        # `address` parameter for eager validation of the field to be able to generate more
+        # helpful error messages.
+        self.value = self.hydrate(address=address)
 
     @abstractmethod
-    def hydrate(self) -> Any:
+    def hydrate(self, *, address: Address) -> Any:
         """Convert `self.raw_value` into `self.value`.
 
         You should perform any validation and/or hydration here. For example, you may want to check
@@ -108,6 +124,13 @@ class AsyncField(Field, metaclass=ABCMeta):
         sources = await Get[SourcesResult](Sources, my_tgt.get(Sources))
     """
 
+    address: Address
+
+    @final
+    def __init__(self, raw_value: Optional[Any], *, address: Address) -> None:
+        self.raw_value = raw_value
+        self.address = address
+
     def __str__(self) -> str:
         return f"{self.alias}={repr(self.raw_value)}"
 
@@ -125,6 +148,7 @@ class Target(ABC):
     core_fields: ClassVar[Tuple[Type[Field], ...]]
 
     # These get calculated in the constructor
+    address: Address
     plugin_fields: Tuple[Type[Field], ...]
     field_values: Dict[Type[Field], Field]
 
@@ -133,8 +157,10 @@ class Target(ABC):
         self,
         unhydrated_values: Dict[str, Any],
         *,
+        address: Address,
         union_membership: Optional[UnionMembership] = None,
     ) -> None:
+        self.address = address
         self.plugin_fields = cast(
             Tuple[Type[Field], ...],
             (
@@ -149,13 +175,14 @@ class Target(ABC):
         for alias, value in unhydrated_values.items():
             if alias not in aliases_to_field_types:
                 raise ValueError(
-                    f"Unrecognized field `{alias}={value}` for target type `{self.alias}`."
+                    f"Unrecognized field `{alias}={value}` for target {address} with target "
+                    f"type `{self.alias}`."
                 )
             field_type = aliases_to_field_types[alias]
-            self.field_values[field_type] = field_type(value)
+            self.field_values[field_type] = field_type(value, address=address)
         # For undefined fields, mark the raw value as None.
         for field_type in set(self.field_types) - set(self.field_values.keys()):
-            self.field_values[field_type] = field_type(raw_value=None)
+            self.field_values[field_type] = field_type(raw_value=None, address=address)
 
     @final
     @property
@@ -174,6 +201,7 @@ class Target(ABC):
     def __repr__(self) -> str:
         return (
             f"{self.__class__}("
+            f"address={self.address},"
             f"alias={repr(self.alias)}, "
             f"core_fields={list(self.core_fields)}, "
             f"plugin_fields={list(self.plugin_fields)}, "
@@ -183,7 +211,8 @@ class Target(ABC):
 
     def __str__(self) -> str:
         fields = ", ".join(str(field) for field in self.field_values.values())
-        return f"{self.alias}({fields})"
+        address = f"address=\"{self.address}\"{', ' if fields else ''}"
+        return f"{self.alias}({address}{fields})"
 
     @final
     def _find_registered_field_subclass(self, requested_field: Type[_F]) -> Optional[Type[_F]]:
@@ -234,7 +263,7 @@ class BoolField(PrimitiveField):
     value: bool
     default: ClassVar[bool]
 
-    def hydrate(self) -> bool:
+    def hydrate(self, *, address: Address) -> bool:
         if self.raw_value is None:
             return self.default
         # TODO: consider type checking `raw_value` via `isinstance`. Here, we assume that it's
