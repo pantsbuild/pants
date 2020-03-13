@@ -36,10 +36,10 @@ include the `1.`.
  * `args`, allows the platform to specify additional, global to that platform, compile arguments.
 
 For runtime configuration, `target`, `strict` and `jvm_options` are used. `target` is used to
-determine the minimum version of the JVM to use. `strict` makes the max version also use the
-`target` version.`jvm_options` is used by some tasks to allow platforms to specify platform specific
-JVM options. These can make transitions between JVM versions smoother by allowing compatibility
-options to be provided globally.
+determine the minimum version of the JVM to use. `strict` forces the JVM used to be exactly the
+`target` version. `jvm_options` is used by some tasks to allow platforms to specify platform
+specific JVM options. These can make transitions between JVM versions smoother by allowing
+compatibility options to be provided globally.
 
 An example pants.toml config might look like this:
 
