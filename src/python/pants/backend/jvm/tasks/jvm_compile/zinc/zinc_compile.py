@@ -128,7 +128,6 @@ class BaseZincCompile(JvmCompile):
             "-C-Xlint:all",
             "-C-Xlint:-serial",
             "-C-Xlint:-path",
-            "-C-Xlint:unchecked",
             "-S-deprecation",
             "-S-unchecked",
             "-S-Xlint",
@@ -574,7 +573,7 @@ class BaseZincCompile(JvmCompile):
             for (severity, count) in counts.items():
                 self.context.log.debug(f"    {severity}: {count}")
                 self.context.run_tracker.report_target_info(
-                    self.options_scope, ctx.target, ["n_diagnostics", severity], count
+                    self.options_scope, ctx.target, ["diagnostic_counts", severity], count
                 )
 
     class ZincCompileError(TaskError):
