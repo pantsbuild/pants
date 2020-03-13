@@ -119,6 +119,8 @@ class Revision:
             if ours != theirs:
                 ours, theirs = self._fill_value_if_missing(ours, theirs)
                 ours, theirs = self._stringify_if_different_types(ours, theirs)
+                if ours == theirs:
+                   continue
                 return ours < theirs
         return False
 
