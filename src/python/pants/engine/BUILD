@@ -267,9 +267,9 @@ python_library(
   sources=['target.py'],
   dependencies=[
     ':rules',
+    '3rdparty/python:typing-extensions',
     'src/python/pants/util:collections',
     'src/python/pants/util:meta',
-    'src/python/pants/util:memo',
   ],
   tags = {'type_checked'},
 )

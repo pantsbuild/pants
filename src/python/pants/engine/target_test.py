@@ -10,22 +10,21 @@ import pytest
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, PathGlobs, Snapshot
 from pants.engine.rules import UnionMembership, rule
 from pants.engine.selectors import Get
-from pants.engine.target import AsyncField, PrimitiveField, Target
+from pants.engine.target import AsyncField, BoolField, PrimitiveField, Target
 from pants.testutil.engine.util import MockGet, run_rule
 from pants.util.collections import ensure_str_list
-from pants.util.memo import memoized_property
 from pants.util.ordered_set import OrderedSet
 
 
 class HaskellGhcExtensions(PrimitiveField):
     alias: ClassVar = "ghc_extensions"
     raw_value: Optional[List[str]]
+    value: List[str]
 
-    @memoized_property
-    def value(self) -> List[str]:
+    def hydrate(self) -> List[str]:
         if self.raw_value is None:
             return []
-        # Add some arbitrary validation to test that hydration works properly.
+        # Add some arbitrary validation to test that hydration/validation works properly.
         bad_extensions = [
             extension for extension in self.raw_value if not extension.startswith("Ghc")
         ]
@@ -127,15 +126,9 @@ def test_get_async_field() -> None:
 
 
 def test_has_fields() -> None:
-    class UnrelatedField(PrimitiveField):
+    class UnrelatedField(BoolField):
         alias: ClassVar = "unrelated"
-        raw_value: Optional[bool]
-
-        @memoized_property
-        def value(self) -> bool:
-            if self.raw_value is None:
-                return False
-            return self.raw_value
+        default: ClassVar = False
 
     tgt = HaskellTarget({})
     assert tgt.has_fields([]) is True
@@ -144,28 +137,18 @@ def test_has_fields() -> None:
     assert tgt.has_fields([HaskellGhcExtensions, UnrelatedField]) is False
 
 
-def test_field_hydration_is_lazy() -> None:
-    # No error upon creating the Target because validation does not happen until a call site
-    # hydrates the specific field.
-    tgt = HaskellTarget(
-        {HaskellGhcExtensions.alias: ["GhcExistentialQuantification", "DoesNotStartWithGhc"]}
-    )
-    # When hydrating, we expect a failure.
+def test_primitive_field_hydration_is_eager() -> None:
     with pytest.raises(ValueError) as exc:
-        tgt.get(HaskellGhcExtensions).value
+        HaskellTarget(
+            {HaskellGhcExtensions.alias: ["GhcExistentialQuantification", "DoesNotStartWithGhc"]}
+        )
     assert "must be prefixed by `Ghc`" in str(exc)
 
 
 def test_add_custom_fields() -> None:
-    class CustomField(PrimitiveField):
+    class CustomField(BoolField):
         alias: ClassVar = "custom_field"
-        raw_value: Optional[bool]
-
-        @memoized_property
-        def value(self) -> bool:
-            if self.raw_value is None:
-                return False
-            return self.raw_value
+        default: ClassVar = False
 
     union_membership = UnionMembership({HaskellTarget.PluginField: OrderedSet([CustomField])})
     tgt_values = {CustomField.alias: True}
@@ -194,10 +177,9 @@ def test_override_preexisting_field_via_new_target() -> None:
         banned_extensions: ClassVar = ["GhcBanned"]
         default_extensions: ClassVar = ["GhcCustomExtension"]
 
-        @memoized_property
-        def value(self) -> List[str]:
+        def hydrate(self) -> List[str]:
             # Ensure that we avoid certain problematic extensions and always use some defaults.
-            specified_extensions = super().value
+            specified_extensions = super().hydrate()
             banned = [
                 extension
                 for extension in specified_extensions
@@ -239,9 +221,8 @@ def test_override_preexisting_field_via_new_target() -> None:
     )
 
     # Custom validation
-    bad_tgt = CustomHaskellTarget(
-        {HaskellGhcExtensions.alias: CustomHaskellGhcExtensions.banned_extensions}
-    )
     with pytest.raises(ValueError) as exc:
-        bad_tgt.get(HaskellGhcExtensions).value
+        CustomHaskellTarget(
+            {HaskellGhcExtensions.alias: CustomHaskellGhcExtensions.banned_extensions}
+        )
     assert str(CustomHaskellGhcExtensions.banned_extensions) in str(exc)
