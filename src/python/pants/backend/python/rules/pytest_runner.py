@@ -157,6 +157,10 @@ async def setup_pytest_for_target(
         [adaptor_with_origin], strip_source_roots=True
     )
 
+    # TODO(John Sirois): Support exploiting concurrecncy better:
+    #   https://github.com/pantsbuild/pants/issues/9294
+    # Some awkward code follows in order to execute 5-6 items concurrently given the current state
+    # of MultiGet typing / API. Improve this since we should encourage full concurrency in general.
     requests: List[Get[Any]] = [
         Get[Pex](CreatePex, create_pytest_pex_request),
         Get[Pex](CreatePexFromTargetClosure, create_requirements_pex_request),
