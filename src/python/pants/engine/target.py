@@ -5,12 +5,14 @@ from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
 from typing import Any, ClassVar, Dict, Iterable, Optional, Tuple, Type, TypeVar, cast
 
+from typing_extensions import final
+
 from pants.engine.rules import UnionMembership
-from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
 
 
-@dataclass(frozen=True)
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class Field(ABC):
     alias: ClassVar[str]
     raw_value: Optional[Any]  # None indicates that the field was not explicitly defined
@@ -22,24 +24,54 @@ class Field(ABC):
 class PrimitiveField(Field, metaclass=ABCMeta):
     """A Field that does not need the engine in order to be hydrated.
 
-    This should be subclassed by the majority of fields.
+    This should be used by the majority of fields.
+
+    Subclasses must implement `hydrate()` to convert `self.raw_value` into `self.value`. This
+    hydration and/or validation happens eagerly in the constructor. If the hydration is
+    particularly expensive, use `AsyncField` instead to get the benefits of the engine's caching.
+
+    Subclasses should also override the type hints for `raw_value` and `value` to be more precise
+    than `Any`.
+
+    Example:
+
+        class ZipSafe(PrimitiveField):
+            alias: ClassVar = "zip_safe"
+            raw_value: Optional[bool]
+            value: bool
+
+            def hydrate(self) -> bool:
+                if self.raw_value is None:
+                    return True
+                return self.raw_value
     """
+
+    value: Any
+
+    @final
+    def __init__(self, raw_value: Optional[Any]) -> None:
+        self.raw_value = raw_value
+        self.value = self.hydrate()
+
+    @abstractmethod
+    def hydrate(self) -> Any:
+        """Convert `self.raw_value` into `self.value`.
+
+        You should perform any validation and/or hydration here. For example, you may want to check
+        that an integer is > 0, apply a default value if `raw_value` is None, or convert an
+        Iterable[str] to List[str].
+
+        If you have no validation/hydration, simply set this function to `return self.raw_value`.
+        """
+
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__}(alias={repr(self.alias)}, raw_value={self.raw_value}, "
+            f"value={self.value})"
+        )
 
     def __str__(self) -> str:
         return f"{self.alias}={self.value}"
-
-    @memoized_property
-    @abstractmethod
-    def value(self) -> Any:
-        """Get the field's value.
-
-        The value will possibly be first hydrated and/or validated, such as using a default value
-        if the field was not defined or ensuring that an int value is positive.
-
-        This property is memoized because hydration and validation can often be costly. This
-        hydration is lazy, i.e. it will only happen when a downstream rule explicitly requests this
-        field.
-        """
 
 
 class AsyncField(Field, metaclass=ABCMeta):
@@ -96,6 +128,7 @@ class Target(ABC):
     plugin_fields: Tuple[Type[Field], ...]
     field_values: Dict[Type[Field], Field]
 
+    @final
     def __init__(
         self,
         unhydrated_values: Dict[str, Any],
@@ -124,6 +157,7 @@ class Target(ABC):
         for field_type in set(self.field_types) - set(self.field_values.keys()):
             self.field_values[field_type] = field_type(raw_value=None)
 
+    @final
     @property
     def field_types(self) -> Tuple[Type[Field], ...]:
         return (*self.core_fields, *self.plugin_fields)
@@ -151,6 +185,7 @@ class Target(ABC):
         fields = ", ".join(str(field) for field in self.field_values.values())
         return f"{self.alias}({fields})"
 
+    @final
     def _find_registered_field_subclass(self, requested_field: Type[_F]) -> Optional[Type[_F]]:
         """Check if the Target has registered a subclass of the requested Field.
 
@@ -169,6 +204,7 @@ class Target(ABC):
         )
         return cast(Optional[Type[_F]], subclass)
 
+    @final
     def get(self, field: Type[_F]) -> _F:
         result = self.field_values.get(field, None)
         if result is not None:
@@ -182,6 +218,7 @@ class Target(ABC):
             "filter out any irrelevant Targets."
         )
 
+    @final
     def has_fields(self, fields: Iterable[Type[Field]]) -> bool:
         unrecognized_fields = [field for field in fields if field not in self.field_types]
         if not unrecognized_fields:
@@ -190,3 +227,18 @@ class Target(ABC):
             if self._find_registered_field_subclass(unrecognized_field) is None:
                 return False
         return True
+
+
+class BoolField(PrimitiveField):
+    raw_value: Optional[bool]
+    value: bool
+    default: ClassVar[bool]
+
+    def hydrate(self) -> bool:
+        if self.raw_value is None:
+            return self.default
+        # TODO: consider type checking `raw_value` via `isinstance`. Here, we assume that it's
+        #  `Optional[bool]`, but there's nothing preventing a user from using a `str` or `int`, etc.
+        #  So, the type hint on `raw_value` is technically a lie - while we expect that to be the
+        #  raw_value, it could easily be different.
+        return self.raw_value
