@@ -1,8 +1,8 @@
 use crate::remote_tests::echo_foo_request;
 use crate::speculate::SpeculatingCommandRunner;
 use crate::{
-  CommandRunner, Context, ExecuteProcessRequest, FallibleExecuteProcessResult,
-  MultiPlatformExecuteProcessRequest, PlatformConstraint,
+  CommandRunner, Context, ExecuteProcessRequest, FallibleExecuteProcessResultWithPlatform,
+  MultiPlatformExecuteProcessRequest, Platform, PlatformConstraint,
 };
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
@@ -104,7 +104,7 @@ fn run_speculation_test(
   r1_is_compatible: bool,
   r2_is_compatible: bool,
 ) -> (
-  Result<FallibleExecuteProcessResult, String>,
+  Result<FallibleExecuteProcessResultWithPlatform, String>,
   Arc<Mutex<u32>>,
   Arc<Mutex<u32>>,
 ) {
@@ -152,12 +152,13 @@ fn make_delayed_command_runner(
   let result = if is_err {
     Err(msg.into())
   } else {
-    Ok(FallibleExecuteProcessResult {
+    Ok(FallibleExecuteProcessResultWithPlatform {
       stdout: msg.into(),
       stderr: "".into(),
       exit_code: 0,
       output_directory: EMPTY_DIGEST,
       execution_attempts: vec![],
+      platform: Platform::current().unwrap(),
     })
   };
   DelayedCommandRunner::new(
@@ -172,7 +173,7 @@ fn make_delayed_command_runner(
 #[derive(Clone)]
 struct DelayedCommandRunner {
   delay: Duration,
-  result: Result<FallibleExecuteProcessResult, String>,
+  result: Result<FallibleExecuteProcessResultWithPlatform, String>,
   is_compatible: bool,
   call_counter: Arc<Mutex<u32>>,
   finished_counter: Arc<Mutex<u32>>,
@@ -181,7 +182,7 @@ struct DelayedCommandRunner {
 impl DelayedCommandRunner {
   pub fn new(
     delay: Duration,
-    result: Result<FallibleExecuteProcessResult, String>,
+    result: Result<FallibleExecuteProcessResultWithPlatform, String>,
     is_compatible: bool,
     call_counter: Arc<Mutex<u32>>,
     finished_counter: Arc<Mutex<u32>>,
@@ -209,7 +210,7 @@ impl CommandRunner for DelayedCommandRunner {
     &self,
     _req: MultiPlatformExecuteProcessRequest,
     _context: Context,
-  ) -> BoxFuture<FallibleExecuteProcessResult, String> {
+  ) -> BoxFuture<FallibleExecuteProcessResultWithPlatform, String> {
     let delay = Delay::new(Instant::now() + self.delay);
     let exec_result = self.result.clone();
     let command_runner = self.clone();

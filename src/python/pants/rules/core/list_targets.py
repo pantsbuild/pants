@@ -60,9 +60,9 @@ async def list_targets(console: Console, list_options: ListOptions, addresses: A
                 push_db_basedir=lambda adaptor: adaptor.provides.repo.push_db_basedir,
             )
 
-            def print_provides(column_extractors, target):
+            def print_provides(col_extractors, target):
                 if getattr(target.adaptor, "provides", None):
-                    return " ".join(extractor(target.adaptor) for extractor in column_extractors)
+                    return " ".join(extractor(target.adaptor) for extractor in col_extractors)
 
             try:
                 column_extractors = [extractors[col] for col in (provides_columns.split(","))]

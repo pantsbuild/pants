@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Dict, Optional, Tuple, Union
 
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Digest
-from pants.engine.platform import PlatformConstraint
+from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.rules import RootRule, rule
 from pants.util.meta import frozen_after_init
 
@@ -133,6 +133,20 @@ class FallibleExecuteProcessResult:
     output_directory_digest: Digest
 
 
+@dataclass(frozen=True)
+class FallibleExecuteProcessResultWithPlatform:
+    """Result of executing a process.
+
+    Contains information about what platform a request ran on.
+    """
+
+    stdout: bytes
+    stderr: bytes
+    exit_code: int
+    output_directory_digest: Digest
+    platform: Platform
+
+
 class ProcessExecutionFailure(Exception):
     """Used to denote that a process exited, but was unsuccessful in some way.
 
@@ -185,7 +199,7 @@ def fallible_to_exec_result_or_raise(
 
     if fallible_result.exit_code == 0:
         return ExecuteProcessResult(
-            fallible_result.stdout, fallible_result.stderr, fallible_result.output_directory_digest
+            fallible_result.stdout, fallible_result.stderr, fallible_result.output_directory_digest,
         )
     else:
         raise ProcessExecutionFailure(
@@ -196,6 +210,18 @@ def fallible_to_exec_result_or_raise(
         )
 
 
+@rule
+def remove_platform_information(
+    res: FallibleExecuteProcessResultWithPlatform,
+) -> FallibleExecuteProcessResult:
+    return FallibleExecuteProcessResult(
+        exit_code=res.exit_code,
+        stdout=res.stdout,
+        stderr=res.stderr,
+        output_directory_digest=res.output_directory_digest,
+    )
+
+
 def create_process_rules():
     """Creates rules that consume the intrinsic filesystem types."""
     return [
@@ -203,5 +229,6 @@ def create_process_rules():
         RootRule(MultiPlatformExecuteProcessRequest),
         upcast_execute_process_request,
         fallible_to_exec_result_or_raise,
+        remove_platform_information,
         get_multi_platform_request_description,
     ]

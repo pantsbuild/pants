@@ -42,10 +42,15 @@ class SourceMapperTest(TestBase):
 
     def test_joint_ownership(self):
         # A simple target with two sources.
-        self.create_library("lib/rpc", "java_library", "rpc", ["err.py", "http.py"])
+        self.create_library(
+            path="lib/rpc", target_type="java_library", name="rpc", sources=["err.py", "http.py"]
+        )
         # Another target with sources but also claims one already owned from above.
         self.create_library(
-            "lib", "java_library", "lib", ["a.py", "b.py", "rpc/net.py", "rpc/err.py"]
+            path="lib",
+            target_type="java_library",
+            name="lib",
+            sources=["a.py", "b.py", "rpc/net.py", "rpc/err.py"],
         )
 
         # Sole ownership of new files.
@@ -61,7 +66,12 @@ class SourceMapperTest(TestBase):
 
     def test_nested(self):
         # A root-level BUILD file's sources are found or not correctly.
-        self.create_library("date", "java_library", "date", ["day.py", "time/unit/hour.py"])
+        self.create_library(
+            path="date",
+            target_type="java_library",
+            name="date",
+            sources=["day.py", "time/unit/hour.py"],
+        )
         self.create_file("date/time/unit/minute.py")
         # Shallow, simple source still works.
         self.owner(["date:date"], "date/day.py")
@@ -71,10 +81,27 @@ class SourceMapperTest(TestBase):
         self.owner([], "date/time/unit/minute.py")
 
     def test_with_root_level_build(self):
-        self.create_library("", "java_library", "top", ["foo.py", "text/common/const/emoji.py"])
-        self.create_library("text", "java_library", "text", ["localize.py"])
-        self.create_library("text/common/const", "java_library", "const", ["emoji.py", "ascii.py"])
-        self.create_library("text/common/helper", "java_library", "helper", ["trunc.py"])
+        self.create_library(
+            path="",
+            target_type="java_library",
+            name="top",
+            sources=["foo.py", "text/common/const/emoji.py"],
+        )
+        self.create_library(
+            path="text", target_type="java_library", name="text", sources=["localize.py"]
+        )
+        self.create_library(
+            path="text/common/const",
+            target_type="java_library",
+            name="const",
+            sources=["emoji.py", "ascii.py"],
+        )
+        self.create_library(
+            path="text/common/helper",
+            target_type="java_library",
+            name="helper",
+            sources=["trunc.py"],
+        )
         self.create_file("bar.py")
 
         self.owner(["text/common/helper:helper"], "text/common/helper/trunc.py")

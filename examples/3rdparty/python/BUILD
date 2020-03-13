@@ -33,3 +33,8 @@ unpacked_whls(
   ],
   within_data_subdir='purelib/tensorflow',
 )
+
+files(
+  name='examples_python_3rdparty',
+  sources=['**/*'],
+)

@@ -353,6 +353,12 @@ class CacheFactory:
             raise ValueError("compression_level must be an integer 1-9: {}".format(compression))
 
         artifact_root = self._options.pants_workdir
+        # If the artifact root is a symlink it is more efficient to readlink the symlink
+        # only once in a FUSE context like VCFS. The artifact extraction root lets us extract
+        # artifacts directly side-stepping a VCFS lookup if in use.
+        artifact_extraction_root = (
+            os.readlink(artifact_root) if os.path.islink(artifact_root) else artifact_root
+        )
 
         def create_local_cache(parent_path):
             path = os.path.join(parent_path, self._cache_dirname)
@@ -361,6 +367,7 @@ class CacheFactory:
             )
             return LocalArtifactCache(
                 artifact_root,
+                artifact_extraction_root,
                 path,
                 compression,
                 self._options.max_entries_per_target,
@@ -375,7 +382,9 @@ class CacheFactory:
                 best_url_selector = BestUrlSelector(
                     ["{}/{}".format(url.rstrip("/"), self._cache_dirname) for url in urls]
                 )
-                local_cache = local_cache or TempLocalArtifactCache(artifact_root, compression)
+                local_cache = local_cache or TempLocalArtifactCache(
+                    artifact_root, artifact_extraction_root, compression
+                )
                 return RESTfulArtifactCache(
                     artifact_root,
                     best_url_selector,
