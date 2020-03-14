@@ -9,7 +9,8 @@ from typing_extensions import final
 
 from pants.build_graph.address import Address
 from pants.engine.fs import EMPTY_SNAPSHOT, GlobExpansionConjunction, PathGlobs, Snapshot
-from pants.engine.rules import UnionMembership, rule
+from pants.engine.objects import union
+from pants.engine.rules import RootRule, UnionMembership, rule
 from pants.engine.selectors import Get
 from pants.util.collections import ensure_str_list
 from pants.util.meta import frozen_after_init
@@ -97,8 +98,14 @@ class AsyncField(Field, metaclass=ABCMeta):
     """A field that needs the engine in order to be hydrated.
 
     You should create a corresponding Result class and define a rule to go from this AsyncField to
-    the Result. For example:
+    the Result.
 
+    You must also annotate the `AsyncField` with `@union` so that subclasses of the field may still
+    be substituted in properly.
+
+    For example:
+
+        @union
         class Sources(AsyncField):
             alias: ClassVar = "sources"
             raw_value: Optional[List[str]]
@@ -125,6 +132,29 @@ class AsyncField(Field, metaclass=ABCMeta):
     Then, call sites can `await Get` if they need to hydrate the field:
 
         sources = await Get[SourcesResult](Sources, my_tgt.get(Sources))
+
+    --
+
+    Subclasses of an `AsyncField` must go through some extra ceremony to work properly. They should
+    both declare a rule to go from the subclass to the common result type, and register the
+    subclass as a union member of the parent class.
+
+        class PythonSources(Sources):
+            ...
+
+
+        def hydrate_python_sources(sources: PythonSources) -> SourcesResult:
+            pass
+
+
+        def rules():
+            return [hydrate_python_sources, UnionRule(Sources, PythonSources)]
+
+    This setup allows call sites to `await Get` both the parent class and the subclass:
+
+        sources1 = await Get[SourcesResult](Sources, my_tgt.get(Sources))
+        sources2 = await Get[SourcesResult](PythonSources, my_tgt.get(PythonSources))
+        assert sources1 == sources2
     """
 
     address: Address
@@ -300,6 +330,7 @@ class StringOrStringListField(PrimitiveField):
         return ensure_str_list(self.raw_value)
 
 
+@union
 class Sources(AsyncField):
     alias: ClassVar = "sources"
     default_globs: ClassVar[Optional[Tuple[str, ...]]] = None
@@ -317,6 +348,7 @@ class HydrateSourcesRequest:
 
 @dataclass(frozen=True)
 class SourcesResult:
+    address: Address
     snapshot: Snapshot
 
 
@@ -337,4 +369,9 @@ async def hydrate_sources_field(sources: Sources) -> SourcesResult:
 
 
 def rules():
-    return [hydrate_sources, hydrate_sources_field]
+    return [
+        hydrate_sources,
+        hydrate_sources_field,
+        RootRule(HydrateSourcesRequest),
+        RootRule(Sources),
+    ]

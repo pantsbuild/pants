@@ -2,9 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pathlib import PurePath
-from typing import ClassVar, Optional
+from typing import Any, ClassVar, Optional
 
-from pants.engine.rules import rule
+from pants.build_graph.address import Address
+from pants.engine.objects import union
+from pants.engine.rules import RootRule, UnionRule, rule
 from pants.engine.selectors import Get
 from pants.engine.target import (
     BoolField,
@@ -16,17 +18,18 @@ from pants.engine.target import (
     StringOrStringListField,
     Target,
 )
-from pants.util.memo import memoized_property
-
-# TODO: Deal with the `provides` field.
 
 
+@union
 class PythonSources(Sources):
     @staticmethod
     def validate_result(result: SourcesResult) -> None:
         non_python_files = [fp for fp in result.snapshot.files if not PurePath(fp).suffix == ".py"]
         if non_python_files:
-            raise ValueError("")
+            raise ValueError(
+                f"Target {result.address} has non-Python sources in its `sources` field: "
+                f"{non_python_files}"
+            )
 
 
 class PythonLibrarySources(PythonSources):
@@ -48,8 +51,6 @@ class PythonBinarySources(PythonSources):
             )
 
 
-# TODO: should these be union rules..? I think the call sites here are nice, to be able to say
-# `await Get[SourcesResult](Sources, my_tgt.get(Sources)`
 @rule
 async def hydrate_python_sources(sources: PythonSources) -> SourcesResult:
     return await Get[SourcesResult](HydrateSourcesRequest(sources))
@@ -81,6 +82,15 @@ class Compatibility(StringOrStringListField):
     alias: ClassVar = "compatibility"
 
 
+# TODO: Deal with the `provides` field. This will at least allow us to correctly parse the valid,
+#  rather than throwing an error when encountering it.
+class Provides(PrimitiveField):
+    alias: ClassVar = "provides"
+
+    def hydrate(self, *, address: Address) -> Any:
+        return self.raw_value
+
+
 class Coverage(StringOrStringListField):
     """The module(s) whose coverage should be generated, e.g. `['pants.util']`."""
 
@@ -96,17 +106,12 @@ class Timeout(PrimitiveField):
     alias: ClassVar = "timeout"
     raw_value: Optional[int]
 
-    @memoized_property
-    def value(self) -> Optional[int]:
-        if self.raw_value is None:
-            return None
-        if not isinstance(self.raw_value, int):
+    def hydrate(self, *, address: Address) -> Optional[int]:
+        if self.raw_value is not None and self.raw_value <= 0:
             raise ValueError(
-                f"The `timeout` field must be an `int`. Was {type(self.raw_value)} "
-                f"({self.raw_value})."
+                f"The `{self.alias}` field for the target {address} must be > 1. Was "
+                f"{self.raw_value}."
             )
-        if self.raw_value <= 0:
-            raise ValueError(f"The `timeout` field must be > 1. Was {self.raw_value}.")
         return self.raw_value
 
 
@@ -182,7 +187,7 @@ class EmitPexWarnings(BoolField):
     default: ClassVar = True
 
 
-COMMON_PYTHON_FIELDS = (Compatibility,)
+COMMON_PYTHON_FIELDS = (Compatibility, Provides)
 
 
 class PythonBinary(Target):
@@ -221,11 +226,17 @@ class PythonTests(Target):
 
 
 def rules():
+    python_sources_subclasses = (PythonBinarySources, PythonLibrarySources, PythonTestsSources)
     return [
         hydrate_python_sources,
-        hydrate_python_binary_sources,
-        hydrate_python_library_sources,
-        hydrate_python_tests_sources,
+        # hydrate_python_binary_sources,
+        # hydrate_python_library_sources,
+        # hydrate_python_tests_sources,
+        RootRule(PythonSources),
+        # UnionRule(Sources, PythonSources),
+        # *(RootRule(subclass) for subclass in python_sources_subclasses),
+        # *(UnionRule(Sources, subclass) for subclass in python_sources_subclasses),
+        # *(UnionRule(PythonSources, subclass) for subclass in python_sources_subclasses),
     ]
 
 

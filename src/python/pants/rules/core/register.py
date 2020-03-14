@@ -1,6 +1,7 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from pants.engine.target import rules as target_rules
 from pants.rules.core import (
     binary,
     cloc,
@@ -33,4 +34,5 @@ def rules():
         *strip_source_roots.rules(),
         *distdir.rules(),
         *test.rules(),
+        *target_rules(),
     ]
