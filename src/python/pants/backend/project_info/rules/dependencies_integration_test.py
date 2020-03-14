@@ -3,7 +3,7 @@
 
 from typing import List, Optional
 
-from pants.backend.project_info.rules.dependencies import Dependencies, rules
+from pants.backend.project_info.rules.dependencies import Dependencies, DependencyType, rules
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -47,20 +47,20 @@ class DependenciesIntegrationTest(GoalRuleTestBase):
         target: str,
         expected: List[str],
         transitive: bool = True,
-        dependency_type: str = "source",
+        dependency_type: DependencyType = DependencyType.SOURCE,
     ) -> None:
         env = {"PANTS_BACKEND_PACKAGES2": "pants.backend.project_info"}
-        args = [f"--type={dependency_type}"]
+        args = [f"--type={dependency_type.value}"]
         if transitive:
             args.append("--transitive")
         self.assert_console_output(*expected, args=[*args, target], env=env)
 
-    def test_no_target(self):
+    def test_no_target(self) -> None:
         self.assert_dependencies(
             target="", expected=[], transitive=False,
         )
 
-    def test_no_dependencies(self):
+    def test_no_dependencies(self) -> None:
         self.create_python_library(path="some/target")
         self.assert_dependencies(
             target="some/target", expected=[], transitive=False,
@@ -69,7 +69,7 @@ class DependenciesIntegrationTest(GoalRuleTestBase):
             target="some/target", expected=[], transitive=True,
         )
 
-    def test_dependencies_source(self):
+    def test_dependencies_source(self) -> None:
         self.create_python_requirement_library(name="foo")
         self.create_python_requirement_library(name="bar")
         self.create_python_library(path="dep/target")
@@ -83,10 +83,10 @@ class DependenciesIntegrationTest(GoalRuleTestBase):
             target="some/other/target",
             expected=["3rdparty/bar:bar", "some/target:target"],
             transitive=False,
-            dependency_type="source",
+            dependency_type=DependencyType.SOURCE,
         )
 
-    def test_dependencies_source_transitive(self):
+    def test_dependencies_source_transitive(self) -> None:
         self.create_python_requirement_library(name="foo")
         self.create_python_requirement_library(name="bar")
         self.create_python_library(path="dep/target")
@@ -105,10 +105,10 @@ class DependenciesIntegrationTest(GoalRuleTestBase):
                 "dep/target:target",
             ],
             transitive=True,
-            dependency_type="source",
+            dependency_type=DependencyType.SOURCE,
         )
 
-    def test_dependencies_3rdparty(self):
+    def test_dependencies_3rdparty(self) -> None:
         self.create_python_requirement_library(name="foo")
         self.create_python_requirement_library(name="bar")
         self.create_python_library(path="dep/target")
@@ -122,10 +122,10 @@ class DependenciesIntegrationTest(GoalRuleTestBase):
             target="some/other/target",
             expected=["bar==1.0.0"],
             transitive=False,
-            dependency_type="3rdparty",
+            dependency_type=DependencyType.THIRD_PARTY,
         )
 
-    def test_dependencies_3rdparty_transitive(self):
+    def test_dependencies_3rdparty_transitive(self) -> None:
         self.create_python_requirement_library(name="foo")
         self.create_python_requirement_library(name="bar")
         self.create_python_library(path="dep/target")
@@ -139,10 +139,10 @@ class DependenciesIntegrationTest(GoalRuleTestBase):
             target="some/other/target",
             expected=["bar==1.0.0", "foo==1.0.0"],
             transitive=True,
-            dependency_type="3rdparty",
+            dependency_type=DependencyType.THIRD_PARTY,
         )
 
-    def test_dependencies_source_and_3rdparty(self):
+    def test_dependencies_source_and_3rdparty(self) -> None:
         self.create_python_requirement_library(name="foo")
         self.create_python_requirement_library(name="bar")
         self.create_python_library(path="dep/target")
@@ -156,10 +156,10 @@ class DependenciesIntegrationTest(GoalRuleTestBase):
             target="some/other/target",
             expected=["3rdparty/bar:bar", "some/target:target", "bar==1.0.0"],
             transitive=False,
-            dependency_type="source-and-3rdparty",
+            dependency_type=DependencyType.SOURCE_AND_THIRD_PARTY,
         )
 
-    def test_dependencies_source_and_3rdparty_transitive(self):
+    def test_dependencies_source_and_3rdparty_transitive(self) -> None:
         self.create_python_requirement_library(name="foo")
         self.create_python_requirement_library(name="bar")
         self.create_python_library(path="dep/target")
@@ -180,5 +180,5 @@ class DependenciesIntegrationTest(GoalRuleTestBase):
                 "bar==1.0.0",
             ],
             transitive=True,
-            dependency_type="source-and-3rdparty",
+            dependency_type=DependencyType.SOURCE_AND_THIRD_PARTY,
         )
