@@ -106,10 +106,41 @@ class CoverageDataBatch:
     pass
 
 
+class CoverageReport(ABC):
+    """Represents a code coverage report that can be materialized to the terminal or disk."""
+
+    def materialize(self, console: Console, workspace: Workspace) -> None:
+        """Materialize this code coverage report to the terminal or disk.
+
+        :param console: A handle to the terminal.
+        :param workspace: A handle to local disk.
+        """
+
+
 @dataclass(frozen=True)
-class CoverageReport:
+class ConsoleCoverageReport(CoverageReport):
+    """Materializes a code coverage report to the terminal."""
+
+    report: str
+
+    def materialize(self, console: Console, workspace: Workspace) -> None:
+        console.print_stdout(f"\n{self.report}")
+
+
+@dataclass(frozen=True)
+class FilesystemCoverageReport(CoverageReport):
+    """Materializes a code coverage report to disk."""
+
     result_digest: Digest
     directory_to_materialize_to: PurePath
+
+    def materialize(self, console: Console, workspace: Workspace) -> None:
+        workspace.materialize_directory(
+            DirectoryToMaterialize(
+                self.result_digest, path_prefix=str(self.directory_to_materialize_to),
+            )
+        )
+        console.print_stdout(f"\nWrote coverage report to `{self.directory_to_materialize_to}`")
 
 
 class TestOptions(GoalSubsystem):
@@ -196,29 +227,6 @@ async def run_tests(
         if test_runner.is_valid_target(adaptor_with_origin)
     )
 
-    if options.values.run_coverage:
-        # TODO: consider warning if a user uses `--coverage` but the language backend does not
-        # provide coverage support. This might be too chatty to be worth doing?
-        results_with_coverage = [x for x in results if x.test_result.coverage_data is not None]
-        coverage_data_collections = itertools.groupby(
-            results_with_coverage,
-            lambda address_and_test_result: address_and_test_result.test_result.coverage_data.batch_cls,  # type: ignore[union-attr]
-        )
-
-        coverage_reports = await MultiGet(
-            Get[CoverageReport](
-                CoverageDataBatch, coverage_batch_cls(tuple(addresses_and_test_results))  # type: ignore[call-arg]
-            )
-            for coverage_batch_cls, addresses_and_test_results in coverage_data_collections
-        )
-        for report in coverage_reports:
-            workspace.materialize_directory(
-                DirectoryToMaterialize(
-                    report.result_digest, path_prefix=str(report.directory_to_materialize_to),
-                )
-            )
-            console.print_stdout(f"Wrote coverage report to `{report.directory_to_materialize_to}`")
-
     did_any_fail = False
     for result in results:
         if result.test_result.status == Status.FAILURE:
@@ -246,6 +254,25 @@ async def run_tests(
         exit_code = PANTS_FAILED_EXIT_CODE
     else:
         exit_code = PANTS_SUCCEEDED_EXIT_CODE
+
+    if options.values.run_coverage:
+        # TODO: consider warning if a user uses `--coverage` but the language backend does not
+        # provide coverage support. This might be too chatty to be worth doing?
+        results_with_coverage = [x for x in results if x.test_result.coverage_data is not None]
+        coverage_data_collections = itertools.groupby(
+            results_with_coverage,
+            lambda address_and_test_result: address_and_test_result.test_result.coverage_data.batch_cls,  # type: ignore[union-attr]
+        )
+
+        coverage_reports = await MultiGet(
+            Get[CoverageReport](
+                CoverageDataBatch, coverage_batch_cls(tuple(addresses_and_test_results))  # type: ignore[call-arg]
+            )
+            for coverage_batch_cls, addresses_and_test_results in coverage_data_collections
+        )
+
+        for report in coverage_reports:
+            report.materialize(console, workspace)
 
     return Test(exit_code)
 
