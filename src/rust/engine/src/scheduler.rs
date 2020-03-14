@@ -13,6 +13,7 @@ use futures01::future::{self, Future};
 use crate::context::{Context, Core};
 use crate::core::{Failure, Params, TypeId, Value};
 use crate::nodes::{NodeKey, Select, Tracer, Visualizer};
+use crate::watch::InvalidationWatcher;
 use graph::{Graph, InvalidationResult};
 use hashing;
 use indexmap::IndexMap;
@@ -227,22 +228,7 @@ impl Scheduler {
   /// Invalidate the invalidation roots represented by the given Paths.
   ///
   pub fn invalidate(&self, paths: &HashSet<PathBuf>) -> usize {
-    let InvalidationResult { cleared, dirtied } =
-      self.core.graph.invalidate_from_roots(move |node| {
-        if let Some(fs_subject) = node.fs_subject() {
-          paths.contains(fs_subject)
-        } else {
-          false
-        }
-      });
-    // TODO: The rust log level is not currently set correctly in a pantsd context. To ensure that
-    // we see this even at `info` level, we set it to warn. #6004 should address this by making
-    // rust logging re-configuration an explicit step in `src/python/pants/init/logging.py`.
-    warn!(
-      "invalidation: cleared {} and dirtied {} nodes for: {:?}",
-      cleared, dirtied, paths
-    );
-    cleared + dirtied
+    InvalidationWatcher::invalidate(&self.core.graph, paths, "watchman")
   }
 
   ///

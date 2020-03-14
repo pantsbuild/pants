@@ -221,7 +221,7 @@ impl Core {
       ));
     }
     let graph = Arc::new(Graph::new());
-    let watcher = InvalidationWatcher::new(Arc::downgrade(&graph))?;
+    let watcher = InvalidationWatcher::new(Arc::downgrade(&graph), build_root.clone())?;
 
     let http_client = reqwest::r#async::Client::new();
     let rule_graph = RuleGraph::new(tasks.as_map(), root_subject_types);
