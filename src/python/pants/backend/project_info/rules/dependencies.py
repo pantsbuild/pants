@@ -8,6 +8,7 @@ from pants.engine.addressable import Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
+from pants.engine.legacy.structs import PythonRequirementLibraryAdaptor
 from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get
 
@@ -33,7 +34,6 @@ class DependenciesOptions(LineOriented, GoalSubsystem):
             type=bool,
             help="Run dependencies against transitive dependencies of targets specified on the command line.",
         )
-        # TODO(#8762): Wire this up. Currently we only support `internal`.
         register(
             "--type",
             type=DependencyType,
@@ -52,23 +52,48 @@ async def dependencies(
     console: Console, addresses: Addresses, options: DependenciesOptions,
 ) -> Dependencies:
     address_strings: Set[str] = set()
+    third_party_requirements: Set[str] = set()
+
     if options.values.transitive:
         transitive_targets = await Get[TransitiveHydratedTargets](Addresses, addresses)
-        transitive_dependencies = transitive_targets.closure - set(transitive_targets.roots)
-        address_strings.update(
-            hydrated_target.adaptor.address.spec for hydrated_target in transitive_dependencies
+        hydrated_targets = HydratedTargets(
+            transitive_targets.closure - set(transitive_targets.roots)
         )
     else:
-        hydrated_targets = await Get[HydratedTargets](Addresses, addresses)
-        address_strings.update(
-            dep.spec
-            for hydrated_target in hydrated_targets
-            for dep in hydrated_target.adaptor.dependencies
+        targets = await Get[HydratedTargets](Addresses, addresses)
+        direct_dependency_addresses = [
+            dep for target in targets for dep in target.adaptor.dependencies
+        ]
+        hydrated_targets = await Get[HydratedTargets](
+            Addresses, Addresses(direct_dependency_addresses)
         )
+
+    should_include_third_party = options.values.type in [
+        DependencyType.THIRD_PARTY,
+        DependencyType.SOURCE_AND_THIRD_PARTY,
+    ]
+    should_include_source = options.values.type in [
+        DependencyType.SOURCE,
+        DependencyType.SOURCE_AND_THIRD_PARTY,
+    ]
+
+    for target in hydrated_targets:
+        if should_include_third_party:
+            if isinstance(target.adaptor, PythonRequirementLibraryAdaptor):
+                third_party_requirements.update(
+                    str(requirement.requirement) for requirement in target.adaptor.requirements
+                )
+                # TODO(#8762): Support jvm third party deps when there is some sort of JarLibraryAdaptor.
+        if should_include_source:
+            address_strings.update(
+                target.adaptor.address.spec for hydrated_target in hydrated_targets
+            )
 
     with options.line_oriented(console) as print_stdout:
         for address in sorted(address_strings):
             print_stdout(address)
+        for requirement_string in sorted(third_party_requirements):
+            print_stdout(requirement_string)
 
     return Dependencies(exit_code=0)
 
