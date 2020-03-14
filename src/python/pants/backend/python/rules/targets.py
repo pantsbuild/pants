@@ -76,7 +76,7 @@ class Coverage(StringOrStringListField):
 
 
 class Timeout(PrimitiveField):
-    """A timeout (in seconds) which covers the total the total runtime of all tests in this target.
+    """A timeout (in seconds) which covers the total runtime of all tests in this target.
 
     This only applies if `--pytest-timeouts` is set to True.
     """
