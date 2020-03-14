@@ -9,6 +9,7 @@ from pants.engine.objects import union
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
+    ImmutableValue,
     PrimitiveField,
     Sources,
     SourcesResult,
@@ -65,7 +66,7 @@ class Compatibility(StringOrStringSequenceField):
 class Provides(PrimitiveField):
     alias: ClassVar = "provides"
 
-    def hydrate(self, raw_value: Optional[Any], *, address: Address) -> Any:
+    def hydrate(self, raw_value: Optional[Any], *, address: Address) -> ImmutableValue:
         return raw_value
 
 

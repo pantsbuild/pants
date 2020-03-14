@@ -13,6 +13,10 @@ from pants.engine.rules import UnionMembership
 from pants.util.collections import ensure_str_list
 from pants.util.meta import frozen_after_init
 
+# Type alias to express the intent that the type should be immutable and hashable. There's nothing
+# to actually enforce this, outside of convention. Maybe we could develop a MyPy plugin?
+ImmutableValue = Any
+
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)  # type: ignore[misc]  # MyPy doesn't like the abstract __init__()
@@ -58,7 +62,7 @@ class PrimitiveField(Field, metaclass=ABCMeta):
                 return raw_value
     """
 
-    value: Any
+    value: ImmutableValue
 
     @final
     def __init__(self, raw_value: Optional[Any], *, address: Address) -> None:
@@ -70,7 +74,7 @@ class PrimitiveField(Field, metaclass=ABCMeta):
         self.value = self.hydrate(raw_value, address=address)
 
     @abstractmethod
-    def hydrate(self, raw_value: Optional[Any], *, address: Address) -> Any:
+    def hydrate(self, raw_value: Optional[Any], *, address: Address) -> ImmutableValue:
         """Convert the `raw_value` into `self.value`.
 
         You should perform any validation and/or hydration here. For example, you may want to check
@@ -135,7 +139,7 @@ class AsyncField(Field, metaclass=ABCMeta):
     """
 
     address: Address
-    sanitized_raw_value: Any
+    sanitized_raw_value: ImmutableValue
 
     @final
     def __init__(self, raw_value: Optional[Any], *, address: Address) -> None:
@@ -143,7 +147,7 @@ class AsyncField(Field, metaclass=ABCMeta):
         self.sanitized_raw_value = self.sanitize_raw_value(raw_value)
 
     @abstractmethod
-    def sanitize_raw_value(self, raw_value: Optional[Any]) -> Any:
+    def sanitize_raw_value(self, raw_value: Optional[Any]) -> ImmutableValue:
         """Sanitize the `raw_value` into a type that is safe for the V2 engine to use.
 
         The resulting type should be immutable and hashable.
