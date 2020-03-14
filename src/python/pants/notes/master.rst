@@ -5,7 +5,7 @@ This document describes development releases which occur weekly from master, and
 not undergone the vetting associated with ``stable`` releases.
 
 1.27.0.dev0 (3/14/2020)
-----------------------------------------------------------------------------------------------------
+-----------------------
 
 API Changes
 ~~~~~~~~~~~
