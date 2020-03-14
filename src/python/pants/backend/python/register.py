@@ -15,7 +15,6 @@ from pants.backend.python.rules import (
     python_create_binary,
     repl,
     run_setup_py,
-    targets,
 )
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.targets.python_app import PythonApp
@@ -118,5 +117,4 @@ def rules():
         *repl.rules(),
         *run_setup_py.rules(),
         *subprocess_environment.rules(),
-        *targets.rules(),
     )

@@ -8,10 +8,8 @@ from typing import Any, ClassVar, Dict, Iterable, List, Optional, Tuple, Type, T
 from typing_extensions import final
 
 from pants.build_graph.address import Address
-from pants.engine.fs import EMPTY_SNAPSHOT, GlobExpansionConjunction, PathGlobs, Snapshot
-from pants.engine.objects import union
-from pants.engine.rules import RootRule, UnionMembership, rule
-from pants.engine.selectors import Get
+from pants.engine.fs import Snapshot
+from pants.engine.rules import UnionMembership
 from pants.util.collections import ensure_str_list
 from pants.util.meta import frozen_after_init
 
@@ -98,14 +96,8 @@ class AsyncField(Field, metaclass=ABCMeta):
     """A field that needs the engine in order to be hydrated.
 
     You should create a corresponding Result class and define a rule to go from this AsyncField to
-    the Result.
+    the Result. For example:
 
-    You must also annotate the `AsyncField` with `@union` so that subclasses of the field may still
-    be substituted in properly.
-
-    For example:
-
-        @union
         class Sources(AsyncField):
             alias: ClassVar = "sources"
             raw_value: Optional[List[str]]
@@ -132,29 +124,6 @@ class AsyncField(Field, metaclass=ABCMeta):
     Then, call sites can `await Get` if they need to hydrate the field:
 
         sources = await Get[SourcesResult](Sources, my_tgt.get(Sources))
-
-    --
-
-    Subclasses of an `AsyncField` must go through some extra ceremony to work properly. They should
-    both declare a rule to go from the subclass to the common result type, and register the
-    subclass as a union member of the parent class.
-
-        class PythonSources(Sources):
-            ...
-
-
-        def hydrate_python_sources(sources: PythonSources) -> SourcesResult:
-            pass
-
-
-        def rules():
-            return [hydrate_python_sources, UnionRule(Sources, PythonSources)]
-
-    This setup allows call sites to `await Get` both the parent class and the subclass:
-
-        sources1 = await Get[SourcesResult](Sources, my_tgt.get(Sources))
-        sources2 = await Get[SourcesResult](PythonSources, my_tgt.get(PythonSources))
-        assert sources1 == sources2
     """
 
     address: Address
@@ -330,20 +299,17 @@ class StringOrStringListField(PrimitiveField):
         return ensure_str_list(self.raw_value)
 
 
-@union
+# TODO: implement the hydration for this so that you can
+#  `await Get[SourcesResult](Sources, my_tgt.get(Sources)`. Tricky part of this...this _must_
+#  support subclassing the field to give custom behavior.
 class Sources(AsyncField):
     alias: ClassVar = "sources"
     default_globs: ClassVar[Optional[Tuple[str, ...]]] = None
     raw_value: Optional[Iterable[str]]
 
-    @staticmethod
-    def validate_result(_: "SourcesResult") -> None:
+    @classmethod
+    def validate_result(cls, _: "SourcesResult") -> None:
         pass
-
-
-@dataclass(frozen=True)
-class HydrateSourcesRequest:
-    field: Sources
 
 
 @dataclass(frozen=True)
@@ -352,26 +318,8 @@ class SourcesResult:
     snapshot: Snapshot
 
 
-@rule
-async def hydrate_sources(request: HydrateSourcesRequest) -> SourcesResult:
-    sources_field = request.field
-    if sources_field.raw_value is None:
-        if sources_field.default_globs is None:
-            return SourcesResult(EMPTY_SNAPSHOT)
-        PathGlobs(sources_field.default_globs, conjunction=GlobExpansionConjunction.any_match)
-    sources = ensure_str_list(sources_field.raw_value)
-    PathGlobs(sources, conjunction=GlobExpansionConjunction.all_match)
-
-
-@rule
-async def hydrate_sources_field(sources: Sources) -> SourcesResult:
-    return await Get[SourcesResult](HydrateSourcesRequest(sources))
-
-
-def rules():
-    return [
-        hydrate_sources,
-        hydrate_sources_field,
-        RootRule(HydrateSourcesRequest),
-        RootRule(Sources),
-    ]
+# TODO: figure out what support looks like for this. Likely, hydration means resolving direct
+#  dependencies, but not transitive.
+class Dependencies(AsyncField):
+    alias: ClassVar = "dependencies"
+    raw_value: Optional[Iterable[str]]

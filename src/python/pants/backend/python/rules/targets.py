@@ -6,11 +6,9 @@ from typing import Any, ClassVar, Optional
 
 from pants.build_graph.address import Address
 from pants.engine.objects import union
-from pants.engine.rules import RootRule, UnionRule, rule
-from pants.engine.selectors import Get
 from pants.engine.target import (
     BoolField,
-    HydrateSourcesRequest,
+    Dependencies,
     PrimitiveField,
     Sources,
     SourcesResult,
@@ -22,8 +20,8 @@ from pants.engine.target import (
 
 @union
 class PythonSources(Sources):
-    @staticmethod
-    def validate_result(result: SourcesResult) -> None:
+    @classmethod
+    def validate_result(cls, result: SourcesResult) -> None:
         non_python_files = [fp for fp in result.snapshot.files if not PurePath(fp).suffix == ".py"]
         if non_python_files:
             raise ValueError(
@@ -41,34 +39,14 @@ class PythonTestsSources(PythonSources):
 
 
 class PythonBinarySources(PythonSources):
-    @staticmethod
-    def validate_result(result: SourcesResult) -> None:
+    @classmethod
+    def validate_result(cls, result: SourcesResult) -> None:
         super().validate_result(result)
         if len(result.snapshot.files) not in [0, 1]:
             raise ValueError(
                 "Binary targets must have only 0 or 1 source files. Any additional files should "
                 "be put in a `python_library` which is added to `dependencies`"
             )
-
-
-@rule
-async def hydrate_python_sources(sources: PythonSources) -> SourcesResult:
-    return await Get[SourcesResult](HydrateSourcesRequest(sources))
-
-
-@rule
-async def hydrate_python_library_sources(sources: PythonLibrarySources) -> SourcesResult:
-    return await Get[SourcesResult](HydrateSourcesRequest(sources))
-
-
-@rule
-async def hydrate_python_tests_sources(sources: PythonTestsSources) -> SourcesResult:
-    return await Get[SourcesResult](HydrateSourcesRequest(sources))
-
-
-@rule
-async def hydrate_python_binary_sources(sources: PythonBinarySources) -> SourcesResult:
-    return await Get[SourcesResult](HydrateSourcesRequest(sources))
 
 
 class Compatibility(StringOrStringListField):
@@ -187,7 +165,7 @@ class EmitPexWarnings(BoolField):
     default: ClassVar = True
 
 
-COMMON_PYTHON_FIELDS = (Compatibility, Provides)
+COMMON_PYTHON_FIELDS = (Dependencies, Compatibility, Provides)
 
 
 class PythonBinary(Target):
@@ -223,21 +201,6 @@ class PythonLibrary(Target):
 class PythonTests(Target):
     alias: ClassVar = "python_tests"
     core_fields: ClassVar = (*COMMON_PYTHON_FIELDS, PythonTestsSources, Coverage, Timeout)
-
-
-def rules():
-    python_sources_subclasses = (PythonBinarySources, PythonLibrarySources, PythonTestsSources)
-    return [
-        hydrate_python_sources,
-        # hydrate_python_binary_sources,
-        # hydrate_python_library_sources,
-        # hydrate_python_tests_sources,
-        RootRule(PythonSources),
-        # UnionRule(Sources, PythonSources),
-        # *(RootRule(subclass) for subclass in python_sources_subclasses),
-        # *(UnionRule(Sources, subclass) for subclass in python_sources_subclasses),
-        # *(UnionRule(PythonSources, subclass) for subclass in python_sources_subclasses),
-    ]
 
 
 def targets():
