@@ -3,12 +3,14 @@
 
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
-from typing import Any, ClassVar, Dict, Iterable, Optional, Tuple, Type, TypeVar, cast
+from typing import Any, ClassVar, Dict, Iterable, List, Optional, Tuple, Type, TypeVar, Union, cast
 
 from typing_extensions import final
 
 from pants.build_graph.address import Address
+from pants.engine.fs import Snapshot
 from pants.engine.rules import UnionMembership
+from pants.util.collections import ensure_str_list
 from pants.util.meta import frozen_after_init
 
 
@@ -201,7 +203,7 @@ class Target(ABC):
     def __repr__(self) -> str:
         return (
             f"{self.__class__}("
-            f"address={self.address},"
+            f"address={self.address}, "
             f"alias={repr(self.alias)}, "
             f"core_fields={list(self.core_fields)}, "
             f"plugin_fields={list(self.plugin_fields)}, "
@@ -271,3 +273,72 @@ class BoolField(PrimitiveField):
         #  So, the type hint on `raw_value` is technically a lie - while we expect that to be the
         #  raw_value, it could easily be different.
         return self.raw_value
+
+
+class StringField(PrimitiveField):
+    raw_value: Optional[str]
+    value: Optional[str]
+
+    def hydrate(self, *, address: Address) -> Optional[str]:
+        return self.raw_value
+
+
+class StringListField(PrimitiveField):
+    raw_value: Optional[Iterable[str]]
+    value: Optional[List[str]]
+
+    def hydrate(self, *, address: Address) -> Optional[List[str]]:
+        if self.raw_value is None:
+            return None
+        return list(self.raw_value)
+
+
+class StringOrStringListField(PrimitiveField):
+    """The raw_value may either be a string or be a list of strings.
+
+    This is syntactic sugar that we use for certain fields to make BUILD files simpler when the user
+    has no need for more than one element.
+    """
+
+    raw_value: Optional[Union[str, Iterable[str]]]
+    value: Optional[List[str]]
+
+    def hydrate(self, *, address: Address) -> Optional[List[str]]:
+        if self.raw_value is None:
+            return None
+        return ensure_str_list(self.raw_value)
+
+
+class Tags(StringListField):
+    alias: ClassVar = "tags"
+
+
+# TODO: figure out what support looks like for this. This already gets hydrated into a
+#  List[Address] by the time we have a HydratedStruct. Should it stay that way, or should it go
+#  back to being a List[str] and we only hydrate into Addresses when necessary? Alternatively, does
+#  hydration mean getting back `Targets`?
+class Dependencies(AsyncField):
+    alias: ClassVar = "dependencies"
+    raw_value: List[Address]
+
+
+COMMON_TARGET_FIELDS = (Dependencies, Tags)
+
+
+# TODO: implement the hydration for this so that you can
+#  `await Get[SourcesResult](Sources, my_tgt.get(Sources)`. Tricky part of this...this _must_
+#  support subclassing the field to give custom behavior.
+class Sources(AsyncField):
+    alias: ClassVar = "sources"
+    default_globs: ClassVar[Optional[Tuple[str, ...]]] = None
+    raw_value: Optional[Iterable[str]]
+
+    @classmethod
+    def validate_result(cls, _: "SourcesResult") -> None:
+        pass
+
+
+@dataclass(frozen=True)
+class SourcesResult:
+    address: Address
+    snapshot: Snapshot
