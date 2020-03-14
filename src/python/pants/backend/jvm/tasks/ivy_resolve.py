@@ -95,7 +95,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
 
         deprecated_conditional(
             lambda: JvmResolveSubsystem.global_instance().get_options().resolver == "ivy",
-            removal_version="1.27.0.dev0",
+            removal_version="1.27.0.dev2",
             entity_description="Ivy Resolve",
             hint_message="resolve.ivy as well as --resolver-resolver=ivy will be removed."
             "Please use --resolver-resolver=coursier instead and refer to "
