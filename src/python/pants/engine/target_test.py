@@ -7,6 +7,7 @@ from typing import ClassVar, List, Optional, Tuple
 
 import pytest
 
+from pants.build_graph.address import Address
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, PathGlobs, Snapshot
 from pants.engine.rules import UnionMembership, rule
 from pants.engine.selectors import Get
@@ -21,7 +22,7 @@ class HaskellGhcExtensions(PrimitiveField):
     raw_value: Optional[List[str]]
     value: List[str]
 
-    def hydrate(self) -> List[str]:
+    def hydrate(self, *, address: Address) -> List[str]:
         if self.raw_value is None:
             return []
         # Add some arbitrary validation to test that hydration/validation works properly.
@@ -31,7 +32,7 @@ class HaskellGhcExtensions(PrimitiveField):
         if bad_extensions:
             raise ValueError(
                 f"All elements of `{self.alias}` must be prefixed by `Ghc`. Received "
-                f"{bad_extensions}."
+                f"{bad_extensions} for target {address}."
             )
         return self.raw_value
 
@@ -54,7 +55,10 @@ async def hydrate_haskell_sources(sources: HaskellSources) -> HaskellSourcesResu
     # Validate after hydration
     non_haskell_sources = [fp for fp in result.files if PurePath(fp).suffix != ".hs"]
     if non_haskell_sources:
-        raise ValueError(f"Received non-Haskell sources in {sources.alias}: {non_haskell_sources}.")
+        raise ValueError(
+            f"Received non-Haskell sources in {sources.alias} for target {sources.address}: "
+            f"{non_haskell_sources}."
+        )
     return HaskellSourcesResult(result)
 
 
@@ -65,19 +69,24 @@ class HaskellTarget(Target):
 
 def test_invalid_fields_rejected() -> None:
     with pytest.raises(ValueError) as exc:
-        HaskellTarget({"invalid_field": True})
-    assert "Unrecognized field `invalid_field=True` for target type `haskell`." in str(exc)
+        HaskellTarget({"invalid_field": True}, address=Address.parse(":lib"))
+    assert (
+        "Unrecognized field `invalid_field=True` for target //:lib with target type `haskell`."
+        in str(exc)
+    )
 
 
 def test_get_primitive_field() -> None:
     extensions = ["GhcExistentialQuantification"]
-    extensions_field = HaskellTarget({HaskellGhcExtensions.alias: extensions}).get(
-        HaskellGhcExtensions
-    )
+    extensions_field = HaskellTarget(
+        {HaskellGhcExtensions.alias: extensions}, address=Address.parse(":lib")
+    ).get(HaskellGhcExtensions)
     assert extensions_field.raw_value == extensions
     assert extensions_field.value == extensions
 
-    default_extensions_field = HaskellTarget({}).get(HaskellGhcExtensions)
+    default_extensions_field = HaskellTarget({}, address=Address.parse(":default")).get(
+        HaskellGhcExtensions
+    )
     assert default_extensions_field.raw_value is None
     assert default_extensions_field.value == []
 
@@ -86,7 +95,9 @@ def test_get_async_field() -> None:
     def hydrate_field(
         *, raw_source_files: List[str], hydrated_source_files: Tuple[str, ...]
     ) -> HaskellSourcesResult:
-        sources_field = HaskellTarget({HaskellSources.alias: raw_source_files}).get(HaskellSources)
+        sources_field = HaskellTarget(
+            {HaskellSources.alias: raw_source_files}, address=Address.parse(":lib")
+        ).get(HaskellSources)
         assert sources_field.raw_value == raw_source_files
         result: HaskellSourcesResult = run_rule(
             hydrate_haskell_sources,
@@ -123,6 +134,7 @@ def test_get_async_field() -> None:
     with pytest.raises(ValueError) as exc:
         hydrate_field(raw_source_files=["*.js"], hydrated_source_files=("not_haskell.js",))
     assert "Received non-Haskell sources" in str(exc)
+    assert "//:lib" in str(exc)
 
 
 def test_has_fields() -> None:
@@ -130,7 +142,7 @@ def test_has_fields() -> None:
         alias: ClassVar = "unrelated"
         default: ClassVar = False
 
-    tgt = HaskellTarget({})
+    tgt = HaskellTarget({}, address=Address.parse(":lib"))
     assert tgt.has_fields([]) is True
     assert tgt.has_fields([HaskellGhcExtensions]) is True
     assert tgt.has_fields([UnrelatedField]) is False
@@ -140,9 +152,11 @@ def test_has_fields() -> None:
 def test_primitive_field_hydration_is_eager() -> None:
     with pytest.raises(ValueError) as exc:
         HaskellTarget(
-            {HaskellGhcExtensions.alias: ["GhcExistentialQuantification", "DoesNotStartWithGhc"]}
+            {HaskellGhcExtensions.alias: ["GhcExistentialQuantification", "DoesNotStartWithGhc"]},
+            address=Address.parse(":bad_extension"),
         )
     assert "must be prefixed by `Ghc`" in str(exc)
+    assert "//:bad_extension" in str(exc)
 
 
 def test_add_custom_fields() -> None:
@@ -152,13 +166,17 @@ def test_add_custom_fields() -> None:
 
     union_membership = UnionMembership({HaskellTarget.PluginField: OrderedSet([CustomField])})
     tgt_values = {CustomField.alias: True}
-    tgt = HaskellTarget(tgt_values, union_membership=union_membership)
+    tgt = HaskellTarget(
+        tgt_values, address=Address.parse(":lib"), union_membership=union_membership
+    )
     assert tgt.field_types == (HaskellGhcExtensions, HaskellSources, CustomField)
     assert tgt.core_fields == (HaskellGhcExtensions, HaskellSources)
     assert tgt.plugin_fields == (CustomField,)
     assert tgt.get(CustomField).value is True
 
-    default_tgt = HaskellTarget({}, union_membership=union_membership)
+    default_tgt = HaskellTarget(
+        {}, address=Address.parse(":default"), union_membership=union_membership
+    )
     assert default_tgt.get(CustomField).value is False
 
 
@@ -177,16 +195,18 @@ def test_override_preexisting_field_via_new_target() -> None:
         banned_extensions: ClassVar = ["GhcBanned"]
         default_extensions: ClassVar = ["GhcCustomExtension"]
 
-        def hydrate(self) -> List[str]:
+        def hydrate(self, *, address: Address) -> List[str]:
             # Ensure that we avoid certain problematic extensions and always use some defaults.
-            specified_extensions = super().hydrate()
+            specified_extensions = super().hydrate(address=address)
             banned = [
                 extension
                 for extension in specified_extensions
                 if extension in self.banned_extensions
             ]
             if banned:
-                raise ValueError(f"Banned extensions used for {self.alias}: {banned}.")
+                raise ValueError(
+                    f"Banned extensions used for {self.alias} on target {address}: {banned}."
+                )
             return [*specified_extensions, *self.default_extensions]
 
     class CustomHaskellTarget(Target):
@@ -195,7 +215,9 @@ def test_override_preexisting_field_via_new_target() -> None:
             {*HaskellTarget.core_fields, CustomHaskellGhcExtensions} - {HaskellGhcExtensions}
         )
 
-    custom_tgt = CustomHaskellTarget({HaskellGhcExtensions.alias: ["GhcNormalExtension"]})
+    custom_tgt = CustomHaskellTarget(
+        {HaskellGhcExtensions.alias: ["GhcNormalExtension"]}, address=Address.parse(":custom")
+    )
 
     assert custom_tgt.has_fields([HaskellGhcExtensions]) is True
     assert custom_tgt.has_fields([CustomHaskellGhcExtensions]) is True
@@ -204,7 +226,7 @@ def test_override_preexisting_field_via_new_target() -> None:
     # Ensure that subclasses not defined on a target are not accepted. This allows us to, for
     # example, filter every target with `PythonSources` (or a subclass) and to ignore targets with
     # only `Sources`.
-    normal_tgt = HaskellTarget({})
+    normal_tgt = HaskellTarget({}, address=Address.parse(":normal"))
     assert normal_tgt.has_fields([HaskellGhcExtensions]) is True
     assert normal_tgt.has_fields([CustomHaskellGhcExtensions]) is False
 
@@ -216,13 +238,15 @@ def test_override_preexisting_field_via_new_target() -> None:
 
     # Check custom default value
     assert (
-        CustomHaskellTarget({}).get(HaskellGhcExtensions).value
+        CustomHaskellTarget({}, address=Address.parse(":default")).get(HaskellGhcExtensions).value
         == CustomHaskellGhcExtensions.default_extensions
     )
 
     # Custom validation
     with pytest.raises(ValueError) as exc:
         CustomHaskellTarget(
-            {HaskellGhcExtensions.alias: CustomHaskellGhcExtensions.banned_extensions}
+            {HaskellGhcExtensions.alias: CustomHaskellGhcExtensions.banned_extensions},
+            address=Address.parse(":invalid"),
         )
     assert str(CustomHaskellGhcExtensions.banned_extensions) in str(exc)
+    assert "//:invalid" in str(exc)
