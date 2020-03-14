@@ -7,8 +7,8 @@ from typing import Any, ClassVar, Optional
 from pants.build_graph.address import Address
 from pants.engine.objects import union
 from pants.engine.target import (
+    COMMON_TARGET_FIELDS,
     BoolField,
-    Dependencies,
     PrimitiveField,
     Sources,
     SourcesResult,
@@ -165,7 +165,7 @@ class EmitPexWarnings(BoolField):
     default: ClassVar = True
 
 
-COMMON_PYTHON_FIELDS = (Dependencies, Compatibility, Provides)
+COMMON_PYTHON_FIELDS = (*COMMON_TARGET_FIELDS, Compatibility, Provides)
 
 
 class PythonBinary(Target):

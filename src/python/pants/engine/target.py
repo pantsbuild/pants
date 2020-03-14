@@ -203,7 +203,7 @@ class Target(ABC):
     def __repr__(self) -> str:
         return (
             f"{self.__class__}("
-            f"address={self.address},"
+            f"address={self.address}, "
             f"alias={repr(self.alias)}, "
             f"core_fields={list(self.core_fields)}, "
             f"plugin_fields={list(self.plugin_fields)}, "
@@ -283,6 +283,16 @@ class StringField(PrimitiveField):
         return self.raw_value
 
 
+class StringListField(PrimitiveField):
+    raw_value: Optional[Iterable[str]]
+    value: Optional[List[str]]
+
+    def hydrate(self, *, address: Address) -> Optional[List[str]]:
+        if self.raw_value is None:
+            return None
+        return list(self.raw_value)
+
+
 class StringOrStringListField(PrimitiveField):
     """The raw_value may either be a string or be a list of strings.
 
@@ -297,6 +307,22 @@ class StringOrStringListField(PrimitiveField):
         if self.raw_value is None:
             return None
         return ensure_str_list(self.raw_value)
+
+
+class Tags(StringListField):
+    alias: ClassVar = "tags"
+
+
+# TODO: figure out what support looks like for this. This already gets hydrated into a
+#  List[Address] by the time we have a HydratedStruct. Should it stay that way, or should it go
+#  back to being a List[str] and we only hydrate into Addresses when necessary? Alternatively, does
+#  hydration mean getting back `Targets`?
+class Dependencies(AsyncField):
+    alias: ClassVar = "dependencies"
+    raw_value: List[Address]
+
+
+COMMON_TARGET_FIELDS = (Dependencies, Tags)
 
 
 # TODO: implement the hydration for this so that you can
@@ -316,10 +342,3 @@ class Sources(AsyncField):
 class SourcesResult:
     address: Address
     snapshot: Snapshot
-
-
-# TODO: figure out what support looks like for this. Likely, hydration means resolving direct
-#  dependencies, but not transitive.
-class Dependencies(AsyncField):
-    alias: ClassVar = "dependencies"
-    raw_value: Optional[Iterable[str]]
