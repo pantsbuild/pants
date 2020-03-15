@@ -3,6 +3,7 @@
 
 import itertools
 import random
+from copy import copy
 from typing import AbstractSet, Iterator, Sequence, Tuple, Type, Union
 
 import pytest
@@ -33,56 +34,11 @@ def test_contains(cls: OrderedSetCls) -> None:
 @pytest.mark.parametrize("cls", [OrderedSet, FrozenOrderedSet])
 def test_copy(cls: OrderedSetCls) -> None:
     set1 = cls("abc")
-    set2 = set1.copy()
+    set2 = copy(set1)
     assert set1 == set2
     assert set1 is set1
     assert set2 is set2
     assert set1 is not set2
-
-
-@pytest.mark.parametrize("cls", [OrderedSet, FrozenOrderedSet])
-def test_get_by_index(cls: OrderedSetCls) -> None:
-    set1 = cls("abracadabra")
-    assert set1[0] == "a"
-    assert set1[1] == "b"
-    assert set1[2] == "r"
-    assert set1[3] == "c"
-    assert set1[4] == "d"
-    with pytest.raises(IndexError):
-        set1[5]
-
-
-@pytest.mark.parametrize("cls", [OrderedSet, FrozenOrderedSet])
-def test_slices(cls: OrderedSetCls) -> None:
-    set1 = cls("abracadabra")
-    assert set1[:] == set1
-    assert set1[:] is not set1
-    assert set1[1:3] == cls(["b", "r"])
-
-
-@pytest.mark.parametrize("cls", [OrderedSet, FrozenOrderedSet])
-def test_find_index(cls: OrderedSetCls) -> None:
-    set1 = cls("abc")
-    assert set1.index("a") == 0
-    assert set1.index("b") == 1
-    assert set1.index("c") == 2
-
-    with pytest.raises(ValueError):
-        set1.index("z")
-    with pytest.raises(ValueError):
-        set1.index("a", start=1)
-    with pytest.raises(ValueError):
-        set1.index("c", end=2)
-    with pytest.raises(ValueError):
-        set1.index("b", start=1, end=1)
-
-
-@pytest.mark.parametrize("cls", [OrderedSet, FrozenOrderedSet])
-def test_tuples(cls: OrderedSetCls) -> None:
-    tup = ("tuple", 1)
-    set1 = OrderedSet([tup])
-    assert set1.index(tup) == 0
-    assert set1[0] == tup
 
 
 @pytest.mark.parametrize("cls", [OrderedSet, FrozenOrderedSet])
@@ -118,12 +74,10 @@ def test_equality(cls: OrderedSetCls) -> None:
 
 def test_frozen_is_hashable() -> None:
     set1 = FrozenOrderedSet("abcabc")
-    assert hash(set1) == hash(set1.copy())
-    assert hash(set1) == hash(("a", "b", "c"))
+    assert hash(set1) == hash(copy(set1))
 
     set2 = FrozenOrderedSet("abcd")
     assert hash(set1) != hash(set2)
-    assert hash(set1) != hash(("a", "b", "c", "d"))
 
 
 @pytest.mark.parametrize("cls", [OrderedSet, FrozenOrderedSet])
@@ -177,13 +131,7 @@ def test_remove() -> None:
     set1.remove("b")
 
     assert set1 == OrderedSet("rcd")
-    assert set1[0] == "r"
-    assert set1[1] == "c"
-    assert set1[2] == "d"
-
-    assert set1.index("r") == 0
-    assert set1.index("c") == 1
-    assert set1.index("d") == 2
+    assert list(set1) == ["r", "c", "d"]
 
     assert "a" not in set1
     assert "b" not in set1
@@ -201,15 +149,13 @@ def test_remove() -> None:
 
 def test_pop() -> None:
     set1 = OrderedSet("ab")
-    elem = set1.pop()
+    assert set1.pop() in ["a", "b"]
+    assert len(set1) == 1
 
-    assert elem == "b"
-    assert set1 == OrderedSet("a")
-    elem = set1.pop()
+    assert set1.pop() in ["a", "b"]
+    assert len(set1) == 0
 
-    assert elem == "a"
     assert set1 == OrderedSet()
-
     with pytest.raises(KeyError):
         set1.pop()
 
@@ -277,11 +223,11 @@ def test_intersection(cls: OrderedSetCls) -> None:
     for set1, set2 in generate_testdata(cls):
         results = [set1 & set2, set1.intersection(set2)]
         if isinstance(set1, OrderedSet):
-            mutation_result1 = set1.copy()
+            mutation_result1 = copy(set1)
             mutation_result1.intersection_update(set2)
             results.append(mutation_result1)
 
-            mutation_result2 = set1.copy()
+            mutation_result2 = copy(set1)
             mutation_result2 &= set2  # type: ignore[misc]
             results.append(mutation_result2)
         assert_results_are_the_same(results, sets=(set1, set2))
@@ -292,11 +238,11 @@ def test_difference(cls: OrderedSetCls) -> None:
     for set1, set2 in generate_testdata(cls):
         results = [set1 - set2, set1.difference(set2)]
         if isinstance(set1, OrderedSet):
-            mutation_result1 = set1.copy()
+            mutation_result1 = copy(set1)
             mutation_result1.difference_update(set2)
             results.append(mutation_result1)
 
-            mutation_result2 = set1.copy()
+            mutation_result2 = copy(set1)
             mutation_result2 -= set2  # type: ignore[misc]
             results.append(mutation_result2)
         assert_results_are_the_same(results, sets=(set1, set2))
@@ -307,11 +253,11 @@ def test_xor(cls: OrderedSetCls) -> None:
     for set1, set2 in generate_testdata(cls):
         results = [set1 ^ set2, set1.symmetric_difference(set2)]
         if isinstance(set1, OrderedSet):
-            mutation_result1 = set1.copy()
+            mutation_result1 = copy(set1)
             mutation_result1.symmetric_difference_update(set2)
             results.append(mutation_result1)
 
-            mutation_result2 = set1.copy()
+            mutation_result2 = copy(set1)
             mutation_result2 ^= set2  # type: ignore[misc]
             results.append(mutation_result2)
         assert_results_are_the_same(results, sets=(set1, set2))
@@ -322,11 +268,11 @@ def test_union(cls: OrderedSetCls) -> None:
     for set1, set2 in generate_testdata(cls):
         results = [set1 | set2, set1.union(set2)]
         if isinstance(set1, OrderedSet):
-            mutation_result1 = set1.copy()
+            mutation_result1 = copy(set1)
             mutation_result1.update(set2)
             results.append(mutation_result1)
 
-            mutation_result2 = set1.copy()
+            mutation_result2 = copy(set1)
             mutation_result2 |= set2  # type: ignore[misc]
             results.append(mutation_result2)
         assert_results_are_the_same(results, sets=(set1, set2))
