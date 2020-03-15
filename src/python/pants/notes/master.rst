@@ -126,7 +126,6 @@ Refactoring, Improvements, and Tooling
 
 * Redesign `test.py` to work with custom target types (#9276)
   `PR #9276 <https://github.com/pantsbuild/pants/pull/9276>`_
->`_ttps://github.com/pantsbuild/pants/pull/9211.
 
 * Add core abstractions for the V2 Target API (#9284)
   `PR #9284 <https://github.com/pantsbuild/pants/pull/9284>`_
@@ -158,7 +157,7 @@ Refactoring, Improvements, and Tooling
 * Rename `fmt2` to `fmt` and `lint2` to `lint` (#9257)
   `PR #9257 <https://github.com/pantsbuild/pants/pull/9257>`_
 
-*  Open Remove leftover `globs()` code for `bundles` (#9262)
+* Open Remove leftover `globs()` code for `bundles` (#9262)
   `PR #9262 <https://github.com/pantsbuild/pants/pull/9262>`_
 
 * Remove support for `globs()`, `rglobs()`, and `zglobs()` (#9247)
