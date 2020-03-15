@@ -69,7 +69,6 @@ def build_file_aliases():
             PythonRequirementsFile.alias(): PythonRequirementsFile,
             Resources.alias(): Resources,
             UnpackedWheels.alias(): UnpackedWheels,
-
         },
         objects={
             "python_requirement": PythonRequirement,

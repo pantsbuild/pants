@@ -58,7 +58,9 @@ class PythonRequirements:
 
         requirements_file_target_name = requirements_relpath
         self._parse_context.create_object(
-            "_python_requirements_file", name=requirements_file_target_name, sources=[requirements_relpath]
+            "_python_requirements_file",
+            name=requirements_file_target_name,
+            sources=[requirements_relpath],
         )
         requirements_dep = ":{}".format(requirements_file_target_name)
 
