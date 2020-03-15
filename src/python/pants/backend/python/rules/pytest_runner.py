@@ -28,6 +28,7 @@ from pants.engine.interactive_runner import InteractiveProcessRequest
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
 from pants.engine.legacy.structs import (
+    FilesAdaptor,
     PythonTargetAdaptor,
     PythonTestsAdaptorWithOrigin,
     ResourcesAdaptor,
@@ -164,7 +165,9 @@ async def setup_pytest_for_target(
 
     # TODO: Replace this with appropriate target API logic.
     python_targets = [t for t in all_targets if isinstance(t.adaptor, PythonTargetAdaptor)]
-    resource_targets = [t for t in all_targets if isinstance(t.adaptor, ResourcesAdaptor)]
+    resource_targets = [
+        t for t in all_targets if isinstance(t.adaptor, (FilesAdaptor, ResourcesAdaptor))
+    ]
 
     # TODO(John Sirois): Support exploiting concurrency better:
     #   https://github.com/pantsbuild/pants/issues/9294
