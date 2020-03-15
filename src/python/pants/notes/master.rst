@@ -55,6 +55,9 @@ API Changes
 * Deprecate V1 isort implementation in favor of improved V2 implementation (#9267)
   `PR #9267 <https://github.com/pantsbuild/pants/pull/9267>`_
 
+* Remove support for `globs()`, `rglobs()`, and `zglobs()` (#9247)
+  `PR #9247 <https://github.com/pantsbuild/pants/pull/9247>`_
+
 New Features
 ~~~~~~~~~~~~
 
@@ -69,9 +72,6 @@ New Features
 
 * Enable zinc to log diagnostics for jvm languages (#9228)
   `PR #9228 <https://github.com/pantsbuild/pants/pull/9228>`_
-
-* Remove support for `globs()`, `rglobs()`, and `zglobs()` (#9247)
-  `PR #9247 <https://github.com/pantsbuild/pants/pull/9247>`_
 
 * Rename `fmt2` to `fmt` and `lint2` to `lint` (#9257)
   `PR #9257 <https://github.com/pantsbuild/pants/pull/9257>`_
