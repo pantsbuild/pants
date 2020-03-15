@@ -29,16 +29,6 @@ class PyThriftNamespaceClashCheck(Task):
     def register_options(cls, register):
         super().register_options(register)
         register(
-            "--strict",
-            type=bool,
-            default=False,
-            fingerprint=True,
-            removal_version="1.27.0.dev0",
-            removal_hint="This option is now a noop: use either `--strict-clashing-py-namespace` "
-            "or --strict-missing-py-namespace",
-            help="Whether to fail the build if any namespace issue is found",
-        )
-        register(
             "--strict-clashing-py-namespace",
             type=bool,
             default=False,
