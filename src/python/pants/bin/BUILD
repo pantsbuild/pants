@@ -81,6 +81,7 @@ python_binary(
     '//:pyproject',
     'build-support/checkstyle',
     'build-support/eslint',
+    'build-support/flake8',
     'build-support/ivy',
     'build-support/mypy',
     'build-support/pylint',
