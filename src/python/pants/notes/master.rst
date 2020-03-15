@@ -79,6 +79,9 @@ New Features
 Bugfixes
 ~~~~~~~~
 
+* Switch to a dict-backed OrderedSet impl. (#9305)
+  `PR #9305 <https://github.com/pantsbuild/pants/pull/9305>`_
+
 * Prevent excessive uncached readlink's when using a symlinked workdir (#9270)
   `PR #9270 <https://github.com/pantsbuild/pants/pull/9270>`_
 
@@ -96,6 +99,12 @@ Bugfixes
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Make Target API safe to use with the engine (#9303)
+  `PR #9303 <https://github.com/pantsbuild/pants/pull/9303>`_
+
+* Filter sources passed to the pytest invocation. (#9299)
+  `PR #9299 <https://github.com/pantsbuild/pants/pull/9299>`_
 
 * Make the platform a remote execution happened on available to `@rule`s. (#9198)
   `PR #9198 <https://github.com/pantsbuild/pants/pull/9198>`_
