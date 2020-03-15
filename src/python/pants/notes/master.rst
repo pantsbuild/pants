@@ -52,15 +52,16 @@ API Changes
 * Remove deprecated `fmt` and `lint` task options moved to subsystem options (#9246)
   `PR #9246 <https://github.com/pantsbuild/pants/pull/9246>`_
 
+* Deprecate V1 isort implementation in favor of improved V2 implementation (#9267)
+  `PR #9267 <https://github.com/pantsbuild/pants/pull/9267>`_
+
 New Features
 ~~~~~~~~~~~~
 
 * Add support for `--dependencies-type=3rdparty` to `dependencies2` (#9225)
   `PR #9225 <https://github.com/pantsbuild/pants/pull/9225>`_
 
-* pants build committing publish data for push of org.pantsbuild#zinc-compiler_2.12;0.0.20["ci skip"]
-
-* first implement v1 of robot impl (#8793)
+* introduce --generate-ipex to (v1) python binary creation to lazy-load requirements (#8793)
   `PR #8793 <https://github.com/pantsbuild/pants/pull/8793>`_
 
 * [jvm] Add jvm_options to platform; use from junit and run (#9150)
@@ -81,9 +82,6 @@ Bugfixes
 * Prevent excessive uncached readlink's when using a symlinked workdir (#9270)
   `PR #9270 <https://github.com/pantsbuild/pants/pull/9270>`_
 
-* Make the platform a remote execution happened on available to `@rule`s. (#9198)
-  `PR #9198 <https://github.com/pantsbuild/pants/pull/9198>`_
-
 * Fix interpreter constraints with V2 to AND multiple targets (#9265)
   `PR #9265 <https://github.com/pantsbuild/pants/pull/9265>`_
 
@@ -98,6 +96,9 @@ Bugfixes
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Make the platform a remote execution happened on available to `@rule`s. (#9198)
+  `PR #9198 <https://github.com/pantsbuild/pants/pull/9198>`_
 
 * Support build file aliases in v2. (#9279)
   `PR #9279 <https://github.com/pantsbuild/pants/pull/9279>`_
@@ -137,9 +138,6 @@ Refactoring, Improvements, and Tooling
 
 * Add core abstractions for the V2 Target API (#9284)
   `PR #9284 <https://github.com/pantsbuild/pants/pull/9284>`_
-
-* Deprecate V1 isort implementation in favor of improved V2 implementation (#9267)
-  `PR #9267 <https://github.com/pantsbuild/pants/pull/9267>`_
 
 * create RequestsSession.Factory global subsystem, and use it to configure urllib3.util.Retry for http artifact cache downloads (#8568)
   `PR #8568 <https://github.com/pantsbuild/pants/pull/8568>`_
@@ -194,7 +192,6 @@ Documentation
 
 * Release notes for 1.25.0rc1 (#9252)
   `PR #9252 <https://github.com/pantsbuild/pants/pull/9252>`_
-
 
 1.26.0rc0 (03/04/2020)
 ----------------------
