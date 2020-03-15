@@ -22,6 +22,7 @@ from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
+from pants.backend.python.targets.python_requirements_file import PythonRequirementsFile
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.targets.unpacked_whls import UnpackedWheels
 from pants.backend.python.tasks.build_local_python_distributions import (
@@ -65,8 +66,10 @@ def build_file_aliases():
             PythonTests.alias(): PythonTests,
             PythonDistribution.alias(): PythonDistribution,
             "python_requirement_library": PythonRequirementLibrary,
+            PythonRequirementsFile.alias(): PythonRequirementsFile,
             Resources.alias(): Resources,
             UnpackedWheels.alias(): UnpackedWheels,
+
         },
         objects={
             "python_requirement": PythonRequirement,

@@ -41,6 +41,7 @@ from pants.engine.legacy.structs import (
     PythonAWSLambdaAdaptor,
     PythonBinaryAdaptor,
     PythonRequirementLibraryAdaptor,
+    PythonRequirementsFileAdaptor,
     PythonTargetAdaptor,
     PythonTestsAdaptor,
     RemoteSourcesAdaptor,
@@ -144,6 +145,9 @@ def _legacy_symbol_table(build_file_aliases: BuildFileAliases) -> SymbolTable:
     table["files"] = FilesAdaptor
     table["page"] = PageAdaptor
     table["python_awslambda"] = PythonAWSLambdaAdaptor
+    # The leading underscore in the name is to emphasize that this is used by macros but is
+    # not intended to be used in user-authored BUILD files.
+    table["_python_requirements_file"] = PythonRequirementsFileAdaptor
 
     # Note that these don't call _make_target_adaptor because we don't have a handy reference to the
     # types being constructed. They don't have any default_sources behavior, so this should be ok,
