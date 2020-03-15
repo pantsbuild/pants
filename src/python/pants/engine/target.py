@@ -18,22 +18,17 @@ from pants.util.meta import frozen_after_init
 @dataclass(unsafe_hash=True)  # type: ignore[misc]  # MyPy doesn't like the abstract __init__()
 class Field(ABC):
     alias: ClassVar[str]
-    raw_value: Optional[Any]  # None indicates that the field was not explicitly defined
 
     # This is a little weird to have an abstract __init__(). We do this to ensure that all
     # subclasses have this exact type signature for their constructor.
     #
     # Normally, with dataclasses, each constructor parameter would instead be specified via a
-    # dataclass field declaration. But, we don't want to declare `address` as an actual attribute
-    # because not all subclasses will need to store the value. Instead, we only care that the
-    # constructor accepts `address` so that the `Field` can use it in validation, and can
-    # optionally store the value if it wants to.
+    # dataclass field declaration. But, we don't want to declare either `address` or `raw_value` as
+    # attributes because we make no assumptions whether the subclasses actually store those values
+    # on each instance. All that we care about is a common constructor interface.
     @abstractmethod
     def __init__(self, raw_value: Optional[Any], *, address: Address) -> None:
         pass
-
-    def __repr__(self) -> str:
-        return f"{self.__class__}(alias={repr(self.alias)}, raw_value={self.raw_value})"
 
 
 class PrimitiveField(Field, metaclass=ABCMeta):
@@ -41,52 +36,54 @@ class PrimitiveField(Field, metaclass=ABCMeta):
 
     This should be used by the majority of fields.
 
-    Subclasses must implement `hydrate()` to convert `self.raw_value` into `self.value`. This
+    Subclasses must implement `hydrate()` to convert the `raw_value` into `self.value`. This
     hydration and/or validation happens eagerly in the constructor. If the hydration is
     particularly expensive, use `AsyncField` instead to get the benefits of the engine's caching.
 
-    Subclasses should also override the type hints for `raw_value` and `value` to be more precise
-    than `Any`.
+    The hydrated `value` must be immutable and hashable so that this Field may be used by the
+    V2 engine. This means, for example, using tuples rather than lists and using
+    `FrozenOrderedSet` rather than `set`.
+
+    Subclasses should also override the type hints for `value` to be more precise than `Any`.
 
     Example:
 
         class ZipSafe(PrimitiveField):
             alias: ClassVar = "zip_safe"
-            raw_value: Optional[bool]
             value: bool
 
-            def hydrate(self, *, address: Address) -> bool:
-                if self.raw_value is None:
+            def hydrate(self, raw_value: Optional[bool], *, address: Address) -> bool:
+                if raw_value is None:
                     return True
-                return self.raw_value
+                return raw_value
     """
 
     value: Any
 
     @final
     def __init__(self, raw_value: Optional[Any], *, address: Address) -> None:
-        self.raw_value = raw_value
-        # NB: we do not store the `address` as an attribute of the class. We only use the
-        # `address` parameter for eager validation of the field to be able to generate more
-        # helpful error messages.
-        self.value = self.hydrate(address=address)
+        # NB: We neither store the `address` or `raw_value` as attributes on this dataclass:
+        # * Don't store `raw_value` because it very often is mutable and/or unhashable, which means
+        #   this Field could not be passed around in the engine.
+        # * Don't store `address` to avoid the cost in memory of storing `Address` on every single
+        #   field encountered by Pants in a run.
+        self.value = self.hydrate(raw_value, address=address)
 
     @abstractmethod
-    def hydrate(self, *, address: Address) -> Any:
-        """Convert `self.raw_value` into `self.value`.
+    def hydrate(self, raw_value: Optional[Any], *, address: Address) -> Any:
+        """Convert the `raw_value` into `self.value`.
 
         You should perform any validation and/or hydration here. For example, you may want to check
         that an integer is > 0, apply a default value if `raw_value` is None, or convert an
         Iterable[str] to List[str].
 
-        If you have no validation/hydration, simply set this function to `return self.raw_value`.
+        The resulting value should be immutable and hashable.
+
+        If you have no validation/hydration, simply set this function to `return raw_value`.
         """
 
     def __repr__(self) -> str:
-        return (
-            f"{self.__class__}(alias={repr(self.alias)}, raw_value={self.raw_value}, "
-            f"value={self.value})"
-        )
+        return f"{self.__class__}(alias={repr(self.alias)}, value={self.value})"
 
     def __str__(self) -> str:
         return f"{self.alias}={self.value}"
@@ -95,12 +92,23 @@ class PrimitiveField(Field, metaclass=ABCMeta):
 class AsyncField(Field, metaclass=ABCMeta):
     """A field that needs the engine in order to be hydrated.
 
-    You should create a corresponding Result class and define a rule to go from this AsyncField to
-    the Result. For example:
+    You must implement `sanitize_raw_value()` to convert the `raw_value` into a type that is
+    immutable and hashable so that this Field may be used by the V2 engine. This means, for example,
+    using tuples rather than lists and using `FrozenOrderedSet` rather than `set`.
+
+    You should also create a corresponding Result class and define a rule to go from this
+    AsyncField to the Result.
+
+    For example:
 
         class Sources(AsyncField):
             alias: ClassVar = "sources"
-            raw_value: Optional[List[str]]
+            sanitized_raw_value: Optional[Tuple[str, ...]]
+
+            def sanitize_raw_value(
+                raw_value: Optional[List[str]], *, address: Address
+            ) -> Optional[Tuple[str, ...]]:
+                ...
 
 
         @dataclass(frozen=True)
@@ -127,16 +135,34 @@ class AsyncField(Field, metaclass=ABCMeta):
     """
 
     address: Address
+    sanitized_raw_value: Any
 
     @final
     def __init__(self, raw_value: Optional[Any], *, address: Address) -> None:
-        self.raw_value = raw_value
         self.address = address
+        self.sanitized_raw_value = self.sanitize_raw_value(raw_value)
+
+    @abstractmethod
+    def sanitize_raw_value(self, raw_value: Optional[Any]) -> Any:
+        """Sanitize the `raw_value` into a type that is safe for the V2 engine to use.
+
+        The resulting type should be immutable and hashable.
+
+        You may also do light-weight validation in this method, such as ensuring that all
+        elements of a list are strings.
+        """
+
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__}(alias={self.alias}, sanitized_raw_value={self.sanitized_raw_value})"
+        )
 
     def __str__(self) -> str:
-        return f"{self.alias}={repr(self.raw_value)}"
+        return f"{self.alias}={self.sanitized_raw_value}"
 
 
+# NB: This TypeVar is what allows `Target.get()` to properly work with MyPy so that MyPy knows
+# the precise Field returned.
 _F = TypeVar("_F", bound=Field)
 
 
@@ -191,6 +217,7 @@ class Target(ABC):
     def field_types(self) -> Tuple[Type[Field], ...]:
         return (*self.core_fields, *self.plugin_fields)
 
+    @final
     class PluginField:
         """A sentinel class to allow plugin authors to add additional fields to this target type.
 
@@ -207,7 +234,7 @@ class Target(ABC):
             f"alias={repr(self.alias)}, "
             f"core_fields={list(self.core_fields)}, "
             f"plugin_fields={list(self.plugin_fields)}, "
-            f"raw_field_values={list(self.field_values.values())}"
+            f"field_values={list(self.field_values.values())}"
             f")"
         )
 
@@ -260,56 +287,63 @@ class Target(ABC):
         return True
 
 
+# TODO: add light-weight runtime type checking to these helper fields, such as ensuring that
+# the raw_value of `BoolField` is in fact a `bool` and not an int or str. Use `instanceof`. All
+# the types are primitive objects like `str` and `int`, so this should be performant and easy to
+# implement.
+#
+# We should also sort where relevant, e.g. in `StringSequenceField`. This is important for cacahe
+# hits.
+
+
 class BoolField(PrimitiveField):
-    raw_value: Optional[bool]
     value: bool
     default: ClassVar[bool]
 
-    def hydrate(self, *, address: Address) -> bool:
-        if self.raw_value is None:
+    def hydrate(self, raw_value: Optional[bool], *, address: Address) -> bool:
+        if raw_value is None:
             return self.default
-        # TODO: consider type checking `raw_value` via `isinstance`. Here, we assume that it's
-        #  `Optional[bool]`, but there's nothing preventing a user from using a `str` or `int`, etc.
-        #  So, the type hint on `raw_value` is technically a lie - while we expect that to be the
-        #  raw_value, it could easily be different.
-        return self.raw_value
+        return raw_value
 
 
 class StringField(PrimitiveField):
-    raw_value: Optional[str]
     value: Optional[str]
 
-    def hydrate(self, *, address: Address) -> Optional[str]:
-        return self.raw_value
+    def hydrate(self, raw_value: Optional[str], *, address: Address) -> Optional[str]:
+        return raw_value
 
 
-class StringListField(PrimitiveField):
-    raw_value: Optional[Iterable[str]]
-    value: Optional[List[str]]
+class StringSequenceField(PrimitiveField):
+    value: Optional[Tuple[str, ...]]
 
-    def hydrate(self, *, address: Address) -> Optional[List[str]]:
-        if self.raw_value is None:
+    def hydrate(
+        self, raw_value: Optional[Iterable[str]], *, address: Address
+    ) -> Optional[Tuple[str, ...]]:
+        if raw_value is None:
             return None
-        return list(self.raw_value)
+        return tuple(raw_value)
 
 
-class StringOrStringListField(PrimitiveField):
-    """The raw_value may either be a string or be a list of strings.
+class StringOrStringSequenceField(PrimitiveField):
+    """The raw_value may either be a string or be an iterable of strings.
 
     This is syntactic sugar that we use for certain fields to make BUILD files simpler when the user
     has no need for more than one element.
+
+    Generally, this should not be used by any new Fields. This mechanism is a misfeature.
     """
 
-    raw_value: Optional[Union[str, Iterable[str]]]
-    value: Optional[List[str]]
+    value: Optional[Tuple[str, ...]]
 
-    def hydrate(self, *, address: Address) -> Optional[List[str]]:
-        if self.raw_value is None:
+    def hydrate(
+        self, raw_value: Optional[Union[str, Iterable[str]]], *, address: Address
+    ) -> Optional[Tuple[str, ...]]:
+        if raw_value is None:
             return None
-        return ensure_str_list(self.raw_value)
+        return tuple(ensure_str_list(raw_value))
 
 
-class Tags(StringListField):
+class Tags(StringSequenceField):
     alias: ClassVar = "tags"
 
 
@@ -319,7 +353,14 @@ class Tags(StringListField):
 #  hydration mean getting back `Targets`?
 class Dependencies(AsyncField):
     alias: ClassVar = "dependencies"
-    raw_value: List[Address]
+    sanitized_raw_value: Optional[Tuple[Address, ...]]
+
+    def sanitize_raw_value(
+        self, raw_value: Optional[List[Address]]
+    ) -> Optional[Tuple[Address, ...]]:
+        if raw_value is None:
+            return None
+        return tuple(raw_value)
 
 
 COMMON_TARGET_FIELDS = (Dependencies, Tags)
@@ -331,7 +372,12 @@ COMMON_TARGET_FIELDS = (Dependencies, Tags)
 class Sources(AsyncField):
     alias: ClassVar = "sources"
     default_globs: ClassVar[Optional[Tuple[str, ...]]] = None
-    raw_value: Optional[Iterable[str]]
+    sanitized_raw_value: Optional[Tuple[str, ...]]
+
+    def sanitize_raw_value(self, raw_value: Optional[Iterable[str]]) -> Optional[Tuple[str, ...]]:
+        if raw_value is None:
+            return None
+        return tuple(raw_value)
 
     @classmethod
     def validate_result(cls, _: "SourcesResult") -> None:
