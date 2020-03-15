@@ -27,7 +27,13 @@ from pants.engine.fs import Digest, DirectoriesToMerge, InputFilesContent
 from pants.engine.interactive_runner import InteractiveProcessRequest
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
-from pants.engine.legacy.structs import PythonTestsAdaptorWithOrigin, TargetAdaptorWithOrigin
+from pants.engine.legacy.structs import (
+    FilesAdaptor,
+    PythonTargetAdaptor,
+    PythonTestsAdaptorWithOrigin,
+    ResourcesAdaptor,
+    TargetAdaptorWithOrigin,
+)
 from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.option.global_options import GlobalOptions
@@ -157,7 +163,13 @@ async def setup_pytest_for_target(
         [adaptor_with_origin], strip_source_roots=True
     )
 
-    # TODO(John Sirois): Support exploiting concurrecncy better:
+    # TODO: Replace this with appropriate target API logic.
+    python_targets = [t for t in all_targets if isinstance(t.adaptor, PythonTargetAdaptor)]
+    resource_targets = [
+        t for t in all_targets if isinstance(t.adaptor, (FilesAdaptor, ResourcesAdaptor))
+    ]
+
+    # TODO(John Sirois): Support exploiting concurrency better:
     #   https://github.com/pantsbuild/pants/issues/9294
     # Some awkward code follows in order to execute 5-6 items concurrently given the current state
     # of MultiGet typing / API. Improve this since we should encourage full concurrency in general.
@@ -165,12 +177,12 @@ async def setup_pytest_for_target(
         Get[Pex](CreatePex, create_pytest_pex_request),
         Get[Pex](CreatePexFromTargetClosure, create_requirements_pex_request),
         Get[Pex](CreatePex, create_test_runner_pex),
-        Get[ChrootedPythonSources](HydratedTargets(all_targets)),
+        Get[ChrootedPythonSources](HydratedTargets(python_targets + resource_targets)),
         Get[SourceFiles](SpecifiedSourceFilesRequest, specified_source_files_request),
     ]
     if run_coverage:
         requests.append(
-            Get[Coveragerc](CoveragercRequest(HydratedTargets(all_targets), test_time=True)),
+            Get[Coveragerc](CoveragercRequest(HydratedTargets(python_targets), test_time=True)),
         )
 
     (

@@ -32,6 +32,7 @@ from pants.engine.legacy.graph import LegacyBuildGraph, create_legacy_graph_task
 from pants.engine.legacy.options_parsing import create_options_parsing_rules
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
 from pants.engine.legacy.structs import (
+    FilesAdaptor,
     JvmAppAdaptor,
     JvmBinaryAdaptor,
     PageAdaptor,
@@ -140,6 +141,7 @@ def _legacy_symbol_table(build_file_aliases: BuildFileAliases) -> SymbolTable:
     table["python_requirement_library"] = PythonRequirementLibraryAdaptor
     table["remote_sources"] = RemoteSourcesAdaptor
     table["resources"] = ResourcesAdaptor
+    table["files"] = FilesAdaptor
     table["page"] = PageAdaptor
     table["python_awslambda"] = PythonAWSLambdaAdaptor
 
