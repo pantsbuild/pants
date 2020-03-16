@@ -1032,14 +1032,14 @@ impl Node for NodeKey {
   type Item = NodeResult;
   type Error = Failure;
 
-  fn run(self, context: Context) -> NodeFuture<NodeResult> {
+  fn run(self, context: Context, start_time: std::time::SystemTime) -> NodeFuture<NodeResult> {
     let (maybe_started_workunit, maybe_span_id) = if context.session.should_handle_workunits() {
       let user_facing_name = self.user_facing_name();
       let span_id = generate_random_64bit_string();
       let parent_id = workunit_store::get_parent_id();
       let maybe_started_workunit = user_facing_name.as_ref().map(|node_name| StartedWorkUnit {
         name: node_name.to_string(),
-        start_time: std::time::SystemTime::now(),
+        start_time,
         span_id: span_id.clone(),
         parent_id,
       });

@@ -434,7 +434,7 @@ impl Node for TNode {
   type Item = Vec<T>;
   type Error = TError;
 
-  fn run(self, context: TContext) -> BoxFuture<Vec<T>, TError> {
+  fn run(self, context: TContext, _start_time: std::time::SystemTime) -> BoxFuture<Vec<T>, TError> {
     context.ran(self.clone());
     let token = T(self.0, context.salt());
     if let Some(dep) = context.dependency_of(&self) {

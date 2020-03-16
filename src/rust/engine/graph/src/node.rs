@@ -27,7 +27,11 @@ pub trait Node: Clone + Debug + Display + Eq + Hash + Send + 'static {
   type Item: Clone + Debug + Eq + Send + 'static;
   type Error: NodeError;
 
-  fn run(self, context: Self::Context) -> BoxFuture<Self::Item, Self::Error>;
+  fn run(
+    self,
+    context: Self::Context,
+    start_time: std::time::SystemTime,
+  ) -> BoxFuture<Self::Item, Self::Error>;
 
   ///
   /// If the given Node output represents an FS operation, returns its Digest.

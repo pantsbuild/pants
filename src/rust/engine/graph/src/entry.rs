@@ -138,7 +138,7 @@ pub(crate) enum EntryState<N: Node> {
   Running {
     run_token: RunToken,
     generation: Generation,
-    start_time: Instant,
+    start_time: Arc<Mutex<Option<Instant>>>,
     waiters: Vec<oneshot::Sender<Result<(N::Item, Generation), N::Error>>>,
     previous_result: Option<EntryResult<N>>,
     dirty: bool,
@@ -222,6 +222,8 @@ impl<N: Node> Entry<N> {
     let run_token = run_token.next();
     let context = context_factory.clone_for(entry_id);
     let node = node.clone();
+    let start_time = Arc::new(Mutex::new(None));
+    let start_time_handle = start_time.clone();
 
     context_factory.spawn(future::lazy(move || {
       // If we have previous result generations, compare them to all current dependency
@@ -261,8 +263,13 @@ impl<N: Node> Entry<N> {
         } else {
           // The Node needs to (re-)run!
           let context2 = context.clone();
+          let current_time = std::time::SystemTime::now();
+          {
+            let mut locked = start_time_handle.lock();
+            *locked = Some(Instant::now());
+          }
           node
-            .run(context)
+            .run(context, current_time)
             .then(move |res| {
               context2
                 .graph()
@@ -276,7 +283,7 @@ impl<N: Node> Entry<N> {
 
     EntryState::Running {
       waiters: Vec::new(),
-      start_time: Instant::now(),
+      start_time,
       run_token,
       generation,
       previous_result,
@@ -557,15 +564,20 @@ impl<N: Node> Entry<N> {
   ///
   pub(crate) fn current_running_duration(&self, now: Instant) -> Option<Duration> {
     match *self.state.lock() {
-      EntryState::Running { start_time, .. } =>
+      EntryState::Running { ref start_time, .. } =>
       // NB: `Instant::duration_since` panics if the end time is before the start time, which can
       // happen when starting a Node races against a caller creating their Instant.
       {
-        Some(if start_time < now {
-          now.duration_since(start_time)
+        let start_time_mtx = start_time.lock();
+        if let Some(start_time) = *start_time_mtx {
+          Some(if start_time < now {
+            now.duration_since(start_time)
+          } else {
+            Duration::from_secs(0)
+          })
         } else {
-          Duration::from_secs(0)
-        })
+          None
+        }
       }
       _ => None,
     }
