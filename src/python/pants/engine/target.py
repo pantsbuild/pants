@@ -261,7 +261,11 @@ class Target(ABC):
         aliases_to_field_types = {field_type.alias: field_type for field_type in self.field_types}
         for alias, value in unhydrated_values.items():
             if alias not in aliases_to_field_types:
-                raise TargetDefinitionException(address, f"Unrecognized field `{alias}={value}`.")
+                raise TargetDefinitionException(
+                    address,
+                    f"Unrecognized field `{alias}={value}`. Valid fields for the target type "
+                    f"`{self.alias}`: {sorted(aliases_to_field_types.keys())}."
+                )
             field_type = aliases_to_field_types[alias]
             self.field_values[field_type] = field_type(value, address=address)
         # For undefined fields, mark the raw value as None.
