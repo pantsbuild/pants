@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from enum import Enum
 from io import StringIO
 from textwrap import dedent
-from typing import Tuple, Type
+from typing import Optional, Tuple, Type
 
 import pkg_resources
 
@@ -39,9 +39,11 @@ from pants.rules.core.determine_source_files import AllSourceFilesRequest, Sourc
 from pants.rules.core.distdir import DistDir
 from pants.rules.core.test import (
     AddressAndTestResult,
+    ConsoleCoverageReport,
     CoverageData,
     CoverageDataBatch,
     CoverageReport,
+    FilesystemCoverageReport,
 )
 from pants.source.source_root import SourceRootConfig
 
@@ -212,8 +214,21 @@ async def construct_coverage_config(
 
 
 class ReportType(Enum):
-    XML = "xml"
-    HTML = "html"
+    CONSOLE = ("console", "report")
+    XML = ("xml", None)
+    HTML = ("html", None)
+
+    _report_name: str
+
+    def __new__(cls, value: str, report_name: Optional[str] = None) -> "ReportType":
+        member: "ReportType" = object.__new__(cls)
+        member._value_ = value
+        member._report_name = report_name if report_name is not None else value
+        return member
+
+    @property
+    def report_name(self) -> str:
+        return self._report_name
 
 
 class PytestCoverage(PythonToolBase):
@@ -234,8 +249,8 @@ class PytestCoverage(PythonToolBase):
         register(
             "--report",
             type=ReportType,
-            default=ReportType.HTML,
-            help="Which coverage reports to emit.",
+            default=ReportType.CONSOLE,
+            help="Which coverage report type to emit.",
         )
 
 
@@ -346,7 +361,6 @@ class PytestCoverageData(CoverageData):
 
 @rule(name="Generate coverage report")
 async def generate_coverage_report(
-    data_batch: PytestCoverageDataBatch,
     transitive_targets: TransitiveHydratedTargets,
     python_setup: PythonSetup,
     coverage_setup: CoverageSetup,
@@ -383,7 +397,8 @@ async def generate_coverage_report(
             )
         ),
     )
-    coverage_args = [coverage_toolbase.options.report.value]
+    report_type = coverage_toolbase.options.report
+    coverage_args = [report_type.report_name]
     request = requirements_pex.create_execute_request(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
@@ -396,7 +411,10 @@ async def generate_coverage_report(
     )
 
     result = await Get[ExecuteProcessResult](ExecuteProcessRequest, request)
-    return CoverageReport(
+    if report_type == ReportType.CONSOLE:
+        return ConsoleCoverageReport(result.stdout.decode())
+
+    return FilesystemCoverageReport(
         result.output_directory_digest, coverage_toolbase.options.report_output_path
     )
 

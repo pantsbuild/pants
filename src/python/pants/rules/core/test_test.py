@@ -27,6 +27,7 @@ from pants.rules.core.test import (
     AddressAndTestResult,
     CoverageDataBatch,
     CoverageReport,
+    FilesystemCoverageReport,
     Status,
     Test,
     TestDebugRequest,
@@ -168,7 +169,7 @@ class TestTest(TestBase):
                 MockGet(
                     product_type=CoverageReport,
                     subject_type=CoverageDataBatch,
-                    mock=lambda _: CoverageReport(
+                    mock=lambda _: FilesystemCoverageReport(
                         result_digest=EMPTY_DIRECTORY_DIGEST,
                         directory_to_materialize_to=PurePath("mockety/mock"),
                     ),
