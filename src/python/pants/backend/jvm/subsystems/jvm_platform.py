@@ -128,7 +128,7 @@ class JvmPlatform(Subsystem):
         :returns: Distribution one of the selected distributions.
         """
         return DistributionLocator.cached(
-            cls._preferred_jvm_distribution_args(platforms, strict, jdk)
+            *cls._preferred_jvm_distribution_args(platforms, strict, jdk)
         )
 
     @classmethod
