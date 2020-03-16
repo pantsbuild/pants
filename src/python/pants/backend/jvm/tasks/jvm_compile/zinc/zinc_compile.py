@@ -192,6 +192,16 @@ class BaseZincCompile(JvmCompile):
             "This is experimental, but it provides great speedups in native-images of Zinc.",
         )
 
+        register(
+            "--report-diagnostic-counts",
+            advanced=True,
+            type=bool,
+            default=False,
+            help="Have the Zinc compiler record information on Warnings and Errors. "
+            "For each target, send the count of diagnostics of each severity (Hint, Information, "
+            "Warning, Error) to the reporting server.",
+        )
+
     @classmethod
     def subsystem_dependencies(cls):
         return super().subsystem_dependencies() + (Zinc.Factory, JvmPlatform,)
@@ -354,6 +364,8 @@ class BaseZincCompile(JvmCompile):
         return fast_relpath(path, get_buildroot())
 
     def _diagnostics_out(self, ctx):
+        if not self.get_options().report_diagnostic_counts:
+            return None
         return self.relative_to_exec_root(ctx.diagnostics_out)
 
     def create_zinc_args(
@@ -547,7 +559,7 @@ class BaseZincCompile(JvmCompile):
         )()
 
     def always_do_after_compile(self, ctx):
-        self._pass_diagnostics_to_buildstats(ctx)
+        self._pass_diagnostics_to_reporting_server(ctx)
 
     def _aggregate_diagnostics(self, lsp_data):
         # Note: this is not arbitrary. It is exactly every value that the LSP's DiagnosticSeverity allows.
@@ -564,16 +576,16 @@ class BaseZincCompile(JvmCompile):
                 counts[severity] += 1
         return counts
 
-    def _pass_diagnostics_to_buildstats(self, ctx):
+    def _pass_diagnostics_to_reporting_server(self, ctx):
         diagnostics_file = self._diagnostics_out(ctx)
         if not (diagnostics_file and os.path.exists(diagnostics_file)):
             return
         with open(diagnostics_file) as json_diagnostics:
             data = json.load(json_diagnostics)
             counts = self._aggregate_diagnostics(data)
-            self.context.log.debug(f"Reporting number of diagnostics for: {ctx.target}")
+            self.context.log.info(f"Reporting number of diagnostics for: {ctx.target}")
             for (severity, count) in counts.items():
-                self.context.log.debug(f"    {severity}: {count}")
+                self.context.log.info(f"    {severity}: {count}")
                 self.context.run_tracker.report_target_info(
                     self.options_scope, ctx.target, ["diagnostic_counts", severity], count
                 )
