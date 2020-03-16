@@ -516,6 +516,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
             args_file=os.path.join(target_workdir, "zinc_args"),
             post_compile_merge_dir=os.path.join(target_workdir, "post_compile_merge_dir"),
             sources=self._compute_sources_for_target(target),
+            diagnostics_out=None,
         )
 
     def execute(self):
