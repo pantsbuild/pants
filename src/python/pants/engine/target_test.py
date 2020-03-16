@@ -6,6 +6,7 @@ from pathlib import PurePath
 from typing import ClassVar, Iterable, List, Optional, Tuple
 
 import pytest
+from typing_extensions import final
 
 from pants.build_graph.address import Address
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, PathGlobs, Snapshot
@@ -43,6 +44,16 @@ class HaskellSources(AsyncField):
             return None
         return tuple(ensure_str_list(raw_value))
 
+    @final
+    @property
+    def request(self) -> "HaskellSourcesRequest":
+        return HaskellSourcesRequest(self)
+
+
+@dataclass(frozen=True)
+class HaskellSourcesRequest:
+    field: HaskellSources
+
 
 @dataclass(frozen=True)
 class HaskellSourcesResult:
@@ -50,14 +61,15 @@ class HaskellSourcesResult:
 
 
 @rule
-async def hydrate_haskell_sources(sources: HaskellSources) -> HaskellSourcesResult:
-    result = await Get[Snapshot](PathGlobs(sources.sanitized_raw_value))
+async def hydrate_haskell_sources(request: HaskellSourcesRequest) -> HaskellSourcesResult:
+    sources_field = request.field
+    result = await Get[Snapshot](PathGlobs(sources_field.sanitized_raw_value))
     # Validate after hydration
     non_haskell_sources = [fp for fp in result.files if PurePath(fp).suffix != ".hs"]
     if non_haskell_sources:
         raise ValueError(
-            f"Received non-Haskell sources in {sources.alias} for target {sources.address}: "
-            f"{non_haskell_sources}."
+            f"Received non-Haskell sources in {sources_field.alias} for target "
+            f"{sources_field.address}: {non_haskell_sources}."
         )
     return HaskellSourcesResult(result)
 
@@ -100,7 +112,7 @@ def test_get_async_field() -> None:
         ).get(HaskellSources)
         result: HaskellSourcesResult = run_rule(
             hydrate_haskell_sources,
-            rule_args=[sources_field],
+            rule_args=[HaskellSourcesRequest(sources_field)],
             mock_gets=[
                 MockGet(
                     product_type=Snapshot,

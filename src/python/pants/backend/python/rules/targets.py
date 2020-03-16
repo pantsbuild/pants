@@ -5,13 +5,14 @@ from pathlib import PurePath
 from typing import Any, ClassVar, Optional
 
 from pants.build_graph.address import Address
+from pants.engine.fs import Snapshot
 from pants.engine.objects import union
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
+    ImmutableValue,
     PrimitiveField,
     Sources,
-    SourcesResult,
     StringField,
     StringOrStringSequenceField,
     Target,
@@ -20,12 +21,11 @@ from pants.engine.target import (
 
 @union
 class PythonSources(Sources):
-    @classmethod
-    def validate_result(cls, result: SourcesResult) -> None:
-        non_python_files = [fp for fp in result.snapshot.files if not PurePath(fp).suffix == ".py"]
+    def validate_snapshot(self, snapshot: Snapshot) -> None:
+        non_python_files = [fp for fp in snapshot.files if not PurePath(fp).suffix == ".py"]
         if non_python_files:
             raise ValueError(
-                f"Target {result.address} has non-Python sources in its `sources` field: "
+                f"Target {self.address} has non-Python sources in its `sources` field: "
                 f"{non_python_files}"
             )
 
@@ -39,13 +39,13 @@ class PythonTestsSources(PythonSources):
 
 
 class PythonBinarySources(PythonSources):
-    @classmethod
-    def validate_result(cls, result: SourcesResult) -> None:
-        super().validate_result(result)
-        if len(result.snapshot.files) not in [0, 1]:
+    def validate_snapshot(self, snapshot: Snapshot) -> None:
+        super().validate_snapshot(snapshot)
+        if len(snapshot.files) not in [0, 1]:
             raise ValueError(
                 "Binary targets must have only 0 or 1 source files. Any additional files should "
-                "be put in a `python_library` which is added to `dependencies`"
+                f"be put in a `python_library` which is added to `dependencies`. The target "
+                f"{self.address} had {len(snapshot.files)} sources: {snapshot.files}."
             )
 
 
@@ -65,7 +65,7 @@ class Compatibility(StringOrStringSequenceField):
 class Provides(PrimitiveField):
     alias: ClassVar = "provides"
 
-    def hydrate(self, raw_value: Optional[Any], *, address: Address) -> Any:
+    def hydrate(self, raw_value: Optional[Any], *, address: Address) -> ImmutableValue:
         return raw_value
 
 

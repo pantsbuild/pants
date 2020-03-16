@@ -3,19 +3,34 @@
 
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
+from pathlib import PurePath
 from typing import Any, ClassVar, Dict, Iterable, List, Optional, Tuple, Type, TypeVar, Union, cast
 
 from typing_extensions import final
 
 from pants.build_graph.address import Address
-from pants.engine.fs import Snapshot
-from pants.engine.rules import UnionMembership
+from pants.engine.fs import (
+    EMPTY_SNAPSHOT,
+    GlobExpansionConjunction,
+    GlobMatchErrorBehavior,
+    PathGlobs,
+    Snapshot,
+)
+from pants.engine.rules import RootRule, UnionMembership, rule
+from pants.engine.selectors import Get
 from pants.util.collections import ensure_str_list
 from pants.util.meta import frozen_after_init
 
+# Type alias to express the intent that the type should be immutable and hashable. There's nothing
+# to actually enforce this, outside of convention. Maybe we could develop a MyPy plugin?
+ImmutableValue = Any
 
+
+# NB: We don't generate `__eq__` because dataclass would only look at the `alias` classvar, which
+# is always the same between every Field instance. Instead, subclasses like `PrimitiveField` should
+# define `__eq__`.
 @frozen_after_init
-@dataclass(unsafe_hash=True)  # type: ignore[misc]  # MyPy doesn't like the abstract __init__()
+@dataclass(eq=False)  # type: ignore[misc]   # https://github.com/python/mypy/issues/5374
 class Field(ABC):
     alias: ClassVar[str]
 
@@ -31,6 +46,8 @@ class Field(ABC):
         pass
 
 
+@frozen_after_init
+@dataclass(unsafe_hash=True)  # type: ignore[misc]   # https://github.com/python/mypy/issues/5374
 class PrimitiveField(Field, metaclass=ABCMeta):
     """A Field that does not need the engine in order to be hydrated.
 
@@ -58,7 +75,7 @@ class PrimitiveField(Field, metaclass=ABCMeta):
                 return raw_value
     """
 
-    value: Any
+    value: ImmutableValue
 
     @final
     def __init__(self, raw_value: Optional[Any], *, address: Address) -> None:
@@ -70,7 +87,7 @@ class PrimitiveField(Field, metaclass=ABCMeta):
         self.value = self.hydrate(raw_value, address=address)
 
     @abstractmethod
-    def hydrate(self, raw_value: Optional[Any], *, address: Address) -> Any:
+    def hydrate(self, raw_value: Optional[Any], *, address: Address) -> ImmutableValue:
         """Convert the `raw_value` into `self.value`.
 
         You should perform any validation and/or hydration here. For example, you may want to check
@@ -89,6 +106,13 @@ class PrimitiveField(Field, metaclass=ABCMeta):
         return f"{self.alias}={self.value}"
 
 
+# Type alias to express the intent that the type should be a new Request class created to
+# correspond with its AsyncField.
+AsyncFieldRequest = Any
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)  # type: ignore[misc]   # https://github.com/python/mypy/issues/5374
 class AsyncField(Field, metaclass=ABCMeta):
     """A field that needs the engine in order to be hydrated.
 
@@ -96,8 +120,11 @@ class AsyncField(Field, metaclass=ABCMeta):
     immutable and hashable so that this Field may be used by the V2 engine. This means, for example,
     using tuples rather than lists and using `FrozenOrderedSet` rather than `set`.
 
-    You should also create a corresponding Result class and define a rule to go from this
-    AsyncField to the Result.
+    You should also create corresponding Request and Result classes and define a rule to go from
+    this Request to Result. The Request type must be registered as a RootRule. Then, implement
+    the property `AsyncField.request` to instantiate the Request type. If you use MyPy, you should
+    mark `AsyncField.request` as `@final` (from `typing_extensions)` to ensure that subclasses
+    don't change this property.
 
     For example:
 
@@ -110,6 +137,22 @@ class AsyncField(Field, metaclass=ABCMeta):
             ) -> Optional[Tuple[str, ...]]:
                 ...
 
+            @final
+            @property
+            def request(self) -> SourcesRequest:
+                return SourcesRequest(self)
+
+            # Example extension point provided by this field. Subclasses can override this to do
+            # whatever validation they'd like. Each AsyncField must define its own entry points
+            # like this to allow subclasses to change behavior.
+            def validate_snapshot(self, snapshot: Snapshot) -> None:
+                pass
+
+
+        @dataclass(frozen=True)
+        class SourcesRequest:
+            field: Sources
+
 
         @dataclass(frozen=True)
         class SourcesResult:
@@ -117,25 +160,25 @@ class AsyncField(Field, metaclass=ABCMeta):
 
 
         @rule
-        def hydrate_sources(sources: Sources) -> SourcesResult:
-            # possibly validate `sources.raw_value`
-            ...
-            result = await Get[Snapshot](PathGlobs(sources.raw_value))
-            # possibly validate `result`
+        def hydrate_sources(request: SourcesRequest) -> SourcesResult:
+            result = await Get[Snapshot](PathGlobs(request.field.sanitized_raw_value))
+            request.field.validate_snapshot(result)
             ...
             return SourcesResult(result)
 
 
         def rules():
-            return [hydrate_sources]
+            return [hydrate_sources, RootRule(SourcesRequest)]
 
-    Then, call sites can `await Get` if they need to hydrate the field:
+    Then, call sites can `await Get` if they need to hydrate the field, even if they subclassed
+    the original `AsyncField` to have custom behavior:
 
-        sources = await Get[SourcesResult](Sources, my_tgt.get(Sources))
+        sources1 = await Get[SourcesResult](SourcesRequest, my_tgt.get(Sources).request)
+        sources2 = await Get[SourcesResult[(SourcesRequest, custom_tgt.get(CustomSources).request)
     """
 
     address: Address
-    sanitized_raw_value: Any
+    sanitized_raw_value: ImmutableValue
 
     @final
     def __init__(self, raw_value: Optional[Any], *, address: Address) -> None:
@@ -143,7 +186,7 @@ class AsyncField(Field, metaclass=ABCMeta):
         self.sanitized_raw_value = self.sanitize_raw_value(raw_value)
 
     @abstractmethod
-    def sanitize_raw_value(self, raw_value: Optional[Any]) -> Any:
+    def sanitize_raw_value(self, raw_value: Optional[Any]) -> ImmutableValue:
         """Sanitize the `raw_value` into a type that is safe for the V2 engine to use.
 
         The resulting type should be immutable and hashable.
@@ -153,12 +196,26 @@ class AsyncField(Field, metaclass=ABCMeta):
         """
 
     def __repr__(self) -> str:
-        return (
-            f"{self.__class__}(alias={self.alias}, sanitized_raw_value={self.sanitized_raw_value})"
-        )
+        return f"{self.__class__}(alias={repr(self.alias)}, sanitized_raw_value={self.sanitized_raw_value})"
 
     def __str__(self) -> str:
         return f"{self.alias}={self.sanitized_raw_value}"
+
+    @property
+    @abstractmethod
+    def request(self) -> AsyncFieldRequest:
+        """Wrap the field in its corresponding Request type.
+
+        This is necessary to avoid ambiguity in the V2 rule graph when dealing with possible
+        subclasses of this AsyncField.
+
+        For example:
+
+            @final
+            @property
+            def request() -> SourcesRequest:
+                return SourcesRequest(self)
+        """
 
 
 # NB: This TypeVar is what allows `Target.get()` to properly work with MyPy so that MyPy knows
@@ -362,13 +419,13 @@ class Dependencies(AsyncField):
             return None
         return tuple(raw_value)
 
+    def request(self) -> Any:
+        raise NotImplementedError("Hydration of the Dependencies field is not yet implemented.")
+
 
 COMMON_TARGET_FIELDS = (Dependencies, Tags)
 
 
-# TODO: implement the hydration for this so that you can
-#  `await Get[SourcesResult](Sources, my_tgt.get(Sources)`. Tricky part of this...this _must_
-#  support subclassing the field to give custom behavior.
 class Sources(AsyncField):
     alias: ClassVar = "sources"
     default_globs: ClassVar[Optional[Tuple[str, ...]]] = None
@@ -379,12 +436,70 @@ class Sources(AsyncField):
             return None
         return tuple(raw_value)
 
-    @classmethod
-    def validate_result(cls, _: "SourcesResult") -> None:
-        pass
+    def validate_snapshot(self, _: Snapshot) -> None:
+        """Perform any validation on the resulting snapshot, e.g. ensuring that all files end in
+        `.py`."""
+
+    @final
+    @property
+    def request(self) -> "SourcesRequest":
+        return SourcesRequest(self)
+
+    @final
+    def prefix_glob_with_address(self, glob: str) -> str:
+        if glob.startswith("!"):
+            return f"!{PurePath(self.address.spec_path, glob[1:])}"
+        return str(PurePath(self.address.spec_path, glob))
+
+
+@dataclass(frozen=True)
+class SourcesRequest:
+    field: Sources
 
 
 @dataclass(frozen=True)
 class SourcesResult:
-    address: Address
     snapshot: Snapshot
+
+    # TODO: do we want to support the `extension` parameter from Target.has_sources()? In V1,
+    # it's used to distinguish between Java vs. Scala files. For now, we should leave it off to
+    # keep things as simple as possible, but we may want to add it in the future.
+    def has_sources(self) -> bool:
+        return bool(self.snapshot.files)
+
+
+@rule
+async def hydrate_sources(
+    request: SourcesRequest, glob_match_error_behavior: GlobMatchErrorBehavior
+) -> SourcesResult:
+    sources_field = request.field
+    globs: Iterable[str]
+    if sources_field.sanitized_raw_value is not None:
+        globs = ensure_str_list(sources_field.sanitized_raw_value)
+        conjunction = GlobExpansionConjunction.all_match
+    else:
+        if sources_field.default_globs is None:
+            return SourcesResult(EMPTY_SNAPSHOT)
+        globs = sources_field.default_globs
+        conjunction = GlobExpansionConjunction.any_match
+
+    snapshot = await Get[Snapshot](
+        PathGlobs(
+            (sources_field.prefix_glob_with_address(glob) for glob in globs),
+            conjunction=conjunction,
+            glob_match_error_behavior=glob_match_error_behavior,
+            # TODO(#9012): add line number referring to the sources field. When doing this, we'll
+            # likely need to `await Get[BuildFileAddress](Address)`.
+            description_of_origin=(
+                f"{sources_field.address}'s `{sources_field.alias}` field"
+                if glob_match_error_behavior != GlobMatchErrorBehavior.ignore
+                else None
+            ),
+        )
+    )
+    sources_field.validate_snapshot(snapshot)
+    return SourcesResult(snapshot)
+
+
+def rules():
+    return [hydrate_sources, RootRule(SourcesRequest)]
