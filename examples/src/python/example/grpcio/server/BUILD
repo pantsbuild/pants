@@ -9,5 +9,5 @@ python_binary(
     'examples/src/protobuf/org/pantsbuild/example/grpcio/service',
     'examples/src/protobuf/org/pantsbuild/example/grpcio/imports',
   ],
-  source='server.py',
+  sources=['server.py'],
 )

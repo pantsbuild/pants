@@ -3,7 +3,7 @@
 
 page(
   name='readme',
-  source='README.md',
+  sources=['README.md'],
 )
 
 # TODO: Get rid of all these microtargets. The entire package should be one target,

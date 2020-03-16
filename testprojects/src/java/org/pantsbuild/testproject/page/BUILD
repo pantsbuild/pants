@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 page(name="readme",
-     source="README.md",
+     sources=["README.md"],
      links=[
        'examples/src/java/org/pantsbuild/example/hello/main:readme',
        ':circular',
@@ -10,7 +10,7 @@ page(name="readme",
 )
 
 page(name="circular",
-     source="circular.md",
+     sources=["circular.md"],
      links=[
        ':readme',
      ]

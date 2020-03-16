@@ -15,7 +15,7 @@ python_library(
 
 python_library(
   name = 'util',
-  source = 'util.py',
+  sources = ['util.py'],
   dependencies = [
     '3rdparty/python:ansicolors',
     '3rdparty/python:dataclasses',

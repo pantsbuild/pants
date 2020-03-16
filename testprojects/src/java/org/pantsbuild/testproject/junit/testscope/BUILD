@@ -11,7 +11,7 @@ junit_tests(name='tests',
 )
 
 jvm_binary(name='bin',
-  source='CheckForLibrary.java',
+  sources=['CheckForLibrary.java'],
   main='org.pantsbuild.testproject.junit.testscope.CheckForLibrary',
   dependencies=[
     ':lib',

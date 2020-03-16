@@ -3,7 +3,7 @@
 
 
 jvm_binary(
-  source = 'Main.java',
+  sources = ['Main.java'],
   main = 'org.pantsbuild.testproject.annotation.processorwithdep.Main',
   basename = 'processorwithdep-main',
   dependencies = [

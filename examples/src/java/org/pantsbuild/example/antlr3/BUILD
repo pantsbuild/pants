@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 jvm_binary(
-  source='ExampleAntlr3.java',
+  sources=['ExampleAntlr3.java'],
   main='org.pantsbuild.example.antlr3.ExampleAntlr3',
   dependencies=[
     'examples/src/antlr/org/pantsbuild/example/exp:exp_antlr3',

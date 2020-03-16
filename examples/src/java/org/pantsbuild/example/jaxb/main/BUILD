@@ -7,6 +7,6 @@ jvm_binary(
     'examples/src/java/org/pantsbuild/example/jaxb/reader',
     'examples/src/resources/org/pantsbuild/example/jaxb',
   ],
-  source='ExampleJaxb.java',
+  sources=['ExampleJaxb.java'],
   main='org.pantsbuild.example.jaxb.main.ExampleJaxb',
 )

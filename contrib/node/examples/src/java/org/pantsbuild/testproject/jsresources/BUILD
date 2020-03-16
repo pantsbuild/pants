@@ -1,5 +1,5 @@
 jvm_binary(
-  source = 'JsResourcesMain.java',
+  sources = ['JsResourcesMain.java'],
   main = 'org.pantsbuild.testproject.jsresources.JsResourcesMain',
   dependencies = [
     '3rdparty:guava',
@@ -7,7 +7,7 @@ jvm_binary(
   ]
 )
 jvm_binary(name='jsresources-unprocessed',
-  source = 'JsResourcesMain.java',
+  sources = ['JsResourcesMain.java'],
   main = 'org.pantsbuild.testproject.jsresources.JsResourcesMain',
   dependencies = [
     '3rdparty:guava',
@@ -16,7 +16,7 @@ jvm_binary(name='jsresources-unprocessed',
 )
 
 jvm_binary(name = 'jsresources-with-dependency-artifacts',
-  source = 'JsResourcesMain.java',
+  sources = ['JsResourcesMain.java'],
   main = 'org.pantsbuild.testproject.jsresources.JsResourcesMain',
   dependencies = [
     '3rdparty:guava',

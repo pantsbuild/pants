@@ -35,7 +35,7 @@ jvm_binary(name='c-bin',
 )
 
 jvm_binary(name='c-with-direct-dep',
-  source='subc/C.java',
+  sources=['subc/C.java'],
   main='org.pantsbuild.testproject.provided.subc.C',
   dependencies=[
     ':a',
@@ -50,7 +50,7 @@ target(name='trans-3', dependencies=[':trans-2'])
 target(name='trans-4', dependencies=[':trans-3'])
 
 jvm_binary(name='c-with-transitive-dep',
-  source='subc/C.java',
+  sources=['subc/C.java'],
   main='org.pantsbuild.testproject.provided.subc.C',
   dependencies=[
     ':trans-1',

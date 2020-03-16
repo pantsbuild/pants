@@ -22,7 +22,7 @@ jvm_binary(name = 'main-bin',
     'examples/src/java/org/pantsbuild/example/hello/greet',
     'examples/src/resources/org/pantsbuild/example/hello',
   ],
-  source = 'HelloMain.java',
+  sources = ['HelloMain.java'],
   main = 'org.pantsbuild.example.hello.main.HelloMain',
   basename = 'hello-example',
 )

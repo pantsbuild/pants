@@ -7,7 +7,7 @@ python_binary(
   dependencies=[
     'examples/src/python/example/hello/greet:greet',
   ],
-  source='main.py',
+  sources=['main.py'],
 )
 
 # An "app" is a binary plus other loose files bundled together in

@@ -7,6 +7,6 @@ jvm_binary(
     '3rdparty:wire-runtime',
     'examples/src/wire/org/pantsbuild/example/temperature',
   ],
-  source='WireTemperatureExample.java',
+  sources=['WireTemperatureExample.java'],
   main='org.pantsbuild.example.pants.temperatureservice.WireTemperatureExample',
 )

@@ -5,6 +5,6 @@ jvm_binary(
   dependencies=[
     'examples/src/scala/org/pantsbuild/example/hello/welcome:welcome',
   ],
-  source='Exe.scala',
+  sources=['Exe.scala'],
   main='org.pantsbuild.example.hello.exe.Exe',
 )

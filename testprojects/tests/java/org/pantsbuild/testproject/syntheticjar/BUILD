@@ -7,7 +7,7 @@ java_library(name='util',
 )
 
 jvm_binary(name='run',
-  source='SyntheticJarRun.java',
+  sources=['SyntheticJarRun.java'],
   main='org.pantsbuild.testproject.syntheticjar.run.SyntheticJarRun',
   dependencies=[
     ':util',

@@ -7,6 +7,6 @@ jvm_binary(
     'examples/src/protobuf/org/pantsbuild/example/imports',
     '3rdparty:protobuf-java',
   ],
-  source='ExampleProtobufImports.java',
+  sources=['ExampleProtobufImports.java'],
   main='org.pantsbuild.example.protobuf.imports.ExampleProtobufImports',
 )

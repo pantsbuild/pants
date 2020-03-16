@@ -11,7 +11,7 @@ target(
 
 page(
   name='readme',
-  source='README.md',
+  sources=['README.md'],
   links=[
     'examples/src/java/org/pantsbuild/example:publish',
   ])

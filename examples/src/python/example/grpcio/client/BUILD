@@ -7,7 +7,7 @@ python_binary(
     'examples/3rdparty/python:grpcio',
     'examples/src/protobuf/org/pantsbuild/example/grpcio/service',
   ],
-  source='service_client.py',
+  sources=['service_client.py'],
 )
 
 python_binary(
@@ -16,5 +16,5 @@ python_binary(
     'examples/3rdparty/python:grpcio',
     'examples/src/protobuf/org/pantsbuild/example/grpcio/imports',
   ],
-  source='imports_client.py',
+  sources=['imports_client.py'],
 )

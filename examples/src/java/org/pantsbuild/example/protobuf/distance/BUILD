@@ -7,6 +7,6 @@ jvm_binary(
     'examples/src/protobuf/org/pantsbuild/example/distance',
     '3rdparty:protobuf-java',
   ],
-  source='ExampleProtobuf.java',
+  sources=['ExampleProtobuf.java'],
   main='org.pantsbuild.example.protobuf.distance.ExampleProtobuf',
 )

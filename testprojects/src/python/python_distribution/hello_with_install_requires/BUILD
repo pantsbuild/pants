@@ -11,7 +11,7 @@ python_dist(
 
 python_binary(
   name='main_with_no_conflict',
-  source='main.py',
+  sources=['main.py'],
   dependencies=[
     ':hello_with_install_requires',
   ],

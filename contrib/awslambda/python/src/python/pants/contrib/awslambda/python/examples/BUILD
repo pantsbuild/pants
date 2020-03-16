@@ -16,7 +16,7 @@ python_library(
 
 python_binary(
   name='hello-bin',
-  source='hello_handler.py',
+  sources=['hello_handler.py'],
   dependencies=[
     ':pycountry',
     ':hello-lib',

@@ -25,7 +25,7 @@ python_dist(
 
 python_binary(
   name='bin_with_third_party',
-  source='main.py',
+  sources=['main.py'],
   dependencies=[
     ':python_dist_with_third_party_cpp',
   ],

@@ -6,7 +6,7 @@ jvm_binary(
   dependencies=[
     'examples/src/wire/org/pantsbuild/example/roots',
   ],
-  source='WireRootsExample.java',
+  sources=['WireRootsExample.java'],
   main='org.pantsbuild.example.wire.roots.WireRootsExample',
 )
 

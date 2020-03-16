@@ -7,6 +7,6 @@ jvm_binary(
     'testprojects/src/protobuf/org/pantsbuild/testproject/utf8proto',
     '3rdparty:protobuf-java',
   ],
-  source='ExampleUtf8Proto.java',
+  sources=['ExampleUtf8Proto.java'],
   main='org.pantsbuild.testproject.utf8proto.ExampleUtf8Proto',
 )

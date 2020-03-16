@@ -18,7 +18,7 @@
 
 python_binary(
   name='main_py3',
-  source='main_py3.py',
+  sources=['main_py3.py'],
   compatibility=['CPython>3'],
   dependencies=[
     # We depend on libraries with both narrow and wide ranges in order to confirm that the narrower
@@ -47,7 +47,7 @@ python_tests(
 
 python_binary(
   name='main_py2',
-  source='main_py2.py',
+  sources=['main_py2.py'],
   compatibility=['CPython>2.7.6,<3'],
   dependencies=[
     # We depend on libraries with both narrow and wide ranges in order to confirm that the narrower
@@ -76,7 +76,7 @@ python_tests(
 
 python_binary(
   name='main_py23',
-  source='main_py23.py',
+  sources=['main_py23.py'],
   compatibility=['CPython>2.7'],
   dependencies=[
     ':lib_py23'
