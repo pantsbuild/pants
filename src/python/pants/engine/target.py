@@ -264,6 +264,21 @@ class Target(ABC):
 
     @final
     def get(self, field: Type[_F]) -> _F:
+        """Get the requested `Field` instance belonging to this target.
+
+        This will return an instance of the requested field type, e.g. an instance of
+        `Compatibility`, `Sources`, `EntryPoint`, etc. Usually, you will want to grab the
+        `Field`'s inner value, e.g. `tgt.get(Compatibility).value`. (For `AsyncField`s, you would
+        call `await Get[SourcesResult](SourcesRequest, tgt.get(Sources).request)`).
+
+        If the `Field` is not registered on this `Target` type, this method will raise a
+        `KeyError`. To avoid this, you should first call `tgt.has_field()` or `tgt.has_fields()`
+        to ensure that the field is registered.
+
+        This works with subclasses of `Field`s. For example, if you subclass `Sources` to define a
+        custom subclass `PythonSources`, both `python_tgt.get(PythonSources)` and
+        `python_tgt.get(Sources)` will return the same `PythonSources` instance.
+        """
         result = self.field_values.get(field, None)
         if result is not None:
             return cast(_F, result)
@@ -272,12 +287,28 @@ class Target(ABC):
             return cast(_F, self.field_values[field_subclass])
         raise KeyError(
             f"The target `{self}` does not have a field `{field}`. Before calling "
-            f"`my_tgt.get({field.__name__})`, call `my_tgt.has_fields([{field.__name__}])` to "
+            f"`my_tgt.get({field.__name__})`, call `my_tgt.has_field({field.__name__})` to "
             "filter out any irrelevant Targets."
         )
 
     @final
+    def has_field(self, field: Type[Field]) -> bool:
+        """Check that this target has registered the requested field.
+
+        This works with subclasses of `Field`s. For example, if you subclass `Sources` to define a
+        custom subclass `PythonSources`, both `python_tgt.has_field(PythonSources)` and
+        `python_tgt.has_field(Sources)` will return True.
+        """
+        return self.has_fields([field])
+
+    @final
     def has_fields(self, fields: Iterable[Type[Field]]) -> bool:
+        """Check that this target has registered all of the requested fields.
+
+        This works with subclasses of `Field`s. For example, if you subclass `Sources` to define a
+        custom subclass `PythonSources`, both `python_tgt.has_fields([PythonSources])` and
+        `python_tgt.has_fields([Sources])` will return True.
+        """
         unrecognized_fields = [field for field in fields if field not in self.field_types]
         if not unrecognized_fields:
             return True
