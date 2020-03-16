@@ -13,7 +13,7 @@ from pants.engine.target import (
     Sources,
     SourcesResult,
     StringField,
-    StringOrStringListField,
+    StringOrStringSequenceField,
     Target,
 )
 
@@ -49,7 +49,7 @@ class PythonBinarySources(PythonSources):
             )
 
 
-class Compatibility(StringOrStringListField):
+class Compatibility(StringOrStringSequenceField):
     """A string for Python interpreter constraints on this target.
 
     This should be written in Requirement-style format, e.g. `CPython==2.7.*` or `CPython>=3.6,<4`.
@@ -60,16 +60,16 @@ class Compatibility(StringOrStringListField):
     alias: ClassVar = "compatibility"
 
 
-# TODO: Deal with the `provides` field. This will at least allow us to correctly parse the valid,
+# TODO: Deal with the `provides` field. This will at least allow us to correctly parse the field,
 #  rather than throwing an error when encountering it.
 class Provides(PrimitiveField):
     alias: ClassVar = "provides"
 
-    def hydrate(self, *, address: Address) -> Any:
-        return self.raw_value
+    def hydrate(self, raw_value: Optional[Any], *, address: Address) -> Any:
+        return raw_value
 
 
-class Coverage(StringOrStringListField):
+class Coverage(StringOrStringSequenceField):
     """The module(s) whose coverage should be generated, e.g. `['pants.util']`."""
 
     alias: ClassVar = "coverage"
@@ -82,15 +82,13 @@ class Timeout(PrimitiveField):
     """
 
     alias: ClassVar = "timeout"
-    raw_value: Optional[int]
 
-    def hydrate(self, *, address: Address) -> Optional[int]:
-        if self.raw_value is not None and self.raw_value <= 0:
+    def hydrate(self, raw_value: Optional[int], *, address: Address) -> Optional[int]:
+        if raw_value is not None and raw_value <= 0:
             raise ValueError(
-                f"The `{self.alias}` field for the target {address} must be > 1. Was "
-                f"{self.raw_value}."
+                f"The `{self.alias}` field for the target {address} must be > 1. Was {raw_value}."
             )
-        return self.raw_value
+        return raw_value
 
 
 class EntryPoint(StringField):
@@ -103,7 +101,7 @@ class EntryPoint(StringField):
     alias: ClassVar = "entry_point"
 
 
-class Platforms(StringOrStringListField):
+class Platforms(StringOrStringSequenceField):
     """Extra platforms to target when building a Python binary."""
 
     alias: ClassVar = "platforms"
@@ -130,13 +128,13 @@ class PexAlwaysWriteCache(BoolField):
     default: ClassVar = False
 
 
-class PexRepositories(StringOrStringListField):
+class PexRepositories(StringOrStringSequenceField):
     """Repositories for Pex to query for dependencies."""
 
     alias: ClassVar = "repositories"
 
 
-class PexIndices(StringOrStringListField):
+class PexIndices(StringOrStringSequenceField):
     """Indices for Pex to use for packages."""
 
     alias: ClassVar = "indices"
