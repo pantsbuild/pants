@@ -264,7 +264,7 @@ class Target(ABC):
                 raise TargetDefinitionException(
                     address,
                     f"Unrecognized field `{alias}={value}`. Valid fields for the target type "
-                    f"`{self.alias}`: {sorted(aliases_to_field_types.keys())}."
+                    f"`{self.alias}`: {sorted(aliases_to_field_types.keys())}.",
                 )
             field_type = aliases_to_field_types[alias]
             self.field_values[field_type] = field_type(value, address=address)
