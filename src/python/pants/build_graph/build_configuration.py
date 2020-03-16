@@ -2,19 +2,21 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+import typing
 from collections import namedtuple
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Any, Dict, Type
+from typing import Any, Dict, Type, Union
 
 from pants.base.parse_context import ParseContext
 from pants.build_graph.addressable import AddressableCallProxy
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target_addressable import TargetAddressable
 from pants.engine.rules import RuleIndex
+from pants.engine.target import Target
 from pants.option.optionable import Optionable
 from pants.util.memo import memoized_method
-from pants.util.ordered_set import OrderedSet
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +32,7 @@ class BuildConfiguration:
     _optionables: OrderedSet = field(default_factory=OrderedSet)
     _rules: OrderedSet = field(default_factory=OrderedSet)
     _union_rules: Dict[Type, OrderedSet[Type]] = field(default_factory=dict)
+    _targets: FrozenOrderedSet[Type[Target]] = field(default_factory=FrozenOrderedSet)
 
     class ParseState(namedtuple("ParseState", ["parse_context", "parse_globals"])):
         @property
@@ -185,6 +188,27 @@ class BuildConfiguration:
         """Returns a mapping of registered union base types -> [OrderedSet of union member
         types]."""
         return self._union_rules
+
+    def register_targets(self, targets: Union[typing.Iterable[Type[Target]], Any]) -> None:
+        """Registers the given target types."""
+        if not isinstance(targets, Iterable):
+            raise TypeError(
+                f"The entrypoint `targets` must return an iterable. Given {repr(targets)}"
+            )
+        bad_elements = [
+            tgt_type
+            for tgt_type in targets
+            if not isinstance(tgt_type, type) or not issubclass(tgt_type, Target)
+        ]
+        if bad_elements:
+            raise TypeError(
+                "Every element of the entrypoint `targets` must be a subclass of "
+                f"{Target.__name__}. Bad elements: {bad_elements}."
+            )
+        self._targets = FrozenOrderedSet(sorted(targets, key=lambda target_type: target_type.alias))
+
+    def targets(self) -> FrozenOrderedSet[Type[Target]]:
+        return self._targets
 
     @memoized_method
     def _get_addressable_factory(self, target_type, alias):

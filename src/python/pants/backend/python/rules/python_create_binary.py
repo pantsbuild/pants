@@ -7,15 +7,13 @@ from typing import Optional
 from pants.backend.python.rules.pex import Pex
 from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
 from pants.backend.python.rules.targets import EntryPoint, PythonBinarySources
-from pants.backend.python.rules.targets import targets as python_targets
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses
 from pants.engine.legacy.structs import PythonBinaryAdaptor
-from pants.engine.parser import HydratedStruct
 from pants.engine.rules import UnionRule, rule
 from pants.engine.selectors import Get
-from pants.engine.target import SourcesRequest, SourcesResult, Target, hydrated_struct_to_target
+from pants.engine.target import SourcesRequest, SourcesResult, Target, WrappedTarget
 from pants.rules.core.binary import BinaryTarget, CreatedBinary
 from pants.rules.core.strip_source_roots import SourceRootStrippedSources, StripSnapshotRequest
 
@@ -48,9 +46,8 @@ class PythonBinaryFields:
 
 @rule
 async def convert_python_binary_target(adaptor: PythonBinaryAdaptor) -> PythonBinaryFields:
-    hydrated_struct = await Get[HydratedStruct](Address, adaptor.address)
-    tgt = hydrated_struct_to_target(hydrated_struct, target_types=python_targets())
-    return PythonBinaryFields.create(tgt)
+    wrapped_tgt = await Get[WrappedTarget](Address, adaptor.address)
+    return PythonBinaryFields.create(wrapped_tgt.target)
 
 
 @rule

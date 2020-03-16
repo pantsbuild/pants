@@ -202,7 +202,3 @@ class PythonLibrary(Target):
 class PythonTests(Target):
     alias: ClassVar = "python_tests"
     core_fields: ClassVar = (*COMMON_PYTHON_FIELDS, PythonTestsSources, Coverage, Timeout)
-
-
-def targets():
-    return [PythonBinary, PythonLibrary, PythonTests]

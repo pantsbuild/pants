@@ -56,6 +56,7 @@ from pants.engine.platform import create_platform_rules
 from pants.engine.rules import RootRule, UnionMembership, rule
 from pants.engine.scheduler import Scheduler, SchedulerSession
 from pants.engine.selectors import Params
+from pants.engine.target import RegisteredTargetTypes
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.option.global_options import (
     DEFAULT_EXECUTION_OPTIONS,
@@ -369,6 +370,10 @@ class EngineInitializer:
 
         symbol_table = _legacy_symbol_table(build_file_aliases)
 
+        # TODO: register this with the SymbolTable/LegacyPythonCallbacksParser so that the aliases
+        #  exposed by the Target API are interpreted correctly.
+        registered_target_types = RegisteredTargetTypes.create(build_configuration.targets())
+
         execution_options = execution_options or DEFAULT_EXECUTION_OPTIONS
 
         # Register "literal" subjects required for these rules.
@@ -395,6 +400,10 @@ class EngineInitializer:
             return symbol_table
 
         @rule
+        def registered_target_types_singleton() -> RegisteredTargetTypes:
+            return registered_target_types
+
+        @rule
         def union_membership_singleton() -> UnionMembership:
             return UnionMembership(build_configuration.union_rules())
 
@@ -409,6 +418,7 @@ class EngineInitializer:
             glob_match_error_behavior_singleton,
             build_configuration_singleton,
             symbol_table_singleton,
+            registered_target_types_singleton,
             union_membership_singleton,
             build_root_singleton,
             *create_legacy_graph_tasks(),
