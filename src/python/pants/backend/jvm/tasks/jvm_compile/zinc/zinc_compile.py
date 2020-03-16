@@ -393,10 +393,12 @@ class BaseZincCompile(JvmCompile):
                 classes_dir,
                 "-jar",
                 jar_file,
-                "-diag",
-                self._diagnostics_out(ctx),
             ]
         )
+        diag_out = self._diagnostics_out(ctx)
+        if diag_out:
+            zinc_args.extend(["-diag", diag_out])
+
         if not self.get_options().colors:
             zinc_args.append("-no-color")
 
@@ -564,7 +566,7 @@ class BaseZincCompile(JvmCompile):
 
     def _pass_diagnostics_to_buildstats(self, ctx):
         diagnostics_file = self._diagnostics_out(ctx)
-        if not os.path.exists(diagnostics_file):
+        if not (diagnostics_file and os.path.exists(diagnostics_file)):
             return
         with open(diagnostics_file) as json_diagnostics:
             data = json.load(json_diagnostics)
