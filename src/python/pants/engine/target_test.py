@@ -8,6 +8,7 @@ from typing import ClassVar, Iterable, List, Optional, Tuple
 import pytest
 from typing_extensions import final
 
+from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.address import Address
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, PathGlobs, Snapshot
 from pants.engine.rules import UnionMembership, rule
@@ -28,9 +29,10 @@ class HaskellGhcExtensions(PrimitiveField):
         # Add some arbitrary validation to test that hydration/validation works properly.
         bad_extensions = [extension for extension in raw_value if not extension.startswith("Ghc")]
         if bad_extensions:
-            raise ValueError(
+            raise TargetDefinitionException(
+                address,
                 f"All elements of `{self.alias}` must be prefixed by `Ghc`. Received "
-                f"{bad_extensions} for target {address}."
+                f"{bad_extensions}.",
             )
         return tuple(raw_value)
 
@@ -80,12 +82,9 @@ class HaskellTarget(Target):
 
 
 def test_invalid_fields_rejected() -> None:
-    with pytest.raises(ValueError) as exc:
+    with pytest.raises(TargetDefinitionException) as exc:
         HaskellTarget({"invalid_field": True}, address=Address.parse(":lib"))
-    assert (
-        "Unrecognized field `invalid_field=True` for target //:lib with target type `haskell`."
-        in str(exc)
-    )
+    assert "Unrecognized field `invalid_field=True`" in str(exc)
 
 
 def test_get_primitive_field() -> None:
@@ -163,7 +162,7 @@ def test_has_fields() -> None:
 
 
 def test_primitive_field_hydration_is_eager() -> None:
-    with pytest.raises(ValueError) as exc:
+    with pytest.raises(TargetDefinitionException) as exc:
         HaskellTarget(
             {HaskellGhcExtensions.alias: ["GhcExistentialQuantification", "DoesNotStartWithGhc"]},
             address=Address.parse(":bad_extension"),
@@ -219,8 +218,8 @@ def test_override_preexisting_field_via_new_target() -> None:
                 if extension in self.banned_extensions
             ]
             if banned:
-                raise ValueError(
-                    f"Banned extensions used for {self.alias} on target {address}: {banned}."
+                raise TargetDefinitionException(
+                    address, f"Banned extensions used for {self.alias}: {banned}."
                 )
             return (*specified_extensions, *self.default_extensions)
 
@@ -258,7 +257,7 @@ def test_override_preexisting_field_via_new_target() -> None:
     )
 
     # Custom validation
-    with pytest.raises(ValueError) as exc:
+    with pytest.raises(TargetDefinitionException) as exc:
         CustomHaskellTarget(
             {HaskellGhcExtensions.alias: CustomHaskellGhcExtensions.banned_extensions},
             address=Address.parse(":invalid"),

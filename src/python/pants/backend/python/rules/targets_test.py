@@ -10,6 +10,7 @@ from pants.backend.python.rules.targets import (
     PythonTestsSources,
     Timeout,
 )
+from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.address import Address
 from pants.engine.rules import RootRule
 from pants.engine.scheduler import ExecutionError
@@ -19,9 +20,9 @@ from pants.testutil.test_base import TestBase
 
 
 def test_timeout_validation() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(TargetDefinitionException):
         Timeout(-100, address=Address.parse(":tests"))
-    with pytest.raises(ValueError):
+    with pytest.raises(TargetDefinitionException):
         Timeout(0, address=Address.parse(":tests"))
     assert Timeout(5, address=Address.parse(":tests")).value == 5
 
@@ -41,7 +42,6 @@ class TestPythonSources(TestBase):
         assert sources.sanitized_raw_value == files
         with pytest.raises(ExecutionError) as exc:
             self.request_single_product(SourcesResult, sources.request)
-        assert "non-Python sources" in str(exc)
         assert "f.hs" in str(exc)
 
         # Also check that we support valid sources
@@ -66,7 +66,7 @@ class TestPythonSources(TestBase):
         multiple_sources = PythonBinarySources(["f1.py", "f2.py"], address=address)
         with pytest.raises(ExecutionError) as exc:
             self.request_single_product(SourcesResult, multiple_sources.request)
-        assert "//:binary had 2 sources" in str(exc)
+        assert "has 2 sources" in str(exc)
 
     def test_python_library_sources_default_globs(self) -> None:
         self.create_files(path="", files=[*self.PYTHON_SRC_FILES, *self.PYTHON_TEST_FILES])

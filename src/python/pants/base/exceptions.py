@@ -37,6 +37,9 @@ class ErrorWhileTesting(TaskError):
     """
 
 
+# TODO: Create subclasses for the V2 Target API, e.g. one for an invalid field. We don't
+#  want to use the exceptions in build_graph.target.Target to avoid coupling to V1. Likely, these
+#  new exceptions should live in engine.target for fewer import statements for target authors.
 class TargetDefinitionException(Exception):
     """Indicates an invalid target definition.
 
@@ -48,7 +51,7 @@ class TargetDefinitionException(Exception):
     :param target: the target in question
     :param string msg: a description of the target misconfiguration
     """
-        super().__init__("Invalid target {}: {}".format(target, msg))
+        super().__init__(f"Invalid target {target}: {msg}")
 
 
 class BuildConfigurationError(Exception):

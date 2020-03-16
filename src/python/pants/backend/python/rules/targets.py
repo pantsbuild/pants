@@ -4,6 +4,7 @@
 from pathlib import PurePath
 from typing import Any, ClassVar, Optional
 
+from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.address import Address
 from pants.engine.fs import Snapshot
 from pants.engine.objects import union
@@ -24,9 +25,10 @@ class PythonSources(Sources):
     def validate_snapshot(self, snapshot: Snapshot) -> None:
         non_python_files = [fp for fp in snapshot.files if not PurePath(fp).suffix == ".py"]
         if non_python_files:
-            raise ValueError(
-                f"Target {self.address} has non-Python sources in its `sources` field: "
-                f"{non_python_files}"
+            raise TargetDefinitionException(
+                self.address,
+                "All files in the `sources` field must be Python files (i.e., end in `.py`): "
+                f"{non_python_files}.",
             )
 
 
@@ -42,10 +44,11 @@ class PythonBinarySources(PythonSources):
     def validate_snapshot(self, snapshot: Snapshot) -> None:
         super().validate_snapshot(snapshot)
         if len(snapshot.files) not in [0, 1]:
-            raise ValueError(
+            raise TargetDefinitionException(
+                self.address,
                 "Binary targets must have only 0 or 1 source files. Any additional files should "
-                f"be put in a `python_library` which is added to `dependencies`. The target "
-                f"{self.address} had {len(snapshot.files)} sources: {snapshot.files}."
+                f"be put in a `python_library` which is added to `dependencies`. This target "
+                f"has {len(snapshot.files)} sources: {snapshot.files}.",
             )
 
 
@@ -85,8 +88,8 @@ class Timeout(PrimitiveField):
 
     def hydrate(self, raw_value: Optional[int], *, address: Address) -> Optional[int]:
         if raw_value is not None and raw_value <= 0:
-            raise ValueError(
-                f"The `{self.alias}` field for the target {address} must be > 1. Was {raw_value}."
+            raise TargetDefinitionException(
+                address, f"The `timeout` field must be > 1. Was {raw_value}."
             )
         return raw_value
 
