@@ -452,6 +452,10 @@ compiler_option_sets_disabled_args = "{'glibcxx_use_old_abi': ['-D_GLIBCXX_USE_C
 [libc]
 enable_libc_search = true
 
+[source]
+unmatched = "fail"
+source_root_patterns.add = ["build-support/bin", "build-support/migration-support"]
+
 [sourcefile-validation]
 config = "@build-support/regexes/config.yaml"
 

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Dict, Optional, Sequence, Set, Tuple
 
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import deprecated_conditional
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.objects import Collection
 from pants.subsystem.subsystem import Subsystem
@@ -306,6 +307,22 @@ class SourceRootConfig(Subsystem):
 
     @memoized_method
     def get_source_roots(self):
+        deprecated_conditional(
+            lambda: self.options.is_default("unmatched"),
+            removal_version="1.29.0.dev0",
+            entity_description="Defaulting to `--source-unmatched=create`",
+            hint_message=(
+                "`--source-unmatched=create` is an unsafe option. It means that when no source "
+                "root can be found for a file, such as `src/python` or `tests/java`, Pants will "
+                "try to automatically create an implicit source root. Instead, when Pants does not "
+                "already know about the source root, you should either switch to using a known "
+                "pattern or explicitly register the source root in your `pants.ini`. See "
+                "https://pants.readme.io/docs/source-roots for more information.\n\nTo prepare "
+                "for this change, please explicitly set `--source-unmatched=create` or "
+                "`--source-unmatched=fail` (we recommend using `fail`)."
+            ),
+            stacklevel=5,
+        )
         return SourceRoots(self)
 
     def create_trie(self) -> "SourceRootTrie":
