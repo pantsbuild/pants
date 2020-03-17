@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pathlib import PurePath
-from typing import List, Optional, Union
+from typing import List, Optional, Type, Union
 from unittest.mock import Mock
 
 import pytest
@@ -12,13 +12,17 @@ from pants.build_graph.files import Files
 from pants.engine.legacy.structs import TargetAdaptor
 from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Params
+from pants.engine.target import Sources as SourcesField
+from pants.engine.target import rules as target_rules
 from pants.rules.core.strip_source_roots import (
     LegacySourceRootStrippedSources,
     LegacyStripTargetRequest,
     SourceRootStrippedSources,
     StripSnapshotRequest,
+    StripSourcesFieldRequest,
 )
 from pants.rules.core.strip_source_roots import rules as strip_source_root_rules
+from pants.rules.core.targets import FilesSources
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
@@ -29,17 +33,18 @@ class StripSourceRootsTest(TestBase):
         return (
             *super().rules(),
             *strip_source_root_rules(),
+            *target_rules(),
         )
 
     def get_stripped_files(
         self,
-        request: Union[StripSnapshotRequest, LegacyStripTargetRequest],
+        request: Union[StripSnapshotRequest, StripSourcesFieldRequest, LegacyStripTargetRequest],
         *,
         args: Optional[List[str]] = None,
     ) -> List[str]:
         product = (
             SourceRootStrippedSources
-            if isinstance(request, StripSnapshotRequest)
+            if not isinstance(request, LegacyStripTargetRequest)
             else LegacySourceRootStrippedSources
         )
         result = self.request_single_product(
@@ -92,7 +97,54 @@ class StripSourceRootsTest(TestBase):
             get_stripped_files_for_snapshot(file_names, use_representative_path=False)
         ) == sorted(["project/example.py", "com/project/example.java"])
 
-    def test_strip_target(self) -> None:
+    def test_strip_sources_field(self) -> None:
+        source_root = "src/python/project"
+
+        def get_stripped_files_for_sources_field(
+            *,
+            source_files: Optional[List[str]],
+            sources_field_cls: Type[SourcesField] = SourcesField,
+            specified_source_files: Optional[List[str]] = None,
+        ) -> List[str]:
+            if source_files:
+                self.create_files(path=source_root, files=source_files)
+            sources_field = sources_field_cls(
+                source_files, address=Address.parse(f"{source_root}:lib")
+            )
+            specified_sources_snapshot = (
+                None
+                if not specified_source_files
+                else self.make_snapshot_of_empty_files(
+                    f"{source_root}/{f}" for f in specified_source_files
+                )
+            )
+            return self.get_stripped_files(
+                StripSourcesFieldRequest(
+                    sources_field, specified_files_snapshot=specified_sources_snapshot,
+                )
+            )
+
+        # normal sources
+        assert get_stripped_files_for_sources_field(source_files=["f1.py", "f2.py"]) == sorted(
+            ["project/f1.py", "project/f2.py"]
+        )
+
+        # empty sources
+        assert get_stripped_files_for_sources_field(source_files=None) == []
+
+        # FilesSources is not stripped
+        assert get_stripped_files_for_sources_field(
+            source_files=["f1.py"], sources_field_cls=FilesSources,
+        ) == [f"{source_root}/f1.py"]
+
+        # When given `specified_files_snapshot`, only strip what is specified, even if that snapshot
+        # has files not belonging to the corresponding Sources field! (Validation of ownership
+        # would have a performance cost.)
+        assert get_stripped_files_for_sources_field(
+            source_files=["f1.py"], specified_source_files=["f1.py", "different_owner.py"],
+        ) == sorted(["project/f1.py", "project/different_owner.py"])
+
+    def test_legacy_strip_target(self) -> None:
         def get_stripped_files_for_target(
             *,
             source_paths: Optional[List[str]],
