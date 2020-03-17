@@ -375,7 +375,11 @@ branch_notes = """
 ivy_settings = "%(pants_supportdir)s/ivy/publish.ivysettings.xml"
 # Prevent Travis-CI from running for this automated jar publish commit:
 #   http://docs.travis-ci.com/user/how-to-skip-a-build/
-push_postscript = '["ci skip"]'
+push_postscript = """
+# Prevent Travis CI from running for this automated jar publish commit:
+#  http://docs.travis-ci.com/user/how-to-skip-a-build/
+["ci skip"]
+"""
 repos = """
 {
   'public': {  # must match the name of the `Repository` object that you defined in your plugin.
