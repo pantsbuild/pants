@@ -20,15 +20,15 @@ from pants.util.meta import frozen_after_init
 @dataclass(frozen=True)
 class SourceFiles:
     """A merged snapshot of the `sources` fields of multiple targets, possibly containing a subset
-    of the `sources` when using `SpecifiedSourceFilesRequest` (instead of
-    `AllSourceFilesRequest`)."""
+    of the `sources` when using `LegacySpecifiedSourceFilesRequest` (instead of
+    `LegacyAllSourceFilesRequest`)."""
 
     snapshot: Snapshot
 
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class AllSourceFilesRequest:
+class LegacyAllSourceFilesRequest:
     adaptors: Tuple[TargetAdaptor, ...]
     strip_source_roots: bool = False
 
@@ -41,7 +41,7 @@ class AllSourceFilesRequest:
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class SpecifiedSourceFilesRequest:
+class LegacySpecifiedSourceFilesRequest:
     adaptors_with_origins: Tuple[TargetAdaptorWithOrigin, ...]
     strip_source_roots: bool = False
 
@@ -56,7 +56,7 @@ class SpecifiedSourceFilesRequest:
 
 
 @rule
-async def determine_all_source_files(request: AllSourceFilesRequest) -> SourceFiles:
+async def legacy_determine_all_source_files(request: LegacyAllSourceFilesRequest) -> SourceFiles:
     """Merge all the `sources` for targets into one snapshot."""
     if request.strip_source_roots:
         stripped_snapshots = await MultiGet(
@@ -74,7 +74,7 @@ async def determine_all_source_files(request: AllSourceFilesRequest) -> SourceFi
     return SourceFiles(result)
 
 
-def determine_specified_sources_for_target(
+def legacy_determine_specified_sources_for_target(
     adaptor_with_origin: TargetAdaptorWithOrigin,
 ) -> Union[Snapshot, SnapshotSubset]:
     adaptor = adaptor_with_origin.adaptor
@@ -94,7 +94,9 @@ def determine_specified_sources_for_target(
 
 
 @rule
-async def determine_specified_source_files(request: SpecifiedSourceFilesRequest) -> SourceFiles:
+async def legacy_determine_specified_source_files(
+    request: LegacySpecifiedSourceFilesRequest,
+) -> SourceFiles:
     """Determine the specified `sources` for targets, possibly finding a subset of the original
     `sources` fields if the user supplied file arguments."""
     full_snapshots = {}
@@ -103,7 +105,7 @@ async def determine_specified_source_files(request: SpecifiedSourceFilesRequest)
         adaptor = adaptor_with_origin.adaptor
         if not adaptor.has_sources():
             continue
-        result = determine_specified_sources_for_target(adaptor_with_origin)
+        result = legacy_determine_specified_sources_for_target(adaptor_with_origin)
         if isinstance(result, Snapshot):
             full_snapshots[adaptor] = result
         else:
@@ -133,9 +135,9 @@ async def determine_specified_source_files(request: SpecifiedSourceFilesRequest)
 
 def rules():
     return [
-        determine_all_source_files,
-        determine_specified_source_files,
+        legacy_determine_all_source_files,
+        legacy_determine_specified_source_files,
         *strip_source_roots.rules(),
-        RootRule(AllSourceFilesRequest),
-        RootRule(SpecifiedSourceFilesRequest),
+        RootRule(LegacyAllSourceFilesRequest),
+        RootRule(LegacySpecifiedSourceFilesRequest),
     ]

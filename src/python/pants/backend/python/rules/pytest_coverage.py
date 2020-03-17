@@ -36,7 +36,7 @@ from pants.engine.legacy.structs import TargetAdaptor
 from pants.engine.rules import RootRule, UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.python.python_setup import PythonSetup
-from pants.rules.core.determine_source_files import AllSourceFilesRequest, SourceFiles
+from pants.rules.core.determine_source_files import LegacyAllSourceFilesRequest, SourceFiles
 from pants.rules.core.distdir import DistDir
 from pants.rules.core.test import (
     AddressAndTestResult,
@@ -174,7 +174,7 @@ async def construct_coverage_config(
     source_root_config: SourceRootConfig, coverage_config_request: CoveragercRequest
 ) -> Coveragerc:
     sources = await Get[SourceFiles](
-        AllSourceFilesRequest(
+        LegacyAllSourceFilesRequest(
             (ht.adaptor for ht in coverage_config_request.hydrated_targets),
             strip_source_roots=False,
         )
@@ -310,7 +310,7 @@ async def merge_coverage_data(
         if result.test_result.coverage_data is not None
     )
     sources = await Get[SourceFiles](
-        AllSourceFilesRequest(
+        LegacyAllSourceFilesRequest(
             (ht.adaptor for ht in transitive_targets.closure), strip_source_roots=False
         )
     )
@@ -380,7 +380,7 @@ async def generate_coverage_report(
 
     coveragerc = await Get[Coveragerc](CoveragercRequest(HydratedTargets(python_targets)))
     sources = await Get[SourceFiles](
-        AllSourceFilesRequest(
+        LegacyAllSourceFilesRequest(
             (ht.adaptor for ht in transitive_targets.closure), strip_source_roots=False
         )
     )

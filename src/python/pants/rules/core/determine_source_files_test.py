@@ -20,9 +20,9 @@ from pants.engine.legacy.structs import TargetAdaptor, TargetAdaptorWithOrigin
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.rules.core.determine_source_files import (
-    AllSourceFilesRequest,
+    LegacyAllSourceFilesRequest,
+    LegacySpecifiedSourceFilesRequest,
     SourceFiles,
-    SpecifiedSourceFilesRequest,
 )
 from pants.rules.core.determine_source_files import rules as determine_source_files_rules
 from pants.rules.core.strip_source_roots import rules as strip_source_roots_rules
@@ -39,7 +39,7 @@ class TargetSources(NamedTuple):
         return [PurePath(self.source_root, name).as_posix() for name in self.source_files]
 
 
-class DetermineSourceFilesTest(TestBase):
+class LegacyDetermineSourceFilesTest(TestBase):
 
     SOURCES1 = TargetSources("src/python", ["s1.py", "s2.py", "s3.py"])
     SOURCES2 = TargetSources("tests/python", ["t1.py", "t2.java"])
@@ -51,7 +51,7 @@ class DetermineSourceFilesTest(TestBase):
             *super().rules(),
             *determine_source_files_rules(),
             *strip_source_roots_rules(),
-            RootRule(SpecifiedSourceFilesRequest),
+            RootRule(LegacySpecifiedSourceFilesRequest),
         )
 
     def mock_target(
@@ -81,7 +81,7 @@ class DetermineSourceFilesTest(TestBase):
         *,
         strip_source_roots: bool = False,
     ) -> List[str]:
-        request = AllSourceFilesRequest(
+        request = LegacyAllSourceFilesRequest(
             (adaptor_with_origin.adaptor for adaptor_with_origin in adaptors_with_origins),
             strip_source_roots=strip_source_roots,
         )
@@ -96,7 +96,7 @@ class DetermineSourceFilesTest(TestBase):
         *,
         strip_source_roots: bool = False,
     ) -> List[str]:
-        request = SpecifiedSourceFilesRequest(
+        request = LegacySpecifiedSourceFilesRequest(
             adaptors_with_origins, strip_source_roots=strip_source_roots,
         )
         result = self.request_single_product(
