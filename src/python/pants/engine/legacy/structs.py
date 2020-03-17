@@ -38,8 +38,6 @@ class TargetAdaptor(StructWithDeps):
 
     @property
     def address(self) -> Address:
-        # TODO: this isn't actually safe to override as not being Optional. There are
-        # some cases where this property is not defined. But, then we get a ton of MyPy issues.
         return cast(Address, super().address)
 
     def get_sources(self) -> Optional["GlobsWithConjunction"]:

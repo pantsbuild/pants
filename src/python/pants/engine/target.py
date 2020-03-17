@@ -516,10 +516,8 @@ def hydrated_struct_to_target(
     # We special case `address` and the field `name`. The `Target` constructor requires an
     # `Address`, so we use the value pre-calculated via `build_files.py`'s `hydrate_struct` rule.
     # We throw away the field `name` because it can be accessed via `tgt.address.target_name`, so
-    # there is no (known) reason to preserve the field.
-    # TODO: is this safe to do..? We annotate HydratedStruct.value.address as Optional. Are we
-    #  certain that every HydratedStruct indeed has an address? What would we do if it didn't...?
-    #  The Target API requires Addresses to work.
+    # there is no (known) reason to preserve the field and it's slightly tricky to get the default
+    # value correct for the field.
     address = cast(Address, kwargs.pop("address"))
     kwargs.pop("name", None)
 
