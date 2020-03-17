@@ -20,8 +20,8 @@ from pants.engine.fs import (
 from pants.engine.legacy.structs import TargetAdaptor
 from pants.engine.rules import RootRule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
+from pants.engine.target import HydratedSources, HydrateSourcesRequest
 from pants.engine.target import Sources as SourcesField
-from pants.engine.target import SourcesRequest, SourcesResult
 from pants.rules.core.targets import FilesSources
 from pants.source.source_root import NoSourceRootError, SourceRootConfig
 
@@ -130,8 +130,10 @@ async def strip_source_roots_from_sources_field(
     if request.specified_files_snapshot is not None:
         sources_snapshot = request.specified_files_snapshot
     else:
-        sources_result = await Get[SourcesResult](SourcesRequest, request.sources_field.request)
-        sources_snapshot = sources_result.snapshot
+        hydrated_sources = await Get[HydratedSources](
+            HydrateSourcesRequest, request.sources_field.request
+        )
+        sources_snapshot = hydrated_sources.snapshot
 
     if not sources_snapshot.files:
         return SourceRootStrippedSources(EMPTY_SNAPSHOT)

@@ -122,11 +122,11 @@ class AsyncField(Field, metaclass=ABCMeta):
     immutable and hashable so that this Field may be used by the V2 engine. This means, for example,
     using tuples rather than lists and using `FrozenOrderedSet` rather than `set`.
 
-    You should also create corresponding Request and Result classes and define a rule to go from
-    this Request to Result. The Request type must be registered as a RootRule. Then, implement
-    the property `AsyncField.request` to instantiate the Request type. If you use MyPy, you should
-    mark `AsyncField.request` as `@final` (from `typing_extensions)` to ensure that subclasses
-    don't change this property.
+    You should also create corresponding HydratedField and HydrateFieldRequest classes and define a
+    rule to go from this HydrateFieldRequest to HydratedField. The HydrateFieldRequest type must
+    be registered as a RootRule. Then, implement the property `AsyncField.request` to instantiate
+    the HydrateFieldRequest type. If you use MyPy, you should mark `AsyncField.request` as
+    `@final` (from `typing_extensions)` to ensure that subclasses don't change this property.
 
     For example:
 
@@ -141,8 +141,8 @@ class AsyncField(Field, metaclass=ABCMeta):
 
             @final
             @property
-            def request(self) -> SourcesRequest:
-                return SourcesRequest(self)
+            def request(self) -> HydrateSourcesRequest:
+                return HydrateSourcesRequest(self)
 
             # Example extension point provided by this field. Subclasses can override this to do
             # whatever validation they'd like. Each AsyncField must define its own entry points
@@ -152,31 +152,33 @@ class AsyncField(Field, metaclass=ABCMeta):
 
 
         @dataclass(frozen=True)
-        class SourcesRequest:
+        class HydrateSourcesRequest:
             field: Sources
 
 
         @dataclass(frozen=True)
-        class SourcesResult:
+        class HydratedSources:
             snapshot: Snapshot
 
 
         @rule
-        def hydrate_sources(request: SourcesRequest) -> SourcesResult:
+        def hydrate_sources(request: HydrateSourcesRequest) -> HydratedSources:
             result = await Get[Snapshot](PathGlobs(request.field.sanitized_raw_value))
             request.field.validate_snapshot(result)
             ...
-            return SourcesResult(result)
+            return HydratedSources(result)
 
 
         def rules():
-            return [hydrate_sources, RootRule(SourcesRequest)]
+            return [hydrate_sources, RootRule(HydrateSourcesRequest)]
 
     Then, call sites can `await Get` if they need to hydrate the field, even if they subclassed
     the original `AsyncField` to have custom behavior:
 
-        sources1 = await Get[SourcesResult](SourcesRequest, my_tgt.get(Sources).request)
-        sources2 = await Get[SourcesResult[(SourcesRequest, custom_tgt.get(CustomSources).request)
+        sources1 = await Get[HydratedSources](HydrateSourcesRequest, my_tgt.get(Sources).request)
+        sources2 = await Get[HydratedSources[(
+            HydrateSourcesRequest, custom_tgt.get(CustomSources).request
+        )
     """
 
     address: Address
@@ -215,8 +217,8 @@ class AsyncField(Field, metaclass=ABCMeta):
 
             @final
             @property
-            def request() -> SourcesRequest:
-                return SourcesRequest(self)
+            def request() -> HydrateSourcesRequest:
+                return HydrateSourcesRequest(self)
         """
 
 
@@ -476,8 +478,8 @@ class Sources(AsyncField):
 
     @final
     @property
-    def request(self) -> "SourcesRequest":
-        return SourcesRequest(self)
+    def request(self) -> "HydrateSourcesRequest":
+        return HydrateSourcesRequest(self)
 
     @final
     def prefix_glob_with_address(self, glob: str) -> str:
@@ -487,25 +489,19 @@ class Sources(AsyncField):
 
 
 @dataclass(frozen=True)
-class SourcesRequest:
+class HydrateSourcesRequest:
     field: Sources
 
 
 @dataclass(frozen=True)
-class SourcesResult:
+class HydratedSources:
     snapshot: Snapshot
-
-    # TODO: do we want to support the `extension` parameter from Target.has_sources()? In V1,
-    # it's used to distinguish between Java vs. Scala files. For now, we should leave it off to
-    # keep things as simple as possible, but we may want to add it in the future.
-    def has_sources(self) -> bool:
-        return bool(self.snapshot.files)
 
 
 @rule
 async def hydrate_sources(
-    request: SourcesRequest, glob_match_error_behavior: GlobMatchErrorBehavior
-) -> SourcesResult:
+    request: HydrateSourcesRequest, glob_match_error_behavior: GlobMatchErrorBehavior
+) -> HydratedSources:
     sources_field = request.field
     globs: Iterable[str]
     if sources_field.sanitized_raw_value is not None:
@@ -513,7 +509,7 @@ async def hydrate_sources(
         conjunction = GlobExpansionConjunction.all_match
     else:
         if sources_field.default_globs is None:
-            return SourcesResult(EMPTY_SNAPSHOT)
+            return HydratedSources(EMPTY_SNAPSHOT)
         globs = sources_field.default_globs
         conjunction = GlobExpansionConjunction.any_match
 
@@ -532,7 +528,7 @@ async def hydrate_sources(
         )
     )
     sources_field.validate_snapshot(snapshot)
-    return SourcesResult(snapshot)
+    return HydratedSources(snapshot)
 
 
 # TODO: move this conversion into a rule. Create a singleton to access all the registered
@@ -580,4 +576,4 @@ def hydrated_struct_to_target(
 
 
 def rules():
-    return [hydrate_sources, RootRule(SourcesRequest)]
+    return [hydrate_sources, RootRule(HydrateSourcesRequest)]
