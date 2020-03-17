@@ -105,7 +105,6 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
                 "3rdparty",
                 "build-support",
                 "contrib",
-                "pants-plugins",
                 "src",
                 ".isort.cfg",
                 "pyproject.toml",
