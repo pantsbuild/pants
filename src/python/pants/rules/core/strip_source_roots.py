@@ -24,7 +24,7 @@ from pants.source.source_root import NoSourceRootError, SourceRootConfig
 
 @dataclass(frozen=True)
 class SourceRootStrippedSources:
-    """Wrapper for a snapshot of targets whose source roots have been stripped."""
+    """Wrapper for a snapshot of files whose source roots have been stripped."""
 
     snapshot: Snapshot
 
@@ -41,19 +41,6 @@ class StripSnapshotRequest:
 
     snapshot: Snapshot
     representative_path: Optional[str] = None
-
-
-@dataclass(frozen=True)
-class LegacyStripTargetRequest:
-    """A request to strip source roots for every file in a target's `sources` field.
-
-    The call site may optionally give a snapshot to `specified_files_snapshot` to only strip a
-    subset of the target's `sources`, rather than every `sources` file. This is useful when working
-    with precise file arguments.
-    """
-
-    adaptor: TargetAdaptor
-    specified_files_snapshot: Optional[Snapshot] = None
 
 
 @rule
@@ -111,16 +98,37 @@ async def strip_source_roots_from_snapshot(
     return SourceRootStrippedSources(resulting_snapshot)
 
 
+class LegacySourceRootStrippedSources(SourceRootStrippedSources):
+    """Wrapper for a snapshot of files whose source roots have been stripped.
+
+    This is solely used to work around graph ambiguity found in
+    https://github.com/pantsbuild/pants/issues/9320.
+    """
+
+
+@dataclass(frozen=True)
+class LegacyStripTargetRequest:
+    """A request to strip source roots for every file in a target's `sources` field.
+
+    The call site may optionally give a snapshot to `specified_files_snapshot` to only strip a
+    subset of the target's `sources`, rather than every `sources` file. This is useful when working
+    with precise file arguments.
+    """
+
+    adaptor: TargetAdaptor
+    specified_files_snapshot: Optional[Snapshot] = None
+
+
 @rule
 async def legacy_strip_source_roots_from_target(
     request: LegacyStripTargetRequest,
-) -> SourceRootStrippedSources:
+) -> LegacySourceRootStrippedSources:
     """Remove source roots from a target, e.g. `src/python/pants/util/strutil.py` ->
     `pants/util/strutil.py`."""
     target_adaptor = request.adaptor
 
     if not target_adaptor.has_sources():
-        return SourceRootStrippedSources(snapshot=EMPTY_SNAPSHOT)
+        return LegacySourceRootStrippedSources(snapshot=EMPTY_SNAPSHOT)
 
     sources_snapshot = request.specified_files_snapshot or target_adaptor.sources.snapshot
 
@@ -128,15 +136,16 @@ async def legacy_strip_source_roots_from_target(
     # structure and so we do not remove their source root like we normally do, so that filesystem
     # APIs may still access the files. See pex_build_util.py's `_create_source_dumper`.
     if target_adaptor.type_alias == Files.alias():
-        return SourceRootStrippedSources(sources_snapshot)
+        return LegacySourceRootStrippedSources(sources_snapshot)
 
     # NB: We generate a synthetic representative_path for the target as a performance hack so that
     # we don't need to call SourceRoots.find_by_path() on every single file belonging to the
     # target's `sources`.
     representative_path = PurePath(target_adaptor.address.spec_path, "BUILD").as_posix()
-    return await Get[SourceRootStrippedSources](
+    result = await Get[SourceRootStrippedSources](
         StripSnapshotRequest(sources_snapshot, representative_path=representative_path)
     )
+    return LegacySourceRootStrippedSources(result.snapshot)
 
 
 def rules():

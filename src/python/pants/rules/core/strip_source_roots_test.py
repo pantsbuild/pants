@@ -13,6 +13,7 @@ from pants.engine.legacy.structs import TargetAdaptor
 from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Params
 from pants.rules.core.strip_source_roots import (
+    LegacySourceRootStrippedSources,
     LegacyStripTargetRequest,
     SourceRootStrippedSources,
     StripSnapshotRequest,
@@ -36,8 +37,13 @@ class StripSourceRootsTest(TestBase):
         *,
         args: Optional[List[str]] = None,
     ) -> List[str]:
+        product = (
+            SourceRootStrippedSources
+            if isinstance(request, StripSnapshotRequest)
+            else LegacySourceRootStrippedSources
+        )
         result = self.request_single_product(
-            SourceRootStrippedSources, Params(request, create_options_bootstrapper(args=args))
+            product, Params(request, create_options_bootstrapper(args=args)),
         )
         return sorted(result.snapshot.files)
 
