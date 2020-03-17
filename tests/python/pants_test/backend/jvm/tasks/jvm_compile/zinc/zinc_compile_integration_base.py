@@ -314,12 +314,18 @@ class BaseZincCompileIntegrationTest:
             ],
         )
 
-    def _compile_unused_import(self, use_barebones_logger=False):
+    def _compile_unused_import(self, use_barebones_logger=False, report_diagnostic_counts=False):
         # Compile a target that we expect will raise an "Unused import" warning.
         with self.temporary_workdir() as workdir:
             with self.temporary_cachedir() as cachedir:
-                args = ['--compile-rsc-args=+["-S-Ywarn-unused:_"]', "-ldebug",] + (
-                    ["--compile-rsc-use-barebones-logger"] if use_barebones_logger else []
+                args = (
+                    ['--compile-rsc-args=+["-S-Ywarn-unused:_"]', "-ldebug",]
+                    + (["--compile-rsc-use-barebones-logger"] if use_barebones_logger else [])
+                    + (
+                        ["--compile-rsc-report_diagnostic_counts"]
+                        if report_diagnostic_counts
+                        else []
+                    )
                 )
                 pants_run = self.run_test_compile(
                     workdir,
@@ -338,6 +344,21 @@ class BaseZincCompileIntegrationTest:
             "/testprojects/src/scala/org/pantsbuild/testproject/compilation_warnings/unused_import_warning/UnusedImportWarning.scala:2:14: Unused import",
             "[warn] import scala.List // Unused import warning",
             "[warn] one warning found",
+        ]
+
+        for expected in expected_strings:
+            self.assertIn(expected, pants_run.stdout_data)
+
+    def test_zinc_reports_diagnostic_counts_properly(self):
+        """Test that, when the option is enabled, we report the diagnostic counts correctly."""
+        pants_run = self._compile_unused_import(report_diagnostic_counts=True)
+        # Confirm that we were warned in the expected format.
+        expected_strings = [
+            "Reporting number of diagnostics for: ScalaLibrary(testprojects/src/scala/org/pantsbuild/testproject/compilation_warnings/unused_import_warning:unused_import)",
+            "Error: 0",
+            "Warning: 1",
+            "Information: 0",
+            "Hint: 0",
         ]
 
         for expected in expected_strings:
