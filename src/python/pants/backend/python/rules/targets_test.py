@@ -42,7 +42,6 @@ class TestPythonSources(TestBase):
         assert sources.sanitized_raw_value == files
         with pytest.raises(ExecutionError) as exc:
             self.request_single_product(SourcesResult, sources.request)
-        assert "//:lib" in str(exc)
         assert "f.hs" in str(exc)
 
         # Also check that we support valid sources
@@ -67,7 +66,6 @@ class TestPythonSources(TestBase):
         multiple_sources = PythonBinarySources(["f1.py", "f2.py"], address=address)
         with pytest.raises(ExecutionError) as exc:
             self.request_single_product(SourcesResult, multiple_sources.request)
-        assert "//:binary" in str(exc)
         assert "has 2 sources" in str(exc)
 
     def test_python_library_sources_default_globs(self) -> None:
