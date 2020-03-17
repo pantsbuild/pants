@@ -146,7 +146,7 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
 
     def test_junit_run_with_coverage_succeeds_cobertura_output(self):
         self.do_test_junit_run_with_coverage_succeeds_cobertura(
-            args=["--scoverage-report-output-as-cobertura", "--test-junit-coverage"],
+            args=["--test-junit-coverage", "--scoverage-enable-scoverage", "--scoverage-report-output-as-cobertura"],
         )
 
     def do_test_junit_run_with_coverage_succeeds_jacoco(self, tests=(), args=()):
