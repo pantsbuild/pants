@@ -469,6 +469,8 @@ repos = [
   'file://%(homedir)s/.m2/repository',
 ]
 
+fetch_options.add = ["--retry-count", "3"]
+
 [cache.resolve.coursier]
 # Only use local artifact for coursier because the cache content contains abs path
 # and is not portable. That said, if remote cache is enabled, this would not break
