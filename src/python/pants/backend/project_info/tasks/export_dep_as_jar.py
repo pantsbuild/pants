@@ -5,7 +5,7 @@ import json
 import os
 import zipfile
 from collections import defaultdict
-from typing import Set, Dict, List
+from typing import Dict, List, Tuple
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
@@ -26,7 +26,7 @@ from pants.java.jar.jar_dependency_utils import M2Coordinate
 from pants.task.console_task import ConsoleTask
 from pants.util.contextutil import temporary_file
 from pants.util.memo import memoized_property
-from pants.util.ordered_set import OrderedSet
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 
 class ExportDepAsJar(ConsoleTask):
@@ -195,26 +195,33 @@ class ExportDepAsJar(ConsoleTask):
                     )
         return f
 
-    def _extract_arguments_with_prefix_from_zinc_args(self, args, prefix):
-        return [option[len(prefix) :] for option in args if option.startswith(prefix)]
+    @staticmethod
+    def _extract_arguments_with_prefix_from_zinc_args(
+        args: List[str], prefix: str
+    ) -> Tuple[str, ...]:
+        return tuple([option[len(prefix) :] for option in args if option.startswith(prefix)])
 
-
-    def _compute_transitive_source_dependencies(self, target: Target, info_entry: List[str], modulizable_target_set: Set[Target]) -> List[str]:
+    def _compute_transitive_source_dependencies(
+        self,
+        target: Target,
+        info_entry: Tuple[str, ...],
+        modulizable_target_set: FrozenOrderedSet[Target],
+    ) -> Tuple[str, ...]:
         if self._is_strict_deps(target):
             return info_entry
         else:
-            transitive_targets = set(info_entry)
+            transitive_targets = OrderedSet(info_entry)
             self.context.build_graph.walk_transitive_dependency_graph(
                 addresses=[target.address],
                 predicate=lambda d: d in modulizable_target_set,
                 work=lambda d: transitive_targets.add(d.address.spec),
             )
-            return list(transitive_targets)
+            return tuple(transitive_targets)
 
     def _process_target(
         self,
-        current_target,
-        modulizable_target_set,
+        current_target: Target,
+        modulizable_target_set: FrozenOrderedSet[Target],
         resource_target_map,
         runtime_classpath,
         zinc_args_for_target,
@@ -238,10 +245,10 @@ class ExportDepAsJar(ConsoleTask):
             "is_target_root": current_target in modulizable_target_set,
             "transitive": current_target.transitive,
             "scope": str(current_target.scope),
-            "scalac_args": self._extract_arguments_with_prefix_from_zinc_args(
+            "scalac_args": ExportDepAsJar._extract_arguments_with_prefix_from_zinc_args(
                 zinc_args_for_target, "-S"
             ),
-            "javac_args": self._extract_arguments_with_prefix_from_zinc_args(
+            "javac_args": ExportDepAsJar._extract_arguments_with_prefix_from_zinc_args(
                 zinc_args_for_target, "-C"
             ),
             "extra_jvm_options": current_target.payload.get_field_value("extra_jvm_options", []),
@@ -284,7 +291,7 @@ class ExportDepAsJar(ConsoleTask):
         libraries_for_target = set(
             [self._jar_id(jar) for jar in iter_transitive_jars(current_target)]
         )
-        for dep in list(sorted(flat_non_modulizable_deps_for_modulizable_targets[current_target])):
+        for dep in sorted(flat_non_modulizable_deps_for_modulizable_targets[current_target]):
             libraries_for_target.update(_full_library_set_for_target(dep))
         info["libraries"].extend(libraries_for_target)
 
@@ -310,7 +317,9 @@ class ExportDepAsJar(ConsoleTask):
             if hasattr(current_target, "runtime_platform"):
                 info["runtime_platform"] = current_target.runtime_platform.name
 
-        info["source_dependencies_in_classpath"] = self._compute_transitive_source_dependencies(current_target, info["targets"], modulizable_target_set)
+        info["source_dependencies_in_classpath"] = self._compute_transitive_source_dependencies(
+            current_target, info["targets"], modulizable_target_set
+        )
 
         return info
 
@@ -417,14 +426,17 @@ class ExportDepAsJar(ConsoleTask):
         return library_entry
 
     @staticmethod
-    def _is_strict_deps(target):
-        return isinstance(target, JvmTarget) and DependencyContext.global_instance().defaulted_property(target, "strict_deps")
+    def _is_strict_deps(target: Target) -> bool:
+        return isinstance(
+            target, JvmTarget
+        ) and DependencyContext.global_instance().defaulted_property(target, "strict_deps")
 
-    def _flat_non_modulizable_deps_for_modulizable_targets(self, modulizable_targets: Set[Target]) -> Dict[Target, Set[Target]]:
-        """
-        Collect flat dependencies for targets that will end up in libraries.
-        When visiting a target, we don't expand the dependencies that are modulizable targets,
-        since we need to reflect those relationships in a separate way later on.
+    def _flat_non_modulizable_deps_for_modulizable_targets(
+        self, modulizable_targets: FrozenOrderedSet[Target]
+    ) -> Dict[Target, FrozenOrderedSet[Target]]:
+        """Collect flat dependencies for targets that will end up in libraries. When visiting a
+        target, we don't expand the dependencies that are modulizable targets, since we need to
+        reflect those relationships in a separate way later on.
 
         E.g. if A -> B -> C -> D and A -> E and B -> F, if modulizable_targets = {A, B}, the resulting map will be:
          {
@@ -443,37 +455,35 @@ class ExportDepAsJar(ConsoleTask):
         """
         flat_deps = {}
 
-        def create_entry_for_target(target: Target):
+        def create_entry_for_target(target: Target) -> None:
             target_key = target
-            deps = [
-                dep for dep in target.dependencies
-                if dep not in modulizable_targets
+            non_modulizable_deps = [
+                dep for dep in target.dependencies if dep not in modulizable_targets
             ]
-            entry = set([])
-            for dep in deps:
-                entry.update(flat_deps.get(dep, set([])).union({dep}))
-            flat_deps[target_key] = entry
+            entry = OrderedSet()
+            for dep in non_modulizable_deps:
+                entry.update(flat_deps.get(dep, set()).union({dep}))
+            flat_deps[target_key] = FrozenOrderedSet(entry)
 
         targets_with_strict_deps = [t for t in modulizable_targets if self._is_strict_deps(t)]
         for t in targets_with_strict_deps:
-            flat_deps[t] = t.strict_dependencies(DependencyContext.global_instance())
+            flat_deps[t] = FrozenOrderedSet(
+                t.strict_dependencies(DependencyContext.global_instance())
+            )
 
         self.context.build_graph.walk_transitive_dependency_graph(
             addresses=[t.address for t in modulizable_targets if not self._is_strict_deps(t)],
             # Work is to populate the entry of the map by merging the entries of all of the deps.
             work=create_entry_for_target,
-
             # We pre-populate the dict according to several principles (e.g. strict_deps),
             # so a target being there means that there is no need to expand.
             predicate=lambda target: target not in flat_deps.keys(),
-
             # We want children to populate their entries in the map before the parents,
-            # so that we are guarranteed to have entries for all dependencies before
+            # so that we are guaranteed to have entries for all dependencies before
             # computing a target's entry.
             postorder=True,
         )
         return flat_deps
-
 
     def generate_targets_map(self, targets, runtime_classpath, zinc_args_for_all_targets):
         """Generates a dictionary containing all pertinent information about the target graph.
@@ -505,8 +515,9 @@ class ExportDepAsJar(ConsoleTask):
                 t, resource_target_map, runtime_classpath
             )
 
-        flat_non_modulizable_deps_for_modulizable_targets: Dict[Target, Set[Target]] = \
-            self._flat_non_modulizable_deps_for_modulizable_targets(modulizable_targets)
+        flat_non_modulizable_deps_for_modulizable_targets: Dict[
+            Target, FrozenOrderedSet[Target]
+        ] = self._flat_non_modulizable_deps_for_modulizable_targets(modulizable_targets)
 
         for target in modulizable_targets:
             zinc_args_for_target = zinc_args_for_all_targets.get(target)
