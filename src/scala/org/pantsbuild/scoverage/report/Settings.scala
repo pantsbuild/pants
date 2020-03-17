@@ -12,7 +12,8 @@ case class Settings(
   xmlDirPath: String = "",
   xmlDebugDirPath: String = "",
   cleanOldReports: Boolean = false,
-  targetFilters: Seq[String] = Seq())
+  targetFilters: Seq[String] = Seq(),
+  outputAsCobertura: Boolean = false)
 
 object Settings {
 
@@ -58,5 +59,9 @@ object Settings {
     opt[Seq[String]]("targetFilters")
       .action((f: Seq[String], s: Settings) => s.copy(targetFilters = f))
       .text("Directory names for which report has to be generated.")
+
+    opt[Unit]("outputAsCobertura")
+      .action((_, s: Settings) => s.copy(outputAsCobertura = true))
+      .text("Export Cobertura formats for Scoverage.")
   }
 }
