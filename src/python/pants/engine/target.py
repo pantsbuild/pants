@@ -504,7 +504,7 @@ async def hydrate_sources(
     return SourcesResult(snapshot)
 
 
-# TODO: move this conversion into the engine. Create a singleton to access all the registered
+# TODO: move this conversion into a rule. Create a singleton to access all the registered
 #  targets (or maybe just use unions). Consider having that singleton be a dict from alias ->
 #  Target for efficient lookups (we're guaranteed only one alias per target type).
 def hydrated_struct_to_target(

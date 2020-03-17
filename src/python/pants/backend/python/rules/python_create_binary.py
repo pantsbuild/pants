@@ -20,6 +20,10 @@ from pants.rules.core.binary import BinaryTarget, CreatedBinary
 from pants.rules.core.strip_source_roots import SourceRootStrippedSources, StripSnapshotRequest
 
 
+# TODO: consider replacing this with sugar like `SelectFields(EntryPoint, PythonBinarySources)` so
+#  that the rule would request that instead of this dataclass. Note that this syntax must support
+#  both optional_fields (see the below TODO) and opt-out `SentinelField`s
+#  (see https://github.com/pantsbuild/pants/pull/9316#issuecomment-600152573).
 @dataclass(frozen=True)
 class PythonBinaryFields:
     address: Address
@@ -43,14 +47,14 @@ class PythonBinaryFields:
 
 
 @rule
-async def create_python_binary(python_binary_adaptor: PythonBinaryAdaptor) -> CreatedBinary:
-    # TODO: instead, get this to work via the engine. Have the rule request `PythonBinaryFields`,
-    #  which means that all we care about in the world is that those 2 Fields are defined on the
-    #  target (so it's extensible to custom target types).
-    hydrated_struct = await Get[HydratedStruct](Address, python_binary_adaptor.address)
+async def convert_python_binary_target(adaptor: PythonBinaryAdaptor) -> PythonBinaryFields:
+    hydrated_struct = await Get[HydratedStruct](Address, adaptor.address)
     tgt = hydrated_struct_to_target(hydrated_struct, target_types=python_targets())
-    fields = PythonBinaryFields.create(tgt)
+    return PythonBinaryFields.create(tgt)
 
+
+@rule
+async def create_python_binary(fields: PythonBinaryFields) -> CreatedBinary:
     entry_point: Optional[str]
     if fields.entry_point.value is not None:
         entry_point = fields.entry_point.value
@@ -70,10 +74,9 @@ async def create_python_binary(python_binary_adaptor: PythonBinaryAdaptor) -> Cr
             entry_point = None
 
     request = CreatePexFromTargetClosure(
-        # TODO: pass Targets, rather than Addresses, to this helper.
-        addresses=Addresses([tgt.address]),
+        addresses=Addresses([fields.address]),
         entry_point=entry_point,
-        output_filename=f"{tgt.address.target_name}.pex",
+        output_filename=f"{fields.address.target_name}.pex",
     )
 
     pex = await Get[Pex](CreatePexFromTargetClosure, request)
@@ -83,5 +86,6 @@ async def create_python_binary(python_binary_adaptor: PythonBinaryAdaptor) -> Cr
 def rules():
     return [
         UnionRule(BinaryTarget, PythonBinaryAdaptor),
+        convert_python_binary_target,
         create_python_binary,
     ]
