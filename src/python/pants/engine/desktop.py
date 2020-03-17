@@ -12,8 +12,8 @@ from pants.util.osutil import get_os_name
 from pants.util.strutil import safe_shlex_join
 
 
-@dataclass
-class Opener(ABC):
+@dataclass(frozen=True)
+class _Opener(ABC):
     console: Console
     runner: InteractiveRunner
 
@@ -43,7 +43,7 @@ class Opener(ABC):
                 )
 
 
-class DarwinOpener(Opener):
+class _DarwinOpener(_Opener):
     program = "open"
 
     def _iter_openers(self, files: Iterable[PurePath]) -> Iterator[InteractiveProcessRequest]:
@@ -52,7 +52,7 @@ class DarwinOpener(Opener):
         )
 
 
-class LinuxOpener(Opener):
+class _LinuxOpener(_Opener):
     program = "xdg-open"
 
     def _iter_openers(self, files: Iterable[PurePath]) -> Iterator[InteractiveProcessRequest]:
@@ -60,10 +60,15 @@ class LinuxOpener(Opener):
             yield InteractiveProcessRequest(argv=(self.program, str(f)), run_in_workspace=True)
 
 
-_OPENERS_BY_OSNAME = {"darwin": DarwinOpener, "linux": LinuxOpener}
+_OPENERS_BY_OSNAME = {"darwin": _DarwinOpener, "linux": _LinuxOpener}
 
 
 def ui_open(console: Console, runner: InteractiveRunner, files: Iterable[PurePath]) -> None:
+    """Opens the given files with the appropriate application for the current operating system.
+
+    Any failures to either locate an appropriate application to open the files with or else execute
+    that program are reported to the console stderr.
+    """
     osname = get_os_name()
     opener_type = _OPENERS_BY_OSNAME.get(osname)
     if opener_type is None:
