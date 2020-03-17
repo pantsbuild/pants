@@ -12,7 +12,6 @@ from pants.base.exceptions import TaskError
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.target_scopes import Scopes
 from pants.java.jar.jar_dependency import JarDependency
-from pants.option.custom_types import file_option
 from pants.task.fmt_task_mixin import FmtTaskMixin
 from pants.task.lint_task_mixin import LintTaskMixin
 from pants.util.memo import memoized_property
@@ -30,15 +29,6 @@ class ScalafixTask(RewriteBase):
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
-        register(
-            "--configuration",
-            type=file_option,
-            default=None,
-            fingerprint=True,
-            removal_version="1.27.0.dev0",
-            removal_hint="Use `--scalafix-config` instead.",
-            help="The config file to use (in HOCON format).",
-        )
         register(
             "--rules",
             default="ProcedureSyntax",

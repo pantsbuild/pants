@@ -55,6 +55,7 @@ fn multi_platform_process_request_to_process_result(
   }))
   .and_then(move |process_request| context.get(process_request))
   .map(move |result| {
+    let platform_name: String = result.0.platform.into();
     externs::unsafe_call(
       &core.types.construct_process_result,
       &[
@@ -62,6 +63,10 @@ fn multi_platform_process_request_to_process_result(
         externs::store_bytes(&result.0.stderr),
         externs::store_i64(result.0.exit_code.into()),
         Snapshot::store_directory(&core, &result.0.output_directory),
+        externs::unsafe_call(
+          &core.types.construct_platform,
+          &[externs::store_utf8(&platform_name)],
+        ),
       ],
     )
   })

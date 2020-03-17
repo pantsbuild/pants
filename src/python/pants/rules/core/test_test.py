@@ -1,45 +1,41 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import logging
-from collections import OrderedDict
+from abc import ABCMeta, abstractmethod
 from pathlib import PurePath
 from textwrap import dedent
-from typing import Optional
+from typing import List, Tuple, Type
 from unittest.mock import Mock
 
-from pants.base.specs import DescendantAddresses, OriginSpec, SingleAddress
+import pytest
+
+from pants.base.exceptions import ResolveError
 from pants.build_graph.address import Address
-from pants.engine.addressable import AddressesWithOrigins, AddressWithOrigin
 from pants.engine.fs import (
     EMPTY_DIRECTORY_DIGEST,
     Digest,
     FileContent,
     InputFilesContent,
-    Snapshot,
     Workspace,
 )
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
-from pants.engine.legacy.graph import HydratedTarget, HydratedTargetWithOrigin
-from pants.engine.legacy.structs import (
-    PythonBinaryAdaptor,
-    PythonTestsAdaptor,
-    PythonTestsAdaptorWithOrigin,
-)
+from pants.engine.legacy.graph import HydratedTargetsWithOrigins, HydratedTargetWithOrigin
+from pants.engine.legacy.structs import TargetAdaptorWithOrigin
 from pants.engine.rules import UnionMembership
+from pants.rules.core.fmt_test import FmtTest
 from pants.rules.core.test import (
-    AddressAndDebugRequest,
     AddressAndTestResult,
     CoverageDataBatch,
     CoverageReport,
+    FilesystemCoverageReport,
     Status,
+    Test,
     TestDebugRequest,
     TestResult,
-    TestTarget,
-    coordinator_of_tests,
+    TestRunner,
+    WrappedTestRunner,
     run_tests,
 )
-from pants.source.wrapped_globs import EagerFilesetWithSpec
 from pants.testutil.engine.util import MockConsole, MockGet, run_rule
 from pants.testutil.test_base import TestBase
 from pants.util.ordered_set import OrderedSet
@@ -51,285 +47,207 @@ class MockOptions:
         self.values = Mock(**values)
 
 
+class MockTestRunner(TestRunner, metaclass=ABCMeta):
+    @staticmethod
+    def is_valid_target(_: TargetAdaptorWithOrigin) -> bool:
+        return True
+
+    @staticmethod
+    @abstractmethod
+    def status(_: Address) -> Status:
+        pass
+
+    @staticmethod
+    def stdout(_: Address) -> str:
+        return ""
+
+    @staticmethod
+    def stderr(_: Address) -> str:
+        return ""
+
+    @property
+    def test_result(self) -> TestResult:
+        address = self.adaptor_with_origin.adaptor.address
+        return TestResult(self.status(address), self.stdout(address), self.stderr(address))
+
+
+class SuccessfulTestRunner(MockTestRunner):
+    @staticmethod
+    def status(_: Address) -> Status:
+        return Status.SUCCESS
+
+    @staticmethod
+    def stdout(address: Address) -> str:
+        return f"Successful test runner: Passed for {address}!"
+
+
+class ConditionallySucceedsTestRunner(MockTestRunner):
+    @staticmethod
+    def status(address: Address) -> Status:
+        return Status.FAILURE if address.target_name == "bad" else Status.SUCCESS
+
+    @staticmethod
+    def stdout(address: Address) -> str:
+        return (
+            f"Conditionally succeeds test runner: Passed for {address}!"
+            if address.target_name != "bad"
+            else ""
+        )
+
+    @staticmethod
+    def stderr(address: Address) -> str:
+        return (
+            f"Conditionally succeeds test runner: Had an issue for {address}! Oh no!"
+            if address.target_name == "bad"
+            else ""
+        )
+
+
+class InvalidTargetTestRunner(MockTestRunner):
+    @staticmethod
+    def is_valid_target(_: TargetAdaptorWithOrigin) -> bool:
+        return False
+
+    @staticmethod
+    def status(_: Address) -> Status:
+        return Status.FAILURE
+
+
 class TestTest(TestBase):
-    def make_ipr(self, content: bytes) -> InteractiveProcessRequest:
+    def make_ipr(self) -> InteractiveProcessRequest:
         input_files_content = InputFilesContent(
-            (FileContent(path="program.py", content=content, is_executable=True),)
+            (FileContent(path="program.py", content=b"def test(): pass"),)
         )
         digest = self.request_single_product(Digest, input_files_content)
         return InteractiveProcessRequest(
             argv=("/usr/bin/python", "program.py",), run_in_workspace=False, input_files=digest,
         )
 
-    def make_successful_ipr(self) -> InteractiveProcessRequest:
-        content = b"import sys; sys.exit(0)"
-        return self.make_ipr(content)
-
-    def make_failure_ipr(self) -> InteractiveProcessRequest:
-        content = b"import sys; sys.exit(1)"
-        return self.make_ipr(content)
-
-    @staticmethod
-    def make_addresses_with_origins(*addresses: Address) -> AddressesWithOrigins:
-        return AddressesWithOrigins(
-            [
-                AddressWithOrigin(
-                    address=address,
-                    origin=SingleAddress(directory=address.spec_path, name=address.target_name),
-                )
-                for address in addresses
-            ]
-        )
-
-    def single_target_test(self, result, expected_console_output, success=True, debug=False):
+    def run_test_rule(
+        self,
+        *,
+        test_runner: Type[TestRunner],
+        targets: List[HydratedTargetWithOrigin],
+        debug: bool = False,
+    ) -> Tuple[int, str]:
         console = MockConsole(use_colors=False)
         options = MockOptions(debug=debug, run_coverage=False)
-        runner = InteractiveRunner(self.scheduler)
+        interactive_runner = InteractiveRunner(self.scheduler)
         workspace = Workspace(self.scheduler)
-        addr = Address.parse("some/target")
-        res = run_rule(
-            run_tests,
-            rule_args=[console, options, runner, self.make_addresses_with_origins(addr), workspace],
-            mock_gets=[
-                MockGet(
-                    product_type=AddressAndTestResult,
-                    subject_type=AddressWithOrigin,
-                    mock=lambda _: AddressAndTestResult(addr, result),
-                ),
-                MockGet(
-                    product_type=AddressAndDebugRequest,
-                    subject_type=AddressWithOrigin,
-                    mock=lambda _: AddressAndDebugRequest(
-                        addr,
-                        TestDebugRequest(
-                            ipr=self.make_successful_ipr() if success else self.make_failure_ipr()
-                        ),
-                    ),
-                ),
-                MockGet(
-                    product_type=CoverageReport,
-                    subject_type=CoverageDataBatch,
-                    mock=lambda _: CoverageReport(
-                        result_digest=EMPTY_DIRECTORY_DIGEST,
-                        directory_to_materialize_to=PurePath("mockety/mock"),
-                    ),
-                ),
-            ],
-        )
-        assert console.stdout.getvalue() == expected_console_output
-        assert (0 if success else 1) == res.exit_code
+        union_membership = UnionMembership({TestRunner: OrderedSet([test_runner])})
 
-    def test_output_success(self) -> None:
-        self.single_target_test(
-            result=TestResult(
-                status=Status.SUCCESS, stdout="Here is some output from a test", stderr=""
-            ),
-            expected_console_output=dedent(
-                """\
-                some/target stdout:
-                Here is some output from a test
-
-                some/target                                                                     .....   SUCCESS
-                """
-            ),
-        )
-
-    def test_output_failure(self) -> None:
-        self.single_target_test(
-            result=TestResult(
-                status=Status.FAILURE, stdout="Here is some output from a test", stderr=""
-            ),
-            expected_console_output=dedent(
-                """\
-                some/target stdout:
-                Here is some output from a test
-
-                some/target                                                                     .....   FAILURE
-                """
-            ),
-            success=False,
-        )
-
-    def test_output_mixed(self) -> None:
-        console = MockConsole(use_colors=False)
-        options = MockOptions(debug=False, run_coverage=False)
-        runner = InteractiveRunner(self.scheduler)
-        workspace = Workspace(self.scheduler)
-        address1 = Address.parse("testprojects/tests/python/pants/passes")
-        address2 = Address.parse("testprojects/tests/python/pants/fails")
-
-        def make_result(address_with_origin: AddressWithOrigin) -> AddressAndTestResult:
-            address = address_with_origin.address
-            if address == address1:
-                tr = TestResult(status=Status.SUCCESS, stdout="I passed\n", stderr="")
-            elif address == address2:
-                tr = TestResult(status=Status.FAILURE, stdout="I failed\n", stderr="")
-            else:
-                raise Exception("Unrecognised target")
-            return AddressAndTestResult(address, tr)
-
-        def make_debug_request(address_with_origin: AddressWithOrigin) -> AddressAndDebugRequest:
-            address = address_with_origin.address
-            request = TestDebugRequest(
-                ipr=self.make_successful_ipr() if address == address1 else self.make_failure_ipr()
+        def mock_coordinator_of_tests(
+            wrapped_test_runner: WrappedTestRunner,
+        ) -> AddressAndTestResult:
+            runner = wrapped_test_runner.runner
+            return AddressAndTestResult(
+                address=runner.adaptor_with_origin.adaptor.address,
+                test_result=runner.test_result,  # type: ignore[attr-defined]
             )
-            return AddressAndDebugRequest(address, request)
 
-        res = run_rule(
+        result: Test = run_rule(
             run_tests,
             rule_args=[
                 console,
                 options,
-                runner,
-                self.make_addresses_with_origins(address1, address2),
+                interactive_runner,
+                HydratedTargetsWithOrigins(targets),
                 workspace,
+                union_membership,
             ],
             mock_gets=[
                 MockGet(
                     product_type=AddressAndTestResult,
-                    subject_type=AddressWithOrigin,
-                    mock=make_result,
+                    subject_type=WrappedTestRunner,
+                    mock=lambda wrapped_test_runner: mock_coordinator_of_tests(wrapped_test_runner),
                 ),
                 MockGet(
-                    product_type=AddressAndDebugRequest,
-                    subject_type=AddressWithOrigin,
-                    mock=make_debug_request,
+                    product_type=TestDebugRequest,
+                    subject_type=TestRunner,
+                    mock=lambda _: TestDebugRequest(self.make_ipr()),
                 ),
                 MockGet(
                     product_type=CoverageReport,
                     subject_type=CoverageDataBatch,
-                    mock=lambda _: CoverageReport(
+                    mock=lambda _: FilesystemCoverageReport(
                         result_digest=EMPTY_DIRECTORY_DIGEST,
                         directory_to_materialize_to=PurePath("mockety/mock"),
                     ),
                 ),
             ],
+            union_membership=union_membership,
+        )
+        return result.exit_code, console.stdout.getvalue()
+
+    def test_empty_target_noops(self) -> None:
+        exit_code, stdout = self.run_test_rule(
+            test_runner=SuccessfulTestRunner,
+            targets=[FmtTest.make_hydrated_target_with_origin(include_sources=False)],
+        )
+        assert exit_code == 0
+        assert stdout.strip() == ""
+
+    def test_invalid_target_noops(self) -> None:
+        exit_code, stdout = self.run_test_rule(
+            test_runner=InvalidTargetTestRunner,
+            targets=[FmtTest.make_hydrated_target_with_origin()],
+        )
+        assert exit_code == 0
+        assert stdout.strip() == ""
+
+    def test_single_target(self) -> None:
+        target_with_origin = FmtTest.make_hydrated_target_with_origin()
+        address = target_with_origin.target.adaptor.address
+        exit_code, stdout = self.run_test_rule(
+            test_runner=SuccessfulTestRunner, targets=[target_with_origin],
+        )
+        assert exit_code == 0
+        assert stdout == dedent(
+            f"""\
+            {address} stdout:
+            {SuccessfulTestRunner.stdout(address)}
+
+            {address}                                                                       .....   SUCCESS
+            """
         )
 
-        self.assertEqual(1, res.exit_code)
-        self.assertEqual(
-            console.stdout.getvalue(),
-            dedent(
-                """\
-                testprojects/tests/python/pants/passes stdout:
-                I passed
+    def test_multiple_targets(self) -> None:
+        good_target = FmtTest.make_hydrated_target_with_origin(name="good")
+        good_address = good_target.target.adaptor.address
+        bad_target = FmtTest.make_hydrated_target_with_origin(name="bad")
+        bad_address = bad_target.target.adaptor.address
 
-                testprojects/tests/python/pants/fails stdout:
-                I failed
+        exit_code, stdout = self.run_test_rule(
+            test_runner=ConditionallySucceedsTestRunner, targets=[good_target, bad_target],
+        )
+        assert exit_code == 1
+        assert stdout == dedent(
+            f"""\
+            {good_address} stdout:
+            {ConditionallySucceedsTestRunner.stdout(good_address)}
+            {bad_address} stderr:
+            {ConditionallySucceedsTestRunner.stderr(bad_address)}
 
-
-                testprojects/tests/python/pants/passes                                          .....   SUCCESS
-                testprojects/tests/python/pants/fails                                           .....   FAILURE
-                """
-            ),
+            {good_address}                                                                         .....   SUCCESS
+            {bad_address}                                                                          .....   FAILURE
+            """
         )
 
-    def test_stderr(self) -> None:
-        self.single_target_test(
-            result=TestResult(
-                status=Status.FAILURE, stdout="", stderr="Failure running the tests!"
-            ),
-            expected_console_output=dedent(
-                """\
-                some/target stderr:
-                Failure running the tests!
-
-                some/target                                                                     .....   FAILURE
-                """
-            ),
-            success=False,
+    def test_single_debug_target(self) -> None:
+        exit_code, stdout = self.run_test_rule(
+            test_runner=SuccessfulTestRunner,
+            targets=[FmtTest.make_hydrated_target_with_origin()],
+            debug=True,
         )
+        assert exit_code == 0
 
-    def test_debug_options(self) -> None:
-        self.single_target_test(result=None, expected_console_output="", success=False, debug=True)
-
-    def run_coordinator_of_tests(
-        self,
-        *,
-        address: Address,
-        origin: Optional[OriginSpec] = None,
-        test_target_type: bool = True,
-        include_sources: bool = True,
-    ) -> AddressAndTestResult:
-        mocked_fileset = EagerFilesetWithSpec(
-            "src",
-            {"globs": []},
-            snapshot=Snapshot(
-                # TODO: this is not robust to set as an empty digest. Add a test util that provides
-                #  some premade snapshots and possibly a generalized make_hydrated_target function.
-                directory_digest=EMPTY_DIRECTORY_DIGEST,
-                files=tuple(["test.py"] if include_sources else []),
-                dirs=(),
-            ),
-        )
-        adaptor_cls = PythonTestsAdaptor if test_target_type else PythonBinaryAdaptor
-        type_alias = "python_tests" if test_target_type else "python_binary"
-        adaptor = adaptor_cls(address=address, type_alias=type_alias, sources=mocked_fileset)
-        union_membership = UnionMembership(
-            union_rules=OrderedDict({TestTarget: OrderedSet([PythonTestsAdaptorWithOrigin])})
-        )
-        with self.captured_logging(logging.INFO):
-            result: AddressAndTestResult = run_rule(
-                coordinator_of_tests,
-                rule_args=[
-                    HydratedTargetWithOrigin(
-                        target=HydratedTarget(adaptor),
-                        origin=(
-                            origin
-                            or SingleAddress(directory=address.spec_path, name=address.target_name)
-                        ),
-                    ),
-                    union_membership,
+    def test_multiple_debug_targets_fail(self) -> None:
+        with pytest.raises(ResolveError):
+            self.run_test_rule(
+                test_runner=SuccessfulTestRunner,
+                targets=[
+                    FmtTest.make_hydrated_target_with_origin(name="t1"),
+                    FmtTest.make_hydrated_target_with_origin(name="t2"),
                 ],
-                mock_gets=[
-                    MockGet(
-                        product_type=TestResult,
-                        subject_type=TestTarget,
-                        mock=lambda _: TestResult(status=Status.SUCCESS, stdout="foo", stderr=""),
-                    ),
-                ],
-                union_membership=union_membership,
+                debug=True,
             )
-        return result
-
-    def test_coordinator_single_test_target(self) -> None:
-        addr = Address.parse("some/dir:tests")
-        result = self.run_coordinator_of_tests(address=addr)
-        assert result == AddressAndTestResult(
-            addr, TestResult(status=Status.SUCCESS, stdout="foo", stderr="")
-        )
-
-    def test_coordinator_single_non_test_target(self) -> None:
-        addr = Address.parse("some/dir:bin")
-        # Note that this is not the same error message the end user will see, as we're resolving
-        # union Get requests in run_rule, not the real engine.  But this test still asserts that
-        # we error when we expect to error.
-        with self.assertRaisesRegex(
-            AssertionError, r"Rule requested: .* which cannot be satisfied."
-        ):
-            self.run_coordinator_of_tests(
-                address=addr,
-                origin=SingleAddress(directory="some/dir", name="bin"),
-                test_target_type=False,
-            )
-
-    def test_coordinator_empty_sources(self) -> None:
-        addr = Address.parse("some/dir:tests")
-        result = self.run_coordinator_of_tests(address=addr, include_sources=False)
-        assert result == AddressAndTestResult(addr, None)
-
-    def test_coordinator_globbed_test_target(self) -> None:
-        addr = Address.parse("some/dir:tests")
-        result = self.run_coordinator_of_tests(
-            address=addr, origin=DescendantAddresses(directory="some/dir"),
-        )
-        assert result == AddressAndTestResult(
-            addr, TestResult(status=Status.SUCCESS, stdout="foo", stderr="")
-        )
-
-    def test_coordinator_globbed_non_test_target(self) -> None:
-        addr = Address.parse("some/dir:bin")
-        result = self.run_coordinator_of_tests(
-            address=addr, origin=DescendantAddresses(directory="some/dir"), test_target_type=False,
-        )
-        assert result == AddressAndTestResult(addr, None)

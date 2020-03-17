@@ -41,8 +41,8 @@ class GraphTest(TestBase):
         )
 
     def test_with_missing_target_in_existing_build_file(self) -> None:
-        self.create_library("3rdparty/python", "target", "Markdown")
-        self.create_library("3rdparty/python", "target", "Pygments")
+        self.create_library(path="3rdparty/python", target_type="target", name="Markdown")
+        self.create_library(path="3rdparty/python", target_type="target", name="Pygments")
         # When a target is missing,
         #  the suggestions should be in order
         #  and there should only be one copy of the error if tracing is off.
@@ -63,7 +63,7 @@ class GraphTest(TestBase):
 
     def test_invalidate_fsnode(self) -> None:
         # NB: Invalidation is now more directly tested in unit tests in the `graph` crate.
-        self.create_library("src/example", "target", "things")
+        self.create_library(path="src/example", target_type="target", name="things")
         self.targets("src/example::")
         invalidated_count = self.invalidate_for("src/example/BUILD")
         self.assertGreater(invalidated_count, 0)
@@ -71,7 +71,9 @@ class GraphTest(TestBase):
     def test_sources_ordering(self) -> None:
         input_sources = ["p", "a", "n", "t", "s", "b", "u", "i", "l", "d"]
         expected_sources = sorted(input_sources)
-        self.create_library("src/example", "files", "things", sources=input_sources)
+        self.create_library(
+            path="src/example", target_type="files", name="things", sources=input_sources
+        )
 
         target = self.target("src/example:things")
         sources = [os.path.basename(s) for s in target.sources_relative_to_buildroot()]
@@ -84,6 +86,6 @@ class GraphTest(TestBase):
         definitions.
         """
 
-        files = self.create_library("src/example", "tagged_files", "things")
+        files = self.create_library(path="src/example", target_type="tagged_files", name="things")
         self.assertIn(self._TAG, files.tags)
         self.assertEqual(type(files), Files)

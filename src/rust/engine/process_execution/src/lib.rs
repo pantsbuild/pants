@@ -30,6 +30,7 @@ extern crate derivative;
 
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryFrom;
 use std::ops::AddAssign;
@@ -65,6 +66,25 @@ pub mod nailgun;
 
 extern crate uname;
 
+#[derive(PartialOrd, Ord, Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+pub enum Platform {
+  Darwin,
+  Linux,
+}
+
+impl Platform {
+  pub fn current() -> Result<Platform, String> {
+    let platform_info =
+      uname::uname().map_err(|_| "Failed to get local platform info!".to_string())?;
+
+    match platform_info {
+      uname::Info { ref sysname, .. } if sysname.to_lowercase() == "darwin" => Ok(Platform::Darwin),
+      uname::Info { ref sysname, .. } if sysname.to_lowercase() == "linux" => Ok(Platform::Linux),
+      uname::Info { ref sysname, .. } => Err(format!("Found unknown system name {}", sysname)),
+    }
+  }
+}
+
 #[derive(PartialOrd, Ord, Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum PlatformConstraint {
   Darwin,
@@ -74,16 +94,15 @@ pub enum PlatformConstraint {
 
 impl PlatformConstraint {
   pub fn current_platform_constraint() -> Result<PlatformConstraint, String> {
-    let platform_info =
-      uname::uname().map_err(|_| "Failed to get local platform info!".to_string())?;
-    match platform_info {
-      uname::Info { ref sysname, .. } if sysname.to_lowercase() == "darwin" => {
-        Ok(PlatformConstraint::Darwin)
-      }
-      uname::Info { ref sysname, .. } if sysname.to_lowercase() == "linux" => {
-        Ok(PlatformConstraint::Linux)
-      }
-      uname::Info { ref sysname, .. } => Err(format!("Found unknown system name {}", sysname)),
+    Platform::current().map(|p: Platform| p.into())
+  }
+}
+
+impl From<Platform> for PlatformConstraint {
+  fn from(platform: Platform) -> PlatformConstraint {
+    match platform {
+      Platform::Linux => PlatformConstraint::Linux,
+      Platform::Darwin => PlatformConstraint::Darwin,
     }
   }
 }
@@ -107,11 +126,20 @@ impl TryFrom<&String> for PlatformConstraint {
   }
 }
 
+impl From<Platform> for String {
+  fn from(platform: Platform) -> String {
+    match platform {
+      Platform::Linux => "linux".to_string(),
+      Platform::Darwin => "darwin".to_string(),
+    }
+  }
+}
+
 impl From<PlatformConstraint> for String {
   fn from(platform: PlatformConstraint) -> String {
     match platform {
       PlatformConstraint::Linux => "linux".to_string(),
-      PlatformConstraint::Darwin => "osx".to_string(),
+      PlatformConstraint::Darwin => "darwin".to_string(),
       PlatformConstraint::None => "none".to_string(),
     }
   }
@@ -280,10 +308,11 @@ pub struct ExecuteProcessRequestMetadata {
 /// The result of running a process.
 ///
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct FallibleExecuteProcessResult {
+pub struct FallibleExecuteProcessResultWithPlatform {
   pub stdout: Bytes,
   pub stderr: Bytes,
   pub exit_code: i32,
+  pub platform: Platform,
 
   // It's unclear whether this should be a Snapshot or a digest of a Directory. A Directory digest
   // is handy, so let's try that out for now.
@@ -293,7 +322,7 @@ pub struct FallibleExecuteProcessResult {
 }
 
 #[cfg(test)]
-impl FallibleExecuteProcessResult {
+impl FallibleExecuteProcessResultWithPlatform {
   pub fn without_execution_attempts(mut self) -> Self {
     self.execution_attempts = vec![];
     self
@@ -335,7 +364,7 @@ pub trait CommandRunner: Send + Sync {
     &self,
     req: MultiPlatformExecuteProcessRequest,
     context: Context,
-  ) -> BoxFuture<FallibleExecuteProcessResult, String>;
+  ) -> BoxFuture<FallibleExecuteProcessResultWithPlatform, String>;
 
   ///
   /// Given a multi platform request which may have some platform
@@ -401,7 +430,7 @@ impl CommandRunner for BoundedCommandRunner {
     &self,
     req: MultiPlatformExecuteProcessRequest,
     context: Context,
-  ) -> BoxFuture<FallibleExecuteProcessResult, String> {
+  ) -> BoxFuture<FallibleExecuteProcessResultWithPlatform, String> {
     let inner = self.inner.clone();
     self
       .inner

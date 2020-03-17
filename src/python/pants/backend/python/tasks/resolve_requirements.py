@@ -3,8 +3,8 @@
 
 from pex.interpreter import PythonInterpreter
 
-from pants.backend.python.subsystems.pex_build_util import has_python_requirements, is_python_target
 from pants.backend.python.tasks.resolve_requirements_task_base import ResolveRequirementsTaskBase
+from pants.python.pex_build_util import has_python_requirements, is_python_target
 
 
 class ResolveRequirements(ResolveRequirementsTaskBase):

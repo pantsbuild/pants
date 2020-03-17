@@ -29,3 +29,16 @@ python_library(
   ],
   tags = {"partially_type_checked"},
 )
+
+python_tests(
+  name = 'tests',
+  dependencies = [
+    ':source',
+    ':payload_fields',
+    'src/python/pants/base:payload',
+    'src/python/pants/build_graph',
+    'src/python/pants/testutil:test_base',
+    'src/python/pants/testutil/subsystem',
+  ],
+  tags = {"partially_type_checked"},
+)

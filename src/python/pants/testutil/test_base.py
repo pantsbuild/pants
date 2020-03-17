@@ -23,7 +23,7 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
 from pants.engine.fs import PathGlobs, PathGlobsAndRoot, Snapshot
 from pants.engine.legacy.graph import HydratedField
-from pants.engine.legacy.structs import Files, SourcesField
+from pants.engine.legacy.structs import SourceGlobs, SourcesField
 from pants.engine.rules import RootRule
 from pants.engine.scheduler import SchedulerSession
 from pants.engine.selectors import Params
@@ -276,12 +276,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
                 rel_path=os.path.join(package_dir, "BUILD"), target_name="_bogus_target_for_test",
             ),
             arg="sources",
-            filespecs={"globs": package_relative_path_globs},
-            base_globs=Files(spec_path=package_dir),
-            path_globs=PathGlobs(
-                tuple(os.path.join(package_dir, path) for path in package_relative_path_globs),
-            ),
-            validate_fn=lambda _: True,
+            source_globs=SourceGlobs(*package_relative_path_globs),
         )
         field = self.scheduler.product_request(HydratedField, [sources_field])[0]
         return cast(EagerFilesetWithSpec, field.value)
@@ -611,51 +606,59 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
             targets.append(self.build_graph.get_target(address))
         return targets
 
-    def create_library(self, path, target_type, name, sources=None, **kwargs):
+    def create_library(
+        self,
+        *,
+        path: str,
+        target_type: str,
+        name: str,
+        sources: Optional[List[str]] = None,
+        java_sources: Optional[List[str]] = None,
+        provides: Optional[str] = None,
+        dependencies: Optional[List[str]] = None,
+        requirements: Optional[str] = None,
+    ):
         """Creates a library target of given type at the BUILD file at path with sources.
 
         :API: public
 
-         path: The relative path to the BUILD file from the build root.
-         target_type: valid pants target type.
-         name: Name of the library target.
-         sources: List of source file at the path relative to path.
-         **kwargs: Optional attributes that can be set for any library target.
-           Currently it includes support for resources, java_sources, provides
-           and dependencies.
+        path: The relative path to the BUILD file from the build root.
+        target_type: valid pants target type.
+        name: Name of the library target.
+        sources: List of source file at the path relative to path.
+        java_sources: List of java sources.
+        provides: Provides with a format consistent with what should be rendered in the resulting BUILD
+            file, eg: "artifact(org='org.pantsbuild.example', name='hello-greet', repo=public)"
+        dependencies: List of dependencies: [':protobuf-2.4.1']
+        requirements: Python requirements with a format consistent with what should be in the resulting
+            build file, eg: "[python_requirement(foo==1.0.0)]"
         """
         if sources:
             self.create_files(path, sources)
+
+        sources_str = f"sources={repr(sources)}," if sources else ""
+        if java_sources is not None:
+            formatted_java_sources = ",".join(f'"{str_target}"' for str_target in java_sources)
+            java_sources_str = f"java_sources=[{formatted_java_sources}],"
+        else:
+            java_sources_str = ""
+
+        provides_str = f"provides={provides}," if provides is not None else ""
+        dependencies_str = f"dependencies={dependencies}," if dependencies is not None else ""
+        requirements_str = f"requirements={requirements}," if requirements is not None else ""
+
         self.add_to_build_file(
             path,
             dedent(
-                """
-          %(target_type)s(name='%(name)s',
-            %(sources)s
-            %(java_sources)s
-            %(provides)s
-            %(dependencies)s
-          )
-        """
-                % dict(
-                    target_type=target_type,
-                    name=name,
-                    sources=("sources=%s," % repr(sources) if sources else ""),
-                    java_sources=(
-                        "java_sources=[%s],"
-                        % ",".join('"%s"' % str_target for str_target in kwargs.get("java_sources"))
-                        if "java_sources" in kwargs
-                        else ""
-                    ),
-                    provides=(
-                        "provides=%s," % kwargs.get("provides") if "provides" in kwargs else ""
-                    ),
-                    dependencies=(
-                        "dependencies=%s," % kwargs.get("dependencies")
-                        if "dependencies" in kwargs
-                        else ""
-                    ),
+                f"""
+                {target_type}(name='{name}',
+                    {sources_str}
+                    {java_sources_str}
+                    {provides_str}
+                    {dependencies_str}
+                    {requirements_str}
                 )
+                """
             ),
         )
         return self.target(f"{path}:{name}")
@@ -664,7 +667,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         """
         :API: public
         """
-        return self.create_library(path, "resources", name, sources)
+        return self.create_library(path=path, target_type="resources", name=name, sources=sources,)
 
     def assertUnorderedPrefixEqual(self, expected, actual_iter):
         """Consumes len(expected) items from the given iter, and asserts that they match, unordered.

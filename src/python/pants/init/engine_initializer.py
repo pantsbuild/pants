@@ -32,6 +32,7 @@ from pants.engine.legacy.graph import LegacyBuildGraph, create_legacy_graph_task
 from pants.engine.legacy.options_parsing import create_options_parsing_rules
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
 from pants.engine.legacy.structs import (
+    FilesAdaptor,
     JvmAppAdaptor,
     JvmBinaryAdaptor,
     PageAdaptor,
@@ -40,6 +41,7 @@ from pants.engine.legacy.structs import (
     PythonAWSLambdaAdaptor,
     PythonBinaryAdaptor,
     PythonRequirementLibraryAdaptor,
+    PythonRequirementsFileAdaptor,
     PythonTargetAdaptor,
     PythonTestsAdaptor,
     RemoteSourcesAdaptor,
@@ -140,8 +142,12 @@ def _legacy_symbol_table(build_file_aliases: BuildFileAliases) -> SymbolTable:
     table["python_requirement_library"] = PythonRequirementLibraryAdaptor
     table["remote_sources"] = RemoteSourcesAdaptor
     table["resources"] = ResourcesAdaptor
+    table["files"] = FilesAdaptor
     table["page"] = PageAdaptor
     table["python_awslambda"] = PythonAWSLambdaAdaptor
+    # The leading underscore in the name is to emphasize that this is used by macros but is
+    # not intended to be used in user-authored BUILD files.
+    table["_python_requirements_file"] = PythonRequirementsFileAdaptor
 
     # Note that these don't call _make_target_adaptor because we don't have a handy reference to the
     # types being constructed. They don't have any default_sources behavior, so this should be ok,
@@ -170,7 +176,7 @@ def _make_target_adaptor(base_class, target_type):
 class LegacyGraphScheduler:
     """A thin wrapper around a Scheduler configured with @rules for a symbol table."""
 
-    scheduler: Any
+    scheduler: Scheduler
     build_file_aliases: Any
     goal_map: Any
 

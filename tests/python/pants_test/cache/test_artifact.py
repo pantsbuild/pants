@@ -25,7 +25,9 @@ class TarballArtifactTest(TestBase):
 
             file_path = self.touch_file_in(artifact_root)
 
-            artifact = TarballArtifact(artifact_root, os.path.join(cache_root, "some.tar"))
+            artifact = TarballArtifact(
+                artifact_root, artifact_root, os.path.join(cache_root, "some.tar")
+            )
             artifact.collect([file_path])
 
             self.assertEqual([file_path], list(artifact.get_paths()))
@@ -36,7 +38,9 @@ class TarballArtifactTest(TestBase):
             cache_root = os.path.join(tmpdir, "cache")
             safe_mkdir(cache_root)
 
-            artifact = TarballArtifact(artifact_root, os.path.join(cache_root, "some.tar"))
+            artifact = TarballArtifact(
+                artifact_root, artifact_root, os.path.join(cache_root, "some.tar")
+            )
             self.assertFalse(artifact.exists())
 
     def test_exists_true_when_exists(self):
@@ -47,21 +51,27 @@ class TarballArtifactTest(TestBase):
 
             path = self.touch_file_in(artifact_root)
 
-            artifact = TarballArtifact(artifact_root, os.path.join(cache_root, "some.tar"))
+            artifact = TarballArtifact(
+                artifact_root, artifact_root, os.path.join(cache_root, "some.tar")
+            )
             artifact.collect([path])
 
             self.assertTrue(artifact.exists())
 
     def test_non_existent_tarball_extraction(self):
         with temporary_dir() as tmpdir:
-            artifact = TarballArtifact(artifact_root=tmpdir, tarfile_="vapor.tar")
+            artifact = TarballArtifact(
+                artifact_root=tmpdir, artifact_extraction_root=tmpdir, tarfile_="vapor.tar"
+            )
             with self.assertRaises(ArtifactError):
                 artifact.extract()
 
     def test_corrupt_tarball_extraction(self):
         with temporary_dir() as tmpdir:
             path = self.touch_file_in(tmpdir, content="invalid")
-            artifact = TarballArtifact(artifact_root=tmpdir, tarfile_=path)
+            artifact = TarballArtifact(
+                artifact_root=tmpdir, artifact_extraction_root=tmpdir, tarfile_=path
+            )
             with self.assertRaises(ArtifactError):
                 artifact.extract()
 

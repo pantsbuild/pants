@@ -166,7 +166,12 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
         if target_name:
             target = self.target(target_name)
         else:
-            target = self.create_library(test_rel_path, "junit_tests", "foo_test", ["FooTest.java"])
+            target = self.create_library(
+                path=test_rel_path,
+                target_type="junit_tests",
+                name="foo_test",
+                sources=["FooTest.java"],
+            )
 
         target_roots = []
         if create_some_resources:
@@ -279,7 +284,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
         )
 
     @ensure_cached(JUnitRun, expected_num_artifacts=1)
-    def test_junit_runner_runtime_platform_args(self):
+    def test_junit_runner_runtime_platform_jvm_options(self):
         self.make_target(
             spec="tests/java/org/pantsbuild/foo:foo_test",
             target_type=JUnitTests,
@@ -291,7 +296,11 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
             default_platform="java8",
             platforms={
                 "java8": {"source": "8", "target": "8",},
-                "java8-extra": {"source": "8", "target": "8", "args": ["-Dexample.property=1"]},
+                "java8-extra": {
+                    "source": "8",
+                    "target": "8",
+                    "jvm_options": ["-Dexample.property=1"],
+                },
             },
         )
         self._execute_junit_runner(
@@ -558,11 +567,11 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
                   @Test
                   public void testFoo() {{
                     assertTrue(new File("target_cwd_sentinel").exists());
-        
+
                     // We declare a Files dependency on this file, but since we run in a CWD not in a
                     // chroot and not in the build root, we can't find it at the expected relative path.
                     assertFalse(new File("config/org/pantsbuild/foo/files_dep_sentinel").exists());
-        
+
                     // As a sanity check, it is at the expected absolute path though.
                     File buildRoot = new File("{}");
                     assertTrue(new File(buildRoot,

@@ -364,7 +364,7 @@ impl WrappedNode for MultiPlatformExecuteProcess {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ProcessResult(pub process_execution::FallibleExecuteProcessResult);
+pub struct ProcessResult(pub process_execution::FallibleExecuteProcessResultWithPlatform);
 
 ///
 /// A Node that represents reading the destination of a symlink (non-recursively).

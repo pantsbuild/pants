@@ -1,7 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
+from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform, JvmPlatformSettings
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.runtime_platform_mixin import RuntimePlatformMixin
 from pants.base.payload import Payload
@@ -200,3 +200,79 @@ class JvmPlatformTest(TestBase):
             instance.get_runtime_platform_for_target(synth_just_platform_with_parent_same).name
             == "default-platform"
         )
+
+    def test_jvm_options(self):
+        init_subsystem(
+            JvmPlatform,
+            options={
+                "jvm-platform": {
+                    "platforms": {
+                        "platform-with-jvm-options": {
+                            "target": "8",
+                            "jvm_options": ["-Dsomething"],
+                        },
+                        "platform-without-jvm-options": {"target": "8"},
+                    },
+                }
+            },
+        )
+        instance = JvmPlatform.global_instance()
+        with_options = instance.get_platform_by_name("platform-with-jvm-options")
+        without_options = instance.get_platform_by_name("platform-without-jvm-options")
+
+        assert ("-Dsomething",) == with_options.jvm_options
+        assert tuple() == without_options.jvm_options
+
+    def test_jvm_options_from_platform_shlexed(self):
+        init_subsystem(
+            JvmPlatform,
+            options={
+                "jvm-platform": {
+                    "platforms": {
+                        "platform-with-shlexable-vm-options": {
+                            "target": "8",
+                            "jvm_options": ["-Dsomething -Dsomethingelse"],
+                        },
+                    },
+                }
+            },
+        )
+        instance = JvmPlatform.global_instance()
+        need_shlex_options = instance.get_platform_by_name("platform-with-shlexable-vm-options")
+
+        assert ("-Dsomething", "-Dsomethingelse") == need_shlex_options.jvm_options
+
+    def test_compile_setting_equivalence(self):
+        assert JvmPlatformSettings(
+            source_level="11", target_level="11", args=["-Xfoo:bar"], jvm_options=[]
+        ) == JvmPlatformSettings(
+            source_level="11", target_level="11", args=["-Xfoo:bar"], jvm_options=[]
+        )
+        assert JvmPlatformSettings(
+            source_level="11", target_level="11", args=[], jvm_options=["-Xfoo:bar"]
+        ) == JvmPlatformSettings(
+            source_level="11", target_level="11", args=[], jvm_options=["-Xfoo:bar"]
+        )
+
+    def test_compile_setting_inequivalence(self):
+        assert JvmPlatformSettings(
+            source_level="11", target_level="11", args=[], jvm_options=[]
+        ) != JvmPlatformSettings(source_level="11", target_level="12", args=[], jvm_options=[])
+
+        assert JvmPlatformSettings(
+            source_level="11", target_level="11", args=["-Xfoo:bar"], jvm_options=[]
+        ) != JvmPlatformSettings(
+            source_level="11", target_level="11", args=["-XSomethingElse"], jvm_options=[]
+        )
+
+        assert JvmPlatformSettings(
+            source_level="9", target_level="11", args=[], jvm_options=[]
+        ) != JvmPlatformSettings(source_level="11", target_level="11", args=[], jvm_options=[])
+
+        assert JvmPlatformSettings(
+            source_level="11", target_level="11", args=[], jvm_options=["-Xvmsomething"]
+        ) != JvmPlatformSettings(source_level="11", target_level="11", args=[], jvm_options=[])
+
+    def test_incompatible_source_target_level_raises_error(self):
+        with self.assertRaises(JvmPlatformSettings.IllegalSourceTargetCombination):
+            JvmPlatformSettings(source_level="11", target_level="9", args=[], jvm_options=[])

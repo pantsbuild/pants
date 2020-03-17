@@ -21,7 +21,7 @@ use fs::{safe_create_dir_all_ioerror, PosixFS};
 use graph::{EntryId, Graph, NodeContext};
 use process_execution::{
   self, speculate::SpeculatingCommandRunner, BoundedCommandRunner, ExecuteProcessRequestMetadata,
-  PlatformConstraint,
+  Platform,
 };
 use rand::seq::SliceRandom;
 use reqwest;
@@ -180,7 +180,7 @@ impl Core {
             store.clone(),
             // TODO if we ever want to configure the remote platform to be something else we
             // need to take an option all the way down here and into the remote::CommandRunner struct.
-            PlatformConstraint::Linux,
+            Platform::Linux,
             executor.clone(),
             std::time::Duration::from_secs(300),
             std::time::Duration::from_millis(500),
@@ -211,12 +211,12 @@ impl Core {
         executor.clone(),
       )
       .map_err(|err| format!("Could not initialize store for process cache: {:?}", err))?;
-      command_runner = Box::new(process_execution::cache::CommandRunner {
-        underlying: command_runner.into(),
+      command_runner = Box::new(process_execution::cache::CommandRunner::new(
+        command_runner.into(),
         process_execution_store,
-        file_store: store.clone(),
-        metadata: process_execution_metadata,
-      })
+        store.clone(),
+        process_execution_metadata,
+      ));
     }
 
     let http_client = reqwest::r#async::Client::new();

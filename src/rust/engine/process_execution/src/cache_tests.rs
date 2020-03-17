@@ -1,6 +1,6 @@
 use crate::{
   CommandRunner as CommandRunnerTrait, Context, ExecuteProcessRequest,
-  ExecuteProcessRequestMetadata, FallibleExecuteProcessResult, PlatformConstraint,
+  ExecuteProcessRequestMetadata, FallibleExecuteProcessResultWithPlatform, PlatformConstraint,
 };
 use hashing::EMPTY_DIGEST;
 use sharded_lmdb::ShardedLmdb;
@@ -14,8 +14,8 @@ use tempfile::TempDir;
 use testutil::data::TestData;
 
 struct RoundtripResults {
-  uncached: Result<FallibleExecuteProcessResult, String>,
-  maybe_cached: Result<FallibleExecuteProcessResult, String>,
+  uncached: Result<FallibleExecuteProcessResultWithPlatform, String>,
+  maybe_cached: Result<FallibleExecuteProcessResultWithPlatform, String>,
 }
 
 fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
@@ -65,21 +65,23 @@ fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
   let local_result = runtime.block_on(local.run(request.clone().into(), Context::default()));
 
   let cache_dir = TempDir::new().unwrap();
-  let caching = crate::cache::CommandRunner {
-    underlying: Arc::new(local),
-    file_store: store.clone(),
-    process_execution_store: ShardedLmdb::new(
-      cache_dir.path().to_owned(),
-      50 * 1024 * 1024,
-      runtime.clone(),
-    )
-    .unwrap(),
-    metadata: ExecuteProcessRequestMetadata {
-      instance_name: None,
-      cache_key_gen_version: None,
-      platform_properties: vec![],
-    },
+  let max_lmdb_size = 50 * 1024 * 1024; //50 MB - I didn't pick that number but it seems reasonable.
+
+  let process_execution_store =
+    ShardedLmdb::new(cache_dir.path().to_owned(), max_lmdb_size, runtime.clone()).unwrap();
+
+  let metadata = ExecuteProcessRequestMetadata {
+    instance_name: None,
+    cache_key_gen_version: None,
+    platform_properties: vec![],
   };
+
+  let caching = crate::cache::CommandRunner::new(
+    Arc::new(local),
+    process_execution_store,
+    store.clone(),
+    metadata,
+  );
 
   let uncached_result = runtime.block_on(caching.run(request.clone().into(), Context::default()));
 

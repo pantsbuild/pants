@@ -12,8 +12,9 @@ from pants.backend.python.rules import (
     pex_from_target_closure,
     prepare_chrooted_python_sources,
     pytest_coverage,
-    python_test_runner,
+    pytest_runner,
 )
+from pants.backend.python.rules.pytest_runner import PytestRunner
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
@@ -105,8 +106,8 @@ class PythonTestRunnerIntegrationTest(TestBase):
     def rules(cls):
         return (
             *super().rules(),
-            *python_test_runner.rules(),
             *pytest_coverage.rules(),
+            *pytest_runner.rules(),
             *download_pex_bin.rules(),
             *determine_source_files.rules(),
             *pex.rules(),
@@ -116,7 +117,7 @@ class PythonTestRunnerIntegrationTest(TestBase):
             *strip_source_roots.rules(),
             *subprocess_environment.rules(),
             subsystem_rule(TestOptions),
-            RootRule(PythonTestsAdaptorWithOrigin),
+            RootRule(PytestRunner),
         )
 
     def run_pytest(
@@ -141,7 +142,9 @@ class PythonTestRunnerIntegrationTest(TestBase):
         adaptor = PythonTestsAdaptor(
             address=v1_target.address.to_address(), sources=v1_target._sources_field.sources,
         )
-        params = Params(PythonTestsAdaptorWithOrigin(adaptor, origin), options_bootstrapper)
+        params = Params(
+            PytestRunner(PythonTestsAdaptorWithOrigin(adaptor, origin)), options_bootstrapper
+        )
         test_result = self.request_single_product(TestResult, params)
         debug_request = self.request_single_product(TestDebugRequest, params)
         debug_result = InteractiveRunner(self.scheduler).run_local_interactive_process(

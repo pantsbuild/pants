@@ -153,6 +153,7 @@ python_tests(
   sources = ['test_python_binary_integration.py'],
   dependencies = [
     '3rdparty/python:pex',
+    'examples/src/python/example/tensorflow_custom_op:show-tf-version-files',
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil:int-test',
     'testprojects/src/python:python_distribution_directory',

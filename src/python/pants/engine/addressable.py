@@ -14,7 +14,7 @@ from pants.engine.objects import Collection, Resolvable, Serializable
 from pants.util.objects import TypeConstraintError
 
 
-def _assert_single_address(addresses: Sequence[Address]) -> None:
+def assert_single_address(addresses: Sequence[Address]) -> None:
     """Assert that exactly one address must be contained in the collection."""
     if len(addresses) == 0:
         raise ResolveError("No targets were matched.")
@@ -28,7 +28,7 @@ def _assert_single_address(addresses: Sequence[Address]) -> None:
 
 class Addresses(Collection[Address]):
     def expect_single(self) -> Address:
-        _assert_single_address(self.dependencies)
+        assert_single_address(self.dependencies)
         return self.dependencies[0]
 
 
@@ -42,7 +42,7 @@ class AddressWithOrigin:
 
 class AddressesWithOrigins(Collection[AddressWithOrigin]):
     def expect_single(self) -> AddressWithOrigin:
-        _assert_single_address(
+        assert_single_address(
             [address_with_origin.address for address_with_origin in self.dependencies]
         )
         return self.dependencies[0]
