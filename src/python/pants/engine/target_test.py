@@ -157,8 +157,13 @@ def test_has_fields() -> None:
 
     tgt = HaskellTarget({}, address=Address.parse(":lib"))
     assert tgt.has_fields([]) is True
+
     assert tgt.has_fields([HaskellGhcExtensions]) is True
+    assert tgt.has_field(HaskellGhcExtensions) is True
+
     assert tgt.has_fields([UnrelatedField]) is False
+    assert tgt.has_field(UnrelatedField) is False
+
     assert tgt.has_fields([HaskellGhcExtensions, UnrelatedField]) is False
 
 
@@ -234,16 +239,16 @@ def test_override_preexisting_field_via_new_target() -> None:
         {HaskellGhcExtensions.alias: ["GhcNormalExtension"]}, address=Address.parse(":custom")
     )
 
-    assert custom_tgt.has_fields([HaskellGhcExtensions]) is True
-    assert custom_tgt.has_fields([CustomHaskellGhcExtensions]) is True
+    assert custom_tgt.has_field(HaskellGhcExtensions) is True
+    assert custom_tgt.has_field(CustomHaskellGhcExtensions) is True
     assert custom_tgt.has_fields([HaskellGhcExtensions, CustomHaskellGhcExtensions]) is True
 
     # Ensure that subclasses not defined on a target are not accepted. This allows us to, for
     # example, filter every target with `PythonSources` (or a subclass) and to ignore targets with
     # only `Sources`.
     normal_tgt = HaskellTarget({}, address=Address.parse(":normal"))
-    assert normal_tgt.has_fields([HaskellGhcExtensions]) is True
-    assert normal_tgt.has_fields([CustomHaskellGhcExtensions]) is False
+    assert normal_tgt.has_field(HaskellGhcExtensions) is True
+    assert normal_tgt.has_field(CustomHaskellGhcExtensions) is False
 
     assert custom_tgt.get(HaskellGhcExtensions) == custom_tgt.get(CustomHaskellGhcExtensions)
     assert custom_tgt.get(HaskellGhcExtensions).value == (
