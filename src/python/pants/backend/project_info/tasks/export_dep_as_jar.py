@@ -457,9 +457,11 @@ class ExportDepAsJar(ConsoleTask):
 
         def create_entry_for_target(target: Target) -> None:
             target_key = target
-            non_modulizable_deps = [
-                dep for dep in target.dependencies if dep not in modulizable_targets
-            ]
+            if self._is_strict_deps(target):
+                dependencies = target.strict_dependencies(DependencyContext.global_instance())
+            else:
+                dependencies = target.dependencies
+            non_modulizable_deps = [dep for dep in dependencies if dep not in modulizable_targets]
             entry = OrderedSet()
             for dep in non_modulizable_deps:
                 entry.update(flat_deps.get(dep, set()).union({dep}))
