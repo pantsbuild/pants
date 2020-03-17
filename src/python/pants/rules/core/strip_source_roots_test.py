@@ -13,9 +13,9 @@ from pants.engine.legacy.structs import TargetAdaptor
 from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Params
 from pants.rules.core.strip_source_roots import (
+    LegacyStripTargetRequest,
     SourceRootStrippedSources,
     StripSnapshotRequest,
-    StripTargetRequest,
 )
 from pants.rules.core.strip_source_roots import rules as strip_source_root_rules
 from pants.testutil.option.util import create_options_bootstrapper
@@ -32,7 +32,7 @@ class StripSourceRootsTest(TestBase):
 
     def get_stripped_files(
         self,
-        request: Union[StripSnapshotRequest, StripTargetRequest],
+        request: Union[StripSnapshotRequest, LegacyStripTargetRequest],
         *,
         args: Optional[List[str]] = None,
     ) -> List[str]:
@@ -106,7 +106,7 @@ class StripSourceRootsTest(TestBase):
                 else self.make_snapshot_of_empty_files(specified_sources)
             )
             return self.get_stripped_files(
-                StripTargetRequest(
+                LegacyStripTargetRequest(
                     TargetAdaptor(address=address, type_alias=type_alias, sources=sources),
                     specified_files_snapshot=specified_sources_snapshot,
                 )

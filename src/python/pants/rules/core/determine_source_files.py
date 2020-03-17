@@ -10,7 +10,7 @@ from pants.engine.legacy.structs import TargetAdaptor, TargetAdaptorWithOrigin
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.rules.core import strip_source_roots
-from pants.rules.core.strip_source_roots import SourceRootStrippedSources, StripTargetRequest
+from pants.rules.core.strip_source_roots import LegacyStripTargetRequest, SourceRootStrippedSources
 from pants.util.meta import frozen_after_init
 
 
@@ -57,7 +57,7 @@ async def determine_all_source_files(request: AllSourceFilesRequest) -> SourceFi
     """Merge all the `sources` for targets into one snapshot."""
     if request.strip_source_roots:
         stripped_snapshots = await MultiGet(
-            Get[SourceRootStrippedSources](StripTargetRequest(adaptor))
+            Get[SourceRootStrippedSources](LegacyStripTargetRequest(adaptor))
             for adaptor in request.adaptors
         )
         input_snapshots = (stripped_snapshot.snapshot for stripped_snapshot in stripped_snapshots)
@@ -117,7 +117,7 @@ async def determine_specified_source_files(request: SpecifiedSourceFilesRequest)
         all_adaptors = (*full_snapshots.keys(), *snapshot_subset_requests.keys())
         stripped_snapshots = await MultiGet(
             Get[SourceRootStrippedSources](
-                StripTargetRequest(adaptor, specified_files_snapshot=snapshot)
+                LegacyStripTargetRequest(adaptor, specified_files_snapshot=snapshot)
             )
             for adaptor, snapshot in zip(all_adaptors, all_snapshots)
         )

@@ -44,7 +44,7 @@ class StripSnapshotRequest:
 
 
 @dataclass(frozen=True)
-class StripTargetRequest:
+class LegacyStripTargetRequest:
     """A request to strip source roots for every file in a target's `sources` field.
 
     The call site may optionally give a snapshot to `specified_files_snapshot` to only strip a
@@ -112,7 +112,9 @@ async def strip_source_roots_from_snapshot(
 
 
 @rule
-async def strip_source_roots_from_target(request: StripTargetRequest,) -> SourceRootStrippedSources:
+async def legacy_strip_source_roots_from_target(
+    request: LegacyStripTargetRequest,
+) -> SourceRootStrippedSources:
     """Remove source roots from a target, e.g. `src/python/pants/util/strutil.py` ->
     `pants/util/strutil.py`."""
     target_adaptor = request.adaptor
@@ -140,8 +142,8 @@ async def strip_source_roots_from_target(request: StripTargetRequest,) -> Source
 def rules():
     return [
         strip_source_roots_from_snapshot,
-        strip_source_roots_from_target,
+        legacy_strip_source_roots_from_target,
         subsystem_rule(SourceRootConfig),
-        RootRule(StripTargetRequest),
+        RootRule(LegacyStripTargetRequest),
         RootRule(StripSnapshotRequest),
     ]
