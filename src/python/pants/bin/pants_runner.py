@@ -93,7 +93,6 @@ class PantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         )
         ExceptionSink.reset_log_location(global_bootstrap_options.pants_workdir)
 
-        # TODO https://github.com/pantsbuild/pants/issues/7205
         if self._should_run_with_pantsd(global_bootstrap_options):
             try:
                 return RemotePantsRunner(
