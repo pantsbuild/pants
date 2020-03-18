@@ -37,6 +37,11 @@ class HaskellGhcExtensions(PrimitiveField):
         return tuple(raw_value)
 
 
+class UnrelatedField(BoolField):
+    alias: ClassVar = "unrelated"
+    default: ClassVar = False
+
+
 class HaskellSources(AsyncField):
     alias: ClassVar = "sources"
     sanitized_raw_value: Optional[Tuple[str, ...]]
@@ -149,13 +154,15 @@ def test_get_async_field() -> None:
     assert "//:lib" in str(exc)
 
 
+def test_maybe_get_field() -> None:
+    tgt = HaskellTarget({}, address=Address.parse(":lib"))
+    assert tgt.get(HaskellGhcExtensions) == tgt.maybe_get(HaskellGhcExtensions)
+    assert tgt.get(HaskellSources) == tgt.maybe_get(HaskellSources)
+    assert tgt.maybe_get(UnrelatedField) is None
+
+
 def test_has_fields() -> None:
-    class UnrelatedField(BoolField):
-        alias: ClassVar = "unrelated"
-        default: ClassVar = False
-
     empty_union_membership = UnionMembership({})
-
     tgt = HaskellTarget({}, address=Address.parse(":lib"))
     assert tgt.has_fields([]) is True
     assert HaskellTarget.class_has_fields([], union_membership=empty_union_membership) is True

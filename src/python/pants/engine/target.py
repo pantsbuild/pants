@@ -329,6 +329,26 @@ class Target(ABC):
         return cast(Optional[Type[_F]], subclass)
 
     @final
+    def maybe_get(self, field: Type[_F]) -> Optional[_F]:
+        """Get the requested `Field` instance belonging to this target, if it exists.
+
+        See the docstring for `Target.get()` for how this method handles subclasses of the
+        requested Field and for tips on how to use the returned value.
+
+        Unlike `Target.get()`, this will not raise a KeyError if the field is not registered on
+        this target type.
+        """
+        result = self.field_values.get(field, None)
+        if result is not None:
+            return cast(_F, result)
+        field_subclass = self._find_registered_field_subclass(
+            field, registered_fields=self.field_types
+        )
+        if field_subclass is not None:
+            return cast(_F, self.field_values[field_subclass])
+        return None
+
+    @final
     def get(self, field: Type[_F]) -> _F:
         """Get the requested `Field` instance belonging to this target.
 
@@ -339,24 +359,20 @@ class Target(ABC):
 
         If the `Field` is not registered on this `Target` type, this method will raise a
         `KeyError`. To avoid this, you should first call `tgt.has_field()` or `tgt.has_fields()`
-        to ensure that the field is registered.
+        to ensure that the field is registered, or, use `tgt.maybe_get()`.
 
         This works with subclasses of `Field`s. For example, if you subclass `Sources` to define a
         custom subclass `PythonSources`, both `python_tgt.get(PythonSources)` and
         `python_tgt.get(Sources)` will return the same `PythonSources` instance.
         """
-        result = self.field_values.get(field, None)
+        result = self.maybe_get(field)
         if result is not None:
-            return cast(_F, result)
-        field_subclass = self._find_registered_field_subclass(
-            field, registered_fields=self.field_types
-        )
-        if field_subclass is not None:
-            return cast(_F, self.field_values[field_subclass])
+            return result
         raise KeyError(
-            f"The target `{self}` does not have a field `{field}`. Before calling "
+            f"The target `{self}` does not have a field `{field.__name__}`. Before calling "
             f"`my_tgt.get({field.__name__})`, call `my_tgt.has_field({field.__name__})` to "
-            "filter out any irrelevant Targets."
+            "filter out any irrelevant Targets. Alternatively, use "
+            f"`my_tgt.maybe_get({field.__name__})`."
         )
 
     @final
