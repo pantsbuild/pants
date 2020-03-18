@@ -148,7 +148,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
             res = executor.execute(
                 classpath=[global_subsystem_instance(CoursierSubsystem).select()],
                 main="coursier.cli.Coursier",
-                args=["fetch", "junit:junit:4.12"],
+                args=["fetch", "junit:junit:4.12", "-r", "https://maven-central.storage-download.googleapis.com/repos/central/data"],
                 stdout=f,
             )
             self.assertEqual(0, res, "Coursier resolve failed.")
