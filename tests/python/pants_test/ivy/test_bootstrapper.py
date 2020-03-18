@@ -7,14 +7,13 @@ from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.testutil.subsystem.util import init_subsystem
 import pkg_resources
-import os
 
 
 class BootstrapperTest(unittest.TestCase):
     def setUp(self):
         super().setUp()
         pants_ivy_settings = pkg_resources.resource_filename(
-            __name__, os.path.join("build-support", "ivy", "ivysettings.xml")
+            __name__, "../../build-support/ivy/ivysettings.xml"
         )
         # This ivy settings contains the RBE maven mirror that gets around maven blacklisting.
         init_subsystem(IvySubsystem, {"ivy": {"bootstrap_ivy_settings": pants_ivy_settings}})
