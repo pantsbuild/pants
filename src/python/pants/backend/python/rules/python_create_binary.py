@@ -17,7 +17,7 @@ from pants.engine.rules import UnionRule, rule
 from pants.engine.selectors import Get
 from pants.engine.target import Target, hydrated_struct_to_target
 from pants.rules.core.binary import BinaryTarget, CreatedBinary
-from pants.rules.core.strip_source_roots import SourceRootStrippedSources, StripSourcesFieldRequest
+from pants.rules.core.determine_source_files import AllSourceFilesRequest, SourceFiles
 
 
 # TODO: consider replacing this with sugar like `SelectFields(EntryPoint, PythonBinarySources)` so
@@ -59,13 +59,12 @@ async def create_python_binary(fields: PythonBinaryFields) -> CreatedBinary:
     if fields.entry_point.value is not None:
         entry_point = fields.entry_point.value
     else:
-        stripped_sources = await Get[SourceRootStrippedSources](
-            StripSourcesFieldRequest(fields.sources)
+        source_files = await Get[SourceFiles](
+            AllSourceFilesRequest([fields.sources], strip_source_roots=True)
         )
-        source_files = stripped_sources.snapshot.files
         # NB: `PythonBinarySources` enforces that we have 0-1 sources.
-        if len(source_files) == 1:
-            module_name = source_files[0]
+        if len(source_files.files) == 1:
+            module_name = source_files.files[0]
             entry_point = PythonBinary.translate_source_path_to_py_module_specifier(module_name)
         else:
             entry_point = None
