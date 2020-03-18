@@ -6,7 +6,6 @@ import os
 from collections import defaultdict
 
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
-from pants.backend.jvm.subsystems.resolve_subsystem import JvmResolveSubsystem
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.junit_tests import JUnitTests
@@ -15,7 +14,6 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.coursier_resolve import CoursierMixin
-from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.backend.project_info.tasks.export_version import DEFAULT_EXPORT_VERSION
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
@@ -53,9 +51,7 @@ class SourceRootTypes:
 
 # Changing the behavior of this task may affect the IntelliJ Pants plugin.
 # Please add @yic to reviews for this file.
-# NB: IvyTaskMixin conflicts with the resolve() method of CoursierMixin. IvyTaskMixin.resolve()
-# will be used because it appears first in the MRO.
-class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):  # type: ignore[misc]
+class ExportTask(ResolveRequirementsTaskBase, CoursierMixin):
     """Base class for generating a json-formattable blob of data about the target graph.
 
     Subclasses can invoke the generate_targets_map method to get a dictionary of plain
@@ -164,23 +160,14 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):  # t
 
         if confs:
             compile_classpath = ClasspathProducts(self.get_options().pants_workdir)
-            if JvmResolveSubsystem.global_instance().get_options().resolver == "ivy":
-                IvyTaskMixin.resolve(
-                    self,
-                    executor=executor,
-                    targets=targets,
-                    classpath_products=compile_classpath,
-                    confs=confs,
-                )
-            else:
-                CoursierMixin.resolve(
-                    self,
-                    targets,
-                    compile_classpath,
-                    sources=self.get_options().libraries_sources,
-                    javadoc=self.get_options().libraries_javadocs,
-                    executor=executor,
-                )
+            CoursierMixin.resolve(
+                self,
+                targets,
+                compile_classpath,
+                sources=self.get_options().libraries_sources,
+                javadoc=self.get_options().libraries_javadocs,
+                executor=executor,
+            )
 
         return compile_classpath
 
@@ -462,9 +449,7 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):  # t
         return {root_package_prefix(source) for source in target.sources_relative_to_source_root()}
 
 
-# NB: ExportTask's IvyTaskMixin conflicts with the resolve() method of ExportTask's CoursierMixin.
-# IvyTaskMixin.resolve() will be used because it appears first in the MRO.
-class Export(ExportTask, ConsoleTask):  # type: ignore[misc]
+class Export(ExportTask, ConsoleTask):
     """Export project information in JSON format.
 
     Intended for exporting project information for IDE, such as the IntelliJ Pants plugin.

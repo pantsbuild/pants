@@ -10,6 +10,7 @@ from pants.backend.jvm.subsystems.junit import JUnit
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.junit_tests import JUnitTests
+from pants.backend.jvm.tasks.coursier.coursier_subsystem import CoursierSubsystem
 from pants.backend.jvm.tasks.coverage.cobertura import Cobertura
 from pants.backend.jvm.tasks.coverage.engine import NoCoverage
 from pants.backend.jvm.tasks.coverage.jacoco import Jacoco
@@ -20,14 +21,12 @@ from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.files import Files
 from pants.build_graph.resources import Resources
-from pants.ivy.bootstrapper import Bootstrapper
-from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.testutil.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 from pants.testutil.subsystem.util import global_subsystem_instance, init_subsystem
 from pants.testutil.task_test_base import ensure_cached
-from pants.util.contextutil import environment_as, temporary_dir
+from pants.util.contextutil import environment_as, temporary_dir, temporary_file
 from pants.util.dirutil import touch
 
 
@@ -132,7 +131,6 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     ):
         # Create the temporary base test directory
         test_rel_path = "tests/java/org/pantsbuild/foo"
-        test_abs_path = self.create_dir(test_rel_path)
 
         # Create the temporary classes directory under work dir
         test_classes_abs_path = self.create_workdir_dir(test_rel_path)
@@ -144,25 +142,24 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
             test_java_file_abs_path = self.create_file(test_java_file_rel_path, content)
             test_java_file_abs_paths.append(test_java_file_abs_path)
 
-        # Invoke ivy to resolve classpath for junit.
-        classpath_file_abs_path = os.path.join(test_abs_path, "junit.classpath")
-        ivy_subsystem = global_subsystem_instance(IvySubsystem)
         distribution = DistributionLocator.cached(jdk=True)
-        ivy = Bootstrapper(ivy_subsystem=ivy_subsystem).ivy()
-        ivy.execute(
-            args=[
-                "-cachepath",
-                classpath_file_abs_path,
-                "-dependency",
-                "junit",
-                "junit-dep",
-                "4.10",
-            ],
-            executor=SubprocessExecutor(distribution=distribution),
-        )
-
-        with open(classpath_file_abs_path, "r") as fp:
-            classpath = fp.read()
+        executor = SubprocessExecutor(distribution=distribution)
+        with temporary_file() as f:
+            res = executor.execute(
+                classpath=[global_subsystem_instance(CoursierSubsystem).select()],
+                main="coursier.cli.Coursier",
+                args=[
+                    "fetch",
+                    "junit:junit:4.12",
+                    "-r",
+                    # This is needed to get around the maven blacklisting RBE.
+                    "https://maven-central.storage-download.googleapis.com/repos/central/data",
+                ],
+                stdout=f,
+            )
+            self.assertEqual(0, res, "Coursier resolve failed.")
+            f.seek(0)
+            classpath = ":".join(f.read().decode().split())
 
         # Now directly invoke javac to compile the test java code into classfiles that we can later
         # inject into a product mapping for JUnitRun to execute against.

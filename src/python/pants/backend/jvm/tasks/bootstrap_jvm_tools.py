@@ -10,13 +10,14 @@ from collections import defaultdict
 from textwrap import dedent
 
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
-from pants.backend.jvm.subsystems.resolve_subsystem import JvmResolveSubsystem
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.classpath_entry import ClasspathEntry
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
-from pants.backend.jvm.tasks.coursier_resolve import CoursierMixin
-from pants.backend.jvm.tasks.ivy_task_mixin import IvyResolveFingerprintStrategy, IvyTaskMixin
+from pants.backend.jvm.tasks.coursier_resolve import (
+    CoursierMixin,
+    CoursierResolveFingerprintStrategy,
+)
 from pants.backend.jvm.tasks.jar_task import JarTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
@@ -32,7 +33,7 @@ from pants.util.dirutil import fast_relpath, safe_mkdir_for
 from pants.util.memo import memoized_property
 
 
-class ShadedToolFingerprintStrategy(IvyResolveFingerprintStrategy):
+class ShadedToolFingerprintStrategy(CoursierResolveFingerprintStrategy):
     def __init__(self, main, custom_rules=None):
         # The bootstrapper uses no custom confs in its resolves.
         super().__init__(confs=None)
@@ -70,9 +71,7 @@ class ShadedToolFingerprintStrategy(IvyResolveFingerprintStrategy):
         return type(self) == type(other) and self._tuple() == other._tuple()
 
 
-# NB: IvyTaskMixin conflicts with the resolve() method of CoursierMixin. IvyTaskMixin.resolve()
-# will be used because it appears first in the MRO.
-class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):  # type: ignore[misc]
+class BootstrapJvmTools(CoursierMixin, JarTask):
     class ToolUnderspecified(Exception):
         pass
 
@@ -275,12 +274,9 @@ class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):  # type: ignore[m
         self._check_underspecified_tools(jvm_tool, targets)
         self.context.log.debug(f"Bootstrapping {jvm_tool.key}")
         classpath_holder = ClasspathProducts(self.get_options().pants_workdir)
-        if JvmResolveSubsystem.global_instance().get_options().resolver == "ivy":
-            self.resolve(executor=None, targets=targets, classpath_products=classpath_holder)
-        else:
-            CoursierMixin.resolve(
-                self, targets, classpath_holder, sources=False, javadoc=False, executor=None
-            )
+        CoursierMixin.resolve(
+            self, targets, classpath_holder, sources=False, javadoc=False, executor=None
+        )
         return [
             cp_entry for _, cp_entry in classpath_holder.get_classpath_entries_for_targets(targets)
         ]

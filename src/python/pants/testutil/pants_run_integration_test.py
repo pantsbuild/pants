@@ -110,19 +110,6 @@ def ensure_cached(expected_num_artifacts=None):
     return decorator
 
 
-def ensure_resolver(f):
-    """A decorator for running an integration test with ivy and coursier as the resolver."""
-
-    def wrapper(self, *args, **kwargs):
-        for env_var_value in ("ivy", "coursier"):
-            with environment_as(
-                HERMETIC_ENV="PANTS_RESOLVER_RESOLVER", PANTS_RESOLVER_RESOLVER=env_var_value
-            ):
-                f(self, *args, **kwargs)
-
-    return wrapper
-
-
 def ensure_daemon(f):
     """A decorator for running an integration test with and without the daemon enabled."""
 

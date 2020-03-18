@@ -80,7 +80,8 @@ jar_library(
 jar_library(
   name='javac9',
   jars = [
-    jar(org='java', name='javac', rev='9+181-r4173-1'),
+    jar(org='java', name='javac', rev='9+181-r4173-1',
+        url='https://raw.githubusercontent.com/toolchainlabs/binhost/master/java/javac/9+181-r4173-1/javac-9+181-r4173-1.jar'),
   ],
 )
 

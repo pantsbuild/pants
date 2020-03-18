@@ -464,7 +464,12 @@ repos = [
   'https://repo1.maven.org/maven2',
   # Custom repo for Kythe jars, as Google doesn't currently publish them anywhere.
   'https://raw.githubusercontent.com/toolchainlabs/binhost/master/',
+  # Specify local default maven repo to support
+  # testing snapshots of 3rdparty jars published locally.
+  'file://%(homedir)s/.m2/repository',
 ]
+
+fetch_options.add = ["--retry-count", "3", "--no-default"]
 
 [cache.resolve.coursier]
 # Only use local artifact for coursier because the cache content contains abs path

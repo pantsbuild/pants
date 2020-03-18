@@ -276,7 +276,6 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
                 "--no-jvm-platform-validate-colors",
                 "--test-junit-colors",
                 "--unpack-jars-colors",
-                "--no-resolve-ivy-colors",
                 "--imports-ivy-imports-colors",
                 "--compile-colors",
                 "--no-compile-rsc-colors",
@@ -300,7 +299,6 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
         self.assertIn("compile.rsc.colors = False", lines)
         # These should be omitted because they have the same value as their super-scope.
         self.assertNotIn("jvm-platform-validate.colors = False", lines)
-        self.assertNotIn("resolve.ivy.colors = False", lines)
 
     def test_pants_ignore_option(self) -> None:
         with temporary_dir(root_dir=os.path.abspath(".")) as tempdir:
