@@ -30,7 +30,7 @@ class FileLoggingSetupResult:
 def _configure_requests_debug_logging() -> None:
     http.client.HTTPConnection.debuglevel = 1  # type: ignore[attr-defined]
     requests_logger = logging.getLogger("requests.packages.urllib3")
-    LogLevel.TRACE.set_level(requests_logger)
+    LogLevel.TRACE.set_level_for(requests_logger)
     requests_logger.propagate = True
 
 
@@ -50,7 +50,7 @@ def setup_logging_to_stderr(python_logger: Logger, log_level: LogLevel) -> None:
     handler = create_native_stderr_log_handler(log_level, native, stream=sys.stderr)
     python_logger.addHandler(handler)
     # Let the rust side filter levels; try to have the python side send everything to the rust logger.
-    LogLevel.TRACE.set_level(python_logger)
+    LogLevel.TRACE.set_level_for(python_logger)
 
 
 def setup_logging_from_options(
@@ -190,7 +190,7 @@ def setup_logging(
         native_handler = create_native_stderr_log_handler(log_level, native, stream=console_stream)
         logger.addHandler(native_handler)
 
-    log_level.set_level(logger)
+    log_level.set_level_for(logger)
 
     # This routes warnings through our loggers instead of straight to raw stderr.
     logging.captureWarnings(True)

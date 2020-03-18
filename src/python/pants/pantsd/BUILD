@@ -72,6 +72,7 @@ python_library(
     'src/python/pants/engine:native',
     'src/python/pants/goal:run_tracker',
     'src/python/pants/init',
+    'src/python/pants/option',
     'src/python/pants/pantsd/service:fs_event_service',
     'src/python/pants/pantsd/service:pailgun_service',
     'src/python/pants/pantsd/service:scheduler_service',

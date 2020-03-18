@@ -37,5 +37,5 @@ class LogLevel(Enum):
     def log(self, logger: logging.Logger, *args, **kwargs) -> None:
         logger.log(self._level, *args, **kwargs)
 
-    def set_level(self, logger: logging.Logger):
+    def set_level_for(self, logger: logging.Logger):
         logger.setLevel(self.level)
