@@ -35,24 +35,6 @@ def _log(message):
     sys.stderr.write(message + "\n")
 
 
-def _sanitize_requirements(requirements):
-    """Remove duplicate keys such as setuptools or pex which may be injected multiple times into the
-    resulting ipex when first executed."""
-    project_names = []
-    new_requirements = {}
-
-    for r in requirements:
-        r = Requirement(r)
-        if r.marker and not r.marker.evaluate():
-            continue
-        if r.name not in new_requirements:
-            project_names.append(r.name)
-            new_requirements[r.name] = str(r)
-    sanitized_requirements = [new_requirements[n] for n in project_names]
-
-    return sanitized_requirements
-
-
 def modify_pex_info(pex_info, **kwargs):
     new_info = json.loads(pex_info.dump())
     new_info.update(kwargs)
@@ -85,10 +67,6 @@ def _hydrate_pex_file(self, hydrated_pex_file):
 
     # Perform a fully pinned intransitive resolve to hydrate the install cache.
     resolver_settings = ipex_info["resolver_settings"]
-
-    sanitized_requirements = _sanitize_requirements(bootstrap_info.requirements)
-    bootstrap_info = modify_pex_info(bootstrap_info, requirements=sanitized_requirements)
-    bootstrap_builder.info = bootstrap_info
 
     resolved_distributions = resolver.resolve(
         requirements=bootstrap_info.requirements,

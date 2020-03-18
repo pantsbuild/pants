@@ -290,6 +290,7 @@ class PexBuilderWrapper:
                         self._log.debug(
                             f"  *AVOIDING* dumping distribution into ipex: .../{os.path.basename(dist.location)}"
                         )
+                        self._register_distribution(dist)
                     else:
                         self._log.debug(
                             f"  Dumping distribution: .../{os.path.basename(dist.location)}"
