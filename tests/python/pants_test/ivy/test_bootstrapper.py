@@ -3,10 +3,11 @@
 
 import unittest
 
+import pkg_resources
+
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.testutil.subsystem.util import init_subsystem
-import pkg_resources
 
 
 class BootstrapperTest(unittest.TestCase):
