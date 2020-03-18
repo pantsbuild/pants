@@ -71,9 +71,7 @@ class ShadedToolFingerprintStrategy(CoursierResolveFingerprintStrategy):
         return type(self) == type(other) and self._tuple() == other._tuple()
 
 
-# NB: IvyTaskMixin conflicts with the resolve() method of CoursierMixin. IvyTaskMixin.resolve()
-# will be used because it appears first in the MRO.
-class BootstrapJvmTools(CoursierMixin, JarTask):  # type: ignore[misc]
+class BootstrapJvmTools(CoursierMixin, JarTask):
     class ToolUnderspecified(Exception):
         pass
 
