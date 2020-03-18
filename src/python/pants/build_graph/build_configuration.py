@@ -189,6 +189,10 @@ class BuildConfiguration:
         types]."""
         return self._union_rules
 
+    # NB: We expect the parameter to be Iterable[Type[Target]], but we can't be confident in this
+    # because we pass whatever people put in their `register.py`s to this function; i.e., this is
+    # an impure function that reads from the outside world. So, we use the type hint `Any` and
+    # perform runtime type checking.
     def register_targets(self, targets: Union[typing.Iterable[Type[Target]], Any]) -> None:
         """Registers the given target types."""
         if not isinstance(targets, Iterable):
