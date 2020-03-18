@@ -29,6 +29,7 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
     'src/python/pants/goal',
+    'src/python/pants/util:logging',
     'src/python/pants/util:ordered_set',
   ],
   tags = {"partially_type_checked"},

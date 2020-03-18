@@ -185,7 +185,7 @@ class PantsDaemon(FingerprintedProcessManager):
                 native=native,
                 build_root=build_root,
                 work_dir=bootstrap_options_values.pants_workdir,
-                log_level=bootstrap_options_values.level.upper(),
+                log_level=bootstrap_options_values.level,
                 services=services,
                 metadata_base_dir=bootstrap_options_values.pants_subprocessdir,
                 bootstrap_options=bootstrap_options,
@@ -337,10 +337,14 @@ class PantsDaemon(FingerprintedProcessManager):
             init_rust_logger(self._log_level, self._log_show_rust_3rdparty)
             result = setup_logging(
                 self._log_level,
+                native=self._native,
                 log_dir=self._log_dir,
                 log_name=self.LOG_NAME,
-                native=self._native,
                 warnings_filter_regexes=self._bootstrap_options.for_global_scope(),
+            )
+            assert result is not None, (
+                f"Expected a file logging setup given a log_dir of "
+                f"{self._log_dir} and a log_name of {self.LOG_NAME}."
             )
             self._native.override_thread_logging_destination_to_just_pantsd()
 

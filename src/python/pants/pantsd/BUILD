@@ -42,6 +42,7 @@ python_library(
   dependencies = [
     ':watchman',
     'src/python/pants/binaries',
+    'src/python/pants/util:logging',
     'src/python/pants/util:memo',
   ],
   tags = {"partially_type_checked"},
@@ -62,6 +63,8 @@ python_library(
   dependencies = [
     '3rdparty/python:dataclasses',
     '3rdparty/python:setproctitle',
+    ':process_manager',
+    ':watchman_launcher',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exception_sink',
     'src/python/pants/base:exiter',
@@ -74,9 +77,8 @@ python_library(
     'src/python/pants/pantsd/service:scheduler_service',
     'src/python/pants/pantsd/service:store_gc_service',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:logging',
     'src/python/pants/util:memo',
-    ':process_manager',
-    ':watchman_launcher'
   ],
   tags = {'partially_type_checked'},
 )

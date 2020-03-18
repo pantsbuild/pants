@@ -119,7 +119,7 @@ class ScalafixTask(RewriteBase):
 
         if self.get_options().rules:
             args.append(f"--rules={self.get_options().rules}")
-        if self.get_options().level == "debug":
+        if self.debug:
             args.append("--verbose")
 
         # This is how you pass a list of strings to a single arg key

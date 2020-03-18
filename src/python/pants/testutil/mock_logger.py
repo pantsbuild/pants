@@ -3,6 +3,7 @@
 
 import sys
 
+from pants.base.deprecated import deprecated
 from pants.reporting.report import Report
 
 
@@ -45,8 +46,12 @@ class MockLogger:
         """
         self._maybe_log(Report.ERROR, *msg_elements)
 
+    @deprecated(
+        removal_version="1.29.0.dev0",
+        hint_message=(
+            "Neither Pants reporting nor Pants context logging supports fatal logging any longer. "
+            "Transition to `error`."
+        ),
+    )
     def fatal(self, *msg_elements):
-        """
-        :API: public
-        """
-        self._maybe_log(Report.FATAL, *msg_elements)
+        self.error(*msg_elements)

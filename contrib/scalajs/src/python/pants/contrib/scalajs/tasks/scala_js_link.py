@@ -79,7 +79,7 @@ class ScalaJSLink(NailgunTask):
 
     def _link(self, target, output_file, classpaths):
         args = ["--output", output_file]
-        if self.get_options().level == "debug":
+        if self.debug:
             args.append("--debug")
         if self.get_options().full_opt:
             args.append("--fullOpt")

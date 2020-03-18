@@ -113,7 +113,7 @@ class SchedulerService(PantsService):
             self._invalidating_snapshot
             and new_snapshot.directory_digest != self._invalidating_snapshot.directory_digest
         ):
-            self._logger.fatal(
+            self._logger.critical(
                 "saw file events covered by invalidation globs [{}], terminating the daemon.".format(
                     self._invalidating_files
                 )
@@ -123,7 +123,7 @@ class SchedulerService(PantsService):
     def _maybe_invalidate_scheduler_pidfile(self):
         new_pid = self._check_pid_changed()
         if new_pid is not False:
-            self._logger.fatal(
+            self._logger.critical(
                 "{} says pantsd PID is {} but my PID is: {}: terminating".format(
                     self._pantsd_pidfile, new_pid, os.getpid(),
                 )
