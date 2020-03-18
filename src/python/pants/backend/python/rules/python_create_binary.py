@@ -36,13 +36,13 @@ class PythonBinaryImplementation(BinaryImplementation):
 
 
 @rule
-async def create_python_binary(fields: PythonBinaryImplementation) -> CreatedBinary:
+async def create_python_binary(implementation: PythonBinaryImplementation) -> CreatedBinary:
     entry_point: Optional[str]
-    if fields.entry_point.value is not None:
-        entry_point = fields.entry_point.value
+    if implementation.entry_point.value is not None:
+        entry_point = implementation.entry_point.value
     else:
         stripped_sources = await Get[SourceRootStrippedSources](
-            StripSourcesFieldRequest(fields.sources)
+            StripSourcesFieldRequest(implementation.sources)
         )
         source_files = stripped_sources.snapshot.files
         # NB: `PythonBinarySources` enforces that we have 0-1 sources.
@@ -53,9 +53,9 @@ async def create_python_binary(fields: PythonBinaryImplementation) -> CreatedBin
             entry_point = None
 
     request = CreatePexFromTargetClosure(
-        addresses=Addresses([fields.address]),
+        addresses=Addresses([implementation.address]),
         entry_point=entry_point,
-        output_filename=f"{fields.address.target_name}.pex",
+        output_filename=f"{implementation.address.target_name}.pex",
     )
 
     pex = await Get[Pex](CreatePexFromTargetClosure, request)
