@@ -74,7 +74,7 @@ class CoursierResolveTest(NailgunTaskTestBase):
     def test_resolve_with_remote_url(self):
         with self._temp_task_cache_dir():
             dep_with_url = JarDependency(
-                "a", "b", "c", url="https://repo1.maven.org/maven2/junit/junit/4.12/junit-4.12.jar"
+                "a", "b", "c", url="https://maven-central.storage-download.googleapis.com/repos/central/data/junit/junit/4.12/junit-4.12.jar"
             )
             dep_with_url_lib = self.make_target("//:a", JarLibrary, jars=[dep_with_url])
 
