@@ -3,7 +3,7 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Iterable, Type
+from typing import ClassVar, Iterable, Tuple, Type
 
 from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses
@@ -13,16 +13,29 @@ from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.objects import union
 from pants.engine.rules import UnionMembership, goal_rule, rule
 from pants.engine.selectors import Get, MultiGet
-from pants.engine.target import Target, WrappedTarget
+from pants.engine.target import Field, RegisteredTargetTypes, Target, WrappedTarget
 from pants.rules.core.distdir import DistDir
 
 
+# TODO: This might not be the right level of abstraction. Possibly factor out some superclass.
+#  Revisit after porting lint.py, fmt.py, and test.py to use the Target API.
 @union
 class BinaryImplementation(ABC):
-    @staticmethod
-    @abstractmethod
-    def is_valid_target(tgt: Target) -> bool:
-        pass
+    required_fields: ClassVar[Tuple[Type[Field], ...]]
+
+    @classmethod
+    def is_valid_target(cls, tgt: Target) -> bool:
+        return tgt.has_fields(cls.required_fields)
+
+    @classmethod
+    def valid_target_types(
+        cls, target_types: Iterable[Type[Target]], *, union_membership: UnionMembership
+    ) -> Tuple[Type[Target], ...]:
+        return tuple(
+            target_type
+            for target_type in target_types
+            if target_type.class_has_fields(cls.required_fields, union_membership=union_membership)
+        )
 
     @classmethod
     @abstractmethod
@@ -71,9 +84,34 @@ async def create_binary(
     return Binary(exit_code=0)
 
 
+# TODO: possibly factor this out. Revisit after porting lint.py, fmt.py, and test.py to use the
+#  Target API.
+def implementations_with_supported_target_types(
+    implementations: Iterable[Type[BinaryImplementation]],
+    *,
+    registered_target_types: RegisteredTargetTypes,
+    union_membership: UnionMembership,
+) -> str:
+    implementations_to_target_types = {
+        implementation: implementation.valid_target_types(
+            registered_target_types.types, union_membership=union_membership
+        )
+        for implementation in implementations
+    }
+    return "\n".join(
+        sorted(
+            f"  * {implementation.__name__}, works with target types: "
+            f"{sorted(target_type.alias for target_type in target_types)}"
+            for implementation, target_types in implementations_to_target_types.items()
+        )
+    )
+
+
 @rule
 async def coordinator_of_binaries(
-    wrapped_target: WrappedTarget, union_membership: UnionMembership
+    wrapped_target: WrappedTarget,
+    union_membership: UnionMembership,
+    registered_target_types: RegisteredTargetTypes,
 ) -> CreatedBinary:
     target = wrapped_target.target
     binary_implementations: Iterable[Type[BinaryImplementation]] = union_membership.union_rules[
@@ -85,33 +123,26 @@ async def coordinator_of_binaries(
         if binary_implementation.is_valid_target(target)
     ]
     if not valid_binary_implementations:
-        all_implementations = sorted(
-            binary_implementation.__name__ for binary_implementation in binary_implementations
+        all_implementations = implementations_with_supported_target_types(
+            binary_implementations,
+            registered_target_types=registered_target_types,
+            union_membership=union_membership,
         )
-        # TODO: improve this message even more by calculating exactly which targets work with each
-        #  binary implementation, e.g.
-        #
-        #   All registered binary implementations:
-        #     * PythonBinaryImplementation, works with target types: [`python_binary`, `my_custom_python_binary`]
-        #     * JavaBinaryImplementation, works with target types: [`java_binary`]
-        #
-        # Ensure that this works with plugin fields...which is tricky because Target.has_fields()
-        # is currently an instance method so that it can dynamically register any plugin fields at
-        # constructor time. We need a classmethod. What should that be called to disambiguate
-        # between Target.has_fields()? We also still need to call the helper method
-        # Target._find_registered_field_subclass() to ensure that we support subclasses of Fields.
         raise ValueError(
-            f"No registered binary implementations work with {target.address} (target type "
-            f"{repr(target.alias)}). All registered binary implementations: {all_implementations}."
+            f"None of the registered binary implementations work with {target.address} (target "
+            f"type {repr(target.alias)}). All registered binary implementations:\n\n"
+            f"{all_implementations}."
         )
     if len(valid_binary_implementations) > 1:
-        valid_implementations = sorted(
-            binary_implementation.__name__ for binary_implementation in valid_binary_implementations
+        valid_implementations = implementations_with_supported_target_types(
+            valid_binary_implementations,
+            registered_target_types=registered_target_types,
+            union_membership=union_membership,
         )
         raise ValueError(
-            f"Multiple registered binary implementations work for {target.address} "
+            f"Multiple of the registered binary implementations work for {target.address} "
             f"(target type {repr(target.alias)}). It is ambiguous which implementation to use. "
-            f"Possible implementations: {valid_implementations}."
+            f"Possible implementations:\n\n{valid_implementations}."
         )
     binary_implementation = valid_binary_implementations[0]
     return await Get[CreatedBinary](BinaryImplementation, binary_implementation.create(target))

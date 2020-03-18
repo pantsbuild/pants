@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import ClassVar, Optional
 
 from pants.backend.python.rules.pex import Pex
 from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
@@ -17,12 +17,10 @@ from pants.rules.core.binary import BinaryImplementation, CreatedBinary
 from pants.rules.core.strip_source_roots import SourceRootStrippedSources, StripSourcesFieldRequest
 
 
-# TODO: consider replacing this with sugar like `SelectFields(EntryPoint, PythonBinarySources)` so
-#  that the rule would request that instead of this dataclass. Note that this syntax must support
-#  both optional_fields (see the below TODO) and opt-out `SentinelField`s
-#  (see https://github.com/pantsbuild/pants/pull/9316#issuecomment-600152573).
 @dataclass(frozen=True)
 class PythonBinaryImplementation(BinaryImplementation):
+    required_fields: ClassVar = (EntryPoint, PythonBinarySources)
+
     address: Address
     sources: PythonBinarySources
     entry_point: EntryPoint
@@ -31,10 +29,6 @@ class PythonBinaryImplementation(BinaryImplementation):
     #  optional fields. If your target type has them registered, we can do extra meaningful things;
     #  if you don't have them on your target type, we can still operate so long as you have the
     #  required fields. Use `Target.get()` in the `create()` method.
-
-    @staticmethod
-    def is_valid_target(tgt: Target) -> bool:
-        return tgt.has_fields([EntryPoint, PythonBinarySources])
 
     @classmethod
     def create(cls, tgt: Target) -> "PythonBinaryImplementation":
