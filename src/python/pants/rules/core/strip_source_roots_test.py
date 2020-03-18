@@ -13,7 +13,6 @@ from pants.engine.legacy.structs import TargetAdaptor
 from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Params
 from pants.engine.target import Sources as SourcesField
-from pants.engine.target import rules as target_rules
 from pants.rules.core.strip_source_roots import (
     LegacySourceRootStrippedSources,
     LegacyStripTargetRequest,
@@ -30,11 +29,7 @@ from pants.testutil.test_base import TestBase
 class StripSourceRootsTest(TestBase):
     @classmethod
     def rules(cls):
-        return (
-            *super().rules(),
-            *strip_source_root_rules(),
-            *target_rules(),
-        )
+        return (*super().rules(), *strip_source_root_rules())
 
     def get_stripped_files(
         self,
