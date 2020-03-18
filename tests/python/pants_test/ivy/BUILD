@@ -5,6 +5,7 @@ python_tests(
   name='bootstrapper',
   sources=['test_bootstrapper.py'],
   dependencies=[
+    'build-support/ivy:ivy',
     'src/python/pants/ivy',
     'src/python/pants/testutil/subsystem',
   ],
