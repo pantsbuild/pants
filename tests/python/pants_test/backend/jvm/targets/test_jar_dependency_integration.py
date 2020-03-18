@@ -8,7 +8,6 @@ class JarDependencyIntegrationTest(PantsRunIntegrationTest):
     def test_resolve_relative(self):
         pants_run = self.run_pants(
             [
-                "--resolver-resolver=ivy",
                 "resolve",
                 "testprojects/3rdparty/org/pantsbuild/testprojects",
             ]
