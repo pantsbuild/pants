@@ -245,17 +245,13 @@ class Target(ABC):
         unhydrated_values: Dict[str, Any],
         *,
         address: Address,
+        # NB: `union_membership` is only optional to facilitate tests. In production, we should
+        # always provide this parameter. This should be safe to do because production code should
+        # rarely directly instantiate Targets and should instead use the engine to request them.
         union_membership: Optional[UnionMembership] = None,
     ) -> None:
         self.address = address
-        self.plugin_fields = cast(
-            Tuple[Type[Field], ...],
-            (
-                ()
-                if union_membership is None
-                else tuple(union_membership.union_rules.get(self.PluginField, ()))
-            ),
-        )
+        self.plugin_fields = self._find_plugin_fields(union_membership or UnionMembership({}))
 
         self.field_values = {}
         aliases_to_field_types = {field_type.alias: field_type for field_type in self.field_types}
@@ -304,7 +300,17 @@ class Target(ABC):
         return f"{self.alias}({address}{fields})"
 
     @final
-    def _find_registered_field_subclass(self, requested_field: Type[_F]) -> Optional[Type[_F]]:
+    @classmethod
+    def _find_plugin_fields(cls, union_membership: UnionMembership) -> Tuple[Type[Field], ...]:
+        return cast(
+            Tuple[Type[Field], ...], tuple(union_membership.union_rules.get(cls.PluginField, ()))
+        )
+
+    @final
+    @classmethod
+    def _find_registered_field_subclass(
+        cls, requested_field: Type[_F], *, registered_fields: Iterable[Type[Field]]
+    ) -> Optional[Type[_F]]:
         """Check if the Target has registered a subclass of the requested Field.
 
         This is necessary to allow targets to override the functionality of common fields like
@@ -315,7 +321,7 @@ class Target(ABC):
         subclass = next(
             (
                 registered_field
-                for registered_field in self.field_types
+                for registered_field in registered_fields
                 if issubclass(registered_field, requested_field)
             ),
             None,
@@ -342,7 +348,9 @@ class Target(ABC):
         result = self.field_values.get(field, None)
         if result is not None:
             return cast(_F, result)
-        field_subclass = self._find_registered_field_subclass(field)
+        field_subclass = self._find_registered_field_subclass(
+            field, registered_fields=self.field_types
+        )
         if field_subclass is not None:
             return cast(_F, self.field_values[field_subclass])
         raise KeyError(
@@ -350,6 +358,22 @@ class Target(ABC):
             f"`my_tgt.get({field.__name__})`, call `my_tgt.has_field({field.__name__})` to "
             "filter out any irrelevant Targets."
         )
+
+    @final
+    @classmethod
+    def _has_fields(
+        cls, fields: Iterable[Type[Field]], *, registered_fields: Iterable[Type[Field]]
+    ) -> bool:
+        unrecognized_fields = [field for field in fields if field not in registered_fields]
+        if not unrecognized_fields:
+            return True
+        for unrecognized_field in unrecognized_fields:
+            maybe_subclass = cls._find_registered_field_subclass(
+                unrecognized_field, registered_fields=registered_fields
+            )
+            if maybe_subclass is None:
+                return False
+        return True
 
     @final
     def has_field(self, field: Type[Field]) -> bool:
@@ -369,13 +393,25 @@ class Target(ABC):
         custom subclass `PythonSources`, both `python_tgt.has_fields([PythonSources])` and
         `python_tgt.has_fields([Sources])` will return True.
         """
-        unrecognized_fields = [field for field in fields if field not in self.field_types]
-        if not unrecognized_fields:
-            return True
-        for unrecognized_field in unrecognized_fields:
-            if self._find_registered_field_subclass(unrecognized_field) is None:
-                return False
-        return True
+        return self._has_fields(fields, registered_fields=self.field_types)
+
+    @final
+    @classmethod
+    def class_has_field(cls, field: Type[Field], *, union_membership: UnionMembership) -> bool:
+        """Behaves like `Target.has_field()`, but works as a classmethod rather than an instance
+        method."""
+        return cls.class_has_fields([field], union_membership=union_membership)
+
+    @final
+    @classmethod
+    def class_has_fields(
+        cls, fields: Iterable[Type[Field]], *, union_membership: UnionMembership
+    ) -> bool:
+        """Behaves like `Target.has_fields()`, but works as a classmethod rather than an instance
+        method."""
+        return cls._has_fields(
+            fields, registered_fields=(*cls.core_fields, *cls._find_plugin_fields(union_membership))
+        )
 
 
 # TODO: add light-weight runtime type checking to these helper fields, such as ensuring that
