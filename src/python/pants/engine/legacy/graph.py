@@ -51,7 +51,6 @@ from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
     RegisteredTargetTypes,
-    Target,
     Targets,
     TargetsWithOrigins,
     TargetWithOrigin,

@@ -10,11 +10,10 @@ from pants.backend.python.rules.targets import EntryPoint, PythonBinarySources
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses
-from pants.engine.legacy.structs import PythonBinaryAdaptor
 from pants.engine.rules import UnionRule, rule
 from pants.engine.selectors import Get
-from pants.engine.target import Target, WrappedTarget
-from pants.rules.core.binary import BinaryTarget, CreatedBinary
+from pants.engine.target import Target
+from pants.rules.core.binary import BinaryImplementation, CreatedBinary
 from pants.rules.core.strip_source_roots import SourceRootStrippedSources, StripSourcesFieldRequest
 
 
@@ -23,7 +22,7 @@ from pants.rules.core.strip_source_roots import SourceRootStrippedSources, Strip
 #  both optional_fields (see the below TODO) and opt-out `SentinelField`s
 #  (see https://github.com/pantsbuild/pants/pull/9316#issuecomment-600152573).
 @dataclass(frozen=True)
-class PythonBinaryFields:
+class PythonBinaryImplementation(BinaryImplementation):
     address: Address
     sources: PythonBinarySources
     entry_point: EntryPoint
@@ -38,18 +37,12 @@ class PythonBinaryFields:
         return tgt.has_fields([EntryPoint, PythonBinarySources])
 
     @classmethod
-    def create(cls, tgt: Target) -> "PythonBinaryFields":
+    def create(cls, tgt: Target) -> "PythonBinaryImplementation":
         return cls(tgt.address, sources=tgt[PythonBinarySources], entry_point=tgt[EntryPoint])
 
 
 @rule
-async def convert_python_binary_target(adaptor: PythonBinaryAdaptor) -> PythonBinaryFields:
-    wrapped_tgt = await Get[WrappedTarget](Address, adaptor.address)
-    return PythonBinaryFields.create(wrapped_tgt.target)
-
-
-@rule
-async def create_python_binary(fields: PythonBinaryFields) -> CreatedBinary:
+async def create_python_binary(fields: PythonBinaryImplementation) -> CreatedBinary:
     entry_point: Optional[str]
     if fields.entry_point.value is not None:
         entry_point = fields.entry_point.value
@@ -76,8 +69,4 @@ async def create_python_binary(fields: PythonBinaryFields) -> CreatedBinary:
 
 
 def rules():
-    return [
-        UnionRule(BinaryTarget, PythonBinaryAdaptor),
-        convert_python_binary_target,
-        create_python_binary,
-    ]
+    return [create_python_binary, UnionRule(BinaryImplementation, PythonBinaryImplementation)]
