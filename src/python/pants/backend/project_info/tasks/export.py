@@ -160,8 +160,7 @@ class ExportTask(ResolveRequirementsTaskBase, CoursierMixin):
 
         if confs:
             compile_classpath = ClasspathProducts(self.get_options().pants_workdir)
-            CoursierMixin.resolve(
-                self,
+            self.resolve(
                 targets,
                 compile_classpath,
                 sources=self.get_options().libraries_sources,
