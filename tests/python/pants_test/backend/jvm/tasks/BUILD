@@ -273,28 +273,6 @@ python_tests(
   tags = {'integration', 'partially_type_checked'},
 )
 
-# python_tests(
-#   name = 'ivy_resolve',
-#   sources = ['test_ivy_resolve.py'],
-#   dependencies = [
-#     'src/python/pants/backend/jvm/subsystems:jar_dependency_management',
-#     'src/python/pants/backend/jvm/targets:java',
-#     'src/python/pants/backend/jvm/targets:jvm',
-#     'src/python/pants/backend/jvm/tasks:ivy_resolve',
-#     'src/python/pants/backend/jvm/tasks:ivy_task_mixin',
-#     'src/python/pants/backend/jvm:ivy_utils',
-#     'src/python/pants/java/jar',
-#     'src/python/pants/task',
-#     'src/python/pants/util:contextutil',
-#     'src/python/pants/util:ordered_set',
-#     'src/python/pants/testutil/jvm:jvm_tool_task_test_base',
-#     'src/python/pants/testutil/jvm:nailgun_task_test_base',
-#     'src/python/pants/testutil/subsystem',
-#     'src/python/pants/testutil:task_test_base',
-#   ],
-#   tags = {"partially_type_checked"},
-# )
-
 python_tests(
   name = 'coursier_resolve',
   sources = ['test_coursier_resolve.py'],
