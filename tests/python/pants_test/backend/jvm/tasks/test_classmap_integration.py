@@ -1,9 +1,12 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import pytest
+
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9330")
 class ClassmapTaskIntegrationTest(PantsRunIntegrationTest):
     # A test target with both transitive internal dependency as well as external dependency
     TEST_JVM_TARGET = "testprojects/tests/java/org/pantsbuild/testproject/testjvms:eight"
