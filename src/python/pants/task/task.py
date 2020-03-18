@@ -223,6 +223,14 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
 
     @property
     def debug(self) -> bool:
+        """Whether debugging is requested for this task.
+
+        If `True` the task can assume the user wants debugging information surrounding the task
+        logged. Common uses of this include passing debug logging flags through to tools a task
+        runs.
+
+        :API: public
+        """
         log_level: LogLevel = self.get_options().level
         return log_level == LogLevel.DEBUG
 
