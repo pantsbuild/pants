@@ -8,6 +8,7 @@ from typing import Any, ClassVar, Dict, Iterable, List, Optional, Tuple, Type, T
 
 from typing_extensions import final
 
+from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.address import Address
 from pants.engine.fs import (
     EMPTY_SNAPSHOT,
@@ -16,6 +17,7 @@ from pants.engine.fs import (
     PathGlobs,
     Snapshot,
 )
+from pants.engine.parser import HydratedStruct
 from pants.engine.rules import RootRule, UnionMembership, rule
 from pants.engine.selectors import Get
 from pants.util.collections import ensure_str_list
@@ -259,9 +261,10 @@ class Target(ABC):
         aliases_to_field_types = {field_type.alias: field_type for field_type in self.field_types}
         for alias, value in unhydrated_values.items():
             if alias not in aliases_to_field_types:
-                raise ValueError(
-                    f"Unrecognized field `{alias}={value}` for target {address} with target "
-                    f"type `{self.alias}`."
+                raise TargetDefinitionException(
+                    address,
+                    f"Unrecognized field `{alias}={value}`. Valid fields for the target type "
+                    f"`{self.alias}`: {sorted(aliases_to_field_types.keys())}.",
                 )
             field_type = aliases_to_field_types[alias]
             self.field_values[field_type] = field_type(value, address=address)
@@ -530,6 +533,50 @@ async def hydrate_sources(
     )
     sources_field.validate_snapshot(snapshot)
     return SourcesResult(snapshot)
+
+
+# TODO: move this conversion into a rule. Create a singleton to access all the registered
+#  targets (or maybe just use unions). Consider having that singleton be a dict from alias ->
+#  Target for efficient lookups (we're guaranteed only one alias per target type).
+def hydrated_struct_to_target(
+    hydrated_struct: HydratedStruct, *, target_types: Iterable[Type[Target]]
+) -> Target:
+    kwargs = hydrated_struct.value.kwargs().copy()
+    type_alias = kwargs.pop("type_alias")
+
+    # We special case `address` and the field `name`. The `Target` constructor requires an
+    # `Address`, so we use the value pre-calculated via `build_files.py`'s `hydrate_struct` rule.
+    # We throw away the field `name` because it can be accessed via `tgt.address.target_name`, so
+    # there is no (known) reason to preserve the field and it's slightly tricky to get the default
+    # value correct for the field.
+    address = cast(Address, kwargs.pop("address"))
+    kwargs.pop("name", None)
+
+    # We convert `source` into `sources` because the Target API has no `Source` field, only
+    # `Sources`.
+    if "source" in kwargs and "sources" in kwargs:
+        raise TargetDefinitionException(
+            address, "Cannot specify both `source` and `sources` fields."
+        )
+    if "source" in kwargs:
+        source = kwargs.pop("source")
+        if not isinstance(source, str):
+            raise TargetDefinitionException(
+                address,
+                f"The `source` field must be a string containing a path relative to the target, "
+                f"but got {source} of type {type(source)}.",
+            )
+        kwargs["sources"] = [source]
+
+    aliases_to_target_types = {target_type.alias: target_type for target_type in target_types}
+    target_type = aliases_to_target_types.get(type_alias, None)
+    if target_type is None:
+        raise TargetDefinitionException(
+            address,
+            f"Target type {type_alias} is not recognized. All valid target types: "
+            f"{sorted(aliases_to_target_types.keys())}.",
+        )
+    return target_type(kwargs, address=address)
 
 
 def rules():
