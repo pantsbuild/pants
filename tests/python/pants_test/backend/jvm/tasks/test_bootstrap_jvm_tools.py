@@ -5,6 +5,8 @@ import os
 import subprocess
 from contextlib import contextmanager
 
+import pytest
+
 from pants.backend.jvm.subsystems.shader import Shading
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
@@ -32,6 +34,7 @@ class BootstrapJvmToolsTestBase(JvmToolTaskTestBase):
         yield out.decode()
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9330")
 class BootstrapJvmToolsShadingTest(BootstrapJvmToolsTestBase):
     class JvmToolTask(JvmToolTaskMixin, Task):
         @classmethod
@@ -105,6 +108,7 @@ class BootstrapJvmToolsShadingTest(BootstrapJvmToolsTestBase):
         )
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9330")
 class BootstrapJvmToolsOptionalTest(BootstrapJvmToolsTestBase):
     class JvmToolTask(JvmToolTaskMixin, Task):
         @classmethod
@@ -132,6 +136,7 @@ class BootstrapJvmToolsOptionalTest(BootstrapJvmToolsTestBase):
             self.assertIn("OK (0 tests)", out)
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9330")
 class BootstrapJvmToolsNonOptionalNoDefaultTest(BootstrapJvmToolsTestBase):
     class JvmToolTask(JvmToolTaskMixin, Task):
         @classmethod

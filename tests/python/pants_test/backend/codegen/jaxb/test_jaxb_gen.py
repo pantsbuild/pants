@@ -3,6 +3,8 @@
 
 import os
 
+import pytest
+
 from pants.backend.codegen.jaxb.jaxb_gen import JaxbGen
 from pants.backend.codegen.jaxb.jaxb_library import JaxbLibrary
 from pants.backend.codegen.jaxb.register import build_file_aliases as register_codegen
@@ -10,6 +12,7 @@ from pants.build_graph.register import build_file_aliases as register_core
 from pants.testutil.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9330")
 class JaxbGenJavaTest(NailgunTaskTestBase):
     @classmethod
     def task_type(cls):

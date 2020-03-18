@@ -5,6 +5,8 @@ import os
 from contextlib import closing
 from textwrap import dedent
 
+import pytest
+
 from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
@@ -50,6 +52,7 @@ class JarCreateTestBase(JarTaskTestBase):
         init_subsystem(Target.Arguments)
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9330")
 class JarCreateMiscTest(JarCreateTestBase):
     def test_jar_create_init(self):
         self.create_task(self.context(), "/tmp/workdir")
@@ -62,6 +65,7 @@ class JarCreateMiscTest(JarCreateTestBase):
             self.assertFalse(is_jvm_library(target))
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9330")
 class JarCreateExecuteTest(JarCreateTestBase):
     def java_library(self, path, name, sources, dependencies=None):
         return self.create_library(

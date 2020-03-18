@@ -3,11 +3,14 @@
 
 import unittest
 
+import pytest
+
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.testutil.subsystem.util import init_subsystem
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9330")
 class BootstrapperTest(unittest.TestCase):
     def setUp(self):
         super().setUp()

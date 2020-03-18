@@ -5,6 +5,8 @@ import os
 import re
 from typing import List
 
+import pytest
+
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_app import JvmApp
@@ -16,6 +18,7 @@ from pants.util.dirutil import safe_file_dump
 from pants_test.backend.jvm.tasks.jvm_binary_task_test_base import JvmBinaryTaskTestBase
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9330")
 class TestConsolidateClasspath(JvmBinaryTaskTestBase):
     @classmethod
     def task_type(cls):

@@ -9,6 +9,8 @@ from pathlib import Path
 from textwrap import dedent
 from typing import Any
 
+import pytest
+
 from pants.backend.codegen.antlr.java.antlr_java_gen import AntlrJavaGen
 from pants.backend.codegen.antlr.java.java_antlr_library import JavaAntlrLibrary
 from pants.base.exceptions import TaskError
@@ -27,6 +29,7 @@ class DummyVersionedTarget:
         return self.results_dir
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9330")
 class AntlrJavaGenTest(NailgunTaskTestBase):
     @classmethod
     def task_type(cls):

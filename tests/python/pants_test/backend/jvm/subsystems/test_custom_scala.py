@@ -3,6 +3,8 @@
 
 from textwrap import dedent
 
+import pytest
+
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.scalastyle import Scalastyle
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -13,6 +15,7 @@ from pants.testutil.jvm.nailgun_task_test_base import NailgunTaskTestBase
 from pants.testutil.subsystem.util import init_subsystem
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9330")
 class CustomScalaTest(NailgunTaskTestBase):
     @classmethod
     def task_type(cls):

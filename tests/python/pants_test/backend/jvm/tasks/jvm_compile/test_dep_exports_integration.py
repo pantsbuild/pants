@@ -5,10 +5,13 @@ import os
 import re
 import shutil
 
+import pytest
+
 from pants.base.build_environment import get_buildroot
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9330")
 class DepExportsIntegrationTest(PantsRunIntegrationTest):
 
     SRC_PREFIX = "testprojects/tests"

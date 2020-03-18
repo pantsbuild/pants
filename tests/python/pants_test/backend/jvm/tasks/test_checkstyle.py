@@ -4,6 +4,8 @@
 import os
 from textwrap import dedent
 
+import pytest
+
 from pants.backend.jvm.subsystems.checkstyle import Checkstyle as CheckstyleSubsystem
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.checkstyle import Checkstyle
@@ -13,6 +15,7 @@ from pants.testutil.jvm.nailgun_task_test_base import NailgunTaskTestBase
 from pants.testutil.task_test_base import ensure_cached
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9330")
 class CheckstyleTest(NailgunTaskTestBase):
     """Tests for the class Checkstyle."""
 

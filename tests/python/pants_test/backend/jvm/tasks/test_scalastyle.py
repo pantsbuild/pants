@@ -4,6 +4,8 @@
 import logging
 from textwrap import dedent
 
+import pytest
+
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.scalastyle import Scalastyle
 from pants.backend.jvm.subsystems.scoverage_platform import ScoveragePlatform
@@ -20,6 +22,7 @@ from pants.testutil.task_test_base import ensure_cached
 logger = logging.getLogger(__name__)
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9330")
 class ScalastyleTest(NailgunTaskTestBase):
     """Tests for the class Scalastyle."""
 

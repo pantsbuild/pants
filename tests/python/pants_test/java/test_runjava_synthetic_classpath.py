@@ -3,6 +3,8 @@
 
 import os
 
+import pytest
+
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_buildroot
 from pants.java import util
@@ -17,6 +19,7 @@ class DummyRunJavaTask(NailgunTask):
         pass
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9330")
 class SyntheticClasspathTest(NailgunTaskTestBase):
     @classmethod
     def task_type(cls):

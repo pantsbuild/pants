@@ -6,6 +6,8 @@ import re
 from contextlib import contextmanager
 from textwrap import dedent
 
+import pytest
+
 from pants.backend.jvm.targets.java_agent import JavaAgent
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.jar_task import JarBuilderTask, JarTask
@@ -49,6 +51,7 @@ class BaseJarTaskTest(JarTaskTestBase):
         )
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9330")
 class JarTaskTest(BaseJarTaskTest):
     MAX_SUBPROC_ARGS = 50
 
@@ -233,6 +236,7 @@ class JarTaskTest(BaseJarTaskTest):
                     self.assert_listing(jar, "e/", "e/f")
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9330")
 class JarBuilderTest(BaseJarTaskTest):
     class TestJarBuilderTask(JarBuilderTask):
         def execute(self):

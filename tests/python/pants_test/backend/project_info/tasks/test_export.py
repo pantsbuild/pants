@@ -7,6 +7,8 @@ import textwrap
 from contextlib import contextmanager
 from textwrap import dedent
 
+import pytest
+
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.subsystems.junit import JUnit
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
@@ -38,6 +40,7 @@ from pants.util.dirutil import chmod_plus_x, safe_open
 from pants.util.osutil import get_os_name, normalize_os_name
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9330")
 class ExportTest(ConsoleTaskTestBase):
     @classmethod
     def task_type(cls):

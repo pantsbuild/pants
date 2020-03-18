@@ -8,6 +8,8 @@ from contextlib import contextmanager
 from unittest.mock import MagicMock
 from zipfile import ZipFile
 
+import pytest
+
 from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.subsystems.junit import JUnit
@@ -193,6 +195,7 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
         return runtime_classpath
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9330")
 class ExportDepAsJarTestSuiteOne(ExportDepAsJarTest):
 
     # Version of the scala compiler and libraries used for this test.
@@ -651,6 +654,7 @@ class ExportDepAsJarTestSuiteOne(ExportDepAsJarTest):
         assert dependency_spec in disabled_result["source_dependencies_in_classpath"]
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9330")
 class ExportDepAsJarTestWithCodegenTargets(ExportDepAsJarTest):
 
     # Version of the scala compiler and libraries used for this test.

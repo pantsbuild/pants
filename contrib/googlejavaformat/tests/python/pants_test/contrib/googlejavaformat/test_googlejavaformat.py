@@ -3,6 +3,7 @@
 
 from textwrap import dedent
 
+import pytest
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.exceptions import TaskError
@@ -45,6 +46,7 @@ class TestBase(NailgunTaskTestBase):
         return super().alias_groups().merge(register_core().merge(register_jvm()))
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9330")
 class GoogleJavaFormatTests(TestBase):
     @classmethod
     def task_type(cls):
@@ -68,6 +70,7 @@ class GoogleJavaFormatTests(TestBase):
         self.assertEqual(actual, self._GOODFORMAT)
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9330")
 class GoogleJavaFormatCheckFormatTests(TestBase):
     @classmethod
     def task_type(cls):

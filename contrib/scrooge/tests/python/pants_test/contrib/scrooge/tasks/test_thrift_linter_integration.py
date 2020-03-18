@@ -4,12 +4,14 @@
 from functools import wraps
 from typing import Any, Callable, TypeVar
 
+import pytest
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 FuncType = Callable[..., Any]
 F = TypeVar("F", bound=FuncType)
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9330")
 class ThriftLinterTest(PantsRunIntegrationTest):
 
     lint_warn_token = "LINT-WARN"

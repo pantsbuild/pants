@@ -5,6 +5,8 @@ import os
 import subprocess
 from textwrap import dedent
 
+import pytest
+
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
@@ -14,6 +16,7 @@ from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9330")
 class NailgunTaskTest(JvmToolTaskTestBase):
     class DetermineJavaCwd(NailgunTask):
         def execute(self):

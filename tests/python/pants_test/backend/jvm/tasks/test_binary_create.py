@@ -3,11 +3,14 @@
 
 import os
 
+import pytest
+
 from pants.backend.jvm.tasks.binary_create import BinaryCreate
 from pants.util.contextutil import open_zip
 from pants_test.backend.jvm.tasks.jvm_binary_task_test_base import JvmBinaryTaskTestBase
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9330")
 class TestBinaryCreate(JvmBinaryTaskTestBase):
     @classmethod
     def task_type(cls):

@@ -3,9 +3,11 @@
 
 import os
 
+import pytest
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9330")
 class AvroJavaGenTest(PantsRunIntegrationTest):
     @classmethod
     def hermetic(cls):

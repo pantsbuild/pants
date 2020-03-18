@@ -6,6 +6,8 @@ import re
 from contextlib import contextmanager
 from unittest.mock import MagicMock
 
+import pytest
+
 from pants.backend.jvm.subsystems.jar_dependency_management import (
     JarDependencyManagement,
     PinnedJarArtifactSet,
@@ -31,6 +33,7 @@ from pants.util.contextutil import temporary_dir, temporary_file_path
 from pants.util.dirutil import safe_delete, safe_rmtree
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9330")
 class CoursierResolveTest(NailgunTaskTestBase):
     """Tests for the class CoursierResolve."""
 
@@ -320,6 +323,7 @@ class CoursierResolveTest(NailgunTaskTestBase):
         self.set_options_for_scope("", pants_workdir=old_workdir)
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9330")
 class CoursierResolveFingerprintStrategyTest(TaskTestBase):
     class EmptyTask(Task):
         @classmethod

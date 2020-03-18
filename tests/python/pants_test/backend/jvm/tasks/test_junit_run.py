@@ -6,6 +6,8 @@ import subprocess
 from contextlib import contextmanager
 from textwrap import dedent
 
+import pytest
+
 from pants.backend.jvm.subsystems.junit import JUnit
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -31,6 +33,7 @@ from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import touch
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9330")
 class JUnitRunnerTest(JvmToolTaskTestBase):
     @classmethod
     def task_type(cls):

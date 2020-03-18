@@ -4,6 +4,8 @@
 import os
 from textwrap import dedent
 
+import pytest
+
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.scalafmt import Scalafmt
 from pants.backend.jvm.subsystems.scoverage_platform import ScoveragePlatform
@@ -96,6 +98,7 @@ class ScalaFmtTestBase(NailgunTaskTestBase):
         )
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9330")
 class ScalaFmtCheckFormatTest(ScalaFmtTestBase):
     @classmethod
     def task_type(cls):
@@ -122,6 +125,7 @@ class ScalaFmtCheckFormatTest(ScalaFmtTestBase):
         self.execute(context)
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9330")
 class ScalaFmtFormatTest(ScalaFmtTestBase):
     @classmethod
     def task_type(cls):

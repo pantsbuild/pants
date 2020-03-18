@@ -5,6 +5,8 @@ import glob
 import os
 from contextlib import contextmanager
 
+import pytest
+
 from pants.backend.jvm.ivy_utils import IvyInfo, IvyModule, IvyModuleRef, IvyResolveResult
 from pants.backend.jvm.subsystems.jar_dependency_management import (
     JarDependencyManagement,
@@ -31,6 +33,7 @@ def strip_workdir(dir, classpath):
     return [(conf, path[len(dir) :]) for conf, path in classpath]
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9330")
 class IvyResolveTest(NailgunTaskTestBase):
     """Tests for the class IvyResolve."""
 
