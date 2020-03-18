@@ -49,7 +49,14 @@ from pants.engine.objects import Collection
 from pants.engine.parser import HydratedStruct
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
-from pants.engine.target import RegisteredTargetTypes, WrappedTarget
+from pants.engine.target import (
+    RegisteredTargetTypes,
+    Target,
+    Targets,
+    TargetsWithOrigins,
+    TargetWithOrigin,
+    WrappedTarget,
+)
 from pants.option.global_options import (
     GlobalOptions,
     GlobMatchErrorBehavior,
@@ -661,6 +668,29 @@ async def resolve_target(
 
 
 @rule
+async def resolve_target_with_origin(address_with_origin: AddressWithOrigin) -> TargetWithOrigin:
+    wrapped_target = await Get[WrappedTarget](Address, address_with_origin.address)
+    return TargetWithOrigin(wrapped_target.target, address_with_origin.origin)
+
+
+@rule
+async def resolve_targets(addresses: Addresses) -> Targets:
+    wrapped_targets = await MultiGet(Get[WrappedTarget](Address, a) for a in addresses)
+    return Targets(wrapped_target.target for wrapped_target in wrapped_targets)
+
+
+@rule
+async def resolve_targets_with_origins(
+    addresses_with_origins: AddressesWithOrigins,
+) -> TargetsWithOrigins:
+    targets_with_origins = await MultiGet(
+        Get[TargetWithOrigin](AddressWithOrigin, address_with_origin)
+        for address_with_origin in addresses_with_origins
+    )
+    return TargetsWithOrigins(targets_with_origins)
+
+
+@rule
 async def hydrate_target_with_origin(
     address_with_origin: AddressWithOrigin,
 ) -> HydratedTargetWithOrigin:
@@ -868,6 +898,9 @@ def create_legacy_graph_tasks():
         transitive_hydrated_targets,
         legacy_transitive_hydrated_targets,
         resolve_target,
+        resolve_target_with_origin,
+        resolve_targets,
+        resolve_targets_with_origins,
         hydrate_target,
         hydrate_target_with_origin,
         hydrated_targets,

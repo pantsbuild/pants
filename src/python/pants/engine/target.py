@@ -9,7 +9,9 @@ from typing import Any, ClassVar, Dict, Iterable, List, Optional, Tuple, Type, T
 from typing_extensions import final
 
 from pants.base.exceptions import TargetDefinitionException
+from pants.base.specs import OriginSpec
 from pants.build_graph.address import Address
+from pants.engine.addressable import assert_single_address
 from pants.engine.fs import (
     EMPTY_SNAPSHOT,
     GlobExpansionConjunction,
@@ -17,6 +19,7 @@ from pants.engine.fs import (
     PathGlobs,
     Snapshot,
 )
+from pants.engine.objects import Collection
 from pants.engine.rules import RootRule, UnionMembership, rule
 from pants.engine.selectors import Get
 from pants.util.collections import ensure_str_list
@@ -450,6 +453,47 @@ class WrappedTarget:
     """
 
     target: Target
+
+
+@dataclass(frozen=True)
+class TargetWithOrigin:
+    target: Target
+    origin: OriginSpec
+
+
+class Targets(Collection[Target]):
+    """A heterogeneous collection of instances of Target subclasses.
+
+    While every element will be a subclass of `Target`, there may be many different `Target` types
+    in this collection, e.g. some `Files` targets and some `PythonLibrary` targets.
+
+    Often, you will want to filter out the relevant targets by looking at what fields they have
+    registered, e.g.:
+
+        valid_tgts = [tgt for tgt in tgts if tgt.has_fields([Compatibility, PythonSources])]
+
+    You should not check the Target's actual type because this breaks custom target types;
+    for example, prefer `tgt.has_field(PythonTestsSources)` to `isinstance(tgt, PythonTests)`.
+    """
+
+    def expect_single(self) -> Target:
+        assert_single_address([tgt.address for tgt in self.dependencies])
+        return self.dependencies[0]
+
+
+class TargetsWithOrigins(Collection[TargetWithOrigin]):
+    """A heterogeneous collection of instances of Target subclasses with the original Spec used to
+    resolve the target.
+
+    See the docstring for `Targets` for an explanation of the `Target`s being heterogeneous and how
+    you should filter out the targets you care about.
+    """
+
+    def expect_single(self) -> TargetWithOrigin:
+        assert_single_address(
+            [tgt_with_origin.target.address for tgt_with_origin in self.dependencies]
+        )
+        return self.dependencies[0]
 
 
 @dataclass(frozen=True)
