@@ -265,6 +265,7 @@ class TestArtifactCache(TestBase):
                 call_insert((cache, key, [path], False))
                 self.assertFalse(call_use_cached_files((cache, key, None)))
 
+    @pytest.mark.flaky(retries=1)  # https://github.com/pantsbuild/pants/issues/6838
     def test_noops_after_max_retries_exceeded(self):
         key = CacheKey("muppet_key", "fake_hash")
 
