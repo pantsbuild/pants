@@ -16,7 +16,6 @@ from pex.common import open_zip
 from pex.interpreter import PythonInterpreter
 from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
-from pkg_resources import Requirement
 
 APP_CODE_PREFIX = "user_files/"
 

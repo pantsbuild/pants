@@ -6,7 +6,7 @@ import logging
 import os
 from collections import defaultdict
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Sequence, Set, Tuple
+from typing import Callable, Dict, List, Optional, Sequence, Set, Tuple, cast
 
 from pex.interpreter import PythonIdentity, PythonInterpreter
 from pex.pex_builder import PEXBuilder
@@ -214,17 +214,18 @@ class PexBuilderWrapper:
         :raises: :class:`self.SingleDistExtractionError` if no dists or multiple dists matched the
                  given `dist_key`.
         """
-        distributions, _transitive_requirements = self.resolve_distributions(
-            reqs, platforms=["current"]
-        )
+        distributions = self.resolve_distributions(reqs, platforms=["current"])
         try:
-            matched_dist = assert_single_element(
-                list(
-                    dist
-                    for _, dists in distributions.items()
-                    for dist in dists
-                    if dist.key == dist_key
-                )
+            matched_dist = cast(
+                Distribution,
+                assert_single_element(
+                    list(
+                        dist
+                        for dists in distributions.values()
+                        for dist in dists
+                        if dist.key == dist_key
+                    )
+                ),
             )
         except (StopIteration, ValueError) as e:
             raise self.SingleDistExtractionError(
@@ -234,7 +235,7 @@ class PexBuilderWrapper:
 
     def resolve_distributions(
         self, reqs: List[PythonRequirement], platforms: Optional[List[Platform]] = None,
-    ) -> Tuple[Dict[str, List[Distribution]], List[PythonRequirement]]:
+    ) -> Dict[str, List[Distribution]]:
         """Multi-platform dependency resolution.
 
         :param reqs: A list of :class:`PythonRequirement` to resolve.
@@ -254,10 +255,10 @@ class PexBuilderWrapper:
                 find_links.add(req.repository)
 
         # Resolve the requirements into distributions.
-        distributions, transitive_requirements = self._resolve_multi(
+        distributions = self._resolve_multi(
             self._builder.interpreter, list(deduped_reqs), platforms, list(find_links),
         )
-        return (distributions, transitive_requirements)
+        return distributions
 
     def add_resolved_requirements(
         self,
@@ -279,9 +280,7 @@ class PexBuilderWrapper:
                                                                         pex dependency to the output ipex file, and therefore needs to
                                                                         override the default behavior of this method.
         """
-        distributions, transitive_requirements = self.resolve_distributions(
-            reqs, platforms=platforms
-        )
+        distributions = self.resolve_distributions(reqs, platforms=platforms)
         locations: Set[str] = set()
         for platform, dists in distributions.items():
             for dist in dists:
@@ -297,11 +296,6 @@ class PexBuilderWrapper:
                         )
                         self.add_distribution(dist)
                 locations.add(dist.location)
-        # In addition to the top-level requirements, we add all the requirements matching the resolved
-        # distributions to the resulting pex. If `generate_ipex=True` is set, we need to have all the
-        # transitive requirements resolved in order to hydrate the .ipex with an intransitive resolve.
-        if self._generate_ipex and not override_ipex_build_do_actually_add_distribution:
-            self.add_direct_requirements(transitive_requirements)
 
     def _resolve_multi(
         self,
@@ -309,7 +303,7 @@ class PexBuilderWrapper:
         requirements: List[PythonRequirement],
         platforms: Optional[List[Platform]],
         find_links: Optional[List[str]],
-    ) -> Tuple[Dict[str, List[Distribution]], List[PythonRequirement]]:
+    ) -> Dict[str, List[Distribution]]:
         """Multi-platform dependency resolution for PEX files.
 
         Returns a tuple containing a list of distributions that must be included in order to satisfy a
@@ -337,9 +331,6 @@ class PexBuilderWrapper:
         self._all_find_links.update(OrderedSet(find_links))
 
         distributions: Dict[str, List[Distribution]] = defaultdict(list)
-        transitive_requirements: List[PythonRequirement] = []
-
-        all_find_links = [*python_repos.repos, *find_links]
 
         for platform in platforms:
             requirements_cache_dir = os.path.join(
@@ -350,17 +341,15 @@ class PexBuilderWrapper:
                 interpreter=interpreter,
                 platform=platform,
                 indexes=python_repos.indexes,
-                find_links=all_find_links,
+                find_links=find_links,
                 cache=requirements_cache_dir,
                 allow_prereleases=python_setup.resolver_allow_prereleases,
                 manylinux=python_setup.manylinux,
             )
             for resolved_dist in resolved_dists:
-                dist = resolved_dist.distribution
-                transitive_requirements.append(dist.as_requirement())
-                distributions[platform].append(dist)
+                distributions[platform].append(resolved_dist.distribution)
 
-        return (distributions, transitive_requirements)
+        return distributions
 
     def _create_source_dumper(self, tgt: Target) -> Callable[[str], None]:
         buildroot = get_buildroot()
@@ -447,6 +436,11 @@ class PexBuilderWrapper:
             self._builder.info, self._builder.interpreter.identity
         )
 
+        # Remove all the original top-level requirements in favor of the transitive == requirements.
+        self._builder.info = ipex_launcher.modify_pex_info(self._builder.info, requirements=[])
+        transitive_reqs = [dist.as_requirement() for dist in self._distributions.values()]
+        self.add_direct_requirements(transitive_reqs)
+
         orig_info = self._builder.info.copy()
 
         orig_chroot = self._builder.chroot()
@@ -456,6 +450,8 @@ class PexBuilderWrapper:
         self._builder.info = self._set_major_minor_interpreter_constraint_for_ipex(
             self._builder.info, self._builder.interpreter.identity
         )
+
+        self._distributions = {}
 
         return (orig_info, Path(orig_chroot.path()))
 
