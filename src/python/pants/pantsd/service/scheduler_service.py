@@ -191,13 +191,6 @@ class SchedulerService(PantsService):
 
         self._event_queue.task_done()
 
-    def product_graph_len(self):
-        """Provides the size of the captive product graph.
-
-        :returns: The node count for the captive product graph.
-        """
-        return self._scheduler.graph_len()
-
     def prepare_v1_graph_run_v2(
         self, options: Options, options_bootstrapper: OptionsBootstrapper,
     ) -> Tuple[LegacyGraphSession, Specs, int]:
