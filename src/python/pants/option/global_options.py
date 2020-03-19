@@ -20,6 +20,7 @@ from pants.option.custom_types import dir_option, file_option
 from pants.option.errors import OptionsError
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.subsystem.subsystem import Subsystem
+from pants.util.logging import LogLevel
 
 
 class GlobMatchErrorBehavior(Enum):
@@ -178,8 +179,8 @@ class GlobalOptions(Subsystem):
         register(
             "-l",
             "--level",
-            choices=["trace", "debug", "info", "warn", "error"],
-            default="info",
+            type=LogLevel,
+            default=LogLevel.INFO,
             recursive=True,
             help="Set the logging level.",
         )

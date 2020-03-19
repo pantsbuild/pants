@@ -61,7 +61,6 @@ class PlainTextReporter(PlainTextReporterBase):
         tool_output_format: Any
 
     _COLOR_BY_LEVEL = {
-        Report.FATAL: red,
         Report.ERROR: red,
         Report.WARN: yellow,
         Report.INFO: green,

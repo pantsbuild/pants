@@ -216,10 +216,6 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
         # See http://nedbatchelder.com/code/coverage/config.html for details.
         return "\n\t{values}".format(values="\n\t".join(values))
 
-    @property
-    def _debug(self):
-        return self.get_options().level == "debug"
-
     @staticmethod
     def _ensure_section(cp, section):
         if not cp.has_section(section):
@@ -265,7 +261,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
         self._add_plugin_config(cp, self._source_chroot_path, srcs_to_omit, src_to_target_base)
 
         # See the debug options here: http://nedbatchelder.com/code/coverage/cmd.html#cmd-run-debug
-        if self._debug:
+        if self.debug:
             debug_options = self._format_string_list(
                 [
                     # Dumps the coverage config realized values.
@@ -721,7 +717,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
             ]
             if fail_fast:
                 args.extend(["-x"])
-            if self._debug:
+            if self.debug:
                 args.extend(["-s"])
             if self.get_options().colors:
                 args.extend(["--color", "yes"])

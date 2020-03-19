@@ -3,7 +3,9 @@
 
 from dataclasses import dataclass
 
+from pants.base.workunit import WorkUnit
 from pants.reporting.report import Report
+from pants.util.logging import LogLevel
 
 
 class ReporterDestination:
@@ -26,7 +28,7 @@ class Reporter:
         they'd like.
         """
 
-        log_level: str  # Display log messages up to this level.
+        log_level: int  # Display log messages up to this level.
 
     def __init__(self, run_tracker, settings):
         self.run_tracker = run_tracker
@@ -84,16 +86,16 @@ class Reporter:
         """Is the workunit running under the main thread's root."""
         return self.run_tracker.is_under_background_root(workunit)
 
-    def level_for_workunit(self, workunit, default_level):
-        if workunit.log_config and workunit.log_config.level:
+    def level_for_workunit(self, workunit: WorkUnit, default_level: int) -> int:
+        if workunit.log_config:
             # The value of the level option is a string defined in global_options.py
-            if workunit.log_config.level == "error":
+            if workunit.log_config.log_level == LogLevel.ERROR:
                 return Report.ERROR
-            if workunit.log_config.level == "warn":
+            if workunit.log_config.log_level == LogLevel.WARN:
                 return Report.WARN
-            if workunit.log_config.level == "debug":
+            if workunit.log_config.log_level == LogLevel.DEBUG:
                 return Report.DEBUG
-            if workunit.log_config.level == "info":
+            if workunit.log_config.log_level == LogLevel.INFO:
                 return Report.INFO
         return default_level
 

@@ -201,7 +201,9 @@ python_library(
   name = 'workunit',
   sources = ['workunit.py'],
   dependencies = [
+    '3rdparty/python:dataclasses',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:logging',
     'src/python/pants/util:memo',
     'src/python/pants/util:rwbuf',
   ],

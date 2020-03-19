@@ -12,6 +12,7 @@ from pants.option.option_value_container import OptionValueContainer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.scope import ScopeInfo
 from pants.util.contextutil import temporary_dir, temporary_file, temporary_file_path
+from pants.util.logging import LogLevel
 
 
 class OptionsBootstrapperTest(unittest.TestCase):
@@ -296,16 +297,16 @@ class OptionsBootstrapperTest(unittest.TestCase):
         # No short options passed - defaults presented.
         vals = parse_options()
         self.assertIsNone(vals.logdir)
-        self.assertEqual("info", vals.level)
+        self.assertEqual(LogLevel.INFO, vals.level)
 
         # Unrecognized short options passed and ignored - defaults presented.
         vals = parse_options("-_UnderscoreValue", "-^")
         self.assertIsNone(vals.logdir)
-        self.assertEqual("info", vals.level)
+        self.assertEqual(LogLevel.INFO, vals.level)
 
         vals = parse_options("-d/tmp/logs", "-ldebug")
         self.assertEqual("/tmp/logs", vals.logdir)
-        self.assertEqual("debug", vals.level)
+        self.assertEqual(LogLevel.DEBUG, vals.level)
 
     def test_bootstrap_options_passthrough_dup_ignored(self) -> None:
         def parse_options(*args: str) -> OptionValueContainer:

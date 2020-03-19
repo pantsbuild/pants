@@ -235,7 +235,7 @@ class Reporting(Subsystem):
         buffered_out = self._consume_stringio(removed_reporter.settings.outfile)
         buffered_err = self._consume_stringio(removed_reporter.settings.errfile)
 
-        log_level = Report.log_level_from_string(global_options.level or "info")
+        log_level = Report.report_level_from_log_level(global_options.level)
         # Ideally, we'd use terminfo or somesuch to discover whether a
         # terminal truly supports color, but most that don't set TERM=dumb.
         color = global_options.colors and (os.getenv("TERM") != "dumb")
