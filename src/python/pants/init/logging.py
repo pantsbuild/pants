@@ -12,11 +12,18 @@ from dataclasses import dataclass
 from logging import Handler, Logger, LogRecord, StreamHandler
 from typing import Iterator, List, Optional, TextIO, overload
 
+import pants.util.logging as pants_logging
 from pants.base.exception_sink import ExceptionSink
 from pants.engine.native import Native
 from pants.option.option_value_container import OptionValueContainer
 from pants.util.dirutil import safe_mkdir
 from pants.util.logging import LogLevel
+
+# Although logging supports the WARN level, its not documented and could conceivably be yanked.
+# Since pants has supported 'warn' since inception, leave the 'warn' choice as-is but explicitly
+# setup a 'WARN' logging level name that maps to 'WARNING'.
+logging.addLevelName(logging.WARNING, "WARN")
+logging.addLevelName(pants_logging.TRACE, "TRACE")
 
 
 @dataclass(frozen=True)

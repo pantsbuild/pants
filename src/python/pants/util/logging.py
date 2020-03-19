@@ -8,13 +8,6 @@ from enum import Enum
 TRACE = 5
 
 
-# Although logging supports the WARN level, its not documented and could conceivably be yanked.
-# Since pants has supported 'warn' since inception, leave the 'warn' choice as-is but explicitly
-# setup a 'WARN' logging level name that maps to 'WARNING'.
-logging.addLevelName(logging.WARNING, "WARN")
-logging.addLevelName(TRACE, "TRACE")
-
-
 class LogLevel(Enum):
     TRACE = ("trace", TRACE)
     DEBUG = ("debug", logging.DEBUG)
