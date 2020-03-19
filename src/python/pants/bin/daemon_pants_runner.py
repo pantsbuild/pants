@@ -261,7 +261,7 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
                 # Clean global state.
                 clean_global_runtime_state(reset_subsystem=True)
 
-                options, build_root, options_bootstrapper = LocalPantsRunner.parse_options(
+                options, _, options_bootstrapper = LocalPantsRunner.parse_options(
                     self._args, self._env
                 )
 
@@ -272,7 +272,7 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
                     options=options,
                     session=session.scheduler_session,
                     exclude_patterns=tuple(global_options.exclude_target_regexp),
-                    tags=tuple(global_options.tag) if global_options.tag else tuple(),
+                    tags=tuple(global_options.tag) if global_options.tag else (),
                 )
 
                 exit_code = self._scheduler_service.graph_run_v2(
