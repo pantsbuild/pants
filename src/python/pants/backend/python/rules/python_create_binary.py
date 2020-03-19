@@ -13,9 +13,9 @@ from pants.engine.addressable import Addresses
 from pants.engine.legacy.structs import PythonBinaryAdaptor
 from pants.engine.rules import UnionRule, rule
 from pants.engine.selectors import Get
-from pants.engine.target import SourcesRequest, SourcesResult, Target, WrappedTarget
+from pants.engine.target import Target, WrappedTarget
 from pants.rules.core.binary import BinaryTarget, CreatedBinary
-from pants.rules.core.strip_source_roots import SourceRootStrippedSources, StripSnapshotRequest
+from pants.rules.core.strip_source_roots import SourceRootStrippedSources, StripSourcesFieldRequest
 
 
 # TODO: consider replacing this with sugar like `SelectFields(EntryPoint, PythonBinarySources)` so
@@ -56,11 +56,8 @@ async def create_python_binary(fields: PythonBinaryFields) -> CreatedBinary:
     if fields.entry_point.value is not None:
         entry_point = fields.entry_point.value
     else:
-        # TODO: rework determine_source_files.py to work with the Target API. It should take the
-        #  Sources AsyncField as input, rather than TargetAdaptor.
-        sources_result = await Get[SourcesResult](SourcesRequest, fields.sources.request)
         stripped_sources = await Get[SourceRootStrippedSources](
-            StripSnapshotRequest(sources_result.snapshot)
+            StripSourcesFieldRequest(fields.sources)
         )
         source_files = stripped_sources.snapshot.files
         # NB: `PythonBinarySources` enforces that we have 0-1 sources.

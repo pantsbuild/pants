@@ -111,10 +111,10 @@ class RemotePantsRunner:
         """Minimal backoff strategy for daemon restarts."""
         time.sleep(attempt + (attempt - 1))
 
-    def _run_pants_with_retry(self, pantsd_handle, retries=3):
+    def _run_pants_with_retry(self, pantsd_handle: PantsDaemon.Handle, retries: int = 3):
         """Runs pants remotely with retry and recovery for nascent executions.
 
-        :param PantsDaemon.Handle pantsd_handle: A Handle for the daemon to connect to.
+        :param pantsd_handle: A Handle for the daemon to connect to.
         """
         attempt = 1
         while 1:
@@ -213,9 +213,6 @@ class RemotePantsRunner:
     def _restart_pantsd(self):
         return PantsDaemon.Factory.restart(options_bootstrapper=self._options_bootstrapper)
 
-    def _maybe_launch_pantsd(self):
-        return PantsDaemon.Factory.maybe_launch(options_bootstrapper=self._options_bootstrapper)
-
-    def run(self, args=None):
-        pantsd_handle = self._maybe_launch_pantsd()
-        self._run_pants_with_retry(pantsd_handle)
+    def run(self, args=None) -> None:
+        handle = PantsDaemon.Factory.maybe_launch(options_bootstrapper=self._options_bootstrapper)
+        self._run_pants_with_retry(handle)

@@ -17,6 +17,7 @@ from pants.rules.core import (
     strip_source_roots,
     test,
 )
+from pants.rules.core.targets import Files
 
 
 def rules():
@@ -36,3 +37,7 @@ def rules():
         *test.rules(),
         *target_rules(),
     ]
+
+
+def targets():
+    return [Files]

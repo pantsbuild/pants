@@ -154,16 +154,43 @@ def test_has_fields() -> None:
         alias: ClassVar = "unrelated"
         default: ClassVar = False
 
+    empty_union_membership = UnionMembership({})
+
     tgt = HaskellTarget({}, address=Address.parse(":lib"))
     assert tgt.has_fields([]) is True
+    assert HaskellTarget.class_has_fields([], union_membership=empty_union_membership) is True
 
     assert tgt.has_fields([HaskellGhcExtensions]) is True
     assert tgt.has_field(HaskellGhcExtensions) is True
+    assert (
+        HaskellTarget.class_has_fields(
+            [HaskellGhcExtensions], union_membership=empty_union_membership
+        )
+        is True
+    )
+    assert (
+        HaskellTarget.class_has_field(HaskellGhcExtensions, union_membership=empty_union_membership)
+        is True
+    )
 
     assert tgt.has_fields([UnrelatedField]) is False
     assert tgt.has_field(UnrelatedField) is False
+    assert (
+        HaskellTarget.class_has_fields([UnrelatedField], union_membership=empty_union_membership)
+        is False
+    )
+    assert (
+        HaskellTarget.class_has_field(UnrelatedField, union_membership=empty_union_membership)
+        is False
+    )
 
     assert tgt.has_fields([HaskellGhcExtensions, UnrelatedField]) is False
+    assert (
+        HaskellTarget.class_has_fields(
+            [HaskellGhcExtensions, UnrelatedField], union_membership=empty_union_membership
+        )
+        is False
+    )
 
 
 def test_primitive_field_hydration_is_eager() -> None:
@@ -186,9 +213,13 @@ def test_add_custom_fields() -> None:
     tgt = HaskellTarget(
         tgt_values, address=Address.parse(":lib"), union_membership=union_membership
     )
+
     assert tgt.field_types == (HaskellGhcExtensions, HaskellSources, CustomField)
     assert tgt.core_fields == (HaskellGhcExtensions, HaskellSources)
     assert tgt.plugin_fields == (CustomField,)
+    assert tgt.has_field(CustomField) is True
+    assert HaskellTarget.class_has_field(CustomField, union_membership=union_membership) is True
+
     assert tgt.get(CustomField).value is True
 
     default_tgt = HaskellTarget(

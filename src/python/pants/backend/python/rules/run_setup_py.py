@@ -55,7 +55,10 @@ from pants.engine.selectors import Get, MultiGet
 from pants.option.custom_types import shell_str
 from pants.python.python_setup import PythonSetup
 from pants.rules.core.distdir import DistDir
-from pants.rules.core.strip_source_roots import SourceRootStrippedSources, StripTargetRequest
+from pants.rules.core.strip_source_roots import (
+    LegacySourceRootStrippedSources,
+    LegacyStripTargetRequest,
+)
 from pants.source.source_root import SourceRootConfig
 
 logger = logging.getLogger(__name__)
@@ -448,7 +451,8 @@ async def get_sources(
 ) -> SetupPySources:
     targets = request.hydrated_targets
     stripped_srcs_list = await MultiGet(
-        Get[SourceRootStrippedSources](StripTargetRequest(target.adaptor)) for target in targets
+        Get[LegacySourceRootStrippedSources](LegacyStripTargetRequest(target.adaptor))
+        for target in targets
     )
 
     # Create a chroot with all the sources, and any ancestor __init__.py files that might be needed

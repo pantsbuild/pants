@@ -121,11 +121,11 @@ class AsyncField(Field, metaclass=ABCMeta):
     immutable and hashable so that this Field may be used by the V2 engine. This means, for example,
     using tuples rather than lists and using `FrozenOrderedSet` rather than `set`.
 
-    You should also create corresponding Request and Result classes and define a rule to go from
-    this Request to Result. The Request type must be registered as a RootRule. Then, implement
-    the property `AsyncField.request` to instantiate the Request type. If you use MyPy, you should
-    mark `AsyncField.request` as `@final` (from `typing_extensions)` to ensure that subclasses
-    don't change this property.
+    You should also create corresponding HydratedField and HydrateFieldRequest classes and define a
+    rule to go from this HydrateFieldRequest to HydratedField. The HydrateFieldRequest type must
+    be registered as a RootRule. Then, implement the property `AsyncField.request` to instantiate
+    the HydrateFieldRequest type. If you use MyPy, you should mark `AsyncField.request` as
+    `@final` (from `typing_extensions)` to ensure that subclasses don't change this property.
 
     For example:
 
@@ -140,8 +140,8 @@ class AsyncField(Field, metaclass=ABCMeta):
 
             @final
             @property
-            def request(self) -> SourcesRequest:
-                return SourcesRequest(self)
+            def request(self) -> HydrateSourcesRequest:
+                return HydrateSourcesRequest(self)
 
             # Example extension point provided by this field. Subclasses can override this to do
             # whatever validation they'd like. Each AsyncField must define its own entry points
@@ -151,31 +151,33 @@ class AsyncField(Field, metaclass=ABCMeta):
 
 
         @dataclass(frozen=True)
-        class SourcesRequest:
+        class HydrateSourcesRequest:
             field: Sources
 
 
         @dataclass(frozen=True)
-        class SourcesResult:
+        class HydratedSources:
             snapshot: Snapshot
 
 
         @rule
-        def hydrate_sources(request: SourcesRequest) -> SourcesResult:
+        def hydrate_sources(request: HydrateSourcesRequest) -> HydratedSources:
             result = await Get[Snapshot](PathGlobs(request.field.sanitized_raw_value))
             request.field.validate_snapshot(result)
             ...
-            return SourcesResult(result)
+            return HydratedSources(result)
 
 
         def rules():
-            return [hydrate_sources, RootRule(SourcesRequest)]
+            return [hydrate_sources, RootRule(HydrateSourcesRequest)]
 
     Then, call sites can `await Get` if they need to hydrate the field, even if they subclassed
     the original `AsyncField` to have custom behavior:
 
-        sources1 = await Get[SourcesResult](SourcesRequest, my_tgt.get(Sources).request)
-        sources2 = await Get[SourcesResult[(SourcesRequest, custom_tgt.get(CustomSources).request)
+        sources1 = await Get[HydratedSources](HydrateSourcesRequest, my_tgt.get(Sources).request)
+        sources2 = await Get[HydratedSources[(
+            HydrateSourcesRequest, custom_tgt.get(CustomSources).request
+        )
     """
 
     address: Address
@@ -214,8 +216,8 @@ class AsyncField(Field, metaclass=ABCMeta):
 
             @final
             @property
-            def request() -> SourcesRequest:
-                return SourcesRequest(self)
+            def request() -> HydrateSourcesRequest:
+                return HydrateSourcesRequest(self)
         """
 
 
@@ -244,17 +246,13 @@ class Target(ABC):
         unhydrated_values: Dict[str, Any],
         *,
         address: Address,
+        # NB: `union_membership` is only optional to facilitate tests. In production, we should
+        # always provide this parameter. This should be safe to do because production code should
+        # rarely directly instantiate Targets and should instead use the engine to request them.
         union_membership: Optional[UnionMembership] = None,
     ) -> None:
         self.address = address
-        self.plugin_fields = cast(
-            Tuple[Type[Field], ...],
-            (
-                ()
-                if union_membership is None
-                else tuple(union_membership.union_rules.get(self.PluginField, ()))
-            ),
-        )
+        self.plugin_fields = self._find_plugin_fields(union_membership or UnionMembership({}))
 
         self.field_values = {}
         aliases_to_field_types = {field_type.alias: field_type for field_type in self.field_types}
@@ -303,7 +301,17 @@ class Target(ABC):
         return f"{self.alias}({address}{fields})"
 
     @final
-    def _find_registered_field_subclass(self, requested_field: Type[_F]) -> Optional[Type[_F]]:
+    @classmethod
+    def _find_plugin_fields(cls, union_membership: UnionMembership) -> Tuple[Type[Field], ...]:
+        return cast(
+            Tuple[Type[Field], ...], tuple(union_membership.union_rules.get(cls.PluginField, ()))
+        )
+
+    @final
+    @classmethod
+    def _find_registered_field_subclass(
+        cls, requested_field: Type[_F], *, registered_fields: Iterable[Type[Field]]
+    ) -> Optional[Type[_F]]:
         """Check if the Target has registered a subclass of the requested Field.
 
         This is necessary to allow targets to override the functionality of common fields like
@@ -314,7 +322,7 @@ class Target(ABC):
         subclass = next(
             (
                 registered_field
-                for registered_field in self.field_types
+                for registered_field in registered_fields
                 if issubclass(registered_field, requested_field)
             ),
             None,
@@ -341,7 +349,9 @@ class Target(ABC):
         result = self.field_values.get(field, None)
         if result is not None:
             return cast(_F, result)
-        field_subclass = self._find_registered_field_subclass(field)
+        field_subclass = self._find_registered_field_subclass(
+            field, registered_fields=self.field_types
+        )
         if field_subclass is not None:
             return cast(_F, self.field_values[field_subclass])
         raise KeyError(
@@ -349,6 +359,22 @@ class Target(ABC):
             f"`my_tgt.get({field.__name__})`, call `my_tgt.has_field({field.__name__})` to "
             "filter out any irrelevant Targets."
         )
+
+    @final
+    @classmethod
+    def _has_fields(
+        cls, fields: Iterable[Type[Field]], *, registered_fields: Iterable[Type[Field]]
+    ) -> bool:
+        unrecognized_fields = [field for field in fields if field not in registered_fields]
+        if not unrecognized_fields:
+            return True
+        for unrecognized_field in unrecognized_fields:
+            maybe_subclass = cls._find_registered_field_subclass(
+                unrecognized_field, registered_fields=registered_fields
+            )
+            if maybe_subclass is None:
+                return False
+        return True
 
     @final
     def has_field(self, field: Type[Field]) -> bool:
@@ -368,13 +394,25 @@ class Target(ABC):
         custom subclass `PythonSources`, both `python_tgt.has_fields([PythonSources])` and
         `python_tgt.has_fields([Sources])` will return True.
         """
-        unrecognized_fields = [field for field in fields if field not in self.field_types]
-        if not unrecognized_fields:
-            return True
-        for unrecognized_field in unrecognized_fields:
-            if self._find_registered_field_subclass(unrecognized_field) is None:
-                return False
-        return True
+        return self._has_fields(fields, registered_fields=self.field_types)
+
+    @final
+    @classmethod
+    def class_has_field(cls, field: Type[Field], *, union_membership: UnionMembership) -> bool:
+        """Behaves like `Target.has_field()`, but works as a classmethod rather than an instance
+        method."""
+        return cls.class_has_fields([field], union_membership=union_membership)
+
+    @final
+    @classmethod
+    def class_has_fields(
+        cls, fields: Iterable[Type[Field]], *, union_membership: UnionMembership
+    ) -> bool:
+        """Behaves like `Target.has_fields()`, but works as a classmethod rather than an instance
+        method."""
+        return cls._has_fields(
+            fields, registered_fields=(*cls.core_fields, *cls._find_plugin_fields(union_membership))
+        )
 
 
 @dataclass(frozen=True)
@@ -505,8 +543,8 @@ class Sources(AsyncField):
 
     @final
     @property
-    def request(self) -> "SourcesRequest":
-        return SourcesRequest(self)
+    def request(self) -> "HydrateSourcesRequest":
+        return HydrateSourcesRequest(self)
 
     @final
     def prefix_glob_with_address(self, glob: str) -> str:
@@ -516,25 +554,19 @@ class Sources(AsyncField):
 
 
 @dataclass(frozen=True)
-class SourcesRequest:
+class HydrateSourcesRequest:
     field: Sources
 
 
 @dataclass(frozen=True)
-class SourcesResult:
+class HydratedSources:
     snapshot: Snapshot
-
-    # TODO: do we want to support the `extension` parameter from Target.has_sources()? In V1,
-    # it's used to distinguish between Java vs. Scala files. For now, we should leave it off to
-    # keep things as simple as possible, but we may want to add it in the future.
-    def has_sources(self) -> bool:
-        return bool(self.snapshot.files)
 
 
 @rule
 async def hydrate_sources(
-    request: SourcesRequest, glob_match_error_behavior: GlobMatchErrorBehavior
-) -> SourcesResult:
+    request: HydrateSourcesRequest, glob_match_error_behavior: GlobMatchErrorBehavior
+) -> HydratedSources:
     sources_field = request.field
     globs: Iterable[str]
     if sources_field.sanitized_raw_value is not None:
@@ -542,7 +574,7 @@ async def hydrate_sources(
         conjunction = GlobExpansionConjunction.all_match
     else:
         if sources_field.default_globs is None:
-            return SourcesResult(EMPTY_SNAPSHOT)
+            return HydratedSources(EMPTY_SNAPSHOT)
         globs = sources_field.default_globs
         conjunction = GlobExpansionConjunction.any_match
 
@@ -561,8 +593,8 @@ async def hydrate_sources(
         )
     )
     sources_field.validate_snapshot(snapshot)
-    return SourcesResult(snapshot)
+    return HydratedSources(snapshot)
 
 
 def rules():
-    return [hydrate_sources, RootRule(SourcesRequest)]
+    return [hydrate_sources, RootRule(HydrateSourcesRequest)]
