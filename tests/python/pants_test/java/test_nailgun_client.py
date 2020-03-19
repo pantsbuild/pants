@@ -198,6 +198,5 @@ class TestNailgunClient(unittest.TestCase):
 
     @unittest.mock.patch("os.kill", **PATCH_OPTS)
     def test_send_control_c_noop_nopid(self, mock_kill):
-        self.nailgun_client._session = unittest.mock.Mock(remote_pid=None, remote_pgrp=None)
         self.nailgun_client.maybe_send_signal(signal.SIGINT)
         mock_kill.assert_not_called()
