@@ -15,12 +15,12 @@ class TaskError(Exception):
         :param int exit_code: an optional exit code (defaults to nonzero)
         :param list failed_targets: an optional list of failed targets (default=[])
         """
-        self._exit_code = kwargs.pop("exit_code", PANTS_FAILED_EXIT_CODE)
+        self._exit_code: int = kwargs.pop("exit_code", PANTS_FAILED_EXIT_CODE)
         self._failed_targets = kwargs.pop("failed_targets", [])
         super().__init__(*args, **kwargs)
 
     @property
-    def exit_code(self):
+    def exit_code(self) -> int:
         return self._exit_code
 
     @property
