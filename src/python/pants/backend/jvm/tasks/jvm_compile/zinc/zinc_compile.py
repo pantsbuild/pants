@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import errno
+import json
 import logging
 import os
 import re
@@ -191,6 +192,16 @@ class BaseZincCompile(JvmCompile):
             "This is experimental, but it provides great speedups in native-images of Zinc.",
         )
 
+        register(
+            "--report-diagnostic-counts",
+            advanced=True,
+            type=bool,
+            default=False,
+            help="Have the Zinc compiler record information on Warnings and Errors. "
+            "For each target, send the count of diagnostics of each severity (Hint, Information, "
+            "Warning, Error) to the reporting server.",
+        )
+
     @classmethod
     def subsystem_dependencies(cls):
         return super().subsystem_dependencies() + (Zinc.Factory, JvmPlatform,)
@@ -352,6 +363,11 @@ class BaseZincCompile(JvmCompile):
         # TODO: Support workdirs not nested under buildroot by path-rewriting.
         return fast_relpath(path, get_buildroot())
 
+    def _diagnostics_out(self, ctx):
+        if not self.get_options().report_diagnostic_counts:
+            return None
+        return self.relative_to_exec_root(ctx.diagnostics_out)
+
     def create_zinc_args(
         self,
         ctx,
@@ -391,6 +407,10 @@ class BaseZincCompile(JvmCompile):
                 jar_file,
             ]
         )
+        diag_out = self._diagnostics_out(ctx)
+        if diag_out:
+            zinc_args.extend(["-diag", diag_out])
+
         if not self.get_options().colors:
             zinc_args.append("-no-color")
 
@@ -537,6 +557,38 @@ class BaseZincCompile(JvmCompile):
                 ),
             },
         )()
+
+    def always_do_after_compile(self, ctx):
+        self._pass_diagnostics_to_reporting_server(ctx)
+
+    def _aggregate_diagnostics(self, lsp_data):
+        # Note: this is not arbitrary. It is exactly every value that the LSP's DiagnosticSeverity allows.
+        # See https://microsoft.github.io/language-server-protocol/specification#diagnostic
+        counts = {
+            "Error": 0,
+            "Warning": 0,
+            "Information": 0,
+            "Hint": 0,
+        }
+        for published_diagnostics in lsp_data:
+            for diagnostic in published_diagnostics["diagnostics"]:
+                severity = diagnostic["severity"]
+                counts[severity] += 1
+        return counts
+
+    def _pass_diagnostics_to_reporting_server(self, ctx):
+        diagnostics_file = self._diagnostics_out(ctx)
+        if not (diagnostics_file and os.path.exists(diagnostics_file)):
+            return
+        with open(diagnostics_file) as json_diagnostics:
+            data = json.load(json_diagnostics)
+            counts = self._aggregate_diagnostics(data)
+            self.context.log.info(f"Reporting number of diagnostics for: {ctx.target.address}")
+            for (severity, count) in counts.items():
+                self.context.log.info(f"    {severity}: {count}")
+                self.context.run_tracker.report_target_info(
+                    self.options_scope, ctx.target, ["diagnostic_counts", severity], count
+                )
 
     class ZincCompileError(TaskError):
         """An exception type specifically to signal a failed zinc execution."""
