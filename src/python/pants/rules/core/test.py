@@ -11,6 +11,7 @@ from typing import Iterable, Optional, Type
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.build_graph.address import Address
+from pants.engine import desktop
 from pants.engine.console import Console
 from pants.engine.fs import Digest, DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
@@ -109,12 +110,15 @@ class CoverageDataBatch:
 class CoverageReport(ABC):
     """Represents a code coverage report that can be materialized to the terminal or disk."""
 
-    def materialize(self, console: Console, workspace: Workspace) -> None:
+    def materialize(self, console: Console, workspace: Workspace) -> Optional[PurePath]:
         """Materialize this code coverage report to the terminal or disk.
 
         :param console: A handle to the terminal.
         :param workspace: A handle to local disk.
+        :return: If a report was materialized to disk, the path of the file in the report one might
+                 open first to start examining the report.
         """
+        ...
 
 
 @dataclass(frozen=True)
@@ -123,8 +127,9 @@ class ConsoleCoverageReport(CoverageReport):
 
     report: str
 
-    def materialize(self, console: Console, workspace: Workspace) -> None:
+    def materialize(self, console: Console, workspace: Workspace) -> Optional[PurePath]:
         console.print_stdout(f"\n{self.report}")
+        return None
 
 
 @dataclass(frozen=True)
@@ -133,14 +138,16 @@ class FilesystemCoverageReport(CoverageReport):
 
     result_digest: Digest
     directory_to_materialize_to: PurePath
+    report_file: Optional[PurePath]
 
-    def materialize(self, console: Console, workspace: Workspace) -> None:
+    def materialize(self, console: Console, workspace: Workspace) -> Optional[PurePath]:
         workspace.materialize_directory(
             DirectoryToMaterialize(
                 self.result_digest, path_prefix=str(self.directory_to_materialize_to),
             )
         )
         console.print_stdout(f"\nWrote coverage report to `{self.directory_to_materialize_to}`")
+        return self.report_file
 
 
 class TestOptions(GoalSubsystem):
@@ -160,14 +167,21 @@ class TestOptions(GoalSubsystem):
             "--debug",
             type=bool,
             default=False,
-            help="Run a single test target in an interactive process. This is necessary, for example, when you add "
-            "breakpoints in your code.",
+            help="Run a single test target in an interactive process. This is necessary, for "
+            "example, when you add breakpoints in your code.",
         )
         register(
             "--run-coverage",
             type=bool,
             default=False,
             help="Generate a coverage report for this test run.",
+        )
+        register(
+            "--open-coverage",
+            type=bool,
+            default=False,
+            help="If a coverage report file is generated, open it on the local system if the "
+            "system supports this.",
         )
 
 
@@ -271,8 +285,14 @@ async def run_tests(
             for coverage_batch_cls, addresses_and_test_results in coverage_data_collections
         )
 
+        coverage_report_files = []
         for report in coverage_reports:
-            report.materialize(console, workspace)
+            report_file = report.materialize(console, workspace)
+            if report_file is not None:
+                coverage_report_files.append(report_file)
+
+        if coverage_report_files and options.values.open_coverage:
+            desktop.ui_open(console, runner, coverage_report_files)
 
     return Test(exit_code)
 

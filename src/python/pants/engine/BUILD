@@ -134,6 +134,19 @@ python_library(
 )
 
 python_library(
+  name='desktop',
+  sources=['desktop.py'],
+  dependencies=[
+    '3rdparty/python:dataclasses',
+    ':console',
+    ':interactive_runner',
+    'src/python/pants/util:osutil',
+    'src/python/pants/util:strutil',
+  ],
+  tags = {"type_checked"},
+)
+
+python_library(
   name='isolated_process',
   sources=['isolated_process.py'],
   dependencies=[

@@ -172,6 +172,7 @@ class TestTest(TestBase):
                     mock=lambda _: FilesystemCoverageReport(
                         result_digest=EMPTY_DIRECTORY_DIGEST,
                         directory_to_materialize_to=PurePath("mockety/mock"),
+                        report_file=None,
                     ),
                 ),
             ],

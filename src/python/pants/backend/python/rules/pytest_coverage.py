@@ -7,6 +7,7 @@ import os
 from dataclasses import dataclass
 from enum import Enum
 from io import StringIO
+from pathlib import PurePath
 from textwrap import dedent
 from typing import Optional, Tuple, Type
 
@@ -414,8 +415,18 @@ async def generate_coverage_report(
     if report_type == ReportType.CONSOLE:
         return ConsoleCoverageReport(result.stdout.decode())
 
+    report_dir = PurePath(coverage_toolbase.options.report_output_path)
+
+    report_file: Optional[PurePath] = None
+    if coverage_toolbase.options.report == ReportType.HTML:
+        report_file = report_dir / "htmlcov" / "index.html"
+    elif coverage_toolbase.options.report == ReportType.XML:
+        report_file = report_dir / "coverage.xml"
+
     return FilesystemCoverageReport(
-        result.output_directory_digest, coverage_toolbase.options.report_output_path
+        result_digest=result.output_directory_digest,
+        directory_to_materialize_to=report_dir,
+        report_file=report_file,
     )
 
 
