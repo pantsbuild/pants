@@ -1,6 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import itertools
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import ClassVar, Iterable, Tuple, Type
@@ -84,29 +85,6 @@ async def create_binary(
     return Binary(exit_code=0)
 
 
-# TODO: possibly factor this out. Revisit after porting lint.py, fmt.py, and test.py to use the
-#  Target API.
-def implementations_with_supported_target_types(
-    implementations: Iterable[Type[BinaryImplementation]],
-    *,
-    registered_target_types: RegisteredTargetTypes,
-    union_membership: UnionMembership,
-) -> str:
-    implementations_to_target_types = {
-        implementation: implementation.valid_target_types(
-            registered_target_types.types, union_membership=union_membership
-        )
-        for implementation in implementations
-    }
-    return "\n".join(
-        sorted(
-            f"  * {implementation.__name__}, works with target types: "
-            f"{sorted(target_type.alias for target_type in target_types)}"
-            for implementation, target_types in implementations_to_target_types.items()
-        )
-    )
-
-
 @rule
 async def coordinator_of_binaries(
     wrapped_target: WrappedTarget,
@@ -123,26 +101,36 @@ async def coordinator_of_binaries(
         if binary_implementation.is_valid_target(target)
     ]
     if not valid_binary_implementations:
-        all_implementations = implementations_with_supported_target_types(
-            binary_implementations,
-            registered_target_types=registered_target_types,
-            union_membership=union_membership,
+        all_valid_target_types = itertools.chain.from_iterable(
+            implementation.valid_target_types(
+                registered_target_types.types, union_membership=union_membership
+            )
+            for implementation in binary_implementations
         )
+        formatted_target_types = sorted(target_type.alias for target_type in all_valid_target_types)
+        # TODO: this is a leaky abstraction that the error message knows this rule is being used
+        #  by `run` and `binary`. How should this be handled? A custom goal author could depend on
+        #  this error message too and the error would now be lying.
         raise ValueError(
-            f"None of the registered binary implementations work with {target.address} (target "
-            f"type {repr(target.alias)}). All registered binary implementations:\n\n"
-            f"{all_implementations}."
+            f"The `run` and `binary` goals only work with the following target types: "
+            f"{formatted_target_types}\n\nYou used {target.address} with target type "
+            f"{repr(target.alias)}."
         )
+    # TODO: we must use this check when running `./v2 run` because we should only run one target
+    #  with one implementation. But, we don't necessarily need to enforce this with `./v2 binary`.
+    #  See https://github.com/pantsbuild/pants/pull/9345#discussion_r395221542 for some possible
+    #  semantics for `./v2 binary`.
     if len(valid_binary_implementations) > 1:
-        valid_implementations = implementations_with_supported_target_types(
-            valid_binary_implementations,
-            registered_target_types=registered_target_types,
-            union_membership=union_membership,
+        possible_implementations = sorted(
+            implementation.__name__ for implementation in valid_binary_implementations
         )
+        # TODO: improve this error message. (It's never actually triggered yet because we only have
+        #  Python implemented with V2.) A better error message would explain to users how they can
+        #  resolve the issue.
         raise ValueError(
             f"Multiple of the registered binary implementations work for {target.address} "
             f"(target type {repr(target.alias)}). It is ambiguous which implementation to use. "
-            f"Possible implementations:\n\n{valid_implementations}."
+            f"Possible implementations: {possible_implementations}."
         )
     binary_implementation = valid_binary_implementations[0]
     return await Get[CreatedBinary](BinaryImplementation, binary_implementation.create(target))
