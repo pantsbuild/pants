@@ -6,7 +6,7 @@ import os
 import queue
 import sys
 import threading
-from typing import List, Optional, Set, Tuple
+from typing import List, Optional, Set
 
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import Specs
@@ -14,7 +14,6 @@ from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.rules import UnionMembership
 from pants.goal.run_tracker import RunTracker
 from pants.init.engine_initializer import LegacyGraphScheduler, LegacyGraphSession
-from pants.init.specs_calculator import SpecsCalculator
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.service.fs_event_service import FSEventService
@@ -191,37 +190,33 @@ class SchedulerService(PantsService):
 
         self._event_queue.task_done()
 
-    def prepare_v1_graph_run_v2(
-        self, options: Options, options_bootstrapper: OptionsBootstrapper,
-    ) -> Tuple[LegacyGraphSession, Specs, int]:
-        """For v1 (and v2): computing Specs for a later v1 run.
-
-        For v2: running an entire v2 run The exit_code in the return indicates whether any issue was
-        encountered
-        """
+    def prepare_graph(self, options: Options) -> LegacyGraphSession:
         # If any nodes exist in the product graph, wait for the initial watchman event to avoid
         # racing watchman startup vs invalidation events.
         graph_len = self._scheduler.graph_len()
         if graph_len > 0:
-            self._logger.debug(
-                "graph len was {}, waiting for initial watchman event".format(graph_len)
-            )
+            self._logger.debug(f"graph len was {graph_len}, waiting for initial watchman event")
             self._watchman_is_running.wait()
 
         global_options = options.for_global_scope()
-
         build_id = RunTracker.global_instance().run_id
         v2_ui = global_options.get("v2_ui", False)
         zipkin_trace_v2 = options.for_scope("reporting").zipkin_trace_v2
-        session = self._graph_helper.new_session(zipkin_trace_v2, build_id, v2_ui)
+        return self._graph_helper.new_session(zipkin_trace_v2, build_id, v2_ui)
 
-        specs = SpecsCalculator.create(
-            options=options,
-            session=session.scheduler_session,
-            exclude_patterns=tuple(global_options.exclude_target_regexp),
-            tags=tuple(global_options.tag) if global_options.tag else tuple(),
-        )
+    def graph_run_v2(
+        self,
+        session: LegacyGraphSession,
+        specs: Specs,
+        options: Options,
+        options_bootstrapper: OptionsBootstrapper,
+    ) -> int:
+        """Perform an entire v2 run.
 
+        The exit_code in the return indicates whether any issue was encountered.
+        """
+
+        global_options = options.for_global_scope()
         perform_loop = global_options.get("loop", False)
         v2 = global_options.v2
 
@@ -230,7 +225,7 @@ class SchedulerService(PantsService):
             exit_code = self._loop(session, options, options_bootstrapper, specs, loop_max, v2)
         else:
             exit_code = self._body(session, options, options_bootstrapper, specs, v2)
-        return session, specs, exit_code
+        return exit_code
 
     def _loop(
         self,
