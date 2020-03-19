@@ -4,6 +4,7 @@
 import logging
 import os
 from contextlib import contextmanager
+from dataclasses import dataclass
 from typing import List, Mapping, Optional, Tuple
 
 from pants.base.build_environment import get_buildroot
@@ -22,7 +23,7 @@ from pants.help.help_printer import HelpPrinter
 from pants.init.engine_initializer import EngineInitializer, LegacyGraphSession
 from pants.init.logging import setup_logging_from_options
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
-from pants.init.repro import Reproducer
+from pants.init.repro import Repro, Reproducer
 from pants.init.specs_calculator import SpecsCalculator
 from pants.option.arg_splitter import UnknownGoalHelp
 from pants.option.options import Options
@@ -96,8 +97,34 @@ class LocalExiter(Exiter):
         super().exit(result=result, msg=msg, *args, **kwargs)
 
 
+@dataclass
 class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
-    """Handles a single pants invocation running in the process-local context."""
+    """Handles a single pants invocation running in the process-local context.
+
+    build_root: The build root for this run.
+    options: The parsed options for this run.
+    options_bootstrapper: The OptionsBootstrapper instance to use.
+    build_config: The parsed build configuration for this run.
+    specs: The specs for this run, i.e. either the address or filesystem specs.
+    graph_session: A LegacyGraphSession instance for graph reuse.
+    is_daemon: Whether or not this run was launched with a daemon graph helper.
+    profile_path: The profile path - if any (from from the `PANTS_PROFILE` env var).
+    """
+
+    build_root: str
+    options: Options
+    options_bootstrapper: OptionsBootstrapper
+    build_config: BuildConfiguration
+    specs: Specs
+    graph_session: LegacyGraphSession
+    scheduler_session: SchedulerSession
+    union_membership: UnionMembership
+    is_daemon: bool
+    profile_path: Optional[str]
+    _run_start_time: Optional[float] = None
+    _run_tracker: Optional[RunTracker] = None
+    _reporting: Optional[Reporting] = None
+    _repro: Optional[Repro] = None
 
     @staticmethod
     def parse_options(
@@ -211,46 +238,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
             profile_path=profile_path,
         )
 
-    def __init__(
-        self,
-        build_root: str,
-        options: Options,
-        options_bootstrapper: OptionsBootstrapper,
-        build_config: BuildConfiguration,
-        specs: Specs,
-        graph_session: LegacyGraphSession,
-        scheduler_session: SchedulerSession,
-        union_membership: UnionMembership,
-        is_daemon: bool,
-        profile_path: Optional[str],
-    ) -> None:
-        """
-        :param build_root: The build root for this run.
-        :param options: The parsed options for this run.
-        :param options_bootstrapper: The OptionsBootstrapper instance to use.
-        :param build_config: The parsed build configuration for this run.
-        :param specs: The specs for this run, i.e. either the address or filesystem specs.
-        :param graph_session: A LegacyGraphSession instance for graph reuse.
-        :param is_daemon: Whether or not this run was launched with a daemon graph helper.
-        :param profile_path: The profile path - if any (from from the `PANTS_PROFILE` env var).
-        """
-        self._build_root = build_root
-        self._options = options
-        self._options_bootstrapper = options_bootstrapper
-        self._build_config = build_config
-        self._specs = specs
-        self._graph_session = graph_session
-        self._scheduler_session = scheduler_session
-        self._union_membership = union_membership
-        self._is_daemon = is_daemon
-        self._profile_path = profile_path
-
-        self._run_start_time = None
-        self._run_tracker: Optional[RunTracker] = None
-        self._reporting = None
-        self._repro = None
-
-    def set_start_time(self, start_time):
+    def set_start_time(self, start_time: float) -> None:
         # Launch RunTracker as early as possible (before .run() is called).
         self._run_tracker = RunTracker.global_instance()
 
@@ -260,12 +248,10 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         self._reporting = Reporting.global_instance()
 
         self._run_start_time = start_time
-        self._reporting.initialize(
-            self._run_tracker, self._options, start_time=self._run_start_time
-        )
+        self._reporting.initialize(self._run_tracker, self.options, start_time=self._run_start_time)
 
         spec_parser = CmdLineSpecParser(get_buildroot())
-        specs = [spec_parser.parse_spec(spec).to_spec_string() for spec in self._options.specs]
+        specs = [spec_parser.parse_spec(spec).to_spec_string() for spec in self.options.specs]
         # Note: This will not include values from `--changed-*` flags.
         self._run_tracker.run_info.add_info("specs_from_command_line", specs, stringify=False)
 
@@ -276,27 +262,25 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
 
     def run(self):
         with LocalExiter.wrap_global_exiter(self._run_tracker, self._repro), maybe_profiled(
-            self._profile_path
+            self.profile_path
         ):
             self._run()
 
     def _maybe_handle_help(self):
         """Handle requests for `help` information."""
-        if self._options.help_request:
-            help_printer = HelpPrinter(
-                options=self._options, union_membership=self._union_membership
-            )
+        if self.options.help_request:
+            help_printer = HelpPrinter(options=self.options, union_membership=self.union_membership)
             result = help_printer.print_help()
             return result
 
     def _maybe_run_v1(self, v1: bool) -> int:
-        v1_goals, ambiguous_goals, _ = self._options.goals_by_version
+        v1_goals, ambiguous_goals, _ = self.options.goals_by_version
         if not v1:
             if v1_goals:
                 HelpPrinter(
-                    options=self._options,
+                    options=self.options,
                     help_request=UnknownGoalHelp(list(v1_goals)),
-                    union_membership=self._union_membership,
+                    union_membership=self.union_membership,
                 ).print_help()
                 return PANTS_FAILED_EXIT_CODE
             return PANTS_SUCCEEDED_EXIT_CODE
@@ -307,14 +291,14 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         # Setup and run GoalRunner.
         return (
             GoalRunner.Factory(
-                self._build_root,
-                self._options_bootstrapper,
-                self._options,
-                self._build_config,
+                self.build_root,
+                self.options_bootstrapper,
+                self.options,
+                self.build_config,
                 self._run_tracker,  # type: ignore
                 self._reporting,  # type: ignore
-                self._graph_session,
-                self._specs,
+                self.graph_session,
+                self.specs,
                 self._exiter,
             )
             .create()
@@ -324,22 +308,22 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     def _maybe_run_v2(self, v2: bool) -> int:
         # N.B. For daemon runs, @goal_rules are invoked pre-fork -
         # so this path only serves the non-daemon run mode.
-        if self._is_daemon:
+        if self.is_daemon:
             return PANTS_SUCCEEDED_EXIT_CODE
 
-        _, ambiguous_goals, v2_goals = self._options.goals_by_version
+        _, ambiguous_goals, v2_goals = self.options.goals_by_version
         goals = v2_goals + (ambiguous_goals if v2 else tuple())
         if self._run_tracker:
             self._run_tracker.set_v2_goal_rule_names(goals)
         if not goals:
             return PANTS_SUCCEEDED_EXIT_CODE
 
-        return self._graph_session.run_goal_rules(
-            options_bootstrapper=self._options_bootstrapper,
-            union_membership=self._union_membership,
-            options=self._options,
+        return self.graph_session.run_goal_rules(
+            options_bootstrapper=self.options_bootstrapper,
+            union_membership=self.union_membership,
+            options=self.options,
             goals=goals,
-            specs=self._specs,
+            specs=self.specs,
         )
 
     @staticmethod
@@ -352,20 +336,20 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         return max_code
 
     def _update_stats(self):
-        metrics = self._scheduler_session.metrics()
+        metrics = self.scheduler_session.metrics()
         self._run_tracker.pantsd_stats.set_scheduler_metrics(metrics)
-        engine_workunits = self._scheduler_session.engine_workunits(metrics)
+        engine_workunits = self.scheduler_session.engine_workunits(metrics)
         if engine_workunits:
             self._run_tracker.report.bulk_record_workunits(engine_workunits)
 
     def _run(self):
-        global_options = self._options.for_global_scope()
+        global_options = self.options.for_global_scope()
 
         streaming_handlers = global_options.streaming_workunits_handlers
         report_interval = global_options.streaming_workunits_report_interval
         callbacks = Subsystem.get_streaming_workunit_callbacks(streaming_handlers)
         streaming_reporter = StreamingWorkunitHandler(
-            self._scheduler_session, callbacks=callbacks, report_interval_seconds=report_interval
+            self.scheduler_session, callbacks=callbacks, report_interval_seconds=report_interval
         )
 
         help_output = self._maybe_handle_help()
