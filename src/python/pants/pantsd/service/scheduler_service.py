@@ -220,11 +220,9 @@ class SchedulerService(PantsService):
         session = self._graph_helper.new_session(zipkin_trace_v2, build_id, v2_ui)
 
         if options.for_global_scope().get("loop", False):
-            fn = self._loop
+            specs, exit_code = self._loop(session, options, options_bootstrapper)
         else:
-            fn = self._body
-
-        specs, exit_code = fn(session, options, options_bootstrapper)
+            specs, exit_code = self._body(session, options, options_bootstrapper)
         return session, specs, exit_code
 
     def _loop(
