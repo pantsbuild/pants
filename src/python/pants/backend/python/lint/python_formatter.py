@@ -11,7 +11,7 @@ from pants.engine.legacy.structs import TargetAdaptorWithOrigin
 from pants.engine.objects import union
 from pants.engine.rules import UnionMembership, UnionRule, rule
 from pants.engine.selectors import Get
-from pants.rules.core.determine_source_files import AllSourceFilesRequest, SourceFiles
+from pants.rules.core.determine_source_files import LegacyAllSourceFilesRequest, SourceFiles
 from pants.rules.core.fmt import FmtResult, Formatter, LanguageFmtResults, LanguageFormatters
 
 
@@ -34,7 +34,7 @@ async def format_python_target(
 ) -> LanguageFmtResults:
     adaptors_with_origins = python_formatters.adaptors_with_origins
     original_sources = await Get[SourceFiles](
-        AllSourceFilesRequest(
+        LegacyAllSourceFilesRequest(
             adaptor_with_origin.adaptor for adaptor_with_origin in adaptors_with_origins
         )
     )

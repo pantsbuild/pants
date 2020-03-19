@@ -23,9 +23,9 @@ from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
 from pants.rules.core import determine_source_files, strip_source_roots
 from pants.rules.core.determine_source_files import (
-    AllSourceFilesRequest,
+    LegacyAllSourceFilesRequest,
+    LegacySpecifiedSourceFilesRequest,
     SourceFiles,
-    SpecifiedSourceFilesRequest,
 )
 from pants.rules.core.lint import Linter, LintResult
 
@@ -82,12 +82,12 @@ async def lint(
     )
 
     all_source_files = await Get[SourceFiles](
-        AllSourceFilesRequest(
+        LegacyAllSourceFilesRequest(
             adaptor_with_origin.adaptor for adaptor_with_origin in adaptors_with_origins
         )
     )
     specified_source_files = await Get[SourceFiles](
-        SpecifiedSourceFilesRequest(adaptors_with_origins)
+        LegacySpecifiedSourceFilesRequest(adaptors_with_origins)
     )
 
     merged_input_files = await Get[Digest](

@@ -38,7 +38,7 @@ from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.option.global_options import GlobalOptions
 from pants.python.python_setup import PythonSetup
-from pants.rules.core.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
+from pants.rules.core.determine_source_files import LegacySpecifiedSourceFilesRequest, SourceFiles
 from pants.rules.core.test import TestDebugRequest, TestOptions, TestResult, TestRunner
 
 
@@ -159,7 +159,7 @@ async def setup_pytest_for_target(
 
     # Get the file names for the test_target so that we can specify to Pytest precisely which files
     # to test, rather than using auto-discovery.
-    specified_source_files_request = SpecifiedSourceFilesRequest(
+    specified_source_files_request = LegacySpecifiedSourceFilesRequest(
         [adaptor_with_origin], strip_source_roots=True
     )
 
@@ -178,7 +178,7 @@ async def setup_pytest_for_target(
         Get[Pex](CreatePexFromTargetClosure, create_requirements_pex_request),
         Get[Pex](CreatePex, create_test_runner_pex),
         Get[ChrootedPythonSources](HydratedTargets(python_targets + resource_targets)),
-        Get[SourceFiles](SpecifiedSourceFilesRequest, specified_source_files_request),
+        Get[SourceFiles](LegacySpecifiedSourceFilesRequest, specified_source_files_request),
     ]
     if run_coverage:
         requests.append(

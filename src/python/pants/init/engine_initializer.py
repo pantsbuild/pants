@@ -215,7 +215,7 @@ class LegacyGraphSession:
         options: Options,
         goals: Iterable[str],
         specs: Specs,
-    ):
+    ) -> int:
         """Runs @goal_rules sequentially and interactively by requesting their implicit Goal
         products.
 

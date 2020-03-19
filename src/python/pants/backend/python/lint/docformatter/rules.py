@@ -26,9 +26,9 @@ from pants.engine.selectors import Get
 from pants.python.python_setup import PythonSetup
 from pants.rules.core import determine_source_files, strip_source_roots
 from pants.rules.core.determine_source_files import (
-    AllSourceFilesRequest,
+    LegacyAllSourceFilesRequest,
+    LegacySpecifiedSourceFilesRequest,
     SourceFiles,
-    SpecifiedSourceFilesRequest,
 )
 from pants.rules.core.fmt import FmtResult
 from pants.rules.core.lint import Linter, LintResult
@@ -82,7 +82,7 @@ async def setup(
 
     if request.formatter.prior_formatter_result is None:
         all_source_files = await Get[SourceFiles](
-            AllSourceFilesRequest(
+            LegacyAllSourceFilesRequest(
                 adaptor_with_origin.adaptor for adaptor_with_origin in adaptors_with_origins
             )
         )
@@ -91,7 +91,7 @@ async def setup(
         all_source_files_snapshot = request.formatter.prior_formatter_result
 
     specified_source_files = await Get[SourceFiles](
-        SpecifiedSourceFilesRequest(adaptors_with_origins)
+        LegacySpecifiedSourceFilesRequest(adaptors_with_origins)
     )
 
     merged_input_files = await Get[Digest](
