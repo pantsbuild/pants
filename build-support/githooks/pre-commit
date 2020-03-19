@@ -52,15 +52,8 @@ echo "* Checking shell scripts via our custom linter"
 # When travis builds a tag, it does so in a shallow clone without master fetched, which
 # fails in pants changed.
 if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
-  echo "* Checking formatting of Python files"
-  ./v2 --changed-parent="${MERGE_BASE}" lint || die "To fix formatting, run \`./v2 --changed-since=master fmt\`"
-
-  # TODO(CMLivingston) Make lint use `-q` option again after addressing proper workunit labeling:
-  # https://github.com/pantsbuild/pants/issues/6633
-  # TODO: add a test case for this while including a pexrc file, as python checkstyle currently fails
-  # quite often with a pexrc available.
-  echo "* Checking lint"
-  ./pants --exclude-target-regexp='testprojects/.*' --changed-parent="${MERGE_BASE}" lint || exit 1
+  echo "* Checking formatting and Flake8"
+  ./v2 --changed-parent="${MERGE_BASE}" lint || die "If there were formatting errors, run \`./v2 --changed-since=master fmt\`"
 
   echo "* Checking types"
   ./build-support/bin/mypy.py || exit 1
