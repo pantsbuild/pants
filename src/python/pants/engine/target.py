@@ -329,22 +329,7 @@ class Target(ABC):
         return cast(Optional[Type[_F]], subclass)
 
     @final
-    def get(self, field: Type[_F]) -> _F:
-        """Get the requested `Field` instance belonging to this target.
-
-        This will return an instance of the requested field type, e.g. an instance of
-        `Compatibility`, `Sources`, `EntryPoint`, etc. Usually, you will want to grab the
-        `Field`'s inner value, e.g. `tgt.get(Compatibility).value`. (For `AsyncField`s, you would
-        call `await Get[SourcesResult](SourcesRequest, tgt.get(Sources).request)`).
-
-        If the `Field` is not registered on this `Target` type, this method will raise a
-        `KeyError`. To avoid this, you should first call `tgt.has_field()` or `tgt.has_fields()`
-        to ensure that the field is registered.
-
-        This works with subclasses of `Field`s. For example, if you subclass `Sources` to define a
-        custom subclass `PythonSources`, both `python_tgt.get(PythonSources)` and
-        `python_tgt.get(Sources)` will return the same `PythonSources` instance.
-        """
+    def _maybe_get(self, field: Type[_F]) -> Optional[_F]:
         result = self.field_values.get(field, None)
         if result is not None:
             return cast(_F, result)
@@ -353,11 +338,52 @@ class Target(ABC):
         )
         if field_subclass is not None:
             return cast(_F, self.field_values[field_subclass])
+        return None
+
+    @final
+    def __getitem__(self, field: Type[_F]) -> _F:
+        """Get the requested `Field` instance belonging to this target.
+
+        If the `Field` is not registered on this `Target` type, this method will raise a
+        `KeyError`. To avoid this, you should first call `tgt.has_field()` or `tgt.has_fields()`
+        to ensure that the field is registered, or, alternatively, use `Target.get()`.
+
+        See the docstring for `Target.get()` for how this method handles subclasses of the
+        requested Field and for tips on how to use the returned value.
+        """
+        result = self._maybe_get(field)
+        if result is not None:
+            return result
         raise KeyError(
-            f"The target `{self}` does not have a field `{field}`. Before calling "
-            f"`my_tgt.get({field.__name__})`, call `my_tgt.has_field({field.__name__})` to "
-            "filter out any irrelevant Targets."
+            f"The target `{self}` does not have a field `{field.__name__}`. Before calling "
+            f"`my_tgt[{field.__name__}]`, call `my_tgt.has_field({field.__name__})` to "
+            f"filter out any irrelevant Targets or call `my_tgt.get({field.__name__})` to use the "
+            f"default Field value."
         )
+
+    @final
+    def get(self, field: Type[_F], *, default_raw_value: Optional[Any] = None) -> _F:
+        """Get the requested `Field` instance belonging to this target.
+
+        This will return an instance of the requested field type, e.g. an instance of
+        `Compatibility`, `Sources`, `EntryPoint`, etc. Usually, you will want to grab the
+        `Field`'s inner value, e.g. `tgt.get(Compatibility).value`. (For `AsyncField`s, you would
+        call `await Get[SourcesResult](SourcesRequest, tgt.get(Sources).request)`).
+
+        This works with subclasses of `Field`s. For example, if you subclass `Sources` to define a
+        custom subclass `PythonSources`, both `python_tgt.get(PythonSources)` and
+        `python_tgt.get(Sources)` will return the same `PythonSources` instance.
+
+        If the `Field` is not registered on this `Target` type, this will return an instance of
+        the requested Field by using `default_raw_value` to create the instance. Alternatively,
+        first call `tgt.has_field()` or `tgt.has_fields()` to ensure that the field is registered,
+        or, alternatively, use indexing (e.g. `tgt[Compatibility]`) to raise a KeyError when the
+        field is not registered.
+        """
+        result = self._maybe_get(field)
+        if result is not None:
+            return result
+        return field(raw_value=default_raw_value, address=self.address)
 
     @final
     @classmethod

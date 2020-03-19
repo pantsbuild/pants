@@ -37,6 +37,11 @@ class HaskellGhcExtensions(PrimitiveField):
         return tuple(raw_value)
 
 
+class UnrelatedField(BoolField):
+    alias: ClassVar = "unrelated"
+    default: ClassVar = False
+
+
 class HaskellSources(AsyncField):
     alias: ClassVar = "sources"
     sanitized_raw_value: Optional[Tuple[str, ...]]
@@ -87,75 +92,50 @@ def test_invalid_fields_rejected() -> None:
     assert "Unrecognized field `invalid_field=True`" in str(exc)
 
 
-def test_get_primitive_field() -> None:
+def test_get_field() -> None:
     extensions = ("GhcExistentialQuantification",)
-    assert (
-        HaskellTarget({HaskellGhcExtensions.alias: extensions}, address=Address.parse(":lib"))
-        .get(HaskellGhcExtensions)
-        .value
-        == extensions
-    )
+    tgt = HaskellTarget({HaskellGhcExtensions.alias: extensions}, address=Address.parse(":lib"))
 
-    # Default value
-    assert (
-        HaskellTarget({}, address=Address.parse(":default")).get(HaskellGhcExtensions).value == ()
-    )
+    assert tgt[HaskellGhcExtensions].value == extensions
+    assert tgt.get(HaskellGhcExtensions).value == extensions
+    assert tgt.get(HaskellGhcExtensions, default_raw_value=["GhcDefault"]).value == extensions
+
+    # Default field value. This happens when the field is registered on the target type, but the
+    # user does not explicitly set the field in the BUILD file.
+    #
+    # NB: `default_raw_value` is not used in this case - that parameter is solely used when
+    # the field is not registered on the target type. To override the default field value, either
+    # subclass the Field and create a new target, or, in your call site, interpret the result and
+    # and apply your default.
+    default_field_tgt = HaskellTarget({}, address=Address.parse(":default"))
+    assert default_field_tgt[HaskellGhcExtensions].value == ()
+    assert default_field_tgt.get(HaskellGhcExtensions).value == ()
+    assert default_field_tgt.get(HaskellGhcExtensions, default_raw_value=["GhcDefault"]).value == ()
+    # Example of a call site applying its own default value instead of the field's default value.
+    assert default_field_tgt[HaskellGhcExtensions].value or 123 == 123
+
+    # Field is not registered on the target.
+    with pytest.raises(KeyError) as exc:
+        default_field_tgt[UnrelatedField]
+    assert UnrelatedField.__name__ in str(exc)
+    assert default_field_tgt.get(UnrelatedField).value == UnrelatedField.default
+    assert default_field_tgt.get(
+        UnrelatedField, default_raw_value=not UnrelatedField.default
+    ).value == (not UnrelatedField.default)
 
 
-def test_get_async_field() -> None:
-    def hydrate_field(
-        *, raw_source_files: List[str], hydrated_source_files: Tuple[str, ...]
-    ) -> HaskellSourcesResult:
-        sources_field = HaskellTarget(
-            {HaskellSources.alias: raw_source_files}, address=Address.parse(":lib")
-        ).get(HaskellSources)
-        result: HaskellSourcesResult = run_rule(
-            hydrate_haskell_sources,
-            rule_args=[HaskellSourcesRequest(sources_field)],
-            mock_gets=[
-                MockGet(
-                    product_type=Snapshot,
-                    subject_type=PathGlobs,
-                    mock=lambda _: Snapshot(
-                        directory_digest=EMPTY_DIRECTORY_DIGEST,
-                        files=hydrated_source_files,
-                        dirs=(),
-                    ),
-                )
-            ],
+def test_primitive_field_hydration_is_eager() -> None:
+    with pytest.raises(TargetDefinitionException) as exc:
+        HaskellTarget(
+            {HaskellGhcExtensions.alias: ["GhcExistentialQuantification", "DoesNotStartWithGhc"]},
+            address=Address.parse(":bad_extension"),
         )
-        return result
-
-    # Normal field
-    expected_files = ("monad.hs", "abstract_art.hs", "abstract_algebra.hs")
-    assert (
-        hydrate_field(
-            raw_source_files=["monad.hs", "abstract_*.hs"], hydrated_source_files=expected_files
-        ).snapshot.files
-        == expected_files
-    )
-
-    # Test `raw_value` gets sanitized/validated eagerly
-    with pytest.raises(ValueError) as exc:
-        HaskellTarget({HaskellSources.alias: [0, 1, 2]}, address=Address.parse(":lib")).get(
-            HaskellSources
-        )
-    assert "Not all elements of the iterable have type" in str(exc)
-
-    # Test post-hydration validation
-    with pytest.raises(ValueError) as exc:
-        hydrate_field(raw_source_files=["*.js"], hydrated_source_files=("not_haskell.js",))
-    assert "Received non-Haskell sources" in str(exc)
-    assert "//:lib" in str(exc)
+    assert "must be prefixed by `Ghc`" in str(exc)
+    assert "//:bad_extension" in str(exc)
 
 
 def test_has_fields() -> None:
-    class UnrelatedField(BoolField):
-        alias: ClassVar = "unrelated"
-        default: ClassVar = False
-
     empty_union_membership = UnionMembership({})
-
     tgt = HaskellTarget({}, address=Address.parse(":lib"))
     assert tgt.has_fields([]) is True
     assert HaskellTarget.class_has_fields([], union_membership=empty_union_membership) is True
@@ -193,14 +173,49 @@ def test_has_fields() -> None:
     )
 
 
-def test_primitive_field_hydration_is_eager() -> None:
-    with pytest.raises(TargetDefinitionException) as exc:
-        HaskellTarget(
-            {HaskellGhcExtensions.alias: ["GhcExistentialQuantification", "DoesNotStartWithGhc"]},
-            address=Address.parse(":bad_extension"),
+def test_async_field() -> None:
+    def hydrate_field(
+        *, raw_source_files: List[str], hydrated_source_files: Tuple[str, ...]
+    ) -> HaskellSourcesResult:
+        sources_field = HaskellTarget(
+            {HaskellSources.alias: raw_source_files}, address=Address.parse(":lib")
+        )[HaskellSources]
+        result: HaskellSourcesResult = run_rule(
+            hydrate_haskell_sources,
+            rule_args=[HaskellSourcesRequest(sources_field)],
+            mock_gets=[
+                MockGet(
+                    product_type=Snapshot,
+                    subject_type=PathGlobs,
+                    mock=lambda _: Snapshot(
+                        directory_digest=EMPTY_DIRECTORY_DIGEST,
+                        files=hydrated_source_files,
+                        dirs=(),
+                    ),
+                )
+            ],
         )
-    assert "must be prefixed by `Ghc`" in str(exc)
-    assert "//:bad_extension" in str(exc)
+        return result
+
+    # Normal field
+    expected_files = ("monad.hs", "abstract_art.hs", "abstract_algebra.hs")
+    assert (
+        hydrate_field(
+            raw_source_files=["monad.hs", "abstract_*.hs"], hydrated_source_files=expected_files
+        ).snapshot.files
+        == expected_files
+    )
+
+    # Test that `raw_value` gets sanitized/validated eagerly.
+    with pytest.raises(ValueError) as exc:
+        HaskellTarget({HaskellSources.alias: [0, 1, 2]}, address=Address.parse(":lib"))
+    assert "Not all elements of the iterable have type" in str(exc)
+
+    # Test post-hydration validation.
+    with pytest.raises(ValueError) as exc:
+        hydrate_field(raw_source_files=["*.js"], hydrated_source_files=("not_haskell.js",))
+    assert "Received non-Haskell sources" in str(exc)
+    assert "//:lib" in str(exc)
 
 
 def test_add_custom_fields() -> None:
@@ -220,12 +235,12 @@ def test_add_custom_fields() -> None:
     assert tgt.has_field(CustomField) is True
     assert HaskellTarget.class_has_field(CustomField, union_membership=union_membership) is True
 
-    assert tgt.get(CustomField).value is True
+    assert tgt[CustomField].value is True
 
     default_tgt = HaskellTarget(
         {}, address=Address.parse(":default"), union_membership=union_membership
     )
-    assert default_tgt.get(CustomField).value is False
+    assert default_tgt[CustomField].value is False
 
 
 def test_override_preexisting_field_via_new_target() -> None:
@@ -280,15 +295,15 @@ def test_override_preexisting_field_via_new_target() -> None:
     assert normal_tgt.has_field(HaskellGhcExtensions) is True
     assert normal_tgt.has_field(CustomHaskellGhcExtensions) is False
 
-    assert custom_tgt.get(HaskellGhcExtensions) == custom_tgt.get(CustomHaskellGhcExtensions)
-    assert custom_tgt.get(HaskellGhcExtensions).value == (
+    assert custom_tgt[HaskellGhcExtensions] == custom_tgt[CustomHaskellGhcExtensions]
+    assert custom_tgt[HaskellGhcExtensions].value == (
         "GhcNormalExtension",
         *CustomHaskellGhcExtensions.default_extensions,
     )
 
     # Check custom default value
     assert (
-        CustomHaskellTarget({}, address=Address.parse(":default")).get(HaskellGhcExtensions).value
+        CustomHaskellTarget({}, address=Address.parse(":default"))[HaskellGhcExtensions].value
         == CustomHaskellGhcExtensions.default_extensions
     )
 
