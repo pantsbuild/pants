@@ -434,7 +434,12 @@ class RegisteredTargetTypes:
 
     @classmethod
     def create(cls, target_types: Iterable[Type[Target]]) -> "RegisteredTargetTypes":
-        return cls({target_type.alias: target_type for target_type in target_types})
+        return cls(
+            {
+                target_type.alias: target_type
+                for target_type in sorted(target_types, key=lambda target_type: target_type.alias)
+            }
+        )
 
     @property
     def aliases(self) -> Tuple[str, ...]:

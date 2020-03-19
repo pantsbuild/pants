@@ -16,7 +16,7 @@ from pants.engine.rules import RuleIndex
 from pants.engine.target import Target
 from pants.option.optionable import Optionable
 from pants.util.memo import memoized_method
-from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+from pants.util.ordered_set import OrderedSet
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ class BuildConfiguration:
     _optionables: OrderedSet = field(default_factory=OrderedSet)
     _rules: OrderedSet = field(default_factory=OrderedSet)
     _union_rules: Dict[Type, OrderedSet[Type]] = field(default_factory=dict)
-    _targets: FrozenOrderedSet[Type[Target]] = field(default_factory=FrozenOrderedSet)
+    _targets: OrderedSet[Type[Target]] = field(default_factory=OrderedSet)
 
     class ParseState(namedtuple("ParseState", ["parse_context", "parse_globals"])):
         @property
@@ -209,9 +209,9 @@ class BuildConfiguration:
                 "Every element of the entrypoint `targets` must be a subclass of "
                 f"{Target.__name__}. Bad elements: {bad_elements}."
             )
-        self._targets = FrozenOrderedSet(sorted(targets, key=lambda target_type: target_type.alias))
+        self._targets.update(targets)
 
-    def targets(self) -> FrozenOrderedSet[Type[Target]]:
+    def targets(self) -> OrderedSet[Type[Target]]:
         return self._targets
 
     @memoized_method
