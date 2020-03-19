@@ -140,7 +140,7 @@ class GoalRunnerFactory:
 
             return goals, context
 
-    def create(self):
+    def create(self) -> "GoalRunner":
         goals, context = self._setup_context()
         return GoalRunner(
             context=context,
@@ -182,7 +182,7 @@ class GoalRunner:
         )
         return False
 
-    def _execute_engine(self):
+    def _execute_engine(self) -> int:
         engine = RoundEngine()
         sorted_goal_infos = engine.sort_goals(self._context, self._goals)
         RunTracker.global_instance().set_sorted_goal_infos(sorted_goal_infos)
@@ -193,7 +193,7 @@ class GoalRunner:
 
         return result
 
-    def _run_goals(self):
+    def _run_goals(self) -> int:
         should_kill_nailguns = self._kill_nailguns
 
         try:
@@ -221,7 +221,7 @@ class GoalRunner:
 
         return result
 
-    def run(self):
+    def run(self) -> int:
         global_options = self._context.options.for_global_scope()
 
         if not self._is_valid_workdir(global_options.pants_workdir):

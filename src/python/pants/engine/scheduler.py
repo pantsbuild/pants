@@ -9,7 +9,7 @@ import time
 import traceback
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, cast
 
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE
@@ -493,7 +493,7 @@ class SchedulerSession:
                 unique_exceptions,
             )
 
-    def run_goal_rule(self, product, subject):
+    def run_goal_rule(self, product, subject) -> int:
         """
         :param product: A Goal subtype.
         :param subject: subject for the request.
@@ -508,7 +508,7 @@ class SchedulerSession:
             self._trace_on_error([exc], request)
             return PANTS_FAILED_EXIT_CODE
         _, state = returns[0]
-        return state.value.exit_code
+        return cast(int, state.value.exit_code)
 
     def product_request(self, product, subjects):
         """Executes a request for a single product for some subjects, and returns the products.

@@ -189,12 +189,12 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         if specs is None:
             global_options = options.for_global_scope()
             specs = SpecsCalculator.create(
-                    options=options,
-                    build_root=build_root,
-                    session=graph_session.scheduler_session,
-                    exclude_patterns=tuple(global_options.exclude_target_regexp),
-                    tags=tuple(global_options.tag),
-                    )
+                options=options,
+                build_root=build_root,
+                session=graph_session.scheduler_session,
+                exclude_patterns=tuple(global_options.exclude_target_regexp),
+                tags=tuple(global_options.tag),
+            )
 
         profile_path = env.get("PANTS_PROFILE")
 
@@ -246,10 +246,9 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         self._profile_path = profile_path
 
         self._run_start_time = None
-        self._run_tracker = None
+        self._run_tracker: Optional[RunTracker] = None
         self._reporting = None
         self._repro = None
-        self._global_options = options.for_global_scope()
 
     def set_start_time(self, start_time):
         # Launch RunTracker as early as possible (before .run() is called).
@@ -290,13 +289,13 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
             result = help_printer.print_help()
             return result
 
-    def _maybe_run_v1(self):
+    def _maybe_run_v1(self, v1: bool) -> int:
         v1_goals, ambiguous_goals, _ = self._options.goals_by_version
-        if not self._global_options.v1:
+        if not v1:
             if v1_goals:
                 HelpPrinter(
                     options=self._options,
-                    help_request=UnknownGoalHelp(v1_goals),
+                    help_request=UnknownGoalHelp(list(v1_goals)),
                     union_membership=self._union_membership,
                 ).print_help()
                 return PANTS_FAILED_EXIT_CODE
@@ -312,8 +311,8 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
                 self._options_bootstrapper,
                 self._options,
                 self._build_config,
-                self._run_tracker,
-                self._reporting,
+                self._run_tracker,  # type: ignore
+                self._reporting,  # type: ignore
                 self._graph_session,
                 self._specs,
                 self._exiter,
@@ -322,15 +321,16 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
             .run()
         )
 
-    def _maybe_run_v2(self):
+    def _maybe_run_v2(self, v2: bool) -> int:
         # N.B. For daemon runs, @goal_rules are invoked pre-fork -
         # so this path only serves the non-daemon run mode.
         if self._is_daemon:
             return PANTS_SUCCEEDED_EXIT_CODE
 
         _, ambiguous_goals, v2_goals = self._options.goals_by_version
-        goals = v2_goals + (ambiguous_goals if self._global_options.v2 else tuple())
-        self._run_tracker.set_v2_goal_rule_names(goals)
+        goals = v2_goals + (ambiguous_goals if v2 else tuple())
+        if self._run_tracker:
+            self._run_tracker.set_v2_goal_rule_names(goals)
         if not goals:
             return PANTS_SUCCEEDED_EXIT_CODE
 
@@ -372,10 +372,12 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         if help_output is not None:
             self._exiter.exit(help_output)
 
+        v1 = global_options.v1
+        v2 = global_options.v2
         with streaming_reporter.session():
             try:
-                engine_result = self._maybe_run_v2()
-                goal_runner_result = self._maybe_run_v1()
+                engine_result = self._maybe_run_v2(v2)
+                goal_runner_result = self._maybe_run_v1(v1)
             finally:
                 run_tracker_result = self._finish_run()
         final_exit_code = self._compute_final_exit_code(
