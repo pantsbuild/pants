@@ -4,6 +4,8 @@
 import threading
 import time
 
+from pants.util.logging import LogLevel
+
 
 class ReportingError(Exception):
     pass
@@ -40,25 +42,21 @@ class Report:
     """A report of a pants run."""
 
     # Log levels.
-    FATAL = 0
     ERROR = 1
     WARN = 2
     INFO = 3
     DEBUG = 4
 
     _log_level_name_map = {
-        "FATAL": FATAL,
-        "ERROR": ERROR,
-        "WARN": WARN,
-        "WARNING": WARN,
-        "INFO": INFO,
-        "DEBUG": DEBUG,
+        LogLevel.ERROR: ERROR,
+        LogLevel.WARN: WARN,
+        LogLevel.INFO: INFO,
+        LogLevel.DEBUG: DEBUG,
     }
 
-    @staticmethod
-    def log_level_from_string(s):
-        s = s.upper()
-        return Report._log_level_name_map.get(s, Report.INFO)
+    @classmethod
+    def report_level_from_log_level(cls, log_level: LogLevel) -> int:
+        return cls._log_level_name_map.get(log_level, Report.INFO)
 
     def __init__(self):
         # We periodically emit newly gathered output from tool invocations.

@@ -39,6 +39,7 @@ from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import fast_relpath
 from pants.util.enums import match
+from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import classproperty
 from pants.util.strutil import safe_shlex_join
@@ -363,6 +364,17 @@ class BaseZincCompile(JvmCompile):
         # TODO: Support workdirs not nested under buildroot by path-rewriting.
         return fast_relpath(path, get_buildroot())
 
+    _LOG_LEVEL_TO_ZINC_LOG_LEVEL = {
+        LogLevel.DEBUG: "debug",
+        LogLevel.INFO: "info",
+        LogLevel.WARN: "warn",
+        LogLevel.ERROR: "error",
+    }
+
+    def create_zinc_log_level_args(self):
+        zinc_log_level = self._LOG_LEVEL_TO_ZINC_LOG_LEVEL.get(self.get_options().level)
+        return ["-log-level", zinc_log_level] if zinc_log_level is not None else []
+
     def _diagnostics_out(self, ctx):
         if not self.get_options().report_diagnostic_counts:
             return None
@@ -393,10 +405,9 @@ class BaseZincCompile(JvmCompile):
             for classpath_entry in scalac_classpath_entries
         ]
         zinc_args = []
+        zinc_args.extend(self.create_zinc_log_level_args())
         zinc_args.extend(
             [
-                "-log-level",
-                self.get_options().level,
                 "-analysis-cache",
                 analysis_cache,
                 "-classpath",

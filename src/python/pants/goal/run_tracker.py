@@ -833,6 +833,3 @@ class RunTrackerLogger:
 
     def error(self, *msg_elements):
         self._run_tracker.log(Report.ERROR, *msg_elements)
-
-    def fatal(self, *msg_elements):
-        self._run_tracker.log(Report.FATAL, *msg_elements)

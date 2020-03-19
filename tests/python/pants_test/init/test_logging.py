@@ -3,12 +3,15 @@
 
 import logging
 from contextlib import contextmanager
+from logging import Logger
 from pathlib import Path
+from typing import Iterator, Tuple
 
-from pants.init.logging import get_numeric_level, setup_logging
+from pants.init.logging import FileLoggingSetupResult, setup_logging
 from pants.testutil.engine.util import init_native
 from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
+from pants.util.logging import LogLevel
 
 
 class LoggingTest(TestBase):
@@ -21,29 +24,29 @@ class LoggingTest(TestBase):
         init_native().init_rust_logging(
             # We set the level to the least verbose possible, as individual tests will increase the
             # verbosity as necessary.
-            level=get_numeric_level("ERROR"),
+            level=LogLevel.ERROR.level,
             log_show_rust_3rdparty=False,
         )
 
     @contextmanager
-    def logger(self, level):
+    def logger(self, log_level: LogLevel) -> Iterator[Tuple[Logger, FileLoggingSetupResult]]:
         native = self.scheduler._scheduler._native
         logger = logging.getLogger("my_file_logger")
         with temporary_dir() as log_dir:
             logging_setup_result = setup_logging(
-                level, log_dir=log_dir, scope=logger.name, native=native
+                log_level, log_dir=log_dir, scope=logger.name, native=native
             )
             yield logger, logging_setup_result
 
-    def test_utf8_logging(self):
-        with self.logger("INFO") as (file_logger, logging_setup_result):
+    def test_utf8_logging(self) -> None:
+        with self.logger(LogLevel.INFO) as (file_logger, logging_setup_result):
             cat = "🐈"
             file_logger.info(cat)
             logging_setup_result.log_handler.flush()
             self.assertIn(cat, Path(logging_setup_result.log_filename).read_text())
 
-    def test_file_logging(self):
-        with self.logger("INFO") as (file_logger, logging_setup_result):
+    def test_file_logging(self) -> None:
+        with self.logger(LogLevel.INFO) as (file_logger, logging_setup_result):
             file_logger.warning("this is a warning")
             file_logger.info("this is some info")
             file_logger.debug("this is some debug info")

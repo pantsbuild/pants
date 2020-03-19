@@ -27,6 +27,7 @@ from pants.reporting.reporting_utils import items_to_report_element
 from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 from pants.util.dirutil import safe_mkdir, safe_rm_oldest_items_in_dir
+from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import classproperty
 
@@ -219,6 +220,19 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
         passthru_args.extend(self.get_options().get("passthrough_args", default=()))
         passthru_args.extend(self.context.options.passthru_args_for_scope(self.options_scope))
         return passthru_args
+
+    @property
+    def debug(self) -> bool:
+        """Whether debugging is requested for this task.
+
+        If `True` the task can assume the user wants debugging information surrounding the task
+        logged. Common uses of this include passing debug logging flags through to tools a task
+        runs.
+
+        :API: public
+        """
+        log_level: LogLevel = self.get_options().level
+        return log_level == LogLevel.DEBUG
 
     @property
     def skip_execution(self):

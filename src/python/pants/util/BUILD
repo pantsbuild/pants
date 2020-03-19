@@ -79,6 +79,12 @@ python_library(
 )
 
 python_library(
+  name = 'logging',
+  sources = ['logging.py'],
+  tags = {'type_checked'},
+)
+
+python_library(
   name = 'memo',
   sources = ['memo.py'],
   dependencies = [
