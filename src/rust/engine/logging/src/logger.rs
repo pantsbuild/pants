@@ -64,14 +64,17 @@ impl Logger {
   }
 
   pub fn set_stderr_logger(&self, python_level: u64) -> Result<(), String> {
-    python_level.try_into().map(|level: PythonLogLevel| {
-      self.maybe_increase_global_verbosity(level.into());
-      *self.stderr_log.lock() = MaybeWriteLogger::new(
-        stderr(),
-        level.into(),
-        self.show_rust_3rdparty_logs.load(Ordering::SeqCst),
-      )
-    })
+    python_level
+      .try_into()
+      .map_err(|err| format!("{}", err))
+      .map(|level: PythonLogLevel| {
+        self.maybe_increase_global_verbosity(level.into());
+        *self.stderr_log.lock() = MaybeWriteLogger::new(
+          stderr(),
+          level.into(),
+          self.show_rust_3rdparty_logs.load(Ordering::SeqCst),
+        )
+      })
   }
 
   ///
@@ -85,27 +88,30 @@ impl Logger {
     python_level: u64,
   ) -> Result<std::os::unix::io::RawFd, String> {
     use std::os::unix::io::AsRawFd;
-    python_level.try_into().and_then(|level: PythonLogLevel| {
-      {
-        // Maybe close open file by dropping the existing logger
-        *self.pantsd_log.lock() = MaybeWriteLogger::empty();
-      }
-      OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(log_file_path)
-        .map(|file| {
-          let fd = file.as_raw_fd();
-          self.maybe_increase_global_verbosity(level.into());
-          *self.pantsd_log.lock() = MaybeWriteLogger::new(
-            file,
-            level.into(),
-            self.show_rust_3rdparty_logs.load(Ordering::SeqCst),
-          );
-          fd
-        })
-        .map_err(|err| format!("Error opening pantsd logfile: {}", err))
-    })
+    python_level
+      .try_into()
+      .map_err(|err| format!("{}", err))
+      .and_then(|level: PythonLogLevel| {
+        {
+          // Maybe close open file by dropping the existing logger
+          *self.pantsd_log.lock() = MaybeWriteLogger::empty();
+        }
+        OpenOptions::new()
+          .create(true)
+          .append(true)
+          .open(log_file_path)
+          .map(|file| {
+            let fd = file.as_raw_fd();
+            self.maybe_increase_global_verbosity(level.into());
+            *self.pantsd_log.lock() = MaybeWriteLogger::new(
+              file,
+              level.into(),
+              self.show_rust_3rdparty_logs.load(Ordering::SeqCst),
+            );
+            fd
+          })
+          .map_err(|err| format!("Error opening pantsd logfile: {}", err))
+      })
   }
 
   pub fn log_from_python(
@@ -114,9 +120,12 @@ impl Logger {
     python_level: u64,
     target: &str,
   ) -> Result<(), String> {
-    python_level.try_into().map(|level: PythonLogLevel| {
-      log!(target: target, level.into(), "{}", message);
-    })
+    python_level
+      .try_into()
+      .map_err(|err| format!("{}", err))
+      .map(|level: PythonLogLevel| {
+        log!(target: target, level.into(), "{}", message);
+      })
   }
 
   pub fn register_engine_display(&self, engine_display: Arc<Mutex<EngineDisplay>>) -> Uuid {
