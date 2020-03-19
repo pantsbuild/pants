@@ -16,14 +16,15 @@ from pants.backend.python.rules import (
     repl,
     run_setup_py,
 )
+from pants.backend.python.rules.targets import PythonBinary, PythonLibrary, PythonTests
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.targets.python_app import PythonApp
-from pants.backend.python.targets.python_binary import PythonBinary
+from pants.backend.python.targets.python_binary import PythonBinary as PythonBinaryV1
 from pants.backend.python.targets.python_distribution import PythonDistribution
-from pants.backend.python.targets.python_library import PythonLibrary
+from pants.backend.python.targets.python_library import PythonLibrary as PythonLibraryV1
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_requirements_file import PythonRequirementsFile
-from pants.backend.python.targets.python_tests import PythonTests
+from pants.backend.python.targets.python_tests import PythonTests as PythonTestsV1
 from pants.backend.python.targets.unpacked_whls import UnpackedWheels
 from pants.backend.python.tasks.build_local_python_distributions import (
     BuildLocalPythonDistributions,
@@ -61,9 +62,9 @@ def build_file_aliases():
     return BuildFileAliases(
         targets={
             PythonApp.alias(): PythonApp,
-            PythonBinary.alias(): PythonBinary,
-            PythonLibrary.alias(): PythonLibrary,
-            PythonTests.alias(): PythonTests,
+            PythonBinaryV1.alias(): PythonBinaryV1,
+            PythonLibraryV1.alias(): PythonLibraryV1,
+            PythonTestsV1.alias(): PythonTestsV1,
             PythonDistribution.alias(): PythonDistribution,
             "python_requirement_library": PythonRequirementLibrary,
             PythonRequirementsFile.alias(): PythonRequirementsFile,
@@ -120,3 +121,7 @@ def rules():
         *run_setup_py.rules(),
         *subprocess_environment.rules(),
     )
+
+
+def targets2():
+    return [PythonBinary, PythonLibrary, PythonTests]

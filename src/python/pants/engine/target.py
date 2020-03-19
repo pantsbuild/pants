@@ -17,7 +17,6 @@ from pants.engine.fs import (
     PathGlobs,
     Snapshot,
 )
-from pants.engine.parser import HydratedStruct
 from pants.engine.rules import RootRule, UnionMembership, rule
 from pants.engine.selectors import Get
 from pants.util.collections import ensure_str_list
@@ -416,6 +415,41 @@ class Target(ABC):
         )
 
 
+@dataclass(frozen=True)
+class WrappedTarget:
+    """A light wrapper to encapsulate all the distinct `Target` subclasses into a single type.
+
+    This is necessary when using a single target in a rule because the engine expects exact types
+    and does not work with subtypes.
+    """
+
+    target: Target
+
+
+@dataclass(frozen=True)
+class RegisteredTargetTypes:
+    # TODO: add `FrozenDict` as a light-weight wrapper around `dict` that de-registers the
+    #  mutation entry points.
+    aliases_to_types: Dict[str, Type[Target]]
+
+    @classmethod
+    def create(cls, target_types: Iterable[Type[Target]]) -> "RegisteredTargetTypes":
+        return cls(
+            {
+                target_type.alias: target_type
+                for target_type in sorted(target_types, key=lambda target_type: target_type.alias)
+            }
+        )
+
+    @property
+    def aliases(self) -> Tuple[str, ...]:
+        return tuple(self.aliases_to_types.keys())
+
+    @property
+    def types(self) -> Tuple[Type[Target], ...]:
+        return tuple(self.aliases_to_types.values())
+
+
 # TODO: add light-weight runtime type checking to these helper fields, such as ensuring that
 # the raw_value of `BoolField` is in fact a `bool` and not an int or str. Use `instanceof`. All
 # the types are primitive objects like `str` and `int`, so this should be performant and easy to
@@ -565,50 +599,6 @@ async def hydrate_sources(
     )
     sources_field.validate_snapshot(snapshot)
     return HydratedSources(snapshot)
-
-
-# TODO: move this conversion into a rule. Create a singleton to access all the registered
-#  targets (or maybe just use unions). Consider having that singleton be a dict from alias ->
-#  Target for efficient lookups (we're guaranteed only one alias per target type).
-def hydrated_struct_to_target(
-    hydrated_struct: HydratedStruct, *, target_types: Iterable[Type[Target]]
-) -> Target:
-    kwargs = hydrated_struct.value.kwargs().copy()
-    type_alias = kwargs.pop("type_alias")
-
-    # We special case `address` and the field `name`. The `Target` constructor requires an
-    # `Address`, so we use the value pre-calculated via `build_files.py`'s `hydrate_struct` rule.
-    # We throw away the field `name` because it can be accessed via `tgt.address.target_name`, so
-    # there is no (known) reason to preserve the field and it's slightly tricky to get the default
-    # value correct for the field.
-    address = cast(Address, kwargs.pop("address"))
-    kwargs.pop("name", None)
-
-    # We convert `source` into `sources` because the Target API has no `Source` field, only
-    # `Sources`.
-    if "source" in kwargs and "sources" in kwargs:
-        raise TargetDefinitionException(
-            address, "Cannot specify both `source` and `sources` fields."
-        )
-    if "source" in kwargs:
-        source = kwargs.pop("source")
-        if not isinstance(source, str):
-            raise TargetDefinitionException(
-                address,
-                f"The `source` field must be a string containing a path relative to the target, "
-                f"but got {source} of type {type(source)}.",
-            )
-        kwargs["sources"] = [source]
-
-    aliases_to_target_types = {target_type.alias: target_type for target_type in target_types}
-    target_type = aliases_to_target_types.get(type_alias, None)
-    if target_type is None:
-        raise TargetDefinitionException(
-            address,
-            f"Target type {type_alias} is not recognized. All valid target types: "
-            f"{sorted(aliases_to_target_types.keys())}.",
-        )
-    return target_type(kwargs, address=address)
 
 
 def rules():

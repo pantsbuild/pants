@@ -123,15 +123,11 @@ def load_plugins(
         if is_v1_plugin:
             if "register_goals" in entries:
                 entries["register_goals"].load()()
-
-            # TODO: Might v2 plugins need to register global subsystems? Hopefully not.
             if "global_subsystems" in entries:
                 subsystems = entries["global_subsystems"].load()()
                 build_configuration.register_optionables(subsystems)
-
-            # The v2 target API is still TBD, so we keep build_file_aliases as a v1-only thing.
-            # Having thus no overlap between v1 and v2 backend entrypoints makes things much simpler.
-            # TODO: Revisit, ideally with a v2-only entry point, once the v2 target API is a thing.
+            # For now, `build_file_aliases` is still V1-only. TBD what entry-point we use for
+            # `objects` and `context_aware_object_factories`.
             if "build_file_aliases" in entries:
                 aliases = entries["build_file_aliases"].load()()
                 build_configuration.register_aliases(aliases)
@@ -142,6 +138,9 @@ def load_plugins(
             if "build_file_aliases2" in entries:
                 build_file_aliases2 = entries["build_file_aliases2"].load()()
                 build_configuration.register_aliases(build_file_aliases2)
+            if "targets2" in entries:
+                targets = entries["targets2"].load()()
+                build_configuration.register_targets(targets)
         loaded[dist.as_requirement().key] = dist
 
 
@@ -197,15 +196,11 @@ def load_backend(
 
     if is_v1_backend:
         invoke_entrypoint("register_goals")
-
-        # TODO: Might v2 plugins need to register global subsystems? Hopefully not.
         subsystems = invoke_entrypoint("global_subsystems")
         if subsystems:
             build_configuration.register_optionables(subsystems)
-
-        # The v2 target API is still TBD, so we keep build_file_aliases as a v1-only thing.
-        # Having thus no overlap between v1 and v2 backend entrypoints makes things much simpler.
-        # TODO: Revisit, ideally with a v2-only entry point, once the v2 target API is a thing.
+        # For now, `build_file_aliases` is still V1-only. TBD what entry-point we use for
+        # `objects` and `context_aware_object_factories`.
         build_file_aliases = invoke_entrypoint("build_file_aliases")
         if build_file_aliases:
             build_configuration.register_aliases(build_file_aliases)
@@ -213,6 +208,9 @@ def load_backend(
         rules = invoke_entrypoint("rules")
         if rules:
             build_configuration.register_rules(rules)
+        targets = invoke_entrypoint("targets2")
+        if targets:
+            build_configuration.register_targets(targets)
         build_file_aliases2 = invoke_entrypoint("build_file_aliases2")
         if build_file_aliases2:
             build_configuration.register_aliases(build_file_aliases2)
