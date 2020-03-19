@@ -28,10 +28,10 @@ class PythonBinaryFields:
     sources: PythonBinarySources
     entry_point: EntryPoint
 
-    # TODO: consume the other PythonBinary fields like `ZipSafe`. Consider making those fields
-    #  optional. We _need_ PythonBinarySources and EntryPoint to work properly. If your target
-    #  type also has ZipSafe, AlwaysWriteCache, etc, then we can do some additional things as an
-    #  extra bonus. Consider adding `Target.maybe_get()` to facilitate this.
+    # TODO: consume the other PythonBinary fields like `ZipSafe` and `AlwaysWriteCache`. These are
+    #  optional fields. If your target type has them registered, we can do extra meaningful things;
+    #  if you don't have them on your target type, we can still operate so long as you have the
+    #  required fields. Use `Target.get()` in the `create()` method.
 
     @staticmethod
     def is_valid_target(tgt: Target) -> bool:
@@ -39,9 +39,7 @@ class PythonBinaryFields:
 
     @classmethod
     def create(cls, tgt: Target) -> "PythonBinaryFields":
-        return cls(
-            tgt.address, sources=tgt.get(PythonBinarySources), entry_point=tgt.get(EntryPoint)
-        )
+        return cls(tgt.address, sources=tgt[PythonBinarySources], entry_point=tgt[EntryPoint])
 
 
 @rule
