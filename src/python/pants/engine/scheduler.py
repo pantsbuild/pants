@@ -235,10 +235,7 @@ class Scheduler:
                     yield line.rstrip()
 
     def invalidate_files(self, direct_filenames):
-        # NB: Watchman no longer triggers events when children are created/deleted under a directory,
-        # so we always need to invalidate the direct parent as well.
         filenames = set(direct_filenames)
-        filenames.update(os.path.dirname(f) for f in direct_filenames)
         filenames_buf = self._native.context.utf8_buf_buf(filenames)
         return self._native.lib.graph_invalidate(self._scheduler, filenames_buf)
 

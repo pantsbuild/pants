@@ -4,7 +4,9 @@
 import hashlib
 import logging
 import os
+import shutil
 import tarfile
+import time
 import unittest
 from abc import ABCMeta
 from contextlib import contextmanager
@@ -55,6 +57,17 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
             return globs
         return PathGlobs(globs)
 
+    def read_file_content(self, scheduler, filespecs_or_globs):
+        """Helper method for reading the content of some files from an existing scheduler
+        session."""
+        snapshot = self.execute_expecting_one_result(
+            scheduler, Snapshot, self.path_globs(filespecs_or_globs)
+        ).value
+        result = self.execute_expecting_one_result(
+            scheduler, FilesContent, snapshot.directory_digest
+        ).value
+        return {f.path: f.content for f in result.dependencies}
+
     def assert_walk_dirs(self, filespecs_or_globs, paths, **kwargs):
         self.assert_walk_snapshot("dirs", filespecs_or_globs, paths, **kwargs)
 
@@ -74,13 +87,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
     def assert_content(self, filespecs_or_globs, expected_content):
         with self.mk_project_tree() as project_tree:
             scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree)
-            snapshot = self.execute_expecting_one_result(
-                scheduler, Snapshot, self.path_globs(filespecs_or_globs)
-            ).value
-            result = self.execute_expecting_one_result(
-                scheduler, FilesContent, snapshot.directory_digest
-            ).value
-            actual_content = {f.path: f.content for f in result.dependencies}
+            actual_content = self.read_file_content(scheduler, filespecs_or_globs)
             self.assertEqual(expected_content, actual_content)
 
     def assert_digest(self, filespecs_or_globs, expected_files):
@@ -707,6 +714,94 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
 
         subset_digest = self.request_single_product(Digest, subset_input)
         assert subset_snapshot.directory_digest == subset_digest
+
+    def test_file_content_invalidated(self) -> None:
+        """Test that we can update files and have the native engine invalidate previous operations
+        on those files."""
+
+        with self.mk_project_tree() as project_tree:
+            scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree)
+            fname = "4.txt"
+            new_data = "rouf"
+            # read the original file so we have a cached value.
+            self.read_file_content(scheduler, [fname])
+            path_to_fname = os.path.join(project_tree.build_root, fname)
+            with open(path_to_fname, "w") as f:
+                f.write(new_data)
+            for i in range(4):
+                time.sleep(0.1 * i)
+                new_content = self.read_file_content(scheduler, [fname])
+                if new_content[fname].decode("utf-8") == new_data:
+                    # successfully read new data
+                    break
+            else:
+                raise AssertionError(
+                    f"New content {new_data} was not found in the FilesContent of the modified file {path_to_fname}, instead we found {new_content[fname]}"
+                )
+
+    def test_file_content_invalidated_after_parent_deletion(self) -> None:
+        """Test that FileContent is invalidated after deleting parent directory."""
+
+        with self.mk_project_tree() as project_tree:
+            scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree)
+            fname = "a/b/1.txt"
+            # read the original file so we have nodes to invalidate.
+            original_content = self.read_file_content(scheduler, [fname])
+            self.assertIn(fname, original_content)
+            path_to_parent_dir = os.path.join(project_tree.build_root, "a/b/")
+            shutil.rmtree(path_to_parent_dir)
+            for i in range(4):
+                time.sleep(0.1 * i)
+                new_content = self.read_file_content(scheduler, [fname])
+                if new_content.get(fname) is None:
+                    break
+            else:
+                raise AssertionError(
+                    f"Deleting parent dir and could still read file from original snapshot."
+                )
+
+    def assert_mutated_directory_digest(self, mutation_function):
+        with self.mk_project_tree() as project_tree:
+            scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree)
+            dir_path = "a/"
+            dir_glob = dir_path + "*"
+            initial_snapshot = self.execute_expecting_one_result(
+                scheduler, Snapshot, self.path_globs([dir_glob])
+            ).value
+            assert not initial_snapshot.is_empty
+            assertion_error = mutation_function(project_tree, dir_path)
+            for i in range(4):
+                time.sleep(0.1 * i)
+                new_snapshot = self.execute_expecting_one_result(
+                    scheduler, Snapshot, self.path_globs([dir_glob])
+                ).value
+                assert not new_snapshot.is_empty
+                if initial_snapshot.directory_digest != new_snapshot.directory_digest:
+                    # successfully invalidated snapshot and got a new digest
+                    break
+            else:
+                raise assertion_error
+
+    def test_directory_digest_invalidated_by_child_removal(self):
+        def mutation_function(project_tree, dir_path):
+            removed_path = os.path.join(project_tree.build_root, dir_path, "3.txt")
+            os.remove(removed_path)
+            return AssertionError(
+                f"Did not find a new directory snapshot after adding file {removed_path}."
+            )
+
+        self.assert_mutated_directory_digest(mutation_function)
+
+    def test_directory_digest_invalidated_by_child_change(self):
+        def mutation_function(project_tree, dir_path):
+            new_file_path = os.path.join(project_tree.build_root, dir_path, "new_file.txt")
+            with open(new_file_path, "w") as f:
+                f.write("new file")
+            return AssertionError(
+                f"Did not find a new directory snapshot after adding file {new_file_path}."
+            )
+
+        self.assert_mutated_directory_digest(mutation_function)
 
 
 class StubHandler(BaseHTTPRequestHandler):

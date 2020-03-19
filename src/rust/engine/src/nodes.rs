@@ -1033,13 +1033,6 @@ impl Node for NodeKey {
   type Error = Failure;
 
   fn run(self, context: Context) -> NodeFuture<NodeResult> {
-    if let Some(path) = self.fs_subject() {
-      let abs_path = context.core.build_root.join(path);
-      context
-        .core
-        .executor
-        .spawn_and_ignore(context.core.watcher.watch(abs_path));
-    }
     let (maybe_started_workunit, maybe_span_id) = if context.session.should_handle_workunits() {
       let user_facing_name = self.user_facing_name();
       let span_id = generate_random_64bit_string();
@@ -1061,26 +1054,46 @@ impl Node for NodeKey {
     };
 
     let context2 = context.clone();
-    future::lazy(|| {
-      if let Some(span_id) = maybe_span_id {
-        set_parent_id(span_id);
-      }
-      match self {
-        NodeKey::DigestFile(n) => n.run(context).map(NodeResult::from).to_boxed(),
-        NodeKey::DownloadedFile(n) => n.run(context).map(NodeResult::from).to_boxed(),
-        NodeKey::MultiPlatformExecuteProcess(n) => n.run(context).map(NodeResult::from).to_boxed(),
-        NodeKey::ReadLink(n) => n.run(context).map(NodeResult::from).to_boxed(),
-        NodeKey::Scandir(n) => n.run(context).map(NodeResult::from).to_boxed(),
-        NodeKey::Select(n) => n.run(context).map(NodeResult::from).to_boxed(),
-        NodeKey::Snapshot(n) => n.run(context).map(NodeResult::from).to_boxed(),
-        NodeKey::Task(n) => n.run(context).map(NodeResult::from).to_boxed(),
+    future::lazy({
+      let context = context.clone();
+      let self2 = self.clone();
+      move || {
+        if let Some(path) = self2.fs_subject() {
+          let abs_path = context.core.build_root.join(path);
+          context
+            .core
+            .executor
+            .spawn_on_io_pool(context.core.watcher.watch(abs_path))
+            .to_boxed()
+        } else {
+          future::ok(()).to_boxed()
+        }
       }
     })
-    .inspect(move |_: &NodeResult| {
-      if let Some(started_workunit) = maybe_started_workunit {
-        let workunit: WorkUnit = started_workunit.finish();
-        context2.session.workunit_store().add_workunit(workunit)
-      }
+    .then(|_| {
+      future::lazy(|| {
+        if let Some(span_id) = maybe_span_id {
+          set_parent_id(span_id);
+        }
+        match self {
+          NodeKey::DigestFile(n) => n.run(context).map(NodeResult::from).to_boxed(),
+          NodeKey::DownloadedFile(n) => n.run(context).map(NodeResult::from).to_boxed(),
+          NodeKey::MultiPlatformExecuteProcess(n) => {
+            n.run(context).map(NodeResult::from).to_boxed()
+          }
+          NodeKey::ReadLink(n) => n.run(context).map(NodeResult::from).to_boxed(),
+          NodeKey::Scandir(n) => n.run(context).map(NodeResult::from).to_boxed(),
+          NodeKey::Select(n) => n.run(context).map(NodeResult::from).to_boxed(),
+          NodeKey::Snapshot(n) => n.run(context).map(NodeResult::from).to_boxed(),
+          NodeKey::Task(n) => n.run(context).map(NodeResult::from).to_boxed(),
+        }
+      })
+      .inspect(move |_: &NodeResult| {
+        if let Some(started_workunit) = maybe_started_workunit {
+          let workunit: WorkUnit = started_workunit.finish();
+          context2.session.workunit_store().add_workunit(workunit)
+        }
+      })
     })
     .to_boxed()
   }
