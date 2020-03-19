@@ -7,6 +7,7 @@ import sys
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass
+from typing import Optional
 
 from setproctitle import setproctitle as set_process_title
 
@@ -112,12 +113,11 @@ class PantsDaemon(FingerprintedProcessManager):
 
     class Factory:
         @classmethod
-        def maybe_launch(cls, options_bootstrapper):
+        def maybe_launch(cls, options_bootstrapper) -> "PantsDaemon.Handle":
             """Creates and launches a daemon instance if one does not already exist.
 
             :param OptionsBootstrapper options_bootstrapper: The bootstrap options.
             :returns: A Handle for the running pantsd instance.
-            :rtype: PantsDaemon.Handle
             """
             stub_pantsd = cls.create(options_bootstrapper, full_init=False)
             with stub_pantsd._services.lifecycle_lock:
@@ -147,7 +147,7 @@ class PantsDaemon(FingerprintedProcessManager):
                 return pantsd.launch()
 
         @classmethod
-        def create(cls, options_bootstrapper, full_init=True):
+        def create(cls, options_bootstrapper, full_init=True) -> "PantsDaemon":
             """
             :param OptionsBootstrapper options_bootstrapper: The bootstrap options.
             :param bool full_init: Whether or not to fully initialize an engine et al for the purposes
@@ -160,6 +160,9 @@ class PantsDaemon(FingerprintedProcessManager):
             bootstrap_options_values = bootstrap_options.for_global_scope()
             # TODO: https://github.com/pantsbuild/pants/issues/3479
             watchman = WatchmanLauncher.create(bootstrap_options_values).watchman
+
+            native: Optional[Native] = None
+            build_root: Optional[str] = None
 
             if full_init:
                 build_root = get_buildroot()
@@ -176,8 +179,6 @@ class PantsDaemon(FingerprintedProcessManager):
                     union_membership=UnionMembership(build_config.union_rules()),
                 )
             else:
-                build_root = None
-                native = None
                 services = PantsServices()
 
             return PantsDaemon(
@@ -245,8 +246,8 @@ class PantsDaemon(FingerprintedProcessManager):
 
     def __init__(
         self,
-        native,
-        build_root,
+        native: Optional[Native],
+        build_root: Optional[str],
         work_dir,
         log_level,
         services,
@@ -490,13 +491,12 @@ class PantsDaemon(FingerprintedProcessManager):
         )
         return self.needs_restart(new_fingerprint)
 
-    def launch(self):
+    def launch(self) -> "PantsDaemon.Handle":
         """Launches pantsd in a subprocess.
 
         N.B. This should always be called under care of the `lifecycle_lock`.
 
         :returns: A Handle for the pantsd instance.
-        :rtype: PantsDaemon.Handle
         """
         self.terminate(include_watchman=False)
         self.watchman_launcher.maybe_launch()
