@@ -6,7 +6,7 @@ import os
 import queue
 import sys
 import threading
-from typing import List, Optional, Set, Tuple, cast
+from typing import List, Optional, Set, Tuple
 
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import Specs
@@ -214,15 +214,29 @@ class SchedulerService(PantsService):
                 "graph len was {}, waiting for initial watchman event".format(graph_len)
             )
             self._watchman_is_running.wait()
+
+        global_options = options.for_global_scope()
+
         build_id = RunTracker.global_instance().run_id
-        v2_ui = options.for_global_scope().get("v2_ui", False)
+        v2_ui = global_options.get("v2_ui", False)
         zipkin_trace_v2 = options.for_scope("reporting").zipkin_trace_v2
         session = self._graph_helper.new_session(zipkin_trace_v2, build_id, v2_ui)
 
-        if options.for_global_scope().get("loop", False):
-            specs, exit_code = self._loop(session, options, options_bootstrapper)
+        specs = SpecsCalculator.create(
+            options=options,
+            session=session.scheduler_session,
+            exclude_patterns=tuple(global_options.exclude_target_regexp),
+            tags=tuple(global_options.tag) if global_options.tag else tuple(),
+        )
+
+        perform_loop = global_options.get("loop", False)
+        v2 = global_options.v2
+
+        if perform_loop:
+            loop_max = global_options.loop_max
+            exit_code = self._loop(session, options, options_bootstrapper, specs, loop_max, v2)
         else:
-            specs, exit_code = self._body(session, options, options_bootstrapper)
+            exit_code = self._body(session, options, options_bootstrapper, specs, v2)
         return session, specs, exit_code
 
     def _loop(
@@ -230,14 +244,15 @@ class SchedulerService(PantsService):
         session: LegacyGraphSession,
         options: Options,
         options_bootstrapper: OptionsBootstrapper,
-    ) -> Tuple[Specs, int]:
+        specs: Specs,
+        iterations: int,
+        v2: bool,
+    ) -> int:
         # TODO: See https://github.com/pantsbuild/pants/issues/6288 regarding Ctrl+C handling.
-        iterations = options.for_global_scope().loop_max
-        specs = None
         exit_code = PANTS_SUCCEEDED_EXIT_CODE
         while iterations and not self._state.is_terminating:
             try:
-                specs, exit_code = self._body(session, options, options_bootstrapper)
+                exit_code = self._body(session, options, options_bootstrapper, specs, v2)
             except session.scheduler_session.execution_error_type as e:
                 # Render retryable exceptions raised by the Scheduler.
                 print(e, file=sys.stderr)
@@ -249,29 +264,22 @@ class SchedulerService(PantsService):
                 and not self._loop_condition.wait(timeout=1)
             ):
                 continue
-        return cast(Specs, specs), exit_code
+        return exit_code
 
     def _body(
         self,
         session: LegacyGraphSession,
         options: Options,
         options_bootstrapper: OptionsBootstrapper,
-    ) -> Tuple[Specs, int]:
-        global_options = options.for_global_scope()
-        specs = SpecsCalculator.create(
-            options=options,
-            session=session.scheduler_session,
-            exclude_patterns=tuple(global_options.exclude_target_regexp)
-            if global_options.exclude_target_regexp
-            else tuple(),
-            tags=tuple(global_options.tag) if global_options.tag else tuple(),
-        )
+        specs: Specs,
+        v2: bool,
+    ) -> int:
         exit_code = PANTS_SUCCEEDED_EXIT_CODE
 
-        v1_goals, ambiguous_goals, v2_goals = options.goals_by_version
+        _, ambiguous_goals, v2_goals = options.goals_by_version
 
-        if v2_goals or (ambiguous_goals and global_options.v2):
-            goals = v2_goals + (ambiguous_goals if global_options.v2 else tuple())
+        if v2_goals or (ambiguous_goals and v2):
+            goals = v2_goals + (ambiguous_goals if v2 else tuple())
 
             # N.B. @goal_rules run pre-fork in order to cache the products they request during execution.
             exit_code = session.run_goal_rules(
@@ -282,7 +290,7 @@ class SchedulerService(PantsService):
                 specs=specs,
             )
 
-        return specs, exit_code
+        return exit_code
 
     def run(self):
         """Main service entrypoint."""
