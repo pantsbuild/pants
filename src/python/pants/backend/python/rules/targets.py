@@ -2,21 +2,21 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pathlib import PurePath
-from typing import Any, ClassVar, Optional
+from typing import ClassVar, Optional
 
-from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.address import Address
 from pants.engine.fs import Snapshot
 from pants.engine.objects import union
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
-    ImmutableValue,
-    PrimitiveField,
+    IntField,
+    InvalidFieldException,
     Sources,
     StringField,
     StringOrStringSequenceField,
     Target,
+    UnimplementedField,
 )
 
 
@@ -25,10 +25,9 @@ class PythonSources(Sources):
     def validate_snapshot(self, snapshot: Snapshot) -> None:
         non_python_files = [fp for fp in snapshot.files if not PurePath(fp).suffix == ".py"]
         if non_python_files:
-            raise TargetDefinitionException(
-                self.address,
-                "All files in the `sources` field must be Python files (i.e., end in `.py`): "
-                f"{non_python_files}.",
+            raise InvalidFieldException(
+                f"The {repr(self.alias)} field in target {self.address} must only contain Python "
+                f"files that end in `.py`, but it had these non-Python files: {non_python_files}."
             )
 
 
@@ -44,11 +43,11 @@ class PythonBinarySources(PythonSources):
     def validate_snapshot(self, snapshot: Snapshot) -> None:
         super().validate_snapshot(snapshot)
         if len(snapshot.files) not in [0, 1]:
-            raise TargetDefinitionException(
-                self.address,
-                "Binary targets must have only 0 or 1 source files. Any additional files should "
-                f"be put in a `python_library` which is added to `dependencies`. This target "
-                f"has {len(snapshot.files)} sources: {snapshot.files}.",
+            raise InvalidFieldException(
+                f"The {repr(self.alias)} field in target {self.address} must only have 0 or 1 "
+                f"files because it is a binary target, but has {len(snapshot.files)} sources: "
+                f"{sorted(snapshot.files)}.\n\nTo use any additional files, put them in a "
+                "`python_library` and then add that `python_library` as a `dependency`."
             )
 
 
@@ -63,13 +62,8 @@ class Compatibility(StringOrStringSequenceField):
     alias: ClassVar = "compatibility"
 
 
-# TODO: Deal with the `provides` field. This will at least allow us to correctly parse the field,
-#  rather than throwing an error when encountering it.
-class Provides(PrimitiveField):
+class Provides(UnimplementedField):
     alias: ClassVar = "provides"
-
-    def hydrate(self, raw_value: Optional[Any], *, address: Address) -> ImmutableValue:
-        return raw_value
 
 
 class Coverage(StringOrStringSequenceField):
@@ -78,7 +72,7 @@ class Coverage(StringOrStringSequenceField):
     alias: ClassVar = "coverage"
 
 
-class Timeout(PrimitiveField):
+class Timeout(IntField):
     """A timeout (in seconds) which covers the total runtime of all tests in this target.
 
     This only applies if `--pytest-timeouts` is set to True.
@@ -87,9 +81,11 @@ class Timeout(PrimitiveField):
     alias: ClassVar = "timeout"
 
     def hydrate(self, raw_value: Optional[int], *, address: Address) -> Optional[int]:
-        if raw_value is not None and raw_value <= 0:
-            raise TargetDefinitionException(
-                address, f"The `timeout` field must be > 1. Was {raw_value}."
+        hydrated_value = super().hydrate(raw_value, address=address)
+        if hydrated_value is not None and hydrated_value < 1:
+            raise InvalidFieldException(
+                f"The value for the `timeout` field in target {address} must be >= 1, but was "
+                f"{raw_value}."
             )
         return raw_value
 
