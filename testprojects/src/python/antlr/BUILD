@@ -1,10 +1,9 @@
 python_library(
   name = 'eval',
   sources = ['eval.py'],
-  # dependencies = [
-  #   'testprojects/src/antlr/python/test:eval',
-  # ],
-  # compatibility='CPython>=2.7,<3'
+  dependencies = [
+    'testprojects/src/antlr/python/test:eval',
+  ],
 )
 
 python_binary(
@@ -13,5 +12,4 @@ python_binary(
   dependencies = [
     ':eval',
   ],
-  # compatibility='CPython>=2.7,<3'
 )
