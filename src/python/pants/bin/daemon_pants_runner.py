@@ -12,6 +12,7 @@ from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode, Exiter
 from pants.bin.local_pants_runner import LocalPantsRunner
 from pants.init.logging import encapsulated_global_logger
+from pants.init.specs_calculator import SpecsCalculator
 from pants.init.util import clean_global_runtime_state
 from pants.java.nailgun_io import (
     NailgunStreamStdinReader,
@@ -264,21 +265,26 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
                     self._args, self._env
                 )
 
-                (
-                    graph_helper,
-                    specs,
-                    new_exit_code,
-                ) = self._scheduler_service.prepare_v1_graph_run_v2(options, options_bootstrapper,)
-                exit_code = new_exit_code
+                global_options = options.for_global_scope()
+                session = self._scheduler_service.prepare_graph(options)
 
-                # Otherwise, conduct a normal run.
+                specs = SpecsCalculator.create(
+                    options=options,
+                    session=session.scheduler_session,
+                    exclude_patterns=tuple(global_options.exclude_target_regexp),
+                    tags=tuple(global_options.tag) if global_options.tag else tuple(),
+                )
+
+                exit_code = self._scheduler_service.graph_run_v2(
+                    session, specs, options, options_bootstrapper
+                )
                 with ExceptionSink.exiter_as_until_exception(lambda _: PantsRunFailCheckerExiter()):
                     runner = LocalPantsRunner.create(
-                        self._args, self._env, specs, graph_helper, options_bootstrapper,
+                        self._args, self._env, specs, session, options_bootstrapper,
                     )
                     runner.set_start_time(self._maybe_get_client_start_time_from_env(self._env))
-
                     runner.run()
+
             except KeyboardInterrupt:
                 self._exiter.exit_and_fail("Interrupted by user.\n")
             except _PantsRunFinishedWithFailureException as e:
