@@ -81,7 +81,7 @@ class PathGlobs:
                                   unmatched globs. For example, this might be
                                   "the option `--isort-config`".
     """
-    self.globs = tuple(globs)
+    self.globs = tuple(sorted(globs))
     self.glob_match_error_behavior = glob_match_error_behavior
     self.conjunction = conjunction
     self.description_of_origin = description_of_origin or ""
