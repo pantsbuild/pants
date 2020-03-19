@@ -260,7 +260,7 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
                 # Clean global state.
                 clean_global_runtime_state(reset_subsystem=True)
 
-                options, _, options_bootstrapper = LocalPantsRunner.parse_options(
+                options, build_root, options_bootstrapper = LocalPantsRunner.parse_options(
                     self._args, self._env
                 )
                 graph_helper, specs, exit_code = self._scheduler_service.prepare_v1_graph_run_v2(
