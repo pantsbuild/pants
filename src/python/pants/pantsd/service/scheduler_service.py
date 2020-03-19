@@ -4,7 +4,6 @@
 import logging
 import os
 import queue
-import sys
 import threading
 from typing import List, Optional, Set
 
@@ -221,38 +220,20 @@ class SchedulerService(PantsService):
         v2 = global_options.v2
 
         if perform_loop:
+            # TODO: See https://github.com/pantsbuild/pants/issues/6288 regarding Ctrl+C handling.
             loop_max = global_options.loop_max
-            exit_code = self._loop(session, options, options_bootstrapper, specs, loop_max, v2)
+            exit_code = PANTS_SUCCEEDED_EXIT_CODE
+            for _ in range(loop_max):
+                if self._state.is_terminating or self._loop_condition.wait(timeout=1):
+                    break
+                try:
+                    exit_code = self._body(session, options, options_bootstrapper, specs, v2)
+                except session.scheduler_session.execution_error_type as e:
+                    self._logger.warning(e)
+
+            return exit_code
         else:
-            exit_code = self._body(session, options, options_bootstrapper, specs, v2)
-        return exit_code
-
-    def _loop(
-        self,
-        session: LegacyGraphSession,
-        options: Options,
-        options_bootstrapper: OptionsBootstrapper,
-        specs: Specs,
-        iterations: int,
-        v2: bool,
-    ) -> int:
-        # TODO: See https://github.com/pantsbuild/pants/issues/6288 regarding Ctrl+C handling.
-        exit_code = PANTS_SUCCEEDED_EXIT_CODE
-        while iterations and not self._state.is_terminating:
-            try:
-                exit_code = self._body(session, options, options_bootstrapper, specs, v2)
-            except session.scheduler_session.execution_error_type as e:
-                # Render retryable exceptions raised by the Scheduler.
-                print(e, file=sys.stderr)
-
-            iterations -= 1
-            while (
-                iterations
-                and not self._state.is_terminating
-                and not self._loop_condition.wait(timeout=1)
-            ):
-                continue
-        return exit_code
+            return self._body(session, options, options_bootstrapper, specs, v2)
 
     def _body(
         self,
