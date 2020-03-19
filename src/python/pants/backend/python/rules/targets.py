@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pathlib import PurePath
-from typing import ClassVar, Optional
+from typing import Optional
 
 from pants.build_graph.address import Address
 from pants.engine.fs import Snapshot
@@ -32,11 +32,11 @@ class PythonSources(Sources):
 
 
 class PythonLibrarySources(PythonSources):
-    default_globs: ClassVar = ("*.py", "!test_*.py", "!*_test.py", "!conftest.py")
+    default_globs = ("*.py", "!test_*.py", "!*_test.py", "!conftest.py")
 
 
 class PythonTestsSources(PythonSources):
-    default_globs: ClassVar = ("test_*.py", "*_test.py", "conftest.py")
+    default_globs = ("test_*.py", "*_test.py", "conftest.py")
 
 
 class PythonBinarySources(PythonSources):
@@ -59,17 +59,17 @@ class Compatibility(StringOrStringSequenceField):
     As a shortcut, you can leave off `CPython`, e.g. `>=2.7` will be expanded to `CPython>=2.7`.
     """
 
-    alias: ClassVar = "compatibility"
+    alias = "compatibility"
 
 
 class Provides(UnimplementedField):
-    alias: ClassVar = "provides"
+    alias = "provides"
 
 
 class Coverage(StringOrStringSequenceField):
     """The module(s) whose coverage should be generated, e.g. `['pants.util']`."""
 
-    alias: ClassVar = "coverage"
+    alias = "coverage"
 
 
 class Timeout(IntField):
@@ -78,7 +78,7 @@ class Timeout(IntField):
     This only applies if `--pytest-timeouts` is set to True.
     """
 
-    alias: ClassVar = "timeout"
+    alias = "timeout"
 
     def hydrate(self, raw_value: Optional[int], *, address: Address) -> Optional[int]:
         hydrated_value = super().hydrate(raw_value, address=address)
@@ -97,59 +97,59 @@ class EntryPoint(StringField):
     `__main__` function.
     """
 
-    alias: ClassVar = "entry_point"
+    alias = "entry_point"
 
 
 class Platforms(StringOrStringSequenceField):
     """Extra platforms to target when building a Python binary."""
 
-    alias: ClassVar = "platforms"
+    alias = "platforms"
 
 
 class PexInheritPath(BoolField):
     """Whether to inherit the `sys.path` of the environment that the binary runs in or not."""
 
-    alias: ClassVar = "inherit_path"
-    default: ClassVar = False
+    alias = "inherit_path"
+    default = False
 
 
 class PexZipSafe(BoolField):
     """Whether or not this binary is safe to run in compacted (zip-file) form."""
 
-    alias: ClassVar = "zip_safe"
-    default: ClassVar = True
+    alias = "zip_safe"
+    default = True
 
 
 class PexAlwaysWriteCache(BoolField):
     """Whether Pex should always write the .deps cache of the Pex file to disk or not."""
 
-    alias: ClassVar = "always_write_cache"
-    default: ClassVar = False
+    alias = "always_write_cache"
+    default = False
 
 
 class PexRepositories(StringOrStringSequenceField):
     """Repositories for Pex to query for dependencies."""
 
-    alias: ClassVar = "repositories"
+    alias = "repositories"
 
 
 class PexIndices(StringOrStringSequenceField):
     """Indices for Pex to use for packages."""
 
-    alias: ClassVar = "indices"
+    alias = "indices"
 
 
 class IgnorePexErrors(BoolField):
     """Should we ignore when Pex cannot resolve dependencies?"""
 
-    alias: ClassVar = "ignore_errors"
-    default: ClassVar = False
+    alias = "ignore_errors"
+    default = False
 
 
 class PexShebang(StringField):
     """For the generated Pex, use this shebang."""
 
-    alias: ClassVar = "shebang"
+    alias = "shebang"
 
 
 # TODO: This option is weird. Its default is determined by `--python-binary-pex-emit-warnings`.
@@ -158,8 +158,8 @@ class PexShebang(StringField):
 class EmitPexWarnings(BoolField):
     """Whether or not to emit Pex warnings at runtime."""
 
-    alias: ClassVar = "emit_warnings"
-    default: ClassVar = True
+    alias = "emit_warnings"
+    default = True
 
 
 COMMON_PYTHON_FIELDS = (*COMMON_TARGET_FIELDS, Compatibility, Provides)
@@ -173,8 +173,8 @@ class PythonBinary(Target):
     http://pantsbuild.github.io/python-readme.html#how-pex-files-work.
     """
 
-    alias: ClassVar = "python_binary"
-    core_fields: ClassVar = (
+    alias = "python_binary"
+    core_fields = (
         *COMMON_PYTHON_FIELDS,
         PythonBinarySources,
         EntryPoint,
@@ -191,10 +191,10 @@ class PythonBinary(Target):
 
 
 class PythonLibrary(Target):
-    alias: ClassVar = "python_library"
-    core_fields: ClassVar = (*COMMON_PYTHON_FIELDS, PythonLibrarySources)
+    alias = "python_library"
+    core_fields = (*COMMON_PYTHON_FIELDS, PythonLibrarySources)
 
 
 class PythonTests(Target):
-    alias: ClassVar = "python_tests"
-    core_fields: ClassVar = (*COMMON_PYTHON_FIELDS, PythonTestsSources, Coverage, Timeout)
+    alias = "python_tests"
+    core_fields = (*COMMON_PYTHON_FIELDS, PythonTestsSources, Coverage, Timeout)

@@ -659,7 +659,7 @@ class StringOrStringSequenceField(PrimitiveField):
 
 
 class Tags(StringSequenceField):
-    alias: ClassVar = "tags"
+    alias = "tags"
 
 
 # TODO: figure out what support looks like for this. This already gets hydrated into a
@@ -667,7 +667,7 @@ class Tags(StringSequenceField):
 #  back to being a List[str] and we only hydrate into Addresses when necessary? Alternatively, does
 #  hydration mean getting back `Targets`?
 class Dependencies(AsyncField):
-    alias: ClassVar = "dependencies"
+    alias = "dependencies"
     sanitized_raw_value: Optional[Tuple[Address, ...]]
 
     def sanitize_raw_value(
@@ -685,7 +685,7 @@ COMMON_TARGET_FIELDS = (Dependencies, Tags)
 
 
 class Sources(AsyncField):
-    alias: ClassVar = "sources"
+    alias = "sources"
     default_globs: ClassVar[Optional[Tuple[str, ...]]] = None
     sanitized_raw_value: Optional[Tuple[str, ...]]
 

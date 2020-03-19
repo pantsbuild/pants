@@ -1,8 +1,6 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import ClassVar
-
 from pants.engine.target import COMMON_TARGET_FIELDS, Sources, Target
 
 
@@ -16,4 +14,4 @@ class FilesSources(Sources):
 class Files(Target):
     """A collection of loose files."""
 
-    core_fields: ClassVar = (*COMMON_TARGET_FIELDS, FilesSources)
+    core_fields = (*COMMON_TARGET_FIELDS, FilesSources)

@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import ClassVar, Optional
+from typing import Optional
 
 from pants.backend.python.rules.pex import Pex
 from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
@@ -19,7 +19,7 @@ from pants.rules.core.determine_source_files import AllSourceFilesRequest, Sourc
 
 @dataclass(frozen=True)
 class PythonBinaryImplementation(BinaryImplementation):
-    required_fields: ClassVar = (EntryPoint, PythonBinarySources)
+    required_fields = (EntryPoint, PythonBinarySources)
 
     address: Address
     sources: PythonBinarySources
