@@ -305,20 +305,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'ivy_resolve_integration',
-  sources = ['test_ivy_resolve_integration.py'],
-  dependencies = [
-    'examples/src/scala/org/pantsbuild/example:hello_directory',
-    'src/java/org/pantsbuild:junit_directory',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/testutil:int-test',
-    'testprojects/src/java/org/pantsbuild/testproject:unicode_directory',
-  ],
-  timeout = 240,
-  tags = {'integration', 'partially_type_checked'},
-)
-
-python_tests(
   name = 'ivy_utils',
   sources = ['test_ivy_utils.py'],
   dependencies = [
