@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 _ANTLR3_REV = "3.1.3"
+_ANTLR4_REV = "4.7.2"
 
 
 # TODO: Refactor this and AntlrJavaGen to share a common base class with most of the functionality.
@@ -41,9 +42,22 @@ class AntlrPyGen(SimpleCodegenTask, NailgunTask):
             classpath=[JarDependency(org="org.antlr", name="antlr", rev=_ANTLR3_REV)],
             classpath_spec="//:antlr-{}".format(_ANTLR3_REV),
         )
+        cls.register_jvm_tool(
+            register,
+            "antlr4",
+            classpath=[JarDependency(org="org.antlr", name="antlr4", rev=_ANTLR4_REV)],
+            classpath_spec="//:antlr4-{}".format(_ANTLR4_REV),
+        )
         # The ANTLR runtime python deps.
         register(
             "--antlr3-deps",
+            advanced=True,
+            type=list,
+            member_type=target_option,
+            help="A list of address specs pointing to dependencies of ANTLR3 generated code.",
+        )
+        register(
+            "--antlr4-deps",
             advanced=True,
             type=list,
             member_type=target_option,
@@ -70,22 +84,40 @@ class AntlrPyGen(SimpleCodegenTask, NailgunTask):
 
     @memoized_method
     def _deps(self):
-        deps = self.get_options().antlr3_deps
-        return list(self.resolve_deps(deps))
+        antlr3_deps = self.get_options().antlr3_deps
+        antlr4_deps = self.get_options().antlr4_deps
+        return list(self.resolve_deps(antlr3_deps + antlr4_deps))
+
+    # This checks to make sure that all of the sources have an identical package source structure, and
+    # if they do, uses that as the package. If they are different, then the user will need to set the
+    # package as it cannot be correctly inferred.
+    def _get_sources_package(self, target):
+        parents = {os.path.dirname(source) for source in target.sources_relative_to_source_root()}
+        if len(parents) != 1:
+            raise self.AmbiguousPackageError(
+                "Antlr sources in multiple directories, cannot infer "
+                "package. Please set package member in antlr target."
+            )
+        return parents.pop().replace("/", ".")
 
     def execute_codegen(self, target, target_workdir):
-        if target.antlr_version != _ANTLR3_REV:
-            # TODO: Deprecate the antlr_version argument to PythonAntlrLibrary and replace
-            # it with a compiler= argument, that takes logical names (antlr3, antlr4), like
-            # JavaAntlrLibrary.  We can't support arbitrary revisions on targets because we
-            # have to register them as jvm tools before we see any targets.
-            raise TaskError("Only antlr rev {} supported for Python.".format(_ANTLR3_REV))
+        args = ["-o", target_workdir]
+        compiler = target.compiler
+        java_package = self._get_sources_package(target)
 
-        output_dir = self._create_package_structure(target_workdir, target.module)
+        if compiler == "antlr3":
+            java_main = "org.antlr.Tool"
+        elif compiler == "antlr4":
+            args.append("-visitor")  # Generate Parse Tree Visitor As Well
+            # Note that this assumes that there is no package set in the antlr file itself,
+            # which is considered an ANTLR best practice.
+            args.append("-package")
+            args.append(java_package)
+            java_main = "org.antlr.v4.Tool"
+        else:
+            raise TaskError("Unsupported ANTLR compiler: {}".format(compiler))
 
-        java_main = "org.antlr.Tool"
-        args = ["-fo", output_dir]
-        antlr_classpath = self.tool_classpath("antlr3")
+        antlr_classpath = self.tool_classpath(compiler)
         sources = self._calculate_sources([target])
         args.extend(sources)
         result = self.runjava(

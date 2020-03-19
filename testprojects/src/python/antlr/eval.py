@@ -6,8 +6,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import sys
 
-import antlr3
-import antlr3.tree
+import antlr4
+import antlr4.tree
 from pants_antlr.test.eval.Eval import Eval
 from pants_antlr.test.eval.ExprLexer import ExprLexer
 from pants_antlr.test.eval.ExprParser import ExprParser
@@ -21,16 +21,16 @@ def main(expr):
     This code is modified from the canonical example
     at http://www.antlr.org/wiki/display/ANTLR3/Example.
     """
-    char_stream = antlr3.ANTLRStringStream("{}\n".format(expr))
+    char_stream = antlr4.InputStream("{}\n".format(expr))
     lexer = ExprLexer(char_stream)
-    tokens = antlr3.CommonTokenStream(lexer)
+    tokens = antlr4.CommonTokenStream(lexer)
     parser = ExprParser(tokens)
     r = parser.prog()
 
     # this is the root of the AST
     root = r.tree
 
-    nodes = antlr3.tree.CommonTreeNodeStream(root)
+    nodes = antlr4.tree.CommonTreeNodeStream(root)
     nodes.setTokenStream(tokens)
     eval = Eval(nodes)
     eval.prog()

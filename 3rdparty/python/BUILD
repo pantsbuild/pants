@@ -17,6 +17,16 @@ python_requirement_library(
   ]
 )
 
+python_requirement_library(
+  name='antlr4',
+  requirements=[
+    # TODO: this library is not currently linked from pypi, so we override the repository
+    # to fetch it from antlr.org instead. If at any point it reappears on pypi, the
+    # repository arg can be removed.
+    python_requirement('antlr4_python3_runtime==4.7.2')
+  ]
+)
+
 # Only used by a maintenance tool, so we lift this library out of the requirements.txt
 # file used to bootstrap pants itself.
 python_requirement_library(
