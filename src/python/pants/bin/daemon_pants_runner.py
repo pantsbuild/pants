@@ -146,8 +146,6 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         self._services = services
         self._scheduler_service = scheduler_service
 
-        self.exit_code = PANTS_SUCCEEDED_EXIT_CODE
-
     @classmethod
     @contextmanager
     def _tty_stdio(cls, env):
@@ -256,6 +254,8 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         ), hermetic_environment_as(
             **self._env
         ), encapsulated_global_logger():
+
+            exit_code = PANTS_SUCCEEDED_EXIT_CODE
             try:
                 # Clean global state.
                 clean_global_runtime_state(reset_subsystem=True)
@@ -263,10 +263,13 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
                 options, build_root, options_bootstrapper = LocalPantsRunner.parse_options(
                     self._args, self._env
                 )
-                graph_helper, specs, exit_code = self._scheduler_service.prepare_v1_graph_run_v2(
-                    options, options_bootstrapper,
-                )
-                self.exit_code = exit_code
+
+                (
+                    graph_helper,
+                    specs,
+                    new_exit_code,
+                ) = self._scheduler_service.prepare_v1_graph_run_v2(options, options_bootstrapper,)
+                exit_code = new_exit_code
 
                 # Otherwise, conduct a normal run.
                 with ExceptionSink.exiter_as_until_exception(lambda _: PantsRunFailCheckerExiter()):
@@ -290,4 +293,4 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
                 # and calling this method, we emulate the normal, expected sys.excepthook override.
                 ExceptionSink._log_unhandled_exception_and_exit(exc=e)
             else:
-                self._exiter.exit(self.exit_code if self.exit_code else PANTS_SUCCEEDED_EXIT_CODE)
+                self._exiter.exit(exit_code)
