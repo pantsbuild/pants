@@ -583,7 +583,7 @@ class BaseZincCompile(JvmCompile):
         with open(diagnostics_file) as json_diagnostics:
             data = json.load(json_diagnostics)
             counts = self._aggregate_diagnostics(data)
-            self.context.log.info(f"Reporting number of diagnostics for: {ctx.target}")
+            self.context.log.info(f"Reporting number of diagnostics for: {ctx.target.address}")
             for (severity, count) in counts.items():
                 self.context.log.info(f"    {severity}: {count}")
                 self.context.run_tracker.report_target_info(

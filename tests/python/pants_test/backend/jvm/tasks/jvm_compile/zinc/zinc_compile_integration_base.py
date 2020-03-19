@@ -7,6 +7,7 @@ import xml.etree.ElementTree as ET
 from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
+from pants.util.collections import assert_single_element
 from pants.util.contextutil import open_zip, temporary_dir
 from pants.util.dirutil import safe_open
 
@@ -354,7 +355,7 @@ class BaseZincCompileIntegrationTest:
                 self.assert_success(pants_run)
 
             expected_strings = [
-                "Reporting number of diagnostics for: ScalaLibrary(testprojects/src/scala/org/pantsbuild/testproject/compilation_warnings/unused_import_warning:unused_import)",
+                f"Reporting number of diagnostics for: {target}",
                 "Error: 0",
                 "Warning: 1",
                 "Information: 0",
@@ -372,8 +373,7 @@ class BaseZincCompileIntegrationTest:
                 def is_target_data_line(line):
                     return line.startswith("target_data: ")
 
-                target_data_line = next(filter(is_target_data_line, run_info))
-                assert target_data_line is not None
+                target_data_line = assert_single_element(filter(is_target_data_line, run_info))
                 expected_target_data = (
                     "'diagnostic_counts': {'Error': 0, 'Warning': 1, 'Information': 0, 'Hint': 0}"
                 )
