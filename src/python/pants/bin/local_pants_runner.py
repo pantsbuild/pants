@@ -142,25 +142,6 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
             )
         return graph_session, graph_session.scheduler_session
 
-    @staticmethod
-    def _maybe_init_specs(
-        specs: Optional[Specs],
-        graph_session: LegacyGraphSession,
-        options: Options,
-        build_root: str,
-    ) -> Specs:
-        if specs:
-            return specs
-
-        global_options = options.for_global_scope()
-        return SpecsCalculator.create(
-            options=options,
-            build_root=build_root,
-            session=graph_session.scheduler_session,
-            exclude_patterns=tuple(global_options.exclude_target_regexp),
-            tags=tuple(global_options.tag),
-        )
-
     @classmethod
     def create(
         cls,
@@ -205,7 +186,15 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
             daemon_graph_session, options_bootstrapper, build_config, options
         )
 
-        specs = cls._maybe_init_specs(specs, graph_session, options, build_root)
+        if specs is None:
+            global_options = options.for_global_scope()
+            specs = SpecsCalculator.create(
+                    options=options,
+                    build_root=build_root,
+                    session=graph_session.scheduler_session,
+                    exclude_patterns=tuple(global_options.exclude_target_regexp),
+                    tags=tuple(global_options.tag),
+                    )
 
         profile_path = env.get("PANTS_PROFILE")
 

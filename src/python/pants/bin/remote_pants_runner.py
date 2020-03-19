@@ -149,7 +149,7 @@ class RemotePantsRunner:
                 traceback = sys.exc_info()[2]
                 raise self._extract_remote_exception(pantsd_handle.pid, e).with_traceback(traceback)
 
-    def _connect_and_execute(self, pantsd_handle):
+    def _connect_and_execute(self, pantsd_handle: PantsDaemon.Handle):
         port = pantsd_handle.port
         # Merge the nailgun TTY capability environment variables with the passed environment dict.
         ng_env = NailgunProtocol.isatty_to_env(self._stdin, self._stdout, self._stderr)
