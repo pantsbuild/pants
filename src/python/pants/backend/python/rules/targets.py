@@ -45,7 +45,7 @@ class PythonBinarySources(PythonSources):
         if len(snapshot.files) not in [0, 1]:
             raise InvalidFieldException(
                 f"The {repr(self.alias)} field in target {self.address} must only have 0 or 1 "
-                f"files because it is a binary target, but has {len(snapshot.files)} sources: "
+                f"files because it is a binary target, but it has {len(snapshot.files)} sources: "
                 f"{sorted(snapshot.files)}.\n\nTo use any additional files, put them in a "
                 "`python_library` and then add that `python_library` as a `dependency`."
             )
