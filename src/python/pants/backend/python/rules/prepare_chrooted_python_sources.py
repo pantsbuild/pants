@@ -10,7 +10,7 @@ from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.rules import rule
 from pants.engine.selectors import Get
 from pants.rules.core import determine_source_files
-from pants.rules.core.determine_source_files import AllSourceFilesRequest, SourceFiles
+from pants.rules.core.determine_source_files import LegacyAllSourceFilesRequest, SourceFiles
 
 
 @dataclass(frozen=True)
@@ -30,7 +30,9 @@ async def prepare_chrooted_python_sources(
     stripping source roots.
     """
     stripped_sources = await Get[SourceFiles](
-        AllSourceFilesRequest((ht.adaptor for ht in hydrated_targets), strip_source_roots=True)
+        LegacyAllSourceFilesRequest(
+            (ht.adaptor for ht in hydrated_targets), strip_source_roots=True
+        )
     )
     init_injected = await Get[InitInjectedSnapshot](InjectInitRequest(stripped_sources.snapshot))
     return ChrootedPythonSources(init_injected.snapshot)
