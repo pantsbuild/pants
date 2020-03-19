@@ -103,6 +103,7 @@ class RscCompileContext(CompileContext):
         post_compile_merge_dir,
         sources,
         workflow,
+        diagnostics_out,
     ):
         super().__init__(
             target,
@@ -113,6 +114,7 @@ class RscCompileContext(CompileContext):
             args_file,
             post_compile_merge_dir,
             sources,
+            diagnostics_out,
         )
         self.workflow = workflow
         self.rsc_jar_file = rsc_jar_file
@@ -830,6 +832,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
                 post_compile_merge_dir=os.path.join(rsc_dir, "post_compile_merge_dir"),
                 sources=sources,
                 workflow=self._classify_target_compile_workflow(target),
+                diagnostics_out=None,
             ),
             zinc_cc=CompileContext(
                 target=target,
@@ -840,6 +843,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
                 args_file=os.path.join(zinc_dir, "zinc_args"),
                 post_compile_merge_dir=os.path.join(zinc_dir, "post_compile_merge_dir"),
                 sources=sources,
+                diagnostics_out=os.path.join(zinc_dir, "diagnostics.json"),
             ),
         )
 
