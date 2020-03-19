@@ -123,5 +123,5 @@ def rules():
     )
 
 
-def targets():
+def targets2():
     return [PythonBinary, PythonLibrary, PythonTests]

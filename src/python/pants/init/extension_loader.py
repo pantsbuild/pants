@@ -138,8 +138,8 @@ def load_plugins(
             if "build_file_aliases2" in entries:
                 build_file_aliases2 = entries["build_file_aliases2"].load()()
                 build_configuration.register_aliases(build_file_aliases2)
-            if "targets" in entries:
-                targets = entries["targets"].load()()
+            if "targets2" in entries:
+                targets = entries["targets2"].load()()
                 build_configuration.register_targets(targets)
         loaded[dist.as_requirement().key] = dist
 
@@ -208,7 +208,7 @@ def load_backend(
         rules = invoke_entrypoint("rules")
         if rules:
             build_configuration.register_rules(rules)
-        targets = invoke_entrypoint("targets")
+        targets = invoke_entrypoint("targets2")
         if targets:
             build_configuration.register_targets(targets)
         build_file_aliases2 = invoke_entrypoint("build_file_aliases2")
