@@ -65,6 +65,7 @@ class DepExportsIntegrationTest(PantsRunIntegrationTest):
         )
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9350")
 class DepExportsThriftTargets(PantsRunIntegrationTest):
     def test_exports_for_thrift_targets(self):
         pants_run = self.run_pants(
