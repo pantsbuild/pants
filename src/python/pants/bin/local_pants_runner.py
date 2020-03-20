@@ -260,13 +260,6 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         if self._repro:
             self._repro.capture(self._run_tracker.run_info.get_as_dict())
 
-    def _maybe_handle_help(self):
-        """Handle requests for `help` information."""
-        if self.options.help_request:
-            help_printer = HelpPrinter(options=self.options, union_membership=self.union_membership)
-            result = help_printer.print_help()
-            return result
-
     def _maybe_run_v1(self, v1: bool) -> int:
         v1_goals, ambiguous_goals, _ = self.options.goals_by_version
         if not v1:
@@ -350,8 +343,11 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
                 self.scheduler_session, callbacks=callbacks, report_interval_seconds=report_interval
             )
 
-            help_output = self._maybe_handle_help()
-            if help_output is not None:
+            if self.options.help_request:
+                help_printer = HelpPrinter(
+                    options=self.options, union_membership=self.union_membership
+                )
+                help_output = help_printer.print_help()
                 self._exiter.exit(help_output)
 
             v1 = global_options.v1
