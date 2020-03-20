@@ -3,8 +3,8 @@
 
 import logging
 import os
-import sys
-from typing import List, Mapping, Optional
+from dataclasses import dataclass
+from typing import List, Mapping
 
 from pants.base.exception_sink import ExceptionSink
 from pants.bin.remote_pants_runner import RemotePantsRunner
@@ -16,23 +16,15 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 logger = logging.getLogger(__name__)
 
 
+@dataclass
 class PantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     """A higher-level runner that delegates runs to either a LocalPantsRunner or
     RemotePantsRunner."""
 
-    def __init__(
-        self,
-        args: Optional[List[str]] = None,
-        env: Optional[Mapping[str, str]] = None,
-        start_time: Optional[float] = None,
-    ) -> None:
-        """
-        :param args: The arguments (sys.argv) for this run. (Optional, default: sys.argv)
-        :param env: The environment for this run. (Optional, default: os.environ)
-        """
-        self._args = args or sys.argv
-        self._env = env or os.environ
-        self._start_time = start_time
+    args: List[str]
+    env: Mapping[
+        str, str,
+    ]
 
     # This could be a bootstrap option, but it's preferable to keep these very limited to make it
     # easier to make the daemon the default use case. Once the daemon lifecycle is stable enough we
@@ -40,7 +32,7 @@ class PantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     _DAEMON_KILLING_GOALS = frozenset(["kill-pantsd", "clean-all"])
 
     def will_terminate_pantsd(self) -> bool:
-        return not frozenset(self._args).isdisjoint(self._DAEMON_KILLING_GOALS)
+        return not frozenset(self.args).isdisjoint(self._DAEMON_KILLING_GOALS)
 
     def _enable_rust_logging(self, global_bootstrap_options: OptionValueContainer) -> None:
         log_level = global_bootstrap_options.level
@@ -73,10 +65,10 @@ class PantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         if pythonpath and not os.environ.pop("RUNNING_PANTS_FROM_SOURCES", None):
             logger.warning(f"Scrubbed PYTHONPATH={pythonpath} from the environment.")
 
-    def run(self):
+    def run(self, start_time: float):
         self.scrub_pythonpath()
 
-        options_bootstrapper = OptionsBootstrapper.create(env=self._env, args=self._args)
+        options_bootstrapper = OptionsBootstrapper.create(env=self.env, args=self.args)
         bootstrap_options = options_bootstrapper.bootstrap_options
         global_bootstrap_options = bootstrap_options.for_global_scope()
 
@@ -96,7 +88,7 @@ class PantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         if self._should_run_with_pantsd(global_bootstrap_options):
             try:
                 return RemotePantsRunner(
-                    self._exiter, self._args, self._env, options_bootstrapper
+                    self._exiter, self.args, self.env, options_bootstrapper
                 ).run()
             except RemotePantsRunner.Fallback as e:
                 logger.warning(
@@ -107,10 +99,10 @@ class PantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         from pants.bin.local_pants_runner import LocalPantsRunner
 
         if self.will_terminate_pantsd():
-            logger.debug("Pantsd terminating goal detected: {}".format(self._args))
+            logger.debug("Pantsd terminating goal detected: {}".format(self.args))
 
         runner = LocalPantsRunner.create(
-            self._args, self._env, options_bootstrapper=options_bootstrapper
+            self.args, self.env, options_bootstrapper=options_bootstrapper
         )
-        runner.set_start_time(self._start_time)
+        runner.set_start_time(start_time)
         return runner.run()
