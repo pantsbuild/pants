@@ -736,7 +736,8 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
                     break
             else:
                 raise AssertionError(
-                    f"New content {new_data} was not found in the FilesContent of the modified file {path_to_fname}, instead we found {new_content[fname]}"
+                    f"New content {new_data} was not found in the FilesContent of the "
+                    "modified file {path_to_fname}, instead we found {new_content[fname]}"
                 )
 
     def test_file_content_invalidated_after_parent_deletion(self) -> None:

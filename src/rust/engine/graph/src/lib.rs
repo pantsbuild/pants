@@ -29,10 +29,12 @@ use hashing;
 
 use petgraph;
 
-mod entry;
+// make the entry module public for testing purposes. We use it to contruct mock
+// graph entries in the notify watch tests.
+pub mod entry;
 mod node;
 
-pub use crate::entry::Entry;
+pub use crate::entry::{Entry, EntryState};
 use crate::entry::{Generation, RunToken};
 
 use std::collections::binary_heap::BinaryHeap;
@@ -1005,6 +1007,45 @@ impl<N: Node> Graph<N> {
     } else {
       inner.draining = draining;
       Ok(())
+    }
+  }
+
+}
+
+// This module provides a trait which contains functions that 
+// should only be used in tests. A user must explicitly import the trait
+// to use the extra test functions, and they should only be imported into 
+// test modules.
+pub mod test_support {
+  use super::{EntryState, EntryId, Node};
+  pub trait TestGraph<N: Node> {
+    fn set_fixture_entry_state_for_id(&self, id: EntryId, state: EntryState<N>);
+    fn add_fixture_entry(&self, node: N) -> EntryId;
+    fn entry_state(&self, id: EntryId) -> &str;
+  }
+}
+
+impl<N: Node> test_support::TestGraph<N> for Graph<N> {
+  fn set_fixture_entry_state_for_id(&self, id: EntryId, state: EntryState<N>) {
+    let mut inner = self.inner.lock();
+    let entry = inner.entry_for_id_mut(id).unwrap();
+    let mut entry_state = entry.state.lock();
+    *entry_state = state;
+  }
+
+  fn add_fixture_entry(&self, node: N) -> EntryId {
+    let mut inner = self.inner.lock();
+    inner.ensure_entry(node)
+  }
+
+  fn entry_state(&self, id: EntryId) -> &str {
+    let mut inner = self.inner.lock();
+    let entry = inner.entry_for_id_mut(id).unwrap();
+    let entry_state = entry.state.lock();
+    match *entry_state {
+      EntryState::Completed { .. } => "completed",
+      EntryState::Running { .. } => "running",
+      EntryState::NotStarted { .. } => "not started",
     }
   }
 }

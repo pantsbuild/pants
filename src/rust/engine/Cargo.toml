@@ -117,6 +117,12 @@ uuid = { version = "0.7", features = ["v4"] }
 task_executor = { path = "task_executor" }
 workunit_store = { path = "workunit_store" }
 
+[dev-dependencies]
+testutil = { path = "./testutil" }
+fs = { path = "./fs" }
+tokio = "0.1"
+env_logger = "0.5.4"
+
 [patch.crates-io]
 # TODO: Remove patch when we can upgrade to an official released version of protobuf with a fix.
 # See: https://github.com/pantsbuild/pants/issues/7760 for context.

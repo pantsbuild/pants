@@ -39,6 +39,11 @@ impl InvalidationWatcher {
     graph: Weak<Graph<NodeKey>>,
     build_root: PathBuf,
   ) -> Result<InvalidationWatcher, String> {
+    // Inotify events contain canonical paths to the files being watched.
+    // If the build_root contains a symlink the paths returned in notify events
+    // wouldn't have the build_root as a prefix, and so we would miss invalidating certain nodes.
+    // We canonicalize the build_root once so this isn't a problem.
+    let canonical_build_root = std::fs::canonicalize(build_root.as_path()).map_err(|e| format!("{:?}", e))?.to_path_buf();
     let (watch_sender, watch_receiver) = crossbeam_channel::unbounded();
     let watcher = Arc::new(Mutex::new(
       Watcher::new(watch_sender, Duration::from_millis(50))
@@ -65,8 +70,8 @@ impl InvalidationWatcher {
                 // relativize paths to build root.
                 let mut paths_to_invalidate: Vec<PathBuf> = vec![];
                 let path_relative_to_build_root = {
-                  if path.starts_with(&build_root) {
-                    path.strip_prefix(&build_root).unwrap().into()
+                  if path.starts_with(&canonical_build_root) {
+                    path.strip_prefix(&canonical_build_root).unwrap().into()
                   } else {
                     path
                   }

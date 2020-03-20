@@ -50,3 +50,6 @@ pub use crate::scheduler::{
 };
 pub use crate::tasks::{Rule, Tasks};
 pub use crate::types::Types;
+
+#[cfg(test)]
+mod watch_tests;
