@@ -5,11 +5,14 @@ import json
 import os
 import re
 
+import pytest
+
 from pants_test.backend.jvm.tasks.jvm_compile.scala.base_scalac_plugin_integration_test import (
     ScalacPluginIntegrationTestBase,
 )
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9350")
 class ExportDepAsJarIntegrationTest(ScalacPluginIntegrationTestBase):
 
     scalac_test_targets_dir = "examples/src/scala/org/pantsbuild/example/scalac"

@@ -3,12 +3,15 @@
 
 import re
 
+import pytest
+
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.dirutil import read_file
 
 TEST_DIR = "testprojects/src/scala/org/pantsbuild/testproject"
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9350")
 class ScalaFixIntegrationTest(PantsRunIntegrationTest):
     @classmethod
     def hermetic(cls):

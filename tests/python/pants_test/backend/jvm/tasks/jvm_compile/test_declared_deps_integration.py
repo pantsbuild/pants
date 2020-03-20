@@ -1,12 +1,15 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import pytest
+
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
 
 DIR_DEPS_WHITELISTED = "testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist"
 JAR_DEPS_WHITELISTED = "testprojects/src/java/org/pantsbuild/testproject/missingjardepswhitelist"
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9350")
 class DeclaredDepsIntegrationTest(BaseCompileIT):
     def test_direct_source_dep(self):
         # Should fail with strict deps.

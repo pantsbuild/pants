@@ -7,11 +7,14 @@ from subprocess import PIPE, Popen
 from textwrap import dedent
 from zipfile import ZipFile
 
+import pytest
+
 from pants.base.build_environment import get_buildroot
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import temporary_dir
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9350")
 class ScopeRuntimeIntegrationTest(PantsRunIntegrationTest):
     @classmethod
     def _spec(cls, name):
@@ -115,6 +118,7 @@ class ScopeRuntimeIntegrationTest(PantsRunIntegrationTest):
                 )
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9350")
 class ScopeChangesCacheInvalidationIntegrationTest(PantsRunIntegrationTest):
     def test_invalidate_compiles_when_scopes_change(self):
         with temporary_dir(root_dir=get_buildroot()) as workdir_parent:

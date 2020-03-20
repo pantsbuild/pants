@@ -3,11 +3,14 @@
 
 import os
 
+import pytest
+
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import safe_delete
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9350")
 class JvmPrepCommandIntegration(PantsRunIntegrationTest):
     def setUp(self):
         safe_delete("/tmp/running-in-goal-test")

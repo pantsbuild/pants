@@ -5,6 +5,8 @@ import json
 import os
 import re
 
+import pytest
+
 from pants.base.build_environment import get_buildroot
 from pants.build_graph.intermediate_target_factory import hash_target
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
@@ -12,6 +14,7 @@ from pants.util.collections import ensure_str_list
 from pants_test.backend.project_info.tasks.resolve_jars_test_mixin import ResolveJarsTestMixin
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9350")
 class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
     _confs_args = [
         "--export-libraries-sources",

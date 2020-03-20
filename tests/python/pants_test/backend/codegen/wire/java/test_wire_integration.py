@@ -5,12 +5,15 @@ import os
 import re
 import subprocess
 
+import pytest
+
 from pants.base.build_environment import get_buildroot
 from pants.testutil.file_test_util import exact_files
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import open_zip
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9350")
 class WireIntegrationTest(PantsRunIntegrationTest):
     def test_good(self):
         # wire example should compile without warnings with correct wire files.

@@ -4,9 +4,11 @@
 import glob
 import os
 
+import pytest
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9350")
 class TestIndexJavaIntegration(PantsRunIntegrationTest):
     def test_index_simple_java_code(self):
         # Very simple test that we can run the extractor and indexer on some

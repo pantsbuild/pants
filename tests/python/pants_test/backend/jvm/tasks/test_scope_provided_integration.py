@@ -1,9 +1,12 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import pytest
+
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9350")
 class ScopeProvidedIntegrationTest(PantsRunIntegrationTest):
     """Tests "provided" emulation (having scope='compile test' and transitive=False)."""
 
@@ -38,6 +41,7 @@ class ScopeProvidedIntegrationTest(PantsRunIntegrationTest):
         )
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9350")
 class ScopeProvidedShadowingIntegrationTest(PantsRunIntegrationTest):
     @classmethod
     def _spec(cls, name):

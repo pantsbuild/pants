@@ -3,9 +3,11 @@
 
 from textwrap import dedent
 
+import pytest
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9350")
 class ScalaJSReplIntegrationTest(PantsRunIntegrationTest):
     def setUp(self):
         self.maxDiff = None

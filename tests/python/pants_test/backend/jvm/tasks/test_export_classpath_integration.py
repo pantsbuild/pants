@@ -4,11 +4,14 @@
 import os
 import time
 
+import pytest
+
 from pants.java.jar.manifest import Manifest
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import open_zip
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9350")
 class ExportClasspathIntegrationTest(PantsRunIntegrationTest):
     def test_export_manifest_jar(self):
         ctimes = []

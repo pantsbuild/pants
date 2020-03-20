@@ -4,10 +4,13 @@
 import json
 import os
 
+import pytest
+
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import temporary_dir
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9350")
 class TestJvmDependencyUsageIntegration(PantsRunIntegrationTest):
     def _run_dep_usage(self, workdir, target, clean_all=False, extra_args=None, cachedir=None):
         if cachedir:

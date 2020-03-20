@@ -7,12 +7,15 @@ import re
 import shutil
 from textwrap import dedent
 
+import pytest
+
 from pants.base.build_environment import get_buildroot
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_file_dump
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9350")
 class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
     @contextlib.contextmanager
     def tmp_custom_scala(self, path_suffix):

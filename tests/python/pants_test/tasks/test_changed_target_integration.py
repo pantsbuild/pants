@@ -5,6 +5,8 @@ import os
 from contextlib import contextmanager
 from textwrap import dedent
 
+import pytest
+
 from pants.base.build_environment import get_buildroot
 from pants.testutil.git_util import initialize_repo
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
@@ -12,6 +14,7 @@ from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9350")
 class ChangedTargetGoalsIntegrationTest(PantsRunIntegrationTest):
     @contextmanager
     def known_commits(self):

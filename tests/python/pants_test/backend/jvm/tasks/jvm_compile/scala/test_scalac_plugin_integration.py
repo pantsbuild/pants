@@ -1,12 +1,14 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import pytest
 
 from pants_test.backend.jvm.tasks.jvm_compile.scala.base_scalac_plugin_integration_test import (
     ScalacPluginIntegrationTestBase,
 )
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9350")
 class ScalacPluginIntegrationTest(ScalacPluginIntegrationTestBase):
     example_dir = "examples/src/scala/org/pantsbuild/example/scalac/plugin"
 

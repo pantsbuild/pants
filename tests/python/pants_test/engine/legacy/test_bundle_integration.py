@@ -4,10 +4,13 @@
 import os
 from contextlib import contextmanager
 
+import pytest
+
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import temporary_dir
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9350")
 class BundleIntegrationTest(PantsRunIntegrationTest):
 
     TARGET_PATH = "testprojects/src/java/org/pantsbuild/testproject/bundle"

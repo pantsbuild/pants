@@ -4,12 +4,14 @@
 import os
 from contextlib import contextmanager
 
+import pytest
 from pants.fs.archive import archiver_for_path, create_archiver
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import read_file
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9350")
 class NodeBundleIntegrationTest(PantsRunIntegrationTest):
 
     DIST_DIR = "dist"

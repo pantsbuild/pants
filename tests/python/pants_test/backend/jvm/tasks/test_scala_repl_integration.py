@@ -3,9 +3,12 @@
 
 from textwrap import dedent
 
+import pytest
+
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9350")
 class ScalaReplIntegrationTest(PantsRunIntegrationTest):
     def run_repl(self, target, program, repl_args=None):
         """Run a repl for the given target with the given input, and return stdout_data."""

@@ -5,11 +5,14 @@ import glob
 import os
 import time
 
+import pytest
+
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_delete, safe_mkdir, touch
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9350")
 class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
     def _create_platform_args(self, version):
         return [

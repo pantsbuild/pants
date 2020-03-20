@@ -5,11 +5,14 @@ import os
 import re
 import subprocess
 
+import pytest
+
 from pants.base.build_environment import get_buildroot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9350")
 class ProtobufIntegrationTest(PantsRunIntegrationTest):
     def test_import_from_buildroot(self):
         pants_run = self.run_pants(

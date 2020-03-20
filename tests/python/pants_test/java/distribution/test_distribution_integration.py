@@ -5,6 +5,8 @@ import os
 from contextlib import contextmanager
 from unittest import skipIf
 
+import pytest
+
 from pants.java.distribution.distribution import Distribution, DistributionLocator
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.testutil.subsystem.util import global_subsystem_instance
@@ -27,6 +29,7 @@ def _get_two_distributions():
             return None
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9350")
 class DistributionIntegrationTest(PantsRunIntegrationTest):
     def _test_two_distributions(self, os_name=None):
         java8, java9 = _get_two_distributions()

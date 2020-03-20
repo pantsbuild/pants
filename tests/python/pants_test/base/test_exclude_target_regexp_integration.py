@@ -5,6 +5,8 @@ import os
 import subprocess
 from contextlib import contextmanager
 
+import pytest
+
 from pants.base.build_environment import get_buildroot
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
@@ -44,6 +46,7 @@ class Bundles:
     all_bundles = [lesser_of_two, once_upon_a_time, ten_thousand, there_was_a_duck]
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9350")
 class ExcludeTargetRegexpIntegrationTest(PantsRunIntegrationTest):
     """Tests the functionality of the --exclude-target-regexp flag."""
 

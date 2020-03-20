@@ -4,10 +4,13 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import temporary_file_path
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9350")
 class RunTrackerIntegrationTest(PantsRunIntegrationTest):
 
     load_plugin_cmdline = [

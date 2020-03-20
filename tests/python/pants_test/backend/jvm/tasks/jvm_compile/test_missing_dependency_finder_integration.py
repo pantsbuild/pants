@@ -3,9 +3,12 @@
 
 import re
 
+import pytest
+
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9350")
 class MissingDependencyFinderIntegrationTest(PantsRunIntegrationTest):
     def test_missing_deps_found(self):
         target = "testprojects/src/java/org/pantsbuild/testproject/missingjardepswhitelist:missingjardepswhitelist"

@@ -5,6 +5,8 @@ import json
 import os
 from textwrap import dedent
 
+import pytest
+
 from pants.base.build_environment import get_buildroot
 from pants.fs.archive import ZIP
 from pants.java.distribution.distribution import DistributionLocator
@@ -13,6 +15,7 @@ from pants.testutil.subsystem.util import init_subsystem
 from pants.util.contextutil import temporary_dir
 
 
+@pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/9350")
 class ShaderIntegrationTest(PantsRunIntegrationTest):
     def test_shader_project(self):
         """Test that the binary target at the ``shading_project`` can be built and run.
