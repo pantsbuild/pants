@@ -77,7 +77,7 @@ class CoursierResolveTest(NailgunTaskTestBase):
                 "a",
                 "b",
                 "c",
-                url="https://maven-central.storage-download.googleapis.com/repos/central/data/junit/junit/4.12/junit-4.12.jar",
+                url="https://maven-central.storage-download.googleapis.com/maven2/junit/junit/4.12/junit-4.12.jar",
             )
             dep_with_url_lib = self.make_target("//:a", JarLibrary, jars=[dep_with_url])
 

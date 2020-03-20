@@ -20,7 +20,7 @@ class IvySubsystem(Script):
 
     _default_urls = [
         "https://repo1.maven.org/maven2/org/apache/ivy/ivy/{version}/ivy-{version}.jar",
-        "https://maven-central.storage-download.googleapis.com/repos/central/data/org/apache/ivy/ivy/{version}/ivy-{version}.jar",
+        "https://maven-central.storage-download.googleapis.com/maven2/org/apache/ivy/ivy/{version}/ivy-{version}.jar",
     ]
 
     @classmethod

@@ -462,7 +462,7 @@ repos = [
   # First try RBE's maven central mirror, as we can get throttled by
   # maven central due to all RBE traffic appearing to them as coming from a single IP.
   # There's no harm in trying this even outside RBE, as it is world-visible.
-  'https://maven-central.storage-download.googleapis.com/repos/central/data',
+  'https://maven-central.storage-download.googleapis.com/maven2',
   'https://repo1.maven.org/maven2',
   # Custom repo for Kythe jars, as Google doesn't currently publish them anywhere.
   'https://raw.githubusercontent.com/toolchainlabs/binhost/master/',
