@@ -221,15 +221,18 @@ class SchedulerService(PantsService):
 
         if perform_loop:
             # TODO: See https://github.com/pantsbuild/pants/issues/6288 regarding Ctrl+C handling.
-            loop_max = global_options.loop_max
+            iterations = global_options.loop_max
             exit_code = PANTS_SUCCEEDED_EXIT_CODE
-            for _ in range(loop_max):
-                if self._state.is_terminating or self._loop_condition.wait(timeout=1):
-                    break
+
+            while iterations and not self._state.is_terminating:
                 try:
                     exit_code = self._body(session, options, options_bootstrapper, specs, v2)
                 except session.scheduler_session.execution_error_type as e:
                     self._logger.warning(e)
+
+                iterations -= 1
+                if self._state.is_terminating or self._loop_condition.wait(timeout=1):
+                    break
 
             return exit_code
         else:
