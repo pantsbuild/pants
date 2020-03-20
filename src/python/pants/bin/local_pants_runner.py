@@ -17,7 +17,6 @@ from pants.bin.goal_runner import GoalRunner
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.native import Native
 from pants.engine.rules import UnionMembership
-from pants.engine.scheduler import SchedulerSession
 from pants.goal.run_tracker import RunTracker
 from pants.help.help_printer import HelpPrinter
 from pants.init.engine_initializer import EngineInitializer, LegacyGraphSession
@@ -139,34 +138,31 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         return options, build_config, options_bootstrapper
 
     @staticmethod
-    def _maybe_init_graph_session(
-        graph_session: Optional[LegacyGraphSession],
+    def _init_graph_session(
         options_bootstrapper: OptionsBootstrapper,
         build_config: BuildConfiguration,
         options: Options,
-    ) -> Tuple[LegacyGraphSession, SchedulerSession]:
-        if not graph_session:
-            native = Native()
-            native.set_panic_handler()
-            graph_scheduler_helper = EngineInitializer.setup_legacy_graph(
-                native, options_bootstrapper, build_config
-            )
+    ) -> LegacyGraphSession:
+        native = Native()
+        native.set_panic_handler()
+        graph_scheduler_helper = EngineInitializer.setup_legacy_graph(
+            native, options_bootstrapper, build_config
+        )
 
-            v2_ui = options.for_global_scope().get("v2_ui", False)
-            zipkin_trace_v2 = options.for_scope("reporting").zipkin_trace_v2
-            # TODO(#8658) This should_report_workunits flag must be set to True for
-            # StreamingWorkunitHandler to receive WorkUnits. It should eventually
-            # be merged with the zipkin_trace_v2 flag, since they both involve most
-            # of the same engine functionality, but for now is separate to avoid
-            # breaking functionality associated with zipkin tracing while iterating on streaming workunit reporting.
-            stream_workunits = len(options.for_global_scope().streaming_workunits_handlers) != 0
-            graph_session = graph_scheduler_helper.new_session(
-                zipkin_trace_v2,
-                RunTracker.global_instance().run_id,
-                v2_ui,
-                should_report_workunits=stream_workunits,
-            )
-        return graph_session, graph_session.scheduler_session
+        v2_ui = options.for_global_scope().get("v2_ui", False)
+        zipkin_trace_v2 = options.for_scope("reporting").zipkin_trace_v2
+        # TODO(#8658) This should_report_workunits flag must be set to True for
+        # StreamingWorkunitHandler to receive WorkUnits. It should eventually
+        # be merged with the zipkin_trace_v2 flag, since they both involve most
+        # of the same engine functionality, but for now is separate to avoid
+        # breaking functionality associated with zipkin tracing while iterating on streaming workunit reporting.
+        stream_workunits = len(options.for_global_scope().streaming_workunits_handlers) != 0
+        return graph_scheduler_helper.new_session(
+            zipkin_trace_v2,
+            RunTracker.global_instance().run_id,
+            v2_ui,
+            should_report_workunits=stream_workunits,
+        )
 
     @classmethod
     def create(
@@ -211,9 +207,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         if daemon_graph_session:
             graph_session = daemon_graph_session
         else:
-            graph_session, _ = cls._maybe_init_graph_session(
-                daemon_graph_session, options_bootstrapper, build_config, options
-            )
+            graph_session = cls._init_graph_session(options_bootstrapper, build_config, options)
 
         if specs is None:
             global_options = options.for_global_scope()
