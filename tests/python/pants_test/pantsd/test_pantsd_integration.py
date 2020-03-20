@@ -119,7 +119,9 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                 checker.assert_started()
 
                 # Assert pantsd is in a good functional state.
-                self.assert_success(self.run_pants_with_workdir(["help"], workdir, pantsd_config))
+                self.assert_success(
+                    self.run_pants_with_workdir(["--no-v1", "--v2", "help"], workdir, pantsd_config)
+                )
                 checker.assert_running()
 
     @pytest.mark.flaky(retries=1)  # https://github.com/pantsbuild/pants/issues/6114
