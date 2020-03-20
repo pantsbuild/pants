@@ -84,9 +84,8 @@ class AntlrPyGen(SimpleCodegenTask, NailgunTask):
 
     @memoized_method
     def _deps(self):
-        antlr3_deps = self.get_options().antlr3_deps
         antlr4_deps = self.get_options().antlr4_deps
-        return list(self.resolve_deps(antlr3_deps + antlr4_deps))
+        return list(self.resolve_deps(antlr4_deps))
 
     # This checks to make sure that all of the sources have an identical package source structure, and
     # if they do, uses that as the package. If they are different, then the user will need to set the
