@@ -537,7 +537,7 @@ class InvalidFieldTypeException(InvalidFieldException):
         )
 
 
-class UnimplementedField(PrimitiveField):
+class UnimplementedField(PrimitiveField, metaclass=ABCMeta):
     """Simply use whatever value the user passed in the BUILD file.
 
     Warning: This is not safe to use with the engine. If the user uses an unhashable type like a
@@ -557,7 +557,7 @@ class UnimplementedField(PrimitiveField):
         return raw_value
 
 
-class BoolField(PrimitiveField):
+class BoolField(PrimitiveField, metaclass=ABCMeta):
     value: bool
     default: ClassVar[bool]
 
@@ -571,7 +571,7 @@ class BoolField(PrimitiveField):
         return raw_value
 
 
-class IntField(PrimitiveField):
+class IntField(PrimitiveField, metaclass=ABCMeta):
     value: Optional[int]
 
     def hydrate(self, raw_value: Optional[int], *, address: Address) -> Optional[int]:
@@ -582,7 +582,7 @@ class IntField(PrimitiveField):
         return raw_value
 
 
-class FloatField(PrimitiveField):
+class FloatField(PrimitiveField, metaclass=ABCMeta):
     value: Optional[float]
 
     def hydrate(self, raw_value: Optional[int], *, address: Address) -> Optional[float]:
@@ -597,7 +597,7 @@ class FloatField(PrimitiveField):
         return raw_value
 
 
-class StringField(PrimitiveField):
+class StringField(PrimitiveField, metaclass=ABCMeta):
     value: Optional[str]
 
     def hydrate(self, raw_value: Optional[str], *, address: Address) -> Optional[str]:
@@ -608,7 +608,7 @@ class StringField(PrimitiveField):
         return raw_value
 
 
-class StringSequenceField(PrimitiveField):
+class StringSequenceField(PrimitiveField, metaclass=ABCMeta):
     value: Optional[Tuple[str, ...]]
 
     def hydrate(
@@ -628,7 +628,7 @@ class StringSequenceField(PrimitiveField):
         return tuple(sorted(raw_value))
 
 
-class StringOrStringSequenceField(PrimitiveField):
+class StringOrStringSequenceField(PrimitiveField, metaclass=ABCMeta):
     """The raw_value may either be a string or be an iterable of strings.
 
     This is syntactic sugar that we use for certain fields to make BUILD files simpler when the user
