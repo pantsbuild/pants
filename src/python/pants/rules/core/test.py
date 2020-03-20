@@ -7,9 +7,10 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import Iterable, Optional, Type
+from typing import ClassVar, Iterable, Optional, Tuple, Type
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
+from pants.base.specs import OriginSpec
 from pants.build_graph.address import Address
 from pants.engine import desktop
 from pants.engine.console import Console
@@ -17,11 +18,16 @@ from pants.engine.fs import Digest, DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.isolated_process import FallibleExecuteProcessResult
-from pants.engine.legacy.graph import HydratedTargetsWithOrigins
-from pants.engine.legacy.structs import TargetAdaptorWithOrigin
 from pants.engine.objects import union
 from pants.engine.rules import UnionMembership, goal_rule, rule
 from pants.engine.selectors import Get, MultiGet
+from pants.engine.target import (
+    Field,
+    RegisteredTargetTypes,
+    Target,
+    TargetsWithOrigins,
+    TargetWithOrigin,
+)
 
 # TODO(#6004): use proper Logging singleton, rather than static logger.
 logger = logging.getLogger(__name__)
@@ -67,14 +73,31 @@ class TestDebugRequest:
 @union
 @dataclass(frozen=True)  # type: ignore[misc]   # https://github.com/python/mypy/issues/5374
 class TestRunner(ABC):
-    adaptor_with_origin: TargetAdaptorWithOrigin
+    required_fields: ClassVar[Tuple[Type[Field], ...]]
+
+    address: Address
+    origin: OriginSpec
 
     __test__ = False
 
-    @staticmethod
+    @classmethod
+    def is_valid_target(cls, tgt: Target) -> bool:
+        return tgt.has_fields(cls.required_fields)
+
+    @classmethod
+    def valid_target_types(
+        cls, target_types: Iterable[Type[Target]], *, union_membership: UnionMembership
+    ) -> Tuple[Type[Target], ...]:
+        return tuple(
+            target_type
+            for target_type in target_types
+            if target_type.class_has_fields(cls.required_fields, union_membership=union_membership)
+        )
+
+    @classmethod
     @abstractmethod
-    def is_valid_target(_: TargetAdaptorWithOrigin) -> bool:
-        """Return True if the test runner can meaningfully operate on this target."""
+    def create(cls, target_with_origin: TargetWithOrigin) -> "TestRunner":
+        pass
 
 
 # NB: This is only used for the sake of coordinator_of_tests. Consider inlining that rule so that
@@ -195,50 +218,56 @@ class Test(Goal):
 async def run_tests(
     console: Console,
     options: TestOptions,
-    runner: InteractiveRunner,
-    targets_with_origins: HydratedTargetsWithOrigins,
+    interactive_runner: InteractiveRunner,
+    targets_with_origins: TargetsWithOrigins,
     workspace: Workspace,
     union_membership: UnionMembership,
+    registered_target_types: RegisteredTargetTypes,
 ) -> Test:
     test_runners: Iterable[Type[TestRunner]] = union_membership.union_rules[TestRunner]
 
     if options.values.debug:
         target_with_origin = targets_with_origins.expect_single()
-        adaptor_with_origin = TargetAdaptorWithOrigin.create(
-            target_with_origin.target.adaptor, target_with_origin.origin
-        )
-        address = adaptor_with_origin.adaptor.address
-        valid_test_runners = [
-            test_runner
-            for test_runner in test_runners
-            if test_runner.is_valid_target(adaptor_with_origin)
-        ]
+        target = target_with_origin.target
+        valid_test_runners = [runner for runner in test_runners if runner.is_valid_target(target)]
+
         if not valid_test_runners:
-            raise ValueError(f"No valid test runner for {address}.")
-        if len(valid_test_runners) > 1:
+            all_valid_target_types = itertools.chain.from_iterable(
+                runner.valid_target_types(
+                    registered_target_types.types, union_membership=union_membership
+                )
+                for runner in test_runners
+            )
+            formatted_target_types = sorted(
+                target_type.alias for target_type in all_valid_target_types
+            )
             raise ValueError(
-                f"Multiple possible test runners for {address} "
-                f"({', '.join(test_runner.__name__ for test_runner in valid_test_runners)})."
+                f"The `test` goal only works with the following target types: "
+                f"{formatted_target_types}\n\nYou used {target.address} with target type "
+                f"{repr(target.alias)}."
+            )
+        if len(valid_test_runners) > 1:
+            possible_runners = sorted(
+                implementation.__name__ for implementation in valid_test_runners
+            )
+            raise ValueError(
+                f"Multiple of the registered test runners work for {target.address} "
+                f"(target type {repr(target.alias)}). It is ambiguous which implementation to use. "
+                f"Possible implementations: {possible_runners}."
             )
         test_runner = valid_test_runners[0]
-        logger.info(f"Starting test in debug mode: {address.reference()}")
-        request = await Get[TestDebugRequest](TestRunner, test_runner(adaptor_with_origin))
-        debug_result = runner.run_local_interactive_process(request.ipr)
+        logger.info(f"Starting test in debug mode: {target.address.reference()}")
+        request = await Get[TestDebugRequest](TestRunner, test_runner.create(target_with_origin))
+        debug_result = interactive_runner.run_local_interactive_process(request.ipr)
         return Test(debug_result.process_exit_code)
-
-    adaptors_with_origins = tuple(
-        TargetAdaptorWithOrigin.create(target_with_origin.target.adaptor, target_with_origin.origin)
-        for target_with_origin in targets_with_origins
-        if target_with_origin.target.adaptor.has_sources()
-    )
 
     results = await MultiGet(
         Get[AddressAndTestResult](
-            WrappedTestRunner, WrappedTestRunner(test_runner(adaptor_with_origin))
+            WrappedTestRunner, WrappedTestRunner(runner.create(target_with_origin))
         )
-        for adaptor_with_origin in adaptors_with_origins
-        for test_runner in test_runners
-        if test_runner.is_valid_target(adaptor_with_origin)
+        for target_with_origin in targets_with_origins
+        for runner in test_runners
+        if runner.is_valid_target(target_with_origin.target)
     )
 
     did_any_fail = False
@@ -292,30 +321,28 @@ async def run_tests(
                 coverage_report_files.append(report_file)
 
         if coverage_report_files and options.values.open_coverage:
-            desktop.ui_open(console, runner, coverage_report_files)
+            desktop.ui_open(console, interactive_runner, coverage_report_files)
 
     return Test(exit_code)
 
 
 @rule
-async def coordinator_of_tests(wrapped_test_runner: WrappedTestRunner) -> AddressAndTestResult:
-    test_runner = wrapped_test_runner.runner
-    adaptor_with_origin = test_runner.adaptor_with_origin
-    adaptor = adaptor_with_origin.adaptor
+async def coordinator_of_tests(wrapped_runner: WrappedTestRunner) -> AddressAndTestResult:
+    runner = wrapped_runner.runner
 
     # TODO(#6004): when streaming to live TTY, rely on V2 UI for this information. When not a
     # live TTY, periodically dump heavy hitters to stderr. See
     # https://github.com/pantsbuild/pants/issues/6004#issuecomment-492699898.
-    logger.info(f"Starting tests: {adaptor.address.reference()}")
+    logger.info(f"Starting tests: {runner.address.reference()}")
     # NB: This has the effect of "casting" a TargetAdaptorWithOrigin to a member of the TestTarget
     # union. If the adaptor is not a member of the union, the engine will fail at runtime with a
     # useful error message.
-    result = await Get[TestResult](TestRunner, test_runner)
+    result = await Get[TestResult](TestRunner, runner)
     logger.info(
         f"Tests {'succeeded' if result.status == Status.SUCCESS else 'failed'}: "
-        f"{adaptor.address.reference()}"
+        f"{runner.address.reference()}"
     )
-    return AddressAndTestResult(adaptor.address, result)
+    return AddressAndTestResult(runner.address, result)
 
 
 def rules():

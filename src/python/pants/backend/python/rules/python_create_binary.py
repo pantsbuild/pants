@@ -8,7 +8,6 @@ from pants.backend.python.rules.pex import Pex
 from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
 from pants.backend.python.rules.targets import EntryPoint, PythonBinarySources
 from pants.backend.python.targets.python_binary import PythonBinary
-from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses
 from pants.engine.rules import UnionRule, rule
 from pants.engine.selectors import Get
@@ -21,7 +20,6 @@ from pants.rules.core.determine_source_files import AllSourceFilesRequest, Sourc
 class PythonBinaryImplementation(BinaryImplementation):
     required_fields = (EntryPoint, PythonBinarySources)
 
-    address: Address
     sources: PythonBinarySources
     entry_point: EntryPoint
 
@@ -32,7 +30,9 @@ class PythonBinaryImplementation(BinaryImplementation):
 
     @classmethod
     def create(cls, tgt: Target) -> "PythonBinaryImplementation":
-        return cls(tgt.address, sources=tgt[PythonBinarySources], entry_point=tgt[EntryPoint])
+        return cls(
+            address=tgt.address, sources=tgt[PythonBinarySources], entry_point=tgt[EntryPoint]
+        )
 
 
 @rule

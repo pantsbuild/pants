@@ -21,8 +21,11 @@ from pants.rules.core.distdir import DistDir
 # TODO: This might not be the right level of abstraction. Possibly factor out some superclass.
 #  Revisit after porting lint.py, fmt.py, and test.py to use the Target API.
 @union
+@dataclass(frozen=True)  # type: ignore[misc]   # https://github.com/python/mypy/issues/5374
 class BinaryImplementation(ABC):
     required_fields: ClassVar[Tuple[Type[Field], ...]]
+
+    address: Address
 
     @classmethod
     def is_valid_target(cls, tgt: Target) -> bool:

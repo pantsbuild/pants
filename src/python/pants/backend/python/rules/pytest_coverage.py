@@ -95,6 +95,16 @@ from pants.source.source_root import SourceRootConfig
 
 
 COVERAGE_PLUGIN_MODULE_NAME = "__coverage_coverage_plugin__"
+COVERAGE_PLUGIN_INPUT = InputFilesContent(
+    FilesContent(
+        (
+            FileContent(
+                path=f"{COVERAGE_PLUGIN_MODULE_NAME}.py",
+                content=pkg_resources.resource_string(__name__, "coverage_plugin/plugin.py"),
+            ),
+        )
+    )
+)
 
 DEFAULT_COVERAGE_CONFIG = dedent(
     """
@@ -108,19 +118,6 @@ DEFAULT_COVERAGE_CONFIG = dedent(
 
 def get_coveragerc_input(coveragerc_content: str) -> InputFilesContent:
     return InputFilesContent([FileContent(path=".coveragerc", content=coveragerc_content.encode())])
-
-
-def get_coverage_plugin_input() -> InputFilesContent:
-    return InputFilesContent(
-        FilesContent(
-            (
-                FileContent(
-                    path=f"{COVERAGE_PLUGIN_MODULE_NAME}.py",
-                    content=pkg_resources.resource_string(__name__, "coverage_plugin/plugin.py"),
-                ),
-            )
-        )
-    )
 
 
 def ensure_section(config_parser: configparser.ConfigParser, section: str) -> None:
@@ -233,7 +230,7 @@ class CoverageSetup:
 
 @rule
 async def setup_coverage(coverage: PytestCoverage) -> CoverageSetup:
-    plugin_file_digest = await Get[Digest](InputFilesContent, get_coverage_plugin_input())
+    plugin_file_digest = await Get[Digest](InputFilesContent, COVERAGE_PLUGIN_INPUT)
     output_pex_filename = "coverage.pex"
     requirements_pex = await Get[Pex](
         CreatePex(

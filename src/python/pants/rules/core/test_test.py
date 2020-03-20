@@ -4,12 +4,13 @@
 from abc import ABCMeta, abstractmethod
 from pathlib import PurePath
 from textwrap import dedent
-from typing import List, Tuple, Type
+from typing import List, Optional, Tuple, Type
 from unittest.mock import Mock
 
 import pytest
 
 from pants.base.exceptions import ResolveError
+from pants.base.specs import SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.fs import (
     EMPTY_DIRECTORY_DIGEST,
@@ -19,10 +20,8 @@ from pants.engine.fs import (
     Workspace,
 )
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
-from pants.engine.legacy.graph import HydratedTargetsWithOrigins, HydratedTargetWithOrigin
-from pants.engine.legacy.structs import TargetAdaptorWithOrigin
 from pants.engine.rules import UnionMembership
-from pants.rules.core.fmt_test import FmtTest
+from pants.engine.target import RegisteredTargetTypes, Target, TargetsWithOrigins, TargetWithOrigin
 from pants.rules.core.test import (
     AddressAndTestResult,
     CoverageDataBatch,
@@ -47,10 +46,19 @@ class MockOptions:
         self.values = Mock(**values)
 
 
+class MockTarget(Target):
+    alias = "mock_target"
+    core_fields = ()
+
+
 class MockTestRunner(TestRunner, metaclass=ABCMeta):
-    @staticmethod
-    def is_valid_target(_: TargetAdaptorWithOrigin) -> bool:
+    @classmethod
+    def is_valid_target(cls, _: Target) -> bool:
         return True
+
+    @classmethod
+    def create(cls, target_with_origin: TargetWithOrigin) -> "MockTestRunner":
+        return cls(address=target_with_origin.target.address, origin=target_with_origin.origin)
 
     @staticmethod
     @abstractmethod
@@ -67,8 +75,9 @@ class MockTestRunner(TestRunner, metaclass=ABCMeta):
 
     @property
     def test_result(self) -> TestResult:
-        address = self.adaptor_with_origin.adaptor.address
-        return TestResult(self.status(address), self.stdout(address), self.stderr(address))
+        return TestResult(
+            self.status(self.address), self.stdout(self.address), self.stderr(self.address)
+        )
 
 
 class SuccessfulTestRunner(MockTestRunner):
@@ -104,8 +113,8 @@ class ConditionallySucceedsTestRunner(MockTestRunner):
 
 
 class InvalidTargetTestRunner(MockTestRunner):
-    @staticmethod
-    def is_valid_target(_: TargetAdaptorWithOrigin) -> bool:
+    @classmethod
+    def is_valid_target(cls, _: Target) -> bool:
         return False
 
     @staticmethod
@@ -123,11 +132,20 @@ class TestTest(TestBase):
             argv=("/usr/bin/python", "program.py",), run_in_workspace=False, input_files=digest,
         )
 
+    @staticmethod
+    def make_target_with_origin(address: Optional[Address] = None) -> TargetWithOrigin:
+        if address is None:
+            address = Address.parse(":tests")
+        return TargetWithOrigin(
+            MockTarget({}, address=address),
+            origin=SingleAddress(directory=address.spec_path, name=address.target_name),
+        )
+
     def run_test_rule(
         self,
         *,
         test_runner: Type[TestRunner],
-        targets: List[HydratedTargetWithOrigin],
+        targets: List[TargetWithOrigin],
         debug: bool = False,
     ) -> Tuple[int, str]:
         console = MockConsole(use_colors=False)
@@ -141,7 +159,7 @@ class TestTest(TestBase):
         ) -> AddressAndTestResult:
             runner = wrapped_test_runner.runner
             return AddressAndTestResult(
-                address=runner.adaptor_with_origin.adaptor.address,
+                address=runner.address,
                 test_result=runner.test_result,  # type: ignore[attr-defined]
             )
 
@@ -151,9 +169,10 @@ class TestTest(TestBase):
                 console,
                 options,
                 interactive_runner,
-                HydratedTargetsWithOrigins(targets),
+                TargetsWithOrigins(targets),
                 workspace,
                 union_membership,
+                RegisteredTargetTypes.create([MockTarget]),
             ],
             mock_gets=[
                 MockGet(
@@ -180,27 +199,17 @@ class TestTest(TestBase):
         )
         return result.exit_code, console.stdout.getvalue()
 
-    def test_empty_target_noops(self) -> None:
-        exit_code, stdout = self.run_test_rule(
-            test_runner=SuccessfulTestRunner,
-            targets=[FmtTest.make_hydrated_target_with_origin(include_sources=False)],
-        )
-        assert exit_code == 0
-        assert stdout.strip() == ""
-
     def test_invalid_target_noops(self) -> None:
         exit_code, stdout = self.run_test_rule(
-            test_runner=InvalidTargetTestRunner,
-            targets=[FmtTest.make_hydrated_target_with_origin()],
+            test_runner=InvalidTargetTestRunner, targets=[self.make_target_with_origin()],
         )
         assert exit_code == 0
         assert stdout.strip() == ""
 
     def test_single_target(self) -> None:
-        target_with_origin = FmtTest.make_hydrated_target_with_origin()
-        address = target_with_origin.target.adaptor.address
+        address = Address.parse(":tests")
         exit_code, stdout = self.run_test_rule(
-            test_runner=SuccessfulTestRunner, targets=[target_with_origin],
+            test_runner=SuccessfulTestRunner, targets=[self.make_target_with_origin(address)],
         )
         assert exit_code == 0
         assert stdout == dedent(
@@ -208,18 +217,20 @@ class TestTest(TestBase):
             {address} stdout:
             {SuccessfulTestRunner.stdout(address)}
 
-            {address}                                                                       .....   SUCCESS
+            {address}                                                                        .....   SUCCESS
             """
         )
 
     def test_multiple_targets(self) -> None:
-        good_target = FmtTest.make_hydrated_target_with_origin(name="good")
-        good_address = good_target.target.adaptor.address
-        bad_target = FmtTest.make_hydrated_target_with_origin(name="bad")
-        bad_address = bad_target.target.adaptor.address
+        good_address = Address.parse(":good")
+        bad_address = Address.parse(":bad")
 
         exit_code, stdout = self.run_test_rule(
-            test_runner=ConditionallySucceedsTestRunner, targets=[good_target, bad_target],
+            test_runner=ConditionallySucceedsTestRunner,
+            targets=[
+                self.make_target_with_origin(address=good_address),
+                self.make_target_with_origin(bad_address),
+            ],
         )
         assert exit_code == 1
         assert stdout == dedent(
@@ -236,9 +247,7 @@ class TestTest(TestBase):
 
     def test_single_debug_target(self) -> None:
         exit_code, stdout = self.run_test_rule(
-            test_runner=SuccessfulTestRunner,
-            targets=[FmtTest.make_hydrated_target_with_origin()],
-            debug=True,
+            test_runner=SuccessfulTestRunner, targets=[self.make_target_with_origin()], debug=True,
         )
         assert exit_code == 0
 
@@ -247,8 +256,8 @@ class TestTest(TestBase):
             self.run_test_rule(
                 test_runner=SuccessfulTestRunner,
                 targets=[
-                    FmtTest.make_hydrated_target_with_origin(name="t1"),
-                    FmtTest.make_hydrated_target_with_origin(name="t2"),
+                    self.make_target_with_origin(Address.parse(":t1")),
+                    self.make_target_with_origin(Address.parse(":t2")),
                 ],
                 debug=True,
             )

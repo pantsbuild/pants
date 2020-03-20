@@ -14,12 +14,12 @@ from pants.backend.python.rules.pex import (
 from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
 from pants.backend.python.rules.prepare_chrooted_python_sources import ChrootedPythonSources
 from pants.backend.python.rules.pytest_coverage import (
+    COVERAGE_PLUGIN_INPUT,
     Coveragerc,
     CoveragercRequest,
     PytestCoverageData,
-    get_coverage_plugin_input,
 )
-from pants.backend.python.rules.targets import Coverage, Timeout
+from pants.backend.python.rules.targets import Coverage, PythonTestsSources, Timeout
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.addressable import Addresses
@@ -27,26 +27,34 @@ from pants.engine.fs import Digest, DirectoriesToMerge, InputFilesContent
 from pants.engine.interactive_runner import InteractiveProcessRequest
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
-from pants.engine.legacy.structs import (
-    FilesAdaptor,
-    PythonTargetAdaptor,
-    PythonTestsAdaptorWithOrigin,
-    ResourcesAdaptor,
-    TargetAdaptorWithOrigin,
-)
+from pants.engine.legacy.structs import FilesAdaptor, PythonTargetAdaptor, ResourcesAdaptor
 from pants.engine.rules import UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
+from pants.engine.target import TargetWithOrigin
 from pants.option.global_options import GlobalOptions
 from pants.python.python_setup import PythonSetup
-from pants.rules.core.determine_source_files import LegacySpecifiedSourceFilesRequest, SourceFiles
+from pants.rules.core.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.rules.core.test import TestDebugRequest, TestOptions, TestResult, TestRunner
 
 
 @dataclass(frozen=True)
 class PytestRunner(TestRunner):
-    @staticmethod
-    def is_valid_target(adaptor_with_origin: TargetAdaptorWithOrigin) -> bool:
-        return isinstance(adaptor_with_origin, PythonTestsAdaptorWithOrigin)
+    required_fields = (PythonTestsSources,)
+
+    sources: PythonTestsSources
+    timeout: Timeout
+    coverage: Coverage
+
+    @classmethod
+    def create(cls, target_with_origin: TargetWithOrigin) -> "PytestRunner":
+        tgt = target_with_origin.target
+        return cls(
+            address=tgt.address,
+            origin=target_with_origin.origin,
+            sources=tgt[PythonTestsSources],
+            timeout=tgt.get(Timeout),
+            coverage=tgt.get(Coverage),
+        )
 
 
 @dataclass(frozen=True)
@@ -62,23 +70,22 @@ class TestTargetSetup:
 
 @rule
 async def setup_pytest_for_target(
-    pytest_runner: PytestRunner,
-    pytest: PyTest,
-    test_options: TestOptions,
-    python_setup: PythonSetup,
+    runner: PytestRunner, pytest: PyTest, test_options: TestOptions, python_setup: PythonSetup,
 ) -> TestTargetSetup:
     # TODO: Rather than consuming the TestOptions subsystem, the TestRunner should pass on coverage
     # configuration via #7490.
 
-    adaptor_with_origin = pytest_runner.adaptor_with_origin
-    adaptor = adaptor_with_origin.adaptor
-    test_addresses = Addresses((adaptor.address,))
+    test_addresses = Addresses((runner.address,))
 
     # TODO(John Sirois): PexInterpreterConstraints are gathered in the same way by the
     #  `create_pex_from_target_closure` rule, factor up.
+    # TODO: stop using target adaptors here once we have a way to get the transitive closure of a
+    #  Target.
     transitive_hydrated_targets = await Get[TransitiveHydratedTargets](Addresses, test_addresses)
     all_targets = transitive_hydrated_targets.closure
     all_target_adaptors = [t.adaptor for t in all_targets]
+    # TODO: use PexInterpreterConstraints.create_from_compatibility_fields() once we have a way to
+    #  get the transitive closure of a Target.
     interpreter_constraints = PexInterpreterConstraints.create_from_adaptors(
         adaptors=all_target_adaptors, python_setup=python_setup
     )
@@ -98,7 +105,7 @@ async def setup_pytest_for_target(
 
     run_coverage = test_options.values.run_coverage
     plugin_file_digest: Optional[Digest] = (
-        await Get[Digest](InputFilesContent, get_coverage_plugin_input()) if run_coverage else None
+        await Get[Digest](InputFilesContent, COVERAGE_PLUGIN_INPUT) if run_coverage else None
     )
 
     create_pytest_pex_request = create_pex(
@@ -137,8 +144,8 @@ async def setup_pytest_for_target(
 
     # Get the file names for the test_target so that we can specify to Pytest precisely which files
     # to test, rather than using auto-discovery.
-    specified_source_files_request = LegacySpecifiedSourceFilesRequest(
-        [adaptor_with_origin], strip_source_roots=True
+    specified_source_files_request = SpecifiedSourceFilesRequest(
+        [(runner.sources, runner.origin)], strip_source_roots=True
     )
 
     # TODO: Replace this with appropriate target API logic.
@@ -156,7 +163,7 @@ async def setup_pytest_for_target(
         Get[Pex](CreatePexFromTargetClosure, create_requirements_pex_request),
         Get[Pex](CreatePex, create_test_runner_pex),
         Get[ChrootedPythonSources](HydratedTargets(python_targets + resource_targets)),
-        Get[SourceFiles](LegacySpecifiedSourceFilesRequest, specified_source_files_request),
+        Get[SourceFiles](SpecifiedSourceFilesRequest, specified_source_files_request),
     ]
     if run_coverage:
         requests.append(
@@ -197,28 +204,23 @@ async def setup_pytest_for_target(
         coverage_args = [
             "--cov-report=",  # To not generate any output. https://pytest-cov.readthedocs.io/en/latest/config.html
         ]
-        # TODO: replace this with proper usage of the Target API.
-        coverage_field = Coverage(getattr(adaptor, "coverage", None), address=adaptor.address)
-        for package in coverage_field.determine_packages_to_cover(
+        for package in runner.coverage.determine_packages_to_cover(
             specified_source_files=specified_source_files
         ):
             coverage_args.extend(["--cov", package])
-
-    # TODO: replace this with proper usage of the Target API.
-    timeout_field = Timeout(getattr(adaptor, "timeout", None), address=adaptor.address)
 
     specified_source_file_names = sorted(specified_source_files.snapshot.files)
     return TestTargetSetup(
         test_runner_pex=test_runner_pex,
         args=(*pytest.options.args, *coverage_args, *specified_source_file_names),
         input_files_digest=merged_input_files,
-        timeout_seconds=timeout_field.calculate_from_global_options(pytest),
+        timeout_seconds=runner.timeout.calculate_from_global_options(pytest),
     )
 
 
 @rule(name="Run pytest")
 async def run_python_test(
-    pytest_runner: PytestRunner,
+    runner: PytestRunner,
     test_setup: TestTargetSetup,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
@@ -235,7 +237,7 @@ async def run_python_test(
         pex_args=test_setup.args,
         input_files=test_setup.input_files_digest,
         output_directories=(".coverage",) if run_coverage else None,
-        description=f"Run Pytest for {pytest_runner.adaptor_with_origin.adaptor.address.reference()}",
+        description=f"Run Pytest for {runner.address.reference()}",
         timeout_seconds=(
             test_setup.timeout_seconds if test_setup.timeout_seconds is not None else 9999
         ),
