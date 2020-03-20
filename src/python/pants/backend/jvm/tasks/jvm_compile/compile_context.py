@@ -15,7 +15,8 @@ class CompileContext:
   """
 
   def __init__(self, target, analysis_file, classes_dir, jar_file,
-               log_dir, args_file, post_compile_merge_dir, sources):
+               log_dir, args_file, post_compile_merge_dir, sources,
+               diagnostics_out):
     self.target = target
     self.analysis_file = analysis_file
     self.classes_dir = classes_dir
@@ -24,6 +25,7 @@ class CompileContext:
     self.args_file = args_file
     self.post_compile_merge_dir = post_compile_merge_dir
     self.sources = sources
+    self.diagnostics_out = diagnostics_out
 
   @contextmanager
   def open_jar(self, mode):
@@ -32,7 +34,7 @@ class CompileContext:
 
   @property
   def _id(self):
-    return (self.target, self.analysis_file, self.classes_dir.path)
+    return (self.target, self.analysis_file, self.classes_dir.path, self.diagnostics_out)
 
   def __eq__(self, other):
     return self._id == other._id

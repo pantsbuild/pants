@@ -35,7 +35,8 @@ class ZincCompileTest(JvmToolTaskTestBase):
         self.java_target,
         analysis_file="", classes_dir="", jar_file="", log_dir="",
         args_file=arg_file_path,
-        sources=[], post_compile_merge_dir=""
+        sources=[], post_compile_merge_dir="",
+        diagnistics_out=None
       )}
       task = self.get_task()
       args = ['-classpath', 'a.jar:b.jar', '-C-Xplugin:some_javac_plugin with args']

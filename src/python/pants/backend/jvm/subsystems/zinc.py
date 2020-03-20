@@ -28,7 +28,7 @@ from pants.util.fileutil import safe_hardlink_or_copy
 from pants.util.memo import memoized_method, memoized_property
 
 
-_ZINC_COMPILER_VERSION = '0.0.17'
+_ZINC_COMPILER_VERSION = '0.0.20'
 
 
 class Zinc:

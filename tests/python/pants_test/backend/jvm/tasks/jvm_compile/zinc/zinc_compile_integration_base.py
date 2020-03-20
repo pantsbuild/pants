@@ -7,6 +7,7 @@ import xml.etree.ElementTree as ET
 from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
+from pants.util.collections import assert_single_element
 from pants.util.contextutil import open_zip, temporary_dir
 from pants.util.dirutil import safe_open
 
@@ -280,6 +281,50 @@ class BaseZincCompileIntegrationTest:
 
     for expected in expected_strings:
       self.assertIn(expected, pants_run.stdout_data)
+
+  def _test_zinc_reports_diagnostic_counts(self, reporting):
+    with self.temporary_workdir() as workdir:
+      target = "testprojects/src/scala/org/pantsbuild/testproject/compilation_warnings/unused_import_warning:unused_import"
+      with self.temporary_cachedir() as cachedir:
+        args = ['--compile-rsc-args=+["-S-Ywarn-unused:_"]'] + (
+          ["--compile-rsc-report-diagnostic-counts"] if reporting else []
+        )
+        pants_run = self.run_test_compile(workdir, cachedir, target, extra_args=args,)
+        self.assert_success(pants_run)
+
+      expected_strings = [
+        f"Reporting number of diagnostics for: {target}",
+        "Error: 0",
+        "Warning: 1",
+        "Information: 0",
+        "Hint: 0",
+      ]
+
+      for expected in expected_strings:
+        if reporting:
+          self.assertIn(expected, pants_run.stdout_data)
+        else:
+          self.assertNotIn(expected, pants_run.stdout_data)
+      run_info_path = os.path.join(workdir, "run-tracker", "latest", "info")
+      with open(run_info_path, "r") as run_info:
+
+        def is_target_data_line(line):
+          return line.startswith("target_data: ")
+
+        target_data_line = assert_single_element(filter(is_target_data_line, run_info))
+        expected_target_data = (
+          "'diagnostic_counts': {'Error': 0, 'Warning': 1, 'Information': 0, 'Hint': 0}"
+        )
+        if reporting:
+          self.assertIn(expected_target_data, target_data_line)
+        else:
+          self.assertNotIn(expected_target_data, target_data_line)
+
+  def test_zinc_reports_diagnostic_counts_when_prompted(self):
+    self._test_zinc_reports_diagnostic_counts(reporting=True)
+
+  def test_zinc_does_not_report_diagnostic_counts_when_unprompted(self):
+    self._test_zinc_reports_diagnostic_counts(reporting=False)
 
   def test_barebones_logger_works(self):
     """
