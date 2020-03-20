@@ -18,8 +18,8 @@ from pants.backend.python.rules.pytest_coverage import (
     CoveragercRequest,
     PytestCoverageData,
     get_coverage_plugin_input,
-    get_packages_to_cover,
 )
+from pants.backend.python.rules.targets import Coverage, Timeout
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.addressable import Addresses
@@ -40,28 +40,6 @@ from pants.option.global_options import GlobalOptions
 from pants.python.python_setup import PythonSetup
 from pants.rules.core.determine_source_files import LegacySpecifiedSourceFilesRequest, SourceFiles
 from pants.rules.core.test import TestDebugRequest, TestOptions, TestResult, TestRunner
-
-
-def calculate_timeout_seconds(
-    *,
-    timeouts_enabled: bool,
-    target_timeout: Optional[int],
-    timeout_default: Optional[int],
-    timeout_maximum: Optional[int],
-) -> Optional[int]:
-    """Calculate the timeout for a test target.
-
-    If a target has no timeout configured its timeout will be set to the default timeout.
-    """
-    if not timeouts_enabled:
-        return None
-    if target_timeout is None:
-        if timeout_default is None:
-            return None
-        target_timeout = timeout_default
-    if timeout_maximum is not None:
-        return min(target_timeout, timeout_maximum)
-    return target_timeout
 
 
 @dataclass(frozen=True)
@@ -216,29 +194,25 @@ async def setup_pytest_for_target(
 
     coverage_args = []
     if run_coverage:
-        packages_to_cover = get_packages_to_cover(
-            target=adaptor, specified_source_files=specified_source_files,
-        )
         coverage_args = [
             "--cov-report=",  # To not generate any output. https://pytest-cov.readthedocs.io/en/latest/config.html
         ]
-        for package in packages_to_cover:
+        # TODO: replace this with proper usage of the Target API.
+        coverage_field = Coverage(getattr(adaptor, "coverage", None), address=adaptor.address)
+        for package in coverage_field.determine_packages_to_cover(
+            specified_source_files=specified_source_files
+        ):
             coverage_args.extend(["--cov", package])
 
-    specified_source_file_names = specified_source_files.snapshot.files
+    # TODO: replace this with proper usage of the Target API.
+    timeout_field = Timeout(getattr(adaptor, "timeout", None), address=adaptor.address)
 
-    timeout_seconds = calculate_timeout_seconds(
-        timeouts_enabled=pytest.options.timeouts,
-        target_timeout=getattr(adaptor, "timeout", None),
-        timeout_default=pytest.options.timeout_default,
-        timeout_maximum=pytest.options.timeout_maximum,
-    )
-
+    specified_source_file_names = sorted(specified_source_files.snapshot.files)
     return TestTargetSetup(
         test_runner_pex=test_runner_pex,
-        args=(*pytest.options.args, *coverage_args, *sorted(specified_source_file_names)),
+        args=(*pytest.options.args, *coverage_args, *specified_source_file_names),
         input_files_digest=merged_input_files,
-        timeout_seconds=timeout_seconds,
+        timeout_seconds=timeout_field.calculate_from_global_options(pytest),
     )
 
 

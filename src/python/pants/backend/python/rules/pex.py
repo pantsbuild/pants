@@ -9,6 +9,7 @@ from pkg_resources import Requirement
 
 from pants.backend.python.rules.download_pex_bin import DownloadedPexBin
 from pants.backend.python.rules.hermetic_pex import HermeticPex
+from pants.backend.python.rules.targets import Compatibility
 from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.fs import (
@@ -135,6 +136,15 @@ class PexInterpreterConstraints:
         )
 
     @classmethod
+    def create_from_compatibility_fields(
+        cls, fields: Iterable[Compatibility], python_setup: PythonSetup
+    ) -> "PexInterpreterConstraints":
+        constraint_sets = {field.value_or_global_default(python_setup) for field in fields}
+        # This will OR within each field and AND across fields.
+        merged_constraints = cls.merge_constraint_sets(constraint_sets)
+        return PexInterpreterConstraints(merged_constraints)
+
+    @classmethod
     def create_from_adaptors(
         cls, adaptors: Iterable[TargetAdaptor], python_setup: PythonSetup
     ) -> "PexInterpreterConstraints":
@@ -142,8 +152,8 @@ class PexInterpreterConstraints:
         for adaptor in adaptors:
             if not isinstance(adaptor, PythonTargetAdaptor):
                 continue
-            constraint_set = python_setup.compatibility_or_constraints(adaptor.compatibility)
-            constraint_sets.add(constraint_set)
+            compatibility_field = Compatibility(adaptor.compatibility, address=adaptor.address)
+            constraint_sets.add(compatibility_field.value_or_global_default(python_setup))
         # This will OR within each target and AND across targets.
         merged_constraints = cls.merge_constraint_sets(constraint_sets)
         return PexInterpreterConstraints(merged_constraints)
