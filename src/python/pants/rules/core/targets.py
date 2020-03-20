@@ -14,4 +14,5 @@ class FilesSources(Sources):
 class Files(Target):
     """A collection of loose files."""
 
+    alias = "files"
     core_fields = (*COMMON_TARGET_FIELDS, FilesSources)
