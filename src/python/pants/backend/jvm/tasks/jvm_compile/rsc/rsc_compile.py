@@ -979,15 +979,9 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         ]
 
         zinc_args = []
+        zinc_args.extend(self.create_zinc_log_level_args())
         zinc_args.extend(
-            [
-                "-log-level",
-                self.get_options().level,
-                "-analysis-cache",
-                analysis_cache,
-                "-classpath",
-                os.pathsep.join(relative_classpath),
-            ]
+            ["-analysis-cache", analysis_cache, "-classpath", os.pathsep.join(relative_classpath),]
         )
 
         compiler_bridge_classpath_entry = self._zinc.compile_compiler_bridge(self.context)

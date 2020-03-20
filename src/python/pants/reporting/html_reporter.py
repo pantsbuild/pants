@@ -343,7 +343,6 @@ class HtmlReporter(Reporter):
             f.flush()
 
     _log_level_css_map = {
-        Report.FATAL: "fatal",
         Report.ERROR: "error",
         Report.WARN: "warn",
         Report.INFO: "info",

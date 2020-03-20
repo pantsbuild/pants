@@ -6,6 +6,7 @@ from pants.init.options_initializer import BuildConfigInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.scope import GLOBAL_SCOPE, Scope, ScopedOptions
 from pants.testutil.test_base import TestBase
+from pants.util.logging import LogLevel
 
 
 class TestEngineOptionsParsing(TestBase):
@@ -29,7 +30,7 @@ class TestEngineOptionsParsing(TestBase):
             ScopedOptions, [global_options_params, python_setup_options_params],
         )
 
-        self.assertEqual(global_options.options.level, "debug")
+        self.assertEqual(global_options.options.level, LogLevel.DEBUG)
         self.assertEqual(global_options.options.enable_pantsd, True)
         self.assertEqual(global_options.options.binaries_baseurls, ["https://bins.com"])
 

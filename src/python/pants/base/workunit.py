@@ -5,9 +5,10 @@ import os
 import re
 import time
 import uuid
-from collections import namedtuple
+from dataclasses import dataclass
 
 from pants.util.dirutil import safe_mkdir_for
+from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method
 from pants.util.rwbuf import FileBackedRWBuf
 
@@ -78,7 +79,10 @@ class WorkUnit:
     # Generic workunit log config.
     #   log_level: Display log messages up to this level.
     #   color: log color settings.
-    LogConfig = namedtuple("LogConfig", ["level", "colors"])
+    @dataclass(frozen=True)
+    class LogConfig:
+        log_level: LogLevel
+        colors: bool
 
     @staticmethod
     def outcome_string(outcome):

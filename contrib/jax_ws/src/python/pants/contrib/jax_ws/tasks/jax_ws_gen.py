@@ -83,7 +83,7 @@ class JaxWsGen(SimpleCodegenTask, NailgunTask):
         )  # Don't let xjc write out a timestamp, because it'll break caching.
         cmd.extend(target.payload.extra_args)
         cmd.append(url)
-        if self.get_options().level == "debug":
+        if self.debug:
             cmd.append("-Xdebug")
         return cmd
 

@@ -153,7 +153,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
                     "junit:junit:4.12",
                     "-r",
                     # This is needed to get around the maven blacklisting RBE.
-                    "https://maven-central.storage-download.googleapis.com/repos/central/data",
+                    "https://maven-central.storage-download.googleapis.com/maven2",
                 ],
                 stdout=f,
             )

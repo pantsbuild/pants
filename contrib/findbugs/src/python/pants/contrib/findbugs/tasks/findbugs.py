@@ -235,7 +235,7 @@ class FindBugs(NailgunTask):
         if self.get_options().relaxed:
             args.extend(["-relaxed"])
 
-        if self.get_options().level == "debug":
+        if self.debug:
             args.extend(["-progress"])
 
         args.extend(target_jars)

@@ -650,7 +650,7 @@ class JarPublish(HasTransitiveOptionMixin, ScmPublishMixin, JarTask):
         # that we can:
         # a.) obtain a handle to (dependency injection or manual plumbing)
         # b.) query for log detail, ie: `if log_manager.is_verbose:`
-        if self.get_options().level == "debug":
+        if self.debug:
             args.append("-verbose")
 
         if self.local_snapshot:
