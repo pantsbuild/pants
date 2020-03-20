@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pathlib import PurePath
-from typing import Iterable, List, NamedTuple, Optional, Type
+from typing import Iterable, List, NamedTuple, Optional, Tuple, Type
 from unittest.mock import Mock
 
 from pants.base.specs import (
@@ -25,7 +25,6 @@ from pants.rules.core.determine_source_files import (
     LegacyAllSourceFilesRequest,
     LegacySpecifiedSourceFilesRequest,
     SourceFiles,
-    SourcesFieldWithOrigin,
     SpecifiedSourceFilesRequest,
 )
 from pants.rules.core.determine_source_files import rules as determine_source_files_rules
@@ -66,7 +65,7 @@ class DetermineSourceFilesTest(TestBase):
         origin: Optional[OriginSpec] = None,
         include_sources: bool = True,
         sources_field_cls: Type[SourcesField] = SourcesField,
-    ) -> SourcesFieldWithOrigin:
+    ) -> Tuple[SourcesField, OriginSpec]:
         sources_field = sources_field_cls(
             sources.source_files, address=Address.parse(f"{sources.source_root}:lib")
         )
@@ -75,17 +74,17 @@ class DetermineSourceFilesTest(TestBase):
         )
         if origin is None:
             origin = SiblingAddresses(sources.source_root)
-        return SourcesFieldWithOrigin(sources_field, origin)
+        return sources_field, origin
 
     def get_all_source_files(
         self,
-        sources_fields_with_origins: Iterable[SourcesFieldWithOrigin],
+        sources_fields_with_origins: Iterable[Tuple[SourcesField, OriginSpec]],
         *,
         strip_source_roots: bool = False,
     ) -> List[str]:
         request = AllSourceFilesRequest(
             (
-                sources_field_with_origin.sources_field
+                sources_field_with_origin[0]
                 for sources_field_with_origin in sources_fields_with_origins
             ),
             strip_source_roots=strip_source_roots,
@@ -97,7 +96,7 @@ class DetermineSourceFilesTest(TestBase):
 
     def get_specified_source_files(
         self,
-        sources_fields_with_origins: Iterable[SourcesFieldWithOrigin],
+        sources_fields_with_origins: Iterable[Tuple[SourcesField, OriginSpec]],
         *,
         strip_source_roots: bool = False,
     ) -> List[str]:
@@ -124,7 +123,7 @@ class DetermineSourceFilesTest(TestBase):
         )
 
         def assert_all_source_files_resolved(
-            sources_field_with_origin: SourcesFieldWithOrigin, sources: TargetSources
+            sources_field_with_origin: Tuple[SourcesField, OriginSpec], sources: TargetSources
         ) -> None:
             expected = sources.source_file_absolute_paths
             assert self.get_all_source_files([sources_field_with_origin]) == expected
@@ -177,7 +176,7 @@ class DetermineSourceFilesTest(TestBase):
         sources_field3 = self.mock_sources_field_with_origin(SOURCES3, origin=sources_field3_origin)
 
         def assert_file_args_resolved(
-            sources_field_with_origin: SourcesFieldWithOrigin,
+            sources_field_with_origin: Tuple[SourcesField, OriginSpec],
             all_sources: List[str],
             expected_slice: slice,
         ) -> None:
@@ -209,7 +208,7 @@ class DetermineSourceFilesTest(TestBase):
         sources_field3 = self.mock_sources_field_with_origin(SOURCES3)
 
         def assert_source_roots_stripped(
-            sources_field_with_origin: SourcesFieldWithOrigin, sources: TargetSources
+            sources_field_with_origin: Tuple[SourcesField, OriginSpec], sources: TargetSources
         ) -> None:
             expected = sources.source_files
             assert (

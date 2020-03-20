@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Iterable, NamedTuple, Tuple, Union, cast
+from typing import Iterable, Tuple, Union, cast
 
 from pants.base.specs import AddressSpec, OriginSpec
 from pants.engine.fs import DirectoriesToMerge, PathGlobs, Snapshot, SnapshotSubset
@@ -47,20 +47,15 @@ class AllSourceFilesRequest:
         self.strip_source_roots = strip_source_roots
 
 
-class SourcesFieldWithOrigin(NamedTuple):
-    sources_field: SourcesField
-    origin: OriginSpec
-
-
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class SpecifiedSourceFilesRequest:
-    sources_fields_with_origins: Tuple[SourcesFieldWithOrigin, ...]
+    sources_fields_with_origins: Tuple[Tuple[SourcesField, OriginSpec], ...]
     strip_source_roots: bool = False
 
     def __init__(
         self,
-        sources_fields_with_origins: Iterable[SourcesFieldWithOrigin],
+        sources_fields_with_origins: Iterable[Tuple[SourcesField, OriginSpec]],
         *,
         strip_source_roots: bool = False
     ) -> None:
@@ -112,7 +107,7 @@ async def determine_specified_source_files(request: SpecifiedSourceFilesRequest)
     """Determine the specified `sources` for targets, possibly finding a subset of the original
     `sources` fields if the user supplied file arguments."""
     all_hydrated_sources = await MultiGet(
-        Get[HydratedSources](HydrateSourcesRequest, sources_field_with_origin.sources_field.request)
+        Get[HydratedSources](HydrateSourcesRequest, sources_field_with_origin[0].request)
         for sources_field_with_origin in request.sources_fields_with_origins
     )
 
@@ -121,15 +116,14 @@ async def determine_specified_source_files(request: SpecifiedSourceFilesRequest)
     for hydrated_sources, sources_field_with_origin in zip(
         all_hydrated_sources, request.sources_fields_with_origins
     ):
+        sources_field, origin = sources_field_with_origin
         if not hydrated_sources.snapshot.files:
             continue
-        result = calculate_specified_sources(
-            hydrated_sources.snapshot, sources_field_with_origin.origin
-        )
+        result = calculate_specified_sources(hydrated_sources.snapshot, origin)
         if isinstance(result, Snapshot):
-            full_snapshots[sources_field_with_origin.sources_field] = result
+            full_snapshots[sources_field] = result
         else:
-            snapshot_subset_requests[sources_field_with_origin.sources_field] = result
+            snapshot_subset_requests[sources_field] = result
 
     snapshot_subsets: Tuple[Snapshot, ...] = ()
     if snapshot_subset_requests:
