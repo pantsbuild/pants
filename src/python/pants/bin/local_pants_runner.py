@@ -117,7 +117,6 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     build_config: BuildConfiguration
     specs: Specs
     graph_session: LegacyGraphSession
-    scheduler_session: SchedulerSession
     union_membership: UnionMembership
     is_daemon: bool
     profile_path: Optional[str]
@@ -209,9 +208,12 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
 
         # If we're running with the daemon, we'll be handed a session from the
         # resident graph helper - otherwise initialize a new one here.
-        graph_session, scheduler_session = cls._maybe_init_graph_session(
-            daemon_graph_session, options_bootstrapper, build_config, options
-        )
+        if daemon_graph_session:
+            graph_session = daemon_graph_session
+        else:
+            graph_session, _ = cls._maybe_init_graph_session(
+                daemon_graph_session, options_bootstrapper, build_config, options
+            )
 
         if specs is None:
             global_options = options.for_global_scope()
@@ -232,7 +234,6 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
             build_config=build_config,
             specs=specs,
             graph_session=graph_session,
-            scheduler_session=scheduler_session,
             union_membership=union_membership,
             is_daemon=daemon_graph_session is not None,
             profile_path=profile_path,
@@ -323,9 +324,10 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         return max_code
 
     def _update_stats(self):
-        metrics = self.scheduler_session.metrics()
+        scheduler_session = self.graph_session.scheduler_session
+        metrics = scheduler_session.metrics()
         self._run_tracker.pantsd_stats.set_scheduler_metrics(metrics)
-        engine_workunits = self.scheduler_session.engine_workunits(metrics)
+        engine_workunits = scheduler_session.engine_workunits(metrics)
         if engine_workunits:
             self._run_tracker.report.bulk_record_workunits(engine_workunits)
 
@@ -340,7 +342,9 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
             report_interval = global_options.streaming_workunits_report_interval
             callbacks = Subsystem.get_streaming_workunit_callbacks(streaming_handlers)
             streaming_reporter = StreamingWorkunitHandler(
-                self.scheduler_session, callbacks=callbacks, report_interval_seconds=report_interval
+                self.graph_session.scheduler_session,
+                callbacks=callbacks,
+                report_interval_seconds=report_interval,
             )
 
             if self.options.help_request:
