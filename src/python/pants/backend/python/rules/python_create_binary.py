@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import ClassVar, Optional
 
 from pants.backend.python.rules.pex import Pex
 from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
@@ -10,20 +10,17 @@ from pants.backend.python.rules.targets import EntryPoint, PythonBinarySources
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses
-from pants.engine.legacy.structs import PythonBinaryAdaptor
 from pants.engine.rules import UnionRule, rule
 from pants.engine.selectors import Get
-from pants.engine.target import Target, WrappedTarget
-from pants.rules.core.binary import BinaryTarget, CreatedBinary
+from pants.engine.target import Target
+from pants.rules.core.binary import BinaryImplementation, CreatedBinary
 from pants.rules.core.determine_source_files import AllSourceFilesRequest, SourceFiles
 
 
-# TODO: consider replacing this with sugar like `SelectFields(EntryPoint, PythonBinarySources)` so
-#  that the rule would request that instead of this dataclass. Note that this syntax must support
-#  both optional_fields (see the below TODO) and opt-out `SentinelField`s
-#  (see https://github.com/pantsbuild/pants/pull/9316#issuecomment-600152573).
 @dataclass(frozen=True)
-class PythonBinaryFields:
+class PythonBinaryImplementation(BinaryImplementation):
+    required_fields: ClassVar = (EntryPoint, PythonBinarySources)
+
     address: Address
     sources: PythonBinarySources
     entry_point: EntryPoint
@@ -33,29 +30,19 @@ class PythonBinaryFields:
     #  if you don't have them on your target type, we can still operate so long as you have the
     #  required fields. Use `Target.get()` in the `create()` method.
 
-    @staticmethod
-    def is_valid_target(tgt: Target) -> bool:
-        return tgt.has_fields([EntryPoint, PythonBinarySources])
-
     @classmethod
-    def create(cls, tgt: Target) -> "PythonBinaryFields":
+    def create(cls, tgt: Target) -> "PythonBinaryImplementation":
         return cls(tgt.address, sources=tgt[PythonBinarySources], entry_point=tgt[EntryPoint])
 
 
 @rule
-async def convert_python_binary_target(adaptor: PythonBinaryAdaptor) -> PythonBinaryFields:
-    wrapped_tgt = await Get[WrappedTarget](Address, adaptor.address)
-    return PythonBinaryFields.create(wrapped_tgt.target)
-
-
-@rule
-async def create_python_binary(fields: PythonBinaryFields) -> CreatedBinary:
+async def create_python_binary(implementation: PythonBinaryImplementation) -> CreatedBinary:
     entry_point: Optional[str]
-    if fields.entry_point.value is not None:
-        entry_point = fields.entry_point.value
+    if implementation.entry_point.value is not None:
+        entry_point = implementation.entry_point.value
     else:
         source_files = await Get[SourceFiles](
-            AllSourceFilesRequest([fields.sources], strip_source_roots=True)
+            AllSourceFilesRequest([implementation.sources], strip_source_roots=True)
         )
         # NB: `PythonBinarySources` enforces that we have 0-1 sources.
         if len(source_files.files) == 1:
@@ -65,9 +52,9 @@ async def create_python_binary(fields: PythonBinaryFields) -> CreatedBinary:
             entry_point = None
 
     request = CreatePexFromTargetClosure(
-        addresses=Addresses([fields.address]),
+        addresses=Addresses([implementation.address]),
         entry_point=entry_point,
-        output_filename=f"{fields.address.target_name}.pex",
+        output_filename=f"{implementation.address.target_name}.pex",
     )
 
     pex = await Get[Pex](CreatePexFromTargetClosure, request)
@@ -75,8 +62,4 @@ async def create_python_binary(fields: PythonBinaryFields) -> CreatedBinary:
 
 
 def rules():
-    return [
-        UnionRule(BinaryTarget, PythonBinaryAdaptor),
-        convert_python_binary_target,
-        create_python_binary,
-    ]
+    return [create_python_binary, UnionRule(BinaryImplementation, PythonBinaryImplementation)]
