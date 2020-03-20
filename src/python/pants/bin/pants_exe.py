@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import sys
 import time
 
 from pants.base.exception_sink import ExceptionSink
@@ -25,10 +26,10 @@ def test_env():
 
 
 def main():
-    start_time = time.time()
-
     with maybe_profiled(os.environ.get("PANTSC_PROFILE")):
+        start_time = time.time()
         try:
-            PantsRunner(start_time=start_time).run()
+            runner = PantsRunner(args=sys.argv, env=os.environ,)
+            runner.run(start_time)
         except KeyboardInterrupt as e:
             ExceptionSink.get_global_exiter().exit_and_fail("Interrupted by user:\n{}".format(e))
