@@ -73,7 +73,7 @@ class TestDebugRequest:
 @union
 @dataclass(frozen=True)  # type: ignore[misc]   # https://github.com/python/mypy/issues/5374
 class TestTarget(ABC):
-    """An ad-hoc collection of the fields necessary for a test implementation to run on a target."""
+    """An ad hoc collection of the fields necessary for a test implementation to run on a target."""
 
     required_fields: ClassVar[Tuple[Type[Field], ...]]
 

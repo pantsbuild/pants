@@ -22,7 +22,7 @@ class RunOptions(GoalSubsystem):
 
     name = "run"
 
-    # NB: To be runnable, the target must be able to be converted into an ad-hoc subclass of
+    # NB: To be runnable, the target must be able to be converted into an ad hoc subclass of
     # BinaryTarget.
     required_union_implementations = (BinaryTarget,)
 

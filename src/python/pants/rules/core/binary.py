@@ -22,7 +22,7 @@ from pants.rules.core.distdir import DistDir
 @union
 @dataclass(frozen=True)  # type: ignore[misc]   # https://github.com/python/mypy/issues/5374
 class BinaryTarget(ABC):
-    """An ad-hoc collection of the fields necessary for a binary implementation to work with a
+    """An ad hoc collection of the fields necessary for a binary implementation to work with a
     target."""
 
     required_fields: ClassVar[Tuple[Type[Field], ...]]
