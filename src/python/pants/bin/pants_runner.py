@@ -29,12 +29,12 @@ class PantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     # This could be a bootstrap option, but it's preferable to keep these very limited to make it
     # easier to make the daemon the default use case. Once the daemon lifecycle is stable enough we
     # should be able to avoid needing to kill it at all.
-    _DAEMON_KILLING_GOALS = frozenset(["kill-pantsd", "clean-all"])
-
     def will_terminate_pantsd(self) -> bool:
-        return not frozenset(self.args).isdisjoint(self._DAEMON_KILLING_GOALS)
+        _DAEMON_KILLING_GOALS = frozenset(["kill-pantsd", "clean-all"])
+        return not frozenset(self.args).isdisjoint(_DAEMON_KILLING_GOALS)
 
-    def _enable_rust_logging(self, global_bootstrap_options: OptionValueContainer) -> None:
+    @staticmethod
+    def _enable_rust_logging(global_bootstrap_options: OptionValueContainer) -> None:
         log_level = global_bootstrap_options.level
         init_rust_logger(log_level, global_bootstrap_options.log_show_rust_3rdparty)
         setup_logging_to_stderr(logging.getLogger(None), log_level)
@@ -45,11 +45,15 @@ class PantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         # Inner runs should never be run with pantsd.
         # See https://github.com/pantsbuild/pants/issues/7881 for context.
         is_inner_run = global_bootstrap_options.parent_build_id is not None
+        terminate_pantsd = self.will_terminate_pantsd()
+
+        if terminate_pantsd:
+            logger.debug("Pantsd terminating goal detected: {}".format(self.args))
 
         # If we want concurrent pants runs, we can't have pantsd enabled.
         return (
             global_bootstrap_options.enable_pantsd
-            and not self.will_terminate_pantsd()
+            and not terminate_pantsd
             and not global_bootstrap_options.concurrent
             and not is_inner_run
         )
@@ -65,9 +69,10 @@ class PantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         if pythonpath and not os.environ.pop("RUNNING_PANTS_FROM_SOURCES", None):
             logger.warning(f"Scrubbed PYTHONPATH={pythonpath} from the environment.")
 
-    def run(self, start_time: float):
+    def run(self, start_time: float) -> None:
         self.scrub_pythonpath()
 
+        # TODO could options-bootstrapper be parsed in the runners?
         options_bootstrapper = OptionsBootstrapper.create(env=self.env, args=self.args)
         bootstrap_options = options_bootstrapper.bootstrap_options
         global_bootstrap_options = bootstrap_options.for_global_scope()
@@ -83,26 +88,19 @@ class PantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         ExceptionSink.reset_should_print_backtrace_to_terminal(
             global_bootstrap_options.print_exception_stacktrace
         )
-        ExceptionSink.reset_log_location(global_bootstrap_options.pants_workdir)
 
         if self._should_run_with_pantsd(global_bootstrap_options):
             try:
-                return RemotePantsRunner(
-                    self._exiter, self.args, self.env, options_bootstrapper
-                ).run()
+                RemotePantsRunner(self._exiter, self.args, self.env, options_bootstrapper).run()
+                return
             except RemotePantsRunner.Fallback as e:
-                logger.warning(
-                    "caught client exception: {!r}, falling back to non-daemon mode".format(e)
-                )
+                logger.warning(f"Client exception: {e}, falling back to non-daemon mode")
 
         # N.B. Inlining this import speeds up the python thin client run by about 100ms.
         from pants.bin.local_pants_runner import LocalPantsRunner
-
-        if self.will_terminate_pantsd():
-            logger.debug("Pantsd terminating goal detected: {}".format(self.args))
 
         runner = LocalPantsRunner.create(
             self.args, self.env, options_bootstrapper=options_bootstrapper
         )
         runner.set_start_time(start_time)
-        return runner.run()
+        runner.run()
