@@ -204,10 +204,11 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
 
         # If we're running with the daemon, we'll be handed a session from the
         # resident graph helper - otherwise initialize a new one here.
-        if daemon_graph_session:
-            graph_session = daemon_graph_session
-        else:
-            graph_session = cls._init_graph_session(options_bootstrapper, build_config, options)
+        graph_session = (
+            daemon_graph_session
+            if daemon_graph_session
+            else cls._init_graph_session(options_bootstrapper, build_config, options)
+        )
 
         if specs is None:
             global_options = options.for_global_scope()
