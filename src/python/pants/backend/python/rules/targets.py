@@ -1,9 +1,11 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import os.path
 from pathlib import PurePath
-from typing import Optional
+from typing import Optional, Tuple
 
+from pants.backend.python.subsystems.pytest import PyTest
 from pants.build_graph.address import Address
 from pants.engine.fs import Snapshot
 from pants.engine.objects import union
@@ -18,6 +20,8 @@ from pants.engine.target import (
     Target,
     UnimplementedField,
 )
+from pants.python.python_setup import PythonSetup
+from pants.rules.core.determine_source_files import SourceFiles
 
 
 @union
@@ -61,6 +65,13 @@ class Compatibility(StringOrStringSequenceField):
 
     alias = "compatibility"
 
+    def value_or_global_default(self, python_setup: PythonSetup) -> Tuple[str, ...]:
+        """Return either the given `compatibility` field or the global interpreter constraints.
+
+        If interpreter constraints are supplied by the CLI flag, return those only.
+        """
+        return python_setup.compatibility_or_constraints(self.value)
+
 
 class Provides(UnimplementedField):
     alias = "provides"
@@ -70,6 +81,30 @@ class Coverage(StringOrStringSequenceField):
     """The module(s) whose coverage should be generated, e.g. `['pants.util']`."""
 
     alias = "coverage"
+
+    def determine_packages_to_cover(
+        self, *, specified_source_files: SourceFiles
+    ) -> Tuple[str, ...]:
+        """Either return the specified `coverage` field value or, if not defined, attempt to
+        generate packages with a heuristic that tests have the same package name as their source
+        code.
+
+        This heuristic about package names works when either the tests live in the same folder as
+        their source code, or there is a parallel file structure with the same top-level package
+        names, e.g. `src/python/project` and `tests/python/project` (but not
+        `tests/python/test_project`).
+        """
+        if self.value is not None:
+            return self.value
+        return tuple(
+            sorted(
+                {
+                    # Turn file paths into package names.
+                    os.path.dirname(source_file).replace(os.sep, ".")
+                    for source_file in specified_source_files.snapshot.files
+                }
+            )
+        )
 
 
 class Timeout(IntField):
@@ -84,10 +119,24 @@ class Timeout(IntField):
         hydrated_value = super().hydrate(raw_value, address=address)
         if hydrated_value is not None and hydrated_value < 1:
             raise InvalidFieldException(
-                f"The value for the `timeout` field in target {address} must be >= 1, but was "
+                f"The value for the `timeout` field in target {address} must be > 0, but was "
                 f"{raw_value}."
             )
         return raw_value
+
+    def calculate_from_global_options(self, pytest: PyTest) -> Optional[int]:
+        """Determine the timeout (in seconds) after applying global `pytest` options."""
+        if not pytest.timeouts_enabled:
+            return None
+        if self.value is None:
+            if pytest.timeout_default is None:
+                return None
+            result = pytest.timeout_default
+        else:
+            result = self.value
+        if pytest.timeout_maximum is not None:
+            return min(result, pytest.timeout_maximum)
+        return result
 
 
 class EntryPoint(StringField):
