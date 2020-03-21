@@ -21,7 +21,7 @@ from pants.rules.core.distdir import DistDir
 # TODO: Factor this out once porting fmt.py and lint.py to the Target API.
 @union
 @dataclass(frozen=True)  # type: ignore[misc]   # https://github.com/python/mypy/issues/5374
-class BinaryTarget(ABC):
+class BinaryConfiguration(ABC):
     """An ad hoc collection of the fields necessary for a binary implementation to work with a
     target."""
 
@@ -34,7 +34,7 @@ class BinaryTarget(ABC):
         return tgt.has_fields(cls.required_fields)
 
     @classmethod
-    def valid_registered_target_types(
+    def valid_target_types(
         cls, target_types: Iterable[Type[Target]], *, union_membership: UnionMembership
     ) -> Tuple[Type[Target], ...]:
         return tuple(
@@ -45,7 +45,7 @@ class BinaryTarget(ABC):
 
     @classmethod
     @abstractmethod
-    def create(cls, tgt: Target) -> "BinaryTarget":
+    def create(cls, tgt: Target) -> "BinaryConfiguration":
         pass
 
 
@@ -61,7 +61,7 @@ class BinaryOptions(LineOriented, GoalSubsystem):
 
     name = "binary"
 
-    required_union_implementations = (BinaryTarget,)
+    required_union_implementations = (BinaryConfiguration,)
 
 
 class Binary(Goal):
@@ -97,37 +97,35 @@ async def coordinator_of_binaries(
     registered_target_types: RegisteredTargetTypes,
 ) -> CreatedBinary:
     target = wrapped_target.target
-    binary_target_types: Iterable[Type[BinaryTarget]] = union_membership.union_rules[BinaryTarget]
-    valid_binary_target_types = [
-        binary_target_type
-        for binary_target_type in binary_target_types
-        if binary_target_type.is_valid(target)
+    binary_config_types: Iterable[Type[BinaryConfiguration]] = union_membership.union_rules[
+        BinaryConfiguration
     ]
-    if not valid_binary_target_types:
-        all_registered_valid_target_types = itertools.chain.from_iterable(
-            binary_target_type.valid_registered_target_types(
+    valid_binary_config_types = [
+        config_type for config_type in binary_config_types if config_type.is_valid(target)
+    ]
+    if not valid_binary_config_types:
+        all_valid_target_types = itertools.chain.from_iterable(
+            config_type.valid_target_types(
                 registered_target_types.types, union_membership=union_membership
             )
-            for binary_target_type in binary_target_types
+            for config_type in binary_config_types
         )
-        formatted_registered_target_types = sorted(
-            target_type.alias for target_type in all_registered_valid_target_types
-        )
+        formatted_target_types = sorted(target_type.alias for target_type in all_valid_target_types)
         # TODO: this is a leaky abstraction that the error message knows this rule is being used
         #  by `run` and `binary`. How should this be handled? A custom goal author could depend on
         #  this error message too and the error would now be lying.
         raise ValueError(
             f"The `run` and `binary` goals only work with the following target types: "
-            f"{formatted_registered_target_types}\n\nYou used {target.address} with target type "
+            f"{formatted_target_types}\n\nYou used {target.address} with target type "
             f"{repr(target.alias)}."
         )
     # TODO: we must use this check when running `./v2 run` because we should only run one target
     #  with one implementation. But, we don't necessarily need to enforce this with `./v2 binary`.
     #  See https://github.com/pantsbuild/pants/pull/9345#discussion_r395221542 for some possible
     #  semantics for `./v2 binary`.
-    if len(valid_binary_target_types) > 1:
-        possible_binary_target_types = sorted(
-            binary_target_type.__name__ for binary_target_type in valid_binary_target_types
+    if len(valid_binary_config_types) > 1:
+        possible_config_types = sorted(
+            config_type.__name__ for config_type in valid_binary_config_types
         )
         # TODO: improve this error message. (It's never actually triggered yet because we only have
         #  Python implemented with V2.) A better error message would explain to users how they can
@@ -135,10 +133,10 @@ async def coordinator_of_binaries(
         raise ValueError(
             f"Multiple of the registered binary implementations work for {target.address} "
             f"(target type {repr(target.alias)}). It is ambiguous which implementation to use. "
-            f"Possible implementations: {possible_binary_target_types}."
+            f"Possible implementations: {possible_config_types}."
         )
-    binary_target_type = valid_binary_target_types[0]
-    return await Get[CreatedBinary](BinaryTarget, binary_target_type.create(target))
+    config_type = valid_binary_config_types[0]
+    return await Get[CreatedBinary](BinaryConfiguration, config_type.create(target))
 
 
 def rules():

@@ -75,7 +75,7 @@ class TestDebugRequest:
 
 @union
 @dataclass(frozen=True)  # type: ignore[misc]   # https://github.com/python/mypy/issues/5374
-class TestTarget(ABC):
+class TestConfiguration(ABC):
     """An ad hoc collection of the fields necessary for a test implementation to run on a target."""
 
     required_fields: ClassVar[Tuple[Type[Field], ...]]
@@ -92,7 +92,7 @@ class TestTarget(ABC):
         return tgt.has_fields(cls.required_fields)
 
     @classmethod
-    def valid_registered_target_types(
+    def valid_target_types(
         cls, target_types: Iterable[Type[Target]], *, union_membership: UnionMembership
     ) -> Tuple[Type[Target], ...]:
         return tuple(
@@ -103,15 +103,15 @@ class TestTarget(ABC):
 
     @classmethod
     @abstractmethod
-    def create(cls, target_with_origin: TargetWithOrigin) -> "TestTarget":
+    def create(cls, target_with_origin: TargetWithOrigin) -> "TestConfiguration":
         pass
 
 
 # NB: This is only used for the sake of coordinator_of_tests. Consider inlining that rule so that
 # we can remove this wrapper type.
 @dataclass(frozen=True)
-class WrappedTestTarget:
-    test_target: TestTarget
+class WrappedTestConfiguration:
+    config: TestConfiguration
 
 
 @dataclass(frozen=True)
@@ -185,7 +185,7 @@ class TestOptions(GoalSubsystem):
 
     name = "test"
 
-    required_union_implementations = (TestTarget,)
+    required_union_implementations = (TestConfiguration,)
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
@@ -231,45 +231,45 @@ async def run_tests(
     union_membership: UnionMembership,
     registered_target_types: RegisteredTargetTypes,
 ) -> Test:
-    test_target_types: Iterable[Type[TestTarget]] = union_membership.union_rules[TestTarget]
+    test_config_types: Iterable[Type[TestConfiguration]] = union_membership.union_rules[
+        TestConfiguration
+    ]
 
     if options.values.debug:
         target_with_origin = targets_with_origins.expect_single()
         target = target_with_origin.target
-        valid_test_target_types = [
-            test_target_type
-            for test_target_type in test_target_types
-            if test_target_type.is_valid(target)
+        valid_test_config_types = [
+            config_type for config_type in test_config_types if config_type.is_valid(target)
         ]
 
-        if not valid_test_target_types:
-            all_valid_registered_target_types = itertools.chain.from_iterable(
-                test_target_type.valid_registered_target_types(
+        if not valid_test_config_types:
+            all_valid_target_types = itertools.chain.from_iterable(
+                config_type.valid_target_types(
                     registered_target_types.types, union_membership=union_membership
                 )
-                for test_target_type in test_target_types
+                for config_type in test_config_types
             )
-            formatted_registered_target_types = sorted(
-                target_type.alias for target_type in all_valid_registered_target_types
+            formatted_target_types = sorted(
+                target_type.alias for target_type in all_valid_target_types
             )
             raise ValueError(
                 f"The `test` goal only works with the following target types: "
-                f"{formatted_registered_target_types}\n\nYou used {target.address} with target "
+                f"{formatted_target_types}\n\nYou used {target.address} with target "
                 f"type {repr(target.alias)}."
             )
-        if len(valid_test_target_types) > 1:
-            possible_test_target_types = sorted(
-                test_target_type.__name__ for test_target_type in valid_test_target_types
+        if len(valid_test_config_types) > 1:
+            possible_config_types = sorted(
+                config_type.__name__ for config_type in valid_test_config_types
             )
             raise ValueError(
                 f"Multiple of the registered test implementations work for {target.address} "
                 f"(target type {repr(target.alias)}). It is ambiguous which implementation to use. "
-                f"Possible implementations: {possible_test_target_types}."
+                f"Possible implementations: {possible_config_types}."
             )
-        test_target_type = valid_test_target_types[0]
+        test_config_type = valid_test_config_types[0]
         logger.info(f"Starting test in debug mode: {target.address.reference()}")
         request = await Get[TestDebugRequest](
-            TestTarget, test_target_type.create(target_with_origin)
+            TestConfiguration, test_config_type.create(target_with_origin)
         )
         debug_result = interactive_runner.run_local_interactive_process(request.ipr)
         return Test(debug_result.process_exit_code)
@@ -277,20 +277,20 @@ async def run_tests(
     # TODO: possibly factor out this filtering out of empty `sources`. We do this at this level of
     #  abstraction, rather than in the test runners, because the test runners often will use
     #  auto-discovery when given no input files.
-    test_targets = tuple(
-        test_target_type.create(target_with_origin)
+    test_configs = tuple(
+        test_config_type.create(target_with_origin)
         for target_with_origin in targets_with_origins
-        for test_target_type in test_target_types
-        if test_target_type.is_valid(target_with_origin.target)
+        for test_config_type in test_config_types
+        if test_config_type.is_valid(target_with_origin.target)
     )
     all_hydrated_sources = await MultiGet(
         Get[HydratedSources](HydrateSourcesRequest, test_target.sources.request)
-        for test_target in test_targets
+        for test_target in test_configs
     )
 
     results = await MultiGet(
-        Get[AddressAndTestResult](WrappedTestTarget(test_target))
-        for test_target, hydrated_sources in zip(test_targets, all_hydrated_sources)
+        Get[AddressAndTestResult](WrappedTestConfiguration(test_config))
+        for test_config, hydrated_sources in zip(test_configs, all_hydrated_sources)
         if hydrated_sources.snapshot.files
     )
 
@@ -351,19 +351,19 @@ async def run_tests(
 
 
 @rule
-async def coordinator_of_tests(wrapped_test_target: WrappedTestTarget) -> AddressAndTestResult:
-    test_target = wrapped_test_target.test_target
+async def coordinator_of_tests(wrapped_config: WrappedTestConfiguration) -> AddressAndTestResult:
+    config = wrapped_config.config
 
     # TODO(#6004): when streaming to live TTY, rely on V2 UI for this information. When not a
     # live TTY, periodically dump heavy hitters to stderr. See
     # https://github.com/pantsbuild/pants/issues/6004#issuecomment-492699898.
-    logger.info(f"Starting tests: {test_target.address.reference()}")
-    result = await Get[TestResult](TestTarget, test_target)
+    logger.info(f"Starting tests: {config.address.reference()}")
+    result = await Get[TestResult](TestConfiguration, config)
     logger.info(
         f"Tests {'succeeded' if result.status == Status.SUCCESS else 'failed'}: "
-        f"{test_target.address.reference()}"
+        f"{config.address.reference()}"
     )
-    return AddressAndTestResult(test_target.address, result)
+    return AddressAndTestResult(config.address, result)
 
 
 def rules():

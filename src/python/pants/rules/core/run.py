@@ -13,7 +13,7 @@ from pants.engine.interactive_runner import InteractiveProcessRequest, Interacti
 from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get
 from pants.option.custom_types import shell_str
-from pants.rules.core.binary import BinaryTarget, CreatedBinary
+from pants.rules.core.binary import BinaryConfiguration, CreatedBinary
 from pants.util.contextutil import temporary_dir
 
 
@@ -24,7 +24,7 @@ class RunOptions(GoalSubsystem):
 
     # NB: To be runnable, the target must be able to be converted into an ad hoc subclass of
     # BinaryTarget.
-    required_union_implementations = (BinaryTarget,)
+    required_union_implementations = (BinaryConfiguration,)
 
     @classmethod
     def register_options(cls, register) -> None:
