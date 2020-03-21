@@ -31,8 +31,8 @@ from pants.rules.core.test import (
     Test,
     TestDebugRequest,
     TestResult,
-    TestRunner,
-    WrappedTestRunner,
+    TestTarget,
+    WrappedTestTarget,
     run_tests,
 )
 from pants.testutil.engine.util import MockConsole, MockGet, run_rule
@@ -46,18 +46,18 @@ class MockOptions:
         self.values = Mock(**values)
 
 
-class MockTarget(Target):
-    alias = "mock_target"
+class HaskellTests(Target):
+    alias = "haskell_tests"
     core_fields = ()
 
 
-class MockTestRunner(TestRunner, metaclass=ABCMeta):
+class MockTestTarget(TestTarget, metaclass=ABCMeta):
     @classmethod
-    def is_valid_target(cls, _: Target) -> bool:
+    def is_valid(cls, _: Target) -> bool:
         return True
 
     @classmethod
-    def create(cls, target_with_origin: TargetWithOrigin) -> "MockTestRunner":
+    def create(cls, target_with_origin: TargetWithOrigin) -> "MockTestTarget":
         return cls(address=target_with_origin.target.address, origin=target_with_origin.origin)
 
     @staticmethod
@@ -80,17 +80,17 @@ class MockTestRunner(TestRunner, metaclass=ABCMeta):
         )
 
 
-class SuccessfulTestRunner(MockTestRunner):
+class SuccessfulTestTarget(MockTestTarget):
     @staticmethod
     def status(_: Address) -> Status:
         return Status.SUCCESS
 
     @staticmethod
     def stdout(address: Address) -> str:
-        return f"Successful test runner: Passed for {address}!"
+        return f"Successful test target: Passed for {address}!"
 
 
-class ConditionallySucceedsTestRunner(MockTestRunner):
+class ConditionallySucceedsTestTarget(MockTestTarget):
     @staticmethod
     def status(address: Address) -> Status:
         return Status.FAILURE if address.target_name == "bad" else Status.SUCCESS
@@ -98,7 +98,7 @@ class ConditionallySucceedsTestRunner(MockTestRunner):
     @staticmethod
     def stdout(address: Address) -> str:
         return (
-            f"Conditionally succeeds test runner: Passed for {address}!"
+            f"Conditionally succeeds test target: Passed for {address}!"
             if address.target_name != "bad"
             else ""
         )
@@ -106,15 +106,15 @@ class ConditionallySucceedsTestRunner(MockTestRunner):
     @staticmethod
     def stderr(address: Address) -> str:
         return (
-            f"Conditionally succeeds test runner: Had an issue for {address}! Oh no!"
+            f"Conditionally succeeds test target: Had an issue for {address}! Oh no!"
             if address.target_name == "bad"
             else ""
         )
 
 
-class InvalidTargetTestRunner(MockTestRunner):
+class InvalidTestTarget(MockTestTarget):
     @classmethod
-    def is_valid_target(cls, _: Target) -> bool:
+    def is_valid(cls, _: Target) -> bool:
         return False
 
     @staticmethod
@@ -137,14 +137,14 @@ class TestTest(TestBase):
         if address is None:
             address = Address.parse(":tests")
         return TargetWithOrigin(
-            MockTarget({}, address=address),
+            HaskellTests({}, address=address),
             origin=SingleAddress(directory=address.spec_path, name=address.target_name),
         )
 
     def run_test_rule(
         self,
         *,
-        test_runner: Type[TestRunner],
+        test_target: Type[TestTarget],
         targets: List[TargetWithOrigin],
         debug: bool = False,
     ) -> Tuple[int, str]:
@@ -152,15 +152,15 @@ class TestTest(TestBase):
         options = MockOptions(debug=debug, run_coverage=False)
         interactive_runner = InteractiveRunner(self.scheduler)
         workspace = Workspace(self.scheduler)
-        union_membership = UnionMembership({TestRunner: OrderedSet([test_runner])})
+        union_membership = UnionMembership({TestTarget: OrderedSet([test_target])})
 
         def mock_coordinator_of_tests(
-            wrapped_test_runner: WrappedTestRunner,
+            wrapped_test_runner: WrappedTestTarget,
         ) -> AddressAndTestResult:
-            runner = wrapped_test_runner.runner
+            target = wrapped_test_runner.test_target
             return AddressAndTestResult(
-                address=runner.address,
-                test_result=runner.test_result,  # type: ignore[attr-defined]
+                address=target.address,
+                test_result=target.test_result,  # type: ignore[attr-defined]
             )
 
         result: Test = run_rule(
@@ -172,17 +172,17 @@ class TestTest(TestBase):
                 TargetsWithOrigins(targets),
                 workspace,
                 union_membership,
-                RegisteredTargetTypes.create([MockTarget]),
+                RegisteredTargetTypes.create([HaskellTests]),
             ],
             mock_gets=[
                 MockGet(
                     product_type=AddressAndTestResult,
-                    subject_type=WrappedTestRunner,
-                    mock=lambda wrapped_test_runner: mock_coordinator_of_tests(wrapped_test_runner),
+                    subject_type=WrappedTestTarget,
+                    mock=lambda wrapped_test_target: mock_coordinator_of_tests(wrapped_test_target),
                 ),
                 MockGet(
                     product_type=TestDebugRequest,
-                    subject_type=TestRunner,
+                    subject_type=TestTarget,
                     mock=lambda _: TestDebugRequest(self.make_ipr()),
                 ),
                 MockGet(
@@ -201,7 +201,7 @@ class TestTest(TestBase):
 
     def test_invalid_target_noops(self) -> None:
         exit_code, stdout = self.run_test_rule(
-            test_runner=InvalidTargetTestRunner, targets=[self.make_target_with_origin()],
+            test_target=InvalidTestTarget, targets=[self.make_target_with_origin()],
         )
         assert exit_code == 0
         assert stdout.strip() == ""
@@ -209,13 +209,13 @@ class TestTest(TestBase):
     def test_single_target(self) -> None:
         address = Address.parse(":tests")
         exit_code, stdout = self.run_test_rule(
-            test_runner=SuccessfulTestRunner, targets=[self.make_target_with_origin(address)],
+            test_target=SuccessfulTestTarget, targets=[self.make_target_with_origin(address)],
         )
         assert exit_code == 0
         assert stdout == dedent(
             f"""\
             {address} stdout:
-            {SuccessfulTestRunner.stdout(address)}
+            {SuccessfulTestTarget.stdout(address)}
 
             {address}                                                                        .....   SUCCESS
             """
@@ -226,7 +226,7 @@ class TestTest(TestBase):
         bad_address = Address.parse(":bad")
 
         exit_code, stdout = self.run_test_rule(
-            test_runner=ConditionallySucceedsTestRunner,
+            test_target=ConditionallySucceedsTestTarget,
             targets=[
                 self.make_target_with_origin(address=good_address),
                 self.make_target_with_origin(bad_address),
@@ -236,9 +236,9 @@ class TestTest(TestBase):
         assert stdout == dedent(
             f"""\
             {good_address} stdout:
-            {ConditionallySucceedsTestRunner.stdout(good_address)}
+            {ConditionallySucceedsTestTarget.stdout(good_address)}
             {bad_address} stderr:
-            {ConditionallySucceedsTestRunner.stderr(bad_address)}
+            {ConditionallySucceedsTestTarget.stderr(bad_address)}
 
             {good_address}                                                                         .....   SUCCESS
             {bad_address}                                                                          .....   FAILURE
@@ -247,14 +247,14 @@ class TestTest(TestBase):
 
     def test_single_debug_target(self) -> None:
         exit_code, stdout = self.run_test_rule(
-            test_runner=SuccessfulTestRunner, targets=[self.make_target_with_origin()], debug=True,
+            test_target=SuccessfulTestTarget, targets=[self.make_target_with_origin()], debug=True,
         )
         assert exit_code == 0
 
     def test_multiple_debug_targets_fail(self) -> None:
         with pytest.raises(ResolveError):
             self.run_test_rule(
-                test_runner=SuccessfulTestRunner,
+                test_target=SuccessfulTestTarget,
                 targets=[
                     self.make_target_with_origin(Address.parse(":t1")),
                     self.make_target_with_origin(Address.parse(":t2")),

@@ -72,7 +72,9 @@ class TestDebugRequest:
 
 @union
 @dataclass(frozen=True)  # type: ignore[misc]   # https://github.com/python/mypy/issues/5374
-class TestRunner(ABC):
+class TestTarget(ABC):
+    """An ad-hoc collection of the fields necessary for a test implementation to run on a target."""
+
     required_fields: ClassVar[Tuple[Type[Field], ...]]
 
     address: Address
@@ -81,11 +83,11 @@ class TestRunner(ABC):
     __test__ = False
 
     @classmethod
-    def is_valid_target(cls, tgt: Target) -> bool:
+    def is_valid(cls, tgt: Target) -> bool:
         return tgt.has_fields(cls.required_fields)
 
     @classmethod
-    def valid_target_types(
+    def valid_registered_target_types(
         cls, target_types: Iterable[Type[Target]], *, union_membership: UnionMembership
     ) -> Tuple[Type[Target], ...]:
         return tuple(
@@ -96,15 +98,15 @@ class TestRunner(ABC):
 
     @classmethod
     @abstractmethod
-    def create(cls, target_with_origin: TargetWithOrigin) -> "TestRunner":
+    def create(cls, target_with_origin: TargetWithOrigin) -> "TestTarget":
         pass
 
 
 # NB: This is only used for the sake of coordinator_of_tests. Consider inlining that rule so that
 # we can remove this wrapper type.
 @dataclass(frozen=True)
-class WrappedTestRunner:
-    runner: TestRunner
+class WrappedTestTarget:
+    test_target: TestTarget
 
 
 @dataclass(frozen=True)
@@ -178,7 +180,7 @@ class TestOptions(GoalSubsystem):
 
     name = "test"
 
-    required_union_implementations = (TestRunner,)
+    required_union_implementations = (TestTarget,)
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
@@ -224,50 +226,56 @@ async def run_tests(
     union_membership: UnionMembership,
     registered_target_types: RegisteredTargetTypes,
 ) -> Test:
-    test_runners: Iterable[Type[TestRunner]] = union_membership.union_rules[TestRunner]
+    test_target_types: Iterable[Type[TestTarget]] = union_membership.union_rules[TestTarget]
 
     if options.values.debug:
         target_with_origin = targets_with_origins.expect_single()
         target = target_with_origin.target
-        valid_test_runners = [runner for runner in test_runners if runner.is_valid_target(target)]
+        valid_test_target_types = [
+            test_target_type
+            for test_target_type in test_target_types
+            if test_target_type.is_valid(target)
+        ]
 
-        if not valid_test_runners:
-            all_valid_target_types = itertools.chain.from_iterable(
-                runner.valid_target_types(
+        if not valid_test_target_types:
+            all_valid_registered_target_types = itertools.chain.from_iterable(
+                test_target_type.valid_registered_target_types(
                     registered_target_types.types, union_membership=union_membership
                 )
-                for runner in test_runners
+                for test_target_type in test_target_types
             )
-            formatted_target_types = sorted(
-                target_type.alias for target_type in all_valid_target_types
+            formatted_registered_target_types = sorted(
+                target_type.alias for target_type in all_valid_registered_target_types
             )
             raise ValueError(
                 f"The `test` goal only works with the following target types: "
-                f"{formatted_target_types}\n\nYou used {target.address} with target type "
-                f"{repr(target.alias)}."
+                f"{formatted_registered_target_types}\n\nYou used {target.address} with target "
+                f"type {repr(target.alias)}."
             )
-        if len(valid_test_runners) > 1:
-            possible_runners = sorted(
-                implementation.__name__ for implementation in valid_test_runners
+        if len(valid_test_target_types) > 1:
+            possible_test_target_types = sorted(
+                test_target_type.__name__ for test_target_type in valid_test_target_types
             )
             raise ValueError(
-                f"Multiple of the registered test runners work for {target.address} "
+                f"Multiple of the registered test implementations work for {target.address} "
                 f"(target type {repr(target.alias)}). It is ambiguous which implementation to use. "
-                f"Possible implementations: {possible_runners}."
+                f"Possible implementations: {possible_test_target_types}."
             )
-        test_runner = valid_test_runners[0]
+        test_target_type = valid_test_target_types[0]
         logger.info(f"Starting test in debug mode: {target.address.reference()}")
-        request = await Get[TestDebugRequest](TestRunner, test_runner.create(target_with_origin))
+        request = await Get[TestDebugRequest](
+            TestTarget, test_target_type.create(target_with_origin)
+        )
         debug_result = interactive_runner.run_local_interactive_process(request.ipr)
         return Test(debug_result.process_exit_code)
 
     results = await MultiGet(
         Get[AddressAndTestResult](
-            WrappedTestRunner, WrappedTestRunner(runner.create(target_with_origin))
+            WrappedTestTarget, WrappedTestTarget(test_target_type.create(target_with_origin))
         )
         for target_with_origin in targets_with_origins
-        for runner in test_runners
-        if runner.is_valid_target(target_with_origin.target)
+        for test_target_type in test_target_types
+        if test_target_type.is_valid(target_with_origin.target)
     )
 
     did_any_fail = False
@@ -327,22 +335,19 @@ async def run_tests(
 
 
 @rule
-async def coordinator_of_tests(wrapped_runner: WrappedTestRunner) -> AddressAndTestResult:
-    runner = wrapped_runner.runner
+async def coordinator_of_tests(wrapped_test_target: WrappedTestTarget) -> AddressAndTestResult:
+    test_target = wrapped_test_target.test_target
 
     # TODO(#6004): when streaming to live TTY, rely on V2 UI for this information. When not a
     # live TTY, periodically dump heavy hitters to stderr. See
     # https://github.com/pantsbuild/pants/issues/6004#issuecomment-492699898.
-    logger.info(f"Starting tests: {runner.address.reference()}")
-    # NB: This has the effect of "casting" a TargetAdaptorWithOrigin to a member of the TestTarget
-    # union. If the adaptor is not a member of the union, the engine will fail at runtime with a
-    # useful error message.
-    result = await Get[TestResult](TestRunner, runner)
+    logger.info(f"Starting tests: {test_target.address.reference()}")
+    result = await Get[TestResult](TestTarget, test_target)
     logger.info(
         f"Tests {'succeeded' if result.status == Status.SUCCESS else 'failed'}: "
-        f"{runner.address.reference()}"
+        f"{test_target.address.reference()}"
     )
-    return AddressAndTestResult(runner.address, result)
+    return AddressAndTestResult(test_target.address, result)
 
 
 def rules():

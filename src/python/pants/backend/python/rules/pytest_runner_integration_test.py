@@ -14,7 +14,7 @@ from pants.backend.python.rules import (
     pytest_coverage,
     pytest_runner,
 )
-from pants.backend.python.rules.pytest_runner import PytestRunner
+from pants.backend.python.rules.pytest_runner import PytestTarget
 from pants.backend.python.rules.targets import PythonTests
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.targets.python_library import PythonLibrary
@@ -121,7 +121,7 @@ class PytestRunnerIntegrationTest(TestBase):
             *strip_source_roots.rules(),
             *subprocess_environment.rules(),
             subsystem_rule(TestOptions),
-            RootRule(PytestRunner),
+            RootRule(PytestTarget),
         )
 
     def run_pytest(
@@ -140,7 +140,7 @@ class PytestRunnerIntegrationTest(TestBase):
         if origin is None:
             origin = SingleAddress(directory=address.spec_path, name=address.target_name)
         tgt = PythonTests({}, address=address)
-        params = Params(PytestRunner.create(TargetWithOrigin(tgt, origin)), options_bootstrapper)
+        params = Params(PytestTarget.create(TargetWithOrigin(tgt, origin)), options_bootstrapper)
         test_result = self.request_single_product(TestResult, params)
         debug_request = self.request_single_product(TestDebugRequest, params)
         debug_result = InteractiveRunner(self.scheduler).run_local_interactive_process(
