@@ -11,6 +11,7 @@ from typing import (
     Dict,
     Generic,
     Iterable,
+    NamedTuple,
     Optional,
     Tuple,
     Type,
@@ -520,8 +521,7 @@ class WrappedTarget:
     target: Target
 
 
-@dataclass(frozen=True)
-class TargetWithOrigin:
+class TargetWithOrigin(NamedTuple):
     target: Target
     origin: OriginSpec
 

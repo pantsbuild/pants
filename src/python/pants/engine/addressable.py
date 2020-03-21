@@ -3,9 +3,8 @@
 
 import inspect
 from collections.abc import Mapping
-from dataclasses import dataclass
 from functools import update_wrapper
-from typing import Any, Sequence, Set, Tuple, Type
+from typing import Any, NamedTuple, Sequence, Set, Tuple, Type
 
 from pants.base.exceptions import ResolveError
 from pants.base.specs import OriginSpec
@@ -32,9 +31,8 @@ class Addresses(Collection[Address]):
         return self.dependencies[0]
 
 
-@dataclass(frozen=True)
-class AddressWithOrigin:
-    """A BuildFileAddress along with the cmd-line spec it was generated from."""
+class AddressWithOrigin(NamedTuple):
+    """An Address along with the cmd-line spec it was generated from."""
 
     address: Address
     origin: OriginSpec

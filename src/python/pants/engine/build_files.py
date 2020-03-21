@@ -264,7 +264,7 @@ async def addresses_with_origins_from_address_families(
 
     # NB: This may be empty, as the result of filtering by tag and exclude patterns!
     return AddressesWithOrigins(
-        AddressWithOrigin(address=addr, origin=addr_to_origin[addr]) for addr in matched_addresses
+        AddressWithOrigin(addr, addr_to_origin[addr]) for addr in matched_addresses
     )
 
 
