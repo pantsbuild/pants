@@ -137,7 +137,7 @@ class ListTargetsTest(GoalRuleTestBase):
             "a/b/d:d",
             "a/b/e:e1",
             "f:alias",
-            args=["--sep=, ", "::",],
+            args=["--sep=, ", "::"],
         )
 
         self.assert_console_output(

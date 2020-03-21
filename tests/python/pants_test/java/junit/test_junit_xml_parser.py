@@ -76,7 +76,7 @@ class TestTestRegistry(unittest.TestCase):
 
         test_specs = [JUnitTest(classname="a.b.c1", methodname=None)]
         matched_specs, unknown_tests = registry.match_test_spec(test_specs)
-        self.assertEqual({JUnitTest("a.b.c1"): "target_a",}, matched_specs)
+        self.assertEqual({JUnitTest("a.b.c1"): "target_a"}, matched_specs)
         self.assertEqual([], unknown_tests)
 
     def test_match_test_specs_fqcn_with_methodname(self):
@@ -91,7 +91,7 @@ class TestTestRegistry(unittest.TestCase):
         registry = self._get_sample_test_registry()
 
         spec, unknown_tests = registry.match_test_spec([JUnitTest(classname="c1", methodname=None)])
-        self.assertEqual({JUnitTest("a.b.c1"): "target_a", JUnitTest("x.y.c1"): "target_b",}, spec)
+        self.assertEqual({JUnitTest("a.b.c1"): "target_a", JUnitTest("x.y.c1"): "target_b"}, spec)
         self.assertEqual([], unknown_tests)
 
     def test_match_test_specs_non_fqcn_no_match(self):

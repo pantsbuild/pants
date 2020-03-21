@@ -8,7 +8,7 @@ from pants.goal.task_registrar import TaskRegistrar as task
 
 
 def build_file_aliases():
-    return BuildFileAliases(targets={"java_ragel_library": JavaRagelLibrary,})
+    return BuildFileAliases(targets={"java_ragel_library": JavaRagelLibrary})
 
 
 def register_goals():

@@ -42,7 +42,7 @@ def build_file_aliases():
             "remote_sources": RemoteSources,
             "target": Target,
         },
-        objects={"get_buildroot": get_buildroot, "netrc": Netrc, "pants_version": pants_version,},
+        objects={"get_buildroot": get_buildroot, "netrc": Netrc, "pants_version": pants_version},
         context_aware_object_factories={
             "buildfile_path": BuildFilePath,
             "intransitive": IntransitiveDependencyFactory,

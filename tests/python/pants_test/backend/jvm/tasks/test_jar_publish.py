@@ -34,8 +34,8 @@ class JarPublishTest(NailgunTaskTestBase):
     @classmethod
     def alias_groups(cls):
         return BuildFileAliases(
-            targets={"jar_library": JarLibrary, "java_library": JavaLibrary, "target": Target,},
-            objects={"artifact": Artifact, "scala_artifact": ScalaArtifact,},
+            targets={"jar_library": JarLibrary, "java_library": JavaLibrary, "target": Target},
+            objects={"artifact": Artifact, "scala_artifact": ScalaArtifact},
             context_aware_object_factories={
                 "internal": lambda _: Repository(
                     name="internal", url="http://example.com", push_db_basedir=cls.push_db_basedir
@@ -110,7 +110,7 @@ class JarPublishTest(NailgunTaskTestBase):
         return targets
 
     def _get_repos(self):
-        return {"internal": {"resolver": "example.com",}}
+        return {"internal": {"resolver": "example.com"}}
 
     def _prepare_mocks(self, task):
         task.scm = Mock()
@@ -125,7 +125,7 @@ class JarPublishTest(NailgunTaskTestBase):
 
     def test_publish_unlisted_repo(self):
         # Note that we set a different config here, so repos:internal has no config
-        repos = {"another-repo": {"resolver": "example.org",}}
+        repos = {"another-repo": {"resolver": "example.org"}}
 
         targets = self._prepare_for_publishing()
         with temporary_dir():

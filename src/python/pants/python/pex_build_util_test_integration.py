@@ -35,7 +35,7 @@ class PexBuildUtilIntegrationTest(PantsRunIntegrationTest):
                 self.binary_target_address,
                 config={
                     "GLOBAL": {"pants_distdir": tmp_dir},
-                    "python-setup": {"interpreter_constraints": [cur_interpreter_constraint],},
+                    "python-setup": {"interpreter_constraints": [cur_interpreter_constraint]},
                 },
             )
 

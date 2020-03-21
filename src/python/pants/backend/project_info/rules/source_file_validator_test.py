@@ -85,8 +85,8 @@ class MultiMatcherTest(unittest.TestCase):
             self.assertEqual(expected_encoding, encoding)
 
         check({"python_header", "no_six"}, "utf8", "foo/bar/baz.py")
-        check({"jvm_header",}, "utf8", "foo/bar/baz.java")
-        check({"jvm_header",}, "utf8", "foo/bar/baz.scala")
+        check({"jvm_header"}, "utf8", "foo/bar/baz.java")
+        check({"jvm_header"}, "utf8", "foo/bar/baz.scala")
         check(set(), None, "foo/bar/baz.c")
         check(set(), None, "foo/bar/bazpy")
 
@@ -130,7 +130,7 @@ class MultiMatcherTest(unittest.TestCase):
 
     def test_pattern_name_checks(self):
         bad_config1 = {
-            "required_matches": {"unknown_path_pattern1": (), "unknown_path_pattern2": (),}
+            "required_matches": {"unknown_path_pattern1": (), "unknown_path_pattern2": ()}
         }
         with self.assertRaisesRegex(
             ValueError,

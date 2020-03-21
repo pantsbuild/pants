@@ -65,8 +65,8 @@ class PythonToolPrepTest(PythonTaskTestBase):
                 for_task_types=[tool_prep_type],
                 for_subsystems=[Tool],
                 options={
-                    "": {"pants_bootstrapdir": tmp_dir,},
-                    "test-tool": {"interpreter_constraints": [constraint_string],},
+                    "": {"pants_bootstrapdir": tmp_dir},
+                    "test-tool": {"interpreter_constraints": [constraint_string]},
                 },
             )
             tool_prep_task = tool_prep_type(
@@ -96,7 +96,7 @@ class PythonToolPrepTest(PythonTaskTestBase):
         context = self.context(
             for_task_types=[tool_prep_type],
             for_subsystems=[Tool],
-            options={"test-tool": {"needs_to_be_invoked_for_some_reason": False,},},
+            options={"test-tool": {"needs_to_be_invoked_for_some_reason": False}},
         )
         tool_prep_task = tool_prep_type(context, os.path.join(self.pants_workdir, "tool_prep_dir"))
         tool_prep_task.execute()

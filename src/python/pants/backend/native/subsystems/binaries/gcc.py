@@ -57,7 +57,7 @@ class GCC(NativeTool):
 
     @memoized_property
     def _common_include_dirs(self):
-        return self._filemap([("include",), ("lib/gcc/*", self.version(), "include"),])
+        return self._filemap([("include",), ("lib/gcc/*", self.version(), "include")])
 
     def c_compiler(self, platform: Platform) -> CCompiler:
         return CCompiler(
@@ -70,7 +70,7 @@ class GCC(NativeTool):
 
     @memoized_property
     def _cpp_include_dirs(self):
-        most_cpp_include_dirs = self._filemap([("include/c++", self.version()),])
+        most_cpp_include_dirs = self._filemap([("include/c++", self.version())])
 
         # TODO(#6143): determine whether there is any manual explaining when any of these file paths are
         # necessary.

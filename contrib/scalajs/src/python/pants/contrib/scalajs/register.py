@@ -14,7 +14,7 @@ from pants.contrib.scalajs.tasks.scala_js_zinc_compile import ScalaJSZincCompile
 
 def build_file_aliases():
     return BuildFileAliases(
-        targets={"scala_js_binary": ScalaJSBinary, "scala_js_library": ScalaJSLibrary,},
+        targets={"scala_js_binary": ScalaJSBinary, "scala_js_library": ScalaJSLibrary}
     )
 
 

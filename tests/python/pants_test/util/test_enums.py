@@ -25,7 +25,7 @@ class EnumMatchTest(unittest.TestCase):
 
     def test_inexhaustive_match(self) -> None:
         with self.assertRaises(InexhaustiveMatchError):
-            match(EnumMatchTest.Test.pig, {EnumMatchTest.Test.pig: "oink",})
+            match(EnumMatchTest.Test.pig, {EnumMatchTest.Test.pig: "oink"})
 
     def test_unrecognized_match(self) -> None:
         with self.assertRaises(UnrecognizedMatchError):

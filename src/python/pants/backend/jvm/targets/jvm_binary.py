@@ -31,9 +31,7 @@ class JarRule(FingerprintedMixin, metaclass=ABCMeta):
                 "The supplied apply_pattern: {pattern} "
                 "is not a valid regular expression: {msg}".format(pattern=apply_pattern, msg=e)
             )
-        self.payload.add_fields(
-            {"apply_pattern": PrimitiveField(apply_pattern),}
-        )
+        self.payload.add_fields({"apply_pattern": PrimitiveField(apply_pattern)})
 
     def fingerprint(self):
         return self.payload.fingerprint()
@@ -118,9 +116,7 @@ class Duplicate(JarRule):
           or ``Duplicate.FAIL``.
         """
         payload = Payload()
-        payload.add_fields(
-            {"action": PrimitiveField(self.validate_action(action)),}
-        )
+        payload.add_fields({"action": PrimitiveField(self.validate_action(action))})
         super().__init__(apply_pattern, payload=payload)
 
     @property
@@ -274,9 +270,7 @@ class ManifestEntries(FingerprintedMixin):
                             key, type(key).__name__
                         )
                     )
-        self.payload.add_fields(
-            {"entries": PrimitiveField(entries or {}),}
-        )
+        self.payload.add_fields({"entries": PrimitiveField(entries or {})})
 
     def fingerprint(self):
         return self.payload.fingerprint()

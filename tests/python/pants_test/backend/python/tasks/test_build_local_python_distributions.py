@@ -39,7 +39,7 @@ setup(
                 {
                     "key": "pycountry",
                     "target_type": PythonRequirementLibrary,
-                    "requirements": [PythonRequirement("pycountry==18.5.20"),],
+                    "requirements": [PythonRequirement("pycountry==18.5.20")],
                 },
             ),
             (
@@ -47,7 +47,7 @@ setup(
                 {
                     "key": "setup_requires",
                     "target_type": PythonDistribution,
-                    "setup_requires": ["3rdparty/python:pycountry",],
+                    "setup_requires": ["3rdparty/python:pycountry"],
                     "sources": ["__init__.py", "setup.py"],
                     "filemap": {
                         "__init__.py": "",

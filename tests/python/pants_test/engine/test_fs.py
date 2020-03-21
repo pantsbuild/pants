@@ -169,13 +169,13 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         # Ignore '*.ln' suffixed items at the root.
         self.assert_walk_files(
             ["**"],
-            ["4.txt", "a/3.txt", "a/4.txt.ln", "a/b/1.txt", "a/b/2",],
+            ["4.txt", "a/3.txt", "a/4.txt.ln", "a/b/1.txt", "a/b/2"],
             ignore_patterns=["/*.ln"],
         )
         # Whitelist one entry.
         self.assert_walk_files(
             ["**"],
-            ["4.txt", "a/3.txt", "a/4.txt.ln", "a/b/1.txt", "a/b/2", "c.ln/1.txt", "c.ln/2",],
+            ["4.txt", "a/3.txt", "a/4.txt.ln", "a/b/1.txt", "a/b/2", "c.ln/1.txt", "c.ln/2"],
             ignore_patterns=["/*.ln", "!c.ln"],
         )
 

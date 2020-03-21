@@ -41,7 +41,7 @@ class ReplTest(GoalRuleTestBase):
 
     @classmethod
     def alias_groups(cls) -> BuildFileAliases:
-        return BuildFileAliases(targets={"python_library": PythonLibrary,})
+        return BuildFileAliases(targets={"python_library": PythonLibrary})
 
     def setup_python_library(self) -> None:
         library_source = FileContent(path="some_lib.py", content=b"class SomeClass:\n  pass\n")

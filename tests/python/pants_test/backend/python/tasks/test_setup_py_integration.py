@@ -31,7 +31,7 @@ class SetupPyIntegrationTest(PantsRequirementIntegrationTestBase):
 
         expected_entries = [
             f"{key}-0.0.1/{relpath}"
-            for relpath in ["", "MANIFEST.in", "PKG-INFO", "setup.cfg", "setup.py", "src/",]
+            for relpath in ["", "MANIFEST.in", "PKG-INFO", "setup.cfg", "setup.py", "src/"]
             + src_entries
             + egg_info_entries
         ]

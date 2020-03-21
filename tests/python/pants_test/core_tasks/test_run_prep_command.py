@@ -37,7 +37,7 @@ class RunPrepCommandTest(TaskTestBase):
 
     @classmethod
     def alias_groups(cls):
-        return BuildFileAliases(targets={"prep_command": PrepCommand,},)
+        return BuildFileAliases(targets={"prep_command": PrepCommand})
 
     def test_prep_order(self):
         with temporary_dir() as workdir:

@@ -25,9 +25,7 @@ class NodePreinstalledModule(NodeModule):
         :param string url: The location of a tar.gz file containing containing a node_modules directory.
         """
         payload = payload or Payload()
-        payload.add_fields(
-            {"dependencies_archive_url": PrimitiveField(dependencies_archive_url),}
-        )
+        payload.add_fields({"dependencies_archive_url": PrimitiveField(dependencies_archive_url)})
         super().__init__(sources=sources, address=address, payload=payload, **kwargs)
 
     @property

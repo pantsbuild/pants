@@ -77,7 +77,7 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
     def test_conflict_via_config(self):
         # Tests that targets with compatibility conflict with targets with default compatibility.
         # NB: Passes empty `args` to avoid having the default CLI args override the config.
-        config = {"python-setup": {"interpreter_constraints": ["CPython<2.7"],}}
+        config = {"python-setup": {"interpreter_constraints": ["CPython<2.7"]}}
         binary_target = f"{self.testproject}:echo_interpreter_version"
         pants_run = self._build_pex(binary_target, config=config, args=[])
         self.assert_failure(pants_run, f"Unexpected successful build of {binary_target}.")
@@ -128,7 +128,7 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
 
     def test_stale_interpreter_purge_integration(self):
         target = f"{self.testproject}:{'echo_interpreter_version'}"
-        config = {"python-setup": {"interpreter_constraints": ["CPython>=2.7,<4"],}}
+        config = {"python-setup": {"interpreter_constraints": ["CPython>=2.7,<4"]}}
         with self.temporary_workdir() as workdir:
             pants_run = self.run_pants_with_workdir(["run", target], workdir=workdir, config=config)
             self.assert_success(pants_run)

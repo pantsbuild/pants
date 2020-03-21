@@ -152,10 +152,10 @@ class File1(ConfigFile):
     @property
     def expected_options(self) -> Dict:
         ini_values = {
-            "a": {"list": "[1, 2, 3, 42]", "list2": "+[7, 8, 9]", "list3": '-["x", "y", "z"]',},
-            "b": {"preempt": "True",},
+            "a": {"list": "[1, 2, 3, 42]", "list2": "+[7, 8, 9]", "list3": '-["x", "y", "z"]'},
+            "b": {"preempt": "True"},
             "b.nested": {"dict": "{\n'a': 1,\n'b': 42,\n'c': ['42', '42'],\n}"},
-            "b.nested.nested-again": {"movie": "inception",},
+            "b.nested.nested-again": {"movie": "inception"},
             "c": {
                 "name": "overridden_from_default",
                 "interpolated_from_section": "overridden_from_default is interpolated",
@@ -168,7 +168,7 @@ class File1(ConfigFile):
                 ConfigFormat.ini: ini_values,
                 ConfigFormat.toml: {
                     **ini_values,
-                    "a": {**ini_values["a"], "list": '["1", "2", "3", "42"]',},
+                    "a": {**ini_values["a"], "list": '["1", "2", "3", "42"]'},
                     "b.nested": {"dict": '{\n  "a": 1,\n  "b": "42",\n  "c": ["42", "42"],\n}'},
                 },
             },
@@ -264,7 +264,7 @@ class ConfigBaseTest(TestBase):
         self.expected_combined_values = {
             **self.file1.expected_options,
             **self.file2.expected_options,
-            "a": {**self.file2.expected_options["a"], **self.file1.expected_options["a"],},
+            "a": {**self.file2.expected_options["a"], **self.file1.expected_options["a"]},
         }
 
     def test_sections(self) -> None:
@@ -422,11 +422,11 @@ def test_toml_serializer() -> None:
             "listy": ["a", "b", "c"],
             "map": {"a": 0, "b": 1},
         },
-        "cache.java": {"o": "",},
-        "inception.nested.nested-again.one-more": {"o": "",},
+        "cache.java": {"o": ""},
+        "inception.nested.nested-again.one-more": {"o": ""},
     }
     assert TomlSerializer(original_values).normalize() == {
-        "GLOBAL": {**original_values["GLOBAL"], "map": "{'a': 0, 'b': 1}",},
+        "GLOBAL": {**original_values["GLOBAL"], "map": "{'a': 0, 'b': 1}"},
         "cache": {"java": {"o": ""}},
         "inception": {"nested": {"nested-again": {"one-more": {"o": ""}}}},
     }

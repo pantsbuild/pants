@@ -34,7 +34,7 @@ class JavaCompileIntegrationTest(BaseCompileIT):
 
             self.assert_success(
                 self.run_pants(
-                    ["compile", "testprojects/src/java/org/pantsbuild/testproject/nocache::",],
+                    ["compile", "testprojects/src/java/org/pantsbuild/testproject/nocache::"],
                     config=config,
                 )
             )
@@ -191,13 +191,13 @@ class JavaCompileIntegrationTest(BaseCompileIT):
             dotted_path = path_prefix.replace(os.path.sep, ".")
 
             config = {
-                "cache.compile.rsc": {"write_to": [cache_dir], "read_from": [cache_dir],},
-                "compile.rsc": {"incremental_caching": True,},
+                "cache.compile.rsc": {"write_to": [cache_dir], "read_from": [cache_dir]},
+                "compile.rsc": {"incremental_caching": True},
             }
 
             self.assert_success(
                 self.run_pants_with_workdir(
-                    ["compile", f"{path_prefix}:only-15-directly",], workdir, config
+                    ["compile", f"{path_prefix}:only-15-directly"], workdir, config
                 )
             )
             guava_15_base_dir = self.get_cache_subdir(cache_dir)
@@ -211,7 +211,7 @@ class JavaCompileIntegrationTest(BaseCompileIT):
             # Rerun for guava 16
             self.assert_success(
                 self.run_pants_with_workdir(
-                    ["compile", (f"{path_prefix}:alongside-16"),], workdir, config
+                    ["compile", (f"{path_prefix}:alongside-16")], workdir, config
                 )
             )
 
@@ -234,7 +234,7 @@ class JavaCompileIntegrationTest(BaseCompileIT):
             with cache_server(cache_root=cachedir) as server:
                 target = "testprojects/tests/java/org/pantsbuild/testproject/matcher"
                 config = {
-                    "cache.compile.rsc": {"write_to": [server.url], "read_from": [server.url],},
+                    "cache.compile.rsc": {"write_to": [server.url], "read_from": [server.url]},
                 }
 
                 # Compile to populate the cache, and actually run the tests to help verify runtime.

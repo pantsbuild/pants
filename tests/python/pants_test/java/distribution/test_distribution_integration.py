@@ -39,13 +39,13 @@ class DistributionIntegrationTest(PantsRunIntegrationTest):
             run = self.run_pants(
                 ["run", target_spec],
                 config={
-                    "jvm-distributions": {"paths": {os_name: [one.home],}},
+                    "jvm-distributions": {"paths": {os_name: [one.home]}},
                     "jvm-platform": {
                         "default_platform": f"java{one.version.components[1]}",
                         "compiler": "javac",
                     },
                 },
-                extra_env={"JDK_HOME": two.home,},
+                extra_env={"JDK_HOME": two.home},
             )
             self.assert_success(run)
             self.assertIn(f"java.home:{os.path.realpath(one.home)}", run.stdout_data)

@@ -52,7 +52,7 @@ class JarRulesTest(unittest.TestCase):
 class JvmBinaryTest(TestBase):
     @classmethod
     def alias_groups(cls):
-        return build_file_aliases().merge(BuildFileAliases(objects={"duplicate": Duplicate,},))
+        return build_file_aliases().merge(BuildFileAliases(objects={"duplicate": Duplicate}))
 
     def test_simple(self):
         self.add_to_build_file(

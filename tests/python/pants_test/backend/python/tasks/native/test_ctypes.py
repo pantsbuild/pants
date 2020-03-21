@@ -19,7 +19,7 @@ from pants_test.backend.python.tasks.util.build_local_dists_test_base import (
 class TestBuildLocalDistsWithCtypesNativeSources(BuildLocalPythonDistributionsTestBase):
     @classproperty
     def run_before_task_types(cls):
-        return [CCompile, CppCompile, LinkSharedLibraries,] + super().run_before_task_types
+        return [CCompile, CppCompile, LinkSharedLibraries] + super().run_before_task_types
 
     dist_specs = OrderedDict(
         [
