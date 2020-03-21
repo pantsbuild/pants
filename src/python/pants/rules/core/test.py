@@ -270,9 +270,7 @@ async def run_tests(
         return Test(debug_result.process_exit_code)
 
     results = await MultiGet(
-        Get[AddressAndTestResult](
-            WrappedTestTarget, WrappedTestTarget(test_target_type.create(target_with_origin))
-        )
+        Get[AddressAndTestResult](WrappedTestTarget(test_target_type.create(target_with_origin)))
         for target_with_origin in targets_with_origins
         for test_target_type in test_target_types
         if test_target_type.is_valid(target_with_origin.target)
