@@ -42,6 +42,7 @@ python_library(
     'src/python/pants/engine:fs',
     'src/python/pants/engine:objects',
     'src/python/pants/option',
+    'src/python/pants/util:logging',
   ],
   tags = {"partially_type_checked"},
 )
