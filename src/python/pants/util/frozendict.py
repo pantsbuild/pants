@@ -19,10 +19,13 @@ class FrozenDict(Mapping[K, V]):
         """Creates a `FrozenDict` from a mapping object or a sequence of tuples representing
         entries.
 
-        These value should be immutable and hashable, but this collection does not do any validation
-        that that is true.
+        These values must be immutable and hashable, which we proactively validate.
         """
         self._data: Dict[K, V] = dict(item)  # type: ignore[arg-type]
+        # NB: We eagerly compute the hash to validate that the values are hashable and to avoid
+        # performing the calculation multiple times. This can be revisited if it's found to be a
+        # performance bottleneck.
+        self._hash = self._calculate_hash()
 
     def __getitem__(self, k: K) -> V:
         return self._data[k]
@@ -41,7 +44,7 @@ class FrozenDict(Mapping[K, V]):
             return NotImplemented
         return tuple(self.items()) == tuple(other.items())
 
-    def __hash__(self) -> int:
+    def _calculate_hash(self) -> int:
         try:
             return hash(tuple(self.items()))
         except TypeError as e:
@@ -49,8 +52,11 @@ class FrozenDict(Mapping[K, V]):
                 "Even though you are using a `FrozenDict`, the underlying values are not hashable. "
                 "Please use hashable and immutable types for the underlying values, e.g. use "
                 f"tuples instead of lists and use FrozenOrderedSet instead of set().\n\n"
-                f"Original error message: {repr(e)}"
+                f"Original error message: {e}\n\nValue: {self}"
             )
+
+    def __hash__(self) -> int:
+        return self._hash
 
     def __repr__(self) -> str:
         return f"FrozenDict({repr(self._data)})"

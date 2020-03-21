@@ -16,18 +16,18 @@ def test_flexible_constructor() -> None:
     assert FrozenDict((("a", 0), ("b", 1))) == expected
 
 
-def test_items_can_be_mutable() -> None:
-    # We avoid runtime type checking for now to avoid the slight performance hit and to keep this
-    # API simple and aligned with how other immutable Python types like `tuple` behave. Possibly,
-    # we will want to enforce this in the future.
-    #
-    # NB: the collection will not be hashable when the underlying values are not hashable (see
-    # `test_hash()`). This means that the engine will provide runtime type checking for us if the
-    # FrozenDict is passed to the engine.
-    fd1 = FrozenDict({0: ["a"]})
-    fd1[0].append("x")
-    fd1[0].append("y")
-    assert fd1[0] == ["a", "x", "y"]
+def test_unhashable_items_rejected() -> None:
+    with pytest.raises(TypeError):
+        FrozenDict({[]: 0})
+    with pytest.raises(TypeError):
+        FrozenDict({0: []})
+
+
+def test_original_data_gets_copied() -> None:
+    d1 = {"a": 0, "b": 1}
+    fd1 = FrozenDict(d1)
+    d1.clear()
+    assert fd1 == FrozenDict({"a": 0, "b": 1})
 
 
 def test_len() -> None:
@@ -80,9 +80,9 @@ def test_eq() -> None:
     fd1 = FrozenDict(d1)
     assert fd1 == fd1
     assert fd1 == FrozenDict(d1)
-    # Order matters
+    # Order matters.
     assert fd1 != FrozenDict({"b": 1, "a": 0})
-    # Must be an instance of FrozenDict
+    # Must be an instance of FrozenDict.
     assert fd1 != d1
 
 
@@ -91,9 +91,6 @@ def test_hash() -> None:
     assert hash(FrozenDict(d1)) == hash(FrozenDict(d1))
     # Order matters.
     assert hash(FrozenDict(d1)) != hash(FrozenDict({"b": 1, "a": 0}))
-    # If the underlying type is not hashable, then the FrozenDict will not be.
-    with pytest.raises(TypeError):
-        hash(FrozenDict({"a": []}))
 
 
 def test_works_with_dataclasses() -> None:
@@ -107,13 +104,11 @@ def test_works_with_dataclasses() -> None:
 
     fd1 = FrozenDict({"a": Frozen(0)})
     fd2 = FrozenDict({Frozen(0): "a"})
-    fd3 = FrozenDict({"a": Mutable(0)})
-    with pytest.raises(TypeError):
-        FrozenDict({Mutable(0): "a"})
-
     assert hash(fd1) == hash(fd1)
     assert hash(fd2) == hash(fd2)
     assert hash(fd1) != hash(fd2)
 
     with pytest.raises(TypeError):
-        hash(fd3)
+        FrozenDict({Mutable(0): "a"})
+    with pytest.raises(TypeError):
+        FrozenDict({"a": Mutable(0)})
