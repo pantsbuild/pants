@@ -18,21 +18,23 @@ from pants.engine.target import Field, RegisteredTargetTypes, Target, WrappedTar
 from pants.rules.core.distdir import DistDir
 
 
-# TODO: This might not be the right level of abstraction. Possibly factor out some superclass.
-#  Revisit after porting lint.py, fmt.py, and test.py to use the Target API.
+# TODO: Factor this out once porting fmt.py and lint.py to the Target API.
 @union
 @dataclass(frozen=True)  # type: ignore[misc]   # https://github.com/python/mypy/issues/5374
-class BinaryImplementation(ABC):
+class BinaryTarget(ABC):
+    """An ad-hoc collection of the fields necessary for a binary implementation to work with a
+    target."""
+
     required_fields: ClassVar[Tuple[Type[Field], ...]]
 
     address: Address
 
     @classmethod
-    def is_valid_target(cls, tgt: Target) -> bool:
+    def is_valid(cls, tgt: Target) -> bool:
         return tgt.has_fields(cls.required_fields)
 
     @classmethod
-    def valid_target_types(
+    def valid_registered_target_types(
         cls, target_types: Iterable[Type[Target]], *, union_membership: UnionMembership
     ) -> Tuple[Type[Target], ...]:
         return tuple(
@@ -43,7 +45,7 @@ class BinaryImplementation(ABC):
 
     @classmethod
     @abstractmethod
-    def create(cls, tgt: Target) -> "BinaryImplementation":
+    def create(cls, tgt: Target) -> "BinaryTarget":
         pass
 
 
@@ -59,7 +61,7 @@ class BinaryOptions(LineOriented, GoalSubsystem):
 
     name = "binary"
 
-    required_union_implementations = (BinaryImplementation,)
+    required_union_implementations = (BinaryTarget,)
 
 
 class Binary(Goal):
@@ -95,37 +97,37 @@ async def coordinator_of_binaries(
     registered_target_types: RegisteredTargetTypes,
 ) -> CreatedBinary:
     target = wrapped_target.target
-    binary_implementations: Iterable[Type[BinaryImplementation]] = union_membership.union_rules[
-        BinaryImplementation
+    binary_target_types: Iterable[Type[BinaryTarget]] = union_membership.union_rules[BinaryTarget]
+    valid_binary_target_types = [
+        binary_target_type
+        for binary_target_type in binary_target_types
+        if binary_target_type.is_valid(target)
     ]
-    valid_binary_implementations = [
-        binary_implementation
-        for binary_implementation in binary_implementations
-        if binary_implementation.is_valid_target(target)
-    ]
-    if not valid_binary_implementations:
-        all_valid_target_types = itertools.chain.from_iterable(
-            implementation.valid_target_types(
+    if not valid_binary_target_types:
+        all_registered_valid_target_types = itertools.chain.from_iterable(
+            binary_target_type.valid_registered_target_types(
                 registered_target_types.types, union_membership=union_membership
             )
-            for implementation in binary_implementations
+            for binary_target_type in binary_target_types
         )
-        formatted_target_types = sorted(target_type.alias for target_type in all_valid_target_types)
+        formatted_registered_target_types = sorted(
+            target_type.alias for target_type in all_registered_valid_target_types
+        )
         # TODO: this is a leaky abstraction that the error message knows this rule is being used
         #  by `run` and `binary`. How should this be handled? A custom goal author could depend on
         #  this error message too and the error would now be lying.
         raise ValueError(
             f"The `run` and `binary` goals only work with the following target types: "
-            f"{formatted_target_types}\n\nYou used {target.address} with target type "
+            f"{formatted_registered_target_types}\n\nYou used {target.address} with target type "
             f"{repr(target.alias)}."
         )
     # TODO: we must use this check when running `./v2 run` because we should only run one target
     #  with one implementation. But, we don't necessarily need to enforce this with `./v2 binary`.
     #  See https://github.com/pantsbuild/pants/pull/9345#discussion_r395221542 for some possible
     #  semantics for `./v2 binary`.
-    if len(valid_binary_implementations) > 1:
-        possible_implementations = sorted(
-            implementation.__name__ for implementation in valid_binary_implementations
+    if len(valid_binary_target_types) > 1:
+        possible_binary_target_types = sorted(
+            binary_target_type.__name__ for binary_target_type in valid_binary_target_types
         )
         # TODO: improve this error message. (It's never actually triggered yet because we only have
         #  Python implemented with V2.) A better error message would explain to users how they can
@@ -133,10 +135,10 @@ async def coordinator_of_binaries(
         raise ValueError(
             f"Multiple of the registered binary implementations work for {target.address} "
             f"(target type {repr(target.alias)}). It is ambiguous which implementation to use. "
-            f"Possible implementations: {possible_implementations}."
+            f"Possible implementations: {possible_binary_target_types}."
         )
-    binary_implementation = valid_binary_implementations[0]
-    return await Get[CreatedBinary](BinaryImplementation, binary_implementation.create(target))
+    binary_target_type = valid_binary_target_types[0]
+    return await Get[CreatedBinary](BinaryTarget, binary_target_type.create(target))
 
 
 def rules():

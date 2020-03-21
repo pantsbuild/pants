@@ -12,12 +12,12 @@ from pants.engine.addressable import Addresses
 from pants.engine.rules import UnionRule, rule
 from pants.engine.selectors import Get
 from pants.engine.target import Target
-from pants.rules.core.binary import BinaryImplementation, CreatedBinary
+from pants.rules.core.binary import BinaryTarget, CreatedBinary
 from pants.rules.core.determine_source_files import AllSourceFilesRequest, SourceFiles
 
 
 @dataclass(frozen=True)
-class PythonBinaryImplementation(BinaryImplementation):
+class PexTarget(BinaryTarget):
     required_fields = (EntryPoint, PythonBinarySources)
 
     sources: PythonBinarySources
@@ -29,20 +29,20 @@ class PythonBinaryImplementation(BinaryImplementation):
     #  required fields. Use `Target.get()` in the `create()` method.
 
     @classmethod
-    def create(cls, tgt: Target) -> "PythonBinaryImplementation":
+    def create(cls, tgt: Target) -> "PexTarget":
         return cls(
             address=tgt.address, sources=tgt[PythonBinarySources], entry_point=tgt[EntryPoint]
         )
 
 
 @rule
-async def create_python_binary(implementation: PythonBinaryImplementation) -> CreatedBinary:
+async def create_python_binary(target: PexTarget) -> CreatedBinary:
     entry_point: Optional[str]
-    if implementation.entry_point.value is not None:
-        entry_point = implementation.entry_point.value
+    if target.entry_point.value is not None:
+        entry_point = target.entry_point.value
     else:
         source_files = await Get[SourceFiles](
-            AllSourceFilesRequest([implementation.sources], strip_source_roots=True)
+            AllSourceFilesRequest([target.sources], strip_source_roots=True)
         )
         # NB: `PythonBinarySources` enforces that we have 0-1 sources.
         if len(source_files.files) == 1:
@@ -52,9 +52,9 @@ async def create_python_binary(implementation: PythonBinaryImplementation) -> Cr
             entry_point = None
 
     request = CreatePexFromTargetClosure(
-        addresses=Addresses([implementation.address]),
+        addresses=Addresses([target.address]),
         entry_point=entry_point,
-        output_filename=f"{implementation.address.target_name}.pex",
+        output_filename=f"{target.address.target_name}.pex",
     )
 
     pex = await Get[Pex](CreatePexFromTargetClosure, request)
@@ -62,4 +62,4 @@ async def create_python_binary(implementation: PythonBinaryImplementation) -> Cr
 
 
 def rules():
-    return [create_python_binary, UnionRule(BinaryImplementation, PythonBinaryImplementation)]
+    return [create_python_binary, UnionRule(BinaryTarget, PexTarget)]
