@@ -1056,18 +1056,15 @@ impl Node for NodeKey {
     };
 
     let context2 = context.clone();
-    future::lazy({
-      let context = context.clone();
-      let self2 = self.clone();
-      move || {
-        if let Some(path) = self2.fs_subject() {
-          let abs_path = context.core.build_root.join(path);
-          context.core.watcher.watch(abs_path)
-        } else {
-          future::ok(()).to_boxed()
-        }
+    let maybe_watch = {
+      if let Some(path) = self.fs_subject() {
+        let abs_path = context.core.build_root.join(path);
+        context.core.watcher.watch(abs_path)
+      } else {
+        future::ok(()).to_boxed()
       }
-    })
+    };
+    maybe_watch
     // This will cause a node to fail if we cannot watch its fs_subject. That doesn't
     // seem too farfetched, but there may be unknown consequences. We can
     // ignore notify::ErrorKind::PathNotFound if needed.

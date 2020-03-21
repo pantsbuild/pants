@@ -11,7 +11,7 @@ use boxfuture::{BoxFuture, Boxable};
 use crossbeam_channel::{self, Receiver, RecvTimeoutError, TryRecvError};
 use futures01 as futures;
 use log::{debug, error, info, warn};
-use notify::{event::EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use parking_lot::Mutex;
 use task_executor::Executor;
 
@@ -29,11 +29,13 @@ use crate::nodes::NodeKey;
 ///
 /// TODO: Need the above polling
 ///
-/// TODO: To simplify testing the InvalidationWatcher we could impl a trait which
-/// has an `invalidate_from_roots` method that is called from the background event thread.
+/// TODO: To simplify testing the InvalidationWatcher we could create  a trait which
+/// has an `invalidate_from_roots` method  and impl it on the Graph. Then we could make the InvalidationWatcher
+/// take an argument that implements the trait.
 /// Then we wouldn't have to mock out a Graph object in watch_tests.rs. This will probably
-/// only be possible when we remove watchman invalidation, when the code path for invaldation will be
+/// only be possible when we remove watchman invalidation, when the one code path for invaldation will be
 /// the notify background thread.
+/// Potential impl here: https://github.com/pantsbuild/pants/pull/9318#discussion_r396005978 
 ///
 pub struct InvalidationWatcher {
   watcher: Arc<Mutex<RecommendedWatcher>>,
@@ -72,12 +74,12 @@ impl InvalidationWatcher {
         };
         match event_res {
           Ok(Ok(ev)) => {
-            let event_kind = ev.kind.clone();
             let paths: HashSet<_> = ev
               .paths
               .into_iter()
               .map(|path| {
                 // relativize paths to build root.
+                let mut paths_to_invalidate: Vec<PathBuf> = vec![];
                 let path_relative_to_build_root = {
                   if path.starts_with(&canonical_build_root) {
                     path.strip_prefix(&canonical_build_root).unwrap().into()
@@ -85,25 +87,11 @@ impl InvalidationWatcher {
                     path
                   }
                 };
-                match event_kind {
-                  EventKind::Access(..) | EventKind::Other => vec![],
-                  // If the event is modifying an existing path then we can
-                  // invalidate only matching nodes.
-                  EventKind::Modify(..) => vec![path_relative_to_build_root],
-                  // If the event is creating a new file under a watched path
-                  // then we have to invalidate the parent path as well because
-                  // Scandir nodes will be invalid. EventKind::Any is a catch all for
-                  // unknown events, we should be safe in these cases, and invalidate
-                  // parent paths as well.
-                  EventKind::Create(..) | EventKind::Remove(..) | EventKind::Any => {
-                    let mut paths = vec![];
-                    if let Some(parent_path) = path_relative_to_build_root.parent() {
-                      paths.push(parent_path.to_path_buf())
-                    }
-                    paths.push(path_relative_to_build_root);
-                    paths
-                  }
+                paths_to_invalidate.push(path_relative_to_build_root.clone());
+                if let Some(parent_dir) = path_relative_to_build_root.parent() {
+                  paths_to_invalidate.push(parent_dir.to_path_buf());
                 }
+                paths_to_invalidate
               })
               .flatten()
               .collect();
