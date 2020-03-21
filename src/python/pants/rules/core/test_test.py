@@ -4,7 +4,7 @@
 from abc import ABCMeta, abstractmethod
 from pathlib import PurePath
 from textwrap import dedent
-from typing import List, Optional, Tuple, Type
+from typing import List, Optional, Tuple, Type, cast
 from unittest.mock import Mock
 
 import pytest
@@ -17,11 +17,20 @@ from pants.engine.fs import (
     Digest,
     FileContent,
     InputFilesContent,
+    Snapshot,
     Workspace,
 )
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.rules import UnionMembership
-from pants.engine.target import RegisteredTargetTypes, Target, TargetsWithOrigins, TargetWithOrigin
+from pants.engine.target import (
+    HydratedSources,
+    HydrateSourcesRequest,
+    RegisteredTargetTypes,
+    Sources,
+    Target,
+    TargetsWithOrigins,
+    TargetWithOrigin,
+)
 from pants.rules.core.test import (
     AddressAndTestResult,
     CoverageDataBatch,
@@ -58,7 +67,12 @@ class MockTestTarget(TestTarget, metaclass=ABCMeta):
 
     @classmethod
     def create(cls, target_with_origin: TargetWithOrigin) -> "MockTestTarget":
-        return cls(address=target_with_origin.target.address, origin=target_with_origin.origin)
+        address = target_with_origin.target.address
+        return cls(
+            address=address,
+            origin=target_with_origin.origin,
+            sources=Sources(None, address=address),
+        )
 
     @staticmethod
     @abstractmethod
@@ -147,6 +161,7 @@ class TestTest(TestBase):
         test_target: Type[TestTarget],
         targets: List[TargetWithOrigin],
         debug: bool = False,
+        include_sources: bool = True,
     ) -> Tuple[int, str]:
         console = MockConsole(use_colors=False)
         options = MockOptions(debug=debug, run_coverage=False)
@@ -186,6 +201,17 @@ class TestTest(TestBase):
                     mock=lambda _: TestDebugRequest(self.make_ipr()),
                 ),
                 MockGet(
+                    product_type=HydratedSources,
+                    subject_type=HydrateSourcesRequest,
+                    mock=lambda _: HydratedSources(
+                        Snapshot(
+                            directory_digest=EMPTY_DIRECTORY_DIGEST,
+                            files=cast(Tuple[str, ...], ("test.hs",) if include_sources else ()),
+                            dirs=(),
+                        )
+                    ),
+                ),
+                MockGet(
                     product_type=CoverageReport,
                     subject_type=CoverageDataBatch,
                     mock=lambda _: FilesystemCoverageReport(
@@ -198,6 +224,15 @@ class TestTest(TestBase):
             union_membership=union_membership,
         )
         return result.exit_code, console.stdout.getvalue()
+
+    def test_empty_target_noops(self) -> None:
+        exit_code, stdout = self.run_test_rule(
+            test_target=InvalidTestTarget,
+            targets=[self.make_target_with_origin()],
+            include_sources=False,
+        )
+        assert exit_code == 0
+        assert stdout.strip() == ""
 
     def test_invalid_target_noops(self) -> None:
         exit_code, stdout = self.run_test_rule(

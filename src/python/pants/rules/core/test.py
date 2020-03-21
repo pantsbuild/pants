@@ -23,7 +23,10 @@ from pants.engine.rules import UnionMembership, goal_rule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
     Field,
+    HydratedSources,
+    HydrateSourcesRequest,
     RegisteredTargetTypes,
+    Sources,
     Target,
     TargetsWithOrigins,
     TargetWithOrigin,
@@ -79,6 +82,8 @@ class TestTarget(ABC):
 
     address: Address
     origin: OriginSpec
+
+    sources: Sources
 
     __test__ = False
 
@@ -269,11 +274,24 @@ async def run_tests(
         debug_result = interactive_runner.run_local_interactive_process(request.ipr)
         return Test(debug_result.process_exit_code)
 
-    results = await MultiGet(
-        Get[AddressAndTestResult](WrappedTestTarget(test_target_type.create(target_with_origin)))
+    # TODO: possibly factor out this filtering out of empty `sources`. We do this at this level of
+    #  abstraction, rather than in the test runners, because the test runners often will use
+    #  auto-discovery when given no input files.
+    test_targets = tuple(
+        test_target_type.create(target_with_origin)
         for target_with_origin in targets_with_origins
         for test_target_type in test_target_types
         if test_target_type.is_valid(target_with_origin.target)
+    )
+    all_hydrated_sources = await MultiGet(
+        Get[HydratedSources](HydrateSourcesRequest, test_target.sources.request)
+        for test_target in test_targets
+    )
+
+    results = await MultiGet(
+        Get[AddressAndTestResult](WrappedTestTarget(test_target))
+        for test_target, hydrated_sources in zip(test_targets, all_hydrated_sources)
+        if hydrated_sources.snapshot.files
     )
 
     did_any_fail = False
