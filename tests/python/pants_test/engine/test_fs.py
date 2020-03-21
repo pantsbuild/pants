@@ -12,7 +12,9 @@ from abc import ABCMeta
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
+from typing import Callable
 
+from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.fs import (
     EMPTY_DIRECTORY_DIGEST,
     Digest,
@@ -141,7 +143,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
 
     def test_walk_escaping_symlink(self):
         link = "subdir/escaping"
-        dest = "../../this-is-probably-nonexistent"
+        dest = "../../"
 
         def prepare(project_tree):
             link_path = os.path.join(project_tree.build_root, link)
@@ -728,13 +730,15 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
             path_to_fname = os.path.join(project_tree.build_root, fname)
             with open(path_to_fname, "w") as f:
                 f.write(new_data)
-            for i in range(4):
-                time.sleep(0.1 * i)
+
+            def assertion_fn():
                 new_content = self.read_file_content(scheduler, [fname])
                 if new_content[fname].decode("utf-8") == new_data:
                     # successfully read new data
-                    break
-            else:
+                    return True
+                return False
+
+            if not self.try_with_backoff(assertion_fn):
                 raise AssertionError(
                     f"New content {new_data} was not found in the FilesContent of the "
                     "modified file {path_to_fname}, instead we found {new_content[fname]}"
@@ -751,17 +755,21 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
             self.assertIn(fname, original_content)
             path_to_parent_dir = os.path.join(project_tree.build_root, "a/b/")
             shutil.rmtree(path_to_parent_dir)
-            for i in range(4):
-                time.sleep(0.1 * i)
+
+            def assertion_fn():
                 new_content = self.read_file_content(scheduler, [fname])
                 if new_content.get(fname) is None:
-                    break
-            else:
+                    return True
+                return False
+
+            if not self.try_with_backoff(assertion_fn):
                 raise AssertionError(
                     f"Deleting parent dir and could still read file from original snapshot."
                 )
 
-    def assert_mutated_directory_digest(self, mutation_function):
+    def assert_mutated_directory_digest(
+        self, mutation_function: Callable[[FileSystemProjectTree, str], Exception]
+    ):
         with self.mk_project_tree() as project_tree:
             scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree)
             dir_path = "a/"
@@ -771,17 +779,27 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
             ).value
             assert not initial_snapshot.is_empty
             assertion_error = mutation_function(project_tree, dir_path)
-            for i in range(4):
-                time.sleep(0.1 * i)
+
+            def assertion_fn():
                 new_snapshot = self.execute_expecting_one_result(
                     scheduler, Snapshot, self.path_globs([dir_glob])
                 ).value
                 assert not new_snapshot.is_empty
                 if initial_snapshot.directory_digest != new_snapshot.directory_digest:
                     # successfully invalidated snapshot and got a new digest
-                    break
-            else:
+                    return True
+                return False
+
+            if not self.try_with_backoff(assertion_fn):
                 raise assertion_error
+
+    @staticmethod
+    def try_with_backoff(assertion_fn: Callable[[], bool]) -> bool:
+        for i in range(4):
+            time.sleep(0.1 * i)
+            if assertion_fn():
+                return True
+        return False
 
     def test_directory_digest_invalidated_by_child_removal(self):
         def mutation_function(project_tree, dir_path):

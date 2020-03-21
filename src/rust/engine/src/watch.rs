@@ -10,10 +10,10 @@ use std::time::Duration;
 use boxfuture::{BoxFuture, Boxable};
 use crossbeam_channel::{self, Receiver, RecvTimeoutError, TryRecvError};
 use futures01 as futures;
-use futures01::future::Future;
 use log::{debug, error, info, warn};
-use notify::{RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{event::EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use parking_lot::Mutex;
+use task_executor::Executor;
 
 use graph::{Graph, InvalidationResult};
 use logging;
@@ -29,21 +29,30 @@ use crate::nodes::NodeKey;
 ///
 /// TODO: Need the above polling
 ///
+/// TODO: To simplify testing the InvalidationWatcher we could impl a trait which
+/// has an `invalidate_from_roots` method that is called from the background event thread.
+/// Then we wouldn't have to mock out a Graph object in watch_tests.rs. This will probably
+/// only be possible when we remove watchman invalidation, when the code path for invaldation will be
+/// the notify background thread.
+///
 pub struct InvalidationWatcher {
   watcher: Arc<Mutex<RecommendedWatcher>>,
+  executor: Executor,
   liveness: Receiver<()>,
 }
 
 impl InvalidationWatcher {
   pub fn new(
     graph: Weak<Graph<NodeKey>>,
+    executor: Executor,
     build_root: PathBuf,
   ) -> Result<InvalidationWatcher, String> {
     // Inotify events contain canonical paths to the files being watched.
     // If the build_root contains a symlink the paths returned in notify events
     // wouldn't have the build_root as a prefix, and so we would miss invalidating certain nodes.
     // We canonicalize the build_root once so this isn't a problem.
-    let canonical_build_root = std::fs::canonicalize(build_root.as_path()).map_err(|e| format!("{:?}", e))?.to_path_buf();
+    let canonical_build_root =
+      std::fs::canonicalize(build_root.as_path()).map_err(|e| format!("{:?}", e))?;
     let (watch_sender, watch_receiver) = crossbeam_channel::unbounded();
     let watcher = Arc::new(Mutex::new(
       Watcher::new(watch_sender, Duration::from_millis(50))
@@ -63,12 +72,12 @@ impl InvalidationWatcher {
         };
         match event_res {
           Ok(Ok(ev)) => {
+            let event_kind = ev.kind.clone();
             let paths: HashSet<_> = ev
               .paths
               .into_iter()
               .map(|path| {
                 // relativize paths to build root.
-                let mut paths_to_invalidate: Vec<PathBuf> = vec![];
                 let path_relative_to_build_root = {
                   if path.starts_with(&canonical_build_root) {
                     path.strip_prefix(&canonical_build_root).unwrap().into()
@@ -76,11 +85,25 @@ impl InvalidationWatcher {
                     path
                   }
                 };
-                paths_to_invalidate.push(path_relative_to_build_root.clone());
-                if let Some(parent_dir) = path_relative_to_build_root.parent() {
-                  paths_to_invalidate.push(parent_dir.to_path_buf());
+                match event_kind {
+                  EventKind::Access(..) | EventKind::Other => vec![],
+                  // If the event is modifying an existing path then we can
+                  // invalidate only matching nodes.
+                  EventKind::Modify(..) => vec![path_relative_to_build_root],
+                  // If the event is creating a new file under a watched path
+                  // then we have to invalidate the parent path as well because
+                  // Scandir nodes will be invalid. EventKind::Any is a catch all for
+                  // unknown events, we should be safe in these cases, and invalidate
+                  // parent paths as well.
+                  EventKind::Create(..) | EventKind::Remove(..) | EventKind::Any => {
+                    let mut paths = vec![];
+                    if let Some(parent_path) = path_relative_to_build_root.parent() {
+                      paths.push(parent_path.to_path_buf())
+                    }
+                    paths.push(path_relative_to_build_root);
+                    paths
+                  }
                 }
-                paths_to_invalidate
               })
               .flatten()
               .collect();
@@ -110,6 +133,7 @@ impl InvalidationWatcher {
 
     Ok(InvalidationWatcher {
       watcher,
+      executor,
       liveness: thread_liveness_receiver,
     })
   }
@@ -117,17 +141,13 @@ impl InvalidationWatcher {
   ///
   /// Watch the given path non-recursively.
   ///
-  pub fn watch(&self, path: PathBuf) -> BoxFuture<(), ()> {
+  pub fn watch(&self, path: PathBuf) -> BoxFuture<(), notify::Error> {
     let watcher = self.watcher.clone();
-    let path2 = path.clone();
-    futures::lazy(move || watcher.lock().watch(path, RecursiveMode::NonRecursive))
-      .then(move |r| match r {
-        Ok(_) => futures::future::ok(()).to_boxed(),
-        Err(e) => {
-          warn!("Failed to watch path {:?}, with error {:?}", path2, e);
-          futures::future::err(()).to_boxed()
-        }
-      })
+    self
+      .executor
+      .spawn_on_io_pool(futures::lazy(move || {
+        watcher.lock().watch(path, RecursiveMode::NonRecursive)
+      }))
       .to_boxed()
   }
 

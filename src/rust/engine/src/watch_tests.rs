@@ -1,14 +1,15 @@
+use crate::nodes::{DigestFile, NodeKey, NodeResult};
+use crate::watch::InvalidationWatcher;
+use fs::File;
+use graph::entry::{EntryResult, EntryState, Generation, RunToken};
+use graph::{test_support::TestGraph, Graph};
+use hashing::EMPTY_DIGEST;
+use std::path::PathBuf;
 use std::sync::Arc;
-use std::path::{PathBuf};
 use std::thread::sleep;
 use std::time::Duration;
-use crate::watch::InvalidationWatcher;
-use graph::{Graph, test_support::TestGraph};
-use hashing::EMPTY_DIGEST;
-use graph::entry::{RunToken, Generation, EntryState, EntryResult};
-use crate::nodes::{DigestFile, NodeKey, NodeResult};
-use fs::File;
-use testutil::make_file;
+use task_executor::Executor;
+use testutil::{append_to_exisiting_file, make_file};
 
 #[test]
 fn receive_watch_event_on_file_change() {
@@ -20,7 +21,10 @@ fn receive_watch_event_on_file_change() {
   make_file(&file_path, &content, 0o600);
 
   // set up a node in the graph to check that it gets cleared by the invalidation watcher.
-  let node = NodeKey::DigestFile(DigestFile(File {path: PathBuf::from("watch_me.txt"), is_executable: false}));
+  let node = NodeKey::DigestFile(DigestFile(File {
+    path: PathBuf::from("watch_me.txt"),
+    is_executable: false,
+  }));
   let graph = Arc::new(Graph::new());
   let entry_id = graph.add_fixture_entry(node);
   let completed_state = EntryState::Completed {
@@ -33,21 +37,30 @@ fn receive_watch_event_on_file_change() {
   // Assert the nodes initial state is completed
   assert!(graph.entry_state(entry_id) == "completed");
   // Instantiate a watcher and watch the file in question.
-  let watcher = InvalidationWatcher::new(Arc::downgrade(&graph), build_root.path().to_path_buf()).expect("Couldn't create InvalidationWatcher");
+  let executor = Executor::new();
+  let watcher = InvalidationWatcher::new(
+    Arc::downgrade(&graph),
+    executor,
+    build_root.path().to_path_buf(),
+  )
+  .expect("Couldn't create InvalidationWatcher");
   let mut rt = tokio::runtime::Runtime::new().unwrap();
   rt.block_on(watcher.watch(file_path.clone())).unwrap();
   // Update the content of the file being watched.
   let new_content = "stnetonc".as_bytes().to_vec();
-  make_file(&file_path, &new_content, 0o600);
+  append_to_exisiting_file(&file_path, &new_content);
   // Wait for watcher background thread to trigger a node invalidation,
   // by checking the entry state for the node. It will be reset to EntryState::NotStarted
   // when Graph::invalidate_from_roots calls clear on the node.
   for _ in 0..10 {
     sleep(Duration::from_millis(100));
     if graph.entry_state(entry_id) == "not started" {
-      return
+      return;
     }
   }
   // If we didn't find a new state fail the test.
-  assert!(false, "Nodes EntryState was not invalidated, or reset to NotStarted.")
+  assert!(
+    false,
+    "Nodes EntryState was not invalidated, or reset to NotStarted."
+  )
 }

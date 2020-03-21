@@ -929,7 +929,7 @@ impl NodeVisualizer<NodeKey> for Visualizer {
     let max_colors = 12;
     match entry.peek(context) {
       None => "white".to_string(),
-      Some(Err(Failure::Throw(..))) => "4".to_string(),
+      Some(Err(Failure::Throw(..))) | Some(Err(Failure::FileWatch(..))) => "4".to_string(),
       Some(Err(Failure::Invalidated)) => "12".to_string(),
       Some(Ok(_)) => {
         let viz_colors_len = self.viz_colors.len();
@@ -950,6 +950,7 @@ impl NodeTracer<NodeKey> for Tracer {
     match result {
       Some(Err(Failure::Invalidated)) => false,
       Some(Err(Failure::Throw(..))) => false,
+      Some(Err(Failure::FileWatch(..))) => false,
       Some(Ok(_)) => true,
       None => {
         // A Node with no state is either still running, or effectively cancelled
@@ -974,6 +975,7 @@ impl NodeTracer<NodeKey> for Tracer {
           .join("\n")
       ),
       Some(Err(Failure::Invalidated)) => "Invalidated".to_string(),
+      Some(Err(Failure::FileWatch(failure))) => format!("FileWatch failed: {}", failure),
     }
   }
 }
@@ -1060,17 +1062,17 @@ impl Node for NodeKey {
       move || {
         if let Some(path) = self2.fs_subject() {
           let abs_path = context.core.build_root.join(path);
-          context
-            .core
-            .executor
-            .spawn_on_io_pool(context.core.watcher.watch(abs_path))
-            .to_boxed()
+          context.core.watcher.watch(abs_path)
         } else {
           future::ok(()).to_boxed()
         }
       }
     })
-    .then(|_| {
+    // This will cause a node to fail if we cannot watch its fs_subject. That doesn't
+    // seem too farfetched, but there may be unknown consequences. We can
+    // ignore notify::ErrorKind::PathNotFound if needed.
+    .map_err(|e| Failure::FileWatch(format!("{:?}", e)))
+    .and_then(|()| {
       future::lazy(|| {
         if let Some(span_id) = maybe_span_id {
           set_parent_id(span_id);
