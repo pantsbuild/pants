@@ -547,6 +547,7 @@ def run_rust_tests() -> None:
 
 
 def run_jvm_tests() -> None:
+    # NB: Ensure that this stays in sync with githooks/prepare-commit-msg.
     targets = ["src/java::", "src/scala::", "tests/java::", "tests/scala::", "zinc::"]
     _run_command(
         ["./pants.pex", "doc", "test", *targets],

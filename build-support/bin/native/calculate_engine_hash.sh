@@ -24,6 +24,8 @@ function calculate_current_hash() {
   # sensitive to the CWD, and the `--work-tree` option doesn't seem to resolve that.
   #
   # Assumes we're in the venv that will be used to build the native engine.
+  #
+  # NB: Ensure that this stays in sync wtih `githooks/prepare-commit-msg`.
   (
    cd "${REPO_ROOT}" || exit 1
    (echo "${MODE_FLAG}"
