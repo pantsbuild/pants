@@ -1,10 +1,10 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Any, Dict, Hashable, Iterable, Iterator, Mapping, Optional, Tuple, TypeVar, Union
+from typing import Any, Dict, Iterable, Iterator, Mapping, Optional, Tuple, TypeVar, Union
 
-K = TypeVar("K", bound=Hashable)
-V = TypeVar("V", bound=Hashable)
+K = TypeVar("K")
+V = TypeVar("V")
 
 
 class FrozenDict(Mapping[K, V]):

@@ -21,12 +21,10 @@ def test_items_can_be_mutable() -> None:
     # API simple and aligned with how other immutable Python types like `tuple` behave. Possibly,
     # we will want to enforce this in the future.
     #
-    # MyPy will also check that the types implement the Hashable protocol.
-    #
     # NB: the collection will not be hashable when the underlying values are not hashable (see
     # `test_hash()`). This means that the engine will provide runtime type checking for us if the
     # FrozenDict is passed to the engine.
-    fd1 = FrozenDict({0: ["a"]})  # type: ignore[type-var]
+    fd1 = FrozenDict({0: ["a"]})
     fd1[0].append("x")
     fd1[0].append("y")
     assert fd1[0] == ["a", "x", "y"]
@@ -95,7 +93,7 @@ def test_hash() -> None:
     assert hash(FrozenDict(d1)) != hash(FrozenDict({"b": 1, "a": 0}))
     # If the underlying type is not hashable, then the FrozenDict will not be.
     with pytest.raises(TypeError):
-        hash(FrozenDict({"a": []}))  # type: ignore[type-var]
+        hash(FrozenDict({"a": []}))
 
 
 def test_works_with_dataclasses() -> None:
