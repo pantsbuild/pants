@@ -13,8 +13,8 @@ use std::{self, fmt};
 use async_trait::async_trait;
 use futures::compat::Future01CompatExt;
 use futures::future::{FutureExt, TryFutureExt};
+use futures::stream::StreamExt;
 use futures01::future::{self, Future};
-use futures01::Stream;
 use url::Url;
 
 use crate::context::{Context, Core};
@@ -639,6 +639,7 @@ impl DownloadedFile {
       .http_client
       .get(url.clone())
       .send()
+      .compat()
       .map_err(|err| format!("Error downloading file: {}", err))
       .and_then(move |response| {
         // Handle common HTTP errors.
@@ -687,25 +688,25 @@ impl DownloadedFile {
           }
         }
 
-        let hasher = hashing::WriterHasher::new(SizeLimiter {
-          writer: bytes::BytesMut::with_capacity(expected_digest.1).writer(),
-          written: 0,
-          size_limit: expected_digest.1,
-        });
+        let digest_and_bytes = async move {
+          let mut hasher = hashing::WriterHasher::new(SizeLimiter {
+            writer: bytes::BytesMut::with_capacity(expected_digest.1).writer(),
+            written: 0,
+            size_limit: expected_digest.1,
+          });
 
-        response
-          .into_body()
-          .map_err(|err| format!("Error reading URL fetch response: {}", err))
-          .fold(hasher, |mut hasher, chunk| {
+          let mut response_stream = response.bytes_stream();
+          while let Some(next_chunk) = response_stream.next().await {
+            let chunk =
+              next_chunk.map_err(|err| format!("Error reading URL fetch response: {}", err))?;
             hasher
               .write_all(&chunk)
-              .map(|_| hasher)
-              .map_err(|err| format!("Error hashing/writing URL fetch response: {}", err))
-          })
-          .map(|hasher| {
-            let (digest, bytewriter) = hasher.finish();
-            (digest, bytewriter.writer.into_inner().freeze())
-          })
+              .map_err(|err| format!("Error hashing/capturing URL fetch response: {}", err))?;
+          }
+          let (digest, bytewriter) = hasher.finish();
+          Ok((digest, bytewriter.writer.into_inner().freeze()))
+        };
+        digest_and_bytes.boxed().compat().to_boxed()
       })
       .and_then(move |(actual_digest, buf)| {
         if expected_digest != actual_digest {

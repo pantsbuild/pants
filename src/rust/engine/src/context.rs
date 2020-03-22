@@ -51,7 +51,7 @@ pub struct Core {
   pub executor: task_executor::Executor,
   store: Store,
   pub command_runner: Box<dyn process_execution::CommandRunner>,
-  pub http_client: reqwest::r#async::Client,
+  pub http_client: reqwest::Client,
   pub vfs: PosixFS,
   pub build_root: PathBuf,
 }
@@ -223,7 +223,7 @@ impl Core {
       ));
     }
 
-    let http_client = reqwest::r#async::Client::new();
+    let http_client = reqwest::Client::new();
     let rule_graph = RuleGraph::new(tasks.as_map(), root_subject_types);
 
     Ok(Core {

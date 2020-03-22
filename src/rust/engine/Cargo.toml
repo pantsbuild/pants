@@ -100,7 +100,7 @@ num_enum = "0.4"
 parking_lot = "0.6"
 process_execution = { path = "process_execution" }
 rand = "0.6"
-reqwest = { version = "0.9.22", default_features = false, features = ["rustls-tls"] }
+reqwest = { version = "0.10", default_features = false, features = ["stream", "rustls-tls"] }
 rule_graph = { path = "rule_graph" }
 sharded_lmdb = { path = "sharded_lmdb" }
 smallvec = "0.6"
@@ -108,7 +108,7 @@ store = { path = "fs/store" }
 tempfile = "3"
 time = "0.1.40"
 ui = { path = "ui" }
-url = "1.7.1"
+url = "2.1"
 uuid = { version = "0.7", features = ["v4"] }
 task_executor = { path = "task_executor" }
 tokio = { version = "0.2", features = ["rt-threaded"] }
