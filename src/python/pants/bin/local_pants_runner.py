@@ -119,7 +119,6 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     union_membership: UnionMembership
     is_daemon: bool
     profile_path: Optional[str]
-    _run_start_time: Optional[float] = None
     _run_tracker: Optional[RunTracker] = None
     _reporting: Optional[Reporting] = None
     _repro: Optional[Repro] = None
@@ -225,7 +224,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
             profile_path=profile_path,
         )
 
-    def set_start_time(self, start_time: float) -> None:
+    def set_start_time(self, start_time: Optional[float]) -> None:
         # Launch RunTracker as early as possible (before .run() is called).
         self._run_tracker = RunTracker.global_instance()
 
@@ -233,9 +232,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         os.environ["PANTS_PARENT_BUILD_ID"] = self._run_tracker.run_id
 
         self._reporting = Reporting.global_instance()
-
-        self._run_start_time = start_time
-        self._reporting.initialize(self._run_tracker, self.options, start_time=self._run_start_time)
+        self._reporting.initialize(self._run_tracker, self.options, start_time=start_time)
 
         spec_parser = CmdLineSpecParser(get_buildroot())
         specs = [spec_parser.parse_spec(spec).to_spec_string() for spec in self.options.specs]

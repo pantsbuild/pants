@@ -234,10 +234,6 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
             ) as finalizer:
                 yield finalizer
 
-    def _maybe_get_client_start_time_from_env(self, env):
-        client_start_time = env.pop("PANTSD_RUNTRACKER_CLIENT_START_TIME", None)
-        return None if client_start_time is None else float(client_start_time)
-
     def run(self):
         # Ensure anything referencing sys.argv inherits the Pailgun'd args.
         sys.argv = self._args
@@ -282,7 +278,10 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
                 )
                 with ExceptionSink.exiter_as_until_exception(lambda _: PantsRunFailCheckerExiter()):
                     runner = LocalPantsRunner.create(env, options_bootstrapper, specs, session)
-                    runner.set_start_time(self._maybe_get_client_start_time_from_env(self._env))
+
+                    st = self._env.pop("PANTSD_RUNTRACKER_CLIENT_START_TIME", None)
+                    start_time = float(st) if st else None
+                    runner.set_start_time(start_time)
                     runner.run()
 
             except KeyboardInterrupt:
