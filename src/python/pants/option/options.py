@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import copy
+import logging
 import re
 import sys
 from dataclasses import dataclass
@@ -15,10 +16,12 @@ from pants.option.option_util import is_list_option
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.parser import Parser
 from pants.option.parser_hierarchy import ParserHierarchy, all_enclosing_scopes, enclosing_scope
-from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
+from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+
+logger = logging.getLogger(__name__)
 
 
 class Options:
@@ -260,6 +263,39 @@ class Options:
     def freeze(self) -> None:
         """Freezes this Options instance."""
         self._frozen = True
+
+    def verify_configs_against_self(self, global_config: Config) -> None:
+        """Verify all loaded configs have correct scopes and options."""
+
+        error_log = []
+        for config in global_config.configs():
+            for section in config.sections():
+                scope = GLOBAL_SCOPE if section == GLOBAL_SCOPE_CONFIG_SECTION else section
+                try:
+                    valid_options_under_scope = set(
+                        self.for_scope(scope, include_passive_options=True)
+                    )
+                # Only catch ConfigValidationError. Other exceptions will be raised directly.
+                except Config.ConfigValidationError:
+                    error_log.append(f"Invalid scope [{section}] in {config.config_path}")
+                else:
+                    # All the options specified under [`section`] in `config` excluding bootstrap defaults.
+                    all_options_under_scope = set(config.values.options(section)) - set(
+                        config.values.defaults
+                    )
+                    for option in sorted(all_options_under_scope):
+                        if option not in valid_options_under_scope:
+                            error_log.append(
+                                f"Invalid option '{option}' under [{section}] in {config.config_path}"
+                            )
+
+        if error_log:
+            for error in error_log:
+                logger.error(error)
+            raise Config.ConfigValidationError(
+                "Invalid config entries detected. See log for details on which entries to update or "
+                "remove.\n(Specify --no-verify-config to disable this check.)"
+            )
 
     def drop_flag_values(self) -> "Options":
         """Returns a copy of these options that ignores values specified via flags.
