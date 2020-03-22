@@ -5,7 +5,7 @@ import logging
 import os
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import List, Mapping, Optional, Tuple
+from typing import Mapping, Optional, Tuple
 
 from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
@@ -126,16 +126,11 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
 
     @staticmethod
     def parse_options(
-        args: List[str],
-        env: Mapping[str, str],
-        options_bootstrapper: Optional[OptionsBootstrapper] = None,
-    ) -> Tuple[Options, BuildConfiguration, OptionsBootstrapper]:
-        options_bootstrapper = options_bootstrapper or OptionsBootstrapper.create(
-            args=args, env=env
-        )
+        options_bootstrapper: OptionsBootstrapper,
+    ) -> Tuple[Options, BuildConfiguration]:
         build_config = BuildConfigInitializer.get(options_bootstrapper)
         options = OptionsInitializer.create(options_bootstrapper, build_config)
-        return options, build_config, options_bootstrapper
+        return options, build_config
 
     @staticmethod
     def _init_graph_session(
@@ -167,25 +162,21 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     @classmethod
     def create(
         cls,
-        args: List[str],
         env: Mapping[str, str],
+        options_bootstrapper: OptionsBootstrapper,
         specs: Optional[Specs] = None,
         daemon_graph_session: Optional[LegacyGraphSession] = None,
-        options_bootstrapper: Optional[OptionsBootstrapper] = None,
     ) -> "LocalPantsRunner":
         """Creates a new LocalPantsRunner instance by parsing options.
 
-        :param args: The arguments (e.g. sys.argv) for this run.
         :param env: The environment (e.g. os.environ) for this run.
+        :param options_bootstrapper: The OptionsBootstrapper instance to reuse.
         :param specs: The specs for this run, i.e. either the address or filesystem specs.
         :param daemon_graph_session: The graph helper for this session.
-        :param options_bootstrapper: The OptionsBootstrapper instance to reuse.
         """
         build_root = get_buildroot()
 
-        options, build_config, options_bootstrapper = cls.parse_options(
-            args, env, options_bootstrapper=options_bootstrapper,
-        )
+        options, build_config = LocalPantsRunner.parse_options(options_bootstrapper)
         global_options = options.for_global_scope()
         # This works as expected due to the encapsulated_logger in DaemonPantsRunner and
         # we don't have to gate logging setup anymore.

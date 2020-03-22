@@ -99,8 +99,6 @@ class PantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         # N.B. Inlining this import speeds up the python thin client run by about 100ms.
         from pants.bin.local_pants_runner import LocalPantsRunner
 
-        runner = LocalPantsRunner.create(
-            self.args, self.env, options_bootstrapper=options_bootstrapper
-        )
+        runner = LocalPantsRunner.create(env=self.env, options_bootstrapper=options_bootstrapper)
         runner.set_start_time(start_time)
         runner.run()
