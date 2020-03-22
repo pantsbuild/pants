@@ -38,7 +38,7 @@ use rule_graph;
 use graph::{Entry, Node, NodeError, NodeTracer, NodeVisualizer};
 use store::{self, StoreFileByDigest};
 use workunit_store::{
-  generate_random_64bit_string, set_parent_id, StartedWorkUnit, WorkUnit, WorkUnitStore,
+  generate_random_64bit_string, scope_task_parent_id, StartedWorkUnit, WorkUnit, WorkUnitStore,
 };
 
 pub type NodeFuture<T> = BoxFuture<T, Failure>;
@@ -1065,28 +1065,28 @@ impl Node for NodeKey {
       (None, None)
     };
 
-    let context2 = context.clone();
-    future::lazy(|| {
-      if let Some(span_id) = maybe_span_id {
-        set_parent_id(span_id);
-      }
-      match self {
-        NodeKey::DigestFile(n) => n.run(context).map(NodeResult::from).to_boxed(),
-        NodeKey::DownloadedFile(n) => n.run(context).map(NodeResult::from).to_boxed(),
-        NodeKey::MultiPlatformExecuteProcess(n) => n.run(context).map(NodeResult::from).to_boxed(),
-        NodeKey::ReadLink(n) => n.run(context).map(NodeResult::from).to_boxed(),
-        NodeKey::Scandir(n) => n.run(context).map(NodeResult::from).to_boxed(),
-        NodeKey::Select(n) => n.run(context).map(NodeResult::from).to_boxed(),
-        NodeKey::Snapshot(n) => n.run(context).map(NodeResult::from).to_boxed(),
-        NodeKey::Task(n) => n.run(context).map(NodeResult::from).to_boxed(),
-      }
-    })
-    .inspect(move |_: &NodeResult| {
+    scope_task_parent_id(maybe_span_id, async move {
+      let context2 = context.clone();
+      let result = match self {
+        NodeKey::DigestFile(n) => n.run(context).map(NodeResult::from).compat().await,
+        NodeKey::DownloadedFile(n) => n.run(context).map(NodeResult::from).compat().await,
+        NodeKey::MultiPlatformExecuteProcess(n) => {
+          n.run(context).map(NodeResult::from).compat().await
+        }
+        NodeKey::ReadLink(n) => n.run(context).map(NodeResult::from).compat().await,
+        NodeKey::Scandir(n) => n.run(context).map(NodeResult::from).compat().await,
+        NodeKey::Select(n) => n.run(context).map(NodeResult::from).compat().await,
+        NodeKey::Snapshot(n) => n.run(context).map(NodeResult::from).compat().await,
+        NodeKey::Task(n) => n.run(context).map(NodeResult::from).compat().await,
+      };
       if let Some(started_workunit) = maybe_started_workunit {
         let workunit: WorkUnit = started_workunit.finish();
         context2.session.workunit_store().add_workunit(workunit)
       }
+      result
     })
+    .boxed()
+    .compat()
     .to_boxed()
   }
 

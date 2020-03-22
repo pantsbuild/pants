@@ -135,10 +135,8 @@ impl Executor {
     // NB: We unwrap here because the only thing that should cause an error in a spawned task is a
     // panic, in which case we want to propagate that.
     tokio::task::spawn_blocking(move || {
-      logging::set_destination(logging_destination);
-      if let Some(parent_id) = workunit_parent_id {
-        workunit_store::set_parent_id(parent_id);
-      }
+      logging::set_thread_destination(logging_destination);
+      workunit_store::set_thread_parent_id(workunit_parent_id);
       f()
     })
     .map(|res| res.unwrap())
@@ -154,12 +152,13 @@ impl Executor {
   fn future_with_correct_context<F: Future>(future: F) -> impl Future<Output = F::Output> {
     let logging_destination = logging::get_destination();
     let workunit_parent_id = workunit_store::get_parent_id();
-    async move {
-      logging::set_destination(logging_destination);
-      if let Some(parent_id) = workunit_parent_id {
-        workunit_store::set_parent_id(parent_id);
-      }
-      future.await
-    }
+
+    // NB: It is important that the first portion of this method is synchronous (meaning that this
+    // method cannot be `async`), because that means that it will run on the thread that calls it.
+    // The second, async portion of the method will run in the spawned Task.
+
+    logging::scope_task_destination(logging_destination, async move {
+      workunit_store::scope_task_parent_id(workunit_parent_id, future).await
+    })
   }
 }
