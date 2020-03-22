@@ -413,96 +413,100 @@ impl fuse::Filesystem for BuildResultFS {
     name: &OsStr,
     reply: fuse::ReplyEntry,
   ) {
-    let r = match (parent, name.to_str()) {
-      (ROOT, Some("digest")) => Ok(dir_attr_for(DIGEST_ROOT)),
-      (ROOT, Some("directory")) => Ok(dir_attr_for(DIRECTORY_ROOT)),
-      (DIGEST_ROOT, Some(digest_str)) => match digest_from_filepath(digest_str) {
-        Ok(digest) => self
-          .inode_for_file(digest, true)
-          .map_err(|err| {
-            error!("Error loading file by digest {}: {}", digest_str, err);
-            libc::EINVAL
-          })
-          .and_then(|maybe_inode| {
-            maybe_inode
-              .and_then(|inode| self.file_attr_for(inode))
-              .ok_or(libc::ENOENT)
-          }),
-        Err(err) => {
-          warn!("Invalid digest for file in digest root: {}", err);
-          Err(libc::ENOENT)
-        }
-      },
-      (DIRECTORY_ROOT, Some(digest_str)) => match digest_from_filepath(digest_str) {
-        Ok(digest) => self.dir_attr_for(digest),
-        Err(err) => {
-          warn!("Invalid digest for directory in directory root: {}", err);
-          Err(libc::ENOENT)
-        }
-      },
-      (parent, Some(filename)) => {
-        let maybe_cache_entry = self
-          .inode_digest_cache
-          .get(&parent)
-          .cloned()
-          .ok_or(libc::ENOENT);
-        maybe_cache_entry
-          .and_then(|cache_entry| {
-            let parent_digest = cache_entry.digest;
-            self
-              .runtime
-              .block_on(
-                self
-                  .store
-                  .load_directory(parent_digest, WorkUnitStore::new())
-                  .compat(),
-              )
-              .map_err(|err| {
-                error!("Error reading directory {:?}: {}", parent_digest, err);
-                libc::EINVAL
-              })?
-              .and_then(|(directory, _metadata)| self.node_for_digest(&directory, filename))
-              .ok_or(libc::ENOENT)
-          })
-          .and_then(|node| match node {
-            Node::Directory(directory_node) => {
-              let digest_result: Result<Digest, String> = directory_node.get_digest().into();
-              let digest = digest_result.map_err(|err| {
-                error!("Error parsing digest: {:?}", err);
-                libc::ENOENT
-              })?;
-              self.dir_attr_for(digest)
-            }
-            Node::File(file_node) => {
-              let digest_result: Result<Digest, String> = file_node.get_digest().into();
-              let digest = digest_result.map_err(|err| {
-                error!("Error parsing digest: {:?}", err);
-                libc::ENOENT
-              })?;
+    let runtime = self.runtime.clone();
+    runtime.enter(|| {
+      let r = match (parent, name.to_str()) {
+        (ROOT, Some("digest")) => Ok(dir_attr_for(DIGEST_ROOT)),
+        (ROOT, Some("directory")) => Ok(dir_attr_for(DIRECTORY_ROOT)),
+        (DIGEST_ROOT, Some(digest_str)) => match digest_from_filepath(digest_str) {
+          Ok(digest) => self
+            .inode_for_file(digest, true)
+            .map_err(|err| {
+              error!("Error loading file by digest {}: {}", digest_str, err);
+              libc::EINVAL
+            })
+            .and_then(|maybe_inode| {
+              maybe_inode
+                .and_then(|inode| self.file_attr_for(inode))
+                .ok_or(libc::ENOENT)
+            }),
+          Err(err) => {
+            warn!("Invalid digest for file in digest root: {}", err);
+            Err(libc::ENOENT)
+          }
+        },
+        (DIRECTORY_ROOT, Some(digest_str)) => match digest_from_filepath(digest_str) {
+          Ok(digest) => self.dir_attr_for(digest),
+          Err(err) => {
+            warn!("Invalid digest for directory in directory root: {}", err);
+            Err(libc::ENOENT)
+          }
+        },
+        (parent, Some(filename)) => {
+          let maybe_cache_entry = self
+            .inode_digest_cache
+            .get(&parent)
+            .cloned()
+            .ok_or(libc::ENOENT);
+          maybe_cache_entry
+            .and_then(|cache_entry| {
+              let parent_digest = cache_entry.digest;
               self
-                .inode_for_file(digest, file_node.get_is_executable())
+                .runtime
+                .block_on(
+                  self
+                    .store
+                    .load_directory(parent_digest, WorkUnitStore::new())
+                    .compat(),
+                )
                 .map_err(|err| {
-                  error!("Error loading file by digest {}: {}", filename, err);
+                  error!("Error reading directory {:?}: {}", parent_digest, err);
                   libc::EINVAL
-                })
-                .and_then(|maybe_inode| {
-                  maybe_inode
-                    .and_then(|inode| self.file_attr_for(inode))
-                    .ok_or(libc::ENOENT)
-                })
-            }
-          })
+                })?
+                .and_then(|(directory, _metadata)| self.node_for_digest(&directory, filename))
+                .ok_or(libc::ENOENT)
+            })
+            .and_then(|node| match node {
+              Node::Directory(directory_node) => {
+                let digest_result: Result<Digest, String> = directory_node.get_digest().into();
+                let digest = digest_result.map_err(|err| {
+                  error!("Error parsing digest: {:?}", err);
+                  libc::ENOENT
+                })?;
+                self.dir_attr_for(digest)
+              }
+              Node::File(file_node) => {
+                let digest_result: Result<Digest, String> = file_node.get_digest().into();
+                let digest = digest_result.map_err(|err| {
+                  error!("Error parsing digest: {:?}", err);
+                  libc::ENOENT
+                })?;
+                self
+                  .inode_for_file(digest, file_node.get_is_executable())
+                  .map_err(|err| {
+                    error!("Error loading file by digest {}: {}", filename, err);
+                    libc::EINVAL
+                  })
+                  .and_then(|maybe_inode| {
+                    maybe_inode
+                      .and_then(|inode| self.file_attr_for(inode))
+                      .ok_or(libc::ENOENT)
+                  })
+              }
+            })
+        }
+        _ => Err(libc::ENOENT),
+      };
+      match r {
+        Ok(r) => reply.entry(&TTL, &r, 1),
+        Err(err) => reply.error(err),
       }
-      _ => Err(libc::ENOENT),
-    };
-    match r {
-      Ok(r) => reply.entry(&TTL, &r, 1),
-      Err(err) => reply.error(err),
-    }
+    })
   }
 
   fn getattr(&mut self, _req: &fuse::Request<'_>, inode: Inode, reply: fuse::ReplyAttr) {
-    match inode {
+    let runtime = self.runtime.clone();
+    runtime.enter(|| match inode {
       ROOT => reply.attr(&TTL, &dir_attr_for(ROOT)),
       DIGEST_ROOT => reply.attr(&TTL, &dir_attr_for(DIGEST_ROOT)),
       DIRECTORY_ROOT => reply.attr(&TTL, &dir_attr_for(DIRECTORY_ROOT)),
@@ -520,7 +524,7 @@ impl fuse::Filesystem for BuildResultFS {
         }) => reply.attr(&TTL, &dir_attr_for(inode)),
         _ => reply.error(libc::ENOENT),
       },
-    }
+    })
   }
 
   // TODO: Find out whether fh is ever passed if open isn't explicitly implemented (and whether offset is ever negative)
@@ -533,53 +537,56 @@ impl fuse::Filesystem for BuildResultFS {
     size: u32,
     reply: fuse::ReplyData,
   ) {
-    match self.inode_digest_cache.get(&inode) {
-      Some(&InodeDetails {
-        digest,
-        entry_type: EntryType::File,
-        ..
-      }) => {
-        let reply = Arc::new(Mutex::new(Some(reply)));
-        let reply2 = reply.clone();
-        // TODO: Read from a cache of Futures driven from a CPU pool, so we can merge in-flight
-        // requests, rather than reading from the store directly here.
-        let result: Result<(), ()> = self
-          .runtime
-          .block_on(
-            self
-              .store
-              .load_file_bytes_with(
-                digest,
-                move |bytes| {
-                  let begin = std::cmp::min(offset as usize, bytes.len());
-                  let end = std::cmp::min(offset as usize + size as usize, bytes.len());
-                  let mut reply = reply.lock();
-                  reply.take().unwrap().data(&bytes.slice(begin, end));
-                },
-                WorkUnitStore::new(),
-              )
-              .compat(),
-          )
-          .map(|v| {
-            if v.is_none() {
+    let runtime = self.runtime.clone();
+    runtime.enter(|| {
+      match self.inode_digest_cache.get(&inode) {
+        Some(&InodeDetails {
+          digest,
+          entry_type: EntryType::File,
+          ..
+        }) => {
+          let reply = Arc::new(Mutex::new(Some(reply)));
+          let reply2 = reply.clone();
+          // TODO: Read from a cache of Futures driven from a CPU pool, so we can merge in-flight
+          // requests, rather than reading from the store directly here.
+          let result: Result<(), ()> = self
+            .runtime
+            .block_on(
+              self
+                .store
+                .load_file_bytes_with(
+                  digest,
+                  move |bytes| {
+                    let begin = std::cmp::min(offset as usize, bytes.len());
+                    let end = std::cmp::min(offset as usize + size as usize, bytes.len());
+                    let mut reply = reply.lock();
+                    reply.take().unwrap().data(&bytes.slice(begin, end));
+                  },
+                  WorkUnitStore::new(),
+                )
+                .compat(),
+            )
+            .map(|v| {
+              if v.is_none() {
+                let maybe_reply = reply2.lock().take();
+                if let Some(reply) = maybe_reply {
+                  reply.error(libc::ENOENT);
+                }
+              }
+            })
+            .or_else(|err| {
+              error!("Error loading bytes for {:?}: {}", digest, err);
               let maybe_reply = reply2.lock().take();
               if let Some(reply) = maybe_reply {
-                reply.error(libc::ENOENT);
+                reply.error(libc::EINVAL);
               }
-            }
-          })
-          .or_else(|err| {
-            error!("Error loading bytes for {:?}: {}", digest, err);
-            let maybe_reply = reply2.lock().take();
-            if let Some(reply) = maybe_reply {
-              reply.error(libc::EINVAL);
-            }
-            Ok(())
-          });
-        result.expect("Error from read future which should have been handled in the future ");
+              Ok(())
+            });
+          result.expect("Error from read future which should have been handled in the future ");
+        }
+        _ => reply.error(libc::ENOENT),
       }
-      _ => reply.error(libc::ENOENT),
-    }
+    })
   }
 
   fn readdir(
@@ -591,23 +598,26 @@ impl fuse::Filesystem for BuildResultFS {
     offset: i64,
     mut reply: fuse::ReplyDirectory,
   ) {
-    match self.readdir_entries(inode) {
-      Ok(entries) => {
-        // 0 is a magic offset which means no offset, whereas a non-zero offset means start
-        // _after_ that entry. Inconsistency is fun.
-        let to_skip = if offset == 0 { 0 } else { offset + 1 } as usize;
-        let mut i = offset;
-        for entry in entries.into_iter().skip(to_skip) {
-          if reply.add(entry.inode, i, entry.kind, entry.name) {
-            // Buffer is full, don't add more entries.
-            break;
+    let runtime = self.runtime.clone();
+    runtime.enter(|| {
+      match self.readdir_entries(inode) {
+        Ok(entries) => {
+          // 0 is a magic offset which means no offset, whereas a non-zero offset means start
+          // _after_ that entry. Inconsistency is fun.
+          let to_skip = if offset == 0 { 0 } else { offset + 1 } as usize;
+          let mut i = offset;
+          for entry in entries.into_iter().skip(to_skip) {
+            if reply.add(entry.inode, i, entry.kind, entry.name) {
+              // Buffer is full, don't add more entries.
+              break;
+            }
+            i += 1;
           }
-          i += 1;
+          reply.ok();
         }
-        reply.ok();
+        Err(err) => reply.error(err),
       }
-      Err(err) => reply.error(err),
-    }
+    })
   }
 
   // If this isn't implemented, OSX will try to manipulate ._ files to manage xattrs out of band, which adds both overhead and logspam.
@@ -618,7 +628,10 @@ impl fuse::Filesystem for BuildResultFS {
     _size: u32,
     reply: fuse::ReplyXattr,
   ) {
-    reply.size(0);
+    let runtime = self.runtime.clone();
+    runtime.enter(|| {
+      reply.size(0);
+    })
   }
 }
 

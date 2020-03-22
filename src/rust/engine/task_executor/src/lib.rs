@@ -31,19 +31,25 @@ use futures::future::{BoxFuture, FutureExt};
 
 use tokio::runtime::{Handle, Runtime};
 
-///
-/// NB: This struct does not currently hold any state (because tokio's runtime is thread-local),
-/// but it has in the past, and it might in the future. We leave it here to minimize refactoring
-/// churn until we're fully ported to stdlib Future.
-///
 #[derive(Clone)]
-pub struct Executor;
+pub struct Executor {
+  handle: Handle,
+}
 
 impl Executor {
-  pub fn new(_handle: Handle) -> Executor {
-    // We don't actually hold a Handle: we just request one to ensure that a Runtime has been
-    // started, and push error handling to callers.
-    Executor
+  pub fn new(handle: Handle) -> Executor {
+    Executor { handle }
+  }
+
+  ///
+  /// Enter the runtime context associated with this Executor. This should be used in situations
+  /// where threads not started by the runtime need access to it via task-local variables.
+  ///
+  pub fn enter<F, R>(&self, f: F) -> R
+  where
+    F: FnOnce() -> R,
+  {
+    self.handle.enter(f)
   }
 
   ///
