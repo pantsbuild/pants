@@ -8,7 +8,6 @@ java_library(
     '3rdparty:ivy',
     'src/java/org/pantsbuild/args4j'
   ],
-  platform='java7',
   provides=artifact(
     org='org.pantsbuild',
     name='ivy-dependency-update-checker',
@@ -26,5 +25,4 @@ jvm_binary(
   dependencies=[
     ':ivy-dependency-update-checker',
   ],
-  platform='java7',
 )

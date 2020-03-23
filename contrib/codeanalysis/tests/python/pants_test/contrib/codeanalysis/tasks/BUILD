@@ -4,10 +4,11 @@
 
 python_tests(
   name = 'integration',
-  sources = globs('*_integration.py'),
+  sources = ['*_integration.py'],
   dependencies=[
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
+    'examples/src/java/org/pantsbuild/example:hello_directory',
   ],
-  tags={'integration'},
-  timeout=180,
+  tags={'integration', 'partially_type_checked'},
+  timeout=240,
 )

@@ -6,18 +6,14 @@ python_tests(
   name = 'markdown_to_html',
   sources = ['test_markdown_to_html.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python:beautifulsoup4',
-    '3rdparty/python:mock',
     'src/python/pants/backend/docgen/targets',
     'src/python/pants/backend/docgen/tasks',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil:task_test_base',
   ],
-  coverage = [
-    'pants.backend.docgen.tasks.markdown_to_html',
-  ]
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -26,11 +22,8 @@ python_tests(
   dependencies = [
     'src/python/pants/base:build_environment',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:int-test',
-    'tests/python/pants_test/testutils:py2_compat',
+    'src/python/pants/testutil:int-test',
+    'testprojects/src/java/org/pantsbuild/testproject:page_directory',
   ],
-  coverage = [
-    'pants.backend.docgen.tasks.markdown_to_html',
-  ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )

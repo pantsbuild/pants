@@ -3,8 +3,6 @@
 
 python_library(
   dependencies = [
-    '3rdparty/python:future',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/codegen/thrift/lib',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/base:exceptions',
@@ -14,4 +12,5 @@ python_library(
     'src/python/pants/subsystem',
     'src/python/pants/task',
   ],
+  tags = {"partially_type_checked"},
 )

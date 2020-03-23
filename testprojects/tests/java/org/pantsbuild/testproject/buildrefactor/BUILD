@@ -3,19 +3,23 @@
 
 java_library(
     name = "X",
+    sources = [],
 )
 
 java_library(
     name = "A",
+    sources = [],
     dependencies = [":X"],
 )
 
 java_library(
     name = "B",
+    sources = [],
     dependencies = [":X"],
 )
 
 java_library(
     name = "C",
+    sources = [],
     dependencies = [":X"],
 )

@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.goal.task_registrar import TaskRegistrar as task
@@ -26,29 +23,32 @@ from pants.contrib.go.tasks.go_thrift_gen import GoThriftGen
 
 
 def build_file_aliases():
-  return BuildFileAliases(
-    targets={
-      GoBinary.alias(): TargetMacro.Factory.wrap(GoBinary.create, GoBinary),
-      GoLibrary.alias(): TargetMacro.Factory.wrap(GoLibrary.create, GoLibrary),
-      GoProtobufLibrary.alias(): GoProtobufLibrary,
-      GoThriftLibrary.alias(): GoThriftLibrary,
-      'go_remote_libraries': TargetMacro.Factory.wrap(GoRemoteLibrary.from_packages,
-                                                      GoRemoteLibrary),
-      'go_remote_library': TargetMacro.Factory.wrap(GoRemoteLibrary.from_package, GoRemoteLibrary),
-    }
-  )
+    return BuildFileAliases(
+        targets={
+            GoBinary.alias(): TargetMacro.Factory.wrap(GoBinary.create, GoBinary),
+            GoLibrary.alias(): TargetMacro.Factory.wrap(GoLibrary.create, GoLibrary),
+            GoProtobufLibrary.alias(): GoProtobufLibrary,
+            GoThriftLibrary.alias(): GoThriftLibrary,
+            "go_remote_libraries": TargetMacro.Factory.wrap(
+                GoRemoteLibrary.from_packages, GoRemoteLibrary
+            ),
+            "go_remote_library": TargetMacro.Factory.wrap(
+                GoRemoteLibrary.from_package, GoRemoteLibrary
+            ),
+        }
+    )
 
 
 def register_goals():
-  task(name='go-thrift', action=GoThriftGen).install('gen')
-  task(name='go-protobuf', action=GoProtobufGen).install('gen')
-  task(name='go', action=GoBuildgen).install('buildgen')
-  task(name='go', action=GoGo).install('go')
-  task(name='go-env', action=GoEnv).install()
-  task(name='go', action=GoFetch).install('resolve')
-  task(name='go', action=GoCompile).install('compile')
-  task(name='go', action=GoBinaryCreate).install('binary')
-  task(name='go', action=GoRun).install('run')
-  task(name='go', action=GoCheckstyle).install('lint')
-  task(name='go', action=GoTest).install('test')
-  task(name='go', action=GoFmt).install('fmt')
+    task(name="go-thrift", action=GoThriftGen).install("gen")
+    task(name="go-protobuf", action=GoProtobufGen).install("gen")
+    task(name="go", action=GoBuildgen).install("buildgen")
+    task(name="go", action=GoGo).install("go")
+    task(name="go-env", action=GoEnv).install()
+    task(name="go", action=GoFetch).install("resolve")
+    task(name="go", action=GoCompile).install("compile")
+    task(name="go", action=GoBinaryCreate).install("binary")
+    task(name="go", action=GoRun).install("run")
+    task(name="go", action=GoCheckstyle).install("lint")
+    task(name="go", action=GoTest).install("test")
+    task(name="go", action=GoFmt).install("fmt")

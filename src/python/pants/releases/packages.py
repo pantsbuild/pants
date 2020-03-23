@@ -1,23 +1,18 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import argparse
 import json
 import os
+import subprocess
 import sys
-from builtins import object
 from collections import defaultdict
 from configparser import ConfigParser
-from distutils.util import get_platform
 from functools import total_ordering
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
 
-import subprocess32 as subprocess
 from bs4 import BeautifulSoup
-from future.moves.urllib.error import HTTPError
-from future.moves.urllib.request import Request, urlopen
 
 
 COLOR_BLUE = "\x1b[34m"
@@ -29,14 +24,12 @@ def banner(message):
 
 
 @total_ordering
-class Package(object):
+class Package:
 
   def __init__(self, name, target, bdist_wheel_flags=None):
     self.name = name
     self.target = target
-    # Update the --python-tag default in lockstep with other changes as described in
-    #   https://github.com/pantsbuild/pants/issues/6450
-    self.bdist_wheel_flags = bdist_wheel_flags or ("--python-tag", "py27")
+    self.bdist_wheel_flags = bdist_wheel_flags or ("--python-tag", "py36.py37")
 
   def __lt__(self, other):
     return self.name < other.name
@@ -45,7 +38,7 @@ class Package(object):
     return self.name == other.name
 
   def __hash__(self):
-    return super(Package, self).__hash__()
+    return super().__hash__()
 
   def __str__(self):
     return self.name
@@ -69,34 +62,28 @@ class Package(object):
     j = json.load(f)
     return j["info"]["version"]
 
-  def owners(self,
-             html_node_type='a',
-             html_node_class='sidebar-section__user-gravatar',
-             html_node_attr='aria-label'):
+  def owners(self):
     url = "https://pypi.org/pypi/{}/{}".format(self.name, self.latest_version())
     url_content = urlopen(url).read()
     parser = BeautifulSoup(url_content, 'html.parser')
-    owners = [
-      item.attrs[html_node_attr]
-      for item
-      in parser.find_all(html_node_type, class_=html_node_class)
-    ]
-    return {owner.lower() for owner in owners}
+    owners = {span.find('a', recursive=False).get_text().strip().lower()
+              for span in parser.find_all('span', class_='sidebar-section__maintainer')}
+    return owners
 
 
-def find_platform_name():
-  # See: https://www.python.org/dev/peps/pep-0425/#id13
-  return get_platform().replace("-", "_").replace(".", "_")
-
-
-core_packages = {
-  Package(
-    "pantsbuild.pants",
-    "//src/python/pants:pants-packaged",
-    bdist_wheel_flags=("--python-tag", "cp27", "--plat-name", find_platform_name()),
-  ),
-  Package("pantsbuild.pants.testinfra", "//tests/python/pants_test:test_infra"),
-}
+def core_packages():
+  # N.B. We constrain the ABI (Application Binary Interface) to cp36 to allow pantsbuild.pants to
+  # work with any Python 3 version>= 3.6. We are able to get this future compatibility by specifying
+  # `abi3`, which signifies any version >= 3.6 must work. This is possible to set because in
+  # `src/rust/engine/src/cffi/native_engine.c` we set up `Py_LIMITED_API` and in `src/python/pants/BUILD` we
+  # set ext_modules, which together allows us to mark the abi tag. See https://docs.python.org/3/c-api/stable.html
+  # for documentation and https://bitbucket.org/pypa/wheel/commits/1f63b534d74b00e8c2e8809f07914f6da4502490?at=default#Ldocs/index.rstT121
+  # for how to mark the ABI through bdist_wheel.
+  bdist_wheel_flags = ("--py-limited-api", "cp36")
+  return {
+    Package("pantsbuild.pants", "//src/python/pants:pants-packaged", bdist_wheel_flags=bdist_wheel_flags),
+    Package("pantsbuild.pants.testutil", "//src/python/pants/testutil:testutil_wheel"),
+  }
 
 
 def contrib_packages():
@@ -170,11 +157,15 @@ def contrib_packages():
       "pantsbuild.pants.contrib.googlejavaformat",
       "//contrib/googlejavaformat/src/python/pants/contrib/googlejavaformat:plugin",
     ),
+    Package(
+      "pantsbuild.pants.contrib.awslambda_python",
+      "//contrib/awslambda/python/src/python/pants/contrib/awslambda/python:plugin",
+    ),
   }
 
 
 def all_packages():
-  return core_packages.union(contrib_packages())
+  return core_packages().union(contrib_packages())
 
 
 def build_and_print_packages(version):
@@ -183,9 +174,10 @@ def build_and_print_packages(version):
     packages_by_flags[package.bdist_wheel_flags].append(package)
 
   for (flags, packages) in packages_by_flags.items():
-    args = ("./pants", "-q", "setup-py", "--run=bdist_wheel {}".format(" ".join(flags))) + tuple(package.target for package in packages)
+    args = ("./pants", "setup-py", "--run=bdist_wheel {}".format(" ".join(flags))) + tuple(package.target for package in packages)
     try:
-      subprocess.check_call(args)
+      # We print stdout to stderr because release.sh is expecting stdout to only be package names.
+      subprocess.run(args, stdout=sys.stderr, check=True)
       for package in packages:
         print(package.name)
     except subprocess.CalledProcessError:

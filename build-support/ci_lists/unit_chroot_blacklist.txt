@@ -1,0 +1,1 @@
+contrib/python/tests/python/pants_test/contrib/python/checks/tasks/checkstyle:checkstyle

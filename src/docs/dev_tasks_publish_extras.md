@@ -9,32 +9,34 @@ that contains some metadata -- code coverage info, source git
 repository, java version that created the jar, etc. To accomplish this,
 you'll first need to write a custom task, which creates any additional
 files (jar or otherwise) that you would like to publish. Next, you'll
-create a `publish_extras` section under `[publish.jar]` in pants.ini,
+create a `publish_extras` section under `[publish.jar]` in pants.toml,
 and add a key for the new product type. Your custom task will create the
 extra file(s) that you want to publish, and write the path to the
-products map under the key that you have defined in pants.ini. The
-publishing code will loop over all keys found in pants.ini, and consult
+products map under the key that you have defined in pants.toml. The
+publishing code will loop over all keys found in pants.toml, and consult
 the product map. If pants finds a file for the current key, it will
 gather it up, and bundle it in with the rest of the files being
 published.
 
 An example of a custom task is supplied in the
 `examples/src/python/example/pants_publish_plugin` directory. To use it,
-add the following to your pants.ini:
+add the following to your pants.toml:
 
     [publish.jar]
-    publish_extras: {
-        'extra_test_jar_example': {
-          'override_name': '{target_provides_name}-extra_example',
-          'classifier': 'classy',
-          'extension': 'jar',
-        },
-      }
+    publish_extras = """
+    {
+      'extra_test_jar_example': {
+        'override_name': '{target_provides_name}-extra_example',
+        'classifier': 'classy',
+        'extension': 'jar',
+      },
+    }
+    """
 
     [GLOBAL]
-    backend_packages: [
-        'example.pants_publish_plugin',
-      ]
+    backend_packages = [
+      'example.pants_publish_plugin',
+    ]
 
 In the above configuration example, the string
 `'extra_test_jar_example'` is a key into the product map. In this case,
@@ -53,7 +55,7 @@ By default, pants uses the following scheme when publishing artifacts:
 The pants plugin publishing system allows a customization of the
 artifact identifier, classifier, and file extension. To customize the
 name of your extra object, you can supply some extra parameters in the
-`pants.ini` file:
+`pants.toml` file:
 
 +   `override_name` -- allows customization of the name (`artifactId`)
     of the additional file published. Specifying a string will
@@ -67,7 +69,7 @@ name of your extra object, you can supply some extra parameters in the
 
 **Note:** You must supply a non-default value for at least one of the
 above parameters, otherwise your extra publish artifact won't have a
-unique name. With the above config in your pants.ini, invoke pants like
+unique name. With the above config in your pants.toml, invoke pants like
 this, to do a test publish:
 
     :::bash

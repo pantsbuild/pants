@@ -3,10 +3,8 @@
 
 
 python_tests(
-  sources=rglobs('*.py'),
   dependencies = [
-    '3rdparty/python:future',
-    '3rdparty/python:mock',
+    '3rdparty/python:dataclasses',
     '3rdparty/python:parameterized',
     '3rdparty/python:pex',
     '3rdparty/python:setuptools',
@@ -20,13 +18,15 @@ python_tests(
     'src/python/pants/init',
     'src/python/pants/option',
     'src/python/pants/pantsd:pants_daemon',
+    'src/python/pants/python',
     'src/python/pants/subsystem',
+    'src/python/pants/testutil/engine:util',
+    'src/python/pants/testutil/subsystem',
+    'src/python/pants/testutil:interpreter_selection_utils',
+    'src/python/pants/testutil:test_base',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:objects',
-    'tests/python/pants_test:test_base',
-    'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test/testutils:py2_compat',
+    'src/python/pants/util:logging',
   ],
-  coverage = ['pants.init'],
+  tags = {"partially_type_checked"},
 )

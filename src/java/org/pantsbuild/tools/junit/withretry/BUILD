@@ -14,5 +14,4 @@ java_library(
     '3rdparty:junit',
     'src/java/org/pantsbuild/tools/junit:security-manager'
   ],
-  platform='java7',
 )

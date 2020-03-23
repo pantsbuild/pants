@@ -6,4 +6,5 @@ python_library(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:payload',
   ],
+  tags = {"partially_type_checked"},
 )

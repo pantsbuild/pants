@@ -1,0 +1,40 @@
+[package]
+name = "store"
+version = "0.1.0"
+authors = ["Daniel Wagner-Hall <dwagnerhall@twitter.com>"]
+edition = "2018"
+
+[dependencies]
+bazel_protos = { path = "../../process_execution/bazel_protos" }
+boxfuture = { path = "../../boxfuture" }
+bytes = "0.4.5"
+concrete_time = { path = "../../concrete_time" }
+digest = "0.8"
+dirs = "1"
+fs = { path = ".." }
+futures01 = { package = "futures", version = "0.1" }
+futures = { version = "0.3", features = ["compat"] }
+grpcio = { git = "https://github.com/pantsbuild/grpc-rs.git", rev = "b582ef3dc4e8c7289093c8febff8dadf0997b532", default_features = false, features = ["protobuf-codec", "secure"] }
+hashing = { path = "../../hashing" }
+indexmap = "1.0.2"
+itertools = "0.7.2"
+lmdb = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "06bdfbfc6348f6804127176e561843f214fc17f8" }
+log = "0.4"
+parking_lot = "0.6"
+protobuf = { version = "2.0.6", features = ["with-bytes"] }
+serverset = { path = "../../serverset" }
+sha2 = "0.8"
+serde = "1.0"
+serde_derive = "1.0"
+sharded_lmdb = { path = "../../sharded_lmdb" }
+task_executor = { path = "../../task_executor" }
+tempfile = "3"
+uuid = { version = "0.7.1", features = ["v4"] }
+workunit_store = {path = "../../workunit_store" }
+
+[dev-dependencies]
+maplit = "*"
+mock = { path = "../../testutil/mock" }
+testutil = { path = "../../testutil" }
+tokio = { version = "0.2", features = ["rt-core", "macros"] }
+walkdir = "2"

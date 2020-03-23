@@ -8,6 +8,7 @@ contrib_plugin(
     'contrib/python/src/python/pants/contrib/python/checks/tasks/checkstyle',
     'src/python/pants/goal:task_registrar',
   ],
+  tags = {'partially_type_checked'},
   distribution_name='pantsbuild.pants.contrib.python.checks',
   description='Additional python lints and checks.',
   register_goals=True,

@@ -17,30 +17,31 @@ However, in many cases the server expects you to provide credentials to an authe
 in exchange for a session id, and then provide that session id in subsequent requests to the other endpoints.
 
 In the latter case, you can perform that authentication using the `login` goal, and specifying the 
-provider you're authenticating against, either with the `--to` option or with a passthru arg:
+provider you're authenticating against with the `--to` option:
 
 ```bash
 $ ./pants login --to=myauthprovider
-$ ./pants login -- myauthprovider
 ```
 
 This submits credentials from `.netrc` to the provider's authentication endpoint using HTTP basic auth, 
 and stores all returned cookies (which, presumably, include the session id), for future use with the other 
 endpoints.
 
-In the future the `login` goal will optionally prompt for a username and password, allowing you to
+In the future, the `login` goal will optionally prompt for a username and password, allowing you to
 bypass `.netrc` altogether.
 
 
 ## Required Configuration
 
-The named provider must be configured. E.g., in `pants.ini` you'd have:
+The named provider must be configured. E.g., in `pants.toml` you'd have:
 
-```ini
+```toml
 [basic_auth]
-providers = {
-    'myauthprovider': {
-      'url': 'https://myauthprovider.com/path/to/authentication/endpoint'
-    }
+providers = """
+{
+  'myauthprovider': {
+    'url': 'https://myauthprovider.com/path/to/authentication/endpoint'
   }
+}
+"""
 ```

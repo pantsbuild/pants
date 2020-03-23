@@ -1,0 +1,28 @@
+[package]
+version = "0.0.1"
+edition = "2018"
+name = "engine_cffi"
+authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+engine = { path = ".." }
+futures01 = { package = "futures", version = "0.1" }
+futures = { version = "0.3", features = ["compat"] }
+hashing = { path = "../hashing" }
+log = "0.4"
+logging = { path = "../logging" }
+rule_graph = { path = "../rule_graph" }
+store = { path = "../fs/store" }
+tar_api = { path = "../tar_api" }
+tempfile = "3"
+workunit_store = { path = "../workunit_store" }
+
+[build-dependencies]
+build_utils = { path = "../build_utils" }
+cbindgen = "0.8.6"
+cc = "1.0"
+walkdir = "2"

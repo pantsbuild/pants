@@ -3,3 +3,8 @@
 /*/**/Cargo.lock
 !fs/fs_util/Cargo.lock
 !process_executor/Cargo.lock
+engine_cffi/logs/
+engine_cffi/src/cffi/
+# These modules contain purely generated code.
+process_execution/bazel_protos/src/gen/
+process_execution/bazel_protos/src/gen_for_tower/

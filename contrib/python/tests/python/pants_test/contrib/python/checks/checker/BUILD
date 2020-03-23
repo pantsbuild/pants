@@ -4,21 +4,21 @@
 python_library(
   name='lib',
   dependencies = [
-    '3rdparty/python:future',
     'contrib/python/src/python/pants/contrib/python/checks/checker',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/option/util',
+    'src/python/pants/testutil/option',
   ],
+  tags = {'partially_type_checked'},
 )
 
 python_tests(
   dependencies=[
-    '3rdparty/python:future',
     ':lib',
     'contrib/python/src/python/pants/contrib/python/checks/checker',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/option/util',
-    'tests/python/pants_test:test_base',
-  ]
+    'src/python/pants/testutil/option',
+    'src/python/pants/testutil:test_base',
+  ],
+  tags = {'partially_type_checked'},
 )

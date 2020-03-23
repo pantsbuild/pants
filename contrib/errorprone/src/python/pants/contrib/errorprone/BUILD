@@ -11,4 +11,5 @@ contrib_plugin(
   distribution_name='pantsbuild.pants.contrib.errorprone',
   description='Error Prone pants plugin',
   register_goals=True,
+  tags = {"partially_type_checked"},
 )

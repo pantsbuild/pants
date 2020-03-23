@@ -39,7 +39,7 @@ Relevant Goals and Targets
 > <a pantsref="bdict_python_requirement_library">`python_requirement_library`</a>
 > and a
 > <a pantsref="bdict_python_requirement">`python_requirement`</a> to refer to
-> the code. To use several several of these via a `pip`-style
+> the code. To use several of these via a `pip`-style
 > `requirements.txt` file, use a
 > <a pantsref="bdict_python_requirements">`python_requirements`</a>.
 > For details, see [[Python 3rdparty Pattern|pants('examples/src/python/example:3rdparty_py')]].
@@ -65,11 +65,11 @@ an interpreter (e.g.: `CPython`, `PyPy`) and version constraint, and that a list
 may be specified.
 
 The most common approach is to configure interpreter constraints for your whole repo.
-For example, to use python3 for the whole repo, update `pants.ini` as follows:
+For example, to use python3 for the whole repo, update `pants.toml` as follows:
 
-```ini
+```toml
 [python-setup]
-interpreter_constraints: ["CPython>=3.5"]
+interpreter_constraints = ["CPython>=3.5"]
 ```
 
 If you require more granularity, the `compatibility` parameter may be specified on
@@ -129,7 +129,7 @@ run the PEX:
 You can also run the binary "from source" with the `run` goal:
 
     :::bash
-    $ ./pants run.py --args='Whirled' examples/src/python/example/hello/main
+    $ ./pants run.py examples/src/python/example/hello/main -- 'Whirled'
          ...much output...
     14:32:01 00:00     [py]
     14:32:02 00:01       [run]
@@ -394,7 +394,7 @@ Pants runs Python tests with `pytest`. You can pass CLI options to `pytest` with
 you could run:
 
     :::bash
-    $ ./pants test.pytest --options='-k foo' examples/tests/python/example_test/hello/greet
+    $ ./pants test.pytest --options='-k req' examples/tests/python/example_test/hello/greet
     ...
                      ============== test session starts ===============
                      platform linux2 -- Python 2.7.12, pytest-3.0.7, py-1.4.32, pluggy-0.4.0
@@ -512,20 +512,20 @@ passed to the `setup` function.
 
     :::python
     python_library(
-      name='test_infra',
+      name='testutil_wheel',
       dependencies=[
-        'tests/python/pants_test:base_test',
+        ':base_test',
         ...
       ],
       provides=setup_py(
-        name='pantsbuild.pants.testinfra',
+        name='pantsbuild.pants.testutil',
         version='0.0.24',
         description='Test support for writing pants plugins.',
         long_description='''A much longer description of this package. Pages and pages!''',
         url='https://github.com/pantsbuild/pants',
         license='Apache License, Version 2.0',
         zip_safe=True,
-        namespace_packages=['pants_test'],
+        namespace_packages=['pants.testutil'],
         classifiers=[
           'Intended Audience :: Developers',
           'License :: OSI Approved :: Apache Software License',
@@ -541,7 +541,7 @@ passed to the `setup` function.
 The <a pantsref="oref_goal_setup-py">`setup-py`</a> goal builds a package from such a target:
 
     :::bash
-    $ ./pants setup-py src/python/pants:test_infra
+    $ ./pants setup-py src/python/pants/testutil:testutil_wheel
     10:23:06 00:00 [main]
                    (To run a reporting server: ./pants server)
     10:23:07 00:01   [bootstrap]
@@ -550,8 +550,8 @@ The <a pantsref="oref_goal_setup-py">`setup-py`</a> goal builds a package from s
                    Executing tasks in goals: setup-py
     10:23:07 00:01   [setup-py]
     10:23:07 00:01     [setup-py]
-                       Running packager against /Users/you/workspace/pants/dist/pantsbuild.pants.testinfra-0.0.24
-                       Writing /Users/you/workspace/pants/dist/pantsbuild.pants.testinfra-0.0.24.tar.gz
+                       Running packager against /Users/you/workspace/pants/dist/pantsbuild.pants.testutil-0.0.24
+                       Writing /Users/you/workspace/pants/dist/pantsbuild.pants.testutil-0.0.24.tar.gz
                    SUCCESS
 
 

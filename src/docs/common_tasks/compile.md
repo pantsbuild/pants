@@ -9,7 +9,7 @@ You need to compile a JVM binary or library target that you're working on, e.g. 
 The `compile` goal enables you to compile Scala or Java [[binaries|]] and libraries. Here's an example:
 
     :::bash
-    $ ./pants compile examples/src/scala/org/pantsbuild/hello/exe:exe
+    $ ./pants compile src/scala/com/myorg/myproject/hello/exe:exe
 
 
 The `compile` goal requires you to target a `BUILD` file containing either a `java_library`, `scala_library`, `java_binary` or `scala_binary` target. For the CLI example above, the target `BUILD` file might look something like this:
@@ -17,7 +17,7 @@ The `compile` goal requires you to target a `BUILD` file containing either a `ja
     :::python
     jvm_binary(
       dependencies=[
-        'examples/src/scala/org/pantsbuild/example/hello/welcome:welcome',
+        'src/scala/com/myorg/myproject/example/hello/welcome:welcome',
       ],
       source='Exe.scala',
       main='org.pantsbuild.example.hello.exe.Exe',

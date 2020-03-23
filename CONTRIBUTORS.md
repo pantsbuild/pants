@@ -4,11 +4,13 @@ Created by running `./build-support/bin/contributors.sh`.
 + Adam Chainz
 + Alan Paulin
 + Alan Velasco
++ Alex Schmitt
 + Alexander Johnson
 + Alyssa Pohahau
 + Andrew Hamilton
 + Andy Reitz
 + Antoine Tollenaere
++ Asher Foa
 + Bardur Arantsson
 + Benjy Weinberger
 + Bill Farner
@@ -28,6 +30,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Christopher Livingston
 + Cody Gibb
 + Craig Schertz
++ Damon Revoe
 + Dan Davydov
 + Dan Fabulich
 + Dan Harrison
@@ -46,6 +49,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Dorothy Ordogh
 + Drew Rothstein
 + Dumitru Daniliuc
++ Dylan Herman
 + Ebube Chuba
 + Eitan Adler
 + Ekaterina Tyurina
@@ -56,14 +60,17 @@ Created by running `./build-support/bin/contributors.sh`.
 + Eric Lindvall
 + Eugene Burmako
 + Evan Jones
++ Fatin H
 + Fedor Korotkov
 + Fiona Condone
 + Florian Leibert
 + Gabriel Gonzalez
 + Garrett Malmquist
 + Gary M. Josack
++ Greg Shuflin
 + Guy Marom
 + Harley Cooper
++ Henry Fuller
 + Hwasung Lee
 + Ian Tabolt
 + Igor Morozov
@@ -100,6 +107,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Joshua Humphries
 + Justin Trobec
 + Karin Lundberg
++ Kaushik Srenevasan
 + Ken Kawamoto
 + Kevin Oliver
 + Kevin Sweeney
@@ -117,6 +125,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Lukasz Jastrzebski
 + Marc Abramowitz
 + Marcin Podolski
++ Marek Żarnowski
 + Marilyn Cruz
 + Marius Eriksen
 + Mark Chu-Carroll
@@ -130,10 +139,14 @@ Created by running `./build-support/bin/contributors.sh`.
 + Matt Olsen
 + Matthew Jeffryes
 + Maxim Khutornenko
++ Maxim Popenko
 + Michael Doherty
++ Michal Bryc
 + Mike Cripps
 + Mike Lindsey
++ Mike Solomon
 + Misho Krastev
++ Mohamed Abdi
 + Moses Nakamura
 + Nadav Samet
 + Neil Sanchala
@@ -149,21 +162,27 @@ Created by running `./build-support/bin/contributors.sh`.
 + Pall Valmundsson
 + Pankaj Gupta
 + Patrick Lawson
++ Patrick Liu
 + Paul Groudas
 + Paul Yau
 + Peiyu Wang
 + Peter Seibel
++ Pierre Chevalier
 + Qicheng Ma
 + Robert Stapenhurst
 + Roger Jiang
++ Rushal Verma
 + Ryan Williams
++ Sameer Arora
 + Sameer Brenn
 + Sara Solano
 + Senthil Kumaran
++ SergeKireev
 + Sergey Serebryakov
 + Shane Delmore
 + Shuo Li
 + Simeon Franklin
++ Srikanth Kotagiri
 + Stefan Sauer
 + Stephan Erb
 + Stu Hood
@@ -178,12 +197,17 @@ Created by running `./build-support/bin/contributors.sh`.
 + Todd Stumpf
 + Tom Dyas
 + Tom Howland
++ Tomasz Godzik
++ Tomasz Pasternak
 + Travis Crawford
 + Troy Howard
 + Ugo Di Girolamo
 + Wei An
 + Wilhelmina Drengwitz
++ Win Wang
 + Wolfram Arnold
 + Xaelias
 + Yi Cheng
 + Yujie Chen
++ billybecker
++ Ólafur Páll Geirsson

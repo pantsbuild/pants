@@ -17,11 +17,11 @@ Pants "bootstrap" itself, downloading and compiling things it needs:
 Now you're ready to invoke pants for more useful things.
 
 You invoke pants with *goals* (like `test` or `bundle`) and the *targets* to use (like
-`examples/tests/java/org/pantsbuild/example/hello/greet:greet`). For
+`src/python/myproject/example:tests`). For
 example,
 
     :::bash
-    $ ./pants test examples/tests/java/org/pantsbuild/example/hello/greet:greet
+    $ ./pants test src/python/myproject/example:tests
 
 Goals (the "verbs" of Pants) produce new files from targets (the "nouns").
 
@@ -40,7 +40,7 @@ Pants knows about goals ("verbs" like `bundle` and `test`) and targets
 invocation looks like
 
     :::bash
-    $ ./pants test examples/tests/java/org/pantsbuild/example/hello/greet:greet
+    $ ./pants test src/python/myproject/example:tests
 
 Looking at the pieces of this we see
 
@@ -62,7 +62,7 @@ example, before it run tests, it must compile the code.
 You can specify more than one goal on a command line. E.g., to run
 tests *and* run a binary, we could have said `./pants test run ...`
 
-`examples/tests/java/org/pantsbuild/example/hello/greet:greet`<br>
+`src/python/myproject/example:tests`<br>
 This is a *build target*, a "build-able" thing in your source code. To
 define these, you set up configuration files named `BUILD` in your
 source code file tree. (You'll see more about these later.)
@@ -125,7 +125,7 @@ tell Pants to "fail fast" on the first `junit` test failure instead of running a
 `junit` tests like so:
 
     :::bash
-    $ ./pants test.junit --fail-fast examples/tests/java/org/pantsbuild/example/hello/greet:greet
+    $ ./pants test.junit --fail-fast src/java/com/myorg/myproject/example/hello:tests
 
 Here, `test` has become `test.junit`. The `test` goal is made up of parts, or *tasks*: `test.junit`,
 `test.pytest`, and `test.specs`. We want to specify a flag to the `test.junit` task, so we
@@ -138,16 +138,16 @@ for a goal or task go immediately after that goal or task.
 You can specify options for more than one part of a goal. For example,
 
     :::bash
-    $ ./pants test.junit --fail-fast test.pytest --options='-k seq' examples/tests::
+    $ ./pants test.junit --fail-fast test.pytest --no-fail-fast src/java:: src/python::
 
-Here, the `--fail-fast` flag affects `test.junit` and `--options` affects `test.pytest`.
+Here, the `--fail-fast` flag affects `test.junit` and `--no-fail-fast` affects `test.pytest`.
 
 Pants has some global options, options not associated with just one goal. For example,
 If you pass the global `-ldebug` flag after the word `goal` but before any particular goal or
 task, you get verbose debug-level logging for all goals:
 
     :::bash
-    $ ./pants -ldebug test examples/tests/java/org/pantsbuild/example/hello/greet:
+    $ ./pants -ldebug test src/java/myproject/example/hello:tests
     09:18:53 00:00 [main]
                    (To run a reporting server: ./pants server)
     09:18:53 00:00   [bootstrap]
@@ -209,20 +209,20 @@ If you want help diagnosing some strange Pants behavior, you might want verbose 
 To get this, instead of just invoking `./pants`, set some environment variables and request
 more logging: `PEX_VERBOSE=5 ./pants -ldebug`.
 
-### pants.ini
+### pants.toml
 
 Pants allows you to also specify options in a config file. If you want to always run pants
-with a particular option, you can configure it in a file at the root of the repo named `pants.ini`
+with a particular option, you can configure it in a file at the root of the repo named `pants.toml`
 
-    :::ini
+    :::toml
     [default]
-    jvm_options: ["-Xmx1g", "-Dfile.encoding=UTF8"]
+    jvm_options = ["-Xmx1g", "-Dfile.encoding=UTF8"]
 
     [test.junit]
-    fail-fast: True
+    fail-fast = true
 
-For more information on the `pants.ini` file format, see
-[[Invoking Pants|pants('src/docs:invoking')]].
+For more information on the `pants.toml` file format, see
+[[Options|pants('src/docs:options')]].
 
 BUILD Files
 -----------
@@ -262,10 +262,10 @@ A target definition in a `BUILD` file looks something like
       dependencies = [
         '3rdparty:commons-math',
         '3rdparty:thrift',
-        'src/java/org/pantsbuild/auth',
-        ':base'
+        'src/java/com/myorg/myproject/example',
+        ':base',
       ],
-      sources=globs('*.java'),
+      sources=['*.java'],
     )
 
 Here, `java_library` is the target's *type*. Different target types
@@ -289,17 +289,11 @@ refer to them here.
 List of source files, which must be under the directory tree rooted
 at the BUILD file's directory.
 
-You can provide an explicit list, e.g.,
-`sources=['Foo.java', 'Bar.java']`, or use the `globs` function
-to glob over files, e.g., `sources=globs('*.java')`. Similarly,
-`rglobs` will apply the glob pattern recursively in all subdirectories
-of the BUILD file's directory.
+You can provide explicit file names and also use globs, e.g. `sources=['Foo.java', 'subdir/**/*.java']`. To exclude a file or glob, prefix the value with `!`, e.g. `sources=['*.java', '!ignore.java']`.
 
 If you omit `sources` in a target, Pants will attempt to apply a
 sensible default that depends on the target type.
-E.g., `junit_tests` will default to globbing over `*Test.java`,
-`java_library` will default to globbing over `*.java`, minus the
-test files, and so on.
+For example, `junit_tests` will default to `sources=['*Test.java']`, while `java_library` will default to `sources=['*.java', '!*Test.java']`.
 
 
 The Usual Commands
@@ -312,13 +306,13 @@ will still compile them since it knows it must compile before it can
 test.
 
     :::bash
-    $ ./pants test src/java/com/myorg/myproject tests/java/com/myorg/myproject
+    $ ./pants test src/python:: src/java::
 
 **Run a binary**<br>
-Use pants to execute a binary target.  Compiles the code first if it is not up to date.
+Use pants to execute a binary target. Compiles the code first if it is not up to date.
 
     :::bash
-    $ ./pants run examples/src/java/org/pantsbuild/example/hello/simple
+    $ ./pants run src/python/myproject/example:my_script
 
 **Get Help**<br>
 Get the list of goals:

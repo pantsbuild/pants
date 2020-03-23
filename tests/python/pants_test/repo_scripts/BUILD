@@ -4,10 +4,11 @@
 python_tests(
   name = 'git_hooks',
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:process_handler',
-    'tests/python/pants_test/testutils:git_util',
-  ]
+    'src/python/pants/testutil:git_util',
+    'build-support/bin:bash_scripts',
+    'build-support/bin:python_scripts',
+  ],
+  tags = {"partially_type_checked"},
 )

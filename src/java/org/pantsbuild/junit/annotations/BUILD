@@ -10,5 +10,4 @@ java_library(
       Annotations for use with org.pantsbuild#junit-runner that support running tests in parallel.
     """)
   ),
-  platform='java7',
 )

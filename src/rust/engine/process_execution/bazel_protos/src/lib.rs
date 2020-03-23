@@ -13,5 +13,13 @@ mod gen_for_tower;
 pub use crate::gen_for_tower::*;
 
 mod conversions;
+#[cfg(test)]
+mod conversions_tests;
+
+mod metadata;
+pub use metadata::call_option;
+
 mod verification;
 pub use crate::verification::verify_directory_canonical;
+#[cfg(test)]
+mod verification_tests;

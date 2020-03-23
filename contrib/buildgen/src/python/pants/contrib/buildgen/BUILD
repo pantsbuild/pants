@@ -7,6 +7,7 @@ python_library(
   dependencies=[
     ':build_file_manipulator',
   ],
+  tags = {"partially_type_checked"},
   provides=contrib_setup_py(
     name='pantsbuild.pants.contrib.buildgen',
     description='Automatic manipulation of BUILD dependencies based on source analysis.',
@@ -21,7 +22,7 @@ python_library(
   name = 'build_file_manipulator',
   sources = ['build_file_manipulator.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/build_graph',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )

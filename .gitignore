@@ -36,16 +36,18 @@ out/
 # remove root-level /bin, which is created by Eclipse
 /bin/
 /build-support/*.pex
-/build-support/*.venv
+/build-support/virtualenvs
 /build-support/virtualenv-*
 /build-support/virtualenv.dist/
 /build-support/phab/
+/build-support/twine-deps.venv/
 /dist/
 /lib/
 # This is created by the very handy `build-support/bin/get_failing_travis_targets_for_pr.sh`.
 /logs/
 arc.sh
 BUILD.release*
+/pants.pex
 pants.ini.sitegen
 target
 GPATH

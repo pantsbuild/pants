@@ -29,16 +29,16 @@ shorthand flags must immediately follow the goal they apply to.
 Consider the following command:
 
     :::bash
-    ./pants --level=debug compile.zinc --no-delete-scratch --resolve-ivy-open src::
+    ./pants --level=debug compile.rsc --no-delete-scratch --resolve-ivy-open src::
 
 + `--level` is a global flag.
-+ The goal and task to run are `compile.zinc`.
++ The goal and task to run are `compile.rsc`.
 + The `--no-delete-scratch` is shorthand for the
-  `--compile-zinc-no-delete-scratch` flag.
+  `--compile-rsc-no-delete-scratch` flag.
 + The `--resolve-ivy-open` command is a fully qualified flag and
   applies to the `resolve.ivy` task.  Although the task `resolve.ivy`
   isn't specified on the command line it implicitly runs because
-  `compile.zinc` task depends on it.
+  `compile.rsc` task depends on it.
 
 You can pass options to pants using the a config file, the
 environment, or command line flags. See the
@@ -70,13 +70,13 @@ task and goal name to use the short form flag.  Here's an example of
 using the long form to pass an option to the `zinc` task:
 
     :::bash
-    ./pants --no-compile-zinc-delete-scratch compile src::
+    ./pants --no-compile-rsc-delete-scratch compile src::
 
 To use the shorthand form of the option, specify both goal and task
-name as `compile.zinc`:
+name as `compile.rsc`:
 
     :::bash
-    ./pants  compile.zinc --no-delete-scratch src::
+    ./pants  compile.rsc --no-delete-scratch src::
 
 This is especially handy if you have lots of options to type:
 
@@ -87,12 +87,12 @@ You can use shorthand even when you want to pass options to multiple
 tasks by listing each task.  For example:
 
     :::bash
-    ./pants compile --compile-zinc-no-delete-scratch --resolve-ivy-open src::
+    ./pants compile --compile-rsc-no-delete-scratch --resolve-ivy-open src::
 
 can also be expressed using shorthand flags:
 
     :::bash
-    ./pants --level=debug compile.zinc --no-delete-scratch resolve.ivy --open src::
+    ./pants --level=debug compile.rsc --no-delete-scratch resolve.ivy --open src::
 
 Passthrough Args
 ----------------
@@ -128,20 +128,41 @@ cases where relatively small portions of the repo have changed since the previou
 
 As of `1.4.0`, there is one remaining set of caveats to using the daemon:
 
-* Although `./pants repl` works, it is missing some advanced TTY integrations which prevent
-  line editing and some control sequences from being propagated. See the
-  [Daemon Beta milestone](https://github.com/pantsbuild/pants/milestone/11) for a summary.
+* Although `./pants repl` works, it is missing some advanced TTY integrations which prevent line
+  editing and some control sequences from being propagated. Ammonite in particular has a known issue
+  -- see [#5223](https://github.com/pantsbuild/pants/issues/5223).
 
 ### Usage
 
-To enable the daemon, see the example in `pants.daemon.ini` in the root of the pantsbuild repo:
+To enable the daemon, turn on the `--enable-pantsd` global option via CLI arg, environment variable, or `pants.toml` (see [[Options|pants('src/docs:options')]]).
 
-!inc(../../pants.daemon.ini)
+#### Killing the Daemon
+
+To kill the daemon, you can run either `clean-all` or `kill-pantsd`:
+
+    :::bash
+    ./pants clean-all
+    ./pants kill-pantsd
+
+
+#### Observation Tools
+
+To see what's going on with the daemon, you can tail the pantsd log file in another window:
+
+    :::bash
+    cd $SOURCE
+    tail -F .pants.d/pantsd/pantsd.log
+
+To see what's going on with the client and daemon processes, you can watch the process table:
+
+    :::bash
+    watch -n.1 "ps -ef | grep -v grep | grep pants"
+
 
 ### Rollout
 
 The daemon will be in beta until the caveat mentioned above is addressed, but we hope to
-enable the daemon by default for the [`1.5.0` release of pants](https://github.com/pantsbuild/pants/milestone/12).
+enable the daemon by default soon.
 
 Profiling Pants
 ---------------

@@ -9,7 +9,6 @@
   clippy::expl_impl_clone_on_copy,
   clippy::if_not_else,
   clippy::needless_continue,
-  clippy::single_match_else,
   clippy::unseparated_literal_suffix,
   clippy::used_underscore_binding
 )]
@@ -22,11 +21,7 @@
   clippy::too_many_arguments
 )]
 // Default isn't as big a deal as people seem to think it is.
-#![allow(
-  clippy::new_without_default,
-  clippy::new_without_default_derive,
-  clippy::new_ret_no_self
-)]
+#![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 

@@ -1,1 +1,3 @@
-python_library()
+python_binary(
+  source = 'main.py'
+)

@@ -8,7 +8,9 @@ scala_library(
     'examples/src/java/org/pantsbuild/example/hello/greet:greet',
     'examples/src/resources/org/pantsbuild/example/hello',
   ],
-  provides = scala_artifact(org='org.pantsbuild.example.hello',
-                            name='welcome',
-                            repo=public,),
+  provides = scala_artifact(
+    org='org.pantsbuild.example.hello',
+    name='welcome',
+    repo=public,
+  ),
 )

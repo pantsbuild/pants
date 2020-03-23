@@ -26,6 +26,13 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
            This can lead to jars downloading without their transitive deps which leads
            to confusing failures later when classpaths are constructed and used.
            We setup the maven central resolver to require successful pom downloads here. -->
+
+      <!-- First try RBE's maven central mirror, as we can get throttled by
+           maven central due to all RBE traffic appearing to them as coming from a single IP.
+           There's no harm in trying this even outside RBE, as it is world-visible. -->
+      <ibiblio name="maven-central-mirror" m2compatible="true" descriptor="required"
+               root="https://maven-central.storage-download.googleapis.com/maven2"/>
+
       <ibiblio name="maven-central" m2compatible="true" descriptor="required"/>
 
       <!-- The mvn standard local filesystem repo/cache -->
@@ -35,8 +42,8 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
       </filesystem>
 
       <!-- Custom repo for Kythe jars, as Google don't currently publish them anywhere. -->
-      <url name="benjyw/binhost">
-        <artifact pattern="https://github.com/benjyw/binhost/raw/master/${kythe.artifact}" />
+      <url name="toolchainlabs/binhost">
+        <artifact pattern="https://github.com/toolchainlabs/binhost/raw/master/${kythe.artifact}" />
       </url>
     </chain>
   </resolvers>

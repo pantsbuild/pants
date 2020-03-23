@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+
+# NB: pre-commit runs in the context of GIT_WORK_TREE, ie: pwd == REPO_ROOT
+
+source build-support/common.sh
+
+# Commit hooks set $GIT_DIR by default to .git
+# This causes git commands (notably, git rev-parse --show-toplevel) to fail if the script isn't
+# running in the git root, as it looks for a .git directory relative to the working directory.
+# Explicitly absolute-ify the $GIT_DIR variable so that this doesn't happen.
+if [[ -n "${GIT_DIR}" && "${GIT_DIR}" != /* ]]; then
+  GIT_DIR="$(pwd)/${GIT_DIR}"
+  export GIT_DIR
+fi
+
+DIRS_TO_CHECK=(
+  src
+  tests
+  pants-plugins
+  examples
+  contrib
+  build-support/bin
+)
+
+# TODO(#7068): Fix all these checks to only act on staged files with
+# `git diff --cached --name-only`!
+
+# TODO: test all the scripts in this file in test_git_hooks.py, remove uses of `|| exit 1`, and add an
+# integration test!
+set -e
+
+# WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
+# shellcheck disable=SC2207
+ADDED_FILES=($(./build-support/bin/get_added_files.sh))
+MERGE_BASE="$(git_merge_base)"
+
+echo "* Checking packages"
+./build-support/bin/check_packages.sh "${DIRS_TO_CHECK[@]}" || exit 1
+
+echo "* Checking headers"
+./build-support/bin/check_header.py "${DIRS_TO_CHECK[@]}" --files-added "${ADDED_FILES[@]}" || exit 1
+
+echo "* Checking for banned imports"
+./build-support/bin/check_banned_imports.py || exit 1
+
+echo "* Checking shell scripts via shellcheck"
+./build-support/bin/shellcheck.py || exit 1
+
+echo "* Checking shell scripts via our custom linter"
+./build-support/bin/check_shell.sh || exit 1
+
+# When travis builds a tag, it does so in a shallow clone without master fetched, which
+# fails in pants changed.
+if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
+  echo "* Checking formatting and Flake8"
+  ./v2 --changed-parent="${MERGE_BASE}" lint || die "If there were formatting errors, run \`./v2 --changed-since=master fmt\`"
+
+  echo "* Checking types"
+  ./build-support/bin/mypy.py || exit 1
+
+  if git diff "${MERGE_BASE}" --name-only | grep '\.rs$' > /dev/null; then
+    echo "* Checking formatting of Rust files"
+    ./build-support/bin/check_rust_formatting.sh || exit 1
+    # Clippy happens on a different Travis CI shard because of separate caching concerns.
+    # The TRAVIS env var is documented here:
+    #   https://docs.travis-ci.com/user/environment-variables/#default-environment-variables
+    if [[ "${TRAVIS}" != "true" ]]; then
+      echo "* Running cargo clippy"
+      ./build-support/bin/check_clippy.sh || exit 1
+    fi
+    echo "* Checking Rust target headers"
+    build-support/bin/check_rust_target_headers.sh || exit 1
+  fi
+
+  if git diff "${MERGE_BASE}" --name-only | grep build-support/bin/generate_travis_yml.py > /dev/null; then
+    echo "* Checking .travis.yml generation"
+    actual_travis_yml=$(<.travis.yml)
+    expected_travis_yml=$(./pants --quiet run build-support/bin:generate_travis_yml)
+    [ "${expected_travis_yml}" == "${actual_travis_yml}" ] || \
+      die "Travis config generator changed but .travis.yml file not regenerated. See top of that file for instructions."
+  fi
+else
+  echo "* Skipping import/lint checks in partial working copy."
+fi

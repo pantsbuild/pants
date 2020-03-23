@@ -6,27 +6,45 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
+copy_dir = "0.1.2"
+walkdir = "2"
 async_semaphore = { path = "../async_semaphore" }
 bazel_protos = { path = "bazel_protos" }
 boxfuture = { path = "../boxfuture" }
 bytes = "0.4.5"
+derivative = "1.0.2"
 digest = "0.8"
 fs = { path = "../fs" }
-futures = "^0.1.16"
-grpcio = { git = "https://github.com/pantsbuild/grpc-rs.git", rev = "4dfafe9355dc996d7d0702e7386a6fedcd9734c0", default_features = false, features = ["protobuf-codec"] }
+futures01 = { package = "futures", version = "0.1" }
+futures = { version = "0.3", features = ["compat"] }
+grpcio = { git = "https://github.com/pantsbuild/grpc-rs.git", rev = "b582ef3dc4e8c7289093c8febff8dadf0997b532", default_features = false, features = ["protobuf-codec", "secure"] }
 hashing = { path = "../hashing" }
+libc = "0.2.39"
 log = "0.4"
-protobuf = { version = "2.0.4", features = ["with-bytes"] }
-resettable = { path = "../resettable" }
+nails = "0.4"
+protobuf = { version = "2.0.6", features = ["with-bytes"] }
 sha2 = "0.8"
+sharded_lmdb = {  path = "../sharded_lmdb" }
+store = { path = "../fs/store" }
+task_executor = { path = "../task_executor" }
 tempfile = "3"
-# TODO: Switch to a release once https://github.com/alexcrichton/futures-timer/pull/11 and https://github.com/alexcrichton/futures-timer/pull/12 merge
-futures-timer = { git = "https://github.com/pantsbuild/futures-timer", rev = "0b747e565309a58537807ab43c674d8951f9e5a0" }
-time = "0.1.40"
-tokio-codec = "0.1"
-tokio-process = "0.2.1"
+concrete_time = { path = "../concrete_time" }
+tokio = { version = "0.2", features = ["process", "rt-threaded", "tcp", "time"] }
+tokio-util = { version = "0.2", features = ["codec"] }
+uname = "0.1.1"
+workunit_store = { path = "../workunit_store" }
+regex = "1.3.1"
+lazy_static = "1"
+parking_lot = "0.6"
+itertools = "0.8.0"
+serde = "1.0.104"
+bincode = "1.2.1"
 
 [dev-dependencies]
+maplit = "1.0.1"
 mock = { path = "../testutil/mock" }
+parking_lot = "0.6"
+spectral = "0.6.0"
 tempfile = "3"
 testutil = { path = "../testutil" }
+tokio = { version = "0.2", features = ["macros"] }

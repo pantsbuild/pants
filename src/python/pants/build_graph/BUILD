@@ -1,13 +1,9 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-
 python_library(
   dependencies = [
-    'src/python/pants/util:collections_abc_backport',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python:future',
-    '3rdparty/python:six',
+    '3rdparty/python:dataclasses',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file',
     'src/python/pants/base:build_file_target_factory',
@@ -19,8 +15,8 @@ python_library(
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
     'src/python/pants/base:specs',
-    'src/python/pants/base:target_roots',
     'src/python/pants/base:validation',
+    'src/python/pants/engine:target',
     'src/python/pants/fs',
     'src/python/pants/option',
     'src/python/pants/source',
@@ -30,5 +26,7 @@ python_library(
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
     'src/python/pants/util:netrc',
-  ]
+    'src/python/pants/util:ordered_set',
+  ],
+  tags = {"partially_type_checked"},
 )

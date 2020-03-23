@@ -28,7 +28,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.output.TeeOutputStream;
 import org.junit.runner.Computer;
 import org.junit.runner.Description;
@@ -323,6 +324,11 @@ public class ConsoleRunnerImpl {
     public byte[] readErr(Class<?> testClass) throws IOException {
       return suiteCaptures.get(testClass).readErr();
     }
+
+    @Override
+    public void close(Class<?> testClass) throws IOException {
+      suiteCaptures.get(testClass).close();
+    }
   }
 
   /**
@@ -383,6 +389,8 @@ public class ConsoleRunnerImpl {
   private final boolean useExperimentalRunner;
   private final SwappableStream<PrintStream> swappableOut;
   private final SwappableStream<PrintStream> swappableErr;
+  private final Set<Thread> shutdownHooks = Sets.newHashSet(); // for use in tests
+  private Collection<String> testsToRun;
 
   ConsoleRunnerImpl(
       boolean failFast,
@@ -421,11 +429,25 @@ public class ConsoleRunnerImpl {
     this.useExperimentalRunner = useExperimentalRunner;
   }
 
+  // by holding on to the tests to run, we can create a runner that is ready to go
+  // without beginning the run (which is useful in the tests for the runner itself)
+  private void setTestsToRun(Collection<String> tests) {
+    this.testsToRun = tests;
+  }
+
   void run(Collection<String> tests) {
+    setTestsToRun(tests);
+    run();
+  }
+
+  @VisibleForTesting
+  public void run() {
     System.setOut(new PrintStream(swappableOut));
     System.setErr(new PrintStream(swappableErr));
 
     JUnitCore core = new JUnitCore();
+
+    int numShutdownHooks = 0;
 
     if (testListener != null) {
       core.addListener(testListener);
@@ -439,8 +461,11 @@ public class ConsoleRunnerImpl {
         new StreamCapturingListener(outdir, outputMode, swappableOut, swappableErr);
     core.addListener(streamCapturingListener);
 
+    RunListener xmlListener = null;
     if (xmlReport) {
-      core.addListener(new AntJunitXmlReportListener(outdir, streamCapturingListener));
+      xmlListener = new AntJunitXmlReportListener(outdir, streamCapturingListener);
+      core.addListener(xmlListener);
+      numShutdownHooks++; // later we will register a shutdown hook for writing XML output
     }
 
     if (perTestTimer) {
@@ -449,17 +474,38 @@ public class ConsoleRunnerImpl {
       core.addListener(new ConsoleListener(swappableOut.getOriginal()));
     }
 
-    ShutdownListener shutdownListener = new ShutdownListener(swappableOut.getOriginal());
-    core.addListener(shutdownListener);
+    ShutdownListener consoleShutdownListener =
+      new ShutdownListener(new ConsoleListener(swappableOut.getOriginal()));
+    core.addListener(consoleShutdownListener);
+
     // Wrap test execution with registration of a shutdown hook that will ensure we
     // never exit silently if the VM does.
-    final Thread unexpectedExitHook =
-        createUnexpectedExitHook(shutdownListener, swappableOut.getOriginal());
-    Runtime.getRuntime().addShutdownHook(unexpectedExitHook);
+    numShutdownHooks++;
+    final CountDownLatch haltAfterUnexpectedShutdown = new CountDownLatch(numShutdownHooks);
+    final Thread unexpectedExitHook = createUnexpectedExitHook(
+      consoleShutdownListener,
+      swappableOut.getOriginal(),
+      haltAfterUnexpectedShutdown);
+    addShutdownHook(unexpectedExitHook);
+
+    // handle writing XML output when the tests time out and are terminated by pants
+    if (xmlListener != null) {
+      final ShutdownListener xmlShutdownListener = new ShutdownListener(xmlListener);
+      core.addListener(xmlShutdownListener);
+
+      Thread xmlShutdownHook = new Thread() {
+        @Override
+        public void run() {
+          xmlShutdownListener.unexpectedShutdown();
+          haltAfterUnexpectedShutdown.countDown();
+        }
+      };
+      addShutdownHook(xmlShutdownHook);
+    }
 
     int failures = 1;
     try {
-      Collection<Spec> parsedTests = new SpecParser(tests).parse();
+      Collection<Spec> parsedTests = new SpecParser(testsToRun).parse();
       if (useExperimentalRunner) {
         failures = runExperimental(parsedTests, core);
       } else {
@@ -472,15 +518,20 @@ public class ConsoleRunnerImpl {
     } finally {
       // If we're exiting via a thrown exception, we'll get a better message by letting it
       // propagate than by halt()ing.
-      Runtime.getRuntime().removeShutdownHook(unexpectedExitHook);
+      removeShutdownHook(unexpectedExitHook);
     }
     exit(failures == 0 ? 0 : 1);
   }
 
   /**
-   * Returns a thread that records a system exit to the listener, and then halts(1).
+   * Returns a thread that records a system exit to the listener,
+   * and then halts(1) after other unexpected exit hooks that use the given CountDownLatch.
    */
-  private Thread createUnexpectedExitHook(final ShutdownListener listener, final PrintStream out) {
+  private Thread createUnexpectedExitHook(
+    final ShutdownListener listener,
+    final PrintStream out,
+    final CountDownLatch haltAfter
+  ) {
     return new Thread() {
       @Override public void run() {
         try {
@@ -490,13 +541,37 @@ public class ConsoleRunnerImpl {
           out.println(e);
           e.printStackTrace(out);
         }
-        // This error might be a call to `System.exit(0)` in a test, which we definitely do
-        // not want to go unnoticed.
-        out.println("FATAL: VM exiting unexpectedly.");
-        out.flush();
-        Runtime.getRuntime().halt(1);
+        try {
+          // Other shutdown hooks might still need to write test results,
+          // so wait for them (up to 15 seconds) to finish before halting.
+          haltAfter.countDown();
+          long awaiting = haltAfter.getCount();
+          if (awaiting > 0) out.println("Waiting for " + awaiting + "shutdown hooks to complete");
+          haltAfter.await(15, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+          out.println(e);
+          e.printStackTrace(out);
+        } finally {
+          if (callSystemExitOnFinish) {
+            // This error might be a call to `System.exit(0)` in a test, which we definitely do
+            // not want to go unnoticed.
+            out.println("FATAL: VM exiting unexpectedly.");
+            out.flush();
+            Runtime.getRuntime().halt(1);
+          }
+        }
       }
     };
+  }
+
+  private void addShutdownHook(Thread hook) {
+    shutdownHooks.add(hook);
+    Runtime.getRuntime().addShutdownHook(hook);
+  }
+
+  private void removeShutdownHook(Thread hook) {
+    shutdownHooks.remove(hook);
+    Runtime.getRuntime().removeShutdownHook(hook);
   }
 
   private int runExperimental(Collection<Spec> parsedTests, JUnitCore core)
@@ -693,7 +768,7 @@ public class ConsoleRunnerImpl {
 
       @Override
       public boolean shouldRun(Description desc) {
-        if (desc.isSuite()) {
+        if (desc.isSuite() && !ScalaTestUtil.isScalaTestTest(desc.getTestClass())) {
           return true;
         }
         String descString = Util.getPantsFriendlyDisplayName(desc);
@@ -739,12 +814,32 @@ public class ConsoleRunnerImpl {
     return filteredRequests;
   }
 
+  @VisibleForTesting
+  void runShutdownHooks() throws InterruptedException {
+    for(Thread hook: shutdownHooks) {
+      hook.start();
+    }
+    for(Thread hook: shutdownHooks) {
+      hook.join(10000); // wait for all hooks to complete, up to 10 seconds each
+    }
+  }
+
   /**
    * Launcher for JUnitConsoleRunner.
    *
    * @param args options from the command line
    */
   public static void main(String[] args) {
+    mainImpl(args).run();
+  }
+
+  /**
+   * As main, but returns the ConsoleRunnerImpl instance and doesn't begin the test run.
+   * For use in tests.
+   *
+   * @param args options from the command line
+   */
+  public static ConsoleRunnerImpl mainImpl(String[] args) {
     /**
      * Command line option bean.
      */
@@ -921,7 +1016,8 @@ public class ConsoleRunnerImpl {
         tests.add(test);
       }
     }
-    runner.run(tests);
+    runner.setTestsToRun(tests);
+    return runner;
   }
 
   /**

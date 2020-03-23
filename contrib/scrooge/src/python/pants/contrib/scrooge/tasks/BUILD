@@ -6,16 +6,15 @@ python_library(
     ':scrooge_gen',
     ':thrift_linter',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
   name='scrooge_gen',
   sources=['scrooge_gen.py'],
   dependencies=[
-    '3rdparty/python:future',
     ':java_thrift_library_fingerprint_strategy',
     ':thrift_util',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/codegen/thrift/java',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:scala',
@@ -28,15 +27,17 @@ python_library(
     'src/python/pants/task',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
+    'src/python/pants/util:ordered_set',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
   name='thrift_linter',
-  sources=['thrift_linter.py'],
+  sources=['thrift_linter_task.py'],
   dependencies=[
-    '3rdparty/python:future',
     ':thrift_util',
+    'contrib/scrooge/src/python/pants/contrib/scrooge/subsystems',
     'src/python/pants/backend/codegen/thrift/java',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/base:exceptions',
@@ -45,22 +46,21 @@ python_library(
     'src/python/pants/option',
     'src/python/pants/task'
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
   name='thrift_util',
   sources=['thrift_util.py'],
-  dependencies = [
-    '3rdparty/python:future',
-  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
   name='java_thrift_library_fingerprint_strategy',
   sources=['java_thrift_library_fingerprint_strategy.py'],
   dependencies=[
-    '3rdparty/python:future',
     'src/python/pants/backend/codegen/thrift/java',
     'src/python/pants/base:fingerprint_strategy',
   ],
+  tags = {"partially_type_checked"},
 )

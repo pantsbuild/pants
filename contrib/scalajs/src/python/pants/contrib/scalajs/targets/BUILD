@@ -3,7 +3,6 @@
 
 python_library(
   dependencies = [
-    '3rdparty/python:future',
     'contrib/node/src/python/pants/contrib/node/targets:node_module',
     'contrib/scalajs/src/python/pants/contrib/scalajs/subsystems',
     'src/python/pants/backend/jvm/targets:jvm',
@@ -12,4 +11,5 @@ python_library(
     'src/python/pants/base:payload_field',
     'src/python/pants/build_graph',
   ],
+  tags = {'partially_type_checked'},
 )

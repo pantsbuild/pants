@@ -1,6 +1,5 @@
 python_library(
   dependencies=[
-    '3rdparty/python:future',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:deprecated',
     'src/python/pants/base:exceptions',
@@ -10,4 +9,5 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/source',
   ],
+  tags = {"partially_type_checked"},
 )

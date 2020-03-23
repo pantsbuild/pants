@@ -1,15 +1,43 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from pants.rules.core import fastlist, filedeps
-from pants.rules.core.test import coordinator_of_tests, fast_test
+from pants.engine.target import rules as target_rules
+from pants.rules.core import (
+    binary,
+    cloc,
+    determine_source_files,
+    distdir,
+    filedeps,
+    fmt,
+    lint,
+    list_roots,
+    list_targets,
+    repl,
+    run,
+    strip_source_roots,
+    test,
+)
+from pants.rules.core.targets import Files
 
 
 def rules():
-  return fastlist.rules() + filedeps.rules() + [
-    fast_test,
-    coordinator_of_tests,
-  ]
+    return [
+        *cloc.rules(),
+        *binary.rules(),
+        *fmt.rules(),
+        *lint.rules(),
+        *list_roots.rules(),
+        *list_targets.rules(),
+        *determine_source_files.rules(),
+        *filedeps.rules(),
+        *repl.rules(),
+        *run.rules(),
+        *strip_source_roots.rules(),
+        *distdir.rules(),
+        *test.rules(),
+        *target_rules(),
+    ]
+
+
+def targets2():
+    return [Files]

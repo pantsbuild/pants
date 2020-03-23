@@ -5,12 +5,12 @@ python_tests(
   name='artifact_cache_stats',
   sources= ['test_artifact_cache_stats.py'],
   dependencies=[
-    '3rdparty/python:future',
     'src/python/pants/cache',
     'src/python/pants/goal:artifact_cache_stats',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:test_base',
-  ]
+    'src/python/pants/testutil:test_base',
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -22,16 +22,16 @@ python_tests(
     'test_union_products.py',
   ],
   dependencies=[
-    '3rdparty/python:future',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/auth',
     'src/python/pants/build_graph',
     'src/python/pants/goal:products',
     'src/python/pants/goal:run_tracker',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:test_base',
-  ]
+    'src/python/pants/util:ordered_set',
+    'src/python/pants/testutil:test_base',
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -40,9 +40,12 @@ python_tests(
     'test_run_tracker_integration.py'
   ],
   dependencies=[
-    '3rdparty/python:future',
     'src/python/pants/goal:run_tracker',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
+    'tests/python/pants_test/goal/data:plugin',
+    'testprojects/src/java/org/pantsbuild/testproject:extra_jvm_options_directory',
+    'testprojects/src/java/org/pantsbuild/testproject:unicode_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
+  timeout = 180,
 )

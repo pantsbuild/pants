@@ -7,6 +7,7 @@ import com.google.common.base.Charsets;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.PrintStream;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.junit.Assert;
 import org.junit.Test;
@@ -26,6 +27,7 @@ import org.pantsbuild.tools.junit.lib.ParallelMethodsDefaultParallelTest1;
 import org.pantsbuild.tools.junit.lib.ParallelTest1;
 import org.pantsbuild.tools.junit.lib.SerialTest1;
 import org.pantsbuild.tools.junit.lib.TestRegistry;
+import org.pantsbuild.tools.junit.lib.XmlOutputOnShutdownTest;
 
 import static org.hamcrest.CoreMatchers.anyOf;
 import static org.hamcrest.CoreMatchers.containsString;
@@ -70,8 +72,7 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
 
   @Test
   public void testShardedTesting12() {
-    invokeConsoleRunner("MockTest1 MockTest2 MockTest3 "
-        + "-test-shard 1/2");
+    invokeConsoleRunner("MockTest1 MockTest2 MockTest3 -test-shard 1/2");
     assertEquals("test12 test21 test31", TestRegistry.getCalledTests());
   }
 
@@ -116,6 +117,41 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
   public void testShardedTesting34() {
     invokeConsoleRunner("MockTest1 MockTest2 MockTest3 -test-shard 3/4");
     assertEquals("test21", TestRegistry.getCalledTests());
+  }
+
+  @Test
+  public void testShardedTesting02Scala() {
+    invokeConsoleRunner("MockScalaTest MockScalaTest1 MockScalaTest2 MockScalaTest3 "
+        + "-test-shard 0/2");
+    assertEquals("MockScalaTest-1 MockScalaTest-3", TestRegistry.getCalledTests());
+  }
+
+  @Test
+  public void testShardedTesting12Scala() {
+    invokeConsoleRunner("MockScalaTest MockScalaTest1 MockScalaTest2 MockScalaTest3 "
+        + "-test-shard 1/2");
+    assertEquals("MockScalaTest-2 MockScalaTest-4", TestRegistry.getCalledTests());
+  }
+
+  @Test
+  public void testShardedTesting03Scala() {
+    invokeConsoleRunner("MockScalaTest MockScalaTest1 MockScalaTest2 MockScalaTest3 "
+        + "-test-shard 0/3");
+    assertEquals("MockScalaTest-1 MockScalaTest-4", TestRegistry.getCalledTests());
+  }
+
+  @Test
+  public void testShardedTesting13Scala() {
+    invokeConsoleRunner("MockScalaTest MockScalaTest1 MockScalaTest2 MockScalaTest3 "
+        + "-test-shard 1/3");
+    assertEquals("MockScalaTest-2", TestRegistry.getCalledTests());
+  }
+
+  @Test
+  public void testShardedTesting23Scala() {
+    invokeConsoleRunner("MockScalaTest MockScalaTest1 MockScalaTest2 MockScalaTest3 "
+        + "-test-shard 2/3");
+    assertEquals("MockScalaTest-3", TestRegistry.getCalledTests());
   }
 
   @Test
@@ -186,6 +222,36 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
     assertThat(output, containsString("test41"));
     assertThat(output, containsString("start test42"));
     assertThat(output, containsString("end test42"));
+  }
+
+  @Test
+  public void testXmlOutputOnShutdown() throws Exception {
+    String outdir = temporary.newFolder("testOutputDir").getAbsolutePath();
+    ConsoleRunnerImpl runner =
+      prepareConsoleRunner("XmlOutputOnShutdownTest -xmlreport -outdir " + outdir);
+
+    Thread runningTests = new Thread(){
+      @Override public void run() {
+        runner.run();
+      }
+    };
+
+    XmlOutputOnShutdownTest.setUpLatch();
+    runningTests.start();
+    XmlOutputOnShutdownTest.testStarted.await(2, TimeUnit.SECONDS);
+    runner.runShutdownHooks();
+
+    String testsCalled = TestRegistry.getCalledTests();
+    assertThat(testsCalled, containsString("hangs"));
+
+    String testClassName = XmlOutputOnShutdownTest.class.getCanonicalName();
+    String xmlOutput = FileUtils.readFileToString(
+        new File(outdir, "TEST-" + testClassName + ".xml"), Charsets.UTF_8);
+    assertThat(xmlOutput, containsString("errors=\"1\""));
+    assertThat(xmlOutput, containsString("tests=\"1\""));
+    assertThat(xmlOutput, containsString("The test run may have timed out."));
+
+    runningTests.interrupt();
   }
 
   @Test

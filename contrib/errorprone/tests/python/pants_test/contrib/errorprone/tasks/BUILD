@@ -5,18 +5,20 @@ python_tests(
   sources=['test_errorprone.py'],
   dependencies=[
     'contrib/errorprone/src/python/pants/contrib/errorprone/tasks',
-    'tests/python/pants_test/jvm:nailgun_task_test_base',
-    'tests/python/pants_test/option/util',
-    'tests/python/pants_test:test_base',
-  ]
+    'src/python/pants/testutil/jvm:nailgun_task_test_base',
+    'src/python/pants/testutil/option',
+    'src/python/pants/testutil:test_base',
+  ],
+  tags = {'partially_type_checked'},
 )
 
 python_tests(
   name='integration',
   sources=['test_errorprone_integration.py'],
   dependencies=[
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
+    'contrib/errorprone:java_tests_directory',
   ],
-  tags={'integration'},
-  timeout=300,
+  tags={'integration', 'partially_type_checked'},
+  timeout=420,
 )

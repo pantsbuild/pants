@@ -14,7 +14,6 @@ java_library(
   dependencies=[
     '3rdparty:guava',
   ],
-  platform='java7',
 )
 
 jvm_binary(
@@ -24,7 +23,6 @@ jvm_binary(
   dependencies=[
     ':runner-library',
   ],
-  platform='java7',
   description="""
     A command line tool for fixing problems with custom classloading and synthetic jar.
   """

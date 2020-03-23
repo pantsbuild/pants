@@ -8,7 +8,6 @@
 python_library(
   sources=['zero_out_custom_op.py'],
   dependencies=[
-    '3rdparty/python:future',
     'examples/3rdparty/python:tensorflow',
     ':tensorflow-zero-out-op-wrapper',
   ],
@@ -33,9 +32,26 @@ python_dist(
 
 ctypes_compatible_cpp_library(
   name='tensorflow-zero-out-op',
-  compiler_option_sets={'glibcxx_use_old_abi'},
   dependencies=[
     'examples/3rdparty/python:tensorflow-framework',
   ],
   ctypes_native_library=native_artifact(lib_name='tensorflow-zero-out-operator'),
+)
+
+
+python_binary(
+  name='show-tf-version',
+  source='show_tf_version.py',
+  dependencies=[
+    'examples/3rdparty/python:tensorflow',
+  ],
+  compatibility=['CPython>=3.6,<4'],
+)
+
+files(
+  name='show-tf-version-files',
+  sources=['**/*'],
+  dependencies=[
+    'examples/3rdparty/python:examples_python_3rdparty',
+  ],
 )

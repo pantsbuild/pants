@@ -14,22 +14,16 @@ fn main() {
   mark_dir_as_rerun_trigger(&thirdpartyprotobuf);
 
   let grpcio_output_dir = PathBuf::from("src/gen");
-  make_clean_dir(&grpcio_output_dir);
-  generate_for_grpcio(&thirdpartyprotobuf, &grpcio_output_dir);
+  replace_if_changed(&grpcio_output_dir, |path| {
+    generate_for_grpcio(&thirdpartyprotobuf, path);
+    format(path);
+  });
 
   let tower_output_dir = PathBuf::from("src/gen_for_tower");
-  make_clean_dir(&tower_output_dir);
-  generate_for_tower(&thirdpartyprotobuf, tower_output_dir.clone());
-
-  let success = std::process::Command::new(env!("CARGO"))
-    .arg("fmt")
-    .arg("--package=bazel_protos")
-    .status()
-    .unwrap()
-    .success();
-  if !success {
-    panic!("Cargo formatting failed for generated protos. Output should be above.");
-  }
+  replace_if_changed(&tower_output_dir, |path| {
+    generate_for_tower(&thirdpartyprotobuf, path);
+    format(path);
+  });
 
   // Re-gen if, say, someone does a git clean on the gen dir but not the target dir. This ensures
   // generated sources are available for reading by programmers and tools like rustfmt alike.
@@ -71,7 +65,7 @@ fn mark_dir_as_rerun_trigger(dir: &Path) {
   }
 }
 
-const EXTRA_HEADER: &'static str = r#"import "rustproto.proto";
+const EXTRA_HEADER: &str = r#"import "rustproto.proto";
 option (rustproto.carllerche_bytes_for_bytes_all) = true;
 "#;
 
@@ -138,7 +132,10 @@ fn disable_clippy_in_generated_code(dir: &Path) -> Result<(), String> {
       .filter(|line| !line.contains("clippy"))
       .map(str::to_owned)
       .collect();
-    let content = String::from("#![allow(clippy::all)]\n") + &lines.join("\n");
+    let content = (String::from("#![allow(clippy::all)]\n") + &lines.join("\n"))
+      // Quash warnings about missing dyn, because we can't currently update the code generator
+      // to get rid of them because we forked it upstream a while ago.
+      .replace("::std::any::Any", "dyn ::std::any::Any");
     std::fs::write(file.path(), content).map_err(|err| {
       format!(
         "Error re-writing generated protobuf at {}: {}",
@@ -155,7 +152,7 @@ fn generate_mod_rs(dir: &Path) -> Result<(), String> {
   let mut pub_mod_stmts = listing
     .filter_map(|d| d.ok())
     .map(|d| d.file_name().to_string_lossy().into_owned())
-    .filter(|name| &name != &"mod.rs" && &name != &".gitignore")
+    .filter(|name| name != "mod.rs" && name != ".gitignore")
     .map(|name| format!("pub mod {};", name.trim_end_matches(".rs")))
     .collect::<Vec<_>>();
   pub_mod_stmts.sort();
@@ -171,7 +168,7 @@ fn generate_mod_rs(dir: &Path) -> Result<(), String> {
     .map_err(|err| format!("Failed to write mod.rs: {}", err))
 }
 
-fn generate_for_tower(thirdpartyprotobuf: &Path, out_dir: PathBuf) {
+fn generate_for_tower(thirdpartyprotobuf: &Path, out_dir: &Path) {
   tower_grpc_build::Config::new()
     .enable_server(true)
     .enable_client(true)
@@ -181,14 +178,13 @@ fn generate_for_tower(thirdpartyprotobuf: &Path, out_dir: PathBuf) {
       )],
       &std::fs::read_dir(&thirdpartyprotobuf)
         .unwrap()
-        .into_iter()
         .map(|d| d.unwrap().path())
         .collect::<Vec<_>>(),
     )
     .unwrap_or_else(|e| panic!("protobuf compilation failed: {}", e));
 
   let mut dirs_needing_mod_rs = HashSet::new();
-  dirs_needing_mod_rs.insert(out_dir.clone());
+  dirs_needing_mod_rs.insert(out_dir.to_owned());
 
   for f in walkdir::WalkDir::new(std::env::var("OUT_DIR").unwrap())
     .into_iter()
@@ -206,7 +202,7 @@ fn generate_for_tower(thirdpartyprotobuf: &Path, out_dir: PathBuf) {
     // pop .rs
     parts.pop();
 
-    let mut dst = out_dir.clone();
+    let mut dst = out_dir.to_owned();
     for part in parts {
       dst.push(part);
       dirs_needing_mod_rs.insert(dst.clone());
@@ -220,16 +216,56 @@ fn generate_for_tower(thirdpartyprotobuf: &Path, out_dir: PathBuf) {
     std::fs::copy(f.path(), dst).unwrap();
   }
 
-  disable_clippy_in_generated_code(&out_dir).expect("Failed to strip clippy from generated code");
+  disable_clippy_in_generated_code(out_dir).expect("Failed to strip clippy from generated code");
 
   for dir in &dirs_needing_mod_rs {
     generate_mod_rs(dir).expect("Failed to write mod.rs");
   }
 }
 
-fn make_clean_dir(path: &Path) {
+///
+/// Replaces contents of directory `path` with contents of directory populated by passed function.
+/// Does not modify `path` if the contents are identical.
+///
+fn replace_if_changed<F: FnOnce(&Path)>(path: &Path, f: F) {
+  let tempdir = tempfile::TempDir::new().unwrap();
+  f(tempdir.path());
+  if let Ok(false) = dir_diff::is_different(path, tempdir.path()) {
+    return;
+  }
   if path.exists() {
     std::fs::remove_dir_all(path).unwrap();
   }
-  std::fs::create_dir_all(path).unwrap();
+  std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+  copy_dir::copy_dir(tempdir.path(), path).unwrap();
+}
+
+fn format(path: &Path) {
+  let mut rustfmt = PathBuf::from(env!("CARGO"));
+  rustfmt.pop();
+  rustfmt.push("rustfmt");
+  let mut rustfmt_config = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+  rustfmt_config.pop(); // bazel_protos
+  rustfmt_config.pop(); // process_execution
+  rustfmt_config.push("rustfmt.toml");
+
+  if !rustfmt_config.exists() {
+    panic!("Couldn't find file {}", rustfmt_config.display());
+  }
+
+  for file in walkdir::WalkDir::new(path) {
+    let file = file.unwrap();
+    if file.file_type().is_file() {
+      let success = std::process::Command::new(&rustfmt)
+        .arg(file.path())
+        .arg("--config-path")
+        .arg(&rustfmt_config)
+        .status()
+        .unwrap()
+        .success();
+      if !success {
+        panic!("Cargo formatting failed for generated protos. Output should be above.");
+      }
+    }
+  }
 }

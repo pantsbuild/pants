@@ -32,10 +32,12 @@
 # WRAPPER_SRCPATH=/src/wrapper/src/main/python \
 #    exec /src/pantsbuild-pants/pants "$@"
 #
+# The script defaults to running with Python 3. To use a specific Python version,
+# such as 3.7, prefix the script with `PY=python3.7`.
 
 set -e
 
-HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # Set RUN_PANTS_FROM_PEX to non-empty to cause this wrapper script to delegate directly
 # to ./pants.pex. We use this in CI to avoid bootstrapping in every shard.
@@ -47,56 +49,83 @@ fi
 
 # Exposes:
 # + activate_pants_venv: Activate a virtualenv for pants requirements, creating it if needed.
-source ${HERE}/build-support/pants_venv
+# shellcheck source=build-support/pants_venv
+source "${HERE}/build-support/pants_venv"
 
 # Exposes:
 # + bootstrap_native_code: Builds target-specific native engine binaries.
-source ${HERE}/build-support/bin/native/bootstrap_code.sh
+# shellcheck source=build-support/bin/native/bootstrap_code.sh
+source "${HERE}/build-support/bin/native/bootstrap_code.sh"
 
-# Default to using Python 2.7 if not otherwise specified.
-export PY="${PY:-python2.7}"
+export PY="${PY:-python3}"
 
 PANTS_EXE="${HERE}/src/python/pants/bin/pants_loader.py"
 
-if [[ ! -z "${WRAPPER_REQUIREMENTS}" ]]; then
+if [[ -n "${WRAPPER_REQUIREMENTS}" ]]; then
+  # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
+  # shellcheck disable=SC2207
   REQUIREMENTS=(
-    $(echo ${WRAPPER_REQUIREMENTS} | tr : ' ')
-    ${REQUIREMENTS[@]}
+    $(echo "${WRAPPER_REQUIREMENTS}" | tr : ' ')
+    "${REQUIREMENTS[@]}"
   )
 fi
 
 PANTS_SRCPATH=(
-  ${HERE}/src/python
+  "${HERE}/src/python"
 )
-if [[ ! -z "${WRAPPER_SRCPATH}" ]]; then
+if [[ -n "${WRAPPER_SRCPATH}" ]]; then
+  # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
+  # shellcheck disable=SC2207
   PANTS_SRCPATH=(
-    $(echo ${WRAPPER_SRCPATH} | tr : ' ')
-    ${PANTS_SRCPATH[@]}
+    $(echo "${WRAPPER_SRCPATH}" | tr : ' ')
+    "${PANTS_SRCPATH[@]}"
   )
 fi
-PANTS_SRCPATH="$(echo ${PANTS_SRCPATH[@]} | tr ' ' :)"
+PANTS_SRCPATH_STR="$(echo "${PANTS_SRCPATH[@]}" | tr ' ' :)"
 
 function exec_pants_bare() {
   # Redirect activation and native bootstrap to ensure that they don't interfere with stdout.
   activate_pants_venv 1>&2
   bootstrap_native_code 1>&2
-  PYTHONPATH="${PANTS_SRCPATH}:${PYTHONPATH}" \
-    exec python ${PANTS_EXE} "$@"
+  PYTHONPATH="${PANTS_SRCPATH_STR}:${PYTHONPATH}" RUNNING_PANTS_FROM_SOURCES=1 \
+    exec python "${PANTS_EXE}" "$@"
 }
 
-if [[ ! -z "${WRAPPER_REQUIREMENTS}" ]]; then
+if [[ -n "${WRAPPER_REQUIREMENTS}" ]]; then
   log "*** Running pants with extra requirements: ${WRAPPER_REQUIREMENTS} ***"
 fi
-if [[ ! -z "${WRAPPER_SRCPATH}" ]]; then
+if [[ -n "${WRAPPER_SRCPATH}" ]]; then
   log "*** Running pants with extra sources ${WRAPPER_SRCPATH} ***"
 fi
 
-if [[ ! -z "$PANTS_DEV" && "$PANTS_DEV" -eq 0 ]]; then
+if [[ -n "$PANTS_DEV" && "$PANTS_DEV" -eq 0 ]]; then
   # Unexport PANTS_DEV if explicitly set to 0.
   export -n PANTS_DEV
 else
   # We're running against a Pants clone.
   export PANTS_DEV=1
+fi
+
+# Integration tests depend on an up-to-date `pants.pex`. Here, we check if we're running tests
+# and ensure the `pants.pex` is generated if so. We do this here, rather than via `pants-plugins`,
+# because we want the file to be generated _before_ any tests run, not during that Pants invocation,
+# as the dependency is marked via BUILD files so should not be constructed at runtime.
+#
+# Note that we have no way to distinguish between integration tests vs unit tests here, so we
+# unfortunately rebuild the pants.pex for unit tests too.
+#
+# We do not do this when in CI because CI downloads the PEX from AWS and we never want a worker
+# shard to try bootstrapping the PEX itself.
+test_goal_used=false
+for arg in "$@"; do
+  if [[ "${arg}" == 'test' || "${arg}" == 'test.*' ]]; then
+    test_goal_used=true
+  fi
+done
+
+no_regen_pex="${NO_REGEN_PEX:-${TRAVIS}}"
+if [[ "${test_goal_used}" == 'true' && "${no_regen_pex}" != 'true' ]]; then
+  "$HERE/build-support/bin/bootstrap_pants_pex.sh"
 fi
 
 exec_pants_bare "$@"

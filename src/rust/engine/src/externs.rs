@@ -3,21 +3,38 @@
 
 use std::ffi::OsStr;
 use std::ffi::OsString;
+use std::fmt;
 use std::mem;
 use std::os::raw;
 use std::os::unix::ffi::{OsStrExt, OsStringExt};
 use std::string::FromUtf8Error;
 
-use crate::core::{Failure, Function, Key, TypeConstraint, TypeId, Value};
+use crate::core::{Failure, Function, Key, TypeId, Value};
 use crate::handles::{DroppingHandle, Handle};
 use crate::interning::Interns;
+use itertools::Itertools;
 use lazy_static::lazy_static;
-use log;
-use num_enum::CustomTryInto;
 use parking_lot::RwLock;
+use std::collections::BTreeMap;
 
-pub fn eval(python: &str) -> Result<Value, Failure> {
-  with_externs(|e| (e.eval)(e.context, python.as_ptr(), python.len() as u64)).into()
+/// Return the Python value None.
+pub fn none() -> Handle {
+  with_externs(|e| (e.clone_val)(e.context, &e.none))
+}
+
+pub fn get_value_from_type_id(ty: TypeId) -> Value {
+  with_externs(|e| {
+    let handle = (e.get_handle_from_type_id)(e.context, ty);
+    Value::new(handle)
+  })
+}
+
+pub fn get_type_for(val: &Value) -> TypeId {
+  with_externs(|e| (e.get_type_for)(e.context, val as &Handle))
+}
+
+pub fn is_union(ty: TypeId) -> bool {
+  with_externs(|e| (e.is_union)(e.context, ty))
 }
 
 pub fn identify(val: &Value) -> Ident {
@@ -46,22 +63,6 @@ pub fn drop_handles(handles: &[DroppingHandle]) {
   with_externs(|e| (e.drop_handles)(e.context, handles.as_ptr(), handles.len() as u64))
 }
 
-pub fn satisfied_by(constraint: &TypeConstraint, obj: &Value) -> bool {
-  let interns = INTERNS.read();
-  with_externs(|e| {
-    (e.satisfied_by)(
-      e.context,
-      interns.get(&constraint.0) as &Handle,
-      obj as &Handle,
-    )
-  })
-}
-
-pub fn satisfied_by_type(constraint: &TypeConstraint, cls: TypeId) -> bool {
-  let interns = INTERNS.read();
-  with_externs(|e| (e.satisfied_by_type)(e.context, interns.get(&constraint.0) as &Handle, &cls))
-}
-
 pub fn store_tuple(values: &[Value]) -> Value {
   let handles: Vec<_> = values
     .iter()
@@ -76,18 +77,11 @@ pub fn store_set<I: Iterator<Item = Value>>(values: I) -> Value {
   with_externs(|e| (e.store_set)(e.context, handles.as_ptr(), handles.len() as u64).into())
 }
 
-///
-/// Store a dict of values, which are stored in a slice alternating interleaved keys and values,
-/// i.e. stored (key0, value0, key1, value1, ...)
-///
-/// The underlying slice _must_ contain an even number of elements.
-///
-pub fn store_dict(keys_and_values_interleaved: &[(Value)]) -> Value {
-  if keys_and_values_interleaved.len() % 2 != 0 {
-    panic!("store_dict requires an even number of elements");
-  }
-  let handles: Vec<_> = keys_and_values_interleaved
+/// Store a slice containing 2-tuples of (key, value) as a Python dictionary.
+pub fn store_dict(keys_and_values: &[(Value, Value)]) -> Value {
+  let handles: Vec<_> = keys_and_values
     .iter()
+    .flat_map(|(k, v)| vec![k, v].into_iter())
     .map(|v| v as &Handle as *const Handle)
     .collect();
   with_externs(|e| (e.store_dict)(e.context, handles.as_ptr(), handles.len() as u64).into())
@@ -114,6 +108,10 @@ pub fn store_utf8(utf8: &str) -> Value {
 pub fn store_utf8_osstr(utf8: &OsStr) -> Value {
   let bytes = utf8.as_bytes();
   with_externs(|e| (e.store_utf8)(e.context, bytes.as_ptr(), bytes.len() as u64).into())
+}
+
+pub fn store_u64(val: u64) -> Value {
+  with_externs(|e| (e.store_u64)(e.context, val).into())
 }
 
 pub fn store_i64(val: i64) -> Value {
@@ -157,11 +155,38 @@ pub fn project_multi(value: &Value, field: &str) -> Vec<Value> {
   })
 }
 
+pub fn project_bool(value: &Value, field: &str) -> bool {
+  with_externs(|e| {
+    let named_val: Value = (e.project_ignoring_type)(
+      e.context,
+      value as &Handle,
+      field.as_ptr(),
+      field.len() as u64,
+    )
+    .into();
+    (e.val_to_bool)(e.context, &named_val as &Handle)
+  })
+}
+
 pub fn project_multi_strs(item: &Value, field: &str) -> Vec<String> {
   project_multi(item, field)
     .iter()
     .map(|v| val_to_str(v))
     .collect()
+}
+
+// This is intended for projecting environment variable maps - i.e. Python Dict[str, str] that are
+// encoded as a Tuple of an (even) number of str's. It could be made more general if we need
+// similar functionality for something else.
+pub fn project_tuple_encoded_map(
+  value: &Value,
+  field: &str,
+) -> Result<BTreeMap<String, String>, String> {
+  let parts = project_multi_strs(&value, field);
+  if parts.len() % 2 != 0 {
+    return Err("Error parsing env: odd number of parts".to_owned());
+  }
+  Ok(parts.into_iter().tuples::<(_, _)>().collect())
 }
 
 pub fn project_str(value: &Value, field: &str) -> String {
@@ -177,6 +202,19 @@ pub fn project_str(value: &Value, field: &str) -> String {
   val_to_str(&name_val)
 }
 
+pub fn project_bytes(value: &Value, field: &str) -> Vec<u8> {
+  let name_val = with_externs(|e| {
+    (e.project_ignoring_type)(
+      e.context,
+      value as &Handle,
+      field.as_ptr(),
+      field.len() as u64,
+    )
+    .into()
+  });
+  val_to_bytes(&name_val)
+}
+
 pub fn key_to_str(key: &Key) -> String {
   val_to_str(&val_for(key))
 }
@@ -187,6 +225,10 @@ pub fn type_to_str(type_id: TypeId) -> String {
       .to_string()
       .unwrap_or_else(|e| format!("<failed to decode unicode for {:?}: {}>", type_id, e))
   })
+}
+
+pub fn val_to_bytes(val: &Value) -> Vec<u8> {
+  with_externs(|e| (e.val_to_bytes)(e.context, val as &Handle).to_bytes())
 }
 
 pub fn val_to_str(val: &Value) -> String {
@@ -221,27 +263,35 @@ pub fn call(func: &Value, args: &[Value]) -> Result<Value, Failure> {
 pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorResponse, Failure> {
   let response =
     with_externs(|e| (e.generator_send)(e.context, generator as &Handle, arg as &Handle));
-  match response.res_type {
-    PyGeneratorResponseType::Break => Ok(GeneratorResponse::Break(response.values.unwrap_one())),
-    PyGeneratorResponseType::Throw => Err(PyResult::failure_from(response.values.unwrap_one())),
-    PyGeneratorResponseType::Get => {
+  match response {
+    PyGeneratorResponse::Broke(h) => Ok(GeneratorResponse::Break(Value::new(h))),
+    PyGeneratorResponse::Throw(h) => Err(PyResult::failure_from(Value::new(h))),
+    PyGeneratorResponse::Get(product, handle, ident, declared_subject) => {
       let mut interns = INTERNS.write();
-      let constraint = TypeConstraint(interns.insert(response.constraints.unwrap_one()));
-      Ok(GeneratorResponse::Get(Get(
-        constraint,
-        interns.insert(response.values.unwrap_one()),
-      )))
+      let g = Get {
+        product,
+        subject: interns.insert_with(Value::new(handle), ident),
+        declared_subject: Some(declared_subject),
+      };
+      Ok(GeneratorResponse::Get(g))
     }
-    PyGeneratorResponseType::GetMulti => {
+    PyGeneratorResponse::GetMulti(products, handles, identities) => {
       let mut interns = INTERNS.write();
-      let continues = response
-        .constraints
-        .to_vec()
+      let products = products.to_vec();
+      let identities = identities.to_vec();
+      let values = handles.to_vec();
+      assert_eq!(products.len(), values.len());
+      let gets: Vec<Get> = products
         .into_iter()
-        .zip(response.values.to_vec().into_iter())
-        .map(|(c, v)| Get(TypeConstraint(interns.insert(c)), interns.insert(v)))
+        .zip(values.into_iter())
+        .zip(identities.into_iter())
+        .map(|((p, v), i)| Get {
+          product: p,
+          subject: interns.insert_with(v, i),
+          declared_subject: None,
+        })
         .collect();
-      Ok(GeneratorResponse::GetMulti(continues))
+      Ok(GeneratorResponse::GetMulti(gets))
     }
   }
 }
@@ -270,7 +320,7 @@ pub fn unsafe_call(func: &Function, args: &[Value]) -> Value {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-/// The remainder of this file deals with the static initialization of the Externs.
+// The remainder of this file deals with the static initialization of the Externs.
 /////////////////////////////////////////////////////////////////////////////////////////
 
 lazy_static! {
@@ -280,28 +330,13 @@ lazy_static! {
   static ref INTERNS: RwLock<Interns> = RwLock::new(Interns::new());
 }
 
-// This is mut so that the max level can be set via set_externs.
-// It should only be set exactly once, and nothing should ever read it (it is only defined to
-// prevent the FfiLogger from being dropped).
-// In order to avoid a performance hit, there is no lock guarding it (because if it had a lock, it
-// would need to be acquired for every single logging statement).
-// Please don't mutate it.
-// Please.
-static mut LOGGER: FfiLogger = FfiLogger {
-  level_filter: log::LevelFilter::Off,
-};
-
 ///
 /// Set the static Externs for this process. All other methods of this module will fail
 /// until this has been called.
 ///
 pub fn set_externs(externs: Externs) {
-  let log_level = externs.log_level;
   let mut externs_ref = EXTERNS.write();
   *externs_ref = Some(externs);
-  unsafe {
-    LOGGER.init(log_level);
-  }
 }
 
 fn with_externs<F, T>(f: F) -> T
@@ -332,44 +367,43 @@ pub type ExternContext = raw::c_void;
 pub struct Externs {
   pub context: *const ExternContext,
   pub log_level: u8,
-  pub log: LogExtern,
+  pub none: Handle,
   pub call: CallExtern,
   pub generator_send: GeneratorSendExtern,
-  pub eval: EvalExtern,
+  pub get_type_for: GetTypeForExtern,
+  pub get_handle_from_type_id: GetHandleFromTypeIdExtern,
+  pub is_union: IsUnionExtern,
   pub identify: IdentifyExtern,
   pub equals: EqualsExtern,
   pub clone_val: CloneValExtern,
   pub drop_handles: DropHandlesExtern,
-  pub satisfied_by: SatisfiedByExtern,
-  pub satisfied_by_type: SatisfiedByTypeExtern,
   pub store_tuple: StoreTupleExtern,
   pub store_set: StoreTupleExtern,
   pub store_dict: StoreTupleExtern,
   pub store_bytes: StoreBytesExtern,
   pub store_utf8: StoreUtf8Extern,
+  pub store_u64: StoreU64Extern,
   pub store_i64: StoreI64Extern,
   pub store_f64: StoreF64Extern,
   pub store_bool: StoreBoolExtern,
   pub project_ignoring_type: ProjectIgnoringTypeExtern,
   pub project_multi: ProjectMultiExtern,
   pub type_to_str: TypeToStrExtern,
+  pub val_to_bytes: ValToBytesExtern,
   pub val_to_str: ValToStrExtern,
+  pub val_to_bool: ValToBoolExtern,
   pub create_exception: CreateExceptionExtern,
-  // TODO: This type is also declared on `types::Types`.
-  pub py_str_type: TypeId,
 }
 
 // The pointer to the context is safe for sharing between threads.
 unsafe impl Sync for Externs {}
 unsafe impl Send for Externs {}
 
-pub type LogExtern = extern "C" fn(*const ExternContext, u8, str_ptr: *const u8, str_len: u64);
+pub type GetTypeForExtern = extern "C" fn(*const ExternContext, *const Handle) -> TypeId;
 
-pub type SatisfiedByExtern =
-  extern "C" fn(*const ExternContext, *const Handle, *const Handle) -> bool;
+pub type GetHandleFromTypeIdExtern = extern "C" fn(*const ExternContext, TypeId) -> Handle;
 
-pub type SatisfiedByTypeExtern =
-  extern "C" fn(*const ExternContext, *const Handle, *const TypeId) -> bool;
+pub type IsUnionExtern = extern "C" fn(*const ExternContext, TypeId) -> bool;
 
 pub type IdentifyExtern = extern "C" fn(*const ExternContext, *const Handle) -> Ident;
 
@@ -385,6 +419,8 @@ pub type StoreTupleExtern =
 pub type StoreBytesExtern = extern "C" fn(*const ExternContext, *const u8, u64) -> Handle;
 
 pub type StoreUtf8Extern = extern "C" fn(*const ExternContext, *const u8, u64) -> Handle;
+
+pub type StoreU64Extern = extern "C" fn(*const ExternContext, u64) -> Handle;
 
 pub type StoreI64Extern = extern "C" fn(*const ExternContext, i64) -> Handle;
 
@@ -409,13 +445,19 @@ impl PyResult {
   }
 }
 
+impl From<Value> for PyResult {
+  fn from(val: Value) -> Self {
+    PyResult {
+      is_throw: false,
+      handle: val.into(),
+    }
+  }
+}
+
 impl From<Result<Value, Failure>> for PyResult {
   fn from(result: Result<Value, Failure>) -> Self {
     match result {
-      Ok(val) => PyResult {
-        is_throw: false,
-        handle: val.into(),
-      },
+      Ok(val) => val.into(),
       Err(f) => {
         let val = match f {
           f @ Failure::Invalidated => create_exception(&format!("{}", f)),
@@ -458,29 +500,41 @@ impl From<Result<Value, String>> for PyResult {
 
 impl From<Result<(), String>> for PyResult {
   fn from(res: Result<(), String>) -> Self {
-    PyResult::from(res.map(|()| eval("None").unwrap()))
+    PyResult::from(res.map(|()| Value::from(none())))
   }
 }
 
-// Only constructed from the python side.
-#[allow(dead_code)]
-#[repr(u8)]
-pub enum PyGeneratorResponseType {
-  Break = 0,
-  Throw = 1,
-  Get = 2,
-  GetMulti = 3,
-}
-
+///
+/// The response from a call to extern_generator_send. Gets include Idents for their Handles
+/// in order to avoid roundtripping to intern them, and to eagerly trigger errors for unhashable
+/// types on the python side where possible.
+///
 #[repr(C)]
-pub struct PyGeneratorResponse {
-  res_type: PyGeneratorResponseType,
-  values: HandleBuffer,
-  constraints: HandleBuffer,
+pub enum PyGeneratorResponse {
+  Get(TypeId, Handle, Ident, TypeId),
+  GetMulti(TypeIdBuffer, HandleBuffer, IdentBuffer),
+  // NB: Broke not Break because C keyword.
+  Broke(Handle),
+  Throw(Handle),
 }
 
 #[derive(Debug)]
-pub struct Get(pub TypeConstraint, pub Key);
+pub struct Get {
+  pub product: TypeId,
+  pub subject: Key,
+  pub declared_subject: Option<TypeId>,
+}
+
+impl fmt::Display for Get {
+  fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+    write!(
+      f,
+      "Get({}, {})",
+      type_to_str(self.product),
+      key_to_str(&self.subject)
+    )
+  }
+}
 
 pub enum GeneratorResponse {
   Break(Value),
@@ -489,12 +543,45 @@ pub enum GeneratorResponse {
 }
 
 ///
-/// The result of an `identify` call, including the __hash__ of a Handle and its TypeId.
+/// The result of an `identify` call, including the __hash__ of a Handle and a TypeId representing
+/// the object's type.
 ///
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct Ident {
   pub hash: i64,
   pub type_id: TypeId,
+}
+
+pub trait RawBuffer<Raw, Output> {
+  fn ptr(&self) -> *mut Raw;
+  fn len(&self) -> u64;
+
+  ///
+  /// A buffer-specific shallow clone operation (possibly just implemented via clone).
+  ///
+  fn lift(t: &Raw) -> Output;
+
+  ///
+  /// Returns a Vec copy of the buffer contents.
+  ///
+  fn to_vec(&self) -> Vec<Output> {
+    with_vec(self.ptr(), self.len() as usize, |vec| {
+      vec.iter().map(Self::lift).collect()
+    })
+  }
+
+  ///
+  /// Asserts that the buffer contains one item, and returns a copy of it.
+  ///
+  fn unwrap_one(&self) -> Output {
+    assert!(
+      self.len() == 1,
+      "Expected exactly 1 item in Buffer, but had: {}",
+      self.len()
+    );
+    with_vec(self.ptr(), self.len() as usize, |vec| Self::lift(&vec[0]))
+  }
 }
 
 ///
@@ -512,30 +599,42 @@ pub struct HandleBuffer {
   handle_: Handle,
 }
 
-impl HandleBuffer {
-  pub fn to_vec(&self) -> Vec<Value> {
-    with_vec(self.handles_ptr, self.handles_len as usize, |handle_vec| {
-      handle_vec
-        .iter()
-        .map(|h| Value::new(unsafe { h.clone_shallow() }))
-        .collect()
-    })
+impl RawBuffer<Handle, Value> for HandleBuffer {
+  fn ptr(&self) -> *mut Handle {
+    self.handles_ptr
   }
 
-  /// Asserts that the HandleBuffer contains one value, and returns it.
-  pub fn unwrap_one(&self) -> Value {
-    assert!(
-      self.handles_len == 1,
-      "HandleBuffer contained more than one value: {}",
-      self.handles_len
-    );
-    with_vec(self.handles_ptr, self.handles_len as usize, |handle_vec| {
-      Value::new(unsafe { handle_vec.iter().next().unwrap().clone_shallow() })
-    })
+  fn len(&self) -> u64 {
+    self.handles_len
+  }
+
+  fn lift(t: &Handle) -> Value {
+    Value::new(unsafe { t.clone_shallow() })
   }
 }
 
-// Points to an array of TypeIds.
+#[repr(C)]
+pub struct IdentBuffer {
+  idents_ptr: *mut Ident,
+  idents_len: u64,
+  // A Handle to hold the underlying array alive.
+  handle_: Handle,
+}
+
+impl RawBuffer<Ident, Ident> for IdentBuffer {
+  fn ptr(&self) -> *mut Ident {
+    self.idents_ptr
+  }
+
+  fn len(&self) -> u64 {
+    self.idents_len
+  }
+
+  fn lift(t: &Ident) -> Ident {
+    *t
+  }
+}
+
 #[repr(C)]
 pub struct TypeIdBuffer {
   ids_ptr: *mut TypeId,
@@ -544,9 +643,17 @@ pub struct TypeIdBuffer {
   handle_: Handle,
 }
 
-impl TypeIdBuffer {
-  pub fn to_vec(&self) -> Vec<TypeId> {
-    with_vec(self.ids_ptr, self.ids_len as usize, |vec| vec.clone())
+impl RawBuffer<TypeId, TypeId> for TypeIdBuffer {
+  fn ptr(&self) -> *mut TypeId {
+    self.ids_ptr
+  }
+
+  fn len(&self) -> u64 {
+    self.ids_len
+  }
+
+  fn lift(t: &TypeId) -> TypeId {
+    *t
   }
 }
 
@@ -574,7 +681,7 @@ pub struct Buffer {
 
 impl Buffer {
   pub fn to_bytes(&self) -> Vec<u8> {
-    with_vec(self.bytes_ptr, self.bytes_len as usize, |vec| vec.clone())
+    with_vec(self.bytes_ptr, self.bytes_len as usize, Vec::clone)
   }
 
   pub fn to_os_string(&self) -> OsString {
@@ -603,7 +710,7 @@ pub struct BufferBuffer {
 impl BufferBuffer {
   pub fn to_bytes_vecs(&self) -> Vec<Vec<u8>> {
     with_vec(self.bufs_ptr, self.bufs_len as usize, |vec| {
-      vec.iter().map(|b| b.to_bytes()).collect()
+      vec.iter().map(Buffer::to_bytes).collect()
     })
   }
 
@@ -622,11 +729,26 @@ impl BufferBuffer {
       .map(String::from_utf8)
       .collect()
   }
+
+  pub fn to_map(&self, name: &'static str) -> Result<BTreeMap<String, String>, String> {
+    let strings = self
+      .to_strings()
+      .map_err(|err| format!("Error decoding UTF8 from {}: {}", name, err))?;
+
+    if strings.len() % 2 != 0 {
+      return Err(format!("Map for {} had an odd number of elements", name));
+    }
+
+    Ok(strings.into_iter().tuples::<(_, _)>().collect())
+  }
 }
 
 pub type TypeToStrExtern = extern "C" fn(*const ExternContext, TypeId) -> Buffer;
 
 pub type ValToStrExtern = extern "C" fn(*const ExternContext, *const Handle) -> Buffer;
+pub type ValToBytesExtern = extern "C" fn(*const ExternContext, *const Handle) -> Buffer;
+
+pub type ValToBoolExtern = extern "C" fn(*const ExternContext, *const Handle) -> bool;
 
 pub type CreateExceptionExtern =
   extern "C" fn(*const ExternContext, str_ptr: *const u8, str_len: u64) -> Handle;
@@ -637,9 +759,6 @@ pub type CallExtern =
 pub type GeneratorSendExtern =
   extern "C" fn(*const ExternContext, *const Handle, *const Handle) -> PyGeneratorResponse;
 
-pub type EvalExtern =
-  extern "C" fn(*const ExternContext, python_ptr: *const u8, python_len: u64) -> PyResult;
-
 pub fn with_vec<F, C, T>(c_ptr: *mut C, c_len: usize, f: F) -> T
 where
   F: FnOnce(&Vec<C>) -> T,
@@ -648,98 +767,4 @@ where
   let output = f(&cs);
   mem::forget(cs);
   output
-}
-
-// This is a hard-coding of constants in the standard logging python package.
-// TODO: Switch from CustomTryInto to TryFromPrimitive when try_from is stable.
-#[derive(Debug, Eq, PartialEq, CustomTryInto)]
-#[repr(u8)]
-enum PythonLogLevel {
-  NotSet = 0,
-  // Trace doesn't exist in a Python world, so set it to "a bit lower than Debug".
-  Trace = 5,
-  Debug = 10,
-  Info = 20,
-  Warn = 30,
-  Error = 40,
-  Critical = 50,
-}
-
-impl From<log::Level> for PythonLogLevel {
-  fn from(level: log::Level) -> Self {
-    match level {
-      log::Level::Error => PythonLogLevel::Error,
-      log::Level::Warn => PythonLogLevel::Warn,
-      log::Level::Info => PythonLogLevel::Info,
-      log::Level::Debug => PythonLogLevel::Debug,
-      log::Level::Trace => PythonLogLevel::Trace,
-    }
-  }
-}
-
-impl From<PythonLogLevel> for log::LevelFilter {
-  fn from(level: PythonLogLevel) -> Self {
-    match level {
-      PythonLogLevel::NotSet => log::LevelFilter::Off,
-      PythonLogLevel::Trace => log::LevelFilter::Trace,
-      PythonLogLevel::Debug => log::LevelFilter::Debug,
-      PythonLogLevel::Info => log::LevelFilter::Info,
-      PythonLogLevel::Warn => log::LevelFilter::Warn,
-      PythonLogLevel::Error => log::LevelFilter::Error,
-      // Rust doesn't have a Critical, so treat them like Errors.
-      PythonLogLevel::Critical => log::LevelFilter::Error,
-    }
-  }
-}
-
-///
-/// FfiLogger is an implementation of log::Log which asks the Python logging system to log via cffi.
-///
-struct FfiLogger {
-  level_filter: log::LevelFilter,
-}
-
-impl FfiLogger {
-  // init must only be called once in the lifetime of the program. No other loggers may be init'd.
-  // If either of the above are violated, expect a panic.
-  pub fn init(&'static mut self, max_level: u8) {
-    let max_python_level = max_level.try_into_PythonLogLevel();
-    self.level_filter = {
-      match max_python_level {
-        Ok(python_level) => {
-          let level: log::LevelFilter = python_level.into();
-          level
-        }
-        Err(err) => panic!("Unrecognised log level from python: {}: {}", max_level, err),
-      }
-    };
-
-    log::set_max_level(self.level_filter);
-    log::set_logger(self)
-      .expect("Failed to set logger (maybe you tried to call init multiple times?)");
-  }
-}
-
-impl log::Log for FfiLogger {
-  fn enabled(&self, metadata: &log::Metadata<'_>) -> bool {
-    metadata.level() <= self.level_filter
-  }
-
-  fn log(&self, record: &log::Record<'_>) {
-    if !self.enabled(record.metadata()) {
-      return;
-    }
-    let level: PythonLogLevel = record.level().into();
-    let message = format!("{}", record.args());
-    with_externs(|e| {
-      (e.log)(
-        e.context,
-        level as u8,
-        message.as_ptr(),
-        message.len() as u64,
-      )
-    })
-  }
-
-  fn flush(&self) {}
 }

@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.subsystems.shader import Shader
@@ -20,7 +17,7 @@ class JUnit(JvmToolMixin, InjectablesMixin, Subsystem):
     RUNNER_MAIN = "org.pantsbuild.tools.junit.ConsoleRunner"
 
     LIBRARY_JAR = JarDependency(org="junit", name="junit", rev=LIBRARY_REV)
-    _RUNNER_JAR = JarDependency(org="org.pantsbuild", name="junit-runner", rev="1.0.24")
+    _RUNNER_JAR = JarDependency(org="org.pantsbuild", name="junit-runner", rev="1.0.28")
 
     @classmethod
     def register_options(cls, register):
@@ -42,27 +39,22 @@ class JUnit(JvmToolMixin, InjectablesMixin, Subsystem):
                 Shader.exclude_package("junit.framework", recursive=True),
                 Shader.exclude_package("org.junit", recursive=True),
                 Shader.exclude_package("org.hamcrest", recursive=True),
-                Shader.exclude_package(
-                    "org.pantsbuild.junit.annotations", recursive=True
-                ),
+                Shader.exclude_package("org.pantsbuild.junit.annotations", recursive=True),
                 Shader.exclude_package("org.pantsbuild.junit.security", recursive=True),
             ],
         )
 
     def injectables(self, build_graph):
-        junit_addr = Address.parse(self.injectables_spec_for_key("library"))
+        junit_addr = Address.parse(self.injectables_address_spec_for_key("library"))
         if not build_graph.contains_address(junit_addr):
             build_graph.inject_synthetic_target(
                 junit_addr, JarLibrary, jars=[JUnit.LIBRARY_JAR], scope="forced"
             )
 
     @property
-    def injectables_spec_mapping(self):
+    def injectables_address_spec_mapping(self):
         return {"library": [self.get_options().junit_library]}
 
     def runner_classpath(self, context):
-        """Returns an iterable of classpath elements for the runner.
-    """
-        return self.tool_classpath_from_products(
-            context.products, "junit", self.options_scope
-        )
+        """Returns an iterable of classpath elements for the runner."""
+        return self.tool_classpath_from_products(context.products, "junit", self.options_scope)

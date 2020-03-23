@@ -10,5 +10,6 @@ python_library(
     'src/python/pants/backend/docgen/tasks',
     'src/python/pants/build_graph',
     'src/python/pants/goal:task_registrar',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )

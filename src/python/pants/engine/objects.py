@@ -1,98 +1,99 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import inspect
-import sys
-from abc import abstractmethod, abstractproperty
-from builtins import object
+import typing
+from abc import ABC, abstractmethod
 from collections import namedtuple
+from collections.abc import Iterable
+from typing import Generic, Iterator, TypeVar
 
-from future.utils import PY2
-
-from pants.util.memo import memoized_classmethod
-from pants.util.meta import AbstractClass
-from pants.util.objects import Exactly, TypedCollection, datatype
+from pants.util.meta import decorated_type_checkable
 
 
 class SerializationError(Exception):
-  """Indicates an error serializing an object."""
+    """Indicates an error serializing an object."""
 
 
 # TODO: Likely no longer necessary, due to the laziness of the product graph.
-class Resolvable(AbstractClass):
-  """Represents a resolvable object."""
+class Resolvable(ABC):
+    """Represents a resolvable object."""
 
-  @abstractproperty
-  def address(self):
-    """Return the opaque address descriptor that this resolvable resolves."""
+    @property
+    @abstractmethod
+    def address(self):
+        """Return the opaque address descriptor that this resolvable resolves."""
 
-  @abstractmethod
-  def resolve(self):
-    """Resolve and return the resolvable object."""
+    @abstractmethod
+    def resolve(self):
+        """Resolve and return the resolvable object."""
 
 
 def _unpickle_serializable(serializable_class, kwargs):
-  # A pickle-compatible top-level function for custom unpickling of Serializables.
-  return serializable_class(**kwargs)
+    # A pickle-compatible top-level function for custom unpickling of Serializables.
+    return serializable_class(**kwargs)
 
 
-class Locatable(AbstractClass):
-  """Marks a class whose constructor should receive its spec_path relative to the build root.
+class Locatable(ABC):
+    """Marks a class whose constructor should receive its spec_path relative to the build root.
 
-  Locatable objects will be passed a `spec_path` constructor kwarg that indicates where they
-  were parsed. If the object also has a `name` (not all do), then these two fields can be
-  combined into an Address.
-  """
-
-
-class SerializablePickle(namedtuple('CustomPickle', ['unpickle_func', 'args'])):
-  """A named tuple to help the readability of the __reduce__ protocol.
-
-  See: https://docs.python.org/2.7/library/pickle.html#pickling-and-unpickling-extension-types
-  """
-
-  @classmethod
-  def create(cls, serializable_instance):
-    """Return a tuple that implements the __reduce__ pickle protocol for serializable_instance."""
-    if not Serializable.is_serializable(serializable_instance):
-      raise ValueError('Can only create pickles for Serializable objects, given {} of type {}'
-                       .format(serializable_instance, type(serializable_instance).__name__))
-    return cls(unpickle_func=_unpickle_serializable,
-               args=(type(serializable_instance), serializable_instance._asdict()))
-
-
-class Serializable(AbstractClass):
-  """Marks a class that can be serialized into and reconstituted from python builtin values.
-
-  Also provides support for the pickling protocol out of the box.
-  """
-
-  @staticmethod
-  def is_serializable(obj):
-    """Return `True` if the given object conforms to the Serializable protocol.
-
-    :rtype: bool
+    Locatable objects will be passed a `spec_path` constructor kwarg that indicates where they were
+    parsed. If the object also has a `name` (not all do), then these two fields can be combined into
+    an Address.
     """
-    if inspect.isclass(obj):
-      return Serializable.is_serializable_type(obj)
-    return isinstance(obj, Serializable) or hasattr(obj, '_asdict')
 
-  @staticmethod
-  def is_serializable_type(type_):
-    """Return `True` if the given type's instances conform to the Serializable protocol.
 
-    :rtype: bool
+class SerializablePickle(namedtuple("CustomPickle", ["unpickle_func", "args"])):
+    """A named tuple to help the readability of the __reduce__ protocol.
+
+    See: https://docs.python.org/2.7/library/pickle.html#pickling-and-unpickling-extension-types
     """
-    if not inspect.isclass(type_):
-      return Serializable.is_serializable(type_)
-    return issubclass(type_, Serializable) or hasattr(type_, '_asdict')
 
-  @abstractmethod
-  def _asdict(self):
-    """Return a dict mapping this class' properties.
+    @classmethod
+    def create(cls, serializable_instance):
+        """Return a tuple that implements the __reduce__ pickle protocol for
+        serializable_instance."""
+        if not Serializable.is_serializable(serializable_instance):
+            raise ValueError(
+                "Can only create pickles for Serializable objects, given {} of type {}".format(
+                    serializable_instance, type(serializable_instance).__name__
+                )
+            )
+        return cls(
+            unpickle_func=_unpickle_serializable,
+            args=(type(serializable_instance), serializable_instance._asdict()),
+        )
+
+
+class Serializable(ABC):
+    """Marks a class that can be serialized into and reconstituted from python builtin values.
+
+    Also provides support for the pickling protocol out of the box.
+    """
+
+    @staticmethod
+    def is_serializable(obj):
+        """Return `True` if the given object conforms to the Serializable protocol.
+
+        :rtype: bool
+        """
+        if inspect.isclass(obj):
+            return Serializable.is_serializable_type(obj)
+        return isinstance(obj, Serializable) or hasattr(obj, "_asdict")
+
+    @staticmethod
+    def is_serializable_type(type_):
+        """Return `True` if the given type's instances conform to the Serializable protocol.
+
+        :rtype: bool
+        """
+        if not inspect.isclass(type_):
+            return Serializable.is_serializable(type_)
+        return issubclass(type_, Serializable) or hasattr(type_, "_asdict")
+
+    @abstractmethod
+    def _asdict(self):
+        """Return a dict mapping this class' properties.
 
     To meet the contract of a serializable the constructor must accept all the properties returned
     here as constructor parameters; ie the following must be true::
@@ -106,84 +107,109 @@ class Serializable(AbstractClass):
 
     Any :class:`collections.namedtuple` satisfies the Serializable contract automatically via duck
     typing if it is composed of only primitive python values or Serializable values.
-    """
+        """
 
-  def __reduce__(self):
-    # We implement __reduce__ to steer the pickling process away from __getattr__ scans.  This is
-    # both more direct - we know where our instance data lives - and it notably allows __getattr__
-    # implementations by Serializable subclasses.  Without the __reduce__, __getattr__ is rendered
-    # unworkable since it causes pickle failures.
-    # See the note at the bottom of this section:
-    # https://docs.python.org/2.7/library/pickle.html#pickling-and-unpickling-normal-class-instances
-    return SerializablePickle.create(self)
+    def __reduce__(self):
+        # We implement __reduce__ to steer the pickling process away from __getattr__ scans.  This is
+        # both more direct - we know where our instance data lives - and it notably allows __getattr__
+        # implementations by Serializable subclasses.  Without the __reduce__, __getattr__ is rendered
+        # unworkable since it causes pickle failures.
+        # See the note at the bottom of this section:
+        # https://docs.python.org/2.7/library/pickle.html#pickling-and-unpickling-normal-class-instances
+        return SerializablePickle.create(self)
 
 
-class SerializableFactory(AbstractClass):
-  """Creates :class:`Serializable` objects."""
+class SerializableFactory(ABC):
+    """Creates :class:`Serializable` objects."""
 
-  @abstractmethod
-  def create(self):
-    """Return a serializable object.
+    @abstractmethod
+    def create(self):
+        """Return a serializable object.
 
-    :rtype: :class:`Serializable`
-    """
+        :rtype: :class:`Serializable`
+        """
 
 
 class ValidationError(Exception):
-  """Indicates invalid fields on an object."""
+    """Indicates invalid fields on an object."""
 
-  def __init__(self, identifier, message):
-    """Creates a validation error pertaining to the identified invalid object.
+    def __init__(self, identifier, message):
+        """Creates a validation error pertaining to the identified invalid object.
 
-    :param object identifier: Any object whose string representation identifies the invalid object
-                              that led to this validation error.
-    :param string message: A message describing the invalid Struct field.
+        :param object identifier: Any object whose string representation identifies the invalid object
+                                  that led to this validation error.
+        :param string message: A message describing the invalid Struct field.
+        """
+        super().__init__("Failed to validate {id}: {msg}".format(id=identifier, msg=message))
+
+
+class Validatable(ABC):
+    """Marks a class whose instances should validated post-construction."""
+
+    @abstractmethod
+    def validate(self):
+        """Check that this object's fields are valid.
+
+        :raises: :class:`ValidationError` if this object is invalid.
+        """
+
+
+_C = TypeVar("_C")
+
+
+class Collection(Generic[_C], Iterable):
+    """Constructs classes representing collections of objects of a particular type.
+
+    The produced class will expose its values under a field named dependencies - this is a stable API
+    which may be consumed e.g. over FFI from the engine.
+
+    Python consumers of a Collection should prefer to use its standard iteration API.
     """
-    super(ValidationError, self).__init__('Failed to validate {id}: {msg}'
-                                          .format(id=identifier, msg=message))
+
+    def __init__(self, dependencies: typing.Iterable[_C]) -> None:
+        self.dependencies = tuple(dependencies)
+
+    def __iter__(self) -> Iterator[_C]:
+        return iter(self.dependencies)
+
+    def __bool__(self) -> bool:
+        return bool(self.dependencies)
 
 
-class Validatable(AbstractClass):
-  """Marks a class whose instances should validated post-construction."""
+@decorated_type_checkable
+def union(cls):
+    """A class decorator which other classes can specify that they can resolve to with `UnionRule`.
 
-  @abstractmethod
-  def validate(self):
-    """Check that this object's fields are valid.
+    Annotating a class with @union allows other classes to use a UnionRule() instance to indicate that
+    they can be resolved to this base union class. This class will never be instantiated, and should
+    have no members -- it is used as a tag only, and will be replaced with whatever object is passed
+    in as the subject of a `await Get(...)`. See the following example:
 
-    :raises: :class:`ValidationError` if this object is invalid.
+    @union
+    class UnionBase: pass
+
+    @rule
+    async def get_some_union_type(x: X) -> B:
+      result = await Get(ResultType, UnionBase, x.f())
+      # ...
+
+    If there exists a single path from (whatever type the expression `x.f()` returns) -> `ResultType`
+    in the rule graph, the engine will retrieve and execute that path to produce a `ResultType` from
+    `x.f()`. This requires also that whatever type `x.f()` returns was registered as a union member of
+    `UnionBase` with a `UnionRule`.
+
+    Unions allow @rule bodies to be written without knowledge of what types may eventually be provided
+    as input -- rather, they let the engine check that there is a valid path to the desired result.
     """
+    # TODO: Check that the union base type is used as a tag and nothing else (e.g. no attributes)!
+    assert isinstance(cls, type)
 
+    def non_member_error_message(subject):
+        if hasattr(cls, "non_member_error_message"):
+            return cls.non_member_error_message(subject)
+        desc = f' ("{cls.__doc__}")' if cls.__doc__ else ""
+        return f"Type {type(subject).__name__} is not a member of the {cls.__name__} @union{desc}"
 
-class Collection(object):
-  """Constructs classes representing collections of objects of a particular type.
-
-  The produced class will expose its values under a field named dependencies - this is a stable API
-  which may be consumed e.g. over FFI from the engine.
-
-  Python consumers of a Collection should prefer to use its standard iteration API.
-
-  Note that elements of a Collection are type-checked upon construction.
-  """
-
-  @memoized_classmethod
-  def of(cls, *element_types):
-    union = '|'.join(element_type.__name__ for element_type in element_types)
-    type_name = '{}.of({})'.format(cls.__name__, union)
-    if PY2:
-      type_name = type_name.encode('utf-8')
-    type_checked_collection_class = datatype([
-      # Create a datatype with a single field 'dependencies' which is type-checked on construction
-      # to be a collection containing elements of only the exact `element_types` specified.
-      ('dependencies', TypedCollection(Exactly(*element_types)))
-    ], superclass_name=cls.__name__)
-    supertypes = (cls, type_checked_collection_class)
-    properties = {'element_types': element_types}
-    collection_of_type = type(type_name, supertypes, properties)
-
-    # Expose the custom class type at the module level to be pickle compatible.
-    setattr(sys.modules[cls.__module__], type_name, collection_of_type)
-
-    return collection_of_type
-
-  def __iter__(self):
-    return iter(self.dependencies)
+    return union.define_instance_of(
+        cls, non_member_error_message=staticmethod(non_member_error_message)
+    )

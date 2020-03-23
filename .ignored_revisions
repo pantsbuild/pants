@@ -1,0 +1,11 @@
+# This commit reformatted all the Python code with Black the first time.
+6c60cf752a6cc150620e8a2437974ae7d16917c5
+
+# This commit reverted the previous commit as more work and discussions were needed.
+33a6d51db91ea1fe69c39117c8878abcb824cdfb
+
+# This commit ran docformatter over the whole codebase.
+d0998872d8116edd5ebc8231dbdd28779591dc2b
+
+# This commit ran Black over the whole codebase.
+29cf9fc8b25a540f32e4a9e0aeeaaa6ea4dcc48f

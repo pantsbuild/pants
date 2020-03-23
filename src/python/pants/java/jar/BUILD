@@ -3,8 +3,6 @@
 
 python_library(
   dependencies = [
-    '3rdparty/python:future',
-    '3rdparty/python:six',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:hash_utils',
     'src/python/pants/base:payload_field',
@@ -13,4 +11,5 @@ python_library(
     'src/python/pants/util:memo',
     'src/python/pants/util:objects',
   ],
+  tags = {"partially_type_checked"},
 )

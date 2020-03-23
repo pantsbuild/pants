@@ -4,9 +4,10 @@
 
 python_tests(
   dependencies=[
-    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/backend/python/targets',
     'src/python/pants/base:build_environment',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil:task_test_base',
   ],
-  sources=globs('*.py')
+  sources=['*.py'],
+  tags = {"partially_type_checked"},
 )

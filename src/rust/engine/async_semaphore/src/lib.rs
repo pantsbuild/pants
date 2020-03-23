@@ -9,7 +9,6 @@
   clippy::expl_impl_clone_on_copy,
   clippy::if_not_else,
   clippy::needless_continue,
-  clippy::single_match_else,
   clippy::unseparated_literal_suffix,
   clippy::used_underscore_binding
 )]
@@ -22,25 +21,29 @@
   clippy::too_many_arguments
 )]
 // Default isn't as big a deal as people seem to think it is.
-#![allow(
-  clippy::new_without_default,
-  clippy::new_without_default_derive,
-  clippy::new_ret_no_self
-)]
+#![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
 use std::collections::VecDeque;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
+use std::task::{Context, Poll, Waker};
 
-use futures::future::Future;
-use futures::task::{self, Task};
-use futures::{Async, Poll};
 use parking_lot::Mutex;
 
+struct Waiter {
+  id: usize,
+  waker: Waker,
+}
+
 struct Inner {
-  waiters: VecDeque<Task>,
+  waiters: VecDeque<Waiter>,
   available_permits: usize,
+  // Used as the source of id in Waiters's because
+  // it is monotonically increasing, and only incremented under the mutex lock.
+  next_waiter_id: usize,
 }
 
 #[derive(Clone)]
@@ -54,31 +57,35 @@ impl AsyncSemaphore {
       inner: Arc::new(Mutex::new(Inner {
         waiters: VecDeque::new(),
         available_permits: permits,
+        next_waiter_id: 0,
       })),
     }
+  }
+
+  pub fn num_waiters(&self) -> usize {
+    let inner = self.inner.lock();
+    inner.waiters.len()
   }
 
   ///
   /// Runs the given Future-creating function (and the Future it returns) under the semaphore.
   ///
-  pub fn with_acquired<F, B, T, E>(&self, f: F) -> Box<dyn Future<Item = T, Error = E> + Send>
+  pub async fn with_acquired<F, B, O>(self, f: F) -> O
   where
     F: FnOnce() -> B + Send + 'static,
-    B: Future<Item = T, Error = E> + Send + 'static,
+    B: Future<Output = O> + Send + 'static,
   {
-    let permit = PermitFuture {
-      inner: Some(self.inner.clone()),
-    };
-    Box::new(
-      permit
-        .map_err(|()| panic!("Acquisition is infalliable."))
-        .and_then(|permit| {
-          f().map(move |t| {
-            drop(permit);
-            t
-          })
-        }),
-    )
+    let permit = self.acquire().await;
+    let res = f().await;
+    drop(permit);
+    res
+  }
+
+  fn acquire(&self) -> PermitFuture {
+    PermitFuture {
+      inner: self.inner.clone(),
+      waiter_id: None,
+    }
   }
 }
 
@@ -88,114 +95,89 @@ pub struct Permit {
 
 impl Drop for Permit {
   fn drop(&mut self) {
-    let task = {
-      let mut inner = self.inner.lock();
-      inner.available_permits += 1;
-      if let Some(task) = inner.waiters.pop_front() {
-        task
-      } else {
-        return;
-      }
-    };
-    task.notify();
+    let mut inner = self.inner.lock();
+    inner.available_permits += 1;
+    if let Some(waiter) = inner.waiters.front() {
+      waiter.waker.wake_by_ref()
+    }
   }
 }
 
+#[derive(Clone)]
 pub struct PermitFuture {
-  inner: Option<Arc<Mutex<Inner>>>,
+  inner: Arc<Mutex<Inner>>,
+  waiter_id: Option<usize>,
+}
+
+impl Drop for PermitFuture {
+  fn drop(&mut self) {
+    // if task_id is Some then this PermitFuture was added to the waiters queue.
+    if let Some(waiter_id) = self.waiter_id {
+      let mut inner = self.inner.lock();
+      if let Some(waiter_index) = inner
+        .waiters
+        .iter()
+        .position(|waiter| waiter_id == waiter.id)
+      {
+        inner.waiters.remove(waiter_index);
+      }
+    }
+  }
 }
 
 impl Future for PermitFuture {
-  type Item = Permit;
-  type Error = ();
+  type Output = Permit;
 
-  fn poll(&mut self) -> Poll<Permit, ()> {
-    let inner = self.inner.take().expect("cannot poll PermitFuture twice");
+  fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    let inner = self.inner.clone();
     let acquired = {
       let mut inner = inner.lock();
+      if self.waiter_id.is_none() {
+        let waiter_id = inner.next_waiter_id;
+        let this_waiter = Waiter {
+          id: waiter_id,
+          waker: cx.waker().clone(),
+        };
+        self.waiter_id = Some(waiter_id);
+        inner.next_waiter_id += 1;
+        inner.waiters.push_back(this_waiter);
+      }
       if inner.available_permits == 0 {
-        inner.waiters.push_back(task::current());
         false
       } else {
-        inner.available_permits -= 1;
-        true
+        let will_issue_permit = {
+          if let Some(front_waiter) = inner.waiters.front() {
+            // This task is the one we notified, so remove it. Otherwise keep it on the
+            // waiters queue so that it doesn't get forgotten.
+            if front_waiter.id == self.waiter_id.unwrap() {
+              inner.waiters.pop_front();
+              // Set the task_id none to indicate that the task is no longer in the
+              // queue, so we don't have to waste time searching for it in the Drop
+              // handler.
+              self.waiter_id = None;
+              true
+            } else {
+              // Don't issue a permit to this task if it isn't at the head of the line,
+              // we added it as a waiter above.
+              false
+            }
+          } else {
+            false
+          }
+        };
+        if will_issue_permit {
+          inner.available_permits -= 1;
+        }
+        will_issue_permit
       }
     };
     if acquired {
-      Ok(Async::Ready(Permit { inner }))
+      Poll::Ready(Permit { inner })
     } else {
-      self.inner = Some(inner);
-      Ok(Async::NotReady)
+      Poll::Pending
     }
   }
 }
 
 #[cfg(test)]
-mod tests {
-
-  use super::AsyncSemaphore;
-  use futures::{future, Future};
-  use std::sync::mpsc;
-  use std::thread;
-  use std::time::Duration;
-
-  #[test]
-  fn acquire_and_release() {
-    let sema = AsyncSemaphore::new(1);
-
-    sema
-      .with_acquired(|| future::ok::<_, ()>(()))
-      .wait()
-      .unwrap();
-  }
-
-  #[test]
-  fn at_most_n_acquisitions() {
-    let sema = AsyncSemaphore::new(1);
-    let handle1 = sema.clone();
-    let handle2 = sema.clone();
-
-    let (tx_thread1, acquired_thread1) = mpsc::channel();
-    let (unblock_thread1, rx_thread1) = mpsc::channel();
-    let (tx_thread2, acquired_thread2) = mpsc::channel();
-
-    thread::spawn(move || {
-      handle1
-        .with_acquired(move || {
-          // Indicate that we've acquired, and then wait to be signaled to exit.
-          tx_thread1.send(()).unwrap();
-          rx_thread1.recv().unwrap();
-          future::ok::<_, ()>(())
-        })
-        .wait()
-        .unwrap();
-    });
-
-    // Wait for thread1 to acquire, and then launch thread2.
-    acquired_thread1
-      .recv_timeout(Duration::from_secs(5))
-      .expect("thread1 didn't acquire.");
-
-    thread::spawn(move || {
-      handle2
-        .with_acquired(move || {
-          tx_thread2.send(()).unwrap();
-          future::ok::<_, ()>(())
-        })
-        .wait()
-        .unwrap();
-    });
-
-    // thread2 should not signal until we unblock thread1.
-    match acquired_thread2.recv_timeout(Duration::from_millis(100)) {
-      Err(_) => (),
-      Ok(_) => panic!("thread2 should not have acquired while thread1 was holding."),
-    }
-
-    // Unblock thread1 and confirm that thread2 acquires.
-    unblock_thread1.send(()).unwrap();
-    acquired_thread2
-      .recv_timeout(Duration::from_secs(5))
-      .expect("thread2 didn't acquire.");
-  }
-}
+mod tests;

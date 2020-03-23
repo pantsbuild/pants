@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
-  sources = globs('*.py', exclude=[globs('*_integration.py')]),
+  sources = ['*.py', '!*_integration.py'],
   dependencies = [
     'src/python/pants/backend/codegen/protobuf/java',
     'src/python/pants/java/jar',
@@ -10,21 +10,24 @@ python_tests(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:task_test_base',
-  ]
+    'src/python/pants/util:ordered_set',
+    'src/python/pants/testutil:task_test_base',
+  ],
+  tags = {"partially_type_checked"},
 )
 
 
 python_tests(
   name = 'integration',
-  sources = globs('*_integration.py'),
+  sources = ['*_integration.py'],
   dependencies = [
-    '3rdparty/python:future',
-    'src/python/pants/util:process_handler',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
+    'examples/src/java/org/pantsbuild/example:protobuf_directory',
+    'testprojects/src/java/org/pantsbuild/testproject:proto-ordering_directory',
+    'testprojects/src/protobuf/org/pantsbuild/testproject:import_from_buildroot_directory',
   ],
-  tags = {'integration'},
-  timeout = 240,
+  tags = {'integration', 'partially_type_checked'},
+  timeout = 330,
 )

@@ -6,6 +6,7 @@ python_tests(
   dependencies = [
     'src/python/pants/backend/codegen/ragel/java',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil:task_test_base',
   ],
+  tags = {"partially_type_checked"},
 )

@@ -1,9 +1,18 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+python_tests(
+  name='tests',
+  dependencies=[
+    ':ordered_set',
+  ],
+  tags = {'type_checked'},
+)
+
 python_library(
   name = 'argutil',
   sources = ['argutil.py'],
+  tags = {'type_checked'},
 )
 
 python_library(
@@ -11,34 +20,16 @@ python_library(
   sources = ['contextutil.py'],
   dependencies = [
     '3rdparty/python:ansicolors',
-    '3rdparty/python:future',
     ':dirutil',
     ':tarutil',
   ],
+  tags = {'type_checked'},
 )
 
 python_library(
   name = 'collections',
   sources = ['collections.py'],
-  dependencies = [
-    '3rdparty/python:future',
-  ]
-)
-
-python_library(
-  name = 'collections_abc_backport',
-  sources = ['collections_abc_backport.py'],
-  dependencies = [
-    '3rdparty/python:future',
-  ]
-)
-
-python_library(
-  name = 'debug',
-  sources = ['debug.py'],
-  dependencies = [
-    '3rdparty/python:future',
-  ],
+  tags = {'type_checked'},
 )
 
 python_library(
@@ -46,8 +37,8 @@ python_library(
   sources = ['desktop.py'],
   dependencies = [
     ':osutil',
-    ':process_handler',
   ],
+  tags = {'type_checked'},
 )
 
 python_library(
@@ -55,159 +46,134 @@ python_library(
   sources = ['dirutil.py'],
   dependencies = [
     ':strutil',
-    '3rdparty/python:future',
-    'src/python/pants/base:deprecated',
+    '3rdparty/python:typing-extensions',
   ],
+  tags = {'type_checked'},
+)
+
+python_library(
+  name = 'enums',
+  sources = ['enums.py'],
+  tags = {'type_checked'},
 )
 
 python_library(
   name = 'eval',
   sources = ['eval.py'],
-  dependencies = [
-    '3rdparty/python:future',
-  ]
+  tags = {'type_checked'},
 )
 
 python_library(
   name = 'fileutil',
   sources = ['fileutil.py'],
   dependencies = [
-    '3rdparty/python:future',
     ':contextutil',
   ],
+  tags = {'type_checked'},
 )
 
 python_library(
   name = 'filtering',
   sources = ['filtering.py'],
-  dependencies = [
-    '3rdparty/python:future',
-  ]
+  tags = {'partially_type_checked'},
+)
+
+python_library(
+  name = 'logging',
+  sources = ['logging.py'],
+  tags = {'type_checked'},
 )
 
 python_library(
   name = 'memo',
   sources = ['memo.py'],
   dependencies = [
-      ':meta'
+    ':meta'
   ],
+  tags = {'type_checked'},
 )
 
 python_library(
   name = 'meta',
   sources = ['meta.py'],
   dependencies = [
-    '3rdparty/python:future',
-  ]
+    '3rdparty/python:dataclasses'
+  ],
+  tags = {'type_checked'},
 )
 
 python_library(
   name = 'netrc',
   sources = ['netrc.py'],
-  dependencies = [
-    '3rdparty/python:future',
-  ]
+  tags = {'partially_type_checked'},
 )
 
 python_library(
   name = 'objects',
   sources = ['objects.py'],
-  dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python:future',
-    ':collections_abc_backport',
-    ':memo',
-    ':meta',
-  ],
+  tags = {'partially_type_checked'},
+)
+
+python_library(
+  name = 'ordered_set',
+  sources = ['ordered_set.py'],
+  tags = {'type_checked'},
 )
 
 python_library(
   name = 'osutil',
   sources = ['osutil.py'],
-  dependencies = [
-    '3rdparty/python:future',
-  ]
+  tags = {'type_checked'},
 )
 
 python_library(
   name = 'process_handler',
   sources = ['process_handler.py'],
-  dependencies= [
-    '3rdparty/python:future',
-    '3rdparty/python:subprocess32',
-    ':meta',
-  ]
-)
-
-python_library(
-  name = 'py2_compat',
-  sources = ['py2_compat.py'],
-  dependencies= [
-    '3rdparty/python:future',
-    '3rdparty/python:configparser',
-  ]
+  tags = {'partially_type_checked'},
 )
 
 python_library(
   name = 'retry',
   sources = ['retry.py'],
-  dependencies = [
-    '3rdparty/python:future',
-  ]
+  tags = {'partially_type_checked'},
 )
 
 python_library(
   name = 'rwbuf',
   sources = ['rwbuf.py'],
-  dependencies = [
-    '3rdparty/python:future',
-    '3rdparty/python:six',
-  ]
-)
-
-python_library(
-  name = 's3_log_aggregator',
-  sources = ['s3_log_aggregator.py'],
-  dependencies = [
-    '3rdparty/python:future',
-    '3rdparty/python:s3logparse'
-  ]
+  tags = {'partially_type_checked'},
 )
 
 python_binary(
-  name = 's3_log_aggregator_bin',
+  name = 's3_log_aggregator',
+  source = 's3_log_aggregator.py',
   entry_point = 'pants.util.s3_log_aggregator',
   dependencies = [
-    ':s3_log_aggregator'
-  ]
+    '3rdparty/python:s3logparse'
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
   name = 'socket',
   sources = ['socket.py'],
-  dependencies = [
-    '3rdparty/python:future',
-  ]
+  tags = {'partially_type_checked'},
 )
 
 python_library(
   name = 'strutil',
   sources = ['strutil.py'],
-  dependencies = [
-    '3rdparty/python:future',
-  ],
+  tags = {'type_checked'},
 )
 
 python_library(
   name = 'tarutil',
   sources = ['tarutil.py'],
-  dependencies = [
-    '3rdparty/python:future',
-    '3rdparty/python:six',
-  ],
+  tags = {'type_checked'},
 )
 
 python_library(
   name = 'xml_parser',
   sources = ['xml_parser.py'],
+  tags = {'partially_type_checked'},
 )

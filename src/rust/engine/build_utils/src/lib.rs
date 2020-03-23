@@ -9,7 +9,6 @@
   clippy::expl_impl_clone_on_copy,
   clippy::if_not_else,
   clippy::needless_continue,
-  clippy::single_match_else,
   clippy::unseparated_literal_suffix,
   clippy::used_underscore_binding
 )]
@@ -22,11 +21,7 @@
   clippy::too_many_arguments
 )]
 // Default isn't as big a deal as people seem to think it is.
-#![allow(
-  clippy::new_without_default,
-  clippy::new_without_default_derive,
-  clippy::new_ret_no_self
-)]
+#![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
@@ -83,24 +78,4 @@ impl BuildRoot {
 }
 
 #[cfg(test)]
-mod build_utils_test {
-  use super::BuildRoot;
-
-  use std::path::PathBuf;
-  use std::process::Command;
-
-  #[test]
-  fn find() {
-    let result = Command::new("git")
-      .args(&["rev-parse", "--show-toplevel"])
-      .output()
-      .expect("Expected `git` to be on the `PATH` and this test to be run in a git repository.");
-
-    let root_dir: PathBuf = String::from_utf8(result.stdout)
-      .expect("The Pants build root is not a valid UTF-8 path.")
-      .trim()
-      .into();
-
-    assert_eq!(*BuildRoot::find().unwrap(), root_dir)
-  }
-}
+mod tests;

@@ -7,7 +7,12 @@ publish = false
 
 [dependencies]
 boxfuture = { path = "../boxfuture" }
-futures = "^0.1.16"
-# TODO: Switch to a release once https://github.com/alexcrichton/futures-timer/pull/11 and https://github.com/alexcrichton/futures-timer/pull/12 merge
-futures-timer = { git = "https://github.com/pantsbuild/futures-timer", rev = "0b747e565309a58537807ab43c674d8951f9e5a0" }
+futures01 = { package = "futures", version = "0.1" }
+futures = { version = "0.3", features = ["compat"] }
 parking_lot = "0.6"
+tokio = { version = "0.2", features = ["time"] }
+
+[dev-dependencies]
+maplit = "1"
+testutil = { path = "../testutil" }
+tokio = { version = "0.2", features = ["rt-core", "macros"] }

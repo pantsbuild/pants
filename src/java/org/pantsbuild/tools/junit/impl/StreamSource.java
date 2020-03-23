@@ -27,4 +27,12 @@ interface StreamSource {
    * @throws IOException If there is a problem retrieving the output.
    */
   byte[] readErr(Class<?> testClass) throws IOException;
+
+  /**
+   * Releases the output stream resources for the test class run.
+   *
+   * @param testClass The test class to close the captured output for.
+   * @throws IOException If there is a problem closing the stream.
+   */
+  void close(Class<?> testClass) throws IOException;
 }

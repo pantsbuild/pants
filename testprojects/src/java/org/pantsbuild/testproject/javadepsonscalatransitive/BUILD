@@ -5,6 +5,6 @@ java_library(
   dependencies = [
     'testprojects/src/scala/org/pantsbuild/testproject/javadepsonscalatransitive:scala'
   ],
-  sources = rglobs('*.java'),
+  sources = ['**/*.java'],
   strict_deps = True
 )

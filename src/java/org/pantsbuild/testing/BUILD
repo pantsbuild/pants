@@ -3,12 +3,11 @@
 
 java_library(
   # We have to use explicit sources here to grab `EasyMockTest.java` which otherwise gets excluded.
-  sources=globs('*.java'),
+  sources=['*.java'],
   dependencies=[
     '3rdparty:easymock',
     '3rdparty:guava',
     '3rdparty:guava-testlib',
     '3rdparty:junit'
   ],
-  platform='java7',
 )

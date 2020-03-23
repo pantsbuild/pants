@@ -5,3 +5,16 @@ page(
   name='node_readme',
   source='README.md',
 )
+
+files(
+  name='examples_directory',
+  sources=['examples/**/*'],
+  dependencies = [
+    '//:3rdparty_directory',
+  ],
+)
+
+files(
+  name='testprojects_directory',
+  sources=['testprojects/**/*'],
+)

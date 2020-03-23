@@ -3,7 +3,6 @@
 
 python_library(
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     'contrib/avro/src/python/pants/contrib/avro/targets',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
@@ -14,4 +13,5 @@ python_library(
     'src/python/pants/task',
     'src/python/pants/util:memo',
   ],
+  tags = {"partially_type_checked"},
 )

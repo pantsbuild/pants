@@ -25,7 +25,7 @@ python_thrift_library(name='precipitation-python',
 )
 
 python_thrift_library(name='monolithic-precipitation-python',
-  sources=['precipitation.thrift'],
+  sources=['monolithic_precipitation.thrift'],
   dependencies=[
     'examples/src/thrift/org/pantsbuild/example/distance:unexported-distance-python',
   ],

@@ -3,7 +3,6 @@
 
 python_library(
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/backend/graph_info/subsystems',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:cmd_line_spec_parser',
@@ -19,4 +18,5 @@ python_library(
     'src/python/pants/util:process_handler',
     'src/python/pants/util:strutil',
   ],
+  tags = {"partially_type_checked"},
 )

@@ -1,108 +1,196 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
+from abc import ABC, abstractmethod
+from dataclasses import FrozenInstanceError
+from functools import wraps
+from typing import Any, Callable, Optional, Type, TypeVar, Union
 
-from abc import ABCMeta
-from builtins import object
+T = TypeVar("T")
+C = TypeVar("C", bound=Type)
 
 
 class SingletonMetaclass(type):
-  """Singleton metaclass."""
+    """When using this metaclass in your class definition, your class becomes a singleton. That is,
+    every construction returns the same instance.
 
-  def __call__(cls, *args, **kwargs):
-    if not hasattr(cls, 'instance'):
-      cls.instance = super(SingletonMetaclass, cls).__call__(*args, **kwargs)
-    return cls.instance
+    Example class definition:
 
+      class Unicorn(metaclass=SingletonMetaclass):
+        pass
+    """
 
-class ClassPropertyDescriptor(object):
-  """Define a readable class property, given a function."""
-
-  # TODO: it seems overriding __set__ and __delete__ would require defining a metaclass or
-  # overriding __setattr__/__delattr__ (see
-  # https://stackoverflow.com/questions/5189699/how-to-make-a-class-property). The current solution
-  # doesn't require any modifications to the class definition beyond declaring a @classproperty.  If
-  # we can set __delete__ and have it work, we can use that e.g. to clear the cache for a new
-  # `@memoized_classproperty` decorator.
-  def __init__(self, fget, doc):
-    self.fget = fget
-    self.__doc__ = doc
-
-  # See https://docs.python.org/2/howto/descriptor.html for more details.
-  def __get__(self, obj, objtype=None):
-    if objtype is None:
-      objtype = type(obj)
-    return self.fget.__get__(obj, objtype)()
+    def __call__(cls, *args: Any, **kwargs: Any) -> Any:
+        # TODO: convert this into an `@memoized_classproperty`!
+        if not hasattr(cls, "instance"):
+            cls.instance = super().__call__(*args, **kwargs)
+        return cls.instance
 
 
-def classproperty(func):
-  """Use as a decorator on a method definition to make it a class-level attribute.
+class ClassPropertyDescriptor:
+    """Define a readable attribute on a class, given a function."""
 
-  This decorator can be applied to a method, a classmethod, or a staticmethod. This decorator will
-  bind the first argument to the class object.
+    # The current solution is preferred as it doesn't require any modifications to the class
+    # definition beyond declaring a @classproperty.  It seems overriding __set__ and __delete__ would
+    # require defining a metaclass or overriding __setattr__/__delattr__ (see
+    # https://stackoverflow.com/questions/5189699/how-to-make-a-class-property).
+    def __init__(self, fget: Union[classmethod, staticmethod], doc: Optional[str]) -> None:
+        self.fget = fget
+        self.__doc__ = doc
 
-  Usage:
-  >>> class Foo(object):
-  ...   @classproperty
-  ...   def name(cls):
-  ...     return cls.__name__
-  ...
-  >>> Foo.name
-  'Foo'
-
-  Setting or deleting the attribute of this name will overwrite this property.
-
-  The docstring of the classproperty `x` for a class `C` can be obtained by
-  `C.__dict__['x'].__doc__`.
-  """
-  doc = func.__doc__
-
-  if not isinstance(func, (classmethod, staticmethod)):
-    func = classmethod(func)
-
-  return ClassPropertyDescriptor(func, doc)
-
-
-def staticproperty(func):
-  """Use as a decorator on a method definition to make it a class-level attribute (without binding).
-
-  This decorator can be applied to a method or a staticmethod. This decorator does not bind any
-  arguments.
-
-  Usage:
-  >>> other_x = 'value'
-  >>> class Foo(object):
-  ...   @staticproperty
-  ...   def x():
-  ...     return other_x
-  ...
-  >>> Foo.x
-  'value'
-
-  Setting or deleting the attribute of this name will overwrite this property.
-
-  The docstring of the classproperty `x` for a class `C` can be obtained by
-  `C.__dict__['x'].__doc__`.
-  """
-  doc = func.__doc__
-
-  if not isinstance(func, staticmethod):
-    func = staticmethod(func)
-
-  return ClassPropertyDescriptor(func, doc)
+    # See https://docs.python.org/3/howto/descriptor.html for more details.
+    def __get__(self, obj: T, objtype: Optional[Type[T]] = None) -> Any:
+        if objtype is None:
+            objtype = type(obj)
+            # Get the callable field for this object, which may be a property.
+        callable_field = self.fget.__get__(obj, objtype)
+        if getattr(self.fget.__func__, "__isabstractmethod__", False):
+            field_name = self.fget.__func__.fget.__name__  # type: ignore[attr-defined]
+            raise TypeError(
+                """\
+The classproperty '{func_name}' in type '{type_name}' was an abstractproperty, meaning that type \
+{type_name} must override it by setting it as a variable in the class body or defining a method \
+with an @classproperty decorator.""".format(
+                    func_name=field_name, type_name=objtype.__name__
+                )
+            )
+        return callable_field()
 
 
-# Extend Singleton and your class becomes a singleton, each construction returns the same instance.
-try:  # Python3
-  Singleton = SingletonMetaclass(u'Singleton', (object,), {})
-except TypeError:  # Python2
-  Singleton = SingletonMetaclass(b'Singleton', (object,), {})
+def classproperty(func: Callable[..., T]) -> T:
+    """Use as a decorator on a method definition to make it a class-level attribute.
+
+    This decorator can be applied to a method, a classmethod, or a staticmethod. This decorator will
+    bind the first argument to the class object.
+
+    Usage:
+    >>> class Foo:
+    ...   @classproperty
+    ...   def name(cls):
+    ...     return cls.__name__
+    ...
+    >>> Foo.name
+    'Foo'
+
+    Setting or deleting the attribute of this name will overwrite this property.
+
+    The docstring of the classproperty `x` for a class `C` can be obtained by
+    `C.__dict__['x'].__doc__`.
+    """
+    doc = func.__doc__
+
+    if not isinstance(func, (classmethod, staticmethod)):
+        # MyPy complains about converting a Callable -> classmethod. We use a Callable in the first
+        # place because there is no typing.classmethod, i.e. a type that takes generic arguments, and
+        # we need to use TypeVars for the call sites of this decorator to work properly.
+        func = classmethod(func)  # type: ignore[assignment]
+
+    # If we properly annotated this function as returning a ClassPropertyDescriptor, then MyPy would
+    # no longer work correctly at call sites for this decorator.
+    return ClassPropertyDescriptor(func, doc)  # type: ignore[arg-type, return-value]
 
 
-# Abstract base classes w/o __metaclass__ or meta =, just extend AbstractClass.
-try:  # Python3
-  AbstractClass = ABCMeta(u'AbstractClass', (object,), {})
-except TypeError:  # Python2
-  AbstractClass = ABCMeta(b'AbstractClass', (object,), {})
+def staticproperty(func: Callable[..., T]) -> T:
+    """Use as a decorator on a method definition to make it a class-level attribute (without
+    binding).
+
+    This decorator can be applied to a method or a staticmethod. This decorator does not bind any
+    arguments.
+
+    Usage:
+    >>> other_x = 'value'
+    >>> class Foo:
+    ...   @staticproperty
+    ...   def x():
+    ...     return other_x
+    ...
+    >>> Foo.x
+    'value'
+
+    Setting or deleting the attribute of this name will overwrite this property.
+
+    The docstring of the classproperty `x` for a class `C` can be obtained by
+    `C.__dict__['x'].__doc__`.
+    """
+    doc = func.__doc__
+
+    if not isinstance(func, staticmethod):
+        # MyPy complains about converting a Callable -> staticmethod. We use a Callable in the first
+        # place because there is no typing.staticmethod, i.e. a type that takes generic arguments, and
+        # we need to use TypeVars for the call sites of this decorator to work properly.
+        func = staticmethod(func)  # type: ignore[assignment]
+
+    # If we properly annotated this function as returning a ClassPropertyDescriptor, then MyPy would
+    # no longer work correctly at call sites for this decorator.
+    return ClassPropertyDescriptor(func, doc)  # type: ignore[arg-type, return-value]
+
+
+class _ClassDecoratorWithSentinelAttribute(ABC):
+    """Base class to wrap a class decorator which sets a "sentinel attribute".
+
+    This functionality is exposed via the `@decorated_type_checkable` decorator.
+    """
+
+    @abstractmethod
+    def __call__(self, cls: Type) -> Type:
+        ...
+
+    def define_instance_of(self, obj: Type, **kwargs) -> Type:
+        return type(obj.__name__, (obj,), {"_decorated_type_checkable_type": type(self), **kwargs})
+
+    def is_instance(self, obj: Type) -> bool:
+        return getattr(obj, "_decorated_type_checkable_type", None) is type(self)
+
+
+def decorated_type_checkable(
+    decorator: Callable[[Type], Type]
+) -> _ClassDecoratorWithSentinelAttribute:
+    """Wraps a class decorator to add a "sentinel attribute" to decorated classes.
+
+    A "sentinel attribute" is an attribute added to the wrapped class decorator's result with
+    `.define_instance_of()`. The wrapped class decorator can then be imported and used to check
+    whether some class object was wrapped with that decorator with `.is_instance()`.
+
+    When used on a class decorator method, the method should return
+    `<method name>.define_instance_of(cls)`, where `cls` is the class object that the decorator would
+    otherwise return.
+    """
+
+    class WrappedFunction(_ClassDecoratorWithSentinelAttribute):
+        @wraps(decorator)
+        def __call__(self, cls: Type) -> Type:
+            return decorator(cls)
+
+    return WrappedFunction()
+
+
+@decorated_type_checkable
+def frozen_after_init(cls: C) -> C:
+    """Class decorator to freeze any modifications to the object after __init__() is done.
+
+    The primary use case is for @dataclasses who cannot use frozen=True due to the need for a custom
+    __init__(), but who still want to remain as immutable as possible (e.g. for safety with the V2
+    engine). When using with dataclasses, this should be the first decorator applied, i.e. be used
+    before @dataclass.
+    """
+
+    prev_init = cls.__init__
+    prev_setattr = cls.__setattr__
+
+    @wraps(prev_init)
+    def new_init(self, *args: Any, **kwargs: Any) -> None:
+        prev_init(self, *args, **kwargs)
+        self._is_frozen = True
+
+    @wraps(prev_setattr)
+    def new_setattr(self, key: str, value: Any) -> None:
+        if getattr(self, "_is_frozen", False):
+            raise FrozenInstanceError(
+                f"Attempting to modify the attribute {key} after the object {self} was created."
+            )
+        prev_setattr(self, key, value)  # type: ignore[call-arg]
+
+    cls.__init__ = new_init
+    cls.__setattr__ = new_setattr
+
+    return cls

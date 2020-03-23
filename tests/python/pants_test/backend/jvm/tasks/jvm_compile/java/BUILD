@@ -12,37 +12,51 @@ python_tests(
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
   ],
-  tags = {'integration'},
-  timeout=300,
+  tags = {'integration', 'partially_type_checked'},
+  timeout=720,
 )
 
 python_tests(
   name='zinc_compile_integration',
   sources=['test_zinc_compile_integration.py'],
   dependencies=[
-    '3rdparty/python:future',
     'src/python/pants/build_graph',
     'tests/python/pants_test/backend/jvm/tasks:missing_jvm_check',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
+    'examples/src/java/org/pantsbuild/example:hello_directory',
+    'examples/src/scala/org/pantsbuild/example:hello_directory',
+    'testprojects/3rdparty:javactool_directory',
+    'testprojects/src/java/org/pantsbuild/testproject:bench_directory',
+    'testprojects/src/java/org/pantsbuild/testproject:compilation_warnings_directory',
+    'testprojects/src/java/org/pantsbuild/testproject:dummies_directory',
+    'testprojects/src/java/org/pantsbuild/testproject:phrases_directory',
+    'testprojects/src/java/org/pantsbuild/testproject:printversion_directory',
+    'testprojects/src/scala/org/pantsbuild/testproject:unicode_directory',
   ],
-  tags = {'integration'},
-  timeout=240,
+  tags = {'integration', 'partially_type_checked'},
+  timeout=600,
 )
 
 python_tests(
   name='java_compile_integration',
   sources=['test_java_compile_integration.py'],
   dependencies=[
-    '3rdparty/python:future',
     'src/python/pants/backend/jvm/tasks/jvm_compile/zinc',
     'src/python/pants/fs',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
     'tests/python/pants_test/cache:cache_server',
+    'testprojects/src/java/org/pantsbuild/testproject:annotation_directory',
+    'testprojects/src/java/org/pantsbuild/testproject:jarversionincompatibility_directory',
+    'testprojects/src/java/org/pantsbuild/testproject:nocache_directory',
+    'testprojects/src/java/org/pantsbuild/testproject:publish_directory',
+    'testprojects/src/java/org/pantsbuild/testproject:resdependency_directory',
+    'testprojects/src/java/org/pantsbuild/testproject:unicode_directory',
+    'testprojects/tests/java/org/pantsbuild/testproject:matcher_directory',
   ],
-  tags = {'integration'},
-  timeout=180,
+  tags = {'integration', 'partially_type_checked'},
+  timeout=600,
 )
 
 python_tests(
@@ -51,45 +65,24 @@ python_tests(
   dependencies=[
     'tests/python/pants_test/backend/jvm/tasks:missing_jvm_check',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
+    'examples/src/java/org/pantsbuild/example:javac_directory',
   ],
-  timeout = 240,
-  tags = {'integration'},
-)
-
-python_tests(
-  name='zinc_compile_jvm_platform_integration',
-  sources=['test_zinc_compile_jvm_platform_integration.py'],
-  dependencies=[
-    ':jvm_platform_integration_mixin',
-  ],
-  tags = {'integration'},
-  timeout=240,
+  timeout = 530,
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
   name = 'java_compile_settings_partitioning',
   sources = ['test_java_compile_settings_partitioning.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/backend/jvm/tasks/jvm_compile/zinc',
     'src/python/pants/fs',
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/java/distribution',
-    'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil/jvm:nailgun_task_test_base',
+    'src/python/pants/testutil/subsystem',
   ],
-)
-
-python_library(
-  name = 'jvm_platform_integration_mixin',
-  sources = ['jvm_platform_integration_mixin.py'],
-  dependencies = [
-    '3rdparty/python:future',
-    'src/python/pants/fs',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:dirutil',
-    'tests/python/pants_test:int-test',
-  ],
+  tags = {"partially_type_checked"},
 )

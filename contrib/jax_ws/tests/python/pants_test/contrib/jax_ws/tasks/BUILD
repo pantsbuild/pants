@@ -5,18 +5,21 @@ python_tests(
   sources=['test_jax_ws_gen.py'],
   dependencies=[
     'contrib/jax_ws/src/python/pants/contrib/jax_ws/tasks',
-    'tests/python/pants_test/jvm:nailgun_task_test_base',
-    'tests/python/pants_test/option/util',
-    'tests/python/pants_test:test_base',
-  ]
+    'src/python/pants/testutil/jvm:nailgun_task_test_base',
+    'src/python/pants/testutil/option',
+    'src/python/pants/testutil:test_base',
+  ],
+  tags = {'partially_type_checked'},
 )
 
 python_tests(
   name='integration',
   sources=['test_jax_ws_gen_integration.py'],
   dependencies=[
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
+    'src/python/pants/testutil:file_test_util',
+    'contrib/jax_ws:wsdl_tests_directory',
   ],
-  tags={'integration'},
+  tags={'integration', 'partially_type_checked'},
   timeout=300,
 )

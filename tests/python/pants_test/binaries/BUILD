@@ -2,24 +2,14 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
-  sources=globs('test_*.py', exclude=[globs('*_integration.py')]),
+  sources=['test_*.py', '!*_integration.py'],
   dependencies=[
-    '3rdparty/python:future',
-    '3rdparty/python:mock',
     'src/python/pants/binaries',
     'src/python/pants/net',
     'src/python/pants/option',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:test_base',
-  ]
-)
-
-python_tests(
-  name='integration',
-  sources=globs('test_*_integration.py'),
-  dependencies=[
-    'src/python/pants/base:build_environment',
-    'src/python/pants/util:process_handler',
-  ]
+    'src/python/pants/testutil:test_base',
+  ],
+  tags = {"partially_type_checked"},
 )

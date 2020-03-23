@@ -1,205 +1,209 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import open
 
 from pants.base.payload import Payload
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
 from pants.cache.cache_setup import CacheFactory, CacheSetup
 from pants.task.task import Task
+from pants.testutil.task_test_base import TaskTestBase
 from pants.util.contextutil import open_tar, temporary_dir
 from pants.util.dirutil import safe_open
-from pants_test.task_test_base import TaskTestBase
 
-
-SYMLINK_NAME = 'link'
-DUMMY_FILE_NAME = 'dummy'
-DUMMY_FILE_CONTENT = b'dummy_content'
+SYMLINK_NAME = "link"
+DUMMY_FILE_NAME = "dummy"
+DUMMY_FILE_CONTENT = b"dummy_content"
 
 
 class DummyCacheLibrary(Target):
-  def __init__(self, address, sources, *args, **kwargs):
-    payload = Payload()
-    payload.add_fields({'sources': self.create_sources_field(sources=sources,
-                                                             sources_rel_path=address.spec_path)})
-    super(DummyCacheLibrary, self).__init__(address=address, payload=payload, *args, **kwargs)
+    def __init__(self, address, sources, *args, **kwargs):
+        payload = Payload()
+        payload.add_fields(
+            {
+                "sources": self.create_sources_field(
+                    sources=sources, sources_rel_path=address.spec_path
+                )
+            }
+        )
+        super().__init__(address=address, payload=payload, *args, **kwargs)
 
 
 class DummyCacheTask(Task):
-  """A task that inserts a symlink into its results_dir."""
-  options_scope = 'dummy'
+    """A task that inserts a symlink into its results_dir."""
 
-  @property
-  def cache_target_dirs(self):
-    return True
+    options_scope = "dummy"
 
-  def execute(self):
-    self._cache_factory.get_write_cache()
-    with self.invalidated(self.context.targets()) as invalidation:
-      for vt in invalidation.all_vts:
-        if self.get_options().regular_file:
-          # Create regular file.
-          if self.get_options().regular_file_in_results_dir:
-            regular_file_path = os.path.join(vt.results_dir, DUMMY_FILE_NAME)
-          else:
-            with temporary_dir(cleanup=False) as tmpdir:
-              regular_file_path = os.path.join(tmpdir, DUMMY_FILE_NAME)
+    @property
+    def cache_target_dirs(self):
+        return True
 
-          with safe_open(regular_file_path, mode='wb') as fp:
-            fp.write(DUMMY_FILE_CONTENT)
-        else:
-          # Generate a file path for the symlink but does not create the file.
-          with temporary_dir() as tmpdir:
-            regular_file_path = os.path.join(tmpdir, DUMMY_FILE_NAME)
+    def execute(self):
+        self._cache_factory.get_write_cache()
+        with self.invalidated(self.context.targets()) as invalidation:
+            for vt in invalidation.all_vts:
+                if self.get_options().regular_file:
+                    # Create regular file.
+                    if self.get_options().regular_file_in_results_dir:
+                        regular_file_path = os.path.join(vt.results_dir, DUMMY_FILE_NAME)
+                    else:
+                        with temporary_dir(cleanup=False) as tmpdir:
+                            regular_file_path = os.path.join(tmpdir, DUMMY_FILE_NAME)
 
-        # Create a symlink to that file.
-        symlink_y = os.path.join(vt.results_dir, SYMLINK_NAME)
-        os.symlink(regular_file_path, symlink_y)
-      return invalidation.all_vts
+                    with safe_open(regular_file_path, mode="wb") as fp:
+                        fp.write(DUMMY_FILE_CONTENT)
+                else:
+                    # Generate a file path for the symlink but does not create the file.
+                    with temporary_dir() as tmpdir:
+                        regular_file_path = os.path.join(tmpdir, DUMMY_FILE_NAME)
+
+                # Create a symlink to that file.
+                symlink_y = os.path.join(vt.results_dir, SYMLINK_NAME)
+                os.symlink(regular_file_path, symlink_y)
+            return invalidation.all_vts
 
 
 class LocalCachingTarballDereferenceTest(TaskTestBase):
-  _filename = 'f'
+    _filename = "f"
 
-  @classmethod
-  def alias_groups(cls):
-    return BuildFileAliases(targets={'dummy_cache_library': DummyCacheLibrary})
+    @classmethod
+    def alias_groups(cls):
+        return BuildFileAliases(targets={"dummy_cache_library": DummyCacheLibrary})
 
-  @classmethod
-  def task_type(cls):
-    return DummyCacheTask
+    @classmethod
+    def task_type(cls):
+        return DummyCacheTask
 
-  @staticmethod
-  def _find_first_file_in_path(path, file_name):
-    for root, dirs, files in os.walk(path):
-      for file in files:
-        if file == file_name:
-          return os.path.join(root, file)
+    @staticmethod
+    def _find_first_file_in_path(path, file_name):
+        for root, dirs, files in os.walk(path):
+            for file in files:
+                if file == file_name:
+                    return os.path.join(root, file)
 
-    return None
+        return None
 
-  def _get_artifact_path(self, vt):
-    return os.path.join(
-      self.artifact_cache,
-      CacheFactory.make_task_cache_dirname(self.task),
-      self._target.id,
-      '{}.tgz'.format(vt.cache_key.hash),
-    )
-
-  def _prepare_task(self, deference, regular_file, regular_file_in_results_dir):
-    """
-    Define task with caching with certain behaviors.
-
-    :param deference: Specify whether task should dereference symlinks for `VersionedTarget`.
-    :param regular_file: If True, a regular file will be created with some content as the dst of the symlink.
-    :param regular_file_in_results_dir: If True, the regular file created will be in `results_dir`. Otherwise
-                                        it will be somewhere random.
-    """
-    self.artifact_cache = self.create_dir('artifact_cache')
-    self.create_file(self._filename)
-    # Set up options for CacheSetup subsystem.
-    self.set_options_for_scope(
-      CacheSetup.options_scope,
-      write_to=[self.artifact_cache],
-      read_from=[self.artifact_cache],
-      write=True,
-      dereference_symlinks=deference,
-    )
-
-    # Set up options for DummyCacheTask as it is under TaskTestBase context.
-    self.set_options_for_scope(
-      TaskTestBase.options_scope,
-      regular_file=regular_file,
-      regular_file_in_results_dir=regular_file_in_results_dir
-    )
-    self.add_to_build_file('', 'dummy_cache_library(name = "t", source = "{}")'.format(self._filename))
-    self._target = self.target(':t')
-    context = self.context(for_task_types=[DummyCacheTask], target_roots=[self._target])
-    self.task = self.create_task(context)
-
-  def _assert_dereferenced_symlink_in_cache(self, all_vts):
-    """
-    Assert symlink is dereferenced when in the cache tarball.
-    """
-    for vt in all_vts:
-      artifact_address = self._get_artifact_path(vt)
-      with temporary_dir() as tmpdir:
-        with open_tar(artifact_address, 'r') as tarout:
-          tarout.extractall(path=tmpdir)
-        file_path = self._find_first_file_in_path(tmpdir, SYMLINK_NAME)
-        self.assertIsNotNone(file_path, "Cannot find file {} in artifact {}".format(SYMLINK_NAME, artifact_address))
-        self.assertFalse(
-          os.path.islink(file_path)
-          , "{} in artifact {} should not be a symlink but it is.".format(SYMLINK_NAME, artifact_address)
+    def _get_artifact_path(self, vt):
+        return os.path.join(
+            self.artifact_cache,
+            CacheFactory.make_task_cache_dirname(self.task),
+            self._target.id,
+            f"{vt.cache_key.hash}.tgz",
         )
-        with open(file_path, 'rb') as f:
-          self.assertEqual(DUMMY_FILE_CONTENT, f.read())
 
-  # Cache creation should fail because the symlink destination is non-existent.
-  def test_cache_dereference_no_file(self):
-    self._prepare_task(deference=True, regular_file=False, regular_file_in_results_dir=False)
-    with self.assertRaises(OSError):
-      self.task.execute()
+    def _prepare_task(self, deference, regular_file, regular_file_in_results_dir):
+        """Define task with caching with certain behaviors.
 
-  # Symlink in cache should stay as a symlink
-  def test_cache_no_dereference_no_file(self):
-    self._prepare_task(deference=False, regular_file=False, regular_file_in_results_dir=False)
-
-    all_vts = self.task.execute()
-    self.assertGreater(len(all_vts), 0)
-    for vt in all_vts:
-      artifact_address = self._get_artifact_path(vt)
-      with temporary_dir() as tmpdir:
-        with open_tar(artifact_address, 'r') as tarout:
-          tarout.extractall(path=tmpdir)
-
-        file_path = self._find_first_file_in_path(tmpdir, SYMLINK_NAME)
-        self.assertIsNotNone(file_path, "Cannot find file {} in artifact {}".format(SYMLINK_NAME, artifact_address))
-        self.assertTrue(
-          os.path.islink(file_path),
-          "{} in artifact {} should be a symlink but it is not.".format(SYMLINK_NAME, artifact_address)
+        :param deference: Specify whether task should dereference symlinks for `VersionedTarget`.
+        :param regular_file: If True, a regular file will be created with some content as the dst of the symlink.
+        :param regular_file_in_results_dir: If True, the regular file created will be in `results_dir`. Otherwise
+                                            it will be somewhere random.
+        """
+        self.artifact_cache = self.create_dir("artifact_cache")
+        self.create_file(self._filename)
+        # Set up options for CacheSetup subsystem.
+        self.set_options_for_scope(
+            CacheSetup.options_scope,
+            write_to=[self.artifact_cache],
+            read_from=[self.artifact_cache],
+            write=True,
+            dereference_symlinks=deference,
         )
-        # The destination of the symlink should be non-existent, hence IOError.
-        with self.assertRaises(IOError):
-          with open(file_path, 'rb') as f:
-            f.read()
 
-  # Symlink in cache should stay as a symlink, and so does the dst file.
-  def test_cache_no_dereference_file_inside_results_dir(self):
-    self._prepare_task(deference=False, regular_file=True, regular_file_in_results_dir=True)
-
-    all_vts = self.task.execute()
-    self.assertGreater(len(all_vts), 0)
-    for vt in all_vts:
-      artifact_address = self._get_artifact_path(vt)
-      with temporary_dir() as tmpdir:
-        with open_tar(artifact_address, 'r') as tarout:
-          tarout.extractall(path=tmpdir)
-
-        file_path = self._find_first_file_in_path(tmpdir, SYMLINK_NAME)
-        self.assertIsNotNone(file_path, "Cannot find file {} in artifact {}".format(SYMLINK_NAME, artifact_address))
-        self.assertTrue(
-          os.path.islink(file_path),
-          "{} in artifact {} should be a symlink but it is not.".format(SYMLINK_NAME, artifact_address)
+        # Set up options for DummyCacheTask as it is under TaskTestBase context.
+        self.set_options_for_scope(
+            TaskTestBase.options_scope,
+            regular_file=regular_file,
+            regular_file_in_results_dir=regular_file_in_results_dir,
         )
-        with open(file_path, 'rb') as f:
-          self.assertEqual(DUMMY_FILE_CONTENT, f.read())
+        self.add_to_build_file("", f'dummy_cache_library(name = "t", source = "{self._filename}")')
+        self._target = self.target(":t")
+        context = self.context(for_task_types=[DummyCacheTask], target_roots=[self._target])
+        self.task = self.create_task(context)
 
-  def test_cache_dereference_file_inside_results_dir(self):
-    self._prepare_task(deference=True, regular_file=True, regular_file_in_results_dir=True)
+    def _assert_dereferenced_symlink_in_cache(self, all_vts):
+        """Assert symlink is dereferenced when in the cache tarball."""
+        for vt in all_vts:
+            artifact_address = self._get_artifact_path(vt)
+            with temporary_dir() as tmpdir:
+                with open_tar(artifact_address, "r") as tarout:
+                    tarout.extractall(path=tmpdir)
+                file_path = self._find_first_file_in_path(tmpdir, SYMLINK_NAME)
+                self.assertIsNotNone(
+                    file_path, f"Cannot find file {SYMLINK_NAME} in artifact {artifact_address}"
+                )
+                self.assertFalse(
+                    os.path.islink(file_path),
+                    f"{SYMLINK_NAME} in artifact {artifact_address} should not be a symlink but it is.",
+                )
+                with open(file_path, "rb") as f:
+                    self.assertEqual(DUMMY_FILE_CONTENT, f.read())
 
-    all_vts = self.task.execute()
-    self.assertGreater(len(all_vts), 0)
-    self._assert_dereferenced_symlink_in_cache(all_vts)
+    # Cache creation should fail because the symlink destination is non-existent.
+    def test_cache_dereference_no_file(self):
+        self._prepare_task(deference=True, regular_file=False, regular_file_in_results_dir=False)
+        with self.assertRaises(OSError):
+            self.task.execute()
 
-  def test_cache_dereference_file_outside_results_dir(self):
-    self._prepare_task(deference=True, regular_file=True, regular_file_in_results_dir=False)
+    # Symlink in cache should stay as a symlink
+    def test_cache_no_dereference_no_file(self):
+        self._prepare_task(deference=False, regular_file=False, regular_file_in_results_dir=False)
 
-    all_vts = self.task.execute()
-    self.assertGreater(len(all_vts), 0)
-    self._assert_dereferenced_symlink_in_cache(all_vts)
+        all_vts = self.task.execute()
+        self.assertGreater(len(all_vts), 0)
+        for vt in all_vts:
+            artifact_address = self._get_artifact_path(vt)
+            with temporary_dir() as tmpdir:
+                with open_tar(artifact_address, "r") as tarout:
+                    tarout.extractall(path=tmpdir)
+
+                file_path = self._find_first_file_in_path(tmpdir, SYMLINK_NAME)
+                self.assertIsNotNone(
+                    file_path, f"Cannot find file {SYMLINK_NAME} in artifact {artifact_address}"
+                )
+                self.assertTrue(
+                    os.path.islink(file_path),
+                    f"{SYMLINK_NAME} in artifact {artifact_address} should be a symlink but it is not.",
+                )
+                # The destination of the symlink should be non-existent, hence IOError.
+                with self.assertRaises(IOError):
+                    with open(file_path, "rb") as f:
+                        f.read()
+
+    # Symlink in cache should stay as a symlink, and so does the dst file.
+    def test_cache_no_dereference_file_inside_results_dir(self):
+        self._prepare_task(deference=False, regular_file=True, regular_file_in_results_dir=True)
+
+        all_vts = self.task.execute()
+        self.assertGreater(len(all_vts), 0)
+        for vt in all_vts:
+            artifact_address = self._get_artifact_path(vt)
+            with temporary_dir() as tmpdir:
+                with open_tar(artifact_address, "r") as tarout:
+                    tarout.extractall(path=tmpdir)
+
+                file_path = self._find_first_file_in_path(tmpdir, SYMLINK_NAME)
+                self.assertIsNotNone(
+                    file_path, f"Cannot find file {SYMLINK_NAME} in artifact {artifact_address}"
+                )
+                self.assertTrue(
+                    os.path.islink(file_path),
+                    f"{SYMLINK_NAME} in artifact {artifact_address} should be a symlink but it is not.",
+                )
+                with open(file_path, "rb") as f:
+                    self.assertEqual(DUMMY_FILE_CONTENT, f.read())
+
+    def test_cache_dereference_file_inside_results_dir(self):
+        self._prepare_task(deference=True, regular_file=True, regular_file_in_results_dir=True)
+
+        all_vts = self.task.execute()
+        self.assertGreater(len(all_vts), 0)
+        self._assert_dereferenced_symlink_in_cache(all_vts)
+
+    def test_cache_dereference_file_outside_results_dir(self):
+        self._prepare_task(deference=True, regular_file=True, regular_file_in_results_dir=False)
+
+        all_vts = self.task.execute()
+        self.assertGreater(len(all_vts), 0)
+        self._assert_dereferenced_symlink_in_cache(all_vts)

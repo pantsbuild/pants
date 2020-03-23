@@ -1,0 +1,2191 @@
+[
+  {
+    "name": "[B"
+  },
+  {
+    "name": "[J"
+  },
+  {
+    "name": "[Ljava.lang.Object;"
+  },
+  {
+    "name": "java.lang.Boolean"
+  },
+  {
+    "name": "java.lang.Byte"
+  },
+  {
+    "name": "java.lang.Byte$ByteCache"
+  },
+  {
+    "name": "java.lang.Character"
+  },
+  {
+    "name": "java.lang.Character$CharacterCache"
+  },
+  {
+    "name": "java.lang.Class"
+  },
+  {
+    "name": "java.lang.Float"
+  },
+  {
+    "name": "java.lang.Integer"
+  },
+  {
+    "name": "java.lang.Integer$IntegerCache"
+  },
+  {
+    "name": "java.lang.Long"
+  },
+  {
+    "name": "java.lang.Number"
+  },
+  {
+    "name": "java.lang.Object"
+  },
+  {
+    "fields": [
+      {
+        "name": "value"
+      }
+    ],
+    "name": "java.lang.String"
+  },
+  {
+    "allDeclaredMethods": true,
+    "name": "org.apache.logging.log4j.core.config.AppendersPlugin"
+  },
+  {
+    "allDeclaredMethods": true,
+    "name": "org.apache.logging.log4j.core.config.LoggersPlugin"
+  },
+  {
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": [
+          "org.apache.logging.log4j.core.LoggerContext",
+          "org.apache.logging.log4j.core.config.ConfigurationSource",
+          "org.apache.logging.log4j.core.config.builder.api.Component"
+        ]
+      }
+    ],
+    "name": "org.apache.logging.log4j.core.config.builder.impl.BuiltConfiguration"
+  },
+  {
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ],
+    "name": "org.apache.logging.log4j.core.config.plugins.visitors.PluginElementVisitor"
+  },
+  {
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ],
+    "name": "org.apache.logging.log4j.core.impl.Log4jContextFactory"
+  },
+  {
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ],
+    "name": "org.apache.logging.log4j.core.lookup.ContextMapLookup"
+  },
+  {
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ],
+    "name": "org.apache.logging.log4j.core.lookup.DateLookup"
+  },
+  {
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ],
+    "name": "org.apache.logging.log4j.core.lookup.EnvironmentLookup"
+  },
+  {
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ],
+    "name": "org.apache.logging.log4j.core.lookup.JavaLookup"
+  },
+  {
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ],
+    "name": "org.apache.logging.log4j.core.lookup.JmxRuntimeInputArgumentsLookup"
+  },
+  {
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ],
+    "name": "org.apache.logging.log4j.core.lookup.JndiLookup"
+  },
+  {
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ],
+    "name": "org.apache.logging.log4j.core.lookup.Log4jLookup"
+  },
+  {
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ],
+    "name": "org.apache.logging.log4j.core.lookup.MainMapLookup"
+  },
+  {
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ],
+    "name": "org.apache.logging.log4j.core.lookup.MapLookup"
+  },
+  {
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ],
+    "name": "org.apache.logging.log4j.core.lookup.MarkerLookup"
+  },
+  {
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ],
+    "name": "org.apache.logging.log4j.core.lookup.ResourceBundleLookup"
+  },
+  {
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ],
+    "name": "org.apache.logging.log4j.core.lookup.StructuredDataLookup"
+  },
+  {
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ],
+    "name": "org.apache.logging.log4j.core.lookup.SystemPropertiesLookup"
+  },
+  {
+    "allDeclaredMethods": true,
+    "name": "org.apache.logging.log4j.core.pattern.DatePatternConverter"
+  },
+  {
+    "allDeclaredMethods": true,
+    "name": "org.apache.logging.log4j.core.pattern.LevelPatternConverter"
+  },
+  {
+    "allDeclaredMethods": true,
+    "name": "org.apache.logging.log4j.core.pattern.LineSeparatorPatternConverter"
+  },
+  {
+    "allDeclaredMethods": true,
+    "name": "org.apache.logging.log4j.core.pattern.LoggerPatternConverter"
+  },
+  {
+    "allDeclaredMethods": true,
+    "name": "org.apache.logging.log4j.core.pattern.MessagePatternConverter"
+  },
+  {
+    "allDeclaredMethods": true,
+    "name": "org.apache.logging.log4j.core.pattern.ThreadNamePatternConverter"
+  },
+  {
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ],
+    "name": "org.apache.logging.log4j.message.DefaultFlowMessageFactory"
+  },
+  {
+    "name": "java.lang.System"
+  },
+  {
+    "fields": [
+      {
+        "name": "address"
+      }
+    ],
+    "name": "java.nio.Buffer"
+  },
+  {
+    "name": "jdk.vm.ci.meta.DeoptimizationAction"
+  },
+  {
+    "name": "jdk.vm.ci.meta.DeoptimizationReason"
+  },
+  {
+    "name": "jdk.vm.ci.meta.JavaKind"
+  },
+  {
+    "name": "jdk.vm.ci.services.Services"
+  },
+  {
+    "name": "org.graalvm.compiler.api.directives.GraalDirectives"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.bytecode.Bytecodes$Flags"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.core.amd64.AMD64AddressNode"
+  },
+  {
+    "name": "org.graalvm.compiler.core.common.calc.UnsignedMath"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.StandardOp$JumpOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.StandardOp$LabelOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.StandardOp$NoOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64ArrayCompareToOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64ArrayEqualsOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64ArrayIndexOfOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64Binary$CommutativeTwoOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64Binary$ConstOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64Binary$DataTwoOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64Binary$MemoryTwoOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64Binary$RMIOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64Binary$TwoOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64BinaryConsumer$ConstOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64BinaryConsumer$MemoryConstOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64BinaryConsumer$MemoryMROp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64BinaryConsumer$MemoryRMOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64BinaryConsumer$MemoryVMConstOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64BinaryConsumer$Op"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64BinaryConsumer$VMConstOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64BlockEndOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64ByteSwapOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64Call$CallOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64Call$DirectCallOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64Call$DirectNearForeignCallOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64Call$ForeignCallOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64Call$IndirectCallOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64Call$MethodCallOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64ControlFlow$BranchOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64ControlFlow$CondMoveOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64ControlFlow$CondSetOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64ControlFlow$FloatBranchOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64ControlFlow$FloatCondMoveOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64ControlFlow$StrategySwitchOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64LIRInstruction"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64Move$AMD64PushPopStackMove"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64Move$AMD64StackMove"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64Move$AbstractMoveOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64Move$CompareAndSwapOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64Move$CompressPointerOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64Move$LeaOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64Move$MembarOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64Move$MoveFromConstOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64Move$MoveFromRegOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64Move$MoveToRegOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64Move$NullCheckOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64Move$PointerCompressionOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64Move$StackLeaOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64Move$UncompressPointerOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64MulDivOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64PrefetchOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64RestoreRegistersOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64SaveRegistersOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64ShiftOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64SignExtendOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64Unary$MOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64Unary$MROp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64Unary$MemoryOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64Unary$RMOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.AMD64VZeroUpper"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.vector.AMD64VectorBinary$AVXBinaryOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.lir.amd64.vector.AMD64VectorUnary$AVXUnaryOp"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.AbstractBeginNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.AbstractDeoptimizeNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.AbstractEndNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.AbstractFixedGuardNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.AbstractLocalNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.AbstractMergeNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.AbstractStateSplit"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.BeginNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.BeginStateSplitNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.BinaryOpLogicNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.CallTargetNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.CompressionNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.ConstantNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.ControlSinkNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.ControlSplitNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.DeoptimizeNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.DeoptimizingFixedWithNextNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.DirectCallTargetNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.DynamicDeoptimizeNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.EndNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.EntryMarkerNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.EntryProxyNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.FixedGuardNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.FixedNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.FixedWithNextNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.FloatingAnchoredNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.FloatingGuardedNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.FrameState"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.FrameState$TwoSlotMarker"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.GetObjectAddressNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.GuardNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.GuardProxyNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.IfNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.IndirectCallTargetNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.InvokeNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.InvokeWithExceptionNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.KillingBeginNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.LogicConstantNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.LogicNegationNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.LogicNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.LoopBeginNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.LoopEndNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.LoopExitNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.LoweredCallTargetNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.MergeNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.ParameterNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.PhiNode"
+  },
+  {
+    "name": "org.graalvm.compiler.nodes.PiArrayNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.PiArrayNode$Placeholder"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.PiNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.PiNode$Placeholder"
+  },
+  {
+    "name": "org.graalvm.compiler.nodes.PrefetchAllocateNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.ProxyNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.ReturnNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.SafepointNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.ShortCircuitOrNode"
+  },
+  {
+    "name": "org.graalvm.compiler.nodes.SnippetAnchorNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.StartNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.UnaryOpLogicNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.UnwindNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.ValueNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.ValuePhiNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.ValueProxyNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.VirtualState"
+  },
+  {
+    "allDeclaredFields": true,
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": [
+          "org.graalvm.compiler.nodes.ValueNode",
+          "org.graalvm.compiler.nodes.ValueNode"
+        ]
+      }
+    ],
+    "name": "org.graalvm.compiler.nodes.calc.AddNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": [
+          "org.graalvm.compiler.nodes.ValueNode",
+          "org.graalvm.compiler.nodes.ValueNode"
+        ]
+      }
+    ],
+    "name": "org.graalvm.compiler.nodes.calc.AndNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.BinaryArithmeticNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.BinaryNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.CompareNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.ConditionalNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.FixedBinaryNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.FloatConvertNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.FloatEqualsNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.FloatLessThanNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.FloatingNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.IntegerBelowNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.IntegerConvertNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.IntegerDivRemNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.IntegerEqualsNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.IntegerLessThanNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.IntegerLowerThanNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.IntegerMulHighNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.IntegerTestNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.IsNullNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.LeftShiftNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.MulNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.NarrowNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.NegateNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.NormalizeCompareNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.NotNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.ObjectEqualsNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": [
+          "org.graalvm.compiler.nodes.ValueNode",
+          "org.graalvm.compiler.nodes.ValueNode"
+        ]
+      }
+    ],
+    "name": "org.graalvm.compiler.nodes.calc.OrNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.PointerEqualsNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.ReinterpretNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.RightShiftNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.ShiftNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.SignExtendNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.SignedDivNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.SignedRemNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": [
+          "org.graalvm.compiler.nodes.ValueNode",
+          "org.graalvm.compiler.nodes.ValueNode"
+        ]
+      }
+    ],
+    "name": "org.graalvm.compiler.nodes.calc.SubNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.UnaryArithmeticNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.UnaryNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": [
+          "org.graalvm.compiler.nodes.ValueNode",
+          "org.graalvm.compiler.nodes.ValueNode"
+        ]
+      }
+    ],
+    "name": "org.graalvm.compiler.nodes.calc.UnsignedRightShiftNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": [
+          "org.graalvm.compiler.nodes.ValueNode",
+          "org.graalvm.compiler.nodes.ValueNode"
+        ]
+      }
+    ],
+    "name": "org.graalvm.compiler.nodes.calc.XorNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.ZeroExtendNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.extended.BoxNode"
+  },
+  {
+    "name": "org.graalvm.compiler.nodes.extended.BranchProbabilityNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.extended.BytecodeExceptionNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.extended.FixedValueAnchorNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.extended.ForeignCallNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.extended.GetClassNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.extended.IntegerSwitchNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.extended.JavaReadNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.extended.JavaWriteNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.extended.LoadHubNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.extended.LoadMethodNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.extended.MembarNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.extended.NullCheckNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.extended.OSRLocalNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.extended.OSRMonitorEnterNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.extended.OSRStartNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.extended.RawLoadNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.extended.RawStoreNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.extended.StateSplitProxyNode"
+  },
+  {
+    "name": "org.graalvm.compiler.nodes.extended.StoreHubNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.extended.SwitchNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.extended.UnboxNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.extended.UnsafeAccessNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.extended.UnsafeMemoryLoadNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.extended.UnsafeMemoryStoreNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.extended.ValueAnchorNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.AbstractCompareAndSwapNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.AbstractNewArrayNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.AbstractNewObjectNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.AbstractUnsafeCompareAndSwapNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.AccessArrayNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.AccessFieldNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.AccessIndexedNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.AccessMonitorNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.ArrayLengthNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.ClassIsAssignableFromNode"
+  },
+  {
+    "name": "org.graalvm.compiler.nodes.java.DynamicNewArrayNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.ExceptionObjectNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.FinalFieldBarrierNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.InstanceOfDynamicNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.InstanceOfNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.LoadExceptionObjectNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.LoadFieldNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.LoadIndexedNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.LogicCompareAndSwapNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.MethodCallTargetNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.MonitorEnterNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.MonitorExitNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.MonitorIdNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.NewArrayNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.NewInstanceNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.RawMonitorEnterNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.RegisterFinalizerNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.StoreFieldNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.StoreIndexedNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.TypeSwitchNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.UnsafeCompareAndSwapNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.ValueCompareAndSwapNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.memory.AbstractMemoryCheckpoint"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.memory.AbstractWriteNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.memory.FixedAccessNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.memory.FloatableAccessNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.memory.FloatingAccessNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.memory.FloatingReadNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.memory.MemoryAnchorNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.memory.MemoryMapNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.memory.MemoryPhiNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.memory.ReadNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.memory.WriteNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.memory.address.AddressNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.memory.address.OffsetAddressNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.virtual.AllocatedObjectNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.virtual.CommitAllocationNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.virtual.EscapeObjectState"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.virtual.VirtualArrayNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.virtual.VirtualBoxingNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.virtual.VirtualInstanceNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.virtual.VirtualObjectNode"
+  },
+  {
+    "allDeclaredMethods": true,
+    "name": "org.graalvm.compiler.replacements.ArraysSubstitutions"
+  },
+  {
+    "name": "org.graalvm.compiler.replacements.BoxingSnippets"
+  },
+  {
+    "name": "org.graalvm.compiler.replacements.ReplacementsUtil"
+  },
+  {
+    "name": "org.graalvm.compiler.replacements.SnippetCounter"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.replacements.SnippetCounterNode"
+  },
+  {
+    "name": "org.graalvm.compiler.replacements.SnippetIntegerHistogram"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.replacements.SnippetTemplate$VarargsPlaceholderNode"
+  },
+  {
+    "allDeclaredMethods": true,
+    "name": "org.graalvm.compiler.replacements.StringSubstitutions"
+  },
+  {
+    "name": "org.graalvm.compiler.replacements.amd64.AMD64ArrayIndexOf"
+  },
+  {
+    "name": "org.graalvm.compiler.replacements.amd64.AMD64ArrayIndexOfNode"
+  },
+  {
+    "name": "org.graalvm.compiler.replacements.amd64.AMD64ConvertSnippets"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.replacements.amd64.AMD64CountLeadingZerosNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.replacements.amd64.AMD64CountTrailingZerosNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.replacements.amd64.AMD64FloatConvertNode"
+  },
+  {
+    "name": "org.graalvm.compiler.replacements.arraycopy.ArrayCopyCallNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.replacements.arraycopy.ArrayCopyNode"
+  },
+  {
+    "name": "org.graalvm.compiler.replacements.arraycopy.ArrayCopySnippets"
+  },
+  {
+    "name": "org.graalvm.compiler.replacements.arraycopy.ArrayCopySnippets$ArrayCopyTypeCheck"
+  },
+  {
+    "name": "org.graalvm.compiler.replacements.arraycopy.ArrayCopySnippets$Counters"
+  },
+  {
+    "name": "org.graalvm.compiler.replacements.arraycopy.CheckcastArrayCopyCallNode"
+  },
+  {
+    "name": "org.graalvm.compiler.replacements.arraycopy.GenericArrayCopyCallNode"
+  },
+  {
+    "name": "org.graalvm.compiler.replacements.nodes.ArrayCompareToNode"
+  },
+  {
+    "name": "org.graalvm.compiler.replacements.nodes.ArrayEqualsNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.replacements.nodes.BasicArrayCopyNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.replacements.nodes.BasicObjectCloneNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.replacements.nodes.BitCountNode"
+  },
+  {
+    "name": "org.graalvm.compiler.replacements.nodes.ExplodeLoopNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.replacements.nodes.LoadSnippetVarargParameterNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.replacements.nodes.MacroNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.replacements.nodes.MacroStateSplitNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.replacements.nodes.MethodHandleNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.replacements.nodes.ReadRegisterNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.replacements.nodes.ResolvedMethodHandleCallTargetNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.replacements.nodes.ReverseBytesNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.virtual.nodes.MaterializedObjectState"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.virtual.nodes.VirtualObjectState"
+  },
+  {
+    "name": "org.graalvm.compiler.word.Word"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.word.WordCastNode"
+  },
+  {
+    "name": "org.graalvm.word.LocationIdentity"
+  },
+  {
+    "name": "org.graalvm.word.Pointer"
+  },
+  {
+    "name": "org.graalvm.word.WordFactory"
+  },
+  {
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": [
+          "scala.collection.immutable.List",
+          "scala.tools.nsc.Settings"
+        ]
+      }
+    ],
+    "name": "scala.tools.nsc.CompilerCommand"
+  },
+  {
+    "allDeclaredFields": true,
+    "methods": [
+      {
+        "name": "arrayBaseOffset",
+        "parameterTypes": [
+          "java.lang.Class"
+        ]
+      },
+      {
+        "name": "copyMemory",
+        "parameterTypes": [
+          "long",
+          "long",
+          "long"
+        ]
+      },
+      {
+        "name": "copyMemory",
+        "parameterTypes": [
+          "java.lang.Object",
+          "long",
+          "java.lang.Object",
+          "long",
+          "long"
+        ]
+      },
+      {
+        "name": "getBoolean",
+        "parameterTypes": [
+          "java.lang.Object",
+          "long"
+        ]
+      },
+      {
+        "name": "getByte",
+        "parameterTypes": [
+          "long"
+        ]
+      },
+      {
+        "name": "getByte",
+        "parameterTypes": [
+          "java.lang.Object",
+          "long"
+        ]
+      },
+      {
+        "name": "getDouble",
+        "parameterTypes": [
+          "java.lang.Object",
+          "long"
+        ]
+      },
+      {
+        "name": "getFloat",
+        "parameterTypes": [
+          "java.lang.Object",
+          "long"
+        ]
+      },
+      {
+        "name": "getInt",
+        "parameterTypes": [
+          "long"
+        ]
+      },
+      {
+        "name": "getInt",
+        "parameterTypes": [
+          "java.lang.Object",
+          "long"
+        ]
+      },
+      {
+        "name": "getLong",
+        "parameterTypes": [
+          "long"
+        ]
+      },
+      {
+        "name": "getLong",
+        "parameterTypes": [
+          "java.lang.Object",
+          "long"
+        ]
+      },
+      {
+        "name": "getObject",
+        "parameterTypes": [
+          "java.lang.Object",
+          "long"
+        ]
+      },
+      {
+        "name": "objectFieldOffset",
+        "parameterTypes": [
+          "java.lang.reflect.Field"
+        ]
+      },
+      {
+        "name": "putBoolean",
+        "parameterTypes": [
+          "java.lang.Object",
+          "long",
+          "boolean"
+        ]
+      },
+      {
+        "name": "putByte",
+        "parameterTypes": [
+          "long",
+          "byte"
+        ]
+      },
+      {
+        "name": "putByte",
+        "parameterTypes": [
+          "java.lang.Object",
+          "long",
+          "byte"
+        ]
+      },
+      {
+        "name": "putDouble",
+        "parameterTypes": [
+          "java.lang.Object",
+          "long",
+          "double"
+        ]
+      },
+      {
+        "name": "putFloat",
+        "parameterTypes": [
+          "java.lang.Object",
+          "long",
+          "float"
+        ]
+      },
+      {
+        "name": "putInt",
+        "parameterTypes": [
+          "long",
+          "int"
+        ]
+      },
+      {
+        "name": "putInt",
+        "parameterTypes": [
+          "java.lang.Object",
+          "long",
+          "int"
+        ]
+      },
+      {
+        "name": "putLong",
+        "parameterTypes": [
+          "long",
+          "long"
+        ]
+      },
+      {
+        "name": "putLong",
+        "parameterTypes": [
+          "java.lang.Object",
+          "long",
+          "long"
+        ]
+      },
+      {
+        "name": "putObject",
+        "parameterTypes": [
+          "java.lang.Object",
+          "long",
+          "java.lang.Object"
+        ]
+      }
+    ],
+    "name": "sun.misc.Unsafe"
+  },
+  {
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      },
+      {
+        "name": "newCompiler",
+        "parameterTypes": [
+          "[Ljava.lang.String;",
+          "xsbti.compile.Output",
+          "xsbti.Logger",
+          "xsbti.Reporter"
+        ]
+      },
+      {
+        "name": "run",
+        "parameterTypes": [
+          "[Ljava.io.File;",
+          "xsbti.compile.DependencyChanges",
+          "xsbti.AnalysisCallback",
+          "xsbti.Logger",
+          "xsbti.Reporter",
+          "xsbti.compile.CompileProgress",
+          "xsbti.compile.CachedCompiler"
+        ]
+      }
+    ],
+    "name": "xsbt.CompilerInterface"
+  },
+  {
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": [
+          "scala.tools.nsc.Settings"
+        ]
+      }
+    ],
+    "name": "scala.tools.nsc.reporters.ConsoleReporter"
+  },
+  {
+    "methods": [
+      {
+        "name": "getCallerClass",
+        "parameterTypes": [
+          "int"
+        ]
+      }
+    ],
+    "name": "sun.reflect.Reflection"
+  },
+  {
+    "fields": [
+      {
+        "name": "value"
+      }
+    ],
+    "name": "java.lang.String"
+  },
+  {
+    "allDeclaredMethods": true,
+    "name": "org.apache.logging.log4j.core.config.AppendersPlugin"
+  },
+  {
+    "allDeclaredMethods": true,
+    "name": "org.apache.logging.log4j.core.config.LoggersPlugin"
+  },
+  {
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": [
+          "org.apache.logging.log4j.core.LoggerContext",
+          "org.apache.logging.log4j.core.config.ConfigurationSource",
+          "org.apache.logging.log4j.core.config.builder.api.Component"
+        ]
+      }
+    ],
+    "name": "org.apache.logging.log4j.core.config.builder.impl.BuiltConfiguration"
+  },
+  {
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ],
+    "name": "org.apache.logging.log4j.core.config.plugins.visitors.PluginElementVisitor"
+  },
+  {
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ],
+    "name": "org.apache.logging.log4j.core.impl.Log4jContextFactory"
+  },
+  {
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ],
+    "name": "org.apache.logging.log4j.core.lookup.ContextMapLookup"
+  },
+  {
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ],
+    "name": "org.apache.logging.log4j.core.lookup.DateLookup"
+  },
+  {
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ],
+    "name": "org.apache.logging.log4j.core.lookup.EnvironmentLookup"
+  },
+  {
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ],
+    "name": "org.apache.logging.log4j.core.lookup.JavaLookup"
+  },
+  {
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ],
+    "name": "org.apache.logging.log4j.core.lookup.JmxRuntimeInputArgumentsLookup"
+  },
+  {
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ],
+    "name": "org.apache.logging.log4j.core.lookup.JndiLookup"
+  },
+  {
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ],
+    "name": "org.apache.logging.log4j.core.lookup.Log4jLookup"
+  },
+  {
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ],
+    "name": "org.apache.logging.log4j.core.lookup.MainMapLookup"
+  },
+  {
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ],
+    "name": "org.apache.logging.log4j.core.lookup.MapLookup"
+  },
+  {
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ],
+    "name": "org.apache.logging.log4j.core.lookup.MarkerLookup"
+  },
+  {
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ],
+    "name": "org.apache.logging.log4j.core.lookup.ResourceBundleLookup"
+  },
+  {
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ],
+    "name": "org.apache.logging.log4j.core.lookup.StructuredDataLookup"
+  },
+  {
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ],
+    "name": "org.apache.logging.log4j.core.lookup.SystemPropertiesLookup"
+  },
+  {
+    "allDeclaredMethods": true,
+    "name": "org.apache.logging.log4j.core.pattern.DatePatternConverter"
+  },
+  {
+    "allDeclaredMethods": true,
+    "name": "org.apache.logging.log4j.core.pattern.LevelPatternConverter"
+  },
+  {
+    "allDeclaredMethods": true,
+    "name": "org.apache.logging.log4j.core.pattern.LineSeparatorPatternConverter"
+  },
+  {
+    "allDeclaredMethods": true,
+    "name": "org.apache.logging.log4j.core.pattern.LoggerPatternConverter"
+  },
+  {
+    "allDeclaredMethods": true,
+    "name": "org.apache.logging.log4j.core.pattern.MessagePatternConverter"
+  },
+  {
+    "allDeclaredMethods": true,
+    "name": "org.apache.logging.log4j.core.pattern.ThreadNamePatternConverter"
+  },
+  {
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ],
+    "name": "org.apache.logging.log4j.message.DefaultFlowMessageFactory"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.bytecode.Bytecodes$Flags"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.AbstractBeginNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.AbstractDeoptimizeNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.AbstractEndNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.AbstractFixedGuardNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.AbstractLocalNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.AbstractMergeNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.BeginNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.BeginStateSplitNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.BinaryOpLogicNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.CallTargetNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.ConstantNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.ControlSinkNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.ControlSplitNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.DeoptimizeNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.DeoptimizingFixedWithNextNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.EndNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.FixedGuardNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.FixedNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.FixedWithNextNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.FloatingAnchoredNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.FloatingGuardedNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.FrameState"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.FrameState$TwoSlotMarker"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.GuardNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.IfNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.LogicNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.LoopBeginNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.LoopExitNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.MergeNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.ParameterNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.PhiNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.PiNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.ReturnNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.StartNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.UnaryOpLogicNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.ValueNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.ValuePhiNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.VirtualState"
+  },
+  {
+    "allDeclaredFields": true,
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": [
+          "org.graalvm.compiler.nodes.ValueNode",
+          "org.graalvm.compiler.nodes.ValueNode"
+        ]
+      }
+    ],
+    "name": "org.graalvm.compiler.nodes.calc.AddNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.BinaryArithmeticNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.BinaryNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.CompareNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.FloatingNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.IntegerConvertNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.IntegerLessThanNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.IntegerLowerThanNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.IsNullNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.LeftShiftNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.MulNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.NarrowNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.ShiftNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.SignExtendNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.SubNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.UnaryNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.calc.ZeroExtendNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.AccessArrayNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.AccessFieldNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.AccessIndexedNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.ArrayLengthNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.LoadFieldNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.LoadIndexedNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.java.MethodCallTargetNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.nodes.virtual.VirtualObjectNode"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.replacements.SnippetCounterNode"
+  },
+  {
+    "name": "org.graalvm.compiler.replacements.StringSubstitutions"
+  },
+  {
+    "name": "org.graalvm.compiler.replacements.amd64.AMD64ArrayIndexOf"
+  },
+  {
+    "name": "org.graalvm.compiler.word.Word"
+  },
+  {
+    "allDeclaredFields": true,
+    "name": "org.graalvm.compiler.word.WordCastNode"
+  },
+  {
+    "fields": [
+      {
+        "name": "theUnsafe"
+      }
+    ],
+    "name": "sun.misc.Unsafe"
+  },
+  {
+    "methods": [
+      {
+        "name": "getCallerClass",
+        "parameterTypes": [
+          "int"
+        ]
+      }
+    ],
+    "name": "sun.reflect.Reflection"
+  }
+]

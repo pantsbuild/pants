@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import ctypes
 import os
@@ -18,6 +15,7 @@ def get_generated_shared_lib(lib_name):
 
 asdf_cpp_lib_path = get_generated_shared_lib('asdf-cpp_ctypes-with-extra-compiler-flags')
 asdf_cpp_lib = ctypes.CDLL(asdf_cpp_lib_path)
+
 
 def f(x):
   multiplied = asdf_cpp_lib.multiply_by_something(42)

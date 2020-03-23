@@ -5,4 +5,5 @@ python_library(
   dependencies = [
     'src/python/pants/binaries'
   ],
+  tags = {"partially_type_checked"},
 )

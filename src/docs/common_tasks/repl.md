@@ -9,7 +9,7 @@ You're working on a Scala or Python project and would like to interact with a li
 The pants `repl` goal will open up an interactive Scala or Python REPL session for a library target.
 
     ::bash
-    $ ./pants repl myproject/src/main/scala
+    $ ./pants repl src/python/myproject/example:lib
 
 ## Discussion
 
@@ -26,7 +26,7 @@ If you're working on a Scala project that has, for example, `com.twitter.util.Fu
 It's also possible to open the Scala REPL without first compiling the specified library using the `repl-dirty` goal:
 
     ::bash
-    $ ./pants repl-dirty myproject/src/main/scala
+    $ ./pants repl-dirty src/scala/com/myorg/myproject/example
 
 ## See Also
 

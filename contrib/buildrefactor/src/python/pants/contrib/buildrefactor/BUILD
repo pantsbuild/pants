@@ -6,6 +6,7 @@ contrib_plugin(
   dependencies=[
     ':buildrefactor'
   ],
+  tags = {'partially_type_checked'},
   distribution_name='pantsbuild.pants.contrib.buildrefactor',
   description='Plugin to manipulate and refactor BUILD files and targets',
   register_goals=True,
@@ -16,5 +17,6 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/binaries'
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )

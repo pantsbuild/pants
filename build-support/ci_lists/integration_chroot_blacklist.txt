@@ -1,0 +1,3 @@
+tests/python/pants_test/backend/python/tasks:setup_py_integration
+tests/python/pants_test/backend/python:integration
+tests/python/pants_test/pantsd:pantsd_integration

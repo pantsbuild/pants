@@ -5,4 +5,5 @@ python_tests(
   dependencies=[
     'src/python/pants/backend/native/targets',
   ],
+  tags = {"partially_type_checked"},
 )

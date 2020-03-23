@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::fmt::Debug;
 use std::iter::FromIterator;
 use std::ops::Deref;
@@ -8,7 +8,7 @@ use std::time::Duration;
 use std::time::Instant;
 
 use bazel_protos;
-use futures::{Future, Sink};
+use futures01::{Future, Sink};
 use grpcio;
 use parking_lot::Mutex;
 use protobuf;
@@ -84,7 +84,7 @@ impl TestServer {
   ///                      If a GetOperation request is received whose name is not equal to this
   ///                      MockExecution's name, or more requests are received than stub responses
   ///                      are available for, an error will be returned.
-  pub fn new(mock_execution: MockExecution) -> TestServer {
+  pub fn new(mock_execution: MockExecution, port: Option<u16>) -> TestServer {
     let mock_responder = MockResponder::new(mock_execution);
 
     let env = Arc::new(grpcio::Environment::new(1));
@@ -95,7 +95,7 @@ impl TestServer {
       .register_service(bazel_protos::operations_grpc::create_operations(
         mock_responder.clone(),
       ))
-      .bind("localhost", 0)
+      .bind("localhost", port.unwrap_or(0))
       .build()
       .unwrap();
     server_transport.start();
@@ -154,12 +154,14 @@ pub struct ReceivedMessage {
   pub message_type: String,
   pub message: Box<dyn protobuf::Message>,
   pub received_at: Instant,
+  pub headers: HashMap<String, Vec<u8>>,
 }
 
 #[derive(Clone, Debug)]
 pub struct MockResponder {
   mock_execution: MockExecution,
   pub received_messages: Arc<Mutex<Vec<ReceivedMessage>>>,
+  pub cancelation_requests: Arc<Mutex<Vec<bazel_protos::operations::CancelOperationRequest>>>,
 }
 
 impl MockResponder {
@@ -167,14 +169,21 @@ impl MockResponder {
     MockResponder {
       mock_execution: mock_execution,
       received_messages: Arc::new(Mutex::new(vec![])),
+      cancelation_requests: Arc::new(Mutex::new(vec![])),
     }
   }
 
-  fn log<T: protobuf::Message + Sized>(&self, message: T) {
+  fn log<T: protobuf::Message + Sized>(&self, ctx: &grpcio::RpcContext, message: T) {
+    let headers = ctx
+      .request_headers()
+      .iter()
+      .map(|(name, value)| (name.to_string(), value.to_vec()))
+      .collect();
     self.received_messages.lock().push(ReceivedMessage {
       message_type: message.descriptor().name().to_string(),
       message: Box::new(message),
       received_at: Instant::now(),
+      headers,
     });
   }
 
@@ -198,7 +207,7 @@ impl MockResponder {
       }
       if let Ok(Some(op)) = op {
         // Complete the channel with the op.
-        sink.success(op.clone());
+        sink.success(op);
       } else if let Err(status) = op {
         sink.fail(status);
       } else {
@@ -226,7 +235,7 @@ impl MockResponder {
         if let Ok(Some(op)) = op {
           ctx.spawn(
             sink
-              .send((op.clone(), grpcio::WriteFlags::default()))
+              .send((op, grpcio::WriteFlags::default()))
               .map(|mut stream| stream.close())
               .map(|_| ())
               .map_err(|_| ()),
@@ -260,14 +269,17 @@ impl bazel_protos::remote_execution_grpc::Execution for MockResponder {
     req: bazel_protos::remote_execution::ExecuteRequest,
     sink: grpcio::ServerStreamingSink<bazel_protos::operations::Operation>,
   ) {
-    self.log(req.clone());
+    self.log(&ctx, req.clone());
 
     if self.mock_execution.execute_request != req {
       ctx.spawn(
         sink
           .fail(grpcio::RpcStatus::new(
             grpcio::RpcStatusCode::InvalidArgument,
-            Some("Did not expect this request".to_string()),
+            Some(format!(
+              "Did not expect this request. Expected: {:?}, Got: {:?}",
+              self.mock_execution.execute_request, req
+            )),
           ))
           .map_err(|_| ()),
       );
@@ -290,11 +302,11 @@ impl bazel_protos::remote_execution_grpc::Execution for MockResponder {
 impl bazel_protos::operations_grpc::Operations for MockResponder {
   fn get_operation(
     &self,
-    _: grpcio::RpcContext<'_>,
+    ctx: grpcio::RpcContext<'_>,
     req: bazel_protos::operations::GetOperationRequest,
     sink: grpcio::UnarySink<bazel_protos::operations::Operation>,
   ) {
-    self.log(req.clone());
+    self.log(&ctx, req);
 
     self.send_next_operation_unary(sink)
   }
@@ -325,13 +337,12 @@ impl bazel_protos::operations_grpc::Operations for MockResponder {
 
   fn cancel_operation(
     &self,
-    _: grpcio::RpcContext<'_>,
-    _: bazel_protos::operations::CancelOperationRequest,
+    ctx: grpcio::RpcContext<'_>,
+    req: bazel_protos::operations::CancelOperationRequest,
     sink: grpcio::UnarySink<bazel_protos::empty::Empty>,
   ) {
-    sink.fail(grpcio::RpcStatus::new(
-      grpcio::RpcStatusCode::Unimplemented,
-      None,
-    ));
+    self.log(&ctx, req.clone());
+    self.cancelation_requests.lock().push(req);
+    sink.success(bazel_protos::empty::Empty::new());
   }
 }

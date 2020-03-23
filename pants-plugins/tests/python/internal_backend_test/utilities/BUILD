@@ -6,4 +6,5 @@ python_tests(
     'pants-plugins/src/python/internal_backend/utilities:plugin',
     'src/python/pants/base:revision',
   ],
+  tags = {"partially_type_checked"},
 )

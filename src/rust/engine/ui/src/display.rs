@@ -9,7 +9,6 @@
   clippy::expl_impl_clone_on_copy,
   clippy::if_not_else,
   clippy::needless_continue,
-  clippy::single_match_else,
   clippy::unseparated_literal_suffix,
   clippy::used_underscore_binding
 )]
@@ -22,88 +21,78 @@
   clippy::too_many_arguments
 )]
 // Default isn't as big a deal as people seem to think it is.
-#![allow(
-  clippy::new_without_default,
-  clippy::new_without_default_derive,
-  clippy::new_ret_no_self
-)]
+#![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
 use termion;
 
 use std::collections::{BTreeMap, VecDeque};
+use std::io::Read;
 use std::io::Write;
 use std::io::{stdout, Result, Stdout};
-use std::thread;
-use std::time::Duration;
 
-use termion::cursor::DetectCursorPos;
 use termion::raw::IntoRawMode;
 use termion::raw::RawTerminal;
+use termion::screen::AlternateScreen;
+use termion::{async_stdin, AsyncReader};
 use termion::{clear, color, cursor};
 use unicode_segmentation::UnicodeSegmentation;
 
 enum Console {
-  Terminal(RawTerminal<Stdout>),
+  Uninitialized,
+  Terminal(RawTerminal<AlternateScreen<Stdout>>),
   Pipe(Stdout),
+}
+
+#[derive(Clone)]
+struct PrintableMsg {
+  msg: String,
+  output: PrintableMsgOutput,
+}
+
+#[derive(Clone)]
+enum PrintableMsgOutput {
+  Stdout,
+  Stderr,
+}
+
+pub enum KeyboardCommand {
+  None,
+  CtrlC,
 }
 
 pub struct EngineDisplay {
   sigil: char,
   divider: String,
-  poll_interval_ms: Duration,
   padding: String,
   terminal: Console,
   action_map: BTreeMap<String, String>,
   logs: VecDeque<String>,
-  running: bool,
+  printable_msgs: VecDeque<PrintableMsg>,
   cursor_start: (u16, u16),
   terminal_size: (u16, u16),
+  async_stdin: Option<AsyncReader>,
+  suspended: bool,
 }
 
 // TODO: Prescribe a threading/polling strategy for callers - or implement a built-in one.
 // TODO: Better error handling for .flush() and .write() failure modes.
 // TODO: Permit scrollback in the terminal - both at exit and during the live run.
 impl EngineDisplay {
-  /// Create a EngineDisplay only if stdout is tty and v2 ui is enabled.
-  pub fn create(display_worker_count: usize, should_render_ui: bool) -> Option<EngineDisplay> {
-    if should_render_ui && termion::is_tty(&stdout()) {
-      let mut display = EngineDisplay::for_stdout(0);
-      display.initialize(display_worker_count);
-      Some(display)
-    } else {
-      None
-    }
-  }
-
-  fn initialize(&mut self, display_worker_count: usize) {
-    let worker_ids: Vec<String> = (0..display_worker_count)
-      .map(|s| format!("{}", s))
-      .collect();
-    for worker_id in worker_ids {
-      self.add_worker(worker_id);
-    }
-  }
-
-  pub fn for_stdout(indent_level: u16) -> EngineDisplay {
-    let write_handle = stdout();
-
-    let mut display = EngineDisplay {
+  /// Create a new EngineDisplay
+  pub fn new(indent_level: u16) -> EngineDisplay {
+    EngineDisplay {
       sigil: '⚡',
       divider: "▵".to_string(),
-      poll_interval_ms: Duration::from_millis(55),
       padding: " ".repeat(indent_level.into()),
-      terminal: match write_handle.into_raw_mode() {
-        Ok(t) => Console::Terminal(t),
-        Err(_) => Console::Pipe(stdout()),
-      },
+      terminal: Console::Uninitialized,
       action_map: BTreeMap::new(),
       // This is arbitrary based on a guesstimated peak terminal row size for modern displays.
       // The reason this can't be capped to e.g. the starting size is because of resizing - we
       // want to be able to fill the entire screen if resized much larger than when we started.
       logs: VecDeque::with_capacity(500),
-      running: false,
+      printable_msgs: VecDeque::with_capacity(500),
       // N.B. This will cause the screen to clear - but with some improved position
       // tracking logic we could avoid screen clearing in favor of using the value
       // of `EngineDisplay::get_cursor_pos()` as initialization here. From there, the
@@ -115,44 +104,48 @@ impl EngineDisplay {
       // as we've done here is the safest way to avoid terminal oddness.
       cursor_start: (1, 1),
       terminal_size: EngineDisplay::get_size(),
-    };
-
-    display.stop_raw_mode().unwrap();
-    display
-  }
-
-  fn stop_raw_mode(&mut self) -> Result<()> {
-    match self.terminal {
-      Console::Terminal(ref mut t) => t.suspend_raw_mode(),
-      _ => Ok(()),
+      async_stdin: Some(async_stdin()),
+      suspended: false,
     }
   }
 
+  pub fn initialize(&mut self, display_worker_count: usize) {
+    let worker_ids: Vec<String> = (0..display_worker_count)
+      .map(|s| format!("{}", s))
+      .collect();
+    for worker_id in worker_ids {
+      self.add_worker(worker_id);
+    }
+  }
+
+  pub fn stdout_is_tty() -> bool {
+    termion::is_tty(&stdout())
+  }
+
+  pub fn write_stdout(&mut self, msg: &str) {
+    self.printable_msgs.push_back(PrintableMsg {
+      msg: msg.to_string(),
+      output: PrintableMsgOutput::Stdout,
+    });
+  }
+
+  pub fn write_stderr(&mut self, msg: &str) {
+    self.printable_msgs.push_back(PrintableMsg {
+      msg: msg.to_string(),
+      output: PrintableMsgOutput::Stderr,
+    });
+  }
+
   fn start_raw_mode(&mut self) -> Result<()> {
-    eprintln!("BL: Start raw mode");
     match self.terminal {
       Console::Terminal(ref mut t) => t.activate_raw_mode(),
       _ => Ok(()),
     }
   }
 
-  // Gets the current terminal's cursor position, if applicable.
-  fn get_cursor_pos(&mut self) -> (u16, u16) {
-    match self.terminal {
-      // N.B. Real TTY coordinates start at (1, 1).
-      Console::Terminal(ref mut t) => t.cursor_pos().unwrap_or((0, 0)),
-      Console::Pipe(_) => (0, 0),
-    }
-  }
-
   // Gets the current terminal's width and height, if applicable.
   fn get_size() -> (u16, u16) {
     termion::terminal_size().unwrap_or((0, 0))
-  }
-
-  // Whether or not the EngineDisplay is running (whether .start() has been called).
-  pub fn is_running(&self) -> bool {
-    self.running
   }
 
   // Sets the terminal size per-render for signal-free resize detection.
@@ -184,6 +177,7 @@ impl EngineDisplay {
     match self.terminal {
       Console::Terminal(ref mut t) => t.flush(),
       Console::Pipe(ref mut p) => p.flush(),
+      Console::Uninitialized => Ok(()),
     }
   }
 
@@ -192,6 +186,7 @@ impl EngineDisplay {
     let res = match self.terminal {
       Console::Terminal(ref mut t) => t.write(msg.as_bytes()),
       Console::Pipe(ref mut p) => p.write(msg.as_bytes()),
+      Console::Uninitialized => Ok(0),
     };
     self.flush()?;
     res
@@ -282,29 +277,59 @@ impl EngineDisplay {
   }
 
   // Paints one screen of rendering.
-  fn render_for_tty(&mut self) {
+  pub fn render(&mut self) -> std::result::Result<KeyboardCommand, String> {
+    if self.suspended {
+      return Ok(KeyboardCommand::None);
+    }
     self.set_size();
     self.clear();
     let max_log_rows = self.get_max_log_rows();
     let rendered_count = self.render_logs(max_log_rows);
     self.render_actions(rendered_count);
-    self.flush().expect("could not flush terminal!");
+    if let Err(err) = self.flush() {
+      return Err(format!("Could not flush terminal: {}", err));
+    }
+    self.handle_stdin()
   }
 
-  // Paints one screen of rendering.
-  pub fn render(&mut self) {
-    self.render_for_tty()
-  }
+  fn handle_stdin(&mut self) -> std::result::Result<KeyboardCommand, String> {
+    use termion::event::{parse_event, Event, Key};
+    //This buffer must have non-zero size because termion's `read` implementation for
+    //AsyncReader will return early without doing anything if it is of length 0.
+    //(See https://docs.rs/termion/1.5.4/src/termion/async.rs.html#69 )
+    let mut buf: [u8; 32] = [0; 32];
 
-  // Paints one screen of rendering and sleeps for the poll interval.
-  pub fn render_and_sleep(&mut self) {
-    self.render();
-    thread::sleep(self.poll_interval_ms);
+    match self.async_stdin.as_mut().map(|s| s.read(&mut buf)) {
+      Some(Ok(0)) | None => Ok(KeyboardCommand::None),
+      Some(Ok(_)) => {
+        let initial_byte: u8 = buf[0];
+        let mut iter = buf[1..].iter().map(|byte| Ok(*byte));
+        // TODO: calling `parse_event` in this way means that we will potentially miss keyboard
+        // events - a Ctrl-C event has to be the very first event in each `render` frame, or it
+        // won't be handled. In practice, the refresh interval is 100 ms, which is fast enough
+        // on human timescales that hitting Ctrl-C while the program is running will wind up
+        // at the beginning of some frame.  Note that internally termion uses this function
+        // in the context of the `next()` function of an Iterator:
+        // https://github.com/redox-os/termion/blob/master/src/input.rs .
+        let event_or_err = parse_event(initial_byte, &mut iter);
+        match event_or_err {
+          Ok(Event::Key(Key::Ctrl('c'))) => Ok(KeyboardCommand::CtrlC),
+          Err(err) => Err(format!("EngineDisplay keyboard event error: {}", err)),
+          _ => Ok(KeyboardCommand::None),
+        }
+      }
+      Some(Err(err)) => Err(format!("EngineDisplay stdin error: {}", err)),
+    }
   }
 
   // Starts the EngineDisplay at the current cursor position.
   pub fn start(&mut self) {
-    self.running = true;
+    let write_handle = termion::screen::AlternateScreen::from(stdout());
+    self.terminal = match write_handle.into_raw_mode() {
+      Ok(t) => Console::Terminal(t),
+      Err(_) => Console::Pipe(stdout()),
+    };
+
     self.start_raw_mode().unwrap();
     let cursor_start = self.cursor_start;
     self
@@ -342,19 +367,44 @@ impl EngineDisplay {
     self.action_map.len()
   }
 
-  // Terminates the EngineDisplay and returns the cursor to a static position.
+  pub fn suspend(&mut self) {
+    {
+      self.terminal = Console::Uninitialized;
+      self.suspended = true;
+      self.async_stdin = None;
+    }
+    println!("{}", termion::cursor::Show);
+  }
+
+  pub fn unsuspend(&mut self) {
+    let write_handle = termion::screen::AlternateScreen::from(stdout());
+    self.terminal = match write_handle.into_raw_mode() {
+      Ok(t) => Console::Terminal(t),
+      Err(_) => Console::Pipe(stdout()),
+    };
+    self.suspended = false;
+    self.async_stdin = Some(async_stdin());
+  }
+
+  // Initiates one last screen render, then terminates the EngineDisplay and returns the cursor
+  // to a static position, then prints all buffered stdout/stderr output.
   pub fn finish(&mut self) {
-    self.running = false;
-    let current_pos = self.get_cursor_pos();
-    let action_count = self.action_map.len() as u16;
-    self
-      .write(&format!(
-        "{park_cursor}{clear_after_cursor}{reveal_cursor}",
-        park_cursor = cursor::Goto(1, current_pos.1 - action_count),
-        clear_after_cursor = clear::AfterCursor,
-        reveal_cursor = termion::cursor::Show
-      ))
-      .expect("could not write to terminal");
-    self.stop_raw_mode().unwrap();
+    //We don't care about handling the output from render() here, since we're about to shut down
+    //the EngineDisplay anyway.
+    let _ = self.render();
+    {
+      self.terminal = Console::Uninitialized; //This forces the AlternateScreen to drop, restoring the original terminal state.
+    }
+
+    println!("{}", termion::cursor::Show);
+    for log in self.logs.iter() {
+      println!("{}", log);
+    }
+    for PrintableMsg { msg, output } in self.printable_msgs.iter() {
+      match output {
+        PrintableMsgOutput::Stdout => print!("{}", msg),
+        PrintableMsgOutput::Stderr => eprint!("{}", msg),
+      }
+    }
   }
 }

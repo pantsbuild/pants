@@ -1,5 +1,5 @@
 node_module(
-  sources=globs('package.json', 'yarn.lock', 'index.js', 'test/*.js', 'cli.js'),
+  sources=['package.json', 'yarn.lock', 'index.js', 'test/*.js', 'cli.js'],
   package_manager='yarn',
   bin_executables = {
     'add-one': 'cli.js'

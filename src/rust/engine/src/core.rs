@@ -10,6 +10,7 @@ use std::{fmt, hash};
 use crate::externs;
 use crate::handles::Handle;
 
+use rule_graph;
 use smallvec::{smallvec, SmallVec};
 
 pub type FNV = hash::BuildHasherDefault<FnvHasher>;
@@ -89,13 +90,18 @@ impl Params {
   ///
   /// Given a set of either param type or param value strings: sort, join, and render as one string.
   ///
-  pub fn display(mut params: Vec<String>) -> String {
+  pub fn display<T>(params: T) -> String
+  where
+    T: Iterator,
+    T::Item: fmt::Display,
+  {
+    let mut params: Vec<_> = params.map(|p| format!("{}", p)).collect();
     match params.len() {
       0 => "()".to_string(),
       1 => params.pop().unwrap(),
       _ => {
         params.sort();
-        format!("({})", params.join("+"))
+        format!("({})", params.join(", "))
       }
     }
   }
@@ -103,11 +109,7 @@ impl Params {
 
 impl fmt::Display for Params {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(
-      f,
-      "{}",
-      Self::display(self.0.iter().map(|k| format!("{}", k)).collect())
-    )
+    write!(f, "{}", Self::display(self.0.iter()))
   }
 }
 
@@ -116,40 +118,89 @@ pub type Id = u64;
 // The type of a python object (which itself has a type, but which is not represented
 // by a Key, because that would result in a infinitely recursive structure.)
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct TypeId(pub Id);
+
+impl TypeId {
+  fn pretty_print(self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    if self == ANY_TYPE {
+      write!(f, "Any")
+    } else {
+      write!(f, "{}", externs::type_to_str(self))
+    }
+  }
+}
+
+impl rule_graph::TypeId for TypeId {
+  ///
+  /// Render a string for a collection of TypeIds.
+  ///
+  fn display<I>(type_ids: I) -> String
+  where
+    I: Iterator<Item = TypeId>,
+  {
+    Params::display(type_ids)
+  }
+}
+
+impl fmt::Debug for TypeId {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    self.pretty_print(f)
+  }
+}
 
 impl fmt::Display for TypeId {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    if *self == ANY_TYPE {
-      write!(f, "Any")
-    } else {
-      write!(f, "{}", externs::type_to_str(*self))
-    }
+    self.pretty_print(f)
   }
 }
 
 // On the python side, the 0th type id is used as an anonymous id
 pub const ANY_TYPE: TypeId = TypeId(0);
 
-// A type constraint, which a TypeId may or may-not satisfy.
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct TypeConstraint(pub Key);
-
 // An identifier for a python function.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct Function(pub Key);
+
+impl Function {
+  pub fn name(&self) -> String {
+    let Function(key) = self;
+    let module = externs::project_str(&externs::val_for(&key), "__module__");
+    let name = externs::project_str(&externs::val_for(&key), "__name__");
+    // NB: this is a custom dunder method that Python code should populate before sending the
+    // function (e.g. an `@rule`) through FFI.
+    let line_number = externs::project_str(&externs::val_for(&key), "__line_number__");
+    format!("{}:{}:{}", module, line_number, name)
+  }
+}
+
+impl fmt::Display for Function {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{}()", self.name())
+  }
+}
+
+impl fmt::Debug for Function {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{}()", self.name())
+  }
+}
 
 ///
 /// Wraps a type id for use as a key in HashMaps and sets.
 ///
 #[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub struct Key {
   id: Id,
   type_id: TypeId,
+}
+
+impl fmt::Debug for Key {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{}", externs::key_to_str(self))
+  }
 }
 
 impl Eq for Key {}
@@ -187,7 +238,7 @@ impl Key {
 }
 
 ///
-/// A wrapper around a handle: soon to contain an Arc.
+/// A wrapper around a Arc<Handle>
 ///
 #[derive(Clone, Eq, PartialEq)]
 pub struct Value(Arc<Handle>);

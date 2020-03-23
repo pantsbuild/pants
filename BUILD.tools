@@ -1,47 +1,93 @@
 # JVM artifacts that Pants itself depends on.
 # http://pantsbuild.github.io/dev_tasks.html#jvm-tool-bootstrapping
 
-target(name = 'scala-js-cli', dependencies=['contrib/scalajs/3rdparty/jvm/org/scala-js:cli'])
-target(name = 'scala-js-compiler', dependencies=[
-  'contrib/scalajs/3rdparty/jvm/org/scala-js:compiler',
-  'contrib/scalajs/3rdparty/jvm/org/scala-js:library',
-])
-target(name = 'scala-js-library', dependencies=['contrib/scalajs/3rdparty/jvm/org/scala-js:library'])
+target(
+  name = 'scala-js-cli',
+  dependencies=[
+    'contrib/scalajs/3rdparty/jvm/org/scala-js:cli'
+  ],
+)
+
+target(
+  name = 'scala-js-compiler',
+  dependencies=[
+    'contrib/scalajs/3rdparty/jvm/org/scala-js:compiler',
+    'contrib/scalajs/3rdparty/jvm/org/scala-js:library',
+  ],
+)
+
+target(
+  name = 'scala-js-library',
+  dependencies = [
+    'contrib/scalajs/3rdparty/jvm/org/scala-js:library',
+  ],
+)
 
 
 # TODO: Attempting to use these targets fails because BootstrapJvmTools.get_alternate_target_roots()
 # doesn't descend into dependent target directories and uses the same build_graph it starts with.
-# target(name='scrooge-gen', dependencies=['3rdparty/jvm/com/twitter:scrooge-gen'])
-# target(name='scrooge-linter', dependencies=['3rdparty/jvm/com/twitter:scrooge-linter'])
+# target(
+#  name='scrooge-gen',
+#  dependencies=[
+#    '3rdparty/jvm/com/twitter:scrooge-gen',
+#  ],
+# )
+
+# target(
+#  name='scrooge-linter',
+#  dependencies=[
+#    '3rdparty/jvm/com/twitter:scrooge-linter',
+#  ],
+# )
 
 SCROOGE_REV = '18.12.0'
+
 # NB: The scrooge tools do not mix their classpaths with the sources they interact with, and
 # therefore they do not need to use the `scala-platform` via scala_jar.
-jar_library(name = 'scrooge-gen',
-            jars = [
-              jar(org='com.twitter', name='scrooge-generator_2.11', rev=SCROOGE_REV)
-            ])
+jar_library(
+  name = 'scrooge-gen',
+  jars = [
+    jar(org='com.twitter', name='scrooge-generator_2.11', rev=SCROOGE_REV),
+  ],
+)
 
-jar_library(name = 'scrooge-linter',
-            jars = [
-              jar(org='com.twitter', name='scrooge-linter_2.11', rev=SCROOGE_REV)
-            ])
+jar_library(
+  name = 'scrooge-linter',
+  jars = [
+    jar(org='com.twitter', name='scrooge-linter_2.11', rev=SCROOGE_REV),
+  ],
+)
 
 # Google doesn't publish Kythe jars (yet?).  So we publish them to a custom repo
-# (https://github.com/benjyw/binhost) for now.  See build-support/ivy/ivysettings.xml
+# (https://github.com/toolchainlabs/binhost) for now.  See build-support/ivy/ivysettings.xml
 # for more info.
 jar_library(
   name='kythe-java-extractor',
-  jars = [jar(org='kythe', name='javac_extractor', rev='v0.0.26.5-snowchain037-82964297aef')]
+  jars = [
+    jar(org='kythe', name='javac_extractor', rev='v0.0.30-toolchain001-26a6b03b-000'),
+  ],
 )
 
 jar_library(
   name='kythe-java-indexer',
-  jars = [jar(org='kythe', name='java_indexer', rev='v0.0.26.5-snowchain037-82964297aef')]
+  jars = [
+    jar(org='kythe', name='java_indexer', rev='v0.0.30-toolchain001-26a6b03b-000'),
+  ],
+)
+
+# Running Kythe on JDK8 requires a standalone javac 9 on the bootclasspath.
+# This jar is published to the same custom repo as the Kythe jars.
+jar_library(
+  name='javac9',
+  jars = [
+    jar(org='java', name='javac', rev='9+181-r4173-1',
+        url='https://raw.githubusercontent.com/toolchainlabs/binhost/master/java/javac/9+181-r4173-1/javac-9+181-r4173-1.jar'),
+  ],
 )
 
 # Runtime dependencies for the Avro Java generated code.
 avro_rev = '1.8.2'
+
 jar_library(
   name = 'avro-java-runtime',
   jars = [

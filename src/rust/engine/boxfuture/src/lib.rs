@@ -9,7 +9,6 @@
   clippy::expl_impl_clone_on_copy,
   clippy::if_not_else,
   clippy::needless_continue,
-  clippy::single_match_else,
   clippy::unseparated_literal_suffix,
   clippy::used_underscore_binding
 )]
@@ -22,11 +21,7 @@
   clippy::too_many_arguments
 )]
 // Default isn't as big a deal as people seem to think it is.
-#![allow(
-  clippy::new_without_default,
-  clippy::new_without_default_derive,
-  clippy::new_ret_no_self
-)]
+#![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
@@ -34,7 +29,7 @@
 // https://github.com/alexcrichton/futures-rs/issues/228 has background for its removal.
 // This avoids needing to call Box::new() around every future that we produce.
 
-use futures::future::Future;
+use futures01::future::Future;
 
 pub type BoxFuture<T, E> = Box<dyn Future<Item = T, Error = E> + Send>;
 
@@ -64,7 +59,7 @@ macro_rules! try_future {
     match $x {
       Ok(value) => value,
       Err(error) => {
-        use futures::future::err;
+        use futures01::future::err;
         return err(error).to_boxed();
       }
     }

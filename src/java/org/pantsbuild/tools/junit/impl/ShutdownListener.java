@@ -3,71 +3,89 @@
 
 package org.pantsbuild.tools.junit.impl;
 
-import java.io.PrintStream;
+import java.util.concurrent.ConcurrentHashMap;
 import org.junit.runner.Description;
 import org.junit.runner.Result;
 import org.junit.runner.notification.Failure;
 import org.junit.runner.notification.RunListener;
 
 /**
- * A listener that keeps track of the current test state with its own result class so it can print
+ * A listener that keeps track of the current test state with its own result class so it can record
  * the state of tests being run if there is unexpected exit during the tests.
  */
-public class ShutdownListener extends ConsoleListener {
+public class ShutdownListener extends RunListener {
   private final Result result = new Result();
   private final RunListener resultListener = result.createListener();
-  private Description currentTestDescription;
+  // holds running tests: Descriptions are added on testStarted and removed on testFinished
+  private ConcurrentHashMap.KeySetView<Description, Boolean> currentDescriptions =
+    ConcurrentHashMap.newKeySet();
+  private RunListener underlying;
 
-  public ShutdownListener(PrintStream out) {
-    super(out);
+
+  public ShutdownListener(RunListener underlying) {
+    this.underlying = underlying;
   }
 
   public void unexpectedShutdown() {
-    if (currentTestDescription != null) {
-      Failure shutdownFailure = new Failure(currentTestDescription,
-          new UnknownError("Abnormal VM exit - test crashed."));
-      testFailure(shutdownFailure);
+    for(Description description : currentDescriptions) {
+      completeTestWithFailure(description);
     }
 
-    // Log the test summary to the Console
-    super.testRunFinished(result);
+    try {
+      resultListener.testRunFinished(result);
+      underlying.testRunFinished(result);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private void completeTestWithFailure(Description description) {
+    Failure shutdownFailure = new Failure(description,
+      new UnknownError("Abnormal VM exit - test crashed. The test run may have timed out."));
+
+    try {
+      // Mark this test as completed with a failure (finish its lifecycle)
+      resultListener.testFailure(shutdownFailure);
+      resultListener.testFinished(description);
+      underlying.testFailure(shutdownFailure);
+      underlying.testFinished(description);
+    } catch (Exception ignored){}
   }
 
   @Override
   public void testRunStarted(Description description) throws Exception {
-    this.currentTestDescription = description;
     resultListener.testRunStarted(description);
   }
 
   @Override
-  public void testRunFinished(Result result) {
-    try {
-      resultListener.testRunFinished(result);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+  public void testStarted(Description description) throws Exception {
+    currentDescriptions.add(description);
+    resultListener.testStarted(description);
+  }
+
+  @Override
+  public void testAssumptionFailure(Failure failure) {
+    resultListener.testAssumptionFailure(failure);
+  }
+
+  @Override
+  public void testRunFinished(Result result) throws Exception {
+    resultListener.testRunFinished(result);
   }
 
   @Override
   public void testFinished(Description description) throws Exception {
+    currentDescriptions.remove(description);
     resultListener.testFinished(description);
   }
 
   @Override
-  public void testFailure(Failure failure) {
-    try {
-      resultListener.testFailure(failure);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+  public void testFailure(Failure failure) throws Exception {
+    resultListener.testFailure(failure);
   }
 
   @Override
-  public void testIgnored(Description description) {
-    try {
-      resultListener.testIgnored(description);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+  public void testIgnored(Description description) throws Exception {
+    resultListener.testIgnored(description);
   }
 }

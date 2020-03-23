@@ -5,9 +5,10 @@ python_tests(
   name = 'scalastyle_integration',
   sources = ['test_scalastyle_integration.py'],
   dependencies = [
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
+    'examples/src/scala/org/pantsbuild/example:styleissue_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )
 
 python_tests(
@@ -17,11 +18,11 @@ python_tests(
     'src/python/pants/base:build_environment',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:int-test',
-    'tests/python/pants_test/testutils:git_util',
+    'src/python/pants/testutil:int-test',
+    'src/python/pants/testutil:git_util',
   ],
-  tags = {'integration'},
-  timeout=120,
+  tags = {'integration', 'partially_type_checked'},
+  timeout=540,
 )
 
 python_tests(
@@ -29,10 +30,12 @@ python_tests(
   sources = ['test_bootstrap_jvm_tools_integration.py'],
   dependencies = [
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
+    'examples/src/java/org/pantsbuild/example:hello_directory',
+    'examples/src/scala/org/pantsbuild/example:hello_directory',
   ],
-  tags = {'integration'},
-  timeout = 120,
+  tags = {'integration', 'partially_type_checked'},
+  timeout = 540,
 )
 
 python_tests(
@@ -40,8 +43,8 @@ python_tests(
   sources = ['test_execution_graph.py'],
   dependencies = [
     'src/python/pants/backend/jvm/tasks/jvm_compile:execution_graph',
-    'tests/python/pants_test/testutils:py2_compat',
-    ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -49,8 +52,12 @@ python_tests(
   sources = ['test_clean_all_integration.py'],
   dependencies = [
     'src/python/pants/util:contextutil',
-    'src/python/pants/util:process_handler',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
+)
+
+files(
+  name = 'jar_publish_resources_directory',
+  sources = ['jar_publish_resources/**/*'],
 )

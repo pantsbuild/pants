@@ -3,10 +3,11 @@
 
 python_library(
   dependencies=[
-    '3rdparty/python:future',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:dataclasses',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:objects',
+    'src/python/pants/util:meta',
+    'src/python/pants/util:ordered_set',
     'src/python/pants/util:xml_parser',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )

@@ -2,22 +2,30 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::{HashMap, HashSet};
+use std::convert::TryInto;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::{mpsc, Arc};
 use std::time::Duration;
 
-use futures::future::{self, Future};
+use futures::compat::Future01CompatExt;
+use futures01::future::{self, Future};
 
 use crate::context::{Context, Core};
-use crate::core::{Failure, Params, TypeConstraint, Value};
-use crate::nodes::{NodeKey, Select, Tracer, TryInto, Visualizer};
-use crate::selectors;
-use graph::{EntryId, Graph, InvalidationResult, NodeContext};
+use crate::core::{Failure, Params, TypeId, Value};
+use crate::nodes::{NodeKey, Select, Tracer, Visualizer};
+use graph::{Graph, InvalidationResult};
+use hashing;
 use indexmap::IndexMap;
 use log::{debug, info, warn};
+use logging::logger::LOGGER;
 use parking_lot::Mutex;
-use ui::EngineDisplay;
+use ui::{EngineDisplay, KeyboardCommand};
+use workunit_store::WorkUnitStore;
+
+pub enum ExecutionTermination {
+  KeyboardInterrupt,
+}
 
 ///
 /// A Session represents a related series of requests (generally: one run of the pants CLI) on an
@@ -26,32 +34,122 @@ use ui::EngineDisplay;
 /// Both Scheduler and Session are exposed to python and expected to be used by multiple threads, so
 /// they use internal mutability in order to avoid exposing locks to callers.
 ///
-pub struct Session {
+struct InnerSession {
   // The total size of the graph at Session-creation time.
   preceding_graph_size: usize,
   // The set of roots that have been requested within this session.
   roots: Mutex<HashSet<Root>>,
-  // If enabled, the display that will render the progress of the V2 engine.
-  display: Option<Mutex<EngineDisplay>>,
+  // If enabled, the display that will render the progress of the V2 engine. This is only
+  // Some(_) if the --v2-ui option is enabled.
+  display: Option<Arc<Mutex<EngineDisplay>>>,
+  // If enabled, Zipkin spans for v2 engine will be collected.
+  should_record_zipkin_spans: bool,
+  // A place to store info about workunits in rust part
+  workunit_store: WorkUnitStore,
+  // The unique id for this run. Used as the id of the session, and for metrics gathering purposes.
+  build_id: String,
+  should_report_workunits: bool,
 }
 
+#[derive(Clone)]
+pub struct Session(Arc<InnerSession>);
+
 impl Session {
-  pub fn new(scheduler: &Scheduler, should_render_ui: bool, ui_worker_count: usize) -> Session {
-    Session {
+  pub fn new(
+    scheduler: &Scheduler,
+    should_record_zipkin_spans: bool,
+    should_render_ui: bool,
+    ui_worker_count: usize,
+    build_id: String,
+    should_report_workunits: bool,
+  ) -> Session {
+    let display = if should_render_ui && EngineDisplay::stdout_is_tty() {
+      let mut display = EngineDisplay::new(0);
+      display.initialize(ui_worker_count);
+      Some(Arc::new(Mutex::new(display)))
+    } else {
+      None
+    };
+
+    let inner_session = InnerSession {
       preceding_graph_size: scheduler.core.graph.len(),
       roots: Mutex::new(HashSet::new()),
-      display: EngineDisplay::create(ui_worker_count, should_render_ui).map(Mutex::new),
-    }
+      display,
+      should_record_zipkin_spans,
+      workunit_store: WorkUnitStore::new(),
+      build_id,
+      should_report_workunits,
+    };
+    Session(Arc::new(inner_session))
   }
 
   fn extend(&self, new_roots: &[Root]) {
-    let mut roots = self.roots.lock();
+    let mut roots = self.0.roots.lock();
     roots.extend(new_roots.iter().cloned());
   }
 
   fn root_nodes(&self) -> Vec<NodeKey> {
-    let roots = self.roots.lock();
+    let roots = self.0.roots.lock();
     roots.iter().map(|r| r.clone().into()).collect()
+  }
+
+  pub fn preceding_graph_size(&self) -> usize {
+    self.0.preceding_graph_size
+  }
+
+  fn maybe_display(&self) -> Option<&Arc<Mutex<EngineDisplay>>> {
+    self.0.display.as_ref()
+  }
+
+  pub fn should_record_zipkin_spans(&self) -> bool {
+    self.0.should_record_zipkin_spans
+  }
+
+  pub fn should_report_workunits(&self) -> bool {
+    self.0.should_report_workunits
+  }
+
+  pub fn workunit_store(&self) -> WorkUnitStore {
+    self.0.workunit_store.clone()
+  }
+
+  pub fn build_id(&self) -> &String {
+    &self.0.build_id
+  }
+
+  pub fn write_stdout(&self, msg: &str) {
+    if let Some(display) = self.maybe_display() {
+      let mut d = display.lock();
+      d.write_stdout(msg);
+    }
+  }
+
+  pub fn write_stderr(&self, msg: &str) {
+    if let Some(display) = self.maybe_display() {
+      let mut d = display.lock();
+      d.write_stderr(msg);
+    }
+  }
+
+  pub fn with_console_ui_disabled<F: FnOnce() -> T, T>(&self, f: F) -> T {
+    if let Some(display) = self.maybe_display() {
+      {
+        let mut d = display.lock();
+        d.suspend()
+      }
+      let output = f();
+      {
+        let mut d = display.lock();
+        d.unsuspend();
+      }
+      output
+    } else {
+      f()
+    }
+  }
+
+  pub fn should_handle_workunits(&self) -> bool {
+    self.should_report_workunits() || self.should_record_zipkin_spans()
   }
 }
 
@@ -89,17 +187,24 @@ impl Scheduler {
   }
 
   pub fn visualize(&self, session: &Session, path: &Path) -> io::Result<()> {
+    let context = Context::new(self.core.clone(), session.clone());
     self
       .core
       .graph
-      .visualize(Visualizer::default(), &session.root_nodes(), path)
+      .visualize(Visualizer::default(), &session.root_nodes(), path, &context)
   }
 
-  pub fn trace(&self, request: &ExecutionRequest, path: &Path) -> Result<(), String> {
+  pub fn trace(
+    &self,
+    session: &Session,
+    request: &ExecutionRequest,
+    path: &Path,
+  ) -> Result<(), String> {
+    let context = Context::new(self.core.clone(), session.clone());
     self
       .core
       .graph
-      .trace::<Tracer>(&request.root_nodes(), path)?;
+      .trace::<Tracer>(&request.root_nodes(), path, &context)?;
     Ok(())
   }
 
@@ -107,12 +212,12 @@ impl Scheduler {
     &self,
     request: &mut ExecutionRequest,
     params: Params,
-    product: TypeConstraint,
+    product: TypeId,
   ) -> Result<(), String> {
     let edges = self
       .core
       .rule_graph
-      .find_root_edges(params.type_ids(), &selectors::Select::new(product))?;
+      .find_root_edges(params.type_ids(), product)?;
     request
       .roots
       .push(Select::new_from_edges(params, product, &edges));
@@ -160,17 +265,29 @@ impl Scheduler {
   /// Return Scheduler and per-Session metrics.
   ///
   pub fn metrics(&self, session: &Session) -> HashMap<&str, i64> {
+    let context = Context::new(self.core.clone(), session.clone());
     let mut m = HashMap::new();
     m.insert(
       "affected_file_count",
       self
         .core
         .graph
-        .reachable_digest_count(&session.root_nodes()) as i64,
+        .reachable_digest_count(&session.root_nodes(), &context) as i64,
     );
-    m.insert("preceding_graph_size", session.preceding_graph_size as i64);
+    m.insert(
+      "preceding_graph_size",
+      session.preceding_graph_size() as i64,
+    );
     m.insert("resulting_graph_size", self.core.graph.len() as i64);
     m
+  }
+
+  ///
+  /// Return all Digests currently in memory in this Scheduler.
+  ///
+  pub fn all_digests(&self, session: &Session) -> Vec<hashing::Digest> {
+    let context = Context::new(self.core.clone(), session.clone());
+    self.core.graph.all_digests(&context)
   }
 
   ///
@@ -184,12 +301,12 @@ impl Scheduler {
   /// give up.
   ///
   fn execute_helper(
-    context: RootContext,
+    context: Context,
     sender: mpsc::Sender<Vec<Result<Value, Failure>>>,
     roots: Vec<Root>,
     count: usize,
   ) {
-    let executor = context.core.runtime.get().executor();
+    let core = context.core.clone();
     // Attempt all roots in parallel, failing fast to retry for `Invalidated`.
     let roots_res = future::join_all(
       roots
@@ -225,20 +342,24 @@ impl Scheduler {
 
     // If the join failed (due to `Invalidated`, since that is the only error we propagate), retry
     // the entire set of roots.
-    executor.spawn(roots_res.then(move |res| {
+    core.executor.spawn_and_ignore(async move {
+      let res = roots_res.compat().await;
       if let Ok(res) = res {
-        sender.send(res).map_err(|_| ())
+        let _ = sender.send(res);
       } else {
         Scheduler::execute_helper(context, sender, roots, count - 1);
-        Ok(())
       }
-    }));
+    });
   }
 
   ///
   /// Compute the results for roots in the given request.
   ///
-  pub fn execute(&self, request: &ExecutionRequest, session: &Session) -> Vec<RootResult> {
+  pub fn execute(
+    &self,
+    request: &ExecutionRequest,
+    session: &Session,
+  ) -> Result<Vec<RootResult>, ExecutionTermination> {
     // Bootstrap tasks for the roots, and then wait for all of them.
     debug!("Launching {} roots.", request.roots.len());
 
@@ -246,9 +367,7 @@ impl Scheduler {
 
     // Wait for all roots to complete. Failure here should be impossible, because each
     // individual Future in the join was (eventually) mapped into success.
-    let context = RootContext {
-      core: self.core.clone(),
-    };
+    let context = Context::new(self.core.clone(), session.clone());
     let (sender, receiver) = mpsc::channel();
 
     Scheduler::execute_helper(context, sender, request.roots.clone(), 8);
@@ -256,67 +375,107 @@ impl Scheduler {
       .roots
       .clone()
       .into_iter()
-      .map(|s| s.into())
+      .map(NodeKey::from)
       .collect();
-
-    // Lock the display for the remainder of the execution, and grab a reference to it.
-    let mut maybe_display = match &session.display {
-      &Some(ref d) => Some(d.lock()),
-      &None => None,
-    };
 
     // This map keeps the k most relevant jobs in assigned possitions.
     // Keys are positions in the display (display workers) and the values are the actual jobs to print.
     let mut tasks_to_display = IndexMap::new();
+    let refresh_interval = Duration::from_millis(100);
 
-    if let Some(ref mut display) = maybe_display {
-      display.start();
-    };
+    Ok(match session.maybe_display() {
+      Some(display) => {
+        {
+          let mut display = display.lock();
+          display.start();
+        }
+        let unique_handle = LOGGER.register_engine_display(display.clone());
 
-    let results = loop {
-      if let Ok(res) = receiver.recv_timeout(Duration::from_millis(100)) {
-        break res;
-      } else if let Some(ref mut display) = maybe_display {
-        Scheduler::display_ongoing_tasks(&self.core.graph, &roots, display, &mut tasks_to_display);
+        let results = loop {
+          if let Ok(res) = receiver.recv_timeout(refresh_interval) {
+            break res;
+          } else {
+            let render_result = Scheduler::display_ongoing_tasks(
+              &self.core.graph,
+              &roots,
+              display,
+              &mut tasks_to_display,
+            );
+            match render_result {
+              Err(e) => warn!("{}", e),
+              Ok(KeyboardCommand::CtrlC) => {
+                info!("Exiting early in response to Ctrl-C");
+                {
+                  let mut display = display.lock();
+                  display.finish();
+                }
+                return Err(ExecutionTermination::KeyboardInterrupt);
+              }
+              Ok(KeyboardCommand::None) => (),
+            };
+          }
+        };
+        LOGGER.deregister_engine_display(unique_handle);
+        {
+          let mut display = display.lock();
+          display.finish();
+        }
+        results
       }
-    };
-    if let Some(ref mut display) = maybe_display {
-      display.finish();
-    };
-
-    results
+      None => loop {
+        if let Ok(res) = receiver.recv_timeout(refresh_interval) {
+          break res;
+        }
+      },
+    })
   }
 
   fn display_ongoing_tasks(
     graph: &Graph<NodeKey>,
     roots: &[NodeKey],
-    display: &mut EngineDisplay,
+    display: &Mutex<EngineDisplay>,
     tasks_to_display: &mut IndexMap<String, Duration>,
-  ) {
+  ) -> Result<KeyboardCommand, String> {
     // Update the graph. To do that, we iterate over heavy hitters.
-    let heavy_hitters = graph.heavy_hitters(&roots, display.worker_count());
+
+    let worker_count = {
+      let d = display.lock();
+      d.worker_count()
+    };
+    let heavy_hitters = graph.heavy_hitters(&roots, worker_count);
+
     // Insert every one in the set of tasks to display.
     // For tasks already here, the durations are overwritten.
     tasks_to_display.extend(heavy_hitters.clone().into_iter());
+
     // And remove the tasks that no longer should be there.
     for (task, _) in tasks_to_display.clone().into_iter() {
       if !heavy_hitters.contains_key(&task) {
         tasks_to_display.swap_remove(&task);
       }
     }
-    let display_worker_count = display.worker_count();
-    let ongoing_tasks = tasks_to_display;
-    for (i, id) in ongoing_tasks.iter().enumerate() {
-      // TODO Maybe we want to print something else besides the ID here.
-      display.update(i.to_string(), format!("{:?}", id));
+
+    for (i, item) in tasks_to_display.iter().enumerate() {
+      let label = item.0;
+      let duration = item.1;
+      let duration_secs: f64 = (duration.as_millis() as f64) / 1000.0;
+      let mut d = display.lock();
+      d.update(i.to_string(), format!("{:.2}s {}", duration_secs, label));
     }
+
     // If the number of ongoing tasks is less than the number of workers,
     // fill the rest of the workers with empty string.
     // TODO(yic): further improve the UI. https://github.com/pantsbuild/pants/issues/6666
-    for i in ongoing_tasks.len()..display_worker_count {
-      display.update(i.to_string(), "".to_string());
+    let worker_count = {
+      let d = display.lock();
+      d.worker_count()
+    };
+
+    let mut d = display.lock();
+    for i in tasks_to_display.len()..worker_count {
+      d.update(i.to_string(), "".to_string());
     }
-    display.render();
+    d.render()
   }
 }
 
@@ -334,32 +493,3 @@ impl Drop for Scheduler {
 type Root = Select;
 
 pub type RootResult = Result<Value, Failure>;
-
-///
-/// NB: This basic wrapper exists to allow us to implement the `NodeContext` trait (which lives
-/// outside of this crate) for the `Arc` struct (which also lives outside our crate), which is not
-/// possible without the wrapper due to "trait coherence".
-///
-#[derive(Clone)]
-struct RootContext {
-  core: Arc<Core>,
-}
-
-impl NodeContext for RootContext {
-  type Node = NodeKey;
-
-  fn clone_for(&self, entry_id: EntryId) -> Context {
-    Context::new(entry_id, self.core.clone())
-  }
-
-  fn graph(&self) -> &Graph<NodeKey> {
-    &self.core.graph
-  }
-
-  fn spawn<F>(&self, future: F)
-  where
-    F: Future<Item = (), Error = ()> + Send + 'static,
-  {
-    self.core.runtime.get().executor().spawn(future);
-  }
-}

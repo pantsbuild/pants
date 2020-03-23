@@ -1,24 +1,21 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 from pants.core_tasks.bash_completion import BashCompletion
-from pants_test.task_test_base import ConsoleTaskTestBase
+from pants.testutil.task_test_base import ConsoleTaskTestBase
 
 
 class MockedBashCompletion(BashCompletion):
-  """A version of the BashCompletion, with the help introspection mocked out."""
+    """A version of the BashCompletion, with the help introspection mocked out."""
 
-  def get_autocomplete_options_by_scope(self):
-    return {'': []}
+    def get_autocomplete_options_by_scope(self):
+        return {"": []}
 
 
 class BashCompletionTest(ConsoleTaskTestBase):
-  @classmethod
-  def task_type(cls):
-    return MockedBashCompletion
+    @classmethod
+    def task_type(cls):
+        return MockedBashCompletion
 
-  def test_bash_completion_loads_template(self):
-    self.assert_console_output_contains("# Pants Autocompletion Support")
+    def test_bash_completion_loads_template(self):
+        self.assert_console_output_contains("# Pants Autocompletion Support")

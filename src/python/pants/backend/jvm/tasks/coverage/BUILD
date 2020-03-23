@@ -3,8 +3,7 @@
 
 python_library(
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python:future',
+    '3rdparty/python:dataclasses',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/jvm/subsystems:jvm_tool_mixin',
@@ -14,7 +13,8 @@ python_library(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:meta',
-    'src/python/pants/util:objects',
+    'src/python/pants/util:ordered_set',
     'src/python/pants/util:strutil',
   ],
+  tags = {"partially_type_checked"},
 )

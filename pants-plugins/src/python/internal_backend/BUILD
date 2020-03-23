@@ -5,7 +5,9 @@ target(
   name='plugins',
   dependencies = [
     'pants-plugins/src/python/internal_backend/repositories:plugin',
+    'pants-plugins/src/python/internal_backend/rules_for_testing:plugin',
     'pants-plugins/src/python/internal_backend/sitegen:plugin',
     'pants-plugins/src/python/internal_backend/utilities:plugin',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )

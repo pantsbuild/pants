@@ -5,9 +5,10 @@ python_binary(
   name = 'reversion',
   source = 'reversion.py',
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
   ],
+  tags = {"partially_type_checked"},
 )
 
 # Note that packages.py is not part of a target, it should be run with pex.

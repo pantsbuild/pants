@@ -32,3 +32,4 @@ The pants argument `--jvm-run-jvm-options` is *only* used for arguments passed t
 
 * [[Pass Command-line Arguments to an Executable|pants('src/docs/common_tasks:cli_args')]]
 * [[Run a Binary Target|pants('src/docs/common_tasks:run')]]
+* [[Run JVM binaries and tests with different JVM versions|pants('src/docs/common_tasks:multiple_jvm_versions')]]

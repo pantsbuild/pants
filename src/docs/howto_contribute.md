@@ -107,7 +107,7 @@ before pushing branches to ci:
 You can always run the pre-commit checks manually via:
 
     :::bash
-    $ ./build-support/bin/pre-commit.sh
+    $ ./build-support/githooks/pre-commit
 
 **Pro tip:** If you are certain that you have not accidentally committed anything to
 the `master` branch that you want to keep, and you want to reset to an _exact_ copy of
@@ -116,6 +116,16 @@ the `pantsbuild/pants` repo's master branch, use these commands:
     :::bash
     $ git fetch upstream
     $ git checkout master && git reset --hard upstream/master
+
+**Mac users:** Pants requires a more modern OpenSSL version than the one that comes with macOS.
+To get all dependencies to resolve correctly, run the following commands the first time you
+set up Pants.
+
+    :::bash
+    $ brew install openssl
+    $ echo 'export PATH="/usr/local/opt/openssl/bin:$PATH"' >> ~/.bashrc
+    $ echo 'export LDFLAGS="-L/usr/local/opt/openssl/lib"' >> ~/.bashrc
+    $ echo 'export CPPFLAGS="-I/usr/local/opt/openssl/include"' >> ~/.bashrc
 
 ### Making the Change
 
@@ -198,7 +208,7 @@ If your pull request fails in travis, you can look at the shard logs to see the
 failure cause. From that log, you can figure out what tests you need to run to reproduce the failure
 locally. If you cannot reproduce the failure locally and it looks unrelated to your change, please
 open an issue for it with the label
-(`flaky-test`)[https://github.com/pantsbuild/pants/labels/flaky-test]. You can also ping slack to
+[`flaky-test`](https://github.com/pantsbuild/pants/labels/flaky-test). You can also ping slack to
 ask for someone to restart the failing shard.
 (<a pantsref="dev_run_all_tests">More on checking CI test runs here</a>)
 

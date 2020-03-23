@@ -2,7 +2,7 @@
 # transpile since there is no build_script declared.
 node_module(
   name='web-component-button',
-  sources=globs('package.json', 'webpack.config.js', 'src/*', 'test/*'),
+  sources=['package.json', 'webpack.config.js', 'src/*', 'test/*'],
   dependencies=[
     'contrib/node/examples/3rdparty/node/mocha',
     'contrib/node/examples/3rdparty/node/react',
@@ -24,7 +24,7 @@ node_test(
   dependencies=[
     ':web-component-button'
   ],
-  tags={'integration'},
+  tags={'integration', 'partially_type_checked'},
 )
 
 # Contains non-transpiled codes including all subdirectories under node_modules dirctory.
@@ -36,7 +36,7 @@ node_bundle(
 # web-component-button-processed target invokes webpack transpiling via build_script.
 node_module(
   name='web-component-button-processed',
-  sources=globs('package.json', 'webpack.config.js', 'src/*', 'test/*'),
+  sources=['package.json', 'webpack.config.js', 'src/*', 'test/*'],
   dependencies=[
     'contrib/node/examples/3rdparty/node/mocha',
     'contrib/node/examples/3rdparty/node/react',
@@ -54,7 +54,7 @@ node_bundle(
 # Used to testing dependencies bundling.
 node_module(
   name='web-component-button-processed-with-dependency-artifacts',
-  sources=globs('package.json', 'webpack.config.js', 'src/*', 'test/*'),
+  sources=['package.json', 'webpack.config.js', 'src/*', 'test/*'],
   dependencies=[
     'contrib/node/examples/3rdparty/node/mocha',
     'contrib/node/examples/3rdparty/node/react',

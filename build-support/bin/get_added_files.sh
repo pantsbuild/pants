@@ -6,4 +6,4 @@
 # Check for copies (-C) and moves (-M), so we don't get false positives when people do
 # refactorings. -l50 bounds the time git takes to search for these non-additions.
 # See git-diff(1) and https://stackoverflow.com/a/2299672/2518889 for discussion of these options.
-exec git diff --cached --name-only --diff-filter=A -C -M -l50
+exec git --no-pager diff --cached --name-only --diff-filter=A -C -M -l50

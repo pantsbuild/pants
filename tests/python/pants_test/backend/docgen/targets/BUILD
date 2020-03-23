@@ -9,6 +9,7 @@ python_tests(
     'src/python/pants/backend/docgen/targets',
     'src/python/pants/base:build_environment',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:test_base',
-  ]
+    'src/python/pants/testutil:test_base',
+  ],
+  tags = {"partially_type_checked"},
 )

@@ -3,12 +3,13 @@
 
 python_library(
   dependencies=[
-    '3rdparty/python:future',
     'src/python/pants/backend/jvm/subsystems:shader',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin',
     'src/python/pants/base:exceptions',
+    'src/python/pants/base:revision',
     'src/python/pants/build_graph',
     'src/python/pants/java/jar',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )

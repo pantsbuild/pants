@@ -4,13 +4,14 @@
 python_requirement_library(
   name = 'pycountry',
   requirements = [
-    python_requirement('pycountry==18.5.20'),
+    python_requirement('pycountry==19.8.18'),
   ],
 )
 
 python_library(
   name='hello-lib',
   sources = ['hello_lib.py'],
+  tags = {'partially_type_checked'},
 )
 
 python_binary(
@@ -19,7 +20,8 @@ python_binary(
   dependencies=[
     ':pycountry',
     ':hello-lib',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 
 python_awslambda(

@@ -3,7 +3,6 @@ version = "0.0.1"
 edition = "2018"
 name = "engine"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
-build = "src/cffi_build.rs"
 publish = false
 
 [profile.release]
@@ -12,14 +11,6 @@ publish = false
 debug = true
 # Optimise for the speed of our binary, rather than the speed of compilation.
 codegen-units = 1
-
-[lib]
-crate-type = ["cdylib"]
-
-[build-dependencies]
-build_utils = { path = "build_utils" }
-cbindgen = "0.6.7"
-cc = "1.0"
 
 [workspace]
 # These are the packages which are built/tested when the --all flag is passed to cargo.
@@ -30,20 +21,28 @@ members = [
   ".",
   "async_semaphore",
   "boxfuture",
+  "concrete_time",
+  "engine_cffi",
   "fs",
   "fs/brfs",
   "fs/fs_util",
+  "fs/store",
   "graph",
   "hashing",
+  "logging",
   "process_execution",
   "process_executor",
-  "resettable",
+  "rule_graph",
   "serverset",
+  "sharded_lmdb",
   "tar_api",
+  "task_executor",
   "testutil",
   "testutil/mock",
   "testutil/local_cas",
-  "ui"
+  "testutil/local_execution_server",
+  "ui",
+  "workunit_store"
 ]
 
 # These are the packages which are built/tested when no special selector flags are passed to cargo.
@@ -58,51 +57,65 @@ default-members = [
   ".",
   "async_semaphore",
   "boxfuture",
+  "concrete_time",
+  "engine_cffi",
   "fs",
   "fs/fs_util",
+  "fs/store",
   "graph",
   "hashing",
+  "logging",
   "process_execution",
   "process_executor",
-  "resettable",
+  "rule_graph",
   "serverset",
+  "sharded_lmdb",
   "tar_api",
+  "task_executor",
   "testutil",
   "testutil/mock",
   "testutil/local_cas",
-  "ui"
+  "testutil/local_execution_server",
+  "ui",
+  "workunit_store"
 ]
 
 [dependencies]
+async-trait = "0.1"
 boxfuture = { path = "boxfuture" }
 bytes = "0.4.5"
+concrete_time = { path = "concrete_time" }
 fnv = "1.0.5"
 fs = { path = "fs" }
-futures = "^0.1.16"
-# TODO: Switch to a release once https://github.com/alexcrichton/futures-timer/pull/11 and https://github.com/alexcrichton/futures-timer/pull/12 merge
-futures-timer = { git = "https://github.com/pantsbuild/futures-timer", rev = "0b747e565309a58537807ab43c674d8951f9e5a0" }
+futures01 = { package = "futures", version = "0.1" }
+futures = { version = "0.3", features = ["compat"] }
 graph = { path = "graph" }
 hashing = { path = "hashing" }
 indexmap = "1.0.2"
-itertools = "0.7.2"
+itertools = "0.8.2"
 lazy_static = "1"
 log = "0.4"
-num_enum = "0.1.1"
+logging = { path = "logging" }
+num_cpus = "1"
+num_enum = "0.4"
 parking_lot = "0.6"
 process_execution = { path = "process_execution" }
 rand = "0.6"
-reqwest = { version = "0.9.6", default_features = false, features = ["rustls-tls"] }
-resettable = { path = "resettable" }
+reqwest = { version = "0.10", default_features = false, features = ["stream", "rustls-tls"] }
+rule_graph = { path = "rule_graph" }
+sharded_lmdb = { path = "sharded_lmdb" }
 smallvec = "0.6"
-tokio = "0.1"
+store = { path = "fs/store" }
+task_executor = { path = "task_executor" }
 tempfile = "3"
+time = "0.1.40"
+tokio = { version = "0.2", features = ["rt-threaded"] }
 ui = { path = "ui" }
-url = "1.7.1"
-tar_api = { path = "tar_api" }
+url = "2.1"
+uuid = { version = "0.7", features = ["v4"] }
+workunit_store = { path = "workunit_store" }
 
 [patch.crates-io]
-# Patch deps of reqwest to tone down logging until https://github.com/ctz/rustls/pull/210 is merged and released.
-rustls = { git = "https://github.com/pantsbuild/rustls.git", rev = "d414ea1536b04ebcace85627fbac1a3adccc8c31" }
-# Patch deps of reqwest to tone down logging until https://github.com/bluejekyll/trust-dns/commit/45376cc2014cdd13f8da7aa86dac609d1bc7c402 is released.
-trust-dns-proto = { git = "https://github.com/bluejekyll/trust-dns.git", rev = "45376cc2014cdd13f8da7aa86dac609d1bc7c402" }
-trust-dns-resolver = { git = "https://github.com/bluejekyll/trust-dns.git", rev = "45376cc2014cdd13f8da7aa86dac609d1bc7c402" }
+# TODO: Remove patch when we can upgrade to an official released version of protobuf with a fix.
+# See: https://github.com/pantsbuild/pants/issues/7760 for context.
+protobuf = { git="https://github.com/pantsbuild/rust-protobuf", rev="171611c33ec92f07e1b7107327f6d0139a7afebf", version="2.0.6", features = ["with-bytes"] }

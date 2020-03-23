@@ -8,9 +8,9 @@ publish = false
 [dependencies]
 bazel_protos = { path = "../../process_execution/bazel_protos" }
 bytes = "0.4.5"
-futures = "^0.1.16"
-grpcio = { git = "https://github.com/pantsbuild/grpc-rs.git", rev = "4dfafe9355dc996d7d0702e7386a6fedcd9734c0", default_features = false, features = ["protobuf-codec"] }
+futures01 = { package = "futures", version = "0.1" }
+grpcio = { git = "https://github.com/pantsbuild/grpc-rs.git", rev = "b582ef3dc4e8c7289093c8febff8dadf0997b532", default_features = false, features = ["protobuf-codec", "secure"] }
 hashing = { path = "../../hashing" }
 parking_lot = "0.6"
-protobuf = { version = "2.0.4", features = ["with-bytes"] }
+protobuf = { version = "2.0.6", features = ["with-bytes"] }
 testutil = { path = ".." }

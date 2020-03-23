@@ -13,7 +13,6 @@ public class Main {
     private static void printFlag(String name) {
         RuntimeMXBean runtimeMxBean = ManagementFactory.getRuntimeMXBean();
         List<String> arguments = runtimeMxBean.getInputArguments();
-        
         if (arguments.contains(name)) {
           System.out.println("Flag " + name + " is set");
         } else {

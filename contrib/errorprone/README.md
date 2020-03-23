@@ -13,20 +13,20 @@ One notable difference between this plugin and other Error Prone integrations is
 Error Prone support is provided by a plugin distributed to [pypi]
 (https://pypi.org/pypi/pantsbuild.pants.contrib.errorprone).
 Assuming you have already [installed pants](http://www.pantsbuild.org/install.html), you'll need to
-add the Error Prone plugin in your `pants.ini`, like so:
-```ini
+add the Error Prone plugin in your `pants.toml`, like so:
+```toml
 [GLOBAL]
-pants_version: 1.3.0
+pants_version = "1.26.0"
 
-plugins: [
-    'pantsbuild.pants.contrib.errorprone==%(pants_version)s',
-  ]
+plugins = [
+  'pantsbuild.pants.contrib.errorprone==%(pants_version)s',
+]
 ```
 
 The version of Error Prone used by the plugin requires Java 8 to run.  If you want to run Error Prone with Java 7 you will need to use version 2.0.5 or earlier. Using Java 7 may require changes to the bootclasspath to override certain classes from `rt.jar`.  See [this github issue](https://github.com/google/error-prone/issues/287) for more details.
 
 You can override the version of Error Prone by adding the following to the `BUILD.tools` file
-```ini
+```python
 # Override the default version of Error Prone shipped with Pants
 jar_library(name = 'errorprone',
   jars = [
@@ -56,16 +56,16 @@ When you run `./pants compile` Error Prone is executed after the compile step an
 
 You can exclude targets with `--compile-errorprone-exclude-patterns` and globally suppress specific Error Prone checks with `--compile-errorprone-command-line-options`.
 
-Here are example `pants.ini` settings that exclude several test targets and disable the `DefaultCharset` bug pattern.
+Here are example `pants.toml` settings that exclude several test targets and disable the `DefaultCharset` bug pattern.
 
-```ini
+```toml
 [compile.errorprone]
-command_line_options: [
-    # See http://errorprone.info/bugpatterns for all patterns
-    '-Xep:DefaultCharset:OFF'
-  ]
-exclude_patterns: [
-    'tests/java/org/pantsbuild/tools/junit/.*',
-    'testprojects/src/java/org/pantsbuild/testproject/annotation/main:main'
-  ]
+command_line_options = [
+  # See http://errorprone.info/bugpatterns for all patterns
+  '-Xep:DefaultCharset:OFF',
+]
+exclude_patterns = [
+  'tests/java/org/pantsbuild/tools/junit/.*',
+  'testprojects/src/java/org/pantsbuild/testproject/annotation/main:main',
+]
 ```

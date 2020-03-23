@@ -9,15 +9,34 @@ set -euo pipefail
 # to use, which slows down CI jobs significantly. This is also the installation method recommended
 # by AWS, see https://docs.aws.amazon.com/cli/latest/userguide/install-bundle.html.
 
-TMPDIR=$(mktemp -d)
+source build-support/common.sh
 
-pushd ${TMPDIR}
+if [[ -z "${AWS_CLI_ROOT:+''}" ]]; then
+  die "Caller of the script must set the env var AWS_CLI_ROOT."
+fi
 
-curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip"
-unzip awscli-bundle.zip
-sudo ./awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws
+AWS_CLI_BIN="${AWS_CLI_ROOT}/bin/aws"
 
-popd
+# We first check if AWS CLI is already installed thanks to Travis's cache.
+if [[ ! -x "${AWS_CLI_BIN}" ]]; then
+
+  TMPDIR=$(mktemp -d)
+
+  pushd "${TMPDIR}"
+
+  curl --fail "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip"
+  unzip awscli-bundle.zip
+  ./awscli-bundle/install --install-dir "${AWS_CLI_ROOT}"
+
+  popd
+
+fi
+
+# We symlink so that `aws` is discoverable on the $PATH.
+symlink="/usr/local/bin/aws"
+if [[ ! -L "${symlink}" ]]; then
+  sudo ln -s "${AWS_CLI_BIN}" "${symlink}"
+fi
 
 # Multipart operations aren't supported for anonymous users, so we set the
 # threshold high to avoid them being used automatically by the aws cli.

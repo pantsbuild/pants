@@ -5,17 +5,18 @@ python_tests(
   name = 'jar_dependency_utils',
   sources = ['test_jar_dependency_utils.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/java/jar',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
   name='integration',
-  sources=globs('*_integration.py'),
+  sources=['*_integration.py'],
   dependencies=[
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
+    'examples/tests/java/org/pantsbuild/example:hello_directory',
   ],
-  tags={'integration'},
+  tags={'integration', 'partially_type_checked'},
   timeout=300
 )

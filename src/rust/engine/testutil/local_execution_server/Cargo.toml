@@ -1,0 +1,13 @@
+[package]
+name = "local_execution_server"
+version = "0.1.0"
+edition = "2018"
+authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+publish = false
+
+[dependencies]
+bazel_protos = { path = "../../process_execution/bazel_protos" }
+mock = { path = "../mock" }
+clap = "2"
+structopt = "0.2.18"
+

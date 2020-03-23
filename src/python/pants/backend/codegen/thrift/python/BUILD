@@ -3,9 +3,12 @@
 
 python_library(
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/backend/codegen/thrift/lib',
-    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/backend/python/targets',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/engine:fs',
     'src/python/pants/goal:task_registrar',
+    'src/python/pants/task',
   ],
+  tags = {"partially_type_checked"},
 )

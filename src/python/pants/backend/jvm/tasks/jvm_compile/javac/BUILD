@@ -3,8 +3,6 @@
 
 python_library(
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python:future',
     'src/python/pants/backend/jvm/subsystems:java',
     'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/backend/jvm/subsystems:shader',
@@ -19,4 +17,5 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
   ],
+  tags = {"partially_type_checked"},
 )

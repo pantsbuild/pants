@@ -7,7 +7,8 @@ python_tests(
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:test_base',
-    'tests/python/pants_test:task_test_base',
-  ]
+    'src/python/pants/testutil:test_base',
+    'src/python/pants/testutil:task_test_base',
+  ],
+  tags = {"partially_type_checked"},
 )

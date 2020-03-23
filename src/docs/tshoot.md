@@ -55,7 +55,7 @@ Ivy Resolution
 You can view Ivy's report of how it resolved each (transitive) third-party dependency:
 
     :::bash
-    $ ./pants resolve.ivy --open examples/tests/java/org/pantsbuild/example/hello/greet
+    $ ./pants resolve.ivy --open src/java/com/myorg/myproject/example/hello/greet
 
 
 Ivy HTTP Debugging
@@ -81,30 +81,30 @@ $ cat ./ivy-with-commons-httpclient.xml
 </ivy-module>
 ```
 
-Then, reference your modified ivy profile from pants.ini and flip on
+Then, reference your modified ivy profile from pants.toml and flip on
 some extra logging in the commons-httpclient by setting some system properties:
 
-```ini
+```toml
 [ivy]
-ivy_profile: ivy-with-commons-httpclient.xml
+ivy_profile = "ivy-with-commons-httpclient.xml"
 
 # Enable httpcommons debugging when bootstrapping tools
 [bootstrap.bootstrap-jvm-tools]
-jvm_options: [
-    "-Dorg.apache.commons.logging.Log=org.apache.commons.logging.impl.SimpleLog",
-    "-Dorg.apache.commons.logging.simplelog.showdatetime=true",
-    "-Dorg.apache.commons.logging.simplelog.log.httpclient.wire.header=debug",
-    "-Dorg.apache.commons.logging.simplelog.log.org.apache.commons.httpclient=debug",
-  ]
+jvm_options = [
+  "-Dorg.apache.commons.logging.Log=org.apache.commons.logging.impl.SimpleLog",
+  "-Dorg.apache.commons.logging.simplelog.showdatetime=true",
+  "-Dorg.apache.commons.logging.simplelog.log.httpclient.wire.header=debug",
+  "-Dorg.apache.commons.logging.simplelog.log.org.apache.commons.httpclient=debug",
+]
 
 # Enable httpcommons debugging when resolving 3rdparty libraries
 [resolve.ivy]
-jvm_options: [
-    "-Dorg.apache.commons.logging.Log=org.apache.commons.logging.impl.SimpleLog",
-    "-Dorg.apache.commons.logging.simplelog.showdatetime=true",
-    "-Dorg.apache.commons.logging.simplelog.log.httpclient.wire.header=debug",
-    "-Dorg.apache.commons.logging.simplelog.log.org.apache.commons.httpclient=debug",
-	]
+jvm_options = [
+  "-Dorg.apache.commons.logging.Log=org.apache.commons.logging.impl.SimpleLog",
+  "-Dorg.apache.commons.logging.simplelog.showdatetime=true",
+  "-Dorg.apache.commons.logging.simplelog.log.httpclient.wire.header=debug",
+  "-Dorg.apache.commons.logging.simplelog.log.org.apache.commons.httpclient=debug",
+]
 ```
 
 You'll be able to see the output in the pants reporting server output

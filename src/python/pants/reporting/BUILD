@@ -2,13 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  sources=globs('*.py', exclude=[['report.py']]),
+  sources=['*.py', '!report.py'],
   dependencies=[
-    '3rdparty/python:future',
     '3rdparty/python:ansicolors',
-    '3rdparty/python:pystache',
-    '3rdparty/python:six',
+    '3rdparty/python:dataclasses',
     '3rdparty/python:py-zipkin',
+    '3rdparty/python:pystache',
     '3rdparty/python:requests',
     ':report',
     ':reporting_resources',
@@ -21,22 +20,21 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/option',
     'src/python/pants/pantsd:process_manager',
-    'src/python/pants/stats',
     'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:logging',
     'src/python/pants/util:memo',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 resources(
   name='reporting_resources',
-  sources=rglobs('assets/*', 'templates/*.mustache')
+  sources=['assets/**/*', 'templates/**/*.mustache'],
 )
 
 python_library(
   name='report',
   sources=['report.py'],
-  dependencies=[
-    '3rdparty/python:future',
-  ],
+  tags = {"partially_type_checked"},
 )

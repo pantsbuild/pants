@@ -4,5 +4,6 @@
 python_library(
   dependencies = [
     'src/python/pants/backend/python/targets',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )

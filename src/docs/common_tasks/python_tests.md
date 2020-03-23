@@ -9,7 +9,7 @@ You need to define a test target for your Python library that you can run using 
 Define a `python_tests` target definition that specifies which Python files will be used for testing and which library or libraries will be tested. With that target definition in place, you'll be able to run the tests like this:
 
     ::bash
-    $ ./pants test myproject/src/test/python:tests
+    $ ./pants test src/python/myproject/example:tests
 
 ## Discussion
 
@@ -23,17 +23,18 @@ You should specify the following in a `python_tests` definition:
 Here's an example:
 
     ::python
-    python_tests(name='python-tests',
-      sources=globs('*.py'),
+    python_tests(
+      name='tests',
+      sources=['test_*.py'],
       dependencies=[
-        'myproject/src/main/python',
+        'src/python/myproject/example:lib',
       ]
     )
 
 With that target definition, you can then run the tests using Pants:
 
     ::bash
-    $ ./pants test myproject/src/test/python:python-tests
+    $ ./pants test src/python/myproject/example:tests
 
 When you run a test, Pants will compile any libraries being tested and then run the actual tests. You should see many lines of Pants-specific output followed by the test results. Here's an example:
 

@@ -9,7 +9,6 @@
   clippy::expl_impl_clone_on_copy,
   clippy::if_not_else,
   clippy::needless_continue,
-  clippy::single_match_else,
   clippy::unseparated_literal_suffix,
   clippy::used_underscore_binding
 )]
@@ -22,11 +21,7 @@
   clippy::too_many_arguments
 )]
 // Default isn't as big a deal as people seem to think it is.
-#![allow(
-  clippy::new_without_default,
-  clippy::new_without_default_derive,
-  clippy::new_ret_no_self
-)]
+#![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
@@ -42,7 +37,7 @@ use ui::EngineDisplay;
 // N.B. This is purely a demo/testing bin target for exercising the library.
 
 fn main() {
-  let mut display = EngineDisplay::for_stdout(0);
+  let mut display = EngineDisplay::new(0);
   display.start();
 
   let worker_ids = vec![
@@ -81,15 +76,16 @@ fn main() {
 
   for worker_id in worker_ids.clone() {
     display.add_worker(worker_id);
-    display.render();
+    let _ = display.render();
     thread::sleep(Duration::from_millis(63));
   }
 
-  display.render();
+  let _ = display.render();
   thread::sleep(Duration::from_secs(1));
 
   while !done {
-    display.render_and_sleep();
+    let _ = display.render();
+    thread::sleep(Duration::from_millis(55));
 
     gen_display_work(
       &mut display,

@@ -6,9 +6,9 @@ python_library(
   dependencies=[
     'contrib/go/src/python/pants/contrib/go:plugin',
     'src/python/pants/build_graph',
-    'src/python/pants/util:meta',
-    'tests/python/pants_test:test_base',
-  ]
+    'src/python/pants/testutil:test_base',
+  ],
+  tags = {'partially_type_checked'},
 )
 
 python_tests(
@@ -17,6 +17,7 @@ python_tests(
     'contrib/go/src/python/pants/contrib/go:plugin',
     'contrib/go/src/python/pants/contrib/go/targets',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:test_base',
-  ]
+    'src/python/pants/testutil:test_base',
+  ],
+  tags = {'partially_type_checked'},
 )

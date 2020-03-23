@@ -20,7 +20,8 @@ If you need to pass in command-line arguments when running an executable, see **
 The `run` goal will both compile *and* execute a binary target. For Scala and Java projects, you can run any target with a `jvm_binary` definition. Here's an example of a `BUILD` file that would enable you to run a Scala or Java target:
 
     :::python
-    jvm_binary(name='bin',
+    jvm_binary(
+      name='bin',
       basename='my-executable',
       ...
     )
@@ -28,14 +29,15 @@ The `run` goal will both compile *and* execute a binary target. For Scala and Ja
 You can also run a Scala or Java binary target without compiling it first, using the `run-dirty` goal:
 
     :::bash
-    $ ./pants run-dirty myproject/src/main/scala:bin
+    $ ./pants run-dirty src/scala/com/myorg/myproject/example:bin
 
 ### Python
 
 For Python projects, executables are specified using a `python_binary` definition. Here's an example:
 
     :::python
-    python_binary(name='bin',
+    python_binary(
+      name='bin',
       basename='my-executable',
       ...
     )

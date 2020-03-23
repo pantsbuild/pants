@@ -2,7 +2,7 @@ Release Process
 ===============
 
 This page describes how to make a versioned release of Pants and
-other related packages to PyPi.  If you need to release pants jvm tools
+other related packages to PyPI.  If you need to release pants jvm tools
 (jars), see the
 [[JVM Artifact Release Process|pants('src/docs:release_jvm')]]
 page.
@@ -19,7 +19,7 @@ Once you know what to release, releasing pants involves:
 
 -   Preparing the release.
 -   (optional) Perform a release dry run.
--   Publishing the release to PyPi.
+-   Publishing the release to PyPI.
 -   Announce the release on pants-devel.
 
 0. Prerequisites
@@ -33,30 +33,18 @@ script fail:
 
   - **Create a pgp signing key** if you don't already have one.
 
-    You might use the gpg implementation of pgp and start here:
-    [www.gnupg.org/gph/en/manual/c14.html](https://www.gnupg.org/gph/en/manual/c14.html)
-
-  - If using gpg, **ensure that the gpg-agent is running** (for OS X, see
-    instructions [here](https://blog.chendry.org/2015/03/13/starting-gpg-agent-in-osx.html)),
-    and ensure that gpg is set up to use it (e.g., set `use-agent` in `~/.gnupg/gpg.conf`).
-
-  - **Configure git to use your pgp key** for signing release tags.
-
-    A description of the configuration can be found here:
+    You likely want to use the [gpg implementation](https://www.gnupg.org) of pgp. On macOS, you can `brew install gpg`. Once `gpg` is installed, generate a new key: [www.gnupg.org/gph/en/manual/c14.html](https://www.gnupg.org/gph/en/manual/c14.html).
+ 
+  - **Configure `git` to use your pgp key** for signing release tags: 
     [help.github.com/articles/telling-git-about-your-gpg-key/](https://help.github.com/articles/telling-git-about-your-gpg-key/)
+    
+    Note: the last step is required on macOS.
 
-  - **Create a pypi account** if you don't already have one.
+  - **Create a PyPI account** if you don't already have one: [pypi.org/account/register](https://pypi.org/account/register/).
 
-    You can register here: [pypi.org/account/register](https://pypi.org/account/register/)
+  - **Get your PyPI account added as a `maintainer` for all pantsbuild.pants packages.** You can ask any one of the current [Owners](#owners) to do this.
 
-  - **Get your pypi account added as an `owner` for all pantsbuild.pants packages.**
-
-    You can ask any one of the current [Owners](#owners) to do this.
-
-  - **Configure your pypi credentials locally in `~/.pypirc`**
-
-    For some versions of python it's necessary to use both a `server-login` and
-    `pypi` section containing the same info. This will do it:
+  - **Configure your PyPI credentials locally in `~/.pypirc`**:
 
         :::bash
         cat << EOF > ~/.pypirc && chmod 600 ~/.pypirc
@@ -68,10 +56,6 @@ script fail:
         username: <fill me in>
         password: <fill me in>
         EOF
-
-  - Note that the release script expects your pantsbuild/pants git remote to be named `origin`.
-    If you have another name for it, you should `git remote rename othername origin` before running
-    the release script, and rename it back afterwards.
 
 1. Prepare Release
 ------------------
@@ -89,9 +73,9 @@ occur in master, while version changes generally only occur in the relevant rele
 Every week we do a release from master.  In most cases we will use the `dev` naming convention
 detailed in [Release Strategy](http://www.pantsbuild.org/release_strategy.html). When we are
 ready to create a new stable branch we will release under the `rc` naming convention instead of
-`dev`.  For example releases in master should look similar to the following: 1.1.0dev0, 1.1.0dev1,
-1.1.0dev2, 1.1.0rc0, 1.2.0dev0, 1.2.0dev1, 1.2.0rc0, 1.3.0dev0. *In addition to a release from master
-the release manager may also need to do a release from a stable branch.*
+`dev`.  For example releases in master should look similar to the following: `1.1.0.dev0`, `1.1.0.dev1`,
+`1.1.0.dev2`, `1.1.0rc0`, `1.2.0.dev0`, `1.2.0.dev1`, `1.2.0rc0`, `1.3.0.dev0`. *In addition to a release
+from master the release manager may also need to do a release from a stable branch.*
 
 #### Preparing a release from the master branch
 
@@ -102,12 +86,12 @@ the release manager may also need to do a release from a stable branch.*
      * Create the corresponding notes file for that release, initialized with notes for all
        `dev` releases in the series. <br/>
        _For example if you were releasing `1.2.0rc0` you would need to
-       create `src/python/pants/notes/1.2.x.rst` and include all `1.2.0devX` release notes._
-     * Add the file to pants.ini in the branch_notes section.
-     * Add the new notes file to `src/docs/docsite.json`.
-     * Create a new page() in `src/python/pants/notes/BUILD` corresponding to the new notes. <br/>
-   For additional information on generating documentation see the
-   [docs reference](http://www.pantsbuild.org/docs#generating-the-site)
+       create `src/python/pants/notes/1.2.x.rst` and include all `1.2.0.devX` release notes._
+     * Create a new page() in `src/python/pants/notes/BUILD` corresponding to the new notes.
+     * Add the file to pants.toml in the branch_notes section.
+     * Add the new notes file to `src/docs/docsite.json` in a few places.
+     * Check that the new notes are visible on the docsite by previewing it using
+       the [docs reference](http://www.pantsbuild.org/docs#generating-the-site) instructions.
 4. Bring the CONTRIBUTORS roster in
    [CONTRIBUTORS.md](https://github.com/pantsbuild/pants/tree/master/CONTRIBUTORS.md)
    up to date by running `./build-support/bin/contributors.sh`.
@@ -131,8 +115,9 @@ whether a release is needed from a stable branch.
 3. Create and land a review for the notes changes in master.
 4. Cherry pick the merged notes changes from master to the release branch.
 5. In your release branch: edit and commit the version number in `src/python/pants/VERSION`.
-6. Execute the release as described later on this page.
-7. Remove the [needs-cherrypick][needs-cherrypick] label from the changes cherry-picked into the new release.
+6. Manually publish the release notes pages by checking out master and running `build-support/bin/publish_docs.sh -p`.
+7. Execute the release as described later on this page.
+8. Remove the [needs-cherrypick][needs-cherrypick] label from the changes cherry-picked into the new release.
 
 2. (Optional) Dry Run
 ---------------------
@@ -153,18 +138,18 @@ Note that in addition to CI checking dry runs work, the release publish
 flow also performs a mandatory dry run so executing a dry run separately
 is not required.
 
-3. Publish to PyPi
+3. Publish to PyPI
 ------------------
 
-Once the first two travis shards (the "binary builder" shards) have completed for your release
-commit, you can publish to PyPi. First, ensure that you are on your release branch at your version
+Once the two "Build wheels" Travis shards have completed for your release
+commit, you can publish to PyPI. First, ensure that you are on your release branch at your version
 bump commit. Then, publish the release:
 
     :::bash
     $ ./build-support/bin/release.sh
 
 This also performs a dry run and then proceeds to upload the smoke
-tested wheels to PyPi. It may take a few minutes for the packages to be downloadable.
+tested wheels to PyPI. It may take a few minutes for the packages to be downloadable.
 
 Note: If you are releasing from `master` and new commits have landed after your release commit, you
 can reset to your commit (`git reset --hard <sha>`) before publishing.
@@ -172,10 +157,10 @@ can reset to your commit (`git reset --hard <sha>`) before publishing.
 4. Announce
 -----------
 
-Check PyPi to ensure everything looks good. The [pantsbuild.pants
+Check PyPI to ensure everything looks good. The [pantsbuild.pants
 package index page](https://pypi.org/pypi/pantsbuild.pants)
 should display the package version you just uploaded. The same check
-applies to other related package PyPi pages.
+applies to other related package PyPI pages.
 
 To test the packages are installable:
 

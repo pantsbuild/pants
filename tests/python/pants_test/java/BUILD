@@ -5,13 +5,12 @@ python_tests(
   name = 'executor',
   sources = ['test_executor.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/java/distribution:distribution',
     'src/python/pants/java:executor',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:process_handler',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -19,10 +18,9 @@ python_tests(
   sources = ['test_nailgun_client.py'],
   coverage = ['pants.java.nailgun_client'],
   dependencies = [
-    '3rdparty/python:future',
-    '3rdparty/python:mock',
     'src/python/pants/java:nailgun_client',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -30,11 +28,11 @@ python_tests(
   sources = ['test_nailgun_executor.py'],
   coverage = ['pants.java.nailgun_executor'],
   dependencies = [
-    '3rdparty/python:mock',
     '3rdparty/python:psutil',
     'src/python/pants/java:nailgun_executor',
-    'tests/python/pants_test:test_base'
-  ]
+    'src/python/pants/testutil:test_base'
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -42,9 +40,9 @@ python_tests(
   sources = ['test_nailgun_io.py'],
   coverage = ['pants.java.nailgun_io'],
   dependencies = [
-    '3rdparty/python:mock',
     'src/python/pants/java:nailgun_io',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -52,37 +50,40 @@ python_tests(
   sources = ['test_nailgun_protocol.py'],
   coverage = ['pants.java.nailgun_protocol'],
   dependencies = [
-    '3rdparty/python:mock',
     'src/python/pants/java:nailgun_protocol',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
   name = 'util',
   sources = ['test_util.py'],
   dependencies = [
-    '3rdparty/python:mock',
     'src/python/pants/java:util',
     'src/python/pants/util:dirutil',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
   name = 'nailgun_integration',
   sources = ['test_nailgun_integration.py'],
   dependencies = [
-    'tests/python/pants_test:int-test'
+    'src/python/pants/testutil:int-test',
+    'examples/src/scala/org/pantsbuild/example:hello_directory',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
+  timeout = 270,
 )
 
 python_tests(
   name = 'test_runjava',
   sources = ['test_runjava_synthetic_classpath.py'],
   dependencies = [
+    'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/java:util',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/jvm:jvm_tool_task_test_base',
-    'src/python/pants/backend/jvm/tasks:nailgun_task',
-  ]
+    'src/python/pants/testutil/jvm:nailgun_task_test_base',
+  ],
+  tags = {"partially_type_checked"},
 )

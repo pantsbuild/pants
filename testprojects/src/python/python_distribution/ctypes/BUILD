@@ -33,3 +33,16 @@ python_binary(
   ],
   platforms=['current'],
 )
+
+python_binary(
+  name='with_platforms',
+  source='main.py',
+  dependencies=[
+    ':ctypes',
+    'testprojects/3rdparty/python:numpy',
+  ],
+  platforms=[
+    "linux-x86_64",
+    "macosx-10.13-x86_64",
+  ],
+)

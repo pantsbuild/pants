@@ -1,9 +1,9 @@
 {
   "type_alias": "target",
   "name": "b",
-  "dependencies": ["//d:e"],
+  "dependencies": ["//a/d/e"],
   "configurations": [
-    "//a",
+    "//a/d/e",
     {
       "embedded": "yes"
     }

@@ -10,33 +10,32 @@ python_library(
   name='parsers',
   sources=['parsers.py'],
   dependencies=[
-    '3rdparty/python:future',
-    '3rdparty/python:six',
     'src/python/pants/build_graph',
     'src/python/pants/engine:objects',
     'src/python/pants/engine:parser',
     'src/python/pants/util:memo',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 
 resources(
   name='fs_test',
   # Note that this test data dir is bundled into a tarfile, to preserve symlink structure
   # when copied into a chroot.
-  sources=rglobs('fs_test/*')
+  sources=['fs_test/**/*'],
 )
 
 resources(
   name='graph_test',
-  sources=rglobs('graph_test/*')
+  sources=['graph_test/**/*'],
 )
 
 resources(
   name='mapper_test',
-  sources=rglobs('mapper_test/*')
+  sources=['mapper_test/**/*'],
 )
 
 resources(
   name='scheduler_inputs',
-  sources=rglobs('scheduler_inputs/*')
+  sources=['scheduler_inputs/**/*'],
 )

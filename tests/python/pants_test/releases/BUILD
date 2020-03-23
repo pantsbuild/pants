@@ -4,10 +4,10 @@
 python_tests(
   sources = ['test_reversion.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python:pex',
     '3rdparty/python:requests',
-    'tests/python/pants_test:int-test'
+    'src/python/pants/testutil:int-test',
+    'src/python/pants:reversion_file_with_dependencies',
   ],
-  tags = {'integration'},
+  tags = {'integration', 'partially_type_checked'},
 )

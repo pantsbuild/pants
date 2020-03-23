@@ -1,29 +1,26 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.task.noop_exec_task import NoopExecTask
 
 
 class NoopCompile(NoopExecTask):
-  """A no-op that provides a product type that can be used to force scheduling.
+    """A no-op that provides a product type that can be used to force scheduling.
 
-  :API: public
-  """
+    :API: public
+    """
 
-  @classmethod
-  def product_types(cls):
-    return ['ran_compile']
+    @classmethod
+    def product_types(cls):
+        return ["ran_compile"]
 
 
 class NoopTest(NoopExecTask):
-  """A no-op that provides a product type that can be used to force scheduling.
+    """A no-op that provides a product type that can be used to force scheduling.
 
-  :API: public
-  """
+    :API: public
+    """
 
-  @classmethod
-  def product_types(cls):
-    return ['ran_tests']
+    @classmethod
+    def product_types(cls):
+        return ["ran_tests"]

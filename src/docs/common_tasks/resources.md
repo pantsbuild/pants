@@ -10,42 +10,46 @@ Create a `resources` target that tells Pants which files to include in the resou
 
 ## Discussion
 
-A `resources` target definition must include a `name` and a list of `sources`, which can consist of a simple list of file names, multiple `globs` or `rglobs` definitions (more on that in [[Use globs and rglobs to Group Files|pants('src/docs/common_tasks:globs')]]), or any combination thereof. This would create a resource bundle with two files:
+A `resources` target definition must include a `name` and a list of `sources`, which is a simple list of file names. This would create a resource bundle with two files:
 
     ::python
-    resources(name='config'
-      sources=['server-config.yaml', 'logging-config.xml']
+    resources(
+      name='config'
+      sources=['server-config.yaml', 'logging-config.xml'],
     )
 
-This would include a glob of files to a resource bundle:
+This would include a recursive glob of files to a resource bundle:
 
     ::python
-    resources(name='templates',
-      sources=rglobs('*.mustache')
+    resources(
+      name='templates',
+      sources=['**/*.mustache'],
     )
 
-This would include a mixture of globs, rglobs, and specific files:
+This would include a mixture of globs, recursive globs, and specific files:
 
     ::python
-    resources(name='all'
-      sources=globs('*.json') + rglobs('templates/*') + ['logback.xml']
+    resources(
+      name='all'
+      sources=['*.json', 'templates/**/*', 'logback.xml'],
     )
 
-You can also exclude files, globs, or rglobs using the `-` operator:
+You can also exclude files and globs by prefixing them with `!`:
 
     ::python
-    resources(name='python-resources',
-      sources=rglobs('*') - rglobs('*.pyc')
+    resources(
+      name='python-resources',
+      sources=['**/*', '!**/*.pyc'],
     )
 
 Once your resource bundle has been specified, you can depend on it from the target that consumes the resources:
 
     ::python
-    java_library(name='server',
-      sources=globs('*.java'),
+    java_library(
+      name='server',
+      sources=['*.java'],
       dependencies=[
-        ...
-        'myproject/src/main/resources:config'
+        'src/resources:config',
       ]
     )
 

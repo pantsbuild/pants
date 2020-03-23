@@ -47,7 +47,8 @@ A target definition in a `BUILD` file looks something like
         'src/java/org/pantsbuild/auth',
         ':base'
       ],
-      sources=globs('*.java', exclude=[['Base.java']]),
+      sources=['*.java', '!Base.java'],
+      tags={'common'},
     )
 
 ### type
@@ -82,27 +83,45 @@ or otherwise depends on code in other targets, list those targets here.
 
 ### sources
 
-The source files in this target. These are usually defined in one of three ways:
+The source files in this target. These are defined in one of two ways:
 
-+ If the `sources` argument is _not_ passed (and the `--target-arguments-implicit-sources` option is
-  set: enabled by default in `1.4.0.dev2`), many target types define a default ("implicit") source
-  glob to collect all relevant files in the current directory. When possible, this style is
++ If the `sources` argument is _not_ passed, many target types define a sensible default `sources` value to collect all relevant files in the current directory. When possible, this style is
   recommended because it encourages 1:1:1 (see the
   [[Target Granularity|pants('src/docs:build_files')]] section for more information).
-    - As an example: `java_library` defaults to collecting `globs('*.java', exclude=[globs('*Test.java')])`.
-+ Explicitly globbing over the files in the BUILD file's directory: `sources=globs('*.java')`.
-+ Enumerating the files: `sources=['FileUtil.java', 'NetUtil.java']`.
+    - For example, `java_library` defaults to collecting `['*.java', '!*Test.java']`.
++ Explicitly providing file names and globs: `sources=['App.java', '*Util.java']`.
 
-You can exclude files from the results of a glob. For example, to glob over unit tests
+You can exclude files by prefixing the file name or glob with `!`. For example, to collect unit tests
 but not integration tests you could use something like this:
-<br>`sources=globs('*.py', exclude=[globs('*_integration.py')])`.
-<br>The value of `exclude=` is a list of things that evaluate to lists of source files,
-i.e., globs or literal lists. This is why there are double-brackets around `Base.java` in
-the example target above.
+<br>`sources=['*_test.py', '!*_integration_test.py']`.
 
-You can also recursively glob over files in all subdirectories of the BUILD file's directory: `sources=rglobs('*.java')`.
+You can also recursively glob over files in all subdirectories of the BUILD file's directory: `sources=['**/*.java']`.
 However this is discouraged as it tends to lead to coarse-grained dependencies, and Pants's
 advantages come into play when you have many fine-grained dependencies.
+
+### tags
+
+Tags are a set of strings used to describe or categorize targets. They can be inspected during a build to allow for features such as filtering task targets (ex. skip linting targets with a particular tag) or focused testing (ex. running only unit tests by excluding targets with a `integration` tag).
+
+Tags can be configured for targets in three ways:
+- Directly in the `BUILD` file (`tags={'common'}` in the example above)
+- In `pants.toml`:
+
+```toml
+[target-tag-assignments]
+tag_targets_mappings = """
+{
+  'tag1': ['path/to/target:', 'path/to/another/target:bar'],
+  'tag2': ['path/to/another/target:bar']
+}
+"""
+```
+
+- In a `JSON` file, [[referenced from the `pants.toml` or command line|pants('src/docs:options')]], for example:
+
+```bash
+./pants list src/python/pants/base:exceptions --target-tag-assignments-tag-targets-mappings=@/path/to/target_tag_definitions.json
+```
 
 `BUILD.*` files
 ---------------
@@ -126,8 +145,8 @@ techniques can be especially helpful:
 *What targets does a BUILD file define?* Use the `list` goal:
 
     :::bash
-    $ ./pants list examples/src/java/org/pantsbuild/example/hello/greet
-    examples/src/java/org/pantsbuild/example/hello/greet:greet
+    $ ./pants list src/python/myproject/example
+    src/python/myproject/example:example
 
 *Are any BUILD files broken?*
 List **every** target to see if there are any errors:

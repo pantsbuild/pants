@@ -1,0 +1,178 @@
+{
+  "resources": [
+    {
+      "pattern": "META-INF/services/jdk.vm.ci.hotspot.HotSpotJVMCIBackendFactory"
+    },
+    {
+      "pattern": "META-INF/services/jdk.vm.ci.services.JVMCIServiceLocator"
+    },
+    {
+      "pattern": "META-INF/services/org.graalvm.compiler.core.match.MatchStatementSet"
+    },
+    {
+      "pattern": "META-INF/services/org.graalvm.compiler.debug.TTYStreamProvider"
+    },
+    {
+      "pattern": "META-INF/services/org.graalvm.compiler.hotspot.CompilerConfigurationFactory"
+    },
+    {
+      "pattern": "META-INF/services/org.graalvm.compiler.hotspot.HotSpotBackendFactory"
+    },
+    {
+      "pattern": "META-INF/services/org.graalvm.compiler.hotspot.HotSpotCodeCacheListener"
+    },
+    {
+      "pattern": "META-INF/services/org.graalvm.compiler.hotspot.HotSpotGraalManagementRegistration"
+    },
+    {
+      "pattern": "META-INF/services/org.graalvm.compiler.nodes.graphbuilderconf.NodeIntrinsicPluginFactory"
+    },
+    {
+      "pattern": "META-INF/native/linux64/libjansi.so"
+    },
+    {
+      "pattern": "com/sun/jna/linux-x86-64/libjnidispatch.so"
+    },
+    {
+      "pattern": "compiler.properties"
+    },
+    {
+      "pattern": "java/lang/Boolean.class"
+    },
+    {
+      "pattern": "java/lang/Byte.class"
+    },
+    {
+      "pattern": "java/lang/Character.class"
+    },
+    {
+      "pattern": "java/lang/Float.class"
+    },
+    {
+      "pattern": "java/lang/Integer.class"
+    },
+    {
+      "pattern": "java/lang/Long.class"
+    },
+    {
+      "pattern": "java/lang/Number.class"
+    },
+    {
+      "pattern": "java/lang/String.class"
+    },
+    {
+      "pattern": "library.properties"
+    },
+    {
+      "pattern": "org/graalvm/compiler/hotspot/amd64/AMD64ArrayIndexOfStub.class"
+    },
+    {
+      "pattern": "org/graalvm/compiler/hotspot/nodes/GraalHotSpotVMConfigNode.class"
+    },
+    {
+      "pattern": "org/graalvm/compiler/hotspot/replacements/HashCodeSnippets.class"
+    },
+    {
+      "pattern": "org/graalvm/compiler/hotspot/replacements/HotSpotArraySubstitutions.class"
+    },
+    {
+      "pattern": "org/graalvm/compiler/hotspot/replacements/HotSpotClassSubstitutions.class"
+    },
+    {
+      "pattern": "org/graalvm/compiler/hotspot/replacements/HotSpotReplacementsUtil.class"
+    },
+    {
+      "pattern": "org/graalvm/compiler/hotspot/replacements/InstanceOfSnippets.class"
+    },
+    {
+      "pattern": "org/graalvm/compiler/hotspot/replacements/LoadExceptionObjectSnippets.class"
+    },
+    {
+      "pattern": "org/graalvm/compiler/hotspot/replacements/MonitorSnippets.class"
+    },
+    {
+      "pattern": "org/graalvm/compiler/hotspot/replacements/NewObjectSnippets.class"
+    },
+    {
+      "pattern": "org/graalvm/compiler/hotspot/replacements/ObjectCloneSnippets.class"
+    },
+    {
+      "pattern": "org/graalvm/compiler/hotspot/replacements/ObjectSubstitutions.class"
+    },
+    {
+      "pattern": "org/graalvm/compiler/hotspot/replacements/ReflectionSubstitutions.class"
+    },
+    {
+      "pattern": "org/graalvm/compiler/hotspot/replacements/ThreadSubstitutions.class"
+    },
+    {
+      "pattern": "org/graalvm/compiler/hotspot/replacements/TypeCheckSnippetUtils.class"
+    },
+    {
+      "pattern": "org/graalvm/compiler/hotspot/replacements/WriteBarrierSnippets.class"
+    },
+    {
+      "pattern": "org/graalvm/compiler/hotspot/replacements/arraycopy/HotSpotArraycopySnippets.class"
+    },
+    {
+      "pattern": "org/graalvm/compiler/hotspot/stubs/ExceptionHandlerStub.class"
+    },
+    {
+      "pattern": "org/graalvm/compiler/hotspot/stubs/ForeignCallSnippets.class"
+    },
+    {
+      "pattern": "org/graalvm/compiler/hotspot/stubs/UnwindExceptionToCallerStub.class"
+    },
+    {
+      "pattern": "org/graalvm/compiler/nodes/PiNode.class"
+    },
+    {
+      "pattern": "org/graalvm/compiler/nodes/java/DynamicNewArrayNode.class"
+    },
+    {
+      "pattern": "org/graalvm/compiler/nodes/java/NewArrayNode.class"
+    },
+    {
+      "pattern": "org/graalvm/compiler/replacements/ArraysSubstitutions.class"
+    },
+    {
+      "pattern": "org/graalvm/compiler/replacements/BoxingSnippets.class"
+    },
+    {
+      "pattern": "org/graalvm/compiler/replacements/ReplacementsUtil.class"
+    },
+    {
+      "pattern": "org/graalvm/compiler/replacements/SnippetCounter.class"
+    },
+    {
+      "pattern": "org/graalvm/compiler/replacements/SnippetIntegerHistogram.class"
+    },
+    {
+      "pattern": "org/graalvm/compiler/replacements/StringSubstitutions.class"
+    },
+    {
+      "pattern": "org/graalvm/compiler/replacements/amd64/AMD64ArrayIndexOf.class"
+    },
+    {
+      "pattern": "org/graalvm/compiler/replacements/amd64/AMD64ConvertSnippets.class"
+    },
+    {
+      "pattern": "org/graalvm/compiler/replacements/amd64/AMD64StringSubstitutions.class"
+    },
+    {
+      "pattern": "org/graalvm/compiler/replacements/arraycopy/ArrayCopyCallNode.class"
+    },
+    {
+      "pattern": "org/graalvm/compiler/replacements/arraycopy/ArrayCopySnippets.class"
+    },
+    {
+      "pattern": "org/graalvm/compiler/replacements/nodes/ArrayEqualsNode.class"
+    },
+    {
+      "pattern": "org/graalvm/compiler/replacements/nodes/ArrayRegionEqualsNode.class"
+    },
+    {
+      "pattern": "org/graalvm/word/LocationIdentity.class"
+    }
+  ]
+}

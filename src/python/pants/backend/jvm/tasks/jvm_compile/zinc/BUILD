@@ -3,8 +3,6 @@
 
 python_library(
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python:future',
     'src/python/pants/backend/jvm/subsystems:java',
     'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/backend/jvm/subsystems:scala_platform',
@@ -21,7 +19,10 @@ python_library(
     'src/python/pants/option',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:enums',
+    'src/python/pants/util:logging',
     'src/python/pants/util:memo',
     'src/python/pants/util:strutil',
   ],
+  tags = {"partially_type_checked"},
 )

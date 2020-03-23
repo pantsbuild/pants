@@ -35,7 +35,7 @@
 
 <h2>Tasks</h2>
 <p>
-  A goal is made up of one or more <em>tasks</em>. For example, the <code>compile.zinc</code> task
+  A goal is made up of one or more <em>tasks</em>. For example, the <code>compile.rsc</code> task
   compiles JVM code using the Zinc compiler, and is installed in the <code>compile</code> goal.
 </p>
 <p>
@@ -61,7 +61,7 @@
 <h2>Options and Scopes</h2>
 <p>
   Tasks and subsystems can be configured using <em>options</em>. Option values may be specified
-  using command line flags, environment variables or the <code>pants.ini</code> config file.
+  using command line flags, environment variables or the <code>pants.toml</code> config file.
 </p>
 <p>
   Pants has many tasks and subsystems, and therefore it has many options. For organizational
@@ -89,7 +89,7 @@
 </p>
 <ul>
   <li>
-    Set the value of key <code>foo</code> in section <code>bar.baz</code> in pants.ini:
+    Set the value of key <code>foo</code> in section <code>bar.baz</code> in pants.toml:
     <pre>
       [bar.baz]
       foo = 42</pre>
@@ -111,13 +111,13 @@
   the unqualified form of command line flags belonging to that task. E.g., this:
 </p>
   <pre>
-      ./pants compile.zinc --foo --bar run.jvm --baz \
+      ./pants compile.rsc --foo --bar run.jvm --baz \
         examples/src/java/org/pantsbuild/example/hello/main</pre>
 <p>
   is equivalent to this:
 </p>
 <pre>
-      ./pants run --compile-zinc-foo --compile-zinc-bar --run-jvm-baz \
+      ./pants run --compile-rsc-foo --compile-rsc-bar --run-jvm-baz \
         examples/src/java/org/pantsbuild/example/hello/main</pre>
 <p>
   Pants also has a few global options, for basic systemwide configuration.

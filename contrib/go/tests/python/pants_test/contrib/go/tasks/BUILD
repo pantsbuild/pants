@@ -2,9 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
-  sources = globs('*.py', exclude=[globs('*_integration.py')]),
+  sources = ['*.py', '!*_integration.py'],
   dependencies=[
-    '3rdparty/python:future',
     'contrib/go/src/python/pants/contrib/go/subsystems',
     'contrib/go/src/python/pants/contrib/go/targets',
     'contrib/go/src/python/pants/contrib/go/tasks',
@@ -13,26 +12,27 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/testutil/subsystem',
+    'src/python/pants/testutil:task_test_base',
   ],
+  tags = {'partially_type_checked'},
   timeout=120,
 )
 
 
 python_tests(
   name = 'integration',
-  sources = globs('*_integration.py'),
+  sources = ['*_integration.py'],
   dependencies=[
     'contrib/go/src/python/pants/contrib/go/subsystems',
+    'contrib/go:examples_directory',
     'src/python/pants/base:build_environment',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test/testutils:file_test_util',
-    'tests/python/pants_test/testutils:py2_compat',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil/subsystem',
+    'src/python/pants/testutil:file_test_util',
+    'src/python/pants/testutil:int-test',
   ],
-  tags={'integration'},
+  tags={'integration', 'partially_type_checked'},
   timeout=360,
 )

@@ -4,19 +4,17 @@
 python_library(
   sources=[ 'distribution.py' ],
   dependencies=[
-    '3rdparty/python:future',
-    '3rdparty/python:six',
     ':resources',
     'src/python/pants/base:revision',
     'src/python/pants/java:util',
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:osutil',
-    'src/python/pants/util:process_handler',
   ],
+  tags = {"partially_type_checked"},
 )
 
 resources(
   name='resources',
-  sources=globs('*.class'),
+  sources=['*.class'],
 )

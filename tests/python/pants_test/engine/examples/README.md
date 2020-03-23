@@ -65,7 +65,7 @@ modelled flexibly via an [`AddressableDescriptor`](https://github.com/pantsbuild
 that has associated decorators for one to one edges
 ([`@addressable`](https://github.com/pantsbuild/pants/blob/3bd6d75949c253e2e11dfece7e593a7e5fdf0908/src/python/pants/engine/exp/addressable.py#L299)),
 and one to many edges
-([`@addressable_list`](https://github.com/pantsbuild/pants/blob/3bd6d75949c253e2e11dfece7e593a7e5fdf0908/src/python/pants/engine/exp/addressable.py#L341)
+([`@addressable_sequence`](https://github.com/pantsbuild/pants/blob/3bd6d75949c253e2e11dfece7e593a7e5fdf0908/src/python/pants/engine/exp/addressable.py#L341)
 and [`@addressable_dict`](https://github.com/pantsbuild/pants/blob/3bd6d75949c253e2e11dfece7e593a7e5fdf0908/src/python/pants/engine/exp/addressable.py#L370)).
 There are two important outgrowths from the flexible edge-schema model:
 

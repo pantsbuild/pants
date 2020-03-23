@@ -1,0 +1,15 @@
+[package]
+name = "sharded_lmdb"
+version = "0.0.1"
+authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+edition = "2018"
+
+[dependencies]
+bytes = "0.4.5"
+fs = { path = "../fs" }
+futures = "0.3"
+hashing = { path = "../hashing" }
+lmdb = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "06bdfbfc6348f6804127176e561843f214fc17f8" }
+log = "0.4"
+task_executor = { path = "../task_executor" }
+tempfile = "3"

@@ -4,6 +4,7 @@ set -e
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../../.. && pwd -P)"
 
+# shellcheck source=build-support/pants_venv
 source "${REPO_ROOT}/build-support/pants_venv"
 
 if (( $# != 2 )); then

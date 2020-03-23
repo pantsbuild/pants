@@ -5,6 +5,7 @@ python_tests(
   dependencies=[
     'src/python/pants/auth',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:test_base',
-  ]
+    'src/python/pants/testutil:test_base',
+  ],
+  tags = {"partially_type_checked"},
 )

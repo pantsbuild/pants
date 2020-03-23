@@ -18,6 +18,14 @@ page(
 )
 
 page(
+  name='architecture',
+  source='architecture.md',
+  links=[
+    ':architecture_pantsd',
+  ]
+)
+
+page(
   name='build_files',
   source='build_files.md',
   links=[
@@ -38,6 +46,11 @@ page(
 page(
     name='community',
     source='community.md',
+)
+
+page(
+    name='architecture_pantsd',
+    source='architecture_pantsd.md',
 )
 
 page(
@@ -71,6 +84,7 @@ page(
     ':3rdparty',
     ':1.0',
     ':announce_201409',
+    ':architecture',
     ':build_files',
     ':common_tasks',
     ':first_concepts',
@@ -163,6 +177,7 @@ page(
   name='dev',
   source='dev.md',
   links=[
+    ':architecture',
     ':committers',
     ':dev_tasks',
     ':dev_tasks_publish_extras',

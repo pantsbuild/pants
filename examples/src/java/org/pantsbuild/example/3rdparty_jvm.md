@@ -62,12 +62,14 @@ that matches the one used to publish the artifact, pants will always prefer the
 local target definition to the published jar if it is in the context:
 
     :::python
-    java_library(name='api',
-      sources = globs('*.java'),
-      provides = artifact(org='org.archie', name='api', repo=myrepo),
+    java_library(
+      name='api',
+      sources=['*.java'],
+      provides=artifact(org='org.archie', name='api', repo=myrepo),
     )
 
-    jar_library(name='bin-dep',
+    jar_library(
+      name='bin-dep',
       jars=[
         jar(org='org.archie', name='consumer', rev='1.2.3'),
       ],
@@ -102,11 +104,12 @@ Rather than mark the `jar` intransitive, you can `exclude` some
 transitive dependencies from JVM targets:
 
     :::python
-    java_library(name = 'loadtest',
+    java_library(
+      name = 'loadtest',
       dependencies = [
         '3rdparty/storm:storm',
       ],
-      sources = globs('*.java'),
+      sources = ['*.java'],
       excludes = [
         exclude('org.sonatype.sisu.inject', 'cglib')
       ]
@@ -210,11 +213,11 @@ You can set up your `3rdparty/BUILD` file like so:
       ],
     )
 
-And in `pants.ini`, add:
+And in `pants.toml`, add:
 
     :::ini
     [jar-dependency-management]
-    default_target: 3rdparty:management
+    default_target = "3rdparty:management"
 
 This will force all `jar_library` targets in your repository to use the
 versions of `commons-io` and `jersey-core` referenced by the `management`

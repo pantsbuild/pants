@@ -3,11 +3,11 @@
 
 python_library(
   dependencies = [
-    '3rdparty/python:future',
     'contrib/node/src/python/pants/contrib/node/subsystems/resolvers:node_resolver_base',
     'src/python/pants/build_graph',
     'src/python/pants/option',
     'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
   ],
+  tags = {"partially_type_checked"},
 )

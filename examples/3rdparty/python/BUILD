@@ -11,7 +11,14 @@ remote_sources(
   args=dict(
     include_relpath='include',
     lib_relpath='',
-    native_lib_names=['tensorflow_framework'],
+    native_lib_names = {
+      'darwin': ['tensorflow_framework'],
+      # On Linux, the shared lib is literally named `libtensorflow_framework.so.1` in tensorflow
+      # 1.14. Adding a linker command line argument `-l:lib_tensorflow_framework.so.1` will tell the
+      # linker to search for and use a library literally named that filename, without any further
+      # trickery.
+      'linux': [':libtensorflow_framework.so.1'],
+    },
   ),
 )
 
@@ -21,6 +28,13 @@ unpacked_whls(
   module_name='tensorflow',
   include_patterns=[
     'include/**/*',
-    './*.so',
+    './*.so*',
+    './*.dylib*',
   ],
+  within_data_subdir='purelib/tensorflow',
+)
+
+files(
+  name='examples_python_3rdparty',
+  sources=['**/*'],
 )

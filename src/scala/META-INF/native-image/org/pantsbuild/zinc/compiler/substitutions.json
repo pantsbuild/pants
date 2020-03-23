@@ -1,0 +1,56 @@
+[
+  {
+    "annotatedClass": "org.pantsbuild.zinc.compiler.substitutions.scala.tools.nsc.Target_scala_tools_nsc_ast_TreeBrowsers$SwingBrowser",
+    "methods": [
+      {
+        "annotatedName": "browse",
+        "substitute": true
+      }
+    ],
+    "originalClass": "scala.tools.nsc.ast.TreeBrowsers$SwingBrowser"
+  },
+  {
+    "annotatedClass": "org.pantsbuild.zinc.compiler.substitutions.scala.tools.nsc.Target_sbt_io_IO$",
+    "methods": [
+      {
+        "annotatedName": "getModifiedTimeOrZero",
+        "substitute": true
+      },
+      {
+        "annotatedName": "setModifiedTimeOrFalse",
+        "substitute": true
+      }
+    ],
+    "originalClass": "sbt.io.IO$"
+  },
+  {
+    "annotatedClass": "org.pantsbuild.zinc.compiler.substitutions.scala.tools.nsc.Target_scala_reflect_internal_util_StatisticsStatics",
+    "methods": [
+      {
+        "annotatedName": "areSomeHotStatsEnabled",
+        "substitute": true
+      },
+      {
+        "annotatedName": "areSomeColdStatsEnabled",
+        "substitute": true
+      },
+      {
+        "annotatedName": "enableColdStats",
+        "substitute": true
+      },
+      {
+        "annotatedName": "disableColdStats",
+        "substitute": true
+      },
+      {
+        "annotatedName": "enableHotStats",
+        "substitute": true
+      },
+      {
+        "annotatedName": "disableHotStats",
+        "substitute": true
+      }
+    ],
+    "originalClass": "scala.reflect.internal.util.StatisticsStatics"
+  }
+]

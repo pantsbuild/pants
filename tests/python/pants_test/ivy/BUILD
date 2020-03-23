@@ -5,9 +5,11 @@ python_tests(
   name='bootstrapper',
   sources=['test_bootstrapper.py'],
   dependencies=[
+    'build-support/ivy:ivy',
     'src/python/pants/ivy',
-    'tests/python/pants_test/subsystem:subsystem_utils',
-  ]
+    'src/python/pants/testutil/subsystem',
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -16,6 +18,7 @@ python_tests(
   dependencies=[
     'src/python/pants/ivy',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test/subsystem:subsystem_utils',
-  ]
+    'src/python/pants/testutil/subsystem',
+  ],
+  tags = {"partially_type_checked"},
 )

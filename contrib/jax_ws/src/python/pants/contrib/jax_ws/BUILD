@@ -13,4 +13,5 @@ contrib_plugin(
   description='JAX-WS Pants plugin',
   build_file_aliases=True,
   register_goals=True,
+  tags = {"partially_type_checked"},
 )

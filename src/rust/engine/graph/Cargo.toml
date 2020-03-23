@@ -8,9 +8,10 @@ publish = false
 [dependencies]
 boxfuture = { path = "../boxfuture" }
 fnv = "1.0.5"
-futures = "^0.1.16"
+futures01 = { package = "futures", version = "0.1" }
 hashing = { path = "../hashing" }
 indexmap = "1.0.2"
+log = "0.4"
 parking_lot = "0.6"
 petgraph = "0.4.5"
 

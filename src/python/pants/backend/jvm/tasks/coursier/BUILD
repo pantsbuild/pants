@@ -11,4 +11,5 @@ python_library(
     'src/python/pants/util:strutil',
     'src/python/pants/backend/jvm/subsystems:resolve_subsystem'
   ],
+  tags = {"partially_type_checked"},
 )

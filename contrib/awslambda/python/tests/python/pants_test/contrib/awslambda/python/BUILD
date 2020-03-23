@@ -4,9 +4,10 @@
 python_tests(
   dependencies=[
     'contrib/awslambda/python/src/python/pants/contrib/awslambda/python:plugin',
+    'contrib/awslambda/python/src/python/pants/contrib/awslambda/python:examples_directory',
     'src/python/pants/util:contextutil',
-    'src/python/pants/util:process_handler',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
   ],
-  tags={'integration'}
+  tags={'integration', 'partially_type_checked'},
+  timeout=120,
 )

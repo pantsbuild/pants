@@ -28,7 +28,7 @@ of the task class.
 
 **Option help** When registering a `Task` option, pass a `help` parameter to describe that option.
 
-!inc[start-at=register_options&end-at=help=](../python/pants/core_tasks/list_goals.py)
+!inc[start-at=register_options&end-at=help=](../python/pants/backend/project_info/tasks/export.py)
 
 ### Target types and other `BUILD` file symbols
 

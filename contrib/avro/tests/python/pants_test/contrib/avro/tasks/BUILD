@@ -8,15 +8,17 @@ python_tests(
     'contrib/avro/src/python/pants/contrib/avro/targets',
     'contrib/avro/src/python/pants/contrib/avro/tasks',
     'src/python/pants/build_graph:build_graph',
-    'tests/python/pants_test/jvm:nailgun_task_test_base',
+    'src/python/pants/testutil/jvm:nailgun_task_test_base',
   ],
+  tags = {'partially_type_checked'},
 )
 
 python_tests(
   name='avro_java_gen_integration',
   sources=['test_avro_gen_integration.py'],
   dependencies=[
-    'tests/python/pants_test:int-test',
+    'src/python/pants/testutil:int-test',
+    'contrib/avro:avro_tests_directory',
   ],
-  tags={'integration'},
+  tags={'integration', 'partially_type_checked'},
 )

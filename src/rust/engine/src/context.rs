@@ -2,29 +2,37 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std;
+use std::collections::BTreeMap;
+use std::convert::{Into, TryInto};
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::thread;
 use std::time::Duration;
 
-use tokio::runtime::Runtime;
-
-use futures::Future;
+use futures::compat::Future01CompatExt;
+use futures01::Future;
 
 use crate::core::{Failure, TypeId};
 use crate::handles::maybe_drop_handles;
-use crate::nodes::{NodeKey, TryInto, WrappedNode};
-use crate::rule_graph::RuleGraph;
-use crate::tasks::Tasks;
+use crate::nodes::{NodeKey, WrappedNode};
+use crate::scheduler::Session;
+use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
 use boxfuture::{BoxFuture, Boxable};
-use fs::{self, safe_create_dir_all_ioerror, PosixFS, ResettablePool, Store};
+use core::clone::Clone;
+use fs::{safe_create_dir_all_ioerror, PosixFS};
 use graph::{EntryId, Graph, NodeContext};
-use log::debug;
-use process_execution::{self, BoundedCommandRunner, CommandRunner};
+use process_execution::{
+  self, speculate::SpeculatingCommandRunner, BoundedCommandRunner, ExecuteProcessRequestMetadata,
+  Platform,
+};
 use rand::seq::SliceRandom;
 use reqwest;
-use resettable::Resettable;
+use rule_graph::RuleGraph;
+use sharded_lmdb::ShardedLmdb;
+use store::Store;
+use tokio::runtime::{Builder, Runtime};
+
+const GIGABYTES: usize = 1024 * 1024 * 1024;
 
 ///
 /// The core context shared (via Arc) between the Scheduler and the Context objects of
@@ -37,13 +45,13 @@ use resettable::Resettable;
 pub struct Core {
   pub graph: Graph<NodeKey>,
   pub tasks: Tasks,
-  pub rule_graph: RuleGraph,
+  pub rule_graph: RuleGraph<Rule>,
   pub types: Types,
-  pub fs_pool: Arc<ResettablePool>,
-  pub runtime: Resettable<Arc<Runtime>>,
-  pub futures_timer_thread: Resettable<futures_timer::HelperThread>,
-  store_and_command_runner_and_http_client:
-    Resettable<(Store, BoundedCommandRunner, reqwest::r#async::Client)>,
+  pub runtime: Runtime,
+  pub executor: task_executor::Executor,
+  store: Store,
+  pub command_runner: Box<dyn process_execution::CommandRunner>,
+  pub http_client: reqwest::Client,
   pub vfs: PosixFS,
   pub build_root: PathBuf,
 }
@@ -55,8 +63,8 @@ impl Core {
     types: Types,
     build_root: PathBuf,
     ignore_patterns: &[String],
-    work_dir: PathBuf,
     local_store_dir: PathBuf,
+    remote_execution: bool,
     remote_store_servers: Vec<String>,
     remote_execution_server: Option<String>,
     remote_execution_process_cache_namespace: Option<String>,
@@ -67,22 +75,38 @@ impl Core {
     remote_store_chunk_bytes: usize,
     remote_store_chunk_upload_timeout: Duration,
     remote_store_rpc_retries: usize,
-    process_execution_parallelism: usize,
+    remote_store_connection_limit: usize,
+    remote_execution_extra_platform_properties: Vec<(String, String)>,
+    process_execution_local_parallelism: usize,
+    process_execution_remote_parallelism: usize,
     process_execution_cleanup_local_dirs: bool,
-  ) -> Core {
+    process_execution_speculation_delay: Duration,
+    process_execution_speculation_strategy: String,
+    process_execution_use_local_cache: bool,
+    remote_execution_headers: BTreeMap<String, String>,
+    process_execution_local_enable_nailgun: bool,
+  ) -> Result<Core, String> {
     // Randomize CAS address order to avoid thundering herds from common config.
     let mut remote_store_servers = remote_store_servers;
     remote_store_servers.shuffle(&mut rand::thread_rng());
 
-    let fs_pool = Arc::new(ResettablePool::new("io-".to_string()));
-    let runtime = Resettable::new(|| {
-      Arc::new(Runtime::new().unwrap_or_else(|e| panic!("Could not initialize Runtime: {:?}", e)))
-    });
+    let runtime = Builder::new()
+      // This use of Builder (rather than just Runtime::new()) is to allow us to lower the
+      // max_threads setting. As of tokio `0.2.13`, the core threads default to num_cpus, and
+      // the max threads default to a fixed value of 512. In practice, it appears to be slower
+      // to allow 512 threads, and with the default stack size, 512 threads would use 1GB of RAM.
+      .core_threads(num_cpus::get())
+      .max_threads(num_cpus::get() * 4)
+      .threaded_scheduler()
+      .enable_all()
+      .build()
+      .map_err(|e| format!("Failed to start the runtime: {}", e))?;
+    let executor = task_executor::Executor::new(runtime.handle().clone());
     // We re-use these certs for both the execution and store service; they're generally tied together.
     let root_ca_certs = if let Some(path) = remote_root_ca_certs_path {
       Some(
         std::fs::read(&path)
-          .unwrap_or_else(|err| panic!("Error reading root CA certs file {:?}: {}", path, err)),
+          .map_err(|err| format!("Error reading root CA certs file {:?}: {}", path, err))?,
       )
     } else {
       None
@@ -92,148 +116,162 @@ impl Core {
     let oauth_bearer_token = if let Some(path) = remote_oauth_bearer_token_path {
       Some(
         std::fs::read_to_string(&path)
-          .unwrap_or_else(|err| panic!("Error reading root CA certs file {:?}: {}", path, err)),
+          .map_err(|err| format!("Error reading OAuth bearer token file {:?}: {}", path, err))?,
       )
     } else {
       None
     };
 
-    let fs_pool2 = fs_pool.clone();
-    let futures_timer_thread = Resettable::new(|| futures_timer::HelperThread::new().unwrap());
-    let futures_timer_thread2 = futures_timer_thread.clone();
-    let store_and_command_runner_and_http_client = Resettable::new(move || {
-      let local_store_dir = local_store_dir.clone();
-      let store = safe_create_dir_all_ioerror(&local_store_dir)
-        .map_err(|e| format!("Error making directory {:?}: {:?}", local_store_dir, e))
-        .and_then(|()| {
-          if remote_store_servers.is_empty() {
-            Store::local_only(local_store_dir, fs_pool2.clone())
-          } else {
-            Store::with_remote(
-              local_store_dir,
-              fs_pool2.clone(),
-              &remote_store_servers,
-              remote_instance_name.clone(),
-              &root_ca_certs,
-              oauth_bearer_token.clone(),
-              remote_store_thread_count,
-              remote_store_chunk_bytes,
-              remote_store_chunk_upload_timeout,
-              // TODO: Take a parameter
-              fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10))
-                .unwrap(),
-              remote_store_rpc_retries,
-              futures_timer_thread2.with(|t| t.handle()),
-            )
-          }
-        })
-        .unwrap_or_else(|e| panic!("Could not initialize Store: {:?}", e));
+    let local_store_dir2 = local_store_dir.clone();
+    let store = safe_create_dir_all_ioerror(&local_store_dir)
+      .map_err(|e| format!("Error making directory {:?}: {:?}", local_store_dir, e))
+      .and_then(|()| {
+        if !remote_execution || remote_store_servers.is_empty() {
+          Store::local_only(executor.clone(), local_store_dir)
+        } else {
+          Store::with_remote(
+            executor.clone(),
+            local_store_dir,
+            remote_store_servers,
+            remote_instance_name.clone(),
+            root_ca_certs.clone(),
+            oauth_bearer_token.clone(),
+            remote_store_thread_count,
+            remote_store_chunk_bytes,
+            remote_store_chunk_upload_timeout,
+            // TODO: Take a parameter
+            store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10))
+              .unwrap(),
+            remote_store_rpc_retries,
+            remote_store_connection_limit,
+          )
+        }
+      })
+      .map_err(|e| format!("Could not initialize Store: {:?}", e))?;
 
-      let underlying_command_runner: Box<dyn CommandRunner> = match &remote_execution_server {
-        Some(ref address) => Box::new(process_execution::remote::CommandRunner::new(
-          address,
-          remote_execution_process_cache_namespace.clone(),
-          remote_instance_name.clone(),
-          root_ca_certs.clone(),
-          oauth_bearer_token.clone(),
-          // Allow for some overhead for bookkeeping threads (if any).
-          process_execution_parallelism + 2,
-          store.clone(),
-          futures_timer_thread2.clone(),
-        )),
-        None => Box::new(process_execution::local::CommandRunner::new(
-          store.clone(),
-          fs_pool2.clone(),
-          work_dir.clone(),
-          process_execution_cleanup_local_dirs,
-        )),
+    let process_execution_metadata = ExecuteProcessRequestMetadata {
+      instance_name: remote_instance_name,
+      cache_key_gen_version: remote_execution_process_cache_namespace,
+      platform_properties: remote_execution_extra_platform_properties,
+    };
+
+    let local_command_runner = process_execution::local::CommandRunner::new(
+      store.clone(),
+      executor.clone(),
+      std::env::temp_dir(),
+      process_execution_cleanup_local_dirs,
+    );
+
+    let maybe_nailgunnable_local_command_runner: Box<dyn process_execution::CommandRunner> =
+      if process_execution_local_enable_nailgun {
+        Box::new(process_execution::nailgun::CommandRunner::new(
+          local_command_runner,
+          process_execution_metadata.clone(),
+          std::env::temp_dir(),
+          executor.clone(),
+        ))
+      } else {
+        Box::new(local_command_runner)
       };
 
-      let command_runner =
-        BoundedCommandRunner::new(underlying_command_runner, process_execution_parallelism);
+    let mut command_runner: Box<dyn process_execution::CommandRunner> =
+      Box::new(BoundedCommandRunner::new(
+        maybe_nailgunnable_local_command_runner,
+        process_execution_local_parallelism,
+      ));
 
-      let http_client = reqwest::r#async::Client::new();
+    if remote_execution {
+      let remote_command_runner: Box<dyn process_execution::CommandRunner> =
+        Box::new(BoundedCommandRunner::new(
+          Box::new(process_execution::remote::CommandRunner::new(
+            // No problem unwrapping here because the global options validation
+            // requires the remote_execution_server be present when remote_execution is set.
+            &remote_execution_server.unwrap(),
+            process_execution_metadata.clone(),
+            root_ca_certs,
+            oauth_bearer_token,
+            remote_execution_headers,
+            store.clone(),
+            // TODO if we ever want to configure the remote platform to be something else we
+            // need to take an option all the way down here and into the remote::CommandRunner struct.
+            Platform::Linux,
+            executor.clone(),
+            std::time::Duration::from_secs(300),
+            std::time::Duration::from_millis(500),
+            std::time::Duration::from_secs(5),
+          )?),
+          process_execution_remote_parallelism,
+        ));
+      command_runner = match process_execution_speculation_strategy.as_ref() {
+        "local_first" => Box::new(SpeculatingCommandRunner::new(
+          command_runner,
+          remote_command_runner,
+          process_execution_speculation_delay,
+        )),
+        "remote_first" => Box::new(SpeculatingCommandRunner::new(
+          remote_command_runner,
+          command_runner,
+          process_execution_speculation_delay,
+        )),
+        "none" => remote_command_runner,
+        _ => unreachable!(),
+      };
+    }
 
-      (store, command_runner, http_client)
-    });
+    if process_execution_use_local_cache {
+      let process_execution_store = ShardedLmdb::new(
+        local_store_dir2.join("processes"),
+        5 * GIGABYTES,
+        executor.clone(),
+      )
+      .map_err(|err| format!("Could not initialize store for process cache: {:?}", err))?;
+      command_runner = Box::new(process_execution::cache::CommandRunner::new(
+        command_runner.into(),
+        process_execution_store,
+        store.clone(),
+        process_execution_metadata,
+      ));
+    }
 
-    let rule_graph = RuleGraph::new(&tasks, root_subject_types);
+    let http_client = reqwest::Client::new();
+    let rule_graph = RuleGraph::new(tasks.as_map(), root_subject_types);
 
-    Core {
+    Ok(Core {
       graph: Graph::new(),
       tasks: tasks,
       rule_graph: rule_graph,
       types: types,
-      fs_pool: fs_pool.clone(),
-      runtime: runtime,
-      futures_timer_thread: futures_timer_thread,
-      store_and_command_runner_and_http_client: store_and_command_runner_and_http_client,
+      runtime,
+      executor: executor.clone(),
+      store,
+      command_runner,
+      http_client,
       // TODO: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
-      vfs: PosixFS::new(&build_root, fs_pool, &ignore_patterns).unwrap_or_else(|e| {
-        panic!("Could not initialize VFS: {:?}", e);
-      }),
+      vfs: PosixFS::new(&build_root, &ignore_patterns, executor)
+        .map_err(|e| format!("Could not initialize VFS: {:?}", e))?,
       build_root: build_root,
-    }
-  }
-
-  pub fn fork_context<F, T>(&self, f: F) -> T
-  where
-    F: Fn() -> T,
-  {
-    // Only one fork may occur at a time, but draining the Runtime and Graph requires that the
-    // Graph lock is not actually held during draining (as that would not allow the Runtime's
-    // threads to observe the draining value). So we attempt to mark the Graph draining (similar
-    // to a CAS loop), and treat a successful attempt as indication that our thread has permission
-    // to execute the fork.
-    //
-    // An alternative would be to have two locks in the Graph: one outer lock for the draining
-    // bool, and one inner lock for Graph mutations. But forks should be rare enough that busy
-    // waiting is not too contentious.
-    while let Err(()) = self.graph.mark_draining(true) {
-      debug!("Waiting to enter fork_context...");
-      thread::sleep(Duration::from_millis(10));
-    }
-    let t = self.futures_timer_thread.with_reset(|| {
-      self.runtime.with_reset(|| {
-        self.graph.with_exclusive(|| {
-          self
-            .fs_pool
-            .with_shutdown(|| self.store_and_command_runner_and_http_client.with_reset(f))
-        })
-      })
-    });
-    self
-      .graph
-      .mark_draining(false)
-      .expect("Multiple callers should not be in the fork context at once.");
-    t
+    })
   }
 
   pub fn store(&self) -> Store {
-    self.store_and_command_runner_and_http_client.get().0
-  }
-
-  pub fn command_runner(&self) -> BoundedCommandRunner {
-    self.store_and_command_runner_and_http_client.get().1
-  }
-
-  pub fn http_client(&self) -> reqwest::r#async::Client {
-    self.store_and_command_runner_and_http_client.get().2
+    self.store.clone()
   }
 }
 
 #[derive(Clone)]
 pub struct Context {
-  pub entry_id: EntryId,
+  entry_id: Option<EntryId>,
   pub core: Arc<Core>,
+  pub session: Session,
 }
 
 impl Context {
-  pub fn new(entry_id: EntryId, core: Arc<Core>) -> Context {
+  pub fn new(core: Arc<Core>, session: Session) -> Context {
     Context {
-      entry_id: entry_id,
-      core: core,
+      entry_id: None,
+      core,
+      session,
     }
   }
 
@@ -243,10 +281,12 @@ impl Context {
   pub fn get<N: WrappedNode>(&self, node: N) -> BoxFuture<N::Item, Failure> {
     // TODO: Odd place for this... could do it periodically in the background?
     maybe_drop_handles();
-    self
-      .core
-      .graph
-      .get(self.entry_id, self, node.into())
+    let result = if let Some(entry_id) = self.entry_id {
+      self.core.graph.get(entry_id, self, node.into()).to_boxed()
+    } else {
+      self.core.graph.create(node.into(), self).to_boxed()
+    };
+    result
       .map(|node_result| {
         node_result
           .try_into()
@@ -258,6 +298,7 @@ impl Context {
 
 impl NodeContext for Context {
   type Node = NodeKey;
+  type SessionId = String;
 
   ///
   /// Clones this Context for a new EntryId. Because the Core of the context is an Arc, this
@@ -265,9 +306,14 @@ impl NodeContext for Context {
   ///
   fn clone_for(&self, entry_id: EntryId) -> Context {
     Context {
-      entry_id: entry_id,
+      entry_id: Some(entry_id),
       core: self.core.clone(),
+      session: self.session.clone(),
     }
+  }
+
+  fn session_id(&self) -> &Self::SessionId {
+    self.session.build_id()
   }
 
   fn graph(&self) -> &Graph<NodeKey> {
@@ -278,6 +324,8 @@ impl NodeContext for Context {
   where
     F: Future<Item = (), Error = ()> + Send + 'static,
   {
-    self.core.runtime.get().executor().spawn(future);
+    self.core.executor.spawn_and_ignore(async move {
+      let _ = future.compat().await;
+    });
   }
 }

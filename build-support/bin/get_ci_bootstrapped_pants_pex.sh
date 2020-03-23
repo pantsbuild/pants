@@ -12,13 +12,13 @@ BOOTSTRAPPED_PEX_URL=s3://${BOOTSTRAPPED_PEX_BUCKET}/${BOOTSTRAPPED_PEX_KEY}
 
 # First check that there's only one version of the object on S3, to detect malicious overwrites.
 NUM_VERSIONS=$(aws --no-sign-request --region us-east-1 s3api list-object-versions \
-  --bucket ${BOOTSTRAPPED_PEX_BUCKET} --prefix ${BOOTSTRAPPED_PEX_KEY} --max-items 2 \
+  --bucket "${BOOTSTRAPPED_PEX_BUCKET}" --prefix "${BOOTSTRAPPED_PEX_KEY}" --max-items 2 \
   | jq '.Versions | length')
 [ "${NUM_VERSIONS}" == "1" ] || (echo "Error: Found ${NUM_VERSIONS} versions for ${BOOTSTRAPPED_PEX_URL}" && exit 1)
 
 # Now fetch the pre-bootstrapped pex, so that the ./pants wrapper script can use it
 # instead of running from sources (and re-bootstrapping).
-aws --no-sign-request --region us-east-1 s3 cp ${BOOTSTRAPPED_PEX_URL} ./pants.pex
+aws --no-sign-request --region us-east-1 s3 cp "${BOOTSTRAPPED_PEX_URL}" ./pants.pex
 chmod 755 ./pants.pex
 
 # Pants code executing under test expects native_engine.so to be present as a resource
@@ -28,3 +28,9 @@ chmod 755 ./pants.pex
 # bytes before the zip magic number (in our case, the pex shebang), even though the unzip
 # operation otherwise succeeds.
 unzip -j pants.pex pants/engine/native_engine.so -d src/python/pants/engine/ || true
+
+# TODO: As of 2019/10/24, we've seen sigbus errors while starting tests that feel potentially related
+# to either the PEX or native_engine.so just having finished extraction. If we continue to see those
+# issues, we can assume that this `sync` call is not necessary: otherwise, can assume that it is due
+# to some behavior of either 1) the aws tool, 2) chmod, 3) zip extraction.
+sync

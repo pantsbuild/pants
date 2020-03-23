@@ -19,8 +19,8 @@ function pkg_scrooge_install_test() {
 function pkg_buildgen_install_test() {
   local version=$1
   shift
-  local PIP_ARGS="$@"
-  pip install ${PIP_ARGS} "pantsbuild.pants.contrib.buildgen==${version}" && \
+  local PIP_ARGS=("$@")
+  pip install "${PIP_ARGS[@]}" "pantsbuild.pants.contrib.buildgen==${version}" && \
   python -c "from pants.contrib.buildgen.build_file_manipulator import *"
 }
 
@@ -112,7 +112,7 @@ function pkg_mypy_install_test() {
   local version=$1
   execute_packaged_pants_with_internal_backends \
     --plugins="['pantsbuild.pants.contrib.mypy==${version}']" \
-    --explain mypy &> /dev/null
+    --explain lint | grep "mypy" &> /dev/null
 }
 
 function pkg_avro_install_test() {
@@ -120,6 +120,13 @@ function pkg_avro_install_test() {
   execute_packaged_pants_with_internal_backends \
     --plugins="['pantsbuild.pants.contrib.avro==${version}']" \
     --explain gen | grep "avro-java" &> /dev/null
+}
+
+function pkg_awslambda_python_install_test() {
+  local version=$1
+  execute_packaged_pants_with_internal_backends \
+    --plugins="['pantsbuild.pants.contrib.awslambda_python==${version}']" \
+    --explain bundle | grep "lambdex" &> /dev/null
 }
 
 function pkg_thrifty_install_test() {

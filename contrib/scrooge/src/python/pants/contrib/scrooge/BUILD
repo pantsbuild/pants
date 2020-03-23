@@ -7,6 +7,7 @@ contrib_plugin(
     'contrib/scrooge/src/python/pants/contrib/scrooge/tasks',
     'src/python/pants/goal:task_registrar',
   ],
+  tags = {"partially_type_checked"},
   distribution_name='pantsbuild.pants.contrib.scrooge',
   description='Scrooge thrift generator pants plugins.',
   additional_classifiers=[

@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+COMMIT_MSG_FILEPATH=$1
+COMMIT_MSG_SRC=$2
+
+# NB: prepare-commit-msg runs in the context of GIT_WORK_TREE, ie: pwd == REPO_ROOT
+source build-support/common.sh
+MERGE_BASE="$(git_merge_base)"
+
+# NB: We consider all changed files since the merge base, rather than only inspecting the latest
+# commit. With a feature branch, this usually means all the local commits since the last push to
+# the PR.
+#
+# That means that we do not calculate skips based off what is in the overall PR, but rather what is
+# in the changeset being pushed. For example, if a PR's first commit changes Rust and that gets
+# pushed, then we will run the Rust tests for that build; but, if in a followup push, we don't
+# make any further changes to Rust, then we will _not_ rerun those Rust tests by default in the
+# new build.
+CHANGED_FILES="$(git diff --name-only "${MERGE_BASE}")"
+
+NUM_NON_MD_FILES=$(echo "${CHANGED_FILES})" | grep -c -v ".\md$")
+
+# Ensure that this stays in sync with `build-support/bin/native/calculate_engine_hash.sh`.
+NUM_RUST_FILES=$(echo "${CHANGED_FILES})" | grep -c -E \
+  -e "^src/rust/engine" \
+  -e "^rust-toolchain" \
+  -e "^src/python/pants/engine/native.py" \
+  -e "^build-support/bin/native" \
+  -e "^3rdparty/python/requirements.txt")
+
+# Ensure that this stays in sync with `build-support/bin/ci.py`.
+NUM_JVM_FILES=$(echo "${CHANGED_FILES})" | grep -c -E \
+  -e "^src/java" \
+  -e "^src/scala" \
+  -e "^tests/java" \
+  -e "^tests/scala" \
+  -e "^zinc")
+
+# Check if we were called with `--amend` to avoid putting skip labels multiple times.
+IS_AMEND=false
+if [ "${COMMIT_MSG_SRC}" = "commit" ]; then
+  IS_AMEND=true
+fi
+
+if [ "${IS_AMEND}" = "false" ] && [ "${NUM_NON_MD_FILES}" -eq 0 ]; then
+cat <<EOF >> "${COMMIT_MSG_FILEPATH}"
+
+# Delete this line to force a full CI run for documentation-only changes.
+[ci skip]  # Documentation-only change.
+EOF
+fi
+
+if [ "${IS_AMEND}" = "false" ] && [ "${NUM_RUST_FILES}" -eq 0 ]; then
+cat <<EOF >> "${COMMIT_MSG_FILEPATH}"
+
+# Delete this line to force CI to run Clippy and the Rust tests.
+[ci skip-rust-tests]  # No Rust changes made.
+EOF
+fi
+
+if [ "${IS_AMEND}" = "false" ] && [ "${NUM_JVM_FILES}" -eq 0 ]; then
+cat <<EOF >> "${COMMIT_MSG_FILEPATH}"
+
+# Delete this line to force CI to run the JVM tests.
+[ci skip-jvm-tests]  # No JVM changes made.
+EOF
+fi

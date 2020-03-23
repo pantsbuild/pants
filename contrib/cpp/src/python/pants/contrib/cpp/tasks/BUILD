@@ -17,6 +17,6 @@ python_library(
     'src/python/pants/base:workunit',
     'src/python/pants/task',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:process_handler',
   ],
+  tags = {"partially_type_checked"},
 )

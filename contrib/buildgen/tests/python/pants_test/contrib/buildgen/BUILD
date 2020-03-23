@@ -5,11 +5,11 @@ python_tests(
   name = 'build_file_manipulator',
   sources = ['test_build_file_manipulator.py'],
   dependencies = [
-    '3rdparty/python:future',
     'contrib/buildgen/src/python/pants/contrib/buildgen:build_file_manipulator',
     'src/python/pants/base:build_file',
     'src/python/pants/base:project_tree',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:test_base',
+    'src/python/pants/testutil:test_base',
   ],
+  tags = {'partially_type_checked'},
 )

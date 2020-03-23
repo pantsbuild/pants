@@ -3,8 +3,19 @@
 
 python_library(
   dependencies = [
-    '3rdparty/python:future',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:dataclasses',
     'src/python/pants/option',
+    'src/python/pants/util:ordered_set',
   ],
+  tags = {'partially_type_checked'},
+)
+
+python_tests(
+  name='tests',
+  dependencies=[
+    'src/python/pants/option',
+    'src/python/pants/subsystem',
+    'src/python/pants/testutil:test_base',
+  ],
+  tags = {'partially_type_checked'},
 )

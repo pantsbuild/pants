@@ -4,15 +4,38 @@
 
 set -e
 
-ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
-source ${ROOT}/build-support/common.sh
+ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd "$(git rev-parse --show-toplevel)" && pwd)
 
-PY=$(which python2.7 || exit 0)
-[[ -n "${PY}" ]] || die "You must have python2.7 installed and on the path to release."
-export PY
+function safe_curl() {
+  real_curl="$(command -v curl)"
+  set +e
+  "${real_curl}" --fail -SL "$@"
+  exit_code=$?
+  set -e
+  if [[ "${exit_code}" -ne 0 ]]; then
+    echo >&2 "Curl failed with args: $*"
+    exit 1
+  fi
+}
+
+# shellcheck source=build-support/common.sh
+source "${ROOT}/build-support/common.sh"
+
+# Note we allow the user to predefine this value so that they may point to a specific interpreter.
+export PY="${PY:-python3.6}"
+interpreter_constraint="CPython==3.6.*"
+if ! command -v "${PY}" >/dev/null; then
+  die "Python interpreter ${PY} not discoverable on your PATH."
+fi
+py_major_minor=$(${PY} -c 'import sys; print(".".join(map(str, sys.version_info[0:2])))')
+if [[ "${py_major_minor}" != "3.6" ]]; then
+  die "Invalid interpreter. The release script requires Python 3.6 (you are using ${py_major_minor})."
+fi
+
+export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['${interpreter_constraint}']"
 
 function run_local_pants() {
-  ${ROOT}/pants "$@"
+  "${ROOT}/pants" "$@"
 }
 
 # NB: Pants core does not have the ability to change its own version, so we compute the
@@ -20,7 +43,10 @@ function run_local_pants() {
 readonly VERSION_FILE="${ROOT}/src/python/pants/VERSION"
 PANTS_STABLE_VERSION="$(cat "${VERSION_FILE}")"
 HEAD_SHA=$(git rev-parse --verify HEAD)
-readonly PANTS_UNSTABLE_VERSION="${PANTS_STABLE_VERSION}+${HEAD_SHA:0:8}"
+# We add a non-numeric prefix 'git' before the sha in order to avoid a hex sha which happens to
+# contain only [0-9] being parsed as a number -- see #7399.
+# TODO(#7399): mix in the timestamp before the sha instead of 'git' to get monotonic ordering!
+readonly PANTS_UNSTABLE_VERSION="${PANTS_STABLE_VERSION}+git${HEAD_SHA:0:8}"
 
 readonly DEPLOY_DIR="${ROOT}/dist/deploy"
 readonly DEPLOY_3RDPARTY_WHEELS_PATH="wheels/3rdparty/${HEAD_SHA}"
@@ -30,39 +56,38 @@ readonly DEPLOY_PANTS_WHEEL_DIR="${DEPLOY_DIR}/${DEPLOY_PANTS_WHEELS_PATH}"
 
 # A space-separated list of pants packages to include in any pexes that are built: by default,
 # only pants core is included.
-: ${PANTS_PEX_PACKAGES:="pantsbuild.pants"}
+: "${PANTS_PEX_PACKAGES:="pantsbuild.pants"}"
 
 # URL from which pex release binaries can be downloaded.
-: ${PEX_DOWNLOAD_PREFIX:="https://github.com/pantsbuild/pex/releases/download"}
+: "${PEX_DOWNLOAD_PREFIX:="https://github.com/pantsbuild/pex/releases/download"}"
 
-source ${ROOT}/contrib/release_packages.sh
+# shellcheck source=contrib/release_packages.sh
+source "${ROOT}/contrib/release_packages.sh"
 
 function requirement() {
   package="$1"
   grep "^${package}[^A-Za-z0-9]" "${ROOT}/3rdparty/python/requirements.txt" || die "Could not find requirement for ${package}"
 }
 
-function run_pex27() {
+function run_pex() {
   # TODO: Cache this in case we run pex multiple times
   (
     PEX_VERSION="$(requirement pex | sed -e "s|pex==||")"
-    PEX_PEX=pex27
 
     pexdir="$(mktemp -d -t build_pex.XXXXX)"
-    trap "rm -rf ${pexdir}" EXIT
+    trap 'rm -rf "${pexdir}"' EXIT
 
-    pex="${pexdir}/${PEX_PEX}"
+    pex="${pexdir}/pex"
 
-    curl -sSL "${PEX_DOWNLOAD_PREFIX}/v${PEX_VERSION}/${PEX_PEX}" > "${pex}"
-    chmod +x "${pex}"
-    "${pex}" "$@"
+    safe_curl -s "${PEX_DOWNLOAD_PREFIX}/v${PEX_VERSION}/pex" > "${pex}"
+    "${PY}" "${pex}" "$@"
   )
 }
 
 function run_packages_script() {
   (
     cd "${ROOT}"
-    run_pex27 "$(requirement future)" "$(requirement beautifulsoup4)" "$(requirement configparser)" "$(requirement subprocess32)" -- "${ROOT}/src/python/pants/releases/packages.py" "$@"
+    run_pex "$(requirement beautifulsoup4)" -- "${ROOT}/src/python/pants/releases/packages.py" "$@"
   )
 }
 
@@ -76,21 +101,21 @@ function find_pkg() {
 function pkg_pants_install_test() {
   local version=$1
   shift
-  local PIP_ARGS="$@"
-  pip install ${PIP_ARGS} "pantsbuild.pants==${version}" || \
+  local PIP_ARGS=("$@")
+  pip install "${PIP_ARGS[@]}" "pantsbuild.pants==${version}" || \
     die "pip install of pantsbuild.pants failed!"
   execute_packaged_pants_with_internal_backends list src:: || \
     die "'pants list src::' failed in venv!"
   [[ "$(execute_packaged_pants_with_internal_backends --version 2>/dev/null)" \
-     == "${version}" ]] || die "Installed version of pants does match requested version!"
+     == "${version}" ]] || die "Installed version of pants does not match requested version!"
 }
 
-function pkg_testinfra_install_test() {
+function pkg_testutil_install_test() {
   local version=$1
   shift
-  local PIP_ARGS="$@"
-  pip install ${PIP_ARGS} "pantsbuild.pants.testinfra==${version}" && \
-  python -c "import pants_test"
+  local PIP_ARGS=("$@")
+  pip install "${PIP_ARGS[@]}" "pantsbuild.pants.testutil==${version}" && \
+  python -c "import pants.testutil"
 }
 
 #
@@ -100,11 +125,12 @@ function pkg_testinfra_install_test() {
 REQUIREMENTS_3RDPARTY_FILES=(
   "3rdparty/python/requirements.txt"
   "3rdparty/python/twitter/commons/requirements.txt"
+  "contrib/python/src/python/pants/contrib/python/checks/checker/3rdparty/requirements.txt"
 )
 
 # When we do (dry-run) testing, we need to run the packaged pants.
 # It doesn't have internal backend plugins so when we execute it
-# at the repo build root, the root pants.ini will ask it to load
+# at the repo build root, the root pants.toml will ask it to load
 # internal backend packages and their dependencies which it doesn't have,
 # and it'll fail. To solve that problem, we load the internal backend package
 # dependencies into the pantsbuild.pants venv.
@@ -122,6 +148,7 @@ function execute_packaged_pants_with_internal_backends() {
         'pants.backend.native',\
         'pants.backend.project_info',\
         'pants.backend.python',\
+        'pants.cache',\
         'internal_backend.repositories',\
         'internal_backend.sitegen',\
         'internal_backend.utilities',\
@@ -130,8 +157,8 @@ function execute_packaged_pants_with_internal_backends() {
 }
 
 function pants_version_reset() {
-  pushd ${ROOT} > /dev/null
-    git checkout -- ${VERSION_FILE}
+  pushd "${ROOT}" > /dev/null
+    git checkout -- "${VERSION_FILE}"
   popd > /dev/null
   unset _PANTS_VERSION_OVERRIDE
 }
@@ -156,15 +183,15 @@ function build_3rdparty_packages() {
   rm -rf "${DEPLOY_3RDPARTY_WHEEL_DIR}"
   mkdir -p "${DEPLOY_3RDPARTY_WHEEL_DIR}/${version}"
 
-  local req_args=""
+  local req_args=()
   for req_file in "${REQUIREMENTS_3RDPARTY_FILES[@]}"; do
-    req_args="${req_args} -r ${ROOT}/$req_file"
+    req_args=("${req_args[@]}" -r "${ROOT}/$req_file")
   done
 
-  start_travis_section "3rdparty" "Building 3rdparty whls from ${REQUIREMENTS_3RDPARTY_FILES[@]}"
+  start_travis_section "3rdparty" "Building 3rdparty whls from ${REQUIREMENTS_3RDPARTY_FILES[*]}"
   activate_tmp_venv
 
-  pip wheel --wheel-dir="${DEPLOY_3RDPARTY_WHEEL_DIR}/${version}" ${req_args}
+  pip wheel --wheel-dir="${DEPLOY_3RDPARTY_WHEEL_DIR}/${version}" "${req_args[@]}"
 
   deactivate
   end_travis_section
@@ -179,11 +206,15 @@ function build_pants_packages() {
   pants_version_set "${version}"
 
   start_travis_section "${NAME}" "Building packages"
-  packages=($(run_packages_script build_and_print "${version}"))
+  # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
+  # shellcheck disable=SC2207
+  packages=(
+    $(run_packages_script build_and_print "${version}")
+  ) || die "Failed to build packages at ${version}!"
   for package in "${packages[@]}"
   do
     (
-      wheel=$(find_pkg ${package} ${version} "${ROOT}/dist") && \
+      wheel=$(find_pkg "${package}" "${version}" "${ROOT}/dist") && \
       cp -p "${wheel}" "${DEPLOY_PANTS_WHEEL_DIR}/${version}"
     ) || die "Failed to find package ${package}-${version}!"
   done
@@ -212,9 +243,12 @@ function build_fs_util() {
 }
 
 function activate_tmp_venv() {
+  # Because the venv/bin/activate script's location is dynamic and not located in a fixed
+  # place, Shellcheck will not be able to find it so we tell Shellcheck to ignore the file.
+  # shellcheck source=/dev/null
   VENV_DIR=$(mktemp -d -t pants.XXXXX) && \
-  ${ROOT}/build-support/virtualenv $VENV_DIR && \
-  source $VENV_DIR/bin/activate
+  "${ROOT}/build-support/virtualenv" "$VENV_DIR" && \
+  source "$VENV_DIR/bin/activate"
 }
 
 function pre_install() {
@@ -238,7 +272,7 @@ From there, you can run 'pants' (not './pants') to do some testing.
 
 When you're done testing, press enter to continue.
 EOM
-    read
+    read -r
   fi
   deactivate
 }
@@ -254,19 +288,32 @@ function install_and_test_packages() {
     --no-cache-dir
   )
 
+  export PANTS_PYTHON_REPOS_REPOS="${DEPLOY_PANTS_WHEEL_DIR}/${VERSION}"
+
+  start_travis_section "wheel_check" "Validating ${VERSION} pantsbuild.pants wheels"
+  activate_twine
+  twine check "${PANTS_PYTHON_REPOS_REPOS}"/*.whl || die "Failed to validate wheels."
+  deactivate
+  end_travis_section
+
   pre_install || die "Failed to setup virtualenv while testing ${NAME}-${VERSION}!"
 
   # Avoid caching plugin installs.
-  export PANTS_PLUGIN_CACHE_DIR=$(mktemp -d -t plugins_cache.XXXXX)
-  trap "rm -rf ${PANTS_PLUGIN_CACHE_DIR}" EXIT
+  PANTS_PLUGIN_CACHE_DIR=$(mktemp -d -t plugins_cache.XXXXX)
+  export PANTS_PLUGIN_CACHE_DIR
+  trap 'rm -rf "${PANTS_PLUGIN_CACHE_DIR}"' EXIT
 
-  packages=($(run_packages_script list | grep '.' | awk '{print $1}'))
+  # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
+  # shellcheck disable=SC2207
+  packages=(
+    $(run_packages_script list | grep '.' | awk '{print $1}')
+  ) || die "Failed to list packages!"
 
-  export PANTS_PYTHON_REPOS_REPOS="${DEPLOY_PANTS_WHEEL_DIR}/${VERSION}"
   for package in "${packages[@]}"
   do
     start_travis_section "${package}" "Installing and testing package ${package}-${VERSION}"
-    eval pkg_${package##*\.}_install_test ${PIP_ARGS[@]} || \
+    # shellcheck disable=SC2086
+    eval pkg_${package##*\.}_install_test "${PIP_ARGS[@]}" || \
       die "Failed to install and test package ${package}-${VERSION}!"
     end_travis_section
   done
@@ -283,35 +330,6 @@ function dry_run_install() {
   install_and_test_packages "${VERSION}" \
     --only-binary=:all: \
     -f "${DEPLOY_3RDPARTY_WHEEL_DIR}/${VERSION}" -f "${DEPLOY_PANTS_WHEEL_DIR}/${VERSION}"
-}
-
-ALLOWED_ORIGIN_URLS=(
-  git@github.com:pantsbuild/pants.git
-  git@github.com:pantsbuild/pants
-  https://github.com/pantsbuild/pants.git
-  https://github.com/pantsbuild/pants
-)
-
-function check_origin() {
-  banner "Checking for a valid git origin"
-
-  origin_url="$(git remote -v | grep origin | grep "\(push\)" | cut -f2 | cut -d' ' -f1)"
-  for url in "${ALLOWED_ORIGIN_URLS[@]}"
-  do
-    if [[ "${origin_url}" == "${url}" ]]
-    then
-      return
-    fi
-  done
-  msg=$(cat << EOM
-Your origin url is not valid for releasing:
-  ${origin_url}
-
-It must be one of:
-$(echo "${ALLOWED_ORIGIN_URLS[@]}" | tr ' ' '\n' | sed -E "s|^|  |")
-EOM
-)
-  die "$msg"
 }
 
 function get_branch() {
@@ -342,8 +360,8 @@ EOM
 )
   get_pgp_keyid &> /dev/null || die "${msg}"
   echo "Found the following key for release signing:"
-  $(get_pgp_program) -k $(get_pgp_keyid)
-  read -p "Is this the correct key? [Yn]: " answer
+  "$(get_pgp_program)" -k "$(get_pgp_keyid)"
+  read -rp "Is this the correct key? [Yn]: " answer
   [[ "${answer:-y}" =~ [Yy]([Ee][Ss])? ]] || die "${msg}"
 }
 
@@ -359,16 +377,16 @@ function tag_release() {
   release_version="${PANTS_STABLE_VERSION}" && \
   tag_name="release_${release_version}" && \
   git tag -f \
-    --local-user=$(get_pgp_keyid) \
+    "--local-user=$(get_pgp_keyid)" \
     -m "pantsbuild.pants release ${release_version}" \
-    ${tag_name} && \
-  git push -f git@github.com:pantsbuild/pants.git ${tag_name}
+    "${tag_name}" && \
+  git push -f git@github.com:pantsbuild/pants.git "${tag_name}"
 }
 
 function publish_docs_if_master() {
   branch=$(get_branch)
   if [[ "${branch}" == "master" ]]; then
-    ${ROOT}/build-support/bin/publish_docs.sh -p -y
+    "${ROOT}/build-support/bin/publish_docs.sh" -p -y
   else
     echo "Skipping docsite publishing on non-master branch (${branch})."
   fi
@@ -385,7 +403,7 @@ function reversion_whls() {
   local dest_dir=$2
   local output_version=$3
 
-  for whl in `ls -1 "${src_dir}"/*.whl`; do
+  for whl in "${src_dir}"/*.whl; do
     run_local_pants -q run src/python/pants/releases:reversion -- \
       --glob='pants/VERSION' \
       "${whl}" "${dest_dir}" "${output_version}" \
@@ -398,21 +416,25 @@ readonly BINARY_BASE_URL=https://binaries.pantsbuild.org
 function list_prebuilt_wheels() {
   # List prebuilt wheels as tab-separated tuples of filename and URL-encoded name.
   wheel_listing="$(mktemp -t pants.wheels.XXXXX)"
-  trap "rm -f ${wheel_listing}" RETURN
+  trap 'rm -f "${wheel_listing}"' RETURN
 
   for wheels_path in "${DEPLOY_PANTS_WHEELS_PATH}" "${DEPLOY_3RDPARTY_WHEELS_PATH}"; do
-    curl -sSL "${BINARY_BASE_URL}/?prefix=${wheels_path}" > "${wheel_listing}"
+    safe_curl -s "${BINARY_BASE_URL}/?prefix=${wheels_path}" > "${wheel_listing}"
     "${PY}" << EOF
 from __future__ import print_function
 import sys
 import urllib
 import xml.etree.ElementTree as ET
+try:
+  from urllib.parse import quote_plus
+except ImportError:
+  from urllib import quote_plus
 root = ET.parse("${wheel_listing}")
 ns = {'s3': 'http://s3.amazonaws.com/doc/2006-03-01/'}
 for key in root.findall('s3:Contents/s3:Key', ns):
   # Because filenames may contain characters that have different meanings
   # in URLs (namely '+'), # print the key both as url-encoded and as a file path.
-  print('{}\t{}'.format(key.text, urllib.quote_plus(key.text)))
+  print('{}\t{}'.format(key.text, quote_plus(key.text)))
 EOF
  done
 }
@@ -424,14 +446,16 @@ function fetch_prebuilt_wheels() {
   (
     cd "${to_dir}"
     list_prebuilt_wheels | {
-      while read path_tuple
+      while read -r path_tuple
       do
-        local file_path=$(echo "$path_tuple" | awk -F'\t' '{print $1}')
-        local url_path=$(echo "$path_tuple" | awk -F'\t' '{print $2}')
+        local file_path
+        file_path=$(echo "$path_tuple" | awk -F'\t' '{print $1}')
+        local url_path
+        url_path=$(echo "$path_tuple" | awk -F'\t' '{print $2}')
         echo "${BINARY_BASE_URL}/${url_path}:"
         local dest="${to_dir}/${file_path}"
         mkdir -p "$(dirname "${dest}")"
-        curl --fail --progress-bar -o "${dest}" "${BINARY_BASE_URL}/${url_path}" \
+        safe_curl --progress-bar -o "${dest}" "${BINARY_BASE_URL}/${url_path}" \
           || die "Could not fetch ${dest}."
       done
     }
@@ -444,34 +468,39 @@ function fetch_and_check_prebuilt_wheels() {
   if [[ -z "${check_dir}" ]]
   then
     check_dir=$(mktemp -d -t pants.wheel_check.XXXXX)
-    trap "rm -rf ${check_dir}" RETURN
+    trap 'rm -rf "${check_dir}"' RETURN
   fi
 
   banner "Checking prebuilt wheels for ${PANTS_UNSTABLE_VERSION}"
   fetch_prebuilt_wheels "${check_dir}"
 
   local missing=()
-  RELEASE_PACKAGES=($(run_packages_script list | grep '.' | awk '{print $1}'))
-  for PACKAGE in "${RELEASE_PACKAGES[@]}"
-  do
+  # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
+  # shellcheck disable=SC2207
+  RELEASE_PACKAGES=(
+    $(run_packages_script list | grep '.' | awk '{print $1}')
+  ) || die "Failed to get a list of packages to release!"
+  for PACKAGE in "${RELEASE_PACKAGES[@]}"; do
+    # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
+    # shellcheck disable=SC2207
     packages=($(find_pkg "${PACKAGE}" "${PANTS_UNSTABLE_VERSION}" "${check_dir}"))
     if [ ${#packages[@]} -eq 0 ]; then
-      missing+=("${NAME}")
+      missing+=("${PACKAGE}")
       continue
     fi
 
     # Confirm that if the package is not cross platform that we have whls for two platforms.
     local cross_platform=""
-    for package in "${packages[@]}"
-    do
-      if [[ "${package}" =~ "-none-any.whl" ]]
+    for package in "${packages[@]}"; do
+      if [[ "${package}" =~ -none-any.whl ]]
       then
         cross_platform="true"
       fi
     done
 
+    # N.B. For platform-specific wheels, we expect 2 wheels: {linux,osx} * {abi3,}.
     if [ "${cross_platform}" != "true" ] && [ ${#packages[@]} -ne 2 ]; then
-      missing+=("${NAME} (expected whls for each platform: had only ${packages[@]})")
+      missing+=("${PACKAGE} (expected whls for each platform: had only ${packages[@]})")
       continue
     fi
   done
@@ -492,7 +521,7 @@ function adjust_wheel_platform() {
   local src_plat="$1"
   local dst_plat="$2"
   local dir="$3"
-  for src_whl in `find "${dir}" -name '*'"${src_plat}.whl"`; do
+  find "$dir" -type f -name "*${src_plat}.whl" | while read -r src_whl; do
     local dst_whl=${src_whl/$src_plat/$dst_plat}
     mv -f "${src_whl}" "${dst_whl}"
   done
@@ -503,12 +532,15 @@ function activate_twine() {
 
   rm -rf "${venv_dir}"
   "${ROOT}/build-support/virtualenv" "${venv_dir}"
+  # Because the venv/bin/activate script's location is dynamic and not located in a fixed
+  # place, Shellcheck will not be able to find it so we tell Shellcheck to ignore the file.
+  # shellcheck source=/dev/null
   source "${venv_dir}/bin/activate"
   pip install twine
 }
 
 function execute_pex() {
-  run_pex27 \
+  run_pex \
       --no-build \
       --no-pypi \
       --disable-cache \
@@ -523,31 +555,42 @@ function build_pex() {
   # If $1 == "fetch", fetches the linux and OSX wheels which were built on travis.
   local mode="$1"
 
-  local linux_platform="linux_x86_64"
-  local osx_platform="macosx_10.11_x86_64"
+  local linux_platform_noabi="linux_x86_64"
+  local osx_platform_noabi="macosx_10.11_x86_64"
 
+  dest_suffix="py36.pex"
   case "${mode}" in
     build)
       case "$(uname)" in
-	Darwin)
-	  local platform="${osx_platform}"
-	  ;;
-	Linux)
-	  local platform="${linux_platform}"
-	  ;;
-	*)
-	  echo >&2 "Unknown uname"
-	  exit 1
-	  ;;
+        # NB: When building locally, we use a platform that does not refer to the ABI version, to
+        # avoid needing to introspect the python ABI for this machine.
+        Darwin)
+          local platform="${osx_platform_noabi}"
+          ;;
+        Linux)
+          local platform="${linux_platform_noabi}"
+          ;;
+        *)
+          echo >&2 "Unknown uname"
+          exit 1
+          ;;
       esac
       local platforms=("${platform}")
-      local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${platform}.pex"
-      local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.${platform}.pex"
+      local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${platform}.${dest_suffix}"
+      local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.${platform}.${dest_suffix}"
       ;;
     fetch)
-      local platforms=("${linux_platform}" "${osx_platform}")
-      local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.pex"
-      local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.pex"
+      local platforms=()
+      # TODO: once we add Python 3.7 PEX support, which requires first building Py37 wheels,
+      # we'll want to release one big flexible Pex that works with Python 3.6+.
+      abis=("cp-36-m")
+      for platform in "${linux_platform_noabi}" "${osx_platform_noabi}"; do
+        for abi in "${abis[@]}"; do
+          platforms=("${platforms[@]}" "${platform}-${abi}")
+        done
+      done
+      local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${dest_suffix}"
+      local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.${dest_suffix}"
       ;;
     *)
       echo >&2 "Bad build_pex mode ${mode}"
@@ -575,9 +618,14 @@ function build_pex() {
     platform_flags=("${platform_flags[@]}" "--platform=${platform}")
   done
 
+  # Pants depends on twitter.common libraries that trigger pex warnings for not properly declaring
+  # their dependency on setuptools (for namespace package support). To prevent these known warnings
+  # from polluting stderr we pass `--no-emit-warnings`.
   execute_pex \
     -o "${dest}" \
+    --no-emit-warnings \
     --script=pants \
+    --interpreter-constraint="${interpreter_constraint}" \
     "${platform_flags[@]}" \
     "${requirements[@]}"
 
@@ -608,18 +656,20 @@ function publish_packages() {
   activate_twine
   trap deactivate RETURN
 
-  twine upload --sign --sign-with=$(get_pgp_program) --identity=$(get_pgp_keyid) \
+  twine upload --sign "--sign-with=$(get_pgp_program)" "--identity=$(get_pgp_keyid)" \
     "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_STABLE_VERSION}"/*.whl
 
   end_travis_section
 }
 
+_OPTS="dhnftlowepq"
+
 function usage() {
   echo "With no options all packages are built, smoke tested and published to"
-  echo "PyPi.  Credentials are needed for this as described in the"
+  echo "PyPI.  Credentials are needed for this as described in the"
   echo "release docs: http://pantsbuild.org/release.html"
   echo
-  echo "Usage: $0 [-d] [-c] (-h|-n|-f|-t|-l|-o|-e|-p)"
+  echo "Usage: $0 [-d] (-h|-n|-f|-t|-l|-o|-w|-e|-p|-q)"
   echo " -d  Enables debug mode (verbose output, script pauses after venv creation)"
   echo " -h  Prints out this help message."
   echo " -n  Performs a release dry run."
@@ -628,10 +678,11 @@ function usage() {
   echo "       functioning."
   echo " -f  Build the fs_util binary."
   echo " -t  Tests a live release."
-  echo "       Ensures the latest packages have been propagated to PyPi"
+  echo "       Ensures the latest packages have been propagated to PyPI"
   echo "       and can be installed in an ephemeral virtualenv."
   echo " -l  Lists all pantsbuild packages that this script releases."
   echo " -o  Lists all pantsbuild package owners."
+  echo " -w  List pre-built wheels for this release."
   echo " -e  Check that wheels are prebuilt for this release."
   echo " -p  Build a pex from prebuilt wheels for this release."
   echo " -q  Build a pex which only works on the host platform, using the code as exists on disk."
@@ -645,7 +696,7 @@ function usage() {
   fi
 }
 
-while getopts "hdnftcloepqw" opt; do
+while getopts ":${_OPTS}" opt; do
   case ${opt} in
     h) usage ;;
     d) debug="true" ;;
@@ -654,10 +705,10 @@ while getopts "hdnftcloepqw" opt; do
     t) test_release="true" ;;
     l) run_packages_script list ; exit $? ;;
     o) run_packages_script list-owners ; exit $? ;;
+    w) list_prebuilt_wheels ; exit $? ;;
     e) fetch_and_check_prebuilt_wheels ; exit $? ;;
     p) build_pex fetch ; exit $? ;;
     q) build_pex build ; exit $? ;;
-    w) list_prebuilt_wheels ; exit $? ;;
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
@@ -670,22 +721,22 @@ fi
 if [[ "${dry_run}" == "true" && "${test_release}" == "true" ]]; then
   usage "The dry run and test options are mutually exclusive, pick one."
 elif [[ "${dry_run}" == "true" ]]; then
-  banner "Performing a dry run release" && \
+  banner "Performing a dry run release"
   (
     dry_run_install && \
     banner "Dry run release succeeded"
   ) || die "Dry run release failed."
 elif [[ "${test_release}" == "true" ]]; then
-  banner "Installing and testing the latest released packages" && \
+  banner "Installing and testing the latest released packages"
   (
     install_and_test_packages "${PANTS_STABLE_VERSION}" && \
     banner "Successfully installed and tested the latest released packages"
   ) || die "Failed to install and test the latest released packages."
 else
-  banner "Releasing packages to PyPi" && \
+  banner "Releasing packages to PyPI"
   (
-    check_origin && check_clean_branch && check_pgp && check_owners && \
+    check_clean_branch && check_pgp && check_owners && \
       publish_packages && tag_release && publish_docs_if_master && \
-      banner "Successfully released packages to PyPi"
-  ) || die "Failed to release packages to PyPi."
+      banner "Successfully released packages to PyPI"
+  ) || die "Failed to release packages to PyPI."
 fi

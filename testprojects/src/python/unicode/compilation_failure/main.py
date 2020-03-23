@@ -1,4 +1,6 @@
-# This file is expected to fail to "compile", and raise a unicode error while doing so.
+# This file is expected to fail to "compile" when run via `./pants run` due to a SyntaxError.
 # Because the error itself contains unicode, it can exercise that error handling codepaths
 # are unicode aware.
-import sys¡
+
+if __name__ == '__main__':
+  import sys¡

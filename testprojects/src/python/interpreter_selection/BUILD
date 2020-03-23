@@ -7,9 +7,8 @@
 python_library(
   name = 'echo_interpreter_version_lib',
   sources = ['echo_interpreter_version.py'],
-  dependencies = [],
   # Play with this to test interpreter selection in the pex machinery.
-  compatibility = ['CPython>=2.7,<4']
+  compatibility = ['CPython>=2.7']
 )
 
 python_binary(
@@ -41,7 +40,7 @@ python_binary(
 
 # Note: Used by tests, but also useful for manual testing.
 python_binary(
-  name = 'deliberately_conficting_compatibility',
+  name = 'deliberately_conflicting_compatibility',
   dependencies = [
     ':echo_interpreter_version_lib',
   ],
@@ -52,7 +51,6 @@ python_binary(
 python_library(
   name = 'die_lib',
   sources = ['die.py'],
-  dependencies = [],
   compatibility = ['CPython>=2.7,<3']
 )
 

@@ -17,13 +17,16 @@ pub type RawHandle = *const raw::c_void;
 /// underlying CFFI handle.
 ///
 #[repr(C)]
-pub struct Handle(RawHandle);
+pub struct Handle(pub RawHandle);
 
 impl Handle {
   ///
-  /// An escape hatch to allow for cloning a Handle without cloning the value it points to. You
-  /// should generally not do this unless you are certain the input Handle has been mem::forgotten
-  /// (otherwise it will be `Drop`ed twice).
+  /// An escape hatch to allow for cloning a Handle without cloning the value it points to.
+  ///
+  /// # Safety
+  ///
+  /// You should not call this method unless you are certain the input Handle has been
+  /// mem::forgotten (otherwise it will be `Drop`ed twice).
   ///
   pub unsafe fn clone_shallow(&self) -> Handle {
     Handle(self.0)
@@ -59,17 +62,17 @@ pub struct DroppingHandle(RawHandle);
 
 unsafe impl Send for DroppingHandle {}
 
-///
-/// A static queue of Handles which used to be owned by `Value`s. When a Value is dropped, its
-/// Handle is added to this queue. Some thread with access to the ExternContext should periodically
-/// consume this queue to drop the relevant handles on the python side.
-///
-/// This queue avoids giving every `Value` a reference to the ExternContext, which would allow them
-/// to drop themselves directly, but would increase their size.
-///
-/// TODO: This queue should likely move to `core` to allow `enqueue` to be private.
-///
 lazy_static! {
+  ///
+  /// A static queue of Handles which used to be owned by `Value`s. When a Value is dropped, its
+  /// Handle is added to this queue. Some thread with access to the ExternContext should periodically
+  /// consume this queue to drop the relevant handles on the python side.
+  ///
+  /// This queue avoids giving every `Value` a reference to the ExternContext, which would allow them
+  /// to drop themselves directly, but would increase their size.
+  ///
+  /// TODO: This queue should likely move to `core` to allow `enqueue` to be private.
+  ///
   static ref DROPPING_HANDLES: Mutex<Vec<DroppingHandle>> = Mutex::new(Vec::new());
 }
 

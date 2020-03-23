@@ -17,9 +17,7 @@ target(
 python_library(
   name='node_paths',
   sources=['node_paths.py'],
-  dependencies = [
-    '3rdparty/python:future',
-  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -31,7 +29,8 @@ python_library(
     'src/python/pants/base:workunit',
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -43,27 +42,27 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/fs',
     'src/python/pants/util:dirutil',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
   name='node_repl',
   sources=['node_repl.py'],
   dependencies=[
-    '3rdparty/python:future',
     ':node_paths',
     ':node_task',
     'src/python/pants/base:exceptions',
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
   name='node_task',
   sources=['node_task.py'],
   dependencies=[
-    '3rdparty/python:future',
     'contrib/node/src/python/pants/contrib/node/subsystems',
     'contrib/node/src/python/pants/contrib/node/targets:node_bundle',
     'contrib/node/src/python/pants/contrib/node/targets:node_module',
@@ -73,7 +72,8 @@ python_library(
     'src/python/pants/base:workunit',
     'src/python/pants/task',
     'src/python/pants/util:memo',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -84,7 +84,8 @@ python_library(
     ':node_task',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -96,7 +97,8 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
     'src/python/pants/util:contextutil',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -109,14 +111,14 @@ python_library(
     'src/python/pants/base:workunit',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:process_handler',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
   name='javascript_style',
   sources=['javascript_style.py'],
   dependencies=[
-    '3rdparty/python:future',
     ':node_paths',
     ':node_task',
     'src/python/pants/base:deprecated',
@@ -125,7 +127,8 @@ python_library(
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:process_handler',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -137,5 +140,6 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
     'src/python/pants/util:contextutil',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )

@@ -8,10 +8,10 @@ publish = false
 [dependencies]
 clap = "2"
 env_logger = "0.5.4"
-fs = { path = "../fs" }
-# TODO: Switch to a release once https://github.com/alexcrichton/futures-timer/pull/11 and https://github.com/alexcrichton/futures-timer/pull/12 merge
-futures-timer = { git = "https://github.com/pantsbuild/futures-timer", rev = "0b747e565309a58537807ab43c674d8951f9e5a0" }
+futures = { version = "0.3", features = ["compat"] }
 hashing = { path = "../hashing" }
-futures = "^0.1.16"
 process_execution = { path = "../process_execution" }
-resettable = { path = "../resettable" }
+store = { path = "../fs/store" }
+task_executor = { path = "../task_executor" }
+tokio = { version = "0.2", features = ["rt-threaded", "macros"] }
+workunit_store = { path = "../workunit_store"}

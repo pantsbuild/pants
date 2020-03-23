@@ -3,7 +3,6 @@
 
 python_library(
   dependencies=[
-    '3rdparty/python:future',
     '3rdparty/python:ansicolors',
     '3rdparty/python:packaging',
     '3rdparty/python:setuptools',
@@ -27,11 +26,12 @@ python_library(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:desktop',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:process_handler',
     'src/python/pants:version',
-  ])
+  ],
+  tags = {'partially_type_checked'},
+)
 
 resources(
   name='templates',
-  sources=globs('templates/**/*.mustache'),
+  sources=['templates/**/*.mustache'],
 )

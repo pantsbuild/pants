@@ -1,71 +1,58 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import logging
-import unittest
-import uuid
-from builtins import open, str
-from contextlib import closing, contextmanager
-from io import StringIO
+from contextlib import contextmanager
+from logging import Logger
+from pathlib import Path
+from typing import Iterator, Tuple
 
-from pants.init.logging import setup_logging
+from pants.init.logging import FileLoggingSetupResult, setup_logging
+from pants.testutil.engine.util import init_native
+from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
-from pants_test.testutils.py2_compat import assertRegex
+from pants.util.logging import LogLevel
 
 
-class SetupTest(unittest.TestCase):
-  @contextmanager
-  def log_dir(self, file_logging):
-    if file_logging:
-      with temporary_dir() as log_dir:
-        yield log_dir
-    else:
-      yield None
+class LoggingTest(TestBase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        # NB: We must set this up at the class level, rather than per-test level, because
+        # `init_rust_logging` must never be called more than once. The Rust logger is global and static,
+        # and initializing it twice in the same test class results in a SIGABRT.
+        init_native().init_rust_logging(
+            # We set the level to the least verbose possible, as individual tests will increase the
+            # verbosity as necessary.
+            level=LogLevel.ERROR.level,
+            log_show_rust_3rdparty=False,
+        )
 
-  @contextmanager
-  def logger(self, level, file_logging=False):
-    logger = logging.getLogger(str(uuid.uuid4()))
-    with closing(StringIO()) as stream:
-      with self.log_dir(file_logging) as log_dir:
-        log_file = setup_logging(level, console_stream=stream, log_dir=log_dir, scope=logger.name)
-        yield logger, stream, log_file.log_filename
+    @contextmanager
+    def logger(self, log_level: LogLevel) -> Iterator[Tuple[Logger, FileLoggingSetupResult]]:
+        native = self.scheduler._scheduler._native
+        logger = logging.getLogger("my_file_logger")
+        with temporary_dir() as log_dir:
+            logging_setup_result = setup_logging(
+                log_level, log_dir=log_dir, scope=logger.name, native=native
+            )
+            yield logger, logging_setup_result
 
-  def assertWarnInfoOutput(self, lines):
-    """Check to see that only warn and info output appears in the stream.
+    def test_utf8_logging(self) -> None:
+        with self.logger(LogLevel.INFO) as (file_logger, logging_setup_result):
+            cat = "🐈"
+            file_logger.info(cat)
+            logging_setup_result.log_handler.flush()
+            self.assertIn(cat, Path(logging_setup_result.log_filename).read_text())
 
-    The first line may start with WARN] or WARNING] depending on whether 'WARN'
-    has been registered as a global log level.  See options_bootstrapper.py.
-    """
-    self.assertEqual(2, len(lines))
-    assertRegex(self, lines[0], '^WARN\w*] warn')
-    self.assertEqual('INFO] info', lines[1])
+    def test_file_logging(self) -> None:
+        with self.logger(LogLevel.INFO) as (file_logger, logging_setup_result):
+            file_logger.warning("this is a warning")
+            file_logger.info("this is some info")
+            file_logger.debug("this is some debug info")
+            logging_setup_result.log_handler.flush()
 
-  def test_standard_logging(self):
-    with self.logger('INFO') as (logger, stream, _):
-      logger.warn('warn')
-      logger.info('info')
-      logger.debug('debug')
-
-      stream.flush()
-      stream.seek(0)
-      self.assertWarnInfoOutput(stream.read().splitlines())
-
-  def test_file_logging(self):
-    with self.logger('INFO', file_logging=True) as (logger, stream, log_file):
-      logger.warn('warn')
-      logger.info('info')
-      logger.debug('debug')
-
-      stream.flush()
-      stream.seek(0)
-      self.assertWarnInfoOutput(stream.read().splitlines())
-
-      with open(log_file, 'r') as fp:
-        loglines = fp.read().splitlines()
-        self.assertEqual(2, len(loglines))
-        glog_format = r'\d{4} \d{2}:\d{2}:\d{2}.\d{6} \d+ \w+\.py:\d+] '
-        assertRegex(self, loglines[0], r'^W{}warn$'.format(glog_format))
-        assertRegex(self, loglines[1], r'^I{}info$'.format(glog_format))
+            loglines = Path(logging_setup_result.log_filename).read_text().splitlines()
+            self.assertEqual(2, len(loglines))
+            self.assertIn("[WARN] this is a warning", loglines[0])
+            self.assertIn("[INFO] this is some info", loglines[1])

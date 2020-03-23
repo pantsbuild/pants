@@ -3,7 +3,7 @@ Pants Deprecation Policy
 
 Deprecations should live for one entire `dev` series and stable release branch (at the minimum) before their code is removed. This ensures that there is always at least one stable release containing a deprecation, and allows users upgrading their copy of pants to consume only stable releases in order to observe all deprecations.
 
-As an example: if a feature is deprecated during the `1.0.0.dev` series, it should remain available but deprecated for the entire `1.1.0.dev` series, and can be removed when master bumps to `1.2.0.dev0`.
+As an example: if a feature is deprecated in `1.0.0.dev2`, it should remain available but deprecated for the entire `1.1.0.dev` series, and can be removed when master bumps to `1.2.0.dev0`.
 
 API Definition
 --------------
@@ -24,7 +24,7 @@ For example, a method `baz` of class `Bar` defined at the top level of module `f
     """
 
 
-    class Bar(object):
+    class Bar:
       """An example public API class.
 
       :API: public

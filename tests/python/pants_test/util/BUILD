@@ -8,6 +8,7 @@ python_tests(
   dependencies = [
     'src/python/pants/util:argutil',
   ],
+  tags = {'type_checked'},
 )
 
 python_tests(
@@ -15,9 +16,9 @@ python_tests(
   sources = ['test_collections.py'],
   coverage = ['pants.util.collections'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/util:collections',
-  ]
+  ],
+  tags = {'type_checked'},
 )
 
 python_tests(
@@ -25,11 +26,9 @@ python_tests(
   sources = ['test_contextutil.py'],
   coverage = ['pants.util.contextutil'],
   dependencies = [
-    '3rdparty/python:future',
-    '3rdparty/python:mock',
     'src/python/pants/util:contextutil',
-    'src/python/pants/util:process_handler',
-  ]
+  ],
+  tags = {'type_checked'},
 )
 
 python_tests(
@@ -37,32 +36,40 @@ python_tests(
   sources = ['test_dirutil.py'],
   coverage = ['pants.util.dirutil'],
   dependencies = [
-    '3rdparty/python:future',
-    '3rdparty/python:mock',
+    '3rdparty/python:dataclasses',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:objects',
-  ]
+  ],
+  tags = {'type_checked'},
+)
+
+python_tests(
+  name = 'enums',
+  sources = ['test_enums.py'],
+  coverage = ['pants.util.enums'],
+  dependencies = [
+    'src/python/pants/util:enums',
+  ],
+  tags = {'type_checked'},
 )
 
 python_tests(
   name = 'eval',
   sources = ['test_eval.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/util:eval',
-  ]
+  ],
+  tags = {'type_checked'},
 )
 
 python_tests(
   name = 'fileutil',
   sources = ['test_fileutil.py'],
   dependencies = [
-    '3rdparty/python:future',
-    '3rdparty/python:mock',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:fileutil',
-  ]
+  ],
+  tags = {'type_checked'},
 )
 
 python_tests(
@@ -70,37 +77,38 @@ python_tests(
   sources = ['test_filtering.py'],
   dependencies = [
     'src/python/pants/util:filtering',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
   name = 'memo',
   sources = ['test_memo.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
   name = 'meta',
   sources = ['test_meta.py'],
   dependencies = [
-    '3rdparty/python:future',
+    '3rdparty/python:dataclasses',
     'src/python/pants/util:meta',
-    'tests/python/pants_test:test_base',
-  ]
+    'src/python/pants/testutil:test_base',
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
   name = 'netrc',
   sources = ['test_netrc.py'],
   dependencies = [
-    '3rdparty/python:future',
-    '3rdparty/python:mock',
     'src/python/pants/util:netrc',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -108,20 +116,20 @@ python_tests(
   sources = ['test_objects.py'],
   coverage = ['pants.util.objects'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/util:objects',
-    'tests/python/pants_test:test_base',
-  ]
+    'src/python/pants/testutil:test_base',
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
   name = 'osutil',
   sources = ['test_osutil.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/util:osutil',
-    'tests/python/pants_test:test_base',
-  ]
+    'src/python/pants/testutil:test_base',
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -129,16 +137,17 @@ python_tests(
   sources = ['test_process_handler.py'],
   dependencies = [
     'src/python/pants/util:process_handler',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
   name = 'retry',
   sources = ['test_retry.py'],
   dependencies = [
-    '3rdparty/python:mock',
     'src/python/pants/util:retry',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -148,6 +157,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:rwbuf',
   ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -155,28 +165,28 @@ python_tests(
   sources = ['test_socket.py'],
   coverage = ['pants.util.socket'],
   dependencies = [
-    '3rdparty/python:mock',
     'src/python/pants/util:socket',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
   name = 'strutil',
   sources = ['test_strutil.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/util:strutil',
-  ]
+  ],
+  tags = {'type_checked'},
 )
 
 python_tests(
   name = 'tarutil',
   sources = ['test_tarutil.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:tarutil',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -184,7 +194,8 @@ python_library(
   sources = ['xml_test_base.py'],
   dependencies = [
     'src/python/pants/util:contextutil',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -193,5 +204,6 @@ python_tests(
   dependencies = [
     'src/python/pants/util:xml_parser',
     'tests/python/pants_test/util:xml_test_base',
-  ]
+  ],
+  tags = {"partially_type_checked"},
 )

@@ -1,51 +1,322 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
+import itertools
+import logging
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from enum import Enum
+from pathlib import PurePath
+from typing import Iterable, Optional, Type
 
-from pants.backend.python.rules.python_test_runner import PyTestResult
+from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.build_graph.address import Address
-from pants.engine.addressable import BuildFileAddresses
+from pants.engine import desktop
 from pants.engine.console import Console
-from pants.engine.legacy.graph import HydratedTarget
-from pants.engine.rules import console_rule, rule
-from pants.engine.selectors import Get, Select
-from pants.rules.core.core_test_model import Status, TestResult
-from pants.rules.core.exceptions import GracefulTerminationException
+from pants.engine.fs import Digest, DirectoryToMaterialize, Workspace
+from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
+from pants.engine.isolated_process import FallibleExecuteProcessResult
+from pants.engine.legacy.graph import HydratedTargetsWithOrigins
+from pants.engine.legacy.structs import TargetAdaptorWithOrigin
+from pants.engine.objects import union
+from pants.engine.rules import UnionMembership, goal_rule, rule
+from pants.engine.selectors import Get, MultiGet
+
+# TODO(#6004): use proper Logging singleton, rather than static logger.
+logger = logging.getLogger(__name__)
 
 
-@console_rule('test', [Select(Console), Select(BuildFileAddresses)])
-def fast_test(console, addresses):
-  test_results = yield [Get(TestResult, Address, address.to_address()) for address in addresses]
-  wrote_any_stdout = False
-  did_any_fail = False
-  for test_result in test_results:
-    wrote_any_stdout |= bool(test_result.stdout)
-    # Assume \n-terminated
-    console.write_stdout(test_result.stdout)
-    if test_result.stdout and not test_result.stdout[-1] == '\n':
-      console.write_stdout('\n')
-    if test_result.status == Status.FAILURE:
-      did_any_fail = True
-
-  if wrote_any_stdout:
-    console.write_stdout('\n')
-
-  for address, test_result in zip(addresses, test_results):
-    console.print_stdout('{0:80}.....{1:>10}'.format(address.reference(), test_result.status))
-
-  if did_any_fail:
-    raise GracefulTerminationException("Tests failed", exit_code=1)
+class Status(Enum):
+    SUCCESS = "SUCCESS"
+    FAILURE = "FAILURE"
 
 
-@rule(TestResult, [Select(HydratedTarget)])
-def coordinator_of_tests(target):
-  # This should do an instance match, or canonicalise the adaptor type, or something
-  #if isinstance(target.adaptor, PythonTestsAdaptor):
-  # See https://github.com/pantsbuild/pants/issues/4535
-  if target.adaptor.type_alias == 'python_tests':
-    result = yield Get(PyTestResult, HydratedTarget, target)
-    yield TestResult(status=result.status, stdout=result.stdout)
-  else:
-    raise Exception("Didn't know how to run tests for type {}".format(target.adaptor.type_alias))
+@dataclass(frozen=True)
+class TestResult:
+    status: Status
+    stdout: str
+    stderr: str
+    coverage_data: Optional["CoverageData"] = None
+
+    # Prevent this class from being detected by pytest as a test class.
+    __test__ = False
+
+    @staticmethod
+    def from_fallible_execute_process_result(
+        process_result: FallibleExecuteProcessResult,
+        *,
+        coverage_data: Optional["CoverageData"] = None,
+    ) -> "TestResult":
+        return TestResult(
+            status=Status.SUCCESS if process_result.exit_code == 0 else Status.FAILURE,
+            stdout=process_result.stdout.decode(),
+            stderr=process_result.stderr.decode(),
+            coverage_data=coverage_data,
+        )
+
+
+@dataclass(frozen=True)
+class TestDebugRequest:
+    ipr: InteractiveProcessRequest
+
+    # Prevent this class from being detected by pytest as a test class.
+    __test__ = False
+
+
+@union
+@dataclass(frozen=True)  # type: ignore[misc]   # https://github.com/python/mypy/issues/5374
+class TestRunner(ABC):
+    adaptor_with_origin: TargetAdaptorWithOrigin
+
+    __test__ = False
+
+    @staticmethod
+    @abstractmethod
+    def is_valid_target(_: TargetAdaptorWithOrigin) -> bool:
+        """Return True if the test runner can meaningfully operate on this target."""
+
+
+# NB: This is only used for the sake of coordinator_of_tests. Consider inlining that rule so that
+# we can remove this wrapper type.
+@dataclass(frozen=True)
+class WrappedTestRunner:
+    runner: TestRunner
+
+
+@dataclass(frozen=True)
+class AddressAndTestResult:
+    address: Address
+    test_result: TestResult
+
+
+class CoverageData(ABC):
+    """Base class for inputs to a coverage report.
+
+    Subclasses should add whichever fields they require - snapshots of coverage output or xml files, etc.
+    """
+
+    @property
+    @abstractmethod
+    def batch_cls(self) -> Type["CoverageDataBatch"]:
+        pass
+
+
+@union
+class CoverageDataBatch:
+    pass
+
+
+class CoverageReport(ABC):
+    """Represents a code coverage report that can be materialized to the terminal or disk."""
+
+    def materialize(self, console: Console, workspace: Workspace) -> Optional[PurePath]:
+        """Materialize this code coverage report to the terminal or disk.
+
+        :param console: A handle to the terminal.
+        :param workspace: A handle to local disk.
+        :return: If a report was materialized to disk, the path of the file in the report one might
+                 open first to start examining the report.
+        """
+        ...
+
+
+@dataclass(frozen=True)
+class ConsoleCoverageReport(CoverageReport):
+    """Materializes a code coverage report to the terminal."""
+
+    report: str
+
+    def materialize(self, console: Console, workspace: Workspace) -> Optional[PurePath]:
+        console.print_stdout(f"\n{self.report}")
+        return None
+
+
+@dataclass(frozen=True)
+class FilesystemCoverageReport(CoverageReport):
+    """Materializes a code coverage report to disk."""
+
+    result_digest: Digest
+    directory_to_materialize_to: PurePath
+    report_file: Optional[PurePath]
+
+    def materialize(self, console: Console, workspace: Workspace) -> Optional[PurePath]:
+        workspace.materialize_directory(
+            DirectoryToMaterialize(
+                self.result_digest, path_prefix=str(self.directory_to_materialize_to),
+            )
+        )
+        console.print_stdout(f"\nWrote coverage report to `{self.directory_to_materialize_to}`")
+        return self.report_file
+
+
+class TestOptions(GoalSubsystem):
+    """Runs tests."""
+
+    name = "test"
+
+    required_union_implementations = (TestRunner,)
+
+    # Prevent this class from being detected by pytest as a test class.
+    __test__ = False
+
+    @classmethod
+    def register_options(cls, register) -> None:
+        super().register_options(register)
+        register(
+            "--debug",
+            type=bool,
+            default=False,
+            help="Run a single test target in an interactive process. This is necessary, for "
+            "example, when you add breakpoints in your code.",
+        )
+        register(
+            "--run-coverage",
+            type=bool,
+            default=False,
+            help="Generate a coverage report for this test run.",
+        )
+        register(
+            "--open-coverage",
+            type=bool,
+            default=False,
+            help="If a coverage report file is generated, open it on the local system if the "
+            "system supports this.",
+        )
+
+
+class Test(Goal):
+    subsystem_cls = TestOptions
+
+    __test__ = False
+
+
+@goal_rule
+async def run_tests(
+    console: Console,
+    options: TestOptions,
+    runner: InteractiveRunner,
+    targets_with_origins: HydratedTargetsWithOrigins,
+    workspace: Workspace,
+    union_membership: UnionMembership,
+) -> Test:
+    test_runners: Iterable[Type[TestRunner]] = union_membership.union_rules[TestRunner]
+
+    if options.values.debug:
+        target_with_origin = targets_with_origins.expect_single()
+        adaptor_with_origin = TargetAdaptorWithOrigin.create(
+            target_with_origin.target.adaptor, target_with_origin.origin
+        )
+        address = adaptor_with_origin.adaptor.address
+        valid_test_runners = [
+            test_runner
+            for test_runner in test_runners
+            if test_runner.is_valid_target(adaptor_with_origin)
+        ]
+        if not valid_test_runners:
+            raise ValueError(f"No valid test runner for {address}.")
+        if len(valid_test_runners) > 1:
+            raise ValueError(
+                f"Multiple possible test runners for {address} "
+                f"({', '.join(test_runner.__name__ for test_runner in valid_test_runners)})."
+            )
+        test_runner = valid_test_runners[0]
+        logger.info(f"Starting test in debug mode: {address.reference()}")
+        request = await Get[TestDebugRequest](TestRunner, test_runner(adaptor_with_origin))
+        debug_result = runner.run_local_interactive_process(request.ipr)
+        return Test(debug_result.process_exit_code)
+
+    adaptors_with_origins = tuple(
+        TargetAdaptorWithOrigin.create(target_with_origin.target.adaptor, target_with_origin.origin)
+        for target_with_origin in targets_with_origins
+        if target_with_origin.target.adaptor.has_sources()
+    )
+
+    results = await MultiGet(
+        Get[AddressAndTestResult](
+            WrappedTestRunner, WrappedTestRunner(test_runner(adaptor_with_origin))
+        )
+        for adaptor_with_origin in adaptors_with_origins
+        for test_runner in test_runners
+        if test_runner.is_valid_target(adaptor_with_origin)
+    )
+
+    did_any_fail = False
+    for result in results:
+        if result.test_result.status == Status.FAILURE:
+            did_any_fail = True
+        if result.test_result.stdout:
+            console.write_stdout(
+                f"{result.address.reference()} stdout:\n{result.test_result.stdout}\n"
+            )
+        if result.test_result.stderr:
+            # NB: we write to stdout, rather than to stderr, to avoid potential issues interleaving
+            # the two streams.
+            console.write_stdout(
+                f"{result.address.reference()} stderr:\n{result.test_result.stderr}\n"
+            )
+
+    console.write_stdout("\n")
+
+    for result in results:
+        console.print_stdout(
+            f"{result.address.reference():80}.....{result.test_result.status.value:>10}"
+        )
+
+    if did_any_fail:
+        console.print_stderr(console.red("\nTests failed"))
+        exit_code = PANTS_FAILED_EXIT_CODE
+    else:
+        exit_code = PANTS_SUCCEEDED_EXIT_CODE
+
+    if options.values.run_coverage:
+        # TODO: consider warning if a user uses `--coverage` but the language backend does not
+        # provide coverage support. This might be too chatty to be worth doing?
+        results_with_coverage = [x for x in results if x.test_result.coverage_data is not None]
+        coverage_data_collections = itertools.groupby(
+            results_with_coverage,
+            lambda address_and_test_result: address_and_test_result.test_result.coverage_data.batch_cls,  # type: ignore[union-attr]
+        )
+
+        coverage_reports = await MultiGet(
+            Get[CoverageReport](
+                CoverageDataBatch, coverage_batch_cls(tuple(addresses_and_test_results))  # type: ignore[call-arg]
+            )
+            for coverage_batch_cls, addresses_and_test_results in coverage_data_collections
+        )
+
+        coverage_report_files = []
+        for report in coverage_reports:
+            report_file = report.materialize(console, workspace)
+            if report_file is not None:
+                coverage_report_files.append(report_file)
+
+        if coverage_report_files and options.values.open_coverage:
+            desktop.ui_open(console, runner, coverage_report_files)
+
+    return Test(exit_code)
+
+
+@rule
+async def coordinator_of_tests(wrapped_test_runner: WrappedTestRunner) -> AddressAndTestResult:
+    test_runner = wrapped_test_runner.runner
+    adaptor_with_origin = test_runner.adaptor_with_origin
+    adaptor = adaptor_with_origin.adaptor
+
+    # TODO(#6004): when streaming to live TTY, rely on V2 UI for this information. When not a
+    # live TTY, periodically dump heavy hitters to stderr. See
+    # https://github.com/pantsbuild/pants/issues/6004#issuecomment-492699898.
+    logger.info(f"Starting tests: {adaptor.address.reference()}")
+    # NB: This has the effect of "casting" a TargetAdaptorWithOrigin to a member of the TestTarget
+    # union. If the adaptor is not a member of the union, the engine will fail at runtime with a
+    # useful error message.
+    result = await Get[TestResult](TestRunner, test_runner)
+    logger.info(
+        f"Tests {'succeeded' if result.status == Status.SUCCESS else 'failed'}: "
+        f"{adaptor.address.reference()}"
+    )
+    return AddressAndTestResult(adaptor.address, result)
+
+
+def rules():
+    return [coordinator_of_tests, run_tests]

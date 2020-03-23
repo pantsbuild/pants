@@ -5,5 +5,5 @@ java_library(
   dependencies = [
     'testprojects/src/thrift/org/pantsbuild/testproject:thrift-java',
   ],
-  sources = rglobs('*.java')
+  sources = ['**/*.java'],
 )
