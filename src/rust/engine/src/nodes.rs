@@ -384,15 +384,18 @@ impl WrappedNode for ReadLink {
   type Item = LinkDest;
 
   fn run(self, context: Context) -> NodeFuture<LinkDest> {
-    context
-      .core
-      .vfs
-      .read_link(&self.0)
-      .boxed()
-      .compat()
-      .map(LinkDest)
-      .map_err(|e| throw(&format!("{}", e)))
-      .to_boxed()
+    Box::pin(async move {
+      let node = self;
+      let link_dest = context
+        .core
+        .vfs
+        .read_link(&node.0)
+        .await
+        .map_err(|e| throw(&format!("{}", e)))?;
+      Ok(LinkDest(link_dest))
+    })
+    .compat()
+    .to_boxed()
   }
 }
 
@@ -412,21 +415,22 @@ impl WrappedNode for DigestFile {
   type Item = hashing::Digest;
 
   fn run(self, context: Context) -> NodeFuture<hashing::Digest> {
-    context
-      .core
-      .vfs
-      .read_file(&self.0)
-      .boxed()
-      .compat()
-      .map_err(|e| throw(&format!("{}", e)))
-      .and_then(move |c| {
-        context
-          .core
-          .store()
-          .store_file_bytes(c.content, true)
-          .map_err(|e| throw(&e))
-      })
-      .to_boxed()
+    Box::pin(async move {
+      let content = context
+        .core
+        .vfs
+        .read_file(&self.0)
+        .map_err(|e| throw(&format!("{}", e)))
+        .await?;
+      context
+        .core
+        .store()
+        .store_file_bytes(content.content, true)
+        .map_err(|e| throw(&e))
+        .await
+    })
+    .compat()
+    .to_boxed()
   }
 }
 
@@ -447,15 +451,17 @@ impl WrappedNode for Scandir {
   type Item = Arc<DirectoryListing>;
 
   fn run(self, context: Context) -> NodeFuture<Arc<DirectoryListing>> {
-    context
-      .core
-      .vfs
-      .scandir(self.0)
-      .boxed()
-      .compat()
-      .map(Arc::new)
-      .map_err(|e| throw(&format!("{}", e)))
-      .to_boxed()
+    Box::pin(async move {
+      let directory_listing = context
+        .core
+        .vfs
+        .scandir(self.0)
+        .await
+        .map_err(|e| throw(&format!("{}", e)))?;
+      Ok(Arc::new(directory_listing))
+    })
+    .compat()
+    .to_boxed()
   }
 }
 
@@ -476,21 +482,23 @@ impl Snapshot {
     // Recursively expand PathGlobs into PathStats.
     // We rely on Context::expand tracking dependencies for scandirs,
     // and store::Snapshot::from_path_stats tracking dependencies for file digests.
-    context
-      .expand(path_globs)
-      .compat()
-      .map_err(|e| format!("{}", e))
-      .and_then(move |path_stats| {
-        store::Snapshot::from_path_stats(
-          context.core.store(),
-          &context,
-          path_stats,
-          WorkUnitStore::new(),
-        )
-        .map_err(move |e| format!("Snapshot failed: {}", e))
-      })
-      .map_err(|e| throw(&e))
-      .to_boxed()
+
+    Box::pin(async move {
+      let path_stats = context
+        .expand(path_globs)
+        .map_err(|e| throw(&format!("{}", e)))
+        .await?;
+      store::Snapshot::from_path_stats(
+        context.core.store(),
+        context.clone(),
+        path_stats,
+        WorkUnitStore::new(),
+      )
+      .map_err(|e| throw(&format!("Snapshot failed: {}", e)))
+      .await
+    })
+    .compat()
+    .to_boxed()
   }
 
   pub fn lift_path_globs(item: &Value) -> Result<PathGlobs, String> {
@@ -613,20 +621,23 @@ impl DownloadedFile {
       .map(str::to_owned)
       .ok_or_else(|| format!("Error getting the file name from the parsed URL: {}", url)));
 
-    core
-      .store()
-      .load_file_bytes_with(digest, |_| (), workunit_store)
-      .and_then(move |maybe_bytes| {
-        maybe_bytes
-          .map(|((), _metadata)| future::ok(()).to_boxed())
-          .unwrap_or_else(|| DownloadedFile::download(core.clone(), url, file_name.clone(), digest))
-          .and_then(move |()| {
-            core
-              .store()
-              .snapshot_of_one_file(PathBuf::from(file_name), digest, true)
-          })
-      })
-      .to_boxed()
+    Box::pin(async move {
+      let maybe_bytes = core
+        .store()
+        .load_file_bytes_with(digest, |_| (), workunit_store)
+        .await?;
+      if maybe_bytes.is_none() {
+        DownloadedFile::download(core.clone(), url, file_name.clone(), digest)
+          .compat()
+          .await?;
+      }
+      core
+        .store()
+        .snapshot_of_one_file(PathBuf::from(file_name), digest, true)
+        .await
+    })
+    .compat()
+    .to_boxed()
   }
 
   fn download(
@@ -718,11 +729,12 @@ impl DownloadedFile {
           .to_boxed();
         }
 
-        core
-          .store()
-          .store_file_bytes(buf, true)
-          .map(|_| ())
-          .to_boxed()
+        Box::pin(async move {
+          let _ = core.store().store_file_bytes(buf, true).await?;
+          Ok(())
+        })
+        .compat()
+        .to_boxed()
       })
       .to_boxed()
   }

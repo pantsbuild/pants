@@ -176,12 +176,10 @@ async fn merge_directories_two_files() {
 
   store
     .record_directory(&containing_roland.directory(), false)
-    .compat()
     .await
     .expect("Storing roland directory");
   store
     .record_directory(&containing_treats.directory(), false)
-    .compat()
     .await
     .expect("Storing treats directory");
 
@@ -208,12 +206,10 @@ async fn merge_directories_clashing_files() {
 
   store
     .record_directory(&containing_roland.directory(), false)
-    .compat()
     .await
     .expect("Storing roland directory");
   store
     .record_directory(&containing_wrong_roland.directory(), false)
-    .compat()
     .await
     .expect("Storing wrong roland directory");
 
@@ -242,12 +238,10 @@ async fn merge_directories_same_files() {
 
   store
     .record_directory(&containing_roland.directory(), false)
-    .compat()
     .await
     .expect("Storing roland directory");
   store
     .record_directory(&containing_roland_and_treats.directory(), false)
-    .compat()
     .await
     .expect("Storing treats directory");
 
@@ -315,7 +309,6 @@ async fn snapshot_merge_two_files() {
     .unwrap();
   let merged_root_directory = store
     .load_directory(merged.digest, WorkUnitStore::new())
-    .compat()
     .await
     .unwrap()
     .unwrap()
@@ -330,7 +323,6 @@ async fn snapshot_merge_two_files() {
     merged_child_dirnode.get_digest().into();
   let merged_child_directory = store
     .load_directory(merged_child_dirnode_digest.unwrap(), WorkUnitStore::new())
-    .compat()
     .await
     .unwrap()
     .unwrap()
@@ -393,7 +385,6 @@ async fn strip_empty_prefix() {
   let dir = TestDirectory::nested();
   store
     .record_directory(&dir.directory(), false)
-    .compat()
     .await
     .expect("Error storing directory");
 
@@ -411,12 +402,10 @@ async fn strip_non_empty_prefix() {
   let dir = TestDirectory::nested();
   store
     .record_directory(&dir.directory(), false)
-    .compat()
     .await
     .expect("Error storing directory");
   store
     .record_directory(&TestDirectory::containing_roland().directory(), false)
-    .compat()
     .await
     .expect("Error storing directory");
 
@@ -438,7 +427,6 @@ async fn strip_prefix_empty_subdir() {
   let dir = TestDirectory::containing_falcons_dir();
   store
     .record_directory(&dir.directory(), false)
-    .compat()
     .await
     .expect("Error storing directory");
 
@@ -470,7 +458,6 @@ async fn strip_subdir_not_in_store() {
   let dir = TestDirectory::nested();
   store
     .record_directory(&dir.directory(), false)
-    .compat()
     .await
     .expect("Error storing directory");
   let result = super::Snapshot::strip_prefix(
@@ -497,12 +484,10 @@ async fn strip_prefix_non_matching_file() {
   let child_dir = TestDirectory::containing_roland();
   store
     .record_directory(&dir.directory(), false)
-    .compat()
     .await
     .expect("Error storing directory");
   store
     .record_directory(&child_dir.directory(), false)
-    .compat()
     .await
     .expect("Error storing directory");
   let result = super::Snapshot::strip_prefix(
@@ -524,12 +509,10 @@ async fn strip_prefix_non_matching_dir() {
   let child_dir = TestDirectory::nested_dir_and_file();
   store
     .record_directory(&dir.directory(), false)
-    .compat()
     .await
     .expect("Error storing directory");
   store
     .record_directory(&child_dir.directory(), false)
-    .compat()
     .await
     .expect("Error storing directory");
   let result = super::Snapshot::strip_prefix(
@@ -550,12 +533,10 @@ async fn strip_subdir_not_in_dir() {
   let dir = TestDirectory::nested();
   store
     .record_directory(&dir.directory(), false)
-    .compat()
     .await
     .expect("Error storing directory");
   store
     .record_directory(&TestDirectory::containing_roland().directory(), false)
-    .compat()
     .await
     .expect("Error storing directory");
   let result = super::Snapshot::strip_prefix(

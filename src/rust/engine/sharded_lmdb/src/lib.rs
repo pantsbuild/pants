@@ -26,7 +26,6 @@
 #![allow(clippy::mutex_atomic)]
 
 use bytes::Bytes;
-use futures::future::BoxFuture;
 use hashing::{Fingerprint, FINGERPRINT_SIZE};
 use lmdb::{
   self, Database, DatabaseFlags, Environment, EnvironmentCopyFlags, EnvironmentFlags,
@@ -228,42 +227,42 @@ impl ShardedLmdb {
     self.lmdbs.values().cloned().collect()
   }
 
-  ///
-  /// TODO: See the note on references in ASYNC.md.
-  ///
-  pub fn store_bytes<'a, 'b>(
-    &'a self,
+  pub async fn store_bytes(
+    &self,
     fingerprint: Fingerprint,
     bytes: Bytes,
     initial_lease: bool,
-  ) -> BoxFuture<'b, Result<(), String>> {
+  ) -> Result<(), String> {
     let store = self.clone();
-    self.executor.spawn_blocking(move || {
-      let effective_key = VersionedFingerprint::new(fingerprint, ShardedLmdb::schema_version());
-      let (env, db, lease_database) = store.get(&fingerprint);
-      let put_res = env.begin_rw_txn().and_then(|mut txn| {
-        txn.put(db, &effective_key, &bytes, WriteFlags::NO_OVERWRITE)?;
-        if initial_lease {
-          store.lease(
-            lease_database,
-            &effective_key,
-            Self::default_lease_until_secs_since_epoch(),
-            &mut txn,
-          )?;
-        }
-        txn.commit()
-      });
+    self
+      .executor
+      .spawn_blocking(move || {
+        let effective_key = VersionedFingerprint::new(fingerprint, ShardedLmdb::schema_version());
+        let (env, db, lease_database) = store.get(&fingerprint);
+        let put_res = env.begin_rw_txn().and_then(|mut txn| {
+          txn.put(db, &effective_key, &bytes, WriteFlags::NO_OVERWRITE)?;
+          if initial_lease {
+            store.lease(
+              lease_database,
+              &effective_key,
+              Self::default_lease_until_secs_since_epoch(),
+              &mut txn,
+            )?;
+          }
+          txn.commit()
+        });
 
-      match put_res {
-        Ok(()) => Ok(()),
-        Err(lmdb::Error::KeyExist) => Ok(()),
-        Err(err) => Err(format!(
-          "Error storing versioned key {:?}: {}",
-          effective_key.to_hex(),
-          err
-        )),
-      }
-    })
+        match put_res {
+          Ok(()) => Ok(()),
+          Err(lmdb::Error::KeyExist) => Ok(()),
+          Err(err) => Err(format!(
+            "Error storing versioned key {:?}: {}",
+            effective_key.to_hex(),
+            err
+          )),
+        }
+      })
+      .await
   }
 
   fn lease(
@@ -288,36 +287,34 @@ impl ShardedLmdb {
     (now_since_epoch + time::Duration::from_secs(2 * 60 * 60)).as_secs()
   }
 
-  ///
-  /// TODO: See the note on references in ASYNC.md.
-  ///
-  pub fn load_bytes_with<
-    'a,
-    'b,
+  pub async fn load_bytes_with<
     T: Send + 'static,
     F: Fn(Bytes) -> Result<T, String> + Send + Sync + 'static,
   >(
-    &'a self,
+    &self,
     fingerprint: Fingerprint,
     f: F,
-  ) -> BoxFuture<'b, Result<Option<T>, String>> {
+  ) -> Result<Option<T>, String> {
     let store = self.clone();
     let effective_key = VersionedFingerprint::new(fingerprint, ShardedLmdb::schema_version());
-    self.executor.spawn_blocking(move || {
-      let (env, db, _) = store.get(&fingerprint);
-      let ro_txn = env
-        .begin_ro_txn()
-        .map_err(|err| format!("Failed to begin read transaction: {}", err));
-      ro_txn.and_then(|txn| match txn.get(db, &effective_key) {
-        Ok(bytes) => f(Bytes::from(bytes)).map(Some),
-        Err(lmdb::Error::NotFound) => Ok(None),
-        Err(err) => Err(format!(
-          "Error loading versioned key {:?}: {}",
-          effective_key.to_hex(),
-          err,
-        )),
+    self
+      .executor
+      .spawn_blocking(move || {
+        let (env, db, _) = store.get(&fingerprint);
+        let ro_txn = env
+          .begin_ro_txn()
+          .map_err(|err| format!("Failed to begin read transaction: {}", err));
+        ro_txn.and_then(|txn| match txn.get(db, &effective_key) {
+          Ok(bytes) => f(Bytes::from(bytes)).map(Some),
+          Err(lmdb::Error::NotFound) => Ok(None),
+          Err(err) => Err(format!(
+            "Error loading versioned key {:?}: {}",
+            effective_key.to_hex(),
+            err,
+          )),
+        })
       })
-    })
+      .await
   }
 
   #[allow(clippy::identity_conversion)] // False positive: https://github.com/rust-lang/rust-clippy/issues/3913

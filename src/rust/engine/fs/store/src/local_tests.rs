@@ -1,7 +1,6 @@
 use crate::local::ByteStore;
 use crate::{EntryType, ShrinkBehavior};
 use bytes::{BufMut, Bytes, BytesMut};
-use futures::compat::Future01CompatExt;
 use hashing::{Digest, Fingerprint};
 use std::path::Path;
 use tempfile::TempDir;
@@ -17,7 +16,6 @@ async fn save_file() {
   assert_eq!(
     new_store(dir.path())
       .store_bytes(EntryType::File, testdata.bytes(), false,)
-      .compat()
       .await,
     Ok(testdata.digest())
   );
@@ -30,13 +28,11 @@ async fn save_file_is_idempotent() {
   let testdata = TestData::roland();
   new_store(dir.path())
     .store_bytes(EntryType::File, testdata.bytes(), false)
-    .compat()
     .await
     .unwrap();
   assert_eq!(
     new_store(dir.path())
       .store_bytes(EntryType::File, testdata.bytes(), false,)
-      .compat()
       .await,
     Ok(testdata.digest())
   );
@@ -72,7 +68,6 @@ async fn record_and_load_directory_proto() {
   assert_eq!(
     new_store(dir.path())
       .store_bytes(EntryType::Directory, testdir.bytes(), false,)
-      .compat()
       .await,
     Ok(testdir.digest())
   );
@@ -101,7 +96,6 @@ async fn file_is_not_directory_proto() {
 
   new_store(dir.path())
     .store_bytes(EntryType::File, testdata.bytes(), false)
-    .compat()
     .await
     .unwrap();
 
@@ -118,7 +112,6 @@ async fn garbage_collect_nothing_to_do() {
   let bytes = Bytes::from("0123456789");
   store
     .store_bytes(EntryType::File, bytes.clone(), false)
-    .compat()
     .await
     .expect("Error storing");
   store
@@ -148,7 +141,6 @@ async fn garbage_collect_nothing_to_do_with_lease() {
   let bytes = Bytes::from("0123456789");
   store
     .store_bytes(EntryType::File, bytes.clone(), false)
-    .compat()
     .await
     .expect("Error storing");
   let file_fingerprint = Fingerprint::from_hex_string(
@@ -186,12 +178,10 @@ async fn garbage_collect_remove_one_of_two_files_no_leases() {
   let digest_2 = Digest(fingerprint_2, 10);
   store
     .store_bytes(EntryType::File, bytes_1.clone(), false)
-    .compat()
     .await
     .expect("Error storing");
   store
     .store_bytes(EntryType::File, bytes_2.clone(), false)
-    .compat()
     .await
     .expect("Error storing");
   store
@@ -234,12 +224,10 @@ async fn garbage_collect_remove_both_files_no_leases() {
   let digest_2 = Digest(fingerprint_2, 10);
   store
     .store_bytes(EntryType::File, bytes_1.clone(), false)
-    .compat()
     .await
     .expect("Error storing");
   store
     .store_bytes(EntryType::File, bytes_2.clone(), false)
-    .compat()
     .await
     .expect("Error storing");
   store
@@ -269,12 +257,10 @@ async fn garbage_collect_remove_one_of_two_directories_no_leases() {
   let store = new_store(dir.path());
   store
     .store_bytes(EntryType::Directory, testdir.bytes(), false)
-    .compat()
     .await
     .expect("Error storing");
   store
     .store_bytes(EntryType::Directory, other_testdir.bytes(), false)
-    .compat()
     .await
     .expect("Error storing");
   store
@@ -309,13 +295,11 @@ async fn garbage_collect_remove_file_with_leased_directory() {
 
   store
     .store_bytes(EntryType::Directory, testdir.bytes(), true)
-    .compat()
     .await
     .expect("Error storing");
 
   store
     .store_bytes(EntryType::File, testdata.bytes(), false)
-    .compat()
     .await
     .expect("Error storing");
 
@@ -344,13 +328,11 @@ async fn garbage_collect_remove_file_while_leased_file() {
 
   store
     .store_bytes(EntryType::Directory, testdir.bytes(), false)
-    .compat()
     .await
     .expect("Error storing");
   let fourty_chars = TestData::fourty_chars();
   store
     .store_bytes(EntryType::File, fourty_chars.bytes(), true)
-    .compat()
     .await
     .expect("Error storing");
 
@@ -380,18 +362,15 @@ async fn garbage_collect_fail_because_too_many_leases() {
 
   store
     .store_bytes(EntryType::Directory, testdir.bytes(), true)
-    .compat()
     .await
     .expect("Error storing");
   store
     .store_bytes(EntryType::File, fourty_chars.bytes(), true)
-    .compat()
     .await
     .expect("Error storing");
 
   store
     .store_bytes(EntryType::File, TestData::roland().bytes(), false)
-    .compat()
     .await
     .expect("Error storing");
 
@@ -417,7 +396,6 @@ async fn write_one_meg(store: &ByteStore, byte: u8) {
   }
   store
     .store_bytes(EntryType::File, bytes.freeze(), false)
-    .compat()
     .await
     .expect("Error storing");
 }
@@ -458,7 +436,6 @@ async fn entry_type_for_file() {
   let store = new_store(dir.path());
   store
     .store_bytes(EntryType::Directory, testdir.bytes(), false)
-    .compat()
     .await
     .expect("Error storing");
   prime_store_with_file_bytes(&store, testdata.bytes()).await;
@@ -476,7 +453,6 @@ async fn entry_type_for_directory() {
   let store = new_store(dir.path());
   store
     .store_bytes(EntryType::Directory, testdir.bytes(), false)
-    .compat()
     .await
     .expect("Error storing");
   prime_store_with_file_bytes(&store, testdata.bytes()).await;
@@ -494,7 +470,6 @@ async fn entry_type_for_missing() {
   let store = new_store(dir.path());
   store
     .store_bytes(EntryType::Directory, testdir.bytes(), false)
-    .compat()
     .await
     .expect("Error storing");
   prime_store_with_file_bytes(&store, testdata.bytes()).await;
@@ -512,7 +487,6 @@ async fn empty_file_is_known() {
   assert_eq!(
     store
       .load_bytes_with(EntryType::File, empty_file.digest(), |b| b)
-      .compat()
       .await,
     Ok(Some(empty_file.bytes())),
   )
@@ -526,7 +500,6 @@ async fn empty_directory_is_known() {
   assert_eq!(
     store
       .load_bytes_with(EntryType::Directory, empty_dir.digest(), |b| b)
-      .compat()
       .await,
     Ok(Some(empty_dir.bytes())),
   )
@@ -560,16 +533,12 @@ pub async fn load_bytes(
   entry_type: EntryType,
   digest: Digest,
 ) -> Result<Option<Bytes>, String> {
-  store
-    .load_bytes_with(entry_type, digest, |b| b)
-    .compat()
-    .await
+  store.load_bytes_with(entry_type, digest, |b| b).await
 }
 
 async fn prime_store_with_file_bytes(store: &ByteStore, bytes: Bytes) -> Digest {
   store
     .store_bytes(EntryType::File, bytes, false)
-    .compat()
     .await
     .expect("Error storing file bytes")
 }

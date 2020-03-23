@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use futures::future::{self, BoxFuture, TryFutureExt};
+use futures::future::{self, TryFutureExt};
 use glob::Pattern;
 use log::warn;
 use parking_lot::Mutex;
@@ -34,11 +34,8 @@ pub trait GlobMatching<E: Display + Send + Sync + 'static>: VFS<E> {
   ///
   /// Recursively expands PathGlobs into PathStats while applying excludes.
   ///
-  /// TODO: See the note on references in ASYNC.md.
-  ///
-  fn expand<'a, 'b>(&'a self, path_globs: PathGlobs) -> BoxFuture<'b, Result<Vec<PathStat>, E>> {
-    let fs = self.clone();
-    Box::pin(async move { GlobMatchingImplementation::expand(&fs, path_globs).await })
+  async fn expand(&self, path_globs: PathGlobs) -> Result<Vec<PathStat>, E> {
+    GlobMatchingImplementation::expand(self, path_globs).await
   }
 }
 

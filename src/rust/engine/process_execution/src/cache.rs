@@ -6,7 +6,8 @@ use std::sync::Arc;
 
 use bincode;
 use bytes::Bytes;
-use futures::future::TryFutureExt;
+use futures::compat::Future01CompatExt;
+use futures::future::{self as future03, TryFutureExt};
 use futures01::{future, Future};
 use log::{debug, warn};
 use protobuf::Message;
@@ -112,39 +113,41 @@ impl CommandRunner {
     use bazel_protos::remote_execution::ExecuteResponse;
     let file_store = self.file_store.clone();
 
-    self
-      .process_execution_store
-      .load_bytes_with(fingerprint.clone(), move |bytes| {
-        let decoded: PlatformAndResponseBytes = bincode::deserialize(&bytes[..])
-          .map_err(|err| format!("Could not deserialize platform and response: {}", err))?;
+    let command_runner = self.clone();
+    Box::pin(async move {
+      let maybe_execute_response: Option<(ExecuteResponse, Platform)> = command_runner
+        .process_execution_store
+        .load_bytes_with(fingerprint.clone(), move |bytes| {
+          let decoded: PlatformAndResponseBytes = bincode::deserialize(&bytes[..])
+            .map_err(|err| format!("Could not deserialize platform and response: {}", err))?;
 
-        let platform = decoded.platform;
+          let platform = decoded.platform;
 
-        let mut execute_response = ExecuteResponse::new();
-        execute_response
-          .merge_from_bytes(&decoded.response_bytes)
-          .map_err(|e| format!("Invalid ExecuteResponse: {:?}", e))?;
+          let mut execute_response = ExecuteResponse::new();
+          execute_response
+            .merge_from_bytes(&decoded.response_bytes)
+            .map_err(|e| format!("Invalid ExecuteResponse: {:?}", e))?;
 
-        Ok((execute_response, platform))
-      })
-      .compat()
-      .and_then(
-        move |maybe_execute_response: Option<(ExecuteResponse, Platform)>| {
-          if let Some((execute_response, platform)) = maybe_execute_response {
-            crate::remote::populate_fallible_execution_result(
-              file_store,
-              execute_response,
-              vec![],
-              context.workunit_store,
-              platform,
-            )
-            .map(Some)
-            .to_boxed()
-          } else {
-            future::ok(None).to_boxed()
-          }
-        },
-      )
+          Ok((execute_response, platform))
+        })
+        .await?;
+
+      if let Some((execute_response, platform)) = maybe_execute_response {
+        crate::remote::populate_fallible_execution_result(
+          file_store,
+          execute_response,
+          vec![],
+          context.workunit_store,
+          platform,
+        )
+        .map(Some)
+        .compat()
+        .await
+      } else {
+        Ok(None)
+      }
+    })
+    .compat()
   }
 
   fn store(
@@ -170,40 +173,38 @@ impl CommandRunner {
 
     let platform = result.platform;
 
-    self
-      .file_store
-      .store_file_bytes(result.stdout.clone(), true)
-      .join(
-        self
-          .file_store
-          .store_file_bytes(result.stderr.clone(), true),
+    let command_runner = self.clone();
+    let stdout = result.stdout.clone();
+    let stderr = result.stderr.clone();
+    Box::pin(async move {
+      let (stdout_digest, stderr_digest) = future03::try_join(
+        command_runner.file_store.store_file_bytes(stdout, true),
+        command_runner.file_store.store_file_bytes(stderr, true),
       )
-      .and_then(move |(stdout_digest, stderr_digest)| {
-        let action_result = execute_response.mut_result();
-        action_result.set_stdout_digest((&stdout_digest).into());
-        action_result.set_stderr_digest((&stderr_digest).into());
-        execute_response
-          .write_to_bytes()
-          .map_err(|err| format!("Error serializing execute process result to cache: {}", err))
+      .await?;
+      let action_result = execute_response.mut_result();
+      action_result.set_stdout_digest((&stdout_digest).into());
+      action_result.set_stderr_digest((&stderr_digest).into());
+      let response_bytes = execute_response
+        .write_to_bytes()
+        .map_err(|err| format!("Error serializing execute process result to cache: {}", err))?;
+
+      let bytes_to_store = bincode::serialize(&PlatformAndResponseBytes {
+        platform,
+        response_bytes,
       })
-      .and_then(move |response_bytes: Vec<u8>| {
-        let bytes_to_store = bincode::serialize(&PlatformAndResponseBytes {
-          platform,
-          response_bytes,
-        })
-        .map(Bytes::from)
-        .map_err(|err| {
-          format!(
-            "Error serializing platform and execute process result: {}",
-            err
-          )
-        });
-        future::result(bytes_to_store)
-      })
-      .and_then(move |bytes| {
-        process_execution_store
-          .store_bytes(fingerprint, bytes, false)
-          .compat()
-      })
+      .map(Bytes::from)
+      .map_err(|err| {
+        format!(
+          "Error serializing platform and execute process result: {}",
+          err
+        )
+      })?;
+
+      process_execution_store
+        .store_bytes(fingerprint, bytes_to_store, false)
+        .await
+    })
+    .compat()
   }
 }

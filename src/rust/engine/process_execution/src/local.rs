@@ -88,19 +88,22 @@ impl CommandRunner {
       GlobExpansionConjunction::AllMatch,
     ));
 
-    posix_fs
-      .expand(output_globs)
-      .compat()
-      .map_err(|err| format!("Error expanding output globs: {}", err))
-      .and_then(|path_stats| {
-        Snapshot::from_path_stats(
-          store.clone(),
-          &OneOffStoreFileByDigest::new(store, posix_fs),
-          path_stats,
-          WorkUnitStore::new(),
-        )
-      })
-      .to_boxed()
+    let store = store.clone();
+    Box::pin(async move {
+      let path_stats = posix_fs
+        .expand(output_globs)
+        .map_err(|err| format!("Error expanding output globs: {}", err))
+        .await?;
+      Snapshot::from_path_stats(
+        store.clone(),
+        OneOffStoreFileByDigest::new(store, posix_fs),
+        path_stats,
+        WorkUnitStore::new(),
+      )
+      .await
+    })
+    .compat()
+    .to_boxed()
   }
 }
 

@@ -28,13 +28,13 @@
 // just the one minor call as unsafe, than to mark the whole function as unsafe which may hide
 // other unsafeness.
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
-
 // This crate is a wrapper around the engine crate which exposes a C interface which we can access
 // from Python using cffi.
 //
 // The engine crate contains some C interop which we use, notably externs which are functions and
 // types from Python which we can read from our Rust. This particular wrapper crate is just for how
 // we expose ourselves back to Python.
+#![type_length_limit = "1744838"]
 
 mod cffi_externs;
 
@@ -43,7 +43,7 @@ use engine::{
   externs, nodes, Core, ExecutionRequest, ExecutionTermination, Function, Handle, Key, Params,
   RootResult, Rule, Scheduler, Session, Tasks, TypeId, Types, Value,
 };
-use futures::compat::Future01CompatExt;
+use futures::future::{self as future03, TryFutureExt};
 use futures01::{future, Future};
 use hashing::{Digest, EMPTY_DIGEST};
 use log::{error, warn, Log};
@@ -907,26 +907,28 @@ pub extern "C" fn capture_snapshots(
 
   with_scheduler(scheduler_ptr, |scheduler| {
     let core = scheduler.core.clone();
+    let snapshot_futures = path_globs_and_roots
+      .into_iter()
+      .map(|(path_globs, root, digest_hint)| {
+        let core = core.clone();
+        let workunit_store = workunit_store.clone();
+        async move {
+          let snapshot = store::Snapshot::capture_snapshot_from_arbitrary_root(
+            core.store(),
+            core.executor.clone(),
+            root,
+            path_globs,
+            digest_hint,
+            workunit_store,
+          )
+          .await?;
+          let res: Result<_, String> = Ok(nodes::Snapshot::store_snapshot(&core, &snapshot));
+          res
+        }
+      })
+      .collect::<Vec<_>>();
     core.executor.block_on(
-      future::join_all(
-        path_globs_and_roots
-          .into_iter()
-          .map(|(path_globs, root, digest_hint)| {
-            let core = core.clone();
-            store::Snapshot::capture_snapshot_from_arbitrary_root(
-              core.store(),
-              core.executor.clone(),
-              root,
-              path_globs,
-              digest_hint,
-              workunit_store.clone(),
-            )
-            .map(move |snapshot| nodes::Snapshot::store_snapshot(&core, &snapshot))
-          })
-          .collect::<Vec<_>>(),
-      )
-      .map(|values| externs::store_tuple(&values))
-      .compat(),
+      future03::try_join_all(snapshot_futures).map_ok(|values| externs::store_tuple(&values)),
     )
   })
   .into()
@@ -956,10 +958,11 @@ pub extern "C" fn merge_directories(
     scheduler
       .core
       .executor
-      .block_on(
-        store::Snapshot::merge_directories(scheduler.core.store(), digests, workunit_store)
-          .compat(),
-      )
+      .block_on(store::Snapshot::merge_directories(
+        scheduler.core.store(),
+        digests,
+        workunit_store,
+      ))
       .map(|dir| nodes::Snapshot::store_directory(&scheduler.core, &dir))
       .into()
   })
