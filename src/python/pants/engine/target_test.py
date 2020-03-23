@@ -136,6 +136,13 @@ def test_primitive_field_hydration_is_eager() -> None:
 def test_has_fields() -> None:
     empty_union_membership = UnionMembership({})
     tgt = HaskellTarget({}, address=Address.parse(":lib"))
+
+    assert tgt.field_types == (HaskellGhcExtensions, HaskellSources)
+    assert tgt.class_field_types(union_membership=empty_union_membership) == (
+        HaskellGhcExtensions,
+        HaskellSources,
+    )
+
     assert tgt.has_fields([]) is True
     assert HaskellTarget.class_has_fields([], union_membership=empty_union_membership) is True
 
@@ -232,6 +239,12 @@ def test_add_custom_fields() -> None:
     assert tgt.core_fields == (HaskellGhcExtensions, HaskellSources)
     assert tgt.plugin_fields == (CustomField,)
     assert tgt.has_field(CustomField) is True
+
+    assert HaskellTarget.class_field_types(union_membership=union_membership) == (
+        HaskellGhcExtensions,
+        HaskellSources,
+        CustomField,
+    )
     assert HaskellTarget.class_has_field(CustomField, union_membership=union_membership) is True
 
     assert tgt[CustomField].value is True
