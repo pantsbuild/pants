@@ -3,6 +3,7 @@ use super::{EntryType, ShrinkBehavior, GIGABYTES};
 use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::Bytes;
 use digest::{Digest as DigestTrait, FixedOutput};
+use futures::future::{FutureExt, TryFutureExt};
 use futures01::{future, Future};
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use lmdb::Error::NotFound;
@@ -267,17 +268,23 @@ impl ByteStore {
     self
       .inner
       .executor
-      .spawn_on_io_pool(future::lazy(move || {
+      .spawn_blocking(move || {
         let fingerprint = {
           let mut hasher = Sha256::default();
           hasher.input(&bytes);
           Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice())
         };
         Ok(Digest(fingerprint, bytes.len()))
-      }))
+      })
+      .boxed()
+      .compat()
       .and_then(move |digest| {
         future::done(dbs)
-          .and_then(move |db| db.store_bytes(digest.0, bytes2, initial_lease))
+          .and_then(move |db| {
+            db.store_bytes(digest.0, bytes2, initial_lease)
+              .boxed()
+              .compat()
+          })
           .map(move |()| digest)
       })
   }
@@ -306,7 +313,7 @@ impl ByteStore {
                 } else {
                     Err(format!("Got hash collision reading from store - digest {:?} was requested, but retrieved bytes with that fingerprint had length {}. Congratulations, you may have broken sha256! Underlying bytes: {:?}", digest, bytes.len(), bytes))
                 }
-            }).to_boxed()
+            }).boxed().compat().to_boxed()
   }
 
   pub fn all_digests(&self, entry_type: EntryType) -> Result<Vec<Digest>, String> {

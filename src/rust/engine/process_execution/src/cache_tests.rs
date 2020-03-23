@@ -2,6 +2,7 @@ use crate::{
   CommandRunner as CommandRunnerTrait, Context, ExecuteProcessRequest,
   ExecuteProcessRequestMetadata, FallibleExecuteProcessResult, PlatformConstraint,
 };
+use futures::compat::Future01CompatExt;
 use hashing::EMPTY_DIGEST;
 use sharded_lmdb::ShardedLmdb;
 use std::collections::{BTreeMap, BTreeSet};
@@ -12,14 +13,15 @@ use std::time::Duration;
 use store::Store;
 use tempfile::TempDir;
 use testutil::data::TestData;
+use tokio::runtime::Handle;
 
 struct RoundtripResults {
   uncached: Result<FallibleExecuteProcessResult, String>,
   maybe_cached: Result<FallibleExecuteProcessResult, String>,
 }
 
-fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
-  let runtime = task_executor::Executor::new();
+async fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
+  let runtime = task_executor::Executor::new(Handle::current());
   let work_dir = TempDir::new().unwrap();
   let store_dir = TempDir::new().unwrap();
   let store = Store::local_only(runtime.clone(), store_dir.path()).unwrap();
@@ -62,7 +64,10 @@ fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
     is_nailgunnable: false,
   };
 
-  let local_result = runtime.block_on(local.run(request.clone().into(), Context::default()));
+  let local_result = local
+    .run(request.clone().into(), Context::default())
+    .compat()
+    .await;
 
   let cache_dir = TempDir::new().unwrap();
   let caching = crate::cache::CommandRunner {
@@ -81,7 +86,7 @@ fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
     },
   };
 
-  let uncached_result = runtime.block_on(caching.run(request.clone().into(), Context::default()));
+  let uncached_result = caching.run(request.clone().into(), Context::default()).compat().await;
 
   assert_eq!(local_result, uncached_result);
 
@@ -89,7 +94,10 @@ fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
   // fail due to a FileNotFound error. So, If the second run succeeds, that implies that the
   // cache was successfully used.
   std::fs::remove_file(&script_path).unwrap();
-  let maybe_cached_result = runtime.block_on(caching.run(request.into(), Context::default()));
+  let maybe_cached_result = caching
+    .run(request.into(), Context::default())
+    .compat()
+    .await;
 
   RoundtripResults {
     uncached: uncached_result,
@@ -97,15 +105,15 @@ fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
   }
 }
 
-#[test]
-fn cache_success() {
-  let results = run_roundtrip(0);
+#[tokio::test]
+async fn cache_success() {
+  let results = run_roundtrip(0).await;
   assert_eq!(results.uncached, results.maybe_cached);
 }
 
-#[test]
-fn failures_not_cached() {
-  let results = run_roundtrip(1);
+#[tokio::test]
+async fn failures_not_cached() {
+  let results = run_roundtrip(1).await;
   assert_ne!(results.uncached, results.maybe_cached);
   assert_eq!(results.uncached.unwrap().exit_code, 1);
   assert_eq!(results.maybe_cached.unwrap().exit_code, 127); // aka the return code for file not found

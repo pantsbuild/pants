@@ -1,16 +1,18 @@
 use crate::nailgun::{CommandRunner, ARGS_TO_START_NAILGUN, NAILGUN_MAIN_CLASS};
 use crate::{ExecuteProcessRequest, ExecuteProcessRequestMetadata, PlatformConstraint};
+use futures::compat::Future01CompatExt;
 use hashing::EMPTY_DIGEST;
 use std::fs::read_link;
 use std::os::unix::fs::symlink;
 use std::path::PathBuf;
 use store::Store;
 use tempfile::TempDir;
+use tokio::runtime::Handle;
 use workunit_store::WorkUnitStore;
 
 fn mock_nailgun_runner(workdir_base: Option<PathBuf>) -> CommandRunner {
   let store_dir = TempDir::new().unwrap();
-  let executor = task_executor::Executor::new();
+  let executor = task_executor::Executor::new(Handle::current());
   let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
   let local_runner =
     crate::local::CommandRunner::new(store, executor.clone(), std::env::temp_dir(), true);
@@ -48,8 +50,8 @@ fn mock_nailgunnable_request(jdk_home: Option<PathBuf>) -> ExecuteProcessRequest
   }
 }
 
-#[test]
-fn get_workdir_creates_directory_if_it_doesnt_exist() {
+#[tokio::test]
+async fn get_workdir_creates_directory_if_it_doesnt_exist() {
   let mock_workdir_base = unique_temp_dir(std::env::temp_dir(), None)
     .path()
     .to_owned();
@@ -63,8 +65,8 @@ fn get_workdir_creates_directory_if_it_doesnt_exist() {
   assert!(target_workdir.exists());
 }
 
-#[test]
-fn get_workdir_returns_the_workdir_when_it_exists() {
+#[tokio::test]
+async fn get_workdir_returns_the_workdir_when_it_exists() {
   let mock_workdir_base = unique_temp_dir(std::env::temp_dir(), None)
     .path()
     .to_owned();
@@ -82,8 +84,8 @@ fn get_workdir_returns_the_workdir_when_it_exists() {
   assert!(target_workdir.exists());
 }
 
-#[test]
-fn creating_nailgun_server_request_updates_the_cli() {
+#[tokio::test]
+async fn creating_nailgun_server_request_updates_the_cli() {
   let req = super::construct_nailgun_server_request(
     &NAILGUN_MAIN_CLASS.to_string(),
     Vec::new(),
@@ -94,26 +96,25 @@ fn creating_nailgun_server_request_updates_the_cli() {
   assert_eq!(req.argv[1..], ARGS_TO_START_NAILGUN);
 }
 
-#[test]
-fn creating_nailgun_client_request_removes_jdk_home() {
+#[tokio::test]
+async fn creating_nailgun_client_request_removes_jdk_home() {
   let original_req = mock_nailgunnable_request(Some(PathBuf::from("some/path")));
   let req = super::construct_nailgun_client_request(original_req, "".to_string(), vec![]);
   assert_eq!(req.jdk_home, None);
 }
 
-#[test]
-fn nailgun_name_is_the_main_class() {
+#[tokio::test]
+async fn nailgun_name_is_the_main_class() {
   let main_class = "my.main.class".to_string();
   let name = super::CommandRunner::calculate_nailgun_name(&main_class);
   assert_eq!(name, format!("nailgun_server_{}", main_class));
 }
 
-fn materialize_with_jdk(
+async fn materialize_with_jdk(
   runner: &CommandRunner,
   dir: PathBuf,
   jdk_path: PathBuf,
 ) -> Result<(), String> {
-  let executor = task_executor::Executor::new();
   let materializer = super::NailgunPool::materialize_workdir_for_server(
     runner.inner.store.clone(),
     dir,
@@ -121,11 +122,11 @@ fn materialize_with_jdk(
     EMPTY_DIGEST,
     WorkUnitStore::new(),
   );
-  executor.block_on(materializer)
+  materializer.compat().await
 }
 
-#[test]
-fn materializing_workdir_for_server_creates_a_link_for_the_jdk() {
+#[tokio::test]
+async fn materializing_workdir_for_server_creates_a_link_for_the_jdk() {
   let workdir_base_tempdir = unique_temp_dir(std::env::temp_dir(), None);
   let workdir_base = workdir_base_tempdir.path().to_owned();
   let mock_jdk_dir = unique_temp_dir(std::env::temp_dir(), None);
@@ -140,7 +141,7 @@ fn materializing_workdir_for_server_creates_a_link_for_the_jdk() {
 
   // Assert that the materialization was successful
   let materialization_result =
-    materialize_with_jdk(&runner, workdir_for_server.clone(), mock_jdk_path.clone());
+    materialize_with_jdk(&runner, workdir_for_server.clone(), mock_jdk_path.clone()).await;
   assert_eq!(materialization_result, Ok(()));
 
   // Assert that the symlink points to the requested jdk
@@ -150,8 +151,8 @@ fn materializing_workdir_for_server_creates_a_link_for_the_jdk() {
   assert_eq!(materialized_jdk.unwrap(), mock_jdk_path);
 }
 
-#[test]
-fn materializing_workdir_for_server_replaces_jdk_link_if_a_different_one_is_requested() {
+#[tokio::test]
+async fn materializing_workdir_for_server_replaces_jdk_link_if_a_different_one_is_requested() {
   let workdir_base_tempdir = unique_temp_dir(std::env::temp_dir(), None);
   let workdir_base = workdir_base_tempdir.path().to_owned();
 
@@ -174,7 +175,7 @@ fn materializing_workdir_for_server_replaces_jdk_link_if_a_different_one_is_requ
 
   // Trigger materialization of the nailgun server workdir
   let materialization_result =
-    materialize_with_jdk(&runner, workdir_for_server, requested_mock_jdk_path.clone());
+    materialize_with_jdk(&runner, workdir_for_server, requested_mock_jdk_path.clone()).await;
   assert!(materialization_result.is_ok());
 
   // Assert that the symlink points to the requested jdk, and not the original one
