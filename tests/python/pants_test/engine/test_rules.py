@@ -798,7 +798,6 @@ class RuleGraphTest(TestBase):
                 {fmt_non_param_edge(b_from_suba, C, return_func=RuleFormatRequest(suba_from_c))}
                 {fmt_param_edge(C, C, RuleFormatRequest(suba_from_c))}
                 {fmt_param_edge(SubA, SubA, via_func=RuleFormatRequest(a, gets=[("B", "C")]), return_func=RuleFormatRequest(b_from_suba, C))}
-                {fmt_param_edge(SubA, SubA, RuleFormatRequest(b_from_suba))}
                 }}
                 """
             ).strip(),
@@ -1165,6 +1164,6 @@ class RuleGraphTest(TestBase):
 
     def create_subgraph(self, requested_product, rules, subject, validate=True):
         scheduler = create_scheduler(rules + _suba_root_rules, validate=validate)
-        return "\n".join(scheduler.rule_subgraph_visualization(type(subject), requested_product))
+        return "\n".join(scheduler.rule_subgraph_visualization([type(subject)], requested_product))
 
     assert_equal_with_printing = assert_equal_with_printing
