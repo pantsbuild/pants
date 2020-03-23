@@ -29,7 +29,7 @@ junit_tests(
 
 java_library(
   name='common',
-  sources=globs('ConsoleRunnerImplTestSetup.java'),
+  sources=['ConsoleRunnerImplTestSetup.java'],
   dependencies=[
     '3rdparty:guava',
     '3rdparty:junit',

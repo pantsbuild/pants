@@ -30,7 +30,7 @@ java_library(
 
 java_library(
   name='security-manager',
-  sources=globs('impl/security/*.java'),
+  sources=['impl/security/*.java'],
   dependencies=[
     '3rdparty:junit',
     'src/java/org/pantsbuild/junit/security',
