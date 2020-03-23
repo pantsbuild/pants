@@ -22,6 +22,6 @@ workunit_store = { path = "../workunit_store" }
 
 [build-dependencies]
 build_utils = { path = "../build_utils" }
-cbindgen = "0.8.6"
+cbindgen = "0.13.2"
 cc = "1.0"
 walkdir = "2"
