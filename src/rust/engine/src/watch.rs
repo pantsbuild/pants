@@ -35,7 +35,7 @@ use crate::nodes::NodeKey;
 /// Then we wouldn't have to mock out a Graph object in watch_tests.rs. This will probably
 /// only be possible when we remove watchman invalidation, when the one code path for invaldation will be
 /// the notify background thread.
-/// Potential impl here: https://github.com/pantsbuild/pants/pull/9318#discussion_r396005978 
+/// Potential impl here: https://github.com/pantsbuild/pants/pull/9318#discussion_r396005978
 ///
 pub struct InvalidationWatcher {
   watcher: Arc<Mutex<RecommendedWatcher>>,
@@ -133,14 +133,22 @@ impl InvalidationWatcher {
     let watcher = self.watcher.clone();
     let path2 = path.clone();
     let executor = self.executor.clone();
-    watcher.lock()
-    .map_err(move |()| notify::Error::new(notify::ErrorKind::Generic(format!("Could not get lock on notify watcher to watch path {:?}", path2))))
-    .and_then(move |mut watcher_lock| {
-        executor
-        .spawn_on_io_pool(
-            watcher_lock.watch(path, RecursiveMode::NonRecursive).into_future()
-          )
-      }).to_boxed()
+    watcher
+      .lock()
+      .map_err(move |()| {
+        notify::Error::new(notify::ErrorKind::Generic(format!(
+          "Could not get lock on notify watcher to watch path {:?}",
+          path2
+        )))
+      })
+      .and_then(move |mut watcher_lock| {
+        executor.spawn_on_io_pool(
+          watcher_lock
+            .watch(path, RecursiveMode::NonRecursive)
+            .into_future(),
+        )
+      })
+      .to_boxed()
   }
 
   ///

@@ -69,7 +69,7 @@ function _build_native_code() {
     "${REPO_ROOT}/build-support/bin/native/cargo" build ${MODE_FLAG} \
       --manifest-path "${NATIVE_ROOT}/Cargo.toml" -p engine_cffi
   ) || die
-  echo "${NATIVE_ROOT}/target/${MODE}/libengine_cffi.${LIB_EXTENSION}"
+  echo "${CARGO_TARGET_DIR}/${MODE}/libengine_cffi.${LIB_EXTENSION}"
 }
 
 function bootstrap_native_code() {
@@ -79,6 +79,13 @@ function bootstrap_native_code() {
   local engine_version_hdr="engine_version: ${native_engine_version}"
   local target_binary="${NATIVE_ENGINE_CACHE_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
   local target_binary_metadata="${target_binary}.metadata"
+  if [[ -d "${NATIVE_ROOT}/target" ]]
+  then
+    die "The old native code cache ${NATIVE_ROOT}/target has been replaced
+with ${CARGO_TARGET_DIR}\n
+Please remove the old directory with: \`rm -rf ${NATIVE_ROOT}/target\`"
+  fi
+
   if [[ ! -f "${target_binary}" || ! -f "${target_binary_metadata}" ]]
   then
     local -r native_binary="$(_build_native_code)"

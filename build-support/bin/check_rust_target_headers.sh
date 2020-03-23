@@ -2,6 +2,10 @@
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 
+# exports the CARGO_TARGET_DIR location
+# shellcheck source=build-support/common.sh
+source "${REPO_ROOT}/build-support/common.sh"
+
 cargo="${REPO_ROOT}/build-support/bin/native/cargo"
 
 "${cargo}" ensure-installed --package cargo-ensure-prefix --version 0.1.3

@@ -13,7 +13,6 @@ use std::{self, fmt};
 use futures01::future::{self, Future};
 use futures01::Stream;
 use url::Url;
-//use log::warn;
 
 use crate::context::{Context, Core};
 use crate::core::{throw, Failure, Key, Params, TypeId, Value};
@@ -1059,7 +1058,6 @@ impl Node for NodeKey {
     let context2 = context.clone();
     let maybe_watch = {
       if let Some(path) = self.fs_subject() {
-       //warn!("for node {} waching fs_subject {:?}", self, path);
         let abs_path = context.core.build_root.join(path);
         context.core.watcher.watch(abs_path)
       } else {
@@ -1067,36 +1065,36 @@ impl Node for NodeKey {
       }
     };
     maybe_watch
-    // This will cause a node to fail if we cannot watch its fs_subject. That doesn't
-    // seem too farfetched, but there may be unknown consequences. We can
-    // ignore notify::ErrorKind::PathNotFound if needed.
-    .map_err(|e| Failure::FileWatch(format!("{:?}", e)))
-    .and_then(|()| {
-      future::lazy(|| {
-        if let Some(span_id) = maybe_span_id {
-          set_parent_id(span_id);
-        }
-        match self {
-          NodeKey::DigestFile(n) => n.run(context).map(NodeResult::from).to_boxed(),
-          NodeKey::DownloadedFile(n) => n.run(context).map(NodeResult::from).to_boxed(),
-          NodeKey::MultiPlatformExecuteProcess(n) => {
-            n.run(context).map(NodeResult::from).to_boxed()
+      // This will cause a node to fail if we cannot watch its fs_subject. That doesn't
+      // seem too farfetched, but there may be unknown consequences. We can
+      // ignore notify::ErrorKind::PathNotFound if needed.
+      .map_err(|e| Failure::FileWatch(format!("{:?}", e)))
+      .and_then(|()| {
+        future::lazy(|| {
+          if let Some(span_id) = maybe_span_id {
+            set_parent_id(span_id);
           }
-          NodeKey::ReadLink(n) => n.run(context).map(NodeResult::from).to_boxed(),
-          NodeKey::Scandir(n) => n.run(context).map(NodeResult::from).to_boxed(),
-          NodeKey::Select(n) => n.run(context).map(NodeResult::from).to_boxed(),
-          NodeKey::Snapshot(n) => n.run(context).map(NodeResult::from).to_boxed(),
-          NodeKey::Task(n) => n.run(context).map(NodeResult::from).to_boxed(),
-        }
+          match self {
+            NodeKey::DigestFile(n) => n.run(context).map(NodeResult::from).to_boxed(),
+            NodeKey::DownloadedFile(n) => n.run(context).map(NodeResult::from).to_boxed(),
+            NodeKey::MultiPlatformExecuteProcess(n) => {
+              n.run(context).map(NodeResult::from).to_boxed()
+            }
+            NodeKey::ReadLink(n) => n.run(context).map(NodeResult::from).to_boxed(),
+            NodeKey::Scandir(n) => n.run(context).map(NodeResult::from).to_boxed(),
+            NodeKey::Select(n) => n.run(context).map(NodeResult::from).to_boxed(),
+            NodeKey::Snapshot(n) => n.run(context).map(NodeResult::from).to_boxed(),
+            NodeKey::Task(n) => n.run(context).map(NodeResult::from).to_boxed(),
+          }
+        })
+        .inspect(move |_: &NodeResult| {
+          if let Some(started_workunit) = maybe_started_workunit {
+            let workunit: WorkUnit = started_workunit.finish();
+            context2.session.workunit_store().add_workunit(workunit)
+          }
+        })
       })
-      .inspect(move |_: &NodeResult| {
-        if let Some(started_workunit) = maybe_started_workunit {
-          let workunit: WorkUnit = started_workunit.finish();
-          context2.session.workunit_store().add_workunit(workunit)
-        }
-      })
-    })
-    .to_boxed()
+      .to_boxed()
   }
 
   fn digest(res: NodeResult) -> Option<hashing::Digest> {
