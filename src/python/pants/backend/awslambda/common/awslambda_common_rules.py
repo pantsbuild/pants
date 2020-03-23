@@ -1,6 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import os
 from dataclasses import dataclass
 
 from pants.build_graph.address import Address
@@ -49,7 +50,6 @@ async def create_awslambda(
     workspace: Workspace,
 ) -> AWSLambdaGoal:
     with options.line_oriented(console) as print_stdout:
-        print_stdout(f"Generating AWS lambdas in `./{distdir.relpath}`")
         awslambdas = await MultiGet(
             Get[CreatedAWSLambda](Address, address) for address in addresses
         )
@@ -60,7 +60,7 @@ async def create_awslambda(
             DirectoryToMaterialize(merged_digest, path_prefix=str(distdir.relpath))
         )
         for path in result.output_paths:
-            print_stdout(f"Wrote {path}")
+            print_stdout(f"Wrote {os.path.relpath(path)}")
     return AWSLambdaGoal(exit_code=0)
 
 
