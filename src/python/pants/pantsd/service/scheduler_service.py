@@ -233,8 +233,12 @@ class SchedulerService(PantsService):
                 self._logger.warning(e)
 
             iterations -= 1
-            if self._state.is_terminating or self._loop_condition.wait(timeout=1):
-                break
+            while (
+                iterations
+                and not self._state.is_terminating
+                and not self._loop_condition.wait(timeout=1)
+            ):
+                continue
 
         return exit_code
 
