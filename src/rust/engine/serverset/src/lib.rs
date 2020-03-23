@@ -26,11 +26,12 @@
 #![allow(clippy::mutex_atomic)]
 
 use boxfuture::{BoxFuture, Boxable};
+use futures::future::{FutureExt, TryFutureExt};
 use futures01::{future, Future};
 use parking_lot::Mutex;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tokio_timer::Delay;
+use tokio::time::delay_until;
 
 mod retry;
 pub use crate::retry::Retry;
@@ -319,8 +320,11 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
       .unwrap();
 
     let serverset = self.clone();
-    Delay::new(instant)
-      .map_err(|err| format!("Error delaying for serverset: {}", err))
+    delay_until(instant.into())
+      .unit_error()
+      .boxed()
+      .compat()
+      .map_err(|()| "Error delaying for serverset.".to_string())
       .and_then(move |()| serverset.next())
       .to_boxed()
   }
