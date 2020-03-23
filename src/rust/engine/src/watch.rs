@@ -9,10 +9,10 @@ use std::time::Duration;
 
 use boxfuture::{BoxFuture, Boxable};
 use crossbeam_channel::{self, Receiver, RecvTimeoutError, TryRecvError};
-use futures01 as futures;
+use futures01::future::{Future, IntoFuture};
+use futures_locks::Mutex;
 use log::{debug, error, info, warn};
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
-use parking_lot::Mutex;
 use task_executor::Executor;
 
 use graph::{Graph, InvalidationResult};
@@ -131,12 +131,16 @@ impl InvalidationWatcher {
   ///
   pub fn watch(&self, path: PathBuf) -> BoxFuture<(), notify::Error> {
     let watcher = self.watcher.clone();
-    self
-      .executor
-      .spawn_on_io_pool(futures::lazy(move || {
-        watcher.lock().watch(path, RecursiveMode::NonRecursive)
-      }))
-      .to_boxed()
+    let path2 = path.clone();
+    let executor = self.executor.clone();
+    watcher.lock()
+    .map_err(move |()| notify::Error::new(notify::ErrorKind::Generic(format!("Could not get lock on notify watcher to watch path {:?}", path2))))
+    .and_then(move |mut watcher_lock| {
+        executor
+        .spawn_on_io_pool(
+            watcher_lock.watch(path, RecursiveMode::NonRecursive).into_future()
+          )
+      }).to_boxed()
   }
 
   ///

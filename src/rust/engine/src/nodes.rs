@@ -13,7 +13,7 @@ use std::{self, fmt};
 use futures01::future::{self, Future};
 use futures01::Stream;
 use url::Url;
-use log::warn;
+//use log::warn;
 
 use crate::context::{Context, Core};
 use crate::core::{throw, Failure, Key, Params, TypeId, Value};
@@ -1059,7 +1059,7 @@ impl Node for NodeKey {
     let context2 = context.clone();
     let maybe_watch = {
       if let Some(path) = self.fs_subject() {
-        warn!("for node {} waching fs_subject {:?}", self, path);
+       //warn!("for node {} waching fs_subject {:?}", self, path);
         let abs_path = context.core.build_root.join(path);
         context.core.watcher.watch(abs_path)
       } else {

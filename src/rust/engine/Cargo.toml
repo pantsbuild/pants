@@ -81,6 +81,7 @@ default-members = [
 ]
 
 [dependencies]
+async_semaphore = { path = "async_semaphore" }
 boxfuture = { path = "boxfuture" }
 bytes = "0.4.5"
 concrete_time = { path = "concrete_time" }
@@ -88,6 +89,7 @@ crossbeam-channel = "0.3"
 fnv = "1.0.5"
 fs = { path = "fs" }
 futures01 = { package = "futures", version = "0.1" }
+futures-locks = "0.3.0"
 graph = { path = "graph" }
 hashing = { path = "hashing" }
 indexmap = "1.0.2"
