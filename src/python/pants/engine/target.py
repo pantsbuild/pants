@@ -587,7 +587,7 @@ class UnimplementedField(PrimitiveField, metaclass=ABCMeta):
     """
 
     value: Optional[Any]
-    default = None
+    default: ClassVar[Optional[Any]] = None
 
 
 class BoolField(PrimitiveField, metaclass=ABCMeta):
@@ -606,7 +606,7 @@ class BoolField(PrimitiveField, metaclass=ABCMeta):
 
 class IntField(PrimitiveField, metaclass=ABCMeta):
     value: Optional[int]
-    default = None
+    default: ClassVar[Optional[int]] = None
 
     @classmethod
     def compute_value(cls, raw_value: Optional[int], *, address: Address) -> Optional[int]:
@@ -620,7 +620,7 @@ class IntField(PrimitiveField, metaclass=ABCMeta):
 
 class FloatField(PrimitiveField, metaclass=ABCMeta):
     value: Optional[float]
-    default = None
+    default: ClassVar[Optional[float]] = None
 
     @classmethod
     def compute_value(cls, raw_value: Optional[int], *, address: Address) -> Optional[float]:
@@ -634,7 +634,7 @@ class FloatField(PrimitiveField, metaclass=ABCMeta):
 
 class StringField(PrimitiveField, metaclass=ABCMeta):
     value: Optional[str]
-    default = None
+    default: ClassVar[Optional[str]] = None
 
     @classmethod
     def compute_value(cls, raw_value: Optional[str], *, address: Address) -> Optional[str]:
@@ -648,7 +648,7 @@ class StringField(PrimitiveField, metaclass=ABCMeta):
 
 class StringSequenceField(PrimitiveField, metaclass=ABCMeta):
     value: Optional[Tuple[str, ...]]
-    default = None
+    default: ClassVar[Optional[Tuple[str, ...]]] = None
 
     @classmethod
     def compute_value(
@@ -679,7 +679,7 @@ class StringOrStringSequenceField(PrimitiveField, metaclass=ABCMeta):
     """
 
     value: Optional[Tuple[str, ...]]
-    default = None
+    default: ClassVar[Optional[Tuple[str, ...]]] = None
 
     @classmethod
     def compute_value(
@@ -703,7 +703,31 @@ class StringOrStringSequenceField(PrimitiveField, metaclass=ABCMeta):
 
 
 class Tags(StringSequenceField):
+    """Arbitrary strings that you can use to describe a target.
+
+    For example, you may tag some test targets with 'integration_test' so that you could run
+    `./pants --tags='integration_test' test ::` to only run on targets with that tag.
+    """
+
     alias = "tags"
+
+
+# TODO(#9388): remove
+class DescriptionField(StringField):
+    """A human-readable description of the target (soon to be deprecated)."""
+
+    alias = "description"
+
+
+# TODO(#9388): remove
+class NoCacheField(BoolField):
+    """If True, don't store results for this target in the V1 cache (soon to be deprecated)."""
+
+    alias = "no_cache"
+    default = False
+
+
+COMMON_TARGET_FIELDS = (Tags, DescriptionField, NoCacheField)
 
 
 # TODO: figure out what support looks like for this. This already gets hydrated into a
@@ -711,6 +735,8 @@ class Tags(StringSequenceField):
 #  back to being a List[str] and we only hydrate into Addresses when necessary? Alternatively, does
 #  hydration mean getting back `Targets`?
 class Dependencies(AsyncField):
+    """Addresses to other targets that this target depends on, e.g. `['src/python/project:lib']`."""
+
     alias = "dependencies"
     sanitized_raw_value: Optional[Tuple[Address, ...]]
     default = None
@@ -732,14 +758,11 @@ class Dependencies(AsyncField):
         raise NotImplementedError("Hydration of the Dependencies field is not yet implemented.")
 
 
-COMMON_TARGET_FIELDS = (Dependencies, Tags)
-
-
 class Sources(AsyncField):
     """A list of files and globs that belong to this target.
 
-    You can ignore files/globs by prefixing them with `!`. Example: `sources=['*.py',
-    '!ignore.py']`.
+    Paths are relative to the BUILD file's directory. You can ignore files/globs by prefixing them
+    with `!`. Example: `sources=['example.py', 'test_*.py', '!test_ignore.py']`.
     """
 
     alias = "sources"
