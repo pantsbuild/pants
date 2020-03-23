@@ -15,7 +15,7 @@ use futures01::Stream;
 use url::Url;
 
 use crate::context::{Context, Core};
-use crate::core::{throw, Failure, Key, Params, TypeId, Value};
+use crate::core::{throw, Failure, Function, Key, Params, TypeId, Value};
 use crate::externs;
 use crate::intrinsics;
 use crate::selectors;
@@ -767,6 +767,7 @@ impl Task {
     params: &Params,
     entry: &Arc<rule_graph::Entry<Rule>>,
     gets: Vec<externs::Get>,
+    func: Function,
   ) -> NodeFuture<Vec<Value>> {
     let get_futures = gets
       .into_iter()
@@ -806,8 +807,10 @@ impl Task {
                   }
                 }
                 _ => throw(&format!(
-                  "{:?} did not declare a dependency on {:?}",
-                  entry, dependency_key
+                  "Expected {:?} but got {:?} instead. See {:?}",
+                  get.product,
+                  get.subject,
+                  func.name()
                 )),
               })
           });
@@ -830,6 +833,7 @@ impl Task {
     params: Params,
     entry: Arc<rule_graph::Entry<Rule>>,
     generator: Value,
+    func: Function,
   ) -> NodeFuture<Value> {
     future::loop_fn(Value::from(externs::none()), move |input| {
       let context = context.clone();
@@ -838,12 +842,12 @@ impl Task {
       future::result(externs::generator_send(&generator, &input)).and_then(move |response| {
         match response {
           externs::GeneratorResponse::Get(get) => {
-            Self::gen_get(&context, &params, &entry, vec![get])
+            Self::gen_get(&context, &params, &entry, vec![get], func)
               .map(|vs| future::Loop::Continue(vs.into_iter().next().unwrap()))
               .to_boxed()
           }
           externs::GeneratorResponse::GetMulti(gets) => {
-            Self::gen_get(&context, &params, &entry, gets)
+            Self::gen_get(&context, &params, &entry, gets, func)
               .map(|vs| future::Loop::Continue(externs::store_tuple(&vs)))
               .to_boxed()
           }
@@ -896,7 +900,9 @@ impl WrappedNode for Task {
       })
       .then(move |task_result| match task_result {
         Ok(val) => match externs::get_type_for(&val) {
-          t if t == context.core.types.coroutine => Self::generate(context, params, entry, val),
+          t if t == context.core.types.coroutine => {
+            Self::generate(context, params, entry, val, func)
+          }
           t if t == product => ok(val),
           _ => err(throw(&format!(
             "{:?} returned a result value that did not satisfy its constraints: {:?}",
