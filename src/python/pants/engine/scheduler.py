@@ -310,6 +310,7 @@ class Scheduler:
         finally:
             self._native.lib.nodes_destroy(raw_roots)
 
+        print(f"REMAINING RUNTIME EXCEPTIONS: {remaining_runtime_exceptions_to_capture}")
         if remaining_runtime_exceptions_to_capture:
             raise ExecutionError(
                 "Internal logic error in scheduler: expected elements in "

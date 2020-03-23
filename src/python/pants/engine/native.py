@@ -520,7 +520,11 @@ class _FFISpecification(object):
             response.tag = self._lib.Throw
             val = e
             val._formatted_exc = traceback.format_exc()
-            response.throw = (c.to_value(val),)
+            try:
+                response.throw = (c.to_value(val),)
+            except Exception as x:
+                print(f"response.throw exception: {x}")
+                raise x
 
         return response[0]
 

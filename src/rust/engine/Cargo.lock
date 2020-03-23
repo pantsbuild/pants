@@ -316,19 +316,18 @@ dependencies = [
 
 [[package]]
 name = "cbindgen"
-version = "0.8.7"
+version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "proc-macro2 0.4.30 (registry+https://github.com/rust-lang/crates.io-index)",
- "quote 0.6.13 (registry+https://github.com/rust-lang/crates.io-index)",
+ "proc-macro2 1.0.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "quote 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.104 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_derive 1.0.104 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.48 (registry+https://github.com/rust-lang/crates.io-index)",
- "syn 0.15.44 (registry+https://github.com/rust-lang/crates.io-index)",
+ "syn 1.0.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "tempfile 3.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "toml 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "toml 0.5.6 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -726,7 +725,7 @@ name = "engine_cffi"
 version = "0.0.1"
 dependencies = [
  "build_utils 0.0.1",
- "cbindgen 0.8.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cbindgen 0.13.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "cc 1.0.50 (registry+https://github.com/rust-lang/crates.io-index)",
  "engine 0.0.1",
  "futures 0.1.29 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3748,7 +3747,7 @@ dependencies = [
 "checksum bytesize 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "716960a18f978640f25101b5cbf1c6f6b0d3192fab36a2d98ca96f0ecbe41010"
 "checksum c2-chacha 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "214238caa1bf3a496ec3392968969cab8549f96ff30652c9e56885329315f6bb"
 "checksum cargo 0.34.0 (registry+https://github.com/rust-lang/crates.io-index)" = "f7e90b5f23ae79af3ec0e4dc670349167fd47d6c1134f139cf0627817a4792bf"
-"checksum cbindgen 0.8.7 (registry+https://github.com/rust-lang/crates.io-index)" = "1f861ef68cabbb271d373a7795014052bff37edce22c620d95e395e8719d7dc5"
+"checksum cbindgen 0.13.2 (registry+https://github.com/rust-lang/crates.io-index)" = "2db2df1ebc842c41fd2c4ae5b5a577faf63bd5151b953db752fc686812bee318"
 "checksum cc 1.0.50 (registry+https://github.com/rust-lang/crates.io-index)" = "95e28fa049fda1c330bcf9d723be7663a899c4679724b34c81e9f5a326aab8cd"
 "checksum cfg-if 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)" = "4785bdd1c96b2a846b2bd7cc02e86b6b3dbf14e7e53446c4f54c92a361040822"
 "checksum chrono 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)" = "31850b4a4d6bae316f7a09e691c944c28299298837edc0a03f755618c23cbc01"
