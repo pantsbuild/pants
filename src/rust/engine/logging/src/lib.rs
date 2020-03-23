@@ -47,7 +47,7 @@ macro_rules! debug_log {
 
 pub mod logger;
 
-pub use logger::{get_destination, set_destination, Destination};
+pub use logger::{get_destination, scope_task_destination, set_thread_destination, Destination};
 
 pub type Logger = logger::Logger;
 

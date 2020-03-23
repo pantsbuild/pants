@@ -26,10 +26,13 @@
 #![allow(clippy::mutex_atomic)]
 
 use concrete_time::TimeSpan;
-use futures01::task_local;
 use parking_lot::Mutex;
 use rand::thread_rng;
 use rand::Rng;
+use tokio::task_local;
+
+use std::cell::RefCell;
+use std::future::Future;
 use std::sync::Arc;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -125,26 +128,40 @@ fn hex_16_digit_string(number: u64) -> String {
   format!("{:016.x}", number)
 }
 
-task_local! {
-  static TASK_PARENT_ID: Mutex<Option<String>> = Mutex::new(None)
+thread_local! {
+  static THREAD_PARENT_ID: RefCell<Option<String>> = RefCell::new(None)
 }
 
-pub fn set_parent_id(parent_id: String) {
-  if futures01::task::is_in_task() {
-    TASK_PARENT_ID.with(|task_parent_id| {
-      *task_parent_id.lock() = Some(parent_id);
-    })
-  }
+task_local! {
+  static TASK_PARENT_ID: Option<String>;
+}
+
+///
+/// Set the current parent_id for a Thread, but _not_ for a Task. Tasks must always be spawned
+/// by callers using the `scope_task_parent_id` helper (generally via task_executor::Executor.)
+///
+pub fn set_thread_parent_id(parent_id: Option<String>) {
+  THREAD_PARENT_ID.with(|thread_parent_id| {
+    *thread_parent_id.borrow_mut() = parent_id;
+  })
+}
+
+///
+/// Propagate the current parent_id to a Future representing a newly spawned Task. Usage of
+/// this method should mostly be contained to task_executor::Executor.
+///
+pub async fn scope_task_parent_id<F>(parent_id: Option<String>, f: F) -> F::Output
+where
+  F: Future,
+{
+  TASK_PARENT_ID.scope(parent_id, f).await
 }
 
 pub fn get_parent_id() -> Option<String> {
-  if futures01::task::is_in_task() {
-    TASK_PARENT_ID.with(|task_parent_id| {
-      let task_parent_id = task_parent_id.lock();
-      (*task_parent_id).clone()
-    })
+  if let Ok(Some(parent_id)) = TASK_PARENT_ID.try_with(|parent_id| parent_id.clone()) {
+    Some(parent_id)
   } else {
-    None
+    THREAD_PARENT_ID.with(|parent_id| parent_id.borrow().clone())
   }
 }
 

@@ -1,13 +1,19 @@
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../../.. && pwd -P)"
-
 # Defines:
 # + CACHE_ROOT: The pants cache directory, ie: ~/.cache/pants.
 # Exposes:
 # + die: Exit in a failure state and optionally log an error message to the console.
-# + fingerprint_data: Fingerprints the data on stdin.
-
 # shellcheck source=build-support/common.sh
 source "${REPO_ROOT}/build-support/common.sh"
+
+# Defines:
+# + NATIVE_ROOT: The Rust code directory, ie: src/rust/engine.
+# + MODE: Whether to run in debug or release mode.
+# + MODE_FLAG: The string to pass to Cargo to determine if we're in debug or release mode.
+# Exposes:
+# + calculate_current_hash: Generate a stable hash to determine if we need to rebuild the engine.
+# shellcheck source=build-support/bin/native/calculate_engine_hash.sh
+source "${REPO_ROOT}/build-support/bin/native/calculate_engine_hash.sh"
 
 KERNEL=$(uname -s | tr '[:upper:]' '[:lower:]')
 case "${KERNEL}" in
@@ -22,41 +28,9 @@ case "${KERNEL}" in
     ;;
 esac
 
-readonly NATIVE_ROOT="${REPO_ROOT}/src/rust/engine"
 readonly NATIVE_ENGINE_BINARY="native_engine.so"
 readonly NATIVE_ENGINE_RESOURCE="${REPO_ROOT}/src/python/pants/engine/${NATIVE_ENGINE_BINARY}"
-
-# N.B. Set $MODE to "debug" for faster builds.
-readonly MODE="${MODE:-release}"
-case "$MODE" in
-  debug) MODE_FLAG="" ;;
-  *) MODE_FLAG="--release" ;;
-esac
-
 readonly NATIVE_ENGINE_CACHE_DIR=${CACHE_ROOT}/bin/native-engine
-
-function calculate_current_hash() {
-  # Cached and unstaged files, with ignored files excluded.
-  # NB: We fork a subshell because one or both of `ls-files`/`hash-object` are
-  # sensitive to the CWD, and the `--work-tree` option doesn't seem to resolve that.
-  #
-  # Assumes we're in the venv that will be used to build the native engine.
-  (
-   cd "${REPO_ROOT}" || exit 1
-   (echo "${MODE_FLAG}"
-    echo "${RUST_TOOLCHAIN}"
-    uname
-    python --version 2>&1
-    git ls-files --cached --others --exclude-standard \
-     "${NATIVE_ROOT}" \
-     "${REPO_ROOT}/rust-toolchain" \
-     "${REPO_ROOT}/src/python/pants/engine/native.py" \
-     "${REPO_ROOT}/build-support/bin/native" \
-     "${REPO_ROOT}/3rdparty/python/requirements.txt" \
-   | grep -v -E -e "/BUILD$" -e "/[^/]*\.md$" \
-   | git hash-object --stdin-paths) | fingerprint_data
-  )
-}
 
 function _build_native_code() {
   # Builds the native code, and echos the path of the built binary.

@@ -428,6 +428,10 @@ def osx_shard(
     return setup
 
 
+# See https://docs.travis-ci.com/user/conditions-v1.
+SKIP_RUST_CONDITION = r"commit_message !~ /\[ci skip-rust-tests\]/"
+SKIP_JVM_CONDITION = r"commit_message !~ /\[ci skip-jvm-tests\]/"
+
 # ----------------------------------------------------------------------
 # Bootstrap engine
 # ----------------------------------------------------------------------
@@ -527,9 +531,10 @@ def clippy() -> Dict:
         **linux_fuse_shard(),
         "name": "Clippy (Rust linter)",
         "stage": Stage.test.value,
-        "before_script": ["ulimit -c unlimited", "ulimit -n 8192",],
+        "before_script": ["ulimit -c unlimited", "ulimit -n 8192"],
         "script": ["./build-support/bin/ci.py --clippy"],
         "env": ["CACHE_NAME=clippy"],
+        "if": SKIP_RUST_CONDITION,
     }
 
 
@@ -540,6 +545,7 @@ def cargo_audit() -> Dict:
         "stage": Stage.test_cron.value,
         "script": ["./build-support/bin/ci.py --cargo-audit"],
         "env": ["CACHE_NAME=cargo_audit"],
+        "if": SKIP_RUST_CONDITION,
     }
 
 
@@ -670,6 +676,7 @@ _RUST_TESTS_BASE: Dict = {
     "stage": Stage.test.value,
     "before_script": ["ulimit -c unlimited", "ulimit -n 8192"],
     "script": ["./build-support/bin/ci.py --rust-tests"],
+    "if": SKIP_RUST_CONDITION,
 }
 
 
@@ -770,6 +777,7 @@ def jvm_tests(python_version: PythonVersion) -> Dict:
         "script": [
             f"./build-support/bin/ci.py --jvm-tests --python-version {python_version.decimal}"
         ],
+        "if": SKIP_JVM_CONDITION,
     }
     safe_append(shard, "env", f"CACHE_NAME=jvm_tests.py{python_version.number}")
     return shard
@@ -870,7 +878,7 @@ def main() -> None:
             "env": {"global": GLOBAL_ENV_VARS},
             "stages": Stage.all_entries(),
             "deploy": DEPLOY_SETTINGS,
-            "matrix": {
+            "jobs": {
                 "include": [
                     *[bootstrap_linux(v) for v in PythonVersion],
                     *[bootstrap_osx(v) for v in PythonVersion],
