@@ -29,7 +29,7 @@ env:
   - AWS_ACCESS_KEY_ID__TO_BE_REEXPORTED_ON_DEPLOYS=AKIAV6A6G7RQWPRUWIXR
   - secure: hFVAQGLVkexzTd3f9NF+JoG1dE+CPICKqOcdvQYv8+YB2rwwqu0/J6MnqKUZSmec4AM4ZvyPUBIHnSw8aMJysYs+GZ6iG/8ZRRmdbmo2WBPbSZ+ThRZxx/F6AjmovUmf8Zt366ZAZXpc9NHKREkTUGl6UL7FFe9+ouVnb90asdw=
   - RUST_BACKTRACE="all"
-matrix:
+jobs:
   include:
   - addons:
       apt:
@@ -478,6 +478,7 @@ matrix:
     dist: xenial
     env:
     - CACHE_NAME=clippy
+    if: commit_message !~ /\[ci skip-rust-tests\]/
     name: Clippy (Rust linter)
     os: linux
     python:
@@ -501,6 +502,7 @@ matrix:
     dist: xenial
     env:
     - CACHE_NAME=cargo_audit
+    if: commit_message !~ /\[ci skip-rust-tests\]/
     name: Cargo audit
     os: linux
     python:
@@ -2087,6 +2089,7 @@ matrix:
     dist: xenial
     env:
     - CACHE_NAME=rust_tests.linux
+    if: commit_message !~ /\[ci skip-rust-tests\]/
     name: Rust tests - Linux
     os: linux
     python:
@@ -2122,6 +2125,7 @@ matrix:
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
     - CACHE_NAME=rust_tests.osx
+    if: commit_message !~ /\[ci skip-rust-tests\]/
     name: Rust tests - OSX
     os: osx
     osx_image: xcode8.3
@@ -2331,6 +2335,7 @@ matrix:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=jvm_tests.py36
+    if: commit_message !~ /\[ci skip-jvm-tests\]/
     language: python
     name: JVM tests (Python 3.6)
     os: linux
@@ -2392,6 +2397,7 @@ matrix:
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
     - CACHE_NAME=jvm_tests.py37
+    if: commit_message !~ /\[ci skip-jvm-tests\]/
     language: python
     name: JVM tests (Python 3.7)
     os: linux

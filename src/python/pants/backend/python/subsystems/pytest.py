@@ -1,7 +1,7 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Tuple
+from typing import Optional, Tuple, cast
 
 from pants.option.custom_types import shell_str
 from pants.subsystem.subsystem import Subsystem
@@ -63,3 +63,15 @@ class PyTest(Subsystem):
     def get_requirement_strings(self) -> Tuple[str, ...]:
         """Returns a tuple of requirements-style strings for Pytest and Pytest plugins."""
         return (self.options.version, *self.options.pytest_plugins)
+
+    @property
+    def timeouts_enabled(self) -> bool:
+        return cast(bool, self.options.timeouts)
+
+    @property
+    def timeout_default(self) -> Optional[int]:
+        return cast(Optional[int], self.options.timeout_default)
+
+    @property
+    def timeout_maximum(self) -> Optional[int]:
+        return cast(Optional[int], self.options.timeout_maximum)
