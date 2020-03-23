@@ -257,7 +257,7 @@ class SchedulerWithNestedRaiseTest(TestBase):
     def test_get_type_match_failure(self):
         """Test that Get(...)s are now type-checked during rule execution, to allow for union
         types."""
-        expected_msg = 'Exception: Expected A but got A() instead. See "pants_test.engine.test_scheduler:132:a_typecheck_fail_test"'
+        expected_msg = 'Exception: Unable to transfrom from A() to A. See "pants_test.engine.test_scheduler:132:a_typecheck_fail_test"'
         with assert_execution_error(self, expected_msg):
             # `a_typecheck_fail_test` above expects `wrapper.inner` to be a `B`.
             self.request_single_product(A, Params(TypeCheckFailWrapper(A())))
