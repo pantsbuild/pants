@@ -115,14 +115,15 @@ class Timeout(IntField):
 
     alias = "timeout"
 
-    def hydrate(self, raw_value: Optional[int], *, address: Address) -> Optional[int]:
-        hydrated_value = super().hydrate(raw_value, address=address)
-        if hydrated_value is not None and hydrated_value < 1:
+    @classmethod
+    def compute_value(cls, raw_value: Optional[int], *, address: Address) -> Optional[int]:
+        value = super().compute_value(raw_value, address=address)
+        if value is not None and value < 1:
             raise InvalidFieldException(
                 f"The value for the `timeout` field in target {address} must be > 0, but was "
-                f"{raw_value}."
+                f"{value}."
             )
-        return raw_value
+        return value
 
     def calculate_from_global_options(self, pytest: PyTest) -> Optional[int]:
         """Determine the timeout (in seconds) after applying global `pytest` options."""

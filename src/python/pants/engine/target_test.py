@@ -21,20 +21,22 @@ from pants.util.ordered_set import OrderedSet
 class FortranExtensions(PrimitiveField):
     alias: ClassVar = "fortran_extensions"
     value: Tuple[str, ...]
+    default: ClassVar[Tuple[str, ...]] = ()
 
-    def hydrate(self, raw_value: Optional[Iterable[str]], *, address: Address) -> Tuple[str, ...]:
-        if raw_value is None:
-            return ()
+    def compute_value(
+        self, raw_value: Optional[Iterable[str]], *, address: Address
+    ) -> Tuple[str, ...]:
+        value_or_default = super().compute_value(raw_value, address=address)
         # Add some arbitrary validation to test that hydration/validation works properly.
         bad_extensions = [
-            extension for extension in raw_value if not extension.startswith("Fortran")
+            extension for extension in value_or_default if not extension.startswith("Fortran")
         ]
         if bad_extensions:
             raise InvalidFieldException(
                 f"The {repr(self.alias)} field in target {address} expects all elements to be "
                 f"prefixed by `Fortran`. Received {bad_extensions}.",
             )
-        return tuple(raw_value)
+        return tuple(value_or_default)
 
 
 class UnrelatedField(BoolField):
@@ -45,11 +47,16 @@ class UnrelatedField(BoolField):
 class FortranSources(AsyncField):
     alias: ClassVar = "sources"
     sanitized_raw_value: Optional[Tuple[str, ...]]
+    default = None
 
-    def sanitize_raw_value(self, raw_value: Optional[Iterable[str]]) -> Optional[Tuple[str, ...]]:
-        if raw_value is None:
+    @classmethod
+    def sanitize_raw_value(
+        cls, raw_value: Optional[Iterable[str]], address: Address
+    ) -> Optional[Tuple[str, ...]]:
+        value_or_default = super().sanitize_raw_value(raw_value, address=address)
+        if value_or_default is None:
             return None
-        return tuple(ensure_str_list(raw_value))
+        return tuple(ensure_str_list(value_or_default))
 
     @final
     @property
@@ -272,11 +279,11 @@ def test_override_preexisting_field_via_new_target() -> None:
         banned_extensions: ClassVar = ("FortranBannedExt",)
         default_extensions: ClassVar = ("FortranCustomExt",)
 
-        def hydrate(
+        def compute_value(
             self, raw_value: Optional[Iterable[str]], *, address: Address
         ) -> Tuple[str, ...]:
             # Ensure that we avoid certain problematic extensions and always use some defaults.
-            specified_extensions = super().hydrate(raw_value, address=address)
+            specified_extensions = super().compute_value(raw_value, address=address)
             banned = [
                 extension
                 for extension in specified_extensions
