@@ -13,9 +13,9 @@ from pants.util.objects import get_first_line_of_docstring
 class TargetTypesOptions(LineOriented, GoalSubsystem):
     """List all the registered target types, including custom plugin types."""
 
-    # TODO: consider renaming this to to `target-types` or even a more general goal like
+    # TODO: drop the `2` once we settle on this name. Consider a more general goal like
     #  `symbols --type=targets`.
-    name = "targets2"
+    name = "target-types2"
 
     @classmethod
     def register_options(cls, register):
