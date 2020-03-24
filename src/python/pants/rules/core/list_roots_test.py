@@ -90,7 +90,6 @@ class AllRootsTest(TestBase):
         )
 
         source_root_config = SourceRootConfig.global_instance()
-        source_roots = source_root_config.get_source_roots()
 
         # This function mocks out reading real directories off the file system
         def provider_rule(path_globs: PathGlobs) -> Snapshot:
