@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import ClassVar, Iterable, Tuple, Type
 
+from pants.base.build_root import BuildRoot
 from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses
 from pants.engine.console import Console
@@ -71,6 +72,7 @@ async def create_binary(
     workspace: Workspace,
     options: BinaryOptions,
     distdir: DistDir,
+    buildroot: BuildRoot,
 ) -> Binary:
     with options.line_oriented(console) as print_stdout:
         binaries = await MultiGet(Get[CreatedBinary](Address, address) for address in addresses)
@@ -81,7 +83,7 @@ async def create_binary(
             DirectoryToMaterialize(merged_digest, path_prefix=str(distdir.relpath))
         )
         for path in result.output_paths:
-            print_stdout(f"Wrote {os.path.relpath(path)}")
+            print_stdout(f"Wrote {os.path.relpath(path, buildroot.path)}")
     return Binary(exit_code=0)
 
 

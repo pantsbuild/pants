@@ -4,6 +4,7 @@
 import os
 from dataclasses import dataclass
 
+from pants.base.build_root import BuildRoot
 from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses
 from pants.engine.console import Console
@@ -48,6 +49,7 @@ async def create_awslambda(
     options: AWSLambdaOptions,
     distdir: DistDir,
     workspace: Workspace,
+    buildroot: BuildRoot,
 ) -> AWSLambdaGoal:
     with options.line_oriented(console) as print_stdout:
         awslambdas = await MultiGet(
@@ -60,7 +62,7 @@ async def create_awslambda(
             DirectoryToMaterialize(merged_digest, path_prefix=str(distdir.relpath))
         )
         for path in result.output_paths:
-            print_stdout(f"Wrote {os.path.relpath(path)}")
+            print_stdout(f"Wrote {os.path.relpath(path, buildroot.path)}")
     return AWSLambdaGoal(exit_code=0)
 
 
