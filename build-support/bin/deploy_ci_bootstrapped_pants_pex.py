@@ -15,12 +15,12 @@ from common import banner, die
 TRAVIS_BUILD_DIR = os.environ["TRAVIS_BUILD_DIR"]
 AWS_BUCKET = os.environ["AWS_BUCKET"]
 
-PEX_URL_PREFIX = os.environ["BOOTSTRAPPED_PEX_URL_PREFIX"]
+PEX_KEY_PREFIX = os.environ["BOOTSTRAPPED_PEX_KEY_PREFIX"]
 PEX_KEY_SUFFIX = os.environ["BOOTSTRAPPED_PEX_KEY_SUFFIX"]
-PEX_URL = f"{PEX_URL_PREFIX}.{PEX_KEY_SUFFIX}"
+PEX_KEY = f"{PEX_KEY_PREFIX}.{PEX_KEY_SUFFIX}"
+PEX_URL = f"{AWS_BUCKET}/{PEX_KEY}"
 
 NATIVE_ENGINE_SO_KEY_PREFIX = os.environ["NATIVE_ENGINE_SO_KEY_PREFIX"]
-NATIVE_ENGINE_SO_URL_PREFIX = os.environ["NATIVE_ENGINE_SO_URL_PREFIX"]
 NATIVE_ENGINE_SO_LOCAL_PATH = f"{TRAVIS_BUILD_DIR}/src/python/pants/engine/native_engine.so"
 
 AWS_COMMAND_PREFIX = ["aws", "--no-sign-request", "--region", "us-east-1"]
@@ -33,7 +33,7 @@ def main() -> None:
     native_engine_so_aws_key = (
         f"{NATIVE_ENGINE_SO_KEY_PREFIX}/{native_engine_so_hash}/native_engine.so"
     )
-    native_engine_so_aws_url = f"{NATIVE_ENGINE_SO_URL_PREFIX}/{native_engine_so_aws_key}"
+    native_engine_so_aws_url = f"{AWS_BUCKET}/{native_engine_so_aws_key}"
 
     native_engine_so_already_cached = native_engine_so_in_s3_cache(native_engine_so_aws_key)
 
@@ -45,7 +45,10 @@ def main() -> None:
             )
             get_native_engine_so(native_engine_so_aws_url)
         else:
-            banner("`native_engine.so` not found in the AWS S3 cache. Recompiling Rust...")
+            banner(
+                f"`native_engine.so` not found in the AWS S3 cache at {native_engine_so_aws_url}. "
+                f"Recompiling Rust..."
+            )
 
     if args.deploy:
         if not native_engine_so_already_cached:
