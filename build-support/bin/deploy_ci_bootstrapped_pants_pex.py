@@ -3,33 +3,39 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import argparse
+import json
 import os
 import subprocess
 
-from common import banner
+from common import banner, die
 
 # NB: We expect the `aws` CLI to already be installed and for authentication to be
 # configured.
 
 TRAVIS_BUILD_DIR = os.environ["TRAVIS_BUILD_DIR"]
+AWS_BUCKET = os.environ["AWS_BUCKET"]
+
 PEX_URL_PREFIX = os.environ["BOOTSTRAPPED_PEX_URL_PREFIX"]
 PEX_KEY_SUFFIX = os.environ["BOOTSTRAPPED_PEX_KEY_SUFFIX"]
 PEX_URL = f"{PEX_URL_PREFIX}.{PEX_KEY_SUFFIX}"
 
+NATIVE_ENGINE_SO_KEY_PREFIX = os.environ["NATIVE_ENGINE_SO_KEY_PREFIX"]
 NATIVE_ENGINE_SO_URL_PREFIX = os.environ["NATIVE_ENGINE_SO_URL_PREFIX"]
 NATIVE_ENGINE_SO_LOCAL_PATH = f"{TRAVIS_BUILD_DIR}/src/python/pants/engine/native_engine.so"
 
-AWS_S3_COMMAND_PREFIX = ["aws", "--no-sign-request", "--region", "us-east-1", "s3"]
+AWS_COMMAND_PREFIX = ["aws", "--no-sign-request", "--region", "us-east-1"]
 
 
 def main() -> None:
     args = create_parser().parse_args()
 
     native_engine_so_hash = calculate_native_engine_so_hash()
-    native_engine_so_aws_directory = f"{NATIVE_ENGINE_SO_URL_PREFIX}/{native_engine_so_hash}"
-    native_engine_so_aws_url = f"{native_engine_so_aws_directory}/native_engine.so"
+    native_engine_so_aws_key = (
+        f"{NATIVE_ENGINE_SO_KEY_PREFIX}/{native_engine_so_hash}/native_engine.so"
+    )
+    native_engine_so_aws_url = f"{NATIVE_ENGINE_SO_URL_PREFIX}/{native_engine_so_aws_key}"
 
-    native_engine_so_already_cached = native_engine_so_in_s3_cache(native_engine_so_aws_directory)
+    native_engine_so_already_cached = native_engine_so_in_s3_cache(native_engine_so_aws_key)
 
     if args.get:
         if native_engine_so_already_cached:
@@ -77,24 +83,42 @@ def calculate_native_engine_so_hash() -> str:
     )
 
 
-def native_engine_so_in_s3_cache(native_engine_so_directory: str) -> bool:
+def native_engine_so_in_s3_cache(native_engine_so_aws_key: str) -> bool:
     ls_output = subprocess.run(
-        [*AWS_S3_COMMAND_PREFIX, "ls", native_engine_so_directory],
+        [
+            *AWS_COMMAND_PREFIX,
+            "s3api",
+            "list-object-versions",
+            "--bucket",
+            AWS_BUCKET,
+            "--prefix",
+            native_engine_so_aws_key,
+            "--max-items",
+            "2",
+        ],
         stdout=subprocess.PIPE,
         check=True,
     ).stdout.decode()
-    return "native_engine.so" in ls_output
+    num_versions = len(json.loads(ls_output)["VERSIONS"])
+    if num_versions > 1:
+        die(
+            f"Multiple copies found of {native_engine_so_aws_key} in AWS S3. This is not allowed "
+            "as a security precaution. Please raise this failure in the #infra channel "
+            "in Slack so that we may investigate how this happened and delete the duplicate "
+            "copy from S3."
+        )
+    return num_versions == 1
 
 
 def get_native_engine_so(native_engine_so_aws_url: str) -> None:
     subprocess.run(
-        [*AWS_S3_COMMAND_PREFIX, "cp", native_engine_so_aws_url, NATIVE_ENGINE_SO_LOCAL_PATH],
+        [*AWS_COMMAND_PREFIX, "s3", "cp", native_engine_so_aws_url, NATIVE_ENGINE_SO_LOCAL_PATH],
         check=True,
     )
 
 
 def _deploy(file_path: str, s3_url: str) -> None:
-    subprocess.run([*AWS_S3_COMMAND_PREFIX, "cp", file_path, s3_url], check=True)
+    subprocess.run([*AWS_COMMAND_PREFIX, "s3", "cp", file_path, s3_url], check=True)
 
 
 def deploy_native_engine_so(native_engine_so_aws_url: str) -> None:
