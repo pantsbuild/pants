@@ -54,10 +54,13 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--maybe-get-native-engine-so",
         dest="get",
+        action="store_true",
         help="If `native_engine.so` is already in AWS S3, copy it down locally.",
     )
     parser.add_argument(
-        "--deploy", help="Deploy both `pants.pex` and (if relevant) `native_engine.so`."
+        "--deploy",
+        action="store_true",
+        help="Deploy both `pants.pex` and (if relevant) `native_engine.so`.",
     )
     return parser
 
