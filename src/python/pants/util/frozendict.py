@@ -19,7 +19,7 @@ class FrozenDict(Mapping[K, V]):
         """Creates a `FrozenDict` from a mapping object or a sequence of tuples representing
         entries.
 
-        These values must be immutable and hashable, which we proactively validate.
+        These values must be hashable, which we proactively validate.
         """
         self._data: Dict[K, V] = dict(item)  # type: ignore[arg-type]
         # NB: We eagerly compute the hash to validate that the values are hashable and to avoid
@@ -50,8 +50,8 @@ class FrozenDict(Mapping[K, V]):
         except TypeError as e:
             raise TypeError(
                 "Even though you are using a `FrozenDict`, the underlying values are not hashable. "
-                "Please use hashable and immutable types for the underlying values, e.g. use "
-                f"tuples instead of lists and use FrozenOrderedSet instead of set().\n\n"
+                "Please use hashable (and preferably immutable) types for the underlying values, "
+                "e.g. use tuples instead of lists and use FrozenOrderedSet instead of set().\n\n"
                 f"Original error message: {e}\n\nValue: {self}"
             )
 
