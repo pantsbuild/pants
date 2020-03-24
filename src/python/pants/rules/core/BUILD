@@ -21,6 +21,7 @@ python_library(
     'src/python/pants/goal',
     'src/python/pants/source',
     'src/python/pants/util:collections',
+    'src/python/pants/util:objects',
   ],
   tags = {"type_checked"},
 )
