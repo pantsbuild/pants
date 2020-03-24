@@ -61,12 +61,11 @@ public class JunitSecViolationReportingManager extends SecurityManager {
   }
 
   public boolean disallowsThreadsFor(TestSecurityContext context) {
-    return contextLookupAndErrorCollection.disallowsThreadsFor(context);
+    return logic.disallowsThreadsFor(context);
   }
 
   public boolean perClassThreadHandling() {
-    return contextLookupAndErrorCollection.config.getThreadHandling() ==
-        ThreadHandling.disallowLeakingTestSuiteThreads;
+    return logic.perClassThreadHandling();
   }
 
   void startTest(String className, String methodName) {
@@ -93,6 +92,7 @@ public class JunitSecViolationReportingManager extends SecurityManager {
     return contextLookupAndErrorCollection.endRun();
   }
 
+  // NB only called from maybe with security manager
   public <V> V withSettings(ContextKey context, Callable<V> callable) throws Throwable {
     if (context.isSuiteKey()) {
       log("withSettings", "start suite");

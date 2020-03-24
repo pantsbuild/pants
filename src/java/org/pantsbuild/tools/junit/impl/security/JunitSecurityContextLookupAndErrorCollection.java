@@ -71,23 +71,21 @@ class JunitSecurityContextLookupAndErrorCollection {
   // TODO handling of writing Contexts for suites and failures is pretty messy and may have problems
   // across threads if notifiers are not synchronized. Notifiers are synchronized, though
 
-  private final ThreadLocal<TestSecurityContext> settingsRef = new ThreadLocal<>();
-  private final Map<String, TestSecurityContext> classNameToSuiteContext = new HashMap<>();
   private static final Logger logger = Logger.getLogger("junit-security-context");
   static {
     logger.setLevel(Level.FINEST);
   }
-  final JunitSecurityManagerConfig config;
+
+  private final ThreadLocal<TestSecurityContext> settingsRef = new ThreadLocal<>();
+  private final Map<String, TestSecurityContext> classNameToSuiteContext = new HashMap<>();
+  private final JunitSecurityManagerConfig config;
   private AtomicBoolean runEnded = new AtomicBoolean(false);
 
   JunitSecurityContextLookupAndErrorCollection(JunitSecurityManagerConfig config) {
     this.config = config;
   }
 
-  private void removeCurrentThreadSecurityContext() {
-    settingsRef.remove();
-  }
-
+  // NB Only called from Notifiers, so is synchronized.
   void startTest(TestSecurityContext testSecurityContext) {
     TestSecurityContext suiteContext =
         classNameToSuiteContext.get(testSecurityContext.getClassName());
@@ -102,6 +100,7 @@ class JunitSecurityContextLookupAndErrorCollection {
     getAndSetLocal(testSecurityContext);
   }
 
+  // nb only called from main thread
   void startTest(ContextKey contextKey) {
     log("starting test " + contextKey);
     TestSecurityContext suiteContext = classNameToSuiteContext.get(contextKey.getClassName());
@@ -119,12 +118,17 @@ class JunitSecurityContextLookupAndErrorCollection {
     getAndSetLocal(testSecurityContext);
   }
 
+  // nb called from main thread
   void startSuite(ContextKey contextKey) {
     log("starting suite " + contextKey);
     TestSecurityContext securityContext =
         TestSecurityContext.newSuiteContext(contextKey.getClassName());
     getAndSetLocal(securityContext);
     classNameToSuiteContext.put(contextKey.getClassName(), securityContext);
+  }
+
+  private void removeCurrentThreadSecurityContext() {
+    settingsRef.remove();
   }
 
   private void getAndSetLocal(TestSecurityContext testSecurityContext) {
@@ -139,10 +143,13 @@ class JunitSecurityContextLookupAndErrorCollection {
     return classNameToSuiteContext.keySet();
   }
 
+  // nb only called from notifier
   void endTest() {
     removeCurrentThreadSecurityContext();
   }
 
+  // nb called from security manager lookups
+  // others
   TestSecurityContext getCurrentSecurityContext() {
     return settingsRef.get();
   }
@@ -187,21 +194,6 @@ class JunitSecurityContextLookupAndErrorCollection {
     return getContext(contextKey);
   }
 
-  boolean disallowsThreadsFor(TestSecurityContext context) {
-    switch (config.getThreadHandling()) {
-      case allowAll:
-        return false;
-      case disallow:
-        return true;
-      case disallowLeakingTestCaseThreads:
-        return true;
-      case disallowLeakingTestSuiteThreads:
-        return context.isSuite();
-      default:
-        return false;
-    }
-  }
-
   TestSecurityContext lookupWithoutExaminingClassContext() {
     TestSecurityContext cheaperContext = null;
     TestSecurityContext contextFromRef = getCurrentSecurityContext();
@@ -231,7 +223,6 @@ class JunitSecurityContextLookupAndErrorCollection {
   private void log(String s) {
     logger.fine(s);
   }
-
 
   TestSecurityContext lookupContextFromClassContext(Class<?>[] classContext) {
     for (Class<?> c : classContext) {

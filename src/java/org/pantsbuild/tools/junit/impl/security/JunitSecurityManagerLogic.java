@@ -24,7 +24,22 @@ class JunitSecurityManagerLogic {
       this.contextLookupAndErrorCollection = contextLookupAndErrorCollection;
     }
 
-    boolean disallowsFileAccess(TestSecurityContext testSecurityContext, String filename) {
+  boolean disallowsThreadsFor(TestSecurityContext context) {
+    switch (config.getThreadHandling()) {
+      case allowAll:
+        return false;
+      case disallow:
+        return true;
+      case disallowLeakingTestCaseThreads:
+        return true;
+      case disallowLeakingTestSuiteThreads:
+        return context.isSuite();
+      default:
+        return false;
+    }
+  }
+
+  boolean disallowsFileAccess(TestSecurityContext testSecurityContext, String filename) {
       JunitSecurityManagerConfig.FileHandling fileHandling = config.getFileHandling();
       if (fileHandling == JunitSecurityManagerConfig.FileHandling.allowAll) {
         return false;
@@ -91,4 +106,9 @@ class JunitSecurityManagerLogic {
     private static void log(String methodName, String msg) {
       logger.fine("---" + methodName + ":" + msg);
     }
+
+  public boolean perClassThreadHandling() {
+    return config.getThreadHandling() ==
+        JunitSecurityManagerConfig.ThreadHandling.disallowLeakingTestSuiteThreads;
   }
+}
