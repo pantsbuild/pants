@@ -6,7 +6,7 @@ from typing import Type
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import UnionMembership, goal_rule
-from pants.engine.target import BoolField, Field, RegisteredTargetTypes, Target
+from pants.engine.target import Field, RegisteredTargetTypes, Target
 from pants.util.objects import get_first_line_of_docstring
 
 
@@ -55,13 +55,9 @@ def verbose_target_information(
         #  hints, but it might be weird to handle Optional.
         field_alias_text = f"  {field.alias} = ...,"
         field_alias = console.cyan(f"{field_alias_text:<30}")
-        description = get_first_line_of_docstring(field) or "<no description>"
-        # TODO: should we elevate `default` so that every Field has it, whereas now only bool
-        #  fields have it? V1 `targets` renders a default value, which is helpful.
-        default = console.green(
-            f"(default: {field.default})" if issubclass(field, BoolField) else ""
-        )
-        default_prefix = " " if default else ""
+        description = get_first_line_of_docstring(field) or ""
+        default = console.green(f"(default: {field.default})")
+        default_prefix = " " if description else ""
         return f"{field_alias}  {description}{default_prefix}{default}"
 
     output = [target_type_description, "\n"] if target_type_description else []
