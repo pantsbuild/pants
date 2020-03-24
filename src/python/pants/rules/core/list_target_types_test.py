@@ -102,7 +102,7 @@ def test_list_single() -> None:
 
         fortran_tests(
           custom_field = ...,           My custom field! (default: True)
-          fortran_version = ...,        <no description>
+          fortran_version = ...,        (default: None)
         )
         """
     )
@@ -111,7 +111,7 @@ def test_list_single() -> None:
     assert binary_target_stdout == dedent(
         """\
         fortran_binary(
-          fortran_version = ...,        <no description>
+          fortran_version = ...,        (default: None)
         )
         """
     )
