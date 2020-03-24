@@ -49,7 +49,7 @@ def test_get() -> None:
 
     with pytest.raises(KeyError):
         fd1["z"]
-    assert fd1.get("z") == None
+    assert fd1.get("z") is None
     assert fd1.get("z", 26) == 26
 
 
