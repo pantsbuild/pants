@@ -1,13 +1,9 @@
 package org.pantsbuild.tools.junit.impl.security;
 
-import java.io.File;
-import java.io.IOException;
 import java.security.AccessController;
 import java.security.Permission;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.logging.Logger;
 
@@ -17,20 +13,17 @@ import static org.pantsbuild.tools.junit.impl.security.JunitSecurityManagerConfi
 
 public class JunitSecViolationReportingManager extends SecurityManager {
 
+  private final JunitSecurityManagerLogic logic;
+
   private static Logger logger = Logger.getLogger("pants-junit-sec-mgr");
 
   private final JunitSecurityContextLookupAndErrorCollection contextLookupAndErrorCollection;
 
-  private static final Set<String> localhostNames = new HashSet<>();
-
-  static {
-    localhostNames.add("localhost");
-    localhostNames.add("127.0.0.1");
-  }
 
   public JunitSecViolationReportingManager(JunitSecurityManagerConfig config) {
     super();
     this.contextLookupAndErrorCollection = new JunitSecurityContextLookupAndErrorCollection(config);
+    this.logic = new JunitSecurityManagerLogic(config, contextLookupAndErrorCollection);
   }
 
   public static <T> T maybeWithSecurityManagerContext(
@@ -128,10 +121,6 @@ public class JunitSecViolationReportingManager extends SecurityManager {
   public void interruptDanglingThreads() {
   }
 
-  public boolean disallowSystemExit() {
-    return contextLookupAndErrorCollection.disallowSystemExit();
-  }
-
   private TestSecurityContext lookupContext() {
     TestSecurityContext cheaperContext =
         contextLookupAndErrorCollection.lookupWithoutExaminingClassContext();
@@ -183,7 +172,7 @@ public class JunitSecViolationReportingManager extends SecurityManager {
 
   @Override
   public void checkExit(int status) {
-    if (disallowSystemExit()) {
+    if (logic.disallowSystemExit()) {
       // TODO improve message so that it points out the line the call happened on more explicitly.
       //
       SecurityException ex;
@@ -212,7 +201,7 @@ public class JunitSecViolationReportingManager extends SecurityManager {
   }
 
   private void doCheckConnect(String host, int port) {
-    if (disallowConnectionTo(host, port)) {
+    if (logic.disallowConnectionTo(host, port)) {
       SecurityException ex;
       TestSecurityContext context = lookupContext();
       String message = networkCallDisallowedMessage(host, port);
@@ -237,27 +226,10 @@ public class JunitSecViolationReportingManager extends SecurityManager {
     return "Network call to " + host + ":" + port + " is not allowed.";
   }
 
-  private boolean disallowConnectionTo(String host, int port) {
-    switch (contextLookupAndErrorCollection.config.getNetworkHandling()) {
-      case allowAll:
-        return false;
-      case onlyLocalhost:
-        return !hostIsLocalHost(host);
-      case disallow:
-        return true;
-    }
-
-    return contextLookupAndErrorCollection.config.getNetworkHandling() != NetworkHandling.allowAll;
-  }
-
-  private boolean hostIsLocalHost(String host) {
-    return localhostNames.contains(host);
-  }
-
   @Override
   public void checkRead(String filename, Object context) {
     TestSecurityContext testSecurityContext = lookupContext();
-    if (disallowsFileAccess(testSecurityContext, filename)) {
+    if (logic.disallowsFileAccess(testSecurityContext, filename)) {
       String message = disallowedFileAccessMessage(filename);
       log("checkRead", message);
       SecurityViolationException exception = new SecurityViolationException(message);
@@ -272,7 +244,7 @@ public class JunitSecViolationReportingManager extends SecurityManager {
   @Override
   public void checkRead(String filename) {
     TestSecurityContext testSecurityContext = lookupContext();
-    if (disallowsFileAccess(testSecurityContext, filename)) {
+    if (logic.disallowsFileAccess(testSecurityContext, filename)) {
       String message = disallowedFileAccessMessage(filename);
       log("checkRead", message);
       SecurityViolationException exception = new SecurityViolationException(message);
@@ -288,48 +260,10 @@ public class JunitSecViolationReportingManager extends SecurityManager {
     return "Access to file: " + filename + " not allowed";
   }
 
-  private boolean disallowsFileAccess(TestSecurityContext testSecurityContext, String filename) {
-    FileHandling fileHandling = this.contextLookupAndErrorCollection.config.getFileHandling();
-    if (fileHandling == FileHandling.allowAll) {
-      return false;
-    }
-    // NB: This escape hatch allows lazy loading of things like the locale jar, which is pulled from
-    //     the jre location.
-    if(filename.startsWith( System.getProperty("java.home"))) {
-      log("disallowsFileAccess", "is a framework call");
-      return false;
-    }
-
-    if (isFrameworkContext(testSecurityContext)) {
-      // calls within the framework should be passed through.
-      log("disallowsFileAccess", "is a framework call");
-      return false;
-    } else if (isRedirectedOutputFile(testSecurityContext, filename)) {
-      log("disallowsFileAccess", "is a framework call to the redirected output");
-      return false;
-    } else  {
-      if (fileHandling==FileHandling.onlyCWD) {
-        String workingDir = System.getProperty("user.dir");
-        try {
-          String canonicalPath = new File(filename).getCanonicalPath();
-          return !canonicalPath.startsWith(workingDir);
-        } catch (IOException e) {
-          // TODO Do something better here
-          e.printStackTrace();
-        }
-      }
-      return fileHandling == FileHandling.disallow;
-    }
-  }
-
-  private boolean isFrameworkContext(TestSecurityContext testSecurityContext) {
-    return testSecurityContext == null; // TODO introduce null object for framework contexts
-  }
-
   @Override
   public void checkWrite(String filename) {
     TestSecurityContext testSecurityContext = lookupContext();
-    if (disallowsFileAccess(testSecurityContext, filename)) {
+    if (logic.disallowsFileAccess(testSecurityContext, filename)) {
       String message = disallowedFileAccessMessage(filename);
       log("checkWrite", "context: "+testSecurityContext+ " :: "+message);
       SecurityViolationException exception = new SecurityViolationException(message);
@@ -341,15 +275,10 @@ public class JunitSecViolationReportingManager extends SecurityManager {
     super.checkWrite(filename);
   }
 
-  private boolean isRedirectedOutputFile(TestSecurityContext testSecurityContext, String filename) {
-    // TODO make this a bit more bulletproof
-    return filename.endsWith(".out.txt") || filename.endsWith(".err.txt");
-  }
-
   @Override
   public void checkDelete(String filename) {
     TestSecurityContext testSecurityContext = lookupContext();
-    if (disallowsFileAccess(testSecurityContext, filename)) {
+    if (logic.disallowsFileAccess(testSecurityContext, filename)) {
       String message = disallowedFileAccessMessage(filename);
       log("checkWrite", "context: "+testSecurityContext+ " :: "+message);
       SecurityViolationException exception = new SecurityViolationException(message);
