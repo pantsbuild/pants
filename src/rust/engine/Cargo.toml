@@ -126,7 +126,6 @@ workunit_store = { path = "workunit_store" }
 [dev-dependencies]
 testutil = { path = "./testutil" }
 fs = { path = "./fs" }
-tokio = "0.1"
 env_logger = "0.5.4"
 
 [patch.crates-io]
