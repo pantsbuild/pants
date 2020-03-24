@@ -90,7 +90,6 @@ crossbeam-channel = "0.3"
 fnv = "1.0.5"
 fs = { path = "fs" }
 futures01 = { package = "futures", version = "0.1" }
-futures-locks = "0.3.0"
 futures = { version = "0.3", features = ["compat"] }
 graph = { path = "graph" }
 hashing = { path = "hashing" }
