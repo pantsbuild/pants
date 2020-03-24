@@ -6,12 +6,15 @@ import argparse
 import os
 import subprocess
 
+from common import banner
+
 # NB: We expect the `aws` CLI to already be installed and for authentication to be
 # configured.
 
 TRAVIS_BUILD_DIR = os.environ["TRAVIS_BUILD_DIR"]
-BOOTSTRAPPED_PEX_URL_PREFIX = os.environ["BOOTSTRAPPED_PEX_URL_PREFIX"]
-BOOTSTRAPPED_PEX_KEY_SUFFIX = os.environ["BOOTSTRAPPED_PEX_KEY_SUFFIX"]
+PEX_URL_PREFIX = os.environ["BOOTSTRAPPED_PEX_URL_PREFIX"]
+PEX_KEY_SUFFIX = os.environ["BOOTSTRAPPED_PEX_KEY_SUFFIX"]
+PEX_URL = f"{PEX_URL_PREFIX}.{PEX_KEY_SUFFIX}"
 
 NATIVE_ENGINE_SO_PATH = f"{TRAVIS_BUILD_DIR}/src/python/pants/engine/native_engine.so"
 NATIVE_ENGINE_SO_URL_PREFIX = "s3://native_engine_so"
@@ -26,12 +29,21 @@ def main() -> None:
     native_engine_so_aws_url = f"{native_engine_so_aws_directory}/native_engine.so"
     native_engine_so_already_cached = native_engine_so_in_s3_cache(native_engine_so_aws_directory)
 
-    if args.get and native_engine_so_already_cached:
-        get_native_engine_so(native_engine_so_aws_url)
+    if args.get:
+        if native_engine_so_already_cached:
+            banner(
+                f"`native_engine.so` found in the AWS S3 cache at {native_engine_so_aws_url}. "
+                f"Downloading to avoid unnecessary Rust compilation."
+            )
+            get_native_engine_so(native_engine_so_aws_url)
+        else:
+            banner("`native_engine.so` not found in the AWS S3 cache. Recompiling Rust...")
 
     if args.deploy:
         if not native_engine_so_already_cached:
+            banner(f"Deploying `native_engine.so` to {native_engine_so_aws_url}.")
             deploy_native_engine_so(native_engine_so_aws_url)
+        banner(f"Deploying `pants.pex` to {PEX_URL}.")
         deploy_pants_pex()
 
 
@@ -84,10 +96,7 @@ def deploy_native_engine_so(native_engine_so_aws_url: str) -> None:
 
 
 def deploy_pants_pex() -> None:
-    _deploy(
-        f"{TRAVIS_BUILD_DIR}/pants.pex",
-        f"{BOOTSTRAPPED_PEX_URL_PREFIX}.{BOOTSTRAPPED_PEX_KEY_SUFFIX}",
-    )
+    _deploy(f"{TRAVIS_BUILD_DIR}/pants.pex", PEX_URL)
 
 
 if __name__ == "__main__":
