@@ -329,7 +329,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
         finished: bool = False
 
         def add(self, workunits, **kwargs) -> None:
-            if kwargs["finished"] == True:
+            if kwargs["finished"] is True:
                 self.finished = True
             self.workunits.extend(workunits)
 

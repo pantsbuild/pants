@@ -31,7 +31,7 @@ class CheckPublishedDeps(ConsoleTask):
         for target in self.context.scan().targets(predicate=is_published):
             provided_jar, _ = target.get_artifact_info()
             artifact = (provided_jar.org, provided_jar.name)
-            if not artifact in self._artifacts_to_targets:
+            if artifact not in self._artifacts_to_targets:
                 self._artifacts_to_targets[artifact] = target
 
     def console_output(self, targets):
@@ -49,7 +49,7 @@ class CheckPublishedDeps(ConsoleTask):
             if isinstance(target, (JarLibrary, JvmTarget)):
                 for dep in target.jar_dependencies:
                     artifact = (dep.org, dep.name)
-                    if artifact in self._artifacts_to_targets and not artifact in visited:
+                    if artifact in self._artifacts_to_targets and artifact not in visited:
                         visited.add(artifact)
                         artifact_target = self._artifacts_to_targets[artifact]
                         semver, sha = get_version_and_sha(artifact_target)

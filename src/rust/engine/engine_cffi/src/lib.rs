@@ -49,7 +49,7 @@ use hashing::{Digest, EMPTY_DIGEST};
 use log::{error, warn, Log};
 use logging::logger::LOGGER;
 use logging::{Destination, Logger};
-use rule_graph::{GraphMaker, RuleGraph};
+use rule_graph::RuleGraph;
 use std::any::Any;
 use std::borrow::Borrow;
 use std::ffi::CStr;
@@ -736,37 +736,41 @@ pub extern "C" fn validator_run(scheduler_ptr: *mut Scheduler) -> PyResult {
 #[no_mangle]
 pub extern "C" fn rule_graph_visualize(
   scheduler_ptr: *mut Scheduler,
-  subject_types: TypeIdBuffer,
   path_ptr: *const raw::c_char,
-) {
+) -> PyResult {
   with_scheduler(scheduler_ptr, |scheduler| {
     let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
     let path = PathBuf::from(path_str);
 
     // TODO(#7117): we want to represent union types in the graph visualizer somehow!!!
-    let graph = graph_full(scheduler, subject_types.to_vec());
-    write_to_file(path.as_path(), &graph).unwrap_or_else(|e| {
-      println!("Failed to visualize to {}: {:?}", path.display(), e);
-    });
+    write_to_file(path.as_path(), &scheduler.core.rule_graph)
+      .map_err(|e| format!("Failed to visualize to {}: {:?}", path.display(), e))
+      .into()
   })
 }
 
 #[no_mangle]
 pub extern "C" fn rule_subgraph_visualize(
   scheduler_ptr: *mut Scheduler,
-  subject_type: TypeId,
+  param_types: TypeIdBuffer,
   product_type: TypeId,
   path_ptr: *const raw::c_char,
-) {
+) -> PyResult {
   with_scheduler(scheduler_ptr, |scheduler| {
     let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
     let path = PathBuf::from(path_str);
 
     // TODO(#7117): we want to represent union types in the graph visualizer somehow!!!
-    let graph = graph_sub(scheduler, subject_type, product_type);
-    write_to_file(path.as_path(), &graph).unwrap_or_else(|e| {
-      println!("Failed to visualize to {}: {:?}", path.display(), e);
-    });
+    match scheduler
+      .core
+      .rule_graph
+      .subgraph(param_types.to_vec(), product_type)
+    {
+      Ok(subgraph) => write_to_file(path.as_path(), &subgraph)
+        .map_err(|e| format!("Failed to visualize to {}: {:?}", path.display(), e))
+        .into(),
+      e @ Err(_) => e.map(|_| ()).into(),
+    }
   })
 }
 
@@ -1172,16 +1176,6 @@ pub extern "C" fn flush_log() {
 #[no_mangle]
 pub extern "C" fn override_thread_logging_destination(destination: Destination) {
   logging::set_thread_destination(destination);
-}
-
-fn graph_full(scheduler: &Scheduler, subject_types: Vec<TypeId>) -> RuleGraph<Rule> {
-  let graph_maker = GraphMaker::new(scheduler.core.tasks.as_map(), subject_types);
-  graph_maker.full_graph()
-}
-
-fn graph_sub(scheduler: &Scheduler, subject_type: TypeId, product_type: TypeId) -> RuleGraph<Rule> {
-  let graph_maker = GraphMaker::new(scheduler.core.tasks.as_map(), vec![subject_type]);
-  graph_maker.sub_graph(subject_type, product_type)
 }
 
 fn write_to_file(path: &Path, graph: &RuleGraph<Rule>) -> io::Result<()> {
