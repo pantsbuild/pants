@@ -49,7 +49,7 @@ class TestJvmDependencyUsage(TaskTestBase):
         t3 = self.make_java_target(spec=":t3", sources=["d.java", "e.java"], dependencies=[t1])
         self.set_options(size_estimator="filecount")
         dep_usage, product_deps_by_target = self._setup(
-            {t1: ["a.class", "b.class"], t2: ["c.class"], t3: ["d.class", "e.class"],}
+            {t1: ["a.class", "b.class"], t2: ["c.class"], t3: ["d.class", "e.class"]}
         )
         product_deps_by_target[t1] = []
         product_deps_by_target[t2] = ["a.class"]
@@ -111,7 +111,7 @@ class TestJvmDependencyUsage(TaskTestBase):
         )
         self.set_options(strict_deps=False)
         dep_usage, product_deps_by_target = self._setup(
-            {a: ["a.class"], b: ["b.class"], c: ["c.class"],}
+            {a: ["a.class"], b: ["b.class"], c: ["c.class"]}
         )
 
         product_deps_by_target[c] = ["a.class"]
@@ -135,7 +135,7 @@ class TestJvmDependencyUsage(TaskTestBase):
         t4 = self.make_java_target(spec=":t4", sources=["d.java"], dependencies=[t3])
         self.set_options(strict_deps=False)
         dep_usage, product_deps_by_target = self._setup(
-            {t1: ["a.class"], t2: ["a.class", "b.class"], t3: ["c.class"], t4: ["d.class"],}
+            {t1: ["a.class"], t2: ["a.class", "b.class"], t3: ["c.class"], t4: ["d.class"]}
         )
         product_deps_by_target[t3] = ["a.class"]
         product_deps_by_target[t4] = ["a.class"]
@@ -169,7 +169,7 @@ class TestJvmDependencyUsage(TaskTestBase):
         t2 = self.make_java_target(spec=":t2", sources=["b.java"], dependencies=[t1])
         self.create_file("b.java")
         self.set_options(size_estimator="filecount")
-        dep_usage, product_deps_by_target = self._setup({t1: ["a.class"], t2: ["b.class"],})
+        dep_usage, product_deps_by_target = self._setup({t1: ["a.class"], t2: ["b.class"]})
         product_deps_by_target[t1] = []
         product_deps_by_target[t2] = ["a.class"]
 

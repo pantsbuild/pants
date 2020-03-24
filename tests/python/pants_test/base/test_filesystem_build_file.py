@@ -111,7 +111,7 @@ class FilesystemBuildFileTest(unittest.TestCase):
 
     def test_build_files_family_lookup_with_ignore(self):
         self.assertEqual(
-            OrderedSet([self.create_buildfile("grandparent/parent/BUILD"),]),
+            OrderedSet([self.create_buildfile("grandparent/parent/BUILD")]),
             self.get_build_files_family("grandparent/parent", build_ignore_patterns=["*.twitter"]),
         )
 

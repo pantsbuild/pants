@@ -19,9 +19,7 @@ class NodePackage(Target):
                                     used.
         """
         payload = payload or Payload()
-        payload.add_fields(
-            {"package_name": PrimitiveField(package_name or address.target_name),}
-        )
+        payload.add_fields({"package_name": PrimitiveField(package_name or address.target_name)})
         super().__init__(address=address, payload=payload, **kwargs)
 
     @property

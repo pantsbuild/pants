@@ -164,7 +164,7 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
         address_specs = AddressSpecs(
             [SingleAddress("root", "not_me")], exclude_patterns=tuple(["root.*"])
         )
-        address_family = AddressFamily("root", {"not_me": ("root/BUILD", TargetAdaptor()),})
+        address_family = AddressFamily("root", {"not_me": ("root/BUILD", TargetAdaptor())})
 
         targets = self._resolve_addresses(
             address_specs, address_family, self._snapshot(), self._address_mapper()

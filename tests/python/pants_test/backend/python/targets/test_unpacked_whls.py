@@ -29,7 +29,7 @@ class UnpackedWheelsTest(TestBase):
 
     def test_simple(self):
         self.make_target(
-            ":import_whls", PythonRequirementLibrary, requirements=[PythonRequirement("foo==123"),]
+            ":import_whls", PythonRequirementLibrary, requirements=[PythonRequirement("foo==123")]
         )
         target = self.make_target(
             ":foo", UnpackedWheels, libraries=[":import_whls"], module_name="foo"
@@ -45,7 +45,7 @@ class UnpackedWheelsTest(TestBase):
 
     def test_bad_libraries_ref(self):
         self.make_target(
-            ":right-type", PythonRequirementLibrary, requirements=[PythonRequirement("foo==123"),]
+            ":right-type", PythonRequirementLibrary, requirements=[PythonRequirement("foo==123")]
         )
         # Making a target which is not a requirement library, which causes an error.
         self.make_target(

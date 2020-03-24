@@ -116,7 +116,7 @@ class ExecutionGraphTest(unittest.TestCase):
 
     def test_simple_unconnected(self):
         exec_graph = ExecutionGraph(
-            [self.job("A", passing_fn, []), self.job("B", passing_fn, []),], False
+            [self.job("A", passing_fn, []), self.job("B", passing_fn, [])], False
         )
 
         self.execute(exec_graph)

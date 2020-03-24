@@ -24,7 +24,7 @@ class NodeBuild(NodeTask):
     def _snapshotted_classpath(self, results_dir):
         relpath = fast_relpath(results_dir, get_buildroot())
         (classes_dir_snapshot,) = self.context._scheduler.capture_snapshots(
-            [PathGlobsAndRoot(PathGlobs([relpath]), get_buildroot(), Digest.load(relpath),),]
+            [PathGlobsAndRoot(PathGlobs([relpath]), get_buildroot(), Digest.load(relpath))]
         )
         return ClasspathEntry(results_dir, classes_dir_snapshot.directory_digest)
 

@@ -32,6 +32,6 @@ class BundleIntegrationTest(PantsRunIntegrationTest):
                 target,
                 bundle_name,
                 bundle_jar_name=bundle_name,
-                bundle_options=["--bundle-jvm-use-basename-prefix",],
+                bundle_options=["--bundle-jvm-use-basename-prefix"],
             )
             self.assertEqual(stdout, f"Hello world!: resource from example {name}\n")

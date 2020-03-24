@@ -30,9 +30,7 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
     def setUp(self):
         super().setUp()
 
-        init_subsystems(
-            [LibcDev, NativeToolchain], options={"libc": {"enable_libc_search": True,},}
-        )
+        init_subsystems([LibcDev, NativeToolchain], options={"libc": {"enable_libc_search": True}})
 
         self.platform = Platform.current
         self.toolchain = global_subsystem_instance(NativeToolchain)

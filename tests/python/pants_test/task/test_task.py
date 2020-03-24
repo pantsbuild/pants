@@ -584,7 +584,7 @@ class TaskTest(TaskTestBase):
 
         registered_option_fp = self._synth_fp(
             cls=AnotherFakeTask,
-            options_fingerprintable={AnotherFakeTask.options_scope: {"fake-option": bool},},
+            options_fingerprintable={AnotherFakeTask.options_scope: {"fake-option": bool}},
         )
         self.assertNotEqual(registered_option_fp, default_fp)
 

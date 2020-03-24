@@ -10,7 +10,7 @@ from pants.goal.task_registrar import TaskRegistrar as task
 
 def build_file_aliases():
     return BuildFileAliases(
-        targets={"page": Page,},
+        targets={"page": Page},
         objects={
             "wiki_artifact": WikiArtifact,
             # TODO: Why is this capitalized?

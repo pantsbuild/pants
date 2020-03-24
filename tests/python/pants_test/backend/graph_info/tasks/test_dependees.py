@@ -34,7 +34,7 @@ class BaseReverseDepmapTest(ConsoleTaskTestBase):
                 "python_tests": PythonTests,
                 "resources": Resources,
             },
-            objects={"jar": JarDependency, "scala_jar": ScalaJarDependency,},
+            objects={"jar": JarDependency, "scala_jar": ScalaJarDependency},
         )
 
     def setUp(self):
@@ -291,7 +291,7 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
         self.assert_console_output(
             "src/thrift/dependent:my-example",
             "src/thrift/example:compiled_scala",
-            targets=[self.target("src/thrift/example:mybird"),],
+            targets=[self.target("src/thrift/example:mybird")],
         )
 
     def test_external_dependency(self):

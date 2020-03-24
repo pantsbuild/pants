@@ -29,7 +29,7 @@ def publish_extra_config(unique_config):
             # Turn off --verify-config as some scopes in pants.toml will not be
             # recognized due to the select few backend packages.
             "verify_config": False,
-            "pythonpath": ["examples/src/python", "pants-plugins/src/python",],
+            "pythonpath": ["examples/src/python", "pants-plugins/src/python"],
             "backend_packages": [
                 "example.pants_publish_plugin",
                 "internal_backend.repositories",
@@ -37,7 +37,7 @@ def publish_extra_config(unique_config):
                 "pants.backend.jvm",
             ],
         },
-        "publish.jar": {"publish_extras": {"extra_test_jar_example": unique_config,},},
+        "publish.jar": {"publish_extras": {"extra_test_jar_example": unique_config}},
     }
 
 
@@ -152,7 +152,7 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
     def test_publish_extras_name_classifier(self):
         self.publish_extras_runner(
             extra_config=publish_extra_config(
-                {"override_name": "{target_provides_name}-extra_example", "classifier": "classy",}
+                {"override_name": "{target_provides_name}-extra_example", "classifier": "classy"}
             ),
             artifact_name="hello-greet-extra_example-0.0.1-SNAPSHOT-classy.jar",
         )
@@ -160,7 +160,7 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
     def test_publish_extras_name(self):
         self.publish_extras_runner(
             extra_config=publish_extra_config(
-                {"override_name": "{target_provides_name}-extra_example",}
+                {"override_name": "{target_provides_name}-extra_example"}
             ),
             artifact_name="hello-greet-extra_example-0.0.1-SNAPSHOT.jar",
         )
@@ -187,7 +187,7 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
 
     def test_publish_extras_classifier(self):
         self.publish_extras_runner(
-            extra_config=publish_extra_config({"classifier": "classy",}),
+            extra_config=publish_extra_config({"classifier": "classy"}),
             artifact_name="hello-greet-0.0.1-SNAPSHOT-classy.jar",
         )
 
@@ -195,7 +195,7 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
     # should fail with an error from pants.
     def test_publish_extras_invalid_args(self):
         self.publish_extras_runner(
-            extra_config=publish_extra_config({"extension": "jar",}),
+            extra_config=publish_extra_config({"extension": "jar"}),
             artifact_name="hello-greet-0.0.1-SNAPSHOT.jar",
             success_expected=False,
         )

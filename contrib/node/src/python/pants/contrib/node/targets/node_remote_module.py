@@ -18,7 +18,7 @@ class NodeRemoteModule(NodePackage):
         """
         payload = payload or Payload()
         payload.add_fields(
-            {"version": PrimitiveField(version or "*"),}  # Guard against/allow `None`.
+            {"version": PrimitiveField(version or "*")}  # Guard against/allow `None`.
         )
         super().__init__(address=address, payload=payload, **kwargs)
 

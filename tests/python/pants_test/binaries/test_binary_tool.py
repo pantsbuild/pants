@@ -87,10 +87,10 @@ class BinaryToolBaseTest(TestBase):
                     "binaries_baseurls": ["https://binaries.example.org"],
                     "pants_bootstrapdir": str(temporary_dir()),
                 },
-                "another-tool": {"version": "0.0.2",},
-                "default-version-test.another-tool": {"version": "YYY",},
-                "custom-urls": {"version": "v2.3",},
-                "old_tool_scope": {"old_tool_version": "3",},
+                "another-tool": {"version": "0.0.2"},
+                "default-version-test.another-tool": {"version": "YYY"},
+                "custom-urls": {"version": "v2.3"},
+                "old_tool_scope": {"old_tool_version": "3"},
             },
         )
 
@@ -155,7 +155,7 @@ class BinaryToolBaseTest(TestBase):
             )
             context = self.context(
                 for_subsystems=[DefaultVersion],
-                options={GLOBAL_SCOPE: {"binaries_baseurls": [f"file:///{temp_dir}"],},},
+                options={GLOBAL_SCOPE: {"binaries_baseurls": [f"file:///{temp_dir}"]}},
             )
             self.maxDiff = None
             default_version_tool = DefaultVersion.global_instance()

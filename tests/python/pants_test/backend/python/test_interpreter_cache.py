@@ -36,7 +36,7 @@ class TestInterpreterCache(TestBase):
     def _create_interpreter_cache(self, setup_options=None):
         Subsystem.reset(reset_options=True)
         self.context(
-            for_subsystems=[PythonInterpreterCache], options={"python-setup": setup_options,}
+            for_subsystems=[PythonInterpreterCache], options={"python-setup": setup_options}
         )
         return PythonInterpreterCache.global_instance()
 

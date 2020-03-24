@@ -883,13 +883,13 @@ class OptionsTest(TestBase):
             self.assertEqual(expected_val, val)
 
         check_pants_foo(
-            "AAA", {"PANTS_GLOBAL_PANTS_FOO": "AAA", "PANTS_PANTS_FOO": "BBB", "PANTS_FOO": "CCC",}
+            "AAA", {"PANTS_GLOBAL_PANTS_FOO": "AAA", "PANTS_PANTS_FOO": "BBB", "PANTS_FOO": "CCC"}
         )
-        check_pants_foo("BBB", {"PANTS_PANTS_FOO": "BBB", "PANTS_FOO": "CCC",})
-        check_pants_foo("CCC", {"PANTS_FOO": "CCC",})
+        check_pants_foo("BBB", {"PANTS_PANTS_FOO": "BBB", "PANTS_FOO": "CCC"})
+        check_pants_foo("CCC", {"PANTS_FOO": "CCC"})
         check_pants_foo(None, {})
         # Check that an empty string is distinct from no value being specified.
-        check_pants_foo("", {"PANTS_PANTS_FOO": "", "PANTS_FOO": "CCC",})
+        check_pants_foo("", {"PANTS_PANTS_FOO": "", "PANTS_FOO": "CCC"})
 
         # A global option that doesn't begin with 'pants-': Setting BAR_BAZ should have no effect.
 
@@ -898,10 +898,10 @@ class OptionsTest(TestBase):
             self.assertEqual(expected_val, val)
 
         check_bar_baz(
-            "AAA", {"PANTS_GLOBAL_BAR_BAZ": "AAA", "PANTS_BAR_BAZ": "BBB", "BAR_BAZ": "CCC",}
+            "AAA", {"PANTS_GLOBAL_BAR_BAZ": "AAA", "PANTS_BAR_BAZ": "BBB", "BAR_BAZ": "CCC"}
         )
-        check_bar_baz("BBB", {"PANTS_BAR_BAZ": "BBB", "BAR_BAZ": "CCC",})
-        check_bar_baz(None, {"BAR_BAZ": "CCC",})
+        check_bar_baz("BBB", {"PANTS_BAR_BAZ": "BBB", "BAR_BAZ": "CCC"})
+        check_bar_baz(None, {"BAR_BAZ": "CCC"})
         check_bar_baz(None, {})
 
     def test_scoped_env_vars(self) -> None:
@@ -1633,9 +1633,9 @@ class OptionsTest(TestBase):
         options = Options.create(
             env={},
             config=self._create_config(
-                {"DEFAULT": {"foo": "aa"}, DummyOptionable1.options_scope: {"foo": "xx"},}
+                {"DEFAULT": {"foo": "aa"}, DummyOptionable1.options_scope: {"foo": "xx"}}
             ),
-            known_scope_infos=[global_scope(), DummyOptionable1.get_scope_info(),],
+            known_scope_infos=[global_scope(), DummyOptionable1.get_scope_info()],
             args=shlex.split("./pants"),
         )
 

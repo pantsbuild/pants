@@ -327,7 +327,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
 
             with self.temporary_workdir() as workdir:
                 pants_run = self.run_pants_with_workdir(
-                    ["-q", "run", "examples/src/scala/org/pantsbuild/example/hello/exe",],
+                    ["-q", "run", "examples/src/scala/org/pantsbuild/example/hello/exe"],
                     workdir,
                     config,
                 )
@@ -363,7 +363,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
 
             with self.temporary_workdir() as workdir:
                 pants_run = self.run_pants_with_workdir(
-                    ["-q", "run", "examples/src/scala/org/pantsbuild/example/hello/exe",],
+                    ["-q", "run", "examples/src/scala/org/pantsbuild/example/hello/exe"],
                     workdir,
                     config,
                 )
@@ -420,7 +420,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
                         f.write(new_temp_test)
 
                     pants_run = self.run_pants_with_workdir(
-                        ["-q", "run", "examples/src/scala/org/pantsbuild/example/hello/exe",],
+                        ["-q", "run", "examples/src/scala/org/pantsbuild/example/hello/exe"],
                         workdir,
                         config,
                     )

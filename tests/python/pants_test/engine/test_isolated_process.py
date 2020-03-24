@@ -307,7 +307,7 @@ class IsolatedProcessTest(TestBase, unittest.TestCase):
     def rules(cls):
         return (
             super().rules()
-            + [RootRule(JavacVersionExecutionRequest), get_javac_version_output,]
+            + [RootRule(JavacVersionExecutionRequest), get_javac_version_output]
             + create_cat_stdout_rules()
             + create_javac_compile_rules()
         )

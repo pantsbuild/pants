@@ -121,7 +121,7 @@ class ExcludeTargetRegexpIntegrationTest(PantsRunIntegrationTest):
 
     def test_exclude_thoe(self):
         self._test_bundle_existences(
-            [Bundles.phrase_path + "::", r"--exclude-target-regexp=\bth[oe]",],
+            [Bundles.phrase_path + "::", r"--exclude-target-regexp=\bth[oe]"],
             set(Bundles.all_bundles) - {Bundles.there_was_a_duck, Bundles.ten_thousand},
         )
 

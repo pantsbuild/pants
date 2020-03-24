@@ -165,7 +165,7 @@ def main():
     parser.add_argument(
         "--glob",
         action="append",
-        default=["*.dist-info/*", "*-nspkg.pth",],
+        default=["*.dist-info/*", "*-nspkg.pth"],
         help="Globs (fnmatch) to rewrite within the whl: may be specified multiple times.",
     )
     args = parser.parse_args()
