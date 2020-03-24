@@ -426,7 +426,7 @@ class GitRepositoryReader:
         if type(self.lstat(relpath)) != self.Symlink:
             return None
         obj, path_so_far = self._safe_read_object(relpath, max_symlinks=1)
-        if obj == None:
+        if obj is None:
             return None
         return path_so_far
 

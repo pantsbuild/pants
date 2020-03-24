@@ -88,7 +88,7 @@ class BestUrlSelector:
     def _parse_urls(self, urls):
         parsed_urls = [urlparse(url) for url in urls]
         for parsed_url in parsed_urls:
-            if not parsed_url.scheme in self.SUPPORTED_PROTOCOLS:
+            if parsed_url.scheme not in self.SUPPORTED_PROTOCOLS:
                 raise InvalidRESTfulCacheProtoError(
                     "RESTfulArtifactCache only supports HTTP(S). Found: {0}".format(
                         parsed_url.scheme
