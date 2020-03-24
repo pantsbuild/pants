@@ -75,7 +75,7 @@ class BaseCompileIT(PantsRunIntegrationTest):
         :API: public
         """
         config = {
-            "cache": {"write": True, "write_to": [cacheurl],},
+            "cache": {"write": True, "write_to": [cacheurl]},
         }
         task = "test" if test else "compile"
         args = self._EXTRA_TASK_ARGS + [task] + (extra_args if extra_args else []) + [target]

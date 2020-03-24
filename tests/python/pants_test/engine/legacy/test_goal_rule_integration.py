@@ -59,7 +59,7 @@ class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
 
             # Launch the loop as a background process.
             handle = self.run_pants_with_workdir_without_waiting(
-                ["--no-v1", "--v2", "--loop", "--loop-max=3", "list", f"{tmpdir}:",],
+                ["--no-v1", "--v2", "--loop", "--loop-max=3", "list", f"{tmpdir}:"],
                 workdir,
                 config,
             )

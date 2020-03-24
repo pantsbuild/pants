@@ -284,7 +284,7 @@ Current thread [^\n]+ \\(most recent call first\\):
 
         # The exiter that gets added when this option is changed prints that option to stderr.
         changed_exiter_run = self.run_pants(
-            ["--lifecycle-stubs-add-exiter-message='NEW MESSAGE'",] + lifecycle_stub_cmdline
+            ["--lifecycle-stubs-add-exiter-message='NEW MESSAGE'"] + lifecycle_stub_cmdline
         )
         self.assert_failure(changed_exiter_run)
         self.assertIn("erroneous!", changed_exiter_run.stderr_data)
@@ -302,7 +302,7 @@ Current thread [^\n]+ \\(most recent call first\\):
             some_file = os.path.join(tmpdir, "some_file")
             safe_file_dump(some_file, "")
             redirected_pants_run = self.run_pants(
-                [f"--lifecycle-stubs-new-interactive-stream-output-file={some_file}",]
+                [f"--lifecycle-stubs-new-interactive-stream-output-file={some_file}"]
                 + lifecycle_stub_cmdline
             )
             self.assert_failure(redirected_pants_run)

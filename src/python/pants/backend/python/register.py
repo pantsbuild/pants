@@ -85,8 +85,8 @@ def build_file_aliases():
 
 def build_file_aliases2():
     return BuildFileAliases(
-        objects={"python_requirement": PythonRequirement, "setup_py": PythonArtifact,},
-        context_aware_object_factories={"python_requirements": PythonRequirements,},
+        objects={"python_requirement": PythonRequirement, "setup_py": PythonArtifact},
+        context_aware_object_factories={"python_requirements": PythonRequirements},
     )
 
 

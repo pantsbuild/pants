@@ -82,7 +82,7 @@ class OptionsBootstrapperTest(unittest.TestCase):
                 "pants_supportdir": "/from_config/build-support",
                 "pants_distdir": "/from_config/dist",
             },
-            env={"PANTS_SUPPORTDIR": "/from_env/build-support", "PANTS_DISTDIR": "/from_env/dist",},
+            env={"PANTS_SUPPORTDIR": "/from_env/build-support", "PANTS_DISTDIR": "/from_env/dist"},
             args=["--pants-distdir=/from_args/dist"],
             workdir="/from_config/.pants.d",
             supportdir="/from_env/build-support",
@@ -154,7 +154,7 @@ class OptionsBootstrapperTest(unittest.TestCase):
     def test_bootstrapped_options_ignore_irrelevant_env(self) -> None:
         included = "PANTS_SUPPORTDIR"
         excluded = "NON_PANTS_ENV"
-        bootstrapper = OptionsBootstrapper.create(env={excluded: "pear", included: "banana",})
+        bootstrapper = OptionsBootstrapper.create(env={excluded: "pear", included: "banana"})
         self.assertIn(included, bootstrapper.env)
         self.assertNotIn(excluded, bootstrapper.env)
 

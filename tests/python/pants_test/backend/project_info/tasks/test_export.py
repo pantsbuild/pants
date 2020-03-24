@@ -140,7 +140,7 @@ class ExportTest(ConsoleTaskTestBase):
         self.make_target(
             ":nailgun-server",
             JarLibrary,
-            jars=[JarDependency(org="com.martiansoftware", name="nailgun-server", rev="0.9.1"),],
+            jars=[JarDependency(org="com.martiansoftware", name="nailgun-server", rev="0.9.1")],
         )
 
         self.make_target(
@@ -358,7 +358,7 @@ class ExportTest(ConsoleTaskTestBase):
         result = self.execute_export_json("project_info:third")
 
         self.assertEqual(
-            ["project_info/com/foo/Bar.scala", "project_info/com/foo/Baz.scala",],
+            ["project_info/com/foo/Bar.scala", "project_info/com/foo/Baz.scala"],
             sorted(result["targets"]["project_info:third"]["sources"]),
         )
 

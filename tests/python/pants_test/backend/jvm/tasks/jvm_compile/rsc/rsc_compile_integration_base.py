@@ -73,7 +73,7 @@ class RscCompileIntegrationBase(BaseCompileIT):
             config={
                 "cache.compile.rsc": {"ignore": True},
                 "jvm-platform": {"compiler": "rsc"},
-                "compile.rsc": {"workflow": workflow.value, "execution_strategy": "hermetic",},
+                "compile.rsc": {"workflow": workflow.value, "execution_strategy": "hermetic"},
                 "rsc": {"jvm_options": ["-Djava.security.manager=java.util.Optional"]},
             },
         )

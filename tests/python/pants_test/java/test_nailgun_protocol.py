@@ -238,7 +238,7 @@ class TestNailgunProtocol(unittest.TestCase):
 
         self.assertEqual(
             NailgunProtocol.isatty_to_env(mock_stdin, mock_stdout, mock_stderr),
-            {"NAILGUN_TTY_0": b"0", "NAILGUN_TTY_1": b"0", "NAILGUN_TTY_2": b"0",},
+            {"NAILGUN_TTY_0": b"0", "NAILGUN_TTY_1": b"0", "NAILGUN_TTY_2": b"0"},
         )
 
     def test_construct_chunk(self):

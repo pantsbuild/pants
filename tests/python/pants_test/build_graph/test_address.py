@@ -113,7 +113,7 @@ class ParseSpecTest(unittest.TestCase):
             return parse_spec(
                 spec,
                 relative_to=relative_to,
-                subproject_roots=["subprojectA", "path/to/subprojectB",],
+                subproject_roots=["subprojectA", "path/to/subprojectB"],
             )
 
         # Ensure that a spec in subprojectA is determined correctly.

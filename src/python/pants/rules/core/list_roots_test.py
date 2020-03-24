@@ -59,7 +59,7 @@ class AllRootsTest(TestBase):
         output = run_rule(
             list_roots.all_roots,
             rule_args=[source_root_config],
-            mock_gets=[MockGet(product_type=Snapshot, subject_type=PathGlobs, mock=provider_rule),],
+            mock_gets=[MockGet(product_type=Snapshot, subject_type=PathGlobs, mock=provider_rule)],
         )
 
         self.assertEqual(

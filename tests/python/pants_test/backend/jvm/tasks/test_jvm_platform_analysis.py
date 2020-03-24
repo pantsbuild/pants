@@ -25,14 +25,14 @@ class JvmPlatformAnalysisTestMixin:
 
     def _plain(self, name, deps=None):
         """Make a non-jvm target, useful for testing non-jvm intermediate dependencies."""
-        return self.make_target(spec=f"java:{name}", target_type=Target, dependencies=deps or [],)
+        return self.make_target(spec=f"java:{name}", target_type=Target, dependencies=deps or [])
 
     def simple_task(self, targets, **options):
         self.set_options(**options)
         platforms = {
-            "6": {"source": 6, "target": 6, "args": [],},
-            "7": {"source": 7, "target": 7, "args": [],},
-            "8": {"source": 8, "target": 8, "args": [],},
+            "6": {"source": 6, "target": 6, "args": []},
+            "7": {"source": 7, "target": 7, "args": []},
+            "8": {"source": 8, "target": 8, "args": []},
         }
         self.set_options_for_scope("jvm-platform", platforms=platforms, default_platform="6")
         context = self.context(target_roots=targets)

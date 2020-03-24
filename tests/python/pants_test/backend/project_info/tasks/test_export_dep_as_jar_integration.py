@@ -118,7 +118,7 @@ class ExportDepAsJarIntegrationTest(ScalacPluginIntegrationTestBase):
     def test_javac_options(self):
         target_to_test = f"{self.javac_test_targets_dir}/plugin:local"
         config = {}
-        expected_options = {"javac_args": ["-Xplugin:simple_javac_plugin args from target local",]}
+        expected_options = {"javac_args": ["-Xplugin:simple_javac_plugin args from target local"]}
         self._check_compiler_options_for_target_are(target_to_test, expected_options, config)
 
     def test_extra_jvm_options(self):

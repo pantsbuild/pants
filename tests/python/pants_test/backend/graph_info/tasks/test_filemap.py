@@ -13,7 +13,7 @@ from pants.testutil.task_test_base import ConsoleTaskTestBase
 class FilemapTest(ConsoleTaskTestBase):
     @classmethod
     def alias_groups(cls):
-        return BuildFileAliases(targets={"python_library": PythonLibrary,},)
+        return BuildFileAliases(targets={"python_library": PythonLibrary})
 
     @classmethod
     def task_type(cls):

@@ -410,7 +410,7 @@ def osx_shard(
     setup = {
         "os": "osx",
         "language": "generic",
-        "before_script": ["ulimit -c unlimited", "ulimit -n 8192",],
+        "before_script": ["ulimit -c unlimited", "ulimit -n 8192"],
         "before_install": [
             "curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq",
             "chmod 755 /usr/local/bin/jq",

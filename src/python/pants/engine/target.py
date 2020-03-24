@@ -427,6 +427,16 @@ class Target(ABC):
 
     @final
     @classmethod
+    def class_field_types(cls, union_membership: UnionMembership) -> Tuple[Type[Field], ...]:
+        """Return all registered Fields belonging to this target type.
+
+        You can also use the instance property `tgt.field_types` to avoid having to pass the
+        parameter UnionMembership.
+        """
+        return (*cls.core_fields, *cls._find_plugin_fields(union_membership))
+
+    @final
+    @classmethod
     def class_has_field(cls, field: Type[Field], *, union_membership: UnionMembership) -> bool:
         """Behaves like `Target.has_field()`, but works as a classmethod rather than an instance
         method."""
@@ -440,7 +450,7 @@ class Target(ABC):
         """Behaves like `Target.has_fields()`, but works as a classmethod rather than an instance
         method."""
         return cls._has_fields(
-            fields, registered_fields=(*cls.core_fields, *cls._find_plugin_fields(union_membership))
+            fields, registered_fields=cls.class_field_types(union_membership=union_membership)
         )
 
 

@@ -37,7 +37,7 @@ class AntlrJavaGenTest(NailgunTaskTestBase):
         return (
             super()
             .alias_groups()
-            .merge(BuildFileAliases(targets={"java_antlr_library": JavaAntlrLibrary,},))
+            .merge(BuildFileAliases(targets={"java_antlr_library": JavaAntlrLibrary}))
         )
 
     PARTS = {

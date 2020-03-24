@@ -2,6 +2,15 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from abc import ABC, abstractmethod
+from typing import Optional, Type
+
+
+# TODO: maybe find a better place for this helper. It probably belongs in `help`, but then we would
+#  have a dependency cycle.
+def get_first_line_of_docstring(cls: Type) -> Optional[str]:
+    if cls.__doc__ is None:
+        return None
+    return cls.__doc__.partition("\n")[0].strip()
 
 
 # TODO: make this error into an attribute on the `TypeConstraint` class object!

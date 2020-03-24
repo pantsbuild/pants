@@ -172,7 +172,7 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
             },
         )
         binary = self.create_python_binary(
-            "src/ipex", "bin", "main", dependencies=["3rdparty/ipex:ansicolors", ":lib",]
+            "src/ipex", "bin", "main", dependencies=["3rdparty/ipex:ansicolors", ":lib"]
         )
 
         self.set_options(generate_ipex=True)

@@ -40,12 +40,12 @@ class HelpInfoExtracterTest(unittest.TestCase):
         do_test(["--foo"], {"metavar": "xx"}, ["--foo=xx"], ["--foo"])
         do_test(["--foo"], {"type": int}, ["--foo=<int>"], ["--foo"])
         do_test(
-            ["--foo"], {"type": list}, ["--foo=\"['<str>', '<str>', ...]\"",], ["--foo"],
+            ["--foo"], {"type": list}, ["--foo=\"['<str>', '<str>', ...]\""], ["--foo"],
         )
         do_test(
             ["--foo"],
             {"type": list, "member_type": int},
-            ['--foo="[<int>, <int>, ...]"',],
+            ['--foo="[<int>, <int>, ...]"'],
             ["--foo"],
         )
         do_test(
