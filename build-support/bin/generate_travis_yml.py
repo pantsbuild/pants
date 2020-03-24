@@ -68,10 +68,10 @@ class Stage(Enum):
 GLOBAL_ENV_VARS = [
     'PANTS_CONFIG_FILES="${TRAVIS_BUILD_DIR}/pants.travis-ci.toml"',
     'LC_ALL="en_US.UTF-8"',
-    "BOOTSTRAPPED_PEX_BUCKET=ci-public.pantsbuild.org",
+    "AWS_BUCKET=ci-public.pantsbuild.org",
     "BOOTSTRAPPED_PEX_KEY_PREFIX=${TRAVIS_BUILD_NUMBER}/${TRAVIS_BUILD_ID}/pants.pex",
-    "BOOTSTRAPPED_PEX_URL_PREFIX=s3://${BOOTSTRAPPED_PEX_BUCKET}/${BOOTSTRAPPED_PEX_KEY_PREFIX}",
-    "PYENV_PY27_VERSION=2.7.15",
+    "BOOTSTRAPPED_PEX_URL_PREFIX=s3://${AWS_BUCKET}/${BOOTSTRAPPED_PEX_KEY_PREFIX}",
+    "NATIVE_ENGINE_SO_URL_PREFIX=s3://${AWS_BUCKET}/native_engine_so" "PYENV_PY27_VERSION=2.7.15",
     "PYENV_PY36_VERSION=3.6.8",
     "PYENV_PY37_VERSION=3.7.2",
     # NB: We must set `PYENV_ROOT` on macOS for Pyenv to work properly. However, on Linux, we must not
@@ -139,7 +139,7 @@ class PythonVersion(Enum):
 AWS_GET_PANTS_PEX_COMMAND = " ".join(
     [
         "./build-support/bin/get_ci_bootstrapped_pants_pex.sh",
-        "${BOOTSTRAPPED_PEX_BUCKET}",
+        "${AWS_BUCKET}",
         "${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}",
     ]
 )

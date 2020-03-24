@@ -16,8 +16,9 @@ PEX_URL_PREFIX = os.environ["BOOTSTRAPPED_PEX_URL_PREFIX"]
 PEX_KEY_SUFFIX = os.environ["BOOTSTRAPPED_PEX_KEY_SUFFIX"]
 PEX_URL = f"{PEX_URL_PREFIX}.{PEX_KEY_SUFFIX}"
 
-NATIVE_ENGINE_SO_PATH = f"{TRAVIS_BUILD_DIR}/src/python/pants/engine/native_engine.so"
-NATIVE_ENGINE_SO_URL_PREFIX = "s3://native_engine_so"
+NATIVE_ENGINE_SO_URL_PREFIX = os.environ["NATIVE_ENGINE_SO_URL_PREFIX"]
+NATIVE_ENGINE_SO_LOCAL_PATH = f"{TRAVIS_BUILD_DIR}/src/python/pants/engine/native_engine.so"
+
 AWS_S3_COMMAND_PREFIX = ["aws", "--no-sign-request", "--region", "us-east-1", "s3"]
 
 
@@ -27,6 +28,7 @@ def main() -> None:
     native_engine_so_hash = calculate_native_engine_so_hash()
     native_engine_so_aws_directory = f"{NATIVE_ENGINE_SO_URL_PREFIX}/{native_engine_so_hash}"
     native_engine_so_aws_url = f"{native_engine_so_aws_directory}/native_engine.so"
+
     native_engine_so_already_cached = native_engine_so_in_s3_cache(native_engine_so_aws_directory)
 
     if args.get:
@@ -75,17 +77,19 @@ def calculate_native_engine_so_hash() -> str:
     )
 
 
-def native_engine_so_in_s3_cache(native_engine_so_aws_directory: str) -> bool:
-    # NB: This will fail if the bucket does not exist.
-    ls_result = subprocess.run(
-        [*AWS_S3_COMMAND_PREFIX, "ls", native_engine_so_aws_directory], stdout=subprocess.PIPE
-    )
-    return ls_result.returncode == 0 and "native_engine.so" in ls_result.stdout.decode()
+def native_engine_so_in_s3_cache(native_engine_so_directory: str) -> bool:
+    ls_output = subprocess.run(
+        [*AWS_S3_COMMAND_PREFIX, "ls", native_engine_so_directory],
+        stdout=subprocess.PIPE,
+        check=True,
+    ).stdout.decode()
+    return "native_engine.so" in ls_output
 
 
 def get_native_engine_so(native_engine_so_aws_url: str) -> None:
     subprocess.run(
-        [*AWS_S3_COMMAND_PREFIX, "cp", native_engine_so_aws_url, NATIVE_ENGINE_SO_PATH], check=True
+        [*AWS_S3_COMMAND_PREFIX, "cp", native_engine_so_aws_url, NATIVE_ENGINE_SO_LOCAL_PATH],
+        check=True,
     )
 
 
@@ -94,7 +98,7 @@ def _deploy(file_path: str, s3_url: str) -> None:
 
 
 def deploy_native_engine_so(native_engine_so_aws_url: str) -> None:
-    _deploy(file_path=NATIVE_ENGINE_SO_PATH, s3_url=native_engine_so_aws_url)
+    _deploy(file_path=NATIVE_ENGINE_SO_LOCAL_PATH, s3_url=native_engine_so_aws_url)
 
 
 def deploy_pants_pex() -> None:

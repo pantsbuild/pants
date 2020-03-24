@@ -16,10 +16,10 @@ env:
   global:
   - PANTS_CONFIG_FILES="${TRAVIS_BUILD_DIR}/pants.travis-ci.toml"
   - LC_ALL="en_US.UTF-8"
-  - BOOTSTRAPPED_PEX_BUCKET=ci-public.pantsbuild.org
+  - AWS_BUCKET=ci-public.pantsbuild.org
   - BOOTSTRAPPED_PEX_KEY_PREFIX=${TRAVIS_BUILD_NUMBER}/${TRAVIS_BUILD_ID}/pants.pex
-  - BOOTSTRAPPED_PEX_URL_PREFIX=s3://${BOOTSTRAPPED_PEX_BUCKET}/${BOOTSTRAPPED_PEX_KEY_PREFIX}
-  - PYENV_PY27_VERSION=2.7.15
+  - BOOTSTRAPPED_PEX_URL_PREFIX=s3://${AWS_BUCKET}/${BOOTSTRAPPED_PEX_KEY_PREFIX}
+  - NATIVE_ENGINE_SO_URL_PREFIX=s3://${AWS_BUCKET}/native_engine_soPYENV_PY27_VERSION=2.7.15
   - PYENV_PY36_VERSION=3.6.8
   - PYENV_PY37_VERSION=3.7.2
   - PYENV_ROOT_OSX=${HOME}/.pants_pyenv
@@ -357,8 +357,7 @@ jobs:
       | tar -zxvf - travis-wait-enhanced
     - mv travis-wait-enhanced /home/travis/bin/
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -419,8 +418,7 @@ jobs:
       | tar -zxvf - travis-wait-enhanced
     - mv travis-wait-enhanced /home/travis/bin/
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -545,8 +543,7 @@ jobs:
       | tar -zxvf - travis-wait-enhanced
     - mv travis-wait-enhanced /home/travis/bin/
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -605,8 +602,7 @@ jobs:
       | tar -zxvf - travis-wait-enhanced
     - mv travis-wait-enhanced /home/travis/bin/
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -666,8 +662,7 @@ jobs:
       | tar -zxvf - travis-wait-enhanced
     - mv travis-wait-enhanced /home/travis/bin/
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -726,8 +721,7 @@ jobs:
       | tar -zxvf - travis-wait-enhanced
     - mv travis-wait-enhanced /home/travis/bin/
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -784,8 +778,7 @@ jobs:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     - ulimit -c unlimited
     cache:
       directories:
@@ -829,8 +822,7 @@ jobs:
     before_script:
     - ulimit -c unlimited
     - ulimit -n 8192
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     env:
     - PATH="/usr/local/opt/openssl/bin:${PATH}"
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
@@ -879,8 +871,7 @@ jobs:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -936,8 +927,7 @@ jobs:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -993,8 +983,7 @@ jobs:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -1050,8 +1039,7 @@ jobs:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -1107,8 +1095,7 @@ jobs:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -1164,8 +1151,7 @@ jobs:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -1221,8 +1207,7 @@ jobs:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -1278,8 +1263,7 @@ jobs:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -1336,8 +1320,7 @@ jobs:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -1394,8 +1377,7 @@ jobs:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -1452,8 +1434,7 @@ jobs:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -1510,8 +1491,7 @@ jobs:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -1568,8 +1548,7 @@ jobs:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -1626,8 +1605,7 @@ jobs:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -1684,8 +1662,7 @@ jobs:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -1742,8 +1719,7 @@ jobs:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -1800,8 +1776,7 @@ jobs:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -1858,8 +1833,7 @@ jobs:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -1916,8 +1890,7 @@ jobs:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -1974,8 +1947,7 @@ jobs:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -2032,8 +2004,7 @@ jobs:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -2141,8 +2112,7 @@ jobs:
     before_script:
     - ulimit -c unlimited
     - ulimit -n 8192
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     env:
     - PATH="/usr/local/opt/openssl/bin:${PATH}"
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
@@ -2166,8 +2136,7 @@ jobs:
     before_script:
     - ulimit -c unlimited
     - ulimit -n 8192
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     env:
     - PATH="/usr/local/opt/openssl/bin:${PATH}"
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
@@ -2191,8 +2160,7 @@ jobs:
     before_script:
     - ulimit -c unlimited
     - ulimit -n 8192
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     env:
     - PATH="/usr/local/opt/openssl/bin:${PATH}"
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
@@ -2217,8 +2185,7 @@ jobs:
     before_script:
     - ulimit -c unlimited
     - ulimit -n 8192
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     env:
     - PATH="/usr/local/opt/openssl/bin:${PATH}"
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
@@ -2243,8 +2210,7 @@ jobs:
     before_script:
     - ulimit -c unlimited
     - ulimit -n 8192
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     env:
     - PATH="/usr/local/opt/openssl/bin:${PATH}"
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
@@ -2269,8 +2235,7 @@ jobs:
     before_script:
     - ulimit -c unlimited
     - ulimit -n 8192
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     env:
     - PATH="/usr/local/opt/openssl/bin:${PATH}"
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
@@ -2319,8 +2284,7 @@ jobs:
     - sudo chmod 666 /dev/fuse
     - sudo chown root:$USER /etc/fuse.conf
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -2380,8 +2344,7 @@ jobs:
     - sudo chmod 666 /dev/fuse
     - sudo chown root:$USER /etc/fuse.conf
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
       directories:
       - ${AWS_CLI_ROOT}

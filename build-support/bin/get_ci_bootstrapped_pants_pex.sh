@@ -2,17 +2,17 @@
 
 set -euo pipefail
 
-BOOTSTRAPPED_PEX_BUCKET=$1
+AWS_BUCKET=$1
 BOOTSTRAPPED_PEX_KEY=$2
 
-BOOTSTRAPPED_PEX_URL=s3://${BOOTSTRAPPED_PEX_BUCKET}/${BOOTSTRAPPED_PEX_KEY}
+BOOTSTRAPPED_PEX_URL=s3://${AWS_BUCKET}/${BOOTSTRAPPED_PEX_KEY}
 
 # Note that in the aws cli --no-sign-request allows access to public S3 buckets without
 # credentials, as long as we specify the region.
 
 # First check that there's only one version of the object on S3, to detect malicious overwrites.
 NUM_VERSIONS=$(aws --no-sign-request --region us-east-1 s3api list-object-versions \
-  --bucket "${BOOTSTRAPPED_PEX_BUCKET}" --prefix "${BOOTSTRAPPED_PEX_KEY}" --max-items 2 \
+  --bucket "${AWS_BUCKET}" --prefix "${BOOTSTRAPPED_PEX_KEY}" --max-items 2 \
   | jq '.Versions | length')
 [ "${NUM_VERSIONS}" == "1" ] || (echo "Error: Found ${NUM_VERSIONS} versions for ${BOOTSTRAPPED_PEX_URL}" && exit 1)
 
