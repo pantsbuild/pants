@@ -36,7 +36,6 @@ class PailgunClientSignalHandler(SignalHandler):
             timeout=self._timeout,
             reason=KeyboardInterrupt("Interrupted by user over pailgun client!"),
         )
-        self._pailgun_client.maybe_send_signal(signum)
 
     def handle_sigint(self, signum, _frame):
         if self._pailgun_client._maybe_last_pid():
