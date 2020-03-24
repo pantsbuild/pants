@@ -4,6 +4,7 @@
 
 python_library(
   dependencies=[
+    'src/python/pants/base:build_root',
     'src/python/pants/build_graph',
     'src/python/pants/engine:addressable',
     'src/python/pants/engine:console',
