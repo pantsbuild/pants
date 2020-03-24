@@ -81,12 +81,14 @@ default-members = [
 ]
 
 [dependencies]
+async-trait = "0.1"
 boxfuture = { path = "boxfuture" }
 bytes = "0.4.5"
 concrete_time = { path = "concrete_time" }
 fnv = "1.0.5"
 fs = { path = "fs" }
 futures01 = { package = "futures", version = "0.1" }
+futures = { version = "0.3", features = ["compat"] }
 graph = { path = "graph" }
 hashing = { path = "hashing" }
 indexmap = "1.0.2"
@@ -94,21 +96,23 @@ itertools = "0.8.2"
 lazy_static = "1"
 log = "0.4"
 logging = { path = "logging" }
+num_cpus = "1"
 num_enum = "0.4"
 parking_lot = "0.6"
 process_execution = { path = "process_execution" }
 rand = "0.6"
-reqwest = { version = "0.9.22", default_features = false, features = ["rustls-tls"] }
+reqwest = { version = "0.10", default_features = false, features = ["stream", "rustls-tls"] }
 rule_graph = { path = "rule_graph" }
 sharded_lmdb = { path = "sharded_lmdb" }
 smallvec = "0.6"
 store = { path = "fs/store" }
+task_executor = { path = "task_executor" }
 tempfile = "3"
 time = "0.1.40"
+tokio = { version = "0.2", features = ["rt-threaded"] }
 ui = { path = "ui" }
-url = "1.7.1"
+url = "2.1"
 uuid = { version = "0.7", features = ["v4"] }
-task_executor = { path = "task_executor" }
 workunit_store = { path = "workunit_store" }
 
 [patch.crates-io]

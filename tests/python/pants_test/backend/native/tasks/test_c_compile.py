@@ -71,7 +71,7 @@ class CCompileTest(NativeTaskTestBase, NativeCompileTestMixin):
         c = self.create_header_only_alternate_c_library(alternate_extension)
         context = self.prepare_context_for_compile(
             target_roots=[c],
-            options={"c-compile-settings": {"header_file_extensions": [alternate_extension],},},
+            options={"c-compile-settings": {"header_file_extensions": [alternate_extension]}},
         )
 
         # Test that the task runs without error if provided a header-only library.

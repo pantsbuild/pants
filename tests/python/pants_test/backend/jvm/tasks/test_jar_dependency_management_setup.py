@@ -40,12 +40,12 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
         default_target = self.make_target(
             spec="//foo:management",
             target_type=ManagedJarDependencies,
-            artifacts=[JarDependency(org="foobar", name="foobar", rev="2"),],
+            artifacts=[JarDependency(org="foobar", name="foobar", rev="2")],
         )
         jar_library = self.make_target(
             spec="//foo:library",
             target_type=JarLibrary,
-            jars=[JarDependency(org="foobar", name="foobar"),],
+            jars=[JarDependency(org="foobar", name="foobar")],
         )
         context = self.context(target_roots=[default_target, jar_library])
         manager = self._init_manager(default_target="//foo:management")
@@ -59,7 +59,7 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
         jar_library = self.make_target(
             spec="//foo:library",
             target_type=JarLibrary,
-            jars=[JarDependency(org="foobar", name="foobar"),],
+            jars=[JarDependency(org="foobar", name="foobar")],
         )
         context = self.context(target_roots=[jar_library])
         self._init_manager(default_target="//foo:nonexistant")
@@ -72,12 +72,12 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
         management_target = self.make_target(
             spec="//foo:management",
             target_type=ManagedJarDependencies,
-            artifacts=[JarDependency(org="foobar", name="foobar", rev="2"),],
+            artifacts=[JarDependency(org="foobar", name="foobar", rev="2")],
         )
         jar_library = self.make_target(
             spec="//foo:library",
             target_type=JarLibrary,
-            jars=[JarDependency(org="foobar", name="foobar"),],
+            jars=[JarDependency(org="foobar", name="foobar")],
         )
         context = self.context(target_roots=[management_target, jar_library])
         manager = self._init_manager()
@@ -90,12 +90,12 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
         management_target = self.make_target(
             spec="//foo:management",
             target_type=ManagedJarDependencies,
-            artifacts=[JarDependency(org="foobar", name="foobar", rev="2"),],
+            artifacts=[JarDependency(org="foobar", name="foobar", rev="2")],
         )
         jar_library = self.make_target(
             spec="//foo:library",
             target_type=JarLibrary,
-            jars=[JarDependency(org="foobar", name="foobar"),],
+            jars=[JarDependency(org="foobar", name="foobar")],
             managed_dependencies="//foo:management",
         )
         context = self.context(target_roots=[management_target, jar_library])
@@ -110,17 +110,17 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
         default_target = self.make_target(
             spec="//foo:foobar",
             target_type=ManagedJarDependencies,
-            artifacts=[JarDependency(org="foobar", name="foobar", rev="2"),],
+            artifacts=[JarDependency(org="foobar", name="foobar", rev="2")],
         )
         management_target = self.make_target(
             spec="//foo:management",
             target_type=ManagedJarDependencies,
-            artifacts=[JarDependency(org="foobar", name="foobar", rev="3"),],
+            artifacts=[JarDependency(org="foobar", name="foobar", rev="3")],
         )
         jar_library = self.make_target(
             spec="//foo:library",
             target_type=JarLibrary,
-            jars=[JarDependency(org="foobar", name="foobar"),],
+            jars=[JarDependency(org="foobar", name="foobar")],
             managed_dependencies="//foo:management",
         )
         context = self.context(target_roots=[default_target, management_target, jar_library])
@@ -135,17 +135,17 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
         pin_jar_library = self.make_target(
             spec="//foo:pinned-library",
             target_type=JarLibrary,
-            jars=[JarDependency(org="foobar", name="foobar", rev="2"),],
+            jars=[JarDependency(org="foobar", name="foobar", rev="2")],
         )
         management_target = self.make_target(
             spec="//foo:management",
             target_type=ManagedJarDependencies,
-            artifacts=["//foo:pinned-library",],
+            artifacts=["//foo:pinned-library"],
         )
         jar_library = self.make_target(
             spec="//foo:library",
             target_type=JarLibrary,
-            jars=[JarDependency(org="foobar", name="foobar"),],
+            jars=[JarDependency(org="foobar", name="foobar")],
             managed_dependencies="//foo:management",
         )
         context = self.context(target_roots=[management_target, jar_library, pin_jar_library])
@@ -175,7 +175,7 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
         management_target = self.make_target(
             spec="//foo:management",
             target_type=ManagedJarDependencies,
-            artifacts=[JarDependency(org="foobar", name="foobar"),],
+            artifacts=[JarDependency(org="foobar", name="foobar")],
         )
         context = self.context(target_roots=[management_target])
         self._init_manager()
@@ -187,12 +187,12 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
         jar_library = self.make_target(
             spec="//foo:library",
             target_type=JarLibrary,
-            jars=[JarDependency(org="foobar", name="foobar", rev="3"),],
+            jars=[JarDependency(org="foobar", name="foobar", rev="3")],
         )
         management_target = self.make_target(
             spec="//foo:management",
             target_type=ManagedJarDependencies,
-            artifacts=[JarDependency(org="foobar", name="foobar", rev="2"), "//foo:library",],
+            artifacts=[JarDependency(org="foobar", name="foobar", rev="2"), "//foo:library"],
         )
         context = self.context(target_roots=[jar_library, management_target])
         self._init_manager()
@@ -204,12 +204,12 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
         jar_library = self.make_target(
             spec="//foo:library",
             target_type=JarLibrary,
-            jars=[JarDependency(org="foobar", name="foobar", rev=None),],
+            jars=[JarDependency(org="foobar", name="foobar", rev=None)],
         )
         management_target = self.make_target(
             spec="//foo:management",
             target_type=ManagedJarDependencies,
-            artifacts=[JarDependency(org="foobar", name="foobar", rev="2"), "//foo:library",],
+            artifacts=[JarDependency(org="foobar", name="foobar", rev="2"), "//foo:library"],
         )
         context = self.context(target_roots=[jar_library, management_target])
         self._init_manager()
@@ -221,20 +221,20 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
         default_target = self.make_target(
             spec="//foo:management",
             target_type=ManagedJarDependencies,
-            artifacts=[JarDependency(org="foobar", name="foobar", rev="2"),],
+            artifacts=[JarDependency(org="foobar", name="foobar", rev="2")],
         )
         jar_library1 = self.make_target(
             spec="//foo:library",
             target_type=JarLibrary,
-            jars=[JarDependency(org="foobar", name="foobar"),],
+            jars=[JarDependency(org="foobar", name="foobar")],
         )
         jar_library2 = self.make_target(
             spec="//foo:library2",
             target_type=JarLibrary,
-            jars=[JarDependency(org="vegetables", name="potato", rev="3"),],
+            jars=[JarDependency(org="vegetables", name="potato", rev="3")],
         )
         unpacked_target = self.make_target(
-            spec="//foo:unpacked", target_type=UnpackedJars, libraries=[":library2",]
+            spec="//foo:unpacked", target_type=UnpackedJars, libraries=[":library2"]
         )
         context = self.context(
             target_roots=[default_target, jar_library1, jar_library2, unpacked_target]
@@ -252,15 +252,15 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
         management_target = self.make_target(
             target_type=ManagedJarDependencies,
             spec="//foo:management_indirect",
-            artifacts=[JarDependency(org="foobar", name="foobar", rev="2"),],
+            artifacts=[JarDependency(org="foobar", name="foobar", rev="2")],
         )
         default_target = self.make_target(
-            target_type=Target, spec="//foo:management", dependencies=[management_target,],
+            target_type=Target, spec="//foo:management", dependencies=[management_target],
         )
         jar_library1 = self.make_target(
             target_type=JarLibrary,
             spec="//foo:library",
-            jars=[JarDependency(org="foobar", name="foobar"),],
+            jars=[JarDependency(org="foobar", name="foobar")],
         )
         context = self.context(target_roots=[default_target, jar_library1, management_target])
         manager = self._init_manager(default_target="//foo:management")
@@ -308,12 +308,12 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
                 JarDependency(org="foobar", name="foobar", rev="3"),
                 JarDependency(org="fruit", name="apple", rev="4"),
             ],
-            dependencies=[management_target,],
+            dependencies=[management_target],
         )
         jar_library1 = self.make_target(
             target_type=JarLibrary,
             spec="//foo:library",
-            jars=[JarDependency(org="foobar", name="foobar"),],
+            jars=[JarDependency(org="foobar", name="foobar")],
         )
 
         def check_task_execution(manager):
@@ -344,10 +344,10 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
         management_target2 = self.make_target(
             target_type=ManagedJarDependencies,
             spec="//foo:management_indirect2",
-            artifacts=[JarDependency(org="foobar", name="foobar", rev="7", ext="tar"),],
+            artifacts=[JarDependency(org="foobar", name="foobar", rev="7", ext="tar")],
         )
         indirection_2 = self.make_target(
-            target_type=Target, spec="//foo:indirection_2", dependencies=[management_target2,],
+            target_type=Target, spec="//foo:indirection_2", dependencies=[management_target2],
         )
         default_target = self.make_target(
             target_type=ManagedJarDependencies,
@@ -356,12 +356,12 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
                 JarDependency(org="foobar", name="foobar", rev="3"),
                 JarDependency(org="fruit", name="apple", rev="4"),
             ],
-            dependencies=[management_target, indirection_2,],
+            dependencies=[management_target, indirection_2],
         )
         jar_library1 = self.make_target(
             target_type=JarLibrary,
             spec="//foo:library",
-            jars=[JarDependency(org="foobar", name="foobar"),],
+            jars=[JarDependency(org="foobar", name="foobar")],
         )
 
         def check_task_execution(manager):
@@ -391,20 +391,20 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
         jar_library_unversioned = self.make_target(
             target_type=JarLibrary,
             spec="//foo:library-unversioned",
-            jars=[JarDependency(org="foobar", name="foobar"),],
+            jars=[JarDependency(org="foobar", name="foobar")],
         )
         jar_library_versioned = self.make_target(
             target_type=JarLibrary,
             spec="//foo:library-versioned",
-            jars=[JarDependency(org="foobar", name="foobar", rev="2"),],
+            jars=[JarDependency(org="foobar", name="foobar", rev="2")],
         )
         indirect_target = self.make_target(
-            target_type=Target, spec="//foo:indirect-deps", dependencies=[jar_library_versioned,]
+            target_type=Target, spec="//foo:indirect-deps", dependencies=[jar_library_versioned]
         )
         management_target = self.make_target(
             target_type=ManagedJarDependencies,
             spec="//foo:management",
-            artifacts=["//foo:indirect-deps",],
+            artifacts=["//foo:indirect-deps"],
         )
         context = self.context(
             target_roots=[
@@ -425,16 +425,16 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
         class DummyTarget(Target):
             pass
 
-        dummy_target = self.make_target(target_type=DummyTarget, spec="//foo:dummy",)
+        dummy_target = self.make_target(target_type=DummyTarget, spec="//foo:dummy")
         indirect_target = self.make_target(
-            target_type=Target, spec="//foo:indirect", dependencies=[dummy_target,]
+            target_type=Target, spec="//foo:indirect", dependencies=[dummy_target]
         )
         management_target = self.make_target(
             target_type=ManagedJarDependencies,
             spec="//foo:management",
-            artifacts=["//foo:indirect",],
+            artifacts=["//foo:indirect"],
         )
-        context = self.context(target_roots=[management_target, indirect_target, dummy_target,])
+        context = self.context(target_roots=[management_target, indirect_target, dummy_target])
         self._init_manager()
         task = self.create_task(context)
         with self.assertRaises(TargetDefinitionException):

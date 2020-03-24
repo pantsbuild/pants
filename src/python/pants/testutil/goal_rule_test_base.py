@@ -56,7 +56,7 @@ class GoalRuleTestBase(TestBase):
         )
         BuildConfigInitializer.get(options_bootstrapper)
         full_options = options_bootstrapper.get_full_options(
-            [*GlobalOptions.known_scope_infos(), *self.goal_cls.subsystem_cls.known_scope_infos(),]
+            [*GlobalOptions.known_scope_infos(), *self.goal_cls.subsystem_cls.known_scope_infos()]
         )
         stdout, stderr = StringIO(), StringIO()
         console = Console(stdout=stdout, stderr=stderr)

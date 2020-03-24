@@ -27,7 +27,7 @@ class ScopeTestIntegrationTest(PantsRunIntegrationTest):
 
         It should be included because it has the 'test' scope.
         """
-        self.assert_success(self.run_pants(["--no-java-strict-deps", "test", self._spec("tests"),]))
+        self.assert_success(self.run_pants(["--no-java-strict-deps", "test", self._spec("tests")]))
 
     def test_binary_compiles(self):
         """This should compile just fine, because the reference to the 'test' class is dynamic.
@@ -36,10 +36,8 @@ class ScopeTestIntegrationTest(PantsRunIntegrationTest):
         'test' class. We want to make sure that the test-case below this one isn't failing just
         because of an unrelated syntax error.
         """
-        self.assert_success(
-            self.run_pants(["--no-java-strict-deps", "compile", self._spec("bin"),])
-        )
+        self.assert_success(self.run_pants(["--no-java-strict-deps", "compile", self._spec("bin")]))
 
     def test_binary_fails_to_run(self):
         """Ensure the binary does not have access to 'test'-scoped dependencies at runtime."""
-        self.assert_failure(self.run_pants(["--no-java-strict-deps", "run", self._spec("bin"),]))
+        self.assert_failure(self.run_pants(["--no-java-strict-deps", "run", self._spec("bin")]))

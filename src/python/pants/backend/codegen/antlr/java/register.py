@@ -8,7 +8,7 @@ from pants.goal.task_registrar import TaskRegistrar as task
 
 
 def build_file_aliases():
-    return BuildFileAliases(targets={"java_antlr_library": JavaAntlrLibrary,})
+    return BuildFileAliases(targets={"java_antlr_library": JavaAntlrLibrary})
 
 
 def register_goals():

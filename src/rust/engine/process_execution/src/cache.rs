@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use bincode;
 use bytes::Bytes;
+use futures::future::TryFutureExt;
 use futures01::{future, Future};
 use log::{debug, warn};
 use protobuf::Message;
@@ -126,6 +127,7 @@ impl CommandRunner {
 
         Ok((execute_response, platform))
       })
+      .compat()
       .and_then(
         move |maybe_execute_response: Option<(ExecuteResponse, Platform)>| {
           if let Some((execute_response, platform)) = maybe_execute_response {
@@ -198,6 +200,10 @@ impl CommandRunner {
         });
         future::result(bytes_to_store)
       })
-      .and_then(move |bytes: Bytes| process_execution_store.store_bytes(fingerprint, bytes, false))
+      .and_then(move |bytes| {
+        process_execution_store
+          .store_bytes(fingerprint, bytes, false)
+          .compat()
+      })
   }
 }

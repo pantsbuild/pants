@@ -260,12 +260,6 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         if self._repro:
             self._repro.capture(self._run_tracker.run_info.get_as_dict())
 
-    def run(self):
-        with LocalExiter.wrap_global_exiter(self._run_tracker, self._repro), maybe_profiled(
-            self.profile_path
-        ):
-            self._run()
-
     def _maybe_handle_help(self):
         """Handle requests for `help` information."""
         if self.options.help_request:
@@ -342,32 +336,36 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         if engine_workunits:
             self._run_tracker.report.bulk_record_workunits(engine_workunits)
 
-    def _run(self):
+    def run(self):
         global_options = self.options.for_global_scope()
 
-        streaming_handlers = global_options.streaming_workunits_handlers
-        report_interval = global_options.streaming_workunits_report_interval
-        callbacks = Subsystem.get_streaming_workunit_callbacks(streaming_handlers)
-        streaming_reporter = StreamingWorkunitHandler(
-            self.scheduler_session, callbacks=callbacks, report_interval_seconds=report_interval
-        )
+        exiter = LocalExiter.wrap_global_exiter(self._run_tracker, self._repro)
+        profiled = maybe_profiled(self.profile_path)
 
-        help_output = self._maybe_handle_help()
-        if help_output is not None:
-            self._exiter.exit(help_output)
+        with exiter, profiled:
+            streaming_handlers = global_options.streaming_workunits_handlers
+            report_interval = global_options.streaming_workunits_report_interval
+            callbacks = Subsystem.get_streaming_workunit_callbacks(streaming_handlers)
+            streaming_reporter = StreamingWorkunitHandler(
+                self.scheduler_session, callbacks=callbacks, report_interval_seconds=report_interval
+            )
 
-        v1 = global_options.v1
-        v2 = global_options.v2
-        with streaming_reporter.session():
-            try:
-                engine_result = self._maybe_run_v2(v2)
-                goal_runner_result = self._maybe_run_v1(v1)
-            finally:
-                run_tracker_result = self._finish_run()
-        final_exit_code = self._compute_final_exit_code(
-            engine_result, goal_runner_result, run_tracker_result
-        )
-        self._exiter.exit(final_exit_code)
+            help_output = self._maybe_handle_help()
+            if help_output is not None:
+                self._exiter.exit(help_output)
+
+            v1 = global_options.v1
+            v2 = global_options.v2
+            with streaming_reporter.session():
+                try:
+                    engine_result = self._maybe_run_v2(v2)
+                    goal_runner_result = self._maybe_run_v1(v1)
+                finally:
+                    run_tracker_result = self._finish_run()
+            final_exit_code = self._compute_final_exit_code(
+                engine_result, goal_runner_result, run_tracker_result
+            )
+            self._exiter.exit(final_exit_code)
 
     def _finish_run(self):
         try:

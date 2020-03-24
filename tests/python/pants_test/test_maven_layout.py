@@ -15,7 +15,7 @@ from pants.testutil.test_base import TestBase
 class MavenLayoutTest(TestBase):
     @classmethod
     def alias_groups(cls):
-        return BuildFileAliases(targets={"java_library": JavaLibrary, "junit_tests": JUnitTests,},)
+        return BuildFileAliases(targets={"java_library": JavaLibrary, "junit_tests": JUnitTests})
 
     def setUp(self):
         super().setUp()

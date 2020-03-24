@@ -23,7 +23,7 @@ class CheckPublishedDepsTest(ConsoleTaskTestBase):
     @classmethod
     def alias_groups(cls):
         return BuildFileAliases(
-            targets={"target": Target, "jar_library": JarLibrary, "java_library": JavaLibrary,},
+            targets={"target": Target, "jar_library": JarLibrary, "java_library": JavaLibrary},
             objects={
                 "artifact": Artifact,
                 "jar": JarDependency,

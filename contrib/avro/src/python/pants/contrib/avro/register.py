@@ -9,7 +9,7 @@ from pants.contrib.avro.tasks.avro_gen import AvroJavaGenTask
 
 
 def build_file_aliases():
-    return BuildFileAliases(targets={JavaAvroLibrary.alias(): JavaAvroLibrary,})
+    return BuildFileAliases(targets={JavaAvroLibrary.alias(): JavaAvroLibrary})
 
 
 def register_goals():

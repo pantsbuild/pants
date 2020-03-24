@@ -21,7 +21,7 @@ class DummyTargetBase(Target):
         self.copied = copied
         payload = Payload()
         payload.add_fields(
-            {"sources": self.create_sources_field(sources, address.spec_path, key_arg="sources"),}
+            {"sources": self.create_sources_field(sources, address.spec_path, key_arg="sources")}
         )
         super().__init__(address=address, payload=payload, **kwargs)
 

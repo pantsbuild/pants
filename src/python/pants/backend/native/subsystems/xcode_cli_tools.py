@@ -25,7 +25,7 @@ class XCodeCLITools(Subsystem):
     options_scope = "xcode-cli-tools"
 
     _REQUIRED_FILES = {
-        "bin": ["as", "cc", "c++", "clang", "clang++", "ld", "lipo",],
+        "bin": ["as", "cc", "c++", "clang", "clang++", "ld", "lipo"],
         # Any of the entries that would be here are not directly below the 'include' or 'lib' dirs, and
         # we haven't yet encountered an invalid XCode/CLI tools installation which has the include dirs,
         # but incorrect files. These would need to be updated if such an issue arises.

@@ -19,27 +19,27 @@ class ScopeRuntimeIntegrationTest(PantsRunIntegrationTest):
 
     def test_run_runtime_pass(self):
         self.assert_success(
-            self.run_pants(["--no-java-strict-deps", "run", self._spec("runtime-pass"),])
+            self.run_pants(["--no-java-strict-deps", "run", self._spec("runtime-pass")])
         )
 
     def test_run_runtime_fail(self):
         self.assert_failure(
-            self.run_pants(["--no-java-strict-deps", "run", self._spec("runtime-fail"),])
+            self.run_pants(["--no-java-strict-deps", "run", self._spec("runtime-fail")])
         )
 
     def test_compile_compile_pass(self):
         self.assert_success(
-            self.run_pants(["--no-java-strict-deps", "compile", self._spec("compile-pass"),])
+            self.run_pants(["--no-java-strict-deps", "compile", self._spec("compile-pass")])
         )
 
     def test_compile_compile_fail(self):
         self.assert_failure(
-            self.run_pants(["--no-java-strict-deps", "compile", self._spec("compile-fail"),])
+            self.run_pants(["--no-java-strict-deps", "compile", self._spec("compile-fail")])
         )
 
     def test_run_compile_fail(self):
         self.assert_failure(
-            self.run_pants(["--no-java-strict-deps", "run", self._spec("compile-pass"),])
+            self.run_pants(["--no-java-strict-deps", "run", self._spec("compile-pass")])
         )
 
     def test_runtime_binary_has_correct_contents_and_runs(self):
@@ -84,7 +84,7 @@ class ScopeRuntimeIntegrationTest(PantsRunIntegrationTest):
         spec = self._spec("runtime-pass")
         with temporary_dir() as distdir:
             with self.pants_results(
-                [f"--pants-distdir={distdir}", "--no-java-strict-deps", "bundle", spec,]
+                [f"--pants-distdir={distdir}", "--no-java-strict-deps", "bundle", spec]
             ) as run:
                 self.assert_success(run)
                 bundle_dir = os.path.join(distdir, f"{re.sub('[:/]', '.', spec)}-bundle")
@@ -101,7 +101,7 @@ class ScopeRuntimeIntegrationTest(PantsRunIntegrationTest):
         spec = self._spec("compile-pass")
         with temporary_dir() as distdir:
             with self.pants_results(
-                [f"--pants-distdir={distdir}", "--no-java-strict-deps", "bundle", spec,]
+                [f"--pants-distdir={distdir}", "--no-java-strict-deps", "bundle", spec]
             ) as run:
                 self.assert_success(run)
                 bundle_dir = os.path.join(distdir, f"{re.sub('[:/]', '.', spec)}-bundle")
@@ -156,7 +156,7 @@ class ScopeChangesCacheInvalidationIntegrationTest(PantsRunIntegrationTest):
                 write_build("")
                 self.assert_success(
                     self.run_pants_with_workdir(
-                        ["--no-java-strict-deps", "compile", spec("bar"),], workdir=workdir
+                        ["--no-java-strict-deps", "compile", spec("bar")], workdir=workdir
                     ),
                     msg="Normal build from a clean cache failed. Something may be wrong "
                     "with the test setup.",
@@ -165,7 +165,7 @@ class ScopeChangesCacheInvalidationIntegrationTest(PantsRunIntegrationTest):
                 write_build("runtime")
                 self.assert_failure(
                     self.run_pants_with_workdir(
-                        ["--no-java-strict-deps", "compile", spec("bar"),], workdir=workdir
+                        ["--no-java-strict-deps", "compile", spec("bar")], workdir=workdir
                     ),
                     msg="Build from a dirty cache with the dependency on :foo scoped to "
                     "runtime passed, when it should have had a compile failure. The "
@@ -175,7 +175,7 @@ class ScopeChangesCacheInvalidationIntegrationTest(PantsRunIntegrationTest):
                 write_build("compile")
                 self.assert_success(
                     self.run_pants_with_workdir(
-                        ["--no-java-strict-deps", "compile", spec("bar"),], workdir=workdir
+                        ["--no-java-strict-deps", "compile", spec("bar")], workdir=workdir
                     ),
                     msg="Build from a dirty cache with the scope changed to compile "
                     "failed. The cache may not have been invalidated.",
@@ -184,7 +184,7 @@ class ScopeChangesCacheInvalidationIntegrationTest(PantsRunIntegrationTest):
                 write_build("compile")
                 self.assert_failure(
                     self.run_pants_with_workdir(
-                        ["--no-java-strict-deps", "run", spec("bin"),], workdir=workdir
+                        ["--no-java-strict-deps", "run", spec("bin")], workdir=workdir
                     ),
                     msg="Attempt to run binary with the dependency on :foo scoped to "
                     "compile passed. This should have caused a runtime failure.",

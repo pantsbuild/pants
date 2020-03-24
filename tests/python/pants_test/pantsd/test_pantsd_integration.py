@@ -793,7 +793,7 @@ Interrupted by user over pailgun client!
 
         NB: testprojects/src/python/nested_runs assumes that the pants.toml file is in ${workdir}/pants.toml
         """
-        config = {"GLOBAL": {"pantsd_timeout_when_multiple_invocations": 1,}}
+        config = {"GLOBAL": {"pantsd_timeout_when_multiple_invocations": 1}}
         with self.pantsd_successful_run_context(extra_config=config) as (
             pantsd_run,
             checker,

@@ -5,8 +5,8 @@ use crate::Store;
 use bazel_protos;
 use boxfuture::{try_future, BoxFuture, Boxable};
 use fs::{Dir, File, GlobMatching, PathGlobs, PathStat, PosixFS, SymlinkBehavior};
-use futures01::future::{self, join_all};
-use futures01::Future;
+use futures::future::TryFutureExt;
+use futures01::future::{self, join_all, Future};
 use hashing::{Digest, EMPTY_DIGEST};
 use indexmap::{self, IndexMap};
 use itertools::Itertools;
@@ -547,6 +547,7 @@ impl Snapshot {
 
         posix_fs
           .expand(path_globs)
+          .compat()
           .map_err(|err| format!("Error expanding globs: {}", err))
           .and_then(|path_stats| {
             Snapshot::from_path_stats(
@@ -710,6 +711,7 @@ impl StoreFileByDigest<String> for OneOffStoreFileByDigest {
     self
       .posix_fs
       .read_file(&file)
+      .compat()
       .map_err(move |err| format!("Error reading file {:?}: {:?}", file, err))
       .and_then(move |content| store.store_file_bytes(content.content, true))
       .to_boxed()

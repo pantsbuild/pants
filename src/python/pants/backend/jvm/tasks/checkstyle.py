@@ -55,7 +55,7 @@ class Checkstyle(LintTaskMixin, NailgunTask):
             register,
             "checkstyle",
             # Note that checkstyle 7.0 does not run on Java 7 runtimes or below.
-            classpath=[JarDependency(org="com.puppycrawl.tools", name="checkstyle", rev="6.19"),],
+            classpath=[JarDependency(org="com.puppycrawl.tools", name="checkstyle", rev="6.19")],
             main=cls._CHECKSTYLE_MAIN,
             custom_rules=[
                 # Checkstyle uses reflection to load checks and has an affordance that

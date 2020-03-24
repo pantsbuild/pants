@@ -10,6 +10,8 @@ use bytes::Bytes;
 use concrete_time::TimeSpan;
 use digest::{Digest as DigestTrait, FixedOutput};
 use fs::{self, File, PathStat};
+use futures::compat::Future01CompatExt;
+use futures::future::{FutureExt, TryFutureExt};
 use futures01::{future, Future, Stream};
 use grpcio;
 use hashing::{Digest, Fingerprint};
@@ -18,7 +20,7 @@ use log::{debug, trace, warn};
 use protobuf::{self, Message, ProtobufEnum};
 use sha2::Sha256;
 use store::{Snapshot, Store, StoreFileByDigest};
-use tokio_timer::Delay;
+use tokio::time::delay_for;
 
 use crate::{
   Context, ExecuteProcessRequest, ExecuteProcessRequestMetadata, ExecutionStats,
@@ -78,13 +80,12 @@ impl Drop for CancelRemoteExecutionToken {
         .cancel_operation_async(&cancel_op_req)
       {
         Ok(receiver) => {
-          self.executor.spawn_and_ignore(receiver.then(move |res| {
-            match res {
+          self.executor.spawn_and_ignore(async move {
+            match receiver.compat().await {
               Ok(_) => debug!("Canceled operation {} successfully", operation_name),
               Err(err) => debug!("Failed to cancel operation {}, err {}", operation_name, err),
             }
-            Ok(())
-          }));
+          });
         }
         Err(err) => debug!(
           "Failed to schedule cancel operation: {}, err {}",
@@ -412,11 +413,14 @@ impl super::CommandRunner for CommandRunner {
                                   .to_boxed()
                             } else {
                               // maybe the delay here should be the min of remaining time and the backoff period
-                              Delay::new(Instant::now() + backoff_period)
-                                  .map_err(move |e| {
+                              delay_for(backoff_period)
+                                  .unit_error()
+                                  .boxed()
+                                  .compat()
+                                  .map_err(move |()| {
                                     format!(
-                                      "Future-Delay errored at operation result polling for {}, {}: {}",
-                                      operation_name, description, e
+                                      "Future-Delay errored at operation result polling for {}, {}",
+                                      operation_name, description
                                     )
                                   })
                                   .and_then(move |_| {
