@@ -40,32 +40,6 @@ public class JunitSecurityContextLookupAndErrorCollectionTest {
   }
 
   @Test
-  public void disallowsDanglingThreadsForSuiteIfSuiteDisallowed() {
-    JunitSecurityManagerConfig config = new JunitSecurityManagerConfig(
-        SystemExitHandling.disallow,
-        ThreadHandling.disallowLeakingTestSuiteThreads,
-        NetworkHandling.allowAll);
-    JunitSecurityContextLookupAndErrorCollection lookupAndErrorCollection;
-    lookupAndErrorCollection = new JunitSecurityContextLookupAndErrorCollection(config);
-    assertThat(
-        lookupAndErrorCollection.disallowsThreadsFor(TestSecurityContext.newSuiteContext("foo")),
-        is(true));
-  }
-
-  @Test
-  public void allowAllIncludesSuites() {
-    JunitSecurityManagerConfig config = new JunitSecurityManagerConfig(
-        SystemExitHandling.disallow,
-        ThreadHandling.allowAll,
-        NetworkHandling.allowAll);
-    JunitSecurityContextLookupAndErrorCollection lookupAndErrorCollection;
-    lookupAndErrorCollection = new JunitSecurityContextLookupAndErrorCollection(config);
-    assertThat(
-        lookupAndErrorCollection.disallowsThreadsFor(TestSecurityContext.newSuiteContext("foo")),
-        is(false));
-  }
-
-  @Test
   public void createSuiteIfMissing() {
     JunitSecurityManagerConfig config = new JunitSecurityManagerConfig(
         SystemExitHandling.disallow,
