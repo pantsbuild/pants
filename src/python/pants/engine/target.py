@@ -8,8 +8,9 @@ from typing import Any, ClassVar, Dict, Iterable, List, Optional, Tuple, Type, T
 
 from typing_extensions import final
 
-from pants.base.exceptions import TargetDefinitionException
+from pants.base.specs import OriginSpec
 from pants.build_graph.address import Address
+from pants.engine.addressable import assert_single_address
 from pants.engine.fs import (
     EMPTY_SNAPSHOT,
     GlobExpansionConjunction,
@@ -17,6 +18,7 @@ from pants.engine.fs import (
     PathGlobs,
     Snapshot,
 )
+from pants.engine.objects import Collection
 from pants.engine.rules import RootRule, UnionMembership, rule
 from pants.engine.selectors import Get
 from pants.util.collections import ensure_str_list
@@ -52,11 +54,14 @@ class Field(ABC):
 class PrimitiveField(Field, metaclass=ABCMeta):
     """A Field that does not need the engine in order to be hydrated.
 
-    This should be used by the majority of fields.
+    The majority of fields should use subclasses of `PrimitiveField`, e.g. use `BoolField`,
+    `StringField`, or `StringSequenceField`. These subclasses will provide sane type hints and
+    hydration/validation automatically.
 
-    Subclasses must implement `hydrate()` to convert the `raw_value` into `self.value`. This
-    hydration and/or validation happens eagerly in the constructor. If the hydration is
-    particularly expensive, use `AsyncField` instead to get the benefits of the engine's caching.
+    Subclasses of PrimitiveField must implement `hydrate()` to convert the `raw_value` into
+    `self.value`. This hydration and/or validation happens eagerly in the constructor. If the
+    hydration is particularly expensive, use `AsyncField` instead to get the benefits of the
+    engine's caching.
 
     The hydrated `value` must be immutable and hashable so that this Field may be used by the
     V2 engine. This means, for example, using tuples rather than lists and using
@@ -96,8 +101,6 @@ class PrimitiveField(Field, metaclass=ABCMeta):
         Iterable[str] to List[str].
 
         The resulting value should be immutable and hashable.
-
-        If you have no validation/hydration, simply set this function to `return raw_value`.
         """
 
     def __repr__(self) -> str:
@@ -258,10 +261,10 @@ class Target(ABC):
         aliases_to_field_types = {field_type.alias: field_type for field_type in self.field_types}
         for alias, value in unhydrated_values.items():
             if alias not in aliases_to_field_types:
-                raise TargetDefinitionException(
+                raise InvalidFieldException(
                     address,
-                    f"Unrecognized field `{alias}={value}`. Valid fields for the target type "
-                    f"`{self.alias}`: {sorted(aliases_to_field_types.keys())}.",
+                    f"Unrecognized field `{alias}={value}` in target {address}. Valid fields for "
+                    f"the target type `{self.alias}`: {sorted(aliases_to_field_types.keys())}.",
                 )
             field_type = aliases_to_field_types[alias]
             self.field_values[field_type] = field_type(value, address=address)
@@ -453,6 +456,47 @@ class WrappedTarget:
 
 
 @dataclass(frozen=True)
+class TargetWithOrigin:
+    target: Target
+    origin: OriginSpec
+
+
+class Targets(Collection[Target]):
+    """A heterogeneous collection of instances of Target subclasses.
+
+    While every element will be a subclass of `Target`, there may be many different `Target` types
+    in this collection, e.g. some `Files` targets and some `PythonLibrary` targets.
+
+    Often, you will want to filter out the relevant targets by looking at what fields they have
+    registered, e.g.:
+
+        valid_tgts = [tgt for tgt in tgts if tgt.has_fields([Compatibility, PythonSources])]
+
+    You should not check the Target's actual type because this breaks custom target types;
+    for example, prefer `tgt.has_field(PythonTestsSources)` to `isinstance(tgt, PythonTests)`.
+    """
+
+    def expect_single(self) -> Target:
+        assert_single_address([tgt.address for tgt in self.dependencies])
+        return self.dependencies[0]
+
+
+class TargetsWithOrigins(Collection[TargetWithOrigin]):
+    """A heterogeneous collection of instances of Target subclasses with the original Spec used to
+    resolve the target.
+
+    See the docstring for `Targets` for an explanation of the `Target`s being heterogeneous and how
+    you should filter out the targets you care about.
+    """
+
+    def expect_single(self) -> TargetWithOrigin:
+        assert_single_address(
+            [tgt_with_origin.target.address for tgt_with_origin in self.dependencies]
+        )
+        return self.dependencies[0]
+
+
+@dataclass(frozen=True)
 class RegisteredTargetTypes:
     # TODO: add `FrozenDict` as a light-weight wrapper around `dict` that de-registers the
     #  mutation entry points.
@@ -476,33 +520,95 @@ class RegisteredTargetTypes:
         return tuple(self.aliases_to_types.values())
 
 
-# TODO: add light-weight runtime type checking to these helper fields, such as ensuring that
-# the raw_value of `BoolField` is in fact a `bool` and not an int or str. Use `instanceof`. All
-# the types are primitive objects like `str` and `int`, so this should be performant and easy to
-# implement.
-#
-# We should also sort where relevant, e.g. in `StringSequenceField`. This is important for cacahe
-# hits.
+class InvalidFieldException(Exception):
+    pass
 
 
-class BoolField(PrimitiveField):
+class InvalidFieldTypeException(InvalidFieldException):
+    """This is used to ensure that the field's value conforms with the expected type for the field,
+    e.g. `a boolean` or `a string` or `an iterable of strings and integers`."""
+
+    def __init__(
+        self, address: Address, field_alias: str, raw_value: Optional[Any], *, expected_type: str
+    ) -> None:
+        super().__init__(
+            f"The {repr(field_alias)} field in target {address} must be {expected_type}, but was "
+            f"`{repr(raw_value)}` with type `{type(raw_value).__name__}`."
+        )
+
+
+class UnimplementedField(PrimitiveField, metaclass=ABCMeta):
+    """Simply use whatever value the user passed in the BUILD file.
+
+    Warning: This is not safe to use with the engine. If the user uses an unhashable type like a
+    list, the engine will fail.
+    """
+
+    value: Optional[Any]
+
+    # TODO: maybe implement __hash__ on this so that this can always be used with the engine? For
+    # example, `return hash(repr(raw_value))`?
+    #
+    # Whether we keep this Field or not really depends on how we approach backward-compatibility
+    # with V1. Are we indeed going to remove TargetAdaptor and use this API, which requires an
+    # explicit definition for each Field? How would this interact with custom target types? If we
+    # keep TargetAdaptor around for the sake of V1, then we should remove this Field.
+    def hydrate(self, raw_value: Optional[Any], *, address: Address) -> ImmutableValue:
+        return raw_value
+
+
+class BoolField(PrimitiveField, metaclass=ABCMeta):
     value: bool
     default: ClassVar[bool]
 
     def hydrate(self, raw_value: Optional[bool], *, address: Address) -> bool:
         if raw_value is None:
             return self.default
+        if not isinstance(raw_value, bool):
+            raise InvalidFieldTypeException(
+                address, self.alias, raw_value, expected_type="a boolean",
+            )
         return raw_value
 
 
-class StringField(PrimitiveField):
+class IntField(PrimitiveField, metaclass=ABCMeta):
+    value: Optional[int]
+
+    def hydrate(self, raw_value: Optional[int], *, address: Address) -> Optional[int]:
+        if raw_value and not isinstance(raw_value, int):
+            raise InvalidFieldTypeException(
+                address, self.alias, raw_value, expected_type="an integer",
+            )
+        return raw_value
+
+
+class FloatField(PrimitiveField, metaclass=ABCMeta):
+    value: Optional[float]
+
+    def hydrate(self, raw_value: Optional[int], *, address: Address) -> Optional[float]:
+        # TODO: consider if we want to also accept `int` and proactively convert it to `float`.
+        #  This is probably more user-friendly, but there are also benefits to forcing a user to
+        #  use `0.0` instead of `0` because it makes them realize that this field does care about
+        #  the extra precision.
+        if raw_value and not isinstance(raw_value, float):
+            raise InvalidFieldTypeException(
+                address, self.alias, raw_value, expected_type="a float",
+            )
+        return raw_value
+
+
+class StringField(PrimitiveField, metaclass=ABCMeta):
     value: Optional[str]
 
     def hydrate(self, raw_value: Optional[str], *, address: Address) -> Optional[str]:
+        if raw_value and not isinstance(raw_value, str):
+            raise InvalidFieldTypeException(
+                address, self.alias, raw_value, expected_type="a string",
+            )
         return raw_value
 
 
-class StringSequenceField(PrimitiveField):
+class StringSequenceField(PrimitiveField, metaclass=ABCMeta):
     value: Optional[Tuple[str, ...]]
 
     def hydrate(
@@ -510,10 +616,19 @@ class StringSequenceField(PrimitiveField):
     ) -> Optional[Tuple[str, ...]]:
         if raw_value is None:
             return None
-        return tuple(raw_value)
+        try:
+            ensure_str_list(raw_value)
+        except ValueError:
+            raise InvalidFieldTypeException(
+                address,
+                self.alias,
+                raw_value,
+                expected_type="an iterable of strings (e.g. a list of strings)",
+            )
+        return tuple(sorted(raw_value))
 
 
-class StringOrStringSequenceField(PrimitiveField):
+class StringOrStringSequenceField(PrimitiveField, metaclass=ABCMeta):
     """The raw_value may either be a string or be an iterable of strings.
 
     This is syntactic sugar that we use for certain fields to make BUILD files simpler when the user
@@ -529,11 +644,22 @@ class StringOrStringSequenceField(PrimitiveField):
     ) -> Optional[Tuple[str, ...]]:
         if raw_value is None:
             return None
-        return tuple(ensure_str_list(raw_value))
+        try:
+            str_list = ensure_str_list(raw_value)
+        except ValueError:
+            raise InvalidFieldTypeException(
+                address,
+                self.alias,
+                raw_value,
+                expected_type=(
+                    "either a single string or an iterable of strings (e.g. a list of strings)"
+                ),
+            )
+        return tuple(sorted(str_list))
 
 
 class Tags(StringSequenceField):
-    alias: ClassVar = "tags"
+    alias = "tags"
 
 
 # TODO: figure out what support looks like for this. This already gets hydrated into a
@@ -541,7 +667,7 @@ class Tags(StringSequenceField):
 #  back to being a List[str] and we only hydrate into Addresses when necessary? Alternatively, does
 #  hydration mean getting back `Targets`?
 class Dependencies(AsyncField):
-    alias: ClassVar = "dependencies"
+    alias = "dependencies"
     sanitized_raw_value: Optional[Tuple[Address, ...]]
 
     def sanitize_raw_value(
@@ -559,14 +685,23 @@ COMMON_TARGET_FIELDS = (Dependencies, Tags)
 
 
 class Sources(AsyncField):
-    alias: ClassVar = "sources"
+    alias = "sources"
     default_globs: ClassVar[Optional[Tuple[str, ...]]] = None
     sanitized_raw_value: Optional[Tuple[str, ...]]
 
     def sanitize_raw_value(self, raw_value: Optional[Iterable[str]]) -> Optional[Tuple[str, ...]]:
         if raw_value is None:
             return None
-        return tuple(raw_value)
+        try:
+            ensure_str_list(raw_value)
+        except ValueError:
+            raise InvalidFieldTypeException(
+                self.address,
+                self.alias,
+                raw_value,
+                expected_type="an iterable of strings (e.g. a list of strings)",
+            )
+        return tuple(sorted(raw_value))
 
     def validate_snapshot(self, _: Snapshot) -> None:
         """Perform any validation on the resulting snapshot, e.g. ensuring that all files end in

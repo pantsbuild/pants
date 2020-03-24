@@ -2,13 +2,15 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
+import logging
 from dataclasses import dataclass
-from typing import FrozenSet, Iterable, List, NamedTuple, Optional, Sequence, Set, Tuple
+from typing import FrozenSet, Iterable, Iterator, List, NamedTuple, Optional, Sequence, Set, Tuple
 
 from pkg_resources import Requirement
 
 from pants.backend.python.rules.download_pex_bin import DownloadedPexBin
 from pants.backend.python.rules.hermetic_pex import HermeticPex
+from pants.backend.python.rules.targets import Compatibility
 from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.fs import (
@@ -28,6 +30,8 @@ from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.rules import rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.python.python_setup import PythonSetup
+from pants.util.logging import LogLevel
+from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -135,6 +139,15 @@ class PexInterpreterConstraints:
         )
 
     @classmethod
+    def create_from_compatibility_fields(
+        cls, fields: Iterable[Compatibility], python_setup: PythonSetup
+    ) -> "PexInterpreterConstraints":
+        constraint_sets = {field.value_or_global_default(python_setup) for field in fields}
+        # This will OR within each field and AND across fields.
+        merged_constraints = cls.merge_constraint_sets(constraint_sets)
+        return PexInterpreterConstraints(merged_constraints)
+
+    @classmethod
     def create_from_adaptors(
         cls, adaptors: Iterable[TargetAdaptor], python_setup: PythonSetup
     ) -> "PexInterpreterConstraints":
@@ -142,8 +155,8 @@ class PexInterpreterConstraints:
         for adaptor in adaptors:
             if not isinstance(adaptor, PythonTargetAdaptor):
                 continue
-            constraint_set = python_setup.compatibility_or_constraints(adaptor.compatibility)
-            constraint_sets.add(constraint_set)
+            compatibility_field = Compatibility(adaptor.compatibility, address=adaptor.address)
+            constraint_sets.add(compatibility_field.value_or_global_default(python_setup))
         # This will OR within each target and AND across targets.
         merged_constraints = cls.merge_constraint_sets(constraint_sets)
         return PexInterpreterConstraints(merged_constraints)
@@ -175,6 +188,35 @@ class Pex(HermeticPex):
     output_filename: str
 
 
+logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class PexDebug:
+    log_level: LogLevel
+
+    _PEX_LEVEL_BY_PANTS_LEVEL = {
+        LogLevel.TRACE: 9,
+        LogLevel.DEBUG: 3,
+    }
+
+    @memoized_property
+    def level(self) -> int:
+        return self._PEX_LEVEL_BY_PANTS_LEVEL.get(self.log_level, 0)
+
+    def iter_pex_args(self) -> Iterator[str]:
+        yield "--no-emit-warnings"
+        if self.level > 0:
+            yield f"-{'v' * self.level}"
+
+    @property
+    def might_log(self):
+        return self.level > 0
+
+    def log(self, *args, **kwargs) -> None:
+        self.log_level.log(logger, *args, **kwargs)
+
+
 @rule(name="Create PEX")
 async def create_pex(
     request: CreatePex,
@@ -183,6 +225,7 @@ async def create_pex(
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
     pex_build_environment: PexBuildEnvironment,
     platform: Platform,
+    log_level: LogLevel,
 ) -> Pex:
     """Returns a PEX with the given requirements, optional entry point, optional interpreter
     constraints, and optional requirement constraints."""
@@ -193,6 +236,9 @@ async def create_pex(
         *request.interpreter_constraints.generate_pex_arg_list(),
         *request.additional_args,
     ]
+
+    pex_debug = PexDebug(log_level)
+    argv.extend(pex_debug.iter_pex_args())
 
     if python_setup.resolver_jobs:
         argv.extend(["--jobs", python_setup.resolver_jobs])
@@ -261,7 +307,7 @@ async def create_pex(
                 pex_build_environment=pex_build_environment,
                 pex_args=argv,
                 input_files=merged_digest,
-                description=f"Create a requirements PEX: {', '.join(request.requirements.requirements)}",
+                description=f"Resolving {', '.join(request.requirements.requirements)}",
                 output_files=(request.output_filename,),
             )
         }
@@ -270,6 +316,14 @@ async def create_pex(
     result = await Get[ExecuteProcessResult](
         MultiPlatformExecuteProcessRequest, execute_process_request
     )
+
+    if pex_debug.might_log:
+        lines = result.stderr.decode().splitlines()
+        if lines:
+            pex_debug.log(f"Debug output from Pex for: {execute_process_request}")
+            for line in lines:
+                pex_debug.log(line)
+
     return Pex(
         directory_digest=result.output_directory_digest, output_filename=request.output_filename
     )

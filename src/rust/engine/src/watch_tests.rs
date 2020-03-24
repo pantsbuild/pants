@@ -37,14 +37,14 @@ fn receive_watch_event_on_file_change() {
   // Assert the nodes initial state is completed
   assert!(graph.entry_state(entry_id) == "completed");
   // Instantiate a watcher and watch the file in question.
-  let executor = Executor::new();
+  let mut rt = tokio::runtime::Runtime::new().unwrap();
+  let executor = Executor::new(rt.handle().clone());
   let watcher = InvalidationWatcher::new(
     Arc::downgrade(&graph),
     executor,
     build_root.path().to_path_buf(),
   )
   .expect("Couldn't create InvalidationWatcher");
-  let mut rt = tokio::runtime::Runtime::new().unwrap();
   rt.block_on(watcher.watch(file_path.clone())).unwrap();
   // Update the content of the file being watched.
   let new_content = "stnetonc".as_bytes().to_vec();

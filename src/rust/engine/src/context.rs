@@ -2,11 +2,13 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std;
+use std::collections::BTreeMap;
 use std::convert::{Into, TryInto};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
+use futures::compat::Future01CompatExt;
 use futures01::Future;
 
 use crate::core::{Failure, TypeId};
@@ -28,8 +30,8 @@ use rand::seq::SliceRandom;
 use reqwest;
 use rule_graph::RuleGraph;
 use sharded_lmdb::ShardedLmdb;
-use std::collections::BTreeMap;
 use store::Store;
+use tokio::runtime::{Builder, Runtime};
 
 const GIGABYTES: usize = 1024 * 1024 * 1024;
 
@@ -46,10 +48,11 @@ pub struct Core {
   pub tasks: Tasks,
   pub rule_graph: RuleGraph<Rule>,
   pub types: Types,
+  pub runtime: Runtime,
   pub executor: task_executor::Executor,
   store: Store,
   pub command_runner: Box<dyn process_execution::CommandRunner>,
-  pub http_client: reqwest::r#async::Client,
+  pub http_client: reqwest::Client,
   pub vfs: PosixFS,
   pub watcher: InvalidationWatcher,
   pub build_root: PathBuf,
@@ -89,7 +92,18 @@ impl Core {
     let mut remote_store_servers = remote_store_servers;
     remote_store_servers.shuffle(&mut rand::thread_rng());
 
-    let executor = task_executor::Executor::new();
+    let runtime = Builder::new()
+      // This use of Builder (rather than just Runtime::new()) is to allow us to lower the
+      // max_threads setting. As of tokio `0.2.13`, the core threads default to num_cpus, and
+      // the max threads default to a fixed value of 512. In practice, it appears to be slower
+      // to allow 512 threads, and with the default stack size, 512 threads would use 1GB of RAM.
+      .core_threads(num_cpus::get())
+      .max_threads(num_cpus::get() * 4)
+      .threaded_scheduler()
+      .enable_all()
+      .build()
+      .map_err(|e| format!("Failed to start the runtime: {}", e))?;
+    let executor = task_executor::Executor::new(runtime.handle().clone());
     // We re-use these certs for both the execution and store service; they're generally tied together.
     let root_ca_certs = if let Some(path) = remote_root_ca_certs_path {
       Some(
@@ -224,24 +238,25 @@ impl Core {
     let watcher =
       InvalidationWatcher::new(Arc::downgrade(&graph), executor.clone(), build_root.clone())?;
 
-    let http_client = reqwest::r#async::Client::new();
+    let http_client = reqwest::Client::new();
     let rule_graph = RuleGraph::new(tasks.as_map(), root_subject_types);
 
     Ok(Core {
-      graph,
-      tasks,
-      rule_graph,
-      types,
+      graph: graph,
+      tasks: tasks,
+      rule_graph: rule_graph,
+      types: types,
+      runtime,
       executor: executor.clone(),
       store,
       command_runner,
       http_client,
-      watcher,
       // TODO: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
       vfs: PosixFS::new(&build_root, &ignore_patterns, executor)
         .map_err(|e| format!("Could not initialize VFS: {:?}", e))?,
       build_root,
+      watcher,
     })
   }
 
@@ -315,6 +330,8 @@ impl NodeContext for Context {
   where
     F: Future<Item = (), Error = ()> + Send + 'static,
   {
-    self.core.executor.spawn_and_ignore(future);
+    self.core.executor.spawn_and_ignore(async move {
+      let _ = future.compat().await;
+    });
   }
 }

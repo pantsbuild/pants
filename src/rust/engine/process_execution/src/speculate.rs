@@ -3,11 +3,12 @@ use crate::{
   MultiPlatformExecuteProcessRequest,
 };
 use boxfuture::{BoxFuture, Boxable};
+use futures::future::{FutureExt, TryFutureExt};
 use futures01::future::{err, ok, Either, Future};
 use log::{debug, trace};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
-use tokio_timer::Delay;
+use std::time::Duration;
+use tokio::time::delay_for;
 
 #[derive(Clone)]
 pub struct SpeculatingCommandRunner {
@@ -34,7 +35,10 @@ impl SpeculatingCommandRunner {
     req: MultiPlatformExecuteProcessRequest,
     context: Context,
   ) -> BoxFuture<FallibleExecuteProcessResultWithPlatform, String> {
-    let delay = Delay::new(Instant::now() + self.speculation_timeout);
+    let delay = delay_for(self.speculation_timeout)
+      .unit_error()
+      .boxed()
+      .compat();
     let req2 = req.clone();
     trace!(
       "Primary command runner queue length: {:?}",

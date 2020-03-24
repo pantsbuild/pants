@@ -1,8 +1,10 @@
+use futures::compat::Future01CompatExt;
 use futures01::future::Future;
 use hashing::{Digest, Fingerprint};
 use tempfile;
 use testutil::data::TestDirectory;
 use testutil::make_file;
+use tokio::runtime::Handle;
 
 use crate::{OneOffStoreFileByDigest, Snapshot, Store};
 use fs::{
@@ -22,9 +24,8 @@ fn setup() -> (
   tempfile::TempDir,
   Arc<PosixFS>,
   OneOffStoreFileByDigest,
-  task_executor::Executor,
 ) {
-  let executor = task_executor::Executor::new();
+  let executor = task_executor::Executor::new(Handle::current());
   // TODO: Pass a remote CAS address through.
   let store = Store::local_only(
     executor.clone(),
@@ -35,27 +36,24 @@ fn setup() -> (
   )
   .unwrap();
   let dir = tempfile::Builder::new().prefix("root").tempdir().unwrap();
-  let posix_fs = Arc::new(PosixFS::new(dir.path(), &[], task_executor::Executor::new()).unwrap());
+  let posix_fs = Arc::new(PosixFS::new(dir.path(), &[], executor).unwrap());
   let file_saver = OneOffStoreFileByDigest::new(store.clone(), posix_fs.clone());
-  (store, dir, posix_fs, file_saver, executor)
+  (store, dir, posix_fs, file_saver)
 }
 
-#[test]
-fn snapshot_one_file() {
-  let (store, dir, posix_fs, digester, runtime) = setup();
+#[tokio::test]
+async fn snapshot_one_file() {
+  let (store, dir, posix_fs, digester) = setup();
 
   let file_name = PathBuf::from("roland");
   make_file(&dir.path().join(&file_name), STR.as_bytes(), 0o600);
 
-  let path_stats = expand_all_sorted(posix_fs, &runtime);
-  let snapshot = runtime
-    .block_on(Snapshot::from_path_stats(
-      store,
-      &digester,
-      path_stats.clone(),
-      WorkUnitStore::new(),
-    ))
-    .unwrap();
+  let path_stats = expand_all_sorted(posix_fs).await;
+  let snapshot =
+    Snapshot::from_path_stats(store, &digester, path_stats.clone(), WorkUnitStore::new())
+      .compat()
+      .await
+      .unwrap();
   assert_eq!(
     snapshot,
     Snapshot {
@@ -71,24 +69,21 @@ fn snapshot_one_file() {
   );
 }
 
-#[test]
-fn snapshot_recursive_directories() {
-  let (store, dir, posix_fs, digester, runtime) = setup();
+#[tokio::test]
+async fn snapshot_recursive_directories() {
+  let (store, dir, posix_fs, digester) = setup();
 
   let cats = PathBuf::from("cats");
   let roland = cats.join("roland");
   std::fs::create_dir_all(&dir.path().join(cats)).unwrap();
   make_file(&dir.path().join(&roland), STR.as_bytes(), 0o600);
 
-  let path_stats = expand_all_sorted(posix_fs, &runtime);
-  let snapshot = runtime
-    .block_on(Snapshot::from_path_stats(
-      store,
-      &digester,
-      path_stats.clone(),
-      WorkUnitStore::new(),
-    ))
-    .unwrap();
+  let path_stats = expand_all_sorted(posix_fs).await;
+  let snapshot =
+    Snapshot::from_path_stats(store, &digester, path_stats.clone(), WorkUnitStore::new())
+      .compat()
+      .await
+      .unwrap();
   assert_eq!(
     snapshot,
     Snapshot {
@@ -104,39 +99,37 @@ fn snapshot_recursive_directories() {
   );
 }
 
-#[test]
-fn snapshot_from_digest() {
-  let (store, dir, posix_fs, digester, runtime) = setup();
+#[tokio::test]
+async fn snapshot_from_digest() {
+  let (store, dir, posix_fs, digester) = setup();
 
   let cats = PathBuf::from("cats");
   let roland = cats.join("roland");
   std::fs::create_dir_all(&dir.path().join(cats)).unwrap();
   make_file(&dir.path().join(&roland), STR.as_bytes(), 0o600);
 
-  let path_stats = expand_all_sorted(posix_fs, &runtime);
-  let expected_snapshot = runtime
-    .block_on(Snapshot::from_path_stats(
-      store.clone(),
-      &digester,
-      path_stats.clone(),
-      WorkUnitStore::new(),
-    ))
-    .unwrap();
+  let path_stats = expand_all_sorted(posix_fs).await;
+  let expected_snapshot = Snapshot::from_path_stats(
+    store.clone(),
+    &digester,
+    path_stats.clone(),
+    WorkUnitStore::new(),
+  )
+  .compat()
+  .await
+  .unwrap();
   assert_eq!(
     expected_snapshot,
-    runtime
-      .block_on(Snapshot::from_digest(
-        store,
-        expected_snapshot.digest,
-        WorkUnitStore::new()
-      ))
+    Snapshot::from_digest(store, expected_snapshot.digest, WorkUnitStore::new())
+      .compat()
+      .await
       .unwrap()
   );
 }
 
-#[test]
-fn snapshot_recursive_directories_including_empty() {
-  let (store, dir, posix_fs, digester, runtime) = setup();
+#[tokio::test]
+async fn snapshot_recursive_directories_including_empty() {
+  let (store, dir, posix_fs, digester) = setup();
 
   let cats = PathBuf::from("cats");
   let roland = cats.join("roland");
@@ -147,18 +140,19 @@ fn snapshot_recursive_directories_including_empty() {
   std::fs::create_dir_all(&dir.path().join(&llamas)).unwrap();
   make_file(&dir.path().join(&roland), STR.as_bytes(), 0o600);
 
-  let sorted_path_stats = expand_all_sorted(posix_fs, &runtime);
+  let sorted_path_stats = expand_all_sorted(posix_fs).await;
   let mut unsorted_path_stats = sorted_path_stats.clone();
   unsorted_path_stats.reverse();
   assert_eq!(
-    runtime
-      .block_on(Snapshot::from_path_stats(
-        store,
-        &digester,
-        unsorted_path_stats.clone(),
-        WorkUnitStore::new(),
-      ))
-      .unwrap(),
+    Snapshot::from_path_stats(
+      store,
+      &digester,
+      unsorted_path_stats.clone(),
+      WorkUnitStore::new(),
+    )
+    .compat()
+    .await
+    .unwrap(),
     Snapshot {
       digest: Digest(
         Fingerprint::from_hex_string(
@@ -172,25 +166,31 @@ fn snapshot_recursive_directories_including_empty() {
   );
 }
 
-#[test]
-fn merge_directories_two_files() {
-  let (store, _, _, _, runtime) = setup();
+#[tokio::test]
+async fn merge_directories_two_files() {
+  let (store, _, _, _) = setup();
 
   let containing_roland = TestDirectory::containing_roland();
   let containing_treats = TestDirectory::containing_treats();
 
-  runtime
-    .block_on(store.record_directory(&containing_roland.directory(), false))
+  store
+    .record_directory(&containing_roland.directory(), false)
+    .compat()
+    .await
     .expect("Storing roland directory");
-  runtime
-    .block_on(store.record_directory(&containing_treats.directory(), false))
+  store
+    .record_directory(&containing_treats.directory(), false)
+    .compat()
+    .await
     .expect("Storing treats directory");
 
-  let result = runtime.block_on(Snapshot::merge_directories(
+  let result = Snapshot::merge_directories(
     store,
     vec![containing_treats.digest(), containing_roland.digest()],
     WorkUnitStore::new(),
-  ));
+  )
+  .compat()
+  .await;
 
   assert_eq!(
     result,
@@ -198,27 +198,32 @@ fn merge_directories_two_files() {
   );
 }
 
-#[test]
-fn merge_directories_clashing_files() {
-  let (store, _, _, _, runtime) = setup();
+#[tokio::test]
+async fn merge_directories_clashing_files() {
+  let (store, _, _, _) = setup();
 
   let containing_roland = TestDirectory::containing_roland();
   let containing_wrong_roland = TestDirectory::containing_wrong_roland();
 
-  runtime
-    .block_on(store.record_directory(&containing_roland.directory(), false))
+  store
+    .record_directory(&containing_roland.directory(), false)
+    .compat()
+    .await
     .expect("Storing roland directory");
-  runtime
-    .block_on(store.record_directory(&containing_wrong_roland.directory(), false))
+  store
+    .record_directory(&containing_wrong_roland.directory(), false)
+    .compat()
+    .await
     .expect("Storing wrong roland directory");
 
-  let err = runtime
-    .block_on(Snapshot::merge_directories(
-      store,
-      vec![containing_roland.digest(), containing_wrong_roland.digest()],
-      WorkUnitStore::new(),
-    ))
-    .expect_err("Want error merging");
+  let err = Snapshot::merge_directories(
+    store,
+    vec![containing_roland.digest(), containing_wrong_roland.digest()],
+    WorkUnitStore::new(),
+  )
+  .compat()
+  .await
+  .expect_err("Want error merging");
 
   assert!(
     err.contains("roland"),
@@ -227,28 +232,34 @@ fn merge_directories_clashing_files() {
   );
 }
 
-#[test]
-fn merge_directories_same_files() {
-  let (store, _, _, _, runtime) = setup();
+#[tokio::test]
+async fn merge_directories_same_files() {
+  let (store, _, _, _) = setup();
 
   let containing_roland = TestDirectory::containing_roland();
   let containing_roland_and_treats = TestDirectory::containing_roland_and_treats();
 
-  runtime
-    .block_on(store.record_directory(&containing_roland.directory(), false))
+  store
+    .record_directory(&containing_roland.directory(), false)
+    .compat()
+    .await
     .expect("Storing roland directory");
-  runtime
-    .block_on(store.record_directory(&containing_roland_and_treats.directory(), false))
+  store
+    .record_directory(&containing_roland_and_treats.directory(), false)
+    .compat()
+    .await
     .expect("Storing treats directory");
 
-  let result = runtime.block_on(Snapshot::merge_directories(
+  let result = Snapshot::merge_directories(
     store,
     vec![
       containing_roland.digest(),
       containing_roland_and_treats.digest(),
     ],
     WorkUnitStore::new(),
-  ));
+  )
+  .compat()
+  .await;
 
   assert_eq!(
     result,
@@ -256,9 +267,9 @@ fn merge_directories_same_files() {
   );
 }
 
-#[test]
-fn snapshot_merge_two_files() {
-  let (store, tempdir, _, digester, runtime) = setup();
+#[tokio::test]
+async fn snapshot_merge_two_files() {
+  let (store, tempdir, _, digester) = setup();
 
   let common_dir_name = "tower";
   let common_dir = PathBuf::from(common_dir_name);
@@ -277,33 +288,34 @@ fn snapshot_merge_two_files() {
     true,
   );
 
-  let snapshot1 = runtime
-    .block_on(Snapshot::from_path_stats(
-      store.clone(),
-      &digester,
-      vec![dir.clone(), file1.clone()],
-      WorkUnitStore::new(),
-    ))
-    .unwrap();
+  let snapshot1 = Snapshot::from_path_stats(
+    store.clone(),
+    &digester,
+    vec![dir.clone(), file1.clone()],
+    WorkUnitStore::new(),
+  )
+  .compat()
+  .await
+  .unwrap();
 
-  let snapshot2 = runtime
-    .block_on(Snapshot::from_path_stats(
-      store.clone(),
-      &digester,
-      vec![dir.clone(), file2.clone()],
-      WorkUnitStore::new(),
-    ))
-    .unwrap();
+  let snapshot2 = Snapshot::from_path_stats(
+    store.clone(),
+    &digester,
+    vec![dir.clone(), file2.clone()],
+    WorkUnitStore::new(),
+  )
+  .compat()
+  .await
+  .unwrap();
 
-  let merged = runtime
-    .block_on(Snapshot::merge(
-      store.clone(),
-      &[snapshot1, snapshot2],
-      WorkUnitStore::new(),
-    ))
+  let merged = Snapshot::merge(store.clone(), &[snapshot1, snapshot2], WorkUnitStore::new())
+    .compat()
+    .await
     .unwrap();
-  let merged_root_directory = runtime
-    .block_on(store.load_directory(merged.digest, WorkUnitStore::new()))
+  let merged_root_directory = store
+    .load_directory(merged.digest, WorkUnitStore::new())
+    .compat()
+    .await
     .unwrap()
     .unwrap()
     .0;
@@ -315,8 +327,10 @@ fn snapshot_merge_two_files() {
   let merged_child_dirnode = merged_root_directory.directories[0].clone();
   let merged_child_dirnode_digest: Result<Digest, String> =
     merged_child_dirnode.get_digest().into();
-  let merged_child_directory = runtime
-    .block_on(store.load_directory(merged_child_dirnode_digest.unwrap(), WorkUnitStore::new()))
+  let merged_child_directory = store
+    .load_directory(merged_child_dirnode_digest.unwrap(), WorkUnitStore::new())
+    .compat()
+    .await
     .unwrap()
     .unwrap()
     .0;
@@ -332,9 +346,9 @@ fn snapshot_merge_two_files() {
   );
 }
 
-#[test]
-fn snapshot_merge_colliding() {
-  let (store, tempdir, _, digester, runtime) = setup();
+#[tokio::test]
+async fn snapshot_merge_colliding() {
+  let (store, tempdir, _, digester) = setup();
 
   let file = make_file_stat(
     tempdir.path(),
@@ -343,23 +357,21 @@ fn snapshot_merge_colliding() {
     false,
   );
 
-  let snapshot1 = runtime
-    .block_on(Snapshot::from_path_stats(
-      store.clone(),
-      &digester,
-      vec![file.clone()],
-      WorkUnitStore::new(),
-    ))
-    .unwrap();
+  let snapshot1 = Snapshot::from_path_stats(
+    store.clone(),
+    &digester,
+    vec![file.clone()],
+    WorkUnitStore::new(),
+  )
+  .compat()
+  .await
+  .unwrap();
 
-  let snapshot2 = runtime
-    .block_on(Snapshot::from_path_stats(
-      store.clone(),
-      &digester,
-      vec![file],
-      WorkUnitStore::new(),
-    ))
-    .unwrap();
+  let snapshot2 =
+    Snapshot::from_path_stats(store.clone(), &digester, vec![file], WorkUnitStore::new())
+      .compat()
+      .await
+      .unwrap();
 
   let merged_res =
     Snapshot::merge(store.clone(), &[snapshot1, snapshot2], WorkUnitStore::new()).wait();
@@ -373,89 +385,101 @@ fn snapshot_merge_colliding() {
   }
 }
 
-#[test]
-fn strip_empty_prefix() {
-  let (store, _, _, _, runtime) = setup();
+#[tokio::test]
+async fn strip_empty_prefix() {
+  let (store, _, _, _) = setup();
 
   let dir = TestDirectory::nested();
-  runtime
-    .block_on(store.record_directory(&dir.directory(), false))
+  store
+    .record_directory(&dir.directory(), false)
+    .compat()
+    .await
     .expect("Error storing directory");
 
-  let result = runtime.block_on(super::Snapshot::strip_prefix(
-    store,
-    dir.digest(),
-    PathBuf::from(""),
-    WorkUnitStore::new(),
-  ));
+  let result =
+    super::Snapshot::strip_prefix(store, dir.digest(), PathBuf::from(""), WorkUnitStore::new())
+      .compat()
+      .await;
   assert_eq!(result, Ok(dir.digest()));
 }
 
-#[test]
-fn strip_non_empty_prefix() {
-  let (store, _, _, _, runtime) = setup();
+#[tokio::test]
+async fn strip_non_empty_prefix() {
+  let (store, _, _, _) = setup();
 
   let dir = TestDirectory::nested();
-  runtime
-    .block_on(store.record_directory(&dir.directory(), false))
+  store
+    .record_directory(&dir.directory(), false)
+    .compat()
+    .await
     .expect("Error storing directory");
-  runtime
-    .block_on(store.record_directory(&TestDirectory::containing_roland().directory(), false))
+  store
+    .record_directory(&TestDirectory::containing_roland().directory(), false)
+    .compat()
+    .await
     .expect("Error storing directory");
 
-  let result = runtime.block_on(super::Snapshot::strip_prefix(
+  let result = super::Snapshot::strip_prefix(
     store,
     dir.digest(),
     PathBuf::from("cats"),
     WorkUnitStore::new(),
-  ));
+  )
+  .compat()
+  .await;
   assert_eq!(result, Ok(TestDirectory::containing_roland().digest()));
 }
 
-#[test]
-fn strip_prefix_empty_subdir() {
-  let (store, _, _, _, runtime) = setup();
+#[tokio::test]
+async fn strip_prefix_empty_subdir() {
+  let (store, _, _, _) = setup();
 
   let dir = TestDirectory::containing_falcons_dir();
-  runtime
-    .block_on(store.record_directory(&dir.directory(), false))
+  store
+    .record_directory(&dir.directory(), false)
+    .compat()
+    .await
     .expect("Error storing directory");
 
-  let result = runtime.block_on(super::Snapshot::strip_prefix(
+  let result = super::Snapshot::strip_prefix(
     store,
     dir.digest(),
     PathBuf::from("falcons/peregrine"),
     WorkUnitStore::new(),
-  ));
+  )
+  .compat()
+  .await;
   assert_eq!(result, Ok(TestDirectory::empty().digest()));
 }
 
-#[test]
-fn strip_dir_not_in_store() {
-  let (store, _, _, _, runtime) = setup();
+#[tokio::test]
+async fn strip_dir_not_in_store() {
+  let (store, _, _, _) = setup();
   let digest = TestDirectory::nested().digest();
-  let result = runtime.block_on(super::Snapshot::strip_prefix(
-    store,
-    digest,
-    PathBuf::from("cats"),
-    WorkUnitStore::new(),
-  ));
+  let result =
+    super::Snapshot::strip_prefix(store, digest, PathBuf::from("cats"), WorkUnitStore::new())
+      .compat()
+      .await;
   assert_eq!(result, Err(format!("{:?} was not known", digest)));
 }
 
-#[test]
-fn strip_subdir_not_in_store() {
-  let (store, _, _, _, runtime) = setup();
+#[tokio::test]
+async fn strip_subdir_not_in_store() {
+  let (store, _, _, _) = setup();
   let dir = TestDirectory::nested();
-  runtime
-    .block_on(store.record_directory(&dir.directory(), false))
+  store
+    .record_directory(&dir.directory(), false)
+    .compat()
+    .await
     .expect("Error storing directory");
-  let result = runtime.block_on(super::Snapshot::strip_prefix(
+  let result = super::Snapshot::strip_prefix(
     store,
     dir.digest(),
     PathBuf::from("cats"),
     WorkUnitStore::new(),
-  ));
+  )
+  .compat()
+  .await;
   assert_eq!(
     result,
     Err(format!(
@@ -465,64 +489,82 @@ fn strip_subdir_not_in_store() {
   );
 }
 
-#[test]
-fn strip_prefix_non_matching_file() {
-  let (store, _, _, _, runtime) = setup();
+#[tokio::test]
+async fn strip_prefix_non_matching_file() {
+  let (store, _, _, _) = setup();
   let dir = TestDirectory::recursive();
   let child_dir = TestDirectory::containing_roland();
-  runtime
-    .block_on(store.record_directory(&dir.directory(), false))
+  store
+    .record_directory(&dir.directory(), false)
+    .compat()
+    .await
     .expect("Error storing directory");
-  runtime
-    .block_on(store.record_directory(&child_dir.directory(), false))
+  store
+    .record_directory(&child_dir.directory(), false)
+    .compat()
+    .await
     .expect("Error storing directory");
-  let result = runtime.block_on(super::Snapshot::strip_prefix(
+  let result = super::Snapshot::strip_prefix(
     store,
     dir.digest(),
     PathBuf::from("cats"),
     WorkUnitStore::new(),
-  ));
+  )
+  .compat()
+  .await;
 
   assert_eq!(result, Err(format!("Cannot strip prefix cats from root directory {:?} - root directory contained non-matching file named: treats", dir.digest())));
 }
 
-#[test]
-fn strip_prefix_non_matching_dir() {
-  let (store, _, _, _, runtime) = setup();
+#[tokio::test]
+async fn strip_prefix_non_matching_dir() {
+  let (store, _, _, _) = setup();
   let dir = TestDirectory::double_nested_dir_and_file();
   let child_dir = TestDirectory::nested_dir_and_file();
-  runtime
-    .block_on(store.record_directory(&dir.directory(), false))
+  store
+    .record_directory(&dir.directory(), false)
+    .compat()
+    .await
     .expect("Error storing directory");
-  runtime
-    .block_on(store.record_directory(&child_dir.directory(), false))
+  store
+    .record_directory(&child_dir.directory(), false)
+    .compat()
+    .await
     .expect("Error storing directory");
-  let result = runtime.block_on(super::Snapshot::strip_prefix(
+  let result = super::Snapshot::strip_prefix(
     store,
     dir.digest(),
     PathBuf::from("animals/cats"),
     WorkUnitStore::new(),
-  ));
+  )
+  .compat()
+  .await;
 
   assert_eq!(result, Err(format!("Cannot strip prefix animals/cats from root directory {:?} - subdirectory animals contained non-matching directory named: birds", dir.digest())));
 }
 
-#[test]
-fn strip_subdir_not_in_dir() {
-  let (store, _, _, _, runtime) = setup();
+#[tokio::test]
+async fn strip_subdir_not_in_dir() {
+  let (store, _, _, _) = setup();
   let dir = TestDirectory::nested();
-  runtime
-    .block_on(store.record_directory(&dir.directory(), false))
+  store
+    .record_directory(&dir.directory(), false)
+    .compat()
+    .await
     .expect("Error storing directory");
-  runtime
-    .block_on(store.record_directory(&TestDirectory::containing_roland().directory(), false))
+  store
+    .record_directory(&TestDirectory::containing_roland().directory(), false)
+    .compat()
+    .await
     .expect("Error storing directory");
-  let result = runtime.block_on(super::Snapshot::strip_prefix(
+  let result = super::Snapshot::strip_prefix(
     store,
     dir.digest(),
     PathBuf::from("cats/ugly"),
     WorkUnitStore::new(),
-  ));
+  )
+  .compat()
+  .await;
   assert_eq!(result, Err(format!("Cannot strip prefix cats/ugly from root directory {:?} - subdirectory cats didn't contain a directory named ugly but did contain file named: roland", dir.digest())));
 }
 
@@ -546,19 +588,18 @@ fn make_file_stat(root: &Path, relpath: &Path, contents: &[u8], is_executable: b
   )
 }
 
-fn expand_all_sorted(posix_fs: Arc<PosixFS>, executor: &task_executor::Executor) -> Vec<PathStat> {
-  let mut v = executor
-    .block_on(
-      posix_fs.expand(
-        // Don't error or warn if there are no paths matched -- that is a valid state.
-        PathGlobs::create(
-          &["**".to_owned()],
-          StrictGlobMatching::Ignore,
-          GlobExpansionConjunction::AllMatch,
-        )
-        .unwrap(),
-      ),
+async fn expand_all_sorted(posix_fs: Arc<PosixFS>) -> Vec<PathStat> {
+  let mut v = posix_fs
+    .expand(
+      // Don't error or warn if there are no paths matched -- that is a valid state.
+      PathGlobs::create(
+        &["**".to_owned()],
+        StrictGlobMatching::Ignore,
+        GlobExpansionConjunction::AllMatch,
+      )
+      .unwrap(),
     )
+    .await
     .unwrap();
   v.sort_by(|a, b| a.path().cmp(b.path()));
   v

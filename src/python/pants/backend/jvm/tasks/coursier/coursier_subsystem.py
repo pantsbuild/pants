@@ -40,7 +40,7 @@ class CoursierSubsystem(Script):
             fingerprint=True,
             help="Maven style repos",
             default=[
-                "https://maven-central.storage-download.googleapis.com/repos/central/data",
+                "https://maven-central.storage-download.googleapis.com/maven2",
                 "https://repo1.maven.org/maven2",
             ],
         )

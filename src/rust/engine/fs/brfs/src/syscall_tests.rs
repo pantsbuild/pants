@@ -4,24 +4,28 @@
 use super::mount;
 use super::tests::digest_to_filepath;
 use crate::tests::make_dirs;
+use futures::compat::Future01CompatExt;
 use libc;
 use std::ffi::CString;
 use std::path::Path;
 use store::Store;
 use testutil::data::TestData;
+use tokio::runtime::Handle;
 
-#[test]
-fn read_file_by_digest_exact_bytes() {
+#[tokio::test]
+async fn read_file_by_digest_exact_bytes() {
   let (store_dir, mount_dir) = make_dirs();
-  let runtime = task_executor::Executor::new();
+  let runtime = task_executor::Executor::new(Handle::current());
 
   let store =
     Store::local_only(runtime.clone(), store_dir.path()).expect("Error creating local store");
 
   let test_bytes = TestData::roland();
 
-  runtime
-    .block_on(store.store_file_bytes(test_bytes.bytes(), false))
+  store
+    .store_file_bytes(test_bytes.bytes(), false)
+    .compat()
+    .await
     .expect("Storing bytes");
 
   let _fs = mount(mount_dir.path(), store, runtime).expect("Mounting");

@@ -32,7 +32,6 @@ from pants.engine.fs import (
 )
 from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
-from pants.engine.legacy.structs import TargetAdaptor
 from pants.engine.rules import RootRule, UnionRule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.python.python_setup import PythonSetup
@@ -120,34 +119,6 @@ def get_coverage_plugin_input() -> InputFilesContent:
                     content=pkg_resources.resource_string(__name__, "coverage_plugin/plugin.py"),
                 ),
             )
-        )
-    )
-
-
-def get_packages_to_cover(
-    *, target: TargetAdaptor, specified_source_files: SourceFiles,
-) -> Tuple[str, ...]:
-    # Assume that tests in some package test the sources in that package.
-    # This is the case, e.g., if tests live in the same directories as the sources
-    # they test, or if they live in a parallel package structure under a separate
-    # source root, such as tests/python/path/to/package testing src/python/path/to/package.
-
-    # Note in particular that this doesn't work for most of Pants's own tests, as those are
-    # under the top level package 'pants_tests', rather than just 'pants' (although we
-    # are moving towards having tests in the same directories as the sources they test).
-
-    # This heuristic is what is used in V1. If we want coverage data on files tested by tests
-    # under `pants_test/` we will need to specify explicitly which files they are testing using
-    # the `coverage` field in the relevant build file.
-    if hasattr(target, "coverage"):
-        return tuple(sorted(set(target.coverage)))
-    return tuple(
-        sorted(
-            {
-                # Turn file paths into package names.
-                os.path.dirname(source_file).replace(os.sep, ".")
-                for source_file in specified_source_files.snapshot.files
-            }
         )
     )
 

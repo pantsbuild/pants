@@ -13,7 +13,7 @@ from pants.engine.interactive_runner import InteractiveProcessRequest, Interacti
 from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get
 from pants.option.custom_types import shell_str
-from pants.rules.core.binary import BinaryTarget, CreatedBinary
+from pants.rules.core.binary import BinaryImplementation, CreatedBinary
 from pants.util.contextutil import temporary_dir
 
 
@@ -22,8 +22,8 @@ class RunOptions(GoalSubsystem):
 
     name = "run"
 
-    # NB: To be runnable, you must be a BinaryTarget.
-    required_union_implementations = (BinaryTarget,)
+    # NB: To be runnable, there must be a BinaryImplementation that works with the target.
+    required_union_implementations = (BinaryImplementation,)
 
     @classmethod
     def register_options(cls, register) -> None:

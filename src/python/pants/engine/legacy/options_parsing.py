@@ -9,6 +9,7 @@ from pants.option.global_options import GlobalOptions
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.scope import Scope, ScopedOptions
+from pants.util.logging import LogLevel
 
 
 @dataclass(frozen=True)
@@ -34,11 +35,18 @@ def scope_options(scope: Scope, options: _Options) -> ScopedOptions:
     return ScopedOptions(scope, options.options.for_scope(scope.scope))
 
 
+@rule
+def log_level(global_options: GlobalOptions) -> LogLevel:
+    log_level: LogLevel = global_options.get_options().level
+    return log_level
+
+
 def create_options_parsing_rules():
     return [
         scope_options,
         parse_options,
         subsystem_rule(GlobalOptions),
+        log_level,
         RootRule(Scope),
         RootRule(OptionsBootstrapper),
     ]

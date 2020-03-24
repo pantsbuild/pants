@@ -2,6 +2,8 @@ use bazel_protos;
 use bazel_protos::operations::Operation;
 use bazel_protos::remote_execution::ExecutedActionMetadata;
 use bytes::Bytes;
+use futures::compat::Future01CompatExt;
+use futures::future::{FutureExt, TryFutureExt};
 use futures01::{future, Future};
 use grpcio;
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
@@ -28,8 +30,9 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::iter::{self, FromIterator};
 use std::ops::Sub;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
-use tokio::timer::Delay;
+use std::time::Duration;
+use tokio::runtime::Handle;
+use tokio::time::delay_for;
 use workunit_store::{WorkUnit, WorkUnitStore};
 
 #[derive(Debug, PartialEq)]
@@ -48,8 +51,8 @@ enum StderrType {
 /// is ignored for remoting by showing EPR with different digests of
 /// `unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule`
 /// end up having the same bazel_protos::remote_execution::ExecuteRequest.
-#[test]
-fn local_only_scratch_files_ignored() {
+#[tokio::test]
+async fn local_only_scratch_files_ignored() {
   let input_directory = TestDirectory::containing_roland();
   let req1 = ExecuteProcessRequest {
     argv: owned_string_vec(&["/bin/echo", "yo"]),
@@ -107,8 +110,8 @@ fn local_only_scratch_files_ignored() {
   );
 }
 
-#[test]
-fn make_execute_request() {
+#[tokio::test]
+async fn make_execute_request() {
   let input_directory = TestDirectory::containing_roland();
   let req = ExecuteProcessRequest {
     argv: owned_string_vec(&["/bin/echo", "yo"]),
@@ -191,8 +194,8 @@ fn make_execute_request() {
   );
 }
 
-#[test]
-fn make_execute_request_with_instance_name() {
+#[tokio::test]
+async fn make_execute_request_with_instance_name() {
   let input_directory = TestDirectory::containing_roland();
   let req = ExecuteProcessRequest {
     argv: owned_string_vec(&["/bin/echo", "yo"]),
@@ -283,8 +286,8 @@ fn make_execute_request_with_instance_name() {
   );
 }
 
-#[test]
-fn make_execute_request_with_cache_key_gen_version() {
+#[tokio::test]
+async fn make_execute_request_with_cache_key_gen_version() {
   let input_directory = TestDirectory::containing_roland();
   let req = ExecuteProcessRequest {
     argv: owned_string_vec(&["/bin/echo", "yo"]),
@@ -380,8 +383,8 @@ fn make_execute_request_with_cache_key_gen_version() {
   );
 }
 
-#[test]
-fn make_execute_request_with_jdk() {
+#[tokio::test]
+async fn make_execute_request_with_jdk() {
   let input_directory = TestDirectory::containing_roland();
   let req = ExecuteProcessRequest {
     argv: owned_string_vec(&["/bin/echo", "yo"]),
@@ -446,8 +449,8 @@ fn make_execute_request_with_jdk() {
   );
 }
 
-#[test]
-fn make_execute_request_with_jdk_and_extra_platform_properties() {
+#[tokio::test]
+async fn make_execute_request_with_jdk_and_extra_platform_properties() {
   let input_directory = TestDirectory::containing_roland();
   let req = ExecuteProcessRequest {
     argv: owned_string_vec(&["/bin/echo", "yo"]),
@@ -548,8 +551,8 @@ fn make_execute_request_with_jdk_and_extra_platform_properties() {
   );
 }
 
-#[test]
-fn server_rejecting_execute_request_gives_error() {
+#[tokio::test]
+async fn server_rejecting_execute_request_gives_error() {
   let execute_request = echo_foo_request();
 
   let mock_server = {
@@ -582,13 +585,15 @@ fn server_rejecting_execute_request_gives_error() {
     )
   };
 
-  let error = run_command_remote(mock_server.address(), execute_request).expect_err("Want Err");
+  let error = run_command_remote(mock_server.address(), execute_request)
+    .await
+    .expect_err("Want Err");
   assert_that(&error).contains("InvalidArgument");
   assert_that(&error).contains("Did not expect this request");
 }
 
-#[test]
-fn successful_execution_after_one_getoperation() {
+#[tokio::test]
+async fn successful_execution_after_one_getoperation() {
   let execute_request = echo_foo_request();
   let op_name = "gimme-foo".to_string();
 
@@ -616,7 +621,9 @@ fn successful_execution_after_one_getoperation() {
     )
   };
 
-  let result = run_command_remote(mock_server.address(), execute_request).unwrap();
+  let result = run_command_remote(mock_server.address(), execute_request)
+    .await
+    .unwrap();
 
   assert_eq!(
     result.without_execution_attempts(),
@@ -633,8 +640,8 @@ fn successful_execution_after_one_getoperation() {
   assert_cancellation_requests(&mock_server, vec![]);
 }
 
-#[test]
-fn retries_retriable_errors() {
+#[tokio::test]
+async fn retries_retriable_errors() {
   let execute_request = echo_foo_request();
   let op_name = "gimme-foo".to_string();
 
@@ -664,7 +671,9 @@ fn retries_retriable_errors() {
     )
   };
 
-  let result = run_command_remote(mock_server.address(), execute_request).unwrap();
+  let result = run_command_remote(mock_server.address(), execute_request)
+    .await
+    .unwrap();
 
   assert_eq!(
     result.without_execution_attempts(),
@@ -681,8 +690,8 @@ fn retries_retriable_errors() {
   assert_cancellation_requests(&mock_server, vec![]);
 }
 
-#[test]
-fn gives_up_after_many_retriable_errors() {
+#[tokio::test]
+async fn gives_up_after_many_retriable_errors() {
   let execute_request = echo_foo_request();
   let op_name = "gimme-foo".to_string();
 
@@ -713,7 +722,9 @@ fn gives_up_after_many_retriable_errors() {
     )
   };
 
-  let err = run_command_remote(mock_server.address(), execute_request).unwrap_err();
+  let err = run_command_remote(mock_server.address(), execute_request)
+    .await
+    .unwrap_err();
 
   assert_that!(err).contains("Gave up");
   assert_that!(err).contains("appears to be lost");
@@ -721,8 +732,8 @@ fn gives_up_after_many_retriable_errors() {
   assert_cancellation_requests(&mock_server, vec![]);
 }
 
-#[test]
-pub fn sends_headers() {
+#[tokio::test]
+async fn sends_headers() {
   let execute_request = echo_foo_request();
   let op_name = "gimme-foo".to_string();
 
@@ -750,7 +761,7 @@ pub fn sends_headers() {
     )
   };
   let cas = mock::StubCAS::empty();
-  let runtime = task_executor::Executor::new();
+  let runtime = task_executor::Executor::new(Handle::current());
   let store_dir = TempDir::new().unwrap();
   let store = Store::with_remote(
     runtime.clone(),
@@ -788,9 +799,10 @@ pub fn sends_headers() {
     workunit_store: WorkUnitStore::default(),
     build_id: String::from("marmosets"),
   };
-  tokio::runtime::Runtime::new()
-    .unwrap()
-    .block_on(command_runner.run(execute_request, context))
+  command_runner
+    .run(execute_request, context)
+    .compat()
+    .await
     .expect("Execution failed");
 
   let received_messages = mock_server.mock_responder.received_messages.lock();
@@ -826,8 +838,8 @@ pub fn sends_headers() {
   }
 }
 
-#[test]
-fn extract_response_with_digest_stdout() {
+#[tokio::test]
+async fn extract_response_with_digest_stdout() {
   let op_name = "gimme-foo".to_string();
   let testdata = TestData::roland();
   let testdata_empty = TestData::empty();
@@ -844,6 +856,7 @@ fn extract_response_with_digest_stdout() {
       .unwrap(),
       Platform::Linux,
     )
+    .await
     .unwrap()
     .without_execution_attempts(),
     FallibleExecuteProcessResultWithPlatform {
@@ -857,8 +870,8 @@ fn extract_response_with_digest_stdout() {
   );
 }
 
-#[test]
-fn extract_response_with_digest_stderr() {
+#[tokio::test]
+async fn extract_response_with_digest_stderr() {
   let op_name = "gimme-foo".to_string();
   let testdata = TestData::roland();
   let testdata_empty = TestData::empty();
@@ -875,6 +888,7 @@ fn extract_response_with_digest_stderr() {
       .unwrap(),
       Platform::Linux,
     )
+    .await
     .unwrap()
     .without_execution_attempts(),
     FallibleExecuteProcessResultWithPlatform {
@@ -888,8 +902,8 @@ fn extract_response_with_digest_stderr() {
   );
 }
 
-#[test]
-fn extract_response_with_digest_stdout_osx_remote() {
+#[tokio::test]
+async fn extract_response_with_digest_stdout_osx_remote() {
   let op_name = "gimme-foo".to_string();
   let testdata = TestData::roland();
   let testdata_empty = TestData::empty();
@@ -906,6 +920,7 @@ fn extract_response_with_digest_stdout_osx_remote() {
       .unwrap(),
       Platform::Darwin
     )
+    .await
     .unwrap()
     .without_execution_attempts(),
     FallibleExecuteProcessResultWithPlatform {
@@ -919,9 +934,9 @@ fn extract_response_with_digest_stdout_osx_remote() {
   );
 }
 
-#[test]
-fn ensure_inline_stdio_is_stored() {
-  let runtime = task_executor::Executor::new();
+#[tokio::test]
+async fn ensure_inline_stdio_is_stored() {
+  let runtime = task_executor::Executor::new(Handle::current());
 
   let test_stdout = TestData::roland();
   let test_stderr = TestData::catnip();
@@ -983,8 +998,10 @@ fn ensure_inline_stdio_is_stored() {
     Duration::from_secs(0),
   )
   .unwrap();
-  let result = runtime
-    .block_on(cmd_runner.run(echo_roland_request(), Context::default()))
+  let result = cmd_runner
+    .run(echo_roland_request(), Context::default())
+    .compat()
+    .await
     .unwrap();
   assert_eq!(
     result.without_execution_attempts(),
@@ -1002,24 +1019,20 @@ fn ensure_inline_stdio_is_stored() {
     Store::local_only(runtime.clone(), &store_dir_path).expect("Error creating local store");
   {
     assert_eq!(
-      runtime
-        .block_on(local_store.load_file_bytes_with(
-          test_stdout.digest(),
-          |v| v,
-          WorkUnitStore::new()
-        ))
+      local_store
+        .load_file_bytes_with(test_stdout.digest(), |v| v, WorkUnitStore::new())
+        .compat()
+        .await
         .unwrap()
         .unwrap()
         .0,
       test_stdout.bytes()
     );
     assert_eq!(
-      runtime
-        .block_on(local_store.load_file_bytes_with(
-          test_stderr.digest(),
-          |v| v,
-          WorkUnitStore::new()
-        ))
+      local_store
+        .load_file_bytes_with(test_stderr.digest(), |v| v, WorkUnitStore::new())
+        .compat()
+        .await
         .unwrap()
         .unwrap()
         .0,
@@ -1028,8 +1041,8 @@ fn ensure_inline_stdio_is_stored() {
   }
 }
 
-#[test]
-fn successful_execution_after_four_getoperations() {
+#[tokio::test]
+async fn successful_execution_after_four_getoperations() {
   let execute_request = echo_foo_request();
 
   let mock_server = {
@@ -1059,7 +1072,9 @@ fn successful_execution_after_four_getoperations() {
     )
   };
 
-  let result = run_command_remote(mock_server.address(), execute_request).unwrap();
+  let result = run_command_remote(mock_server.address(), execute_request)
+    .await
+    .unwrap();
 
   assert_eq!(
     result.without_execution_attempts(),
@@ -1074,8 +1089,8 @@ fn successful_execution_after_four_getoperations() {
   );
 }
 
-#[test]
-fn timeout_after_sufficiently_delayed_getoperations() {
+#[tokio::test]
+async fn timeout_after_sufficiently_delayed_getoperations() {
   let request_timeout = Duration::new(1, 0);
   // The request should timeout after 2 seconds, with 1 second due to the queue_buffer_time and
   // 1 due to the request_timeout.
@@ -1115,7 +1130,9 @@ fn timeout_after_sufficiently_delayed_getoperations() {
     )
   };
 
-  let result = run_command_remote(mock_server.address(), execute_request.into()).unwrap();
+  let result = run_command_remote(mock_server.address(), execute_request.into())
+    .await
+    .unwrap();
   assert_eq!(result.exit_code, -15);
   let error_msg = String::from_utf8(result.stdout.to_vec()).unwrap();
   assert_that(&error_msg).contains("Exceeded timeout");
@@ -1128,9 +1145,9 @@ fn timeout_after_sufficiently_delayed_getoperations() {
   assert_cancellation_requests(&mock_server, vec![op_name.to_owned()]);
 }
 
-#[test]
 #[ignore] // https://github.com/pantsbuild/pants/issues/8405
-fn dropped_request_cancels() {
+#[tokio::test]
+async fn dropped_request_cancels() {
   let request_timeout = Duration::new(10, 0);
   let delayed_operation_time = Duration::new(5, 0);
 
@@ -1179,7 +1196,6 @@ fn dropped_request_cancels() {
     Duration::from_secs(0),
     Platform::Linux,
   );
-  let mut runtime = tokio::runtime::Runtime::new().unwrap();
 
   let successful_mock_result = FallibleExecuteProcessResultWithPlatform {
     stdout: as_bytes("foo-fast"),
@@ -1191,31 +1207,30 @@ fn dropped_request_cancels() {
   };
 
   let run_future = command_runner.run(execute_request.into(), Context::default());
-  let faster_future = Delay::new(Instant::now() + Duration::from_secs(1))
-    .map_err(|err| format!("Error from timer: {}", err))
+  let faster_future = delay_for(Duration::from_secs(1))
+    .unit_error()
+    .compat()
+    .map_err(|()| "Error from timer.".to_string())
     .map({
       let successful_mock_result = successful_mock_result.clone();
       |_| successful_mock_result
     });
 
-  let result = runtime
-    .block_on(
-      run_future
-        .select(faster_future)
-        .map(|(result, _future)| result)
-        .map_err(|(err, _future)| err),
-    )
+  let result = run_future
+    .select(faster_future)
+    .map(|(result, _future)| result)
+    .map_err(|(err, _future)| err)
+    .compat()
+    .await
     .unwrap();
 
   assert_eq!(result.without_execution_attempts(), successful_mock_result);
 
-  runtime.shutdown_on_idle().wait().unwrap();
-
   assert_cancellation_requests(&mock_server, vec![op_name.to_owned()]);
 }
 
-#[test]
-fn retry_for_cancelled_channel() {
+#[tokio::test]
+async fn retry_for_cancelled_channel() {
   let execute_request = echo_foo_request();
 
   let mock_server = {
@@ -1245,7 +1260,9 @@ fn retry_for_cancelled_channel() {
     )
   };
 
-  let result = run_command_remote(mock_server.address(), execute_request).unwrap();
+  let result = run_command_remote(mock_server.address(), execute_request)
+    .await
+    .unwrap();
 
   assert_eq!(
     result.without_execution_attempts(),
@@ -1260,8 +1277,8 @@ fn retry_for_cancelled_channel() {
   );
 }
 
-#[test]
-fn bad_result_bytes() {
+#[tokio::test]
+async fn bad_result_bytes() {
   let execute_request = echo_foo_request();
 
   let mock_server = {
@@ -1301,11 +1318,13 @@ fn bad_result_bytes() {
     )
   };
 
-  run_command_remote(mock_server.address(), execute_request).expect_err("Want Err");
+  run_command_remote(mock_server.address(), execute_request)
+    .await
+    .expect_err("Want Err");
 }
 
-#[test]
-fn initial_response_error() {
+#[tokio::test]
+async fn initial_response_error() {
   let execute_request = echo_foo_request();
 
   let mock_server = {
@@ -1337,13 +1356,15 @@ fn initial_response_error() {
     )
   };
 
-  let result = run_command_remote(mock_server.address(), execute_request).expect_err("Want Err");
+  let result = run_command_remote(mock_server.address(), execute_request)
+    .await
+    .expect_err("Want Err");
 
   assert_eq!(result, "INTERNAL: Something went wrong");
 }
 
-#[test]
-fn getoperation_response_error() {
+#[tokio::test]
+async fn getoperation_response_error() {
   let execute_request = echo_foo_request();
 
   let mock_server = {
@@ -1378,15 +1399,17 @@ fn getoperation_response_error() {
     )
   };
 
-  let result = run_command_remote(mock_server.address(), execute_request).expect_err("Want Err");
+  let result = run_command_remote(mock_server.address(), execute_request)
+    .await
+    .expect_err("Want Err");
 
   assert_eq!(result, "INTERNAL: Something went wrong");
 
   assert_cancellation_requests(&mock_server, vec![]);
 }
 
-#[test]
-fn initial_response_missing_response_and_error() {
+#[tokio::test]
+async fn initial_response_missing_response_and_error() {
   let execute_request = echo_foo_request();
 
   let mock_server = {
@@ -1412,13 +1435,15 @@ fn initial_response_missing_response_and_error() {
     )
   };
 
-  let result = run_command_remote(mock_server.address(), execute_request).expect_err("Want Err");
+  let result = run_command_remote(mock_server.address(), execute_request)
+    .await
+    .expect_err("Want Err");
 
   assert_eq!(result, "Operation finished but no response supplied");
 }
 
-#[test]
-fn getoperation_missing_response_and_error() {
+#[tokio::test]
+async fn getoperation_missing_response_and_error() {
   let execute_request = echo_foo_request();
 
   let mock_server = {
@@ -1447,14 +1472,16 @@ fn getoperation_missing_response_and_error() {
     )
   };
 
-  let result = run_command_remote(mock_server.address(), execute_request).expect_err("Want Err");
+  let result = run_command_remote(mock_server.address(), execute_request)
+    .await
+    .expect_err("Want Err");
 
   assert_eq!(result, "Operation finished but no response supplied");
 }
 
-#[test]
-fn execute_missing_file_uploads_if_known() {
-  let runtime = task_executor::Executor::new();
+#[tokio::test]
+async fn execute_missing_file_uploads_if_known() {
+  let runtime = task_executor::Executor::new(Handle::current());
 
   let roland = TestData::roland();
 
@@ -1506,11 +1533,15 @@ fn execute_missing_file_uploads_if_known() {
     1,
   )
   .expect("Failed to make store");
-  runtime
-    .block_on(store.store_file_bytes(roland.bytes(), false))
+  store
+    .store_file_bytes(roland.bytes(), false)
+    .compat()
+    .await
     .expect("Saving file bytes to store");
-  runtime
-    .block_on(store.record_directory(&TestDirectory::containing_roland().directory(), false))
+  store
+    .record_directory(&TestDirectory::containing_roland().directory(), false)
+    .compat()
+    .await
     .expect("Saving directory bytes to store");
   let command_runner = CommandRunner::new(
     &mock_server.address(),
@@ -1527,8 +1558,10 @@ fn execute_missing_file_uploads_if_known() {
   )
   .unwrap();
 
-  let result = runtime
-    .block_on(command_runner.run(cat_roland_request(), Context::default()))
+  let result = command_runner
+    .run(cat_roland_request(), Context::default())
+    .compat()
+    .await
     .unwrap();
   assert_eq!(
     result.without_execution_attempts(),
@@ -1547,10 +1580,10 @@ fn execute_missing_file_uploads_if_known() {
   }
 }
 
-//#[test] // TODO: Unignore this test when the server can actually fail with status protos.
-// See https://github.com/pantsbuild/pants/issues/6597
-#[allow(dead_code)]
-fn execute_missing_file_uploads_if_known_status() {
+#[tokio::test]
+//// TODO: Unignore this test when the server can actually fail with status protos.
+#[ignore] // https://github.com/pantsbuild/pants/issues/6597
+async fn execute_missing_file_uploads_if_known_status() {
   let roland = TestData::roland();
 
   let mock_server = {
@@ -1599,7 +1632,7 @@ fn execute_missing_file_uploads_if_known_status() {
   let cas = mock::StubCAS::builder()
     .directory(&TestDirectory::containing_roland())
     .build();
-  let runtime = task_executor::Executor::new();
+  let runtime = task_executor::Executor::new(Handle::current());
   let store = Store::with_remote(
     runtime.clone(),
     store_dir,
@@ -1655,8 +1688,8 @@ fn execute_missing_file_uploads_if_known_status() {
   assert_cancellation_requests(&mock_server, vec![]);
 }
 
-#[test]
-fn execute_missing_file_errors_if_unknown() {
+#[tokio::test]
+async fn execute_missing_file_errors_if_unknown() {
   let missing_digest = TestDirectory::containing_roland().digest();
 
   let mock_server = {
@@ -1684,7 +1717,7 @@ fn execute_missing_file_errors_if_unknown() {
     .file(&TestData::roland())
     .directory(&TestDirectory::containing_roland())
     .build();
-  let runtime = task_executor::Executor::new();
+  let runtime = task_executor::Executor::new(Handle::current());
   let store = Store::with_remote(
     runtime.clone(),
     store_dir,
@@ -1716,14 +1749,16 @@ fn execute_missing_file_errors_if_unknown() {
   )
   .unwrap();
 
-  let error = runtime
-    .block_on(runner.run(cat_roland_request(), Context::default()))
+  let error = runner
+    .run(cat_roland_request(), Context::default())
+    .compat()
+    .await
     .expect_err("Want error");
   assert_contains(&error, &format!("{}", missing_digest.0));
 }
 
-#[test]
-fn format_error_complete() {
+#[tokio::test]
+async fn format_error_complete() {
   let mut error = bazel_protos::status::Status::new();
   error.set_code(bazel_protos::code::Code::CANCELLED.value());
   error.set_message("Oops, oh well!".to_string());
@@ -1733,8 +1768,8 @@ fn format_error_complete() {
   );
 }
 
-#[test]
-fn extract_execute_response_unknown_code() {
+#[tokio::test]
+async fn extract_execute_response_unknown_code() {
   let mut error = bazel_protos::status::Status::new();
   error.set_code(555);
   error.set_message("Oops, oh well!".to_string());
@@ -1744,8 +1779,8 @@ fn extract_execute_response_unknown_code() {
   );
 }
 
-#[test]
-fn extract_execute_response_success() {
+#[tokio::test]
+async fn extract_execute_response_success() {
   let want_result = FallibleExecuteProcessResultWithPlatform {
     stdout: as_bytes("roland"),
     stderr: Bytes::from("simba"),
@@ -1780,27 +1815,28 @@ fn extract_execute_response_success() {
 
   assert_eq!(
     extract_execute_response(operation, Platform::Linux)
+      .await
       .unwrap()
       .without_execution_attempts(),
     want_result
   );
 }
 
-#[test]
-fn extract_execute_response_pending() {
+#[tokio::test]
+async fn extract_execute_response_pending() {
   let operation_name = "cat".to_owned();
   let mut operation = bazel_protos::operations::Operation::new();
   operation.set_name(operation_name.clone());
   operation.set_done(false);
 
   assert_eq!(
-    extract_execute_response(operation, Platform::Linux),
+    extract_execute_response(operation, Platform::Linux).await,
     Err(ExecutionError::NotFinished(operation_name))
   );
 }
 
-#[test]
-fn extract_execute_response_missing_digests() {
+#[tokio::test]
+async fn extract_execute_response_missing_digests() {
   let missing_files = vec![
     TestData::roland().digest(),
     TestDirectory::containing_roland().digest(),
@@ -1817,13 +1853,13 @@ fn extract_execute_response_missing_digests() {
     .unwrap();
 
   assert_eq!(
-    extract_execute_response(operation, Platform::Linux),
+    extract_execute_response(operation, Platform::Linux).await,
     Err(ExecutionError::MissingDigests(missing_files))
   );
 }
 
-#[test]
-fn extract_execute_response_missing_other_things() {
+#[tokio::test]
+async fn extract_execute_response_missing_other_things() {
   let missing = vec![
     missing_preconditionfailure_violation(&TestData::roland().digest()),
     {
@@ -1839,14 +1875,14 @@ fn extract_execute_response_missing_other_things() {
     .unwrap()
     .unwrap();
 
-  match extract_execute_response(operation, Platform::Linux) {
+  match extract_execute_response(operation, Platform::Linux).await {
     Err(ExecutionError::Fatal(err)) => assert_contains(&err, "monkeys"),
     other => assert!(false, "Want fatal error, got {:?}", other),
   };
 }
 
-#[test]
-fn extract_execute_response_other_failed_precondition() {
+#[tokio::test]
+async fn extract_execute_response_other_failed_precondition() {
   let missing = vec![{
     let mut violation = bazel_protos::error_details::PreconditionFailure_Violation::new();
     violation.set_field_type("OUT_OF_CAPACITY".to_owned());
@@ -1858,14 +1894,14 @@ fn extract_execute_response_other_failed_precondition() {
     .unwrap()
     .unwrap();
 
-  match extract_execute_response(operation, Platform::Linux) {
+  match extract_execute_response(operation, Platform::Linux).await {
     Err(ExecutionError::Fatal(err)) => assert_contains(&err, "OUT_OF_CAPACITY"),
     other => assert!(false, "Want fatal error, got {:?}", other),
   };
 }
 
-#[test]
-fn extract_execute_response_missing_without_list() {
+#[tokio::test]
+async fn extract_execute_response_missing_without_list() {
   let missing = vec![];
 
   let operation = make_precondition_failure_operation(missing)
@@ -1873,14 +1909,14 @@ fn extract_execute_response_missing_without_list() {
     .unwrap()
     .unwrap();
 
-  match extract_execute_response(operation, Platform::Linux) {
+  match extract_execute_response(operation, Platform::Linux).await {
     Err(ExecutionError::Fatal(err)) => assert_contains(&err.to_lowercase(), "precondition"),
     other => assert!(false, "Want fatal error, got {:?}", other),
   };
 }
 
-#[test]
-fn extract_execute_response_other_status() {
+#[tokio::test]
+async fn extract_execute_response_other_status() {
   let mut operation = bazel_protos::operations::Operation::new();
   operation.set_name("cat".to_owned());
   operation.set_done(true);
@@ -1894,14 +1930,14 @@ fn extract_execute_response_other_status() {
     response
   }));
 
-  match extract_execute_response(operation, Platform::Linux) {
+  match extract_execute_response(operation, Platform::Linux).await {
     Err(ExecutionError::Fatal(err)) => assert_contains(&err, "PermissionDenied"),
     other => assert!(false, "Want fatal error, got {:?}", other),
   };
 }
 
-#[test]
-fn digest_command() {
+#[tokio::test]
+async fn digest_command() {
   let mut command = bazel_protos::remote_execution::Command::new();
   command.mut_arguments().push("/bin/echo".to_string());
   command.mut_arguments().push("foo".to_string());
@@ -1925,8 +1961,8 @@ fn digest_command() {
   assert_eq!(digest.1, 32)
 }
 
-#[test]
-fn wait_between_request_1_retry() {
+#[tokio::test]
+async fn wait_between_request_1_retry() {
   // wait at least 100 milli for one retry
   {
     let execute_request = echo_foo_request();
@@ -1962,9 +1998,10 @@ fn wait_between_request_1_retry() {
       Duration::from_secs(1),
       Platform::Linux,
     );
-    let mut runtime = tokio::runtime::Runtime::new().unwrap();
-    runtime
-      .block_on(command_runner.run(execute_request, Context::default()))
+    command_runner
+      .run(execute_request, Context::default())
+      .compat()
+      .await
       .unwrap();
 
     let messages = mock_server.mock_responder.received_messages.lock();
@@ -1980,8 +2017,8 @@ fn wait_between_request_1_retry() {
   }
 }
 
-#[test]
-fn wait_between_request_3_retry() {
+#[tokio::test]
+async fn wait_between_request_3_retry() {
   // wait at least 50 + 100 + 150 = 300 milli for 3 retries.
   {
     let execute_request = echo_foo_request();
@@ -2019,9 +2056,10 @@ fn wait_between_request_3_retry() {
       Duration::from_secs(5),
       Platform::Linux,
     );
-    let mut runtime = tokio::runtime::Runtime::new().unwrap();
-    runtime
-      .block_on(command_runner.run(execute_request, Context::default()))
+    command_runner
+      .run(execute_request, Context::default())
+      .compat()
+      .await
       .unwrap();
 
     let messages = mock_server.mock_responder.received_messages.lock();
@@ -2053,8 +2091,8 @@ fn wait_between_request_3_retry() {
   }
 }
 
-#[test]
-fn extract_output_files_from_response_one_file() {
+#[tokio::test]
+async fn extract_output_files_from_response_one_file() {
   let mut output_file = bazel_protos::remote_execution::OutputFile::new();
   output_file.set_path("roland".into());
   output_file.set_digest((&TestData::roland().digest()).into());
@@ -2071,13 +2109,13 @@ fn extract_output_files_from_response_one_file() {
   });
 
   assert_eq!(
-    extract_output_files_from_response(&execute_response),
+    extract_output_files_from_response(&execute_response).await,
     Ok(TestDirectory::containing_roland().digest())
   )
 }
 
-#[test]
-fn extract_output_files_from_response_two_files_not_nested() {
+#[tokio::test]
+async fn extract_output_files_from_response_two_files_not_nested() {
   let mut output_file_1 = bazel_protos::remote_execution::OutputFile::new();
   output_file_1.set_path("roland".into());
   output_file_1.set_digest((&TestData::roland().digest()).into());
@@ -2100,13 +2138,13 @@ fn extract_output_files_from_response_two_files_not_nested() {
   });
 
   assert_eq!(
-    extract_output_files_from_response(&execute_response),
+    extract_output_files_from_response(&execute_response).await,
     Ok(TestDirectory::containing_roland_and_treats().digest())
   )
 }
 
-#[test]
-fn extract_output_files_from_response_two_files_nested() {
+#[tokio::test]
+async fn extract_output_files_from_response_two_files_nested() {
   let mut output_file_1 = bazel_protos::remote_execution::OutputFile::new();
   output_file_1.set_path("cats/roland".into());
   output_file_1.set_digest((&TestData::roland().digest()).into());
@@ -2129,13 +2167,13 @@ fn extract_output_files_from_response_two_files_nested() {
   });
 
   assert_eq!(
-    extract_output_files_from_response(&execute_response),
+    extract_output_files_from_response(&execute_response).await,
     Ok(TestDirectory::recursive().digest())
   )
 }
 
-#[test]
-fn extract_output_files_from_response_just_directory() {
+#[tokio::test]
+async fn extract_output_files_from_response_just_directory() {
   let mut output_directory = bazel_protos::remote_execution::OutputDirectory::new();
   output_directory.set_path("cats".into());
   output_directory.set_tree_digest((&TestDirectory::containing_roland().digest()).into());
@@ -2151,13 +2189,13 @@ fn extract_output_files_from_response_just_directory() {
   });
 
   assert_eq!(
-    extract_output_files_from_response(&execute_response),
+    extract_output_files_from_response(&execute_response).await,
     Ok(TestDirectory::nested().digest())
   )
 }
 
-#[test]
-fn extract_output_files_from_response_directories_and_files() {
+#[tokio::test]
+async fn extract_output_files_from_response_directories_and_files() {
   // /catnip
   // /pets/cats/roland
   // /pets/dogs/robin
@@ -2195,7 +2233,7 @@ fn extract_output_files_from_response_directories_and_files() {
   });
 
   assert_eq!(
-    extract_output_files_from_response(&execute_response),
+    extract_output_files_from_response(&execute_response).await,
     Ok(Digest(
       Fingerprint::from_hex_string(
         "639b4b84bb58a9353d49df8122e7987baf038efe54ed035e67910846c865b1e2"
@@ -2206,8 +2244,8 @@ fn extract_output_files_from_response_directories_and_files() {
   )
 }
 
-#[test]
-fn extract_output_files_from_response_no_prefix() {
+#[tokio::test]
+async fn extract_output_files_from_response_no_prefix() {
   let mut output_directory = bazel_protos::remote_execution::OutputDirectory::new();
   output_directory.set_path(String::new());
   output_directory.set_tree_digest((&TestDirectory::containing_roland().digest()).into());
@@ -2221,7 +2259,7 @@ fn extract_output_files_from_response_no_prefix() {
   });
 
   assert_eq!(
-    extract_output_files_from_response(&execute_response),
+    extract_output_files_from_response(&execute_response).await,
     Ok(TestDirectory::containing_roland().digest())
   )
 }
@@ -2239,8 +2277,8 @@ fn workunits_with_constant_span_id(workunit_store: &WorkUnitStore) -> HashSet<Wo
     .collect()
 }
 
-#[test]
-fn remote_workunits_are_stored() {
+#[tokio::test]
+async fn remote_workunits_are_stored() {
   let workunit_store = WorkUnitStore::new();
   let op_name = "gimme-foo".to_string();
   let testdata = TestData::roland();
@@ -2263,18 +2301,17 @@ fn remote_workunits_are_stored() {
     Platform::Linux,
   );
 
-  let mut runtime = tokio::runtime::Runtime::new().unwrap();
-
   let workunit_store_2 = workunit_store.clone();
-  runtime
-    .block_on(future::lazy(move || {
-      command_runner.extract_execute_response(
-        OperationOrStatus::Operation(operation),
-        &mut ExecutionHistory::default(),
-        workunit_store_2,
-      )
-    }))
-    .unwrap();
+  future::lazy(move || {
+    command_runner.extract_execute_response(
+      OperationOrStatus::Operation(operation),
+      &mut ExecutionHistory::default(),
+      workunit_store_2,
+    )
+  })
+  .compat()
+  .await
+  .unwrap();
 
   let got_workunits = workunits_with_constant_span_id(&workunit_store);
 
@@ -2506,7 +2543,7 @@ fn make_precondition_failure_status(
   status
 }
 
-fn run_command_remote(
+async fn run_command_remote(
   address: String,
   request: MultiPlatformExecuteProcessRequest,
 ) -> Result<FallibleExecuteProcessResultWithPlatform, String> {
@@ -2521,8 +2558,10 @@ fn run_command_remote(
     Duration::from_secs(0),
     Platform::Linux,
   );
-  let mut runtime = tokio::runtime::Runtime::new().unwrap();
-  runtime.block_on(command_runner.run(request, Context::default()))
+  command_runner
+    .run(request, Context::default())
+    .compat()
+    .await
 }
 
 fn create_command_runner(
@@ -2532,7 +2571,7 @@ fn create_command_runner(
   backoff_max_wait: Duration,
   platform: Platform,
 ) -> CommandRunner {
-  let runtime = task_executor::Executor::new();
+  let runtime = task_executor::Executor::new(Handle::current());
   let store_dir = TempDir::new().unwrap();
   let store = make_store(store_dir.path(), cas, runtime.clone());
   CommandRunner::new(
@@ -2569,7 +2608,7 @@ fn make_store(store_dir: &Path, cas: &mock::StubCAS, executor: task_executor::Ex
   .expect("Failed to make store")
 }
 
-fn extract_execute_response(
+async fn extract_execute_response(
   operation: bazel_protos::operations::Operation,
   remote_platform: Platform,
 ) -> Result<FallibleExecuteProcessResultWithPlatform, ExecutionError> {
@@ -2585,30 +2624,29 @@ fn extract_execute_response(
     remote_platform,
   );
 
-  let mut runtime = tokio::runtime::Runtime::new().unwrap();
-
-  runtime.block_on(command_runner.extract_execute_response(
-    OperationOrStatus::Operation(operation),
-    &mut ExecutionHistory::default(),
-    WorkUnitStore::new(),
-  ))
+  command_runner
+    .extract_execute_response(
+      OperationOrStatus::Operation(operation),
+      &mut ExecutionHistory::default(),
+      WorkUnitStore::new(),
+    )
+    .compat()
+    .await
 }
 
-fn extract_output_files_from_response(
+async fn extract_output_files_from_response(
   execute_response: &bazel_protos::remote_execution::ExecuteResponse,
 ) -> Result<Digest, String> {
   let cas = mock::StubCAS::builder()
     .file(&TestData::roland())
     .directory(&TestDirectory::containing_roland())
     .build();
-  let executor = task_executor::Executor::new();
+  let executor = task_executor::Executor::new(Handle::current());
   let store_dir = TempDir::new().unwrap();
   let store = make_store(store_dir.path(), &cas, executor.clone());
-  executor.block_on(crate::remote::extract_output_files(
-    store,
-    &execute_response,
-    WorkUnitStore::new(),
-  ))
+  crate::remote::extract_output_files(store, &execute_response, WorkUnitStore::new())
+    .compat()
+    .await
 }
 
 fn make_any_proto(message: &dyn Message) -> protobuf::well_known_types::Any {
