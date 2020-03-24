@@ -11,8 +11,6 @@ from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass
 
-from pants.util.osutil import Pid
-
 STDIO_DESCRIPTORS = (0, 1, 2)
 
 

@@ -1,7 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import signal
 import socket
 import unittest
 import unittest.mock
@@ -71,7 +70,6 @@ class TestNailgunClientSession(unittest.TestCase):
     @unittest.mock.patch("psutil.Process", **PATCH_OPTS)
     def test_process_session(self, mock_psutil_process):
         mock_psutil_process.cmdline.return_value = ["mock", "process"]
-        NailgunProtocol.write_chunk(self.server_sock, ChunkType.PID, b"31337")
         NailgunProtocol.write_chunk(self.server_sock, ChunkType.START_READING_INPUT)
         NailgunProtocol.write_chunk(self.server_sock, ChunkType.STDOUT, self.TEST_PAYLOAD)
         NailgunProtocol.write_chunk(self.server_sock, ChunkType.STDERR, self.TEST_PAYLOAD)
@@ -84,12 +82,10 @@ class TestNailgunClientSession(unittest.TestCase):
         self.assertEqual(self.fake_stderr.content, self.TEST_PAYLOAD * 3)
         self.mock_stdin_reader.start.assert_called_once_with()
         self.mock_stdin_reader.stop.assert_called_once_with()
-        self.assertEqual(self.nailgun_client_session.remote_pid, 31337)
 
     @unittest.mock.patch("psutil.Process", **PATCH_OPTS)
     def test_process_session_bad_chunk(self, mock_psutil_process):
         mock_psutil_process.cmdline.return_value = ["mock", "process"]
-        NailgunProtocol.write_chunk(self.server_sock, ChunkType.PID, b"31337")
         NailgunProtocol.write_chunk(self.server_sock, ChunkType.START_READING_INPUT)
         NailgunProtocol.write_chunk(self.server_sock, self.BAD_CHUNK_TYPE, "")
 
@@ -145,7 +141,7 @@ class TestNailgunClient(unittest.TestCase):
     @unittest.mock.patch("pants.java.nailgun_client.NailgunClientSession", **PATCH_OPTS)
     def test_execute_propagates_connection_error_on_connect(self, mock_session, mock_try_connect):
         mock_try_connect.side_effect = NailgunClient.NailgunConnectionError(
-            "127.0.0.1:31337", 31337, -31336, Exception("oops"),
+            "127.0.0.1:31337", Exception("oops"),
         )
 
         with self.assertRaises(NailgunClient.NailgunConnectionError):

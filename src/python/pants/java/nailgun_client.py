@@ -4,19 +4,14 @@
 import errno
 import logging
 import os
-import signal
 import socket
 import sys
 import time
 
-import psutil
-
 from pants.java.nailgun_io import NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, MaybeShutdownSocket, NailgunProtocol
-from pants.util.dirutil import safe_file_dump
-from pants.util.osutil import safe_kill
 from pants.util.socket import RecvBufferedSocket
-from pants.util.strutil import ensure_binary, safe_shlex_join
+from pants.util.strutil import ensure_binary
 
 logger = logging.getLogger(__name__)
 
@@ -24,21 +19,10 @@ logger = logging.getLogger(__name__)
 class NailgunClientSession(NailgunProtocol, NailgunProtocol.TimeoutProvider):
     """Handles a single nailgun client session."""
 
-    def __init__(
-        self,
-        sock,
-        in_file,
-        out_file,
-        err_file,
-        exit_on_broken_pipe=False,
-        remote_pid=None,
-    ):
+    def __init__(self, sock, in_file, out_file, err_file, exit_on_broken_pipe=False):
         """
         :param bool exit_on_broken_pipe: whether or not to exit when `Broken Pipe` errors are
                     encountered
-        :param remote_pid_callback: Callback to run when a pid chunk is received from a remote client.
-        :param remote_pgrp_callback: Callback to run when a pgrp (process group) chunk is received from
-                                     a remote client.
         """
         self._sock = sock
         self._input_writer = (
@@ -51,7 +35,6 @@ class NailgunClientSession(NailgunProtocol, NailgunProtocol.TimeoutProvider):
         self._stdout = out_file
         self._stderr = err_file
         self._exit_on_broken_pipe = exit_on_broken_pipe
-        self.remote_pid = remote_pid
         # NB: These variables are set in a signal handler to implement graceful shutdown.
         self._exit_timeout_start_time = None
         self._exit_timeout = None
@@ -144,9 +127,7 @@ class NailgunClientSession(NailgunProtocol, NailgunProtocol.TimeoutProvider):
             self._maybe_stop_input_writer()
             # If an asynchronous error was set at any point (such as in a signal handler), we want to make
             # sure we clean up the remote process before exiting with error.
-            if self._exit_reason and self._remote_pid:
-                if self.remote_pid:
-                    safe_kill(self.remote_pid, signal.SIGKILL)
+            if self._exit_reason:
                 raise self._exit_reason
 
     def execute(self, working_dir, main_class, *arguments, **environment):
@@ -175,9 +156,7 @@ class NailgunClient:
             self.wrapped_exc = wrapped_exc
 
             msg = self._MSG_FMT.format(
-                description=self.DESCRIPTION,
-                address=self.address,
-                wrapped_exc=self.wrapped_exc,
+                description=self.DESCRIPTION, address=self.address, wrapped_exc=self.wrapped_exc,
             )
             super(NailgunClient.NailgunError, self).__init__(msg, self.wrapped_exc)
 
@@ -251,8 +230,7 @@ class NailgunClient:
             )
             sock.close()
             raise self.NailgunConnectionError(
-                address=self._address_string,
-                wrapped_exc=e,
+                address=self._address_string, wrapped_exc=e,
             )
         else:
             return sock
@@ -291,10 +269,7 @@ class NailgunClient:
             return self._session.execute(cwd, main_class, *args, **environment)
         except (socket.error, NailgunProtocol.ProtocolError) as e:
             raise self.NailgunError(
-                address=self._address_string,
-                pid=self._maybe_last_pid(),
-                pgrp=self._maybe_last_pgrp(),
-                wrapped_exc=e,
+                address=self._address_string, wrapped_exc=e,
             )
         finally:
             sock.close()
