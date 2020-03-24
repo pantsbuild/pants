@@ -3,32 +3,18 @@
 
 package org.pantsbuild.tools.junit.impl;
 
-import com.google.common.base.Charsets;
-
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 
 import org.junit.Test;
 import org.junit.runner.Result;
 import org.junit.runner.notification.RunListener;
-import org.pantsbuild.tools.junit.impl.security.JunitSecurityManagerConfig;
 import org.pantsbuild.tools.junit.lib.AllFailingTest;
 import org.pantsbuild.tools.junit.lib.AllIgnoredTest;
 import org.pantsbuild.tools.junit.lib.AllPassingTest;
 import org.pantsbuild.tools.junit.lib.ExceptionInSetupTest;
 import org.pantsbuild.tools.junit.lib.LogOutputInTeardownTest;
 import org.pantsbuild.tools.junit.lib.OutputModeTest;
-import org.pantsbuild.tools.junit.lib.SystemExitsInObjectBody;
-import org.pantsbuild.tools.junit.lib.security.network.BoundaryNetworkTests;
-import org.pantsbuild.tools.junit.lib.security.sysexit.BeforeClassSysExitTestCase;
-import org.pantsbuild.tools.junit.lib.security.sysexit.BoundarySystemExitTests;
-import org.pantsbuild.tools.junit.lib.security.threads.DanglingThreadFromTestCase;
-import org.pantsbuild.tools.junit.lib.security.sysexit.StaticSysExitTestCase;
-import org.pantsbuild.tools.junit.lib.security.threads.ThreadStartedInBeforeClassAndJoinedAfterTest;
-import org.pantsbuild.tools.junit.lib.security.threads.ThreadStartedInBeforeClassAndNotJoinedAfterTest;
-import org.pantsbuild.tools.junit.lib.security.threads.ThreadStartedInBeforeTest;
 import org.pantsbuild.tools.junit.lib.XmlReportTest;
 import org.pantsbuild.tools.junit.lib.XmlReportTestSuite;
 
@@ -36,8 +22,6 @@ import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.core.Is.is;
-import static org.junit.Assert.fail;
-import static org.pantsbuild.tools.junit.impl.security.JunitSecurityManagerConfig.*;
 
 /**
  * These tests are similar to the tests in ConsoleRunnerTest but they create a ConosoleRunnerImpl

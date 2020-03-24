@@ -1,12 +1,12 @@
 package org.pantsbuild.tools.junit.impl.security;
 
 import org.junit.Test;
+import org.pantsbuild.tools.junit.impl.ConsoleRunnerImplTestSetup;
 import org.pantsbuild.tools.junit.lib.SystemExitsInObjectBody;
 import org.pantsbuild.tools.junit.lib.security.fileaccess.FileAccessTests;
 import org.pantsbuild.tools.junit.lib.security.network.BoundaryNetworkTests;
 import org.pantsbuild.tools.junit.lib.security.sysexit.BeforeClassSysExitTestCase;
 import org.pantsbuild.tools.junit.lib.security.sysexit.BoundarySystemExitTests;
-import org.pantsbuild.tools.junit.impl.ConsoleRunnerImplTestSetup;
 import org.pantsbuild.tools.junit.lib.security.sysexit.StaticSysExitTestCase;
 import org.pantsbuild.tools.junit.lib.security.threads.DanglingThreadFromTestCase;
 import org.pantsbuild.tools.junit.lib.security.threads.ThreadStartedInBeforeClassAndJoinedAfterTest;
@@ -431,7 +431,6 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
             "FileAccessTests.java:"));
 
   }
-
 
   private JunitSecurityManagerConfig configDisallowingSystemExitButAllowingEverythingElse() {
     return new JunitSecurityManagerConfig(

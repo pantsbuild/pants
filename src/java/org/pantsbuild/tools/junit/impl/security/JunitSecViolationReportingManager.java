@@ -2,8 +2,6 @@ package org.pantsbuild.tools.junit.impl.security;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.security.AccessController;
 import java.security.Permission;
 import java.security.PrivilegedActionException;
@@ -142,7 +140,7 @@ public class JunitSecViolationReportingManager extends SecurityManager {
       return cheaperContext;
     }
 
-    Class[] classContext = getClassContext();
+    Class<?>[] classContext = getClassContext();
     return contextLookupAndErrorCollection.lookupContextFromClassContext(classContext);
   }
 

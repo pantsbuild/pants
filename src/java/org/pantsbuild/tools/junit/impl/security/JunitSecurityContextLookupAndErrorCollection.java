@@ -233,7 +233,7 @@ class JunitSecurityContextLookupAndErrorCollection {
   }
 
 
-  TestSecurityContext lookupContextFromClassContext(Class[] classContext) {
+  TestSecurityContext lookupContextFromClassContext(Class<?>[] classContext) {
     for (Class<?> c : classContext) {
       // Will only find the classes context and not the test cases, but it's better than not finding
       // any

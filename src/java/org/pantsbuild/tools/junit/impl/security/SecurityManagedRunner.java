@@ -58,7 +58,6 @@ public class SecurityManagedRunner extends Runner implements Filterable {
     Queue<Description> queue = new ArrayDeque<>();
     queue.add(wrappedRunner.getDescription());
     while (!queue.isEmpty()) {
-
       Description pop = queue.remove();
       if (seen.contains(pop)) {
         continue;
