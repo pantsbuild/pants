@@ -91,6 +91,7 @@ fnv = "1.0.5"
 fs = { path = "fs" }
 futures01 = { package = "futures", version = "0.1" }
 futures = { version = "0.3", features = ["compat"] }
+futures-locks = "0.3.0"
 graph = { path = "graph" }
 hashing = { path = "hashing" }
 indexmap = "1.0.2"

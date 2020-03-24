@@ -1069,33 +1069,38 @@ impl Node for NodeKey {
 
     scope_task_parent_id(maybe_span_id, async move {
       let context2 = context.clone();
+      let self2 = self.clone();
 
-      let maybe_watch = if let Some(path) = self.fs_subject() {
-        let abs_path = context.core.build_root.join(path);
-        context
-          .core
-          .watcher
-          .watch(abs_path)
-          .map_err(|e| Failure::FileWatch(format!("{:?}", e)))
-          .await
-      } else {
-        Ok(())
-      };
-
-      let result = match maybe_watch {
-        Ok(()) => match self {
-          NodeKey::DigestFile(n) => n.run(context).map(NodeResult::from).compat().await,
-          NodeKey::DownloadedFile(n) => n.run(context).map(NodeResult::from).compat().await,
-          NodeKey::MultiPlatformExecuteProcess(n) => {
+      let result = match self {
+        NodeKey::DigestFile(n) => n.run(context).map(NodeResult::from).compat().await,
+        NodeKey::DownloadedFile(n) => n.run(context).map(NodeResult::from).compat().await,
+        NodeKey::MultiPlatformExecuteProcess(n) => {
+          n.run(context).map(NodeResult::from).compat().await
+        }
+        NodeKey::ReadLink(n) => n.run(context).map(NodeResult::from).compat().await,
+        NodeKey::Scandir(n) => {
+          // We only need to add watches to scandir nodes. Notify will watch
+          // all direct descendents of the scandir fs subject. We will only ever digest
+          // a file or read a link which is part of a directory we have scanned.
+          // The main reason for doing this is performance. Adding watches to files
+          // adds significant overhead to cold builds or builds not running pantsd.
+          let path = self2.fs_subject().unwrap();
+          let abs_path = context.core.build_root.join(path);
+          if let Err(e) = context
+            .core
+            .watcher
+            .watch(abs_path)
+            .map_err(|e| Failure::FileWatch(format!("{:?}", e)))
+            .await
+          {
+            Err(e)
+          } else {
             n.run(context).map(NodeResult::from).compat().await
           }
-          NodeKey::ReadLink(n) => n.run(context).map(NodeResult::from).compat().await,
-          NodeKey::Scandir(n) => n.run(context).map(NodeResult::from).compat().await,
-          NodeKey::Select(n) => n.run(context).map(NodeResult::from).compat().await,
-          NodeKey::Snapshot(n) => n.run(context).map(NodeResult::from).compat().await,
-          NodeKey::Task(n) => n.run(context).map(NodeResult::from).compat().await,
-        },
-        Err(e) => Err(e),
+        }
+        NodeKey::Select(n) => n.run(context).map(NodeResult::from).compat().await,
+        NodeKey::Snapshot(n) => n.run(context).map(NodeResult::from).compat().await,
+        NodeKey::Task(n) => n.run(context).map(NodeResult::from).compat().await,
       };
       if let Some(started_workunit) = maybe_started_workunit {
         let workunit: WorkUnit = started_workunit.finish();

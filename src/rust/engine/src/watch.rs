@@ -10,7 +10,9 @@ use std::time::Duration;
 use crossbeam_channel::{self, Receiver, RecvTimeoutError, TryRecvError};
 use log::{debug, error, info, warn};
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
-use parking_lot::Mutex;
+//use parking_lot::Mutex;
+use futures::compat::Future01CompatExt;
+use futures_locks::Mutex;
 use task_executor::Executor;
 
 use graph::{Graph, InvalidationResult};
@@ -128,11 +130,21 @@ impl InvalidationWatcher {
   /// Watch the given path non-recursively.
   ///
   pub async fn watch(&self, path: PathBuf) -> Result<(), notify::Error> {
-    let watcher = self.watcher.clone();
-    self
-      .executor
-      .spawn_blocking(move || watcher.lock().watch(path, RecursiveMode::NonRecursive))
-      .await
+    // Using a futurized mutex here because for some reason using a regular mutex
+    // to block the io pool causes the v2 ui to not update which nodes its working
+    // on properly.
+    let watcher_lock = self.watcher.lock().compat().await;
+    match watcher_lock {
+      Ok(mut watcher_lock) => {
+        self
+          .executor
+          .spawn_blocking(move || watcher_lock.watch(path, RecursiveMode::NonRecursive))
+          .await
+      }
+      Err(()) => Err(notify::Error::new(notify::ErrorKind::Generic(
+        "Couldn't lock mutex for invalidation watcher".to_string(),
+      ))),
+    }
   }
 
   ///
