@@ -20,6 +20,7 @@ from pants.java.nailgun_io import (
     PipedNailgunStreamWriter,
 )
 from pants.java.nailgun_protocol import ChunkType, MaybeShutdownSocket, NailgunProtocol
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.contextutil import hermetic_environment_as, stdio_as
 from pants.util.socket import teardown_socket
 
@@ -233,10 +234,6 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
             ) as finalizer:
                 yield finalizer
 
-    def _maybe_get_client_start_time_from_env(self, env):
-        client_start_time = env.pop("PANTSD_RUNTRACKER_CLIENT_START_TIME", None)
-        return None if client_start_time is None else float(client_start_time)
-
     def run(self):
         # Ensure anything referencing sys.argv inherits the Pailgun'd args.
         sys.argv = self._args
@@ -261,9 +258,10 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
                 # Clean global state.
                 clean_global_runtime_state(reset_subsystem=True)
 
-                options, _, options_bootstrapper = LocalPantsRunner.parse_options(
-                    self._args, self._env
-                )
+                args = self._args
+                env = self._env
+                options_bootstrapper = OptionsBootstrapper.create(args=args, env=env)
+                options, _ = LocalPantsRunner.parse_options(options_bootstrapper)
 
                 global_options = options.for_global_scope()
                 session = self._scheduler_service.prepare_graph(options)
@@ -279,10 +277,11 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
                     session, specs, options, options_bootstrapper
                 )
                 with ExceptionSink.exiter_as_until_exception(lambda _: PantsRunFailCheckerExiter()):
-                    runner = LocalPantsRunner.create(
-                        self._args, self._env, specs, session, options_bootstrapper,
-                    )
-                    runner.set_start_time(self._maybe_get_client_start_time_from_env(self._env))
+                    runner = LocalPantsRunner.create(env, options_bootstrapper, specs, session)
+
+                    env_start_time = self._env.pop("PANTSD_RUNTRACKER_CLIENT_START_TIME", None)
+                    start_time = float(env_start_time) if env_start_time else None
+                    runner.set_start_time(start_time)
                     runner.run()
 
             except KeyboardInterrupt:
