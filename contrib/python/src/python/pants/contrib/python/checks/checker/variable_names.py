@@ -85,7 +85,7 @@ class PEP8VariableNames(CheckstylePlugin):
     def name(cls):
         return "variable-names"
 
-    CLASS_GLOBAL_BUILTINS = frozenset({"__slots__", "__metaclass__",})
+    CLASS_GLOBAL_BUILTINS = frozenset({"__slots__", "__metaclass__"})
 
     def iter_class_methods(self, class_node):
         for node in class_node.body:

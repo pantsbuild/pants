@@ -50,7 +50,7 @@ class IndexJava(NailgunTask):
         cls.register_jvm_tool(
             register,
             "javac9",
-            custom_rules=[Shader.exclude_package("com.sun", recursive=True),],
+            custom_rules=[Shader.exclude_package("com.sun", recursive=True)],
             main="com.sun.tools.javac.main.Main",
         )
 

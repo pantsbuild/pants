@@ -52,7 +52,7 @@ class JavacPluginIntegrationTest(BaseCompileIT):
     def test_global_with_local_args(self):
         self._do_test(
             ["args", "from", "target", "global_with_local_args"],
-            {"java": {"javac_plugins": ["simple_javac_plugin"],},},
+            {"java": {"javac_plugins": ["simple_javac_plugin"]}},
             "global_with_local_args",
         )
 

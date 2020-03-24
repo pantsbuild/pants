@@ -135,7 +135,7 @@ class ConanFetch(SimpleCodegenTask):
 
     @memoized_property
     def _conan_os_name(self):
-        return match(Platform.current, {Platform.darwin: "Macos", Platform.linux: "Linux",})
+        return match(Platform.current, {Platform.darwin: "Macos", Platform.linux: "Linux"})
 
     @property
     def _copy_target_attributes(self):

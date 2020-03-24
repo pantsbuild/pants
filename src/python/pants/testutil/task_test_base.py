@@ -387,7 +387,7 @@ class DeclarativeTaskTestMixin:
         )
         all_synthesized_task_types = (
             run_before_synthesized_task_types
-            + [self._testing_task_type,]
+            + [self._testing_task_type]
             + run_after_synthesized_task_types
         )
 

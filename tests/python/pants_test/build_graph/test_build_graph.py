@@ -52,7 +52,7 @@ class BuildGraphTest(TestBase):
 
     def test_transitive_closure_address(self):
         root_address = self.inject_graph(
-            "//:foo", {"//:foo": ["a"], "a": ["a/b:bat"], "a/b:bat": [],}
+            "//:foo", {"//:foo": ["a"], "a": ["a/b:bat"], "a/b:bat": []}
         )
 
         self.assertEqual(len(self.build_graph.transitive_subgraph_of_addresses([root_address])), 3)
@@ -273,9 +273,7 @@ class BuildGraphTest(TestBase):
         )
 
     def test_transitive_subgraph_of_addresses_bfs_predicate(self):
-        root = self.inject_graph(
-            "a", {"a": ["b", "c"], "b": ["d", "e"], "c": [], "d": [], "e": [],}
-        )
+        root = self.inject_graph("a", {"a": ["b", "c"], "b": ["d", "e"], "c": [], "d": [], "e": []})
 
         predicate = lambda t: t.address.target_name != "b"
         filtered = self.build_graph.transitive_subgraph_of_addresses_bfs(

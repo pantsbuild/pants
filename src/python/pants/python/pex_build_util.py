@@ -531,7 +531,7 @@ class PexBuilderWrapper:
         # produced when the .ipex is first executed will read and resolve all those requirements from
         # the BOOTSTRAP-PEX-INFO.
         self.add_resolved_requirements(
-            [self._pex_requirement, self._setuptools_requirement,],
+            [self._pex_requirement, self._setuptools_requirement],
             override_ipex_build_do_actually_add_distribution=True,
         )
 

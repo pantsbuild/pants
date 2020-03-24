@@ -117,9 +117,6 @@ class Scheduler:
         if validate:
             self._assert_ruleset_valid()
 
-    def _root_type_ids(self):
-        return self._to_ids_buf(self._root_subject_types)
-
     def graph_trace(self, session, execution_request):
         with temporary_file_path() as path:
             self._native.lib.graph_trace(self._scheduler, session, execution_request, path.encode())
@@ -161,6 +158,11 @@ class Scheduler:
 
     def _to_utf8_buf(self, string):
         return self._native.context.utf8_buf(string)
+
+    def _to_params_list(self, subject_or_params):
+        if isinstance(subject_or_params, Params):
+            return subject_or_params.params
+        return [subject_or_params]
 
     def _register_rules(self, rule_index: RuleIndex):
         """Create a native Tasks object, and record the given RuleIndex on it."""
@@ -211,9 +213,16 @@ class Scheduler:
         self._raise_or_return(res)
 
     def visualize_rule_graph_to_file(self, filename):
-        self._native.lib.rule_graph_visualize(
-            self._scheduler, self._root_type_ids(), filename.encode()
+        res = self._native.lib.rule_graph_visualize(self._scheduler, filename.encode())
+        self._raise_or_return(res)
+
+    def visualize_rule_subgraph_to_file(self, filename, root_subject_types, product_type):
+        root_type_ids = self._to_ids_buf(root_subject_types)
+        product_type_id = TypeId(self._to_id(product_type))
+        res = self._native.lib.rule_subgraph_visualize(
+            self._scheduler, root_type_ids, product_type_id, filename.encode()
         )
+        self._raise_or_return(res)
 
     def rule_graph_visualization(self):
         with temporary_file_path() as path:
@@ -222,14 +231,9 @@ class Scheduler:
                 for line in fd.readlines():
                     yield line.rstrip()
 
-    def rule_subgraph_visualization(self, root_subject_type, product_type):
-        root_type_id = TypeId(self._to_id(root_subject_type))
-
-        product_type_id = TypeId(self._to_id(product_type))
+    def rule_subgraph_visualization(self, root_subject_types, product_type):
         with temporary_file_path() as path:
-            self._native.lib.rule_subgraph_visualize(
-                self._scheduler, root_type_id, product_type_id, path.encode()
-            )
+            self.visualize_rule_subgraph_to_file(path, root_subject_types, product_type)
             with open(path, "r") as fd:
                 for line in fd.readlines():
                     yield line.rstrip()
@@ -249,10 +253,7 @@ class Scheduler:
         return self._native.lib.graph_len(self._scheduler)
 
     def add_root_selection(self, execution_request, subject_or_params, product):
-        if isinstance(subject_or_params, Params):
-            params = subject_or_params.params
-        else:
-            params = [subject_or_params]
+        params = self._to_params_list(subject_or_params)
         res = self._native.lib.execution_add_root_select(
             self._scheduler, execution_request, self._to_vals_buf(params), self._to_type(product)
         )
@@ -499,6 +500,15 @@ class SchedulerSession:
         :param subject: subject for the request.
         :returns: An exit_code for the given Goal.
         """
+        if self._scheduler.visualize_to_dir is not None:
+            rule_graph_name = f"rule_graph.{product.name}.dot"
+            params = self._scheduler._to_params_list(subject)
+            self._scheduler.visualize_rule_subgraph_to_file(
+                os.path.join(self._scheduler.visualize_to_dir, rule_graph_name),
+                [type(p) for p in params],
+                product,
+            )
+
         request = self.execution_request([product], [subject])
         returns, throws = self.execute(request)
 

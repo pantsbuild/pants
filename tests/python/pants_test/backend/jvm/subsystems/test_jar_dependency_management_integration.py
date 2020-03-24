@@ -49,13 +49,13 @@ class JarDependencyManagementIntegrationTest(PantsRunIntegrationTest):
 
     def test_unmanaged_no_default(self):
         self._assert_run_classpath(
-            {self.set_default: True, self.set_managed: False, self.set_managed2: False,},
+            {self.set_default: True, self.set_managed: False, self.set_managed2: False},
             "unmanaged",
         )
 
     def test_unmanaged_default2(self):
         self._assert_run_classpath(
-            {self.set_default: False, self.set_managed: False, self.set_managed2: True,},
+            {self.set_default: False, self.set_managed: False, self.set_managed2: True},
             "unmanaged",
             default_target=self.manager2_target,
             conflict_strategy="USE_MANAGED",
@@ -75,7 +75,7 @@ class JarDependencyManagementIntegrationTest(PantsRunIntegrationTest):
 
     def test_managed_ignore_default(self):
         self._assert_run_classpath(
-            {self.set_default: False, self.set_managed: True, self.set_managed2: False,},
+            {self.set_default: False, self.set_managed: True, self.set_managed2: False},
             "managed",
             default_target=self.manager2_target,
             conflict_strategy="USE_MANAGED",
@@ -83,7 +83,7 @@ class JarDependencyManagementIntegrationTest(PantsRunIntegrationTest):
 
     def test_managed_auto(self):
         self._assert_run_classpath(
-            {self.set_default: False, self.set_managed: True, self.set_managed2: False,},
+            {self.set_default: False, self.set_managed: True, self.set_managed2: False},
             "managed-auto",
         )
 
@@ -123,7 +123,7 @@ class JarDependencyManagementIntegrationTest(PantsRunIntegrationTest):
 
     def test_managed_redundant(self):
         self._assert_run_classpath(
-            {self.set_default: False, self.set_managed: True, self.set_managed2: False,},
+            {self.set_default: False, self.set_managed: True, self.set_managed2: False},
             "redundant",
         )
 
@@ -133,7 +133,7 @@ class JarDependencyManagementIntegrationTest(PantsRunIntegrationTest):
 
     def test_managed_forceful_use_managed(self):
         self._assert_run_classpath(
-            {self.set_default: False, self.set_managed: True, self.set_managed2: False,},
+            {self.set_default: False, self.set_managed: True, self.set_managed2: False},
             "forceful",
             conflict_strategy="USE_MANAGED",
         )
@@ -147,13 +147,13 @@ class JarDependencyManagementIntegrationTest(PantsRunIntegrationTest):
             "testprojects/3rdparty/managed:managed",
             "testprojects/3rdparty/managed:org.eclipse.jetty.jetty-jsp",
         ]
-        run = self.run_pants(["filter", "testprojects/3rdparty/managed::",])
+        run = self.run_pants(["filter", "testprojects/3rdparty/managed::"])
         self.assert_success(run)
         for spec in expected_specs:
             self.assertIn(spec, run.stdout_data)
 
     def test_managed_jar_libraries_resolve(self):
-        run = self.run_pants(["resolve", "testprojects/3rdparty/managed::",])
+        run = self.run_pants(["resolve", "testprojects/3rdparty/managed::"])
         self.assert_success(run)
 
     def test_two_managers_build(self):

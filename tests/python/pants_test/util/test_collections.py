@@ -44,7 +44,7 @@ class TestCollections(unittest.TestCase):
         self.assertEqual([64, 8], cubes[4])
 
     def test_recursively_update(self) -> None:
-        d1 = {"a": 1, "b": {"c": 2, "o": "z",}, "z": {"y": 0,}}
+        d1 = {"a": 1, "b": {"c": 2, "o": "z"}, "z": {"y": 0}}
         d2 = {"e": 3, "b": {"f": 4, "o": 9}, "g": {"h": 5}, "z": 7}
         recursively_update(d1, d2)
         self.assertEqual(d1, {"a": 1, "b": {"c": 2, "f": 4, "o": 9}, "e": 3, "g": {"h": 5}, "z": 7})

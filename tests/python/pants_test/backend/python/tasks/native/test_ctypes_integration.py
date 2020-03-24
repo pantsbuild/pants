@@ -62,8 +62,8 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
             pants_run = self.run_pants(
                 command=["binary", self._binary_target],
                 config={
-                    GLOBAL_SCOPE_CONFIG_SECTION: {"pants_distdir": tmp_dir,},
-                    "native-build-step": {"toolchain_variant": toolchain_variant.value,},
+                    GLOBAL_SCOPE_CONFIG_SECTION: {"pants_distdir": tmp_dir},
+                    "native-build-step": {"toolchain_variant": toolchain_variant.value},
                 },
             )
 
@@ -89,7 +89,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
             # so there is only one name to check.
             linker_names_to_check = match(
                 toolchain_variant,
-                {ToolchainVariant.gnu: ["g++"], ToolchainVariant.llvm: ["clang++"],},
+                {ToolchainVariant.gnu: ["g++"], ToolchainVariant.llvm: ["clang++"]},
             )
             for linker_name in linker_names_to_check:
                 self.assertIn(f"selected linker exe name: '{linker_name}'", pants_run.stdout_data)
@@ -148,9 +148,9 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
                 command=["binary", self._binary_target_with_interop],
                 # Explicitly set to True (although this is the default).
                 config={
-                    "native-build-step": {"toolchain_variant": toolchain_variant.value,},
+                    "native-build-step": {"toolchain_variant": toolchain_variant.value},
                     # TODO(#6848): don't make it possible to forget to add the toolchain_variant option!
-                    "native-build-settings": {"strict_deps": True,},
+                    "native-build-settings": {"strict_deps": True},
                 },
                 workdir=os.path.join(buildroot.new_buildroot, ".pants.d"),
             )
@@ -170,14 +170,14 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
         # DYLD_LIBRARY_PATH during the 'run' goal somehow.
         attempt_pants_run = match(
             Platform.current,
-            {Platform.darwin: toolchain_variant == ToolchainVariant.llvm, Platform.linux: True,},
+            {Platform.darwin: toolchain_variant == ToolchainVariant.llvm, Platform.linux: True},
         )
         if attempt_pants_run:
             pants_run_interop = self.run_pants(
                 ["-q", "run", self._binary_target_with_interop],
                 config={
-                    "native-build-step": {"toolchain_variant": toolchain_variant.value,},
-                    "native-build-settings": {"strict_deps": True,},
+                    "native-build-step": {"toolchain_variant": toolchain_variant.value},
+                    "native-build-settings": {"strict_deps": True},
                 },
             )
             self.assert_success(pants_run_interop)
@@ -190,7 +190,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     def test_ctypes_third_party_integration(self, toolchain_variant):
         pants_binary = self.run_pants(
             ["binary", self._binary_target_with_third_party],
-            config={"native-build-step": {"toolchain_variant": toolchain_variant.value,},},
+            config={"native-build-step": {"toolchain_variant": toolchain_variant.value}},
         )
         self.assert_success(pants_binary)
 
@@ -198,12 +198,12 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
         # be available on the runtime library path.
         attempt_pants_run = match(
             Platform.current,
-            {Platform.darwin: toolchain_variant == ToolchainVariant.llvm, Platform.linux: True,},
+            {Platform.darwin: toolchain_variant == ToolchainVariant.llvm, Platform.linux: True},
         )
         if attempt_pants_run:
             pants_run = self.run_pants(
                 ["-q", "run", self._binary_target_with_third_party],
-                config={"native-build-step": {"toolchain_variant": toolchain_variant.value,},},
+                config={"native-build-step": {"toolchain_variant": toolchain_variant.value}},
             )
             self.assert_success(pants_run)
             self.assertIn("Test worked!\n", pants_run.stdout_data)
@@ -226,7 +226,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
         pants_run = self.run_pants(
             command=command,
             config={
-                "native-build-step": {"toolchain_variant": "llvm",},
+                "native-build-step": {"toolchain_variant": "llvm"},
                 "python-setup": {"platforms": ["current", foreign_platform]},
             },
         )
@@ -244,7 +244,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
         # be available on the runtime library path.
         attempt_pants_run = match(
             Platform.current,
-            {Platform.darwin: toolchain_variant == ToolchainVariant.llvm, Platform.linux: True,},
+            {Platform.darwin: toolchain_variant == ToolchainVariant.llvm, Platform.linux: True},
         )
         if not attempt_pants_run:
             return
@@ -253,10 +253,10 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
         pants_run = self.run_pants(
             command=command,
             config={
-                "native-build-step": {"toolchain_variant": toolchain_variant.value,},
+                "native-build-step": {"toolchain_variant": toolchain_variant.value},
                 "native-build-step.cpp-compile-settings": {
-                    "compiler_option_sets_enabled_args": {"asdf": ["-D_ASDF=1"],},
-                    "compiler_option_sets_disabled_args": {"asdf": ["-D_ASDF=0"],},
+                    "compiler_option_sets_enabled_args": {"asdf": ["-D_ASDF=1"]},
+                    "compiler_option_sets_disabled_args": {"asdf": ["-D_ASDF=0"]},
                 },
             },
         )

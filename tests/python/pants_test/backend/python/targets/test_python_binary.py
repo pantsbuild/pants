@@ -9,7 +9,7 @@ from pants.testutil.test_base import TestBase
 class PythonBinaryTest(TestBase):
     @classmethod
     def alias_groups(cls):
-        return BuildFileAliases(targets={"python_binary": PythonBinary,},)
+        return BuildFileAliases(targets={"python_binary": PythonBinary})
 
     subsystems = PythonBinary.subsystems()
 

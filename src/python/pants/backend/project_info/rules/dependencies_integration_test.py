@@ -21,7 +21,7 @@ class DependenciesIntegrationTest(GoalRuleTestBase):
                 "python_library": PythonLibrary,
                 "python_requirement_library": PythonRequirementLibrary,
             },
-            objects={"python_requirement": PythonRequirement,},
+            objects={"python_requirement": PythonRequirement},
         )
 
     @classmethod

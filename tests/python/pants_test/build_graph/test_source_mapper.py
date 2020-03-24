@@ -13,7 +13,7 @@ from pants.testutil.test_base import TestBase
 class SourceMapperTest(TestBase):
     @classmethod
     def alias_groups(cls):
-        return BuildFileAliases(targets={"java_library": JavaLibrary,},)
+        return BuildFileAliases(targets={"java_library": JavaLibrary})
 
     def owner(self, owner, f):
         request = OwnersRequest(sources=(f,))

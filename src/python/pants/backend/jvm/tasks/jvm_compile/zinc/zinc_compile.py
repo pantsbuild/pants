@@ -158,7 +158,7 @@ class BaseZincCompile(JvmCompile):
             "--whitelisted-args",
             advanced=True,
             type=dict,
-            default={"-S.*": False, "-C.*": False, "-file-filter": True, "-msg-filter": True,},
+            default={"-S.*": False, "-C.*": False, "-file-filter": True, "-msg-filter": True},
             help="A dict of option regexes that make up pants' supported API for zinc. "
             "Options not listed here are subject to change/removal. The value of the dict "
             "indicates that an option accepts an argument.",
@@ -787,7 +787,7 @@ class BaseZincCompile(JvmCompile):
 
         def _get_analysis_snapshot():
             (_analysis_snapshot,) = self.context._scheduler.capture_snapshots(
-                [PathGlobsAndRoot(PathGlobs([relpath_to_analysis]), get_buildroot(),),]
+                [PathGlobsAndRoot(PathGlobs([relpath_to_analysis]), get_buildroot())]
             )
             return _analysis_snapshot
 
@@ -797,7 +797,7 @@ class BaseZincCompile(JvmCompile):
                     zip_ref.extractall(classes_dir)
 
             (_classes_dir_snapshot,) = self.context._scheduler.capture_snapshots(
-                [PathGlobsAndRoot(PathGlobs([classes_dir + "/**"]), get_buildroot(),),]
+                [PathGlobsAndRoot(PathGlobs([classes_dir + "/**"]), get_buildroot())]
             )
             return _classes_dir_snapshot
 

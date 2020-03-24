@@ -301,7 +301,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
             JvmPlatform.options_scope,
             default_platform="java8",
             platforms={
-                "java8": {"source": "8", "target": "8",},
+                "java8": {"source": "8", "target": "8"},
                 "java8-extra": {
                     "source": "8",
                     "target": "8",
@@ -374,14 +374,14 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
             spec="tests/java/org/pantsbuild/foo:foo_test",
             target_type=JUnitTests,
             sources=["FooTest.java"],
-            extra_env_vars={"HELLO": 27, "THERE": 32,},
+            extra_env_vars={"HELLO": 27, "THERE": 32},
         )
 
         self.make_target(
             spec="tests/java/org/pantsbuild/foo:bar_test",
             target_type=JUnitTests,
             sources=["FooTest.java"],
-            extra_env_vars={"THE_ANSWER": 42, "HELLO": 12,},
+            extra_env_vars={"THE_ANSWER": 42, "HELLO": 12},
         )
 
         self._execute_junit_runner(

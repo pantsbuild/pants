@@ -14,8 +14,8 @@ class PythonRequirementListTest(TestBase):
     @classmethod
     def alias_groups(cls):
         return BuildFileAliases(
-            targets={"python_requirement_library": PythonRequirementLibrary,},
-            objects={"python_requirement": PythonRequirement,},
+            targets={"python_requirement_library": PythonRequirementLibrary},
+            objects={"python_requirement": PythonRequirement},
         )
 
     def test_bad_list(self):

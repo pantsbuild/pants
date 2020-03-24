@@ -144,7 +144,7 @@ class SourceRootTest(TestBase):
         trie.add_pattern("src/main/*")
         trie.add_pattern("src/main/*/foo")
         self.assertEqual(
-            {"*", "src/*/code", "src/main/*/code", "src/main/*", "src/main/*", "src/main/*/foo",},
+            {"*", "src/*/code", "src/main/*/code", "src/main/*", "src/main/*", "src/main/*/foo"},
             trie.traverse(),
         )
 
@@ -153,7 +153,7 @@ class SourceRootTest(TestBase):
         trie.add_pattern("src/*/code")
         trie.add_pattern("src/main/*/code")
         self.assertEqual(
-            {"src/*/code", "^/src/scala-source-code", "src/main/*/code",}, trie.traverse()
+            {"src/*/code", "^/src/scala-source-code", "src/main/*/code"}, trie.traverse()
         )
 
     def test_fixed_source_root_at_buildroot(self):

@@ -115,7 +115,7 @@ class ClasspathUtil:
         target_to_classpath = OrderedDict()
         for classpath_entry, target in filtered_items_iter:
             _, entry = classpath_entry
-            if not target in target_to_classpath:
+            if target not in target_to_classpath:
                 target_to_classpath[target] = []
             target_to_classpath[target].append(entry)
         return target_to_classpath

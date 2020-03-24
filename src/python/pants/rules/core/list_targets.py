@@ -101,6 +101,4 @@ async def list_targets(console: Console, list_options: ListOptions, addresses: A
 
 
 def rules():
-    return [
-        list_targets,
-    ]
+    return [list_targets]

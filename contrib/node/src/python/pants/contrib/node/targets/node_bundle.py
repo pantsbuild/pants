@@ -31,7 +31,7 @@ class NodeBundle(NodePackage):
 
         payload = payload or Payload()
         payload.add_fields(
-            {"archive": PrimitiveField(archive), "node_module": PrimitiveField(node_module),}
+            {"archive": PrimitiveField(archive), "node_module": PrimitiveField(node_module)}
         )
         super().__init__(address=address, payload=payload, **kwargs)
 

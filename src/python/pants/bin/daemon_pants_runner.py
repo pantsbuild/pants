@@ -12,6 +12,7 @@ from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode, Exiter
 from pants.bin.local_pants_runner import LocalPantsRunner
 from pants.init.logging import encapsulated_global_logger
+from pants.init.specs_calculator import SpecsCalculator
 from pants.init.util import clean_global_runtime_state
 from pants.java.nailgun_io import (
     NailgunStreamStdinReader,
@@ -19,6 +20,7 @@ from pants.java.nailgun_io import (
     PipedNailgunStreamWriter,
 )
 from pants.java.nailgun_protocol import ChunkType, MaybeShutdownSocket, NailgunProtocol
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.contextutil import hermetic_environment_as, stdio_as
 from pants.util.socket import teardown_socket
 
@@ -146,8 +148,6 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         self._services = services
         self._scheduler_service = scheduler_service
 
-        self.exit_code = PANTS_SUCCEEDED_EXIT_CODE
-
     @classmethod
     @contextmanager
     def _tty_stdio(cls, env):
@@ -234,10 +234,6 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
             ) as finalizer:
                 yield finalizer
 
-    def _maybe_get_client_start_time_from_env(self, env):
-        client_start_time = env.pop("PANTSD_RUNTRACKER_CLIENT_START_TIME", None)
-        return None if client_start_time is None else float(client_start_time)
-
     def run(self):
         # Ensure anything referencing sys.argv inherits the Pailgun'd args.
         sys.argv = self._args
@@ -256,26 +252,38 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         ), hermetic_environment_as(
             **self._env
         ), encapsulated_global_logger():
+
+            exit_code = PANTS_SUCCEEDED_EXIT_CODE
             try:
                 # Clean global state.
                 clean_global_runtime_state(reset_subsystem=True)
 
-                options, _, options_bootstrapper = LocalPantsRunner.parse_options(
-                    self._args, self._env
-                )
-                graph_helper, specs, exit_code = self._scheduler_service.prepare_v1_graph_run_v2(
-                    options, options_bootstrapper,
-                )
-                self.exit_code = exit_code
+                args = self._args
+                env = self._env
+                options_bootstrapper = OptionsBootstrapper.create(args=args, env=env)
+                options, _ = LocalPantsRunner.parse_options(options_bootstrapper)
 
-                # Otherwise, conduct a normal run.
+                global_options = options.for_global_scope()
+                session = self._scheduler_service.prepare_graph(options)
+
+                specs = SpecsCalculator.create(
+                    options=options,
+                    session=session.scheduler_session,
+                    exclude_patterns=tuple(global_options.exclude_target_regexp),
+                    tags=tuple(global_options.tag) if global_options.tag else (),
+                )
+
+                exit_code = self._scheduler_service.graph_run_v2(
+                    session, specs, options, options_bootstrapper
+                )
                 with ExceptionSink.exiter_as_until_exception(lambda _: PantsRunFailCheckerExiter()):
-                    runner = LocalPantsRunner.create(
-                        self._args, self._env, specs, graph_helper, options_bootstrapper,
-                    )
-                    runner.set_start_time(self._maybe_get_client_start_time_from_env(self._env))
+                    runner = LocalPantsRunner.create(env, options_bootstrapper, specs, session)
 
+                    env_start_time = self._env.pop("PANTSD_RUNTRACKER_CLIENT_START_TIME", None)
+                    start_time = float(env_start_time) if env_start_time else None
+                    runner.set_start_time(start_time)
                     runner.run()
+
             except KeyboardInterrupt:
                 self._exiter.exit_and_fail("Interrupted by user.\n")
             except _PantsRunFinishedWithFailureException as e:
@@ -290,4 +298,4 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
                 # and calling this method, we emulate the normal, expected sys.excepthook override.
                 ExceptionSink._log_unhandled_exception_and_exit(exc=e)
             else:
-                self._exiter.exit(self.exit_code if self.exit_code else PANTS_SUCCEEDED_EXIT_CODE)
+                self._exiter.exit(exit_code)

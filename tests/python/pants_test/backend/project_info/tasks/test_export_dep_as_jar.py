@@ -145,7 +145,7 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
         self.make_target(
             ":nailgun-server",
             JarLibrary,
-            jars=[JarDependency(org="com.martiansoftware", name="nailgun-server", rev="0.9.1"),],
+            jars=[JarDependency(org="com.martiansoftware", name="nailgun-server", rev="0.9.1")],
         )
 
     def execute_export(self, *specs, **options_overrides):
@@ -737,7 +737,7 @@ class ExportDepAsJarTestWithCodegenTargets(ExportDepAsJarTest):
             set(result["targets"].keys()),
         )
         self.assertEqual(
-            {"project_info:b", "project_info:f",},
+            {"project_info:b", "project_info:f"},
             set(result["targets"]["project_info:a"]["targets"]),
         )
 
@@ -754,7 +754,7 @@ class ExportDepAsJarTestWithCodegenTargets(ExportDepAsJarTest):
             set(result["targets"].keys()),
         )
         self.assertEqual(
-            {"project_info:b", "project_info:f",},
+            {"project_info:b", "project_info:f"},
             set(result["targets"]["project_info:a"]["targets"]),
         )
 

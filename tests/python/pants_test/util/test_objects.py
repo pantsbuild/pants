@@ -2,7 +2,41 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.testutil.test_base import TestBase
-from pants.util.objects import Exactly, SubclassesOf, SuperclassesOf, TypeConstraintError
+from pants.util.objects import (
+    Exactly,
+    SubclassesOf,
+    SuperclassesOf,
+    TypeConstraintError,
+    get_first_line_of_docstring,
+)
+
+
+def test_get_first_line_of_docstring() -> None:
+    class SingleLineDocstring:
+        """Hello."""
+
+    assert get_first_line_of_docstring(SingleLineDocstring) == "Hello."
+
+    class MultilineDocstring:
+        """Hello.
+
+        Extra description.
+        """
+
+    assert get_first_line_of_docstring(MultilineDocstring) == "Hello."
+
+    class NoDocstring:
+        pass
+
+    assert get_first_line_of_docstring(NoDocstring) is None
+
+    class SneakyDocstring:
+        """Hello 😀!\n\n.
+
+        More description.
+        """
+
+    assert get_first_line_of_docstring(SneakyDocstring) == "Hello 😀!"
 
 
 class TypeConstraintTestBase(TestBase):

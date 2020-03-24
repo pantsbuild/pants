@@ -9,12 +9,12 @@ class AliasTargetIntegrationTest(PantsRunIntegrationTest):
     test_module = "testprojects/src/java/org/pantsbuild/testproject/aliases"
 
     def test_jvm_binary_alias(self):
-        test_run = self.run_pants(["run", f"{self.test_module}:convenient",])
+        test_run = self.run_pants(["run", f"{self.test_module}:convenient"])
         self.assert_success(test_run)
         self.assertIn("AliasedBinaryMain is up and running.", test_run.stdout_data)
 
     def test_intransitive_target_alias(self):
-        test_run = self.run_pants(["run", f"{self.test_module}:run-use-intransitive",])
+        test_run = self.run_pants(["run", f"{self.test_module}:run-use-intransitive"])
         self.assert_success(test_run)
 
     def test_alias_missing_target(self):

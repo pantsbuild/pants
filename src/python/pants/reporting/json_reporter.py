@@ -50,7 +50,7 @@ class JsonReporter(Reporter):
 
         root_id = str(workunit.root().id)
 
-        if not root_id in self._root_id_to_workunit_stack:
+        if root_id not in self._root_id_to_workunit_stack:
             self._root_id_to_workunit_stack[root_id].append(workunit_data)
             self.results[root_id] = workunit_data
         else:

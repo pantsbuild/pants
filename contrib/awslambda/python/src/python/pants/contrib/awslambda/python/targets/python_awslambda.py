@@ -20,9 +20,7 @@ class PythonAWSLambda(Target):
         :param string handler: Lambda handler entrypoint (module.dotted.name:handler_func).
         """
         payload = Payload()
-        payload.add_fields(
-            {"binary": PrimitiveField(binary), "handler": PrimitiveField(handler),}
-        )
+        payload.add_fields({"binary": PrimitiveField(binary), "handler": PrimitiveField(handler)})
         super().__init__(payload=payload, **kwargs)
 
     @classmethod

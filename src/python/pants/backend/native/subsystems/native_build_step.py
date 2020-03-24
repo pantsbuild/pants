@@ -48,7 +48,7 @@ class NativeBuildStep(CompilerOptionSetsMixin, MirroredTargetOptionMixin, Subsys
             advanced=True,
             default=match(
                 Platform.current,
-                {Platform.darwin: ToolchainVariant.llvm, Platform.linux: ToolchainVariant.gnu,},
+                {Platform.darwin: ToolchainVariant.llvm, Platform.linux: ToolchainVariant.gnu},
             ),
             type=ToolchainVariant,
             fingerprint=True,
