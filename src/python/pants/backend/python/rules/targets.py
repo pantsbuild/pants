@@ -245,5 +245,6 @@ class PythonLibrary(Target):
 
 
 class PythonTests(Target):
+    """Python tests (either Pytest-style or unittest style)."""
     alias = "python_tests"
     core_fields = (*COMMON_PYTHON_FIELDS, PythonTestsSources, Coverage, Timeout)
