@@ -285,11 +285,6 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
             "DNS request for example.com is not allowed.\n"));
     // ... some other ats
     assertThat(output, containsString(
-        "\tat java.net.InetAddress.getAllByName0(InetAddress.java:1268)\n" +
-            "\tat java.net.InetAddress.getAllByName(InetAddress.java:1192)\n" +
-            "\tat java.net.InetAddress.getAllByName(InetAddress.java:1126)\n" +
-            "\tat java.net.InetAddress.getByName(InetAddress.java:1076)\n" +
-            "\tat java.net.InetSocketAddress.<init>(InetSocketAddress.java:220)\n" +
             "\tat " + testClassName + ".makeNetworkCall"));
   }
 
@@ -336,11 +331,6 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
             "DNS request for localhost is not allowed.\n"));
     // ... some other ats
     assertThat(output, containsString(
-        "\tat java.net.InetAddress.getAllByName0(InetAddress.java:1268)\n" +
-            "\tat java.net.InetAddress.getAllByName(InetAddress.java:1192)\n" +
-            "\tat java.net.InetAddress.getAllByName(InetAddress.java:1126)\n" +
-            "\tat java.net.InetAddress.getByName(InetAddress.java:1076)\n" +
-            "\tat java.net.InetSocketAddress.<init>(InetSocketAddress.java:220)\n" +
             "\tat " + testClassName + ".makeNetworkCall"));
   }
 

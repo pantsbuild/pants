@@ -168,8 +168,13 @@ public class JunitSecViolationReportingManager extends SecurityManager {
 
   @Override
   public ThreadGroup getThreadGroup() {
+    // NB: this is called on thread init. The security manager looks to see whether the current
+    // thread is running a test, and if so, it gives the thread a thread group that is assigned to
+    // that test.
     TestSecurityContext testSecurityContext = lookupContext();
     if (testSecurityContext != null) {
+      // TODO we could capture where the thread was started and display that if there's an error.
+      // it may not be that useful if we're running in a pool though
       return testSecurityContext.getThreadGroup();
     } else {
       return null;
@@ -284,6 +289,10 @@ public class JunitSecViolationReportingManager extends SecurityManager {
   }
 
   private boolean disallowsFileAccess(TestSecurityContext testSecurityContext, String filename) {
+    FileHandling fileHandling = this.contextLookupAndErrorCollection.config.getFileHandling();
+    if (fileHandling == FileHandling.allowAll) {
+      return false;
+    }
     // NB: This escape hatch allows lazy loading of things like the locale jar, which is pulled from
     //     the jre location.
     if(filename.startsWith( System.getProperty("java.home"))) {
@@ -299,7 +308,6 @@ public class JunitSecViolationReportingManager extends SecurityManager {
       log("disallowsFileAccess", "is a framework call to the redirected output");
       return false;
     } else  {
-      FileHandling fileHandling = this.contextLookupAndErrorCollection.config.getFileHandling();
       if (fileHandling==FileHandling.onlyCWD) {
         String workingDir = System.getProperty("user.dir");
         try {

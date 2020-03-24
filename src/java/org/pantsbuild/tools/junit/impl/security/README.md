@@ -3,11 +3,9 @@ TODOs
 --------
 
 #### Refactoring /  code movement
-TODO move sec console runner tests into their own files
 TODO java8-ify
 
 #### Attribution / Messaging
-TODO Record where the thread was started and including that in the message
 TODO collapse common initialization errors in test runs.
 TODO ensure that this has a clear error
   The question here is whether it should fail before running the tests. Right now it runs them,
@@ -19,6 +17,7 @@ TODO ensure that this has a clear error
   at org.pantsbuild.tools.junit.impl.security.JunitSecViolationReportingManager
   I think it should either end with 0 tests run 1 error, or
   2 run, 2 error, with a better error than ExceptionInInitializerError
+TODO Record where the thread was started and including that in the message
 
 #### Network
 TODO handle more ways to say localhost
