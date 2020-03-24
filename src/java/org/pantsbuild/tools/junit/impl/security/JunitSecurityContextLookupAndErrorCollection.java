@@ -72,6 +72,7 @@ class JunitSecurityContextLookupAndErrorCollection {
   // across threads if notifiers are not synchronized. Notifiers are synchronized, though
 
   private static final Logger logger = Logger.getLogger("junit-security-context");
+
   static {
     logger.setLevel(Level.FINEST);
   }
@@ -188,7 +189,7 @@ class JunitSecurityContextLookupAndErrorCollection {
   TestSecurityContext lookupContextByThreadGroup() {
     ContextKey contextKey =
         ContextKey.parseFromThreadGroupName(Thread.currentThread().getThreadGroup().getName());
-    if (contextKey ==  null) {
+    if (contextKey == null) {
       return null;
     }
     return getContext(contextKey);
@@ -209,7 +210,7 @@ class JunitSecurityContextLookupAndErrorCollection {
         cheaperContext = contextFromThreadGroup;
       } else {
         logger.fine("lookupContext: not found thread group: " +
-                        Thread.currentThread().getThreadGroup().getName());
+            Thread.currentThread().getThreadGroup().getName());
         logFine("lookupContext: available " + availableClasses());
       }
     }

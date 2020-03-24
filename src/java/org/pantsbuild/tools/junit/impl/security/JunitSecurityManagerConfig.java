@@ -11,10 +11,10 @@ public class JunitSecurityManagerConfig {
       SystemExitHandling systemExitHandling,
       ThreadHandling threadHandling,
       NetworkHandling networkHandling) {
-      this(systemExitHandling,
-          threadHandling,
-          networkHandling,
-          FileHandling.allowAll);
+    this(systemExitHandling,
+        threadHandling,
+        networkHandling,
+        FileHandling.allowAll);
   }
 
   public JunitSecurityManagerConfig(

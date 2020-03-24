@@ -9,8 +9,6 @@ import java.util.logging.Logger;
 
 import org.pantsbuild.junit.security.SecurityViolationException;
 
-import static org.pantsbuild.tools.junit.impl.security.JunitSecurityManagerConfig.*;
-
 public class JunitSecViolationReportingManager extends SecurityManager {
 
   private final JunitSecurityManagerLogic logic;
@@ -265,7 +263,7 @@ public class JunitSecViolationReportingManager extends SecurityManager {
     TestSecurityContext testSecurityContext = lookupContext();
     if (logic.disallowsFileAccess(testSecurityContext, filename)) {
       String message = disallowedFileAccessMessage(filename);
-      log("checkWrite", "context: "+testSecurityContext+ " :: "+message);
+      log("checkWrite", "context: " + testSecurityContext + " :: " + message);
       SecurityViolationException exception = new SecurityViolationException(message);
 
       testSecurityContext.addFailure(exception);
@@ -280,7 +278,7 @@ public class JunitSecViolationReportingManager extends SecurityManager {
     TestSecurityContext testSecurityContext = lookupContext();
     if (logic.disallowsFileAccess(testSecurityContext, filename)) {
       String message = disallowedFileAccessMessage(filename);
-      log("checkWrite", "context: "+testSecurityContext+ " :: "+message);
+      log("checkWrite", "context: " + testSecurityContext + " :: " + message);
       SecurityViolationException exception = new SecurityViolationException(message);
 
       testSecurityContext.addFailure(exception);
