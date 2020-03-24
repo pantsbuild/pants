@@ -36,11 +36,11 @@ class PythonSources(Sources):
 
 
 class PythonLibrarySources(PythonSources):
-    default_globs = ("*.py", "!test_*.py", "!*_test.py", "!conftest.py")
+    default = ("*.py", "!test_*.py", "!*_test.py", "!conftest.py")
 
 
 class PythonTestsSources(PythonSources):
-    default_globs = ("test_*.py", "*_test.py", "conftest.py")
+    default = ("test_*.py", "*_test.py", "conftest.py")
 
 
 class PythonBinarySources(PythonSources):
