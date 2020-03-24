@@ -1,7 +1,6 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import logging
 from typing import Set
 
 from pants.engine.console import Console
@@ -10,8 +9,6 @@ from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import goal_rule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.source.source_root import AllSourceRoots, SourceRoot, SourceRootConfig
-
-logger = logging.getLogger(__name__)
 
 
 class RootsOptions(LineOriented, GoalSubsystem):
