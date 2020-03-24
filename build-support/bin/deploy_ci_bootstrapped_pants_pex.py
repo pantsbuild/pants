@@ -76,12 +76,11 @@ def calculate_native_engine_so_hash() -> str:
 
 
 def native_engine_so_in_s3_cache(native_engine_so_aws_directory: str) -> bool:
-    ls_output = subprocess.run(
-        [*AWS_S3_COMMAND_PREFIX, "ls", native_engine_so_aws_directory],
-        stdout=subprocess.PIPE,
-        check=True,
-    ).stdout.decode()
-    return "native_engine.so" in ls_output
+    # NB: This will fail if the bucket does not exist.
+    ls_result = subprocess.run(
+        [*AWS_S3_COMMAND_PREFIX, "ls", native_engine_so_aws_directory], stdout=subprocess.PIPE
+    )
+    return ls_result.returncode == 0 and "native_engine.so" in ls_result.stdout.decode()
 
 
 def get_native_engine_so(native_engine_so_aws_url: str) -> None:
