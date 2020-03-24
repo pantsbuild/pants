@@ -7,13 +7,7 @@ from pants.backend.python.targets.python_target import PythonTarget
 class PythonAntlrLibrary(PythonTarget):
     """A Python library generated from Antlr grammar files."""
 
-    def __init__(
-        self,
-        module=None,
-        compiler="antlr4",
-        *args,
-        **kwargs
-    ):
+    def __init__(self, module=None, compiler="antlr4", *args, **kwargs):
         """
         :param module: everything beneath module is relative to this module name, None if root namespace
         :param compiler: The name of the compiler used to compile the ANTLR files.
