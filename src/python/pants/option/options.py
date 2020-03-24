@@ -264,7 +264,7 @@ class Options:
         """Freezes this Options instance."""
         self._frozen = True
 
-    def verify_configs_against_self(self, global_config: Config) -> None:
+    def verify_configs(self, global_config: Config) -> None:
         """Verify all loaded configs have correct scopes and options."""
 
         error_log = []
