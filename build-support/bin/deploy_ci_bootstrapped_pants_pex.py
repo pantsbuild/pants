@@ -18,7 +18,7 @@ AWS_BUCKET = os.environ["AWS_BUCKET"]
 PEX_KEY_PREFIX = os.environ["BOOTSTRAPPED_PEX_KEY_PREFIX"]
 PEX_KEY_SUFFIX = os.environ["BOOTSTRAPPED_PEX_KEY_SUFFIX"]
 PEX_KEY = f"{PEX_KEY_PREFIX}.{PEX_KEY_SUFFIX}"
-PEX_URL = f"{AWS_BUCKET}/{PEX_KEY}"
+PEX_URL = f"s3://{AWS_BUCKET}/{PEX_KEY}"
 
 NATIVE_ENGINE_SO_KEY_PREFIX = os.environ["NATIVE_ENGINE_SO_KEY_PREFIX"]
 NATIVE_ENGINE_SO_LOCAL_PATH = f"{TRAVIS_BUILD_DIR}/src/python/pants/engine/native_engine.so"
@@ -33,7 +33,7 @@ def main() -> None:
     native_engine_so_aws_key = (
         f"{NATIVE_ENGINE_SO_KEY_PREFIX}/{native_engine_so_hash}/native_engine.so"
     )
-    native_engine_so_aws_url = f"{AWS_BUCKET}/{native_engine_so_aws_key}"
+    native_engine_so_aws_url = f"s3://{AWS_BUCKET}/{native_engine_so_aws_key}"
 
     native_engine_so_already_cached = native_engine_so_in_s3_cache(native_engine_so_aws_key)
 
