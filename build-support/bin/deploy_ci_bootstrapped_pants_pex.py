@@ -99,6 +99,8 @@ def native_engine_so_in_s3_cache(native_engine_so_aws_key: str) -> bool:
         stdout=subprocess.PIPE,
         check=True,
     ).stdout.decode()
+    if not ls_output:
+        return False
     num_versions = len(json.loads(ls_output)["VERSIONS"])
     if num_versions > 1:
         die(
@@ -107,7 +109,7 @@ def native_engine_so_in_s3_cache(native_engine_so_aws_key: str) -> bool:
             "in Slack so that we may investigate how this happened and delete the duplicate "
             "copy from S3."
         )
-    return num_versions == 1
+    return True
 
 
 def get_native_engine_so(native_engine_so_aws_url: str) -> None:
