@@ -43,22 +43,26 @@ def verbose_target_information(
     target_type: Type[Target], console: Console, union_membership: UnionMembership
 ) -> str:
     """Return a multiline description of the target type and all of its fields."""
-    target_type_description = console.blue(target_type.__doc__) if target_type.__doc__ else None
+    # TODO: show the full docstring for both the target type and each field. We first need to
+    #  process them, e.g. removing all blank lines and possibly stripping type hints? See
+    #  build_dictionary_info_extractor.py for inspiration.
+    target_type_description = get_first_line_of_docstring(target_type)
+    if target_type_description:
+        target_type_description = console.blue(target_type_description)
 
     def format_field(field: Type[Field]) -> str:
         # TODO: possibly put type information in this output. We would extract it from the type
         #  hints, but it might be weird to handle Optional.
-        field_alias = console.cyan(f"  {field.alias} = ...,")
-        # TODO: use the entire docstring. But, we first need to process it, e.g. removing all
-        #  blank lines and possibly stripping type hints? See build_dictionary_info_extractor.py
-        #  for inspiration.
+        field_alias_text = f"  {field.alias} = ...,"
+        field_alias = console.cyan(f"{field_alias_text:<30}")
         description = get_first_line_of_docstring(field) or "<no description>"
         # TODO: should we elevate `default` so that every Field has it, whereas now only bool
         #  fields have it? V1 `targets` renders a default value, which is helpful.
         default = console.green(
             f"(default: {field.default})" if issubclass(field, BoolField) else ""
         )
-        return f"{field_alias:<30}  {description} {default}"
+        default_prefix = " " if default else ""
+        return f"{field_alias}  {description}{default_prefix}{default}"
 
     output = [target_type_description, "\n"] if target_type_description else []
     output.extend(

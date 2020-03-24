@@ -2,11 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from contextlib import contextmanager
+from textwrap import dedent
 from typing import Optional, cast
 from unittest.mock import Mock
 
 from pants.engine.rules import UnionMembership
-from pants.engine.target import BoolField, RegisteredTargetTypes, Target
+from pants.engine.target import BoolField, RegisteredTargetTypes, StringField, Target
 from pants.rules.core.list_target_types import list_target_types
 from pants.testutil.engine.util import MockConsole, run_rule
 from pants.util.ordered_set import OrderedSet
@@ -22,11 +23,16 @@ class MockOptions:
         yield lambda msg: console.print_stdout(msg)
 
 
+# Note no docstring.
+class GhcVersion(StringField):
+    alias = "ghc_version"
+
+
 class HaskellLibrary(Target):
     """A library of Haskell code."""
 
     alias = "haskell_library"
-    core_fields = ()
+    core_fields = (GhcVersion,)
 
 
 # Note multiline docstring.
@@ -37,13 +43,13 @@ class HaskellTests(Target):
     """
 
     alias = "haskell_tests"
-    core_fields = ()
+    core_fields = (GhcVersion,)
 
 
 # Note no docstring.
 class HaskellBinary(Target):
     alias = "haskell_binary"
-    core_fields = ()
+    core_fields = (GhcVersion,)
 
 
 def run_goal(
@@ -64,34 +70,48 @@ def run_goal(
 
 def test_list_all() -> None:
     stdout = run_goal()
-    assert len(stdout.strip()) == 3
-
-    assert HaskellLibrary.alias in stdout
-    assert "A library of Haskell code." in stdout
-
-    assert HaskellTests.alias in stdout
-    assert "Tests for Haskell code." in stdout
-    assert "This assumes that you use QuickCheck or an equivalent test runner." not in stdout
-
-    assert HaskellBinary.alias in stdout
-    assert "<no description>" in stdout
+    assert (
+        stdout
+        == """\
+                haskell_binary: <no description>
+               haskell_library: A library of Haskell code.
+                 haskell_tests: Tests for Haskell code.\n"""
+    )
 
 
-def test_list_single_target_type() -> None:
+def test_list_single() -> None:
     class CustomField(BoolField):
-        """My custom field!"""
+        """My custom field!
+
+        Use this field to...
+        """
 
         default = True
         alias = "custom_field"
 
-    stdout = run_goal(
+    tests_target_stdout = run_goal(
         union_membership=UnionMembership({HaskellTests.PluginField: OrderedSet([CustomField])}),
         details_target=HaskellTests.alias,
     )
+    # TODO: render the full docstring for both the target type (preserve new lines) and for
+    #  custom_field (strip new lines).
+    assert tests_target_stdout == dedent(
+        """\
+        Tests for Haskell code.
 
-    assert "Tests for Haskell code." in stdout
-    # TODO: we really want to be able to assert this.
-    # assert (
-    #     "Tests for Haskell code. This assumes that you use QuickCheck or an equivalent test "
-    #     "runner."
-    # ) in stdout
+
+        haskell_tests(
+          custom_field = ...,           My custom field! (default: True)
+          ghc_version = ...,            <no description>
+        )
+        """
+    )
+
+    binary_target_stdout = run_goal(details_target=HaskellBinary.alias)
+    assert binary_target_stdout == dedent(
+        """\
+        haskell_binary(
+          ghc_version = ...,            <no description>
+        )
+        """
+    )
