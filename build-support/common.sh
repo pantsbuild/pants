@@ -2,10 +2,6 @@
 # shellcheck disable=SC2034
 CACHE_ROOT=${XDG_CACHE_HOME:-$HOME/.cache}/pants
 
-# Set cargo to put compile artifacts into the pants cache, 
-# so they don't interfere with file watching.
-export CARGO_TARGET_DIR="${CACHE_ROOT}/rust/target"
-
 TRAVIS_FOLD_STATE="/tmp/.travis_fold_current"
 
 CLEAR_LINE="\x1b[K"

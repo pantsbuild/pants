@@ -2,10 +2,6 @@
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 
-# exports the CARGO_TARGET_DIR location
-# shellcheck source=build-support/common.sh
-source "${REPO_ROOT}/build-support/common.sh"
-
 function usage() {
   echo "Checks formatting of rust files, optionally fixing mis-formatted files."
   echo
