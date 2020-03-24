@@ -29,7 +29,7 @@ def main():
     with maybe_profiled(os.environ.get("PANTSC_PROFILE")):
         start_time = time.time()
         try:
-            runner = PantsRunner(args=sys.argv, env=os.environ,)
+            runner = PantsRunner(args=sys.argv, env=os.environ)
             runner.run(start_time)
         except KeyboardInterrupt as e:
             ExceptionSink.get_global_exiter().exit_and_fail("Interrupted by user:\n{}".format(e))

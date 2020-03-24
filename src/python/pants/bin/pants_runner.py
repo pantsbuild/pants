@@ -16,15 +16,13 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(frozen=True)
 class PantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     """A higher-level runner that delegates runs to either a LocalPantsRunner or
     RemotePantsRunner."""
 
     args: List[str]
-    env: Mapping[
-        str, str,
-    ]
+    env: Mapping[str, str]
 
     # This could be a bootstrap option, but it's preferable to keep these very limited to make it
     # easier to make the daemon the default use case. Once the daemon lifecycle is stable enough we
@@ -94,7 +92,7 @@ class PantsRunner(ExceptionSink.AccessGlobalExiterMixin):
                 RemotePantsRunner(self._exiter, self.args, self.env, options_bootstrapper).run()
                 return
             except RemotePantsRunner.Fallback as e:
-                logger.warning(f"Client exception: {e}, falling back to non-daemon mode")
+                logger.warning("Client exception: {!r}, falling back to non-daemon mode".format(e))
 
         # N.B. Inlining this import speeds up the python thin client run by about 100ms.
         from pants.bin.local_pants_runner import LocalPantsRunner

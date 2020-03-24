@@ -279,8 +279,8 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
                 with ExceptionSink.exiter_as_until_exception(lambda _: PantsRunFailCheckerExiter()):
                     runner = LocalPantsRunner.create(env, options_bootstrapper, specs, session)
 
-                    st = self._env.pop("PANTSD_RUNTRACKER_CLIENT_START_TIME", None)
-                    start_time = float(st) if st else None
+                    env_start_time = self._env.pop("PANTSD_RUNTRACKER_CLIENT_START_TIME", None)
+                    start_time = float(env_start_time) if env_start_time else None
                     runner.set_start_time(start_time)
                     runner.run()
 

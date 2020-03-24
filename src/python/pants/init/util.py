@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+from typing import cast
 
 from pants.fs.fs import safe_filename_from_path
 from pants.goal.goal import Goal
@@ -18,7 +19,7 @@ def init_workdir(global_options: OptionValueContainer) -> str:
     that is unique to each working copy (via including the entire path to the working copy in its
     name using `safe_filename_from_path`).
     """
-    workdir_src: str = global_options.pants_workdir
+    workdir_src = cast(str, global_options.pants_workdir)
     if not global_options.pants_physical_workdir_base:
         safe_mkdir(workdir_src)
         return workdir_src
