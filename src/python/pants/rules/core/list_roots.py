@@ -1,6 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import logging
 from typing import Set
 
 from pants.engine.console import Console
@@ -9,6 +10,8 @@ from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import goal_rule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.source.source_root import AllSourceRoots, SourceRoot, SourceRootConfig
+
+logger = logging.getLogger(__name__)
 
 
 class RootsOptions(LineOriented, GoalSubsystem):
@@ -28,7 +31,9 @@ async def all_roots(source_root_config: SourceRootConfig) -> AllSourceRoots:
 
     all_paths: Set[str] = set()
     for path in source_roots.traverse():
-        if path.startswith("^/"):
+        if path == "^":
+            all_paths.add("**")
+        elif path.startswith("^/"):
             all_paths.add(f"{path[2:]}/")
         else:
             all_paths.add(f"**/{path}/")
@@ -54,7 +59,7 @@ async def list_roots(console: Console, options: RootsOptions, all_roots: AllSour
     with options.line_oriented(console) as print_stdout:
         for src_root in sorted(all_roots, key=lambda x: x.path):
             all_langs = ",".join(sorted(src_root.langs))
-            print_stdout(f"{src_root.path}: {all_langs or '*'}")
+            print_stdout(f"{src_root.path or '.'}: {all_langs or '*'}")
     return Roots(exit_code=0)
 
 
