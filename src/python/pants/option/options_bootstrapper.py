@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
-import logging
 import os
 import sys
 from dataclasses import dataclass
@@ -15,13 +14,11 @@ from pants.option.custom_types import ListValueComponent
 from pants.option.global_options import GlobalOptions
 from pants.option.optionable import Optionable
 from pants.option.options import Options
-from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
+from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.util.dirutil import read_file
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import ensure_text
-
-logger = logging.getLogger(__name__)
 
 
 # This is a temporary hack that allows us to note the fact that we're in v2-exclusive mode
@@ -240,38 +237,3 @@ class OptionsBootstrapper:
         return self._full_options(
             FrozenOrderedSet(sorted(known_scope_infos, key=lambda si: si.scope))
         )
-
-    def verify_configs_against_options(self, options: Options) -> None:
-        """Verify all loaded configs have correct scopes and options.
-
-        :param options: Fully bootstrapped valid options.
-        """
-        error_log = []
-        for config in self.config.configs():
-            for section in config.sections():
-                scope = GLOBAL_SCOPE if section == GLOBAL_SCOPE_CONFIG_SECTION else section
-                try:
-                    valid_options_under_scope = set(
-                        options.for_scope(scope, include_passive_options=True)
-                    )
-                # Only catch ConfigValidationError. Other exceptions will be raised directly.
-                except Config.ConfigValidationError:
-                    error_log.append(f"Invalid scope [{section}] in {config.config_path}")
-                else:
-                    # All the options specified under [`section`] in `config` excluding bootstrap defaults.
-                    all_options_under_scope = set(config.values.options(section)) - set(
-                        config.values.defaults
-                    )
-                    for option in sorted(all_options_under_scope):
-                        if option not in valid_options_under_scope:
-                            error_log.append(
-                                f"Invalid option '{option}' under [{section}] in {config.config_path}"
-                            )
-
-        if error_log:
-            for error in error_log:
-                logger.error(error)
-            raise Config.ConfigValidationError(
-                "Invalid config entries detected. See log for details on which entries to update or "
-                "remove.\n(Specify --no-verify-config to disable this check.)"
-            )

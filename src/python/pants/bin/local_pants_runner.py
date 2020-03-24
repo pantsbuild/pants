@@ -188,7 +188,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
 
         # Verify configs.
         if global_options.verify_config:
-            options_bootstrapper.verify_configs_against_options(options)
+            options.verify_configs(options_bootstrapper.config)
 
         union_membership = UnionMembership(build_config.union_rules())
 
