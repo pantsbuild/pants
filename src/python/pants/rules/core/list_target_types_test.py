@@ -24,32 +24,32 @@ class MockOptions:
 
 
 # Note no docstring.
-class GhcVersion(StringField):
-    alias = "ghc_version"
+class FortranVersion(StringField):
+    alias = "fortran_version"
 
 
-class HaskellLibrary(Target):
-    """A library of Haskell code."""
+class FortranLibrary(Target):
+    """A library of Fortran code."""
 
-    alias = "haskell_library"
-    core_fields = (GhcVersion,)
+    alias = "fortran_library"
+    core_fields = (FortranVersion,)
 
 
 # Note multiline docstring.
-class HaskellTests(Target):
-    """Tests for Haskell code.
+class FortranTests(Target):
+    """Tests for Fortran code.
 
-    This assumes that you use QuickCheck or an equivalent test runner.
+    This assumes that you use the FRUIT test framework.
     """
 
-    alias = "haskell_tests"
-    core_fields = (GhcVersion,)
+    alias = "fortran_tests"
+    core_fields = (FortranVersion,)
 
 
 # Note no docstring.
-class HaskellBinary(Target):
-    alias = "haskell_binary"
-    core_fields = (GhcVersion,)
+class FortranBinary(Target):
+    alias = "fortran_binary"
+    core_fields = (FortranVersion,)
 
 
 def run_goal(
@@ -59,7 +59,7 @@ def run_goal(
     run_rule(
         list_target_types,
         rule_args=[
-            RegisteredTargetTypes.create([HaskellBinary, HaskellLibrary, HaskellTests]),
+            RegisteredTargetTypes.create([FortranBinary, FortranLibrary, FortranTests]),
             union_membership or UnionMembership({}),
             MockOptions(details=details_target),
             console,
@@ -73,9 +73,9 @@ def test_list_all() -> None:
     assert (
         stdout
         == """\
-                haskell_binary: <no description>
-               haskell_library: A library of Haskell code.
-                 haskell_tests: Tests for Haskell code.\n"""
+                fortran_binary: <no description>
+               fortran_library: A library of Fortran code.
+                 fortran_tests: Tests for Fortran code.\n"""
     )
 
 
@@ -90,28 +90,28 @@ def test_list_single() -> None:
         alias = "custom_field"
 
     tests_target_stdout = run_goal(
-        union_membership=UnionMembership({HaskellTests.PluginField: OrderedSet([CustomField])}),
-        details_target=HaskellTests.alias,
+        union_membership=UnionMembership({FortranTests.PluginField: OrderedSet([CustomField])}),
+        details_target=FortranTests.alias,
     )
     # TODO: render the full docstring for both the target type (preserve new lines) and for
     #  custom_field (strip new lines).
     assert tests_target_stdout == dedent(
         """\
-        Tests for Haskell code.
+        Tests for Fortran code.
 
 
-        haskell_tests(
+        fortran_tests(
           custom_field = ...,           My custom field! (default: True)
-          ghc_version = ...,            <no description>
+          fortran_version = ...,        <no description>
         )
         """
     )
 
-    binary_target_stdout = run_goal(details_target=HaskellBinary.alias)
+    binary_target_stdout = run_goal(details_target=FortranBinary.alias)
     assert binary_target_stdout == dedent(
         """\
-        haskell_binary(
-          ghc_version = ...,            <no description>
+        fortran_binary(
+          fortran_version = ...,        <no description>
         )
         """
     )
