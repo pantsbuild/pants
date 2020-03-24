@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass
 from io import StringIO
 from types import CoroutineType, GeneratorType
-from typing import Any, Callable, List, Optional, Sequence, Tuple, Type, cast, get_type_hints
+from typing import Any, Callable, List, Optional, Sequence, Tuple, Type, get_type_hints
 
 from colors import blue, cyan, green, red
 
@@ -227,8 +227,8 @@ class MockConsole:
     def print_stderr(self, payload):
         print(payload, file=self.stderr)
 
-    def _safe_color(self, text: str, color) -> str:
-        return cast(str, color(text)) if self._use_colors else text
+    def _safe_color(self, text: str, color: Callable[[str], str]) -> str:
+        return color(text) if self._use_colors else text
 
     def blue(self, text: str) -> str:
         return self._safe_color(text, blue)

@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import sys
-from typing import Any, Optional, cast
+from typing import Any, Callable, Optional
 
 from colors import blue, cyan, green, red
 
@@ -83,9 +83,9 @@ class Console:
         self.stdout.flush()
         self.stderr.flush()
 
-    def _safe_color(self, text: str, color) -> str:
+    def _safe_color(self, text: str, color: Callable[[str], str]) -> str:
         """We should only output color when the global flag --colors is enabled."""
-        return cast(str, color(text)) if self._use_colors else text
+        return color(text) if self._use_colors else text
 
     def blue(self, text: str) -> str:
         return self._safe_color(text, blue)

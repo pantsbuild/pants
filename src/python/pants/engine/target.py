@@ -428,7 +428,7 @@ class Target(ABC):
     @final
     @classmethod
     def class_field_types(cls, union_membership: UnionMembership) -> Tuple[Type[Field], ...]:
-        """Return all registered Fields belonging to this target types.
+        """Return all registered Fields belonging to this target type.
 
         You can also use the instance property `tgt.field_types` to avoid having to pass the
         parameter UnionMembership.
