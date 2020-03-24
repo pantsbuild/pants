@@ -7,6 +7,7 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.List;
 
 import org.junit.Test;
 
@@ -18,7 +19,7 @@ public class FileAccessTests {
   public void readAFile() throws IOException {
     String pathname = "tests/resources/org/pantsbuild/tools/junit/lib/a.file";
 
-    ArrayList<String> list = new ArrayList<>();
+    List<String> list = new ArrayList<>();
     list.add("ruby");
     assertThat(Files.readAllLines(Paths.get(pathname)), is(list));
   }
@@ -27,7 +28,7 @@ public class FileAccessTests {
   public void writeAFile() throws IOException {
     String pathname = "tests/resources/org/pantsbuild/tools/junit/lib/another.file";
 
-    ArrayList<String> data = new ArrayList<>();
+    List<String> data = new ArrayList<>();
     data.add("ruby");
     Files.write(Paths.get(pathname), data);
     assertThat(Files.readAllLines(Paths.get(pathname)), is(data));
@@ -38,7 +39,7 @@ public class FileAccessTests {
     String pathname = "tests/resources/org/pantsbuild/tools/junit/lib/a.different.file";
     try {
       Files.delete(Paths.get(pathname));
-    } catch (NoSuchFileException e) {
+    } catch (NoSuchFileException ignored) {
 
     }
   }
@@ -63,8 +64,7 @@ public class FileAccessTests {
     boolean exists = new File(pathname).exists();
     assertThat(exists, is(false));
 
-    Path path = Paths.get(pathname);
-
+    Paths.get(pathname);
   }
 
 }

@@ -15,8 +15,10 @@ import org.pantsbuild.tools.junit.lib.security.threads.ThreadStartedInBeforeTest
 import org.pantsbuild.tools.junit.lib.security.threads.ThreadStartedInBodyAndJoinedAfterTest;
 
 import static org.hamcrest.CoreMatchers.containsString;
+import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.core.Is.is;
+import static org.pantsbuild.tools.junit.impl.security.JunitSecurityManagerConfig.*;
 
 public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestSetup {
 
@@ -64,9 +66,9 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
     Class<?> testClass = DanglingThreadFromTestCase.class;
     String output = runTestsExpectingFailure(
         new JunitSecurityManagerConfig(
-            JunitSecurityManagerConfig.SystemExitHandling.disallow,
-            JunitSecurityManagerConfig.ThreadHandling.disallowLeakingTestCaseThreads,
-            JunitSecurityManagerConfig.NetworkHandling.allowAll),
+            SystemExitHandling.disallow,
+            ThreadHandling.disallowLeakingTestCaseThreads,
+            NetworkHandling.allowAll),
         testClass);
     String testClassName = testClass.getCanonicalName();
     assertThat(output, containsString("startedThread(" + testClassName + ")"));
@@ -87,9 +89,9 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
     Class<?> testClass = ThreadStartedInBeforeTest.class;
     String output = runTestsExpectingFailure(
         new JunitSecurityManagerConfig(
-            JunitSecurityManagerConfig.SystemExitHandling.disallow,
-            JunitSecurityManagerConfig.ThreadHandling.disallowLeakingTestCaseThreads,
-            JunitSecurityManagerConfig.NetworkHandling.allowAll),
+            SystemExitHandling.disallow,
+            ThreadHandling.disallowLeakingTestCaseThreads,
+            NetworkHandling.allowAll),
         testClass);
     assertThat(output, containsString("failing(" + testClass.getCanonicalName() + ")"));
     assertThat(output, containsString("java.lang.AssertionError: failing"));
@@ -104,9 +106,9 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
     Class<?> testClass = ThreadStartedInBeforeTest.class;
     String output = runTestsExpectingFailure(
         new JunitSecurityManagerConfig(
-            JunitSecurityManagerConfig.SystemExitHandling.disallow,
-            JunitSecurityManagerConfig.ThreadHandling.disallowLeakingTestSuiteThreads,
-            JunitSecurityManagerConfig.NetworkHandling.allowAll),
+            SystemExitHandling.disallow,
+            ThreadHandling.disallowLeakingTestSuiteThreads,
+            NetworkHandling.allowAll),
         testClass);
     assertThat(output, containsString("failing(" + testClass.getCanonicalName() + ")"));
     assertThat(output, containsString("java.lang.AssertionError: failing"));
@@ -122,9 +124,9 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
     Class<?> testClass = ThreadStartedInBeforeClassAndJoinedAfterTest.class;
     String output = runTestsExpectingFailure(
         new JunitSecurityManagerConfig(
-            JunitSecurityManagerConfig.SystemExitHandling.disallow,
-            JunitSecurityManagerConfig.ThreadHandling.disallowLeakingTestSuiteThreads,
-            JunitSecurityManagerConfig.NetworkHandling.allowAll),
+            SystemExitHandling.disallow,
+            ThreadHandling.disallowLeakingTestSuiteThreads,
+            NetworkHandling.allowAll),
         testClass);
     assertThat(output, containsString("failing(" + testClass.getCanonicalName() + ")"));
     assertThat(output, containsString("There was 1 failure:"));
@@ -139,9 +141,9 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
     Class<?> testClass = ThreadStartedInBodyAndJoinedAfterTest.class;
     String output = runTestsExpectingFailure(
         new JunitSecurityManagerConfig(
-            JunitSecurityManagerConfig.SystemExitHandling.disallow,
-            JunitSecurityManagerConfig.ThreadHandling.disallowLeakingTestSuiteThreads,
-            JunitSecurityManagerConfig.NetworkHandling.allowAll),
+            SystemExitHandling.disallow,
+            ThreadHandling.disallowLeakingTestSuiteThreads,
+            NetworkHandling.allowAll),
         testClass);
     assertThat(output, containsString("failing(" + testClass.getCanonicalName() + ")"));
     assertThat(output, containsString("There was 1 failure:"));
@@ -156,9 +158,9 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
     Class<?> testClass = ThreadStartedInBodyAndJoinedAfterTest.class;
     String output = runTestsExpectingFailure(
         new JunitSecurityManagerConfig(
-            JunitSecurityManagerConfig.SystemExitHandling.disallow,
-            JunitSecurityManagerConfig.ThreadHandling.disallowLeakingTestCaseThreads,
-            JunitSecurityManagerConfig.NetworkHandling.allowAll),
+            SystemExitHandling.disallow,
+            ThreadHandling.disallowLeakingTestCaseThreads,
+            NetworkHandling.allowAll),
         testClass);
     assertThat(output, containsString("failing(" + testClass.getCanonicalName() + ")"));
     assertThat(output, containsString("passing(" + testClass.getCanonicalName() + ")"));
@@ -174,9 +176,9 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
     Class<?> testClass = ThreadStartedInBeforeClassAndNotJoinedAfterTest.class;
     String output = runTestsExpectingFailure(
         new JunitSecurityManagerConfig(
-            JunitSecurityManagerConfig.SystemExitHandling.disallow,
-            JunitSecurityManagerConfig.ThreadHandling.disallowLeakingTestSuiteThreads,
-            JunitSecurityManagerConfig.NetworkHandling.allowAll),
+            SystemExitHandling.disallow,
+            ThreadHandling.disallowLeakingTestSuiteThreads,
+            NetworkHandling.allowAll),
         testClass);
 
     assertThat(
@@ -202,9 +204,9 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
     Class<?> testClass = SystemExitsInObjectBody.class;
     String output = runTestsExpectingFailure(
         new JunitSecurityManagerConfig(
-            JunitSecurityManagerConfig.SystemExitHandling.disallow,
-            JunitSecurityManagerConfig.ThreadHandling.disallowLeakingTestSuiteThreads,
-            JunitSecurityManagerConfig.NetworkHandling.allowAll),
+            SystemExitHandling.disallow,
+            ThreadHandling.disallowLeakingTestSuiteThreads,
+            NetworkHandling.allowAll),
         testClass);
 
 
@@ -229,9 +231,9 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
     Class<?> testClass = StaticSysExitTestCase.class;
     String output = runTestsExpectingFailure(
         new JunitSecurityManagerConfig(
-            JunitSecurityManagerConfig.SystemExitHandling.disallow,
-            JunitSecurityManagerConfig.ThreadHandling.disallowLeakingTestCaseThreads,
-            JunitSecurityManagerConfig.NetworkHandling.allowAll),
+            SystemExitHandling.disallow,
+            ThreadHandling.disallowLeakingTestCaseThreads,
+            NetworkHandling.allowAll),
         testClass);
 
     assertThat(output, containsString("passingTest(" + testClass.getCanonicalName() + ")"));
@@ -245,9 +247,9 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
     Class<?> testClass = BeforeClassSysExitTestCase.class;
     String output = runTestsExpectingFailure(
         new JunitSecurityManagerConfig(
-            JunitSecurityManagerConfig.SystemExitHandling.disallow,
-            JunitSecurityManagerConfig.ThreadHandling.disallowLeakingTestCaseThreads,
-            JunitSecurityManagerConfig.NetworkHandling.allowAll),
+            SystemExitHandling.disallow,
+            ThreadHandling.disallowLeakingTestCaseThreads,
+            NetworkHandling.allowAll),
         testClass);
 
     assertThat(output, containsString("1) " + testClass.getCanonicalName() + ""));
@@ -264,9 +266,9 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
     BoundaryNetworkTests.reset();
     String output = runTestsExpectingFailure(
         new JunitSecurityManagerConfig(
-            JunitSecurityManagerConfig.SystemExitHandling.disallow,
-            JunitSecurityManagerConfig.ThreadHandling.allowAll,
-            JunitSecurityManagerConfig.NetworkHandling.onlyLocalhost
+            SystemExitHandling.disallow,
+            ThreadHandling.allowAll,
+            NetworkHandling.onlyLocalhost
         ),
         testClass);
     String testClassName = testClass.getCanonicalName();
@@ -294,9 +296,9 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
     BoundaryNetworkTests.setHostname("localhost");
     String output = runTestsExpectingSuccess(
         new JunitSecurityManagerConfig(
-            JunitSecurityManagerConfig.SystemExitHandling.disallow,
-            JunitSecurityManagerConfig.ThreadHandling.allowAll,
-            JunitSecurityManagerConfig.NetworkHandling.onlyLocalhost
+            SystemExitHandling.disallow,
+            ThreadHandling.allowAll,
+            NetworkHandling.onlyLocalhost
         ),
         testClass);
 
@@ -309,9 +311,9 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
     BoundaryNetworkTests.setHostname("localhost");
     String output = runTestsExpectingFailure(
         new JunitSecurityManagerConfig(
-            JunitSecurityManagerConfig.SystemExitHandling.disallow,
-            JunitSecurityManagerConfig.ThreadHandling.allowAll,
-            JunitSecurityManagerConfig.NetworkHandling.disallow
+            SystemExitHandling.disallow,
+            ThreadHandling.allowAll,
+            NetworkHandling.disallow
         ),
         testClass);
 
@@ -339,10 +341,10 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
     Class<?> testClass = FileAccessTests.class;
     String output = runTestsExpectingSuccess(
         new JunitSecurityManagerConfig(
-            JunitSecurityManagerConfig.SystemExitHandling.disallow,
-            JunitSecurityManagerConfig.ThreadHandling.allowAll,
-            JunitSecurityManagerConfig.NetworkHandling.onlyLocalhost,
-            JunitSecurityManagerConfig.FileHandling.allowAll
+            SystemExitHandling.disallow,
+            ThreadHandling.allowAll,
+            NetworkHandling.onlyLocalhost,
+            FileHandling.allowAll
         ),
         testClass);
 
@@ -354,10 +356,10 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
     Class<?> testClass = FileAccessTests.class;
     String output = runTestsExpectingFailure(
         new JunitSecurityManagerConfig(
-            JunitSecurityManagerConfig.SystemExitHandling.disallow,
-            JunitSecurityManagerConfig.ThreadHandling.allowAll,
-            JunitSecurityManagerConfig.NetworkHandling.onlyLocalhost,
-            JunitSecurityManagerConfig.FileHandling.disallow
+            SystemExitHandling.disallow,
+            ThreadHandling.allowAll,
+            NetworkHandling.onlyLocalhost,
+            FileHandling.disallow
         ),
         testClass);
 
@@ -395,10 +397,10 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
     Class<?> testClass = FileAccessTests.class;
     String output = runTestsExpectingFailure(
         new JunitSecurityManagerConfig(
-            JunitSecurityManagerConfig.SystemExitHandling.disallow,
-            JunitSecurityManagerConfig.ThreadHandling.allowAll,
-            JunitSecurityManagerConfig.NetworkHandling.onlyLocalhost,
-            JunitSecurityManagerConfig.FileHandling.onlyCWD
+            SystemExitHandling.disallow,
+            ThreadHandling.allowAll,
+            NetworkHandling.onlyLocalhost,
+            FileHandling.onlyCWD
         ),
         testClass);
 
@@ -419,13 +421,13 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
     assertThat(output,
         containsString("at " + testClassName + ".readNonexistentRootFile(" +
             "FileAccessTests.java:"));
-
+    assertThat(output, not(containsString("writeAFile")));
   }
 
   private JunitSecurityManagerConfig configDisallowingSystemExitButAllowingEverythingElse() {
     return new JunitSecurityManagerConfig(
-        JunitSecurityManagerConfig.SystemExitHandling.disallow,
-        JunitSecurityManagerConfig.ThreadHandling.allowAll,
-        JunitSecurityManagerConfig.NetworkHandling.allowAll);
+        SystemExitHandling.disallow,
+        ThreadHandling.allowAll,
+        NetworkHandling.allowAll);
   }
 }
