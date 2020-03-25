@@ -6,14 +6,13 @@ from textwrap import dedent
 from typing import Any, Optional, Type, Union
 
 
-def get_first_line_of_docstring(cls: Type) -> Optional[str]:
-    """Get the first logical (not necessarily physical) line for a class.
+def get_docstring_summary(cls: Type) -> Optional[str]:
+    """Get the summary line(s) of docstring for a class.
 
-    If the first sentence spans multiple lines, we will flatten it into a single string with no
-    newlines. (`docformatter` ensures that the first logical line corresponds to only one sentence.)
+    If the summary is one more than one line, this will flatten them into a single line.
     """
     # This will fix indentation and strip unnecessary whitespace.
-    all_docstring = get_all_docstring(cls)
+    all_docstring = get_docstring(cls)
 
     if all_docstring is None:
         return None
@@ -27,9 +26,14 @@ def get_first_line_of_docstring(cls: Type) -> Optional[str]:
 
 # TODO: consider teaching this to strip parameter docstring, e.g. `:param foo` and even
 #  `:API public`.
-def get_all_docstring(cls: Type, *, flatten: bool = False) -> Optional[str]:
+def get_docstring(cls: Type, *, flatten: bool = False) -> Optional[str]:
+    """Get the docstring for a class with properly handled indentation.
+
+    Optionally, flatten the docstring into a single line.
+    """
     if cls.__doc__ is None:
         return None
+
     docstring = cls.__doc__.strip()
     newline_index = docstring.find("\n")
     if newline_index == -1:

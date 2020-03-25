@@ -10,8 +10,8 @@ from pants.util.objects import (
     SubclassesOf,
     SuperclassesOf,
     TypeConstraintError,
-    get_all_docstring,
-    get_first_line_of_docstring,
+    get_docstring,
+    get_docstring_summary,
     pretty_print_type_hint,
 )
 
@@ -20,9 +20,9 @@ def test_get_docstring() -> None:
     class SingleLineDocstring:
         """Hello."""
 
-    assert get_first_line_of_docstring(SingleLineDocstring) == "Hello."
-    assert get_all_docstring(SingleLineDocstring) == "Hello."
-    assert get_all_docstring(SingleLineDocstring, flatten=True) == "Hello."
+    assert get_docstring_summary(SingleLineDocstring) == "Hello."
+    assert get_docstring(SingleLineDocstring) == "Hello."
+    assert get_docstring(SingleLineDocstring, flatten=True) == "Hello."
 
     class MultilineDocstring:
         """Hello.
@@ -30,40 +30,40 @@ def test_get_docstring() -> None:
         Extra description.
         """
 
-    assert get_first_line_of_docstring(MultilineDocstring) == "Hello."
-    assert get_all_docstring(MultilineDocstring) == dedent(
+    assert get_docstring_summary(MultilineDocstring) == "Hello."
+    assert get_docstring(MultilineDocstring) == dedent(
         """\
         Hello.
 
         Extra description."""
     )
-    assert get_all_docstring(MultilineDocstring, flatten=True) == "Hello. Extra description."
+    assert get_docstring(MultilineDocstring, flatten=True) == "Hello. Extra description."
 
     class NoDocstring:
         pass
 
-    assert get_first_line_of_docstring(NoDocstring) is None
-    assert get_all_docstring(NoDocstring) is None
-    assert get_all_docstring(NoDocstring, flatten=True) is None
+    assert get_docstring_summary(NoDocstring) is None
+    assert get_docstring(NoDocstring) is None
+    assert get_docstring(NoDocstring, flatten=True) is None
 
-    long_first_line = (
+    long_summary = (
         "This is all one sentence, it's just really really really long so it stretches to a "
         "whole new line."
     )
 
-    class FirstSentenceIsMultipleLines:
+    class MultilineSummary:
         """This is all one sentence, it's just really really really long so it stretches to a whole
         new line."""
 
-    assert get_first_line_of_docstring(FirstSentenceIsMultipleLines) == long_first_line
-    assert get_all_docstring(FirstSentenceIsMultipleLines) == dedent(
+    assert get_docstring_summary(MultilineSummary) == long_summary
+    assert get_docstring(MultilineSummary) == dedent(
         """\
         This is all one sentence, it's just really really really long so it stretches to a whole
         new line."""
     )
-    assert get_all_docstring(FirstSentenceIsMultipleLines, flatten=True) == long_first_line
+    assert get_docstring(MultilineSummary, flatten=True) == long_summary
 
-    class FirstSentenceIsMultipleLinesWithExtra:
+    class MultilineSummaryWithDetails:
         """This is all one sentence, it's just really really really long so it stretches to a whole
         new line.
 
@@ -73,8 +73,8 @@ def test_get_docstring() -> None:
             * l2
         """
 
-    assert get_first_line_of_docstring(FirstSentenceIsMultipleLinesWithExtra) == long_first_line
-    assert get_all_docstring(FirstSentenceIsMultipleLinesWithExtra) == dedent(
+    assert get_docstring_summary(MultilineSummaryWithDetails) == long_summary
+    assert get_docstring(MultilineSummaryWithDetails) == dedent(
         f"""\
         This is all one sentence, it's just really really really long so it stretches to a whole
         new line.
@@ -85,21 +85,21 @@ def test_get_docstring() -> None:
             * l2"""
     )
     assert (
-        get_all_docstring(FirstSentenceIsMultipleLinesWithExtra, flatten=True)
-        == f"{long_first_line} We also have some extra detail. * l1 * l2"
+        get_docstring(MultilineSummaryWithDetails, flatten=True)
+        == f"{long_summary} We also have some extra detail. * l1 * l2"
     )
 
     class SneakyDocstring:
         """Hello 😀!\n\nSneaky."""
 
-    assert get_first_line_of_docstring(SneakyDocstring) == "Hello 😀!"
-    assert get_all_docstring(SneakyDocstring) == dedent(
+    assert get_docstring_summary(SneakyDocstring) == "Hello 😀!"
+    assert get_docstring(SneakyDocstring) == dedent(
         """\
         Hello 😀!
 
         Sneaky."""
     )
-    assert get_all_docstring(SneakyDocstring, flatten=True) == "Hello 😀! Sneaky."
+    assert get_docstring(SneakyDocstring, flatten=True) == "Hello 😀! Sneaky."
 
 
 def test_pretty_print_type_hint() -> None:

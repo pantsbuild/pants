@@ -7,11 +7,7 @@ from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import UnionMembership, goal_rule
 from pants.engine.target import AsyncField, Field, PrimitiveField, RegisteredTargetTypes, Target
-from pants.util.objects import (
-    get_all_docstring,
-    get_first_line_of_docstring,
-    pretty_print_type_hint,
-)
+from pants.util.objects import get_docstring, get_docstring_summary, pretty_print_type_hint
 
 
 class TargetTypesOptions(LineOriented, GoalSubsystem):
@@ -41,7 +37,7 @@ def abbreviated_target_information(
 ) -> str:
     """Return a single line description of the target type."""
     formatted_alias = console.cyan(f"{target_type.alias:>{longest_target_alias + 1}}:")
-    description = get_first_line_of_docstring(target_type) or "<no description>"
+    description = get_docstring_summary(target_type) or "<no description>"
     return f"{formatted_alias} {description}"
 
 
@@ -49,7 +45,7 @@ def verbose_target_information(
     target_type: Type[Target], console: Console, union_membership: UnionMembership
 ) -> str:
     """Return a multiline description of the target type and all of its fields."""
-    target_type_description = get_all_docstring(target_type)
+    target_type_description = get_docstring(target_type)
     if target_type_description:
         target_type_description = console.blue(target_type_description)
 
@@ -60,7 +56,7 @@ def verbose_target_information(
     def format_field(field: Type[Field]) -> str:
         field_alias_text = f"  {field.alias}"
         field_alias = console.cyan(f"{field_alias_text:<{longest_field_name + 2}}")
-        description = get_all_docstring(field, flatten=True) or ""
+        description = get_docstring(field, flatten=True) or ""
         if issubclass(field, PrimitiveField):
             raw_value_type = get_type_hints(field.compute_value)["raw_value"]
         elif issubclass(field, AsyncField):
