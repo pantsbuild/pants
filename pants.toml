@@ -215,6 +215,7 @@ warning_args = [
 no_warning_args = [
   '-S-nowarn',
 ]
+fatal_warnings_allowed_warnings = ["match may not be exhaustive"]
 
 [compile.javac]
 args = [

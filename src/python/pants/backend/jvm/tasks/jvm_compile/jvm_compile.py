@@ -39,6 +39,7 @@ from pants.build_graph.target import Target
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, PathGlobs, PathGlobsAndRoot
 from pants.java.distribution.distribution import DistributionLocator
 from pants.option.compiler_option_sets_mixin import CompilerOptionSetsMixin
+from pants.option.fatal_warnings_mixin import FatalWarningsMixin
 from pants.option.ranked_value import RankedValue
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.contextutil import Timer, temporary_dir
@@ -61,7 +62,7 @@ _JAVAC_PLUGIN_INFO_FILE = "META-INF/services/com.sun.source.util.Plugin"
 _PROCESSOR_INFO_FILE = "META-INF/services/javax.annotation.processing.Processor"
 
 
-class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
+class JvmCompile(CompilerOptionSetsMixin, FatalWarningsMixin, NailgunTaskBase):
     """A common framework for JVM compilation.
 
     To subclass for a specific JVM language, implement the static values and methods mentioned below

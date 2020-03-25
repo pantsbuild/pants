@@ -444,6 +444,7 @@ class BaseZincCompile(JvmCompile):
 
         if fatal_warnings:
             zinc_args.extend(["-fatal-warnings"])
+            zinc_args.extend(["-non-fatal-warnings-patterns"] + self.get_allowed_fatal_warnings_patterns)
 
         zinc_args.extend(self._javac_plugin_args(javac_plugin_map))
         # Search for scalac plugins on the classpath.
