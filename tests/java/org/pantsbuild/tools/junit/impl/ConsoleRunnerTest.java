@@ -6,7 +6,10 @@ package org.pantsbuild.tools.junit.impl;
 import com.google.common.base.Charsets;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.IOException;
 import java.io.PrintStream;
+import com.google.common.io.Files;
+import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.junit.Assert;
@@ -399,6 +402,14 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
   }
 
   @Test
+  public void testArgFile() throws IOException {
+    File file = temporary.newFile();
+    Files.write("org.pantsbuild.tools.junit.lib.MockScalaTest#test should pass", file, Charsets.UTF_8);
+    invokeConsoleRunner("@" + file.getAbsolutePath());
+    assertThat(TestRegistry.getCalledTests(), is("MockScalaTest-1"));
+  }
+
+  @Test
   public void testMockJUnit3Test() throws Exception {
     invokeConsoleRunner("MockJUnit3Test");
     assertEquals("mju3t1", TestRegistry.getCalledTests());
@@ -414,6 +425,21 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
   public void testMockScalaTest() throws Exception {
     invokeConsoleRunner("MockScalaTest");
     assertEquals("MockScalaTest-1", TestRegistry.getCalledTests());
+  }
+
+  @Test
+  public void testMockScalaTestTestCase() throws Exception {
+    invokeConsoleRunner(Arrays.asList(
+        "org.pantsbuild.tools.junit.lib.MockScalaTest#test should pass",
+        "org.pantsbuild.tools.junit.lib.MockScalaTest1#test should pass"));
+    assertEquals("MockScalaTest-1 MockScalaTest-2", TestRegistry.getCalledTests());
+  }
+
+  @Test
+  public void testParameterizedTestMethod() throws Exception {
+    invokeConsoleRunner("ParameterizedTest#isLessThanFive[1] " +
+        "ParameterizedTest#isLessThanFive[3]");
+    assertEquals("isLessThanFive[1] isLessThanFive[3]", TestRegistry.getCalledTests());
   }
 
   @Test

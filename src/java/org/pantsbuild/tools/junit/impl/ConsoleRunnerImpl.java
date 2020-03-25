@@ -47,8 +47,8 @@ import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
-import org.kohsuke.args4j.spi.StringArrayOptionHandler;
 import org.pantsbuild.args4j.InvalidCmdLineArgumentException;
+import org.pantsbuild.args4j.StringArgumentsHandler;
 import org.pantsbuild.junit.annotations.TestParallel;
 import org.pantsbuild.junit.annotations.TestSerial;
 import org.pantsbuild.tools.junit.impl.experimental.ConcurrentComputer;
@@ -892,7 +892,7 @@ public class ConsoleRunnerImpl {
                         + "whitespace delimited arguments found inside added to the list",
                 required = true,
                 metaVar = "TESTS",
-                handler = StringArrayOptionHandler.class)
+                handler = StringArgumentsHandler.class)
       private String[] tests = {};
 
       @Option(name="-use-experimental-runner",
@@ -933,7 +933,7 @@ public class ConsoleRunnerImpl {
       if (test.startsWith("@")) {
         try {
           String argFileContents = Files.toString(new File(test.substring(1)), Charsets.UTF_8);
-          tests.addAll(Arrays.asList(argFileContents.split("\\s+")));
+          tests.addAll(Arrays.asList(argFileContents.split("\n")));
         } catch (IOException e) {
           System.err.printf("Failed to load args from arg file %s: %s\n", test, e.getMessage());
           exit(1);

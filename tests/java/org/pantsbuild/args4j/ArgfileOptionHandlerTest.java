@@ -12,13 +12,17 @@ import com.google.common.io.Files;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 import org.kohsuke.args4j.OptionDef;
+import org.kohsuke.args4j.spi.RestOfArgumentsHandler;
 import org.kohsuke.args4j.spi.Setter;
 import org.kohsuke.args4j.spi.StringOptionHandler;
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertEquals;
 
 public abstract class ArgfileOptionHandlerTest {
@@ -31,9 +35,21 @@ public abstract class ArgfileOptionHandlerTest {
     }
   }
 
+  public static class ArgArgFileHandler extends ArgfileOptionHandler<String> {
+    public ArgArgFileHandler(
+        CmdLineParser parser,
+        OptionDef option,
+        Setter<String> setter) {
+      super(new RestOfArgumentsHandler(parser, option, setter));
+    }
+  }
+
   public static class Options {
     @Option(name="-m", metaVar = "MESSAGE", handler = TestArgFileHandler.class)
     String message;
+
+    @Argument(metaVar = "AND_SUCH", handler = ArgArgFileHandler.class)
+    String[] rest;
   }
 
   protected Options parse(String... args) throws CmdLineException {
@@ -61,6 +77,22 @@ public abstract class ArgfileOptionHandlerTest {
       Files.write("bill", argfile, Charsets.UTF_8);
       Options options = parse("-m", String.format("@%s", argfile.getPath()));
       assertEquals("bill", options.message);
+    }
+
+    @Test
+    public void testArgfileWithSpace() throws CmdLineException, IOException {
+      File argfile = temporary.newFile("argfile");
+      Files.write("bill receipt", argfile, Charsets.UTF_8);
+      Options options = parse( String.format("@%s", argfile.getPath()));
+      assertThat(options.rest, is(new String[]{"bill receipt"}));
+    }
+
+    @Test
+    public void testArgfileWithNewLine() throws CmdLineException, IOException {
+      File argfile = temporary.newFile("argfile");
+      Files.write("bill\nreceipt", argfile, Charsets.UTF_8);
+      Options options = parse(String.format("@%s", argfile.getPath()));
+      assertThat(options.rest, is(new String[]{"bill", "receipt"}));
     }
   }
 }

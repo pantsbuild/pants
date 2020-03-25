@@ -19,14 +19,20 @@ import org.pantsbuild.junit.annotations.TestSerial;
 class Spec {
   private final Class<?> clazz;
   private final ImmutableSet<String> methods;
+  private final boolean hasCustomRunner;
 
   Spec(Class<?> clazz) {
     this(clazz, ImmutableSet.of());
   }
 
   private Spec(Class<?> clazz, ImmutableSet<String> methods) {
+    this(clazz, methods, false);
+  }
+
+  private Spec(Class<?> clazz, ImmutableSet<String> methods, boolean hasCustomRunner) {
     this.clazz = Objects.requireNonNull(clazz);
     this.methods = Objects.requireNonNull(methods);
+    this.hasCustomRunner = hasCustomRunner;
   }
 
   String getSpecName() {
@@ -44,7 +50,7 @@ class Spec {
    * @return A new spec that includes the added method.
    */
   Spec withMethod(String method) {
-    return new Spec(clazz, ImmutableSet.<String>builder().addAll(methods).add(method).build());
+    return new Spec(clazz, ImmutableSet.<String>builder().addAll(methods).add(method).build(), this.hasCustomRunner);
   }
 
   /**
@@ -66,5 +72,23 @@ class Spec {
 
   public Collection<String> getMethods() {
     return methods;
+  }
+
+  // NB: If a test class has a custom runner, then we can't assume spec's method portion's format.
+  public Spec asCustomRunnerSpec() {
+    return new Spec(this.clazz, this.methods, true);
+  }
+
+  public boolean methodNameAllowedToNotMatch() {
+    return hasCustomRunner;
+  }
+
+  @Override
+  public String toString() {
+    return "Spec{" +
+        "clazz=" + clazz +
+        ", methods=" + methods +
+        ", hasCustomRunner=" + hasCustomRunner +
+        '}';
   }
 }

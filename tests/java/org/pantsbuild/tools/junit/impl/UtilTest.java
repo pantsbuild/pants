@@ -16,6 +16,7 @@ import org.pantsbuild.tools.junit.lib.NotATestNoPublicConstructor;
 import org.pantsbuild.tools.junit.lib.NotATestNoRunnableMethods;
 import org.pantsbuild.tools.junit.lib.NotATestNonzeroArgConstructor;
 import org.pantsbuild.tools.junit.lib.NotATestPrivateClass;
+import org.pantsbuild.tools.junit.lib.ParameterizedTest;
 import org.pantsbuild.tools.junit.lib.UnannotatedTestClass;
 import org.pantsbuild.tools.junit.lib.XmlReportFirstTestIngoredTest;
 import org.pantsbuild.tools.junit.lib.XmlReportIgnoredTestSuiteTest;
@@ -104,6 +105,7 @@ public class UtilTest {
     assertTrue(Util.isTestClass(MockRunWithTest.class));
     assertTrue(Util.isTestClass(UnannotatedTestClass.class));
     assertTrue(Util.isTestClass(MockScalaTest.class));
+    assertTrue(Util.isTestClass(ParameterizedTest.class));
     assertFalse(Util.isTestClass(NotATestAbstractClass.class));
     assertFalse(Util.isTestClass(NotATestNonzeroArgConstructor.class));
     assertFalse(Util.isTestClass(NotATestNoPublicConstructor.class));
