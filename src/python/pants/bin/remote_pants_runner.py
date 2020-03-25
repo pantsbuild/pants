@@ -191,8 +191,6 @@ class RemotePantsRunner:
         or failing that, the `pid` of the pantsd instance.
         """
         sources = [pantsd_pid]
-        if nailgun_error.pid is not None:
-            sources = [abs(nailgun_error.pid)] + sources
 
         exception_text = None
         for source in sources:
