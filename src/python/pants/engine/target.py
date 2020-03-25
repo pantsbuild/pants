@@ -723,6 +723,12 @@ COMMON_TARGET_FIELDS = (Dependencies, Tags)
 
 
 class Sources(AsyncField):
+    """A list of files and globs that belong to this target.
+
+    You can ignore files/globs by prefixing them with `!`. Example: `sources=['*.py',
+    '!ignore.py']`.
+    """
+
     alias = "sources"
     sanitized_raw_value: Optional[Tuple[str, ...]]
     default: ClassVar[Optional[Tuple[str, ...]]] = None
