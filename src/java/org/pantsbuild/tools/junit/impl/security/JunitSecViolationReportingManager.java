@@ -24,6 +24,10 @@ public class JunitSecViolationReportingManager extends SecurityManager {
     this.logic = new JunitSecurityManagerLogic(config, contextLookupAndErrorCollection);
   }
 
+  public void reset() {
+
+  }
+
   public static <T> T maybeWithSecurityManagerContext(
       final String className,
       final Callable<T> callable) throws Exception {
