@@ -442,12 +442,6 @@ class BaseZincCompile(JvmCompile):
         )
         zinc_args.extend(["-scala-path", ":".join(scala_path)])
 
-        if fatal_warnings:
-            zinc_args.extend(["-fatal-warnings"])
-            zinc_args.extend(
-                ["-non-fatal-warnings-patterns"] + self.get_allowed_fatal_warnings_patterns
-            )
-
         zinc_args.extend(self._javac_plugin_args(javac_plugin_map))
         # Search for scalac plugins on the classpath.
         # Note that:
@@ -578,8 +572,39 @@ class BaseZincCompile(JvmCompile):
             },
         )()
 
+    def _check_fatal_warnings(self, ctx, lsp_data):
+        if self.get_options().incremental:
+            logger.warning(
+                "Warning recognition might skips some warnings with incremental compilation. "
+                "Follow issue TODO for details."
+            )
+        permitted_warnings = self.get_allowed_fatal_warnings_patterns
+        for published_diagnostics in lsp_data:
+            for diagnostic in published_diagnostics["diagnostics"]:
+                if diagnostic["severity"] == "Warning":
+                    matching_patterns = [
+                        p for p in permitted_warnings if p in diagnostic["message"]
+                    ]
+                    if not matching_patterns:
+                        # TODO This might be a good place to print out the warnings.
+                        raise TaskError(
+                            f"Compilation failed because there were non-permitted warnings when fatal_warnings were enabled for target {ctx.target.address.spec}."
+                        )
+
     def always_do_after_compile(self, ctx):
-        self._pass_diagnostics_to_reporting_server(ctx)
+        diagnostics_file = self._diagnostics_out(ctx)
+        if not (diagnostics_file and os.path.exists(diagnostics_file)):
+            if ctx.target.payload.fatal_warnings:
+                raise TaskError(
+                    "Targets that have `fatal_warnings = True` must be compiled with diagnostics enabled. "
+                    f"Target {ctx.target.address.spec} is one such target. "
+                    "Please pass the --compile-rsc-report-diagnostic-counts to the compilation."
+                )
+            return
+        with open(diagnostics_file) as json_diagnostics:
+            lsp_data = json.load(json_diagnostics)
+            self._check_fatal_warnings(ctx, lsp_data)
+            self._pass_diagnostics_to_reporting_server(ctx, lsp_data)
 
     def _aggregate_diagnostics(self, lsp_data):
         # Note: this is not arbitrary. It is exactly every value that the LSP's DiagnosticSeverity allows.
@@ -596,19 +621,14 @@ class BaseZincCompile(JvmCompile):
                 counts[severity] += 1
         return counts
 
-    def _pass_diagnostics_to_reporting_server(self, ctx):
-        diagnostics_file = self._diagnostics_out(ctx)
-        if not (diagnostics_file and os.path.exists(diagnostics_file)):
-            return
-        with open(diagnostics_file) as json_diagnostics:
-            data = json.load(json_diagnostics)
-            counts = self._aggregate_diagnostics(data)
-            self.context.log.info(f"Reporting number of diagnostics for: {ctx.target.address}")
-            for (severity, count) in counts.items():
-                self.context.log.info(f"    {severity}: {count}")
-                self.context.run_tracker.report_target_info(
-                    self.options_scope, ctx.target, ["diagnostic_counts", severity], count
-                )
+    def _pass_diagnostics_to_reporting_server(self, ctx, lsp_data):
+        counts = self._aggregate_diagnostics(lsp_data)
+        self.context.log.info(f"Reporting number of diagnostics for: {ctx.target.address}")
+        for (severity, count) in counts.items():
+            self.context.log.info(f"    {severity}: {count}")
+            self.context.run_tracker.report_target_info(
+                self.options_scope, ctx.target, ["diagnostic_counts", severity], count
+            )
 
     class ZincCompileError(TaskError):
         """An exception type specifically to signal a failed zinc execution."""

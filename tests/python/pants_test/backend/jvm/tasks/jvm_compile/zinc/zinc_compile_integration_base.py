@@ -325,7 +325,8 @@ class BaseZincCompileIntegrationTest:
             "fatal_explicit",
             expect_success=True,
             extra_args=[
-                "--compile-rsc-fatal-warnings-allowed-warnings=['match may not be exhaustive']"
+                "--compile-rsc-fatal-warnings-allowed-warnings=['match may not be exhaustive']",
+                "--compile-rsc-report-diagnostic-counts",
             ],
         )
 

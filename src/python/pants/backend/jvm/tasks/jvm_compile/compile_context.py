@@ -25,6 +25,7 @@ class CompileContext:
         post_compile_merge_dir,
         sources,
         diagnostics_out,
+        fatal_warnings: bool,
     ):
         self.target = target
         self.analysis_file = analysis_file
@@ -35,6 +36,7 @@ class CompileContext:
         self.post_compile_merge_dir = post_compile_merge_dir
         self.sources = sources
         self.diagnostics_out = diagnostics_out
+        self.fatal_warnings = fatal_warnings
 
     @contextmanager
     def open_jar(self, mode):
@@ -43,7 +45,13 @@ class CompileContext:
 
     @property
     def _id(self):
-        return (self.target, self.analysis_file, self.classes_dir.path, self.diagnostics_out)
+        return (
+            self.target,
+            self.analysis_file,
+            self.classes_dir.path,
+            self.diagnostics_out,
+            self.fatal_warnings,
+        )
 
     def __eq__(self, other):
         return self._id == other._id

@@ -37,6 +37,7 @@ class ZincCompileTest(JvmToolTaskTestBase):
                     sources=[],
                     post_compile_merge_dir="",
                     diagnostics_out=None,
+                    fatal_warnings=False,
                 )
             }
             task = self.get_task()
