@@ -39,7 +39,7 @@ def get_all_docstring(cls: Type, *, flatten: bool = False) -> Optional[str]:
     lines = [docstring[:newline_index], *dedent(docstring[newline_index + 1 :]).splitlines()]
 
     if flatten:
-        return " ".join(line.strip() for line in lines if line)
+        return " ".join(line.strip() for line in lines if line).strip()
     return "\n".join(lines)
 
 

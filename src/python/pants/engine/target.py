@@ -702,9 +702,13 @@ class Dependencies(AsyncField):
     sanitized_raw_value: Optional[Tuple[Address, ...]]
     default = None
 
+    # NB: The type hint for `raw_value` is sort of a lie. While we do expect end-users to use
+    # Iterable[str], the Struct and Addressable code will have already converted those strings
+    # into a List[Address]. But, that's an implementation detail and we don't want our
+    # documentation (e.g. the `target-types2` goal to leak that.
     @classmethod
     def sanitize_raw_value(
-        cls, raw_value: Optional[List[Address]], *, address: Address
+        cls, raw_value: Optional[Iterable[str]], *, address: Address
     ) -> Optional[Tuple[Address, ...]]:
         value_or_default = super().sanitize_raw_value(raw_value, address=address)
         if value_or_default is None:

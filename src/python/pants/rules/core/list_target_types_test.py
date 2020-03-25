@@ -70,12 +70,14 @@ def run_goal(
 
 def test_list_all() -> None:
     stdout = run_goal()
-    assert (
-        stdout
-        == """\
-                fortran_binary: <no description>
-               fortran_library: A library of Fortran code.
-                 fortran_tests: Tests for Fortran code.\n"""
+    assert stdout == dedent(
+        """\
+        Use `./pants target-types2 --details=$target_type` to get detailed information for a particular target type.
+        
+          fortran_binary: <no description>
+         fortran_library: A library of Fortran code.
+           fortran_tests: Tests for Fortran code.
+        """
     )
 
 
@@ -93,16 +95,17 @@ def test_list_single() -> None:
         union_membership=UnionMembership({FortranTests.PluginField: OrderedSet([CustomField])}),
         details_target=FortranTests.alias,
     )
-    # TODO: render the full docstring for both the target type (preserve new lines) and for
-    #  custom_field (strip new lines).
+    print(tests_target_stdout)
     assert tests_target_stdout == dedent(
         """\
         Tests for Fortran code.
+        
+        This assumes that you use the FRUIT test framework.
 
 
         fortran_tests(
-          custom_field = ...,           My custom field! (default: True)
-          fortran_version = ...,        (default: None)
+          custom_field     My custom field! Use this field to... (type: bool | None, default: True)
+          fortran_version  (type: str | None, default: None)
         )
         """
     )
@@ -111,7 +114,7 @@ def test_list_single() -> None:
     assert binary_target_stdout == dedent(
         """\
         fortran_binary(
-          fortran_version = ...,        (default: None)
+          fortran_version  (type: str | None, default: None)
         )
         """
     )
