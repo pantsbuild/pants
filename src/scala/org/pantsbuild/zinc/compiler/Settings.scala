@@ -44,7 +44,9 @@ case class Settings(
     analysis: AnalysisOptions = AnalysisOptions(),
     creationTime: Long = 0,
     compiledBridgeJar: Option[File] = None,
-    useBarebonesLogger: Boolean = false
+    useBarebonesLogger: Boolean = false,
+    fatalWarnings: Boolean = false,
+    nonFatalWarningPatterns: Seq[String] = Seq.empty
 ) {
   import Settings._
 
@@ -464,6 +466,17 @@ object Settings {
       .action(
         (x, c) => c.copy(analysis = c.analysis.copy(clearInvalid = false)))
       .text("If set, zinc will fail rather than purging illegal analysis.")
+
+    opt[Unit]("fatal-warnings")
+        .abbr("fatal-warnings")
+        .action((x, c) => c.copy(fatalWarnings = true))
+        .text("If set, zinc will treat all warnings as fatal.")
+
+    opt[Seq[String]]("non-fatal-warnings-patterns")
+        .abbr("non-fatal-warnings-patterns")
+        .action((x, c) => c.copy(nonFatalWarningPatterns = x))
+        .text("List of warning patterns that will not be fatal evel if -fatal-warnings is enabled. " +
+              "These are defined as plain strings (not regexes) that will try to match the warning message.")
 
     opt[String]("scalac-option")
       .abbr("S")

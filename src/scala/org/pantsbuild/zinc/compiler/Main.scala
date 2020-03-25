@@ -327,6 +327,21 @@ object Main {
             .ConcreteAnalysisContents(result.analysis, result.setup)
         )
       }
+
+      if (settings.fatalWarnings) {
+        val problems: List[Problem] = inputs.setup.reporter.problems.toList
+        val nonFatalWarningPatterns: Seq[String] = settings.nonFatalWarningPatterns
+        val thereWasAFatalWarning = problems.exists(p =>
+          p.severity() == Severity.Warn &&
+          !nonFatalWarningPatterns.exists(pattern => p.message().contains(pattern))
+        )
+        if (thereWasAFatalWarning) {
+          log.error("Compilation failed because there were non-permitted warnings when fatal_warnings were enabled.")
+          exit(1)
+        }
+      }
+
+
       log.info("Compile success " + Util.timing(startTime))
       // if compile is successful, jar the contents of classesDirectory and copy to outputJar
       if (settings.outputJar.isDefined) {
