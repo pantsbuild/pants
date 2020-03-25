@@ -1,21 +1,28 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from textwrap import dedent
+from typing import Any, Iterable, List, Optional, Union
+
 from pants.testutil.test_base import TestBase
 from pants.util.objects import (
     Exactly,
     SubclassesOf,
     SuperclassesOf,
     TypeConstraintError,
+    get_all_docstring,
     get_first_line_of_docstring,
+    pretty_print_type_hint,
 )
 
 
-def test_get_first_line_of_docstring() -> None:
+def test_get_docstring() -> None:
     class SingleLineDocstring:
         """Hello."""
 
     assert get_first_line_of_docstring(SingleLineDocstring) == "Hello."
+    assert get_all_docstring(SingleLineDocstring) == "Hello."
+    assert get_all_docstring(SingleLineDocstring, flatten=True) == "Hello."
 
     class MultilineDocstring:
         """Hello.
@@ -24,19 +31,104 @@ def test_get_first_line_of_docstring() -> None:
         """
 
     assert get_first_line_of_docstring(MultilineDocstring) == "Hello."
+    assert get_all_docstring(MultilineDocstring) == dedent(
+        """\
+        Hello.
+
+        Extra description."""
+    )
+    assert get_all_docstring(MultilineDocstring, flatten=True) == "Hello. Extra description."
 
     class NoDocstring:
         pass
 
     assert get_first_line_of_docstring(NoDocstring) is None
+    assert get_all_docstring(NoDocstring) is None
+    assert get_all_docstring(NoDocstring, flatten=True) is None
+
+    long_first_line = (
+        "This is all one sentence, it's just really really really long so it stretches to a "
+        "whole new line."
+    )
+
+    class FirstSentenceIsMultipleLines:
+        """This is all one sentence, it's just really really really long so it stretches to a whole
+        new line."""
+
+    assert get_first_line_of_docstring(FirstSentenceIsMultipleLines) == long_first_line
+    assert get_all_docstring(FirstSentenceIsMultipleLines) == dedent(
+        """\
+        This is all one sentence, it's just really really really long so it stretches to a whole
+        new line."""
+    )
+    assert get_all_docstring(FirstSentenceIsMultipleLines, flatten=True) == long_first_line
+
+    class FirstSentenceIsMultipleLinesWithExtra:
+        """This is all one sentence, it's just really really really long so it stretches to a whole
+        new line.
+
+        We also have some extra detail.
+
+            * l1
+            * l2
+        """
+
+    assert get_first_line_of_docstring(FirstSentenceIsMultipleLinesWithExtra) == long_first_line
+    assert get_all_docstring(FirstSentenceIsMultipleLinesWithExtra) == dedent(
+        f"""\
+        This is all one sentence, it's just really really really long so it stretches to a whole
+        new line.
+
+        We also have some extra detail.
+
+            * l1
+            * l2"""
+    )
+    assert (
+        get_all_docstring(FirstSentenceIsMultipleLinesWithExtra, flatten=True)
+        == f"{long_first_line} We also have some extra detail. * l1 * l2"
+    )
 
     class SneakyDocstring:
-        """Hello 😀!\n\n.
+        """Hello 😀!\n\n
 
         More description.
         """
 
     assert get_first_line_of_docstring(SneakyDocstring) == "Hello 😀!"
+    assert get_all_docstring(SneakyDocstring) == dedent(
+        """\
+        Hello 😀!
+
+
+
+        More description."""
+    )
+    assert get_all_docstring(SneakyDocstring, flatten=True) == "Hello 😀! More description."
+
+
+def test_pretty_print_type_hint() -> None:
+    assert pretty_print_type_hint(str) == "str"
+    assert pretty_print_type_hint(int) == "int"
+    assert pretty_print_type_hint(None) == "None"
+
+    class ExampleCls:
+        pass
+
+    assert pretty_print_type_hint(ExampleCls) == "ExampleCls"
+
+    # Transform Unions to use `|`
+    assert pretty_print_type_hint(Union[int, float]) == "int | float"
+    assert pretty_print_type_hint(Optional[int]) == "int | None"
+    # NB: `Iterable[List[ExampleCls]]` will use the full module name for `ExampleCls`. We can't
+    # easily control that because it comes from the __repr__ implementation for `typing.Iterable`.
+    example_cls_repr = (
+        f"{__name__}.{test_pretty_print_type_hint.__name__}.<locals>.{ExampleCls.__name__}"
+    )
+    assert (
+        pretty_print_type_hint(Union[Iterable[List[ExampleCls]], Optional[float], Any])
+        == f"Iterable[List[{example_cls_repr}]] | float | None | Any"
+    )
 
 
 class TypeConstraintTestBase(TestBase):
