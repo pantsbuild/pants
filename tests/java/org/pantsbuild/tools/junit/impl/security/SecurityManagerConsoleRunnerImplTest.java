@@ -1,5 +1,6 @@
 package org.pantsbuild.tools.junit.impl.security;
 
+import org.hamcrest.Matcher;
 import org.junit.Test;
 import org.pantsbuild.tools.junit.impl.ConsoleRunnerImplTestSetup;
 import org.pantsbuild.tools.junit.lib.SystemExitsInObjectBody;
@@ -30,26 +31,25 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
         testClass);
     String testClassName = testClass.getCanonicalName();
 
-    assertThat(output, containsString(") directSystemExit(" + testClassName + ")"));
-    assertThat(output, containsString(") catchesSystemExit(" + testClassName + ")"));
-    assertThat(output, containsString(") exitInJoinedThread(" + testClassName + ")"));
-    assertThat(output, containsString(") exitInNotJoinedThread(" + testClassName + ")"));
+    assertThat(output, testFailedWithName(testClass, "directSystemExit"));
+    assertThat(output, testFailedWithName(testClass, "catchesSystemExit"));
+    assertThat(output, testFailedWithName(testClass, "exitInJoinedThread"));
+    assertThat(output, testFailedWithName(testClass, "exitInNotJoinedThread"));
 
     assertThat(output, containsString("There were 4 failures:"));
     assertThat(output, containsString("Tests run: 5,  Failures: 4"));
 
     assertThat(
         output,
-        containsString(
-            ") directSystemExit(" + testClassName + ")\n" +
-                "org.pantsbuild.junit.security.SecurityViolationException: " +
+        testFailedWithName(testClass, "directSystemExit",
+            "org.pantsbuild.junit.security.SecurityViolationException: " +
                 "System.exit calls are not allowed.\n"));
     assertThat(
         output,
         containsString(
             "\tat java.lang.Runtime.exit(Runtime.java:107)\n" +
                 "\tat java.lang.System.exit(System.java:971)\n" +
-                "\tat " + testClassName + ".directSystemExit(" + testClass.getSimpleName() +
+                "\tat " + testClassName + "." + "directSystemExit" + "(" + testClass.getSimpleName() +
                 ".java:43)"));
   }
 
@@ -71,14 +71,14 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
             NetworkHandling.allowAll),
         testClass);
     String testClassName = testClass.getCanonicalName();
-    assertThat(output, containsString("startedThread(" + testClassName + ")"));
+    assertThat(output, testFailedWithName(testClass, "startedThread"));
     assertThat(output, containsString("There was 1 failure:"));
     assertThat(output, containsString("Tests run: 1,  Failures: 1"));
 
-    assertThat(output, containsString(") startedThread(" + testClassName + ")\n" +
+    assertThat(output, testFailedWithName(testClass, "startedThread",
         "org.pantsbuild.junit.security.SecurityViolationException: " +
-        "Threads from startedThread(" + testClassName + ") are still running (1):\n" +
-        "\t\tThread-"
+            "Threads from startedThread(" + testClassName + ") are still running (1):\n" +
+            "\t\tThread-"
     ));
   }
 
@@ -93,7 +93,8 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
             ThreadHandling.disallowLeakingTestCaseThreads,
             NetworkHandling.allowAll),
         testClass);
-    assertThat(output, containsString("failing(" + testClass.getCanonicalName() + ")"));
+    String testName = "failing";
+    assertThat(output, testFailedWithName(testClass, testName));
     assertThat(output, containsString("java.lang.AssertionError: failing"));
     assertThat(output, containsString("There was 1 failure:"));
     assertThat(output, containsString("Tests run: 2,  Failures: 1"));
@@ -110,7 +111,8 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
             ThreadHandling.disallowLeakingTestSuiteThreads,
             NetworkHandling.allowAll),
         testClass);
-    assertThat(output, containsString("failing(" + testClass.getCanonicalName() + ")"));
+    assertThat(output, testFailedWithName(testClass, "failing",
+        "java.lang.AssertionError: failing"));
     assertThat(output, containsString("java.lang.AssertionError: failing"));
     assertThat(output, containsString("There was 1 failure:"));
     assertThat(output, containsString("Tests run: 2,  Failures: 1"));
@@ -212,9 +214,8 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
 
     String testClassName = testClass.getCanonicalName();
 
-    assertThat(output, containsString(
-        ") initializationError(" + testClassName + ")\n" +
-            "java.lang.ExceptionInInitializerError\n" +
+    assertThat(output, testFailedWithName(testClass, "initializationError",
+        "java.lang.ExceptionInInitializerError\n" +
             "\tat " + testClassName + ".<init>(SystemExitsInObjectBody.scala:12)"));
     // NB This caused by clause is hard to find in the stacktrace right now, it might make sense to
     // unwrap the error and display it.
@@ -273,21 +274,20 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
         testClass);
     String testClassName = testClass.getCanonicalName();
 
-    assertThat(output, containsString(") directNetworkCall(" + testClassName + ")"));
-    assertThat(output, containsString(") catchesNetworkCall(" + testClassName + ")"));
-    assertThat(output, containsString(") networkCallInJoinedThread(" + testClassName + ")"));
-    assertThat(output, containsString(") networkCallInNotJoinedThread(" + testClassName + ")"));
+    assertThat(output, testFailedWithName(testClass, "directNetworkCall"));
+    assertThat(output, testFailedWithName(testClass, "catchesNetworkCall"));
+    assertThat(output, testFailedWithName(testClass, "networkCallInJoinedThread"));
+    assertThat(output, testFailedWithName(testClass, "networkCallInNotJoinedThread"));
 
     assertThat(output, containsString("There were 5 failures:"));
     assertThat(output, containsString("Tests run: 6,  Failures: 5"));
 
-    assertThat(output, containsString(
-        ") directNetworkCall(" + testClassName + ")\n" +
-            "org.pantsbuild.junit.security.SecurityViolationException: " +
+    assertThat(output, testFailedWithName(testClass, "directNetworkCall",
+        "org.pantsbuild.junit.security.SecurityViolationException: " +
             "DNS request for example.com is not allowed.\n"));
     // ... some other ats
     assertThat(output, containsString(
-            "\tat " + testClassName + ".makeNetworkCall"));
+        "\tat " + testClassName + ".makeNetworkCall"));
   }
 
   @Test
@@ -317,23 +317,20 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
         ),
         testClass);
 
-    String testClassName = testClass.getCanonicalName();
-
-    assertThat(output, containsString(") directNetworkCall(" + testClassName + ")"));
-    assertThat(output, containsString(") catchesNetworkCall(" + testClassName + ")"));
-    assertThat(output, containsString(") networkCallInJoinedThread(" + testClassName + ")"));
-    assertThat(output, containsString(") networkCallInNotJoinedThread(" + testClassName + ")"));
+    assertThat(output, testFailedWithName(testClass, "directNetworkCall"));
+    assertThat(output, testFailedWithName(testClass, "catchesNetworkCall"));
+    assertThat(output, testFailedWithName(testClass, "networkCallInJoinedThread"));
+    assertThat(output, testFailedWithName(testClass, "networkCallInNotJoinedThread"));
 
     assertThat(output, containsString("There were 5 failures:"));
     assertThat(output, containsString("Tests run: 6,  Failures: 5"));
 
-    assertThat(output, containsString(
-        ") directNetworkCall(" + testClassName + ")\n" +
-            "org.pantsbuild.junit.security.SecurityViolationException: " +
+    assertThat(output, testFailedWithName(testClass, "directNetworkCall",
+        "org.pantsbuild.junit.security.SecurityViolationException: " +
             "DNS request for localhost is not allowed.\n"));
     // ... some other ats
     assertThat(output, containsString(
-            "\tat " + testClassName + ".makeNetworkCall"));
+        "\tat " + testClass.getCanonicalName() + ".makeNetworkCall"));
   }
 
   @Test
@@ -367,24 +364,22 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
     String testClassName = "org.pantsbuild.tools.junit.lib.security.fileaccess.FileAccessTests";
     String testFilePath = "tests/resources/org/pantsbuild/tools/junit/lib/";
     String exceptionName = "org.pantsbuild.junit.security.SecurityViolationException";
-    assertThat(output,
-        containsString(") readAFile(" + testClassName + ")\n" +
-            exceptionName + ": Access to file: " + testFilePath + "a.file not allowed"));
+    assertThat(output, testFailedWithName(testClass, "readAFile",
+        exceptionName + ": Access to file: " + testFilePath + "a.file not allowed"
+    ));
     // ...
     assertThat(output,
         containsString("at " + testClassName + ".readAFile(FileAccessTests.java:"));
 
     assertThat(output,
-        containsString(") writeAFile(" + testClassName + ")\n" +
+        testFailedWithName(testClass, "writeAFile",
             exceptionName + ": Access to file: " + testFilePath + "another.file not allowed"));
     // ...
     assertThat(output,
         containsString("at " + testClassName + ".writeAFile(FileAccessTests.java:"));
 
-    assertThat(output,
-        containsString(
-            ") deleteAFile(" + testClassName + ")\n" +
-                exceptionName + ": Access to file: " + testFilePath + "a.different.file" +
+    assertThat(output, testFailedWithName(testClass, "deleteAFile",
+            exceptionName + ": Access to file: " + testFilePath + "a.different.file" +
                 " not allowed"));
     // ...
     assertThat(output,
@@ -404,24 +399,41 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
         ),
         testClass);
 
-    assertThat(output, containsString("Failures: 2\n"));
+    assertThat(output, hasFailureCountOf("2"));
     String testClassName = "org.pantsbuild.tools.junit.lib.security.fileaccess.FileAccessTests";
     String testFilePath = "tests/resources/org/pantsbuild/tools/junit/lib/";
     String exceptionName = "org.pantsbuild.junit.security.SecurityViolationException";
-    assertThat(output,
-        containsString(") tempfile(" + testClassName + ")\n" +
+    assertThat(output, testFailedWithName(testClass, "tempfile",
             exceptionName + ": Access to file: "));
     // ...
     assertThat(output,
         containsString("at " + testClassName + ".tempfile(FileAccessTests.java:"));
     assertThat(output,
-        containsString(") readNonexistentRootFile(" + testClassName + ")\n" +
+        testFailedWithName(testClass, "readNonexistentRootFile",
             exceptionName + ": Access to file: "));
     // ...
     assertThat(output,
         containsString("at " + testClassName + ".readNonexistentRootFile(" +
             "FileAccessTests.java:"));
+
     assertThat(output, not(containsString("writeAFile")));
+    assertThat(output, not(containsString("readAFile")));
+  }
+
+  private Matcher<String> testFailedWithName(Class<?> testClass, String testName) {
+    return containsString(testReportLine(testClass.getCanonicalName(), testName));
+  }
+
+  private Matcher<String> testFailedWithName(Class<?> testClass, String testName, String reason) {
+    return containsString(testReportLine(testClass.getCanonicalName(), testName) + reason);
+  }
+
+  private Matcher<String> hasFailureCountOf(String failureCt) {
+    return containsString("Failures: " + failureCt + "\n");
+  }
+
+  private String testReportLine(String testClassName, String testName) {
+    return ") " + testName + "(" + testClassName + ")\n";
   }
 
   private JunitSecurityManagerConfig configDisallowingSystemExitButAllowingEverythingElse() {
