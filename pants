@@ -87,8 +87,16 @@ function exec_pants_bare() {
   # Redirect activation and native bootstrap to ensure that they don't interfere with stdout.
   activate_pants_venv 1>&2
   bootstrap_native_code 1>&2
+
+  #venv_dir comes from build_support/pants_venv
+  python_interpreter_path="$(venv_dir)/bin/python"
+  entry_point_path="${HERE}/src/rust/entry-point/target/debug/entry-point"
+
+  #TODO instead of using this variable, read [GLOBAL] Pythonpath from the config file
   PYTHONPATH="${PANTS_SRCPATH_STR}:${PYTHONPATH}" RUNNING_PANTS_FROM_SOURCES=1 \
-    exec python "${PANTS_EXE}" "$@"
+  $entry_point_path $python_interpreter_path "$@"
+  #  exec python "${PANTS_EXE}" "$@"
+
 }
 
 if [[ -n "${WRAPPER_REQUIREMENTS}" ]]; then

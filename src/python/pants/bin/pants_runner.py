@@ -3,6 +3,8 @@
 
 import logging
 import os
+import sys
+import time
 from dataclasses import dataclass
 from typing import List, Mapping
 
@@ -100,3 +102,8 @@ class PantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         runner = LocalPantsRunner.create(env=self.env, options_bootstrapper=options_bootstrapper)
         runner.set_start_time(start_time)
         runner.run()
+
+if __name__ == "__main__":
+    start_time = time.time()
+    runner = PantsRunner(args=sys.argv, env=os.environ)
+    runner.run(start_time)
