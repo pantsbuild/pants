@@ -88,7 +88,6 @@ pants_ignore.add = [
   "/build-support/bin/native/src",
   # We shouldn't walk or watch the rust compiler artifacts because it is slow.
   "/src/rust/engine/target",
-  "/**/*/__pycache__",
 ]
 
 [cache]

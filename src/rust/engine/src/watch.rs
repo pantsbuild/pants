@@ -13,6 +13,7 @@ use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 //use parking_lot::Mutex;
 use futures::compat::Future01CompatExt;
 use futures_locks::Mutex;
+use process_execution::Platform;
 use task_executor::Executor;
 
 use graph::{Graph, InvalidationResult};
@@ -41,6 +42,7 @@ pub struct InvalidationWatcher {
   watcher: Arc<Mutex<RecommendedWatcher>>,
   executor: Executor,
   liveness: Receiver<()>,
+  current_platform: Platform,
 }
 
 impl InvalidationWatcher {
@@ -55,11 +57,25 @@ impl InvalidationWatcher {
     // We canonicalize the build_root once so this isn't a problem.
     let canonical_build_root =
       std::fs::canonicalize(build_root.as_path()).map_err(|e| format!("{:?}", e))?;
+    let current_platform = Platform::current()?;
     let (watch_sender, watch_receiver) = crossbeam_channel::unbounded();
-    let watcher = Arc::new(Mutex::new(
-      Watcher::new(watch_sender, Duration::from_millis(50))
-        .map_err(|e| format!("Failed to begin watching the filesystem: {}", e))?,
-    ));
+    let mut watcher: RecommendedWatcher = Watcher::new(watch_sender, Duration::from_millis(50))
+      .map_err(|e| format!("Failed to begin watching the filesystem: {}", e))?;
+    // On darwin the notify API is much more efficient if you watch the build root
+    // recursively, so we set up that watch here and then return early when watch() is
+    // called by nodes that are running. On Linux the notify crate handles adding paths to watch
+    // much more efficiently so we do that instead on Linux.
+    if current_platform == Platform::Darwin {
+      watcher
+        .watch(canonical_build_root.clone(), RecursiveMode::Recursive)
+        .map_err(|e| {
+          format!(
+            "Failed to begin recursively watching files in the build root: {}",
+            e
+          )
+        })?
+    }
+    let wrapped_watcher = Arc::new(Mutex::new(watcher));
 
     let (thread_liveness_sender, thread_liveness_receiver) = crossbeam_channel::unbounded();
     thread::spawn(move || {
@@ -95,7 +111,7 @@ impl InvalidationWatcher {
               })
               .flatten()
               .collect();
-            info!("notify invalidating {:?} because of {:?}", paths, ev.kind);
+            debug!("notify invalidating {:?} because of {:?}", paths, ev.kind);
             InvalidationWatcher::invalidate(&graph, &paths, "notify");
           }
           Ok(Err(err)) => {
@@ -120,9 +136,10 @@ impl InvalidationWatcher {
     });
 
     Ok(InvalidationWatcher {
-      watcher,
+      watcher: wrapped_watcher,
       executor,
       liveness: thread_liveness_receiver,
+      current_platform,
     })
   }
 
@@ -130,20 +147,26 @@ impl InvalidationWatcher {
   /// Watch the given path non-recursively.
   ///
   pub async fn watch(&self, path: PathBuf) -> Result<(), notify::Error> {
-    // Using a futurized mutex here because for some reason using a regular mutex
-    // to block the io pool causes the v2 ui to not update which nodes its working
-    // on properly.
-    let watcher_lock = self.watcher.lock().compat().await;
-    match watcher_lock {
-      Ok(mut watcher_lock) => {
-        self
-          .executor
-          .spawn_blocking(move || watcher_lock.watch(path, RecursiveMode::NonRecursive))
-          .await
+    // Short circuit here if we are on a Darwin platform because we should be watching
+    // the entire build root recursively already.
+    if self.current_platform == Platform::Darwin {
+      Ok(())
+    } else {
+      // Using a futurized mutex here because for some reason using a regular mutex
+      // to block the io pool causes the v2 ui to not update which nodes its working
+      // on properly.
+      let watcher_lock = self.watcher.lock().compat().await;
+      match watcher_lock {
+        Ok(mut watcher_lock) => {
+          self
+            .executor
+            .spawn_blocking(move || watcher_lock.watch(path, RecursiveMode::NonRecursive))
+            .await
+        }
+        Err(()) => Err(notify::Error::new(notify::ErrorKind::Generic(
+          "Couldn't lock mutex for invalidation watcher".to_string(),
+        ))),
       }
-      Err(()) => Err(notify::Error::new(notify::ErrorKind::Generic(
-        "Couldn't lock mutex for invalidation watcher".to_string(),
-      ))),
     }
   }
 
