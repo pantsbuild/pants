@@ -4,7 +4,7 @@
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any, ClassVar, Dict, Iterable, List, Optional, Tuple, Type, TypeVar, Union, cast
+from typing import Any, ClassVar, Dict, Iterable, Optional, Tuple, Type, TypeVar, Union, cast
 
 from typing_extensions import final
 
