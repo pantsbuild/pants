@@ -4,7 +4,7 @@
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any, ClassVar, Dict, Iterable, List, Optional, Tuple, Type, TypeVar, Union, cast
+from typing import Any, ClassVar, Dict, Iterable, Optional, Tuple, Type, TypeVar, Union, cast
 
 from typing_extensions import final
 
@@ -29,13 +29,9 @@ from pants.util.meta import frozen_after_init
 ImmutableValue = Any
 
 
-# NB: We don't generate `__eq__` because dataclass would only look at the `alias` classvar, which
-# is always the same between every Field instance. Instead, subclasses like `PrimitiveField` should
-# define `__eq__`.
-@frozen_after_init
-@dataclass(eq=False)  # type: ignore[misc]   # https://github.com/python/mypy/issues/5374
 class Field(ABC):
     alias: ClassVar[str]
+    default: ClassVar[Any]
 
     # This is a little weird to have an abstract __init__(). We do this to ensure that all
     # subclasses have this exact type signature for their constructor.
@@ -50,7 +46,7 @@ class Field(ABC):
 
 
 @frozen_after_init
-@dataclass(unsafe_hash=True)  # type: ignore[misc]   # https://github.com/python/mypy/issues/5374
+@dataclass(unsafe_hash=True)
 class PrimitiveField(Field, metaclass=ABCMeta):
     """A Field that does not need the engine in order to be hydrated.
 
@@ -58,27 +54,35 @@ class PrimitiveField(Field, metaclass=ABCMeta):
     `StringField`, or `StringSequenceField`. These subclasses will provide sane type hints and
     hydration/validation automatically.
 
-    Subclasses of PrimitiveField must implement `hydrate()` to convert the `raw_value` into
-    `self.value`. This hydration and/or validation happens eagerly in the constructor. If the
+    If you are directly subclassing `PrimitiveField`, you should likely override `compute_value()`
+    to perform any custom hydration and/or validation, such as converting unhashable types to
+    hashable types or checking for banned values. The returned value must be hashable
+    (and should be immutable) so that this Field may be used by the V2 engine. This means, for
+    example, using tuples rather than lists and using `FrozenOrderedSet` rather than `set`.
+
+    All hydration and/or validation happens eagerly in the constructor. If the
     hydration is particularly expensive, use `AsyncField` instead to get the benefits of the
     engine's caching.
-
-    The hydrated `value` must be immutable and hashable so that this Field may be used by the
-    V2 engine. This means, for example, using tuples rather than lists and using
-    `FrozenOrderedSet` rather than `set`.
 
     Subclasses should also override the type hints for `value` to be more precise than `Any`.
 
     Example:
 
-        class ZipSafe(PrimitiveField):
-            alias: ClassVar = "zip_safe"
-            value: bool
+        # NB: Really, this should subclass IntField. We only use PrimitiveField as an example.
+        class Timeout(PrimitiveField):
+            alias = "timeout"
+            value: Optional[int]
+            default = None
 
-            def hydrate(self, raw_value: Optional[bool], *, address: Address) -> bool:
-                if raw_value is None:
-                    return True
-                return raw_value
+            @classmethod
+            def compute_value(cls, raw_value: Optional[int], *, address: Address) -> Optional[int:
+                value_or_default = super().compute_value(raw_value, address=address)
+                if value_or_default is not None and not isinstance(value_or_default, int):
+                    raise ValueError(
+                        "The `timeout` field expects an integer, but was given"
+                        f"{value_or_default} for target {address}."
+                    )
+                return value_or_default
     """
 
     value: ImmutableValue
@@ -90,21 +94,26 @@ class PrimitiveField(Field, metaclass=ABCMeta):
         #   this Field could not be passed around in the engine.
         # * Don't store `address` to avoid the cost in memory of storing `Address` on every single
         #   field encountered by Pants in a run.
-        self.value = self.hydrate(raw_value, address=address)
+        self.value = self.compute_value(raw_value, address=address)
 
-    @abstractmethod
-    def hydrate(self, raw_value: Optional[Any], *, address: Address) -> ImmutableValue:
+    @classmethod
+    def compute_value(cls, raw_value: Optional[Any], *, address: Address) -> ImmutableValue:
         """Convert the `raw_value` into `self.value`.
 
-        You should perform any validation and/or hydration here. For example, you may want to check
-        that an integer is > 0, apply a default value if `raw_value` is None, or convert an
-        Iterable[str] to List[str].
+        You should perform any optional validation and/or hydration here. For example, you may want
+        to check that an integer is > 0 or convert an Iterable[str] to List[str].
 
-        The resulting value should be immutable and hashable.
+        The resulting value must be hashable (and should be immutable).
         """
+        if raw_value is None:
+            return cls.default
+        return raw_value
 
     def __repr__(self) -> str:
-        return f"{self.__class__}(alias={repr(self.alias)}, value={self.value})"
+        return (
+            f"{self.__class__}(alias={repr(self.alias)}, value={repr(self.value)}, "
+            f"default={repr(self.default)})"
+        )
 
     def __str__(self) -> str:
         return f"{self.alias}={self.value}"
@@ -120,7 +129,7 @@ AsyncFieldRequest = Any
 class AsyncField(Field, metaclass=ABCMeta):
     """A field that needs the engine in order to be hydrated.
 
-    You must implement `sanitize_raw_value()` to convert the `raw_value` into a type that is
+    You should implement `sanitize_raw_value()` to convert the `raw_value` into a type that is
     immutable and hashable so that this Field may be used by the V2 engine. This means, for example,
     using tuples rather than lists and using `FrozenOrderedSet` rather than `set`.
 
@@ -189,10 +198,10 @@ class AsyncField(Field, metaclass=ABCMeta):
     @final
     def __init__(self, raw_value: Optional[Any], *, address: Address) -> None:
         self.address = address
-        self.sanitized_raw_value = self.sanitize_raw_value(raw_value)
+        self.sanitized_raw_value = self.sanitize_raw_value(raw_value, address=address)
 
-    @abstractmethod
-    def sanitize_raw_value(self, raw_value: Optional[Any]) -> ImmutableValue:
+    @classmethod
+    def sanitize_raw_value(cls, raw_value: Optional[Any], *, address: Address) -> ImmutableValue:
         """Sanitize the `raw_value` into a type that is safe for the V2 engine to use.
 
         The resulting type should be immutable and hashable.
@@ -200,9 +209,15 @@ class AsyncField(Field, metaclass=ABCMeta):
         You may also do light-weight validation in this method, such as ensuring that all
         elements of a list are strings.
         """
+        if raw_value is None:
+            return cls.default
+        return raw_value
 
     def __repr__(self) -> str:
-        return f"{self.__class__}(alias={repr(self.alias)}, sanitized_raw_value={self.sanitized_raw_value})"
+        return (
+            f"{self.__class__}(alias={repr(self.alias)}, "
+            f"sanitized_raw_value={repr(self.sanitized_raw_value)}, default={repr(self.default)})"
+        )
 
     def __str__(self) -> str:
         return f"{self.alias}={self.sanitized_raw_value}"
@@ -427,6 +442,16 @@ class Target(ABC):
 
     @final
     @classmethod
+    def class_field_types(cls, union_membership: UnionMembership) -> Tuple[Type[Field], ...]:
+        """Return all registered Fields belonging to this target type.
+
+        You can also use the instance property `tgt.field_types` to avoid having to pass the
+        parameter UnionMembership.
+        """
+        return (*cls.core_fields, *cls._find_plugin_fields(union_membership))
+
+    @final
+    @classmethod
     def class_has_field(cls, field: Type[Field], *, union_membership: UnionMembership) -> bool:
         """Behaves like `Target.has_field()`, but works as a classmethod rather than an instance
         method."""
@@ -440,7 +465,7 @@ class Target(ABC):
         """Behaves like `Target.has_fields()`, but works as a classmethod rather than an instance
         method."""
         return cls._has_fields(
-            fields, registered_fields=(*cls.core_fields, *cls._find_plugin_fields(union_membership))
+            fields, registered_fields=cls.class_field_types(union_membership=union_membership)
         )
 
 
@@ -537,6 +562,10 @@ class InvalidFieldTypeException(InvalidFieldException):
         )
 
 
+# TODO: This probably shouldn't exist by the time that we ask plugin authors to write V2 bindings.
+# We should have pre-made fields for every type of field we may encounter and have good
+# documentation for how to create custom fields in case we missed an edge case.
+# This requires us figuring out how to handle objects with the Target Adaptor.
 class UnimplementedField(PrimitiveField, metaclass=ABCMeta):
     """Simply use whatever value the user passed in the BUILD file.
 
@@ -545,87 +574,86 @@ class UnimplementedField(PrimitiveField, metaclass=ABCMeta):
     """
 
     value: Optional[Any]
-
-    # TODO: maybe implement __hash__ on this so that this can always be used with the engine? For
-    # example, `return hash(repr(raw_value))`?
-    #
-    # Whether we keep this Field or not really depends on how we approach backward-compatibility
-    # with V1. Are we indeed going to remove TargetAdaptor and use this API, which requires an
-    # explicit definition for each Field? How would this interact with custom target types? If we
-    # keep TargetAdaptor around for the sake of V1, then we should remove this Field.
-    def hydrate(self, raw_value: Optional[Any], *, address: Address) -> ImmutableValue:
-        return raw_value
+    default = None
 
 
 class BoolField(PrimitiveField, metaclass=ABCMeta):
     value: bool
     default: ClassVar[bool]
 
-    def hydrate(self, raw_value: Optional[bool], *, address: Address) -> bool:
-        if raw_value is None:
-            return self.default
-        if not isinstance(raw_value, bool):
+    @classmethod
+    def compute_value(cls, raw_value: Optional[bool], *, address: Address) -> bool:
+        value_or_default = super().compute_value(raw_value, address=address)
+        if not isinstance(value_or_default, bool):
             raise InvalidFieldTypeException(
-                address, self.alias, raw_value, expected_type="a boolean",
+                address, cls.alias, raw_value, expected_type="a boolean",
             )
-        return raw_value
+        return value_or_default
 
 
 class IntField(PrimitiveField, metaclass=ABCMeta):
     value: Optional[int]
+    default = None
 
-    def hydrate(self, raw_value: Optional[int], *, address: Address) -> Optional[int]:
-        if raw_value and not isinstance(raw_value, int):
+    @classmethod
+    def compute_value(cls, raw_value: Optional[int], *, address: Address) -> Optional[int]:
+        value_or_default = super().compute_value(raw_value, address=address)
+        if value_or_default is not None and not isinstance(value_or_default, int):
             raise InvalidFieldTypeException(
-                address, self.alias, raw_value, expected_type="an integer",
+                address, cls.alias, raw_value, expected_type="an integer",
             )
-        return raw_value
+        return value_or_default
 
 
 class FloatField(PrimitiveField, metaclass=ABCMeta):
     value: Optional[float]
+    default = None
 
-    def hydrate(self, raw_value: Optional[int], *, address: Address) -> Optional[float]:
-        # TODO: consider if we want to also accept `int` and proactively convert it to `float`.
-        #  This is probably more user-friendly, but there are also benefits to forcing a user to
-        #  use `0.0` instead of `0` because it makes them realize that this field does care about
-        #  the extra precision.
-        if raw_value and not isinstance(raw_value, float):
+    @classmethod
+    def compute_value(cls, raw_value: Optional[int], *, address: Address) -> Optional[float]:
+        value_or_default = super().compute_value(raw_value, address=address)
+        if value_or_default is not None and not isinstance(value_or_default, float):
             raise InvalidFieldTypeException(
-                address, self.alias, raw_value, expected_type="a float",
+                address, cls.alias, value_or_default, expected_type="a float",
             )
-        return raw_value
+        return value_or_default
 
 
 class StringField(PrimitiveField, metaclass=ABCMeta):
     value: Optional[str]
+    default = None
 
-    def hydrate(self, raw_value: Optional[str], *, address: Address) -> Optional[str]:
-        if raw_value and not isinstance(raw_value, str):
+    @classmethod
+    def compute_value(cls, raw_value: Optional[str], *, address: Address) -> Optional[str]:
+        value_or_default = super().compute_value(raw_value, address=address)
+        if value_or_default is not None and not isinstance(value_or_default, str):
             raise InvalidFieldTypeException(
-                address, self.alias, raw_value, expected_type="a string",
+                address, cls.alias, value_or_default, expected_type="a string",
             )
-        return raw_value
+        return value_or_default
 
 
 class StringSequenceField(PrimitiveField, metaclass=ABCMeta):
     value: Optional[Tuple[str, ...]]
+    default = None
 
-    def hydrate(
-        self, raw_value: Optional[Iterable[str]], *, address: Address
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Iterable[str]], *, address: Address
     ) -> Optional[Tuple[str, ...]]:
-        if raw_value is None:
+        value_or_default = super().compute_value(raw_value, address=address)
+        if value_or_default is None:
             return None
         try:
-            ensure_str_list(raw_value)
+            ensure_str_list(value_or_default)
         except ValueError:
             raise InvalidFieldTypeException(
                 address,
-                self.alias,
-                raw_value,
+                cls.alias,
+                value_or_default,
                 expected_type="an iterable of strings (e.g. a list of strings)",
             )
-        return tuple(sorted(raw_value))
+        return tuple(sorted(value_or_default))
 
 
 class StringOrStringSequenceField(PrimitiveField, metaclass=ABCMeta):
@@ -638,19 +666,22 @@ class StringOrStringSequenceField(PrimitiveField, metaclass=ABCMeta):
     """
 
     value: Optional[Tuple[str, ...]]
+    default = None
 
-    def hydrate(
-        self, raw_value: Optional[Union[str, Iterable[str]]], *, address: Address
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Union[str, Iterable[str]]], *, address: Address
     ) -> Optional[Tuple[str, ...]]:
-        if raw_value is None:
+        value_or_default = super().compute_value(raw_value, address=address)
+        if value_or_default is None:
             return None
         try:
-            str_list = ensure_str_list(raw_value)
+            str_list = ensure_str_list(value_or_default)
         except ValueError:
             raise InvalidFieldTypeException(
                 address,
-                self.alias,
-                raw_value,
+                cls.alias,
+                value_or_default,
                 expected_type=(
                     "either a single string or an iterable of strings (e.g. a list of strings)"
                 ),
@@ -669,13 +700,20 @@ class Tags(StringSequenceField):
 class Dependencies(AsyncField):
     alias = "dependencies"
     sanitized_raw_value: Optional[Tuple[Address, ...]]
+    default = None
 
+    # NB: The type hint for `raw_value` is sort of a lie. While we do expect end-users to use
+    # Iterable[str], the Struct and Addressable code will have already converted those strings
+    # into a List[Address]. But, that's an implementation detail and we don't want our
+    # documentation, which is autogenerated from these type hints, to leak that.
+    @classmethod
     def sanitize_raw_value(
-        self, raw_value: Optional[List[Address]]
+        cls, raw_value: Optional[Iterable[str]], *, address: Address
     ) -> Optional[Tuple[Address, ...]]:
-        if raw_value is None:
+        value_or_default = super().sanitize_raw_value(raw_value, address=address)
+        if value_or_default is None:
             return None
-        return tuple(raw_value)
+        return tuple(value_or_default)
 
     def request(self) -> Any:
         raise NotImplementedError("Hydration of the Dependencies field is not yet implemented.")
@@ -686,22 +724,26 @@ COMMON_TARGET_FIELDS = (Dependencies, Tags)
 
 class Sources(AsyncField):
     alias = "sources"
-    default_globs: ClassVar[Optional[Tuple[str, ...]]] = None
     sanitized_raw_value: Optional[Tuple[str, ...]]
+    default: ClassVar[Optional[Tuple[str, ...]]] = None
 
-    def sanitize_raw_value(self, raw_value: Optional[Iterable[str]]) -> Optional[Tuple[str, ...]]:
-        if raw_value is None:
+    @classmethod
+    def sanitize_raw_value(
+        cls, raw_value: Optional[Iterable[str]], *, address: Address
+    ) -> Optional[Tuple[str, ...]]:
+        value_or_default = super().sanitize_raw_value(raw_value, address=address)
+        if value_or_default is None:
             return None
         try:
-            ensure_str_list(raw_value)
+            ensure_str_list(value_or_default)
         except ValueError:
             raise InvalidFieldTypeException(
-                self.address,
-                self.alias,
-                raw_value,
+                address,
+                cls.alias,
+                value_or_default,
                 expected_type="an iterable of strings (e.g. a list of strings)",
             )
-        return tuple(sorted(raw_value))
+        return tuple(sorted(value_or_default))
 
     def validate_snapshot(self, _: Snapshot) -> None:
         """Perform any validation on the resulting snapshot, e.g. ensuring that all files end in
@@ -739,9 +781,9 @@ async def hydrate_sources(
         globs = ensure_str_list(sources_field.sanitized_raw_value)
         conjunction = GlobExpansionConjunction.all_match
     else:
-        if sources_field.default_globs is None:
+        if sources_field.default is None:
             return HydratedSources(EMPTY_SNAPSHOT)
-        globs = sources_field.default_globs
+        globs = sources_field.default
         conjunction = GlobExpansionConjunction.any_match
 
     snapshot = await Get[Snapshot](

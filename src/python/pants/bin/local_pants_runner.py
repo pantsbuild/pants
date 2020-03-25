@@ -5,7 +5,7 @@ import logging
 import os
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import List, Mapping, Optional, Tuple
+from typing import Mapping, Optional, Tuple
 
 from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
@@ -17,7 +17,6 @@ from pants.bin.goal_runner import GoalRunner
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.native import Native
 from pants.engine.rules import UnionMembership
-from pants.engine.scheduler import SchedulerSession
 from pants.goal.run_tracker import RunTracker
 from pants.help.help_printer import HelpPrinter
 from pants.init.engine_initializer import EngineInitializer, LegacyGraphSession
@@ -117,80 +116,66 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     build_config: BuildConfiguration
     specs: Specs
     graph_session: LegacyGraphSession
-    scheduler_session: SchedulerSession
     union_membership: UnionMembership
     is_daemon: bool
     profile_path: Optional[str]
-    _run_start_time: Optional[float] = None
     _run_tracker: Optional[RunTracker] = None
     _reporting: Optional[Reporting] = None
     _repro: Optional[Repro] = None
 
     @staticmethod
     def parse_options(
-        args: List[str],
-        env: Mapping[str, str],
-        options_bootstrapper: Optional[OptionsBootstrapper] = None,
-    ) -> Tuple[Options, BuildConfiguration, OptionsBootstrapper]:
-        options_bootstrapper = options_bootstrapper or OptionsBootstrapper.create(
-            args=args, env=env
-        )
+        options_bootstrapper: OptionsBootstrapper,
+    ) -> Tuple[Options, BuildConfiguration]:
         build_config = BuildConfigInitializer.get(options_bootstrapper)
         options = OptionsInitializer.create(options_bootstrapper, build_config)
-        return options, build_config, options_bootstrapper
+        return options, build_config
 
     @staticmethod
-    def _maybe_init_graph_session(
-        graph_session: Optional[LegacyGraphSession],
+    def _init_graph_session(
         options_bootstrapper: OptionsBootstrapper,
         build_config: BuildConfiguration,
         options: Options,
-    ) -> Tuple[LegacyGraphSession, SchedulerSession]:
-        if not graph_session:
-            native = Native()
-            native.set_panic_handler()
-            graph_scheduler_helper = EngineInitializer.setup_legacy_graph(
-                native, options_bootstrapper, build_config
-            )
+    ) -> LegacyGraphSession:
+        native = Native()
+        native.set_panic_handler()
+        graph_scheduler_helper = EngineInitializer.setup_legacy_graph(
+            native, options_bootstrapper, build_config
+        )
 
-            v2_ui = options.for_global_scope().get("v2_ui", False)
-            zipkin_trace_v2 = options.for_scope("reporting").zipkin_trace_v2
-            # TODO(#8658) This should_report_workunits flag must be set to True for
-            # StreamingWorkunitHandler to receive WorkUnits. It should eventually
-            # be merged with the zipkin_trace_v2 flag, since they both involve most
-            # of the same engine functionality, but for now is separate to avoid
-            # breaking functionality associated with zipkin tracing while iterating on streaming workunit reporting.
-            stream_workunits = len(options.for_global_scope().streaming_workunits_handlers) != 0
-            graph_session = graph_scheduler_helper.new_session(
-                zipkin_trace_v2,
-                RunTracker.global_instance().run_id,
-                v2_ui,
-                should_report_workunits=stream_workunits,
-            )
-        return graph_session, graph_session.scheduler_session
+        v2_ui = options.for_global_scope().get("v2_ui", False)
+        zipkin_trace_v2 = options.for_scope("reporting").zipkin_trace_v2
+        # TODO(#8658) This should_report_workunits flag must be set to True for
+        # StreamingWorkunitHandler to receive WorkUnits. It should eventually
+        # be merged with the zipkin_trace_v2 flag, since they both involve most
+        # of the same engine functionality, but for now is separate to avoid
+        # breaking functionality associated with zipkin tracing while iterating on streaming workunit reporting.
+        stream_workunits = len(options.for_global_scope().streaming_workunits_handlers) != 0
+        return graph_scheduler_helper.new_session(
+            zipkin_trace_v2,
+            RunTracker.global_instance().run_id,
+            v2_ui,
+            should_report_workunits=stream_workunits,
+        )
 
     @classmethod
     def create(
         cls,
-        args: List[str],
         env: Mapping[str, str],
+        options_bootstrapper: OptionsBootstrapper,
         specs: Optional[Specs] = None,
         daemon_graph_session: Optional[LegacyGraphSession] = None,
-        options_bootstrapper: Optional[OptionsBootstrapper] = None,
     ) -> "LocalPantsRunner":
         """Creates a new LocalPantsRunner instance by parsing options.
 
-        :param args: The arguments (e.g. sys.argv) for this run.
         :param env: The environment (e.g. os.environ) for this run.
+        :param options_bootstrapper: The OptionsBootstrapper instance to reuse.
         :param specs: The specs for this run, i.e. either the address or filesystem specs.
         :param daemon_graph_session: The graph helper for this session.
-        :param options_bootstrapper: The OptionsBootstrapper instance to reuse.
         """
         build_root = get_buildroot()
 
-        options, build_config, options_bootstrapper = cls.parse_options(
-            args, env, options_bootstrapper=options_bootstrapper,
-        )
+        options, build_config = LocalPantsRunner.parse_options(options_bootstrapper)
         global_options = options.for_global_scope()
         # This works as expected due to the encapsulated_logger in DaemonPantsRunner and
         # we don't have to gate logging setup anymore.
@@ -203,14 +188,16 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
 
         # Verify configs.
         if global_options.verify_config:
-            options_bootstrapper.verify_configs_against_options(options)
+            options.verify_configs(options_bootstrapper.config)
 
         union_membership = UnionMembership(build_config.union_rules())
 
         # If we're running with the daemon, we'll be handed a session from the
         # resident graph helper - otherwise initialize a new one here.
-        graph_session, scheduler_session = cls._maybe_init_graph_session(
-            daemon_graph_session, options_bootstrapper, build_config, options
+        graph_session = (
+            daemon_graph_session
+            if daemon_graph_session
+            else cls._init_graph_session(options_bootstrapper, build_config, options)
         )
 
         if specs is None:
@@ -232,13 +219,12 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
             build_config=build_config,
             specs=specs,
             graph_session=graph_session,
-            scheduler_session=scheduler_session,
             union_membership=union_membership,
             is_daemon=daemon_graph_session is not None,
             profile_path=profile_path,
         )
 
-    def set_start_time(self, start_time: float) -> None:
+    def set_start_time(self, start_time: Optional[float]) -> None:
         # Launch RunTracker as early as possible (before .run() is called).
         self._run_tracker = RunTracker.global_instance()
 
@@ -246,9 +232,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         os.environ["PANTS_PARENT_BUILD_ID"] = self._run_tracker.run_id
 
         self._reporting = Reporting.global_instance()
-
-        self._run_start_time = start_time
-        self._reporting.initialize(self._run_tracker, self.options, start_time=self._run_start_time)
+        self._reporting.initialize(self._run_tracker, self.options, start_time=start_time)
 
         spec_parser = CmdLineSpecParser(get_buildroot())
         specs = [spec_parser.parse_spec(spec).to_spec_string() for spec in self.options.specs]
@@ -259,13 +243,6 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         self._repro = Reproducer.global_instance().create_repro()
         if self._repro:
             self._repro.capture(self._run_tracker.run_info.get_as_dict())
-
-    def _maybe_handle_help(self):
-        """Handle requests for `help` information."""
-        if self.options.help_request:
-            help_printer = HelpPrinter(options=self.options, union_membership=self.union_membership)
-            result = help_printer.print_help()
-            return result
 
     def _maybe_run_v1(self, v1: bool) -> int:
         v1_goals, ambiguous_goals, _ = self.options.goals_by_version
@@ -330,9 +307,10 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         return max_code
 
     def _update_stats(self):
-        metrics = self.scheduler_session.metrics()
+        scheduler_session = self.graph_session.scheduler_session
+        metrics = scheduler_session.metrics()
         self._run_tracker.pantsd_stats.set_scheduler_metrics(metrics)
-        engine_workunits = self.scheduler_session.engine_workunits(metrics)
+        engine_workunits = scheduler_session.engine_workunits(metrics)
         if engine_workunits:
             self._run_tracker.report.bulk_record_workunits(engine_workunits)
 
@@ -347,11 +325,16 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
             report_interval = global_options.streaming_workunits_report_interval
             callbacks = Subsystem.get_streaming_workunit_callbacks(streaming_handlers)
             streaming_reporter = StreamingWorkunitHandler(
-                self.scheduler_session, callbacks=callbacks, report_interval_seconds=report_interval
+                self.graph_session.scheduler_session,
+                callbacks=callbacks,
+                report_interval_seconds=report_interval,
             )
 
-            help_output = self._maybe_handle_help()
-            if help_output is not None:
+            if self.options.help_request:
+                help_printer = HelpPrinter(
+                    options=self.options, union_membership=self.union_membership
+                )
+                help_output = help_printer.print_help()
                 self._exiter.exit(help_output)
 
             v1 = global_options.v1

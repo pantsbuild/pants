@@ -1,12 +1,12 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import os
 import sys
 import termios
 import time
 from contextlib import contextmanager
-from typing import Callable, Iterator, Optional
+from dataclasses import dataclass
+from typing import Callable, Iterator, List, Mapping, Optional
 
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode, Exiter
@@ -20,6 +20,8 @@ from pants.java.nailgun_io import (
     PipedNailgunStreamWriter,
 )
 from pants.java.nailgun_protocol import ChunkType, MaybeShutdownSocket, NailgunProtocol
+from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.pantsd.service.scheduler_service import SchedulerService
 from pants.util.contextutil import hermetic_environment_as, stdio_as
 from pants.util.socket import teardown_socket
 
@@ -117,35 +119,32 @@ class _PantsRunFinishedWithFailureException(Exception):
         return self._exit_code
 
 
+@dataclass(frozen=True)
 class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     """A daemonizing PantsRunner that speaks the nailgun protocol to a remote client.
 
     N.B. this class is primarily used by the PailgunService in pantsd.
+
+    maybe_shutdown_socket: A connected socket capable of speaking the nailgun protocol.
+    args: The arguments (i.e. sys.argv) for this run.
+    env: The environment (i.e. os.environ) for this run.
+    services: The PantsServices that are currently running.
+    scheduler_service: The SchedulerService that holds the warm graph.
     """
 
+    maybe_shutdown_socket: MaybeShutdownSocket
+    args: List[str]
+    env: Mapping[str, str]
+    scheduler_service: SchedulerService
+
     @classmethod
-    def create(cls, sock, args, env, services, scheduler_service):
+    def create(cls, sock, args, env, scheduler_service):
         return cls(
             maybe_shutdown_socket=MaybeShutdownSocket(sock),
             args=args,
             env=env,
-            services=services,
             scheduler_service=scheduler_service,
         )
-
-    def __init__(self, maybe_shutdown_socket, args, env, services, scheduler_service):
-        """
-        :param MaybeShutdownSocket maybe_shutdown_socket: A connected socket capable of speaking the nailgun protocol.
-        :param list args: The arguments (i.e. sys.argv) for this run.
-        :param dict env: The environment (i.e. os.environ) for this run.
-        :param PantsServices services: The PantsServices that are currently running.
-        :param SchedulerService scheduler_service: The SchedulerService that holds the warm graph.
-        """
-        self._maybe_shutdown_socket = maybe_shutdown_socket
-        self._args = args
-        self._env = env
-        self._services = services
-        self._scheduler_service = scheduler_service
 
     @classmethod
     @contextmanager
@@ -233,27 +232,17 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
             ) as finalizer:
                 yield finalizer
 
-    def _maybe_get_client_start_time_from_env(self, env):
-        client_start_time = env.pop("PANTSD_RUNTRACKER_CLIENT_START_TIME", None)
-        return None if client_start_time is None else float(client_start_time)
-
     def run(self):
         # Ensure anything referencing sys.argv inherits the Pailgun'd args.
-        sys.argv = self._args
-
-        # Broadcast our process group ID (in PID form - i.e. negated) to the remote client so
-        # they can send signals (e.g. SIGINT) to all processes in the runners process group.
-        with self._maybe_shutdown_socket.lock:
-            NailgunProtocol.send_pid(self._maybe_shutdown_socket.socket, os.getpid())
-            NailgunProtocol.send_pgrp(self._maybe_shutdown_socket.socket, os.getpgrp() * -1)
+        sys.argv = self.args
 
         # Invoke a Pants run with stdio redirected and a proxied environment.
         with self.nailgunned_stdio(
-            self._maybe_shutdown_socket, self._env
+            self.maybe_shutdown_socket, self.env
         ) as finalizer, DaemonExiter.override_global_exiter(
-            self._maybe_shutdown_socket, finalizer
+            self.maybe_shutdown_socket, finalizer
         ), hermetic_environment_as(
-            **self._env
+            **self.env
         ), encapsulated_global_logger():
 
             exit_code = PANTS_SUCCEEDED_EXIT_CODE
@@ -261,12 +250,11 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
                 # Clean global state.
                 clean_global_runtime_state(reset_subsystem=True)
 
-                options, _, options_bootstrapper = LocalPantsRunner.parse_options(
-                    self._args, self._env
-                )
+                options_bootstrapper = OptionsBootstrapper.create(args=self.args, env=self.env)
+                options, _ = LocalPantsRunner.parse_options(options_bootstrapper)
 
                 global_options = options.for_global_scope()
-                session = self._scheduler_service.prepare_graph(options)
+                session = self.scheduler_service.prepare_graph(options)
 
                 specs = SpecsCalculator.create(
                     options=options,
@@ -275,14 +263,15 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
                     tags=tuple(global_options.tag) if global_options.tag else (),
                 )
 
-                exit_code = self._scheduler_service.graph_run_v2(
+                exit_code = self.scheduler_service.graph_run_v2(
                     session, specs, options, options_bootstrapper
                 )
                 with ExceptionSink.exiter_as_until_exception(lambda _: PantsRunFailCheckerExiter()):
-                    runner = LocalPantsRunner.create(
-                        self._args, self._env, specs, session, options_bootstrapper,
-                    )
-                    runner.set_start_time(self._maybe_get_client_start_time_from_env(self._env))
+                    runner = LocalPantsRunner.create(self.env, options_bootstrapper, specs, session)
+
+                    env_start_time = self.env.pop("PANTSD_RUNTRACKER_CLIENT_START_TIME", None)
+                    start_time = float(env_start_time) if env_start_time else None
+                    runner.set_start_time(start_time)
                     runner.run()
 
             except KeyboardInterrupt:

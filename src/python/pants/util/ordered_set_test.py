@@ -81,6 +81,14 @@ def test_frozen_is_hashable() -> None:
 
 
 @pytest.mark.parametrize("cls", [OrderedSet, FrozenOrderedSet])
+def test_rejects_unhashable_elements(cls: OrderedSetCls) -> None:
+    # This is a useful by-product of using a dict internally to store the data, as all keys for a
+    # dict must be hashable.
+    with pytest.raises(TypeError):
+        cls([["a", "b"], ["c"]])
+
+
+@pytest.mark.parametrize("cls", [OrderedSet, FrozenOrderedSet])
 def test_binary_operations(cls: OrderedSetCls) -> None:
     set1 = cls("abracadabra")
     set2 = cls("simsalabim")

@@ -99,7 +99,7 @@ class TestArtifactCache(TestBase):
         with self.setup_local_cache(seperate_extraction_root=True) as artifact_cache:
             self.do_test_artifact_cache(artifact_cache)
 
-    @pytest.mark.flaky(retries=1)  # https://github.com/pantsbuild/pants/issues/6838
+    @pytest.mark.skip(reason="flaky: https://github.com/pantsbuild/pants/issues/6838")
     def test_restful_cache(self):
         with self.assertRaises(InvalidRESTfulCacheProtoError):
             RESTfulArtifactCache("foo", BestUrlSelector(["ftp://localhost/bar"]), "foo")
@@ -107,7 +107,7 @@ class TestArtifactCache(TestBase):
         with self.setup_rest_cache() as artifact_cache:
             self.do_test_artifact_cache(artifact_cache)
 
-    @pytest.mark.flaky(retries=1)  # https://github.com/pantsbuild/pants/issues/6838
+    @pytest.mark.skip(reason="flaky: https://github.com/pantsbuild/pants/issues/6838")
     def test_restful_cache_failover(self):
         bad_url = "http://badhost:123"
 
@@ -239,7 +239,7 @@ class TestArtifactCache(TestBase):
                         self.assertTrue(os.path.exists(results_dir))
                         self.assertTrue(len(os.listdir(results_dir)) == 0)
 
-    @pytest.mark.flaky(retries=1)  # https://github.com/pantsbuild/pants/issues/6838
+    @pytest.mark.skip(reason="flaky: https://github.com/pantsbuild/pants/issues/6838")
     def test_multiproc(self):
         key = CacheKey("muppet_key", "fake_hash")
 
@@ -265,7 +265,7 @@ class TestArtifactCache(TestBase):
                 call_insert((cache, key, [path], False))
                 self.assertFalse(call_use_cached_files((cache, key, None)))
 
-    @pytest.mark.flaky(retries=1)  # https://github.com/pantsbuild/pants/issues/6838
+    @pytest.mark.skip(reason="flaky: https://github.com/pantsbuild/pants/issues/6838")
     def test_noops_after_max_retries_exceeded(self):
         key = CacheKey("muppet_key", "fake_hash")
 

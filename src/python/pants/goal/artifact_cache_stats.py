@@ -54,7 +54,7 @@ class ArtifactCacheStats:
             target_address = tgt.address.reference()
             if isinstance(cause, UnreadableArtifact):
                 return (target_address, str(cause.err))
-            elif cause == False:
+            elif cause is False:
                 return (target_address, "uncached")
             else:
                 return (target_address, "")

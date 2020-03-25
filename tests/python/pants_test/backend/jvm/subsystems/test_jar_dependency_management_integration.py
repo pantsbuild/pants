@@ -5,6 +5,8 @@ import os
 from collections import namedtuple
 from contextlib import contextmanager
 
+import pytest
+
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import temporary_dir
 
@@ -198,6 +200,7 @@ class JarDependencyManagementIntegrationTest(PantsRunIntegrationTest):
         self.assert_failure(run)
         self.assertIn("Undefined revs for jars unsupported by Coursier", run.stdout_data)
 
+    @pytest.mark.skip(reason="flaky: https://github.com/pantsbuild/pants/issues/9313")
     def test_unit_tests_with_different_sets_one_batch(self):
         run = self.run_pants(
             [

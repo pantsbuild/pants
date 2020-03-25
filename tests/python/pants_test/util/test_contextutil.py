@@ -131,7 +131,7 @@ class ContextutilTest(unittest.TestCase):
                 os.path.exists(fp.name), "Temporary file should exist within the context."
             )
         self.assertTrue(
-            os.path.exists(fp.name) == False,
+            os.path.exists(fp.name) is False,
             "Temporary file should not exist outside of the context.",
         )
 
