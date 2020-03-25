@@ -2,15 +2,63 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from abc import ABC, abstractmethod
-from typing import Optional, Type
+from textwrap import dedent
+from typing import Any, Optional, Type, Union
 
 
-# TODO: maybe find a better place for this helper. It probably belongs in `help`, but then we would
-#  have a dependency cycle.
-def get_first_line_of_docstring(cls: Type) -> Optional[str]:
+def get_docstring_summary(cls: Type) -> Optional[str]:
+    """Get the summary line(s) of docstring for a class.
+
+    If the summary is one more than one line, this will flatten them into a single line.
+    """
+    # This will fix indentation and strip unnecessary whitespace.
+    all_docstring = get_docstring(cls)
+
+    if all_docstring is None:
+        return None
+
+    lines = all_docstring.splitlines()
+    first_blank_line_index = next(
+        (i for i, line in enumerate(lines) if line.strip() == ""), len(lines)
+    )
+    return " ".join(lines[:first_blank_line_index])
+
+
+# TODO: consider teaching this to strip parameter docstring, e.g. `:param foo` and even
+#  `:API public`.
+def get_docstring(cls: Type, *, flatten: bool = False) -> Optional[str]:
+    """Get the docstring for a class with properly handled indentation.
+
+    Optionally, flatten the docstring into a single line.
+    """
     if cls.__doc__ is None:
         return None
-    return cls.__doc__.partition("\n")[0].strip()
+
+    docstring = cls.__doc__.strip()
+    newline_index = docstring.find("\n")
+    if newline_index == -1:
+        return docstring
+
+    # Fix indentation of lines after the first line.
+    lines = [docstring[:newline_index], *dedent(docstring[newline_index + 1 :]).splitlines()]
+
+    if flatten:
+        return " ".join(line.strip() for line in lines if line).strip()
+    return "\n".join(lines)
+
+
+def pretty_print_type_hint(hint: Any) -> str:
+    if getattr(hint, "__origin__", None) == Union:
+        union_members = hint.__args__
+        hint_str = f" | ".join(pretty_print_type_hint(member) for member in union_members)
+    # NB: Checking for GenericMeta is only for Python 3.6 because some `typing` classes like
+    # `typing.Iterable` have its type, whereas Python 3.7+ removes it. Remove this check
+    # once we drop support for Python 3.6.
+    elif isinstance(hint, type) and not str(type(hint)) == "<class 'typing.GenericMeta'>":
+        hint_str = hint.__name__
+    else:
+        hint_str = str(hint)
+    return hint_str.replace("typing.", "").replace("NoneType", "None")
 
 
 # TODO: make this error into an attribute on the `TypeConstraint` class object!

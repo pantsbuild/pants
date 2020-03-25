@@ -11,7 +11,7 @@ from pants.engine.selectors import Get
 from pants.option.errors import OptionsError
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo
 from pants.util.meta import classproperty
-from pants.util.objects import get_first_line_of_docstring
+from pants.util.objects import get_docstring_summary
 
 
 async def _construct_optionable(optionable_factory):
@@ -129,7 +129,7 @@ class Optionable(OptionableFactory, metaclass=ABCMeta):
 
     @classmethod
     def get_description(cls) -> Optional[str]:
-        return get_first_line_of_docstring(cls)
+        return get_docstring_summary(cls)
 
     @classmethod
     def register_options(cls, register):
