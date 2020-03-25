@@ -1,6 +1,8 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import pytest
+
 from pants_test.backend.jvm.tasks.jvm_compile.rsc.rsc_compile_integration_base import (
     RscCompileIntegrationBase,
     ensure_compile_rsc_execution_strategy,
@@ -24,6 +26,7 @@ class RscCompileIntegration(RscCompileIntegrationBase):
         pants_run = self.do_command("run", "examples/src/scala/org/pantsbuild/example/hello/exe")
         self.assertIn("Hello, Resource World!", pants_run.stdout_data)
 
+    @pytest.mark.skip(reason="flaky: https://github.com/pantsbuild/pants/issues/8679")
     @ensure_compile_rsc_execution_strategy(RscCompileIntegrationBase.rsc_and_zinc)
     def test_java_with_transitive_exported_scala_dep(self):
         self.do_command(

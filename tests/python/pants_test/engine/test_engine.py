@@ -223,9 +223,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
         res = self.mk_scheduler().with_fork_context(fork_context_body)
         self.assertEquals(res, expected)
 
-    @unittest.skip(
-        "Inherently flaky as described in https://github.com/pantsbuild/pants/issues/6829"
-    )
+    @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/6829")
     def test_trace_multi(self):
         # Tests that when multiple distinct failures occur, they are each rendered.
 

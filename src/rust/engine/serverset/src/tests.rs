@@ -100,6 +100,7 @@ async fn reattempts_unhealthy() {
   expect_both(&s, 3).await
 }
 
+#[ignore] // flaky: https://github.com/pantsbuild/pants/issues/7836
 #[tokio::test]
 async fn backoff_when_unhealthy() {
   let s = Serverset::new(
