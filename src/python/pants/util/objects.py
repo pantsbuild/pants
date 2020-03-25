@@ -6,13 +6,13 @@ from textwrap import dedent
 from typing import Any, Optional, Type, Union
 
 
-def get_docstring_summary(cls: Type) -> Optional[str]:
+def get_docstring_summary(cls: Type, *, fallback_to_parents: bool = False) -> Optional[str]:
     """Get the summary line(s) of docstring for a class.
 
     If the summary is one more than one line, this will flatten them into a single line.
     """
     # This will fix indentation and strip unnecessary whitespace.
-    all_docstring = get_docstring(cls)
+    all_docstring = get_docstring(cls, fallback_to_parents=fallback_to_parents)
 
     if all_docstring is None:
         return None
@@ -24,17 +24,31 @@ def get_docstring_summary(cls: Type) -> Optional[str]:
     return " ".join(lines[:first_blank_line_index])
 
 
-# TODO: consider teaching this to strip parameter docstring, e.g. `:param foo` and even
-#  `:API public`.
-def get_docstring(cls: Type, *, flatten: bool = False) -> Optional[str]:
+def get_docstring(
+    cls: Type, *, flatten: bool = False, fallback_to_parents: bool = False
+) -> Optional[str]:
     """Get the docstring for a class with properly handled indentation.
 
-    Optionally, flatten the docstring into a single line.
+    :param cls: the class, e.g. MyClass.
+    :param flatten: flatten the docstring into a single line by replacing all newlines with spaces
+        and stripping leading indentation.
+    :param fallback_to_parents: if the class does not have docstring defined, try to use docstring
+        from its superclasses, if any. This traverses in the MRO order, i.e. tries to use its
+        direct parent, then grandparent, and ultimately `object()`.
     """
-    if cls.__doc__ is None:
-        return None
+    if cls.__doc__ is not None:
+        docstring = cls.__doc__.strip()
+    else:
+        if not fallback_to_parents:
+            return None
+        # Fallback to parents in MRO order. Every class is a subclass of `object`, so this will
+        # always be defined.
+        docstring = next(
+            parent_cls.__doc__.strip()
+            for parent_cls in cls.mro()[1:]
+            if parent_cls.__doc__ is not None
+        )
 
-    docstring = cls.__doc__.strip()
     newline_index = docstring.find("\n")
     if newline_index == -1:
         return docstring

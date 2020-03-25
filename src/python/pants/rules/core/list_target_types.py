@@ -52,11 +52,25 @@ def verbose_target_information(
     fields = target_type.class_field_types(union_membership=union_membership)
     longest_field_name = max(len(field.alias) for field in fields)
 
+    async_field_docstring = get_docstring(AsyncField, flatten=True)
+    primitive_field_docstring = get_docstring(PrimitiveField, flatten=True)
+
     # TODO: consider hard wrapping fields. It's confusing to read when fields soft wrap.
     def format_field(field: Type[Field]) -> str:
         field_alias_text = f"  {field.alias}"
         field_alias = console.cyan(f"{field_alias_text:<{longest_field_name + 2}}")
-        description = get_docstring(field, flatten=True) or ""
+        # NB: It is very common (and encouraged) to subclass Fields to give custom behavior, e.g.
+        # `PythonSources` subclassing `Sources`. Here, we set `fallback_to_parents=True` so that we
+        # can still generate meaningful documentation for all these custom fields without requiring
+        # the Field author to rewrite the docstring.
+        #
+        # However, if the original `Field` author did not define docstring, then this means we
+        # would typically fall back to the docstring for `AsyncField` and `PrimitiveField`, which
+        # is a grandparent for every field. This is a quirk of this heuristic and it's not
+        # intentional. So, we hackily filter out the docstring for both those abstract classes.
+        description = get_docstring(field, flatten=True, fallback_to_parents=True) or ""
+        if description in (async_field_docstring, primitive_field_docstring):
+            description = ""
         if issubclass(field, PrimitiveField):
             raw_value_type = get_type_hints(field.compute_value)["raw_value"]
         elif issubclass(field, AsyncField):

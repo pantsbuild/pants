@@ -7,7 +7,7 @@ from typing import Optional, cast
 from unittest.mock import Mock
 
 from pants.engine.rules import UnionMembership
-from pants.engine.target import BoolField, RegisteredTargetTypes, StringField, Target
+from pants.engine.target import BoolField, IntField, RegisteredTargetTypes, StringField, Target
 from pants.rules.core.list_target_types import list_target_types
 from pants.testutil.engine.util import MockConsole, run_rule
 from pants.util.ordered_set import OrderedSet
@@ -28,6 +28,17 @@ class FortranVersion(StringField):
     alias = "fortran_version"
 
 
+class GenericTimeout(IntField):
+    """The number of seconds to run before timing out."""
+
+    alias = "timeout"
+
+
+# Note no docstring, but GenericTimeout has it, so we should end up using that.
+class FortranTimeout(GenericTimeout):
+    pass
+
+
 class FortranLibrary(Target):
     """A library of Fortran code."""
 
@@ -43,7 +54,7 @@ class FortranTests(Target):
     """
 
     alias = "fortran_tests"
-    core_fields = (FortranVersion,)
+    core_fields = (FortranVersion, FortranTimeout)
 
 
 # Note no docstring.
@@ -106,6 +117,7 @@ def test_list_single() -> None:
         fortran_tests(
           custom_field     My custom field! Use this field to... (type: bool | None, default: True)
           fortran_version  (type: str | None, default: None)
+          timeout          The number of seconds to run before timing out. (type: int | None, default: None)
         )
         """
     )
