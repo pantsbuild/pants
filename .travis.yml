@@ -67,7 +67,6 @@ jobs:
     env:
     - CACHE_NAME=bootstrap.linux.py36
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PREPARE_DEPLOY=1
     language: python
     name: Build Linux native engine and pants.pex (Python 3.6)
     os: linux
@@ -82,7 +81,7 @@ jobs:
     - ./build-support/bin/deploy_ci_bootstrapped_pants_pex.py --maybe-get-native-engine-so
     - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
       travis_ci:latest sh -c "./build-support/bin/ci.py --bootstrap --bootstrap-try-to-skip-rust-compilation
-      --python-version 3.6 && ./build-support/bin/release.sh -f"
+      --python-version 3.6"
     - ./build-support/bin/deploy_ci_bootstrapped_pants_pex.py --deploy
     services:
     - docker
@@ -175,7 +174,6 @@ jobs:
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
     - CACHE_NAME=bootstrap.osx.py36
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
-    - PREPARE_DEPLOY=1
     language: generic
     name: Build OSX native engine and pants.pex (Python 3.6)
     os: osx
@@ -184,7 +182,6 @@ jobs:
     - ./build-support/bin/deploy_ci_bootstrapped_pants_pex.py --maybe-get-native-engine-so
     - ./build-support/bin/ci.py --bootstrap --bootstrap-try-to-skip-rust-compilation
       --python-version 3.6
-    - ./build-support/bin/release.sh -f
     - ./build-support/bin/deploy_ci_bootstrapped_pants_pex.py --deploy
     stage: Bootstrap Pants
   - after_failure:
@@ -264,7 +261,6 @@ jobs:
     env:
     - CACHE_NAME=bootstrap.linux.py36
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PREPARE_DEPLOY=1
     language: python
     name: Build Linux native engine and pants.pex (Python 3.6)
     os: linux
@@ -279,7 +275,7 @@ jobs:
     - ./build-support/bin/deploy_ci_bootstrapped_pants_pex.py --maybe-get-native-engine-so
     - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
       travis_ci:latest sh -c "./build-support/bin/ci.py --bootstrap --bootstrap-try-to-skip-rust-compilation
-      --python-version 3.6 && ./build-support/bin/release.sh -f"
+      --python-version 3.6"
     - ./build-support/bin/deploy_ci_bootstrapped_pants_pex.py --deploy
     services:
     - docker
@@ -316,7 +312,6 @@ jobs:
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
     - CACHE_NAME=bootstrap.osx.py36
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
-    - PREPARE_DEPLOY=1
     language: generic
     name: Build OSX native engine and pants.pex (Python 3.6)
     os: osx
@@ -325,7 +320,6 @@ jobs:
     - ./build-support/bin/deploy_ci_bootstrapped_pants_pex.py --maybe-get-native-engine-so
     - ./build-support/bin/ci.py --bootstrap --bootstrap-try-to-skip-rust-compilation
       --python-version 3.6
-    - ./build-support/bin/release.sh -f
     - ./build-support/bin/deploy_ci_bootstrapped_pants_pex.py --deploy
     stage: Bootstrap Pants (Cron)
   - addons:
@@ -2063,6 +2057,7 @@ jobs:
     dist: xenial
     env:
     - CACHE_NAME=rust_tests.linux
+    - PREPARE_DEPLOY=1
     if: commit_message !~ /\[ci skip-rust-tests\]/
     name: Rust tests - Linux
     os: linux
@@ -2072,6 +2067,7 @@ jobs:
     - '3.7'
     script:
     - ./build-support/bin/ci.py --rust-tests
+    - ./build-support/bin/release.sh -f
     stage: Test Pants
     sudo: required
   - before_cache:
@@ -2099,12 +2095,14 @@ jobs:
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
     - CACHE_NAME=rust_tests.osx
+    - PREPARE_DEPLOY=1
     if: commit_message !~ /\[ci skip-rust-tests\]/
     name: Rust tests - OSX
     os: osx
     osx_image: xcode8.3
     script:
     - ./build-support/bin/ci.py --rust-tests
+    - ./build-support/bin/release.sh -f
     stage: Test Pants
   - before_install:
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64

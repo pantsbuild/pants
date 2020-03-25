@@ -433,31 +433,21 @@ AWS_DEPLOY_PANTS_PEX_COMMAND = " ".join(
 )
 
 
-def _bootstrap_command(*, python_version: PythonVersion) -> List[str]:
-    # Note that for each platform, we have the Python 3.6 shard also create fs_util and upload to S3,
-    # to take advantage of the Rust code built during bootstrapping. We use the Python 3.6 shard, as
-    # it runs during both daily and nightly CI. This requires setting PREPARE_DEPLOY=1.
-    command = [
+def _bootstrap_command(*, python_version: PythonVersion) -> str:
+    return (
         "./build-support/bin/ci.py --bootstrap --bootstrap-try-to-skip-rust-compilation "
         f"--python-version {python_version.decimal}"
-    ]
-    if python_version.is_py36:
-        command.append("./build-support/bin/release.sh -f")
-    return command
+    )
 
 
 def _bootstrap_env(*, python_version: PythonVersion, platform: Platform) -> List[str]:
-    env = [
+    return [
         f"CACHE_NAME=bootstrap.{platform}.py{python_version.number}",
         f"BOOTSTRAPPED_PEX_KEY_SUFFIX=py{python_version.number}.{platform}",
     ]
-    if python_version.is_py36:
-        env.append("PREPARE_DEPLOY=1")
-    return env
 
 
 def bootstrap_linux(python_version: PythonVersion) -> Dict:
-    command = " && ".join(_bootstrap_command(python_version=python_version))
     shard = {
         **CACHE_NATIVE_ENGINE,
         **linux_shard(load_test_config=False, python_version=python_version, use_docker=True),
@@ -466,7 +456,7 @@ def bootstrap_linux(python_version: PythonVersion) -> Dict:
         "script": [
             docker_build_travis_ci_image(python_version=python_version),
             AWS_MAYBE_GET_NATIVE_ENGINE_SO,
-            docker_run_travis_ci_image(command),
+            docker_run_travis_ci_image(_bootstrap_command(python_version=python_version)),
             AWS_DEPLOY_PANTS_PEX_COMMAND,
         ],
     }
@@ -488,7 +478,7 @@ def bootstrap_osx(python_version: PythonVersion) -> Dict:
         "stage": python_version.default_stage(is_bootstrap=True).value,
         "script": [
             AWS_MAYBE_GET_NATIVE_ENGINE_SO,
-            *_bootstrap_command(python_version=python_version),
+            _bootstrap_command(python_version=python_version),
             AWS_DEPLOY_PANTS_PEX_COMMAND,
         ],
     }
@@ -678,7 +668,9 @@ _RUST_TESTS_BASE: Dict = {
     **CACHE_NATIVE_ENGINE,
     "stage": Stage.test.value,
     "before_script": ["ulimit -c unlimited", "ulimit -n 8192"],
-    "script": ["./build-support/bin/ci.py --rust-tests"],
+    # NB: We also build `fs_util` in this shard to leverage having had compiled the engine. This
+    # requires setting PREPARE_DEPLOY=1.
+    "script": ["./build-support/bin/ci.py --rust-tests", "./build-support/bin/release.sh -f"],
     "if": SKIP_RUST_CONDITION,
 }
 
@@ -688,7 +680,7 @@ def rust_tests_linux() -> Dict:
         **_RUST_TESTS_BASE,
         **linux_fuse_shard(),
         "name": "Rust tests - Linux",
-        "env": ["CACHE_NAME=rust_tests.linux"],
+        "env": ["CACHE_NAME=rust_tests.linux", "PREPARE_DEPLOY=1"],
     }
 
 
@@ -714,8 +706,11 @@ def rust_tests_osx() -> Dict:
             # This is good, because `brew install openssl` would trigger the same issues as noted on why
             # we don't use the `addons` section.
         ],
-        "env": _osx_env_with_pyenv(python_version=PythonVersion.py36)
-        + ["CACHE_NAME=rust_tests.osx"],
+        "env": [
+            *_osx_env_with_pyenv(python_version=PythonVersion.py36),
+            "CACHE_NAME=rust_tests.osx",
+            "PREPARE_DEPLOY=1",
+        ],
     }
 
 
