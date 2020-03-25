@@ -28,7 +28,7 @@ def main() -> None:
         if args.bootstrap:
             bootstrap(
                 clean=args.bootstrap_clean,
-                avoid_rust_compilation=args.bootstrap_avoid_rust_compilation,
+                try_to_skip_rust_compilation=args.bootstrap_try_to_skip_rust_compilation,
                 python_version=args.python_version,
             )
         set_run_from_pex()
@@ -105,7 +105,6 @@ def create_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--bootstrap-try-to-skip-rust-compilation",
-        dest="bootstrap_avoid_rust_compilation",
         action="store_true",
         help=(
             "If possible, i.e. `native_engine.so` if is already present, don't rebuild the Rust "
@@ -333,7 +332,9 @@ class TestTargetSets(NamedTuple):
 # -------------------------------------------------------------------------
 
 
-def bootstrap(*, clean: bool, avoid_rust_compilation: bool, python_version: PythonVersion) -> None:
+def bootstrap(
+    *, clean: bool, try_to_skip_rust_compilation: bool, python_version: PythonVersion
+) -> None:
     with travis_section("Bootstrap", f"Bootstrapping Pants as a Python {python_version} PEX"):
         if clean:
             try:
@@ -342,13 +343,17 @@ def bootstrap(*, clean: bool, avoid_rust_compilation: bool, python_version: Pyth
                 die("Failed to clean before bootstrapping Pants.")
 
         try:
+            skip_native_engine_so_bootstrap = (
+                try_to_skip_rust_compilation
+                and Path("src/python/pants/engine/native_engine.so").exists()
+            )
             subprocess.run(
                 ["./build-support/bin/bootstrap_pants_pex.sh"],
                 check=True,
                 env={
                     **os.environ,
                     "SKIP_NATIVE_ENGINE_SO_BOOTSTRAP": (
-                        "true" if avoid_rust_compilation else "false"
+                        "true" if skip_native_engine_so_bootstrap else "false"
                     ),
                 },
             )
