@@ -18,9 +18,7 @@ env:
   - LC_ALL="en_US.UTF-8"
   - AWS_BUCKET=ci-public.pantsbuild.org
   - BOOTSTRAPPED_PEX_KEY_PREFIX=${TRAVIS_BUILD_NUMBER}/${TRAVIS_BUILD_ID}/pants.pex
-  - BOOTSTRAPPED_PEX_URL_PREFIX=s3://${AWS_BUCKET}/${BOOTSTRAPPED_PEX_KEY_PREFIX}
   - NATIVE_ENGINE_SO_KEY_PREFIX=native_engine_so
-  - NATIVE_ENGINE_SO_URL_PREFIX=s3://${AWS_BUCKET}/${NATIVE_ENGINE_SO_KEY_PREFIX}
   - PYENV_PY27_VERSION=2.7.15
   - PYENV_PY36_VERSION=3.6.8
   - PYENV_PY37_VERSION=3.7.2
@@ -83,8 +81,8 @@ jobs:
       "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
     - ./build-support/bin/deploy_ci_bootstrapped_pants_pex.py --maybe-get-native-engine-so
     - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
-      travis_ci:latest sh -c "./build-support/bin/ci.py --bootstrap --python-version
-      3.6 && ./build-support/bin/release.sh -f"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --bootstrap --bootstrap-try-to-skip-rust-compilation
+      --python-version 3.6 && ./build-support/bin/release.sh -f"
     - ./build-support/bin/deploy_ci_bootstrapped_pants_pex.py --deploy
     services:
     - docker
@@ -139,8 +137,8 @@ jobs:
       "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
     - ./build-support/bin/deploy_ci_bootstrapped_pants_pex.py --maybe-get-native-engine-so
     - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
-      travis_ci:latest sh -c "./build-support/bin/ci.py --bootstrap --python-version
-      3.7"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --bootstrap --bootstrap-try-to-skip-rust-compilation
+      --python-version 3.7"
     - ./build-support/bin/deploy_ci_bootstrapped_pants_pex.py --deploy
     services:
     - docker
@@ -184,7 +182,8 @@ jobs:
     osx_image: xcode8
     script:
     - ./build-support/bin/deploy_ci_bootstrapped_pants_pex.py --maybe-get-native-engine-so
-    - ./build-support/bin/ci.py --bootstrap --python-version 3.6
+    - ./build-support/bin/ci.py --bootstrap --bootstrap-try-to-skip-rust-compilation
+      --python-version 3.6
     - ./build-support/bin/release.sh -f
     - ./build-support/bin/deploy_ci_bootstrapped_pants_pex.py --deploy
     stage: Bootstrap Pants
@@ -225,7 +224,8 @@ jobs:
     osx_image: xcode8
     script:
     - ./build-support/bin/deploy_ci_bootstrapped_pants_pex.py --maybe-get-native-engine-so
-    - ./build-support/bin/ci.py --bootstrap --python-version 3.7
+    - ./build-support/bin/ci.py --bootstrap --bootstrap-try-to-skip-rust-compilation
+      --python-version 3.7
     - ./build-support/bin/deploy_ci_bootstrapped_pants_pex.py --deploy
     stage: Bootstrap Pants (Cron)
   - addons:
@@ -278,8 +278,8 @@ jobs:
       "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
     - ./build-support/bin/deploy_ci_bootstrapped_pants_pex.py --maybe-get-native-engine-so
     - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
-      travis_ci:latest sh -c "./build-support/bin/ci.py --bootstrap --python-version
-      3.6 && ./build-support/bin/release.sh -f"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --bootstrap --bootstrap-try-to-skip-rust-compilation
+      --python-version 3.6 && ./build-support/bin/release.sh -f"
     - ./build-support/bin/deploy_ci_bootstrapped_pants_pex.py --deploy
     services:
     - docker
@@ -323,7 +323,8 @@ jobs:
     osx_image: xcode8
     script:
     - ./build-support/bin/deploy_ci_bootstrapped_pants_pex.py --maybe-get-native-engine-so
-    - ./build-support/bin/ci.py --bootstrap --python-version 3.6
+    - ./build-support/bin/ci.py --bootstrap --bootstrap-try-to-skip-rust-compilation
+      --python-version 3.6
     - ./build-support/bin/release.sh -f
     - ./build-support/bin/deploy_ci_bootstrapped_pants_pex.py --deploy
     stage: Bootstrap Pants (Cron)

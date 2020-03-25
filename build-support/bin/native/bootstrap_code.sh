@@ -47,20 +47,29 @@ function _build_native_code() {
 }
 
 function bootstrap_native_code() {
+  # We expose a safety valve to skip compilation iff the user already has `native_engine.so`. This
+  # can result in using a stale `native_engine.so`, but we trust that the user knows what
+  # they're doing.
+  if [[ "${SKIP_NATIVE_ENGINE_SO_BOOTSTRAP}" == "true" ]]; then
+    if [[ ! -f "${NATIVE_ENGINE_RESOURCE}" ]]; then
+      die "You requested to override bootstrapping native_engine.so via the env var" \
+          "SKIP_NATIVE_ENGINE_SO_BOOTSTRAP, but the file does not exist at" \
+           "${NATIVE_ENGINE_RESOURCE}. This is not safe to do."
+    fi
+    return
+  fi
   # Bootstraps the native code only if needed.
   local native_engine_version
   native_engine_version="$(calculate_current_hash)"
   local engine_version_hdr="engine_version: ${native_engine_version}"
   local target_binary="${NATIVE_ENGINE_CACHE_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
   local target_binary_metadata="${target_binary}.metadata"
-  if [[ ! -f "${target_binary}" || ! -f "${target_binary_metadata}" ]]
-  then
+  if [[ ! -f "${target_binary}" || ! -f "${target_binary_metadata}" ]]; then
     local -r native_binary="$(_build_native_code)"
 
     # If bootstrapping the native engine fails, don't attempt to run pants
     # afterwards.
-    if ! [ -f "${native_binary}" ]
-    then
+    if ! [ -f "${native_binary}" ]; then
       die "Failed to build native engine."
     fi
 
@@ -85,8 +94,7 @@ function bootstrap_native_code() {
   if [[
     ! -f "${NATIVE_ENGINE_RESOURCE}" ||
     "$(head -1 "${NATIVE_ENGINE_RESOURCE}" | tr '\0' '\n' 2>/dev/null)" != "${engine_version_hdr}"
-  ]]
-  then
+  ]]; then
     cat "${target_binary_metadata}" "${target_binary}" > "${NATIVE_ENGINE_RESOURCE}"
   fi
 }
