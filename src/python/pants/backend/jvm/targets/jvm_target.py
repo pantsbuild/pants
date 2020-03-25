@@ -36,7 +36,7 @@ class JvmTarget(Target, Jarable):
         strict_deps=None,
         exports=None,
         compiler_option_sets=None,
-        fatal_warnings: bool=None,
+        fatal_warnings: bool = None,
         zinc_file_manager=None,
         # Some subclasses can have both .java and .scala sources
         # (e.g., JUnitTests, JvmBinary, even ScalaLibrary), so it's convenient
@@ -145,7 +145,7 @@ class JvmTarget(Target, Jarable):
 
     @memoized_property
     def fatal_warnings(self) -> bool:
-        """For now, we default to false"""
+        """For now, we default to false."""
         return self.payload.fatal_warnings
 
     @property

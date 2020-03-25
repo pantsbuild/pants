@@ -5,6 +5,7 @@ import os
 import unittest
 import xml.etree.ElementTree as ET
 from textwrap import dedent
+from typing import List
 
 from pants.base.build_environment import get_buildroot
 from pants.util.collections import assert_single_element
@@ -279,39 +280,52 @@ class BaseZincCompileIntegrationTest:
                     "is not supported, and is subject to change/removal", pants_run.stdout_data
                 )
 
+    def _test_compilation_warnings(
+        self, target: str, expect_success: bool, extra_args: List[str] = []
+    ) -> None:
+        with self.temporary_workdir() as workdir:
+            with self.temporary_cachedir() as cachedir:
+                pants_run = self.run_test_compile(
+                    workdir,
+                    cachedir,
+                    "testprojects/src/scala/org/pantsbuild/testproject/compilation_warnings:{}".format(
+                        target
+                    ),
+                    extra_args=extra_args,
+                )
+
+                if expect_success:
+                    self.assert_success(pants_run)
+                else:
+                    self.assert_failure(pants_run)
+
     def test_zinc_compiler_options_sets(self):
-        def test_combination(target, expect_success, extra_args=[]):
-            with self.temporary_workdir() as workdir:
-                with self.temporary_cachedir() as cachedir:
-                    pants_run = self.run_test_compile(
-                        workdir,
-                        cachedir,
-                        "testprojects/src/scala/org/pantsbuild/testproject/compilation_warnings:{}".format(
-                            target
-                        ),
-                        extra_args=extra_args,
-                    )
 
-                    if expect_success:
-                        self.assert_success(pants_run)
-                    else:
-                        self.assert_failure(pants_run)
+        self._test_compilation_warnings("fatal", expect_success=False)
+        self._test_compilation_warnings("nonfatal", expect_success=True)
 
-        test_combination("fatal", expect_success=False)
-        test_combination("nonfatal", expect_success=True)
-
-        test_combination(
-            "fatal",
+        self._test_compilation_warnings(
+            "fatal_compiler_options",
             expect_success=True,
             extra_args=[
                 '--compile-rsc-compiler-option-sets-enabled-args={"fatal_warnings": ["-C-Werror"]}'
             ],
         )
-        test_combination(
-            "fatal",
+        self._test_compilation_warnings(
+            "fatal_compiler_options",
             expect_success=False,
             extra_args=[
                 '--compile-rsc-compiler-option-sets-disabled-args={"fatal_warnings": ["-S-Xfatal-warnings"]}'
+            ],
+        )
+
+    def test_zinc_fatal_warning_filters(self):
+        self._test_compilation_warnings("fatal_explicit", expect_success=False)
+        self._test_compilation_warnings(
+            "fatal_explicit",
+            expect_success=True,
+            extra_args=[
+                "--compile-rsc-fatal-warnings-allowed-warnings=['match may not be exhaustive']"
             ],
         )
 

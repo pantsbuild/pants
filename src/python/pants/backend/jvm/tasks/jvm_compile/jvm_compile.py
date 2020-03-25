@@ -1216,7 +1216,9 @@ class JvmCompile(CompilerOptionSetsMixin, FatalWarningsMixin, NailgunTaskBase):
             dep_context = DependencyContext.global_instance()
             (tgt,) = vts.targets
             compiler_option_sets = dep_context.defaulted_property(tgt, "compiler_option_sets")
-            fatal_warnings = tgt.fatal_warnings # We are guaranteed that this makes sense for all JvmTargets
+            fatal_warnings = (
+                tgt.fatal_warnings
+            )  # We are guaranteed that this makes sense for all JvmTargets
             zinc_file_manager = dep_context.defaulted_property(tgt, "zinc_file_manager")
             with Timer() as timer:
                 directory_digest = self._compile_vts(
