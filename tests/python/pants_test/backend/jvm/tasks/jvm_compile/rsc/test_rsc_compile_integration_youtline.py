@@ -14,7 +14,7 @@ class RscCompileIntegrationYoutline(RscCompileIntegrationBase):
     def test_basic_binary(self):
         self._testproject_compile("mutual", "bin", "A")
 
-    @pytest.mark.flaky(retries=1)
+    @pytest.mark.skip(reason="flaky")
     @ensure_compile_rsc_execution_strategy(RscCompileIntegrationBase.outline_and_zinc)
     def test_public_inference(self):
         self._testproject_compile("public_inference", "public_inference", "PublicInference")
