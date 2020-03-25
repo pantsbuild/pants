@@ -21,6 +21,7 @@ junit_tests(
     'src/java/org/pantsbuild/tools/junit',
     'src/java/org/pantsbuild/tools/junit:security-manager',
     'tests/java/org/pantsbuild/tools/junit/lib:test-dep',
+    'tests/java/org/pantsbuild/tools/junit/lib/security:test-dep',
     'tests/scala/org/pantsbuild/tools/junit/lib:scala-test-dep',
   ],
   sources=['*Test.java'],

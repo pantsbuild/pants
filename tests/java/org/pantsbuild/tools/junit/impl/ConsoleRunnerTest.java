@@ -11,6 +11,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.junit.Assert;
 import org.junit.Test;
+import org.pantsbuild.tools.junit.impl.security.JunitSecViolationReportingManager;
 import org.pantsbuild.tools.junit.lib.AnnotatedParallelClassesAndMethodsTest1;
 import org.pantsbuild.tools.junit.lib.AnnotatedParallelMethodsTest1;
 import org.pantsbuild.tools.junit.lib.AnnotatedParallelTest1;
@@ -31,6 +32,7 @@ import org.pantsbuild.tools.junit.lib.XmlOutputOnShutdownTest;
 
 import static org.hamcrest.CoreMatchers.anyOf;
 import static org.hamcrest.CoreMatchers.containsString;
+import static org.hamcrest.CoreMatchers.instanceOf;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertEquals;
@@ -489,15 +491,18 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
   @Test
   public void testWithSecurityManager() {
     try {
-      invokeConsoleRunner("MockTest3 security.sysexit.StaticSysExitTestCase " +
-                              "-use-security-manager");
+      invokeConsoleRunner("MockTest3 " +
+          "org.pantsbuild.tools.junit.lib.security.sysexit.StaticSysExitTestCase " +
+          "-use-security-manager -xmlreport");
       fail("expected test failure");
     } catch (RuntimeException e) {
+      assertThat(System.getSecurityManager(), instanceOf(JunitSecViolationReportingManager.class));
       assertThat(e.getMessage(), containsString("ConsoleRunner exited with status 1"));
+      assertEquals("test31 test32",
+          TestRegistry.getCalledTests());
     } finally {
+      // TODO reset security manager
       System.setSecurityManager(null);
     }
-    assertEquals("test31 test32",
-        TestRegistry.getCalledTests());
   }
 }
