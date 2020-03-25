@@ -36,6 +36,7 @@ class JvmTarget(Target, Jarable):
         strict_deps=None,
         exports=None,
         compiler_option_sets=None,
+        fatal_warnings: bool=None,
         zinc_file_manager=None,
         # Some subclasses can have both .java and .scala sources
         # (e.g., JUnitTests, JvmBinary, even ScalaLibrary), so it's convenient
@@ -81,6 +82,7 @@ class JvmTarget(Target, Jarable):
                              have access to both B and C.
         :param list compiler_option_sets: A list of compiler_option_sets keys for the target. Platform
           dependent.
+        :param bool fatal_warnings: Whether warnings on the compilation of this target should be fatal.
         :param bool zinc_file_manager: Whether to use zinc provided file manager that allows
                                        transactional rollbacks, but in certain cases may conflict with
                                        user libraries.
@@ -104,6 +106,7 @@ class JvmTarget(Target, Jarable):
                 "strict_deps": PrimitiveField(strict_deps),
                 "exports": PrimitivesSetField(exports or []),
                 "compiler_option_sets": PrimitivesSetField(compiler_option_sets),
+                "fatal_warnings": PrimitiveField(fatal_warnings),
                 "zinc_file_manager": PrimitiveField(zinc_file_manager),
                 "javac_plugins": PrimitivesSetField(javac_plugins or []),
                 "javac_plugin_args": PrimitiveField(javac_plugin_args),
@@ -139,6 +142,11 @@ class JvmTarget(Target, Jarable):
         :rtype: list
         """
         return self.payload.compiler_option_sets
+
+    @memoized_property
+    def fatal_warnings(self) -> bool:
+        """For now, we default to false"""
+        return self.payload.fatal_warnings
 
     @property
     def zinc_file_manager(self):

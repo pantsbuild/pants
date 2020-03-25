@@ -330,6 +330,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
         upstream_analysis,
         settings,
         compiler_option_sets,
+        fatal_warnings: bool,
         zinc_file_manager,
         javac_plugin_map,
         scalac_plugin_map,
@@ -346,6 +347,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
         :param JvmPlatformSettings settings: platform settings determining the -source, -target, etc for
           javac to use.
         :param list compiler_option_sets: The compiler_option_sets flags for the target.
+        :param fatal_warnings: Whether warnings should be fatal.
         :param zinc_file_manager: whether to use zinc provided file manager.
         :param javac_plugin_map: Map of names of javac plugins to use to their arguments.
         :param scalac_plugin_map: Map of names of scalac plugins to use to their arguments.
@@ -707,6 +709,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
         progress_message,
         settings,
         compiler_option_sets,
+        fatal_warnings: bool,
         zinc_file_manager,
         counter,
     ):
@@ -752,6 +755,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
                         upstream_analysis,
                         settings,
                         compiler_option_sets,
+                        fatal_warnings,
                         zinc_file_manager,
                         self._get_plugin_map("javac", Java.global_instance(), ctx.target),
                         self._get_plugin_map("scalac", ScalaPlatform.global_instance(), ctx.target),
@@ -1211,6 +1215,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
             dep_context = DependencyContext.global_instance()
             (tgt,) = vts.targets
             compiler_option_sets = dep_context.defaulted_property(tgt, "compiler_option_sets")
+            fatal_warnings = tgt.fatal_warnings # We are guaranteed that this makes sense for all JvmTargets
             zinc_file_manager = dep_context.defaulted_property(tgt, "zinc_file_manager")
             with Timer() as timer:
                 directory_digest = self._compile_vts(
@@ -1221,6 +1226,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
                     progress_message,
                     tgt.platform,
                     compiler_option_sets,
+                    fatal_warnings,
                     zinc_file_manager,
                     counter,
                 )

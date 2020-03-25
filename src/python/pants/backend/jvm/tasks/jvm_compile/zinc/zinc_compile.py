@@ -388,6 +388,7 @@ class BaseZincCompile(JvmCompile):
         absolute_classpath,
         settings,
         compiler_option_sets,
+        fatal_warnings: bool,
         zinc_file_manager,
         javac_plugin_map,
         scalac_plugin_map,
@@ -440,6 +441,9 @@ class BaseZincCompile(JvmCompile):
             ]
         )
         zinc_args.extend(["-scala-path", ":".join(scala_path)])
+
+        if fatal_warnings:
+            zinc_args.extend(["-fatal-warnings"])
 
         zinc_args.extend(self._javac_plugin_args(javac_plugin_map))
         # Search for scalac plugins on the classpath.
@@ -499,6 +503,7 @@ class BaseZincCompile(JvmCompile):
         upstream_analysis,
         settings,
         compiler_option_sets,
+        fatal_warnings,
         zinc_file_manager,
         javac_plugin_map,
         scalac_plugin_map,
@@ -522,6 +527,7 @@ class BaseZincCompile(JvmCompile):
             absolute_classpath,
             settings,
             compiler_option_sets,
+            fatal_warnings,
             zinc_file_manager,
             javac_plugin_map,
             scalac_plugin_map,
