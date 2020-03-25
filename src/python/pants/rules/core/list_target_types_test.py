@@ -88,8 +88,8 @@ def test_list_single() -> None:
         Use this field to...
         """
 
-        default = True
         alias = "custom_field"
+        required = True
 
     tests_target_stdout = run_goal(
         union_membership=UnionMembership({FortranTests.PluginField: OrderedSet([CustomField])}),
@@ -104,7 +104,7 @@ def test_list_single() -> None:
 
 
         fortran_tests(
-          custom_field     My custom field! Use this field to... (type: bool | None, default: True)
+          custom_field     My custom field! Use this field to... (type: bool, required)
           fortran_version  (type: str | None, default: None)
         )
         """

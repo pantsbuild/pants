@@ -63,9 +63,15 @@ def verbose_target_information(
             raw_value_type = get_type_hints(field.sanitize_raw_value)["raw_value"]
         else:
             raw_value_type = get_type_hints(field.__init__)["raw_value"]
-        type_info = console.green(
-            f"(type: {pretty_print_type_hint(raw_value_type)}, default: {field.default})"
-        )
+        required_or_default = "required" if field.required else f"default: {field.default}"
+        expected_type = f"type: {pretty_print_type_hint(raw_value_type)}"
+        if field.required:
+            # We hackily remove `None` as a valid option for the field when it's required. This
+            # greatly simplifies Field definitions because it means that they don't need to
+            # override the type hints for `PrimitiveField.compute_value()` and
+            # `AsyncField.sanitize_raw_value()` to indicate that `None` is an invalid type.
+            expected_type = expected_type.replace(" | None", "")
+        type_info = console.green(f"({expected_type}, {required_or_default})")
         type_info_prefix = " " if description else ""
         return f"{field_alias}  {description}{type_info_prefix}{type_info}"
 
