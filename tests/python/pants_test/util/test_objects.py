@@ -90,21 +90,16 @@ def test_get_docstring() -> None:
     )
 
     class SneakyDocstring:
-        """Hello 😀!\n\n
-
-        More description.
-        """
+        """Hello 😀!\n\nSneaky."""
 
     assert get_first_line_of_docstring(SneakyDocstring) == "Hello 😀!"
     assert get_all_docstring(SneakyDocstring) == dedent(
         """\
         Hello 😀!
 
-
-
-        More description."""
+        Sneaky."""
     )
-    assert get_all_docstring(SneakyDocstring, flatten=True) == "Hello 😀! More description."
+    assert get_all_docstring(SneakyDocstring, flatten=True) == "Hello 😀! Sneaky."
 
 
 def test_pretty_print_type_hint() -> None:
