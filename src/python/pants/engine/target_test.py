@@ -12,7 +12,15 @@ from pants.build_graph.address import Address
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, PathGlobs, Snapshot
 from pants.engine.rules import UnionMembership, rule
 from pants.engine.selectors import Get
-from pants.engine.target import AsyncField, BoolField, InvalidFieldException, PrimitiveField, Target
+from pants.engine.target import (
+    AsyncField,
+    BoolField,
+    InvalidFieldException,
+    PrimitiveField,
+    RequiredFieldMissingException,
+    StringField,
+    Target,
+)
 from pants.testutil.engine.util import MockGet, run_rule
 from pants.util.collections import ensure_str_list
 from pants.util.ordered_set import OrderedSet
@@ -337,3 +345,37 @@ def test_override_preexisting_field_via_new_target() -> None:
         )
     assert str(list(CustomFortranExtensions.banned_extensions)) in str(exc)
     assert "//:invalid" in str(exc)
+
+
+def test_required_field() -> None:
+    class RequiredPrimitiveField(StringField):
+        alias = "primitive"
+        required = True
+
+    class RequiredAsyncField(AsyncField):
+        alias = "async"
+        required = True
+
+        @final
+        @property
+        def request(self):
+            raise NotImplementedError
+
+    class RequiredTarget(Target):
+        alias = "required_target"
+        core_fields = (RequiredPrimitiveField, RequiredAsyncField)
+
+    address = Address.parse(":lib")
+
+    # No errors when all defined
+    RequiredTarget({"primitive": "present", "async": 0}, address=address)
+
+    with pytest.raises(RequiredFieldMissingException) as exc:
+        RequiredTarget({"primitive": "present"}, address=address)
+    assert str(address) in str(exc.value)
+    assert "async" in str(exc.value)
+
+    with pytest.raises(RequiredFieldMissingException) as exc:
+        RequiredTarget({"async": 0}, address=address)
+    assert str(address) in str(exc.value)
+    assert "primitive" in str(exc.value)
