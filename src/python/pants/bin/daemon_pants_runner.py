@@ -1,7 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import os
 import sys
 import termios
 import time
@@ -237,12 +236,6 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     def run(self):
         # Ensure anything referencing sys.argv inherits the Pailgun'd args.
         sys.argv = self._args
-
-        # Broadcast our process group ID (in PID form - i.e. negated) to the remote client so
-        # they can send signals (e.g. SIGINT) to all processes in the runners process group.
-        with self._maybe_shutdown_socket.lock:
-            NailgunProtocol.send_pid(self._maybe_shutdown_socket.socket, os.getpid())
-            NailgunProtocol.send_pgrp(self._maybe_shutdown_socket.socket, os.getpgrp() * -1)
 
         # Invoke a Pants run with stdio redirected and a proxied environment.
         with self.nailgunned_stdio(
