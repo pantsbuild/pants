@@ -51,7 +51,11 @@ def main() -> None:
             )
 
     if args.deploy:
-        if not native_engine_so_already_cached:
+        if native_engine_so_already_cached:
+            banner(
+                f"`native_engine.so` already cached at {native_engine_so_aws_url}. Skipping deploy."
+            )
+        else:
             banner(f"Deploying `native_engine.so` to {native_engine_so_aws_url}.")
             deploy_native_engine_so(native_engine_so_aws_url)
         banner(f"Deploying `pants.pex` to {PEX_URL}.")
@@ -104,7 +108,7 @@ def native_engine_so_in_s3_cache(native_engine_so_aws_key: str) -> bool:
     ).stdout.decode()
     if not ls_output:
         return False
-    num_versions = len(json.loads(ls_output)["VERSIONS"])
+    num_versions = len(json.loads(ls_output)["Versions"])
     if num_versions > 1:
         die(
             f"Multiple copies found of {native_engine_so_aws_key} in AWS S3. This is not allowed "
