@@ -93,6 +93,8 @@ impl InvalidationWatcher {
             let paths: HashSet<_> = ev
               .paths
               .into_iter()
+              // TODO ignore gitignored patterns using ignorer on the context.core.
+              // ignored patterns will need to be relative to the build root before being passed to the git ignorer.
               .map(|path| {
                 // relativize paths to build root.
                 let mut paths_to_invalidate: Vec<PathBuf> = vec![];
