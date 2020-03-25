@@ -37,6 +37,7 @@ class PailgunClientSignalHandler(SignalHandler):
             timeout=self._timeout,
             reason=KeyboardInterrupt("Interrupted by user over pailgun client!"),
         )
+        self._pailgun_client.maybe_send_signal(signum)
 
     def handle_sigint(self, signum, _frame):
         self._forward_signal_with_timeout(signum, "SIGINT")
@@ -148,6 +149,7 @@ class RemotePantsRunner:
 
     def _connect_and_execute(self, pantsd_handle: PantsDaemon.Handle):
         port = pantsd_handle.port
+        pid = pantsd_handle.pid
         # Merge the nailgun TTY capability environment variables with the passed environment dict.
         ng_env = NailgunProtocol.isatty_to_env(self._stdin, self._stdout, self._stderr)
         modified_env = {
@@ -166,6 +168,7 @@ class RemotePantsRunner:
         # Instantiate a NailgunClient.
         client = NailgunClient(
             port=port,
+            remote_pid=pid,
             ins=self._stdin,
             out=self._stdout,
             err=self._stderr,

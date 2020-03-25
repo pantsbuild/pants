@@ -10,6 +10,7 @@ import time
 
 from pants.java.nailgun_io import NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, MaybeShutdownSocket, NailgunProtocol
+from pants.util.osutil import safe_kill
 from pants.util.socket import RecvBufferedSocket
 from pants.util.strutil import ensure_binary
 
@@ -184,6 +185,7 @@ class NailgunClient:
         err=None,
         exit_on_broken_pipe=False,
         metadata_base_dir=None,
+        remote_pid=None,
     ):
         """Creates a nailgun client that can be used to issue zero or more nailgun commands.
 
@@ -201,6 +203,7 @@ class NailgunClient:
                                          written under this directory. For non-pailgun connections this
                                          may be None.
         """
+        self.remote_pid = remote_pid
         self._host = host or self.DEFAULT_NG_HOST
         self._port = port or self.DEFAULT_NG_PORT
         self._address = (self._host, self._port)
@@ -238,6 +241,14 @@ class NailgunClient:
     def set_exit_timeout(self, timeout, reason):
         """Expose the inner session object's exit timeout setter."""
         self._session._set_exit_timeout(timeout, reason)
+
+    def maybe_send_signal(self, signum):
+        """Send the signal `signum`. No error is raised if the pid is None.
+
+        :param signum: The signal number to send to the remote process.
+        """
+        if self.remote_pid is not None:
+            safe_kill(self.remote_pid, signum)
 
     def execute(self, main_class, cwd=None, *args, **environment):
         """Executes the given main_class with any supplied args in the given environment.

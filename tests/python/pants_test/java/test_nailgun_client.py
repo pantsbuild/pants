@@ -1,6 +1,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import signal
 import socket
 import unittest
 import unittest.mock
@@ -166,3 +167,9 @@ class TestNailgunClient(unittest.TestCase):
 
     def test_repr(self):
         self.assertIsNotNone(repr(self.nailgun_client))
+
+    @unittest.mock.patch("os.kill", **PATCH_OPTS)
+    def test_send_control_c(self, mock_kill):
+        self.nailgun_client.remote_pid = 31337
+        self.nailgun_client.maybe_send_signal(signal.SIGINT)
+        mock_kill.assert_has_calls([unittest.mock.call(31337, signal.SIGINT)])
