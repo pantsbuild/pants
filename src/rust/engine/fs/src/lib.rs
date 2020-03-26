@@ -171,6 +171,13 @@ impl GitignoreStyleExcludes {
       ::ignore::Match::Ignore(_) => true,
     }
   }
+
+  pub fn is_ignored_or_child_of_ignored_path(&self, path: &Path, is_dir: bool) -> bool {
+    match self.gitignore.matched_path_or_any_parents(path, is_dir) {
+      ::ignore::Match::None | ::ignore::Match::Whitelist(_) => false,
+      ::ignore::Match::Ignore(_) => true,
+    }
+  }
 }
 
 lazy_static! {

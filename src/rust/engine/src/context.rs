@@ -56,7 +56,6 @@ pub struct Core {
   pub vfs: PosixFS,
   pub watcher: InvalidationWatcher,
   pub build_root: PathBuf,
-  pub ignorer: Arc<GitignoreStyleExcludes>,
 }
 
 impl Core {
@@ -236,8 +235,6 @@ impl Core {
       ));
     }
     let graph = Arc::new(Graph::new());
-    let watcher =
-      InvalidationWatcher::new(Arc::downgrade(&graph), executor.clone(), build_root.clone())?;
 
     let http_client = reqwest::Client::new();
     let rule_graph = RuleGraph::new(tasks.as_map(), root_subject_types);
@@ -248,6 +245,13 @@ impl Core {
         ignore_patterns, e
       )
     })?;
+
+    let watcher = InvalidationWatcher::new(
+      Arc::downgrade(&graph),
+      executor.clone(),
+      build_root.clone(),
+      ignorer.clone(),
+    )?;
 
     Ok(Core {
       graph: graph,
@@ -261,11 +265,10 @@ impl Core {
       http_client,
       // TODO: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
-      vfs: PosixFS::new(&build_root, ignorer.clone(), executor)
+      vfs: PosixFS::new(&build_root, ignorer, executor)
         .map_err(|e| format!("Could not initialize VFS: {:?}", e))?,
       build_root,
       watcher,
-      ignorer: ignorer,
     })
   }
 
