@@ -4,9 +4,11 @@
 import json
 import os.path
 import zipfile
-from typing import Dict, List, Optional, Tuple, cast
+from dataclasses import dataclass
+from typing import Dict, Iterable, Iterator, List, Optional, Tuple, cast
 
 import pytest
+from pkg_resources import Requirement
 
 from pants.backend.python.rules import download_pex_bin
 from pants.backend.python.rules.pex import (
@@ -123,6 +125,31 @@ def test_merge_interpreter_constraints() -> None:
     )
 
 
+@dataclass(frozen=True)
+class ExactRequirement:
+    project_name: str
+    version: str
+
+    @classmethod
+    def parse(cls, requirement: str) -> "ExactRequirement":
+        req = Requirement.parse(requirement)
+        assert len(req.specs) == 1, (
+            "Expected an exact requirement with only 1 specifier, given {requirement} with "
+            "{count} specifiers".format(requirement=requirement, count=len(req.specs))
+        )
+        operator, version = req.specs[0]
+        assert operator == "==", (
+            "Expected an exact requirement using only the '==' specifier, given {requirement} "
+            "using the {operator!r} operator".format(requirement=requirement, operator=operator)
+        )
+        return cls(project_name=req.project_name, version=version)
+
+
+def parse_requirements(requirements: Iterable[str]) -> Iterator[ExactRequirement]:
+    for requirement in requirements:
+        yield ExactRequirement.parse(requirement)
+
+
 class PexTest(TestBase):
     @classmethod
     def rules(cls):
@@ -227,7 +254,9 @@ class PexTest(TestBase):
         pex_info = self.create_pex_and_get_pex_info(requirements=requirements)
         # NB: We do not check for transitive dependencies, which PEX-INFO will include. We only check
         # that at least the dependencies we requested are included.
-        assert set(requirements.requirements).issubset(pex_info["requirements"]) is True
+        assert set(parse_requirements(requirements.requirements)).issubset(
+            set(parse_requirements(pex_info["requirements"]))
+        )
 
     def test_requirement_constraints(self) -> None:
         # This is intentionally old; a constraint will resolve us to a more modern version.
@@ -245,7 +274,9 @@ class PexTest(TestBase):
             requirements=PexRequirements([direct_dep]),
             additional_pants_args=("--python-setup-requirement-constraints=constraints.txt",),
         )
-        assert set(pex_info["requirements"]) == set(constraints)
+        assert set(parse_requirements(pex_info["requirements"])) == set(
+            parse_requirements(constraints)
+        )
 
     def test_entry_point(self) -> None:
         entry_point = "pydoc"
