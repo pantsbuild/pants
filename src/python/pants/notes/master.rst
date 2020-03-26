@@ -76,6 +76,9 @@ Bugfixes
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+* Filter sources when creating a pex. (#9405)
+  `PR #9405 <https://github.com/pantsbuild/pants/pull/9405>`_
+
 * Make DaemonPantsRunner a dataclass (#9382)
   `PR #9382 <https://github.com/pantsbuild/pants/pull/9382>`_
 
