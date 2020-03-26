@@ -4,7 +4,6 @@
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
-from pants.backend.python.rules.ipex import IpexRequest
 from pants.backend.python.rules.pex import (
     CreatePex,
     Pex,
@@ -37,7 +36,7 @@ class CreatePexFromTargetClosure:
 @rule(name="Create PEX from targets")
 async def create_pex_from_target_closure(
     request: CreatePexFromTargetClosure, python_setup: PythonSetup
-) -> Pex:
+) -> CreatePex:
     transitive_hydrated_targets = await Get[TransitiveHydratedTargets](Addresses, request.addresses)
     all_targets = transitive_hydrated_targets.closure
 
@@ -66,7 +65,7 @@ async def create_pex_from_target_closure(
         adaptors=all_target_adaptors, additional_requirements=request.additional_requirements
     )
 
-    create_pex_request = CreatePex(
+    return CreatePex(
         output_filename=request.output_filename,
         requirements=requirements,
         interpreter_constraints=interpreter_constraints,
@@ -74,12 +73,6 @@ async def create_pex_from_target_closure(
         input_files_digest=merged_input_digest,
         additional_args=request.additional_args,
     )
-
-  if request.generate_ipex:
-    pex = await Get[Pex](IpexRequest(create_pex_request))
-  else:
-    pex = await Get[Pex](CreatePex, create_pex_request)
-  return pex
 
 
 def rules():
