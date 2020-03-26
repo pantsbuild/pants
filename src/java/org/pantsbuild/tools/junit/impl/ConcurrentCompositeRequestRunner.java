@@ -26,6 +26,11 @@ public class ConcurrentCompositeRequestRunner extends CompositeRequestRunner {
   }
 
   @Override
+  protected String getName() {
+    return "Concurrent Test Mechanism";
+  }
+
+  @Override
   protected Statement childrenInvoker(final RunNotifier notifier) {
     return new Statement() {
       @Override

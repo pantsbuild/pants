@@ -36,6 +36,11 @@ public class CompositeRequestRunner extends ParentRunner<Request> {
   }
 
   @Override
+  protected String getName() {
+    return "Test Mechanism";
+  }
+
+  @Override
   protected List<Request> getChildren() {
     return requests;
   }

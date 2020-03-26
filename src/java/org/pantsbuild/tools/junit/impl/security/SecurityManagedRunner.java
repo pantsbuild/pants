@@ -1,8 +1,9 @@
 package org.pantsbuild.tools.junit.impl.security;
 
 import java.util.ArrayDeque;
+import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Queue;
@@ -54,7 +55,10 @@ public class SecurityManagedRunner extends Runner implements Filterable {
   private void recurseThroughChildrenMarkingSuites() {
     // TODO: should this init the test cases too, or just the suites?
     // TODO: should suites reference their parents?
-    Set<Description> seen =  new HashSet<>();
+
+    // NB: Use identity to check for seen, because Description equality only checks the DisplayName,
+    //     which may have duplicate names.
+    Set<Description> seen = Collections.newSetFromMap(new IdentityHashMap<Description, Boolean>());
     Queue<Description> queue = new ArrayDeque<>();
     queue.add(wrappedRunner.getDescription());
     while (!queue.isEmpty()) {

@@ -608,6 +608,8 @@ public class ConsoleRunnerImpl {
     Class<?>[] classes = specSet.extract(concurrency).classes();
     RunnerBuilder builder = createCustomBuilder(swappableErr.getOriginal());
     Runner suite = junitComputer.getSuite(builder, classes);
+    suite=maybeWithFailFastRunner(suite);
+    suite=maybeWrapWithSecurity(suite);
     return core.run(Request.runner(suite)).getFailureCount();
   }
 
@@ -647,14 +649,6 @@ public class ConsoleRunnerImpl {
       return reqRunner;
     }else {
       return new SecurityManagedRunner(reqRunner, securityManager);
-    }
-  }
-
-  private RunnerBuilder maybeWrapWithSecurityManagerBuilder(CustomAnnotationBuilder builder) {
-    if (securityManagerDisabled()) {
-      return builder;
-    } else {
-      return new SecurityManagerAwareCustomAnnotationBuilder(builder, securityManager);
     }
   }
 
@@ -705,13 +699,11 @@ public class ConsoleRunnerImpl {
   }
 
   private AnnotatedClassRequest createAnnotatedClassRequest(PrintStream err, Class<?> clazz) {
-      return new AnnotatedClassRequest(clazz, numRetries, err);
+    return new AnnotatedClassRequest(clazz, numRetries, err);
   }
 
   private RunnerBuilder createCustomBuilder(PrintStream original) {
-    CustomAnnotationBuilder builder =
-        new CustomAnnotationBuilder(numRetries, original);
-    return maybeWrapWithSecurityManagerBuilder(builder);
+    return new CustomAnnotationBuilder(numRetries, original);
   }
 
   private boolean legacyShouldRunParallelMethods(Class<?> clazz) {
