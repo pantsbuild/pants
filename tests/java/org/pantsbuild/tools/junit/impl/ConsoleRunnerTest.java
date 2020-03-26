@@ -404,7 +404,8 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
   @Test
   public void testArgFile() throws IOException {
     File file = temporary.newFile();
-    Files.write("org.pantsbuild.tools.junit.lib.MockScalaTest#test should pass", file, Charsets.UTF_8);
+    Files.write("org.pantsbuild.tools.junit.lib.MockScalaTest#test should pass", file,
+        Charsets.UTF_8);
     invokeConsoleRunner("@" + file.getAbsolutePath());
     assertThat(TestRegistry.getCalledTests(), is("MockScalaTest-1"));
   }
