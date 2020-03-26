@@ -461,7 +461,14 @@ def bootstrap_linux(python_version: PythonVersion) -> Dict:
         ],
     }
     safe_extend(
-        shard, "env", _bootstrap_env(python_version=python_version, platform=Platform.linux)
+        shard,
+        "env",
+        [
+            *_bootstrap_env(python_version=python_version, platform=Platform.linux),
+            # Set $PY to ensure that deploy_ci_bootstrapped_pants_pex.py uses the correct Python
+            # version.
+            f"PY=/opt/pyenv/shims/python{python_version.decimal}",
+        ],
     )
     return shard
 
@@ -482,7 +489,17 @@ def bootstrap_osx(python_version: PythonVersion) -> Dict:
             AWS_DEPLOY_PANTS_PEX_COMMAND,
         ],
     }
-    safe_extend(shard, "env", _bootstrap_env(python_version=python_version, platform=Platform.osx))
+    pyenv_version = "${PYENV_PY36_VERSION}" if python_version.is_py36 else "${PYENV_PY37_VERSION}"
+    safe_extend(
+        shard,
+        "env",
+        [
+            *_bootstrap_env(python_version=python_version, platform=Platform.osx),
+            # Set $PY to ensure that deploy_ci_bootstrapped_pants_pex.py uses the correct Python
+            # version.
+            f"PY=${{PYENV_ROOT}}/versions/{pyenv_version}/bin/python",
+        ],
+    )
     return shard
 
 

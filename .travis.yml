@@ -67,6 +67,7 @@ jobs:
     env:
     - CACHE_NAME=bootstrap.linux.py36
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
+    - PY=/opt/pyenv/shims/python3.6
     language: python
     name: Build Linux native engine and pants.pex (Python 3.6)
     os: linux
@@ -123,6 +124,7 @@ jobs:
     env:
     - CACHE_NAME=bootstrap.linux.py37
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
+    - PY=/opt/pyenv/shims/python3.7
     language: python
     name: Build Linux native engine and pants.pex (Python 3.7)
     os: linux
@@ -174,6 +176,7 @@ jobs:
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
     - CACHE_NAME=bootstrap.osx.py36
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
+    - PY=${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin/python
     language: generic
     name: Build OSX native engine and pants.pex (Python 3.6)
     os: osx
@@ -215,6 +218,7 @@ jobs:
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
     - CACHE_NAME=bootstrap.osx.py37
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
+    - PY=${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin/python
     language: generic
     name: Build OSX native engine and pants.pex (Python 3.7)
     os: osx
@@ -261,6 +265,7 @@ jobs:
     env:
     - CACHE_NAME=bootstrap.linux.py36
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
+    - PY=/opt/pyenv/shims/python3.6
     language: python
     name: Build Linux native engine and pants.pex (Python 3.6)
     os: linux
@@ -312,6 +317,7 @@ jobs:
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
     - CACHE_NAME=bootstrap.osx.py36
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
+    - PY=${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin/python
     language: generic
     name: Build OSX native engine and pants.pex (Python 3.6)
     os: osx
