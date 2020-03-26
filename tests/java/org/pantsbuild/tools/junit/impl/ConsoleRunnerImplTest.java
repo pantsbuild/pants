@@ -5,7 +5,11 @@ package org.pantsbuild.tools.junit.impl;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
 
+import org.hamcrest.Description;
+import org.hamcrest.Matcher;
+import org.hamcrest.TypeSafeDiagnosingMatcher;
 import org.junit.Test;
 import org.junit.runner.Result;
 import org.junit.runner.notification.RunListener;
@@ -38,7 +42,8 @@ public class ConsoleRunnerImplTest extends ConsoleRunnerImplTestSetup {
 
     failFast = true;
     output = runTestExpectingFailure(AllFailingTest.class);
-    assertThat(output, containsString("There was 1 failure:"));
+    assertThat(Arrays.asList(output.split("\n")),
+        hasExactlyOneOf(containsString("There was 1 failure:")));
     assertThat(output, containsString("Tests run: 1,  Failures: 1"));
   }
 
@@ -238,5 +243,42 @@ public class ConsoleRunnerImplTest extends ConsoleRunnerImplTestSetup {
     assertThat(output, containsString("OK (3 tests)"));
     testLogContents = getTestLogContents(LogOutputInTeardownTest.class, ".out.txt");
     assertThat(testLogContents, containsString("Output in tearDown"));
+  }
+
+  private <T> Matcher<Iterable<? super T>> hasExactlyOneOf(final Matcher<? super T> elemMatcher) {
+    return new ExactlyOneOf<T>(elemMatcher);
+  }
+
+  private static class ExactlyOneOf<T> extends TypeSafeDiagnosingMatcher<Iterable<? super T>> {
+    private final Matcher<? super T> elemMatcher;
+
+    public ExactlyOneOf(Matcher<? super T> elemMatcher) {
+      this.elemMatcher = elemMatcher;
+    }
+
+    @Override
+    protected boolean matchesSafely(Iterable<? super T> collection, Description mismatchDescription) {
+      boolean foundOne = false;
+      String s;
+      for (Object t : collection) {
+        if (elemMatcher.matches(t)) {
+          if (foundOne) {
+            mismatchDescription.appendText("found more than one");
+            return false;
+          }
+          foundOne = true;
+        }
+      }
+      if (!foundOne) {
+        mismatchDescription.appendText("found none in " + collection);
+      }
+      return foundOne;
+    }
+
+    @Override
+    public void describeTo(Description description) {
+      description.appendText("exactly one of ");
+      elemMatcher.describeTo(description);
+    }
   }
 }

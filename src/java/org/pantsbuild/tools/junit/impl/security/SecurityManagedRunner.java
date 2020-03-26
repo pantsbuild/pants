@@ -131,6 +131,9 @@ public class SecurityManagedRunner extends Runner implements Filterable {
     public void testRunFinished(Result result) throws Exception {
       log("run finished");
       // Mark the run as finished, and if it was previously marked, skip checks.
+
+      // This isn't correct because each suite will have a separate one of these runners.
+      // This should be finishing a thing registered with the security manager
       if (securityManager.finished()) {
         return;
       }
@@ -192,6 +195,7 @@ public class SecurityManagedRunner extends Runner implements Filterable {
         Description description,
         TestSecurityContext context) {
       // if there were constraint violations and they haven't been reported yet, report them.
+      // TODO maybe if test already failed, wrap failure in a MultipleFailureException
       if (context.hadFailures() && tests.get(description) != TestState.failed) {
         Throwable cause = context.firstFailure();
         fireFailure(description, cause);

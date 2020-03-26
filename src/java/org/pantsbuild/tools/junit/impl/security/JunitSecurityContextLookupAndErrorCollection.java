@@ -239,7 +239,8 @@ class JunitSecurityContextLookupAndErrorCollection {
   }
 
   public boolean disallowSystemExit() {
-    if (runEnded.get()) {
+    // TODO better than this
+    if (runEnded.get() && !anyHasRunningThreads()) {
       return false;
     } else {
       return config.disallowSystemExit();

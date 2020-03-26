@@ -1,9 +1,16 @@
 package org.pantsbuild.tools.junit.impl.security;
 
+import java.util.Arrays;
+
 import org.hamcrest.Matcher;
+import org.junit.Before;
 import org.junit.Test;
 import org.pantsbuild.tools.junit.impl.ConsoleRunnerImplTestSetup;
+import org.pantsbuild.tools.junit.lib.MockTest1;
+import org.pantsbuild.tools.junit.lib.MockTest2;
+import org.pantsbuild.tools.junit.lib.SleepTest;
 import org.pantsbuild.tools.junit.lib.SystemExitsInObjectBody;
+import org.pantsbuild.tools.junit.lib.TestRegistry;
 import org.pantsbuild.tools.junit.lib.security.fileaccess.FileAccessTests;
 import org.pantsbuild.tools.junit.lib.security.network.BoundaryNetworkTests;
 import org.pantsbuild.tools.junit.lib.security.sysexit.BeforeClassSysExitTestCase;
@@ -15,13 +22,82 @@ import org.pantsbuild.tools.junit.lib.security.threads.ThreadStartedInBeforeClas
 import org.pantsbuild.tools.junit.lib.security.threads.ThreadStartedInBeforeTest;
 import org.pantsbuild.tools.junit.lib.security.threads.ThreadStartedInBodyAndJoinedAfterTest;
 
+import static org.hamcrest.CoreMatchers.both;
 import static org.hamcrest.CoreMatchers.containsString;
+import static org.hamcrest.CoreMatchers.either;
 import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.core.Is.is;
-import static org.pantsbuild.tools.junit.impl.security.JunitSecurityManagerConfig.*;
+import static org.pantsbuild.tools.junit.impl.security.JunitSecurityManagerConfig.FileHandling;
+import static org.pantsbuild.tools.junit.impl.security.JunitSecurityManagerConfig.NetworkHandling;
+import static org.pantsbuild.tools.junit.impl.security.JunitSecurityManagerConfig.SystemExitHandling;
+import static org.pantsbuild.tools.junit.impl.security.JunitSecurityManagerConfig.ThreadHandling;
 
 public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestSetup {
+
+  @Before
+  public void resetTestRegistry() {
+    TestRegistry.reset();
+  }
+
+  @Test
+  public void testFailFastDoesntSkipPriorTestsAsSysExit() {
+    failFast = true;
+    String output = runTests(Arrays.asList(
+        MockTest1.class.getCanonicalName(),
+        StaticSysExitTestCase.class.getCanonicalName(),
+        MockTest2.class.getCanonicalName()),
+        true,
+        configDisallowingSystemExitButAllowingEverythingElse());
+
+    assertThat(TestRegistry.getCalledTests(), is("test11 test12 test13"));
+    assertThat(output, testFailedWithName(StaticSysExitTestCase.class, "passingTest2"));
+    assertThat(output, either(
+        containsString("Caused by: org.pantsbuild.junit.security." +
+            "SecurityViolationException: System.exit calls are not allowed.")).or(
+        containsString("java.lang.NoClassDefFoundError: Could not initialize class " +
+            "org.pantsbuild.tools.junit.lib.security.sysexit.StaticSysExitTestCase")
+    ));
+  }
+
+  @Test
+  public void testFailFastDoesntSkipPriorTestsScalaObject() {
+    failFast = true;
+    String output = runTests(Arrays.asList(
+        MockTest1.class.getCanonicalName(),
+        SystemExitsInObjectBody.class.getCanonicalName(),
+        MockTest2.class.getCanonicalName()),
+        true,
+        configDisallowingSystemExitButAllowingEverythingElse());
+
+    assertThat(TestRegistry.getCalledTests(), is("test11 test12 test13"));
+    assertThat(output, testFailedWithName(SystemExitsInObjectBody.class, "initializationError"));
+    assertThat(output, either(
+        containsString(
+            "Caused by: org.pantsbuild.junit.security.SecurityViolationException: " +
+                "System.exit calls are not allowed.")).or(
+        containsString(" java.lang.NoClassDefFoundError: " +
+            "Could not initialize class " +
+            "org.pantsbuild.tools.junit.lib.SystemExitsInObjectBody$")));
+  }
+
+  @Test
+  public void testFailFastWithDanglingThread() {
+    failFast = true;
+    String output = runTests(Arrays.asList(
+        BoundarySystemExitTests.class.getCanonicalName() + "#exitInNotJoinedThread",
+        SleepTest.class.getCanonicalName() + "#sleep",
+        MockTest1.class.getCanonicalName() + "#testMethod11",
+        MockTest2.class.getCanonicalName() + "#testMethod21"),
+        true,
+        configDisallowingSystemExitButAllowingEverythingElse());
+
+    assertThat(output, containsString("Tests run: 4"));
+    assertThat(output, testFailedWithName(BoundarySystemExitTests.class, "exitInNotJoinedThread",
+        "org.pantsbuild.junit.security.SecurityViolationException:" +
+            " System.exit calls are not allowed."));
+    assertThat(TestRegistry.getCalledTests(), is("sleep test11 test21"));
+  }
 
   @Test
   public void testFailSystemExit() {
@@ -49,7 +125,8 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
         containsString(
             "\tat java.lang.Runtime.exit(Runtime.java:107)\n" +
                 "\tat java.lang.System.exit(System.java:971)\n" +
-                "\tat " + testClassName + "." + "directSystemExit" + "(" + testClass.getSimpleName() +
+                "\tat " + testClassName + "." + "directSystemExit" + "(" +
+                testClass.getSimpleName() +
                 ".java:43)"));
   }
 
@@ -214,15 +291,21 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
 
     String testClassName = testClass.getCanonicalName();
 
-    assertThat(output, testFailedWithName(testClass, "initializationError",
-        "java.lang.ExceptionInInitializerError\n" +
-            "\tat " + testClassName + ".<init>(SystemExitsInObjectBody.scala:12)"));
+    assertThat(output, testFailedWithName(testClass, "initializationError"));
     // NB This caused by clause is hard to find in the stacktrace right now, it might make sense to
     // unwrap the error and display it.
-    assertThat(output, containsString(
+    assertThat(output, either(both(containsString(
         "Caused by: " +
             "org.pantsbuild.junit.security.SecurityViolationException: " +
-            "System.exit calls are not allowed.\n"));
+            "System.exit calls are not allowed.\n")).and(
+                containsString(
+        "java.lang.ExceptionInInitializerError\n" +
+            "\tat " + testClassName + ".<init>(SystemExitsInObjectBody.scala:12)")
+    )).or(
+                containsString("java.lang.NoClassDefFoundError: " +
+                    "Could not initialize class " +
+                    "org.pantsbuild.tools.junit.lib.SystemExitsInObjectBody$")
+    ));
   }
 
   @Test
@@ -379,8 +462,8 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
         containsString("at " + testClassName + ".writeAFile(FileAccessTests.java:"));
 
     assertThat(output, testFailedWithName(testClass, "deleteAFile",
-            exceptionName + ": Access to file: " + testFilePath + "a.different.file" +
-                " not allowed"));
+        exceptionName + ": Access to file: " + testFilePath + "a.different.file" +
+            " not allowed"));
     // ...
     assertThat(output,
         containsString("at " + testClassName + ".deleteAFile(FileAccessTests.java:"));
@@ -401,10 +484,9 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
 
     assertThat(output, hasFailureCountOf("2"));
     String testClassName = "org.pantsbuild.tools.junit.lib.security.fileaccess.FileAccessTests";
-    String testFilePath = "tests/resources/org/pantsbuild/tools/junit/lib/";
     String exceptionName = "org.pantsbuild.junit.security.SecurityViolationException";
     assertThat(output, testFailedWithName(testClass, "tempfile",
-            exceptionName + ": Access to file: "));
+        exceptionName + ": Access to file: "));
     // ...
     assertThat(output,
         containsString("at " + testClassName + ".tempfile(FileAccessTests.java:"));
@@ -428,8 +510,8 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
     return containsString(testReportLine(testClass.getCanonicalName(), testName) + reason);
   }
 
-  private Matcher<String> hasFailureCountOf(String failureCt) {
-    return containsString("Failures: " + failureCt + "\n");
+  private Matcher<String> hasFailureCountOf(String failureCount) {
+    return containsString("Failures: " + failureCount + "\n");
   }
 
   private String testReportLine(String testClassName, String testName) {

@@ -121,7 +121,7 @@ public class ConsoleRunnerImplTestSetup {
         secMgrConfig);
   }
 
-  private String runTests(
+  protected String runTests(
       List<String> tests,
       boolean shouldFail,
       JunitSecurityManagerConfig config
@@ -151,7 +151,7 @@ public class ConsoleRunnerImplTestSetup {
       System.setErr(originalErr);
 
       System.setSecurityManager(null); // TODO disallow this, but allow here, could also
-      // TODO add a reset button to the sec mgr
+      // TODO add a reset button to the sec mgr, or just have a registration feature
     }
   }
 
