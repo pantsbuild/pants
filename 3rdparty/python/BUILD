@@ -9,10 +9,7 @@ python_requirements()
 python_requirement_library(
   name='antlr4',
   requirements=[
-    # TODO: this library is not currently linked from pypi, so we override the repository
-    # to fetch it from antlr.org instead. If at any point it reappears on pypi, the
-    # repository arg can be removed.
-    python_requirement('antlr4-python3-runtime==4.7.2')
+    python_requirement('antlr4-python3-runtime==4.8')
   ]
 )
 

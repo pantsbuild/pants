@@ -4,7 +4,7 @@
 python_antlr_library(
   name = 'eval',
   module = 'pants_antlr.test.eval',
-  sources = [],
+  sources = ['Eval.g4', 'Expr.g4'],
 )
 
 

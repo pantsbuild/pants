@@ -17,7 +17,7 @@ from pants.util.memo import memoized_method
 logger = logging.getLogger(__name__)
 
 
-_ANTLR4_REV = "4.7.2"
+_ANTLR4_REV = "4.8"
 
 
 # TODO: Refactor this and AntlrJavaGen to share a common base class with most of the functionality.
