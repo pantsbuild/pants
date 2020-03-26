@@ -3,8 +3,6 @@
 
 package org.pantsbuild.tools.junit.impl;
 
-import com.google.common.base.Charsets;
-import com.google.common.collect.Lists;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -12,15 +10,18 @@ import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.List;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
 import java.util.Arrays;
+import java.util.List;
+
+import com.google.common.base.Charsets;
+import com.google.common.collect.Lists;
 
 import org.hamcrest.Description;
 import org.hamcrest.Matcher;
 import org.hamcrest.TypeSafeDiagnosingMatcher;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.Result;
@@ -158,8 +159,8 @@ public class ConsoleRunnerImplTest {
         useExperimentalRunner,
         outputStream,
         System.err  // TODO, if there's an error reported on system err, it doesn't show up in
-                    // the test failures.
-        );
+        // the test failures.
+    );
 
     try {
       runner.run(tests);
@@ -420,7 +421,8 @@ public class ConsoleRunnerImplTest {
     }
 
     @Override
-    protected boolean matchesSafely(Iterable<? super T> collection, Description mismatchDescription) {
+    protected boolean matchesSafely(Iterable<? super T> collection,
+                                    Description mismatchDescription) {
       boolean foundOne = false;
       String s;
       for (Object t : collection) {
