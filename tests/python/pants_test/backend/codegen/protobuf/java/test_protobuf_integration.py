@@ -140,7 +140,7 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
             split_points = [
                 index for index, line in enumerate(lines) if split_pattern.search(line) or not line
             ]
-            return [lines[start:end] for start, end in pairs(split_points + [-1,]) if lines[start]]
+            return [lines[start:end] for start, end in pairs(split_points + [-1]) if lines[start]]
 
         # Scraping debug statements for protoc compilation.
         all_blocks = list(

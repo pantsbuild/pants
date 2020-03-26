@@ -42,7 +42,7 @@ class BinaryUtilTest(TestBase):
             self._map = read_map
 
         def download(self, url, path_or_fd=None, **kwargs):
-            if not url in self._map:
+            if url not in self._map:
                 raise IOError(f"404: Virtual URL '{url}' does not exist.")
             if not path_or_fd:
                 raise AssertionError("Expected path_or_fd to be set")

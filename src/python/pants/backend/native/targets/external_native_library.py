@@ -108,9 +108,7 @@ class ExternalNativeLibrary(Target):
             raise_type=self._DeprecatedStringPackage,
         )
 
-        payload.add_fields(
-            {"packages": ConanRequirementSetField(packages),}
-        )
+        payload.add_fields({"packages": ConanRequirementSetField(packages)})
         super().__init__(payload=payload, **kwargs)
 
     @property

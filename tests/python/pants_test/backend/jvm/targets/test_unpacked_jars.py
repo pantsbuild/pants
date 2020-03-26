@@ -15,7 +15,7 @@ class UnpackedJarsTest(TestBase):
     @classmethod
     def alias_groups(cls):
         return BuildFileAliases(
-            targets={"jar_library": JarLibrary, "unpacked_jars": UnpackedJars,},
+            targets={"jar_library": JarLibrary, "unpacked_jars": UnpackedJars},
             objects={"jar": JarDependency},
         )
 

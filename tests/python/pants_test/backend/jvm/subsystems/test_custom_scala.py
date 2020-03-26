@@ -70,7 +70,7 @@ class CustomScalaTest(NailgunTaskTestBase):
         )
 
     def scala_platform_setup(self):
-        options = {ScalaPlatform.options_scope: {"version": "custom", "suffix_version": "2.10",}}
+        options = {ScalaPlatform.options_scope: {"version": "custom", "suffix_version": "2.10"}}
         init_subsystem(ScalaPlatform, options)
 
         self.make_target(

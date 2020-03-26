@@ -118,13 +118,13 @@ class TestPythonSources(TestBase):
             self.request_single_product(HydratedSources, multiple_sources.request)
         assert "has 2 sources" in str(exc.value)
 
-    def test_python_library_sources_default_globs(self) -> None:
+    def test_python_library_sources_default(self) -> None:
         self.create_files(path="", files=[*self.PYTHON_SRC_FILES, *self.PYTHON_TEST_FILES])
         sources = PythonLibrarySources(None, address=Address.parse(":lib"))
         result = self.request_single_product(HydratedSources, sources.request)
         assert result.snapshot.files == self.PYTHON_SRC_FILES
 
-    def test_python_tests_sources_default_globs(self) -> None:
+    def test_python_tests_sources_default(self) -> None:
         self.create_files(path="", files=[*self.PYTHON_SRC_FILES, *self.PYTHON_TEST_FILES])
         sources = PythonTestsSources(None, address=Address.parse(":tests"))
         result = self.request_single_product(HydratedSources, sources.request)

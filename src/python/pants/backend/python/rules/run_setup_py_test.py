@@ -54,7 +54,7 @@ class TestSetupPyBase(TestBase):
     @classmethod
     def alias_groups(cls) -> BuildFileAliases:
         return BuildFileAliases(
-            objects={"python_requirement": PythonRequirement, "setup_py": PythonArtifact,}
+            objects={"python_requirement": PythonRequirement, "setup_py": PythonArtifact}
         )
 
     def tgt(self, addr: str) -> HydratedTarget:

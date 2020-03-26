@@ -14,6 +14,7 @@ from pants.backend.python.rules.prepare_chrooted_python_sources import ChrootedP
 from pants.engine.addressable import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
+from pants.engine.legacy.structs import FilesAdaptor, PythonTargetAdaptor, ResourcesAdaptor
 from pants.engine.rules import rule
 from pants.engine.selectors import Get
 from pants.python.python_setup import PythonSetup
@@ -38,6 +39,13 @@ async def create_pex_from_target_closure(
 ) -> Pex:
     transitive_hydrated_targets = await Get[TransitiveHydratedTargets](Addresses, request.addresses)
     all_targets = transitive_hydrated_targets.closure
+
+    # TODO: Replace this with appropriate target API logic.
+    python_targets = [t for t in all_targets if isinstance(t.adaptor, PythonTargetAdaptor)]
+    resource_targets = [
+        t for t in all_targets if isinstance(t.adaptor, (FilesAdaptor, ResourcesAdaptor))
+    ]
+
     all_target_adaptors = [t.adaptor for t in all_targets]
 
     interpreter_constraints = PexInterpreterConstraints.create_from_adaptors(
@@ -48,7 +56,9 @@ async def create_pex_from_target_closure(
     if request.additional_input_files:
         input_digests.append(request.additional_input_files)
     if request.include_source_files:
-        chrooted_sources = await Get[ChrootedPythonSources](HydratedTargets(all_targets))
+        chrooted_sources = await Get[ChrootedPythonSources](
+            HydratedTargets(python_targets + resource_targets)
+        )
         input_digests.append(chrooted_sources.snapshot.directory_digest)
     merged_input_digest = await Get[Digest](DirectoriesToMerge(directories=tuple(input_digests)))
     requirements = PexRequirements.create_from_adaptors(

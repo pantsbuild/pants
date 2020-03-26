@@ -2,10 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
+import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import ClassVar, Iterable, Tuple, Type
 
+from pants.base.build_root import BuildRoot
 from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses
 from pants.engine.console import Console
@@ -70,9 +72,9 @@ async def create_binary(
     workspace: Workspace,
     options: BinaryOptions,
     distdir: DistDir,
+    buildroot: BuildRoot,
 ) -> Binary:
     with options.line_oriented(console) as print_stdout:
-        print_stdout(f"Generating binaries in `./{distdir.relpath}`")
         binaries = await MultiGet(Get[CreatedBinary](Address, address) for address in addresses)
         merged_digest = await Get[Digest](
             DirectoriesToMerge(tuple(binary.digest for binary in binaries))
@@ -81,7 +83,7 @@ async def create_binary(
             DirectoryToMaterialize(merged_digest, path_prefix=str(distdir.relpath))
         )
         for path in result.output_paths:
-            print_stdout(f"Wrote {path}")
+            print_stdout(f"Wrote {os.path.relpath(path, buildroot.path)}")
     return Binary(exit_code=0)
 
 

@@ -218,7 +218,7 @@ async def select_llvm_c_toolchain(
             .prepend_field("runtime_library_dirs", provided_gcc.runtime_library_dirs)
         )
 
-    working_c_compiler = joined_c_compiler.prepend_field("extra_args", ["-x", "c", "-std=c11",])
+    working_c_compiler = joined_c_compiler.prepend_field("extra_args", ["-x", "c", "-std=c11"])
 
     llvm_linker_wrapper = await Get[LLVMLinker](NativeToolchain, native_toolchain)
     working_linker = llvm_linker_wrapper.for_compiler(working_c_compiler)
@@ -300,7 +300,7 @@ async def select_gcc_c_toolchain(
     # GCC needs an assembler, so we provide that (platform-specific) tool here.
     assembler = await Get[Assembler](NativeToolchain, native_toolchain)
     working_c_compiler = joined_c_compiler.sequence(assembler).prepend_field(
-        "extra_args", ["-x", "c", "-std=c11",]
+        "extra_args", ["-x", "c", "-std=c11"]
     )
 
     gcc_linker_wrapper = await Get[GCCLinker](NativeToolchain, native_toolchain)

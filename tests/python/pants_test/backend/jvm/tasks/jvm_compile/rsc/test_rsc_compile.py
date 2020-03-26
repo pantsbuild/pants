@@ -415,7 +415,7 @@ class RscCompileTest(NailgunTaskTestBase):
     def init_dependencies_for_scala_libraries(self):
         init_subsystem(
             ScalaPlatform,
-            {ScalaPlatform.options_scope: {"version": "custom", "suffix_version": "2.12",}},
+            {ScalaPlatform.options_scope: {"version": "custom", "suffix_version": "2.12"}},
         )
         init_subsystem(JUnit,)
         init_subsystem(ScoveragePlatform)

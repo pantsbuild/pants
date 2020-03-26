@@ -61,7 +61,7 @@ class CheckstyleTest(NailgunTaskTestBase):
                     "bootstrap_tools": ["//:checkstyle"],
                     "properties": properties or {},
                 },
-                CheckstyleSubsystem.options_scope: {"config": self._create_config_file(rules_xml),},
+                CheckstyleSubsystem.options_scope: {"config": self._create_config_file(rules_xml)},
             },
             target_roots=target_roots,
         )
@@ -150,7 +150,7 @@ class CheckstyleTest(NailgunTaskTestBase):
         with_tab_2 = self._create_target("with_tab_2", self._TEST_JAVA_SOURCE_WITH_TAB)
         context = self._create_context(
             rules_xml=[self._RULE_XML_SUPPRESSION_FILTER, self._RULE_XML_FILE_TAB_CHECKER],
-            properties={"checkstyle.suppression.file": suppression_file,},
+            properties={"checkstyle.suppression.file": suppression_file},
             target_roots=[no_tab, with_tab_1, with_tab_2],
         )
 

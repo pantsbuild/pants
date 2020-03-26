@@ -112,7 +112,7 @@ class ListTargetsTest(GoalRuleTestBase):
             "a/b:b", "a/b/c:c", "a/b/c:c2", "a/b/c:c3", "a/b/d:d", "a/b/e:e1", args=["a/b::"]
         )
 
-    @pytest.mark.flaky(retries=1)  # https://github.com/pantsbuild/pants/issues/8678
+    @pytest.mark.skip(reason="flaky: https://github.com/pantsbuild/pants/issues/8678")
     def test_list_all(self):
         self.assert_entries(
             "\n",
@@ -137,7 +137,7 @@ class ListTargetsTest(GoalRuleTestBase):
             "a/b/d:d",
             "a/b/e:e1",
             "f:alias",
-            args=["--sep=, ", "::",],
+            args=["--sep=, ", "::"],
         )
 
         self.assert_console_output(

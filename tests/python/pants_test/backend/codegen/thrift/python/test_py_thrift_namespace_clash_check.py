@@ -163,7 +163,7 @@ org.pantsbuild.namespace: [(src/py-thrift-clashing:clashingA, src/py-thrift-clas
             [
                 (
                     "org.pantsbuild.py_whatever",
-                    [(commented_thrift_source_target, "src/py-thrift/with-header.thrift"),],
+                    [(commented_thrift_source_target, "src/py-thrift/with-header.thrift")],
                 )
             ],
             list(namespaces_by_files.items()),

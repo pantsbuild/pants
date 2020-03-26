@@ -9,7 +9,7 @@ from pants.contrib.jax_ws.tasks.jax_ws_gen import JaxWsGen
 
 
 def build_file_aliases():
-    return BuildFileAliases(targets={"jax_ws_library": JaxWsLibrary,})
+    return BuildFileAliases(targets={"jax_ws_library": JaxWsLibrary})
 
 
 def register_goals():

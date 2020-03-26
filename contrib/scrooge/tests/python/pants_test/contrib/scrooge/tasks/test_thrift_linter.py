@@ -19,7 +19,7 @@ class ThriftLinterTest(TaskTestBase):
 
     @classmethod
     def alias_groups(cls):
-        return BuildFileAliases(targets={"java_thrift_library": JavaThriftLibrary,},)
+        return BuildFileAliases(targets={"java_thrift_library": JavaThriftLibrary})
 
     @classmethod
     def task_type(cls):

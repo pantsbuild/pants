@@ -17,7 +17,7 @@ class ScoveragePlatformTest(TestBase):
     blacklist_file_path = "my/file/new_blacklist_scoverage_test"
 
     def setup_scoverage_platform(self):
-        options = {ScalaPlatform.options_scope: {"version": "custom", "suffix_version": "2.10",}}
+        options = {ScalaPlatform.options_scope: {"version": "custom", "suffix_version": "2.10"}}
 
         options2 = {ScoveragePlatform.options_scope: {"enable_scoverage": "False"}}
 

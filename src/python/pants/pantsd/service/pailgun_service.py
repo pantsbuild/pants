@@ -48,9 +48,7 @@ class PailgunService(PantsService):
         """Sets up a PailgunServer instance."""
         # Constructs and returns a runnable PantsRunner.
         def runner_factory(sock, arguments, environment):
-            return self._runner_class.create(
-                sock, arguments, environment, self.services, self._scheduler_service,
-            )
+            return self._runner_class.create(sock, arguments, environment, self._scheduler_service,)
 
         # Plumb the daemon's lifecycle lock to the `PailgunServer` to safeguard teardown.
         # This indirection exists to allow the server to be created before PantsService.setup

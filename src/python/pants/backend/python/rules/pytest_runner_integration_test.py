@@ -99,7 +99,7 @@ class PythonTestRunnerIntegrationTest(TestBase):
                 "python_tests": PythonTests,
                 "python_requirement_library": PythonRequirementLibrary,
             },
-            objects={"python_requirement": PythonRequirement,},
+            objects={"python_requirement": PythonRequirement},
         )
 
     @classmethod

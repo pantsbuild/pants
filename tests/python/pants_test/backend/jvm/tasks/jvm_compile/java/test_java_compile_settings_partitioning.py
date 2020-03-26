@@ -163,7 +163,7 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
             default_platform="11",
         )
         self.assert_partitions_equal(
-            {self._version("11"): {java, java11}, self._version("12"): {java12},}, partition
+            {self._version("11"): {java, java11}, self._version("12"): {java12}}, partition
         )
 
     def test_invalid_source_target_combination_by_jvm_platform(self):
@@ -199,7 +199,7 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
                 JvmPlatformSettings(
                     source_level="1.8",
                     target_level="1.8",
-                    args=["foo", "bar", "foo:$JAVA_HOME/bar:$JAVA_HOME/foobar", "$JAVA_HOME",],
+                    args=["foo", "bar", "foo:$JAVA_HOME/bar:$JAVA_HOME/foobar", "$JAVA_HOME"],
                     jvm_options=[],
                 )
             )
@@ -254,7 +254,7 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
             of paths to the java homes for each distribution.
             """
             with fake_distributions(versions) as paths:
-                path_options = {DistributionLocator.options_scope: {"paths": {os_name: paths,}}}
+                path_options = {DistributionLocator.options_scope: {"paths": {os_name: paths}}}
                 Subsystem.reset()
                 init_subsystem(DistributionLocator, options=path_options)
                 yield paths

@@ -624,6 +624,7 @@ function build_pex() {
   execute_pex \
     -o "${dest}" \
     --no-emit-warnings \
+    --no-strip-pex-env \
     --script=pants \
     --interpreter-constraint="${interpreter_constraint}" \
     "${platform_flags[@]}" \

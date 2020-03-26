@@ -9,6 +9,7 @@ from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Workspace
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
+from pants.option.global_options import GlobalOptions
 from pants.rules.core.binary import CreatedBinary
 from pants.rules.core.run import Run, run
 from pants.testutil.engine.util import MockConsole, MockGet, run_rule
@@ -44,6 +45,7 @@ class RunTest(TestBase):
                 BuildRoot(),
                 Addresses([Address.parse(address_spec)]),
                 MockOptions(args=[]),
+                GlobalOptions.global_instance(),
             ],
             mock_gets=[
                 MockGet(

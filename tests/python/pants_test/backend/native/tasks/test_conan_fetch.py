@@ -38,7 +38,7 @@ class ConanFetchTest(TaskTestBase):
         user_home = conan_fetch._conan_user_home(conan_pex, in_workdir=True)
 
         (stdout, stderr, exit_code, _) = conan_pex.output(
-            ["remote", "list"], env={"CONAN_USER_HOME": user_home,}
+            ["remote", "list"], env={"CONAN_USER_HOME": user_home}
         )
         self.assertEqual(0, exit_code)
         self.assertEqual(stdout, "pants-conan: https://conan.bintray.com [Verify SSL: True]\n")

@@ -50,7 +50,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             pantsd_run(["compile", "examples/src/scala/org/pantsbuild/example/hello/welcome"])
             checker.assert_started()
 
-    @unittest.skip("Flaky as described in: https://github.com/pantsbuild/pants/issues/7573")
+    @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/7573")
     def test_pantsd_run(self):
         with self.pantsd_successful_run_context("debug") as (
             pantsd_run,
@@ -124,7 +124,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                 )
                 checker.assert_running()
 
-    @pytest.mark.flaky(retries=1)  # https://github.com/pantsbuild/pants/issues/6114
+    @pytest.mark.skip(reason="flaky: https://github.com/pantsbuild/pants/issues/6114")
     def test_pantsd_lifecycle_invalidation(self):
         """Runs pants commands with pantsd enabled, in a loop, alternating between options that
         should invalidate pantsd and incur a restart and then asserts for pid consistency."""
@@ -216,7 +216,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         for run_pairs in zip(non_daemon_runs, daemon_runs):
             self.assertEqual(*(run.stdout_data for run in run_pairs))
 
-    @unittest.skip("Flaky as described in: https://github.com/pantsbuild/pants/issues/7622")
+    @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/7622")
     def test_pantsd_filesystem_invalidation(self):
         """Runs with pantsd enabled, in a loop, while another thread invalidates files."""
         with self.pantsd_successful_run_context() as (pantsd_run, checker, workdir, _):
@@ -385,7 +385,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             # Remove the pidfile so that the teardown script doesn't try to kill process 9.
             os.unlink(pidpath)
 
-    @pytest.mark.flaky(retries=1)  # https://github.com/pantsbuild/pants/issues/8193
+    @pytest.mark.skip(reason="flaky: https://github.com/pantsbuild/pants/issues/8193")
     def test_pantsd_memory_usage(self):
         """Validates that after N runs, memory usage has increased by no more than X percent."""
         number_of_runs = 10
@@ -542,7 +542,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                 # The pantsd processes should be dead, and they should have exited with 1.
                 self.assertFalse(proc.is_running())
 
-    @unittest.skip("Flaky as described in: https://github.com/pantsbuild/pants/issues/7554")
+    @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/7554")
     def test_pantsd_sigterm(self):
         self._assert_pantsd_keyboardinterrupt_signal(
             signal.SIGTERM,
@@ -560,7 +560,7 @@ $""",
             ],
         )
 
-    @unittest.skip("Flaky as described in: https://github.com/pantsbuild/pants/issues/7572")
+    @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/7572")
     def test_pantsd_sigquit(self):
         self._assert_pantsd_keyboardinterrupt_signal(
             signal.SIGQUIT,
@@ -578,7 +578,7 @@ $""",
             ],
         )
 
-    @unittest.skip("Flaky as described in: https://github.com/pantsbuild/pants/issues/7547")
+    @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/7547")
     def test_pantsd_sigint(self):
         self._assert_pantsd_keyboardinterrupt_signal(
             signal.SIGINT,
@@ -592,7 +592,7 @@ $"""
             ],
         )
 
-    @unittest.skip("Flaky as described in: https://github.com/pantsbuild/pants/issues/7457")
+    @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/7457")
     def test_signal_pailgun_stream_timeout(self):
         # NB: The actual timestamp has the date and time at sub-second granularity. The date is just
         # used here since that is known in advance in order to assert that the timestamp is well-formed.
@@ -793,7 +793,7 @@ Interrupted by user over pailgun client!
 
         NB: testprojects/src/python/nested_runs assumes that the pants.toml file is in ${workdir}/pants.toml
         """
-        config = {"GLOBAL": {"pantsd_timeout_when_multiple_invocations": 1,}}
+        config = {"GLOBAL": {"pantsd_timeout_when_multiple_invocations": 1}}
         with self.pantsd_successful_run_context(extra_config=config) as (
             pantsd_run,
             checker,

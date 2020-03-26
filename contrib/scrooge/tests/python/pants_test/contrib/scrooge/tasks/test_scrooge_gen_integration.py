@@ -35,7 +35,7 @@ class ScroogeGenTest(PantsRunIntegrationTest):
                     ],
                 },
                 "service_exports": {
-                    "java": ["3rdparty:thrift",],
+                    "java": ["3rdparty:thrift"],
                     "scala": [
                         "3rdparty:thrift",
                         "3rdparty/jvm/com/twitter:finagle-thrift",
@@ -43,12 +43,12 @@ class ScroogeGenTest(PantsRunIntegrationTest):
                     ],
                 },
                 "structs_deps": {
-                    "java": ["3rdparty:thrift", "3rdparty/jvm/com/twitter:scrooge-core",],
-                    "scala": ["3rdparty:thrift", "3rdparty/jvm/com/twitter:scrooge-core",],
+                    "java": ["3rdparty:thrift", "3rdparty/jvm/com/twitter:scrooge-core"],
+                    "scala": ["3rdparty:thrift", "3rdparty/jvm/com/twitter:scrooge-core"],
                 },
                 "structs_exports": {
-                    "java": ["3rdparty:thrift", "3rdparty/jvm/com/twitter:scrooge-core",],
-                    "scala": ["3rdparty:thrift", "3rdparty/jvm/com/twitter:scrooge-core",],
+                    "java": ["3rdparty:thrift", "3rdparty/jvm/com/twitter:scrooge-core"],
+                    "scala": ["3rdparty:thrift", "3rdparty/jvm/com/twitter:scrooge-core"],
                 },
             },
         }

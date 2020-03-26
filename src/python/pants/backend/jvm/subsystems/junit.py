@@ -21,13 +21,13 @@ class JUnit(JvmToolMixin, InjectablesMixin, Subsystem):
 
     @classmethod
     def register_options(cls, register):
-        super(JUnit, cls).register_options(register)
-        cls.register_jvm_tool(register, "junit_library", classpath=[cls.LIBRARY_JAR,])
+        super().register_options(register)
+        cls.register_jvm_tool(register, "junit_library", classpath=[cls.LIBRARY_JAR])
 
         cls.register_jvm_tool(
             register,
             "junit",
-            classpath=[cls._RUNNER_JAR,],
+            classpath=[cls._RUNNER_JAR],
             main=cls.RUNNER_MAIN,
             # TODO(John Sirois): Investigate how much less we can get away with.
             # Clearly both tests and the runner need access to the same @Test,
