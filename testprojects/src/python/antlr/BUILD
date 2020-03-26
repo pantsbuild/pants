@@ -4,6 +4,7 @@ python_library(
   dependencies = [
     'testprojects/src/antlr/python/test:eval',
   ],
+  compatibility='CPython>=3.6,<4',
 )
 
 python_binary(
@@ -12,4 +13,5 @@ python_binary(
   dependencies = [
     ':eval',
   ],
+  compatibility='CPython>=3.6,<4',
 )

@@ -88,11 +88,10 @@ class AntlrPyGen(SimpleCodegenTask, NailgunTask):
     def execute_codegen(self, target, target_workdir):
         args = ["-o", target_workdir]
         compiler = target.compiler
-        java_package = self._get_sources_package(target)
-
         if compiler == "antlr3":
             java_main = "org.antlr.Tool"
         elif compiler == "antlr4":
+            args.append("-Dlanguage=Python3")
             java_main = "org.antlr.v4.Tool"
         else:
             raise TaskError("Unsupported ANTLR compiler: {}".format(compiler))
