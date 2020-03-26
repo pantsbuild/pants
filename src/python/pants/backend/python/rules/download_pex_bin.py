@@ -4,7 +4,6 @@
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping, Optional
 
-from pants.backend.python.rules.hermetic_pex import HermeticPex
 from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.binaries.binary_tool import BinaryToolFetchRequest, Script, ToolForPlatform, ToolVersion
@@ -23,7 +22,12 @@ class PexBinUrlGenerator(BinaryToolUrlGenerator):
 
 
 @dataclass(frozen=True)
-class DownloadedPexBin(HermeticPex):
+class PexBinExecuteRequest:
+    exe_req: ExecuteProcessRequest
+
+
+@dataclass(frozen=True)
+class DownloadedPexBin:
     exe: SingleFileExecutable
 
     @property
@@ -52,54 +56,6 @@ class DownloadedPexBin(HermeticPex):
 
         def get_external_url_generator(self):
             return PexBinUrlGenerator()
-
-    def create_execute_request(  # type: ignore[override]
-        self,
-        python_setup: PythonSetup,
-        subprocess_encoding_environment: SubprocessEncodingEnvironment,
-        pex_build_environment: PexBuildEnvironment,
-        *,
-        pex_args: Iterable[str],
-        description: str,
-        input_files: Optional[Digest] = None,
-        env: Optional[Mapping[str, str]] = None,
-        **kwargs: Any,
-    ) -> ExecuteProcessRequest:
-        """Creates an ExecuteProcessRequest that will run the pex CLI tool hermetically.
-
-        :param python_setup: The parameters for selecting python interpreters to use when invoking
-                             the pex tool.
-        :param subprocess_encoding_environment: The locale settings to use for the pex tool
-                                                invocation.
-        :param pex_build_environment: The build environment for the pex tool.
-        :param pex_args: The arguments to pass to the pex CLI tool.
-        :param description: A description of the process execution to be performed.
-        :param input_files: The files that contain the pex CLI tool itself and any input files it
-                            needs to run against. By default just the files that contain the pex CLI
-                            tool itself. To merge in additional files, include the
-                            `directory_digest` in `DirectoriesToMerge` request.
-        :param env: The environment to run the PEX in.
-        :param kwargs: Any additional :class:`ExecuteProcessRequest` kwargs to pass through.
-        """
-
-        env = dict(env) if env else {}
-        env.update(
-            # We ask Pex to --disable-cache so we shouldn't also set a PEX_ROOT (asking it to
-            # cache).
-            PEX_ROOT="",
-            **pex_build_environment.invocation_environment_dict,
-        )
-
-        return super().create_execute_request(
-            python_setup=python_setup,
-            subprocess_encoding_environment=subprocess_encoding_environment,
-            pex_path=self.executable,
-            pex_args=["--disable-cache"] + list(pex_args),
-            description=description,
-            input_files=input_files or self.directory_digest,
-            env=env,
-            **kwargs,
-        )
 
 
 @rule

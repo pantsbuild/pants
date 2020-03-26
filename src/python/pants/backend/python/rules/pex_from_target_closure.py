@@ -13,6 +13,7 @@ from pants.backend.python.rules.pex import (
 from pants.backend.python.rules.prepare_chrooted_python_sources import ChrootedPythonSources
 from pants.engine.addressable import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge
+from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
 from pants.engine.legacy.structs import FilesAdaptor, PythonTargetAdaptor, ResourcesAdaptor
 from pants.engine.rules import rule
@@ -36,7 +37,7 @@ class CreatePexFromTargetClosure:
 @rule(name="Create PEX from targets")
 async def create_pex_from_target_closure(
     request: CreatePexFromTargetClosure, python_setup: PythonSetup
-) -> Pex:
+) -> CreatePex:
     transitive_hydrated_targets = await Get[TransitiveHydratedTargets](Addresses, request.addresses)
     all_targets = transitive_hydrated_targets.closure
 
@@ -65,7 +66,7 @@ async def create_pex_from_target_closure(
         adaptors=all_target_adaptors, additional_requirements=request.additional_requirements
     )
 
-    create_pex_request = CreatePex(
+    return CreatePex(
         output_filename=request.output_filename,
         requirements=requirements,
         interpreter_constraints=interpreter_constraints,
@@ -73,9 +74,6 @@ async def create_pex_from_target_closure(
         input_files_digest=merged_input_digest,
         additional_args=request.additional_args,
     )
-
-    pex = await Get[Pex](CreatePex, create_pex_request)
-    return pex
 
 
 def rules():

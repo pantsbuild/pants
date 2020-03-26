@@ -9,6 +9,7 @@ from typing import Dict, Optional, Tuple, Union
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Digest
 from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.rules import RootRule, rule
+from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
 
 logger = logging.getLogger(__name__)
@@ -68,6 +69,13 @@ class ExecuteProcessRequest:
         )
         self.jdk_home = jdk_home
         self.is_nailgunnable = is_nailgunnable
+
+    @memoized_property
+    def env_dict(self) -> Dict[str, str]:
+        return {
+            self.env[i]: self.env[i + 1]
+            for i in range(0, len(self.env), 2)
+        }
 
 
 @frozen_after_init

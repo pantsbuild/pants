@@ -4,7 +4,7 @@
 import logging
 import os
 import subprocess
-from typing import Iterable, Optional, Tuple, cast
+from typing import Iterable, List, Optional, Tuple, cast
 
 from pex.variables import Variables
 
@@ -166,6 +166,14 @@ class PythonSetup(Subsystem):
     @memoized_property
     def interpreter_search_paths(self):
         return self.expand_interpreter_search_paths(self.get_options().interpreter_search_paths)
+
+    @property
+    def interpreter_search_paths_ensure_directories(self) -> List[str]:
+        """pex will accept direct paths to python executables, but we need directories to create a hermetic PATH."""
+        return [
+            path if os.path.isdir(path) else os.path.dirname(path)
+            for path in self.interpreter_search_paths
+        ]
 
     @property
     def platforms(self):

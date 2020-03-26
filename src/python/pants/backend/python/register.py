@@ -6,6 +6,7 @@ from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.python_requirements import PythonRequirements
 from pants.backend.python.rules import (
     download_pex_bin,
+    hermetic_pex,
     inject_init,
     pex,
     pex_from_target_closure,
@@ -109,6 +110,7 @@ def register_goals():
 def rules():
     return (
         *download_pex_bin.rules(),
+        *hermetic_pex.rules(),
         *inject_init.rules(),
         *prepare_chrooted_python_sources.rules(),
         *pex.rules(),

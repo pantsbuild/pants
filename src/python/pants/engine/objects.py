@@ -175,6 +175,9 @@ class Collection(Generic[_C], Iterable):
     def __bool__(self) -> bool:
         return bool(self.dependencies)
 
+    def __repr__(self) -> str:
+        return repr(self.dependencies)
+
 
 @decorated_type_checkable
 def union(cls):
