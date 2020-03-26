@@ -105,9 +105,8 @@ async def hydrate_struct(address_mapper: AddressMapper, address: Address) -> Hyd
     Recursively collects any embedded addressables within the Struct, but will not walk into a
     dependencies field, since those should be requested explicitly by rules.
     """
-    build_file_address = await Get[BuildFileAddress](Address, address)
     address_family = await Get[AddressFamily](Dir(address.spec_path))
-    struct = address_family.addressables.get(build_file_address)
+    struct = address_family.addressables_as_address_keyed.get(address)
 
     inline_dependencies = []
 

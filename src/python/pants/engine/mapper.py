@@ -3,10 +3,10 @@
 
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, Optional, Tuple, Union
+from typing import Any, Dict, Iterable, Optional, Tuple, Union, cast
 
 from pants.base.exceptions import DuplicateNameError, MappingError, UnaddressableObjectError
-from pants.build_graph.address import BuildFileAddress
+from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.objects import Serializable
 from pants.engine.parser import Parser
 from pants.util.memo import memoized_property
@@ -136,6 +136,14 @@ class AddressFamily:
             BuildFileAddress(rel_path=path, target_name=name): obj
             for name, (path, obj) in self.objects_by_name.items()
         }
+
+    @property
+    def addressables_as_address_keyed(self) -> Dict[Address, ThinAddressableObject]:
+        """Identical to `addresses`, but with a `cast` to allow for type safe lookup of `Address`es.
+
+        :rtype: dict from `Address` to thin addressable objects.
+        """
+        return cast(Dict[Address, ThinAddressableObject], self.addressables)
 
     def __hash__(self):
         return hash(self.namespace)
