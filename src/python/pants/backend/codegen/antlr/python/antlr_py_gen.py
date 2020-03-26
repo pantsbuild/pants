@@ -86,7 +86,8 @@ class AntlrPyGen(SimpleCodegenTask, NailgunTask):
         return parents.pop().replace("/", ".")
 
     def execute_codegen(self, target, target_workdir):
-        args = ["-o", target_workdir]
+        output_dir = self._create_package_structure(target_workdir, target.module)
+        args = ["-o", output_dir]
         compiler = target.compiler
         if compiler == "antlr3":
             java_main = "org.antlr.Tool"

@@ -8,9 +8,11 @@ import sys
 
 import antlr4
 import antlr4.tree
-from pants_antlr.test.eval.Eval import Eval
-from pants_antlr.test.eval.ExprLexer import ExprLexer
-from pants_antlr.test.eval.ExprParser import ExprParser
+from pants_antlr.test.eval.testprojects.src.antlr.python.test.EvalListener import (
+    EvalListener,
+    ExprLexer,
+    ExprParser,
+)
 
 
 def main(expr):
@@ -32,7 +34,7 @@ def main(expr):
 
     nodes = antlr4.tree.CommonTreeNodeStream(root)
     nodes.setTokenStream(tokens)
-    eval = Eval(nodes)
+    eval = EvalListener(nodes)
     eval.prog()
 
 
