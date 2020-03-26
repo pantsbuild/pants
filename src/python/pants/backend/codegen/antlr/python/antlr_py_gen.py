@@ -17,7 +17,6 @@ from pants.util.memo import memoized_method
 logger = logging.getLogger(__name__)
 
 
-_ANTLR3_REV = "3.1.3"
 _ANTLR4_REV = "4.7.2"
 
 
@@ -38,30 +37,17 @@ class AntlrPyGen(SimpleCodegenTask, NailgunTask):
         # The ANTLR compiler.
         cls.register_jvm_tool(
             register,
-            "antlr3",
-            classpath=[JarDependency(org="org.antlr", name="antlr", rev=_ANTLR3_REV)],
-            classpath_spec="//:antlr-{}".format(_ANTLR3_REV),
-        )
-        cls.register_jvm_tool(
-            register,
             "antlr4",
             classpath=[JarDependency(org="org.antlr", name="antlr4", rev=_ANTLR4_REV)],
             classpath_spec="//:antlr4-{}".format(_ANTLR4_REV),
         )
         # The ANTLR runtime python deps.
         register(
-            "--antlr3-deps",
-            advanced=True,
-            type=list,
-            member_type=target_option,
-            help="A list of address specs pointing to dependencies of ANTLR3 generated code.",
-        )
-        register(
             "--antlr4-deps",
             advanced=True,
             type=list,
             member_type=target_option,
-            help="A list of address specs pointing to dependencies of ANTLR3 generated code.",
+            help="A list of address specs pointing to dependencies of ANTLR4 generated code.",
         )
 
     def find_sources(self, target, target_dir):
@@ -107,11 +93,6 @@ class AntlrPyGen(SimpleCodegenTask, NailgunTask):
         if compiler == "antlr3":
             java_main = "org.antlr.Tool"
         elif compiler == "antlr4":
-            args.append("-visitor")  # Generate Parse Tree Visitor As Well
-            # Note that this assumes that there is no package set in the antlr file itself,
-            # which is considered an ANTLR best practice.
-            args.append("-package")
-            args.append(java_package)
             java_main = "org.antlr.v4.Tool"
         else:
             raise TaskError("Unsupported ANTLR compiler: {}".format(compiler))
