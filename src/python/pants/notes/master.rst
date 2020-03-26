@@ -55,7 +55,7 @@ Bugfixes
 * Make roots goal work with the buildroot. (#9378)
   `PR #9378 <https://github.com/pantsbuild/pants/pull/9378>`_
 
-*  Change google maven mirror url (#9352)
+* Change google maven mirror url (#9352)
   `PR #9352 <https://github.com/pantsbuild/pants/pull/9352>`_
 
 * Fix `PathGlobs` to be deterministic for more cache hits (#9347)
