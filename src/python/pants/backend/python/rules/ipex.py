@@ -34,15 +34,20 @@ class IpexRequest:
     underlying_request: CreatePex
 
 
+@dataclass(frozen=True)
+class IpexResult:
+    underlying_request: CreatePex
+
+
 @rule
-async def create_ipex(request: IpexRequest, python_repos: PythonRepos) -> Pex:
+async def create_ipex(request: IpexRequest, python_repos: PythonRepos) -> IpexResult:
     # 1. Create the original pex as-is *without* input files, in order to get the
     #    transitively-resolved requirements from its PEX-INFO.
     orig_request = request.underlying_request
 
-    # Removing the entry point and input files digest means this process execution will be cached even
-    # if the source files change! This is useful because resolving large deps such as tensorflow can
-    # take multiple minutes when uncached.
+    # Removing the entry point and input files digest means this process execution will be cached
+    # even if the source files change! This is useful because resolving large deps such as
+    # tensorflow can take multiple minutes when uncached.
     requirements_only_request = dataclasses.replace(
         orig_request,
         entry_point=None,
@@ -52,8 +57,8 @@ async def create_ipex(request: IpexRequest, python_repos: PythonRepos) -> Pex:
 
     # 2. Extract its requirements.
     requirements_only_unzipped_info = await Get[ExecuteProcessResult](ExecuteProcessRequest(
-        # TODO: make a "hacky local execute process request" type which automatically adds the PATH to
-        # the subprocess `env`!
+        # TODO: make a "hacky local execute process request" type which automatically adds the PATH
+        # to the subprocess `env`!
         argv=('unzip', '-p', requirements_only_pex.output_filename, 'PEX-INFO',),
         env={'PATH': os.environ['PATH']},
         input_files=requirements_only_pex.directory_digest,
@@ -127,7 +132,7 @@ async def create_ipex(request: IpexRequest, python_repos: PythonRepos) -> Pex:
         input_files_digest=merged_input_files,
     )
 
-    return await Get[Pex](CreatePex, modified_request)
+    return IpexResult(modified_request)
 
 
 def rules():
