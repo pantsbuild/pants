@@ -50,7 +50,8 @@ class Spec {
    * @return A new spec that includes the added method.
    */
   Spec withMethod(String method) {
-    return new Spec(clazz, ImmutableSet.<String>builder().addAll(methods).add(method).build(), this.hasCustomRunner);
+    return new Spec(clazz, ImmutableSet.<String>builder().addAll(methods).add(method).build(),
+        this.hasCustomRunner);
   }
 
   /**
