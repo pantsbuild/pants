@@ -4,7 +4,7 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
-1.27.0.dev1 (3/25/2020)
+1.27.0.dev1 (3/26/2020)
 -----------------------
 
 API Changes
