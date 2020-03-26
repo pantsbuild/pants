@@ -41,6 +41,7 @@ import org.junit.runner.manipulation.Filter;
 import org.junit.runner.notification.Failure;
 import org.junit.runner.notification.RunListener;
 import org.junit.runner.notification.RunNotifier;
+import org.junit.runner.notification.StoppedByUserException;
 import org.junit.runners.model.InitializationError;
 import org.junit.runners.model.RunnerBuilder;
 import org.kohsuke.args4j.Argument;
@@ -329,17 +330,13 @@ public class ConsoleRunnerImpl {
    */
   public static class FailFastListener extends RunListener {
     private final RunNotifier runNotifier;
-    private final Result result = new Result();
 
     public FailFastListener(RunNotifier runNotifier) {
       this.runNotifier = runNotifier;
-      this.runNotifier.addListener(result.createListener());
     }
 
     @Override
-    public void testFailure(Failure failure) throws Exception {
-      runNotifier.fireTestFinished(failure.getDescription());
-      runNotifier.fireTestRunFinished(result);
+    public void testFailure(Failure failure) {
       runNotifier.pleaseStop();
     }
   }
@@ -361,7 +358,12 @@ public class ConsoleRunnerImpl {
 
     @Override public void run(RunNotifier notifier) {
       notifier.addListener(new FailFastListener(notifier));
-      wrappedRunner.run(notifier);
+      try {
+        wrappedRunner.run(notifier);
+      } catch (StoppedByUserException ignore) {
+        // NB: By swallowing StoppedByUserException here, we ensure that the RunFinished callback is
+        // fired once, by JUnitCore.
+      }
     }
   }
 
@@ -606,25 +608,16 @@ public class ConsoleRunnerImpl {
       requests = setFilterForTestShard(requests);
     }
 
+    Runner requestRunner;
     if (this.parallelThreads > 1) {
-      ConcurrentCompositeRequestRunner concurrentRunner = new ConcurrentCompositeRequestRunner(
+      requestRunner = new ConcurrentCompositeRequestRunner(
           requests, this.defaultConcurrency, this.parallelThreads);
-      Runner runner = maybeWithFailFastRunner(concurrentRunner);
-      return core.run(runner).getFailureCount();
+    } else {
+      requestRunner = new CompositeRequestRunner(requests);
     }
+    requestRunner = maybeWithFailFastRunner(requestRunner);
 
-    int failures = 0;
-    Result result;
-    for (Request request : requests) {
-      result = core.run(runnerFor(request));
-      failures += result.getFailureCount();
-    }
-    return failures;
-  }
-
-  private Runner runnerFor(Request request) {
-    Runner reqRunner = request.getRunner();
-    return maybeWithFailFastRunner(reqRunner);
+    return core.run(requestRunner).getFailureCount();
   }
 
   private Runner maybeWithFailFastRunner(Runner runner) {
