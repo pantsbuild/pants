@@ -941,7 +941,7 @@ impl NodeVisualizer<NodeKey> for Visualizer {
     let max_colors = 12;
     match entry.peek(context) {
       None => "white".to_string(),
-      Some(Err(Failure::Throw(..))) => "4".to_string(),
+      Some(Err(Failure::Throw(..))) | Some(Err(Failure::FileWatch(..))) => "4".to_string(),
       Some(Err(Failure::Invalidated)) => "12".to_string(),
       Some(Ok(_)) => {
         let viz_colors_len = self.viz_colors.len();
@@ -962,6 +962,7 @@ impl NodeTracer<NodeKey> for Tracer {
     match result {
       Some(Err(Failure::Invalidated)) => false,
       Some(Err(Failure::Throw(..))) => false,
+      Some(Err(Failure::FileWatch(..))) => false,
       Some(Ok(_)) => true,
       None => {
         // A Node with no state is either still running, or effectively cancelled
@@ -986,6 +987,7 @@ impl NodeTracer<NodeKey> for Tracer {
           .join("\n")
       ),
       Some(Err(Failure::Invalidated)) => "Invalidated".to_string(),
+      Some(Err(Failure::FileWatch(failure))) => format!("FileWatch failed: {}", failure),
     }
   }
 }
@@ -1067,17 +1069,32 @@ impl Node for NodeKey {
 
     scope_task_parent_id(maybe_span_id, async move {
       let context2 = context.clone();
-      let result = match self {
-        NodeKey::DigestFile(n) => n.run(context).map(NodeResult::from).compat().await,
-        NodeKey::DownloadedFile(n) => n.run(context).map(NodeResult::from).compat().await,
-        NodeKey::MultiPlatformExecuteProcess(n) => {
-          n.run(context).map(NodeResult::from).compat().await
-        }
-        NodeKey::ReadLink(n) => n.run(context).map(NodeResult::from).compat().await,
-        NodeKey::Scandir(n) => n.run(context).map(NodeResult::from).compat().await,
-        NodeKey::Select(n) => n.run(context).map(NodeResult::from).compat().await,
-        NodeKey::Snapshot(n) => n.run(context).map(NodeResult::from).compat().await,
-        NodeKey::Task(n) => n.run(context).map(NodeResult::from).compat().await,
+      let maybe_watch = if let Some(path) = self.fs_subject() {
+        let abs_path = context.core.build_root.join(path);
+        context
+          .core
+          .watcher
+          .watch(abs_path)
+          .map_err(|e| Failure::FileWatch(format!("{:?}", e)))
+          .await
+      } else {
+        Ok(())
+      };
+
+      let result = match maybe_watch {
+        Ok(()) => match self {
+          NodeKey::DigestFile(n) => n.run(context).map(NodeResult::from).compat().await,
+          NodeKey::DownloadedFile(n) => n.run(context).map(NodeResult::from).compat().await,
+          NodeKey::MultiPlatformExecuteProcess(n) => {
+            n.run(context).map(NodeResult::from).compat().await
+          }
+          NodeKey::ReadLink(n) => n.run(context).map(NodeResult::from).compat().await,
+          NodeKey::Scandir(n) => n.run(context).map(NodeResult::from).compat().await,
+          NodeKey::Select(n) => n.run(context).map(NodeResult::from).compat().await,
+          NodeKey::Snapshot(n) => n.run(context).map(NodeResult::from).compat().await,
+          NodeKey::Task(n) => n.run(context).map(NodeResult::from).compat().await,
+        },
+        Err(e) => Err(e),
       };
       if let Some(started_workunit) = maybe_started_workunit {
         let workunit: WorkUnit = started_workunit.finish();

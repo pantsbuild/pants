@@ -174,7 +174,7 @@ impl ShardedLmdb {
   ///
   pub fn store_bytes<'a, 'b>(
     &'a self,
-    fingerprint: Fingerprint,
+    key: Fingerprint,
     bytes: Bytes,
     initial_lease: bool,
   ) -> BoxFuture<'b, Result<(), String>> {
