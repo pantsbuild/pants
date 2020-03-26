@@ -4,10 +4,12 @@
 package org.pantsbuild.tools.junit.impl;
 
 import com.google.common.base.Charsets;
+
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.PrintStream;
 import java.util.concurrent.TimeUnit;
+
 import org.apache.commons.io.FileUtils;
 import org.junit.Assert;
 import org.junit.Test;
@@ -40,9 +42,9 @@ import static org.junit.Assert.fail;
 import static org.junit.Assume.assumeThat;
 
 /**
-/**
+ * /**
  * Tests features in ConsoleRunner.
- * <P>
+ * <p>
  * See also {@link XmlReportTest}
  */
 public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
@@ -51,7 +53,7 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
    * <P>This test is Parameterized to run with different combinations of
    * -default-concurrency and -use-experimental-runner flags.
    * </P>
-   * <P>
+   * <p>
    * See {@link ConsoleRunnerTestBase#invokeConsoleRunner(String)}
    * </P>
    */
@@ -230,10 +232,11 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
   public void testXmlOutputOnShutdown() throws Exception {
     String outdir = temporary.newFolder("testOutputDir").getAbsolutePath();
     ConsoleRunnerImpl runner =
-      prepareConsoleRunner("XmlOutputOnShutdownTest -xmlreport -outdir " + outdir);
+        prepareConsoleRunner("XmlOutputOnShutdownTest -xmlreport -outdir " + outdir);
 
-    Thread runningTests = new Thread(){
-      @Override public void run() {
+    Thread runningTests = new Thread() {
+      @Override
+      public void run() {
         runner.run();
       }
     };
@@ -381,7 +384,7 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
     MockBurstParallelMethodsTest.reset();
     invokeConsoleRunner("MockBurstParallelMethodsTest -parallel-threads 6");
     assertEquals("bpmtest1:BOTTOM bpmtest1:CHARM bpmtest1:DOWN bpmtest1:STRANGE "
-        + "bpmtest1:TOP bpmtest1:UP",
+            + "bpmtest1:TOP bpmtest1:UP",
         TestRegistry.getCalledTests());
   }
 
@@ -396,7 +399,7 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
     invokeConsoleRunner("MockBurstParallelClassesAndMethodsTest1"
         + " MockBurstParallelClassesAndMethodsTest2 -parallel-threads 5");
     assertEquals("bpcamtest1:BLUE bpcamtest1:RED"
-        + " bpcamtest2:APPLE bpcamtest2:BANANA bpcamtest2:CHERRY",
+            + " bpcamtest2:APPLE bpcamtest2:BANANA bpcamtest2:CHERRY",
         TestRegistry.getCalledTests());
   }
 

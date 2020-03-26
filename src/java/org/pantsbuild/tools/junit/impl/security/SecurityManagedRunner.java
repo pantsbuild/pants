@@ -36,11 +36,13 @@ public class SecurityManagedRunner extends Runner implements Filterable {
     this.securityManager = securityManager;
   }
 
-  @Override public Description getDescription() {
+  @Override
+  public Description getDescription() {
     return wrappedRunner.getDescription();
   }
 
-  @Override public void run(RunNotifier notifier) {
+  @Override
+  public void run(RunNotifier notifier) {
     // NB: SecListener needs to be the first listener, otherwise the failures it fires will not be
     // in the xml results or the console output. This is because those are constructed with
     // subsequent listeners.
@@ -72,7 +74,7 @@ public class SecurityManagedRunner extends Runner implements Filterable {
       }
 
       for (Description description : pop.getChildren()) {
-        if (!seen.contains(description)){
+        if (!seen.contains(description)) {
           queue.add(description);
         }
       }
@@ -105,15 +107,15 @@ public class SecurityManagedRunner extends Runner implements Filterable {
 
   /**
    * Manages the life cycles of the various contexts that things are run in.
-   *
+   * <p>
    * - It notifies the security manager when a test is about to run.
    * - It Injects security failures into the run results.
-   *
+   * <p>
    * The
    */
   public static class SecListener extends RunListener {
     private final RunNotifier runNotifier;
-    private final Map<Description, TestState> tests =  new HashMap<>();
+    private final Map<Description, TestState> tests = new HashMap<>();
     private final JunitSecViolationReportingManager securityManager;
 
     SecListener(RunNotifier runNotifier, JunitSecViolationReportingManager securityManager) {
@@ -208,7 +210,7 @@ public class SecurityManagedRunner extends Runner implements Filterable {
     }
 
     private void reportDanglingThreads(Description description, TestSecurityContext context) {
-      log("desc: "+description+" checking dangling");
+      log("desc: " + description + " checking dangling");
       if (tests.get(description) == TestState.failed) {
         return;
       }
@@ -221,10 +223,10 @@ public class SecurityManagedRunner extends Runner implements Filterable {
                   context.getThreadGroup().activeCount() + "):\n"
                   + getThreadGroupListing(context.getThreadGroup())));
           tests.put(description, TestState.failed);
-          log("desc: "+description+" failed dangling check");
+          log("desc: " + description + " failed dangling check");
         } else {
           tests.put(description, TestState.danglingThreads);
-          log("desc: "+description+" has, but not failed dangling check");
+          log("desc: " + description + " has, but not failed dangling check");
         }
       } else {
         log("no active threads");
@@ -239,7 +241,7 @@ public class SecurityManagedRunner extends Runner implements Filterable {
         String methodName = description.getMethodName();
         securityManager.startTest(description.getClassName(), methodName);
 
-      } else if (description.isSuite()){
+      } else if (description.isSuite()) {
         // TODO if we never get here, then we shouldn't bother
         securityManager.startSuite(description.getClassName());
       } else {
@@ -266,7 +268,7 @@ public class SecurityManagedRunner extends Runner implements Filterable {
         // failure.
         return;
       }
-      log("testFinished "+ description);
+      log("testFinished " + description);
 
       TestSecurityContext context = contextFor(description);
       if (description.isTest()) {
@@ -287,7 +289,7 @@ public class SecurityManagedRunner extends Runner implements Filterable {
       for (Thread thread : threads) {
         if (thread == null)
           break;
-        sb.append("\t\t" + thread .getName()+ "\n");
+        sb.append("\t\t" + thread.getName() + "\n");
       }
       return sb.toString();
     }

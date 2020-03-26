@@ -210,7 +210,8 @@ public class ConsoleRunnerImplTest extends ConsoleRunnerImplTestSetup {
   @Test
   public void testRunFinishFailed() throws Exception {
     class AbortInTestRunFinishedListener extends RunListener {
-      @Override public void testRunFinished(Result result) throws Exception {
+      @Override
+      public void testRunFinished(Result result) throws Exception {
         throw new IOException("Bogus IOException");
       }
     }
@@ -257,7 +258,8 @@ public class ConsoleRunnerImplTest extends ConsoleRunnerImplTestSetup {
     }
 
     @Override
-    protected boolean matchesSafely(Iterable<? super T> collection, Description mismatchDescription) {
+    protected boolean matchesSafely(Iterable<? super T> collection,
+                                    Description mismatchDescription) {
       boolean foundOne = false;
       String s;
       for (Object t : collection) {

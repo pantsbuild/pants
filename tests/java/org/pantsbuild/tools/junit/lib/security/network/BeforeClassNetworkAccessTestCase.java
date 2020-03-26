@@ -1,7 +1,6 @@
 package org.pantsbuild.tools.junit.lib.security.network;
 
 import java.io.IOException;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 
@@ -18,8 +17,7 @@ public class BeforeClassNetworkAccessTestCase {
       URLConnection myURLConnection = myURL.openConnection();
       myURLConnection.connect();
       myURLConnection.getOutputStream().close();
-    }
-    catch (IOException e) {
+    } catch (IOException e) {
       // ignore
     }
   }

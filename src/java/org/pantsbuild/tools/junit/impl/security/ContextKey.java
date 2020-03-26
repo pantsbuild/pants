@@ -8,6 +8,7 @@ import java.util.Objects;
 public class ContextKey {
 
   static final String SEPARATOR = "\u2053";
+
   public ContextKey(String className, String methodName) {
     this.className = className;
     this.methodName = methodName;
@@ -23,7 +24,7 @@ public class ContextKey {
 
   static ContextKey parseFromThreadGroupName(String threadGroupName) {
     String[] split = threadGroupName.split(SEPARATOR);
-    if (split.length !=4 ||
+    if (split.length != 4 ||
         !Objects.equals(split[1], "m") ||
         !Objects.equals(split[3], "Threads")) {
       // The thread group wasn't created by the junit runner, and so it doesn't have a context key.

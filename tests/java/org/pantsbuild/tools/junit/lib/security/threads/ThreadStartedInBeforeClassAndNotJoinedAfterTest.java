@@ -2,7 +2,6 @@ package org.pantsbuild.tools.junit.lib.security.threads;
 
 import java.util.concurrent.CountDownLatch;
 
-import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 

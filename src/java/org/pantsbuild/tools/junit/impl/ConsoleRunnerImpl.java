@@ -3,15 +3,6 @@
 
 package org.pantsbuild.tools.junit.impl;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Charsets;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
-import com.google.common.io.Closeables;
-import com.google.common.io.Files;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -30,6 +21,17 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Charsets;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
+import com.google.common.io.Closeables;
+import com.google.common.io.Files;
+
 import org.apache.commons.io.output.TeeOutputStream;
 import org.junit.runner.Computer;
 import org.junit.runner.Description;
@@ -60,15 +62,20 @@ import org.pantsbuild.tools.junit.impl.security.SecurityManagedRunner;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-import static org.pantsbuild.tools.junit.impl.security.JunitSecurityManagerConfig.*;
+import static org.pantsbuild.tools.junit.impl.security.JunitSecurityManagerConfig.NetworkHandling;
+import static org.pantsbuild.tools.junit.impl.security.JunitSecurityManagerConfig.SystemExitHandling;
 
 /**
  * An alternative to {@link JUnitCore} with stream capture and junit-report xml output capabilities.
  */
 public class ConsoleRunnerImpl {
-  /** Should be set to false for unit testing via {@link #setCallSystemExitOnFinish} */
+  /**
+   * Should be set to false for unit testing via {@link #setCallSystemExitOnFinish}
+   */
   private static boolean callSystemExitOnFinish = true;
-  /** Intended to be used in unit testing this class */
+  /**
+   * Intended to be used in unit testing this class
+   */
   private static RunListener testListener = null;
   private JunitSecViolationReportingManager securityManager;
 
@@ -212,8 +219,8 @@ public class ConsoleRunnerImpl {
     private final SwappableStream<PrintStream> swappableErr;
 
     StreamCapturingListener(File outdir, OutputMode outputMode,
-        SwappableStream<PrintStream> swappableOut,
-        SwappableStream<PrintStream> swappableErr) {
+                            SwappableStream<PrintStream> swappableOut,
+                            SwappableStream<PrintStream> swappableErr) {
       this.outdir = outdir;
       this.outputMode = outputMode;
       this.swappableOut = swappableOut;
@@ -359,11 +366,13 @@ public class ConsoleRunnerImpl {
       this.wrappedRunner = wrappedRunner;
     }
 
-    @Override public Description getDescription() {
+    @Override
+    public Description getDescription() {
       return wrappedRunner.getDescription();
     }
 
-    @Override public void run(RunNotifier notifier) {
+    @Override
+    public void run(RunNotifier notifier) {
       notifier.addListener(new FailFastListener(notifier));
       try {
         wrappedRunner.run(notifier);
@@ -477,7 +486,7 @@ public class ConsoleRunnerImpl {
     }
 
     ShutdownListener consoleShutdownListener =
-      new ShutdownListener(new ConsoleListener(swappableOut.getOriginal()));
+        new ShutdownListener(new ConsoleListener(swappableOut.getOriginal()));
     core.addListener(consoleShutdownListener);
 
     // Wrap test execution with registration of a shutdown hook that will ensure we
@@ -485,9 +494,9 @@ public class ConsoleRunnerImpl {
     numShutdownHooks++;
     final CountDownLatch haltAfterUnexpectedShutdown = new CountDownLatch(numShutdownHooks);
     final Thread unexpectedExitHook = createUnexpectedExitHook(
-      consoleShutdownListener,
-      swappableOut.getOriginal(),
-      haltAfterUnexpectedShutdown);
+        consoleShutdownListener,
+        swappableOut.getOriginal(),
+        haltAfterUnexpectedShutdown);
     addShutdownHook(unexpectedExitHook);
 
     // handle writing XML output when the tests time out and are terminated by pants
@@ -530,12 +539,13 @@ public class ConsoleRunnerImpl {
    * and then halts(1) after other unexpected exit hooks that use the given CountDownLatch.
    */
   private Thread createUnexpectedExitHook(
-    final ShutdownListener listener,
-    final PrintStream out,
-    final CountDownLatch haltAfter
+      final ShutdownListener listener,
+      final PrintStream out,
+      final CountDownLatch haltAfter
   ) {
     return new Thread() {
-      @Override public void run() {
+      @Override
+      public void run() {
         try {
           listener.unexpectedShutdown();
           // We want to trap and log no matter why abort failed for a better end user message.
@@ -608,8 +618,8 @@ public class ConsoleRunnerImpl {
     Class<?>[] classes = specSet.extract(concurrency).classes();
     RunnerBuilder builder = createCustomBuilder(swappableErr.getOriginal());
     Runner suite = junitComputer.getSuite(builder, classes);
-    suite=maybeWithFailFastRunner(suite);
-    suite=maybeWrapWithSecurity(suite);
+    suite = maybeWithFailFastRunner(suite);
+    suite = maybeWrapWithSecurity(suite);
     return core.run(Request.runner(suite)).getFailureCount();
   }
 
@@ -647,7 +657,7 @@ public class ConsoleRunnerImpl {
   private Runner maybeWrapWithSecurity(Runner reqRunner) {
     if (securityManagerDisabled()) {
       return reqRunner;
-    }else {
+    } else {
       return new SecurityManagedRunner(reqRunner, securityManager);
     }
   }
@@ -655,7 +665,7 @@ public class ConsoleRunnerImpl {
   private List<Request> legacyParseRequests(PrintStream err, Collection<Spec> specs) {
     Set<TestMethod> testMethods = Sets.newLinkedHashSet();
     Set<Class<?>> classes = Sets.newLinkedHashSet();
-    for (Spec spec: specs) {
+    for (Spec spec : specs) {
       if (spec.getMethods().isEmpty()) {
         classes.add(spec.getSpecClass());
       } else {
@@ -790,10 +800,10 @@ public class ConsoleRunnerImpl {
 
   @VisibleForTesting
   void runShutdownHooks() throws InterruptedException {
-    for(Thread hook: shutdownHooks) {
+    for (Thread hook : shutdownHooks) {
       hook.start();
     }
-    for(Thread hook: shutdownHooks) {
+    for (Thread hook : shutdownHooks) {
       hook.join(10000); // wait for all hooks to complete, up to 10 seconds each
     }
   }
@@ -827,11 +837,11 @@ public class ConsoleRunnerImpl {
       private OutputMode outputMode = OutputMode.ALL;
 
       @Option(name = "-xmlreport",
-              usage = "Create ant compatible junit xml report files in -outdir.")
+          usage = "Create ant compatible junit xml report files in -outdir.")
       private boolean xmlReport;
 
       @Option(name = "-outdir",
-              usage = "Directory to output test captures too.")
+          usage = "Directory to output test captures too.")
       private File outdir = new File(System.getProperty("java.io.tmpdir"));
 
       @Option(name = "-per-test-timer",
@@ -846,7 +856,8 @@ public class ConsoleRunnerImpl {
 
       @Option(name = "-default-concurrency",
           usage = "Specify how to parallelize running tests.\n"
-          + "Use -use-experimental-runner for PARALLEL_METHODS and PARALLEL_CLASSES_AND_METHODS")
+              +
+              "Use -use-experimental-runner for PARALLEL_METHODS and PARALLEL_CLASSES_AND_METHODS")
       private Concurrency defaultConcurrency;
 
       private int parallelThreads = 0;
@@ -873,7 +884,7 @@ public class ConsoleRunnerImpl {
 
       @Option(name = "-test-shard",
           usage = "Subset of tests to run, in the form M/N, 0 <= M < N. For example, 1/3 means "
-                  + "run tests number 2, 5, 8, 11, ...")
+              + "run tests number 2, 5, 8, 11, ...")
       public void setTestShard(String shard) {
         String errorMsg = "-test-shard should be in the form M/N";
         int slashIdx = shard.indexOf('/');
@@ -905,15 +916,15 @@ public class ConsoleRunnerImpl {
       }
 
       @Argument(usage = "Names of junit test classes or test methods to run.  Names prefixed "
-                        + "with @ are considered arg file paths and these will be loaded and the "
-                        + "whitespace delimited arguments found inside added to the list",
-                required = true,
-                metaVar = "TESTS",
-                handler = StringArrayOptionHandler.class)
+          + "with @ are considered arg file paths and these will be loaded and the "
+          + "whitespace delimited arguments found inside added to the list",
+          required = true,
+          metaVar = "TESTS",
+          handler = StringArrayOptionHandler.class)
       private String[] tests = {};
 
-      @Option(name="-use-experimental-runner",
-          usage="Use the experimental runner that has support for parallel methods")
+      @Option(name = "-use-experimental-runner",
+          usage = "Use the experimental runner that has support for parallel methods")
       private boolean useExperimentalRunner = false;
 
       @Option(name = "-use-security-manager",
@@ -1000,7 +1011,7 @@ public class ConsoleRunnerImpl {
    */
   @VisibleForTesting
   static Concurrency computeConcurrencyOption(Concurrency defaultConcurrency,
-      boolean defaultParallel) {
+                                              boolean defaultParallel) {
 
     if (defaultConcurrency != null) {
       // -default-concurrency option present - use it.

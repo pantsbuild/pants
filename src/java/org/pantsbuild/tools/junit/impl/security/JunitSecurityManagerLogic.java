@@ -19,7 +19,8 @@ class JunitSecurityManagerLogic {
   private final JunitSecurityManagerConfig config;
   private final JunitSecurityContextLookupAndErrorCollection contextLookupAndErrorCollection;
 
-  public JunitSecurityManagerLogic(JunitSecurityManagerConfig config, JunitSecurityContextLookupAndErrorCollection contextLookupAndErrorCollection) {
+  public JunitSecurityManagerLogic(JunitSecurityManagerConfig config,
+                                   JunitSecurityContextLookupAndErrorCollection contextLookupAndErrorCollection) {
     this.config = config;
     this.contextLookupAndErrorCollection = contextLookupAndErrorCollection;
   }

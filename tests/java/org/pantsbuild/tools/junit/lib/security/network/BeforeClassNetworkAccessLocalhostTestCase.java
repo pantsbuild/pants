@@ -17,8 +17,7 @@ public class BeforeClassNetworkAccessLocalhostTestCase {
       URLConnection myURLConnection = myURL.openConnection();
       myURLConnection.connect();
       myURLConnection.getOutputStream().close();
-    }
-    catch (IOException e) {
+    } catch (IOException e) {
       // ignore
     }
   }

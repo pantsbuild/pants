@@ -18,6 +18,7 @@ import static org.pantsbuild.tools.junit.impl.security.JunitSecurityManagerConfi
 public class JunitSecurityContextLookupAndErrorCollectionTest {
 
   private final CountDownLatch latch = new CountDownLatch(1);
+
   static class AssertableThread extends Thread {
     Throwable thrown;
 
@@ -33,7 +34,7 @@ public class JunitSecurityContextLookupAndErrorCollectionTest {
 
     void joinOrRaise() throws Throwable {
       join();
-      if (thrown!= null) {
+      if (thrown != null) {
         throw thrown;
       }
     }
@@ -162,8 +163,8 @@ public class JunitSecurityContextLookupAndErrorCollectionTest {
     runThreadAwaitingLatch(suiteContext);
 
     assertTrue(lookupAndErrorCollection.anyHasRunningThreads());
-    assertTrue("suite "+suiteContext, suiteContext.hasActiveThreads());
-    assertFalse("test "+testContext, testContext.hasActiveThreads());
+    assertTrue("suite " + suiteContext, suiteContext.hasActiveThreads());
+    assertFalse("test " + testContext, testContext.hasActiveThreads());
 
 
     runThreadAwaitingLatch(testContext);

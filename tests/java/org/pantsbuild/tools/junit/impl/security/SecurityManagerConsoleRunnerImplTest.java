@@ -298,13 +298,13 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
         "Caused by: " +
             "org.pantsbuild.junit.security.SecurityViolationException: " +
             "System.exit calls are not allowed.\n")).and(
-                containsString(
-        "java.lang.ExceptionInInitializerError\n" +
-            "\tat " + testClassName + ".<init>(SystemExitsInObjectBody.scala:12)")
+        containsString(
+            "java.lang.ExceptionInInitializerError\n" +
+                "\tat " + testClassName + ".<init>(SystemExitsInObjectBody.scala:12)")
     )).or(
-                containsString("java.lang.NoClassDefFoundError: " +
-                    "Could not initialize class " +
-                    "org.pantsbuild.tools.junit.lib.SystemExitsInObjectBody$")
+        containsString("java.lang.NoClassDefFoundError: " +
+            "Could not initialize class " +
+            "org.pantsbuild.tools.junit.lib.SystemExitsInObjectBody$")
     ));
   }
 
