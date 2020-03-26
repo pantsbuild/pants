@@ -40,6 +40,7 @@ mod scheduler;
 mod selectors;
 mod tasks;
 mod types;
+mod watch;
 
 pub use crate::context::Core;
 pub use crate::core::{Function, Key, Params, TypeId, Value};
@@ -49,3 +50,6 @@ pub use crate::scheduler::{
 };
 pub use crate::tasks::{Rule, Tasks};
 pub use crate::types::Types;
+
+#[cfg(test)]
+mod watch_tests;
