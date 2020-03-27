@@ -97,7 +97,10 @@ def test_list_single() -> None:
     )
     assert tests_target_stdout == dedent(
         """\
+
         fortran_tests()
+        ---------------
+
         Tests for Fortran code.
         
         This assumes that you use the FRUIT test framework.
@@ -116,7 +119,9 @@ def test_list_single() -> None:
     binary_target_stdout = run_goal(details_target=FortranBinary.alias)
     assert binary_target_stdout == dedent(
         """\
+
         fortran_binary()
+        ----------------
 
         Valid fields:
 

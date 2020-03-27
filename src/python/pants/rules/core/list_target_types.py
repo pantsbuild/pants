@@ -102,10 +102,9 @@ class VerboseTargetInfo:
         )
 
     def format_for_cli(self, *, console: Console) -> str:
-        output = [
-            console.green(f"{self.alias}()"),
-            f"{self.description}\n" if self.description else "",
-        ]
+        output = [console.green(f"{self.alias}()\n{'-' * (len(self.alias) + 2)}\n")]
+        if self.description:
+            output.append(f"{self.description}\n")
         output.extend(
             [
                 "Valid fields:\n",
@@ -134,6 +133,7 @@ def list_target_types(
             verbose_target_info = VerboseTargetInfo.create(
                 target_type, union_membership=union_membership
             )
+            print_stdout("")
             print_stdout(verbose_target_info.format_for_cli(console=console))
         else:
             print_stdout(

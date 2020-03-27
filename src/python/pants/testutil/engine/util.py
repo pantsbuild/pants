@@ -245,6 +245,7 @@ class MockConsole:
     def red(self, text: str) -> str:
         return self._safe_color(text, red)
 
+
 def fmt_rust_function(func: Callable) -> str:
     """Generate the str for a Rust Function, which is how Rust refers to `@rule`s.
 
