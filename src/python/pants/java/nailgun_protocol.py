@@ -92,6 +92,9 @@ class NailgunProtocol:
     @classmethod
     def send_request(cls, sock, working_dir, command, *arguments, **environment):
         """Send the initial Nailgun request over the specified socket."""
+        print(f"Nailgun command: {command}")
+        print(f"Nailgun working_dir: {working_dir}")
+        print(f"Nailgun arguments: {arguments}")
         for argument in arguments:
             cls.write_chunk(sock, ChunkType.ARGUMENT, argument)
 

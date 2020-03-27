@@ -1,6 +1,6 @@
 use nails;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::io::Write;
 use nails::execution::{child_channel, ChildInput, ChildOutput};
 use futures::{future, Stream, StreamExt, TryFutureExt};
 
@@ -14,9 +14,39 @@ struct PantsdHandle {
 
 struct PantsCommandSetup {
   python_interpreter_path: String,
+  python_entry_point: String,
   pants_dir: PathBuf,
   argument_list: Vec<String>,
   env: Vec<(String, String)>,
+}
+
+impl PantsCommandSetup {
+  fn to_stdlib_command(self) -> std::process::Command {
+    let mut c = std::process::Command::new(self.python_interpreter_path);
+    c.current_dir(self.pants_dir)
+     .arg(self.python_entry_point)
+     .args(self.argument_list)
+     .envs(self.env);
+    c
+  }
+
+  fn to_nails_command(self) -> nails::execution::Command {
+    let time = get_current_time();
+    println!("TIME: {}", time);
+    let mut effective_env: Vec<(String, String)> = vec![
+      ("PANTSD_RUNTRACKER_CLIENT_START_TIME".to_string(), time),
+      ("PANTSD_REQUEST_TIMEOUT_LIMIT".to_string(), "60.0".to_string()), //TODO this should come from an option pantsd_timeout_when_multiple
+    ];
+
+    effective_env.extend(self.env);
+
+    nails::execution::Command {
+      command: "pants".to_string(),
+      args: self.argument_list,
+      env: effective_env,
+      working_dir: self.pants_dir
+    }
+  }
 }
 
 /// We expect to invoke this from the `pants` script, with the first argument being the
@@ -33,16 +63,14 @@ fn main() {
     let python_entry_point = pants_dir.join(entry_point_file)
       .display().to_string();
 
-    let mut argument_list: Vec<String> = vec![python_entry_point];
-    for arg in args {
-      argument_list.push(arg);
-    }
+    let argument_list: Vec<String> = args.collect();
     println!("Effective args: {:?}", argument_list);
 
     let using_pantsd = argument_list.iter().any(|arg| arg == "--enable-pantsd"); //TODO make this check more robust!
 
     let setup = PantsCommandSetup {
       python_interpreter_path,
+      python_entry_point,
       pants_dir,
       argument_list,
       env
@@ -56,10 +84,7 @@ fn main() {
 }
 
 fn run_locally(setup: PantsCommandSetup) {
-    let child_process = Command::new(setup.python_interpreter_path)
-      .current_dir(setup.pants_dir)
-      .args(setup.argument_list)
-      .envs(setup.env)
+    let child_process = setup.to_stdlib_command()
       .spawn();
 
     match child_process {
@@ -74,6 +99,12 @@ fn run_locally(setup: PantsCommandSetup) {
         println!("Error executing pants: {}", e)
       }
     }
+}
+
+fn get_current_time() -> String {
+  let now = std::time::SystemTime::now();
+  let duration = now.duration_since(std::time::UNIX_EPOCH).unwrap();
+  format!("{}.{}", duration.as_secs(), duration.subsec_millis())
 }
 
 //need to get value of --pants-subprocessdir (defualt .pids) to read directory
@@ -97,13 +128,20 @@ fn run_with_pantsd(setup: PantsCommandSetup) {
   let pantsd_addr = SocketAddr::new("127.0.0.1".parse().unwrap(), port);
 
   let mut runtime = Runtime::new().unwrap();
-  let connection = TcpStream::connect(pantsd_addr);
+
+  let cmd = setup.to_nails_command();
+  let (stdio_write, stdio_read) = child_channel::<ChildOutput>();
+  let (_, stdin_read) = child_channel::<ChildInput>();
+
+   let connection = TcpStream::connect(&pantsd_addr)
+        .and_then(|stream| nails::client_handle_connection(stream, cmd, stdio_write, stdin_read))
+        .map_err(|e| format!("Error communicating with server: {}", e));
 
   let exit_code = runtime
-    .block_on(future::join(connection, stdio_printer))
-    .0?;
+    .block_on(future::join(connection, print_stdio(stdio_read)))
+    .0.unwrap();
 
-
+  println!("Exiting with: {}", exit_code.0);
   std::process::exit(0);
 }
 

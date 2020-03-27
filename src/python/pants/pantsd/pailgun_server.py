@@ -254,7 +254,7 @@ class PailgunServer(ThreadingMixIn, TCPServer):
         """
         # TODO add `did_poll` to pantsd metrics
 
-        timeout = float(environment["PANTSD_REQUEST_TIMEOUT_LIMIT"])
+        timeout = float(environment["PANTSD_REQUEST_TIMEOUT_LIMIT"]) #TODO maybe we should handle this not existing?
 
         @contextmanager
         def yield_and_release(time_waited):
