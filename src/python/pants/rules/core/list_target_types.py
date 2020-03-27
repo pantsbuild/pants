@@ -1,6 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import textwrap
 from dataclasses import dataclass
 from typing import Optional, Sequence, Type, get_type_hints
 
@@ -72,12 +73,13 @@ class FieldInfo:
             default=str(field.default),
         )
 
-    def format_for_cli(self, *, console: Console, longest_field_name: int) -> str:
-        field_alias_text = f"  {self.alias}"
-        field_alias = console.cyan(f"{field_alias_text:<{longest_field_name + 2}}")
-        type_info = console.green(f"(type: {self.type_hint}, default: {self.default})")
-        type_info_prefix = " " if self.description else ""
-        return f"{field_alias}  {self.description or ''}{type_info_prefix}{type_info}"
+    def format_for_cli(self, *, console: Console) -> str:
+        field_alias = console.magenta(f"{self.alias}")
+        type_info = console.cyan(f"  type: {self.type_hint}, default: {self.default}")
+        lines = [field_alias, type_info]
+        if self.description:
+            lines.extend(f"  {line}" for line in textwrap.wrap(self.description, 80))
+        return "\n".join(f"  {line}" for line in lines)
 
 
 @dataclass(frozen=True)
@@ -100,19 +102,17 @@ class VerboseTargetInfo:
         )
 
     def format_for_cli(self, *, console: Console) -> str:
-        output = [console.blue(self.description), "\n"] if self.description else []
-        longest_field_name = max(len(field.alias) for field in self.fields)
+        output = [
+            console.green(f"{self.alias}()"),
+            f"{self.description}\n" if self.description else "",
+        ]
         output.extend(
             [
-                console.blue(f"{self.alias}("),
-                *sorted(
-                    field.format_for_cli(console=console, longest_field_name=longest_field_name)
-                    for field in self.fields
-                ),
-                console.blue(")"),
+                "Valid fields:\n",
+                *sorted(f"{field.format_for_cli(console=console)}\n" for field in self.fields),
             ]
         )
-        return "\n".join(output)
+        return "\n".join(output).rstrip()
 
 
 @goal_rule

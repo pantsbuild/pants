@@ -82,7 +82,7 @@ class HelpFormatter:
         lines.append(f"  {arg_line}")
 
         indent = "      "
-        lines.extend([f"{indent}{s}" for s in wrap(ohi.help, 76)])
+        lines.extend([f"{indent}{s}" for s in wrap(ohi.help, 80)])
         if ohi.deprecated_message:
             lines.append(self._maybe_red(f"{indent}{ohi.deprecated_message}."))
             if ohi.removal_hint:
