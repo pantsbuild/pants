@@ -23,20 +23,19 @@ RUN yum install -y \
 
 ARG PYTHON_27_VERSION=2.7.13
 ARG PYTHON_36_VERSION=3.6.8
-# NB: PYENV_ROOT must be set for `pyenv install` to be available. This failure mode is not mentioned
-# in https://github.com/pyenv/pyenv#basic-github-checkout.
+
 ENV PYENV_ROOT /pyenv-docker-build
 ENV PYENV_BIN "${PYENV_ROOT}/bin/pyenv"
 RUN git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
 
-# Install Python 2.7 and 3.6.
 # NB: We intentionally do not use `--enable-shared`, as it results in our shipped wheels for the PEX release using
 # `libpython.X.Y.so.1`, which means that the PEX will not work for any consumer interpreters that were statically
 # built, i.e. compiled without `--enable-shared`. See https://github.com/pantsbuild/pants/pull/7794.
 RUN /usr/bin/scl enable devtoolset-7 -- ${PYENV_BIN} install ${PYTHON_27_VERSION}
 RUN /usr/bin/scl enable devtoolset-7 -- ${PYENV_BIN} install ${PYTHON_36_VERSION}
-RUN ${PYENV_BIN} global ${PYTHON_27_VERSION} ${PYTHON_36_VERSION}
-ENV PATH "${PYENV_ROOT}/shims:${PATH}"
+
+ENV PATH "${PYENV_ROOT}/versions/${PYTHON_27_VERSION}/bin:${PATH}"
+ENV PATH "${PYENV_ROOT}/versions/${PYTHON_36_VERSION}/bin:${PATH}"
 
 # Expose the installed gcc to the invoking shell.
 ENTRYPOINT ["/usr/bin/scl", "enable", "devtoolset-7",  "--"]

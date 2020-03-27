@@ -32,8 +32,10 @@ RUN git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
 RUN /usr/bin/scl enable devtoolset-7 -- ${PYENV_BIN} install ${PYTHON_27_VERSION}
 RUN /usr/bin/scl enable devtoolset-7 -- ${PYENV_BIN} install ${PYTHON_36_VERSION}
 RUN /usr/bin/scl enable devtoolset-7 -- ${PYENV_BIN} install ${PYTHON_37_VERSION}
-RUN ${PYENV_BIN} global ${PYTHON_27_VERSION} ${PYTHON_36_VERSION} ${PYTHON_37_VERSION}
-ENV PATH "${PYENV_ROOT}/shims:${PATH}"
+
+ENV PATH "${PYENV_ROOT}/versions/${PYTHON_27_VERSION}/bin:${PATH}"
+ENV PATH "${PYENV_ROOT}/versions/${PYTHON_36_VERSION}/bin:${PATH}"
+ENV PATH "${PYENV_ROOT}/versions/${PYTHON_37_VERSION}/bin:${PATH}"
 
 # Expose the installed gcc to the invoking shell.
 ENTRYPOINT ["/usr/bin/scl", "enable", "devtoolset-7",  "--"]
