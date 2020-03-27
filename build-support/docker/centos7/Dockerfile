@@ -40,10 +40,9 @@ ENV PATH "${PYENV_ROOT}/versions/${PYTHON_37_VERSION}/bin:${PATH}"
 
 # We install the AWS CLI for use in CI to cache assets like pants.pex.
 ENV AWS_CLI_ROOT /aws-docker-build
-ENV AWS_CLI_BIN "${AWS_CLI_ROOT}/bin/aws"
-RUN curl --fail "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip"
-RUN unzip awscli-bundle.zip
-RUN ./awscli-bundle/install --install-dir "${AWS_CLI_ROOT}"
+RUN curl --fail -L "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip" && \
+  unzip awscli-bundle.zip && \
+  ./awscli-bundle/install --install-dir "${AWS_CLI_ROOT}"
 ENV PATH "${AWS_CLI_ROOT}/bin/:${PATH}"
 # Multipart operations aren't supported for anonymous users, so we set the
 # threshold high to avoid them being used automatically by the AWS CLI.
