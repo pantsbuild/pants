@@ -140,18 +140,6 @@ AWS_GET_PANTS_PEX_COMMAND = (
     "${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}"
 )
 
-AWS_DEPLOY_PANTS_PEX_COMMAND = " ".join(
-    [
-        "aws",
-        "--no-sign-request",
-        "--region",
-        "us-east-1",
-        "s3",
-        "cp",
-        "${TRAVIS_BUILD_DIR}/pants.pex",
-        "${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}",
-    ]
-)
 
 # ----------------------------------------------------------------------
 # Docker
@@ -432,6 +420,8 @@ SKIP_JVM_CONDITION = r"commit_message !~ /\[ci skip-jvm-tests\]/"
 # Bootstrap engine
 # ----------------------------------------------------------------------
 
+AWS_DEPLOY_PANTS_PEX_COMMAND = "./build-support/bin/deploy_ci_bootstrapped_pants_pex.py"
+
 
 def _bootstrap_command(*, python_version: PythonVersion) -> List[str]:
     return [f"./build-support/bin/ci.py --bootstrap --python-version {python_version.decimal}"]
@@ -473,8 +463,10 @@ def bootstrap_osx(python_version: PythonVersion) -> Dict:
         "name": f"Build OSX native engine and pants.pex (Python {python_version.decimal})",
         "after_failure": ["./build-support/bin/ci-failure.sh"],
         "stage": python_version.default_stage(is_bootstrap=True).value,
-        "script": _bootstrap_command(python_version=python_version)
-        + [AWS_DEPLOY_PANTS_PEX_COMMAND],
+        "script": [
+            *_bootstrap_command(python_version=python_version),
+            AWS_DEPLOY_PANTS_PEX_COMMAND,
+        ],
     }
     safe_extend(shard, "env", _bootstrap_env(python_version=python_version, platform=Platform.osx))
     return shard
