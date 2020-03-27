@@ -46,7 +46,7 @@ class HelpFormatter:
 
         def add_option(ohis, *, category=None):
             lines.append("")
-            display_scope = f"`{scope}`" or "Global"
+            display_scope = f"`{scope}`" if scope else "Global"
             if category:
                 title = f"{display_scope} {category} options"
                 lines.append(self._maybe_green(f"{title}\n{'-' * len(title)}"))
