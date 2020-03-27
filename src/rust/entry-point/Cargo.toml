@@ -8,3 +8,5 @@ edition = "2018"
 
 [dependencies]
 nails = "0.4.0"
+tokio = { version = "0.2.13", features = ["rt-core", "tcp"] }
+futures = "0.3"
