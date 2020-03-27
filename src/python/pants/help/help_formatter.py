@@ -54,7 +54,7 @@ class HelpFormatter:
                 title = f"{display_scope} options"
                 lines.append(self._maybe_green(f"{title}\n{'-' * len(title)}"))
                 if description:
-                    lines.append(description)
+                    lines.append(f"\n{description}")
             lines.append(" ")
             if not ohis:
                 lines.append("No options available.")
