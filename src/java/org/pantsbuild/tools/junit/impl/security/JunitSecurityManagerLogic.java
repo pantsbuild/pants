@@ -6,6 +6,10 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.logging.Logger;
 
+import static org.pantsbuild.tools.junit.impl.security.JunitSecurityManagerConfig.FileHandling;
+import static org.pantsbuild.tools.junit.impl.security.JunitSecurityManagerConfig.NetworkHandling;
+import static org.pantsbuild.tools.junit.impl.security.JunitSecurityManagerConfig.ThreadHandling;
+
 class JunitSecurityManagerLogic {
   private static Logger logger = Logger.getLogger("pants-junit-sec-mgr-logic");
 
@@ -41,36 +45,43 @@ class JunitSecurityManagerLogic {
   }
 
   boolean disallowsFileAccess(TestSecurityContext testSecurityContext, String filename) {
-    JunitSecurityManagerConfig.FileHandling fileHandling = config.getFileHandling();
-    if (fileHandling == JunitSecurityManagerConfig.FileHandling.allowAll) {
-      return false;
-    }
-    // NB: This escape hatch allows lazy loading of things like the locale jar, which is pulled from
-    //     the jre location.
-    if (filename.startsWith(System.getProperty("java.home"))) {
-      log("disallowsFileAccess", "is a framework call");
-      return false;
-    }
-
-    if (isFrameworkContext(testSecurityContext)) {
-      // calls within the framework should be passed through.
-      log("disallowsFileAccess", "is a framework call");
-      return false;
-    } else if (isRedirectedOutputFile(testSecurityContext, filename)) {
-      log("disallowsFileAccess", "is a framework call to the redirected output");
-      return false;
-    } else {
-      if (fileHandling == JunitSecurityManagerConfig.FileHandling.onlyCWD) {
-        String workingDir = System.getProperty("user.dir");
-        try {
-          String canonicalPath = new File(filename).getCanonicalPath();
-          return !canonicalPath.startsWith(workingDir);
-        } catch (IOException e) {
-          // TODO Do something better here
-          e.printStackTrace();
+    FileHandling fileHandling = config.getFileHandling();
+    switch (fileHandling) {
+      case allowAll:
+        return false;
+      case onlyCWD:
+      case disallow:
+        if (isFrameworkContext(testSecurityContext)) {
+          // calls within the framework should be passed through.
+          log("disallowsFileAccess", "is a framework call");
+          return false;
         }
-      }
-      return fileHandling == JunitSecurityManagerConfig.FileHandling.disallow;
+        String canonicalFile;
+        try {
+          canonicalFile = new File(filename).getCanonicalPath();
+        } catch (IOException e) {
+          // TODO maybe should be something else?
+          return false;
+        }
+
+        if (canonicalFile.startsWith(System.getProperty("java.home"))) {
+          // NB: This escape hatch allows lazy loading of things like the locale jar, which is
+          // pulled from the jre location.
+          log("disallowsFileAccess", "is calling into the jdk");
+          return false;
+        }
+        if (isRedirectedOutputFile(testSecurityContext, filename)) {
+          log("disallowsFileAccess", "is a framework call to the redirected output");
+          return false;
+        }
+        if (fileHandling == FileHandling.onlyCWD &&
+            canonicalFile.startsWith(System.getProperty("user.dir"))) {
+          log("disallowsFileAccess", "in CWD");
+          return false;
+        }
+        return true;
+      default:
+        return false;
     }
   }
 
@@ -88,7 +99,7 @@ class JunitSecurityManagerLogic {
         return true;
     }
 
-    return config.getNetworkHandling() != JunitSecurityManagerConfig.NetworkHandling.allowAll;
+    return config.getNetworkHandling() != NetworkHandling.allowAll;
   }
 
   private boolean hostIsLocalHost(String host) {
@@ -110,6 +121,6 @@ class JunitSecurityManagerLogic {
 
   public boolean perClassThreadHandling() {
     return config.getThreadHandling() ==
-        JunitSecurityManagerConfig.ThreadHandling.disallowLeakingTestSuiteThreads;
+        ThreadHandling.disallowLeakingTestSuiteThreads;
   }
 }
