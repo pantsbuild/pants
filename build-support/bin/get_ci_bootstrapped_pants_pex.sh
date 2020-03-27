@@ -2,19 +2,28 @@
 
 set -euo pipefail
 
-BOOTSTRAPPED_PEX_BUCKET=$1
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../.. && pwd -P)"
+
+AWS_BUCKET=$1
 BOOTSTRAPPED_PEX_KEY=$2
 
-BOOTSTRAPPED_PEX_URL=s3://${BOOTSTRAPPED_PEX_BUCKET}/${BOOTSTRAPPED_PEX_KEY}
+BOOTSTRAPPED_PEX_URL=s3://${AWS_BUCKET}/${BOOTSTRAPPED_PEX_KEY}
+
+# shellcheck source=build-support/common.sh
+ source "${REPO_ROOT}/build-support/common.sh"
 
 # Note that in the aws cli --no-sign-request allows access to public S3 buckets without
 # credentials, as long as we specify the region.
 
 # First check that there's only one version of the object on S3, to detect malicious overwrites.
 NUM_VERSIONS=$(aws --no-sign-request --region us-east-1 s3api list-object-versions \
-  --bucket "${BOOTSTRAPPED_PEX_BUCKET}" --prefix "${BOOTSTRAPPED_PEX_KEY}" --max-items 2 \
+  --bucket "${AWS_BUCKET}" --prefix "${BOOTSTRAPPED_PEX_KEY}" --max-items 2 \
   | jq '.Versions | length')
-[ "${NUM_VERSIONS}" == "1" ] || (echo "Error: Found ${NUM_VERSIONS} versions for ${BOOTSTRAPPED_PEX_URL}" && exit 1)
+[ "${NUM_VERSIONS}" == "1" ] || die "Multiple copies of pants.pex found at" \
+   "${BOOTSTRAPPED_PEX_URL}. This is not allowed as a security precuation. This likely happened" \
+   "from restarting the bootstrap shards in the same Travis build. Instead, initiate a new build" \
+   "by either pulling from master or pushing an empty commit (\`git commit --allow-empty\`)."
+
 
 # Now fetch the pre-bootstrapped pex, so that the ./pants wrapper script can use it
 # instead of running from sources (and re-bootstrapping).
