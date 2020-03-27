@@ -4,7 +4,9 @@
 use crate::Store;
 use bazel_protos;
 use boxfuture::{try_future, BoxFuture, Boxable};
-use fs::{Dir, File, GlobMatching, PathGlobs, PathStat, PosixFS, SymlinkBehavior};
+use fs::{
+  Dir, File, GitignoreStyleExcludes, GlobMatching, PathGlobs, PathStat, PosixFS, SymlinkBehavior,
+};
 use futures::future::TryFutureExt;
 use futures01::future::{self, join_all, Future};
 use hashing::{Digest, EMPTY_DIGEST};
@@ -540,7 +542,7 @@ impl Snapshot {
       .or_else(|_| {
         let posix_fs = Arc::new(try_future!(PosixFS::new_with_symlink_behavior(
           root_path,
-          &[],
+          try_future!(GitignoreStyleExcludes::create(&[])),
           executor,
           SymlinkBehavior::Oblivious
         )));

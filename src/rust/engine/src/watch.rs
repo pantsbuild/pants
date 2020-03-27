@@ -8,14 +8,13 @@ use std::thread;
 use std::time::Duration;
 
 use crossbeam_channel::{self, Receiver, RecvTimeoutError, TryRecvError};
-use log::{debug, error, info, warn};
-use notify::{RecommendedWatcher, RecursiveMode, Watcher};
-//use parking_lot::Mutex;
 use futures::compat::Future01CompatExt;
 use futures_locks::Mutex;
-use process_execution::Platform;
+use log::{debug, error, info, warn};
+use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use task_executor::Executor;
 
+use fs::GitignoreStyleExcludes;
 use graph::{Graph, InvalidationResult};
 use logging;
 
@@ -42,7 +41,6 @@ pub struct InvalidationWatcher {
   watcher: Arc<Mutex<RecommendedWatcher>>,
   executor: Executor,
   liveness: Receiver<()>,
-  current_platform: Platform,
 }
 
 impl InvalidationWatcher {
@@ -50,6 +48,7 @@ impl InvalidationWatcher {
     graph: Weak<Graph<NodeKey>>,
     executor: Executor,
     build_root: PathBuf,
+    ignorer: Arc<GitignoreStyleExcludes>,
   ) -> Result<InvalidationWatcher, String> {
     // Inotify events contain canonical paths to the files being watched.
     // If the build_root contains a symlink the paths returned in notify events
@@ -57,7 +56,6 @@ impl InvalidationWatcher {
     // We canonicalize the build_root once so this isn't a problem.
     let canonical_build_root =
       std::fs::canonicalize(build_root.as_path()).map_err(|e| format!("{:?}", e))?;
-    let current_platform = Platform::current()?;
     let (watch_sender, watch_receiver) = crossbeam_channel::unbounded();
     let mut watcher: RecommendedWatcher = Watcher::new(watch_sender, Duration::from_millis(50))
       .map_err(|e| format!("Failed to begin watching the filesystem: {}", e))?;
@@ -65,7 +63,7 @@ impl InvalidationWatcher {
     // recursively, so we set up that watch here and then return early when watch() is
     // called by nodes that are running. On Linux the notify crate handles adding paths to watch
     // much more efficiently so we do that instead on Linux.
-    if current_platform == Platform::Darwin {
+    if cfg!(target_os = "macos") {
       watcher
         .watch(canonical_build_root.clone(), RecursiveMode::Recursive)
         .map_err(|e| {
@@ -93,26 +91,45 @@ impl InvalidationWatcher {
             let paths: HashSet<_> = ev
               .paths
               .into_iter()
-              .map(|path| {
+              .filter_map(|path| {
                 // relativize paths to build root.
-                let mut paths_to_invalidate: Vec<PathBuf> = vec![];
-                let path_relative_to_build_root = {
-                  if path.starts_with(&canonical_build_root) {
-                    path.strip_prefix(&canonical_build_root).unwrap().into()
-                  } else {
-                    path
-                  }
+                let path_relative_to_build_root = if path.starts_with(&canonical_build_root) {
+                  // Unwrapping is fine because we check that the path starts with
+                  // the build root above.
+                  path.strip_prefix(&canonical_build_root).unwrap().into()
+                } else {
+                  path
                 };
-                paths_to_invalidate.push(path_relative_to_build_root.clone());
+                // To avoid having to stat paths for events we will eventually ignore we "lie" to the ignorer
+                // to say that no path is a directory, they could be if someone chmod's or creates a dir.
+                // This maintains correctness by ensuring that at worst we have false negative events, where a directory
+                // only glob (one that ends in `/` ) was supposed to ignore a directory path, but didn't because we claimed it was a file. That
+                // directory path will be used to invalidate nodes, but won't invalidate anything because its path is somewhere
+                // out of our purview.
+                if ignorer.is_ignored_or_child_of_ignored_path(
+                  &path_relative_to_build_root,
+                  /* is_dir */ false,
+                ) {
+                  None
+                } else {
+                  Some(path_relative_to_build_root)
+                }
+              })
+              .map(|path_relative_to_build_root| {
+                let mut paths_to_invalidate: Vec<PathBuf> = vec![];
                 if let Some(parent_dir) = path_relative_to_build_root.parent() {
                   paths_to_invalidate.push(parent_dir.to_path_buf());
                 }
+                paths_to_invalidate.push(path_relative_to_build_root);
                 paths_to_invalidate
               })
               .flatten()
               .collect();
-            debug!("notify invalidating {:?} because of {:?}", paths, ev.kind);
-            InvalidationWatcher::invalidate(&graph, &paths, "notify");
+            // Only invalidate stuff if we have paths that weren't filtered out by gitignore.
+            if !paths.is_empty() {
+              debug!("notify invalidating {:?} because of {:?}", paths, ev.kind);
+              InvalidationWatcher::invalidate(&graph, &paths, "notify");
+            };
           }
           Ok(Err(err)) => {
             if let notify::ErrorKind::PathNotFound = err.kind {
@@ -139,7 +156,6 @@ impl InvalidationWatcher {
       watcher: wrapped_watcher,
       executor,
       liveness: thread_liveness_receiver,
-      current_platform,
     })
   }
 
@@ -149,7 +165,7 @@ impl InvalidationWatcher {
   pub async fn watch(&self, path: PathBuf) -> Result<(), notify::Error> {
     // Short circuit here if we are on a Darwin platform because we should be watching
     // the entire build root recursively already.
-    if self.current_platform == Platform::Darwin {
+    if cfg!(target_os = "macos") {
       Ok(())
     } else {
       // Using a futurized mutex here because for some reason using a regular mutex
