@@ -98,23 +98,29 @@ impl InvalidationWatcher {
                   // the build root above.
                   path.strip_prefix(&canonical_build_root).unwrap().into()
                 } else {
-                  path.clone()
+                  path
                 };
-                if ignorer
-                  .is_ignored_or_child_of_ignored_path(&path_relative_to_build_root, path.is_dir())
-                {
+                // To avoid having to stat paths for events we will eventually ignore we "lie" to the ignorer
+                // to say that no path is a directory, they could be if someone chmod's or creates a dir.
+                // This maintains correctness by ensuring that at worst we have false negative events, where a directory
+                // only glob (one that ends in `/` ) was supposed to ignore a directory path, but didn't because we claimed it was a file. That
+                // directory path will be used to invalidate nodes, but won't invalidate anything because its path is somewhere
+                // out of our purview.
+                if ignorer.is_ignored_or_child_of_ignored_path(
+                  &path_relative_to_build_root,
+                  /* is_dir */ false,
+                ) {
                   None
                 } else {
                   Some(path_relative_to_build_root)
                 }
               })
               .map(|path_relative_to_build_root| {
-                // relativize paths to build root.
-                let mut paths_to_invalidate: Vec<PathBuf> =
-                  vec![path_relative_to_build_root.clone()];
+                let mut paths_to_invalidate: Vec<PathBuf> = vec![];
                 if let Some(parent_dir) = path_relative_to_build_root.parent() {
                   paths_to_invalidate.push(parent_dir.to_path_buf());
                 }
+                paths_to_invalidate.push(path_relative_to_build_root);
                 paths_to_invalidate
               })
               .flatten()
