@@ -35,7 +35,7 @@ class Scoverage(CoverageEngine):
 
       def scoverage_report_jar(**kwargs):
         return JarDependency(org='org.pantsbuild', name='scoverage-report-generator_2.12',
-          rev='0.0.2', **kwargs)
+          rev='0.0.3', **kwargs)
 
       # We need to inject report generator at runtime.
       cls.register_jvm_tool(register,
@@ -58,6 +58,14 @@ class Scoverage(CoverageEngine):
              'targets are included, which would be the same as specifying ".*" as a '
              'filter.')
 
+      register(
+          "--output-as-cobertura",
+          type=bool,
+          default=False,
+          fingerprint=False,
+          help="Export cobertura formats which would allow users to merge with cobertura coverage for java targets.",
+      )
+
     def create(self, settings, targets, execute_java_for_targets):
       """
       :param settings: Generic code coverage settings.
@@ -75,13 +83,14 @@ class Scoverage(CoverageEngine):
 
       opts = Scoverage.Factory.global_instance().get_options()
       target_filters = opts.target_filters
+      output_as_cobertura = opts.output_as_cobertura
       coverage_output_dir = settings.context.options.for_global_scope().pants_distdir
 
       return Scoverage(report_path, target_filters, settings, targets, execute_java_for_targets,
-                       coverage_output_dir=coverage_output_dir)
+                       output_as_cobertura, coverage_output_dir=coverage_output_dir)
 
   def __init__(self, report_path, target_filters, settings, targets, execute_java_for_targets,
-               coverage_output_dir=None):
+               output_as_cobertura, coverage_output_dir=None):
     """
     :param settings: Generic code coverage settings.
     :type settings: :class:`CodeCoverageSettings`
@@ -101,6 +110,7 @@ class Scoverage(CoverageEngine):
     self._coverage_force = settings.options.coverage_force
     self._report_path = report_path
     self._coverage_output_dir = coverage_output_dir
+    self._output_as_cobertura = output_as_cobertura
 
   #
   def _iter_datafiles(self, output_dir):
@@ -152,6 +162,7 @@ class Scoverage(CoverageEngine):
 
     main = 'org.pantsbuild.scoverage.report.ScoverageReport'
     scoverage_cp = self._report_path
+    output_as_cobertura = self._output_as_cobertura
     html_report_path = os.path.join(output_dir, 'scoverage', 'reports', 'html')
     xml_report_path = os.path.join(output_dir, 'scoverage', 'reports', 'xml')
     safe_mkdir(html_report_path, clean=True)
@@ -165,6 +176,9 @@ class Scoverage(CoverageEngine):
             "--htmlDirPath", f"{html_report_path}",
             "--xmlDirPath", f"{xml_report_path}",
             "--targetFilters", f"{','.join(final_target_dirs)}"]
+
+    if output_as_cobertura:
+      args.append("--outputAsCobertura")
 
     result = self._execute_java(classpath=scoverage_cp,
       main=main,
