@@ -68,9 +68,8 @@ class Stage(Enum):
 GLOBAL_ENV_VARS = [
     'PANTS_CONFIG_FILES="${TRAVIS_BUILD_DIR}/pants.travis-ci.toml"',
     'LC_ALL="en_US.UTF-8"',
-    "BOOTSTRAPPED_PEX_BUCKET=ci-public.pantsbuild.org",
+    "AWS_BUCKET=ci-public.pantsbuild.org",
     "BOOTSTRAPPED_PEX_KEY_PREFIX=${TRAVIS_BUILD_NUMBER}/${TRAVIS_BUILD_ID}/pants.pex",
-    "BOOTSTRAPPED_PEX_URL_PREFIX=s3://${BOOTSTRAPPED_PEX_BUCKET}/${BOOTSTRAPPED_PEX_KEY_PREFIX}",
     "PYENV_PY27_VERSION=2.7.15",
     "PYENV_PY36_VERSION=3.6.8",
     "PYENV_PY37_VERSION=3.7.2",
@@ -136,26 +135,11 @@ class PythonVersion(Enum):
 # shards create a pants.pex, and then upload it to S3 for all of the test
 # shards to pull down.
 
-AWS_GET_PANTS_PEX_COMMAND = " ".join(
-    [
-        "./build-support/bin/get_ci_bootstrapped_pants_pex.sh",
-        "${BOOTSTRAPPED_PEX_BUCKET}",
-        "${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}",
-    ]
+AWS_GET_PANTS_PEX_COMMAND = (
+    "./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} "
+    "${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}"
 )
 
-AWS_DEPLOY_PANTS_PEX_COMMAND = " ".join(
-    [
-        "aws",
-        "--no-sign-request",
-        "--region",
-        "us-east-1",
-        "s3",
-        "cp",
-        "${TRAVIS_BUILD_DIR}/pants.pex",
-        "${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}",
-    ]
-)
 
 # ----------------------------------------------------------------------
 # Docker
@@ -436,25 +420,18 @@ SKIP_JVM_CONDITION = r"commit_message !~ /\[ci skip-jvm-tests\]/"
 # Bootstrap engine
 # ----------------------------------------------------------------------
 
+AWS_DEPLOY_PANTS_PEX_COMMAND = "./build-support/bin/deploy_ci_bootstrapped_pants_pex.py"
+
 
 def _bootstrap_command(*, python_version: PythonVersion) -> List[str]:
-    # Note that for each platform, we have the Python 3.6 shard also create fs_util and upload to S3,
-    # to take advantage of the Rust code built during bootstrapping. We use the Python 3.6 shard, as
-    # it runs during both daily and nightly CI. This requires setting PREPARE_DEPLOY=1.
-    command = [f"./build-support/bin/ci.py --bootstrap --python-version {python_version.decimal}"]
-    if python_version.is_py36:
-        command.append("./build-support/bin/release.sh -f")
-    return command
+    return [f"./build-support/bin/ci.py --bootstrap --python-version {python_version.decimal}"]
 
 
 def _bootstrap_env(*, python_version: PythonVersion, platform: Platform) -> List[str]:
-    env = [
+    return [
         f"CACHE_NAME=bootstrap.{platform}.py{python_version.number}",
         f"BOOTSTRAPPED_PEX_KEY_SUFFIX=py{python_version.number}.{platform}",
     ]
-    if python_version.is_py36:
-        env.append("PREPARE_DEPLOY=1")
-    return env
 
 
 def bootstrap_linux(python_version: PythonVersion) -> Dict:
@@ -486,8 +463,10 @@ def bootstrap_osx(python_version: PythonVersion) -> Dict:
         "name": f"Build OSX native engine and pants.pex (Python {python_version.decimal})",
         "after_failure": ["./build-support/bin/ci-failure.sh"],
         "stage": python_version.default_stage(is_bootstrap=True).value,
-        "script": _bootstrap_command(python_version=python_version)
-        + [AWS_DEPLOY_PANTS_PEX_COMMAND],
+        "script": [
+            *_bootstrap_command(python_version=python_version),
+            AWS_DEPLOY_PANTS_PEX_COMMAND,
+        ],
     }
     safe_extend(shard, "env", _bootstrap_env(python_version=python_version, platform=Platform.osx))
     return shard
@@ -675,7 +654,9 @@ _RUST_TESTS_BASE: Dict = {
     **CACHE_NATIVE_ENGINE,
     "stage": Stage.test.value,
     "before_script": ["ulimit -c unlimited", "ulimit -n 8192"],
-    "script": ["./build-support/bin/ci.py --rust-tests"],
+    # NB: We also build `fs_util` in this shard to leverage having had compiled the engine. This
+    # requires setting PREPARE_DEPLOY=1.
+    "script": ["./build-support/bin/ci.py --rust-tests", "./build-support/bin/release.sh -f"],
     "if": SKIP_RUST_CONDITION,
 }
 
@@ -685,7 +666,7 @@ def rust_tests_linux() -> Dict:
         **_RUST_TESTS_BASE,
         **linux_fuse_shard(),
         "name": "Rust tests - Linux",
-        "env": ["CACHE_NAME=rust_tests.linux"],
+        "env": ["CACHE_NAME=rust_tests.linux", "PREPARE_DEPLOY=1"],
     }
 
 
@@ -711,8 +692,11 @@ def rust_tests_osx() -> Dict:
             # This is good, because `brew install openssl` would trigger the same issues as noted on why
             # we don't use the `addons` section.
         ],
-        "env": _osx_env_with_pyenv(python_version=PythonVersion.py36)
-        + ["CACHE_NAME=rust_tests.osx"],
+        "env": [
+            *_osx_env_with_pyenv(python_version=PythonVersion.py36),
+            "CACHE_NAME=rust_tests.osx",
+            "PREPARE_DEPLOY=1",
+        ],
     }
 
 
