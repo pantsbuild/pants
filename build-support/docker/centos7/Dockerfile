@@ -16,6 +16,7 @@ RUN yum install -y \
         openssl-devel \
         readline-devel \
         sqlite-devel \
+        unzip \
         zlib-devel
 
 ARG PYTHON_27_VERSION=2.7.13
@@ -36,6 +37,17 @@ RUN /usr/bin/scl enable devtoolset-7 -- ${PYENV_BIN} install ${PYTHON_37_VERSION
 ENV PATH "${PYENV_ROOT}/versions/${PYTHON_27_VERSION}/bin:${PATH}"
 ENV PATH "${PYENV_ROOT}/versions/${PYTHON_36_VERSION}/bin:${PATH}"
 ENV PATH "${PYENV_ROOT}/versions/${PYTHON_37_VERSION}/bin:${PATH}"
+
+# We install the AWS CLI for use in CI to cache assets like pants.pex.
+ENV AWS_CLI_ROOT /aws-docker-build
+ENV AWS_CLI_BIN "${AWS_CLI_ROOT}/bin/aws"
+RUN curl --fail "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip"
+RUN unzip awscli-bundle.zip
+RUN ./awscli-bundle/install --install-dir "${AWS_CLI_ROOT}"
+ENV PATH "${AWS_CLI_ROOT}/bin/:${PATH}"
+# Multipart operations aren't supported for anonymous users, so we set the
+# threshold high to avoid them being used automatically by the AWS CLI.
+RUN aws configure set default.s3.multipart_threshold 1024MB
 
 # Expose the installed gcc to the invoking shell.
 ENTRYPOINT ["/usr/bin/scl", "enable", "devtoolset-7",  "--"]
