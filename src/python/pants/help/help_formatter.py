@@ -46,11 +46,13 @@ class HelpFormatter:
 
         def add_option(ohis, *, category=None):
             lines.append("")
-            display_scope = scope or "Global"
+            display_scope = f"`{scope}`" or "Global"
             if category:
-                lines.append(self._maybe_green(f"{display_scope} {category}:"))
+                title = f"{display_scope} {category} options"
+                lines.append(self._maybe_green(f"{title}\n{'-' * len(title)}"))
             else:
-                lines.append(self._maybe_green(f"{display_scope}:"))
+                title = f"{display_scope} options"
+                lines.append(self._maybe_green(f"{title}\n{'-' * len(title)}"))
                 if description:
                     lines.append(description)
             lines.append(" ")
@@ -58,7 +60,7 @@ class HelpFormatter:
                 lines.append("No options available.")
                 return
             for ohi in ohis:
-                lines.extend(self.format_option(ohi))
+                lines.extend([*self.format_option(ohi), ""])
 
         add_option(oshi.basic)
         if self._show_advanced:
@@ -73,16 +75,11 @@ class HelpFormatter:
         :param ohi: Extracted information for option to print
         :return: Formatted help text for this option
         """
-        lines = []
-        choices = f"one of: [{ohi.choices}]; " if ohi.choices else ""
-        arg_line = "{args} {default}".format(
-            args=self._maybe_magenta(", ".join(ohi.display_args)),
-            default=self._maybe_cyan(f"({choices}default: {ohi.default})"),
-        )
-        lines.append(f"  {arg_line}")
-
         indent = "      "
-        lines.extend([f"{indent}{s}" for s in wrap(ohi.help, 76)])
+        arg_line = f"  {self._maybe_magenta(', '.join(ohi.display_args))}"
+        choices = f"one of: [{ohi.choices}]; " if ohi.choices else ""
+        default_line = indent + self._maybe_cyan(f"{choices}default: {ohi.default}")
+        lines = [arg_line, default_line, *[f"{indent}{s}" for s in wrap(ohi.help, 80)]]
         if ohi.deprecated_message:
             lines.append(self._maybe_red(f"{indent}{ohi.deprecated_message}."))
             if ohi.removal_hint:

@@ -181,4 +181,4 @@ class HelpPrinter:
         formatted_lines = help_formatter.format_options(
             scope, description, self._options.get_parser(scope).option_registrations_iter()
         )
-        return "\n".join(formatted_lines)
+        return "\n".join(formatted_lines).rstrip()
