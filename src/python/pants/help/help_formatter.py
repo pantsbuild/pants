@@ -78,8 +78,12 @@ class HelpFormatter:
         indent = "      "
         arg_line = f"  {self._maybe_magenta(', '.join(ohi.display_args))}"
         choices = f"one of: [{ohi.choices}]; " if ohi.choices else ""
-        default_line = indent + self._maybe_cyan(f"{choices}default: {ohi.default}")
-        lines = [arg_line, default_line, *[f"{indent}{s}" for s in wrap(ohi.help, 80)]]
+        default_lines = [
+            f"{indent}{'  ' if i != 0 else ''}{self._maybe_cyan(s)}"
+            for i, s in enumerate(wrap(f"{choices}default: {ohi.default}", 80))
+        ]
+        description_lines = [f"{indent}{s}" for s in wrap(ohi.help, 80)]
+        lines = [arg_line, *default_lines, *description_lines]
         if ohi.deprecated_message:
             lines.append(self._maybe_red(f"{indent}{ohi.deprecated_message}."))
             if ohi.removal_hint:
