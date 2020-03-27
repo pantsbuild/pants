@@ -75,11 +75,12 @@ class FieldInfo:
 
     def format_for_cli(self, *, console: Console) -> str:
         field_alias = console.magenta(f"{self.alias}")
-        type_info = console.cyan(f"  type: {self.type_hint}, default: {self.default}")
+        indent = "    "
+        type_info = console.cyan(f"{indent}type: {self.type_hint}, default: {self.default}")
         lines = [field_alias, type_info]
         if self.description:
-            lines.extend(f"  {line}" for line in textwrap.wrap(self.description, 80))
-        return "\n".join(f"  {line}" for line in lines)
+            lines.extend(f"{indent}{line}" for line in textwrap.wrap(self.description, 80))
+        return "\n".join(f"{indent}{line}" for line in lines)
 
 
 @dataclass(frozen=True)

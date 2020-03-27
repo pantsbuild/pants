@@ -107,12 +107,12 @@ def test_list_single() -> None:
 
         Valid fields:
 
-          custom_field
-            type: bool | None, default: True
-            My custom field! Use this field to...
+            custom_field
+                type: bool | None, default: True
+                My custom field! Use this field to...
 
-          fortran_version
-            type: str | None, default: None
+            fortran_version
+                type: str | None, default: None
         """
     )
 
@@ -125,7 +125,7 @@ def test_list_single() -> None:
 
         Valid fields:
 
-          fortran_version
-            type: str | None, default: None
+            fortran_version
+                type: str | None, default: None
         """
     )
