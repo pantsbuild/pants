@@ -94,8 +94,7 @@ function exec_pants_bare() {
 
   #TODO instead of using this variable, read [GLOBAL] Pythonpath from the config file
   PYTHONPATH="${PANTS_SRCPATH_STR}:${PYTHONPATH}" RUNNING_PANTS_FROM_SOURCES=1 \
-    exec python "${PANTS_EXE}" "$@"
-    #$entry_point_path $python_interpreter_path "$@"
+    $entry_point_path $python_interpreter_path "$@"
 
 }
 
