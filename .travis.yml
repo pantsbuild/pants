@@ -67,7 +67,6 @@ jobs:
     env:
     - CACHE_NAME=bootstrap.linux.py36
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PREPARE_DEPLOY=1
     language: python
     name: Build Linux native engine and pants.pex (Python 3.6)
     os: linux
@@ -81,7 +80,7 @@ jobs:
       "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
     - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
       travis_ci:latest sh -c "./build-support/bin/ci.py --bootstrap --python-version
-      3.6 && ./build-support/bin/release.sh -f"
+      3.6"
     - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex
       ${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     services:
@@ -175,14 +174,12 @@ jobs:
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
     - CACHE_NAME=bootstrap.osx.py36
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
-    - PREPARE_DEPLOY=1
     language: generic
     name: Build OSX native engine and pants.pex (Python 3.6)
     os: osx
     osx_image: xcode8
     script:
     - ./build-support/bin/ci.py --bootstrap --python-version 3.6
-    - ./build-support/bin/release.sh -f
     - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex
       ${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     stage: Bootstrap Pants
@@ -262,7 +259,6 @@ jobs:
     env:
     - CACHE_NAME=bootstrap.linux.py36
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PREPARE_DEPLOY=1
     language: python
     name: Build Linux native engine and pants.pex (Python 3.6)
     os: linux
@@ -276,7 +272,7 @@ jobs:
       "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
     - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
       travis_ci:latest sh -c "./build-support/bin/ci.py --bootstrap --python-version
-      3.6 && ./build-support/bin/release.sh -f"
+      3.6"
     - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex
       ${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     services:
@@ -314,14 +310,12 @@ jobs:
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
     - CACHE_NAME=bootstrap.osx.py36
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
-    - PREPARE_DEPLOY=1
     language: generic
     name: Build OSX native engine and pants.pex (Python 3.6)
     os: osx
     osx_image: xcode8
     script:
     - ./build-support/bin/ci.py --bootstrap --python-version 3.6
-    - ./build-support/bin/release.sh -f
     - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex
       ${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     stage: Bootstrap Pants (Cron)
@@ -1994,6 +1988,7 @@ jobs:
     dist: xenial
     env:
     - CACHE_NAME=rust_tests.linux
+    - PREPARE_DEPLOY=1
     if: commit_message !~ /\[ci skip-rust-tests\]/
     name: Rust tests - Linux
     os: linux
@@ -2003,6 +1998,7 @@ jobs:
     - '3.7'
     script:
     - ./build-support/bin/ci.py --rust-tests
+    - ./build-support/bin/release.sh -f
     stage: Test Pants
     sudo: required
   - before_cache:
@@ -2030,12 +2026,14 @@ jobs:
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
     - CACHE_NAME=rust_tests.osx
+    - PREPARE_DEPLOY=1
     if: commit_message !~ /\[ci skip-rust-tests\]/
     name: Rust tests - OSX
     os: osx
     osx_image: xcode8.3
     script:
     - ./build-support/bin/ci.py --rust-tests
+    - ./build-support/bin/release.sh -f
     stage: Test Pants
   - addons:
       apt:
