@@ -2,8 +2,9 @@ use tempfile;
 use testutil;
 
 use crate::{
-  Dir, DirectoryListing, File, GlobExpansionConjunction, GlobMatching, Link, PathGlobs, PathStat,
-  PathStatGetter, PosixFS, Stat, StrictGlobMatching, SymlinkBehavior, VFS,
+  Dir, DirectoryListing, File, GitignoreStyleExcludes, GlobExpansionConjunction, GlobMatching,
+  Link, PathGlobs, PathStat, PathStatGetter, PosixFS, Stat, StrictGlobMatching, SymlinkBehavior,
+  VFS,
 };
 
 use async_trait::async_trait;
@@ -384,7 +385,7 @@ async fn assert_only_file_is_executable(path: &Path, want_is_executable: bool) {
 fn new_posixfs<P: AsRef<Path>>(dir: P) -> PosixFS {
   PosixFS::new(
     dir.as_ref(),
-    &[],
+    GitignoreStyleExcludes::create(&[]).unwrap(),
     task_executor::Executor::new(Handle::current()),
   )
   .unwrap()
@@ -393,7 +394,7 @@ fn new_posixfs<P: AsRef<Path>>(dir: P) -> PosixFS {
 fn new_posixfs_symlink_oblivious<P: AsRef<Path>>(dir: P) -> PosixFS {
   PosixFS::new_with_symlink_behavior(
     dir.as_ref(),
-    &[],
+    GitignoreStyleExcludes::create(&[]).unwrap(),
     task_executor::Executor::new(Handle::current()),
     SymlinkBehavior::Oblivious,
   )

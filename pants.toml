@@ -86,6 +86,8 @@ pants_ignore.add = [
   "/build-support/*.venv/",
   # An absolute symlink to the Pants Rust toolchain sources.
   "/build-support/bin/native/src",
+  # We shouldn't walk or watch the rust compiler artifacts because it is slow.
+  "/src/rust/engine/target",
 ]
 
 [cache]

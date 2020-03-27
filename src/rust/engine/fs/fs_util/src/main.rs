@@ -662,7 +662,13 @@ fn expand_files_helper(
 }
 
 fn make_posix_fs<P: AsRef<Path>>(executor: task_executor::Executor, root: P) -> fs::PosixFS {
-  fs::PosixFS::new(&root, &[], executor).unwrap()
+  // Unwrapping the output of creating the git ignorer with no patterns is infallible.
+  fs::PosixFS::new(
+    &root,
+    fs::GitignoreStyleExcludes::create(&[]).unwrap(),
+    executor,
+  )
+  .unwrap()
 }
 
 fn ensure_uploaded_to_remote(

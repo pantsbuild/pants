@@ -4,7 +4,7 @@
 import sys
 from typing import Any, Callable, Optional
 
-from colors import blue, cyan, green, red
+from colors import blue, cyan, green, magenta, red
 
 from pants.engine.native import Native
 from pants.engine.rules import side_effecting
@@ -95,6 +95,9 @@ class Console:
 
     def green(self, text: str) -> str:
         return self._safe_color(text, green)
+
+    def magenta(self, text: str) -> str:
+        return self._safe_color(text, magenta)
 
     def red(self, text: str) -> str:
         return self._safe_color(text, red)

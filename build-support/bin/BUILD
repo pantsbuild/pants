@@ -57,6 +57,16 @@ python_library(
 )
 
 python_binary(
+   name = 'deploy_ci_bootstrapped_pants_pex',
+   sources = ['deploy_ci_bootstrapped_pants_pex.py'],
+   dependencies = [
+     ':common',
+   ],
+   tags = {'type_checked'},
+ )
+
+
+python_binary(
   name = 'deploy_to_s3',
   source = 'deploy_to_s3.py',
   dependencies = [

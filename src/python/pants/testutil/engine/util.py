@@ -8,7 +8,7 @@ from io import StringIO
 from types import CoroutineType, GeneratorType
 from typing import Any, Callable, List, Optional, Sequence, Tuple, Type, get_type_hints
 
-from colors import blue, cyan, green, red
+from colors import blue, cyan, green, magenta, red
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.addressable import addressable_sequence
@@ -238,6 +238,9 @@ class MockConsole:
 
     def green(self, text: str) -> str:
         return self._safe_color(text, green)
+
+    def magenta(self, text: str) -> str:
+        return self._safe_color(text, magenta)
 
     def red(self, text: str) -> str:
         return self._safe_color(text, red)
