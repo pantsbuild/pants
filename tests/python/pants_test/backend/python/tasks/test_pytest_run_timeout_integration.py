@@ -1,20 +1,9 @@
-# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import os
 import time
 
-from pants.testutil.interpreter_selection_utils import (
-    PY_3,
-    PY_27,
-    python_interpreter_path,
-    skip_unless_python3_present,
-    skip_unless_python27_and_python3_present,
-    skip_unless_python27_present,
-)
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
-from pants.testutil.pexrc_util import setup_pexrc_with_pex_python_path
-from pants.util.contextutil import temporary_dir
 
 
 class PytestRunTimeoutIntegrationTest(PantsRunIntegrationTest):

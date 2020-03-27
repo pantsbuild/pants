@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-import time
 
 from pants.testutil.interpreter_selection_utils import (
     PY_3,
