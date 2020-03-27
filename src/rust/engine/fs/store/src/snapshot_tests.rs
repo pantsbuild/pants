@@ -8,8 +8,8 @@ use tokio::runtime::Handle;
 
 use crate::{OneOffStoreFileByDigest, Snapshot, Store};
 use fs::{
-  Dir, File, GlobExpansionConjunction, GlobMatching, PathGlobs, PathStat, PosixFS,
-  StrictGlobMatching,
+  Dir, File, GitignoreStyleExcludes, GlobExpansionConjunction, GlobMatching, PathGlobs, PathStat,
+  PosixFS, StrictGlobMatching,
 };
 
 use std;
@@ -36,7 +36,8 @@ fn setup() -> (
   )
   .unwrap();
   let dir = tempfile::Builder::new().prefix("root").tempdir().unwrap();
-  let posix_fs = Arc::new(PosixFS::new(dir.path(), &[], executor).unwrap());
+  let ignorer = GitignoreStyleExcludes::create(&[]).unwrap();
+  let posix_fs = Arc::new(PosixFS::new(dir.path(), ignorer, executor).unwrap());
   let file_saver = OneOffStoreFileByDigest::new(store.clone(), posix_fs.clone());
   (store, dir, posix_fs, file_saver)
 }

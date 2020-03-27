@@ -131,7 +131,7 @@ pub struct GitignoreStyleExcludes {
 }
 
 impl GitignoreStyleExcludes {
-  fn create(patterns: &[String]) -> Result<Arc<Self>, String> {
+  pub fn create(patterns: &[String]) -> Result<Arc<Self>, String> {
     if patterns.is_empty() {
       return Ok(EMPTY_IGNORE.clone());
     }
@@ -167,6 +167,13 @@ impl GitignoreStyleExcludes {
 
   fn is_ignored_path(&self, path: &Path, is_dir: bool) -> bool {
     match self.gitignore.matched(path, is_dir) {
+      ::ignore::Match::None | ::ignore::Match::Whitelist(_) => false,
+      ::ignore::Match::Ignore(_) => true,
+    }
+  }
+
+  pub fn is_ignored_or_child_of_ignored_path(&self, path: &Path, is_dir: bool) -> bool {
+    match self.gitignore.matched_path_or_any_parents(path, is_dir) {
       ::ignore::Match::None | ::ignore::Match::Whitelist(_) => false,
       ::ignore::Match::Ignore(_) => true,
     }
@@ -587,15 +594,15 @@ pub struct PosixFS {
 impl PosixFS {
   pub fn new<P: AsRef<Path>>(
     root: P,
-    ignore_patterns: &[String],
+    ignorer: Arc<GitignoreStyleExcludes>,
     executor: task_executor::Executor,
   ) -> Result<PosixFS, String> {
-    Self::new_with_symlink_behavior(root, ignore_patterns, executor, SymlinkBehavior::Aware)
+    Self::new_with_symlink_behavior(root, ignorer, executor, SymlinkBehavior::Aware)
   }
 
   pub fn new_with_symlink_behavior<P: AsRef<Path>>(
     root: P,
-    ignore_patterns: &[String],
+    ignorer: Arc<GitignoreStyleExcludes>,
     executor: task_executor::Executor,
     symlink_behavior: SymlinkBehavior,
   ) -> Result<PosixFS, String> {
@@ -616,15 +623,9 @@ impl PosixFS {
       })
       .map_err(|e| format!("Could not canonicalize root {:?}: {:?}", root, e))?;
 
-    let ignore = GitignoreStyleExcludes::create(&ignore_patterns).map_err(|e| {
-      format!(
-        "Could not parse build ignore inputs {:?}: {:?}",
-        ignore_patterns, e
-      )
-    })?;
     Ok(PosixFS {
       root: canonical_root,
-      ignore: ignore,
+      ignore: ignorer,
       executor: executor,
       symlink_behavior: symlink_behavior,
     })
