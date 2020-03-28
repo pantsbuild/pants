@@ -2,8 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import sys
+import textwrap
 from typing import Dict, Optional, cast
 
+from colors import cyan, green
 from typing_extensions import Literal
 
 from pants.base.build_environment import pants_release, pants_version
@@ -37,6 +39,7 @@ class HelpPrinter:
         self._options = options
         self._help_request = help_request or self._options.help_request
         self._union_membership = union_membership
+        self._use_color = sys.stdout.isatty()
 
     @property
     def bin_name(self) -> str:
@@ -66,7 +69,6 @@ class HelpPrinter:
         return 0
 
     def _print_goals_help(self) -> None:
-        print(f"\nUse `{self.bin_name} help $goal` to get help for a particular goal.\n")
         global_options = self._options.for_global_scope()
         goal_descriptions: Dict[str, str] = {}
         if global_options.v2:
@@ -91,10 +93,26 @@ class HelpPrinter:
                 {goal.name: goal.description_first_line for goal in Goal.all() if goal.description}
             )
 
-        max_width = max(len(name) for name in goal_descriptions.keys()) if goal_descriptions else 0
-        for name, description in sorted(goal_descriptions.items()):
-            print(f"  {name.rjust(max_width)}: {description}")
-        print()
+        title_text = "Goals"
+        title = f"{title_text}\n{'-' * len(title_text)}"
+        if self._use_color:
+            title = green(title)
+
+        def format_goal(name: str, description: str) -> str:
+            if self._use_color:
+                name = cyan(name)
+            return "\n".join([name, textwrap.fill(description, 80), ""])
+
+        lines = [
+            f"\n{title}\n",
+            f"Use `{self.bin_name} help $goal` to get help for a particular goal.",
+            "\n",
+            *(
+                format_goal(name, description)
+                for name, description in sorted(goal_descriptions.items())
+            ),
+        ]
+        print("\n".join(lines))
 
     def _print_options_help(self) -> None:
         """Print a help screen.
@@ -176,7 +194,7 @@ class HelpPrinter:
             scope=scope,
             show_advanced=show_advanced_and_deprecated,
             show_deprecated=show_advanced_and_deprecated,
-            color=sys.stdout.isatty(),
+            color=self._use_color,
         )
         formatted_lines = help_formatter.format_options(
             scope, description, self._options.get_parser(scope).option_registrations_iter()
