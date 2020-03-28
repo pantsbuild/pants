@@ -646,6 +646,14 @@ class GlobalOptions(Subsystem):
 
         # Watchman options.
         register(
+            "--enable-watchman",
+            type=bool,
+            advanced=True,
+            default=True,
+            help="Use the watchman daemon filesystem event watcher to watch for changes "
+            "in the buildroot. Disable this to rely solely on the experimental pants engine filesystem watcher."
+        )
+        register(
             "--watchman-version", advanced=True, default="4.9.0-pants1", help="Watchman version."
         )
         register(
