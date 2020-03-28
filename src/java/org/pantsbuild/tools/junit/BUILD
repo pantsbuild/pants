@@ -35,7 +35,6 @@ java_library(
     '3rdparty:junit',
     'src/java/org/pantsbuild/junit/security',
   ],
-  platform='java7',
   provides=artifact(
     org='org.pantsbuild',
     name='junit-runner-security-manager',

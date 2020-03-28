@@ -7,5 +7,4 @@ java_library(
       Exceptions for use with org.pantsbuild#junit-runner that support using the integrated security manager.
     """)
   ),
-  platform='java7',
 )
