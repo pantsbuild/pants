@@ -28,13 +28,19 @@ class OptionHelpFormatterTest(unittest.TestCase):
         lines = HelpFormatter(
             scope="", show_advanced=False, show_deprecated=False, color=False
         ).format_option(ohi)
-        assert len(lines) == 2
-        assert "help for foo" in lines[1]
-        return lines[0]
+        assert len(lines) == 3
+        assert "help for foo" in lines[2]
+        return lines[1]
 
     def test_format_help(self):
-        line = self.format_help_for_foo(default="MYDEFAULT")
-        assert line.lstrip() == "--foo (default: MYDEFAULT)"
+        default_line = self.format_help_for_foo(default="MYDEFAULT")
+        assert default_line.lstrip() == "default: MYDEFAULT"
+
+    def test_format_help_choices(self):
+        default_line = self.format_help_for_foo(
+            typ=str, default="kiwi", choices="apple, banana, kiwi"
+        )
+        assert default_line.lstrip() == "one of: [apple, banana, kiwi]; default: kiwi"
 
     def test_suppress_advanced(self):
         args = ["--foo"]
@@ -47,7 +53,7 @@ class OptionHelpFormatterTest(unittest.TestCase):
         lines = HelpFormatter(
             scope="", show_advanced=True, show_deprecated=False, color=False
         ).format_options(scope="", description="", option_registrations_iter=[(args, kwargs)])
-        assert len(lines) == 10
+        assert len(lines) == 12
 
     def test_suppress_deprecated(self):
         args = ["--foo"]
@@ -60,8 +66,4 @@ class OptionHelpFormatterTest(unittest.TestCase):
         lines = HelpFormatter(
             scope="", show_advanced=True, show_deprecated=True, color=False
         ).format_options(scope="", description="", option_registrations_iter=[(args, kwargs)])
-        assert len(lines) == 15
-
-    def test_format_help_choices(self):
-        line = self.format_help_for_foo(typ=str, default="kiwi", choices="apple, banana, kiwi")
-        assert line.lstrip() == "--foo (one of: [apple, banana, kiwi]; default: kiwi)"
+        assert len(lines) == 17
