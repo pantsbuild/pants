@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 import subprocess
+from pathlib import Path
 
 from common import banner, die
 
@@ -15,11 +16,15 @@ AWS_COMMAND_PREFIX = ["aws", "--no-sign-request", "--region", "us-east-1"]
 
 
 def main() -> None:
+    if not Path("src/python/pants").is_dir():
+        raise ValueError(
+            "This script assumes that you are in the Pants build root. Instead, you are at "
+            f"{Path.cwd()}."
+        )
     args = create_parser().parse_args()
-    pex_url = f"s3/::{args.aws_bucket}/{args.pex_key}"
-    native_engine_so_local_path = (
-        f"{args.travis_build_dir}/src/python/pants/engine/native_engine.so"
-    )
+    pex_url = f"s3://{args.aws_bucket}/{args.pex_key}"
+    native_engine_so_local_path = f"./src/python/pants/engine/native_engine.so"
+
     # NB: we must set `$PY` before calling `bootstrap()` to ensure that we use the exact same
     # Python interpreter when calculating the hash of `native_engine.so` as the one we use when
     # calling `ci.py --bootstrap`.
@@ -63,7 +68,7 @@ def main() -> None:
         )
 
     banner(f"Deploying `pants.pex` to {pex_url}.")
-    deploy_pants_pex(travis_build_dir=args.travis_build_dir, pex_url=pex_url)
+    deploy_pants_pex(pex_url=pex_url)
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -79,9 +84,6 @@ def create_parser() -> argparse.ArgumentParser:
             "The key prefix for `native_engine.so`, which will get combined with the unique hash "
             "to determine the key."
         ),
-    )
-    parser.add_argument(
-        "--travis-build-dir", required=True, help="Path to the Travis build directory."
     )
     parser.add_argument(
         "--python-version",
@@ -163,8 +165,8 @@ def deploy_native_engine_so(
     _deploy(file_path=native_engine_so_local_path, s3_url=native_engine_so_aws_url)
 
 
-def deploy_pants_pex(*, travis_build_dir: str, pex_url: str) -> None:
-    _deploy(f"{travis_build_dir}/pants.pex", pex_url)
+def deploy_pants_pex(pex_url: str) -> None:
+    _deploy(f"./pants.pex", pex_url)
 
 
 if __name__ == "__main__":
