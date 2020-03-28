@@ -108,10 +108,7 @@ class JavacCompile(JvmCompile):
         if self.get_options().capture_classpath:
             self._record_compile_classpath(classpath, ctx.target, ctx.classes_dir.path)
 
-        try:
-            distribution = JvmPlatform.preferred_jvm_distribution([settings], strict=True)
-        except DistributionLocator.Error:
-            distribution = JvmPlatform.preferred_jvm_distribution([settings], strict=False)
+        distribution = self._local_jvm_distribution(settings)
 
         javac_args = []
 

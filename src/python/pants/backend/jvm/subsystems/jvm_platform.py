@@ -30,6 +30,9 @@ class JvmPlatform(Subsystem):
 
     _COMPILER_CHOICES = ["zinc", "javac", "rsc"]
 
+    class IncompatiblePlatforms(DistributionLocator.Error):
+        """The provided platforms cannot all be accommodated."""
+
     class IllegalDefaultPlatform(TaskError):
         """The --default-platform option was set, but isn't defined in --platforms."""
 
@@ -135,18 +138,46 @@ class JvmPlatform(Subsystem):
     def _preferred_jvm_distribution_args(cls, platforms, strict=None, jdk=False):
         if not platforms:
             return {"jdk": jdk}
-        if strict is None:
-            strict = all(p.strict for p in platforms)
-        min_version = max(platform.target_level for platform in platforms)
+        if strict is False:  # treat all the platforms as non-strict
+            min_version = max(p.target_level for p in platforms)
+            set_max_version = False
+        else:
+            # treat strict platforms as strict & ensure no non-strict directive is broken
+            strict_target_levels = {p.target_level for p in platforms if p.strict}
+            lenient_target_levels = {p.target_level for p in platforms if not p.strict}
+
+            if len(strict_target_levels) == 0:
+                min_version = max(lenient_target_levels)
+                set_max_version = strict
+            elif len(strict_target_levels) > 1:
+                differing = ", ".join(str(t) for t in strict_target_levels)
+                raise cls.IncompatiblePlatforms(
+                    f"Multiple strict platforms with differing target releases were found:"
+                    f" {differing}"
+                )
+            else:
+                if len(lenient_target_levels) == 0:
+                    min_version = next(iter(strict_target_levels))
+                    set_max_version = True
+                else:
+                    strict_level = next(iter(strict_target_levels))
+                    non_strict_max = max(t for t in lenient_target_levels)
+                    if non_strict_max and non_strict_max > strict_level:
+                        raise cls.IncompatiblePlatforms(
+                            f"lenient platform with higher minimum version,"
+                            f" {non_strict_max}, than strict requirement of"
+                            f" {strict_level}"
+                        )
+                    min_version = strict_level
+                    set_max_version = True
+
         if len(min_version.components) <= 2:  # ensure at least three components.
             min_version = Revision(
                 *(min_version.components + [0] * (3 - len(min_version.components)))
             )
-
-        if strict:
+        max_version = None
+        if set_max_version:
             max_version = Revision(*(min_version.components[0:2] + [9999]))
-        else:
-            max_version = None
         return {"minimum_version": min_version, "maximum_version": max_version, "jdk": jdk}
 
     @memoized_property
@@ -314,8 +345,7 @@ class JvmPlatformSettings:
     :param target_level: Revision object or string for the java target level.
     :param list args: Additional arguments to pass to the java compiler.
     :param list jvm_options: Additional jvm options specific to this JVM platform.
-    :param boolean strict: Whether to use the target level as just a lower bound or both a lower and
-    upper when looking up distributions.
+    :param boolean strict: Whether to use the target level as a lower bound or an exact requirement.
     :param str name: name to identify this platform.
     :param by_default: True if this value was inferred by omission of a specific platform setting.
     """

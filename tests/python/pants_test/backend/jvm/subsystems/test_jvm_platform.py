@@ -210,11 +210,9 @@ class JvmPlatformTest(TestBase):
                     "platforms": {
                         "default-platform": {"target": "9"},
                         "8-platform": {"target": "8"},
-                        "10-platform": {"target": "10"},
-                        "11-platform": {"target": "11"},
+                        "9-platform": {"target": "9"},
                         "strict-8-platform": {"target": "8", "strict": True},
-                        "strict-10-platform": {"target": "10", "strict": True},
-                        "strict-11-platform": {"target": "11", "strict": True},
+                        "strict-9-platform": {"target": "9", "strict": True},
                     },
                     "default_platform": "default-platform",
                     "default_runtime_platform": None,
@@ -248,48 +246,55 @@ class JvmPlatformTest(TestBase):
             "maximum_version": None,
             "jdk": False,
         }
-        # strict/non-strict platform requested together--not strict (maybe should be strict?)
-        # when there are strict platforms in a collection, use those
-        # as long as
-        # - equal to the max target in the collection
-        # - > the min target in the collection
-        # - equivalent to any other strict platforms in the collection
-        # strict has to be highest requested version
-        assert JvmPlatform._preferred_jvm_distribution_args(
-            [strict_8_platform, default_9_platform]
-        ) == {"minimum_version": Revision.lenient("9.0.0"), "maximum_version": None, "jdk": False,}
 
-        with self.assertRaisesRegex(Exception, "wut"):
+        with self.assertRaisesRegex(
+            JvmPlatform.IncompatiblePlatforms,
+            "lenient platform with higher minimum version, 9, than strict requirement of 1.8",
+        ):
             # requested strict 8 & lenient 9.
             # fail because 9 is lower bound
             JvmPlatform._preferred_jvm_distribution_args(
-            [
-                instance.get_platform_by_name("9-platform"),
-                instance.get_platform_by_name("strict-8-platform"),
-            ])
-        with self.assertRaisesRegex(Exception, "WUT"):
+                [
+                    instance.get_platform_by_name("9-platform"),
+                    instance.get_platform_by_name("strict-8-platform"),
+                ]
+            )
+        with self.assertRaisesRegex(
+            JvmPlatform.IncompatiblePlatforms,
+            "Multiple strict platforms with differing target releases were found: 1.8, 9",
+        ):
             # two different strict platforms can't work
             JvmPlatform._preferred_jvm_distribution_args(
+                [
+                    instance.get_platform_by_name("strict-9-platform"),
+                    instance.get_platform_by_name("strict-8-platform"),
+                ]
+            )
+        # two of the same strict platform thumbs up
+        assert JvmPlatform._preferred_jvm_distribution_args(
+            [
+                instance.get_platform_by_name("strict-8-platform"),
+                instance.get_platform_by_name("strict-8-platform"),
+            ]
+        ) == {
+            "minimum_version": Revision.lenient("1.8.0"),
+            "maximum_version": Revision.lenient("1.8.9999"),
+            "jdk": False,
+        }
+        # strict highest, matching highest non-strict, other non-strict
+        assert JvmPlatform._preferred_jvm_distribution_args(
             [
                 instance.get_platform_by_name("strict-9-platform"),
-                instance.get_platform_by_name("strict-8-platform"),
-            ])
-        # two of the same strict platform thumbs up
-        JvmPlatform._preferred_jvm_distribution_args(
-            [
-                instance.get_platform_by_name("strict-8-platform"),
-                instance.get_platform_by_name("strict-8-platform"),
-            ])
-        # strict highest, matching highest non-strict, other non-strict
-        JvmPlatform._preferred_jvm_distribution_args(
-            [
-                instance.get_platform_by_name("strict-11-platform"),
-                instance.get_platform_by_name("11-platform"),
-                instance.get_platform_by_name("10-platform"),
-            ])
+                instance.get_platform_by_name("9-platform"),
+                instance.get_platform_by_name("8-platform"),
+            ]
+        ) == {
+            "minimum_version": Revision.lenient("9.0.0"),
+            "maximum_version": Revision.lenient("9.0.9999"),
+            "jdk": False,
+        }
 
-
-def test_jvm_options(self):
+    def test_jvm_options(self):
         init_subsystem(
             JvmPlatform,
             options={
