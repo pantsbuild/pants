@@ -116,7 +116,8 @@ def bootstrap_pants_pex(python_version: float) -> None:
         [
             "./build-support/bin/ci.py",
             "--bootstrap",
-            "--bootstrap-try-to-skip-rust-compilation " f"--python-version",
+            "--bootstrap-try-to-skip-rust-compilation",
+            "--python-version",
             str(python_version),
         ],
         check=True,
