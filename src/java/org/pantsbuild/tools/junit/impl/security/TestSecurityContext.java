@@ -1,9 +1,13 @@
 package org.pantsbuild.tools.junit.impl.security;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * The context that wraps a test or suite so that the security manager can determine what to do.
@@ -94,6 +98,13 @@ public class TestSecurityContext {
 
   public ThreadGroup getThreadGroup() {
     return threadGroup;
+  }
+
+  Collection<Thread> getActiveThreads() {
+    ThreadGroup threadGroup = getThreadGroup();
+    Thread[] threadArray = new Thread[threadGroup.activeCount()];
+    threadGroup.enumerate(threadArray, false);
+    return Arrays.stream(threadArray).filter(Objects::nonNull).collect(Collectors.toList());
   }
 
   public synchronized void addChild(TestSecurityContext testSecurityContext) {

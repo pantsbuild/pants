@@ -1,7 +1,8 @@
 
 TODOs
 --------
-
+It should just be class and testcase because those are the elements that exist
+not suites, or if suites are in there,they should be a distinct element
 #### Refactoring /  code movement
 TODO java8-ify
 

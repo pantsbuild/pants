@@ -22,8 +22,7 @@ public class ThreadStartedInBeforeClassAndNotJoinedAfterTest {
       public void run() {
         try {
           latch.await();
-        } catch (InterruptedException e) {
-          e.printStackTrace();
+        } catch (InterruptedException ignored) {
         }
       }
     });

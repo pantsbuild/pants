@@ -80,7 +80,7 @@ public class ConsoleRunnerImplTestSetup {
     useExperimentalRunner = false;
   }
 
-  String runTestExpectingSuccess(Class testClass) {
+  String runTestExpectingSuccess(Class<?> testClass) {
     JunitSecurityManagerConfig securityConfig = new JunitSecurityManagerConfig(
         SystemExitHandling.disallow,
         ThreadHandling.disallowLeakingTestCaseThreads,
@@ -234,17 +234,11 @@ public class ConsoleRunnerImplTestSetup {
     }
   }
 
-  private JunitSecurityManagerConfig configDisallowingSystemExitButAllowingEverythingElse() {
-    return new JunitSecurityManagerConfig(
-        SystemExitHandling.disallow,
-        ThreadHandling.allowAll,
-        NetworkHandling.allowAll);
-  }
-
-  String getTestLogContents(Class testClass, String extension) {
+  String getTestLogContents(Class<?> testClass, String extension) {
     try {
       return new String(
-          Files.readAllBytes(Paths.get(outdir.getPath(), testClass.getCanonicalName() + extension)),
+          Files.readAllBytes(Paths.get(outdir.getPath(), testClass.getCanonicalName() +
+              extension)),
           Charsets.UTF_8);
     } catch (IOException e) {
       throw new RuntimeException(e);

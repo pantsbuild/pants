@@ -108,7 +108,7 @@ public class JunitSecViolationReportingManager extends SecurityManager {
     } catch (RuntimeException e) {
       throw e.getCause();
     } finally {
-      contextLookupAndErrorCollection.endTest();
+      contextLookupAndErrorCollection.endTest(); // TODO this probably doesnt make sense here
     }
   }
 

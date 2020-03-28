@@ -1,5 +1,6 @@
 junit_tests(
   dependencies=[
+    'src/java/org/pantsbuild/junit/security',
     'src/java/org/pantsbuild/tools/junit:security-manager',
     'tests/java/org/pantsbuild/tools/junit/impl:common',
     'tests/java/org/pantsbuild/tools/junit/lib:test-dep',

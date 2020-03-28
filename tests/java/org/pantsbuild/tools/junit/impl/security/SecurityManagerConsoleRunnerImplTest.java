@@ -5,6 +5,7 @@ import java.util.Arrays;
 import org.hamcrest.Matcher;
 import org.junit.Before;
 import org.junit.Test;
+import org.pantsbuild.junit.security.SecurityViolationException;
 import org.pantsbuild.tools.junit.impl.ConsoleRunnerImplTestSetup;
 import org.pantsbuild.tools.junit.lib.MockTest1;
 import org.pantsbuild.tools.junit.lib.MockTest2;
@@ -16,7 +17,10 @@ import org.pantsbuild.tools.junit.lib.security.network.BoundaryNetworkTests;
 import org.pantsbuild.tools.junit.lib.security.sysexit.BeforeClassSysExitTestCase;
 import org.pantsbuild.tools.junit.lib.security.sysexit.BoundarySystemExitTests;
 import org.pantsbuild.tools.junit.lib.security.sysexit.StaticSysExitTestCase;
+import org.pantsbuild.tools.junit.lib.security.sysexit.SysExitStaticStartedThread;
+import org.pantsbuild.tools.junit.lib.security.sysexit.SysExitStaticStartedThreadWaitsUntilTestRunning;
 import org.pantsbuild.tools.junit.lib.security.threads.DanglingThreadFromTestCase;
+import org.pantsbuild.tools.junit.lib.security.threads.DanglingThreadStartedStatically;
 import org.pantsbuild.tools.junit.lib.security.threads.ThreadStartedInBeforeClassAndJoinedAfterTest;
 import org.pantsbuild.tools.junit.lib.security.threads.ThreadStartedInBeforeClassAndNotJoinedAfterTest;
 import org.pantsbuild.tools.junit.lib.security.threads.ThreadStartedInBeforeTest;
@@ -131,6 +135,32 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
   }
 
   @Test
+  public void testFailStaticSysExitInThread() {
+    Class<?> testClass = SysExitStaticStartedThread.class;
+    String output = runTestsExpectingFailure(
+        configDisallowingSystemExitButAllowingEverythingElse(),
+        testClass);
+
+    assertThat(output,
+        containsString(") " + testClass.getCanonicalName() + "\n" +
+            SecurityViolationException.class.getCanonicalName() +
+            ": System.exit calls are not allowed."));
+  }
+
+  @Test
+  public void testFailStaticSysExitInThreadJoinedLate() {
+    Class<?> testClass = SysExitStaticStartedThreadWaitsUntilTestRunning.class;
+    String output = runTestsExpectingFailure(
+        configDisallowingSystemExitButAllowingEverythingElse(),
+        testClass);
+
+    assertThat(output,
+        containsString(") " + testClass.getCanonicalName() + "\n" +
+            SecurityViolationException.class.getCanonicalName() +
+            ": System.exit calls are not allowed."));
+  }
+
+  @Test
   public void testWhenDanglingThreadsAllowedPassOnThreadStartedInTestCase() {
     JunitSecurityManagerConfig secMgrConfig =
         configDisallowingSystemExitButAllowingEverythingElse();
@@ -170,11 +200,27 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
             ThreadHandling.disallowLeakingTestCaseThreads,
             NetworkHandling.allowAll),
         testClass);
-    String testName = "failing";
-    assertThat(output, testFailedWithName(testClass, testName));
+    assertThat(output, testFailedWithName(testClass, "failing"));
     assertThat(output, containsString("java.lang.AssertionError: failing"));
     assertThat(output, containsString("There was 1 failure:"));
     assertThat(output, containsString("Tests run: 2,  Failures: 1"));
+  }
+
+  @Test
+  public void testThreadStartedStatically() {
+    Class<?> testClass = DanglingThreadStartedStatically.class;
+    String output = runTestsExpectingFailure(
+        new JunitSecurityManagerConfig(
+            SystemExitHandling.disallow,
+            ThreadHandling.disallowLeakingTestCaseThreads,
+            NetworkHandling.allowAll),
+        testClass);
+    assertThat(output, containsString(") " + testClass.getCanonicalName()));
+    assertThat(output, containsString(SecurityViolationException.class.getCanonicalName() +
+        ": Threads from " + testClass.getCanonicalName() + " are still running (1):\n" +
+        "\t\tThread-"));
+    assertThat(output, containsString("There was 1 failure:"));
+    assertThat(output, containsString("Tests run: 1,  Failures: 1"));
   }
 
   @Test
@@ -310,8 +356,6 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
 
   @Test
   public void treatStaticSystemExitAsFailure() {
-    // TODO it'd be better if this case resulted in a message that said none of the tests were run
-    // because for classes with more tests, it will be difficult to understand
     Class<?> testClass = StaticSysExitTestCase.class;
     String output = runTestsExpectingFailure(
         new JunitSecurityManagerConfig(
@@ -320,10 +364,14 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
             NetworkHandling.allowAll),
         testClass);
 
-    assertThat(output, containsString("passingTest(" + testClass.getCanonicalName() + ")"));
+    // NB tests fail due to the class init failure
+    assertThat(output, testFailedWithName(testClass, "passingTest", "java.lang"));
+    assertThat(output, testFailedWithName(testClass, "passingTest2", "java.lang"));
+    // NB class failure reported separately
+    assertThat(output, containsString(") " + testClass.getCanonicalName()));
     assertThat(output, containsString("System.exit calls are not allowed"));
-    assertThat(output, containsString("There were 2 failures:"));
-    assertThat(output, containsString("Tests run: 2,  Failures: 2"));
+    assertThat(output, containsString("There were 3 failures:"));
+    assertThat(output, containsString("Tests run: 2,  Failures: 3"));
   }
 
   @Test

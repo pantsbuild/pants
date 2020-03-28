@@ -1,14 +1,15 @@
 package org.pantsbuild.tools.junit.impl.security;
 
 import java.util.ArrayDeque;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
-import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 import org.junit.runner.Description;
 import org.junit.runner.Result;
@@ -101,8 +102,8 @@ public class SecurityManagedRunner extends Runner implements Filterable {
 
   public enum TestState {
     started,
-    failed,
-    danglingThreads
+    failureReported,
+    danglingThreadsExistButAllowed
   }
 
   /**
@@ -123,109 +124,81 @@ public class SecurityManagedRunner extends Runner implements Filterable {
       this.securityManager = securityManager;
     }
 
+    // run on the main thread
     @Override
     public void testRunStarted(Description description) throws Exception {
       // might want to have a nested settings here in the manager
       log("run started");
+      // todo move walk of tests here
     }
 
+    // run on the main thread
     // testRunFinished is for all of the tests.
-    // TODO This currently is run for each runner. It might make sense to extract a runner that just
-    //      includes this and only runs it once. I bet this will cause an issue with remote running
-    //      if this can be called from threads--but I think notifiers are synchronized so it's cool
     @Override
     public void testRunFinished(Result result) throws Exception {
       log("run finished");
       // Mark the run as finished, and if it was previously marked, skip checks.
-
-      // This isn't correct because each suite will have a separate one of these runners.
-      // This should be finishing a thing registered with the security manager
       if (securityManager.finished()) {
         return;
       }
 
-      // description types
-      // - test case
-      // -   parameterized
-      // - test suite
-      // - test mechanism
-      // - empty
-      for (Description description : tests.keySet()) {
-        if (tests.get(description) == TestState.failed) {
-          // NB if it's already failed, just show the initial
-          // failure.
-          continue;
-        }
-        TestSecurityContext context = contextFor(description);
-        if (description.isTest()) {
-          resolveConstraintViolationsAndFailures(description, context);
-        } else if (description.isSuite()) {
-          resolveConstraintViolationsAndFailures(description, context);
-        } else {
-          throwNotSuiteOrTest(description);
-        }
-      }
-      // collate the testclasses and report on them separately
-      // This catches failures that hang in particular test classes
-      Set<Class<?>> classNames = new LinkedHashSet<>();
-      for (Description description : tests.keySet()) {
-        Class<?> testClass = description.getTestClass();
-        if (testClass == null) {
-          continue;
-        }
-        classNames.add(testClass);
-      }
-      for (Class<?> className : classNames) {
-        TestSecurityContext context = securityManager.contextFor(className.getCanonicalName());
-        if (context == null) {
-          continue;
-        }
-        Description description = Description.createSuiteDescription(className);
-        reportConstraintFailuresExceptThreads(description, context);
-        if (securityManager.perClassThreadHandling()) {
-          reportDanglingThreads(description, context);
-        }
-      }
+      // TODO lambdas can't be shaded currently
+      tests.keySet()
+          .stream()
+          .map(Description::getClassName)
+          .collect(Collectors.toSet())
+          .stream()
+          .map(securityManager::contextFor).forEach(context -> {
+        Description description = Description.createSuiteDescription(context.getClassName());
+        resolveConstraintViolationsAndFailures(description, context);
+      });
+
+      tests.keySet().stream()
+          .filter(d -> tests.get(d) != TestState.failureReported)
+          .forEach(description -> {
+            TestSecurityContext context = contextFor(description);
+            if (description.isTest()) {
+              resolveConstraintViolationsAndFailures(description, context);
+            } else {
+              throw new RuntimeException("wat " + description);
+            }
+          });
     }
 
     private void resolveConstraintViolationsAndFailures(
         Description description,
         TestSecurityContext context) {
-      // fires failures for the current thing if necessary
-      reportConstraintFailuresExceptThreads(description, context);
-
-      reportDanglingThreads(description, context);
-    }
-
-    private void reportConstraintFailuresExceptThreads(
-        Description description,
-        TestSecurityContext context) {
       // if there were constraint violations and they haven't been reported yet, report them.
-      // TODO maybe if test already failed, wrap failure in a MultipleFailureException
-      if (context.hadFailures() && tests.get(description) != TestState.failed) {
+      if (context.hadFailures() && tests.get(description) != TestState.failureReported) {
+        // TODO maybe if test already failed, wrap failure in a MultipleFailureException
         Throwable cause = context.firstFailure();
         fireFailure(description, cause);
-        tests.put(description, TestState.failed);
+        tests.put(description, TestState.failureReported);
       }
-    }
 
-    private void reportDanglingThreads(Description description, TestSecurityContext context) {
       log("desc: " + description + " checking dangling");
-      if (tests.get(description) == TestState.failed) {
+      if (tests.get(description) == TestState.failureReported) {
         return;
       }
       // if there are threads running and the current context does not allow threads to remain,
       // running, report a failure.
-      if (context.hasActiveThreads()) {
+      Collection<Thread> activeThreads = context.getActiveThreads();
+      if (!activeThreads.isEmpty()) {
         if (securityManager.disallowsThreadsFor(context)) {
+          StringBuilder sb = new StringBuilder();
+          for (Thread thread : activeThreads) {
+            sb.append("\t\t" + thread.getName() + "\n");
+          }
+          String threadGroupListing = sb.toString();
           fireFailure(description, new SecurityViolationException(
               "Threads from " + description + " are still running (" +
-                  context.getThreadGroup().activeCount() + "):\n"
-                  + getThreadGroupListing(context.getThreadGroup())));
-          tests.put(description, TestState.failed);
+                  activeThreads.size() + "):\n"
+                  + threadGroupListing));
+
+          tests.put(description, TestState.failureReported);
           log("desc: " + description + " failed dangling check");
         } else {
-          tests.put(description, TestState.danglingThreads);
+          tests.put(description, TestState.danglingThreadsExistButAllowed);
           log("desc: " + description + " has, but not failed dangling check");
         }
       } else {
@@ -233,76 +206,46 @@ public class SecurityManagedRunner extends Runner implements Filterable {
       }
     }
 
+    // only called for tests not suites
+    // called on the thread the test execs on
     @Override
     public void testStarted(Description description) throws Exception {
       log("test-started: " + description);
-      if (description.isTest()) {
-
-        String methodName = description.getMethodName();
-        securityManager.startTest(description.getClassName(), methodName);
-
-      } else if (description.isSuite()) {
-        // TODO if we never get here, then we shouldn't bother
-        securityManager.startSuite(description.getClassName());
-      } else {
-        throwNotSuiteOrTest(description);
-      }
+      String methodName = description.getMethodName();
+      securityManager.startTest(description.getClassName(), methodName);
       tests.put(description, TestState.started);
     }
 
     @Override
     public void testFailure(Failure failure) throws Exception {
-      tests.put(failure.getDescription(), TestState.failed);
-    }
-
-    @Override
-    public void testAssumptionFailure(Failure failure) {
-      tests.put(failure.getDescription(), TestState.failed);
+      if (failure.getException() instanceof SecurityViolationException) {
+        tests.put(failure.getDescription(), TestState.failureReported);
+      }
     }
 
     @Override
     public void testFinished(Description description) throws Exception {
-      TestState testState = tests.get(description);
-      if (testState == TestState.failed) {
-        // NB if it's already failed, just show the initial
-        // failure.
-        return;
-      }
       log("testFinished " + description);
 
       TestSecurityContext context = contextFor(description);
-      if (description.isTest()) {
-        try {
+      try {
+        TestState testState = tests.get(description);
+        if (testState != TestState.failureReported) {
           resolveConstraintViolationsAndFailures(description, context);
-        } finally {
-          securityManager.endTest();
         }
-      } else if (description.isSuite()) {
-        resolveConstraintViolationsAndFailures(description, context);
+
+      } finally {
+        securityManager.endTest();
       }
     }
 
-    private String getThreadGroupListing(ThreadGroup threadGroup) {
-      Thread[] threads = new Thread[threadGroup.activeCount()];
-      threadGroup.enumerate(threads);
-      StringBuilder sb = new StringBuilder();
-      for (Thread thread : threads) {
-        if (thread == null)
-          break;
-        sb.append("\t\t" + thread.getName() + "\n");
-      }
-      return sb.toString();
+    @Override
+    public void testAssumptionFailure(Failure failure) {
+      // NB unlikely to have been caused by a SecViolation. Ignore.
     }
 
     TestSecurityContext contextFor(Description description) {
       return securityManager.contextFor(description.getClassName(), description.getMethodName());
-    }
-
-    private void throwNotSuiteOrTest(Description description) {
-      // Used as the last case in if stanzas checking isSuite/isTest
-      throw new RuntimeException(
-          "Expected " + description.getDisplayName() +
-              " to be a suite or test, but was neither");
     }
 
     private void fireFailure(Description description, Throwable cause) {
