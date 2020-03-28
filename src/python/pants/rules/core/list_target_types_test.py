@@ -72,7 +72,6 @@ def test_list_all() -> None:
     stdout = run_goal()
     assert stdout == dedent(
         """\
-        
         Target types
         ------------
 

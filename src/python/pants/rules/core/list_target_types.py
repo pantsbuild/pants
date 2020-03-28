@@ -146,7 +146,7 @@ def list_target_types(
                 for target_type in registered_target_types.types
             ]
             lines = [
-                f"\n{title}\n",
+                f"{title}\n",
                 textwrap.fill(
                     "Use `./pants target-types2 --details=$target_type` to get detailed "
                     "information for a particular target type.",
