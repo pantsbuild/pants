@@ -425,7 +425,9 @@ SKIP_JVM_CONDITION = r"commit_message !~ /\[ci skip-jvm-tests\]/"
 def _bootstrap_command(*, python_version: PythonVersion) -> str:
     return (
         f"./build-support/bin/bootstrap_and_deploy_ci_pants_pex.py --python-version "
-        f"{python_version.decimal}"
+        f"{python_version.decimal} --aws-bucket ${{AWS_BUCKET}} --native-engine-so-key-prefix "
+        "${NATIVE_ENGINE_SO_KEY_PREFIX} --travis-build-dir ${TRAVIS_BUILD_DIR} --pex-key "
+        "${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}"
     )
 
 

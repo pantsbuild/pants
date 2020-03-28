@@ -80,7 +80,9 @@ jobs:
       "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
     - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
       travis_ci:latest sh -c "./build-support/bin/bootstrap_and_deploy_ci_pants_pex.py
-      --python-version 3.6"
+      --python-version 3.6 --aws-bucket ${AWS_BUCKET} --native-engine-so-key-prefix
+      ${NATIVE_ENGINE_SO_KEY_PREFIX} --travis-build-dir ${TRAVIS_BUILD_DIR} --pex-key
+      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}"
     services:
     - docker
     stage: Bootstrap Pants
@@ -134,7 +136,9 @@ jobs:
       "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
     - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
       travis_ci:latest sh -c "./build-support/bin/bootstrap_and_deploy_ci_pants_pex.py
-      --python-version 3.7"
+      --python-version 3.7 --aws-bucket ${AWS_BUCKET} --native-engine-so-key-prefix
+      ${NATIVE_ENGINE_SO_KEY_PREFIX} --travis-build-dir ${TRAVIS_BUILD_DIR} --pex-key
+      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}"
     services:
     - docker
     stage: Bootstrap Pants (Cron)
@@ -176,6 +180,8 @@ jobs:
     osx_image: xcode8
     script:
     - ./build-support/bin/bootstrap_and_deploy_ci_pants_pex.py --python-version 3.6
+      --aws-bucket ${AWS_BUCKET} --native-engine-so-key-prefix ${NATIVE_ENGINE_SO_KEY_PREFIX}
+      --travis-build-dir ${TRAVIS_BUILD_DIR} --pex-key ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     stage: Bootstrap Pants
   - after_failure:
     - ./build-support/bin/ci-failure.sh
@@ -214,6 +220,8 @@ jobs:
     osx_image: xcode8
     script:
     - ./build-support/bin/bootstrap_and_deploy_ci_pants_pex.py --python-version 3.7
+      --aws-bucket ${AWS_BUCKET} --native-engine-so-key-prefix ${NATIVE_ENGINE_SO_KEY_PREFIX}
+      --travis-build-dir ${TRAVIS_BUILD_DIR} --pex-key ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     stage: Bootstrap Pants (Cron)
   - addons:
       apt:
@@ -264,7 +272,9 @@ jobs:
       "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
     - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
       travis_ci:latest sh -c "./build-support/bin/bootstrap_and_deploy_ci_pants_pex.py
-      --python-version 3.6"
+      --python-version 3.6 --aws-bucket ${AWS_BUCKET} --native-engine-so-key-prefix
+      ${NATIVE_ENGINE_SO_KEY_PREFIX} --travis-build-dir ${TRAVIS_BUILD_DIR} --pex-key
+      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}"
     services:
     - docker
     stage: Bootstrap Pants (Cron)
@@ -306,6 +316,8 @@ jobs:
     osx_image: xcode8
     script:
     - ./build-support/bin/bootstrap_and_deploy_ci_pants_pex.py --python-version 3.6
+      --aws-bucket ${AWS_BUCKET} --native-engine-so-key-prefix ${NATIVE_ENGINE_SO_KEY_PREFIX}
+      --travis-build-dir ${TRAVIS_BUILD_DIR} --pex-key ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     stage: Bootstrap Pants (Cron)
   - addons:
       apt:

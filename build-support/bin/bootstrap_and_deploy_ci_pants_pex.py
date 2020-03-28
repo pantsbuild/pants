@@ -11,21 +11,15 @@ from common import banner, die
 
 # NB: We expect the `aws` CLI to already be installed.
 
-TRAVIS_BUILD_DIR = os.environ["TRAVIS_BUILD_DIR"]
-AWS_BUCKET = os.environ["AWS_BUCKET"]
-
-PEX_KEY_PREFIX = os.environ["BOOTSTRAPPED_PEX_KEY_PREFIX"]
-PEX_KEY_SUFFIX = os.environ["BOOTSTRAPPED_PEX_KEY_SUFFIX"]
-PEX_KEY = f"{PEX_KEY_PREFIX}.{PEX_KEY_SUFFIX}"
-PEX_URL = f"s3://{AWS_BUCKET}/{PEX_KEY}"
-
-NATIVE_ENGINE_SO_KEY_PREFIX = os.environ["NATIVE_ENGINE_SO_KEY_PREFIX"]
-NATIVE_ENGINE_SO_LOCAL_PATH = f"{TRAVIS_BUILD_DIR}/src/python/pants/engine/native_engine.so"
-
 AWS_COMMAND_PREFIX = ["aws", "--no-sign-request", "--region", "us-east-1"]
 
 
 def main() -> None:
+    args = create_parser().parse_args()
+    pex_url = f"s3/::{args.aws_bucket}/{args.pex_key}"
+    native_engine_so_local_path = (
+        f"{args.travis_build_dir}/src/python/pants/engine/native_engine.so"
+    )
     # NB: we must set `$PY` before calling `bootstrap()` to ensure that we use the exact same
     # Python interpreter when calculating the hash of `native_engine.so` as the one we use when
     # calling `ci.py --bootstrap`.
@@ -35,17 +29,22 @@ def main() -> None:
 
     native_engine_so_hash = calculate_native_engine_so_hash()
     native_engine_so_aws_key = (
-        f"{NATIVE_ENGINE_SO_KEY_PREFIX}/{native_engine_so_hash}/native_engine.so"
+        f"{args.native_engine_so_key_prefix}/{native_engine_so_hash}/native_engine.so"
     )
-    native_engine_so_aws_url = f"s3://{AWS_BUCKET}/{native_engine_so_aws_key}"
-    native_engine_so_already_cached = native_engine_so_in_s3_cache(native_engine_so_aws_key)
+    native_engine_so_aws_url = f"s3://{args.aws_bucket}/{native_engine_so_aws_key}"
+    native_engine_so_already_cached = native_engine_so_in_s3_cache(
+        aws_bucket=args.aws_bucket, native_engine_so_aws_key=native_engine_so_aws_key
+    )
 
     if native_engine_so_already_cached:
         banner(
             f"`native_engine.so` found in the AWS S3 cache at {native_engine_so_aws_url}. "
             f"Downloading to avoid unnecessary Rust compilation."
         )
-        get_native_engine_so(native_engine_so_aws_url)
+        get_native_engine_so(
+            native_engine_so_aws_url=native_engine_so_aws_url,
+            native_engine_so_local_path=native_engine_so_local_path,
+        )
     else:
         banner(
             f"`native_engine.so` not found in the AWS S3 cache at {native_engine_so_aws_url}. "
@@ -58,16 +57,37 @@ def main() -> None:
         banner(f"`native_engine.so` already cached at {native_engine_so_aws_url}. Skipping deploy.")
     else:
         banner(f"Deploying `native_engine.so` to {native_engine_so_aws_url}.")
-        deploy_native_engine_so(native_engine_so_aws_url)
+        deploy_native_engine_so(
+            native_engine_so_aws_url=native_engine_so_aws_url,
+            native_engine_so_local_path=native_engine_so_local_path,
+        )
 
-    banner(f"Deploying `pants.pex` to {PEX_URL}.")
-    deploy_pants_pex()
+    banner(f"Deploying `pants.pex` to {pex_url}.")
+    deploy_pants_pex(travis_build_dir=args.travis_build_dir, pex_url=pex_url)
 
 
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--aws-bucket", required=True, help="Name of the S3 bucket.")
     parser.add_argument(
-        "--python-version", type=float, help="The Python version to bootstrap pants.pex with.",
+        "--pex-key", required=True, help="Key to use with S3 for the bootstrapped pants.pex"
+    )
+    parser.add_argument(
+        "--native-engine-so-key-prefix",
+        required=True,
+        help=(
+            "The key prefix for `native_engine.so`, which will get combined with the unique hash "
+            "to determine the key."
+        ),
+    )
+    parser.add_argument(
+        "--travis-build-dir", required=True, help="Path to the Travis build directory."
+    )
+    parser.add_argument(
+        "--python-version",
+        type=float,
+        required=True,
+        help="The Python version to bootstrap pants.pex with.",
     )
     return parser
 
@@ -82,14 +102,14 @@ def calculate_native_engine_so_hash() -> str:
     )
 
 
-def native_engine_so_in_s3_cache(native_engine_so_aws_key: str) -> bool:
+def native_engine_so_in_s3_cache(*, aws_bucket: str, native_engine_so_aws_key: str) -> bool:
     ls_output = subprocess.run(
         [
             *AWS_COMMAND_PREFIX,
             "s3api",
             "list-object-versions",
             "--bucket",
-            AWS_BUCKET,
+            aws_bucket,
             "--prefix",
             native_engine_so_aws_key,
             "--max-items",
@@ -124,9 +144,11 @@ def bootstrap_pants_pex(python_version: float) -> None:
     )
 
 
-def get_native_engine_so(native_engine_so_aws_url: str) -> None:
+def get_native_engine_so(
+    *, native_engine_so_aws_url: str, native_engine_so_local_path: str
+) -> None:
     subprocess.run(
-        [*AWS_COMMAND_PREFIX, "s3", "cp", native_engine_so_aws_url, NATIVE_ENGINE_SO_LOCAL_PATH],
+        [*AWS_COMMAND_PREFIX, "s3", "cp", native_engine_so_aws_url, native_engine_so_local_path],
         check=True,
     )
 
@@ -135,12 +157,14 @@ def _deploy(file_path: str, s3_url: str) -> None:
     subprocess.run([*AWS_COMMAND_PREFIX, "s3", "cp", file_path, s3_url], check=True)
 
 
-def deploy_native_engine_so(native_engine_so_aws_url: str) -> None:
-    _deploy(file_path=NATIVE_ENGINE_SO_LOCAL_PATH, s3_url=native_engine_so_aws_url)
+def deploy_native_engine_so(
+    *, native_engine_so_aws_url: str, native_engine_so_local_path: str
+) -> None:
+    _deploy(file_path=native_engine_so_local_path, s3_url=native_engine_so_aws_url)
 
 
-def deploy_pants_pex() -> None:
-    _deploy(f"{TRAVIS_BUILD_DIR}/pants.pex", PEX_URL)
+def deploy_pants_pex(*, travis_build_dir: str, pex_url: str) -> None:
+    _deploy(f"{travis_build_dir}/pants.pex", pex_url)
 
 
 if __name__ == "__main__":
