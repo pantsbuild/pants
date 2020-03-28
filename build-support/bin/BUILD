@@ -15,6 +15,15 @@ files(
 )
 
 python_binary(
+   name = 'bootstrap_and_deploy_ci_pants_pex',
+   sources = ['bootstrap_and_deploy_ci_pants_pex.py'],
+   dependencies = [
+     ':common',
+   ],
+   tags = {'type_checked'},
+ )
+
+python_binary(
   name = 'check_banned_imports',
   source = 'check_banned_imports.py',
   dependencies = [
@@ -55,16 +64,6 @@ python_library(
   source = 'common.py',
   tags = {'type_checked'},
 )
-
-python_binary(
-   name = 'deploy_ci_bootstrapped_pants_pex',
-   sources = ['deploy_ci_bootstrapped_pants_pex.py'],
-   dependencies = [
-     ':common',
-   ],
-   tags = {'type_checked'},
- )
-
 
 python_binary(
   name = 'deploy_to_s3',
