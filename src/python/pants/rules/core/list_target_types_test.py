@@ -72,11 +72,22 @@ def test_list_all() -> None:
     stdout = run_goal()
     assert stdout == dedent(
         """\
-        Use `./pants target-types2 --details=$target_type` to get detailed information for a particular target type.
         
-          fortran_binary: <no description>
-         fortran_library: A library of Fortran code.
-           fortran_tests: Tests for Fortran code.
+        Target types
+        ------------
+
+        Use `./pants target-types2 --details=$target_type` to get detailed information
+        for a particular target type.
+
+
+        fortran_binary()
+        <no description>
+
+        fortran_library()
+        A library of Fortran code.
+
+        fortran_tests()
+        Tests for Fortran code.
         """
     )
 
