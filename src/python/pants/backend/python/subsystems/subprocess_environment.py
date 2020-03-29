@@ -3,7 +3,7 @@
 
 import os
 from dataclasses import dataclass
-from typing import Optional
+from typing import Dict, Optional
 
 from pants.engine.rules import rule, subsystem_rule
 from pants.subsystem.subsystem import Subsystem
@@ -39,7 +39,7 @@ class SubprocessEncodingEnvironment:
     lc_all: Optional[str]
 
     @property
-    def invocation_environment_dict(self):
+    def invocation_environment_dict(self) -> Dict[str, str]:
         return {
             "LANG": self.lang or "",
             "LC_ALL": self.lc_all or "",

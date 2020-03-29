@@ -27,14 +27,15 @@ class HermeticPex:
     ) -> ExecuteProcessRequest:
         """Creates an ExecuteProcessRequest that will run a PEX hermetically.
 
-        :param python_setup: The parameters for selecting python interpreters to use when invoking the
-                             PEX.
+        :param python_setup: The parameters for selecting python interpreters to use when invoking
+                             the PEX.
         :param subprocess_encoding_environment: The locale settings to use for the PEX invocation.
-        :param pex_path: The path within `input_files` of the PEX file (or directory if a loose pex).
+        :param pex_path: The path within `input_files` of the PEX file (or directory if a loose
+                         pex).
         :param pex_args: The arguments to pass to the PEX executable.
         :param description: A description of the process execution to be performed.
-        :param input_files: The files that contain the pex itself and any input files it needs to run
-                            against.
+        :param input_files: The files that contain the pex itself and any input files it needs to
+                            run against.
         :param env: The environment to run the PEX in.
         :param **kwargs: Any additional :class:`ExecuteProcessRequest` kwargs to pass through.
         """
@@ -48,14 +49,15 @@ class HermeticPex:
         # platforms, when we introduce platforms in https://github.com/pantsbuild/pants/issues/7735.
         argv = ("python", pex_path, *pex_args)
 
-        hermetic_env = env.copy() if env else {}
-        hermetic_env.update(
+        hermetic_env = dict(
             PATH=create_path_env_var(python_setup.interpreter_search_paths),
             PEX_ROOT="./pex_root",
             PEX_INHERIT_PATH="false",
             PEX_IGNORE_RCFILES="true",
             **subprocess_encoding_environment.invocation_environment_dict
         )
+        if env:
+            hermetic_env.update(env)
 
         return ExecuteProcessRequest(
             argv=argv, input_files=input_files, description=description, env=hermetic_env, **kwargs

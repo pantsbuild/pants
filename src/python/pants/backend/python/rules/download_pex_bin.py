@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Any, Iterable, Optional
+from typing import Any, Dict, Iterable, Optional
 
 from pants.backend.python.rules.hermetic_pex import HermeticPex
 from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment
@@ -62,22 +62,33 @@ class DownloadedPexBin(HermeticPex):
         pex_args: Iterable[str],
         description: str,
         input_files: Optional[Digest] = None,
+        env: Optional[Dict[str, str]] = None,
         **kwargs: Any,
     ) -> ExecuteProcessRequest:
         """Creates an ExecuteProcessRequest that will run the pex CLI tool hermetically.
 
-        :param python_setup: The parameters for selecting python interpreters to use when invoking the
-                             pex tool.
-        :param subprocess_encoding_environment: The locale settings to use for the pex tool invocation.
+        :param python_setup: The parameters for selecting python interpreters to use when invoking
+                             the pex tool.
+        :param subprocess_encoding_environment: The locale settings to use for the pex tool
+                                                invocation.
         :param pex_build_environment: The build environment for the pex tool.
         :param pex_args: The arguments to pass to the pex CLI tool.
         :param description: A description of the process execution to be performed.
-        :param input_files: The files that contain the pex CLI tool itself and any input files it needs
-                            to run against. By default just the files that contain the pex CLI tool
-                            itself. To merge in additional files, include the `directory_digest` in
-                            `DirectoriesToMerge` request.
+        :param input_files: The files that contain the pex CLI tool itself and any input files it
+                            needs to run against. By default just the files that contain the pex CLI
+                            tool itself. To merge in additional files, include the
+                            `directory_digest` in `DirectoriesToMerge` request.
+        :param env: The environment to run the PEX in.
         :param kwargs: Any additional :class:`ExecuteProcessRequest` kwargs to pass through.
         """
+
+        env = env.copy() if env else {}
+        env.update(
+            # We ask Pex to --disable-cache so we shouldn't also set a PEX_ROOT (asking it to
+            # cache).
+            PEX_ROOT="",
+            **pex_build_environment.invocation_environment_dict,
+        )
 
         return super().create_execute_request(
             python_setup=python_setup,
@@ -86,7 +97,7 @@ class DownloadedPexBin(HermeticPex):
             pex_args=["--disable-cache"] + list(pex_args),
             description=description,
             input_files=input_files or self.directory_digest,
-            env=pex_build_environment.invocation_environment_dict,
+            env=env,
             **kwargs,
         )
 
