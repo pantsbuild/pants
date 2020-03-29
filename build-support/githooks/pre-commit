@@ -53,7 +53,8 @@ echo "* Checking shell scripts via our custom linter"
 # fails in pants changed.
 if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
   echo "* Checking formatting and Flake8"
-  ./v2 --changed-since="${MERGE_BASE}" lint || die "If there were formatting errors, run \`./v2 --changed-since=master fmt\`"
+  ./v2 --changed-since="${MERGE_BASE}" lint || \
+    die "If there were formatting errors, run \`./v2 --changed-since=$(git rev-parse --symbolic "${MERGE_BASE}") fmt\`"
 
   echo "* Checking types"
   ./build-support/bin/mypy.py || exit 1
