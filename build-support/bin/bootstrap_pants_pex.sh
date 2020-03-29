@@ -5,7 +5,7 @@ cd "$REPO_ROOT" || exit 1
 
 # This script is used to generate pants.pex and particularly to allow us to maintain multiple versions,
 # each mapped to a particular snapshot of the source code. The different versions are maintained in
-# the CACHE_ROOT, with the current one symlinked into the build root. This allows us to quickly
+# the CACHE_ROOT, with the current one copied into the build root. This allows us to quickly
 # change the specific pants.pex being used. This mechanism is similar to bootstrap_code.sh.
 
 export PY="${PY:-python3}"

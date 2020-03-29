@@ -388,7 +388,8 @@ pub trait CapturedWorkdir {
           future::ok(store::Snapshot::empty()).to_boxed()
         } else {
           // Use no ignore patterns, because we are looking for explicitly listed paths.
-          future::done(fs::PosixFS::new(workdir_path2, &[], executor))
+          future::done(fs::GitignoreStyleExcludes::create(&[]))
+            .and_then(|ignorer| future::done(fs::PosixFS::new(workdir_path2, ignorer, executor)))
             .map_err(|err| {
               format!(
                 "Error making posix_fs to fetch local process execution output files: {}",

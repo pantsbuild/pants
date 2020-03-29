@@ -106,27 +106,41 @@ def test_list_single() -> None:
         union_membership=UnionMembership({FortranTests.PluginField: OrderedSet([CustomField])}),
         details_target=FortranTests.alias,
     )
-    print(tests_target_stdout)
     assert tests_target_stdout == dedent(
         """\
+
+        fortran_tests()
+        ---------------
+
         Tests for Fortran code.
         
         This assumes that you use the FRUIT test framework.
 
+        Valid fields:
 
-        fortran_tests(
-          custom_field     My custom field! Use this field to... (type: bool | None, default: True)
-          fortran_version  (type: str | None, default: None)
-          timeout          The number of seconds to run before timing out. (type: int | None, default: None)
-        )
+            custom_field
+                type: bool | None, default: True
+                My custom field! Use this field to...
+
+            fortran_version
+                type: str | None, default: None
+            
+            timeout
+                type: int | None, default: None
+                The number of seconds to run before timing out.
         """
     )
 
     binary_target_stdout = run_goal(details_target=FortranBinary.alias)
     assert binary_target_stdout == dedent(
         """\
-        fortran_binary(
-          fortran_version  (type: str | None, default: None)
-        )
+
+        fortran_binary()
+        ----------------
+
+        Valid fields:
+
+            fortran_version
+                type: str | None, default: None
         """
     )

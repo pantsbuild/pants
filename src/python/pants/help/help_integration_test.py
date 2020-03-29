@@ -12,13 +12,13 @@ class TestHelpIntegration(PantsRunIntegrationTest):
         assert "Usage:" in pants_run.stdout_data
         # spot check to see that a public global option is printed
         assert "--level" in pants_run.stdout_data
-        assert "Global:" in pants_run.stdout_data
+        assert "Global options" in pants_run.stdout_data
 
     def test_help_advanced(self):
         command = ["help-advanced"]
         pants_run = self.run_pants(command=command)
         self.assert_success(pants_run)
-        assert "Global advanced:" in pants_run.stdout_data
+        assert "Global advanced options" in pants_run.stdout_data
         # Spot check to see that a global advanced option is printed
         assert "--pants-bootstrapdir" in pants_run.stdout_data
 
@@ -27,7 +27,7 @@ class TestHelpIntegration(PantsRunIntegrationTest):
         pants_run = self.run_pants(command=command)
         self.assert_success(pants_run)
         # Spot check to see that scope headings are printed
-        assert "test.junit:" in pants_run.stdout_data
+        assert "`test.junit` options" in pants_run.stdout_data
         # Spot check to see that full args for all options are printed
         assert "--binary-dup-max-dups" in pants_run.stdout_data
         # Spot check to see that subsystem options are printing
@@ -38,8 +38,8 @@ class TestHelpIntegration(PantsRunIntegrationTest):
         pants_run = self.run_pants(command=command)
         self.assert_success(pants_run)
         # Spot check to see that scope headings are printed even for advanced options
-        assert "test.junit:" in pants_run.stdout_data
-        assert "cache.test.junit advanced:" in pants_run.stdout_data
+        assert "`test.junit` options" in pants_run.stdout_data
+        assert "`cache.test.junit` advanced options" in pants_run.stdout_data
         # Spot check to see that full args for all options are printed
         assert "--binary-dup-max-dups" in pants_run.stdout_data
         assert "--cache-test-junit-read" in pants_run.stdout_data
