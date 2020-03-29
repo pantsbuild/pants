@@ -57,7 +57,7 @@ fn setup_watch(
 ) -> InvalidationWatcher {
   let mut rt = tokio::runtime::Runtime::new().unwrap();
   let executor = Executor::new(rt.handle().clone());
-  let watcher = InvalidationWatcher::new(Arc::downgrade(&graph), executor, build_root, ignorer)
+  let watcher = InvalidationWatcher::new(Arc::downgrade(&graph), executor, build_root, ignorer, /*enabled*/ true)
     .expect("Couldn't create InvalidationWatcher");
   rt.block_on(watcher.watch(file_path)).unwrap();
   watcher
