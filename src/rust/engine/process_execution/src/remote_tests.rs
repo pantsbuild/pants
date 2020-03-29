@@ -1145,7 +1145,7 @@ async fn timeout_after_sufficiently_delayed_getoperations() {
   assert_cancellation_requests(&mock_server, vec![op_name.to_owned()]);
 }
 
-#[ignore] // https://github.com/pantsbuild/pants/issues/8405
+#[ignore] // flaky: https://github.com/pantsbuild/pants/issues/8405
 #[tokio::test]
 async fn dropped_request_cancels() {
   let request_timeout = Duration::new(10, 0);
@@ -1229,6 +1229,7 @@ async fn dropped_request_cancels() {
   assert_cancellation_requests(&mock_server, vec![op_name.to_owned()]);
 }
 
+#[ignore] // flaky: https://github.com/pantsbuild/pants/issues/7149
 #[tokio::test]
 async fn retry_for_cancelled_channel() {
   let execute_request = echo_foo_request();

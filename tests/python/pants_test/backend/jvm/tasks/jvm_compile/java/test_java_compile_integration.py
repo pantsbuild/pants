@@ -226,7 +226,7 @@ class JavaCompileIntegrationTest(BaseCompileIT):
             self.assertEqual(guava_16_artifact_dir, guava_15_artifact_dir)
             self.assertEqual(len(os.listdir(guava_16_artifact_dir)), 2)
 
-    @pytest.mark.flaky(retries=1)  # https://github.com/pantsbuild/pants/issues/8171
+    @pytest.mark.skip(reason="flaky: https://github.com/pantsbuild/pants/issues/8171")
     def test_java_compile_with_corrupt_remote(self):
         """Tests that a corrupt artifact in the remote cache still results in a successful
         compile."""

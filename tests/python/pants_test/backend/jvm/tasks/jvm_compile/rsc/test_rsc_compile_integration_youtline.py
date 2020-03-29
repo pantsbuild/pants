@@ -10,11 +10,12 @@ from pants_test.backend.jvm.tasks.jvm_compile.rsc.rsc_compile_integration_base i
 
 
 class RscCompileIntegrationYoutline(RscCompileIntegrationBase):
+    @pytest.mark.skip(reason="flaky: https://github.com/pantsbuild/pants/issues/9396")
     @ensure_compile_rsc_execution_strategy(RscCompileIntegrationBase.outline_and_zinc)
     def test_basic_binary(self):
         self._testproject_compile("mutual", "bin", "A")
 
-    @pytest.mark.flaky(retries=1)
+    @pytest.mark.skip(reason="flaky")
     @ensure_compile_rsc_execution_strategy(RscCompileIntegrationBase.outline_and_zinc)
     def test_public_inference(self):
         self._testproject_compile("public_inference", "public_inference", "PublicInference")

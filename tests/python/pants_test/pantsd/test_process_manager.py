@@ -144,7 +144,7 @@ class TestProcessMetadataManager(TestBase):
                 self.pmm.read_metadata_by_name(self.NAME, self.TEST_KEY, int), self.TEST_VALUE_INT
             )
 
-    @pytest.mark.flaky(retries=1)  # https://github.com/pantsbuild/pants/issues/6836
+    @pytest.mark.skip(reason="flaky: https://github.com/pantsbuild/pants/issues/6836")
     def test_deadline_until(self):
         with self.assertRaises(ProcessMetadataManager.Timeout):
             with self.captured_logging(logging.INFO) as captured:

@@ -86,6 +86,8 @@ pants_ignore.add = [
   "/build-support/*.venv/",
   # An absolute symlink to the Pants Rust toolchain sources.
   "/build-support/bin/native/src",
+  # We shouldn't walk or watch the rust compiler artifacts because it is slow.
+  "/src/rust/engine/target",
 ]
 
 [cache]
@@ -376,9 +378,6 @@ resolver_cache_dir = "%(pants_bootstrapdir)s/python_cache/requirements"
 
 [pytest]
 pytest_plugins.add = [
-  # TODO(8528): implement a generic retry mechanism for the V2 test runner instead of using this
-  #  plugin.
-  "pytest-rerunfailures",
   # TODO(#8651): We need this until we switch to implicit namespace packages so that pytest-cov
   #  understands our __init__ files. NB: this version matches 3rdparty/python/requirements.txt.
   "setuptools==44.0.0",

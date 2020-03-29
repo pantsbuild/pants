@@ -26,7 +26,11 @@ def main() -> None:
     ) as remote_execution_oauth_token_path:
 
         if args.bootstrap:
-            bootstrap(clean=args.bootstrap_clean, python_version=args.python_version)
+            bootstrap(
+                clean=args.bootstrap_clean,
+                try_to_skip_rust_compilation=args.bootstrap_try_to_skip_rust_compilation,
+                python_version=args.python_version,
+            )
         set_run_from_pex()
 
         if args.githooks:
@@ -98,6 +102,15 @@ def create_parser() -> argparse.ArgumentParser:
         "--bootstrap-clean",
         action="store_true",
         help="Before bootstrapping, clean the environment so that it's like a fresh git clone.",
+    )
+    parser.add_argument(
+        "--bootstrap-try-to-skip-rust-compilation",
+        action="store_true",
+        help=(
+            "If possible, i.e. `native_engine.so` if is already present, don't rebuild the Rust "
+            "engine. Otherwise, build. This means that you may end up using an outdated version of "
+            "native_engine.so; this option should generally be avoided."
+        ),
     )
     parser.add_argument("--githooks", action="store_true", help="Run pre-commit githook.")
     parser.add_argument(
@@ -319,7 +332,9 @@ class TestTargetSets(NamedTuple):
 # -------------------------------------------------------------------------
 
 
-def bootstrap(*, clean: bool, python_version: PythonVersion) -> None:
+def bootstrap(
+    *, clean: bool, try_to_skip_rust_compilation: bool, python_version: PythonVersion
+) -> None:
     with travis_section("Bootstrap", f"Bootstrapping Pants as a Python {python_version} PEX"):
         if clean:
             try:
@@ -328,7 +343,20 @@ def bootstrap(*, clean: bool, python_version: PythonVersion) -> None:
                 die("Failed to clean before bootstrapping Pants.")
 
         try:
-            subprocess.run(["./build-support/bin/bootstrap_pants_pex.sh"], check=True)
+            skip_native_engine_so_bootstrap = (
+                try_to_skip_rust_compilation
+                and Path("src/python/pants/engine/native_engine.so").exists()
+            )
+            subprocess.run(
+                ["./build-support/bin/bootstrap_pants_pex.sh"],
+                check=True,
+                env={
+                    **os.environ,
+                    "SKIP_NATIVE_ENGINE_SO_BOOTSTRAP": (
+                        "true" if skip_native_engine_so_bootstrap else "false"
+                    ),
+                },
+            )
         except subprocess.CalledProcessError:
             die("Failed to bootstrap Pants.")
 

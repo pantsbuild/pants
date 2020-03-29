@@ -289,6 +289,7 @@ pub enum Failure {
   Invalidated,
   /// A rule raised an exception.
   Throw(Value, String),
+  FileWatch(String),
 }
 
 impl fmt::Display for Failure {
@@ -296,6 +297,7 @@ impl fmt::Display for Failure {
     match self {
       Failure::Invalidated => write!(f, "Exhausted retries due to changed files."),
       Failure::Throw(exc, _) => write!(f, "{}", externs::val_to_str(exc)),
+      Failure::FileWatch(failure) => write!(f, "{}", failure),
     }
   }
 }

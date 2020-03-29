@@ -17,9 +17,10 @@ use crate::nodes::{NodeKey, WrappedNode};
 use crate::scheduler::Session;
 use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
+use crate::watch::InvalidationWatcher;
 use boxfuture::{BoxFuture, Boxable};
 use core::clone::Clone;
-use fs::{safe_create_dir_all_ioerror, PosixFS};
+use fs::{safe_create_dir_all_ioerror, GitignoreStyleExcludes, PosixFS};
 use graph::{EntryId, Graph, NodeContext};
 use process_execution::{
   self, speculate::SpeculatingCommandRunner, BoundedCommandRunner, ExecuteProcessRequestMetadata,
@@ -43,7 +44,7 @@ const GIGABYTES: usize = 1024 * 1024 * 1024;
 /// https://github.com/tokio-rs/tokio/issues/369 is resolved.
 ///
 pub struct Core {
-  pub graph: Graph<NodeKey>,
+  pub graph: Arc<Graph<NodeKey>>,
   pub tasks: Tasks,
   pub rule_graph: RuleGraph<Rule>,
   pub types: Types,
@@ -53,6 +54,7 @@ pub struct Core {
   pub command_runner: Box<dyn process_execution::CommandRunner>,
   pub http_client: reqwest::Client,
   pub vfs: PosixFS,
+  pub watcher: InvalidationWatcher,
   pub build_root: PathBuf,
 }
 
@@ -232,12 +234,27 @@ impl Core {
         process_execution_metadata,
       ));
     }
+    let graph = Arc::new(Graph::new());
 
     let http_client = reqwest::Client::new();
     let rule_graph = RuleGraph::new(tasks.as_map(), root_subject_types);
 
+    let ignorer = GitignoreStyleExcludes::create(&ignore_patterns).map_err(|e| {
+      format!(
+        "Could not parse build ignore inputs {:?}: {:?}",
+        ignore_patterns, e
+      )
+    })?;
+
+    let watcher = InvalidationWatcher::new(
+      Arc::downgrade(&graph),
+      executor.clone(),
+      build_root.clone(),
+      ignorer.clone(),
+    )?;
+
     Ok(Core {
-      graph: Graph::new(),
+      graph: graph,
       tasks: tasks,
       rule_graph: rule_graph,
       types: types,
@@ -248,9 +265,10 @@ impl Core {
       http_client,
       // TODO: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
-      vfs: PosixFS::new(&build_root, &ignore_patterns, executor)
+      vfs: PosixFS::new(&build_root, ignorer, executor)
         .map_err(|e| format!("Could not initialize VFS: {:?}", e))?,
-      build_root: build_root,
+      build_root,
+      watcher,
     })
   }
 
