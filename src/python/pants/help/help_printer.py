@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import sys
-import textwrap
 from typing import Dict, Optional, cast
 
 from colors import cyan, green
@@ -98,10 +97,13 @@ class HelpPrinter:
         if self._use_color:
             title = green(title)
 
+        max_width = max(len(name) for name in goal_descriptions.keys())
+
         def format_goal(name: str, description: str) -> str:
+            name = name.ljust(max_width + 2)
             if self._use_color:
                 name = cyan(name)
-            return "\n".join([name, textwrap.fill(description, 80), ""])
+            return f"{name}{description}"
 
         lines = [
             f"\n{title}\n",

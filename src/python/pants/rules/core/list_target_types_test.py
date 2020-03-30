@@ -72,6 +72,7 @@ def test_list_all() -> None:
     stdout = run_goal()
     assert stdout == dedent(
         """\
+
         Target types
         ------------
 
@@ -79,14 +80,9 @@ def test_list_all() -> None:
         for a particular target type.
 
 
-        fortran_binary()
-        <no description>
-
-        fortran_library()
-        A library of Fortran code.
-
-        fortran_tests()
-        Tests for Fortran code.
+        fortran_binary()  <no description>
+        fortran_library() A library of Fortran code.
+        fortran_tests()   Tests for Fortran code.
         """
     )
 

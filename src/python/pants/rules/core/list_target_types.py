@@ -43,12 +43,10 @@ class AbbreviatedTargetInfo:
     def create(cls, target_type: Type[Target]) -> "AbbreviatedTargetInfo":
         return cls(alias=target_type.alias, description=get_docstring_summary(target_type))
 
-    def format_for_cli(self, console: Console) -> str:
-        alias = console.cyan(f"{self.alias}()")
-        description = (
-            textwrap.fill(self.description, 80) if self.description else "<no description>"
-        )
-        return f"{alias}\n{description}\n"
+    def format_for_cli(self, console: Console, *, longest_target_alias: int) -> str:
+        alias = console.cyan(f"{self.alias}()".ljust(longest_target_alias + 4))
+        description = self.description or "<no description>"
+        return f"{alias}{description}"
 
 
 @dataclass(frozen=True)
@@ -154,15 +152,21 @@ def list_target_types(
                 AbbreviatedTargetInfo.create(target_type)
                 for target_type in registered_target_types.types
             ]
+            longest_target_alias = max(
+                len(target_type.alias) for target_type in registered_target_types.types
+            )
             lines = [
-                f"{title}\n",
+                f"\n{title}\n",
                 textwrap.fill(
                     "Use `./pants target-types2 --details=$target_type` to get detailed "
                     "information for a particular target type.",
                     80,
                 ),
                 "\n",
-                *(target_info.format_for_cli(console) for target_info in target_infos),
+                *(
+                    target_info.format_for_cli(console, longest_target_alias=longest_target_alias)
+                    for target_info in target_infos
+                ),
             ]
             print_stdout("\n".join(lines).rstrip())
     return TargetTypes(exit_code=0)
