@@ -143,6 +143,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                 pantsd_run(cmd[1:], {"GLOBAL": {"level": cmd[0]}})
                 checker.assert_running()
 
+    @pytest.mark.skip(reason="flaky: https://github.com/pantsbuild/pants/issues/9420")
     def test_pantsd_lifecycle_non_invalidation(self):
         with self.pantsd_successful_run_context() as (pantsd_run, checker, _, _):
             variants = (["-q", "help"], ["--no-colors", "help"], ["help"])
