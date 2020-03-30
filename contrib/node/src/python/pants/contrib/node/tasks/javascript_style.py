@@ -48,7 +48,7 @@ class JavascriptStyleBase(NodeTask):
             advanced=True,
             type=list,
             default=cls._DEFAULT_JS_EXTENSIONS,
-            help="File extensions that should be linted as JS",
+            help="File extensions that should be linted as JS.",
         )
 
     @classmethod
@@ -65,7 +65,7 @@ class JavascriptStyleBase(NodeTask):
             target
             for target in targets
             if isinstance(target, NodeModule)
-            and target.has_sources(tuple(self.get_options().file_extensions))
+            and any(target.has_sources(ext) for ext in self.get_options().file_extensions)
             and (not target.is_synthetic)
         ]
 
@@ -74,7 +74,7 @@ class JavascriptStyleBase(NodeTask):
         sources.update(
             os.path.join(get_buildroot(), source)
             for source in target.sources_relative_to_buildroot()
-            if source.endswith(tuple(self.get_options().file_extensions))
+            if any(source.endswith(ext) for ext in self.get_options().file_extensions)
         )
         return sources
 
