@@ -8,7 +8,20 @@ from typing import Optional, Sequence, Type, get_type_hints
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import UnionMembership, goal_rule
-from pants.engine.target import AsyncField, Field, PrimitiveField, RegisteredTargetTypes, Target
+from pants.engine.target import (
+    AsyncField,
+    BoolField,
+    Field,
+    FloatField,
+    IntField,
+    PrimitiveField,
+    RegisteredTargetTypes,
+    StringField,
+    StringOrStringSequenceField,
+    StringSequenceField,
+    Target,
+    UnimplementedField,
+)
 from pants.util.objects import get_docstring, get_docstring_summary, pretty_print_type_hint
 
 
@@ -49,10 +62,6 @@ class AbbreviatedTargetInfo:
         return f"{formatted_alias} {description}"
 
 
-ASYNC_FIELD_DOCSTRING = get_docstring(AsyncField, flatten=True)
-PRIMITIVE_FIELD_DOCSTRING = get_docstring(PrimitiveField, flatten=True)
-
-
 @dataclass(frozen=True)
 class FieldInfo:
     alias: str
@@ -63,17 +72,34 @@ class FieldInfo:
     @classmethod
     def create(cls, field: Type[Field]) -> "FieldInfo":
         # NB: It is very common (and encouraged) to subclass Fields to give custom behavior, e.g.
-        # `PythonSources` subclassing `Sources`. Here, we set `fallback_to_parents=True` so that we
-        # can still generate meaningful documentation for all these custom fields without requiring
-        # the Field author to rewrite the docstring.
+        # `PythonSources` subclassing `Sources`. Here, we set `fallback_to_ancestors=True` so that
+        # we can still generate meaningful documentation for all these custom fields without
+        # requiring the Field author to rewrite the docstring.
         #
         # However, if the original `Field` author did not define docstring, then this means we
-        # would typically fall back to the docstring for `AsyncField` and `PrimitiveField`, which
-        # is an ancestor for every field. This is a quirk of this heuristic and it's not
-        # intentional. So, we hackily filter out the docstring for both those abstract classes.
-        description = get_docstring(field, flatten=True, fallback_to_parents=True) or ""
-        if description in (ASYNC_FIELD_DOCSTRING, PRIMITIVE_FIELD_DOCSTRING):
-            description = ""
+        # would typically fall back to the docstring for `AsyncField`, `PrimitiveField`, or a
+        # helper class like `StringField`. This is a quirk of this heuristic and it's not
+        # intentional. So, we filter out the docstring for these abstract classes.
+        description = (
+            get_docstring(
+                field,
+                flatten=True,
+                fallback_to_ancestors=True,
+                ignored_ancestors={
+                    *Field.mro(),
+                    AsyncField,
+                    PrimitiveField,
+                    BoolField,
+                    FloatField,
+                    IntField,
+                    StringField,
+                    StringOrStringSequenceField,
+                    StringSequenceField,
+                    UnimplementedField,
+                },
+            )
+            or ""
+        )
         if issubclass(field, PrimitiveField):
             raw_value_type = get_type_hints(field.compute_value)["raw_value"]
         elif issubclass(field, AsyncField):
