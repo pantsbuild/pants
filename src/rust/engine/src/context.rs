@@ -4,7 +4,7 @@
 use std;
 use std::collections::BTreeMap;
 use std::convert::{Into, TryInto};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -241,13 +241,24 @@ impl Core {
     let http_client = reqwest::Client::new();
     let rule_graph = RuleGraph::new(tasks.as_map(), root_subject_types);
 
-    let _ = use_gitignore;
-    let ignorer = GitignoreStyleExcludes::create(&ignore_patterns).map_err(|e| {
-      format!(
-        "Could not parse build ignore inputs {:?}: {:?}",
-        ignore_patterns, e
-      )
-    })?;
+    let gitignore_file = if use_gitignore {
+      let gitignore_path = build_root.join(".gitignore");
+      if Path::is_file(&gitignore_path) {
+        Some(gitignore_path)
+      } else {
+        None
+      }
+    } else {
+      None
+    };
+    let ignorer =
+      GitignoreStyleExcludes::create_with_gitignore_file(&ignore_patterns, gitignore_file)
+        .map_err(|e| {
+          format!(
+            "Could not parse build ignore inputs {:?}: {:?}",
+            ignore_patterns, e
+          )
+        })?;
 
     let watcher = InvalidationWatcher::new(
       Arc::downgrade(&graph),
@@ -258,9 +269,9 @@ impl Core {
     )?;
 
     Ok(Core {
-      graph: graph,
-      tasks: tasks,
-      rule_graph: rule_graph,
+      graph,
+      tasks,
+      rule_graph,
       types: types,
       runtime,
       executor: executor.clone(),
