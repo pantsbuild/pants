@@ -5,7 +5,7 @@ import logging
 import os
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import Tuple
+from typing import Dict, Tuple
 
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.native_library import NativeLibrary
@@ -143,7 +143,7 @@ class PexBuildEnvironment:
     ld_flags: Tuple[str, ...]
 
     @property
-    def invocation_environment_dict(self):
+    def invocation_environment_dict(self) -> Dict[str, str]:
         return {
             "CPPFLAGS": safe_shlex_join(self.cpp_flags),
             "LDFLAGS": safe_shlex_join(self.ld_flags),
