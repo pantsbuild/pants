@@ -3,11 +3,12 @@
 
 import os
 import shutil
+from dataclasses import asdict
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.nodes import Throw
 from pants.engine.scheduler import Scheduler
-from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS
+from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, ExecutionOptions
 from pants.testutil.engine.util import init_native
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import safe_mkdtemp, safe_rmtree
@@ -48,12 +49,17 @@ class SchedulerTestBase:
         work_dir=None,
         include_trace_on_error=True,
         should_report_workunits=False,
+        execution_options=None,
     ):
         """Creates a SchedulerSession for a Scheduler with the given Rules installed."""
         rules = rules or []
         work_dir = work_dir or self._create_work_dir()
         project_tree = project_tree or self.mk_fs_tree(work_dir=work_dir)
         local_store_dir = os.path.realpath(safe_mkdtemp())
+        if execution_options is not None:
+            eo = asdict(DEFAULT_EXECUTION_OPTIONS)
+            eo.update(execution_options)
+            execution_options = ExecutionOptions(**eo)
         scheduler = Scheduler(
             native=self._native,
             ignore_patterns=project_tree.ignore_patterns,
@@ -61,7 +67,7 @@ class SchedulerTestBase:
             local_store_dir=local_store_dir,
             rules=rules,
             union_rules=union_rules,
-            execution_options=DEFAULT_EXECUTION_OPTIONS,
+            execution_options=execution_options or DEFAULT_EXECUTION_OPTIONS,
             include_trace_on_error=include_trace_on_error,
         )
         return scheduler.new_session(

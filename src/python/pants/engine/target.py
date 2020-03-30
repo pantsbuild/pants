@@ -32,6 +32,7 @@ ImmutableValue = Any
 class Field(ABC):
     alias: ClassVar[str]
     default: ClassVar[Any]
+    required: ClassVar[bool] = False
 
     # This is a little weird to have an abstract __init__(). We do this to ensure that all
     # subclasses have this exact type signature for their constructor.
@@ -64,7 +65,10 @@ class PrimitiveField(Field, metaclass=ABCMeta):
     hydration is particularly expensive, use `AsyncField` instead to get the benefits of the
     engine's caching.
 
-    Subclasses should also override the type hints for `value` to be more precise than `Any`.
+    Subclasses should also override the type hints for `value` and `raw_value` to be more precise
+    than `Any`. The type hint for `raw_value` is used to generate documentation, e.g. for
+    `./pants target-types2`. If the field is required, do not use `Optional` for the type hint of
+    `raw_value`.
 
     Example:
 
@@ -106,6 +110,8 @@ class PrimitiveField(Field, metaclass=ABCMeta):
         The resulting value must be hashable (and should be immutable).
         """
         if raw_value is None:
+            if cls.required:
+                raise RequiredFieldMissingException(address, cls.alias)
             return cls.default
         return raw_value
 
@@ -210,6 +216,8 @@ class AsyncField(Field, metaclass=ABCMeta):
         elements of a list are strings.
         """
         if raw_value is None:
+            if cls.required:
+                raise RequiredFieldMissingException(address, cls.alias)
             return cls.default
         return raw_value
 
@@ -560,6 +568,11 @@ class InvalidFieldTypeException(InvalidFieldException):
             f"The {repr(field_alias)} field in target {address} must be {expected_type}, but was "
             f"`{repr(raw_value)}` with type `{type(raw_value).__name__}`."
         )
+
+
+class RequiredFieldMissingException(InvalidFieldException):
+    def __init__(self, address: Address, field_alias: str) -> None:
+        super().__init__(f"The {repr(field_alias)} field in target {address} must be defined.")
 
 
 # TODO: This probably shouldn't exist by the time that we ask plugin authors to write V2 bindings.

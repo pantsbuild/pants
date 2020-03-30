@@ -56,7 +56,8 @@ class FieldInfo:
     alias: str
     description: Optional[str]
     type_hint: str
-    default: str
+    required: bool
+    default: Optional[str]
 
     @classmethod
     def create(cls, field: Type[Field]) -> "FieldInfo":
@@ -68,17 +69,25 @@ class FieldInfo:
         else:
             raw_value_type = get_type_hints(field.__init__)["raw_value"]
         type_hint = pretty_print_type_hint(raw_value_type)
+        if field.required:
+            # We hackily remove `None` as a valid option for the field when it's required. This
+            # greatly simplifies Field definitions because it means that they don't need to
+            # override the type hints for `PrimitiveField.compute_value()` and
+            # `AsyncField.sanitize_raw_value()` to indicate that `None` is an invalid type.
+            type_hint = type_hint.replace(" | None", "")
         return cls(
             alias=field.alias,
             description=description,
             type_hint=type_hint,
-            default=str(field.default),
+            required=field.required,
+            default=str(field.default) if not field.required else None,
         )
 
     def format_for_cli(self, console: Console) -> str:
         field_alias = console.magenta(f"{self.alias}")
         indent = "    "
-        type_info = console.cyan(f"{indent}type: {self.type_hint}, default: {self.default}")
+        required_or_default = "required" if self.required else f"default: {self.default}"
+        type_info = console.cyan(f"{indent}type: {self.type_hint}, {required_or_default}")
         lines = [field_alias, type_info]
         if self.description:
             lines.extend(f"{indent}{line}" for line in textwrap.wrap(self.description, 80))
