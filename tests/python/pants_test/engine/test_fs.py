@@ -722,7 +722,11 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         on those files."""
 
         with self.mk_project_tree() as project_tree:
-            scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree)
+            scheduler = self.mk_scheduler(
+                rules=create_fs_rules(),
+                project_tree=project_tree,
+                execution_options={"experimental_fs_watcher": True},
+            )
             fname = "4.txt"
             new_data = "rouf"
             # read the original file so we have a cached value.
@@ -748,7 +752,11 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         """Test that FileContent is invalidated after deleting parent directory."""
 
         with self.mk_project_tree() as project_tree:
-            scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree)
+            scheduler = self.mk_scheduler(
+                rules=create_fs_rules(),
+                project_tree=project_tree,
+                execution_options={"experimental_fs_watcher": True},
+            )
             fname = "a/b/1.txt"
             # read the original file so we have nodes to invalidate.
             original_content = self.read_file_content(scheduler, [fname])
@@ -771,7 +779,11 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         self, mutation_function: Callable[[FileSystemProjectTree, str], Exception]
     ):
         with self.mk_project_tree() as project_tree:
-            scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree)
+            scheduler = self.mk_scheduler(
+                rules=create_fs_rules(),
+                project_tree=project_tree,
+                execution_options={"experimental_fs_watcher": True},
+            )
             dir_path = "a/"
             dir_glob = dir_path + "*"
             initial_snapshot = self.execute_expecting_one_result(

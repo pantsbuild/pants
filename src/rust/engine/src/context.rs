@@ -87,6 +87,7 @@ impl Core {
     process_execution_use_local_cache: bool,
     remote_execution_headers: BTreeMap<String, String>,
     process_execution_local_enable_nailgun: bool,
+    experimental_fs_watcher: bool,
   ) -> Result<Core, String> {
     // Randomize CAS address order to avoid thundering herds from common config.
     let mut remote_store_servers = remote_store_servers;
@@ -251,6 +252,7 @@ impl Core {
       executor.clone(),
       build_root.clone(),
       ignorer.clone(),
+      experimental_fs_watcher,
     )?;
 
     Ok(Core {
