@@ -1,7 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Iterable, Mapping, Optional
 
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.fs import Digest
@@ -22,7 +22,7 @@ class HermeticPex:
         pex_args: Iterable[str],
         description: str,
         input_files: Digest,
-        env: Optional[Dict[str, str]] = None,
+        env: Optional[Mapping[str, str]] = None,
         **kwargs: Any
     ) -> ExecuteProcessRequest:
         """Creates an ExecuteProcessRequest that will run a PEX hermetically.

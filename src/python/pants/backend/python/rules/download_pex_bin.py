@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Iterable, Mapping, Optional
 
 from pants.backend.python.rules.hermetic_pex import HermeticPex
 from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment
@@ -62,7 +62,7 @@ class DownloadedPexBin(HermeticPex):
         pex_args: Iterable[str],
         description: str,
         input_files: Optional[Digest] = None,
-        env: Optional[Dict[str, str]] = None,
+        env: Optional[Mapping[str, str]] = None,
         **kwargs: Any,
     ) -> ExecuteProcessRequest:
         """Creates an ExecuteProcessRequest that will run the pex CLI tool hermetically.
@@ -82,7 +82,7 @@ class DownloadedPexBin(HermeticPex):
         :param kwargs: Any additional :class:`ExecuteProcessRequest` kwargs to pass through.
         """
 
-        env = env.copy() if env else {}
+        env = dict(env) if env else {}
         env.update(
             # We ask Pex to --disable-cache so we shouldn't also set a PEX_ROOT (asking it to
             # cache).
