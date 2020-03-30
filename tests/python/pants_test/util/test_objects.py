@@ -126,6 +126,45 @@ def test_pretty_print_type_hint() -> None:
     )
 
 
+def test_get_docstring_fallback_to_parents() -> None:
+    class Grandparent:
+        """Grandparent."""
+
+    class ParentWithDocstring(Grandparent):
+        """Parent."""
+
+    class ParentWithoutDocstring(Grandparent):
+        pass
+
+    class ChildWithParentDocstring(ParentWithDocstring):
+        pass
+
+    class ChildWithGrandparentDocstring(ParentWithoutDocstring):
+        pass
+
+    class ChildWithDocstring(ParentWithDocstring):
+        """Child."""
+
+    assert get_docstring(ChildWithParentDocstring, fallback_to_ancestors=True) == "Parent."
+    assert (
+        get_docstring(ChildWithGrandparentDocstring, fallback_to_ancestors=True) == "Grandparent."
+    )
+    assert get_docstring(ChildWithDocstring, fallback_to_ancestors=True) == "Child."
+
+    # `object` is the "cosmic" superclass.
+    class FallbackToObject:
+        pass
+
+    assert (
+        get_docstring(FallbackToObject, fallback_to_ancestors=True, ignored_ancestors=[object])
+        is None
+    )
+    assert (
+        get_docstring(FallbackToObject, fallback_to_ancestors=True, ignored_ancestors=[])
+        == object.__doc__
+    )
+
+
 class TypeConstraintTestBase(TestBase):
     class A:
         def __repr__(self):
