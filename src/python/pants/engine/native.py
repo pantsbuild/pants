@@ -686,7 +686,7 @@ class ExternContext:
         try:
             hash_ = hash(obj)
         except TypeError as e:
-            raise TypeError(f'failed to hash object {obj}: {e}') from e
+            raise TypeError(f"failed to hash object {obj}: {e}") from e
         type_id = self.to_id(type(obj))
         return (hash_, TypeId(type_id))
 
