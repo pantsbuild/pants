@@ -109,13 +109,10 @@ class HelpPrinter:
             if len(description_lines) > 1:
                 description_lines = [
                     description_lines[0],
-                    *(
-                        f"{' ' * (chars_before_description + 4)}{line}"
-                        for line in description_lines[1:]
-                    ),
+                    *(f"{' ' * chars_before_description}{line}" for line in description_lines[1:]),
                 ]
             description = "\n".join(description_lines)
-            return f"{name}{description}"
+            return f"{name}{description}\n"
 
         lines = [
             f"\n{title}\n",

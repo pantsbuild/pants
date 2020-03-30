@@ -80,9 +80,11 @@ def test_list_all() -> None:
         for a particular target type.
 
 
-        fortran_binary()  <no description>
-        fortran_library() A library of Fortran code.
-        fortran_tests()   Tests for Fortran code.
+        fortran_binary   <no description>
+
+        fortran_library  A library of Fortran code.
+
+        fortran_tests    Tests for Fortran code.
         """
     )
 
@@ -104,8 +106,8 @@ def test_list_single() -> None:
     assert tests_target_stdout == dedent(
         """\
 
-        fortran_tests()
-        ---------------
+        fortran_tests
+        -------------
 
         Tests for Fortran code.
         
@@ -126,8 +128,8 @@ def test_list_single() -> None:
     assert binary_target_stdout == dedent(
         """\
 
-        fortran_binary()
-        ----------------
+        fortran_binary
+        --------------
 
         Valid fields:
 
