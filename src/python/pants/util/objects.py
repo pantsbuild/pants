@@ -44,7 +44,7 @@ def get_docstring(
         from its superclasses, if any. This traverses in the MRO order, i.e. tries to use its
         direct parent, then grandparent, and ultimately `object()`.
     :param ignored_ancestors: if `fallback_to_ancestors` is True, do not use the docstring from
-        these ancestors or any of their own ancestors.
+        these ancestors.
     """
     if cls.__doc__ is not None:
         docstring = cls.__doc__.strip()
