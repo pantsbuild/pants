@@ -155,6 +155,7 @@ class TestArtifactCache(TestBase):
             artifact_cache.delete(key)
             self.assertFalse(artifact_cache.has(key))
 
+    @pytest.mark.skip(reason="flaky: https://github.com/pantsbuild/pants/issues/9426")
     def test_local_backed_remote_cache(self):
         """make sure that the combined cache finds what it should and that it backfills."""
         with self.setup_server() as server:
