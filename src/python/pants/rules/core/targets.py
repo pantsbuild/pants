@@ -192,8 +192,9 @@ class RemoteSourcesArgs(PrimitiveField):
         return value_or_default
 
 
+# TODO: figure out what support looks like for this in V2. Is this an example of codegen?
 class RemoteSources(Target):
-    """A V1-only target that generates a synthetic target using deferred sources.
+    """A target that generates a synthetic target using deferred sources.
 
     This provides a mechanism for using the contents of a JAR as sources for another target.
     """

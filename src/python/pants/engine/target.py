@@ -712,16 +712,18 @@ class Tags(StringSequenceField):
     alias = "tags"
 
 
-# TODO(#9388): remove
 class DescriptionField(StringField):
-    """A human-readable description of the target (soon to be deprecated)."""
+    """A human-readable description of the target.
+
+    Use `./pants list --documented ::` to see all targets with descriptions.
+    """
 
     alias = "description"
 
 
-# TODO(#9388): remove
+# TODO(#9388): remove? We don't want this in V2, but maybe keep it for V1.
 class NoCacheField(BoolField):
-    """If True, don't store results for this target in the V1 cache (soon to be deprecated)."""
+    """If True, don't store results for this target in the V1 cache."""
 
     alias = "no_cache"
     default = False
