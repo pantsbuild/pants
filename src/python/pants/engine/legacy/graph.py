@@ -660,7 +660,7 @@ async def resolve_target(
     if target_type is None:
         raise TargetDefinitionException(
             address,
-            f"Target type {type_alias} is not recognized. All valid target types: "
+            f"Target type {repr(type_alias)} is not recognized. All valid target types: "
             f"{sorted(registered_target_types.aliases)}.",
         )
     return WrappedTarget(target_type(kwargs, address=address))

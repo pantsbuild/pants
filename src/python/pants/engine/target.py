@@ -577,21 +577,6 @@ class RequiredFieldMissingException(InvalidFieldException):
         super().__init__(f"The {repr(field_alias)} field in target {address} must be defined.")
 
 
-# TODO: This probably shouldn't exist by the time that we ask plugin authors to write V2 bindings.
-# We should have pre-made fields for every type of field we may encounter and have good
-# documentation for how to create custom fields in case we missed an edge case.
-# This requires us figuring out how to handle objects with the Target Adaptor.
-class UnimplementedField(PrimitiveField, metaclass=ABCMeta):
-    """Simply use whatever value the user passed in the BUILD file.
-
-    Warning: This is not safe to use with the engine. If the user uses an unhashable type like a
-    list, the engine will fail.
-    """
-
-    value: Optional[Any]
-    default: ClassVar[Optional[Any]] = None
-
-
 class BoolField(PrimitiveField, metaclass=ABCMeta):
     value: bool
     default: ClassVar[bool]
@@ -848,6 +833,16 @@ async def hydrate_sources(
     )
     sources_field.validate_snapshot(snapshot)
     return HydratedSources(snapshot)
+
+
+# TODO: figure out what support looks like for this with the Target API. The expected value is an
+#  Artifact, but V1 has no common Artifact interface.
+class ProvidesField(PrimitiveField):
+    """An `artifact`, such as `setup_py` or `scala_artifact`, that describes how to represent this
+    target to the outside world."""
+
+    alias = "provides"
+    default: ClassVar[Optional[Any]] = None
 
 
 def rules():
