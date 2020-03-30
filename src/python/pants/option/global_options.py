@@ -438,7 +438,7 @@ class GlobalOptions(Subsystem):
             "The `--pants-distdir` and `--pants-workdir` locations are inherently ignored.",
         )
         register(
-            "--pants-gitignore",
+            "--pants-use-gitignore",
             advanced=True,
             type=bool,
             default=False,
