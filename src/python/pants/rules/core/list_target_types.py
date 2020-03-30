@@ -44,8 +44,21 @@ class AbbreviatedTargetInfo:
         return cls(alias=target_type.alias, description=get_docstring_summary(target_type))
 
     def format_for_cli(self, console: Console, *, longest_target_alias: int) -> str:
-        alias = console.cyan(f"{self.alias}()".ljust(longest_target_alias + 4))
-        description = self.description or "<no description>"
+        chars_before_description = longest_target_alias + 4
+        alias = console.cyan(f"{self.alias}()".ljust(chars_before_description))
+        if not self.description:
+            description = "<no description>"
+        else:
+            description_lines = textwrap.wrap(self.description, 80 - chars_before_description)
+            if len(description_lines) > 1:
+                description_lines = [
+                    description_lines[0],
+                    *(
+                        f"{' ' * (chars_before_description + 4)}{line}"
+                        for line in description_lines[1:]
+                    ),
+                ]
+            description = "\n".join(description_lines)
         return f"{alias}{description}"
 
 
