@@ -428,13 +428,10 @@ async fn test_basic_gitignore_functionality() {
 
   let gitignore_content = "*.tmp\n!*.x";
   let gitignore_path = root_path.join(".gitignore");
-  make_file(
-    &gitignore_path,
-    gitignore_content.as_bytes(),
-    0o700,
-  );
+  make_file(&gitignore_path, gitignore_content.as_bytes(), 0o700);
   let executor = task_executor::Executor::new(Handle::current());
-  let ignorer = GitignoreStyleExcludes::create_with_gitignore_file(&[], Some(gitignore_path.clone())).unwrap();
+  let ignorer =
+    GitignoreStyleExcludes::create_with_gitignore_file(&[], Some(gitignore_path.clone())).unwrap();
   let posix_fs = Arc::new(PosixFS::new(root.as_ref(), ignorer, executor).unwrap());
 
   let stats = read_mock_files(
@@ -453,25 +450,20 @@ async fn test_basic_gitignore_functionality() {
   assert!(!posix_fs.is_ignored(&stats[2]));
   assert!(!posix_fs.is_ignored(&stats[3]));
 
-
-    // Test that .gitignore files work in tandem with explicit ignores.
+  // Test that .gitignore files work in tandem with explicit ignores.
   let executor = task_executor::Executor::new(Handle::current());
-  let ignorer = GitignoreStyleExcludes::create_with_gitignore_file(&["unimportant.x".to_string()], Some(gitignore_path)).unwrap();
-  let posix_fs_2 = Arc::new(
-    PosixFS::new(
-      root.as_ref(),
-      ignorer,
-      executor,
-    )
-    .unwrap(),
-  );
+  let ignorer = GitignoreStyleExcludes::create_with_gitignore_file(
+    &["unimportant.x".to_string()],
+    Some(gitignore_path),
+  )
+  .unwrap();
+  let posix_fs_2 = Arc::new(PosixFS::new(root.as_ref(), ignorer, executor).unwrap());
 
   assert!(!posix_fs_2.is_ignored(&stats[0]));
   assert!(posix_fs_2.is_ignored(&stats[1]));
   assert!(!posix_fs_2.is_ignored(&stats[2]));
   assert!(posix_fs_2.is_ignored(&stats[3]));
 }
-
 
 ///
 /// An in-memory implementation of VFS, useful for precisely reproducing glob matching behavior for
