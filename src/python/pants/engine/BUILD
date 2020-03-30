@@ -283,6 +283,7 @@ python_library(
     ':rules',
     '3rdparty/python:typing-extensions',
     'src/python/pants/util:collections',
+    'src/python/pants/util:frozendict',
     'src/python/pants/util:meta',
   ],
   tags = {'type_checked'},

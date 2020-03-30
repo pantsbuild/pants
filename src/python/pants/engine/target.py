@@ -22,6 +22,7 @@ from pants.engine.objects import Collection
 from pants.engine.rules import RootRule, UnionMembership, rule
 from pants.engine.selectors import Get
 from pants.util.collections import ensure_str_list
+from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
 
 # Type alias to express the intent that the type should be immutable and hashable. There's nothing
@@ -264,7 +265,7 @@ class Target(ABC):
     # These get calculated in the constructor
     address: Address
     plugin_fields: Tuple[Type[Field], ...]
-    field_values: Dict[Type[Field], Field]
+    field_values: FrozenDict[Type[Field], Field]
 
     @final
     def __init__(
@@ -280,7 +281,7 @@ class Target(ABC):
         self.address = address
         self.plugin_fields = self._find_plugin_fields(union_membership or UnionMembership({}))
 
-        self.field_values = {}
+        field_values = {}
         aliases_to_field_types = {field_type.alias: field_type for field_type in self.field_types}
         for alias, value in unhydrated_values.items():
             if alias not in aliases_to_field_types:
@@ -290,10 +291,11 @@ class Target(ABC):
                     f"the target type `{self.alias}`: {sorted(aliases_to_field_types.keys())}.",
                 )
             field_type = aliases_to_field_types[alias]
-            self.field_values[field_type] = field_type(value, address=address)
+            field_values[field_type] = field_type(value, address=address)
         # For undefined fields, mark the raw value as None.
-        for field_type in set(self.field_types) - set(self.field_values.keys()):
-            self.field_values[field_type] = field_type(raw_value=None, address=address)
+        for field_type in set(self.field_types) - set(field_values.keys()):
+            field_values[field_type] = field_type(raw_value=None, address=address)
+        self.field_values = FrozenDict(field_values)
 
     @final
     @property
