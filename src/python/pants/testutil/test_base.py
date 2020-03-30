@@ -28,7 +28,6 @@ from pants.engine.rules import RootRule
 from pants.engine.scheduler import SchedulerSession
 from pants.engine.selectors import Params
 from pants.init.engine_initializer import EngineInitializer
-from pants.init.util import clean_global_runtime_state
 from pants.option.global_options import BuildFileImportsBehavior
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source.source_root import SourceRootConfig
@@ -305,8 +304,6 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         :API: public
         """
         super().setUp()
-        # Avoid resetting the Runtracker here, as that is specific to fork'd process cleanup.
-        clean_global_runtime_state(reset_subsystem=True)
 
         self.addCleanup(self._reset_engine)
 

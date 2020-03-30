@@ -13,7 +13,6 @@ from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE,
 from pants.bin.local_pants_runner import LocalPantsRunner
 from pants.init.logging import encapsulated_global_logger
 from pants.init.specs_calculator import SpecsCalculator
-from pants.init.util import clean_global_runtime_state
 from pants.java.nailgun_io import (
     NailgunStreamStdinReader,
     NailgunStreamWriterError,
@@ -247,9 +246,6 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
 
             exit_code = PANTS_SUCCEEDED_EXIT_CODE
             try:
-                # Clean global state.
-                clean_global_runtime_state(reset_subsystem=True)
-
                 options_bootstrapper = OptionsBootstrapper.create(args=self.args, env=self.env)
                 options, _ = LocalPantsRunner.parse_options(options_bootstrapper)
 
