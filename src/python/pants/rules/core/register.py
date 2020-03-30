@@ -18,7 +18,14 @@ from pants.rules.core import (
     strip_source_roots,
     test,
 )
-from pants.rules.core.targets import Files
+from pants.rules.core.targets import (
+    AliasTarget,
+    Files,
+    GenericTarget,
+    PrepCommand,
+    RemoteSources,
+    Resources,
+)
 
 
 def rules():
@@ -42,4 +49,4 @@ def rules():
 
 
 def targets2():
-    return [Files]
+    return [AliasTarget, Files, GenericTarget, PrepCommand, RemoteSources, Resources]

@@ -12,6 +12,7 @@ from pants.engine.objects import union
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
+    Dependencies,
     IntField,
     InvalidFieldException,
     Sources,
@@ -212,7 +213,7 @@ class EmitPexWarnings(BoolField):
     default = True
 
 
-COMMON_PYTHON_FIELDS = (*COMMON_TARGET_FIELDS, Compatibility, Provides)
+COMMON_PYTHON_FIELDS = (*COMMON_TARGET_FIELDS, Dependencies, Compatibility, Provides)
 
 
 class PythonBinary(Target):
