@@ -201,6 +201,7 @@ class RemoteSources(Target):
     alias = "remote_sources"
     core_fields = (
         *COMMON_TARGET_FIELDS,
+        Dependencies,
         RemoteSourcesTargetRequestedAddress,
         RemoteSourcesTargetType,
         RemoteSourcesArgs,
