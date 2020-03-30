@@ -168,18 +168,13 @@ class Scheduler:
         """Create a native Tasks object, and record the given RuleIndex on it."""
 
         tasks = self._native.new_tasks()
-        registered = set()
 
         for output_type, rules in rule_index.rules.items():
             for rule in rules:
-                key = (output_type, rule)
-                registered.add(key)
-
                 if type(rule) is TaskRule:
                     self._register_task(tasks, output_type, rule, rule_index.union_rules)
                 else:
                     raise ValueError("Unexpected Rule type: {}".format(rule))
-
         return tasks
 
     def _register_task(
