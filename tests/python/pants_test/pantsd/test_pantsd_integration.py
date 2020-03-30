@@ -87,6 +87,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             self.assertNotIn("broken pipe", run.stderr_data.lower())
             checker.assert_started()
 
+    @pytest.mark.skip(reason="flaky")
     def test_pantsd_stacktrace_dump(self):
         with self.pantsd_successful_run_context() as (pantsd_run, checker, workdir, _):
             pantsd_run(["-ldebug", "help"])
@@ -183,6 +184,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                 pantsd_run([f"--pants-config-files={invalidating_config}", "help"])
                 self.assertNotEqual(pantsd_pid, checker.assert_started())
 
+    @pytest.mark.skip(reason="flaky")
     def test_pantsd_stray_runners(self):
         # Allow env var overrides for local stress testing.
         attempts = int(os.environ.get("PANTS_TEST_PANTSD_STRESS_ATTEMPTS", 20))
