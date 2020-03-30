@@ -80,7 +80,8 @@ class FieldInfo:
         # However, if the original `Field` author did not define docstring, then this means we
         # would typically fall back to the docstring for `AsyncField`, `PrimitiveField`, or a
         # helper class like `StringField`. This is a quirk of this heuristic and it's not
-        # intentional. So, we filter out the docstring for these abstract classes.
+        # intentional since these core `Field` types have documentation oriented to the custom
+        # `Field` author and not the end user filling in fields in a BUILD file target.
         description = (
             get_docstring(
                 field,
