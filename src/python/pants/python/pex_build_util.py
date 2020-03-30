@@ -6,7 +6,7 @@ import logging
 import os
 from collections import defaultdict
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Sequence, Set, Tuple, cast
+from typing import Callable, Dict, List, Optional, Sequence, Set, Tuple
 
 from pex.interpreter import PythonIdentity, PythonInterpreter
 from pex.pex_builder import PEXBuilder
@@ -216,16 +216,8 @@ class PexBuilderWrapper:
         """
         distributions = self.resolve_distributions(reqs, platforms=["current"])
         try:
-            matched_dist = cast(
-                Distribution,
-                assert_single_element(
-                    list(
-                        dist
-                        for dists in distributions.values()
-                        for dist in dists
-                        if dist.key == dist_key
-                    )
-                ),
+            matched_dist = assert_single_element(
+                dist for dists in distributions.values() for dist in dists if dist.key == dist_key
             )
         except (StopIteration, ValueError) as e:
             raise self.SingleDistExtractionError(
