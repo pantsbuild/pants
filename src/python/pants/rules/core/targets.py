@@ -10,6 +10,8 @@ class FilesSources(Sources):
     These will not have their source roots stripped, unlike every other Sources subclass.
     """
 
+    required = True
+
 
 class Files(Target):
     """A collection of loose files."""
