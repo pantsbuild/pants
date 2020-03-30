@@ -1,10 +1,12 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import os
 import logging
 import socket
 import threading
 import traceback
+import time
 from contextlib import contextmanager
 from socketserver import BaseRequestHandler, BaseServer, TCPServer, ThreadingMixIn
 
@@ -61,6 +63,7 @@ class PailgunHandler(PailgunHandlerBase):
         # For the pants run, we want to log to stderr.
         # TODO Might be worth to make contextmanagers for this?
         Native().override_thread_logging_destination_to_just_stderr()
+        #this calls DaemonPantsRunner
         self.server.runner_factory(sock, arguments, environment).run()
         Native().override_thread_logging_destination_to_just_pantsd()
 
@@ -77,8 +80,10 @@ class PailgunHandler(PailgunHandlerBase):
         # (e.g. [list', '::'] -> ['./pants', 'list', '::']).
         arguments.insert(0, "./pants")
 
-        self.logger.info(f"handling pailgun request: `{' '.join(arguments)}`")
-        self.logger.debug("pailgun request environment: %s", environment)
+        pid = os.getpid()
+        self.logger.info(f"Handling pailgun request w/ pid: {pid} at time: {time.time()}")
+        self.logger.info(f"Pailgun request args: `{' '.join(arguments)}`")
+        self.logger.debug("Pailgun request environment: %s", environment)
 
         # Execute the requested command with optional daemon-side profiling.
         with maybe_profiled(environment.get("PANTSD_PROFILE")):
@@ -86,7 +91,7 @@ class PailgunHandler(PailgunHandlerBase):
 
         # NB: This represents the end of pantsd's involvement in the request, but the request will
         # continue to run post-fork.
-        self.logger.info(f"pailgun request completed: `{' '.join(arguments)}`")
+        self.logger.info(f"Pailgun request completed: `{' '.join(arguments)}`")
 
     def handle_error(self, exc=None):
         """Error handler for failed calls to handle()."""

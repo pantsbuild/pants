@@ -92,6 +92,7 @@ class NailgunProtocol:
     @classmethod
     def send_request(cls, sock, working_dir, command, *arguments, **environment):
         """Send the initial Nailgun request over the specified socket."""
+        print(f"PID: {os.getpid()}")
         print(f"Nailgun command: {command}")
         print(f"Nailgun working_dir: {working_dir}")
         print(f"Nailgun arguments: {arguments}")
