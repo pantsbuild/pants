@@ -304,6 +304,7 @@ class TestArtifactCache(TestBase):
                 retry_warning,
             )
 
+    @pytest.mark.skip(reason="flaky: https://github.com/pantsbuild/pants/issues/9436")
     def test_successful_request_cleans_result_dir(self):
         key = CacheKey("muppet_key", "fake_hash")
 
