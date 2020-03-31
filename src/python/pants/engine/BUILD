@@ -285,6 +285,7 @@ python_library(
     'src/python/pants/util:collections',
     'src/python/pants/util:frozendict',
     'src/python/pants/util:meta',
+    'src/python/pants/util:ordered_set',
   ],
   tags = {'type_checked'},
 )

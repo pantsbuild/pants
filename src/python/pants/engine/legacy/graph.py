@@ -50,10 +50,14 @@ from pants.engine.parser import HydratedStruct
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
+    Dependencies,
     RegisteredTargetTypes,
+    Target,
     Targets,
     TargetsWithOrigins,
     TargetWithOrigin,
+    TransitiveTarget,
+    TransitiveTargets,
     WrappedTarget,
 )
 from pants.option.global_options import (
@@ -679,6 +683,41 @@ async def resolve_targets(addresses: Addresses) -> Targets:
 
 
 @rule
+async def transitive_target(wrapped_root: WrappedTarget) -> TransitiveTarget:
+    root = wrapped_root.target
+    dependencies = (
+        await MultiGet(Get[TransitiveTarget](Address, d) for d in root[Dependencies].value or ())
+        if root.has_field(Dependencies)
+        else tuple()
+    )
+    return TransitiveTarget(root, dependencies)
+
+
+@rule
+async def transitive_targets(addresses: Addresses) -> TransitiveTargets:
+    """Given Addresses, kicks off recursion on expansion of TransitiveTargets.
+
+    The TransitiveTarget dataclass represents a structure-shared graph, which we walk and flatten
+    here. The engine memoizes the computation of TransitiveTarget, so when multiple
+    TransitiveTargets objects are being constructed for multiple roots, their structure will be
+    shared.
+    """
+    transitive_targets = await MultiGet(Get[TransitiveTarget](Address, a) for a in addresses)
+
+    closure: OrderedSet[Target] = OrderedSet()
+    to_visit = deque(transitive_targets)
+
+    while to_visit:
+        tt = to_visit.popleft()
+        if tt.root in closure:
+            continue
+        closure.add(tt.root)
+        to_visit.extend(tt.dependencies)
+
+    return TransitiveTargets(tuple(tt.root for tt in transitive_targets), FrozenOrderedSet(closure))
+
+
+@rule
 async def resolve_targets_with_origins(
     addresses_with_origins: AddressesWithOrigins,
 ) -> TargetsWithOrigins:
@@ -900,6 +939,8 @@ def create_legacy_graph_tasks():
         resolve_target_with_origin,
         resolve_targets,
         resolve_targets_with_origins,
+        transitive_target,
+        transitive_targets,
         hydrate_target,
         hydrate_target_with_origin,
         hydrated_targets,
