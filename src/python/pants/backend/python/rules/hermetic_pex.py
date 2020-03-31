@@ -3,11 +3,10 @@
 
 import dataclasses
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, Mapping, Optional, cast
+from typing import List, cast
 
 from pants.backend.python.rules.download_pex_bin import DownloadedPexBin
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
-from pants.engine.fs import Digest
 from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.engine.rules import RootRule, rule, subsystem_rule
 from pants.python.python_setup import PythonSetup
@@ -22,16 +21,24 @@ class HermeticPexRequest:
 
 
 class HermeticPex(Subsystem):
-    options_scope = 'hermetic-pex-creation'
+    options_scope = "hermetic-pex-creation"
 
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
-        register('--python-executable-name', type=str, default='python',
-                 help='The python executable to search for in --python-setup-interpreter-search-paths '
-                      'when creating a pex with the v2 python backend.')
-        register('--use-pex-cache', type=bool, default=False,
-                 help='Whether to enable the pex local cache when executing hermetically.')
+        register(
+            "--python-executable-name",
+            type=str,
+            default="python",
+            help="The python executable to search for in --python-setup-interpreter-search-paths "
+            "when creating a pex with the v2 python backend.",
+        )
+        register(
+            "--use-pex-cache",
+            type=bool,
+            default=False,
+            help="Whether to enable the pex local cache when executing hermetically.",
+        )
 
     @property
     def python_executable_name(self) -> str:
@@ -41,14 +48,19 @@ class HermeticPex(Subsystem):
     def use_pex_cache(self) -> bool:
         return cast(bool, self.get_options().use_pex_cache)
 
+    def caching_args(self) -> List[str]:
+        if self.use_pex_cache:
+            return []
+        return ["--disable-cache"]
+
 
 @rule
 def make_hermetic_pex_exe_request(
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
     downloaded_pex_bin: DownloadedPexBin,
-    hermetic_pex_factory: HermeticPex,
-    req: HermeticPexRequest
+    hermetic_pex: HermeticPex,
+    req: HermeticPexRequest,
 ) -> ExecuteProcessRequest:
     """Creates an ExecuteProcessRequest that will run a PEX hermetically.
 
@@ -79,12 +91,6 @@ def make_hermetic_pex_exe_request(
     )
 
     input_files = orig_exe_req.input_files
-    if not input_files:
-        input_files = downloaded_pex_bin.directory_digest
-
-    cache_args = []
-    if not hermetic_pex_factory.use_pex_cache:
-        cache_args.append('--disable-cache')
 
     # NB: we use the hardcoded and generic bin name `python`, rather than something dynamic like
     # `sys.executable`, to ensure that the interpreter may be discovered both locally and in remote
@@ -93,19 +99,14 @@ def make_hermetic_pex_exe_request(
     # necessarily the interpreter that PEX will use to execute the generated .pex file.
     # TODO(#7735): Set --python-setup-interpreter-search-paths differently for the host and target
     # platforms, when we introduce platforms in https://github.com/pantsbuild/pants/issues/7735.
-    python_exe_name = hermetic_pex_factory.python_executable_name
+    python_exe_name = hermetic_pex.python_executable_name
     argv = (
-        python_exe_name, downloaded_pex_bin.executable,
-        *cache_args,
+        python_exe_name,
+        pex_path,
         *orig_exe_req.argv,
     )
 
-    return dataclasses.replace(
-        orig_exe_req,
-        argv=argv,
-        env=hermetic_env,
-        input_files=input_files,
-    )
+    return dataclasses.replace(orig_exe_req, argv=argv, env=hermetic_env, input_files=input_files,)
 
 
 def rules():

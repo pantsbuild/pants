@@ -6,7 +6,8 @@ from typing import List, Optional, Tuple
 
 from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.lint.python_formatter import PythonFormatter
-from pants.backend.python.rules import download_pex_bin, hermetic_pex, pex
+from pants.backend.python.rules import download_pex_bin, pex
+from pants.backend.python.rules.hermetic_pex import HermeticPexRequest
 from pants.backend.python.rules.pex import (
     CreatePex,
     Pex,
@@ -126,17 +127,19 @@ async def setup(
         )
     )
 
-    hermetic_pex_request = requirements_pex.create_hermetic_pex_request(ExecuteProcessRequest(
-        argv=generate_args(
-            specified_source_files=specified_source_files,
-            isort=isort,
-            check_only=request.check_only,
-        ),
-        input_files=merged_input_files,
-        output_files=all_source_files_snapshot.files,
-        description=f"Run isort for {address_references}",
-    ))
-    process_request = await Get[ExecuteProcessRequest](hermetic_pex.HermeticPexRequest, hermetic_pex_request)
+    hermetic_pex_request = requirements_pex.create_hermetic_pex_request(
+        ExecuteProcessRequest(
+            argv=generate_args(
+                specified_source_files=specified_source_files,
+                isort=isort,
+                check_only=request.check_only,
+            ),
+            input_files=merged_input_files,
+            output_files=all_source_files_snapshot.files,
+            description=f"Run isort for {address_references}",
+        )
+    )
+    process_request = await Get[ExecuteProcessRequest](HermeticPexRequest, hermetic_pex_request)
     return Setup(process_request)
 
 

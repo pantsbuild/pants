@@ -7,7 +7,8 @@ from typing import Optional, Tuple
 
 from pants.backend.python.lint.pylint.subsystem import Pylint
 from pants.backend.python.lint.python_linter import PythonLinter
-from pants.backend.python.rules import download_pex_bin, hermetic_pex, pex, prepare_chrooted_python_sources
+from pants.backend.python.rules import download_pex_bin, pex, prepare_chrooted_python_sources
+from pants.backend.python.rules.hermetic_pex import HermeticPexRequest
 from pants.backend.python.rules.pex import (
     CreatePex,
     Pex,
@@ -117,11 +118,13 @@ async def lint(
         )
     )
 
-    request = requirements_pex.create_hermetic_pex_request(ExecuteProcessRequest(
-        argv=generate_args(specified_source_files=specified_source_files, pylint=pylint),
-        input_files=merged_input_files,
-        description=f"Run Pylint for {address_references}",
-    ))
+    request = requirements_pex.create_hermetic_pex_request(
+        ExecuteProcessRequest(
+            argv=generate_args(specified_source_files=specified_source_files, pylint=pylint),
+            input_files=merged_input_files,
+            description=f"Run Pylint for {address_references}",
+        )
+    )
     result = await Get[FallibleExecuteProcessResult](HermeticPexRequest, request)
     return LintResult.from_fallible_execute_process_result(result)
 

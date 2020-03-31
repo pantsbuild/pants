@@ -4,16 +4,10 @@
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
-from pants.backend.python.rules.pex import (
-    CreatePex,
-    Pex,
-    PexInterpreterConstraints,
-    PexRequirements,
-)
+from pants.backend.python.rules.pex import CreatePex, PexInterpreterConstraints, PexRequirements
 from pants.backend.python.rules.prepare_chrooted_python_sources import ChrootedPythonSources
 from pants.engine.addressable import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge
-from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
 from pants.engine.legacy.structs import FilesAdaptor, PythonTargetAdaptor, ResourcesAdaptor
 from pants.engine.rules import rule

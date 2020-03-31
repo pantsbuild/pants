@@ -1,6 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import dataclasses
 import itertools
 import logging
 from dataclasses import dataclass
@@ -9,7 +10,7 @@ from typing import FrozenSet, Iterable, Iterator, List, NamedTuple, Optional, Se
 from pkg_resources import Requirement
 
 from pants.backend.python.rules.download_pex_bin import DownloadedPexBin
-from pants.backend.python.rules.hermetic_pex import HermeticPexRequest
+from pants.backend.python.rules.hermetic_pex import HermeticPex, HermeticPexRequest
 from pants.backend.python.rules.targets import Compatibility
 from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
@@ -24,13 +25,17 @@ from pants.engine.fs import (
     PathGlobs,
     Snapshot,
 )
-from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult, MultiPlatformExecuteProcessRequest
+from pants.engine.isolated_process import (
+    ExecuteProcessRequest,
+    ExecuteProcessResult,
+    MultiPlatformExecuteProcessRequest,
+)
 from pants.engine.legacy.structs import PythonTargetAdaptor, TargetAdaptor
 from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.rules import rule, subsystem_rule
 from pants.engine.selectors import Get
-from pants.python.python_setup import PythonSetup
 from pants.python.python_repos import PythonRepos
+from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
@@ -189,6 +194,8 @@ class Pex:
     output_filename: str
 
     def create_hermetic_pex_request(self, exe_req: ExecuteProcessRequest) -> HermeticPexRequest:
+        if not exe_req.input_files:
+            exe_req = dataclasses.replace(exe_req, input_files=self.directory_digest,)
         return HermeticPexRequest(pex_path=self.output_filename, exe_req=exe_req)
 
 
@@ -225,6 +232,7 @@ class PexDebug:
 async def create_pex(
     request: CreatePex,
     pex_bin: DownloadedPexBin,
+    hermetic_pex: HermeticPex,
     python_setup: PythonSetup,
     python_repos: PythonRepos,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
@@ -253,7 +261,7 @@ async def create_pex(
     else:
         argv.append("--no-manylinux")
 
-    argv.append('--no-compile')
+    argv.append("--no-compile")
 
     if request.entry_point is not None:
         argv.extend(["--entry-point", request.entry_point])
@@ -261,11 +269,13 @@ async def create_pex(
     if python_setup.requirement_constraints is not None:
         argv.extend(["--constraints", python_setup.requirement_constraints])
 
-    argv.extend([
-      '--no-pypi',
-      *(f'--index={url}' for url in python_repos.indexes),
-      *(f'--find-links={url}' for url in python_repos.repos),
-    ])
+    argv.extend(
+        [
+            "--no-pypi",
+            *(f"--index={url}" for url in python_repos.indexes),
+            *(f"--find-links={url}" for url in python_repos.repos),
+        ]
+    )
 
     source_dir_name = "source_files"
     argv.append(f"--sources-directory={source_dir_name}")
@@ -309,14 +319,17 @@ async def create_pex(
     # (execution_platform_constraint, target_platform_constraint) of this dictionary is "The output of
     # this command is intended for `target_platform_constraint` iff it is run on `execution_platform
     # constraint`".
-    hermetic_pex_exe_request = await Get[ExecuteProcessRequest](HermeticPexRequest(
-        pex_path=downloaded_pex_bin.executable,
-        exe_req=ExecuteProcessRequest(
-            argv=tuple(argv),
-            input_files=merged_digest,
-            description=f"Resolving {', '.join(request.requirements.requirements)}",
-            output_files=(request.output_filename,),
-        )))
+    hermetic_pex_exe_request = await Get[ExecuteProcessRequest](
+        HermeticPexRequest(
+            pex_path=pex_bin.executable,
+            exe_req=ExecuteProcessRequest(
+                argv=(*hermetic_pex.caching_args(), *argv),
+                input_files=merged_digest,
+                description=f"Resolving {', '.join(request.requirements.requirements)}",
+                output_files=(request.output_filename,),
+            ),
+        )
+    )
     execute_process_request = MultiPlatformExecuteProcessRequest(
         {
             (

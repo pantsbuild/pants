@@ -72,10 +72,7 @@ class ExecuteProcessRequest:
 
     @memoized_property
     def env_dict(self) -> Dict[str, str]:
-        return {
-            self.env[i]: self.env[i + 1]
-            for i in range(0, len(self.env), 2)
-        }
+        return {self.env[i]: self.env[i + 1] for i in range(0, len(self.env), 2)}
 
 
 @frozen_after_init

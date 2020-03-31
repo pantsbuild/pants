@@ -374,7 +374,8 @@ async def run_setup_py(
             # TODO: Could there be other useful files to capture?
             output_directories=(dist_dir,),
             description=f"Run setuptools for {req.exported_target.hydrated_target.adaptor.address.reference()}",
-        ))
+        )
+    )
     result = await Get[ExecuteProcessResult](HermeticPexRequest, hermetic_pex_request)
     output_digest = await Get[Digest](
         DirectoryWithPrefixToStrip(result.output_directory_digest, dist_dir)

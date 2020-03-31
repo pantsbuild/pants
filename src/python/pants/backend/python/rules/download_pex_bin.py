@@ -2,10 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Any, Iterable, Mapping, Optional
 
-from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment
-from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.binaries.binary_tool import BinaryToolFetchRequest, Script, ToolForPlatform, ToolVersion
 from pants.binaries.binary_util import BinaryToolUrlGenerator
 from pants.engine.fs import Digest, SingleFileExecutable, Snapshot
@@ -13,7 +10,6 @@ from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.engine.platform import PlatformConstraint
 from pants.engine.rules import rule, subsystem_rule
 from pants.engine.selectors import Get
-from pants.python.python_setup import PythonSetup
 
 
 class PexBinUrlGenerator(BinaryToolUrlGenerator):
