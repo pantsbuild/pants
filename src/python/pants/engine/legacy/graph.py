@@ -555,7 +555,7 @@ async def transitive_hydrated_targets(addresses: Addresses) -> TransitiveHydrate
 
     The TransitiveHydratedTarget struct represents a structure-shared graph, which we walk and
     flatten here. The engine memoizes the computation of TransitiveHydratedTarget, so when multiple
-    TransitiveHydratedTargets objects are being constructed for multiple roots, their structure will
+    TransitiveHydratedTarget objects are being constructed for multiple roots, their structure will
     be shared.
     """
 
