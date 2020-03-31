@@ -8,6 +8,7 @@ from typing import List, Optional
 
 from pants.backend.python.rules import (
     download_pex_bin,
+    hermetic_pex,
     pex,
     pex_from_target_closure,
     prepare_chrooted_python_sources,
@@ -110,6 +111,7 @@ class PythonTestRunnerIntegrationTest(TestBase):
             *pytest_runner.rules(),
             *download_pex_bin.rules(),
             *determine_source_files.rules(),
+            *hermetic_pex.rules(),
             *pex.rules(),
             *pex_from_target_closure.rules(),
             *prepare_chrooted_python_sources.rules(),

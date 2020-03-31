@@ -5,6 +5,7 @@ from typing import List, Optional
 
 from pants.backend.python.lint.bandit.rules import BanditLinter
 from pants.backend.python.lint.bandit.rules import rules as bandit_rules
+from pants.backend.python.rules.hermetic_pex import rules as hermetic_pex_rules
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.address import Address
@@ -31,7 +32,7 @@ class BanditIntegrationTest(TestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *bandit_rules(), RootRule(BanditLinter))
+        return (*super().rules(), *bandit_rules(), *hermetic_pex_rules(), RootRule(BanditLinter))
 
     def make_target_with_origin(
         self,

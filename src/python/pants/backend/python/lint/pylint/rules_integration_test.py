@@ -7,6 +7,7 @@ from typing import List, Optional
 
 from pants.backend.python.lint.pylint.rules import PylintLinter
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
+from pants.backend.python.rules.hermetic_pex import rules as hermetic_pex_rules
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.address import Address
@@ -41,7 +42,7 @@ class PylintIntegrationTest(TestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *pylint_rules(), RootRule(PylintLinter))
+        return (*super().rules(), *pylint_rules(), *hermetic_pex_rules(), RootRule(PylintLinter))
 
     def write_file(self, file_content: FileContent) -> None:
         self.create_file(relpath=file_content.path, contents=file_content.content.decode())

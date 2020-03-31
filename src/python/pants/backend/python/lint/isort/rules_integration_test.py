@@ -5,6 +5,7 @@ from typing import List, Optional, Tuple
 
 from pants.backend.python.lint.isort.rules import IsortFormatter
 from pants.backend.python.lint.isort.rules import rules as isort_rules
+from pants.backend.python.rules.hermetic_pex import rules as hermetic_pex_rules
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.fs import Digest, DirectoriesToMerge, FileContent, InputFilesContent, Snapshot
@@ -36,7 +37,7 @@ class IsortIntegrationTest(TestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *isort_rules(), RootRule(IsortFormatter))
+        return (*super().rules(), *isort_rules(), *hermetic_pex_rules(), RootRule(IsortFormatter))
 
     def make_target_with_origin(
         self, source_files: List[FileContent], *, origin: Optional[OriginSpec] = None,

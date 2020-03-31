@@ -5,6 +5,7 @@ from typing import List, Optional
 
 from pants.backend.python.lint.flake8.rules import Flake8Linter
 from pants.backend.python.lint.flake8.rules import rules as flake8_rules
+from pants.backend.python.rules.hermetic_pex import rules as hermetic_pex_rules
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.address import Address
@@ -32,7 +33,7 @@ class Flake8IntegrationTest(TestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *flake8_rules(), RootRule(Flake8Linter))
+        return (*super().rules(), *flake8_rules(), *hermetic_pex_rules(), RootRule(Flake8Linter))
 
     def make_target_with_origin(
         self,

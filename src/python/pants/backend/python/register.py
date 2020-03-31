@@ -56,6 +56,7 @@ def global_subsystems():
         python_native_code.PythonNativeCode,
         subprocess_environment.SubprocessEnvironment,
         PexBuilderWrapper.Factory,
+        hermetic_pex.HermeticPex,
     }
 
 

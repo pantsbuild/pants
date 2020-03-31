@@ -5,6 +5,7 @@ from typing import List, Optional, Tuple
 
 from pants.backend.python.lint.docformatter.rules import DocformatterFormatter
 from pants.backend.python.lint.docformatter.rules import rules as docformatter_rules
+from pants.backend.python.rules.hermetic_pex import rules as hermetic_pex_rules
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.fs import Digest, DirectoriesToMerge, FileContent, InputFilesContent, Snapshot
@@ -26,7 +27,12 @@ class DocformatterIntegrationTest(TestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *docformatter_rules(), RootRule(DocformatterFormatter))
+        return (
+            *super().rules(),
+            *docformatter_rules(),
+            *hermetic_pex_rules(),
+            RootRule(DocformatterFormatter),
+        )
 
     def make_target_with_origin(
         self, source_files: List[FileContent], *, origin: Optional[OriginSpec] = None,

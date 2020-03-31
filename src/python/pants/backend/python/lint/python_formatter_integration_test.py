@@ -8,6 +8,7 @@ from pants.backend.python.lint.black.rules import rules as black_rules
 from pants.backend.python.lint.isort.rules import IsortFormatter
 from pants.backend.python.lint.isort.rules import rules as isort_rules
 from pants.backend.python.lint.python_formatter import PythonFormatters, format_python_target
+from pants.backend.python.rules.hermetic_pex import rules as hermetic_pex_rules
 from pants.base.specs import SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Snapshot
@@ -27,6 +28,7 @@ class PythonFormatterIntegrationTest(TestBase):
             *super().rules(),
             format_python_target,
             *black_rules(),
+            *hermetic_pex_rules(),
             *isort_rules(),
             RootRule(PythonFormatters),
             RootRule(BlackFormatter),
