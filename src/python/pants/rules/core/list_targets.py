@@ -66,7 +66,7 @@ async def list_targets(addresses: Addresses, options: ListOptions, console: Cons
         addresses_with_provide_artifacts = {
             tgt.address: tgt[ProvidesField].value
             for tgt in targets
-            if tgt.has_field(ProvidesField) and tgt[ProvidesField].value is not None
+            if tgt.get(ProvidesField).value is not None
         }
         extractor_funcs = {
             "address": lambda address, _: address.spec,
@@ -97,7 +97,7 @@ async def list_targets(addresses: Addresses, options: ListOptions, console: Cons
             {
                 tgt.address: tgt[DescriptionField].value
                 for tgt in targets
-                if tgt.has_field(DescriptionField) and tgt[DescriptionField].value is not None
+                if tgt.get(DescriptionField).value is not None
             },
         )
         with options.line_oriented(console) as print_stdout:
