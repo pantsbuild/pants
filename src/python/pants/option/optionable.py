@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type
 from pants.engine.selectors import Get
 from pants.option.errors import OptionsError
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo
+from pants.util.collections import assert_single_element
 from pants.util.memo import memoized_classproperty
 from pants.util.meta import classproperty
 from pants.util.objects import get_docstring_summary
@@ -22,7 +23,7 @@ async def _construct_optionable(optionable_factory):
     return optionable_factory.optionable_cls(scope, scoped_options.options)
 
 
-def option(name, **register_kwargs):
+def option(name: str, **register_kwargs):
     """A decorator for a `def` instance method which registers it as an option.
 
     The type for the option is inferred from the return type of the `def`.
@@ -53,6 +54,9 @@ def option(name, **register_kwargs):
         if hasattr(option_type, "__extra__"):
             option_type = option_type.__extra__
         register_kwargs["type"] = option_type
+
+        if hasattr(option_type, '__args__'):
+            register_kwargs['member_type'] = assert_single_element(option_type.__args__)
 
         func._option_name = name
         func._option_metadata = register_kwargs

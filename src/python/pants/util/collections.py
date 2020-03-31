@@ -56,15 +56,13 @@ def assert_single_element(iterable: Iterable[_T]) -> _T:
     :raise: :class:`StopIteration` if there is no element.
     :raise: :class:`ValueError` if there is more than one element.
     """
-    it = iter(iterable)
-    first_item = next(it)
+    items = list(iterable)
 
-    try:
-        next(it)
-    except StopIteration:
-        return first_item
-
-    raise ValueError(f"iterable {iterable!r} has more than one element.")
+    if len(items) == 1:
+        return items[0]
+    if len(items) == 0:
+        raise StopIteration(f'iterable {iterable} had zero elements')
+    raise ValueError(f"iterable {iterable} has more than one element (elements were: {items}).")
 
 
 def ensure_list(val: Union[Any, Iterable[Any]], *, expected_type: Type[_T]) -> List[_T]:
