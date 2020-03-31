@@ -69,8 +69,12 @@ GLOBAL_ENV_VARS = [
     'PANTS_CONFIG_FILES="${TRAVIS_BUILD_DIR}/pants.travis-ci.toml"',
     'LC_ALL="en_US.UTF-8"',
     "AWS_BUCKET=ci-public.pantsbuild.org",
-    "BOOTSTRAPPED_PEX_KEY_PREFIX=${TRAVIS_BUILD_NUMBER}/${TRAVIS_BUILD_ID}/pants.pex",
-    "NATIVE_ENGINE_SO_KEY_PREFIX=native_engine_so",
+    # The ci-public.pantsbuild.org bucket has expiration policies set up for key prefixes
+    # corresponding to how long the keys will live before they are expired and then deleted 1 day
+    # later. We use these prefixes to control how long cached artifacts live / control cost /
+    # mitigate risk.
+    "BOOTSTRAPPED_PEX_KEY_PREFIX=daily/${TRAVIS_BUILD_NUMBER}/${TRAVIS_BUILD_ID}/pants.pex",
+    "NATIVE_ENGINE_SO_KEY_PREFIX=monthly/native_engine_so",
     "PYENV_PY27_VERSION=2.7.15",
     "PYENV_PY36_VERSION=3.6.8",
     "PYENV_PY37_VERSION=3.7.2",
