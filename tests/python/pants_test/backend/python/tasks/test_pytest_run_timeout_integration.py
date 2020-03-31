@@ -3,6 +3,8 @@
 
 import time
 
+import pytest
+
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -86,6 +88,7 @@ class PytestRunTimeoutIntegrationTest(PantsRunIntegrationTest):
             pants_run.stdout_data,
         )
 
+    @pytest.mark.skip(reason="flaky: https://github.com/pantsbuild/pants/issues/9441")
     def test_pytest_run_killed_by_signal(self):
         start = time.time()
         pants_run = self.run_pants(
