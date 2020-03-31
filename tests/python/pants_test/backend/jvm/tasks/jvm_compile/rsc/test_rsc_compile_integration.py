@@ -10,6 +10,7 @@ from pants_test.backend.jvm.tasks.jvm_compile.rsc.rsc_compile_integration_base i
 
 
 class RscCompileIntegration(RscCompileIntegrationBase):
+    @pytest.mark.skip(reason="flaky: https://github.com/pantsbuild/pants/issues/7856")
     @ensure_compile_rsc_execution_strategy(RscCompileIntegrationBase.rsc_and_zinc)
     def test_basic_binary(self):
         self._testproject_compile("mutual", "bin", "A")
