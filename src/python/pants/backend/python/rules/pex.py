@@ -9,7 +9,7 @@ from typing import FrozenSet, Iterable, Iterator, List, NamedTuple, Optional, Se
 from pkg_resources import Requirement
 
 from pants.backend.python.rules.download_pex_bin import DownloadedPexBin
-from pants.backend.python.rules.hermetic_pex import HermeticPexRequest, HermeticPexResult
+from pants.backend.python.rules.hermetic_pex import HermeticPexRequest
 from pants.backend.python.rules.targets import Compatibility
 from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
@@ -188,6 +188,9 @@ class Pex:
     directory_digest: Digest
     output_filename: str
 
+    def create_hermetic_pex_request(self, exe_req: ExecuteProcessRequest) -> HermeticPexRequest:
+        return HermeticPexRequest(pex_path=self.output_filename, exe_req=exe_req)
+
 
 logger = logging.getLogger(__name__)
 
@@ -306,8 +309,9 @@ async def create_pex(
     # (execution_platform_constraint, target_platform_constraint) of this dictionary is "The output of
     # this command is intended for `target_platform_constraint` iff it is run on `execution_platform
     # constraint`".
-    hermetic_pex_exe_request = await Get[HermeticPexResult](HermeticPexRequest(
-        ExecuteProcessRequest(
+    hermetic_pex_exe_request = await Get[ExecuteProcessRequest](HermeticPexRequest(
+        pex_path=downloaded_pex_bin.executable,
+        exe_req=ExecuteProcessRequest(
             argv=tuple(argv),
             input_files=merged_digest,
             description=f"Resolving {', '.join(request.requirements.requirements)}",
@@ -318,7 +322,7 @@ async def create_pex(
             (
                 PlatformConstraint(platform.value),
                 PlatformConstraint(platform.value),
-            ): hermetic_pex_exe_request.exe_req
+            ): hermetic_pex_exe_request
         }
     )
 

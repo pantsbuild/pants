@@ -6,7 +6,7 @@ from typing import Tuple
 
 from pants.backend.python.lint.docformatter.subsystem import Docformatter
 from pants.backend.python.lint.python_formatter import PythonFormatter
-from pants.backend.python.rules import download_pex_bin, pex
+from pants.backend.python.rules import download_pex_bin, hermetic_pex, pex
 from pants.backend.python.rules.pex import (
     CreatePex,
     Pex,
@@ -110,11 +110,8 @@ async def setup(
         )
     )
 
-    process_request = requirements_pex.create_execute_request(
-        python_setup=python_setup,
-        subprocess_encoding_environment=subprocess_encoding_environment,
-        pex_path="./docformatter.pex",
-        pex_args=generate_args(
+    hermetic_pex_request = requirements_pex.create_hermetic_pex_request(ExecuteProcessRequest(
+        argv=generate_args(
             specified_source_files=specified_source_files,
             docformatter=docformatter,
             check_only=request.check_only,
@@ -122,7 +119,8 @@ async def setup(
         input_files=merged_input_files,
         output_files=all_source_files_snapshot.files,
         description=f"Run docformatter for {address_references}",
-    )
+    ))
+    process_request = await Get[ExecuteProcessRequest](HermeticPexRequest, hermetic_pex_request)
     return Setup(process_request)
 
 

@@ -6,7 +6,7 @@ from typing import Optional, Tuple
 
 from pants.backend.python.lint.flake8.subsystem import Flake8
 from pants.backend.python.lint.python_linter import PythonLinter
-from pants.backend.python.rules import download_pex_bin, pex
+from pants.backend.python.rules import download_pex_bin, hermetic_pex, pex
 from pants.backend.python.rules.pex import (
     CreatePex,
     Pex,
@@ -107,15 +107,12 @@ async def lint(
         )
     )
 
-    request = requirements_pex.create_execute_request(
-        python_setup=python_setup,
-        subprocess_encoding_environment=subprocess_encoding_environment,
-        pex_path=f"./flake8.pex",
-        pex_args=generate_args(specified_source_files=specified_source_files, flake8=flake8),
+    request = requirements_pex.create_hermetic_pex_request(ExecuteProcessRequest(
+        argv=generate_args(specified_source_files=specified_source_files, flake8=flake8),
         input_files=merged_input_files,
         description=f"Run Flake8 for {address_references}",
-    )
-    result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, request)
+    ))
+    result = await Get[FallibleExecuteProcessResult](hermetic_pex.HermeticPexRequest, request)
     return LintResult.from_fallible_execute_process_result(result)
 
 

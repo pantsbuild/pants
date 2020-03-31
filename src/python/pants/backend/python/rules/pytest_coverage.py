@@ -13,6 +13,7 @@ from typing import Optional, Tuple, Type
 
 import pkg_resources
 
+from pants.backend.python.rules.hermetic_pex import HermeticPexRequest
 from pants.backend.python.rules.inject_init import InitInjectedSnapshot, InjectInitRequest
 from pants.backend.python.rules.pex import (
     CreatePex,
@@ -308,17 +309,14 @@ async def merge_coverage_data(
         for result in data_batch.addresses_and_test_results
     ]
     coverage_args = ["combine", *prefixes]
-    request = coverage_setup.requirements_pex.create_execute_request(
-        python_setup=python_setup,
-        subprocess_encoding_environment=subprocess_encoding_environment,
-        pex_path=f"./{coverage_setup.requirements_pex.output_filename}",
-        pex_args=coverage_args,
+    request = coverage_setup.requirements_pex.create_hermetic_pex_request(ExecuteProcessRequest(
+        argv=coverage_args,
         input_files=merged_input_files,
         output_files=(".coverage",),
         description=f"Merge coverage reports.",
-    )
+    ))
 
-    result = await Get[ExecuteProcessResult](ExecuteProcessRequest, request)
+    result = await Get[ExecuteProcessResult](HermeticPexRequest, request)
     return MergedCoverageData(coverage_data=result.output_directory_digest)
 
 
@@ -371,18 +369,15 @@ async def generate_coverage_report(
     )
     report_type = coverage_toolbase.options.report
     coverage_args = [report_type.report_name]
-    request = requirements_pex.create_execute_request(
-        python_setup=python_setup,
-        subprocess_encoding_environment=subprocess_encoding_environment,
-        pex_path=f"./{coverage_setup.requirements_pex.output_filename}",
-        pex_args=coverage_args,
+    request = requirements_pex.create_hermetic_pex_request(ExecuteProcessRequest(
+        argv=coverage_args,
         input_files=merged_input_files,
         output_directories=("htmlcov",),
         output_files=("coverage.xml",),
         description=f"Generate coverage report.",
-    )
+    ))
 
-    result = await Get[ExecuteProcessResult](ExecuteProcessRequest, request)
+    result = await Get[ExecuteProcessResult](HermeticPexRequest, request)
     if report_type == ReportType.CONSOLE:
         return ConsoleCoverageReport(result.stdout.decode())
 

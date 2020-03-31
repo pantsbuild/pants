@@ -7,6 +7,7 @@ from pants.backend.awslambda.common.awslambda_common_rules import AWSLambdaTarge
 from pants.backend.awslambda.python.lambdex import Lambdex
 from pants.backend.python.rules import (
     download_pex_bin,
+    hermetic_pex,
     pex,
     pex_from_target_closure,
     prepare_chrooted_python_sources,
@@ -59,16 +60,13 @@ async def create_python_awslambda(
 
     # NB: Lambdex modifies its input pex in-place, so the input file is also the output file.
     lambdex_args = ("build", "-e", lambda_tgt_adaptor.handler, pex_filename)
-    process_request = lambdex_setup.requirements_pex.create_execute_request(
-        python_setup=python_setup,
-        subprocess_encoding_environment=subprocess_encoding_environment,
-        pex_path="./lambdex.pex",
-        pex_args=lambdex_args,
+    process_request = lambdex_setup.requirements_pex.create_hermetic_pex_request(ExecuteProcessRequest(
+        argv=lambdex_args,
         input_files=merged_input_files,
         output_files=(pex_filename,),
         description=f"Run Lambdex for {lambda_tgt_adaptor.address.reference()}",
-    )
-    result = await Get[ExecuteProcessResult](ExecuteProcessRequest, process_request)
+    ))
+    result = await Get[ExecuteProcessResult](hermetic_pex.HermeticPexRequest, process_request)
     return CreatedAWSLambda(digest=result.output_directory_digest, name=pex_filename)
 
 

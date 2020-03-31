@@ -17,11 +17,7 @@ from pants.util.strutil import create_path_env_var
 
 @dataclass(frozen=True)
 class HermeticPexRequest:
-    exe_req: ExecuteProcessRequest
-
-
-@dataclass(frozen=True)
-class HermeticPexResult:
+    pex_path: str
     exe_req: ExecuteProcessRequest
 
 
@@ -53,7 +49,7 @@ def make_hermetic_pex_exe_request(
     downloaded_pex_bin: DownloadedPexBin,
     hermetic_pex_factory: HermeticPex,
     req: HermeticPexRequest
-) -> HermeticPexResult:
+) -> ExecuteProcessRequest:
     """Creates an ExecuteProcessRequest that will run a PEX hermetically.
 
     :param python_setup: The parameters for selecting python interpreters to use when invoking the
@@ -69,7 +65,7 @@ def make_hermetic_pex_exe_request(
     """
     orig_exe_req = req.exe_req
 
-    pex_path = downloaded_pex_bin.executable
+    pex_path = req.pex_path
 
     hermetic_env = orig_exe_req.env_dict.copy()
     hermetic_env.update(
@@ -104,13 +100,12 @@ def make_hermetic_pex_exe_request(
         *orig_exe_req.argv,
     )
 
-    modified_exe_req = dataclasses.replace(
+    return dataclasses.replace(
         orig_exe_req,
         argv=argv,
         env=hermetic_env,
         input_files=input_files,
     )
-    return HermeticPexResult(modified_exe_req)
 
 
 def rules():

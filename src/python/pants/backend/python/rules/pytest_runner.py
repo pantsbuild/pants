@@ -5,6 +5,7 @@ import functools
 from dataclasses import dataclass
 from typing import Any, List, Optional, Tuple, Union, cast
 
+from pants.backend.python.rules.hermetic_pex import HermeticPexRequest
 from pants.backend.python.rules.pex import (
     CreatePex,
     Pex,
@@ -228,11 +229,8 @@ async def run_python_test(
     """Runs pytest for one target."""
     env = {"PYTEST_ADDOPTS": f"--color={'yes' if global_options.options.colors else 'no'}"}
     run_coverage = test_options.values.run_coverage
-    request = test_setup.test_runner_pex.create_execute_request(
-        python_setup=python_setup,
-        subprocess_encoding_environment=subprocess_encoding_environment,
-        pex_path=f"./{test_setup.test_runner_pex.output_filename}",
-        pex_args=test_setup.args,
+    request = test_setup.test_runner_pex.create_hermetic_pex_request(ExecuteProcessRequest(
+        argv=test_setup.args,
         input_files=test_setup.input_files_digest,
         output_directories=(".coverage",) if run_coverage else None,
         description=f"Run Pytest for {pytest_runner.adaptor_with_origin.adaptor.address.reference()}",
@@ -240,8 +238,8 @@ async def run_python_test(
             test_setup.timeout_seconds if test_setup.timeout_seconds is not None else 9999
         ),
         env=env,
-    )
-    result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, request)
+    ))
+    result = await Get[FallibleExecuteProcessResult](HermeticPexRequest, request)
     coverage_data = PytestCoverageData(result.output_directory_digest) if run_coverage else None
     return TestResult.from_fallible_execute_process_result(result, coverage_data=coverage_data)
 

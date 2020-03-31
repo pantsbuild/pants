@@ -7,6 +7,7 @@ import os
 from dataclasses import dataclass
 from typing import List, Set, Tuple
 
+from pants.backend.python.rules.hermetic_pex import HermeticPexRequest
 from pants.backend.python.rules.pex import (
     CreatePex,
     Pex,
@@ -365,18 +366,16 @@ async def run_setup_py(
     # The setuptools dist dir, created by it under the chroot (not to be confused with
     # pants's own dist dir, at the buildroot).
     dist_dir = "dist/"
-    request = setuptools_setup.requirements_pex.create_execute_request(
-        python_setup=python_setup,
-        subprocess_encoding_environment=subprocess_encoding_environment,
-        pex_path="./setuptools.pex",
-        pex_args=("setup.py", *req.args),
-        input_files=merged_input_files,
-        # setuptools commands that create dists write them to the distdir.
-        # TODO: Could there be other useful files to capture?
-        output_directories=(dist_dir,),
-        description=f"Run setuptools for {req.exported_target.hydrated_target.adaptor.address.reference()}",
-    )
-    result = await Get[ExecuteProcessResult](ExecuteProcessRequest, request)
+    hermetic_pex_request = setuptools_setup.requirements_pex.create_hermetic_pex_request(
+        ExecuteProcessRequest(
+            argv=("setup.py", *req.args),
+            input_files=merged_input_files,
+            # setuptools commands that create dists write them to the distdir.
+            # TODO: Could there be other useful files to capture?
+            output_directories=(dist_dir,),
+            description=f"Run setuptools for {req.exported_target.hydrated_target.adaptor.address.reference()}",
+        ))
+    result = await Get[ExecuteProcessResult](HermeticPexRequest, hermetic_pex_request)
     output_digest = await Get[Digest](
         DirectoryWithPrefixToStrip(result.output_directory_digest, dist_dir)
     )
