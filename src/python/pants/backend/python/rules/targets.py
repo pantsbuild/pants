@@ -15,11 +15,11 @@ from pants.engine.target import (
     Dependencies,
     IntField,
     InvalidFieldException,
+    ProvidesField,
     Sources,
     StringField,
     StringOrStringSequenceField,
     Target,
-    UnimplementedField,
 )
 from pants.python.python_setup import PythonSetup
 from pants.rules.core.determine_source_files import SourceFiles
@@ -72,10 +72,6 @@ class Compatibility(StringOrStringSequenceField):
         If interpreter constraints are supplied by the CLI flag, return those only.
         """
         return python_setup.compatibility_or_constraints(self.value)
-
-
-class Provides(UnimplementedField):
-    alias = "provides"
 
 
 class Coverage(StringOrStringSequenceField):
@@ -213,7 +209,7 @@ class EmitPexWarnings(BoolField):
     default = True
 
 
-COMMON_PYTHON_FIELDS = (*COMMON_TARGET_FIELDS, Dependencies, Compatibility, Provides)
+COMMON_PYTHON_FIELDS = (*COMMON_TARGET_FIELDS, Dependencies, Compatibility, ProvidesField)
 
 
 class PythonBinary(Target):

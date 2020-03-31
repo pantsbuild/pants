@@ -1,20 +1,21 @@
-# Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Union
+from typing import Dict, cast
 
+from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
-from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get
+from pants.engine.target import DescriptionField, ProvidesField, Targets
 
 
 class ListOptions(LineOriented, GoalSubsystem):
-    """Lists all targets matching the target specs."""
+    """Lists all targets."""
 
-    name = "list"
+    name = "list-v2"
 
     @classmethod
     def register_options(cls, register):
@@ -22,14 +23,18 @@ class ListOptions(LineOriented, GoalSubsystem):
         register(
             "--provides",
             type=bool,
-            help="List only targets that provide an artifact, displaying the columns specified by "
-            "--provides-columns.",
+            help=(
+                "List only targets that provide an artifact, displaying the columns specified by "
+                "--provides-columns."
+            ),
         )
         register(
             "--provides-columns",
             default="address,artifact_id",
-            help="Display these columns when --provides is specified. Available columns are: "
-            "address, artifact_id, repo_name, repo_url, push_db_basedir",
+            help=(
+                "Display these columns when --provides is specified. Available columns are: "
+                "address, artifact_id, repo_name, repo_url, push_db_basedir"
+            ),
         )
         register(
             "--documented",
@@ -43,60 +48,67 @@ class List(Goal):
 
 
 @goal_rule
-async def list_targets(console: Console, list_options: ListOptions, addresses: Addresses) -> List:
-    provides = list_options.values.provides
-    provides_columns = list_options.values.provides_columns
-    documented = list_options.values.documented
-    collection: Union[HydratedTargets, Addresses]
-    if provides or documented:
-        # To get provides clauses or documentation, we need hydrated targets.
-        collection = await Get[HydratedTargets](Addresses, addresses)
-        if provides:
-            extractors = dict(
-                address=lambda adaptor: adaptor.address.spec,
-                artifact_id=lambda adaptor: str(adaptor.provides),
-                repo_name=lambda adaptor: adaptor.provides.repo.name,
-                repo_url=lambda adaptor: adaptor.provides.repo.url,
-                push_db_basedir=lambda adaptor: adaptor.provides.repo.push_db_basedir,
+async def list_targets(addresses: Addresses, options: ListOptions, console: Console) -> List:
+    if not addresses.dependencies:
+        console.print_stderr(f"WARNING: No targets were matched in goal `{options.name}`.")
+        return List(exit_code=0)
+
+    provides_enabled = options.values.provides
+    documented_enabled = options.values.documented
+    if provides_enabled and documented_enabled:
+        raise ValueError(
+            "Cannot specify both `--list-documented` and `--list-provides` at the same time. "
+            "Please choose one."
+        )
+
+    if provides_enabled:
+        targets = await Get[Targets](Addresses, addresses)
+        addresses_with_provide_artifacts = {
+            tgt.address: tgt[ProvidesField].value
+            for tgt in targets
+            if tgt.get(ProvidesField).value is not None
+        }
+        extractor_funcs = {
+            "address": lambda address, _: address.spec,
+            "artifact_id": lambda _, artifact: str(artifact),
+            "repo_name": lambda _, artifact: artifact.repo.name,
+            "repo_url": lambda _, artifact: artifact.repo.url,
+            "push_db_basedir": lambda _, artifact: artifact.repo.push_db_basedir,
+        }
+        try:
+            extractors = [
+                extractor_funcs[col] for col in options.values.provides_columns.split(",")
+            ]
+        except KeyError:
+            raise ValueError(
+                "Invalid columns provided for `--list-provides-columns`: "
+                f"{options.values.provides_columns}. Valid columns are: "
+                f"{', '.join(sorted(extractor_funcs.keys()))}."
             )
+        with options.line_oriented(console) as print_stdout:
+            for address, artifact in addresses_with_provide_artifacts.items():
+                print_stdout(" ".join(extractor(address, artifact) for extractor in extractors))
+        return List(exit_code=0)
 
-            def print_provides(col_extractors, target):
-                if getattr(target.adaptor, "provides", None):
-                    return " ".join(extractor(target.adaptor) for extractor in col_extractors)
+    if documented_enabled:
+        targets = await Get[Targets](Addresses, addresses)
+        addresses_with_descriptions = cast(
+            Dict[Address, str],
+            {
+                tgt.address: tgt[DescriptionField].value
+                for tgt in targets
+                if tgt.get(DescriptionField).value is not None
+            },
+        )
+        with options.line_oriented(console) as print_stdout:
+            for address, description in addresses_with_descriptions.items():
+                formatted_description = "\n  ".join(description.strip().split("\n"))
+                print_stdout(f"{address.spec}\n  {formatted_description}")
+        return List(exit_code=0)
 
-            try:
-                column_extractors = [extractors[col] for col in (provides_columns.split(","))]
-            except KeyError:
-                raise Exception(
-                    "Invalid columns specified: {0}. Valid columns are: address, artifact_id, "
-                    "repo_name, repo_url, push_db_basedir.".format(provides_columns)
-                )
-
-            print_fn = lambda target: print_provides(column_extractors, target)
-        else:
-
-            def print_documented(target):
-                description = getattr(target.adaptor, "description", None)
-                if description:
-                    return "{0}\n  {1}".format(
-                        target.adaptor.address.spec, "\n  ".join(description.strip().split("\n"))
-                    )
-
-            print_fn = print_documented
-    else:
-        # Otherwise, we can use only addresses.
-        collection = addresses
-        print_fn = lambda address: address.spec
-
-    with list_options.line_oriented(console) as print_stdout:
-        if not collection.dependencies:
-            console.print_stderr("WARNING: No targets were matched in goal `{}`.".format("list"))
-
-        for item in collection:
-            result = print_fn(item)
-            if result:
-                print_stdout(result)
-
+    with options.line_oriented(console) as print_stdout:
+        for address in sorted(addresses):
+            print_stdout(address)
     return List(exit_code=0)
 
 

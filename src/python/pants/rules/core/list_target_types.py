@@ -20,7 +20,6 @@ from pants.engine.target import (
     StringOrStringSequenceField,
     StringSequenceField,
     Target,
-    UnimplementedField,
 )
 from pants.util.objects import get_docstring, get_docstring_summary, pretty_print_type_hint
 
@@ -97,7 +96,6 @@ class FieldInfo:
                     StringField,
                     StringOrStringSequenceField,
                     StringSequenceField,
-                    UnimplementedField,
                 },
             )
             or ""
