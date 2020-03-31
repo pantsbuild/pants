@@ -81,7 +81,7 @@ def make_hermetic_pex_exe_request(
 
     hermetic_env = orig_exe_req.env_dict.copy()
     hermetic_env.update(
-        PATH=create_path_env_var(python_setup.interpreter_search_paths_ensure_directories),
+        PATH=create_path_env_var(python_setup.interpreter_search_paths_ensure_directories()),
         # We ask Pex to --disable-cache so we shouldn't also set a PEX_ROOT (asking it to
         # cache).
         PEX_ROOT="",

@@ -167,7 +167,6 @@ class PythonSetup(Subsystem):
     def interpreter_search_paths(self):
         return self.expand_interpreter_search_paths(self.get_options().interpreter_search_paths)
 
-    @property
     def interpreter_search_paths_ensure_directories(self) -> List[str]:
         """pex will accept direct paths to python executables, but we need directories to create a
         hermetic PATH."""
