@@ -3,7 +3,7 @@
 
 import os.path
 from pathlib import PurePath
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.build_graph.address import Address
@@ -172,6 +172,17 @@ class PexInheritPath(StringField):
     """
 
     alias = "inherit_path"
+
+    # TODO(#9388): deprecate allowing this to be a `bool`.
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Union[str, bool]], *, address: Address
+    ) -> Optional[str]:
+        if raw_value is False:
+            return "false"
+        if raw_value is True:
+            return "prefer"
+        return super().compute_value(raw_value, address=address)
 
 
 class PexZipSafe(BoolField):
