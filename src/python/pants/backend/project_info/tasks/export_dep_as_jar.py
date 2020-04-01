@@ -13,6 +13,7 @@ from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.backend.jvm.targets.runtime_platform_mixin import RuntimePlatformMixin
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
 from pants.backend.project_info.tasks.export import SourceRootTypes
@@ -314,7 +315,7 @@ class ExportDepAsJar(ConsoleTask):
         if isinstance(current_target, JvmTarget):
             info["excludes"] = [self._exclude_id(exclude) for exclude in current_target.excludes]
             info["platform"] = current_target.platform.name
-            if hasattr(current_target, "runtime_platform"):
+            if isinstance(current_target, RuntimePlatformMixin):
                 info["runtime_platform"] = current_target.runtime_platform.name
 
         info["source_dependencies_in_classpath"] = self._compute_transitive_source_dependencies(
@@ -453,7 +454,7 @@ class ExportDepAsJar(ConsoleTask):
 
         This function takes strict_deps into account when generating the graph.
         """
-        flat_deps = {}
+        flat_deps: Dict[Target, FrozenOrderedSet[Target]] = {}
 
         def create_entry_for_target(target: Target) -> None:
             target_key = target
@@ -462,7 +463,7 @@ class ExportDepAsJar(ConsoleTask):
             else:
                 dependencies = target.dependencies
             non_modulizable_deps = [dep for dep in dependencies if dep not in modulizable_targets]
-            entry = OrderedSet()
+            entry: OrderedSet[Target] = OrderedSet()
             for dep in non_modulizable_deps:
                 entry.update(flat_deps.get(dep, set()).union({dep}))
             flat_deps[target_key] = FrozenOrderedSet(entry)
