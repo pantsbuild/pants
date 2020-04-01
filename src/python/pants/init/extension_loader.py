@@ -120,6 +120,12 @@ def load_plugins(
                 if dep.key not in loaded:
                     raise PluginLoadOrderError(f"Plugin {plugin} must be loaded after {dep}")
 
+        # While the Target API is a V2 concept, we expect V1 plugin authors to still write Target
+        # API bindings. So, we end up using this entry point regardless of V1 vs. V2.
+        if "targets2" in entries:
+            targets = entries["targets2"].load()()
+            build_configuration.register_targets(targets)
+
         if is_v1_plugin:
             if "register_goals" in entries:
                 entries["register_goals"].load()()
@@ -194,6 +200,12 @@ def load_backend(
                 f"Entrypoint {name} in {backend_module} must be a zero-arg callable: {e!r}"
             )
 
+    # While the Target API is a V2 concept, we expect V1 plugin authors to still write Target
+    # API bindings. So, we end up using this entry point regardless of V1 vs. V2.
+    targets = invoke_entrypoint("targets2")
+    if targets:
+        build_configuration.register_targets(targets)
+
     if is_v1_backend:
         invoke_entrypoint("register_goals")
         subsystems = invoke_entrypoint("global_subsystems")
@@ -208,9 +220,6 @@ def load_backend(
         rules = invoke_entrypoint("rules")
         if rules:
             build_configuration.register_rules(rules)
-        targets = invoke_entrypoint("targets2")
-        if targets:
-            build_configuration.register_targets(targets)
         build_file_aliases2 = invoke_entrypoint("build_file_aliases2")
         if build_file_aliases2:
             build_configuration.register_aliases(build_file_aliases2)
