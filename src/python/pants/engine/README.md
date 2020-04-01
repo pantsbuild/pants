@@ -76,80 +76,52 @@ In cases where this search detects any ambiguity (generally because there are tw
 that can provide the same product with the same number of parameters), rule graph compilation will
 fail with a useful error message.
 
-### How to Declare Engine `Param` Types
+### Datatypes
 
 In practical use, builtin types like `str` or `int` do not provide enough information to
-disambiguate between various types of data in `@rule` signatures, so declaring small, unique classes
-to encapsulate different states can help to make `@rule` sets with complex control flow between rules
-more declarative and self-documenting.
-
-#### Requirements for an Engine `Param`
-
-To use an instance of some class `C` as a `Param` to the engine:
-1. instances of `C` must be immutable,
-2. `__hash__` and `__eq__` must be implemented such that when constructing two separate instances of `C` with the same argument list `...`, `C(...) == C(...)` and `hash(C(...)) == hash(C(...))`.
-  - This can be ignored for singleton `Param`s.
-
-#### Benefits of using `@dataclass` for a `Param`
-[Python 3 `@dataclass`es](https://docs.python.org/3/library/dataclasses.html) satisfy the above requirements for engine `Param`s. Using `@dataclass` to declare engine `Param` types also provides additional benefits compared to alternatives:
-1. a compact and high-performance representation which can be stably shared across FFI boundaries,
-2. static type checking via [the `dataclasses` mypy plugin](https://github.com/python/mypy/blob/master/mypy/plugins/dataclasses.py),
-3. a concise, standard, and Pythonic way to declare classes.
-
-
-#### Example Usage of `@dataclass` for Engine `Param`s
-
-*Note that the [3rdparty `dataclasses` library](https://github.com/ericvsmith/dataclasses) must be in your BUILD file and `import`ed if you're running Pants with Python 3.6!*
+disambiguate between various types of data in `@rule` signatures, so declaring small `datatype`
+definitions to provide a unique and descriptive type is highly recommended:
 
 ```python
-from dataclasses import dataclass
-
-from pants.util.meta import frozen_after_init
-
-# Pants requires that engine Params have a stable hash. This can be accomplished with the
-# `frozen=True` argument set in the `@dataclass` decorator.
-@dataclass(frozen=True)
-class FormattedInt:
-  content: str
+class FormattedInt(datatype(['content'])): pass
 
 @rule
 def int_to_str(value: int) -> FormattedInt:
-  return FormattedInt(str(value))
+  return FormattedInt('{}'.format(value))
 
-# `@dataclass` objects can be easily inspected:
-print(x)                        # 'FormattedInt(content="a string")'
+# Field values can be specified with positional and/or keyword arguments in the constructor:
+x = FormattedInt('a string')
+x = FormattedInt(content='a string')
 
-# All MyPy types, including parameterized types, may be used in field definitions. The runtime type
-# must still be hashable.
-@dataclass(frozen=True)
-class TypedDatatype:
+# Field values can be accessed after construction by name or index:
+print(x.content)    # 'a string'
+print(x[0])         # 'a string'
+
+# datatype objects can be easily inspected:
+print(x)            # 'FormattedInt(content=a string)'
+```
+
+#### Types of Fields
+
+`datatype()` accepts a list of *field declarations*, and returns a type which can be subclassed. A
+*field declaration* can just be a string (e.g. `'field_name'`), which is then used as the field
+name, as with `FormattedInt` above. A field can also be declared with a tuple of two elements: the
+field name string, and a `TypeConstraint` for the field (e.g. `('field_name',
+Exactly(FieldType))`). The bare type name (e.g. `FieldType`) can also be used as a shorthand for
+`Exactly(FieldType)`. If the tuple form is used, the constructor will create your object, then raise
+an error if the field value does not satisfy the type constraint.
+
+``` python
+class TypedDatatype(datatype([('field_name', Exactly(str, int))])):
   """Example of a datatype with a more complex field type constraint."""
-  field_name: Union[str, int]
-
-print(TypedDatatype("huh")) # 'TypedDatatype(field_name=huh)'
 ```
 
-#### Using `@frozen_after_init` with `@dataclass`es
-
-`@frozen_after_init` can also be used with `@dataclass(unsafe_hash=True)` to create engine `Param`s which can modify their fields within the `__init__()` method. This is useful if you want to perform any normalization on the args to `__init__()`, such as allowing `List` and then casting this to an immutable `Tuple` in `__init__()`:
-
-```python
-from dataclasses import dataclass
-from typing import Iterable, Tuple
-from pants.util.meta import frozen_after_init
-
-@frozen_after_init
-@dataclass(unsafe_hash=True)
-class ValidatedCollection:
-  elements: Tuple[str, ...]   # Note that we must use a `Tuple` because `List` is mutable
-
-  def __init__(self, elements: Iterable[str]) -> None:
-    self.elements = tuple(elements)
-
-x = ValidatedCollection([1, 2, 3])
-assert x.elements == (1, 2, 3)
-print(x) # ValidatedCollection(elements=(1, 2, 3))
-```
+Assigning a specific type to a field can be somewhat unidiomatic in Python, and may be unexpected or
+unnatural to use. However, regardless of whether the object is created directly with type-checked
+fields or whether it's produced from a set of rules by the engine's dependency injection, it is
+extremely useful to formalize the assumptions made about the value of an object into a specific
+type, even if the type just wraps a single field. The `datatype()` function makes it simple and
+efficient to apply that strategy.
 
 ### Gets and RootRules
 
