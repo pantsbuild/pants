@@ -172,7 +172,6 @@ class PexInheritPath(StringField):
     """
 
     alias = "inherit_path"
-    valid_values = ("false", "fallback", "prefer")
 
 
 class PexZipSafe(BoolField):

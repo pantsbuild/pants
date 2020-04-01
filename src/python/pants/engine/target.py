@@ -637,29 +637,15 @@ class FloatField(PrimitiveField, metaclass=ABCMeta):
 
 
 class StringField(PrimitiveField, metaclass=ABCMeta):
-    """A field for a string value.
-
-    You can set `valid_values` to emulate an enum, i.e. to ensure that the string is one of the
-    valid options.
-    """
-
     value: Optional[str]
     default: ClassVar[Optional[str]] = None
-    valid_values: ClassVar[Optional[Tuple[str, ...]]] = None
 
     @classmethod
     def compute_value(cls, raw_value: Optional[str], *, address: Address) -> Optional[str]:
         value_or_default = super().compute_value(raw_value, address=address)
-        if value_or_default is None:
-            return None
-        if not isinstance(value_or_default, str):
+        if value_or_default is not None and not isinstance(value_or_default, str):
             raise InvalidFieldTypeException(
                 address, cls.alias, value_or_default, expected_type="a string",
-            )
-        if cls.valid_values is not None and value_or_default not in cls.valid_values:
-            raise InvalidFieldException(
-                f"The {repr(cls.alias)} field in target {address} must be one of "
-                f"{sorted(cls.valid_values)}, but was {repr(raw_value)}."
             )
         return value_or_default
 
