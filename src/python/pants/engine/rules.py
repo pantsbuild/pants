@@ -8,7 +8,8 @@ import sys
 import typing
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional, Tuple, Type, get_type_hints
+from typing import Callable, Dict, List, Optional, Tuple, Type, Union, cast, get_type_hints
+from enum import Enum
 
 from pants.engine.goal import Goal
 from pants.engine.objects import union
@@ -18,6 +19,12 @@ from pants.util.collections import assert_single_element
 from pants.util.memo import memoized
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+
+
+class RuleType(Enum):
+    Test = "test"
+    Format = "format"
+    Build = "build"
 
 
 def side_effecting(cls):
@@ -158,10 +165,12 @@ def _make_rule(
         dependency_rules = (subsystem_rule(return_type.subsystem_cls),) if is_goal_cls else None
 
         # Set a default name for Goal classes if one is not explicitly provided
-        if is_goal_cls and name is None:
-            effective_name = return_type.name
-        else:
-            effective_name = name
+        effective_name = name
+        if effective_name is None:
+            if is_goal_cls:
+                effective_name = return_type.name
+            else:
+                effective_name = func.__name__
 
         # Set our own custom `__line_number__` dunder so that the engine may visualize the line number.
         func.__line_number__ = func.__code__.co_firstlineno
@@ -217,7 +226,7 @@ PUBLIC_RULE_DECORATOR_ARGUMENTS = {"name"}
 # We don't want @rule-writers to use 'cacheable' as a kwarg directly, but rather
 # set it implicitly based on whether the rule annotation is @rule or @goal_rule.
 # So we leave it out of PUBLIC_RULE_DECORATOR_ARGUMENTS.
-IMPLICIT_PRIVATE_RULE_DECORATOR_ARGUMENTS = {"cacheable"}
+IMPLICIT_PRIVATE_RULE_DECORATOR_ARGUMENTS = {"cacheable", "named_rule"}
 
 
 def rule_decorator(*args, **kwargs) -> Callable:
@@ -226,6 +235,17 @@ def rule_decorator(*args, **kwargs) -> Callable:
             "The @rule decorator expects no arguments and for the function it decorates to be "
             f"type-annotated. Given {args}."
         )
+
+    named_rule = kwargs.get("named_rule") or False
+    name: Optional[str] = kwargs.get("name")
+    description: Optional[str] = kwargs.get("desc")
+    rule_type: Optional[RuleType] = kwargs.get("rule_type")
+
+    if not named_rule:
+        if any([name, description, rule_type]):
+            raise UnrecognizedRuleArgument(
+                    f"@rules that are not @named_rules or @goal_rules do not accept keyword arguments"
+            )
 
     if (
         len(
@@ -236,13 +256,12 @@ def rule_decorator(*args, **kwargs) -> Callable:
         != 0
     ):
         raise UnrecognizedRuleArgument(
-            f"`@rule`s and `@goal_rule`s only accept the following keyword arguments: {PUBLIC_RULE_DECORATOR_ARGUMENTS}"
+            f"`@named_rule`s and `@goal_rule`s only accept the following keyword arguments: {PUBLIC_RULE_DECORATOR_ARGUMENTS}"
         )
 
     func = args[0]
 
     cacheable: bool = kwargs["cacheable"]
-    name: Optional[str] = kwargs.get("name")
 
     func_id = f"@rule {func.__module__}:{func.__name__}"
     type_hints = get_type_hints(func)
@@ -290,7 +309,11 @@ def rule(*args, **kwargs) -> Callable:
 
 
 def goal_rule(*args, **kwargs) -> Callable:
-    return inner_rule(*args, **kwargs, cacheable=False)
+    return inner_rule(*args, **kwargs, cacheable=False, named_rule=True)
+
+
+def named_rule(*args, **kwargs) -> Callable:
+    return inner_rule(*args, **kwargs, cacheable=True, named_rule=True)
 
 
 @dataclass(frozen=True)

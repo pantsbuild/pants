@@ -20,6 +20,7 @@ from pants.engine.rules import (
     RuleIndex,
     UnrecognizedRuleArgument,
     goal_rule,
+    named_rule,
     rule,
 )
 from pants.engine.selectors import Get
@@ -283,18 +284,18 @@ class RuleIndexTest(TestBase):
 
 class RuleArgumentAnnotationTest(unittest.TestCase):
     def test_name_kwarg(self):
-        @rule(name="A named rule")
-        def named_rule(a: int, b: str) -> bool:
+        @named_rule(name="A named rule")
+        def a_named_rule(a: int, b: str) -> bool:
             return False
 
-        self.assertIsNotNone(named_rule.rule)
-        self.assertEqual(named_rule.rule.name, "A named rule")
+        self.assertIsNotNone(a_named_rule.rule)
+        self.assertEqual(a_named_rule.rule.name, "A named rule")
 
     def test_bogus_rule(self):
         with self.assertRaises(UnrecognizedRuleArgument):
 
-            @rule(bogus_kwarg="TOTALLY BOGUS!!!!!!")
-            def named_rule(a: int, b: str) -> bool:
+            @named_rule(bogus_kwarg="TOTALLY BOGUS!!!!!!")
+            def a_named_rule(a: int, b: str) -> bool:
                 return False
 
     def test_goal_rule_automatically_gets_name_from_goal(self):
