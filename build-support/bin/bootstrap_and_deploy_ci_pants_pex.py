@@ -37,11 +37,10 @@ def main() -> None:
         f"{args.native_engine_so_key_prefix}/{native_engine_so_hash}/native_engine.so"
     )
     native_engine_so_aws_url = f"s3://{args.aws_bucket}/{native_engine_so_aws_key}"
-    native_engine_so_already_cached = native_engine_so_in_s3_cache(
-        aws_bucket=args.aws_bucket, native_engine_so_aws_key=native_engine_so_aws_key
-    )
 
-    if native_engine_so_already_cached:
+    if native_engine_so_in_s3_cache(
+        aws_bucket=args.aws_bucket, native_engine_so_aws_key=native_engine_so_aws_key
+    ):
         banner(
             f"`native_engine.so` found in the AWS S3 cache at {native_engine_so_aws_url}. "
             f"Downloading to avoid unnecessary Rust compilation."
@@ -58,7 +57,9 @@ def main() -> None:
 
     bootstrap_pants_pex(python_version)
 
-    if native_engine_so_already_cached:
+    if native_engine_so_in_s3_cache(
+        aws_bucket=args.aws_bucket, native_engine_so_aws_key=native_engine_so_aws_key
+    ):
         banner(f"`native_engine.so` already cached at {native_engine_so_aws_url}. Skipping deploy.")
     else:
         banner(f"Deploying `native_engine.so` to {native_engine_so_aws_url}.")
