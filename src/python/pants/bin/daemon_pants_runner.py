@@ -266,13 +266,21 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
                 exit_code = self.scheduler_service.graph_run_v2(
                     session, specs, options, options_bootstrapper
                 )
-                with ExceptionSink.exiter_as_until_exception(lambda _: PantsRunFailCheckerExiter()):
-                    runner = LocalPantsRunner.create(self.env, options_bootstrapper, specs, session)
 
-                    env_start_time = self.env.pop("PANTSD_RUNTRACKER_CLIENT_START_TIME", None)
-                    start_time = float(env_start_time) if env_start_time else None
-                    runner.set_start_time(start_time)
-                    runner.run()
+                # self.scheduler_service.graph_run_v2 will already run v2 or ambiguous goals. We should
+                # only enter this code path if v1 is set.
+                if global_options.v1:
+                    with ExceptionSink.exiter_as_until_exception(
+                        lambda _: PantsRunFailCheckerExiter()
+                    ):
+                        runner = LocalPantsRunner.create(
+                            self.env, options_bootstrapper, specs, session
+                        )
+
+                        env_start_time = self.env.pop("PANTSD_RUNTRACKER_CLIENT_START_TIME", None)
+                        start_time = float(env_start_time) if env_start_time else None
+                        runner.set_start_time(start_time)
+                        runner.run()
 
             except KeyboardInterrupt:
                 self._exiter.exit_and_fail("Interrupted by user.\n")
