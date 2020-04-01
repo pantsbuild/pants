@@ -32,6 +32,7 @@ from pants.engine.legacy.graph import LegacyBuildGraph, create_legacy_graph_task
 from pants.engine.legacy.options_parsing import create_options_parsing_rules
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
 from pants.engine.legacy.structs import (
+    FilesAdaptor,
     JvmAppAdaptor,
     JvmBinaryAdaptor,
     PageAdaptor,
@@ -40,6 +41,7 @@ from pants.engine.legacy.structs import (
     PythonAWSLambdaAdaptor,
     PythonBinaryAdaptor,
     PythonRequirementLibraryAdaptor,
+    PythonRequirementsFileAdaptor,
     PythonTargetAdaptor,
     PythonTestsAdaptor,
     RemoteSourcesAdaptor,
@@ -54,6 +56,7 @@ from pants.engine.platform import create_platform_rules
 from pants.engine.rules import RootRule, UnionMembership, rule
 from pants.engine.scheduler import Scheduler, SchedulerSession
 from pants.engine.selectors import Params
+from pants.engine.target import RegisteredTargetTypes
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.option.global_options import (
     DEFAULT_EXECUTION_OPTIONS,
@@ -140,8 +143,12 @@ def _legacy_symbol_table(build_file_aliases: BuildFileAliases) -> SymbolTable:
     table["python_requirement_library"] = PythonRequirementLibraryAdaptor
     table["remote_sources"] = RemoteSourcesAdaptor
     table["resources"] = ResourcesAdaptor
+    table["files"] = FilesAdaptor
     table["page"] = PageAdaptor
     table["python_awslambda"] = PythonAWSLambdaAdaptor
+    # The leading underscore in the name is to emphasize that this is used by macros but is
+    # not intended to be used in user-authored BUILD files.
+    table["_python_requirements_file"] = PythonRequirementsFileAdaptor
 
     # Note that these don't call _make_target_adaptor because we don't have a handy reference to the
     # types being constructed. They don't have any default_sources behavior, so this should be ok,
@@ -170,7 +177,7 @@ def _make_target_adaptor(base_class, target_type):
 class LegacyGraphScheduler:
     """A thin wrapper around a Scheduler configured with @rules for a symbol table."""
 
-    scheduler: Any
+    scheduler: Scheduler
     build_file_aliases: Any
     goal_map: Any
 
@@ -208,7 +215,7 @@ class LegacyGraphSession:
         options: Options,
         goals: Iterable[str],
         specs: Specs,
-    ):
+    ) -> int:
         """Runs @goal_rules sequentially and interactively by requesting their implicit Goal
         products.
 
@@ -363,6 +370,10 @@ class EngineInitializer:
 
         symbol_table = _legacy_symbol_table(build_file_aliases)
 
+        # TODO: register this with the SymbolTable/LegacyPythonCallbacksParser so that the aliases
+        #  exposed by the Target API are interpreted correctly.
+        registered_target_types = RegisteredTargetTypes.create(build_configuration.targets())
+
         execution_options = execution_options or DEFAULT_EXECUTION_OPTIONS
 
         # Register "literal" subjects required for these rules.
@@ -389,6 +400,10 @@ class EngineInitializer:
             return symbol_table
 
         @rule
+        def registered_target_types_singleton() -> RegisteredTargetTypes:
+            return registered_target_types
+
+        @rule
         def union_membership_singleton() -> UnionMembership:
             return UnionMembership(build_configuration.union_rules())
 
@@ -403,6 +418,7 @@ class EngineInitializer:
             glob_match_error_behavior_singleton,
             build_configuration_singleton,
             symbol_table_singleton,
+            registered_target_types_singleton,
             union_membership_singleton,
             build_root_singleton,
             *create_legacy_graph_tasks(),

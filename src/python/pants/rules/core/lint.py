@@ -50,9 +50,7 @@ class Linter(ABC):
 class LintOptions(GoalSubsystem):
     """Lint source code."""
 
-    # TODO: make this "lint"
-    # Blocked on https://github.com/pantsbuild/pants/issues/8351
-    name = "lint2"
+    name = "lint"
 
     required_union_implementations = (Linter,)
 

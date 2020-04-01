@@ -63,9 +63,7 @@ class FileDepsTest(ConsoleTaskTestBase, AbstractTestGenerator):
                 """
                 java_library(
                   name='core',
-                  sources=globs(
-                    'core*.java',
-                  ),
+                  sources=['core*.java'],
                   dependencies=[
                     'src/scala/core'
                   ]
@@ -81,7 +79,7 @@ class FileDepsTest(ConsoleTaskTestBase, AbstractTestGenerator):
                 """
                 resources(
                   name='lib',
-                  sources=globs('*.json')
+                  sources=['*.json'],
                 )
                 """
             ),

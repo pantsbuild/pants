@@ -21,7 +21,7 @@ class JaxbLibrary(JvmTarget):
 
         payload = payload or Payload()
         payload.add_fields(
-            {"package": PrimitiveField(package), "jaxb_language": PrimitiveField(language),}
+            {"package": PrimitiveField(package), "jaxb_language": PrimitiveField(language)}
         )
         super().__init__(payload=payload, **kwargs)
 

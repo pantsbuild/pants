@@ -140,7 +140,7 @@ class ExportTest(ConsoleTaskTestBase):
         self.make_target(
             ":nailgun-server",
             JarLibrary,
-            jars=[JarDependency(org="com.martiansoftware", name="nailgun-server", rev="0.9.1"),],
+            jars=[JarDependency(org="com.martiansoftware", name="nailgun-server", rev="0.9.1")],
         )
 
         self.make_target(
@@ -225,7 +225,7 @@ class ExportTest(ConsoleTaskTestBase):
         self.add_to_build_file(
             "src/python/x/BUILD",
             """
-            python_library(name="x", sources=globs("*.py"))
+            python_library(name="x", sources=["*.py"])
             """.strip(),
         )
 
@@ -233,24 +233,17 @@ class ExportTest(ConsoleTaskTestBase):
             "src/python/y/BUILD",
             dedent(
                 """
-                python_library(name="y", sources=rglobs("*.py"))
-                python_library(name="y2", sources=rglobs("subdir/*.py"))
-                python_library(name="y3", sources=rglobs("Test*.py"))
+                python_library(name="y", sources=["**/*.py"])
+                python_library(name="y2", sources=["subdir/**/*.py"])
+                python_library(name="y3", sources=["Test*.py"])
                 """
             ),
         )
 
         self.add_to_build_file(
-            "src/python/z/BUILD",
-            """
-            python_library(name="z", sources=zglobs("**/*.py"))
-            """.strip(),
-        )
-
-        self.add_to_build_file(
             "src/python/exclude/BUILD",
             """
-            python_library(name="exclude", sources=globs("*.py", exclude=[['foo.py']]))
+            python_library(name="exclude", sources=["*.py", "!foo.py"])
             """.strip(),
         )
 
@@ -265,7 +258,7 @@ class ExportTest(ConsoleTaskTestBase):
             "src/python/has_reqs/BUILD",
             textwrap.dedent(
                 """
-                python_library(name="has_reqs", sources=globs("*.py"), dependencies=[':six'])
+                python_library(name="has_reqs", sources=["*.py"], dependencies=[':six'])
 
                 python_requirement_library(
                     name='six',
@@ -280,7 +273,7 @@ class ExportTest(ConsoleTaskTestBase):
     def execute_export(self, *specs, **options_overrides):
         options = {
             ScalaPlatform.options_scope: {"version": "custom"},
-            JvmResolveSubsystem.options_scope: {"resolver": "ivy"},
+            JvmResolveSubsystem.options_scope: {"resolver": "coursier"},
             JvmPlatform.options_scope: {
                 "default_platform": "java8",
                 "platforms": {"java8": {"source": "1.8", "target": "1.8"}},
@@ -365,7 +358,7 @@ class ExportTest(ConsoleTaskTestBase):
         result = self.execute_export_json("project_info:third")
 
         self.assertEqual(
-            ["project_info/com/foo/Bar.scala", "project_info/com/foo/Baz.scala",],
+            ["project_info/com/foo/Bar.scala", "project_info/com/foo/Baz.scala"],
             sorted(result["targets"]["project_info:third"]["sources"]),
         )
 
@@ -497,7 +490,7 @@ class ExportTest(ConsoleTaskTestBase):
             result["targets"]["src/python/exclude:exclude"]["globs"],
         )
 
-    def test_source_rglobs(self):
+    def test_source_recursive_globs(self):
         self.set_options(globs=True)
         result = self.execute_export_json("src/python/y")
 
@@ -505,7 +498,7 @@ class ExportTest(ConsoleTaskTestBase):
             {"globs": ["src/python/y/**/*.py"]}, result["targets"]["src/python/y:y"]["globs"]
         )
 
-    def test_source_rglobs_subdir(self):
+    def test_source_recursive_globs_subdir(self):
         self.set_options(globs=True)
         result = self.execute_export_json("src/python/y:y2")
 
@@ -514,20 +507,12 @@ class ExportTest(ConsoleTaskTestBase):
             result["targets"]["src/python/y:y2"]["globs"],
         )
 
-    def test_source_rglobs_noninitial(self):
+    def test_source_recursive_globs_noninitial(self):
         self.set_options(globs=True)
         result = self.execute_export_json("src/python/y:y3")
 
         self.assertEqual(
             {"globs": ["src/python/y/Test*.py"]}, result["targets"]["src/python/y:y3"]["globs"]
-        )
-
-    def test_source_zglobs(self):
-        self.set_options(globs=True)
-        result = self.execute_export_json("src/python/z")
-
-        self.assertEqual(
-            {"globs": ["src/python/z/**/*.py"]}, result["targets"]["src/python/z:z"]["globs"]
         )
 
     def test_has_python_requirements(self):

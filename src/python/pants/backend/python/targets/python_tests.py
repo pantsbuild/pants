@@ -39,6 +39,6 @@ class PythonTests(PythonTarget):
     @property
     def timeout(self):
         """
-    :API: public
-    """
+        :API: public
+        """
         return self._timeout

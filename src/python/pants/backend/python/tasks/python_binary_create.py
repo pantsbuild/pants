@@ -2,24 +2,25 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+from typing import cast
 
 from pex.interpreter import PythonInterpreter
 from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
 
-from pants.backend.python.subsystems.pex_build_util import (
-    has_python_requirements,
-    has_python_sources,
-    has_resources,
-    is_python_target,
-)
 from pants.backend.python.subsystems.python_native_code import PythonNativeCode
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.target_scopes import Scopes
-from pants.python.pex_build_util import PexBuilderWrapper
+from pants.python.pex_build_util import (
+    PexBuilderWrapper,
+    has_python_requirements,
+    has_python_sources,
+    has_resources,
+    is_python_target,
+)
 from pants.task.task import Task
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir_for
@@ -41,6 +42,25 @@ class PythonBinaryCreate(Task):
             "created and the command line used to create it. This information may be helpful to you, but means "
             "that the generated PEX will not be reproducible; that is, future runs of `./pants binary` will not "
             "create the same byte-for-byte identical .pex files.",
+        )
+        register(
+            "--generate-ipex",
+            type=bool,
+            default=False,
+            fingerprint=True,
+            help='Whether to generate a .ipex file, which will "hydrate" its dependencies when '
+            "it is first executed, rather than at build time (the normal pex behavior). "
+            "This option can reduce the size of a shipped pex file by over 100x for common"
+            "deps such as tensorflow, but it does require access to the network when "
+            "first executed.",
+        )
+        register(
+            "--output-file-extension",
+            type=str,
+            default=None,
+            fingerprint=True,
+            help="What extension to output the file with. This can be used to differentiate "
+            "ipex files from others.",
         )
 
     @classmethod
@@ -81,6 +101,17 @@ class PythonBinaryCreate(Task):
         super().__init__(*args, **kwargs)
         self._distdir = self.get_options().pants_distdir
 
+    @property
+    def _generate_ipex(self) -> bool:
+        return cast(bool, self.get_options().generate_ipex)
+
+    def _get_output_pex_filename(self, target_name):
+        file_ext = self.get_options().output_file_extension
+        if file_ext is None:
+            file_ext = ".ipex" if self._generate_ipex else ".pex"
+
+        return f"{target_name}{file_ext}"
+
     def execute(self):
         binaries = self.context.targets(self.is_binary)
 
@@ -99,7 +130,9 @@ class PythonBinaryCreate(Task):
             python_deployable_archive = self.context.products.get("deployable_archives")
             python_pex_product = self.context.products.get("pex_archives")
             for vt in invalidation_check.all_vts:
-                pex_path = os.path.join(vt.results_dir, f"{vt.target.name}.pex")
+                pex_path = os.path.join(
+                    vt.results_dir, self._get_output_pex_filename(vt.target.name)
+                )
                 if not vt.valid:
                     self.context.log.debug(f"cache for {vt.target} is invalid, rebuilding")
                     self._create_binary(vt.target, vt.results_dir)
@@ -142,6 +175,7 @@ class PythonBinaryCreate(Task):
                     path=tmpdir, interpreter=interpreter, pex_info=pex_info, copy=True
                 ),
                 log=self.context.log,
+                generate_ipex=self._generate_ipex,
             )
 
             if binary_tgt.shebang:
@@ -184,6 +218,7 @@ class PythonBinaryCreate(Task):
             pex_builder.add_requirement_libs_from(req_tgts, platforms=binary_tgt.platforms)
 
             # Build the .pex file.
-            pex_path = os.path.join(results_dir, f"{binary_tgt.name}.pex")
+            pex_filename = self._get_output_pex_filename(binary_tgt.name)
+            pex_path = os.path.join(results_dir, pex_filename)
             pex_builder.build(pex_path)
             return pex_path

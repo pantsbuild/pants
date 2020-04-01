@@ -13,12 +13,12 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
-from pants.rules.core import list_targets
+from pants.rules.core import list_targets_old
 from pants.testutil.goal_rule_test_base import GoalRuleTestBase
 
 
 class ListTargetsTest(GoalRuleTestBase):
-    goal_cls = list_targets.List
+    goal_cls = list_targets_old.List
 
     @classmethod
     def alias_groups(cls):
@@ -40,7 +40,7 @@ class ListTargetsTest(GoalRuleTestBase):
 
     @classmethod
     def rules(cls):
-        return super().rules() + list_targets.rules()
+        return super().rules() + list_targets_old.rules()
 
     def setUp(self) -> None:
         super().setUp()
@@ -112,7 +112,7 @@ class ListTargetsTest(GoalRuleTestBase):
             "a/b:b", "a/b/c:c", "a/b/c:c2", "a/b/c:c3", "a/b/d:d", "a/b/e:e1", args=["a/b::"]
         )
 
-    @pytest.mark.flaky(retries=1)  # https://github.com/pantsbuild/pants/issues/8678
+    @pytest.mark.skip(reason="flaky: https://github.com/pantsbuild/pants/issues/8678")
     def test_list_all(self):
         self.assert_entries(
             "\n",
@@ -137,7 +137,7 @@ class ListTargetsTest(GoalRuleTestBase):
             "a/b/d:d",
             "a/b/e:e1",
             "f:alias",
-            args=["--sep=, ", "::",],
+            args=["--sep=, ", "::"],
         )
 
         self.assert_console_output(

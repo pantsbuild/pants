@@ -44,7 +44,7 @@ pub const EMPTY_FINGERPRINT: Fingerprint = Fingerprint([
 ]);
 pub const EMPTY_DIGEST: Digest = Digest(EMPTY_FINGERPRINT, 0);
 
-const FINGERPRINT_SIZE: usize = 32;
+pub const FINGERPRINT_SIZE: usize = 32;
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq, Ord, PartialOrd)]
 pub struct Fingerprint(pub [u8; FINGERPRINT_SIZE]);

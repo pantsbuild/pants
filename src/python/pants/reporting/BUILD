@@ -6,8 +6,8 @@ python_library(
   dependencies=[
     '3rdparty/python:ansicolors',
     '3rdparty/python:dataclasses',
-    '3rdparty/python:pystache',
     '3rdparty/python:py-zipkin',
+    '3rdparty/python:pystache',
     '3rdparty/python:requests',
     ':report',
     ':reporting_resources',
@@ -22,6 +22,7 @@ python_library(
     'src/python/pants/pantsd:process_manager',
     'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:logging',
     'src/python/pants/util:memo',
   ],
   tags = {"partially_type_checked"},

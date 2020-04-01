@@ -19,17 +19,18 @@ logger = logging.getLogger(__name__)
 
 
 class PailgunClientSignalHandler(SignalHandler):
-    def __init__(self, pailgun_client, timeout=1, *args, **kwargs):
+    def __init__(self, pailgun_client, pid, timeout=1, *args, **kwargs):
         assert isinstance(pailgun_client, NailgunClient)
         self._pailgun_client = pailgun_client
         self._timeout = timeout
+        self.pid = pid
         super().__init__(*args, **kwargs)
 
     def _forward_signal_with_timeout(self, signum, signame):
         # TODO Consider not accessing the private function _maybe_last_pid here, or making it public.
         logger.info(
             "Sending {} to pantsd with pid {}, waiting up to {} seconds before sending SIGKILL...".format(
-                signame, self._pailgun_client._maybe_last_pid(), self._timeout
+                signame, self.pid, self._timeout
             )
         )
         self._pailgun_client.set_exit_timeout(
@@ -39,12 +40,7 @@ class PailgunClientSignalHandler(SignalHandler):
         self._pailgun_client.maybe_send_signal(signum)
 
     def handle_sigint(self, signum, _frame):
-        if self._pailgun_client._maybe_last_pid():
-            self._forward_signal_with_timeout(signum, "SIGINT")
-        else:
-            # NB: We consider not having received a PID yet as "not having started substantial work".
-            # So in this case, we let the client die gracefully, and the server handle the closed socket.
-            super(PailgunClientSignalHandler, self).handle_sigint(signum, _frame)
+        self._forward_signal_with_timeout(signum, "SIGINT")
 
     def handle_sigquit(self, signum, _frame):
         self._forward_signal_with_timeout(signum, "SIGQUIT")
@@ -98,10 +94,12 @@ class RemotePantsRunner:
         self._stderr = stderr or sys.stderr.buffer
 
     @contextmanager
-    def _trapped_signals(self, client):
+    def _trapped_signals(self, client, pid: int):
         """A contextmanager that handles SIGINT (control-c) and SIGQUIT (control-\\) remotely."""
         signal_handler = PailgunClientSignalHandler(
-            client, timeout=self._bootstrap_options.for_global_scope().pantsd_pailgun_quit_timeout
+            client,
+            pid=pid,
+            timeout=self._bootstrap_options.for_global_scope().pantsd_pailgun_quit_timeout,
         )
         with ExceptionSink.trapped_signals(signal_handler):
             yield
@@ -111,10 +109,10 @@ class RemotePantsRunner:
         """Minimal backoff strategy for daemon restarts."""
         time.sleep(attempt + (attempt - 1))
 
-    def _run_pants_with_retry(self, pantsd_handle, retries=3):
+    def _run_pants_with_retry(self, pantsd_handle: PantsDaemon.Handle, retries: int = 3):
         """Runs pants remotely with retry and recovery for nascent executions.
 
-        :param PantsDaemon.Handle pantsd_handle: A Handle for the daemon to connect to.
+        :param pantsd_handle: A Handle for the daemon to connect to.
         """
         attempt = 1
         while 1:
@@ -144,13 +142,14 @@ class RemotePantsRunner:
                 attempt += 1
             except NailgunClient.NailgunError as e:
                 # Ensure a newline.
-                logger.fatal("")
-                logger.fatal("lost active connection to pantsd!")
+                logger.critical("")
+                logger.critical("lost active connection to pantsd!")
                 traceback = sys.exc_info()[2]
                 raise self._extract_remote_exception(pantsd_handle.pid, e).with_traceback(traceback)
 
-    def _connect_and_execute(self, pantsd_handle):
+    def _connect_and_execute(self, pantsd_handle: PantsDaemon.Handle):
         port = pantsd_handle.port
+        pid = pantsd_handle.pid
         # Merge the nailgun TTY capability environment variables with the passed environment dict.
         ng_env = NailgunProtocol.isatty_to_env(self._stdin, self._stdout, self._stderr)
         modified_env = {
@@ -169,6 +168,7 @@ class RemotePantsRunner:
         # Instantiate a NailgunClient.
         client = NailgunClient(
             port=port,
+            remote_pid=pid,
             ins=self._stdin,
             out=self._stdout,
             err=self._stderr,
@@ -176,7 +176,7 @@ class RemotePantsRunner:
             metadata_base_dir=pantsd_handle.metadata_base_dir,
         )
 
-        with self._trapped_signals(client), STTYSettings.preserved():
+        with self._trapped_signals(client, pantsd_handle.pid), STTYSettings.preserved():
             # Execute the command on the pailgun.
             result = client.execute(self.PANTS_COMMAND, *self._args, **modified_env)
 
@@ -191,8 +191,6 @@ class RemotePantsRunner:
         or failing that, the `pid` of the pantsd instance.
         """
         sources = [pantsd_pid]
-        if nailgun_error.pid is not None:
-            sources = [abs(nailgun_error.pid)] + sources
 
         exception_text = None
         for source in sources:
@@ -213,9 +211,6 @@ class RemotePantsRunner:
     def _restart_pantsd(self):
         return PantsDaemon.Factory.restart(options_bootstrapper=self._options_bootstrapper)
 
-    def _maybe_launch_pantsd(self):
-        return PantsDaemon.Factory.maybe_launch(options_bootstrapper=self._options_bootstrapper)
-
-    def run(self, args=None):
-        pantsd_handle = self._maybe_launch_pantsd()
-        self._run_pants_with_retry(pantsd_handle)
+    def run(self, args=None) -> None:
+        handle = PantsDaemon.Factory.maybe_launch(options_bootstrapper=self._options_bootstrapper)
+        self._run_pants_with_retry(handle)

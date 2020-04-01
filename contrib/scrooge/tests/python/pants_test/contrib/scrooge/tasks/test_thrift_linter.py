@@ -19,7 +19,7 @@ class ThriftLinterTest(TaskTestBase):
 
     @classmethod
     def alias_groups(cls):
-        return BuildFileAliases(targets={"java_thrift_library": JavaThriftLibrary,},)
+        return BuildFileAliases(targets={"java_thrift_library": JavaThriftLibrary})
 
     @classmethod
     def task_type(cls):
@@ -33,7 +33,10 @@ class ThriftLinterTest(TaskTestBase):
             )
 
         thrift_target = self.create_library(
-            "src/thrift/tweet", "java_thrift_library", "a", ["A.thrift"]
+            path="src/thrift/tweet",
+            target_type="java_thrift_library",
+            name="a",
+            sources=["A.thrift"],
         )
         task = self.create_task(self.context(target_roots=thrift_target))
         self._prepare_mocks(task)
@@ -66,9 +69,18 @@ class ThriftLinterTest(TaskTestBase):
                 self.context().options.for_global_scope()
             )
 
-        self.create_library("src/thrift/tweet", "java_thrift_library", "a", ["A.thrift"])
+        self.create_library(
+            path="src/thrift/tweet",
+            target_type="java_thrift_library",
+            name="a",
+            sources=["A.thrift"],
+        )
         target_b = self.create_library(
-            "src/thrift/tweet", "java_thrift_library", "b", ["B.thrift"], dependencies=[":a"]
+            path="src/thrift/tweet",
+            target_type="java_thrift_library",
+            name="b",
+            sources=["B.thrift"],
+            dependencies=[":a"],
         )
         task = self.create_task(self.context(target_roots=target_b))
         self._prepare_mocks(task)

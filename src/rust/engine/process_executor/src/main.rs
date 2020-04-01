@@ -31,8 +31,11 @@ use env_logger;
 use process_execution;
 
 use clap::{value_t, App, AppSettings, Arg};
+use futures::compat::Future01CompatExt;
 use hashing::{Digest, Fingerprint};
-use process_execution::{Context, ExecuteProcessRequestMetadata, PlatformConstraint, RelativePath};
+use process_execution::{
+  Context, ExecuteProcessRequestMetadata, Platform, PlatformConstraint, RelativePath,
+};
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryFrom;
 use std::iter::{FromIterator, Iterator};
@@ -40,7 +43,7 @@ use std::path::PathBuf;
 use std::process::exit;
 use std::time::Duration;
 use store::{BackoffConfig, Store};
-use tokio::runtime::Runtime;
+use tokio::runtime::Handle;
 use workunit_store::WorkUnitStore;
 
 /// A binary which takes args of format:
@@ -50,7 +53,8 @@ use workunit_store::WorkUnitStore;
 /// It outputs its output/err to stdout/err, and exits with its exit code.
 ///
 /// It does not perform $PATH lookup or shell expansion.
-fn main() {
+#[tokio::main]
+async fn main() {
   env_logger::init();
 
   let args = App::new("process_executor")
@@ -268,7 +272,7 @@ fn main() {
     .map(collection_from_keyvalues::<_, BTreeMap<_, _>>)
     .unwrap_or_default();
 
-  let executor = task_executor::Executor::new();
+  let executor = task_executor::Executor::new(Handle::current());
 
   let store = match (server_arg, args.value_of("cas-server")) {
     (Some(_server), Some(cas_server)) => {
@@ -371,7 +375,7 @@ fn main() {
           oauth_bearer_token,
           headers,
           store.clone(),
-          PlatformConstraint::Linux,
+          Platform::Linux,
           executor,
           std::time::Duration::from_secs(300),
           std::time::Duration::from_millis(500),
@@ -388,15 +392,17 @@ fn main() {
     )) as Box<dyn process_execution::CommandRunner>,
   };
 
-  let mut runtime = Runtime::new().unwrap();
-
-  let result = runtime
-    .block_on(runner.run(request.into(), Context::default()))
+  let result = runner
+    .run(request.into(), Context::default())
+    .compat()
+    .await
     .expect("Error executing");
 
   if let Some(output) = args.value_of("materialize-output-to").map(PathBuf::from) {
-    runtime
-      .block_on(store.materialize_directory(output, result.output_directory, WorkUnitStore::new()))
+    store
+      .materialize_directory(output, result.output_directory, WorkUnitStore::new())
+      .compat()
+      .await
       .unwrap();
   }
 

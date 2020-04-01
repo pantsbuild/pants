@@ -66,13 +66,13 @@ class MinimalCoverTest(BaseMinimalCovertTest):
             "common/a:a",
             "common/b:b",
             "common/c:c",
-            targets=[self.target("common/a"), self.target("common/b"), self.target("common/c"),],
+            targets=[self.target("common/a"), self.target("common/b"), self.target("common/c")],
         )
 
     def test_identical(self):
         self.assert_console_output(
             "common/a:a",
-            targets=[self.target("common/a"), self.target("common/a"), self.target("common/a"),],
+            targets=[self.target("common/a"), self.target("common/a"), self.target("common/a")],
         )
 
     def test_intersection(self):

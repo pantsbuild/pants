@@ -10,7 +10,7 @@ from pants.testutil.test_base import TestBase
 class JavaAgentTest(TestBase):
     @classmethod
     def alias_groups(cls):
-        return BuildFileAliases(targets={"java_agent": JavaAgent,},)
+        return BuildFileAliases(targets={"java_agent": JavaAgent})
 
     def create_agent(self, name, **kwargs):
         args = {"name": name, "sources": []}

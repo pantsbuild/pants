@@ -12,7 +12,6 @@ from pants.base.exceptions import TaskError
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.target_scopes import Scopes
 from pants.java.jar.jar_dependency import JarDependency
-from pants.option.custom_types import file_option
 from pants.task.fmt_task_mixin import FmtTaskMixin
 from pants.task.lint_task_mixin import LintTaskMixin
 from pants.util.memo import memoized_property
@@ -23,13 +22,6 @@ class ScalafixTask(RewriteBase):
 
     _SCALAFIX_MAIN = "scalafix.cli.Cli"
 
-    def _resolve_conflicting_skip(self, *, old_scope: str):
-        # Skip mypy because this is a temporary hack, and mypy doesn't follow the inheritance chain
-        # properly.
-        return self.resolve_conflicting_skip_options(  # type: ignore
-            old_scope=old_scope, new_scope="scalafix", subsystem=Scalafix.global_instance(),
-        )
-
     @classmethod
     def subsystem_dependencies(cls):
         return super().subsystem_dependencies() + (Scalafix,)
@@ -37,15 +29,6 @@ class ScalafixTask(RewriteBase):
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
-        register(
-            "--configuration",
-            type=file_option,
-            default=None,
-            fingerprint=True,
-            removal_version="1.27.0.dev0",
-            removal_hint="Use `--scalafix-config` instead.",
-            help="The config file to use (in HOCON format).",
-        )
         register(
             "--rules",
             default="ProcedureSyntax",
@@ -136,7 +119,7 @@ class ScalafixTask(RewriteBase):
 
         if self.get_options().rules:
             args.append(f"--rules={self.get_options().rules}")
-        if self.get_options().level == "debug":
+        if self.debug:
             args.append("--verbose")
 
         # This is how you pass a list of strings to a single arg key
@@ -171,7 +154,7 @@ class ScalaFixFix(FmtTaskMixin, ScalafixTask):
 
     @property
     def skip_execution(self):
-        return super()._resolve_conflicting_skip(old_scope="fmt-scalafix")
+        return super().determine_if_skipped(formatter_subsystem=Scalafix.global_instance())
 
     def process_result(self, result):
         if result != 0:
@@ -186,7 +169,7 @@ class ScalaFixCheck(LintTaskMixin, ScalafixTask):
 
     @property
     def skip_execution(self):
-        return super()._resolve_conflicting_skip(old_scope="lint-scalafix")
+        return Scalafix.global_instance().options.skip
 
     def process_result(self, result):
         if result != 0:

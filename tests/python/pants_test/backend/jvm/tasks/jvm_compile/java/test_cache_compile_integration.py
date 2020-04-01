@@ -7,6 +7,8 @@ from collections import namedtuple
 from textwrap import dedent
 from typing import Callable, Dict, List
 
+import pytest
+
 from pants.backend.jvm.tasks.jvm_compile.rsc.rsc_compile import RscCompile
 from pants.base.build_environment import get_buildroot
 from pants.fs.archive import TGZ, ZIP
@@ -290,6 +292,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
             Compile({srcfile: "public final class A {}"}, config(True), 2),
         )
 
+    @pytest.mark.skip(reason="flaky: https://github.com/pantsbuild/pants/issues/9312")
     def test_rsc_and_zinc_caching(self):
         """Tests that with rsc-and-zinc, we write both artifacts."""
 
@@ -434,7 +437,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
 
         self._compile_spec(
             compiles,
-            [f"java_library(name='{target_name}', sources=rglobs('*.java', '*.scala'))"],
+            [f"java_library(name='{target_name}', sources=['**/*.java', '**/*.scala'])"],
             [target_name],
             target_name,
             work,

@@ -1,38 +1,60 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from dataclasses import dataclass
+from typing import Optional
+
 from pants.backend.python.rules.pex import Pex
 from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
+from pants.backend.python.rules.targets import EntryPoint, PythonBinarySources
 from pants.backend.python.targets.python_binary import PythonBinary
+from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses
-from pants.engine.legacy.structs import PythonBinaryAdaptor
 from pants.engine.rules import UnionRule, rule
 from pants.engine.selectors import Get
-from pants.rules.core.binary import BinaryTarget, CreatedBinary
+from pants.engine.target import Target
+from pants.rules.core.binary import BinaryImplementation, CreatedBinary
 from pants.rules.core.determine_source_files import AllSourceFilesRequest, SourceFiles
 
 
+@dataclass(frozen=True)
+class PythonBinaryImplementation(BinaryImplementation):
+    required_fields = (EntryPoint, PythonBinarySources)
+
+    address: Address
+    sources: PythonBinarySources
+    entry_point: EntryPoint
+
+    # TODO: consume the other PythonBinary fields like `ZipSafe` and `AlwaysWriteCache`. These are
+    #  optional fields. If your target type has them registered, we can do extra meaningful things;
+    #  if you don't have them on your target type, we can still operate so long as you have the
+    #  required fields. Use `Target.get()` in the `create()` method.
+
+    @classmethod
+    def create(cls, tgt: Target) -> "PythonBinaryImplementation":
+        return cls(tgt.address, sources=tgt[PythonBinarySources], entry_point=tgt[EntryPoint])
+
+
 @rule
-async def create_python_binary(python_binary_adaptor: PythonBinaryAdaptor) -> CreatedBinary:
-    # TODO(#8420) This way of calculating the entry point works but is a bit hackish.
-    if hasattr(python_binary_adaptor, "entry_point"):
-        entry_point = python_binary_adaptor.entry_point
+async def create_python_binary(implementation: PythonBinaryImplementation) -> CreatedBinary:
+    entry_point: Optional[str]
+    if implementation.entry_point.value is not None:
+        entry_point = implementation.entry_point.value
     else:
-        sources = await Get[SourceFiles](
-            AllSourceFilesRequest([python_binary_adaptor], strip_source_roots=True)
+        source_files = await Get[SourceFiles](
+            AllSourceFilesRequest([implementation.sources], strip_source_roots=True)
         )
-        # NB: `python_binary` targets may have 0-1 sources. This is enforced by
-        # `PythonBinaryAdaptor`.
-        if len(sources.snapshot.files) == 1:
-            module_name = sources.snapshot.files[0]
+        # NB: `PythonBinarySources` enforces that we have 0-1 sources.
+        if len(source_files.files) == 1:
+            module_name = source_files.files[0]
             entry_point = PythonBinary.translate_source_path_to_py_module_specifier(module_name)
         else:
             entry_point = None
 
     request = CreatePexFromTargetClosure(
-        addresses=Addresses((python_binary_adaptor.address,)),
+        addresses=Addresses([implementation.address]),
         entry_point=entry_point,
-        output_filename=f"{python_binary_adaptor.address.target_name}.pex",
+        output_filename=f"{implementation.address.target_name}.pex",
     )
 
     pex = await Get[Pex](CreatePexFromTargetClosure, request)
@@ -40,7 +62,4 @@ async def create_python_binary(python_binary_adaptor: PythonBinaryAdaptor) -> Cr
 
 
 def rules():
-    return [
-        UnionRule(BinaryTarget, PythonBinaryAdaptor),
-        create_python_binary,
-    ]
+    return [create_python_binary, UnionRule(BinaryImplementation, PythonBinaryImplementation)]

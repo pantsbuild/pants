@@ -10,6 +10,7 @@ python_library(
     'src/python/pants/base:exiter',
     'src/python/pants/binaries',
     'src/python/pants/build_graph',
+    'src/python/pants/engine:desktop',
     'src/python/pants/engine:goal',
     'src/python/pants/engine:rules',
     'src/python/pants/engine:interactive_runner',
@@ -20,6 +21,7 @@ python_library(
     'src/python/pants/goal',
     'src/python/pants/source',
     'src/python/pants/util:collections',
+    'src/python/pants/util:objects',
   ],
   tags = {"type_checked"},
 )

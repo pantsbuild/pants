@@ -13,7 +13,9 @@ scala_library(
   ),
   dependencies=[
     '3rdparty/jvm/com/github/scopt',
+    '3rdparty/jvm/com/google/code/gson',
     '3rdparty/jvm/com/martiansoftware:nailgun-server',
+    '3rdparty/jvm/org/eclipse/lsp4j',
     '3rdparty/jvm/org/scala-lang/modules:scala-java8-compat',
     '3rdparty/jvm/org/scala-sbt:io',
     '3rdparty/jvm/org/scala-sbt:util-logging',

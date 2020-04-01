@@ -55,7 +55,7 @@ class Checkstyle(LintTaskMixin, NailgunTask):
             register,
             "checkstyle",
             # Note that checkstyle 7.0 does not run on Java 7 runtimes or below.
-            classpath=[JarDependency(org="com.puppycrawl.tools", name="checkstyle", rev="6.19"),],
+            classpath=[JarDependency(org="com.puppycrawl.tools", name="checkstyle", rev="6.19")],
             main=cls._CHECKSTYLE_MAIN,
             custom_rules=[
                 # Checkstyle uses reflection to load checks and has an affordance that
@@ -75,11 +75,7 @@ class Checkstyle(LintTaskMixin, NailgunTask):
 
     @property
     def skip_execution(self):
-        return self.resolve_conflicting_skip_options(
-            old_scope="lint-checkstyle",
-            new_scope="checkstyle",
-            subsystem=CheckstyleSubsystem.global_instance(),
-        )
+        return CheckstyleSubsystem.global_instance().options.skip
 
     @classmethod
     def prepare(cls, options, round_manager):

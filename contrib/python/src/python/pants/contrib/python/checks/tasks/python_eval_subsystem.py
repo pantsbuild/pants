@@ -14,6 +14,6 @@ class PythonEval(Subsystem):
         register(
             "--skip",
             type=bool,
-            default=False,
+            default=True,
             help="Don't use `python-eval` when running `./pants lint`.",
         )

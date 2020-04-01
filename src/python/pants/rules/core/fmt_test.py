@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from abc import ABCMeta, abstractmethod
-from collections import OrderedDict
 from pathlib import Path
 from typing import Iterable, List, Type, cast
 from unittest.mock import Mock
@@ -127,9 +126,7 @@ class FmtTest(TestBase):
         per_target_caching: bool,
     ) -> str:
         console = MockConsole(use_colors=False)
-        union_membership = UnionMembership(
-            OrderedDict({LanguageFormatters: OrderedSet(language_formatters)})
-        )
+        union_membership = UnionMembership({LanguageFormatters: OrderedSet(language_formatters)})
         result: Fmt = run_rule(
             fmt,
             rule_args=[

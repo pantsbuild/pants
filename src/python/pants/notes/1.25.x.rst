@@ -10,6 +10,50 @@ The ``1.25.x`` series brings two major changes to Pants:
 
 Please see https://groups.google.com/forum/#!topic/pants-devel/3nmdSeyvwU0 for more information.
 
+1.25.1rc0 (03/20/2020)
+----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Zinc: Use an Array[PublishDiagnosticsParam] for LSP compliance (#9292)
+  `PR #9292 <https://github.com/pantsbuild/pants/pull/9292>`_
+
+* Enable zinc to log diagnostics for jvm languages (#9228)
+  `PR #9228 <https://github.com/pantsbuild/pants/pull/9228>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Report warnings and errors to reporting server for JVM targets (#9293)
+  `PR #9293 <https://github.com/pantsbuild/pants/pull/9293>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix relative path in Zinc compiler (#9261)
+  `PR #9261 <https://github.com/pantsbuild/pants/pull/9261>`_
+
+* Revert "Load the bootstrapped zinc compiler from the zinc server's classpath. (#8753)" (#9226)
+  `PR #9226 <https://github.com/pantsbuild/pants/pull/9226>`_
+
+* fixing scoverage sourcePath to be relative in OSS (#8132)
+  `PR #8132 <https://github.com/pantsbuild/pants/pull/8132>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Fix `PathGlobs` to be deterministic for more cache hits (#9347)
+  `PR #9347 <https://github.com/pantsbuild/pants/pull/9347>`_
+
+* Format zinc compiler with scalafmt (#9227)
+  `PR #9227 <https://github.com/pantsbuild/pants/pull/9227>`_
+
+1.25.0 (03/12/2020)
+-------------------
+
+The first stable release of the ``1.25.x`` series, with no changes since the previous `rc`!
+
 1.25.0rc1 (03/6/2020)
 ---------------------
 

@@ -122,6 +122,10 @@ class SourceRootTest(TestBase):
         trie.add_fixed("src/go/src", ("go",))
         self.assertEqual(root("src/go/src", ("go",)), trie.find("src/go/src/foo/bar/baz.go"))
 
+        # Verify that the repo root can be a fixed source root.
+        trie.add_fixed("", ("python",))
+        self.assertEqual(root("", ("python",)), trie.find("foo/bar/baz.py"))
+
     def test_source_root_trie_traverse(self):
         def make_trie() -> SourceRootTrie:
             return SourceRootTrie(SourceRootFactory({"jvm": ("java", "scala"), "py": ("python",)}))
@@ -140,7 +144,7 @@ class SourceRootTest(TestBase):
         trie.add_pattern("src/main/*")
         trie.add_pattern("src/main/*/foo")
         self.assertEqual(
-            {"*", "src/*/code", "src/main/*/code", "src/main/*", "src/main/*", "src/main/*/foo",},
+            {"*", "src/*/code", "src/main/*/code", "src/main/*", "src/main/*", "src/main/*/foo"},
             trie.traverse(),
         )
 
@@ -149,7 +153,7 @@ class SourceRootTest(TestBase):
         trie.add_pattern("src/*/code")
         trie.add_pattern("src/main/*/code")
         self.assertEqual(
-            {"src/*/code", "^/src/scala-source-code", "src/main/*/code",}, trie.traverse()
+            {"src/*/code", "^/src/scala-source-code", "src/main/*/code"}, trie.traverse()
         )
 
     def test_fixed_source_root_at_buildroot(self):

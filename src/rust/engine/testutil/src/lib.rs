@@ -53,3 +53,8 @@ pub fn make_file(path: &Path, contents: &[u8], mode: u32) {
   permissions.set_mode(mode);
   file.set_permissions(permissions).unwrap();
 }
+
+pub fn append_to_exisiting_file(path: &Path, contents: &[u8]) {
+  let mut file = std::fs::OpenOptions::new().write(true).open(&path).unwrap();
+  file.write_all(contents).unwrap();
+}

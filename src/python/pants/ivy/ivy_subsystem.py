@@ -20,7 +20,7 @@ class IvySubsystem(Script):
 
     _default_urls = [
         "https://repo1.maven.org/maven2/org/apache/ivy/ivy/{version}/ivy-{version}.jar",
-        "https://maven-central.storage-download.googleapis.com/repos/central/data/org/apache/ivy/ivy/{version}/ivy-{version}.jar",
+        "https://maven-central.storage-download.googleapis.com/maven2/org/apache/ivy/ivy/{version}/ivy-{version}.jar",
     ]
 
     @classmethod
@@ -99,14 +99,14 @@ class IvySubsystem(Script):
         if http_proxy:
             host, port = self._parse_proxy_string(http_proxy)
             extra_options.extend(
-                ["-Dhttp.proxyHost={}".format(host), "-Dhttp.proxyPort={}".format(port),]
+                ["-Dhttp.proxyHost={}".format(host), "-Dhttp.proxyPort={}".format(port)]
             )
 
         https_proxy = self.https_proxy()
         if https_proxy:
             host, port = self._parse_proxy_string(https_proxy)
             extra_options.extend(
-                ["-Dhttps.proxyHost={}".format(host), "-Dhttps.proxyPort={}".format(port),]
+                ["-Dhttps.proxyHost={}".format(host), "-Dhttps.proxyPort={}".format(port)]
             )
         return extra_options
 

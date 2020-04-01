@@ -3,7 +3,7 @@
 
 import functools
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Any, List, Optional, Tuple, Union, cast
 
 from pants.backend.python.rules.pex import (
     CreatePex,
@@ -18,8 +18,8 @@ from pants.backend.python.rules.pytest_coverage import (
     CoveragercRequest,
     PytestCoverageData,
     get_coverage_plugin_input,
-    get_packages_to_cover,
 )
+from pants.backend.python.rules.targets import Coverage, Timeout
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.addressable import Addresses
@@ -27,35 +27,26 @@ from pants.engine.fs import Digest, DirectoriesToMerge, InputFilesContent
 from pants.engine.interactive_runner import InteractiveProcessRequest
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
-from pants.engine.legacy.structs import PythonTestsAdaptorWithOrigin
+from pants.engine.legacy.structs import (
+    FilesAdaptor,
+    PythonTargetAdaptor,
+    PythonTestsAdaptorWithOrigin,
+    ResourcesAdaptor,
+    TargetAdaptorWithOrigin,
+)
 from pants.engine.rules import UnionRule, rule, subsystem_rule
-from pants.engine.selectors import Get
+from pants.engine.selectors import Get, MultiGet
 from pants.option.global_options import GlobalOptions
 from pants.python.python_setup import PythonSetup
-from pants.rules.core.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
-from pants.rules.core.test import TestDebugRequest, TestOptions, TestResult, TestTarget
+from pants.rules.core.determine_source_files import LegacySpecifiedSourceFilesRequest, SourceFiles
+from pants.rules.core.test import TestDebugRequest, TestOptions, TestResult, TestRunner
 
 
-def calculate_timeout_seconds(
-    *,
-    timeouts_enabled: bool,
-    target_timeout: Optional[int],
-    timeout_default: Optional[int],
-    timeout_maximum: Optional[int],
-) -> Optional[int]:
-    """Calculate the timeout for a test target.
-
-    If a target has no timeout configured its timeout will be set to the default timeout.
-    """
-    if not timeouts_enabled:
-        return None
-    if target_timeout is None:
-        if timeout_default is None:
-            return None
-        target_timeout = timeout_default
-    if timeout_maximum is not None:
-        return min(target_timeout, timeout_maximum)
-    return target_timeout
+@dataclass(frozen=True)
+class PytestRunner(TestRunner):
+    @staticmethod
+    def is_valid_target(adaptor_with_origin: TargetAdaptorWithOrigin) -> bool:
+        return isinstance(adaptor_with_origin, PythonTestsAdaptorWithOrigin)
 
 
 @dataclass(frozen=True)
@@ -71,7 +62,7 @@ class TestTargetSetup:
 
 @rule
 async def setup_pytest_for_target(
-    adaptor_with_origin: PythonTestsAdaptorWithOrigin,
+    pytest_runner: PytestRunner,
     pytest: PyTest,
     test_options: TestOptions,
     python_setup: PythonSetup,
@@ -79,6 +70,7 @@ async def setup_pytest_for_target(
     # TODO: Rather than consuming the TestOptions subsystem, the TestRunner should pass on coverage
     # configuration via #7490.
 
+    adaptor_with_origin = pytest_runner.adaptor_with_origin
     adaptor = adaptor_with_origin.adaptor
     test_addresses = Addresses((adaptor.address,))
 
@@ -108,97 +100,125 @@ async def setup_pytest_for_target(
     plugin_file_digest: Optional[Digest] = (
         await Get[Digest](InputFilesContent, get_coverage_plugin_input()) if run_coverage else None
     )
-    pytest_pex = await Get[Pex](
-        CreatePex,
-        create_pex(
-            output_filename="pytest.pex",
-            requirements=PexRequirements(pytest.get_requirement_strings()),
-            additional_args=additional_args_for_pytest,
-            input_files_digest=plugin_file_digest,
-        ),
+
+    create_pytest_pex_request = create_pex(
+        output_filename="pytest.pex",
+        requirements=PexRequirements(pytest.get_requirement_strings()),
+        additional_args=additional_args_for_pytest,
+        input_files_digest=plugin_file_digest,
     )
 
-    requirements_pex = await Get[Pex](
-        CreatePexFromTargetClosure(
-            addresses=test_addresses,
-            output_filename="requirements.pex",
-            include_source_files=False,
-            additional_args=additional_args_for_pytest,
-        )
+    create_requirements_pex_request = CreatePexFromTargetClosure(
+        addresses=test_addresses,
+        output_filename="requirements.pex",
+        include_source_files=False,
+        additional_args=additional_args_for_pytest,
     )
 
-    test_runner_pex = await Get[Pex](
-        CreatePex,
-        create_pex(
-            output_filename="test_runner.pex",
-            entry_point="pytest:main",
-            interpreter_constraints=interpreter_constraints,
-            additional_args=(
-                "--pex-path",
-                ":".join(
-                    pex_request.output_filename
-                    # TODO(John Sirois): Support shading python binaries:
-                    #   https://github.com/pantsbuild/pants/issues/9206
-                    # Right now any pytest transitive requirements will shadow corresponding user
-                    # requirements which will lead to problems when APIs that are used by either
-                    # `pytest:main` or the tests themselves break between the two versions.
-                    for pex_request in (pytest_pex, requirements_pex)
-                ),
+    create_test_runner_pex = create_pex(
+        output_filename="test_runner.pex",
+        entry_point="pytest:main",
+        interpreter_constraints=interpreter_constraints,
+        additional_args=(
+            "--pex-path",
+            # TODO(John Sirois): Support shading python binaries:
+            #   https://github.com/pantsbuild/pants/issues/9206
+            # Right now any pytest transitive requirements will shadow corresponding user
+            # requirements which will lead to problems when APIs that are used by either
+            # `pytest:main` or the tests themselves break between the two versions.
+            ":".join(
+                (
+                    create_pytest_pex_request.output_filename,
+                    create_requirements_pex_request.output_filename,
+                )
             ),
         ),
     )
 
-    chrooted_sources = await Get[ChrootedPythonSources](HydratedTargets(all_targets))
+    # Get the file names for the test_target so that we can specify to Pytest precisely which files
+    # to test, rather than using auto-discovery.
+    specified_source_files_request = LegacySpecifiedSourceFilesRequest(
+        [adaptor_with_origin], strip_source_roots=True
+    )
+
+    # TODO: Replace this with appropriate target API logic.
+    python_targets = [t for t in all_targets if isinstance(t.adaptor, PythonTargetAdaptor)]
+    resource_targets = [
+        t for t in all_targets if isinstance(t.adaptor, (FilesAdaptor, ResourcesAdaptor))
+    ]
+
+    # TODO(John Sirois): Support exploiting concurrency better:
+    #   https://github.com/pantsbuild/pants/issues/9294
+    # Some awkward code follows in order to execute 5-6 items concurrently given the current state
+    # of MultiGet typing / API. Improve this since we should encourage full concurrency in general.
+    requests: List[Get[Any]] = [
+        Get[Pex](CreatePex, create_pytest_pex_request),
+        Get[Pex](CreatePexFromTargetClosure, create_requirements_pex_request),
+        Get[Pex](CreatePex, create_test_runner_pex),
+        Get[ChrootedPythonSources](HydratedTargets(python_targets + resource_targets)),
+        Get[SourceFiles](LegacySpecifiedSourceFilesRequest, specified_source_files_request),
+    ]
+    if run_coverage:
+        requests.append(
+            Get[Coveragerc](CoveragercRequest(HydratedTargets(python_targets), test_time=True)),
+        )
+
+    (
+        pytest_pex,
+        requirements_pex,
+        test_runner_pex,
+        chrooted_sources,
+        specified_source_files,
+        *rest,
+    ) = cast(
+        Union[
+            Tuple[Pex, Pex, Pex, ChrootedPythonSources, SourceFiles],
+            Tuple[Pex, Pex, Pex, ChrootedPythonSources, SourceFiles, Coveragerc],
+        ],
+        await MultiGet(requests),
+    )
+
     directories_to_merge = [
         chrooted_sources.snapshot.directory_digest,
         requirements_pex.directory_digest,
         pytest_pex.directory_digest,
         test_runner_pex.directory_digest,
     ]
-
-    # Get the file names for the test_target so that we can specify to Pytest precisely which files
-    # to test, rather than using auto-discovery.
-    specified_source_files = await Get[SourceFiles](
-        SpecifiedSourceFilesRequest([adaptor_with_origin], strip_source_roots=True)
-    )
-    specified_source_file_names = specified_source_files.snapshot.files
-
-    coverage_args = []
     if run_coverage:
-        coveragerc = await Get[Coveragerc](
-            CoveragercRequest(HydratedTargets(all_targets), test_time=True)
-        )
+        coveragerc = rest[0]
         directories_to_merge.append(coveragerc.digest)
-        packages_to_cover = get_packages_to_cover(
-            target=adaptor, specified_source_files=specified_source_files,
-        )
-        coverage_args = [
-            "--cov-report=",  # To not generate any output. https://pytest-cov.readthedocs.io/en/latest/config.html
-        ]
-        for package in packages_to_cover:
-            coverage_args.extend(["--cov", package])
+
     merged_input_files = await Get[Digest](
         DirectoriesToMerge(directories=tuple(directories_to_merge))
     )
 
-    timeout_seconds = calculate_timeout_seconds(
-        timeouts_enabled=pytest.options.timeouts,
-        target_timeout=getattr(adaptor, "timeout", None),
-        timeout_default=pytest.options.timeout_default,
-        timeout_maximum=pytest.options.timeout_maximum,
-    )
+    coverage_args = []
+    if run_coverage:
+        coverage_args = [
+            "--cov-report=",  # To not generate any output. https://pytest-cov.readthedocs.io/en/latest/config.html
+        ]
+        # TODO: replace this with proper usage of the Target API.
+        coverage_field = Coverage(getattr(adaptor, "coverage", None), address=adaptor.address)
+        for package in coverage_field.determine_packages_to_cover(
+            specified_source_files=specified_source_files
+        ):
+            coverage_args.extend(["--cov", package])
 
+    # TODO: replace this with proper usage of the Target API.
+    timeout_field = Timeout(getattr(adaptor, "timeout", None), address=adaptor.address)
+
+    specified_source_file_names = sorted(specified_source_files.snapshot.files)
     return TestTargetSetup(
         test_runner_pex=test_runner_pex,
-        args=(*pytest.options.args, *coverage_args, *sorted(specified_source_file_names)),
+        args=(*pytest.options.args, *coverage_args, *specified_source_file_names),
         input_files_digest=merged_input_files,
-        timeout_seconds=timeout_seconds,
+        timeout_seconds=timeout_field.calculate_from_global_options(pytest),
     )
 
 
 @rule(name="Run pytest")
 async def run_python_test(
-    target_with_origin: PythonTestsAdaptorWithOrigin,
+    pytest_runner: PytestRunner,
     test_setup: TestTargetSetup,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
@@ -215,10 +235,10 @@ async def run_python_test(
         pex_args=test_setup.args,
         input_files=test_setup.input_files_digest,
         output_directories=(".coverage",) if run_coverage else None,
-        description=f"Run Pytest for {target_with_origin.adaptor.address.reference()}",
-        timeout_seconds=test_setup.timeout_seconds
-        if test_setup.timeout_seconds is not None
-        else 9999,
+        description=f"Run Pytest for {pytest_runner.adaptor_with_origin.adaptor.address.reference()}",
+        timeout_seconds=(
+            test_setup.timeout_seconds if test_setup.timeout_seconds is not None else 9999
+        ),
         env=env,
     )
     result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, request)
@@ -241,7 +261,7 @@ def rules():
         run_python_test,
         debug_python_test,
         setup_pytest_for_target,
-        UnionRule(TestTarget, PythonTestsAdaptorWithOrigin),
+        UnionRule(TestRunner, PytestRunner),
         subsystem_rule(PyTest),
         subsystem_rule(PythonSetup),
     ]

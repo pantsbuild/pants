@@ -7,7 +7,6 @@ from pants.backend.jvm.subsystems.scalafmt import Scalafmt
 from pants.backend.jvm.tasks.rewrite_base import RewriteBase
 from pants.base.exceptions import TaskError
 from pants.java.jar.jar_dependency import JarDependency
-from pants.option.custom_types import file_option
 from pants.task.fmt_task_mixin import FmtTaskMixin
 from pants.task.lint_task_mixin import LintTaskMixin
 
@@ -19,13 +18,6 @@ class ScalafmtTask(RewriteBase):
     different scalafmt commands.
     """
 
-    def _resolve_conflicting_skip(self, *, old_scope: str):
-        # Skip mypy because this is a temporary hack, and mypy doesn't follow the inheritance chain
-        # properly.
-        return self.resolve_conflicting_skip_options(  # type: ignore
-            old_scope=old_scope, new_scope="scalafmt", subsystem=Scalafmt.global_instance(),
-        )
-
     @classmethod
     def subsystem_dependencies(cls):
         return super().subsystem_dependencies() + (Scalafmt,)
@@ -33,16 +25,6 @@ class ScalafmtTask(RewriteBase):
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
-        register(
-            "--configuration",
-            advanced=True,
-            type=file_option,
-            fingerprint=True,
-            removal_version="1.27.0.dev0",
-            removal_hint="Use `--scalafmt-config` instead.",
-            help="Path to scalafmt config file, if not specified default scalafmt config used",
-        )
-
         cls.register_jvm_tool(
             register,
             "scalafmt",
@@ -100,7 +82,7 @@ class ScalaFmtCheckFormat(LintTaskMixin, ScalafmtTask):
 
     @property
     def skip_execution(self):
-        return super()._resolve_conflicting_skip(old_scope="lint-scalafmt")
+        return Scalafmt.global_instance().options.skip
 
     def process_result(self, result):
         if result != 0:
@@ -125,7 +107,7 @@ class ScalaFmtFormat(FmtTaskMixin, ScalafmtTask):
 
     @property
     def skip_execution(self):
-        return super()._resolve_conflicting_skip(old_scope="fmt-scalafmt")
+        return super().determine_if_skipped(formatter_subsystem=Scalafmt.global_instance())
 
     def process_result(self, result):
         # Processes the results of running the scalafmt command.

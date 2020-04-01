@@ -13,7 +13,7 @@ from pants.contrib.cpp.tasks.cpp_run import CppRun
 
 
 def build_file_aliases():
-    return BuildFileAliases(targets={"cpp_library": CppLibrary, "cpp_binary": CppBinary,})
+    return BuildFileAliases(targets={"cpp_library": CppLibrary, "cpp_binary": CppBinary})
 
 
 def register_goals():

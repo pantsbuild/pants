@@ -149,6 +149,6 @@ class ApacheThriftGenBase(SimpleCodegenTask):
 
         if self.get_options().strict:
             cmd.append("-strict")
-        if self.get_options().level == "debug":
+        if self.debug:
             cmd.append("-verbose")
         return cmd

@@ -2,20 +2,24 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use crate::PythonLogLevel;
-use chrono;
-use futures01::task_local;
-use lazy_static::lazy_static;
-use log::{log, set_logger, set_max_level, LevelFilter, Log, Metadata, Record};
-use parking_lot::Mutex;
-use simplelog::{ConfigBuilder, LevelPadding, WriteLogger};
+
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::fs::File;
 use std::fs::OpenOptions;
+use std::future::Future;
 use std::io::{stderr, Stderr, Write};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+
+use chrono;
+use lazy_static::lazy_static;
+use log::{log, set_logger, set_max_level, LevelFilter, Log, Metadata, Record};
+use parking_lot::Mutex;
+use simplelog::{ConfigBuilder, LevelPadding, WriteLogger};
+use tokio::task_local;
 use ui::EngineDisplay;
 use uuid::Uuid;
 
@@ -64,14 +68,17 @@ impl Logger {
   }
 
   pub fn set_stderr_logger(&self, python_level: u64) -> Result<(), String> {
-    python_level.try_into().map(|level: PythonLogLevel| {
-      self.maybe_increase_global_verbosity(level.into());
-      *self.stderr_log.lock() = MaybeWriteLogger::new(
-        stderr(),
-        level.into(),
-        self.show_rust_3rdparty_logs.load(Ordering::SeqCst),
-      )
-    })
+    python_level
+      .try_into()
+      .map_err(|err| format!("{}", err))
+      .map(|level: PythonLogLevel| {
+        self.maybe_increase_global_verbosity(level.into());
+        *self.stderr_log.lock() = MaybeWriteLogger::new(
+          stderr(),
+          level.into(),
+          self.show_rust_3rdparty_logs.load(Ordering::SeqCst),
+        )
+      })
   }
 
   ///
@@ -85,27 +92,30 @@ impl Logger {
     python_level: u64,
   ) -> Result<std::os::unix::io::RawFd, String> {
     use std::os::unix::io::AsRawFd;
-    python_level.try_into().and_then(|level: PythonLogLevel| {
-      {
-        // Maybe close open file by dropping the existing logger
-        *self.pantsd_log.lock() = MaybeWriteLogger::empty();
-      }
-      OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(log_file_path)
-        .map(|file| {
-          let fd = file.as_raw_fd();
-          self.maybe_increase_global_verbosity(level.into());
-          *self.pantsd_log.lock() = MaybeWriteLogger::new(
-            file,
-            level.into(),
-            self.show_rust_3rdparty_logs.load(Ordering::SeqCst),
-          );
-          fd
-        })
-        .map_err(|err| format!("Error opening pantsd logfile: {}", err))
-    })
+    python_level
+      .try_into()
+      .map_err(|err| format!("{}", err))
+      .and_then(|level: PythonLogLevel| {
+        {
+          // Maybe close open file by dropping the existing logger
+          *self.pantsd_log.lock() = MaybeWriteLogger::empty();
+        }
+        OpenOptions::new()
+          .create(true)
+          .append(true)
+          .open(log_file_path)
+          .map(|file| {
+            let fd = file.as_raw_fd();
+            self.maybe_increase_global_verbosity(level.into());
+            *self.pantsd_log.lock() = MaybeWriteLogger::new(
+              file,
+              level.into(),
+              self.show_rust_3rdparty_logs.load(Ordering::SeqCst),
+            );
+            fd
+          })
+          .map_err(|err| format!("Error opening pantsd logfile: {}", err))
+      })
   }
 
   pub fn log_from_python(
@@ -114,9 +124,12 @@ impl Logger {
     python_level: u64,
     target: &str,
   ) -> Result<(), String> {
-    python_level.try_into().map(|level: PythonLogLevel| {
-      log!(target: target, level.into(), "{}", message);
-    })
+    python_level
+      .try_into()
+      .map_err(|err| format!("{}", err))
+      .map(|level: PythonLogLevel| {
+        log!(target: target, level.into(), "{}", message);
+      })
   }
 
   pub fn register_engine_display(&self, engine_display: Arc<Mutex<EngineDisplay>>) -> Uuid {
@@ -259,37 +272,44 @@ pub enum Destination {
 }
 
 thread_local! {
-  pub static THREAD_DESTINATION: Mutex<Destination> = Mutex::new(Destination::Stderr)
+  static THREAD_DESTINATION: RefCell<Destination> = RefCell::new(Destination::Stderr)
 }
 
 task_local! {
-  static TASK_DESTINATION: Mutex<Option<Destination>> = Mutex::new(None)
+  static TASK_DESTINATION: Destination;
 }
 
-pub fn set_destination(destination: Destination) {
-  if futures01::task::is_in_task() {
-    TASK_DESTINATION.with(|task_destination| {
-      *task_destination.lock() = Some(destination);
-    })
-  } else {
-    THREAD_DESTINATION.with(|thread_destination| {
-      *thread_destination.lock() = destination;
-    })
-  }
+///
+/// Set the current log destination for a Thread, but _not_ for a Task. Tasks must always be spawned
+/// by callers using the `scope_task_destination` helper (generally via task_executor::Executor.)
+///
+pub fn set_thread_destination(destination: Destination) {
+  THREAD_DESTINATION.with(|thread_destination| {
+    *thread_destination.borrow_mut() = destination;
+  })
 }
 
+///
+/// Propagate the current log destination to a Future representing a newly spawned Task. Usage of
+/// this method should mostly be contained to task_executor::Executor.
+///
+pub async fn scope_task_destination<F>(destination: Destination, f: F) -> F::Output
+where
+  F: Future,
+{
+  TASK_DESTINATION.scope(destination, f).await
+}
+
+///
+/// Get the current log destination, from either a Task or a Thread.
+///
+/// TODO: Having this return an Option and tracking down all cases where it has defaulted would be
+/// good.
+///
 pub fn get_destination() -> Destination {
-  fn get_task_destination() -> Option<Destination> {
-    TASK_DESTINATION.with(|destination| *destination.lock())
-  }
-
-  fn get_thread_destination() -> Destination {
-    THREAD_DESTINATION.with(|destination| *destination.lock())
-  }
-
-  if futures01::task::is_in_task() {
-    get_task_destination().unwrap_or_else(get_thread_destination)
+  if let Ok(destination) = TASK_DESTINATION.try_with(|destination| *destination) {
+    destination
   } else {
-    get_thread_destination()
+    THREAD_DESTINATION.with(|destination| *destination.borrow())
   }
 }

@@ -7,7 +7,7 @@ from pants.goal.task_registrar import TaskRegistrar as task
 
 
 def build_file_aliases():
-    return BuildFileAliases(targets={"python_antlr_library": PythonAntlrLibrary,})
+    return BuildFileAliases(targets={"python_antlr_library": PythonAntlrLibrary})
 
 
 def register_goals():

@@ -178,8 +178,9 @@ python_tests(
     'src/python/pants/bin',
     'src/python/pants/build_graph',
     'src/python/pants/init',
-    'src/python/pants/testutil:test_base',
     'src/python/pants/testutil/engine:util',
+    'src/python/pants/testutil:test_base',
+    'src/python/pants/util:logging',
   ],
   tags = {"partially_type_checked"},
 )

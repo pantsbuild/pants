@@ -108,11 +108,7 @@ class ScalastyleTask(LintTaskMixin, NailgunTask):
 
     @property
     def skip_execution(self):
-        return self.resolve_conflicting_skip_options(
-            old_scope="lint-scalastyle",
-            new_scope="scalastyle",
-            subsystem=Scalastyle.global_instance(),
-        )
+        return Scalastyle.global_instance().options.skip
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

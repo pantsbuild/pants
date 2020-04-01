@@ -29,8 +29,13 @@ from pants.build_graph.app_base import AppBase, Bundle
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
-from pants.build_graph.target import Target
-from pants.engine.addressable import Addresses, AddressesWithOrigins, AddressWithOrigin
+from pants.build_graph.target import Target as TargetV1
+from pants.engine.addressable import (
+    Addresses,
+    AddressesWithOrigins,
+    AddressWithOrigin,
+    assert_single_address,
+)
 from pants.engine.fs import EMPTY_SNAPSHOT, PathGlobs, Snapshot
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.structs import (
@@ -44,6 +49,17 @@ from pants.engine.objects import Collection
 from pants.engine.parser import HydratedStruct
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
+from pants.engine.target import (
+    Dependencies,
+    RegisteredTargetTypes,
+    Target,
+    Targets,
+    TargetsWithOrigins,
+    TargetWithOrigin,
+    TransitiveTarget,
+    TransitiveTargets,
+    WrappedTarget,
+)
 from pants.option.global_options import (
     GlobalOptions,
     GlobMatchErrorBehavior,
@@ -57,7 +73,7 @@ from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 logger = logging.getLogger(__name__)
 
 
-def target_types_from_build_file_aliases(aliases: BuildFileAliases) -> Dict[str, Type[Target]]:
+def target_types_from_build_file_aliases(aliases: BuildFileAliases) -> Dict[str, Type[TargetV1]]:
     """Given BuildFileAliases, return the concrete target types constructed for each alias."""
     target_types = dict(aliases.target_types)
     for alias, factory in aliases.target_macro_factories.items():
@@ -88,7 +104,7 @@ class LegacyBuildGraph(BuildGraph):
         """Construct a graph given a Scheduler and BuildFileAliases."""
         return cls(scheduler, target_types_from_build_file_aliases(build_file_aliases))
 
-    def __init__(self, scheduler, target_types: Dict[str, Type[Target]]) -> None:
+    def __init__(self, scheduler, target_types: Dict[str, Type[TargetV1]]) -> None:
         """Construct a graph given a Scheduler, and set of target type aliases.
 
         :param scheduler: A Scheduler that is configured to be able to resolve TransitiveHydratedTargets.
@@ -108,7 +124,7 @@ class LegacyBuildGraph(BuildGraph):
         This is an additive operation: any existing connections involving these nodes are preserved.
         """
         all_addresses: Set[BuildFileAddress] = set()
-        new_targets: List[Target] = list()
+        new_targets: List[TargetV1] = list()
 
         # Index the ProductGraph.
         for legacy_hydrated_target in hydrated_targets:
@@ -122,7 +138,7 @@ class LegacyBuildGraph(BuildGraph):
         deps_to_inject: OrderedSet = OrderedSet()
         addresses_to_inject = set()
 
-        def inject(target: Target, dep_spec: str, is_dependency: bool) -> None:
+        def inject(target: TargetV1, dep_spec: str, is_dependency: bool) -> None:
             address = Address.parse(dep_spec, relative_to=target.address.spec_path)
             if not any(address == t.address for t in target.dependencies):
                 addresses_to_inject.add(address)
@@ -145,7 +161,7 @@ class LegacyBuildGraph(BuildGraph):
 
         return all_addresses
 
-    def _index_target(self, legacy_hydrated_target: "LegacyHydratedTarget") -> Target:
+    def _index_target(self, legacy_hydrated_target: "LegacyHydratedTarget") -> TargetV1:
         """Instantiate the given LegacyHydratedTarget, index it in the graph, and return a
         Target."""
         # Instantiate the target.
@@ -166,7 +182,7 @@ class LegacyBuildGraph(BuildGraph):
             self._target_dependees_by_address[dependency].add(address)
         return target
 
-    def _instantiate_target(self, legacy_hydrated_target: "LegacyHydratedTarget") -> Target:
+    def _instantiate_target(self, legacy_hydrated_target: "LegacyHydratedTarget") -> TargetV1:
         """Given a LegacyHydratedTarget previously parsed from a BUILD file, instantiate a
         Target."""
         target_cls = self._target_types[legacy_hydrated_target.adaptor.type_alias]
@@ -192,7 +208,7 @@ class LegacyBuildGraph(BuildGraph):
                 "Failed to instantiate Target with type {}: {}".format(target_cls, e),
             )
 
-    def _instantiate_app(self, target_cls: Type[Target], kwargs) -> Target:
+    def _instantiate_app(self, target_cls: Type[TargetV1], kwargs) -> TargetV1:
         """For App targets, convert BundleAdaptor to BundleProps."""
         parse_context = ParseContext(kwargs["address"].spec_path, dict())
         bundleprops_factory = Bundle(parse_context)
@@ -454,7 +470,11 @@ class HydratedTargetWithOrigin:
 
 
 class HydratedTargetsWithOrigins(Collection[HydratedTargetWithOrigin]):
-    pass
+    def expect_single(self) -> HydratedTargetWithOrigin:
+        assert_single_address(
+            [ht_with_origin.target.adaptor.address for ht_with_origin in self.dependencies]
+        )
+        return self.dependencies[0]
 
 
 @dataclass(frozen=True)
@@ -535,7 +555,7 @@ async def transitive_hydrated_targets(addresses: Addresses) -> TransitiveHydrate
 
     The TransitiveHydratedTarget struct represents a structure-shared graph, which we walk and
     flatten here. The engine memoizes the computation of TransitiveHydratedTarget, so when multiple
-    TransitiveHydratedTargets objects are being constructed for multiple roots, their structure will
+    TransitiveHydratedTarget objects are being constructed for multiple roots, their structure will
     be shared.
     """
 
@@ -611,6 +631,104 @@ async def hydrate_target(hydrated_struct: HydratedStruct) -> HydratedTarget:
 
 
 @rule
+async def resolve_target(
+    hydrated_struct: HydratedStruct, registered_target_types: RegisteredTargetTypes
+) -> WrappedTarget:
+    kwargs = hydrated_struct.value.kwargs().copy()
+    type_alias = kwargs.pop("type_alias")
+
+    # We special case `address` and the field `name`. The `Target` constructor requires an
+    # `Address`, so we use the value pre-calculated via `build_files.py`'s `hydrate_struct` rule.
+    # We throw away the field `name` because it can be accessed via `tgt.address.target_name`, so
+    # there is no (known) reason to preserve the field.
+    address = cast(Address, kwargs.pop("address"))
+    kwargs.pop("name", None)
+
+    # We convert `source` into `sources` because the Target API has no `Source` field, only
+    # `Sources`.
+    if "source" in kwargs and "sources" in kwargs:
+        raise TargetDefinitionException(
+            address, "Cannot specify both `source` and `sources` fields."
+        )
+    if "source" in kwargs:
+        source = kwargs.pop("source")
+        if not isinstance(source, str):
+            raise TargetDefinitionException(
+                address,
+                f"The `source` field must be a string containing a path relative to the target, "
+                f"but got {source} of type {type(source)}.",
+            )
+        kwargs["sources"] = [source]
+
+    target_type = registered_target_types.aliases_to_types.get(type_alias, None)
+    if target_type is None:
+        raise TargetDefinitionException(
+            address,
+            f"Target type {repr(type_alias)} is not recognized. All valid target types: "
+            f"{sorted(registered_target_types.aliases)}.",
+        )
+    return WrappedTarget(target_type(kwargs, address=address))
+
+
+@rule
+async def resolve_target_with_origin(address_with_origin: AddressWithOrigin) -> TargetWithOrigin:
+    wrapped_target = await Get[WrappedTarget](Address, address_with_origin.address)
+    return TargetWithOrigin(wrapped_target.target, address_with_origin.origin)
+
+
+@rule
+async def resolve_targets(addresses: Addresses) -> Targets:
+    wrapped_targets = await MultiGet(Get[WrappedTarget](Address, a) for a in addresses)
+    return Targets(wrapped_target.target for wrapped_target in wrapped_targets)
+
+
+@rule
+async def transitive_target(wrapped_root: WrappedTarget) -> TransitiveTarget:
+    root = wrapped_root.target
+    dependencies = (
+        await MultiGet(Get[TransitiveTarget](Address, d) for d in root[Dependencies].value or ())
+        if root.has_field(Dependencies)
+        else tuple()
+    )
+    return TransitiveTarget(root, dependencies)
+
+
+@rule
+async def transitive_targets(addresses: Addresses) -> TransitiveTargets:
+    """Given Addresses, kicks off recursion on expansion of TransitiveTargets.
+
+    The TransitiveTarget dataclass represents a structure-shared graph, which we walk and flatten
+    here. The engine memoizes the computation of TransitiveTarget, so when multiple
+    TransitiveTargets objects are being constructed for multiple roots, their structure will be
+    shared.
+    """
+    transitive_targets = await MultiGet(Get[TransitiveTarget](Address, a) for a in addresses)
+
+    closure: OrderedSet[Target] = OrderedSet()
+    to_visit = deque(transitive_targets)
+
+    while to_visit:
+        tt = to_visit.popleft()
+        if tt.root in closure:
+            continue
+        closure.add(tt.root)
+        to_visit.extend(tt.dependencies)
+
+    return TransitiveTargets(tuple(tt.root for tt in transitive_targets), FrozenOrderedSet(closure))
+
+
+@rule
+async def resolve_targets_with_origins(
+    addresses_with_origins: AddressesWithOrigins,
+) -> TargetsWithOrigins:
+    targets_with_origins = await MultiGet(
+        Get[TargetWithOrigin](AddressWithOrigin, address_with_origin)
+        for address_with_origin in addresses_with_origins
+    )
+    return TargetsWithOrigins(targets_with_origins)
+
+
+@rule
 async def hydrate_target_with_origin(
     address_with_origin: AddressWithOrigin,
 ) -> HydratedTargetWithOrigin:
@@ -671,7 +789,9 @@ async def hydrate_sources(
     )
     snapshot = await Get[Snapshot](PathGlobs, path_globs)
     fileset_with_spec = _eager_fileset_with_spec(
-        spec_path=address.spec_path, filespec=sources_field.filespecs, snapshot=snapshot,
+        spec_path=address.spec_path,
+        filespec=sources_field.source_globs.filespecs,
+        snapshot=snapshot,
     )
     sources_field.validate_fn(fileset_with_spec)
     return HydratedField(sources_field.arg, fileset_with_spec)
@@ -815,6 +935,12 @@ def create_legacy_graph_tasks():
         transitive_hydrated_target,
         transitive_hydrated_targets,
         legacy_transitive_hydrated_targets,
+        resolve_target,
+        resolve_target_with_origin,
+        resolve_targets,
+        resolve_targets_with_origins,
+        transitive_target,
+        transitive_targets,
         hydrate_target,
         hydrate_target_with_origin,
         hydrated_targets,

@@ -8,7 +8,7 @@ from pants.goal.task_registrar import TaskRegistrar as task
 
 
 def build_file_aliases():
-    return BuildFileAliases(targets={"jaxb_library": JaxbLibrary,})
+    return BuildFileAliases(targets={"jaxb_library": JaxbLibrary})
 
 
 def register_goals():

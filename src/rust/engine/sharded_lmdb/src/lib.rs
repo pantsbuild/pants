@@ -26,8 +26,8 @@
 #![allow(clippy::mutex_atomic)]
 
 use bytes::Bytes;
-use futures01::{future, Future};
-use hashing::Fingerprint;
+use futures::future::BoxFuture;
+use hashing::{Fingerprint, FINGERPRINT_SIZE};
 use lmdb::{
   self, Database, DatabaseFlags, Environment, EnvironmentCopyFlags, EnvironmentFlags,
   RwTransaction, Transaction, WriteFlags,
@@ -39,6 +39,55 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time;
 use tempfile::TempDir;
+
+const VERSIONED_FINGERPRINT_SIZE: usize = FINGERPRINT_SIZE + 1;
+
+/// VersionedFingerprint is a byte buffer one longer than the number of bytes stored in a
+/// Fingerprint. It is just the byte pattern of a Fingerprint with the version number concatenated
+/// onto the end of it.
+pub struct VersionedFingerprint([u8; VERSIONED_FINGERPRINT_SIZE]);
+
+impl VersionedFingerprint {
+  pub fn new(fingerprint: Fingerprint, version: u8) -> VersionedFingerprint {
+    let mut buf = [0; VERSIONED_FINGERPRINT_SIZE];
+    buf[0..FINGERPRINT_SIZE].copy_from_slice(&fingerprint.0[..]);
+    buf[FINGERPRINT_SIZE] = version;
+    VersionedFingerprint(buf)
+  }
+
+  pub fn get_fingerprint(&self) -> Fingerprint {
+    let mut buf = [0; FINGERPRINT_SIZE];
+    buf.copy_from_slice(&self.0[0..FINGERPRINT_SIZE]);
+    Fingerprint(buf)
+  }
+
+  pub fn from_bytes_unsafe(bytes: &[u8]) -> VersionedFingerprint {
+    if bytes.len() != VERSIONED_FINGERPRINT_SIZE {
+      panic!(
+        "Input value was not a versioned fingerprint; had length: {}",
+        bytes.len()
+      );
+    }
+
+    let mut buf = [0; VERSIONED_FINGERPRINT_SIZE];
+    buf.clone_from_slice(&bytes[0..VERSIONED_FINGERPRINT_SIZE]);
+    VersionedFingerprint(buf)
+  }
+
+  pub fn to_hex(&self) -> String {
+    let mut s = String::new();
+    for byte in 0..VERSIONED_FINGERPRINT_SIZE {
+      fmt::Write::write_fmt(&mut s, format_args!("{:02x}", byte)).unwrap();
+    }
+    s
+  }
+}
+
+impl AsRef<[u8]> for VersionedFingerprint {
+  fn as_ref(&self) -> &[u8] {
+    &self.0[..]
+  }
+}
 
 // Each LMDB directory can have at most one concurrent writer.
 // We use this type to shard storage into 16 LMDB directories, based on the first 4 bits of the
@@ -53,6 +102,16 @@ pub struct ShardedLmdb {
 }
 
 impl ShardedLmdb {
+  // Whenever we change the byte format of data stored in lmdb, we will
+  // need to increment this schema version. This schema version will
+  // be appended to the Fingerprint-derived keys to create the key
+  // we actually store in the database. This way, data stored with a version
+  // of pants on one schema version will not conflict with data stored
+  // with a different version of pants on a different schema version.
+  pub fn schema_version() -> u8 {
+    1
+  }
+
   // max_size is the maximum size the databases together will be allowed to grow to.
   // When calling this function, we will attempt to allocate that much virtual (not resident) memory
   // for the mmap; in theory it should be possible not to bound this, but in practice we see travis
@@ -69,7 +128,7 @@ impl ShardedLmdb {
     for (env, dir, fingerprint_prefix) in ShardedLmdb::envs(&root_path, max_size)? {
       trace!("Making ShardedLmdb content database for {:?}", dir);
       let content_database = env
-        .create_db(Some("content"), DatabaseFlags::empty())
+        .create_db(Some("content-versioned"), DatabaseFlags::empty())
         .map_err(|e| {
           format!(
             "Error creating/opening content database at {:?}: {}",
@@ -79,7 +138,7 @@ impl ShardedLmdb {
 
       trace!("Making ShardedLmdb lease database for {:?}", dir);
       let lease_database = env
-        .create_db(Some("leases"), DatabaseFlags::empty())
+        .create_db(Some("leases-versioned"), DatabaseFlags::empty())
         .map_err(|e| {
           format!(
             "Error creating/opening content database at {:?}: {}",
@@ -169,21 +228,25 @@ impl ShardedLmdb {
     self.lmdbs.values().cloned().collect()
   }
 
-  pub fn store_bytes(
-    &self,
-    key: Fingerprint,
+  ///
+  /// TODO: See the note on references in ASYNC.md.
+  ///
+  pub fn store_bytes<'a, 'b>(
+    &'a self,
+    fingerprint: Fingerprint,
     bytes: Bytes,
     initial_lease: bool,
-  ) -> impl Future<Item = (), Error = String> {
+  ) -> BoxFuture<'b, Result<(), String>> {
     let store = self.clone();
-    self.executor.spawn_on_io_pool(future::lazy(move || {
-      let (env, db, lease_database) = store.get(&key);
+    self.executor.spawn_blocking(move || {
+      let effective_key = VersionedFingerprint::new(fingerprint, ShardedLmdb::schema_version());
+      let (env, db, lease_database) = store.get(&fingerprint);
       let put_res = env.begin_rw_txn().and_then(|mut txn| {
-        txn.put(db, &key, &bytes, WriteFlags::NO_OVERWRITE)?;
+        txn.put(db, &effective_key, &bytes, WriteFlags::NO_OVERWRITE)?;
         if initial_lease {
           store.lease(
             lease_database,
-            &key,
+            &effective_key,
             Self::default_lease_until_secs_since_epoch(),
             &mut txn,
           )?;
@@ -194,21 +257,25 @@ impl ShardedLmdb {
       match put_res {
         Ok(()) => Ok(()),
         Err(lmdb::Error::KeyExist) => Ok(()),
-        Err(err) => Err(format!("Error storing key {:?}: {}", key.to_hex(), err)),
+        Err(err) => Err(format!(
+          "Error storing versioned key {:?}: {}",
+          effective_key.to_hex(),
+          err
+        )),
       }
-    }))
+    })
   }
 
   fn lease(
     &self,
     database: Database,
-    fingerprint: &Fingerprint,
+    versioned_fingerprint: &VersionedFingerprint,
     until_secs_since_epoch: u64,
     txn: &mut RwTransaction<'_>,
   ) -> Result<(), lmdb::Error> {
     txn.put(
       database,
-      &fingerprint.as_ref(),
+      &versioned_fingerprint.as_ref(),
       &until_secs_since_epoch.to_le_bytes(),
       WriteFlags::empty(),
     )
@@ -221,30 +288,36 @@ impl ShardedLmdb {
     (now_since_epoch + time::Duration::from_secs(2 * 60 * 60)).as_secs()
   }
 
+  ///
+  /// TODO: See the note on references in ASYNC.md.
+  ///
   pub fn load_bytes_with<
+    'a,
+    'b,
     T: Send + 'static,
     F: Fn(Bytes) -> Result<T, String> + Send + Sync + 'static,
   >(
-    &self,
+    &'a self,
     fingerprint: Fingerprint,
     f: F,
-  ) -> impl Future<Item = Option<T>, Error = String> {
+  ) -> BoxFuture<'b, Result<Option<T>, String>> {
     let store = self.clone();
-    self.executor.spawn_on_io_pool(future::lazy(move || {
+    let effective_key = VersionedFingerprint::new(fingerprint, ShardedLmdb::schema_version());
+    self.executor.spawn_blocking(move || {
       let (env, db, _) = store.get(&fingerprint);
       let ro_txn = env
         .begin_ro_txn()
         .map_err(|err| format!("Failed to begin read transaction: {}", err));
-      ro_txn.and_then(|txn| match txn.get(db, &fingerprint) {
+      ro_txn.and_then(|txn| match txn.get(db, &effective_key) {
         Ok(bytes) => f(Bytes::from(bytes)).map(Some),
         Err(lmdb::Error::NotFound) => Ok(None),
         Err(err) => Err(format!(
-          "Error loading fingerprint {:?}: {}",
-          fingerprint.to_hex(),
+          "Error loading versioned key {:?}: {}",
+          effective_key.to_hex(),
           err,
         )),
       })
-    }))
+    })
   }
 
   #[allow(clippy::identity_conversion)] // False positive: https://github.com/rust-lang/rust-clippy/issues/3913

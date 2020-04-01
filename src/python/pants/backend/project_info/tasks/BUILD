@@ -46,7 +46,6 @@ python_library(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/jvm/tasks:classpath_products',
-    'src/python/pants/backend/jvm/tasks:ivy_task_mixin',
     'src/python/pants/backend/jvm:ivy_utils',
     'src/python/pants/backend/python:interpreter_cache',
     'src/python/pants/backend/python/subsystems',

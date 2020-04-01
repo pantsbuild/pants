@@ -3,10 +3,10 @@
 
 python_library(
   dependencies=[
-    ':plugins',
     '3rdparty/python:dataclasses',
     '3rdparty/python:pex',
     '3rdparty/python:setuptools',
+    ':plugins',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_root',
     'src/python/pants/base:exception_sink',
@@ -35,6 +35,7 @@ python_library(
     'src/python/pants/rules/core',
     'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:logging',
     'src/python/pants/util:memo',
     'src/python/pants/util:ordered_set',
     'src/python/pants:version',
@@ -45,6 +46,7 @@ python_library(
 target(
   name='plugins',
   dependencies=[
+    'src/python/pants/backend/awslambda/python',
     'src/python/pants/backend/codegen:plugin',
     'src/python/pants/backend/docgen:plugin',
     'src/python/pants/backend/graph_info:plugin',

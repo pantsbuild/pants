@@ -3,6 +3,7 @@
 
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
+from pants.backend.project_info.rules.dependencies import DependencyType
 from pants.backend.project_info.tasks.dependencies import Dependencies
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
@@ -32,7 +33,7 @@ class NonPythonDependenciesTest(ConsoleTaskTestBase):
         third = self.make_target("dependencies:third", target_type=JavaLibrary, sources=[],)
 
         first = self.make_target(
-            "dependencies:first", target_type=JavaLibrary, sources=[], dependencies=[third,],
+            "dependencies:first", target_type=JavaLibrary, sources=[], dependencies=[third],
         )
 
         second = self.make_target(
@@ -42,7 +43,7 @@ class NonPythonDependenciesTest(ConsoleTaskTestBase):
         )
 
         project = self.make_target(
-            "project:project", target_type=JavaLibrary, sources=[], dependencies=[first, second,],
+            "project:project", target_type=JavaLibrary, sources=[], dependencies=[first, second],
         )
 
         self.make_target("project:dep-bag", target_type=Target, dependencies=[second, project])
@@ -60,23 +61,24 @@ class NonPythonDependenciesTest(ConsoleTaskTestBase):
             "dependencies:second",
             "org.apache:apache-jar:12.12.2012",
             targets=[self.target("project:project")],
+            options={"type": DependencyType.SOURCE_AND_THIRD_PARTY},
         )
 
-    def test_internal_dependencies(self):
+    def test_source_dependencies(self):
         self.assert_console_output_ordered(
             "project:project",
             "dependencies:first",
             "dependencies:third",
             "dependencies:second",
             targets=[self.target("project:project")],
-            options={"internal_only": True},
+            options={"type": DependencyType.SOURCE},
         )
 
-    def test_external_dependencies(self):
+    def test_3rdparty_dependencies(self):
         self.assert_console_output_ordered(
             "org.apache:apache-jar:12.12.2012",
             targets=[self.target("project:project")],
-            options={"external_only": True},
+            options={"type": DependencyType.THIRD_PARTY},
         )
 
     def test_dep_bag(self):
@@ -88,21 +90,22 @@ class NonPythonDependenciesTest(ConsoleTaskTestBase):
             "dependencies:first",
             "dependencies:third",
             targets=[self.target("project:dep-bag")],
+            options={"type": DependencyType.SOURCE_AND_THIRD_PARTY},
         )
 
-    def test_intransitive_internal_dependencies(self):
+    def test_intransitive_source_dependencies(self):
         self.assert_console_output_ordered(
             "dependencies:first",
             "dependencies:second",
             targets=[self.target("project:project")],
-            options={"transitive": False, "internal_only": True},
+            options={"transitive": False, "type": DependencyType.SOURCE},
         )
 
-    def test_intransitive_external_dependencies(self):
+    def test_intransitive_3rdparty_dependencies(self):
         self.assert_console_output_ordered(
             "org.apache:apache-jar:12.12.2012",
             targets=[self.target("project:project")],
-            options={"transitive": False, "external_only": True},
+            options={"transitive": False, "type": DependencyType.THIRD_PARTY},
         )
 
 
@@ -122,7 +125,7 @@ class PythonDependenciesTests(ConsoleTaskTestBase):
             "dependencies:python_inner",
             target_type=PythonLibrary,
             sources=[],
-            dependencies=[python_leaf,],
+            dependencies=[python_leaf],
         )
 
         python_inner_with_external = self.make_target(
@@ -135,7 +138,7 @@ class PythonDependenciesTests(ConsoleTaskTestBase):
             "dependencies:python_root",
             target_type=PythonLibrary,
             sources=[],
-            dependencies=[python_inner, python_inner_with_external,],
+            dependencies=[python_inner, python_inner_with_external],
         )
 
     def test_normal(self):
@@ -146,36 +149,37 @@ class PythonDependenciesTests(ConsoleTaskTestBase):
             "dependencies:python_inner_with_external",
             "antlr_python_runtime==3.1.3",
             targets=[self.target("dependencies:python_root")],
+            options={"type": DependencyType.SOURCE_AND_THIRD_PARTY},
         )
 
-    def test_internal_dependencies(self):
+    def test_source_dependencies(self):
         self.assert_console_output_ordered(
             "dependencies:python_root",
             "dependencies:python_inner",
             "dependencies:python_leaf",
             "dependencies:python_inner_with_external",
             targets=[self.target("dependencies:python_root")],
-            options={"internal_only": True},
+            options={"type": DependencyType.SOURCE},
         )
 
-    def test_external_dependencies(self):
+    def test_3rdparty_dependencies(self):
         self.assert_console_output_ordered(
             "antlr_python_runtime==3.1.3",
             targets=[self.target("dependencies:python_root")],
-            options={"external_only": True},
+            options={"type": DependencyType.THIRD_PARTY},
         )
 
-    def test_intransitive_internal_dependencies(self):
+    def test_intransitive_source_dependencies(self):
         self.assert_console_output_ordered(
             "dependencies:python_inner",
             "dependencies:python_inner_with_external",
             targets=[self.target("dependencies:python_root")],
-            options={"transitive": False, "internal_only": True},
+            options={"transitive": False, "type": DependencyType.SOURCE},
         )
 
-    def test_intransitive_external_dependencies(self):
+    def test_intransitive_3rdparty_dependencies(self):
         self.assert_console_output_ordered(
             "antlr_python_runtime==3.1.3",
             targets=[self.target("dependencies:python_root")],
-            options={"transitive": False, "external_only": True},
+            options={"transitive": False, "type": DependencyType.THIRD_PARTY},
         )

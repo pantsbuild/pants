@@ -7,8 +7,7 @@ use std::time::Duration;
 use boxfuture::{try_future, BoxFuture, Boxable};
 use futures::compat::Future01CompatExt;
 use futures::future::{FutureExt, TryFutureExt};
-use futures01::future::Future;
-use futures01::stream::Stream;
+use futures::stream::{BoxStream, StreamExt};
 use log::{debug, trace};
 use nails::execution::{child_channel, ChildInput, ChildOutput, Command};
 use tokio::net::TcpStream;
@@ -16,8 +15,9 @@ use tokio::net::TcpStream;
 use crate::local::CapturedWorkdir;
 use crate::nailgun::nailgun_pool::NailgunProcessName;
 use crate::{
-  Context, ExecuteProcessRequest, ExecuteProcessRequestMetadata, FallibleExecuteProcessResult,
-  MultiPlatformExecuteProcessRequest, PlatformConstraint,
+  Context, ExecuteProcessRequest, ExecuteProcessRequestMetadata,
+  FallibleExecuteProcessResultWithPlatform, MultiPlatformExecuteProcessRequest, Platform,
+  PlatformConstraint,
 };
 
 #[cfg(test)]
@@ -168,7 +168,7 @@ impl super::CommandRunner for CommandRunner {
     &self,
     req: MultiPlatformExecuteProcessRequest,
     context: Context,
-  ) -> BoxFuture<FallibleExecuteProcessResult, String> {
+  ) -> BoxFuture<FallibleExecuteProcessResultWithPlatform, String> {
     let original_request = self.extract_compatible_request(&req).unwrap();
 
     if !original_request.is_nailgunnable {
@@ -194,6 +194,7 @@ impl super::CommandRunner for CommandRunner {
       executor,
       true,
       &workdir_for_this_nailgun,
+      Platform::current().unwrap(),
     )
   }
 
@@ -207,12 +208,12 @@ impl super::CommandRunner for CommandRunner {
 }
 
 impl CapturedWorkdir for CommandRunner {
-  fn run_in_workdir(
-    &self,
-    workdir_path: &Path,
+  fn run_in_workdir<'a, 'b, 'c>(
+    &'a self,
+    workdir_path: &'b Path,
     req: ExecuteProcessRequest,
     context: Context,
-  ) -> Result<Box<dyn Stream<Item = ChildOutput, Error = String> + Send>, String> {
+  ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String> {
     // Separate argument lists, to form distinct EPRs for (1) starting the nailgun server and (2) running the client in it.
     let ParsedJVMCommandLines {
       nailgun_args,
@@ -271,8 +272,6 @@ impl CapturedWorkdir for CommandRunner {
           )
           .compat()
       })
-      .boxed()
-      .compat()
       .map_err(|e| format!("Failed to connect to nailgun! {}", e))
       .inspect(move |_| debug!("Connected to nailgun instance {}", &nailgun_name3))
       .and_then(move |nailgun_port| {
@@ -292,18 +291,14 @@ impl CapturedWorkdir for CommandRunner {
         trace!("Client request: {:#?}", client_req);
         let addr: SocketAddr = format!("127.0.0.1:{:?}", nailgun_port).parse().unwrap();
         debug!("Connecting to server at {}...", addr);
-        TcpStream::connect(&addr)
+        TcpStream::connect(addr)
           .and_then(move |stream| {
             nails::client_handle_connection(stream, cmd, stdio_write, stdin_read)
           })
           .map_err(|e| format!("Error communicating with server: {}", e))
-          .map(ChildOutput::Exit)
+          .map_ok(ChildOutput::Exit)
       });
 
-    Ok(Box::new(
-      stdio_read
-        .map_err(|()| unreachable!())
-        .select(nails_command.into_stream()),
-    ))
+    Ok(futures::stream::select(stdio_read.map(Ok), nails_command.into_stream()).boxed())
   }
 }

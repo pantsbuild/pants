@@ -12,6 +12,7 @@ from pants.option.option_value_container import OptionValueContainer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.scope import ScopeInfo
 from pants.util.contextutil import temporary_dir, temporary_file, temporary_file_path
+from pants.util.logging import LogLevel
 
 
 class OptionsBootstrapperTest(unittest.TestCase):
@@ -81,7 +82,7 @@ class OptionsBootstrapperTest(unittest.TestCase):
                 "pants_supportdir": "/from_config/build-support",
                 "pants_distdir": "/from_config/dist",
             },
-            env={"PANTS_SUPPORTDIR": "/from_env/build-support", "PANTS_DISTDIR": "/from_env/dist",},
+            env={"PANTS_SUPPORTDIR": "/from_env/build-support", "PANTS_DISTDIR": "/from_env/dist"},
             args=["--pants-distdir=/from_args/dist"],
             workdir="/from_config/.pants.d",
             supportdir="/from_env/build-support",
@@ -153,7 +154,7 @@ class OptionsBootstrapperTest(unittest.TestCase):
     def test_bootstrapped_options_ignore_irrelevant_env(self) -> None:
         included = "PANTS_SUPPORTDIR"
         excluded = "NON_PANTS_ENV"
-        bootstrapper = OptionsBootstrapper.create(env={excluded: "pear", included: "banana",})
+        bootstrapper = OptionsBootstrapper.create(env={excluded: "pear", included: "banana"})
         self.assertIn(included, bootstrapper.env)
         self.assertNotIn(excluded, bootstrapper.env)
 
@@ -296,16 +297,16 @@ class OptionsBootstrapperTest(unittest.TestCase):
         # No short options passed - defaults presented.
         vals = parse_options()
         self.assertIsNone(vals.logdir)
-        self.assertEqual("info", vals.level)
+        self.assertEqual(LogLevel.INFO, vals.level)
 
         # Unrecognized short options passed and ignored - defaults presented.
         vals = parse_options("-_UnderscoreValue", "-^")
         self.assertIsNone(vals.logdir)
-        self.assertEqual("info", vals.level)
+        self.assertEqual(LogLevel.INFO, vals.level)
 
         vals = parse_options("-d/tmp/logs", "-ldebug")
         self.assertEqual("/tmp/logs", vals.logdir)
-        self.assertEqual("debug", vals.level)
+        self.assertEqual(LogLevel.DEBUG, vals.level)
 
     def test_bootstrap_options_passthrough_dup_ignored(self) -> None:
         def parse_options(*args: str) -> OptionValueContainer:

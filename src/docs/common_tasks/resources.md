@@ -10,7 +10,7 @@ Create a `resources` target that tells Pants which files to include in the resou
 
 ## Discussion
 
-A `resources` target definition must include a `name` and a list of `sources`, which can consist of a simple list of file names, multiple `globs` or `rglobs` definitions (more on that in [[Use globs and rglobs to Group Files|pants('src/docs/common_tasks:globs')]]), or any combination thereof. This would create a resource bundle with two files:
+A `resources` target definition must include a `name` and a list of `sources`, which is a simple list of file names. This would create a resource bundle with two files:
 
     ::python
     resources(
@@ -18,7 +18,7 @@ A `resources` target definition must include a `name` and a list of `sources`, w
       sources=['server-config.yaml', 'logging-config.xml'],
     )
 
-This would include a glob of files to a resource bundle:
+This would include a recursive glob of files to a resource bundle:
 
     ::python
     resources(
@@ -26,7 +26,7 @@ This would include a glob of files to a resource bundle:
       sources=['**/*.mustache'],
     )
 
-This would include a mixture of globs, rglobs, and specific files:
+This would include a mixture of globs, recursive globs, and specific files:
 
     ::python
     resources(

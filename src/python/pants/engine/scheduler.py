@@ -9,7 +9,7 @@ import time
 import traceback
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, cast
 
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE
@@ -31,9 +31,8 @@ from pants.util.dirutil import check_no_overlapping_paths
 from pants.util.strutil import pluralize
 
 if TYPE_CHECKING:
-    from collections import OrderedDict
     from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveProcessResult
-    from pants.util.ordered_set import OrderedSet
+    from pants.util.ordered_set import OrderedSet  # noqa
 
 
 logger = logging.getLogger(__name__)
@@ -71,12 +70,12 @@ class Scheduler:
         build_root: str,
         local_store_dir: str,
         rules: Tuple[Rule, ...],
-        union_rules: "OrderedDict[Type, OrderedSet[Type]]",
+        union_rules: Dict[Type, "OrderedSet[Type]"],
         execution_options: ExecutionOptions,
         include_trace_on_error: bool = True,
         visualize_to_dir: Optional[str] = None,
         validate: bool = True,
-    ):
+    ) -> None:
         """
         :param native: An instance of engine.native.Native.
         :param ignore_patterns: A list of gitignore-style file patterns for pants to ignore.
@@ -117,9 +116,6 @@ class Scheduler:
 
         if validate:
             self._assert_ruleset_valid()
-
-    def _root_type_ids(self):
-        return self._to_ids_buf(self._root_subject_types)
 
     def graph_trace(self, session, execution_request):
         with temporary_file_path() as path:
@@ -163,6 +159,11 @@ class Scheduler:
     def _to_utf8_buf(self, string):
         return self._native.context.utf8_buf(string)
 
+    def _to_params_list(self, subject_or_params):
+        if isinstance(subject_or_params, Params):
+            return subject_or_params.params
+        return [subject_or_params]
+
     def _register_rules(self, rule_index: RuleIndex):
         """Create a native Tasks object, and record the given RuleIndex on it."""
 
@@ -182,7 +183,7 @@ class Scheduler:
         return tasks
 
     def _register_task(
-        self, tasks, output_type, rule: TaskRule, union_rules: "OrderedDict[Type, OrderedSet[Type]]"
+        self, tasks, output_type, rule: TaskRule, union_rules: Dict[Type, "OrderedSet[Type]"]
     ) -> None:
         """Register the given TaskRule with the native scheduler."""
         func = Function(self._to_key(rule.func))
@@ -212,9 +213,16 @@ class Scheduler:
         self._raise_or_return(res)
 
     def visualize_rule_graph_to_file(self, filename):
-        self._native.lib.rule_graph_visualize(
-            self._scheduler, self._root_type_ids(), filename.encode()
+        res = self._native.lib.rule_graph_visualize(self._scheduler, filename.encode())
+        self._raise_or_return(res)
+
+    def visualize_rule_subgraph_to_file(self, filename, root_subject_types, product_type):
+        root_type_ids = self._to_ids_buf(root_subject_types)
+        product_type_id = TypeId(self._to_id(product_type))
+        res = self._native.lib.rule_subgraph_visualize(
+            self._scheduler, root_type_ids, product_type_id, filename.encode()
         )
+        self._raise_or_return(res)
 
     def rule_graph_visualization(self):
         with temporary_file_path() as path:
@@ -223,14 +231,9 @@ class Scheduler:
                 for line in fd.readlines():
                     yield line.rstrip()
 
-    def rule_subgraph_visualization(self, root_subject_type, product_type):
-        root_type_id = TypeId(self._to_id(root_subject_type))
-
-        product_type_id = TypeId(self._to_id(product_type))
+    def rule_subgraph_visualization(self, root_subject_types, product_type):
         with temporary_file_path() as path:
-            self._native.lib.rule_subgraph_visualize(
-                self._scheduler, root_type_id, product_type_id, path.encode()
-            )
+            self.visualize_rule_subgraph_to_file(path, root_subject_types, product_type)
             with open(path, "r") as fd:
                 for line in fd.readlines():
                     yield line.rstrip()
@@ -250,10 +253,7 @@ class Scheduler:
         return self._native.lib.graph_len(self._scheduler)
 
     def add_root_selection(self, execution_request, subject_or_params, product):
-        if isinstance(subject_or_params, Params):
-            params = subject_or_params.params
-        else:
-            params = [subject_or_params]
+        params = self._to_params_list(subject_or_params)
         res = self._native.lib.execution_add_root_select(
             self._scheduler, execution_request, self._to_vals_buf(params), self._to_type(product)
         )
@@ -364,6 +364,10 @@ class SchedulerSession:
         self._scheduler = scheduler
         self._session = session
         self._run_count = 0
+
+    @property
+    def scheduler(self):
+        return self._scheduler
 
     def poll_workunits(self) -> Tuple[Dict[str, Any], ...]:
         result: Tuple[Dict[str, Any], ...] = self._scheduler.poll_workunits(self._session)
@@ -490,12 +494,21 @@ class SchedulerSession:
                 unique_exceptions,
             )
 
-    def run_goal_rule(self, product, subject):
+    def run_goal_rule(self, product, subject) -> int:
         """
         :param product: A Goal subtype.
         :param subject: subject for the request.
         :returns: An exit_code for the given Goal.
         """
+        if self._scheduler.visualize_to_dir is not None:
+            rule_graph_name = f"rule_graph.{product.name}.dot"
+            params = self._scheduler._to_params_list(subject)
+            self._scheduler.visualize_rule_subgraph_to_file(
+                os.path.join(self._scheduler.visualize_to_dir, rule_graph_name),
+                [type(p) for p in params],
+                product,
+            )
+
         request = self.execution_request([product], [subject])
         returns, throws = self.execute(request)
 
@@ -505,7 +518,7 @@ class SchedulerSession:
             self._trace_on_error([exc], request)
             return PANTS_FAILED_EXIT_CODE
         _, state = returns[0]
-        return state.value.exit_code
+        return cast(int, state.value.exit_code)
 
     def product_request(self, product, subjects):
         """Executes a request for a single product for some subjects, and returns the products.

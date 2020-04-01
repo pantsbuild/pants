@@ -10,7 +10,7 @@ Markdown==2.1.1
 packaging==16.8
 parameterized==0.6.1
 pathspec==0.5.9
-pex==2.1.5
+pex==2.1.7
 psutil==5.6.3
 Pygments==2.3.1
 pyopenssl==17.3.0

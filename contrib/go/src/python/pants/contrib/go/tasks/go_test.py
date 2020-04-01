@@ -63,12 +63,22 @@ class GoTest(PartitionedTestRunnerTaskMixin, GoWorkspaceTask):
         }
 
     @contextmanager
-    def partitions(self, all_targets, test_targets):
-        def iter_partitions():
-            for test_target in test_targets:
-                partition = (test_target,)
-                args = (self._generate_args_for_targets([test_target]),)
-                yield partition, args
+    def partitions(self, per_target, all_targets, test_targets):
+        if per_target:
+
+            def iter_partitions():
+                for test_target in test_targets:
+                    partition = (test_target,)
+                    args = (self._generate_args_for_targets([test_target]),)
+                    yield partition, args
+
+        else:
+
+            def iter_partitions():
+                if test_targets:
+                    partition = tuple(test_targets)
+                    args = (self._generate_args_for_targets(test_targets),)
+                    yield partition, args
 
         yield iter_partitions
 

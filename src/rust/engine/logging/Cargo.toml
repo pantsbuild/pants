@@ -7,12 +7,12 @@ publish = false
 
 [dependencies]
 chrono = "0.4.10"
-futures01 = { package = "futures", version = "0.1" }
 lazy_static = "1"
 log = "0.4"
-num_enum = "0.1.1"
+num_enum = "0.4"
 parking_lot = "0.6"
 simplelog = "0.7.4"
+tokio = { version = "0.2", features = ["rt-util"] }
 ui = { path = "../ui" }
 uuid = { version = "0.7", features = ["v4"] }
 

@@ -20,15 +20,23 @@ logger = logging.getLogger(__name__)
 
 
 class BaseLocalArtifactCache(ArtifactCache):
-    def __init__(self, artifact_root, compression, permissions=None, dereference=True):
+    def __init__(
+        self,
+        artifact_root,
+        artifact_extraction_root,
+        compression,
+        permissions=None,
+        dereference=True,
+    ):
         """
         :param str artifact_root: The path under which cacheable products will be read/written.
+        :param str artifact_extraction_root: The path to where we should extract artifacts. Usually a reified artifact_path.
         :param int compression: The gzip compression level for created artifacts.
                                 Valid values are 0-9.
         :param str permissions: File permissions to use when creating artifact files.
         :param bool dereference: Dereference symlinks when creating the cache tarball.
         """
-        super().__init__(artifact_root)
+        super().__init__(artifact_root, artifact_extraction_root)
         self._compression = compression
         self._cache_root = None
         self._permissions = permissions
@@ -36,7 +44,11 @@ class BaseLocalArtifactCache(ArtifactCache):
 
     def _artifact(self, path):
         return TarballArtifact(
-            self.artifact_root, path, self._compression, dereference=self._dereference
+            self.artifact_root,
+            self.artifact_extraction_root,
+            path,
+            self._compression,
+            dereference=self._dereference,
         )
 
     @contextmanager
@@ -101,6 +113,7 @@ class LocalArtifactCache(BaseLocalArtifactCache):
     def __init__(
         self,
         artifact_root,
+        artifact_extraction_root,
         cache_root,
         compression,
         max_entries_per_target=None,
@@ -109,6 +122,7 @@ class LocalArtifactCache(BaseLocalArtifactCache):
     ):
         """
         :param str artifact_root: The path under which cacheable products will be read/written.
+        :param str artifact_extraction_root: The path to where we should extract artifacts. Usually a reified artifact_path.
         :param str cache_root: The locally cached files are stored under this directory.
         :param int compression: The gzip compression level for created artifacts (1-9 or false-y).
         :param int max_entries_per_target: The maximum number of old cache files to leave behind on a cache miss.
@@ -117,6 +131,7 @@ class LocalArtifactCache(BaseLocalArtifactCache):
         """
         super().__init__(
             artifact_root,
+            artifact_extraction_root,
             compression,
             permissions=int(permissions.strip(), base=8) if permissions else None,
             dereference=dereference,
@@ -192,11 +207,16 @@ class TempLocalArtifactCache(BaseLocalArtifactCache):
     calls, but is useful for handling file IO for a remote cache.
     """
 
-    def __init__(self, artifact_root, compression, permissions=None):
+    def __init__(self, artifact_root, artifact_extraction_root, compression, permissions=None):
         """
         :param str artifact_root: The path under which cacheable products will be read/written.
         """
-        super().__init__(artifact_root, compression=compression, permissions=permissions)
+        super().__init__(
+            artifact_root,
+            artifact_extraction_root,
+            compression=compression,
+            permissions=permissions,
+        )
 
     def _store_tarball(self, cache_key, src):
         return src

@@ -8,7 +8,7 @@ from pants.goal.task_registrar import TaskRegistrar as task
 
 
 def build_file_aliases():
-    return BuildFileAliases(targets={"java_protobuf_library": JavaProtobufLibrary,})
+    return BuildFileAliases(targets={"java_protobuf_library": JavaProtobufLibrary})
 
 
 def register_goals():

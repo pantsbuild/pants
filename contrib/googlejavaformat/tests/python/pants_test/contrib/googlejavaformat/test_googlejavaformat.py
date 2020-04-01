@@ -60,6 +60,7 @@ class GoogleJavaFormatTests(TestBase):
             target_type=JavaLibrary,
             sources=["MyClass.java"],
         )
+        self.set_options(only=None)
         context = self.context(target_roots=[target])
         self.execute(context)
         with open(javafile, "r") as fh:

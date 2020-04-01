@@ -36,7 +36,6 @@ pythonpath = [
   "%(buildroot)s/contrib/jax_ws/src/python",
   "%(buildroot)s/contrib/mypy/src/python",
   "%(buildroot)s/contrib/node/src/python",
-  "%(buildroot)s/contrib/python/src/python",
   "%(buildroot)s/contrib/scalajs/src/python",
   "%(buildroot)s/contrib/scrooge/src/python",
   "%(buildroot)s/contrib/thrifty/src/python",
@@ -57,7 +56,6 @@ backend_packages.add = [
   "pants.contrib.jax_ws",
   "pants.contrib.scalajs",
   "pants.contrib.node",
-  "pants.contrib.python.checks",
   "pants.contrib.scrooge",
   "pants.contrib.thrifty",
   "internal_backend.repositories",
@@ -73,6 +71,7 @@ backend_packages2 = [
   "pants.backend.python",
   "pants.backend.python.lint.black",
   "pants.backend.python.lint.docformatter",
+  "pants.backend.python.lint.flake8",
   "pants.backend.python.lint.isort",
   "pants.backend.native",
   "internal_backend.rules_for_testing",
@@ -87,6 +86,8 @@ pants_ignore.add = [
   "/build-support/*.venv/",
   # An absolute symlink to the Pants Rust toolchain sources.
   "/build-support/bin/native/src",
+  # We shouldn't walk or watch the rust compiler artifacts because it is slow.
+  "/src/rust/engine/target",
 ]
 
 [cache]
@@ -250,14 +251,15 @@ setupdir = "%(pants_supportdir)s/eslint"
 config = "%(pants_supportdir)s/eslint/.eslintrc"
 ignore = "%(pants_supportdir)s/eslint/.eslintignore"
 
+[flake8]
+config = "build-support/flake8/.flake8"
+extra_requirements.add = ["flake8-pantsbuild>=2.0,<3"]
+
 [google-java-format]
 skip = true
 
 [isort]
 config = [".isort.cfg", "contrib/.isort.cfg", "examples/.isort.cfg"]
-
-[python-eval]
-skip = true
 
 [scalafmt]
 skip = true
@@ -273,33 +275,6 @@ excludes = "%(buildroot)s/build-support/scalastyle/excludes.txt"
 
 [protoc.gen.go-protobuf]
 version = "3.4.1"
-
-[pycheck-class-factoring]
-skip = true
-
-[pycheck-context-manager]
-skip = true
-
-[pycheck-import-order]
-skip = true
-
-[pycheck-indentation]
-skip = true
-
-[pycheck-newlines]
-skip = true
-
-[pycheck-newstyle-classes]
-skip = true
-
-[pycheck-pycodestyle]
-skip = true
-
-[pycheck-trailing-whitespace]
-skip = true
-
-[pycheck-variable-names]
-skip = true
 
 [scala]
 version = 2.12
@@ -373,9 +348,11 @@ branch_notes = """
 
 [publish.jar]
 ivy_settings = "%(pants_supportdir)s/ivy/publish.ivysettings.xml"
-# Prevent Travis-CI from running for this automated jar publish commit:
-#   http://docs.travis-ci.com/user/how-to-skip-a-build/
-push_postscript = '["ci skip"]'
+push_postscript = """
+# Prevent Travis CI from running for this automated JAR publish commit:
+#  https://docs.travis-ci.com/user/customizing-the-build/#skipping-a-build
+[ci skip]
+"""
 repos = """
 {
   'public': {  # must match the name of the `Repository` object that you defined in your plugin.
@@ -401,9 +378,6 @@ resolver_cache_dir = "%(pants_bootstrapdir)s/python_cache/requirements"
 
 [pytest]
 pytest_plugins.add = [
-  # TODO(8528): implement a generic retry mechanism for the V2 test runner instead of using this
-  #  plugin.
-  "pytest-rerunfailures",
   # TODO(#8651): We need this until we switch to implicit namespace packages so that pytest-cov
   #  understands our __init__ files. NB: this version matches 3rdparty/python/requirements.txt.
   "setuptools==44.0.0",
@@ -460,11 +434,16 @@ repos = [
   # First try RBE's maven central mirror, as we can get throttled by
   # maven central due to all RBE traffic appearing to them as coming from a single IP.
   # There's no harm in trying this even outside RBE, as it is world-visible.
-  'https://maven-central.storage-download.googleapis.com/repos/central/data',
+  'https://maven-central.storage-download.googleapis.com/maven2',
   'https://repo1.maven.org/maven2',
   # Custom repo for Kythe jars, as Google doesn't currently publish them anywhere.
   'https://raw.githubusercontent.com/toolchainlabs/binhost/master/',
+  # Specify local default maven repo to support
+  # testing snapshots of 3rdparty jars published locally.
+  'file://%(homedir)s/.m2/repository',
 ]
+
+fetch_options.add = ["--retry-count", "3", "--no-default"]
 
 [cache.resolve.coursier]
 # Only use local artifact for coursier because the cache content contains abs path

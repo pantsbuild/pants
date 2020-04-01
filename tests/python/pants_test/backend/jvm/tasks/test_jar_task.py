@@ -22,7 +22,7 @@ class BaseJarTaskTest(JarTaskTestBase):
         return (
             super()
             .alias_groups()
-            .merge(BuildFileAliases(targets={"java_agent": JavaAgent, "jvm_binary": JvmBinary,},))
+            .merge(BuildFileAliases(targets={"java_agent": JavaAgent, "jvm_binary": JvmBinary}))
         )
 
     def setUp(self):

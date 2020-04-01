@@ -35,7 +35,7 @@ class GoalExecutor:
                 task_workdir = os.path.join(goal_workdir, name)
                 task = task_type(self._context, task_workdir)
                 log_config = WorkUnit.LogConfig(
-                    level=task.get_options().level, colors=task.get_options().colors
+                    log_level=task.get_options().level, colors=task.get_options().colors
                 )
                 with self._context.new_workunit(
                     name=name, labels=[WorkUnitLabel.TASK], log_config=log_config

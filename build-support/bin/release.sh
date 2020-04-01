@@ -148,6 +148,7 @@ function execute_packaged_pants_with_internal_backends() {
         'pants.backend.native',\
         'pants.backend.project_info',\
         'pants.backend.python',\
+        'pants.cache',\
         'internal_backend.repositories',\
         'internal_backend.sitegen',\
         'internal_backend.utilities',\
@@ -623,6 +624,7 @@ function build_pex() {
   execute_pex \
     -o "${dest}" \
     --no-emit-warnings \
+    --no-strip-pex-env \
     --script=pants \
     --interpreter-constraint="${interpreter_constraint}" \
     "${platform_flags[@]}" \

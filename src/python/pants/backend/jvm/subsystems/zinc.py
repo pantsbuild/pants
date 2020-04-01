@@ -27,7 +27,7 @@ from pants.util.dirutil import fast_relpath, safe_delete, safe_mkdir, safe_mkdir
 from pants.util.fileutil import safe_hardlink_or_copy
 from pants.util.memo import memoized_method, memoized_property
 
-_ZINC_COMPILER_VERSION = "0.0.17"
+_ZINC_COMPILER_VERSION = "0.0.20"
 
 
 class Zinc:
@@ -91,7 +91,7 @@ class Zinc:
             cls.register_jvm_tool(
                 register,
                 Zinc.ZINC_BOOTSTRAPPER_TOOL_NAME,
-                classpath=[JarDependency("org.pantsbuild", "zinc-bootstrapper_2.12", "0.0.12"),],
+                classpath=[JarDependency("org.pantsbuild", "zinc-bootstrapper_2.12", "0.0.12")],
                 main=Zinc.ZINC_BOOTSTRAPER_MAIN,
                 custom_rules=shader_rules,
             )

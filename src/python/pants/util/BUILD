@@ -4,6 +4,8 @@
 python_tests(
   name='tests',
   dependencies=[
+    '3rdparty/python:dataclasses',
+    ':frozendict',
     ':ordered_set',
   ],
   tags = {'type_checked'},
@@ -76,6 +78,18 @@ python_library(
   name = 'filtering',
   sources = ['filtering.py'],
   tags = {'partially_type_checked'},
+)
+
+python_library(
+  name = 'frozendict',
+  sources = ['frozendict.py'],
+  tags = {'type_checked'},
+)
+
+python_library(
+  name = 'logging',
+  sources = ['logging.py'],
+  tags = {'type_checked'},
 )
 
 python_library(

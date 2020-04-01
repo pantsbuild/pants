@@ -5,6 +5,7 @@ import logging
 
 from pants.binaries.binary_util import BinaryToolFetcher, BinaryUtil
 from pants.pantsd.watchman import Watchman
+from pants.util.logging import LogLevel
 from pants.util.memo import testable_memoized_property
 
 
@@ -69,13 +70,13 @@ class WatchmanLauncher:
         self._metadata_base_dir = metadata_base_dir
 
     @staticmethod
-    def _convert_log_level(level):
+    def _convert_log_level(log_level):
         """Convert a given pants log level string into a watchman log level string."""
         # N.B. Enabling true Watchman debug logging (log level 2) can generate an absurd amount of log
         # data (10s of gigabytes over the course of an ~hour for an active fs) and is not particularly
         # helpful except for debugging Watchman itself. Thus, here we intentionally avoid this level
         # in the mapping of pants log level -> watchman.
-        return {"warn": "0", "info": "1", "debug": "1"}.get(level, "1")
+        return {LogLevel.WARN: "0", LogLevel.INFO: "1", LogLevel.DEBUG: "1"}.get(log_level, "1")
 
     @testable_memoized_property
     def watchman(self):
@@ -97,7 +98,7 @@ class WatchmanLauncher:
             try:
                 self.watchman.launch()
             except (Watchman.ExecutionError, Watchman.InvalidCommandOutput) as e:
-                self._logger.fatal("failed to launch watchman: {!r})".format(e))
+                self._logger.critical("failed to launch watchman: {!r})".format(e))
                 raise
 
         self._logger.debug(

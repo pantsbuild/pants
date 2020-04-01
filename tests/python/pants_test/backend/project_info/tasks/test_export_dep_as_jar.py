@@ -145,13 +145,13 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
         self.make_target(
             ":nailgun-server",
             JarLibrary,
-            jars=[JarDependency(org="com.martiansoftware", name="nailgun-server", rev="0.9.1"),],
+            jars=[JarDependency(org="com.martiansoftware", name="nailgun-server", rev="0.9.1")],
         )
 
     def execute_export(self, *specs, **options_overrides):
         options = {
             ScalaPlatform.options_scope: {"version": "custom"},
-            JvmResolveSubsystem.options_scope: {"resolver": "ivy"},
+            JvmResolveSubsystem.options_scope: {"resolver": "coursier"},
             JvmPlatform.options_scope: {
                 "default_platform": "java8",
                 "platforms": {"java8": {"source": "1.8", "target": "1.8"}},
@@ -737,7 +737,7 @@ class ExportDepAsJarTestWithCodegenTargets(ExportDepAsJarTest):
             set(result["targets"].keys()),
         )
         self.assertEqual(
-            {"project_info:b", "project_info:f",},
+            {"project_info:b", "project_info:f"},
             set(result["targets"]["project_info:a"]["targets"]),
         )
 
@@ -754,7 +754,7 @@ class ExportDepAsJarTestWithCodegenTargets(ExportDepAsJarTest):
             set(result["targets"].keys()),
         )
         self.assertEqual(
-            {"project_info:b", "project_info:f",},
+            {"project_info:b", "project_info:f"},
             set(result["targets"]["project_info:a"]["targets"]),
         )
 

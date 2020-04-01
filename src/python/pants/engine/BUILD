@@ -14,7 +14,10 @@ python_tests(
   dependencies = [
     ':console',
     ':goal',
+    ':platform',
     ':rules',
+    ':target',
+    'src/python/pants/testutil:test_base',
     'src/python/pants/testutil/engine:util',
   ],
 )
@@ -26,6 +29,7 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
     'src/python/pants/goal',
+    'src/python/pants/util:logging',
     'src/python/pants/util:ordered_set',
   ],
   tags = {"partially_type_checked"},
@@ -128,6 +132,19 @@ python_library(
     ':platform',
   ],
   tags = {"partially_type_checked"},
+)
+
+python_library(
+  name='desktop',
+  sources=['desktop.py'],
+  dependencies=[
+    '3rdparty/python:dataclasses',
+    ':console',
+    ':interactive_runner',
+    'src/python/pants/util:osutil',
+    'src/python/pants/util:strutil',
+  ],
+  tags = {"type_checked"},
 )
 
 python_library(
@@ -257,6 +274,20 @@ python_library(
     '3rdparty/python:ansicolors',
   ],
   tags = {'partially_type_checked'},
+)
+
+python_library(
+  name='target',
+  sources=['target.py'],
+  dependencies=[
+    ':rules',
+    '3rdparty/python:typing-extensions',
+    'src/python/pants/util:collections',
+    'src/python/pants/util:frozendict',
+    'src/python/pants/util:meta',
+    'src/python/pants/util:ordered_set',
+  ],
+  tags = {'type_checked'},
 )
 
 resources(

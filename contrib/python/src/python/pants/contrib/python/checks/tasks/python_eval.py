@@ -6,19 +6,18 @@ import os
 import pkgutil
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
-from pants.backend.python.subsystems.pex_build_util import (
-    has_python_requirements,
-    has_python_sources,
-)
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.resolve_requirements_task_base import ResolveRequirementsTaskBase
-from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
 from pants.base.workunit import WorkUnit, WorkUnitLabel
-from pants.python.pex_build_util import PexBuilderWrapper
+from pants.python.pex_build_util import (
+    PexBuilderWrapper,
+    has_python_requirements,
+    has_python_sources,
+)
 from pants.task.lint_task_mixin import LintTaskMixin
 from pants.util.dirutil import safe_concurrent_creation, safe_mkdir
 from pants.util.memo import memoized_property
@@ -53,28 +52,7 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
 
     @property
     def skip_execution(self):
-        task_options = self.get_options()
-        subsystem_options = PythonEvalSubystem.global_instance().options
-        deprecated_conditional(
-            lambda: task_options.is_default("skip") and subsystem_options.is_default("skip"),
-            entity_description="`python-eval` defaulting to being used",
-            removal_version="1.27.0.dev0",
-            hint_message="`python-eval` is scheduled to be removed in Pants 1.29.0.dev0. The Python "
-            "linter landscape has changed since we first created this tool - there are now "
-            "popular linters that dramatically improve upon this one, such as MyPy and "
-            "Pylint. Pants currently provides a wrapper around MyPy and will soon add "
-            "Pylint. (To install MyPy, add "
-            "`pantsbuild.pants.contrib.mypy==%(pants_version)s` to your `plugins` list.)"
-            "\n\nTo prepare, set `skip = true` in your `pants.toml` under the section "
-            "`python-eval`. If you still need to use this tool, set `skip = false`. In "
-            "Pants 1.27.0.dev0, the default will change from `skip = false` to `skip = true`, "
-            "and in Pants 1.29.0.dev0, the module will be removed.",
-        )
-        return self.resolve_conflicting_skip_options(
-            old_scope="lint-python-eval",
-            new_scope="python-eval",
-            subsystem=PythonEvalSubystem.global_instance(),
-        )
+        return PythonEvalSubystem.global_instance().options.skip
 
     @classmethod
     def prepare(cls, options, round_manager):

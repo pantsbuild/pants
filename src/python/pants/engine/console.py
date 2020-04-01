@@ -2,9 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import sys
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
-from colors import blue, green, red
+from colors import blue, cyan, green, magenta, red
 
 from pants.engine.native import Native
 from pants.engine.rules import side_effecting
@@ -83,15 +83,21 @@ class Console:
         self.stdout.flush()
         self.stderr.flush()
 
-    def _safe_color(self, text, color):
+    def _safe_color(self, text: str, color: Callable[[str], str]) -> str:
         """We should only output color when the global flag --colors is enabled."""
         return color(text) if self._use_colors else text
 
-    def blue(self, text):
+    def blue(self, text: str) -> str:
         return self._safe_color(text, blue)
 
-    def green(self, text):
+    def cyan(self, text: str) -> str:
+        return self._safe_color(text, cyan)
+
+    def green(self, text: str) -> str:
         return self._safe_color(text, green)
 
-    def red(self, text):
+    def magenta(self, text: str) -> str:
+        return self._safe_color(text, magenta)
+
+    def red(self, text: str) -> str:
         return self._safe_color(text, red)

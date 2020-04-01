@@ -354,8 +354,8 @@ class PantsHandler(http.server.BaseHTTPRequestHandler):
         """Check if client is allowed to connect to this server."""
         client_ip = self._client_address[0]
         if (
-            not client_ip in self._settings.allowed_clients
-            and not "ALL" in self._settings.allowed_clients
+            client_ip not in self._settings.allowed_clients
+            and "ALL" not in self._settings.allowed_clients
         ):
             content = f"Access from host {client_ip} forbidden.".encode()
             self._send_content(content, "text/html")

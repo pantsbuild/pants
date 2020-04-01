@@ -15,7 +15,7 @@ class WikiPageTest(TestBase):
     @classmethod
     def alias_groups(cls):
         return BuildFileAliases(
-            targets={"page": Page,},
+            targets={"page": Page},
             objects={
                 "Wiki": Wiki,
                 "wiki_artifact": WikiArtifact,

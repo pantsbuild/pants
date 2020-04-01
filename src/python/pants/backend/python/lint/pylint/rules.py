@@ -26,7 +26,7 @@ from pants.engine.selectors import Get, MultiGet
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
 from pants.rules.core import determine_source_files, strip_source_roots
-from pants.rules.core.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
+from pants.rules.core.determine_source_files import LegacySpecifiedSourceFilesRequest, SourceFiles
 from pants.rules.core.lint import Linter, LintResult
 
 
@@ -107,7 +107,7 @@ async def lint(
     )
 
     specified_source_files = await Get[SourceFiles](
-        SpecifiedSourceFilesRequest(adaptors_with_origins, strip_source_roots=True)
+        LegacySpecifiedSourceFilesRequest(adaptors_with_origins, strip_source_roots=True)
     )
 
     address_references = ", ".join(

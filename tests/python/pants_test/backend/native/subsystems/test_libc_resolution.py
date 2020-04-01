@@ -13,7 +13,7 @@ class TestLibcDirectorySearchFailure(TestBase):
     def setUp(self):
         init_subsystems(
             [LibcDev],
-            options={"libc": {"enable_libc_search": True, "libc_dir": "/does/not/exist",},},
+            options={"libc": {"enable_libc_search": True, "libc_dir": "/does/not/exist"}},
         )
 
         self.libc = global_subsystem_instance(LibcDev)
@@ -30,7 +30,7 @@ class TestLibcSearchDisabled(TestBase):
     def setUp(self):
         init_subsystems(
             [LibcDev],
-            options={"libc": {"enable_libc_search": False, "libc_dir": "/does/not/exist",},},
+            options={"libc": {"enable_libc_search": False, "libc_dir": "/does/not/exist"}},
         )
 
         self.libc = global_subsystem_instance(LibcDev)

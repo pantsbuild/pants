@@ -148,7 +148,7 @@ class PythonSetup(Subsystem):
         register(
             "--resolver-jobs",
             type=int,
-            default=1,
+            default=None,
             advanced=True,
             fingerprint=True,
             help=(

@@ -54,7 +54,7 @@ class TestEnclosingScopeTraversal(unittest.TestCase):
         self.assertEqual(enclosing_scope(compound_scope), base_dashed_scope)
         self.assertEqual(
             list(all_enclosing_scopes(compound_scope)),
-            [compound_scope, base_dashed_scope, GLOBAL_SCOPE,],
+            [compound_scope, base_dashed_scope, GLOBAL_SCOPE],
         )
 
         invalid_scope = "a.b..c.d"

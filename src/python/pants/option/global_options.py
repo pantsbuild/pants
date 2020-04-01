@@ -20,6 +20,7 @@ from pants.option.custom_types import dir_option
 from pants.option.errors import OptionsError
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.subsystem.subsystem import Subsystem
+from pants.util.logging import LogLevel
 
 
 class GlobMatchErrorBehavior(Enum):
@@ -98,6 +99,7 @@ class ExecutionOptions:
     remote_execution_extra_platform_properties: Any
     remote_execution_headers: Any
     process_execution_local_enable_nailgun: bool
+    experimental_fs_watcher: bool
 
     @classmethod
     def from_bootstrap_options(cls, bootstrap_options):
@@ -123,6 +125,7 @@ class ExecutionOptions:
             remote_execution_extra_platform_properties=bootstrap_options.remote_execution_extra_platform_properties,
             remote_execution_headers=bootstrap_options.remote_execution_headers,
             process_execution_local_enable_nailgun=bootstrap_options.process_execution_local_enable_nailgun,
+            experimental_fs_watcher=bootstrap_options.experimental_fs_watcher,
         )
 
 
@@ -148,6 +151,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_execution_extra_platform_properties=[],
     remote_execution_headers={},
     process_execution_local_enable_nailgun=False,
+    experimental_fs_watcher=False,
 )
 
 
@@ -176,8 +180,8 @@ class GlobalOptions(Subsystem):
         register(
             "-l",
             "--level",
-            choices=["trace", "debug", "info", "warn", "error"],
-            default="info",
+            type=LogLevel,
+            default=LogLevel.INFO,
             recursive=True,
             help="Set the logging level.",
         )
@@ -297,19 +301,24 @@ class GlobalOptions(Subsystem):
                 "pants.backend.codegen.grpcio.python",
                 "pants.backend.codegen.wire.java",
                 "pants.backend.project_info",
+                "pants.cache",
             ],
-            help="Register v1 tasks from these backends. The backend packages must be present on "
-            "the PYTHONPATH, typically because they are in the pants core dist, in a "
-            "plugin dist, or available as sources in the repo.",
+            help=(
+                "Register v1 tasks from these backends. The backend packages must be present on "
+                "the PYTHONPATH, typically because they are in the Pants core dist, in a "
+                "plugin dist, or available as sources in the repo."
+            ),
         )
         register(
             "--backend-packages2",
             advanced=True,
             type=list,
             default=[],
-            help="Register v2 rules from these backends. The backend packages must be present on "
-            "the PYTHONPATH, typically because they are in the pants core dist, in a "
-            "plugin dist, or available as sources in the repo.",
+            help=(
+                "Register v2 rules from these backends. The backend packages must be present on "
+                "the PYTHONPATH, typically because they are in the Pants core dist, in a "
+                "plugin dist, or available as sources in the repo."
+            ),
         )
 
         register(
@@ -853,6 +862,14 @@ class GlobalOptions(Subsystem):
             default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_enable_nailgun,
             help="Whether or not to use nailgun to run the requests that are marked as nailgunnable.",
             advanced=True,
+        )
+        register(
+            "--experimental-fs-watcher",
+            type=bool,
+            default=False,
+            advanced=True,
+            help="Whether to use the engine filesystem watcher which registers the workspace"
+            " for kernel file change events",
         )
 
     @classmethod

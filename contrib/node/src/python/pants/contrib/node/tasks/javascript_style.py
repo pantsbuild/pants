@@ -26,8 +26,7 @@ class JavascriptStyleBase(NodeTask):
     :API: public
     """
 
-    _JS_SOURCE_EXTENSION = ".js"
-    _JSX_SOURCE_EXTENSION = ".jsx"
+    _DEFAULT_JS_EXTENSIONS = (".js", ".jsx")
     INSTALL_JAVASCRIPTSTYLE_TARGET_NAME = "synthetic-install-javascriptstyle-module"
 
     def _resolve_conflicting_skip(self, *, old_scope: str):
@@ -44,6 +43,13 @@ class JavascriptStyleBase(NodeTask):
             "--fail-slow", type=bool, help="Check all targets and present the full list of errors."
         )
         register("--color", type=bool, default=True, help="Enable or disable color.")
+        register(
+            "--file-extensions",
+            advanced=True,
+            type=list,
+            default=cls._DEFAULT_JS_EXTENSIONS,
+            help="File extensions that should be linted as JS.",
+        )
 
     @classmethod
     def subsystem_dependencies(cls):
@@ -59,10 +65,7 @@ class JavascriptStyleBase(NodeTask):
             target
             for target in targets
             if isinstance(target, NodeModule)
-            and (
-                target.has_sources(self._JS_SOURCE_EXTENSION)
-                or target.has_sources(self._JSX_SOURCE_EXTENSION)
-            )
+            and any(target.has_sources(ext) for ext in self.get_options().file_extensions)
             and (not target.is_synthetic)
         ]
 
@@ -71,10 +74,7 @@ class JavascriptStyleBase(NodeTask):
         sources.update(
             os.path.join(get_buildroot(), source)
             for source in target.sources_relative_to_buildroot()
-            if (
-                source.endswith(self._JS_SOURCE_EXTENSION)
-                or source.endswith(self._JSX_SOURCE_EXTENSION)
-            )
+            if any(source.endswith(ext) for ext in self.get_options().file_extensions)
         )
         return sources
 
@@ -182,10 +182,8 @@ class JavascriptStyleBase(NodeTask):
         if not targets:
             return
         failed_targets = []
-        bootstrap_dir, is_preconfigured = (
-            ESLint.global_instance().supportdir(task_workdir=self.workdir)
-            if ESLint.global_instance().options.setupdir
-            else self.node_distribution.eslint_supportdir(self.workdir)
+        bootstrap_dir, is_preconfigured = ESLint.global_instance().supportdir(
+            task_workdir=self.workdir
         )
         if not is_preconfigured:
             self.context.log.debug("ESLint is not pre-configured, bootstrapping with defaults.")
@@ -229,7 +227,7 @@ class JavascriptStyleLint(LintTaskMixin, JavascriptStyleBase):
 
     @property
     def skip_execution(self):
-        return super()._resolve_conflicting_skip(old_scope="lint-javascriptstyle")
+        return ESLint.global_instance().options.skip
 
 
 class JavascriptStyleFmt(FmtTaskMixin, JavascriptStyleBase):
@@ -242,4 +240,4 @@ class JavascriptStyleFmt(FmtTaskMixin, JavascriptStyleBase):
 
     @property
     def skip_execution(self):
-        return super()._resolve_conflicting_skip(old_scope="fmt-javascriptstyle")
+        return super().determine_if_skipped(formatter_subsystem=ESLint.global_instance())
