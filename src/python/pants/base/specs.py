@@ -299,17 +299,23 @@ class AddressSpecsMatcher:
     def _exclude_compiled_regexps(self):
         return [re.compile(pattern) for pattern in set(self.exclude_patterns or [])]
 
-    def _excluded_by_pattern(self, address):
+    def _excluded_by_pattern(self, address) -> bool:
         return any(p.search(address.spec) is not None for p in self._exclude_compiled_regexps)
 
     @memoized_property
     def _target_tag_matches(self):
         def filter_for_tag(tag):
-            return lambda t: tag in [str(t_tag) for t_tag in t.kwargs().get("tags", [])]
+            def filter_target(tgt):
+                # `tags` can sometimes be explicitly set to `None`. We convert that to an empty list
+                # with `or`.
+                tags = tgt.kwargs().get("tags", []) or []
+                return tag in [str(t_tag) for t_tag in tags]
+
+            return filter_target
 
         return wrap_filters(create_filters(self.tags, filter_for_tag))
 
-    def matches_target_address_pair(self, address, target):
+    def matches_target_address_pair(self, address, target) -> bool:
         """
         :param Address address: An Address to match
         :param HydratedTarget target: The Target for the address.
