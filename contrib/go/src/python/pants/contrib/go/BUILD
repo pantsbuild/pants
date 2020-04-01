@@ -4,6 +4,7 @@
 contrib_plugin(
   name='plugin',
   dependencies=[
+    'contrib/go/src/python/pants/contrib/go/rules',
     'contrib/go/src/python/pants/contrib/go/targets',
     'contrib/go/src/python/pants/contrib/go/tasks',
     'src/python/pants/build_graph',

@@ -16,7 +16,6 @@ class GoThriftLibrary(Target):
         :param sources: thrift source files
         :type sources: :class:`pants.source.wrapped_globs.FilesetWithSpec` or list of strings. Paths
                        are relative to the BUILD file's directory.
-        :param import_path: Deprecated: unused.
         """
         payload = payload or Payload()
         payload.add_field(
