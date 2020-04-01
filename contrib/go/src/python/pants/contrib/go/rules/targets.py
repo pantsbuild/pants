@@ -16,7 +16,7 @@ class GoSources(Sources):
     default = ("*", "!BUILD", "!BUILD.*")
 
 
-class BuildFlags(StringField):
+class GoBuildFlags(StringField):
     """Build flags to pass to the Go compiler."""
 
     alias = "build_flags"
@@ -26,7 +26,7 @@ class GoBinary(Target):
     """A Go main package."""
 
     alias = "go_binary"
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, GoSources, BuildFlags)
+    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, GoSources, GoBuildFlags)
 
 
 class GoLibrary(Target):
@@ -60,7 +60,7 @@ class GoThriftLibrary(Target):
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, Sources)
 
 
-class Package(StringField):
+class GoPackage(StringField):
     """The package import path within the remote library.
 
     By default, just the root package will be available.
@@ -70,7 +70,7 @@ class Package(StringField):
     default = "."
 
 
-class Revision(StringField):
+class GoRevision(StringField):
     """Identifies which version of the remote library to download.
 
     This could be a commit SHA (git), node id (hg), etc. If left unspecified the version will
@@ -85,10 +85,10 @@ class GoRemoteLibrary(Target):
     """A remote Go package."""
 
     alias = "go_remote_library"
-    core_fields = (*COMMON_TARGET_FIELDS, Package, Revision)
+    core_fields = (*COMMON_TARGET_FIELDS, GoPackage, GoRevision)
 
 
-class Packages(StringSequenceField):
+class GoPackages(StringSequenceField):
     """The package import paths within the remote library.
 
     By default, just the root package will be available.
@@ -102,4 +102,4 @@ class GoRemoteLibraries(Target):
     """Multiple remote Go packages."""
 
     alias = "go_remote_libraries"
-    core_fields = (*COMMON_TARGET_FIELDS, Packages, Revision)
+    core_fields = (*COMMON_TARGET_FIELDS, GoPackages, GoRevision)
