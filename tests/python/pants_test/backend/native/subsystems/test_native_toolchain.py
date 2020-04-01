@@ -27,6 +27,10 @@ from pants_test.engine.scheduler_test_base import SchedulerTestBase
 
 
 class TestNativeToolchain(TestBase, SchedulerTestBase):
+    @classmethod
+    def rules(cls):
+        return (*native_backend_rules(), *create_platform_rules())
+
     def setUp(self):
         super().setUp()
 
@@ -34,7 +38,6 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
 
         self.platform = Platform.current
         self.toolchain = global_subsystem_instance(NativeToolchain)
-        self.rules = native_backend_rules() + create_platform_rules()
 
         gcc_subsystem = global_subsystem_instance(GCC)
         self.gcc_version = gcc_subsystem.version()
