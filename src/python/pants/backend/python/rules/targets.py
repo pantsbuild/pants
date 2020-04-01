@@ -178,10 +178,8 @@ class PexInheritPath(StringField):
     def compute_value(
         cls, raw_value: Optional[Union[str, bool]], *, address: Address
     ) -> Optional[str]:
-        if raw_value is False:
-            return "false"
-        if raw_value is True:
-            return "prefer"
+        if isinstance(raw_value, bool):
+            return "prefer" if raw_value else "false"
         return super().compute_value(raw_value, address=address)
 
 
