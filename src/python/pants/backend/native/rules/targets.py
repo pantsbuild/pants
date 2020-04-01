@@ -48,12 +48,12 @@ class CtypesNativeLibrary(PrimitiveField):
         return value
 
 
-class FatalWarnings(BoolField):
+class NativeFatalWarnings(BoolField):
     alias = "fatal_warnings"
     default = False
 
 
-class StrictDeps(BoolField):
+class NativeStrictDeps(BoolField):
     """Whether to include only dependencies directly declared in the BUILD file.
 
     If this is False, all transitive dependencies are used when compiling and linking native code.
@@ -84,7 +84,7 @@ class ToolchainVariantField(StringField):
         return value
 
 
-class CompilerOptionSets(StringSequenceField):
+class NativeCompilerOptionSets(StringSequenceField):
     alias = "compiler_options_sets"
 
 
@@ -92,10 +92,10 @@ NATIVE_LIBRARY_COMMON_FIELDS = (
     *COMMON_TARGET_FIELDS,
     Dependencies,
     CtypesNativeLibrary,
-    StrictDeps,
-    FatalWarnings,
+    NativeStrictDeps,
+    NativeFatalWarnings,
     ToolchainVariantField,
-    CompilerOptionSets,
+    NativeCompilerOptionSets,
 )
 
 
@@ -113,7 +113,7 @@ class CppLibrary(Target):
     core_fields = (*NATIVE_LIBRARY_COMMON_FIELDS, CppSources)
 
 
-class Packages(PrimitiveField):
+class ConanPackages(PrimitiveField):
     """The `ConanRequirement`s to resolve into a `packaged_native_library()` target."""
 
     alias = "packages"
@@ -143,10 +143,10 @@ class ExternalNativeLibrary(Target):
     """A set of Conan package strings to be passed to the Conan package manager."""
 
     alias = "external_native_library"
-    core_fields = (*COMMON_TARGET_FIELDS, Packages)
+    core_fields = (*COMMON_TARGET_FIELDS, ConanPackages)
 
 
-class IncludeRelpath(StringField):
+class NativeIncludeRelpath(StringField):
     """The path where C/C++ headers are located, relative to this target's directory.
 
     Libraries depending on this target will be able to #include files relative to this directory.
@@ -155,7 +155,7 @@ class IncludeRelpath(StringField):
     alias = "include_relpath"
 
 
-class LibRelpath(StringField):
+class NativeLibRelpath(StringField):
     """The path where native libraries are located, relative to this target's directory."""
 
     alias = "lib_relpath"
@@ -224,7 +224,7 @@ class PackagedNativeLibrary(Target):
         *COMMON_TARGET_FIELDS,
         Dependencies,
         Sources,
-        IncludeRelpath,
-        LibRelpath,
+        NativeIncludeRelpath,
+        NativeLibRelpath,
         NativeLibNames,
     )

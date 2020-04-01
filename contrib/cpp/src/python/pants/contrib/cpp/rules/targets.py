@@ -10,7 +10,7 @@ from pants.engine.target import (
 )
 
 
-class Libraries(StringSequenceField):
+class CppLibraries(StringSequenceField):
     """Libraries that this target depends on that are not pants targets.
 
     For example, 'm' or 'rt' that are expected to be installed on the local system.
@@ -23,7 +23,7 @@ class CppBinary(Target):
     """A C++ binary."""
 
     alias = "cpp_binary"
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, Sources, Libraries)
+    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, Sources, CppLibraries)
 
 
 class CppLibrary(Target):
