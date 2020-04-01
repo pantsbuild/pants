@@ -1,11 +1,12 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import dataclasses
 import itertools
 import os
-from abc import ABC, abstractmethod
+from abc import ABC
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, Tuple, Type
+from typing import ClassVar, Dict, Iterable, Tuple, Type
 
 from pants.base.build_root import BuildRoot
 from pants.build_graph.address import Address
@@ -22,7 +23,7 @@ from pants.rules.core.distdir import DistDir
 
 # TODO: Factor this out once porting fmt.py and lint.py to the Target API.
 @union
-@dataclass(frozen=True)  # type: ignore[misc]   # https://github.com/python/mypy/issues/5374
+@dataclass(frozen=True)
 class BinaryConfiguration(ABC):
     """An ad hoc collection of the fields necessary to create a binary from a target."""
 
@@ -44,10 +45,24 @@ class BinaryConfiguration(ABC):
             if target_type.class_has_fields(cls.required_fields, union_membership=union_membership)
         )
 
+    # TODO: this won't handle any non-Field attributes defined on the configuration. It also
+    # doesn't allow us to override the `default_raw_value` (do we really care about this?).
     @classmethod
-    @abstractmethod
     def create(cls, tgt: Target) -> "BinaryConfiguration":
-        pass
+        all_expected_fields: Dict[str, Type[Field]] = {
+            dataclass_field.name: dataclass_field.type
+            for dataclass_field in dataclasses.fields(cls)
+            if issubclass(dataclass_field.type, Field)
+        }
+        return cls(  # type: ignore[call-arg]
+            address=tgt.address,
+            **{
+                dataclass_field_name: tgt[field_cls]
+                if field_cls in cls.required_fields
+                else tgt.get(field_cls)
+                for dataclass_field_name, field_cls in all_expected_fields.items()
+            },
+        )
 
 
 @union

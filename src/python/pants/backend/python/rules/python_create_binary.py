@@ -2,37 +2,67 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Tuple
 
 from pants.backend.python.rules.pex import Pex
 from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
-from pants.backend.python.rules.targets import EntryPoint, PythonBinarySources
+from pants.backend.python.rules.targets import (
+    PexAlwaysWriteCache,
+    PexEmitWarnings,
+    PexIgnoreErrors,
+    PexIndices,
+    PexInheritPath,
+    PexRepositories,
+    PexShebang,
+    PexZipSafe,
+    PythonBinarySources,
+    PythonEntryPoint,
+    PythonPlatforms,
+)
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.engine.addressable import Addresses
 from pants.engine.rules import UnionRule, rule
 from pants.engine.selectors import Get
-from pants.engine.target import Target
 from pants.rules.core.binary import BinaryConfiguration, CreatedBinary
 from pants.rules.core.determine_source_files import AllSourceFilesRequest, SourceFiles
 
 
 @dataclass(frozen=True)
 class PythonBinaryConfiguration(BinaryConfiguration):
-    required_fields = (EntryPoint, PythonBinarySources)
+    required_fields = (PythonEntryPoint, PythonBinarySources)
 
     sources: PythonBinarySources
-    entry_point: EntryPoint
+    entry_point: PythonEntryPoint
 
-    # TODO: consume the other PythonBinary fields like `ZipSafe` and `AlwaysWriteCache`. These are
-    #  optional fields. If your target type has them registered, we can do extra meaningful things;
-    #  if you don't have them on your target type, we can still operate so long as you have the
-    #  required fields. Use `Target.get()` in the `create()` method.
+    always_write_cache: PexAlwaysWriteCache
+    emit_warnings: PexEmitWarnings
+    ignore_errors: PexIgnoreErrors
+    indices: PexIndices
+    inherit_path: PexInheritPath
+    repositories: PexRepositories
+    shebang: PexShebang
+    zip_safe: PexZipSafe
+    platforms: PythonPlatforms
 
-    @classmethod
-    def create(cls, tgt: Target) -> "PythonBinaryConfiguration":
-        return cls(
-            address=tgt.address, sources=tgt[PythonBinarySources], entry_point=tgt[EntryPoint]
-        )
+    def generate_additional_args(self) -> Tuple[str, ...]:
+        args = []
+        if self.always_write_cache.value is True:
+            args.append("--always-write-cache")
+        if self.emit_warnings.value is False:
+            args.append("--no-emit-warnings")
+        if self.ignore_errors.value is True:
+            args.append("--ignore-errors")
+        if self.indices.value is not None:
+            args.extend([f"--index={index}" for index in self.indices.value])
+        if self.inherit_path.value is not None:
+            args.append(f"--inherit-path={self.inherit_path.value}")
+        if self.repositories.value is not None:
+            args.extend([f"--repo={repo}" for repo in self.repositories.value])
+        if self.shebang.value is not None:
+            args.append(f"--python-shebang={self.shebang.value}")
+        if self.platforms.value is not None:
+            args.extend([f"--platform={platform}" for platform in self.platforms.value])
+        return tuple(args)
 
 
 @rule
@@ -55,6 +85,7 @@ async def create_python_binary(config: PythonBinaryConfiguration) -> CreatedBina
         addresses=Addresses([config.address]),
         entry_point=entry_point,
         output_filename=f"{config.address.target_name}.pex",
+        additional_args=config.generate_additional_args(),
     )
 
     pex = await Get[Pex](CreatePexFromTargetClosure, request)
