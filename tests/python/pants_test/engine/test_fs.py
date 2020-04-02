@@ -725,7 +725,6 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
             scheduler = self.mk_scheduler(
                 rules=create_fs_rules(),
                 project_tree=project_tree,
-                execution_options={"experimental_fs_watcher": True},
             )
             fname = "4.txt"
             new_data = "rouf"
@@ -755,7 +754,6 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
             scheduler = self.mk_scheduler(
                 rules=create_fs_rules(),
                 project_tree=project_tree,
-                execution_options={"experimental_fs_watcher": True},
             )
             fname = "a/b/1.txt"
             # read the original file so we have nodes to invalidate.
@@ -782,7 +780,6 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
             scheduler = self.mk_scheduler(
                 rules=create_fs_rules(),
                 project_tree=project_tree,
-                execution_options={"experimental_fs_watcher": True},
             )
             dir_path = "a/"
             dir_glob = dir_path + "*"

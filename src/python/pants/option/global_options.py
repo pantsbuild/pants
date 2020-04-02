@@ -866,7 +866,7 @@ class GlobalOptions(Subsystem):
         register(
             "--experimental-fs-watcher",
             type=bool,
-            default=False,
+            default=True,
             advanced=True,
             help="Whether to use the engine filesystem watcher which registers the workspace"
             " for kernel file change events",
