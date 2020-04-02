@@ -524,7 +524,7 @@ struct T(usize, usize);
 /// to the result.
 ///
 #[derive(Clone, Debug)]
-struct TNode(usize, bool /*cacheablility*/);
+struct TNode(usize, bool /*cacheability*/);
 impl TNode {
   fn new(id: usize) -> Self {
     TNode(id, true)
