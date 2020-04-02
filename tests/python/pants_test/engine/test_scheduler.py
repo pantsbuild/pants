@@ -288,12 +288,19 @@ class SchedulerWithNestedRaiseTest(TestBase):
                 dedent(
                     """\
                     Traceback (most recent call last):
-                      File LOCATION-INFO, in extern_identify
-                        return c.identify(obj)
                       File LOCATION-INFO, in identify
                         hash_ = hash(obj)
                       File "<string>", line 2, in __hash__
                     TypeError: unhashable type: 'list'
+
+                    The above exception was the direct cause of the following exception:
+
+                    Traceback (most recent call last):
+                      File LOCATION-INFO, in extern_identify
+                        return c.identify(obj)
+                      File LOCATION-INFO, in identify
+                        raise TypeError(f"failed to hash object {obj}: {e}") from e
+                    TypeError: failed to hash object CollectionType(items=[1, 2, 3]): unhashable type: 'list'
                     """
                 ),
                 exc_str,
