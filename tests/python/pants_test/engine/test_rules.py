@@ -16,9 +16,9 @@ from pants.engine.mapper import AddressMapper
 from pants.engine.rules import (
     MissingParameterTypeAnnotation,
     MissingReturnTypeAnnotation,
+    NamedRuleType,
     RootRule,
     RuleIndex,
-    RuleType,
     UnrecognizedRuleArgument,
     goal_rule,
     named_rule,
@@ -295,7 +295,9 @@ class RuleArgumentAnnotationTest(unittest.TestCase):
         self.assertEqual(annotations.desc, None)
         self.assertEqual(annotations.rule_type, None)
 
-        @named_rule(name="something_different", desc="Human readable desc", rule_type=RuleType.Test)
+        @named_rule(
+            name="something_different", desc="Human readable desc", rule_type=NamedRuleType.Test
+        )
         def another_named_rule(a: int, b: str) -> bool:
             return False
 
@@ -303,7 +305,7 @@ class RuleArgumentAnnotationTest(unittest.TestCase):
         annotations = another_named_rule.rule.annotations
         self.assertEqual(annotations.name, "something_different")
         self.assertEqual(annotations.desc, "Human readable desc")
-        self.assertEqual(annotations.rule_type, RuleType.Test)
+        self.assertEqual(annotations.rule_type, NamedRuleType.Test)
 
     def test_bogus_rules(self):
         with self.assertRaises(UnrecognizedRuleArgument):

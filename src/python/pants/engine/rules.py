@@ -21,7 +21,7 @@ from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 
-class RuleType(Enum):
+class NamedRuleType(Enum):
     Test = "test"
     Format = "format"
     Build = "build"
@@ -31,7 +31,7 @@ class RuleType(Enum):
 class RuleAnnotationFields:
     name: Optional[str] = None
     desc: Optional[str] = None
-    rule_type: Optional[RuleType] = None
+    rule_type: Optional[NamedRuleType] = None
 
 
 def side_effecting(cls):
@@ -248,7 +248,7 @@ def rule_decorator(*args, **kwargs) -> Callable:
 
     name: Optional[str] = kwargs.get("name")
     desc: Optional[str] = kwargs.get("desc")
-    rule_type: Optional[RuleType] = kwargs.get("rule_type")
+    rule_type: Optional[NamedRuleType] = kwargs.get("rule_type")
 
     if kwargs.get("named_rule"):
         anno_fields = RuleAnnotationFields(name=name, desc=desc, rule_type=rule_type)
