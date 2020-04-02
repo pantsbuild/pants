@@ -27,6 +27,13 @@ class RuleType(Enum):
     Build = "build"
 
 
+@dataclass(frozen=True)
+class RuleAnnotationFields:
+    name: Optional[str] = None
+    desc: Optional[str] = None
+    rule_type: Optional[RuleType] = None
+
+
 def side_effecting(cls):
     """Annotates a class to indicate that it is a side-effecting type, which needs to be handled
     specially with respect to rule caching semantics."""
@@ -91,8 +98,8 @@ def _make_rule(
     return_type: Type,
     parameter_types: typing.Iterable[Type],
     *,
-    cacheable: bool = True,
-    name: Optional[str] = None,
+    cacheable: bool,
+    anno_fields: RuleAnnotationFields,
 ) -> Callable[[Callable], Callable]:
     """A @decorator that declares that a particular static function may be used as a TaskRule.
 
@@ -165,12 +172,17 @@ def _make_rule(
         dependency_rules = (subsystem_rule(return_type.subsystem_cls),) if is_goal_cls else None
 
         # Set a default name for Goal classes if one is not explicitly provided
-        effective_name = name
+        effective_name = anno_fields.name
         if effective_name is None:
             if is_goal_cls:
                 effective_name = return_type.name
             else:
                 effective_name = func.__name__
+        effective_annotations = RuleAnnotationFields(
+            name=effective_name,
+            desc=anno_fields.desc,
+            rule_type=anno_fields.rule_type
+        )
 
         # Set our own custom `__line_number__` dunder so that the engine may visualize the line number.
         func.__line_number__ = func.__code__.co_firstlineno
@@ -182,7 +194,7 @@ def _make_rule(
             input_gets=tuple(gets),
             dependency_rules=dependency_rules,
             cacheable=cacheable,
-            name=effective_name,
+            annotations=effective_annotations,
         )
 
         return func
@@ -222,7 +234,7 @@ def _ensure_type_annotation(
     return type_annotation
 
 
-PUBLIC_RULE_DECORATOR_ARGUMENTS = {"name"}
+PUBLIC_RULE_DECORATOR_ARGUMENTS = {"name", "desc", "rule_type"}
 # We don't want @rule-writers to use 'cacheable' as a kwarg directly, but rather
 # set it implicitly based on whether the rule annotation is @rule or @goal_rule.
 # So we leave it out of PUBLIC_RULE_DECORATOR_ARGUMENTS.
@@ -236,13 +248,15 @@ def rule_decorator(*args, **kwargs) -> Callable:
             f"type-annotated. Given {args}."
         )
 
-    named_rule = kwargs.get("named_rule") or False
     name: Optional[str] = kwargs.get("name")
-    description: Optional[str] = kwargs.get("desc")
+    desc: Optional[str] = kwargs.get("desc")
     rule_type: Optional[RuleType] = kwargs.get("rule_type")
 
-    if not named_rule:
-        if any([name, description, rule_type]):
+    if kwargs.get("named_rule"):
+        anno_fields = RuleAnnotationFields(name=name, desc=desc, rule_type=rule_type)
+    else:
+        anno_fields = RuleAnnotationFields()
+        if any([name, desc, rule_type]):
             raise UnrecognizedRuleArgument(
                     f"@rules that are not @named_rules or @goal_rules do not accept keyword arguments"
             )
@@ -279,7 +293,7 @@ def rule_decorator(*args, **kwargs) -> Callable:
         for parameter in inspect.signature(func).parameters
     )
     validate_parameter_types(func_id, parameter_types, cacheable)
-    return _make_rule(return_type, parameter_types, cacheable=cacheable, name=name)(func)
+    return _make_rule(return_type, parameter_types, cacheable=cacheable, anno_fields=anno_fields)(func)
 
 
 def validate_parameter_types(
@@ -297,10 +311,8 @@ def inner_rule(*args, **kwargs) -> Callable:
     if len(args) == 1 and inspect.isfunction(args[0]):
         return rule_decorator(*args, **kwargs)
     else:
-
         def wrapper(*args):
             return rule_decorator(*args, **kwargs)
-
         return wrapper
 
 
@@ -397,7 +409,7 @@ class TaskRule(Rule):
     _dependency_rules: Tuple
     _dependency_optionables: Tuple
     cacheable: bool
-    name: Optional[str]
+    annotations: RuleAnnotationFields
 
     def __init__(
         self,
@@ -408,7 +420,7 @@ class TaskRule(Rule):
         dependency_rules: Optional[Tuple] = None,
         dependency_optionables: Optional[Tuple] = None,
         cacheable: bool = True,
-        name: Optional[str] = None,
+        annotations: RuleAnnotationFields = RuleAnnotationFields(),
     ):
         self._output_type = output_type
         self.input_selectors = input_selectors
@@ -417,7 +429,7 @@ class TaskRule(Rule):
         self._dependency_rules = dependency_rules or ()
         self._dependency_optionables = dependency_optionables or ()
         self.cacheable = cacheable
-        self.name = name
+        self.annotations = annotations
 
     def __str__(self):
         return "(name={}, {}, {!r}, {}, gets={}, opts={})".format(

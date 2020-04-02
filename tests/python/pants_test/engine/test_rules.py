@@ -18,6 +18,7 @@ from pants.engine.rules import (
     MissingReturnTypeAnnotation,
     RootRule,
     RuleIndex,
+    RuleType,
     UnrecognizedRuleArgument,
     goal_rule,
     named_rule,
@@ -283,34 +284,54 @@ class RuleIndexTest(TestBase):
 
 
 class RuleArgumentAnnotationTest(unittest.TestCase):
-    def test_name_kwarg(self):
-        @named_rule(name="A named rule")
+    def test_annoations_kwargs(self):
+        @named_rule
         def a_named_rule(a: int, b: str) -> bool:
             return False
 
         self.assertIsNotNone(a_named_rule.rule)
-        self.assertEqual(a_named_rule.rule.name, "A named rule")
+        annotations = a_named_rule.rule.annotations
+        self.assertEqual(annotations.name, "a_named_rule")
+        self.assertEqual(annotations.desc, None)
+        self.assertEqual(annotations.rule_type, None)
 
-    def test_bogus_rule(self):
+        @named_rule(name="something_different", desc="Human readable desc", rule_type=RuleType.Test)
+        def another_named_rule(a: int, b: str) -> bool:
+            return False
+
+        self.assertIsNotNone(a_named_rule.rule)
+        annotations = another_named_rule.rule.annotations
+        self.assertEqual(annotations.name, "something_different")
+        self.assertEqual(annotations.desc, "Human readable desc")
+        self.assertEqual(annotations.rule_type, RuleType.Test)
+
+    def test_bogus_rules(self):
         with self.assertRaises(UnrecognizedRuleArgument):
-
             @named_rule(bogus_kwarg="TOTALLY BOGUS!!!!!!")
             def a_named_rule(a: int, b: str) -> bool:
                 return False
+
+        with self.assertRaises(UnrecognizedRuleArgument) as e:
+            @rule(desc="Some description")
+            def a_named_rule(a: int, b: str) -> bool:
+                return False
+        assert e.exception.args[0] == "@rules that are not @named_rules or @goal_rules do not accept keyword arguments"
 
     def test_goal_rule_automatically_gets_name_from_goal(self):
         @goal_rule
         def some_goal_rule() -> Example:
             return Example(exit_code=0)
 
-        self.assertEqual(some_goal_rule.rule.name, "example")
+        name = some_goal_rule.rule.annotations.name
+        self.assertEqual(name, "example")
 
     def test_can_override_goal_rule_name(self):
-        @goal_rule(name="example but **COOLER**")
+        @goal_rule(name="some_other_name")
         def some_goal_rule() -> Example:
             return Example(exit_code=0)
 
-        self.assertEqual(some_goal_rule.rule.name, "example but **COOLER**")
+        name = some_goal_rule.rule.annotations.name
+        self.assertEqual(name, "some_other_name")
 
 
 class GraphVertexTypeAnnotationTest(unittest.TestCase):
