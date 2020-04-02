@@ -1161,7 +1161,7 @@ impl NodeError for Failure {
 
   fn exhausted() -> Failure {
     Context::mk_error(
-      "Exhausted retries for uncacheable node. The filesystem was changing to much.",
+      "Exhausted retries for uncacheable node. The filesystem was changing too much.",
     )
   }
 
