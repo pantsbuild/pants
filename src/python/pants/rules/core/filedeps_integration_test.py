@@ -3,21 +3,23 @@
 
 from typing import List, Optional
 
+import pytest
+
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 
+@pytest.mark.skip(reason="Unskip once we have bindings for JVM targets")
 class FiledepsIntegrationTest(PantsRunIntegrationTest):
     def assert_filedeps(
         self, *, filedeps_options: Optional[List[str]] = None, expected_entries: List[str]
     ) -> None:
-        args = (
-            ["filedeps2", "--no-absolute"]
-            + (filedeps_options or [])
-            + [
-                "examples/src/scala/org/pantsbuild/example/hello/exe:exe",
-                "examples/src/scala/org/pantsbuild/example/hello/welcome:welcome",
-            ]
-        )
+        args = [
+            "filedeps2",
+            "--no-absolute",
+            *(filedeps_options or []),
+            "examples/src/scala/org/pantsbuild/example/hello/exe:exe",
+            "examples/src/scala/org/pantsbuild/example/hello/welcome:welcome",
+        ]
         pants_run = self.run_pants(args)
         self.assert_success(pants_run)
         self.assertEqual(pants_run.stdout_data.strip(), "\n".join(expected_entries))
