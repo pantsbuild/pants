@@ -5,6 +5,7 @@ contrib_plugin(
   name='plugin',
   dependencies=[
     'contrib/node/src/python/pants/contrib/node:plugin',
+    'contrib/scalajs/src/python/pants/contrib/scalajs/rules',
     'contrib/scalajs/src/python/pants/contrib/scalajs/subsystems',
     'contrib/scalajs/src/python/pants/contrib/scalajs/targets',
     'contrib/scalajs/src/python/pants/contrib/scalajs/tasks',
