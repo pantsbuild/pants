@@ -11,6 +11,8 @@ from pants.engine.rules import UnionMembership, goal_rule
 from pants.engine.target import (
     AsyncField,
     BoolField,
+    DictStringToStringField,
+    DictStringToStringSequenceField,
     Field,
     FloatField,
     IntField,
@@ -101,6 +103,8 @@ class FieldInfo:
                     AsyncField,
                     PrimitiveField,
                     BoolField,
+                    DictStringToStringField,
+                    DictStringToStringSequenceField,
                     FloatField,
                     IntField,
                     StringField,

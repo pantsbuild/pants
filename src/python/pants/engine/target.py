@@ -26,6 +26,10 @@ from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
 
+# -----------------------------------------------------------------------------------------------
+# Core Field abstractions
+# -----------------------------------------------------------------------------------------------
+
 # Type alias to express the intent that the type should be immutable and hashable. There's nothing
 # to actually enforce this, outside of convention. Maybe we could develop a MyPy plugin?
 ImmutableValue = Any
@@ -248,6 +252,10 @@ class AsyncField(Field, metaclass=ABCMeta):
                 return HydrateSourcesRequest(self)
         """
 
+
+# -----------------------------------------------------------------------------------------------
+# Core Target abstractions
+# -----------------------------------------------------------------------------------------------
 
 # NB: This TypeVar is what allows `Target.get()` to properly work with MyPy so that MyPy knows
 # the precise Field returned.
@@ -572,6 +580,11 @@ class RegisteredTargetTypes:
         return tuple(self.aliases_to_types.values())
 
 
+# -----------------------------------------------------------------------------------------------
+# Exception messages
+# -----------------------------------------------------------------------------------------------
+
+
 class InvalidFieldException(Exception):
     pass
 
@@ -592,6 +605,11 @@ class InvalidFieldTypeException(InvalidFieldException):
 class RequiredFieldMissingException(InvalidFieldException):
     def __init__(self, address: Address, field_alias: str) -> None:
         super().__init__(f"The {repr(field_alias)} field in target {address} must be defined.")
+
+
+# -----------------------------------------------------------------------------------------------
+# Field templates
+# -----------------------------------------------------------------------------------------------
 
 
 class BoolField(PrimitiveField, metaclass=ABCMeta):
@@ -661,16 +679,19 @@ class StringSequenceField(PrimitiveField, metaclass=ABCMeta):
         value_or_default = super().compute_value(raw_value, address=address)
         if value_or_default is None:
             return None
+        invalid_type_exception = InvalidFieldTypeException(
+            address,
+            cls.alias,
+            raw_value,
+            expected_type="an iterable of strings (e.g. a list of strings)",
+        )
+        if isinstance(value_or_default, str):
+            raise invalid_type_exception
         try:
             ensure_str_list(value_or_default)
         except ValueError:
-            raise InvalidFieldTypeException(
-                address,
-                cls.alias,
-                value_or_default,
-                expected_type="an iterable of strings (e.g. a list of strings)",
-            )
-        return tuple(sorted(value_or_default))
+            raise invalid_type_exception
+        return tuple(value_or_default)
 
 
 class StringOrStringSequenceField(PrimitiveField, metaclass=ABCMeta):
@@ -703,7 +724,63 @@ class StringOrStringSequenceField(PrimitiveField, metaclass=ABCMeta):
                     "either a single string or an iterable of strings (e.g. a list of strings)"
                 ),
             )
-        return tuple(sorted(str_list))
+        return tuple(str_list)
+
+
+class DictStringToStringField(PrimitiveField, metaclass=ABCMeta):
+    value: Optional[FrozenDict[str, str]]
+    default: ClassVar[Optional[FrozenDict[str, str]]] = None
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Dict[str, str]], *, address: Address
+    ) -> Optional[FrozenDict[str, str]]:
+        value_or_default = super().compute_value(raw_value, address=address)
+        if value_or_default is None:
+            return None
+        invalid_type_exception = InvalidFieldTypeException(
+            address, cls.alias, raw_value, expected_type="a dictionary of string -> string"
+        )
+        if not isinstance(value_or_default, dict):
+            raise invalid_type_exception
+        if not all(isinstance(k, str) and isinstance(v, str) for k, v in value_or_default.items()):
+            raise invalid_type_exception
+        return FrozenDict(value_or_default)
+
+
+class DictStringToStringSequenceField(PrimitiveField, metaclass=ABCMeta):
+    value: Optional[FrozenDict[str, Tuple[str, ...]]]
+    default: ClassVar[Optional[FrozenDict[str, Tuple[str, ...]]]] = None
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Dict[str, Iterable[str]]], *, address: Address
+    ) -> Optional[FrozenDict[str, Tuple[str, ...]]]:
+        value_or_default = super().compute_value(raw_value, address=address)
+        if value_or_default is None:
+            return None
+        invalid_type_exception = InvalidFieldTypeException(
+            address,
+            cls.alias,
+            raw_value,
+            expected_type="a dictionary of string -> an iterable of strings",
+        )
+        if not isinstance(value_or_default, dict):
+            raise invalid_type_exception
+        result = {}
+        for k, v in value_or_default.items():
+            if not isinstance(k, str) or isinstance(v, str):
+                raise invalid_type_exception
+            try:
+                result[k] = tuple(ensure_str_list(v))
+            except ValueError:
+                raise invalid_type_exception
+        return FrozenDict(result)
+
+
+# -----------------------------------------------------------------------------------------------
+# Common Fields used across most targets
+# -----------------------------------------------------------------------------------------------
 
 
 class Tags(StringSequenceField):

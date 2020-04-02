@@ -166,12 +166,6 @@ class RemoteSourcesTargetType(PrimitiveField):
         return cast(Type[TargetV1], super().compute_value(raw_value, address=address))
 
 
-# TODO: maybe add a DictField? This could be a can of worms. How should we type the values? It
-#  doesn't seem safe to assume `Dict[str, str]`. We would want to use `FrozenDict` to store the
-#  computed value, but how should we handle converting the values into hashable types, e.g.
-#  converting a List[str] to Tuple[str, ...]?
-#
-#  Audit other uses of dict fields before adding something.
 class RemoteSourcesArgs(PrimitiveField):
     """Any additional arguments necessary to construct the synthetic destination target (sources and
     dependencies are supplied automatically)."""
