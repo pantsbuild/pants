@@ -11,4 +11,4 @@ log = "0.4"
 parking_lot = "0.6"
 
 [dev-dependencies]
-tokio = { version = "0.2", features = ["rt-core", "macros", "time"] }
+tokio = { git = "https://github.com/tokio-rs/tokio", rev = "a5c87981077a784b2adebe7cf27267cef6ec9fac", features = ["rt-core", "macros", "time"] }

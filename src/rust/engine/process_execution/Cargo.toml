@@ -29,8 +29,8 @@ store = { path = "../fs/store" }
 task_executor = { path = "../task_executor" }
 tempfile = "3"
 concrete_time = { path = "../concrete_time" }
-tokio = { version = "0.2", features = ["process", "rt-threaded", "tcp", "time"] }
-tokio-util = { version = "0.2", features = ["codec"] }
+tokio = { git = "https://github.com/tokio-rs/tokio", rev = "a5c87981077a784b2adebe7cf27267cef6ec9fac", features = ["process", "rt-threaded", "tcp", "time"] }
+tokio-util = { git = "https://github.com/tokio-rs/tokio", rev = "a5c87981077a784b2adebe7cf27267cef6ec9fac", features = ["codec"] }
 uname = "0.1.1"
 workunit_store = { path = "../workunit_store" }
 regex = "1.3.1"
@@ -47,4 +47,4 @@ parking_lot = "0.6"
 spectral = "0.6.0"
 tempfile = "3"
 testutil = { path = "../testutil" }
-tokio = { version = "0.2", features = ["macros"] }
+tokio = { git = "https://github.com/tokio-rs/tokio", rev = "a5c87981077a784b2adebe7cf27267cef6ec9fac", features = ["macros"] }

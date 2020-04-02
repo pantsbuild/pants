@@ -8,5 +8,5 @@ publish = false
 [dependencies]
 futures = "0.3"
 logging = { path = "../logging" }
-tokio = { version = "0.2", features = ["blocking", "rt-threaded"] }
+tokio = { git = "https://github.com/tokio-rs/tokio", rev = "a5c87981077a784b2adebe7cf27267cef6ec9fac", features = ["blocking", "rt-threaded"] }
 workunit_store = { path = "../workunit_store" }

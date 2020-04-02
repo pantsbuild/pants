@@ -9,4 +9,4 @@ publish = false
 concrete_time = { path = "../concrete_time" }
 parking_lot = "0.6"
 rand = "0.6"
-tokio = { version = "0.2", features = ["rt-util"] }
+tokio = { git = "https://github.com/tokio-rs/tokio", rev = "a5c87981077a784b2adebe7cf27267cef6ec9fac", features = ["rt-util"] }

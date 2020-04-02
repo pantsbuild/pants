@@ -117,7 +117,7 @@ store = { path = "fs/store" }
 task_executor = { path = "task_executor" }
 tempfile = "3"
 time = "0.1.40"
-tokio = { version = "0.2", features = ["rt-threaded"] }
+tokio = { git = "https://github.com/tokio-rs/tokio", rev = "a5c87981077a784b2adebe7cf27267cef6ec9fac", features = ["rt-threaded"] }
 ui = { path = "ui" }
 url = "2.1"
 uuid = { version = "0.7", features = ["v4"] }
@@ -132,3 +132,4 @@ env_logger = "0.5.4"
 # TODO: Remove patch when we can upgrade to an official released version of protobuf with a fix.
 # See: https://github.com/pantsbuild/pants/issues/7760 for context.
 protobuf = { git="https://github.com/pantsbuild/rust-protobuf", rev="171611c33ec92f07e1b7107327f6d0139a7afebf", version="2.0.6", features = ["with-bytes"] }
+tokio = { git = "https://github.com/tokio-rs/tokio", rev = "a5c87981077a784b2adebe7cf27267cef6ec9fac" }
