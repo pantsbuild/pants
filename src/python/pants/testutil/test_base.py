@@ -21,7 +21,7 @@ from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target as TargetV1
-from pants.engine.fs import PathGlobs, PathGlobsAndRoot, Snapshot
+from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, PathGlobsAndRoot, Snapshot
 from pants.engine.legacy.graph import HydratedField
 from pants.engine.legacy.structs import SourceGlobs, SourcesField
 from pants.engine.rules import RootRule
@@ -415,6 +415,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
             pants_ignore_patterns=[],
             local_store_dir=local_store_dir,
             build_file_imports_behavior=BuildFileImportsBehavior.error,
+            glob_match_error_behavior=GlobMatchErrorBehavior.error,
             native=init_native(),
             options_bootstrapper=options_bootstrapper,
             build_root=self.build_root,
