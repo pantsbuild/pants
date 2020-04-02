@@ -508,10 +508,17 @@ class TestSources(TestBase):
             assert_invalid_type(v)
 
     def test_normal_hydration(self) -> None:
-        self.create_files("src/fortran", files=["f1.f95", "f2.f95"])
-        sources = Sources(["f1.f95", "f2.f95"], address=Address.parse("src/fortran:lib"))
+        addr = Address.parse("src/fortran:lib")
+        self.create_files("src/fortran", files=["f1.f95", "f2.f95", "f1.f03", "ignored.f03"])
+        sources = Sources(["f1.f95", "*.f03", "!ignored.f03", "!**/ignore*"], address=addr)
         hydrated_sources = self.request_single_product(HydratedSources, sources.request)
-        assert hydrated_sources.snapshot.files == ("src/fortran/f1.f95", "src/fortran/f2.f95")
+        assert hydrated_sources.snapshot.files == ("src/fortran/f1.f03", "src/fortran/f1.f95")
+
+        # Also test that the Filespec is correct. This does not need hydration to be calculated.
+        assert sources.filespec == {
+            "globs": ["src/fortran/*.f03", "src/fortran/f1.f95"],
+            "exclude": [{"globs": ["src/fortran/**/ignore*", "src/fortran/ignored.f03"]}],
+        }
 
     def test_unmatched_globs(self) -> None:
         self.create_files("", files=["f1.f95"])

@@ -21,6 +21,7 @@ from pants.engine.fs import (
 from pants.engine.objects import Collection
 from pants.engine.rules import RootRule, UnionMembership, rule
 from pants.engine.selectors import Get
+from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper, Filespec
 from pants.util.collections import ensure_str_list
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
@@ -904,6 +905,24 @@ class Sources(AsyncField):
             return f"!{PurePath(self.address.spec_path, glob[1:])}"
         return str(PurePath(self.address.spec_path, glob))
 
+    @final
+    @property
+    def filespec(self) -> Filespec:
+        """The original globs, returned in the Filespec dict format.
+
+        The globs will be relativized to the build root.
+        """
+        includes = []
+        excludes = []
+        for glob in self.sanitized_raw_value or ():
+            if glob.startswith("!"):
+                excludes.append(glob[1:])
+            else:
+                includes.append(glob)
+        return FilesetRelPathWrapper.to_filespec(
+            args=includes, exclude=[excludes], root=self.address.spec_path
+        )
+
 
 @dataclass(frozen=True)
 class HydrateSourcesRequest:
@@ -913,6 +932,10 @@ class HydrateSourcesRequest:
 @dataclass(frozen=True)
 class HydratedSources:
     snapshot: Snapshot
+    filespec: Filespec
+
+    def eager_fileset_with_spec(self, *, address: Address) -> EagerFilesetWithSpec:
+        return EagerFilesetWithSpec(address.spec_path, self.filespec, self.snapshot)
 
 
 @rule
@@ -923,7 +946,7 @@ async def hydrate_sources(
     globs = sources_field.sanitized_raw_value
 
     if globs is None:
-        return HydratedSources(EMPTY_SNAPSHOT)
+        return HydratedSources(EMPTY_SNAPSHOT, sources_field.filespec)
 
     conjunction = (
         GlobExpansionConjunction.all_match
@@ -945,7 +968,7 @@ async def hydrate_sources(
         )
     )
     sources_field.validate_snapshot(snapshot)
-    return HydratedSources(snapshot)
+    return HydratedSources(snapshot, sources_field.filespec)
 
 
 # TODO: figure out what support looks like for this with the Target API. The expected value is an
