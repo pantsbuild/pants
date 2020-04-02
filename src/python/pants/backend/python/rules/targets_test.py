@@ -5,13 +5,7 @@ from typing import Optional
 
 import pytest
 
-from pants.backend.python.rules.targets import (
-    PythonBinarySources,
-    PythonLibrarySources,
-    PythonSources,
-    PythonTestsSources,
-    Timeout,
-)
+from pants.backend.python.rules.targets import PythonBinarySources, Timeout
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.build_graph.address import Address
 from pants.engine.rules import RootRule
@@ -74,30 +68,9 @@ class TestTimeout(TestBase):
 
 
 class TestPythonSources(TestBase):
-    PYTHON_SRC_FILES = ("f1.py", "f2.py")
-    PYTHON_TEST_FILES = ("conftest.py", "test_f1.py", "f1_test.py")
-
     @classmethod
     def rules(cls):
         return [*target_rules(), RootRule(HydrateSourcesRequest)]
-
-    def test_python_sources_validation(self) -> None:
-        bad_files = ("f.js", "f.hs", "f.txt")
-        files = ("f.py", *bad_files)
-        self.create_files(path="", files=files)
-        sources = PythonSources(files, address=Address.parse(":lib"))
-        assert sources.sanitized_raw_value == tuple(sorted(files))
-        with pytest.raises(ExecutionError) as exc:
-            self.request_single_product(HydratedSources, sources.request)
-        assert str(sorted(bad_files)) in str(exc.value)
-        assert "//:lib" in str(exc.value)
-
-        # Also check that we support valid sources
-        valid_sources = PythonSources(["f.py"], address=Address.parse(":lib"))
-        assert valid_sources.sanitized_raw_value == ("f.py",)
-        assert self.request_single_product(
-            HydratedSources, valid_sources.request
-        ).snapshot.files == ("f.py",)
 
     def test_python_binary_sources_validation(self) -> None:
         self.create_files(path="", files=["f1.py", "f2.py"])
@@ -117,15 +90,3 @@ class TestPythonSources(TestBase):
         with pytest.raises(ExecutionError) as exc:
             self.request_single_product(HydratedSources, multiple_sources.request)
         assert "has 2 sources" in str(exc.value)
-
-    def test_python_library_sources_default(self) -> None:
-        self.create_files(path="", files=[*self.PYTHON_SRC_FILES, *self.PYTHON_TEST_FILES])
-        sources = PythonLibrarySources(None, address=Address.parse(":lib"))
-        result = self.request_single_product(HydratedSources, sources.request)
-        assert result.snapshot.files == self.PYTHON_SRC_FILES
-
-    def test_python_tests_sources_default(self) -> None:
-        self.create_files(path="", files=[*self.PYTHON_SRC_FILES, *self.PYTHON_TEST_FILES])
-        sources = PythonTestsSources(None, address=Address.parse(":tests"))
-        result = self.request_single_product(HydratedSources, sources.request)
-        assert set(result.snapshot.files) == set(self.PYTHON_TEST_FILES)

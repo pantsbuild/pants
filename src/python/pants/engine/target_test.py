@@ -10,23 +10,29 @@ from typing_extensions import final
 
 from pants.build_graph.address import Address
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, PathGlobs, Snapshot
-from pants.engine.rules import UnionMembership, rule
+from pants.engine.rules import RootRule, UnionMembership, rule
+from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Get
 from pants.engine.target import (
     AsyncField,
     BoolField,
     DictStringToStringField,
     DictStringToStringSequenceField,
+    HydratedSources,
+    HydrateSourcesRequest,
     InvalidFieldException,
     InvalidFieldTypeException,
     PrimitiveField,
     RequiredFieldMissingException,
+    Sources,
     StringField,
     StringOrStringSequenceField,
     StringSequenceField,
     Target,
 )
+from pants.engine.target import rules as target_rules
 from pants.testutil.engine.util import MockGet, run_rule
+from pants.testutil.test_base import TestBase
 from pants.util.collections import ensure_str_list
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import OrderedSet
@@ -473,3 +479,78 @@ def test_dict_string_to_string_sequence_field() -> None:
 
     for v in [0, object(), "hello", ["hello"], {"hello": "world"}, {0: ["world"]}]:
         assert_invalid_type(v)
+
+
+# -----------------------------------------------------------------------------------------------
+# Test common fields
+# -----------------------------------------------------------------------------------------------
+
+
+class TestSources(TestBase):
+    @classmethod
+    def rules(cls):
+        return (*super().rules(), *target_rules(), RootRule(HydrateSourcesRequest))
+
+    def test_raw_value_sanitation(self) -> None:
+        addr = Address.parse(":test")
+
+        def assert_flexible_constructor(raw_value: Iterable[str]) -> None:
+            assert Sources(raw_value, address=addr).sanitized_raw_value == tuple(raw_value)
+
+        for v in [("f1.txt", "f2.txt"), ["f1.txt", "f2.txt"], OrderedSet(["f1.txt", "f2.txt"])]:
+            assert_flexible_constructor(v)
+
+        def assert_invalid_type(raw_value: Any) -> None:
+            with pytest.raises(InvalidFieldTypeException):
+                Sources(raw_value, address=addr)
+
+        for v in [0, object(), "f1.txt"]:
+            assert_invalid_type(v)
+
+    def test_normal_hydration(self) -> None:
+        self.create_files("src/fortran", files=["f1.f95", "f2.f95"])
+        sources = Sources(["f1.f95", "f2.f95"], address=Address.parse("src/fortran:lib"))
+        hydrated_sources = self.request_single_product(HydratedSources, sources.request)
+        assert hydrated_sources.snapshot.files == ("src/fortran/f1.f95", "src/fortran/f2.f95")
+
+    def test_unmatched_globs(self) -> None:
+        self.create_files("", files=["f1.f95"])
+        sources = Sources(["non_existent.f95"], address=Address.parse(":lib"))
+        with pytest.raises(ExecutionError) as exc:
+            self.request_single_product(HydratedSources, sources.request)
+        assert "Unmatched glob" in str(exc.value)
+        assert "//:lib" in str(exc.value)
+        assert "non_existent.f95" in str(exc.value)
+
+    def test_default_globs(self) -> None:
+        class DefaultSources(Sources):
+            default = ("default.f95", "default.f03", "*.f08", "!ignored.f08")
+
+        addr = Address.parse("src/fortran:lib")
+        # NB: Not all globs will be matched with these files, specifically `default.f03` will not
+        # be matched. This is intentional to ensure that we use `any` glob conjunction rather
+        # than the normal `all` conjunction.
+        self.create_files("src/fortran", files=["default.f95", "f1.f08", "ignored.f08"])
+        sources = DefaultSources(None, address=addr)
+        assert set(sources.sanitized_raw_value) == set(DefaultSources.default)
+
+        hydrated_sources = self.request_single_product(HydratedSources, sources.request)
+        assert hydrated_sources.snapshot.files == ("src/fortran/default.f95", "src/fortran/f1.f08")
+
+    def test_expected_file_extensions(self) -> None:
+        class ExpectedExtensionsSources(Sources):
+            expected_file_extensions = (".f95", ".f03")
+
+        addr = Address.parse("src/fortran:lib")
+        self.create_files("src/fortran", files=["s.f95", "s.f03", "s.f08"])
+        sources = ExpectedExtensionsSources(["s.f*"], address=addr)
+        with pytest.raises(ExecutionError) as exc:
+            self.request_single_product(HydratedSources, sources.request)
+        assert "s.f08" in str(exc.value)
+        assert str(addr) in str(exc.value)
+
+        # Also check that we support valid sources
+        valid_sources = ExpectedExtensionsSources(["s.f95"], address=addr)
+        assert self.request_single_product(
+            HydratedSources, valid_sources.request
+        ).snapshot.files == ("src/fortran/s.f95",)

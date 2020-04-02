@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os.path
-from pathlib import PurePath
 from typing import Optional, Tuple, Union
 
 from pants.backend.python.subsystems.pytest import PyTest
@@ -27,13 +26,7 @@ from pants.rules.core.determine_source_files import SourceFiles
 
 @union
 class PythonSources(Sources):
-    def validate_snapshot(self, snapshot: Snapshot) -> None:
-        non_python_files = [fp for fp in snapshot.files if not PurePath(fp).suffix == ".py"]
-        if non_python_files:
-            raise InvalidFieldException(
-                f"The {repr(self.alias)} field in target {self.address} must only contain Python "
-                f"files that end in `.py`, but it had these non-Python files: {non_python_files}."
-            )
+    expected_file_extensions = (".py",)
 
 
 class PythonLibrarySources(PythonSources):
