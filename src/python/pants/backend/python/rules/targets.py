@@ -3,7 +3,7 @@
 
 import os.path
 from pathlib import PurePath
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.build_graph.address import Address
@@ -137,7 +137,7 @@ class Timeout(IntField):
         return result
 
 
-class EntryPoint(StringField):
+class PythonEntryPoint(StringField):
     """The default entry point for the binary.
 
     If omitted, Pants will try to infer the entry point by looking at the `source` argument for a
@@ -147,28 +147,57 @@ class EntryPoint(StringField):
     alias = "entry_point"
 
 
-class Platforms(StringOrStringSequenceField):
-    """Extra platforms to target when building a Python binary."""
+class PythonPlatforms(StringOrStringSequenceField):
+    """Extra platforms to target when building a Python binary.
+
+    This defaults to the current platform, but can be overridden to different platforms. You can
+    give a list of multiple platforms to create a multiplatform PEX.
+
+    To use wheels for specific interpreter/platform tags, you can append them to the platform with
+    hyphens like: PLATFORM-IMPL-PYVER-ABI (e.g. "linux_x86_64-cp-27-cp27mu",
+    "macosx_10.12_x86_64-cp-36-cp36m"). PLATFORM is the host platform e.g. "linux-x86_64",
+    "macosx-10.12-x86_64", etc". IMPL is the Python implementation abbreviation
+    (e.g. "cp", "pp", "jp"). PYVER is a two-digit string representing the python version
+    (e.g. "27", "36"). ABI is the ABI tag (e.g. "cp36m", "cp27mu", "abi3", "none").
+    """
 
     alias = "platforms"
 
 
-class PexInheritPath(BoolField):
-    """Whether to inherit the `sys.path` of the environment that the binary runs in or not."""
+class PexInheritPath(StringField):
+    """Whether to inherit the `sys.path` of the environment that the binary runs in.
+
+    Use `false` to not inherit `sys.path`; use `fallback` to inherit `sys.path` after packaged
+    dependencies; and use `prefer` to inherit `sys.path` before packaged dependencies.
+    """
 
     alias = "inherit_path"
-    default = False
+
+    # TODO(#9388): deprecate allowing this to be a `bool`.
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Union[str, bool]], *, address: Address
+    ) -> Optional[str]:
+        if isinstance(raw_value, bool):
+            return "prefer" if raw_value else "false"
+        return super().compute_value(raw_value, address=address)
 
 
 class PexZipSafe(BoolField):
-    """Whether or not this binary is safe to run in compacted (zip-file) form."""
+    """Whether or not this binary is safe to run in compacted (zip-file) form.
+
+    If they are not zip safe, they will be written to disk prior to execution.
+    """
 
     alias = "zip_safe"
     default = True
 
 
 class PexAlwaysWriteCache(BoolField):
-    """Whether Pex should always write the .deps cache of the Pex file to disk or not."""
+    """Whether Pex should always write the .deps cache of the Pex file to disk or not.
+
+    This can use less memory in RAM constrained environments.
+    """
 
     alias = "always_write_cache"
     default = False
@@ -180,13 +209,17 @@ class PexRepositories(StringOrStringSequenceField):
     alias = "repositories"
 
 
-class PexIndices(StringOrStringSequenceField):
-    """Indices for Pex to use for packages."""
+class PexIndexes(StringOrStringSequenceField):
+    """Additional indices for Pex to use for packages.
+
+    If set to an empty list, i.e. `indices=[]`, then Pex will use no indices (meaning it will not
+    use PyPI).
+    """
 
     alias = "indices"
 
 
-class IgnorePexErrors(BoolField):
+class PexIgnoreErrors(BoolField):
     """Should we ignore when Pex cannot resolve dependencies?"""
 
     alias = "ignore_errors"
@@ -202,7 +235,7 @@ class PexShebang(StringField):
 # TODO: This option is weird. Its default is determined by `--python-binary-pex-emit-warnings`.
 #  How would that work with the Target API? Likely, make this an AsyncField and in the rule
 #  request the corresponding subsystem. For now, we ignore the option.
-class EmitPexWarnings(BoolField):
+class PexEmitWarnings(BoolField):
     """Whether or not to emit Pex warnings at runtime."""
 
     alias = "emit_warnings"
@@ -224,16 +257,16 @@ class PythonBinary(Target):
     core_fields = (
         *COMMON_PYTHON_FIELDS,
         PythonBinarySources,
-        EntryPoint,
-        Platforms,
+        PythonEntryPoint,
+        PythonPlatforms,
         PexInheritPath,
         PexZipSafe,
         PexAlwaysWriteCache,
         PexRepositories,
-        PexIndices,
-        IgnorePexErrors,
+        PexIndexes,
+        PexIgnoreErrors,
         PexShebang,
-        EmitPexWarnings,
+        PexEmitWarnings,
     )
 
 

@@ -1,11 +1,12 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import dataclasses
 import itertools
 import os
-from abc import ABC, abstractmethod
+from abc import ABC
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, Tuple, Type
+from typing import ClassVar, Dict, Iterable, Tuple, Type
 
 from pants.base.build_root import BuildRoot
 from pants.build_graph.address import Address
@@ -20,14 +21,18 @@ from pants.engine.target import Field, RegisteredTargetTypes, Target, WrappedTar
 from pants.rules.core.distdir import DistDir
 
 
-# TODO: This might not be the right level of abstraction. Possibly factor out some superclass.
-#  Revisit after porting lint.py, fmt.py, and test.py to use the Target API.
+# TODO: Factor this out once porting fmt.py and lint.py to the Target API.
 @union
-class BinaryImplementation(ABC):
+@dataclass(frozen=True)
+class BinaryConfiguration(ABC):
+    """An ad hoc collection of the fields necessary to create a binary from a target."""
+
     required_fields: ClassVar[Tuple[Type[Field], ...]]
 
+    address: Address
+
     @classmethod
-    def is_valid_target(cls, tgt: Target) -> bool:
+    def is_valid(cls, tgt: Target) -> bool:
         return tgt.has_fields(cls.required_fields)
 
     @classmethod
@@ -40,10 +45,24 @@ class BinaryImplementation(ABC):
             if target_type.class_has_fields(cls.required_fields, union_membership=union_membership)
         )
 
+    # TODO: this won't handle any non-Field attributes defined on the configuration. It also
+    # doesn't allow us to override the `default_raw_value` (do we really care about this?).
     @classmethod
-    @abstractmethod
-    def create(cls, tgt: Target) -> "BinaryImplementation":
-        pass
+    def create(cls, tgt: Target) -> "BinaryConfiguration":
+        all_expected_fields: Dict[str, Type[Field]] = {
+            dataclass_field.name: dataclass_field.type
+            for dataclass_field in dataclasses.fields(cls)
+            if issubclass(dataclass_field.type, Field)
+        }
+        return cls(  # type: ignore[call-arg]
+            address=tgt.address,
+            **{
+                dataclass_field_name: (
+                    tgt[field_cls] if field_cls in cls.required_fields else tgt.get(field_cls)
+                )
+                for dataclass_field_name, field_cls in all_expected_fields.items()
+            },
+        )
 
 
 @union
@@ -58,7 +77,7 @@ class BinaryOptions(LineOriented, GoalSubsystem):
 
     name = "binary"
 
-    required_union_implementations = (BinaryImplementation,)
+    required_union_implementations = (BinaryConfiguration,)
 
 
 class Binary(Goal):
@@ -94,20 +113,18 @@ async def coordinator_of_binaries(
     registered_target_types: RegisteredTargetTypes,
 ) -> CreatedBinary:
     target = wrapped_target.target
-    binary_implementations: Iterable[Type[BinaryImplementation]] = union_membership.union_rules[
-        BinaryImplementation
+    binary_config_types: Iterable[Type[BinaryConfiguration]] = union_membership.union_rules[
+        BinaryConfiguration
     ]
-    valid_binary_implementations = [
-        binary_implementation
-        for binary_implementation in binary_implementations
-        if binary_implementation.is_valid_target(target)
+    valid_binary_config_types = [
+        config_type for config_type in binary_config_types if config_type.is_valid(target)
     ]
-    if not valid_binary_implementations:
+    if not valid_binary_config_types:
         all_valid_target_types = itertools.chain.from_iterable(
-            implementation.valid_target_types(
+            config_type.valid_target_types(
                 registered_target_types.types, union_membership=union_membership
             )
-            for implementation in binary_implementations
+            for config_type in binary_config_types
         )
         formatted_target_types = sorted(target_type.alias for target_type in all_valid_target_types)
         # TODO: this is a leaky abstraction that the error message knows this rule is being used
@@ -122,9 +139,9 @@ async def coordinator_of_binaries(
     #  with one implementation. But, we don't necessarily need to enforce this with `./v2 binary`.
     #  See https://github.com/pantsbuild/pants/pull/9345#discussion_r395221542 for some possible
     #  semantics for `./v2 binary`.
-    if len(valid_binary_implementations) > 1:
-        possible_implementations = sorted(
-            implementation.__name__ for implementation in valid_binary_implementations
+    if len(valid_binary_config_types) > 1:
+        possible_config_types = sorted(
+            config_type.__name__ for config_type in valid_binary_config_types
         )
         # TODO: improve this error message. (It's never actually triggered yet because we only have
         #  Python implemented with V2.) A better error message would explain to users how they can
@@ -132,10 +149,10 @@ async def coordinator_of_binaries(
         raise ValueError(
             f"Multiple of the registered binary implementations work for {target.address} "
             f"(target type {repr(target.alias)}). It is ambiguous which implementation to use. "
-            f"Possible implementations: {possible_implementations}."
+            f"Possible implementations: {possible_config_types}."
         )
-    binary_implementation = valid_binary_implementations[0]
-    return await Get[CreatedBinary](BinaryImplementation, binary_implementation.create(target))
+    config_type = valid_binary_config_types[0]
+    return await Get[CreatedBinary](BinaryConfiguration, config_type.create(target))
 
 
 def rules():

@@ -14,7 +14,7 @@ from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get
 from pants.option.custom_types import shell_str
 from pants.option.global_options import GlobalOptions
-from pants.rules.core.binary import BinaryImplementation, CreatedBinary
+from pants.rules.core.binary import BinaryConfiguration, CreatedBinary
 from pants.util.contextutil import temporary_dir
 
 
@@ -23,8 +23,8 @@ class RunOptions(GoalSubsystem):
 
     name = "run"
 
-    # NB: To be runnable, there must be a BinaryImplementation that works with the target.
-    required_union_implementations = (BinaryImplementation,)
+    # NB: To be runnable, there must be a BinaryConfiguration that works with the target.
+    required_union_implementations = (BinaryConfiguration,)
 
     @classmethod
     def register_options(cls, register) -> None:
