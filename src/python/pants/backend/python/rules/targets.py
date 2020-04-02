@@ -209,8 +209,12 @@ class PexRepositories(StringOrStringSequenceField):
     alias = "repositories"
 
 
-class PexIndices(StringOrStringSequenceField):
-    """Additional indices for Pex to use for packages."""
+class PexIndexes(StringOrStringSequenceField):
+    """Additional indices for Pex to use for packages.
+
+    If set to an empty list, i.e. `indices=[]`, then Pex will use no indices (meaning it will not
+    use PyPI).
+    """
 
     alias = "indices"
 
@@ -259,7 +263,7 @@ class PythonBinary(Target):
         PexZipSafe,
         PexAlwaysWriteCache,
         PexRepositories,
-        PexIndices,
+        PexIndexes,
         PexIgnoreErrors,
         PexShebang,
         PexEmitWarnings,

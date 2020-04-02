@@ -10,7 +10,7 @@ from pants.backend.python.rules.targets import (
     PexAlwaysWriteCache,
     PexEmitWarnings,
     PexIgnoreErrors,
-    PexIndices,
+    PexIndexes,
     PexInheritPath,
     PexRepositories,
     PexShebang,
@@ -37,7 +37,7 @@ class PythonBinaryConfiguration(BinaryConfiguration):
     always_write_cache: PexAlwaysWriteCache
     emit_warnings: PexEmitWarnings
     ignore_errors: PexIgnoreErrors
-    indices: PexIndices
+    indexes: PexIndexes
     inherit_path: PexInheritPath
     repositories: PexRepositories
     shebang: PexShebang
@@ -52,8 +52,11 @@ class PythonBinaryConfiguration(BinaryConfiguration):
             args.append("--no-emit-warnings")
         if self.ignore_errors.value is True:
             args.append("--ignore-errors")
-        if self.indices.value is not None:
-            args.extend([f"--index={index}" for index in self.indices.value])
+        if self.indexes.value is not None:
+            if not self.indexes.value:
+                args.append("--no-index")
+            else:
+                args.extend([f"--index={index}" for index in self.indexes.value])
         if self.inherit_path.value is not None:
             args.append(f"--inherit-path={self.inherit_path.value}")
         if self.repositories.value is not None:

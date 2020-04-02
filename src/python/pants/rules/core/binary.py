@@ -57,9 +57,9 @@ class BinaryConfiguration(ABC):
         return cls(  # type: ignore[call-arg]
             address=tgt.address,
             **{
-                dataclass_field_name: tgt[field_cls]
-                if field_cls in cls.required_fields
-                else tgt.get(field_cls)
+                dataclass_field_name: (
+                    tgt[field_cls] if field_cls in cls.required_fields else tgt.get(field_cls)
+                )
                 for dataclass_field_name, field_cls in all_expected_fields.items()
             },
         )
