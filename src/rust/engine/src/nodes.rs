@@ -942,7 +942,7 @@ impl NodeVisualizer<NodeKey> for Visualizer {
     match entry.peek(context) {
       None => "white".to_string(),
       Some(Err(Failure::Throw(..))) | Some(Err(Failure::FileWatch(..))) => "4".to_string(),
-      Some(Err(Failure::Invalidated)) => "12".to_string(),
+      Some(Err(Failure::Invalidated)) | Some(Err(Failure::Exhausted)) => "12".to_string(),
       Some(Ok(_)) => {
         let viz_colors_len = self.viz_colors.len();
         self
@@ -960,7 +960,7 @@ pub struct Tracer;
 impl NodeTracer<NodeKey> for Tracer {
   fn is_bottom(result: Option<Result<NodeResult, Failure>>) -> bool {
     match result {
-      Some(Err(Failure::Invalidated)) => false,
+      Some(Err(Failure::Invalidated)) | Some(Err(Failure::Exhausted)) => false,
       Some(Err(Failure::Throw(..))) => false,
       Some(Err(Failure::FileWatch(..))) => false,
       Some(Ok(_)) => true,
@@ -987,6 +987,7 @@ impl NodeTracer<NodeKey> for Tracer {
           .join("\n")
       ),
       Some(Err(Failure::Invalidated)) => "Invalidated".to_string(),
+      Some(Err(Failure::Exhausted)) => "Exhausted".to_string(),
       Some(Err(Failure::FileWatch(failure))) => format!("FileWatch failed: {}", failure),
     }
   }
@@ -1118,7 +1119,7 @@ impl Node for NodeKey {
     }
   }
 
-  fn cacheable(&self, _context: &Self::Context) -> bool {
+  fn cacheable(&self) -> bool {
     match self {
       &NodeKey::Task(ref s) => s.task.cacheable,
       _ => true,
@@ -1159,6 +1160,10 @@ impl Display for NodeKey {
 impl NodeError for Failure {
   fn invalidated() -> Failure {
     Failure::Invalidated
+  }
+
+  fn exhausted() -> Failure {
+    Failure::Exhausted
   }
 
   fn cyclic(mut path: Vec<String>) -> Failure {

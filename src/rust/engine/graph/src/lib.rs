@@ -47,6 +47,8 @@ use std::time::{Duration, Instant};
 
 use fnv::FnvHasher;
 
+use futures::compat::Future01CompatExt;
+use futures::future::{FutureExt, TryFutureExt};
 use futures01::future::{self, Future};
 use indexmap::IndexSet;
 use log::{debug, trace, warn};
@@ -166,7 +168,7 @@ impl<N: Node> InnerGraph<N> {
     // Search for an existing path from dst to src.
     let mut roots = VecDeque::new();
     roots.push_back(root);
-    self.walk(roots, direction).any(|eid| eid == needle)
+    self.walk(roots, direction, false).any(|eid| eid == needle)
   }
 
   ///
@@ -287,12 +289,18 @@ impl<N: Node> InnerGraph<N> {
   /// The Walk will iterate over all nodes that descend from the roots in the direction of
   /// traversal but won't necessarily be in topological order.
   ///
-  fn walk(&self, roots: VecDeque<EntryId>, direction: Direction) -> Walk<'_, N> {
+  fn walk(
+    &self,
+    roots: VecDeque<EntryId>,
+    direction: Direction,
+    stop_at_uncacheable: bool,
+  ) -> Walk<'_, N> {
     Walk {
       graph: self,
       direction: direction,
       deque: roots,
       walked: HashSet::default(),
+      stop_at_uncacheable,
     }
   }
 
@@ -325,7 +333,11 @@ impl<N: Node> InnerGraph<N> {
       .collect();
     // And their transitive dependencies, which will be dirtied.
     let transitive_ids: Vec<_> = self
-      .walk(root_ids.iter().cloned().collect(), Direction::Incoming)
+      .walk(
+        root_ids.iter().cloned().collect(),
+        Direction::Incoming,
+        true,
+      )
       .filter(|eid| !root_ids.contains(eid))
       .collect();
 
@@ -386,7 +398,7 @@ impl<N: Node> InnerGraph<N> {
       .cloned()
       .collect();
 
-    for eid in self.walk(root_entries, Direction::Outgoing) {
+    for eid in self.walk(root_entries, Direction::Outgoing, false) {
       let entry = self.unsafe_entry_for_id(eid);
       let node_str = entry.format(context);
 
@@ -602,7 +614,7 @@ impl<N: Node> InnerGraph<N> {
       .collect();
     self
       .digests_internal(
-        self.walk(root_ids, Direction::Outgoing).collect(),
+        self.walk(root_ids, Direction::Outgoing, false).collect(),
         context.clone(),
       )
       .count()
@@ -663,7 +675,7 @@ impl<N: Node> Graph<N> {
     context: &N::Context,
     dst_node: N,
   ) -> BoxFuture<N::Item, N::Error> {
-    let maybe_entry_and_id = {
+    let maybe_entries_and_id = {
       // Get or create the destination, and then insert the dep and return its state.
       let mut inner = self.inner.lock();
       if inner.draining {
@@ -695,16 +707,44 @@ impl<N: Node> Graph<N> {
         // All edges get a weight of 1.0 so that we can Bellman-Ford over the graph, treating each
         // edge as having equal weight.
         inner.pg.add_edge(src_id, dst_id, 1.0);
+        let src_entry = inner.entry_for_id(src_id).cloned().unwrap();
         inner
           .entry_for_id(dst_id)
           .cloned()
-          .map(|entry| (entry, dst_id))
+          .map(|dst_entry| (src_entry, dst_entry, dst_id))
       }
     };
 
     // Declare the dep, and return the state of the destination.
-    if let Some((mut entry, entry_id)) = maybe_entry_and_id {
-      entry.get(context, entry_id).map(|(res, _)| res).to_boxed()
+    if let Some((src_entry, mut entry, entry_id)) = maybe_entries_and_id {
+      if src_entry.node().cacheable() {
+        entry.get(context, entry_id).map(|(res, _)| res).to_boxed()
+      } else {
+        // Src node is uncacheable, which means it is side-effecting, and can only be allowed to run once.
+        // We retry its dependencies a number of times here in case a side effect of the Node invalidated
+        // some of its dependencies, or another (external) process causes invalidation.
+        let context2 = context.clone();
+        let mut counter: usize = 8;
+        let uncached_node = async move {
+          loop {
+            counter -= 1;
+            if counter == 0 {
+              break Err(N::Error::exhausted());
+            }
+            let dep_res = entry
+              .get(&context2, entry_id)
+              .map(|(res, _)| res)
+              .compat()
+              .await;
+            match dep_res {
+              Ok(r) => break Ok(r),
+              Err(err) if err == N::Error::invalidated() => continue,
+              Err(other_err) => break Err(other_err),
+            }
+          }
+        };
+        uncached_node.boxed().compat().to_boxed()
+      }
     } else {
       future::err(N::Error::invalidated()).to_boxed()
     }
@@ -869,7 +909,7 @@ impl<N: Node> Graph<N> {
   /// TODO: We don't track which generation actually added which edges, so over time nodes will end
   /// up with spurious dependencies. This is mostly sound, but may lead to over-invalidation and
   /// doing more work than is necessary.
-  /// As an example, if generation 0 or X depends on A and B, and generation 1 of X depends on C,
+  /// As an example, if generation 0 of X depends on A and B, and generation 1 of X depends on C,
   /// nothing will prune the dependencies from X onto A and B, so generation 1 of X will have
   /// dependencies on A, B, and C in the graph, even though running it only depends on C.
   /// At some point we should address this, but we must be careful with how we do so; anything which
@@ -904,7 +944,7 @@ impl<N: Node> Graph<N> {
           // If a dependency is uncacheable or currently dirty, this Node should complete as dirty,
           // independent of matching Generation values. This is to allow for the behaviour that an
           // uncacheable Node should always have dirty dependents, transitively.
-          if !entry.node().cacheable(context) || !entry.is_clean(context) {
+          if !entry.node().cacheable() || !entry.is_clean(context) {
             has_dirty_dependencies = true;
           }
           entry.generation()
@@ -1057,6 +1097,7 @@ struct Walk<'a, N: Node> {
   direction: Direction,
   deque: VecDeque<EntryId>,
   walked: HashSet<EntryId, FNV>,
+  stop_at_uncacheable: bool,
 }
 
 impl<'a, N: Node + 'a> Iterator for Walk<'a, N> {
@@ -1064,14 +1105,23 @@ impl<'a, N: Node + 'a> Iterator for Walk<'a, N> {
 
   fn next(&mut self) -> Option<Self::Item> {
     while let Some(id) = self.deque.pop_front() {
+      // NOTE Consider not returning uncacheable nodes as part of the walk using the same
+      // conditions below for not adding children. Uncacheable nodes don't need to be dirty because
+      // they aren't re-run in the same session even if they are dirtied. And they are always
+      // run by their dependents in a new session, hence "uncacheable".
       if !self.walked.insert(id) {
         continue;
       }
 
-      // Queue the neighbors of the entry and then return it.
-      self
-        .deque
-        .extend(self.graph.pg.neighbors_directed(id, self.direction));
+      // Add neighbors if this node is cacheable or we are not stopping when
+      // hitting uncacheable nodes. This mechanism gives us a way to not
+      // dirty the dependents of uncacheable nodes, which would cause them
+      // to re-run in cases where we dont ever want that.
+      if !self.stop_at_uncacheable || self.graph.entry_for_id(id).unwrap().node().cacheable() {
+        self
+          .deque
+          .extend(self.graph.pg.neighbors_directed(id, self.direction));
+      }
       return Some(id);
     }
 

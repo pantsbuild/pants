@@ -37,7 +37,7 @@ pub trait Node: Clone + Debug + Display + Eq + Hash + Send + 'static {
   ///
   /// If the node result is cacheable, return true.
   ///
-  fn cacheable(&self, context: &Self::Context) -> bool;
+  fn cacheable(&self) -> bool;
 
   /// Nodes optionally have a user-facing name (distinct from their Debug and Display
   /// implementations). This user-facing name is intended to provide high-level information
@@ -55,6 +55,12 @@ pub trait NodeError: Clone + Debug + Eq + Send {
   /// Graph (generally while running).
   ///
   fn invalidated() -> Self;
+  ///
+  /// Creates an instance that represents an uncacheable node failing from
+  /// retrying its dependencies too many times, but never able to resolve them,
+  /// usually because they were invalidated too many times while running.
+  ///
+  fn exhausted() -> Self;
 
   ///
   /// Creates an instance that represents that a Node dependency was cyclic along the given path.
@@ -100,7 +106,7 @@ pub trait NodeTracer<N: Node> {
 ///
 /// A context passed between Nodes that also stores an EntryId to uniquely identify them.
 ///
-pub trait NodeContext: Clone + Send + 'static {
+pub trait NodeContext: Clone + Send + Sync + 'static {
   ///
   /// The type generated when this Context is cloned for another Node.
   ///
@@ -111,7 +117,7 @@ pub trait NodeContext: Clone + Send + 'static {
   /// have Session-specific semantics. More than one context object might be associated with a
   /// single caller "session".
   ///
-  type SessionId: Clone + Debug + Eq;
+  type SessionId: Clone + Debug + Eq + Send;
 
   ///
   /// Creates a clone of this NodeContext to be used for a different Node.

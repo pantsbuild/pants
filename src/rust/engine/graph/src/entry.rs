@@ -370,7 +370,7 @@ impl<N: Node> Entry<N> {
             entry_id,
             run_token,
             generation,
-            if self.node.cacheable(context) {
+            if self.node.cacheable() {
               Some(dep_generations)
             } else {
               None
@@ -451,7 +451,7 @@ impl<N: Node> Entry<N> {
             generation,
             previous_result,
           }
-        } else if dirty {
+        } else if dirty && self.node.cacheable() {
           // The node was dirtied while it was running. The dep_generations and new result cannot
           // be trusted and were never published. We continue to use the previous result.
           trace!(
@@ -473,7 +473,7 @@ impl<N: Node> Entry<N> {
         } else {
           // If the new result does not match the previous result, the generation increments.
           let (generation, next_result) = if let Some(result) = result {
-            let next_result = if !self.node.cacheable(context) {
+            let next_result = if !self.node.cacheable() {
               EntryResult::Uncacheable(result, context.session_id().clone())
             } else if has_dirty_dependencies {
               EntryResult::Dirty(result)
