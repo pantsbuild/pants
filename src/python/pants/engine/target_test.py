@@ -3,7 +3,7 @@
 
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import ClassVar, Iterable, List, Optional, Tuple
+from typing import Any, ClassVar, Dict, Iterable, List, Optional, Tuple
 
 import pytest
 from typing_extensions import final
@@ -15,15 +15,25 @@ from pants.engine.selectors import Get
 from pants.engine.target import (
     AsyncField,
     BoolField,
+    DictStringToStringField,
+    DictStringToStringSequenceField,
     InvalidFieldException,
+    InvalidFieldTypeException,
     PrimitiveField,
     RequiredFieldMissingException,
     StringField,
+    StringOrStringSequenceField,
+    StringSequenceField,
     Target,
 )
 from pants.testutil.engine.util import MockGet, run_rule
 from pants.util.collections import ensure_str_list
+from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import OrderedSet
+
+# -----------------------------------------------------------------------------------------------
+# Test core Field and Target abstractions
+# -----------------------------------------------------------------------------------------------
 
 
 class FortranExtensions(PrimitiveField):
@@ -379,3 +389,87 @@ def test_required_field() -> None:
         RequiredTarget({"async": 0}, address=address)
     assert str(address) in str(exc.value)
     assert "primitive" in str(exc.value)
+
+
+# -----------------------------------------------------------------------------------------------
+# Test Field templates
+# -----------------------------------------------------------------------------------------------
+
+
+def test_string_sequence_field() -> None:
+    class Example(StringSequenceField):
+        alias = "example"
+
+    addr = Address.parse(":example")
+
+    def assert_flexible_constructor(raw_value: Iterable[str]) -> None:
+        assert Example(raw_value, address=addr).value == tuple(raw_value)
+
+    for v in [("hello", "world"), ["hello", "world"], OrderedSet(["hello", "world"])]:
+        assert_flexible_constructor(v)
+
+    def assert_invalid_type(raw_value: Any) -> None:
+        with pytest.raises(InvalidFieldTypeException):
+            Example(raw_value, address=addr)
+
+    for v in [0, object(), "strings are technically iterable...", [0, 1], ["hello", 1]]:
+        assert_invalid_type(v)
+
+
+def test_string_or_string_sequence_field() -> None:
+    class Example(StringOrStringSequenceField):
+        alias = "example"
+
+    addr = Address.parse(":example")
+
+    def assert_flexible_constructor(raw_value: Iterable[str]) -> None:
+        assert Example(raw_value, address=addr).value == tuple(raw_value)
+
+    for v in [("hello", "world"), ["hello", "world"], OrderedSet(["hello", "world"])]:
+        assert_flexible_constructor(v)
+    assert Example("hello world", address=addr).value == ("hello world",)
+
+    def assert_invalid_type(raw_value: Any) -> None:
+        with pytest.raises(InvalidFieldTypeException):
+            Example(raw_value, address=addr)
+
+    for v in [0, object(), [0, 1], ["hello", 1]]:
+        assert_invalid_type(v)
+
+
+def test_dict_string_to_string_field() -> None:
+    class Example(DictStringToStringField):
+        alias = "example"
+
+    addr = Address.parse(":example")
+
+    assert Example({"hello": "world"}, address=addr).value == FrozenDict({"hello": "world"})
+
+    def assert_invalid_type(raw_value: Any) -> None:
+        with pytest.raises(InvalidFieldTypeException):
+            Example(raw_value, address=addr)
+
+    for v in [0, object(), "hello", ["hello"], {"hello": 0}, {0: "world"}]:
+        assert_invalid_type(v)
+
+
+def test_dict_string_to_string_sequence_field() -> None:
+    class Example(DictStringToStringSequenceField):
+        alias = "example"
+
+    addr = Address.parse(":example")
+
+    def assert_flexible_constructor(raw_value: Dict[str, Iterable[str]]) -> None:
+        assert Example(raw_value, address=addr).value == FrozenDict(
+            {k: tuple(v) for k, v in raw_value.items()}
+        )
+
+    for v in [("hello", "world"), ["hello", "world"], OrderedSet(["hello", "world"])]:
+        assert_flexible_constructor({"greeting": v})
+
+    def assert_invalid_type(raw_value: Any) -> None:
+        with pytest.raises(InvalidFieldTypeException):
+            Example(raw_value, address=addr)
+
+    for v in [0, object(), "hello", ["hello"], {"hello": "world"}, {0: ["world"]}]:
+        assert_invalid_type(v)
