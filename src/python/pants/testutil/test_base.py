@@ -643,7 +643,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         if sources:
             self.create_files(path, sources)
 
-        sources_str = f"sources={repr(sources)}," if sources else ""
+        sources_str = f"sources={repr(sources)}," if sources is not None else ""
         if java_sources is not None:
             formatted_java_sources = ",".join(f'"{str_target}"' for str_target in java_sources)
             java_sources_str = f"java_sources=[{formatted_java_sources}],"
