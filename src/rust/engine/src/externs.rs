@@ -461,9 +461,7 @@ impl From<Result<Value, Failure>> for PyResult {
       Err(f) => {
         let val = match f {
           f @ Failure::Invalidated => create_exception(&format!("{}", f)),
-          f @ Failure::Exhausted => create_exception(&format!("{}", f)),
           Failure::Throw(exc, _) => exc,
-          Failure::FileWatch(failure) => create_exception(&failure),
         };
         PyResult {
           is_throw: true,

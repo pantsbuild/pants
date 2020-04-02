@@ -307,7 +307,7 @@ fn exhaust_uncacheable_retries() {
     graph2.invalidate_from_roots(|&TNode(n, _)| n == 0);
   });
   let (assertion, subject) = match graph.create(TNode::new(2), &context).wait() {
-    Err(TError::Exhausted) => (true, None),
+    Err(TError::Throw) => (true, None),
     Err(e) => (false, Some(Err(e))),
     other => (false, Some(other)),
   };
@@ -315,7 +315,7 @@ fn exhaust_uncacheable_retries() {
   assert!(
     assertion,
     "expected {:?} found {:?}",
-    Err::<(), TError>(TError::Exhausted),
+    Err::<(), TError>(TError::Throw),
     subject
   );
 }
@@ -771,7 +771,7 @@ impl TContext {
 enum TError {
   Cyclic,
   Invalidated,
-  Exhausted,
+  Throw,
 }
 impl NodeError for TError {
   fn invalidated() -> Self {
@@ -779,7 +779,7 @@ impl NodeError for TError {
   }
 
   fn exhausted() -> Self {
-    TError::Exhausted
+    TError::Throw
   }
 
   fn cyclic(_path: Vec<String>) -> Self {

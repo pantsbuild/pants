@@ -941,8 +941,8 @@ impl NodeVisualizer<NodeKey> for Visualizer {
     let max_colors = 12;
     match entry.peek(context) {
       None => "white".to_string(),
-      Some(Err(Failure::Throw(..))) | Some(Err(Failure::FileWatch(..))) => "4".to_string(),
-      Some(Err(Failure::Invalidated)) | Some(Err(Failure::Exhausted)) => "12".to_string(),
+      Some(Err(Failure::Throw(..))) => "4".to_string(),
+      Some(Err(Failure::Invalidated)) => "12".to_string(),
       Some(Ok(_)) => {
         let viz_colors_len = self.viz_colors.len();
         self
@@ -960,9 +960,8 @@ pub struct Tracer;
 impl NodeTracer<NodeKey> for Tracer {
   fn is_bottom(result: Option<Result<NodeResult, Failure>>) -> bool {
     match result {
-      Some(Err(Failure::Invalidated)) | Some(Err(Failure::Exhausted)) => false,
+      Some(Err(Failure::Invalidated)) => false,
       Some(Err(Failure::Throw(..))) => false,
-      Some(Err(Failure::FileWatch(..))) => false,
       Some(Ok(_)) => true,
       None => {
         // A Node with no state is either still running, or effectively cancelled
@@ -987,8 +986,6 @@ impl NodeTracer<NodeKey> for Tracer {
           .join("\n")
       ),
       Some(Err(Failure::Invalidated)) => "Invalidated".to_string(),
-      Some(Err(Failure::Exhausted)) => "Exhausted".to_string(),
-      Some(Err(Failure::FileWatch(failure))) => format!("FileWatch failed: {}", failure),
     }
   }
 }
@@ -1076,7 +1073,7 @@ impl Node for NodeKey {
           .core
           .watcher
           .watch(abs_path)
-          .map_err(|e| Failure::FileWatch(format!("{:?}", e)))
+          .map_err(|e| Context::mk_error(&format!("{:?}", e)))
           .await
       } else {
         Ok(())
@@ -1163,7 +1160,9 @@ impl NodeError for Failure {
   }
 
   fn exhausted() -> Failure {
-    Failure::Exhausted
+    Context::mk_error(
+      "Exhausted retries for uncacheable node. The filesystem was changing to much.",
+    )
   }
 
   fn cyclic(mut path: Vec<String>) -> Failure {

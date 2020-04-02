@@ -287,27 +287,15 @@ pub enum Failure {
   /// A Node failed because a filesystem change invalidated it or its inputs.
   /// A root requestor should usually immediately retry their request.
   Invalidated,
-  /// A uncacheable node exhausted retry attempts for its dependencies because
-  /// they were invalidated too many times while running. This enum variant is distinguished
-  /// from Invalidated because we DONT want the scheduler to retry the request. Uncacheable
-  /// nodes are allowed to have side-effects and they shouldn't be run multiple times in one
-  /// session.
-  Exhausted,
   /// A rule raised an exception.
   Throw(Value, String),
-  FileWatch(String),
 }
 
 impl fmt::Display for Failure {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     match self {
       Failure::Invalidated => write!(f, "Giving up on retrying due to changed files."),
-      Failure::Exhausted => write!(
-        f,
-        "Giving up on uncacheable node retries due to changing files."
-      ),
       Failure::Throw(exc, _) => write!(f, "{}", externs::val_to_str(exc)),
-      Failure::FileWatch(failure) => write!(f, "{}", failure),
     }
   }
 }
