@@ -15,7 +15,7 @@ from pants.engine.addressable import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
 from pants.engine.legacy.structs import FilesAdaptor, PythonTargetAdaptor, ResourcesAdaptor
-from pants.engine.rules import named_rule, rule
+from pants.engine.rules import named_rule
 from pants.engine.selectors import Get
 from pants.python.python_setup import PythonSetup
 

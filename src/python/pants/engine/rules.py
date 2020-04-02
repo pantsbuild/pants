@@ -8,8 +8,8 @@ import sys
 import typing
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional, Tuple, Type, Union, cast, get_type_hints
 from enum import Enum
+from typing import Callable, Dict, List, Optional, Tuple, Type, get_type_hints
 
 from pants.engine.goal import Goal
 from pants.engine.objects import union
@@ -179,9 +179,7 @@ def _make_rule(
             else:
                 effective_name = func.__name__
         effective_annotations = RuleAnnotationFields(
-            name=effective_name,
-            desc=anno_fields.desc,
-            rule_type=anno_fields.rule_type
+            name=effective_name, desc=anno_fields.desc, rule_type=anno_fields.rule_type
         )
 
         # Set our own custom `__line_number__` dunder so that the engine may visualize the line number.
@@ -258,7 +256,7 @@ def rule_decorator(*args, **kwargs) -> Callable:
         anno_fields = RuleAnnotationFields()
         if any([name, desc, rule_type]):
             raise UnrecognizedRuleArgument(
-                    f"@rules that are not @named_rules or @goal_rules do not accept keyword arguments"
+                f"@rules that are not @named_rules or @goal_rules do not accept keyword arguments"
             )
 
     if (
@@ -293,7 +291,9 @@ def rule_decorator(*args, **kwargs) -> Callable:
         for parameter in inspect.signature(func).parameters
     )
     validate_parameter_types(func_id, parameter_types, cacheable)
-    return _make_rule(return_type, parameter_types, cacheable=cacheable, anno_fields=anno_fields)(func)
+    return _make_rule(return_type, parameter_types, cacheable=cacheable, anno_fields=anno_fields)(
+        func
+    )
 
 
 def validate_parameter_types(
@@ -311,8 +311,10 @@ def inner_rule(*args, **kwargs) -> Callable:
     if len(args) == 1 and inspect.isfunction(args[0]):
         return rule_decorator(*args, **kwargs)
     else:
+
         def wrapper(*args):
             return rule_decorator(*args, **kwargs)
+
         return wrapper
 
 

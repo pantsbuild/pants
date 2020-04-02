@@ -307,15 +307,21 @@ class RuleArgumentAnnotationTest(unittest.TestCase):
 
     def test_bogus_rules(self):
         with self.assertRaises(UnrecognizedRuleArgument):
+
             @named_rule(bogus_kwarg="TOTALLY BOGUS!!!!!!")
             def a_named_rule(a: int, b: str) -> bool:
                 return False
 
         with self.assertRaises(UnrecognizedRuleArgument) as e:
+
             @rule(desc="Some description")
-            def a_named_rule(a: int, b: str) -> bool:
+            def a_named_rule_2(a: int, b: str) -> bool:
                 return False
-        assert e.exception.args[0] == "@rules that are not @named_rules or @goal_rules do not accept keyword arguments"
+
+        assert (
+            e.exception.args[0]
+            == "@rules that are not @named_rules or @goal_rules do not accept keyword arguments"
+        )
 
     def test_goal_rule_automatically_gets_name_from_goal(self):
         @goal_rule
