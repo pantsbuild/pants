@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from textwrap import dedent
 from typing import List
 
-from pants.engine.rules import RootRule, rule
+from pants.engine.rules import RootRule, named_rule, rule
 from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Get, MultiGet
 from pants.reporting.streaming_workunit_handler import StreamingWorkunitHandler
@@ -49,7 +49,7 @@ class Fib:
     val: int
 
 
-@rule(name="fib")
+@named_rule(name="fib")
 async def fib(n: int) -> Fib:
     if n < 2:
         return Fib(n)
@@ -96,7 +96,7 @@ class Omega:
     pass
 
 
-@rule(name="rule_one")
+@named_rule(name="rule_one")
 async def rule_one(i: Input) -> Beta:
     """This rule should be the first one executed by the engine, and thus have no parent."""
     a = Alpha()
@@ -105,7 +105,7 @@ async def rule_one(i: Input) -> Beta:
     return b
 
 
-@rule(name="rule_two")
+@named_rule(name="rule_two")
 async def rule_two(a: Alpha) -> Omega:
     """This rule should be invoked in the body of `rule_one` and therefore its workunit should be a
     child of `rule_one`'s workunit."""
@@ -113,14 +113,14 @@ async def rule_two(a: Alpha) -> Omega:
     return Omega()
 
 
-@rule(name="rule_three")
+@named_rule(name="rule_three")
 async def rule_three(o: Omega) -> Beta:
     """This rule should be invoked in the body of `rule_one` and therefore its workunit should be a
     child of `rule_one`'s workunit."""
     return Beta()
 
 
-@rule(name="rule_four")
+@named_rule(name="rule_four")
 def rule_four(a: Alpha) -> Gamma:
     """This rule should be invoked in the body of `rule_two` and therefore its workunit should be a
     child of `rule_two`'s workunit."""

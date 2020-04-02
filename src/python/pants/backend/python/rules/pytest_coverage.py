@@ -32,7 +32,7 @@ from pants.engine.fs import (
 )
 from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
-from pants.engine.rules import RootRule, UnionRule, rule, subsystem_rule
+from pants.engine.rules import RootRule, UnionRule, named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.python.python_setup import PythonSetup
 from pants.rules.core.determine_source_files import LegacyAllSourceFilesRequest, SourceFiles
@@ -256,7 +256,7 @@ class MergedCoverageData:
     coverage_data: Digest
 
 
-@rule(name="Merge coverage reports")
+@named_rule(name="Merge coverage reports")
 async def merge_coverage_data(
     data_batch: PytestCoverageDataBatch,
     transitive_targets: TransitiveHydratedTargets,
@@ -328,7 +328,7 @@ class PytestCoverageData(CoverageData):
         return PytestCoverageDataBatch
 
 
-@rule(name="Generate coverage report")
+@named_rule(name="Generate coverage report")
 async def generate_coverage_report(
     transitive_targets: TransitiveHydratedTargets,
     python_setup: PythonSetup,

@@ -30,7 +30,7 @@ from pants.engine.fs import (
 from pants.engine.isolated_process import ExecuteProcessResult, MultiPlatformExecuteProcessRequest
 from pants.engine.legacy.structs import PythonTargetAdaptor, TargetAdaptor
 from pants.engine.platform import Platform, PlatformConstraint
-from pants.engine.rules import rule, subsystem_rule
+from pants.engine.rules import named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.python.python_repos import PythonRepos
 from pants.python.python_setup import PythonSetup
@@ -253,7 +253,7 @@ class PexDebug:
         self.log_level.log(logger, *args, **kwargs)
 
 
-@rule(name="Create PEX")
+@named_rule(name="Create PEX")
 async def create_pex(
     request: PexRequest,
     pex_bin: DownloadedPexBin,

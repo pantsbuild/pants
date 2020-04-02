@@ -21,7 +21,7 @@ from pants.engine.isolated_process import (
     ExecuteProcessResult,
     FallibleExecuteProcessResult,
 )
-from pants.engine.rules import UnionRule, rule, subsystem_rule
+from pants.engine.rules import UnionRule, named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.python.python_setup import PythonSetup
 from pants.rules.core import determine_source_files, strip_source_roots
@@ -126,7 +126,7 @@ async def setup(
     return Setup(process_request)
 
 
-@rule(name="Format Python docstrings with docformatter")
+@named_rule(name="Format Python docstrings with docformatter")
 async def fmt(formatter: DocformatterFormatter, docformatter: Docformatter) -> FmtResult:
     if docformatter.options.skip:
         return FmtResult.noop()
@@ -135,7 +135,7 @@ async def fmt(formatter: DocformatterFormatter, docformatter: Docformatter) -> F
     return FmtResult.from_execute_process_result(result)
 
 
-@rule(name="Lint Python docstrings with docformatter")
+@named_rule(name="Lint Python docstrings with docformatter")
 async def lint(formatter: DocformatterFormatter, docformatter: Docformatter) -> LintResult:
     if docformatter.options.skip:
         return LintResult.noop()

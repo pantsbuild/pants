@@ -23,7 +23,7 @@ from pants.engine.isolated_process import (
     ExecuteProcessResult,
     FallibleExecuteProcessResult,
 )
-from pants.engine.rules import UnionRule, rule, subsystem_rule
+from pants.engine.rules import UnionRule, named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
@@ -149,7 +149,7 @@ async def setup(
     return Setup(process_request)
 
 
-@rule(name="Format using Black")
+@named_rule(name="Format using Black")
 async def fmt(formatter: BlackFormatter, black: Black) -> FmtResult:
     if black.options.skip:
         return FmtResult.noop()
@@ -158,7 +158,7 @@ async def fmt(formatter: BlackFormatter, black: Black) -> FmtResult:
     return FmtResult.from_execute_process_result(result)
 
 
-@rule(name="Lint using Black")
+@named_rule(name="Lint using Black")
 async def lint(formatter: BlackFormatter, black: Black) -> LintResult:
     if black.options.skip:
         return LintResult.noop()
