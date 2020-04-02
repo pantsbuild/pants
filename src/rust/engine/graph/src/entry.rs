@@ -451,7 +451,7 @@ impl<N: Node> Entry<N> {
             generation,
             previous_result,
           }
-        } else if dirty && self.node.cacheable() {
+        } else if dirty {
           // The node was dirtied while it was running. The dep_generations and new result cannot
           // be trusted and were never published. We continue to use the previous result.
           trace!(

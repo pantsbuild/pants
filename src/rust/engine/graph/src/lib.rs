@@ -168,7 +168,9 @@ impl<N: Node> InnerGraph<N> {
     // Search for an existing path from dst to src.
     let mut roots = VecDeque::new();
     roots.push_back(root);
-    self.walk(roots, direction, false).any(|eid| eid == needle)
+    self
+      .walk(roots, direction, |_| false)
+      .any(|eid| eid == needle)
   }
 
   ///
@@ -289,18 +291,18 @@ impl<N: Node> InnerGraph<N> {
   /// The Walk will iterate over all nodes that descend from the roots in the direction of
   /// traversal but won't necessarily be in topological order.
   ///
-  fn walk(
+  fn walk<F: Fn(&N) -> bool>(
     &self,
     roots: VecDeque<EntryId>,
     direction: Direction,
-    stop_at_uncacheable: bool,
-  ) -> Walk<'_, N> {
+    stop_walking_predicate: F,
+  ) -> Walk<'_, N, F> {
     Walk {
       graph: self,
       direction: direction,
       deque: roots,
       walked: HashSet::default(),
-      stop_at_uncacheable,
+      stop_walking_predicate,
     }
   }
 
@@ -336,7 +338,7 @@ impl<N: Node> InnerGraph<N> {
       .walk(
         root_ids.iter().cloned().collect(),
         Direction::Incoming,
-        true,
+        |n| !n.cacheable(),
       )
       .filter(|eid| !root_ids.contains(eid))
       .collect();
@@ -398,7 +400,7 @@ impl<N: Node> InnerGraph<N> {
       .cloned()
       .collect();
 
-    for eid in self.walk(root_entries, Direction::Outgoing, false) {
+    for eid in self.walk(root_entries, Direction::Outgoing, |_| false) {
       let entry = self.unsafe_entry_for_id(eid);
       let node_str = entry.format(context);
 
@@ -614,7 +616,9 @@ impl<N: Node> InnerGraph<N> {
       .collect();
     self
       .digests_internal(
-        self.walk(root_ids, Direction::Outgoing, false).collect(),
+        self
+          .walk(root_ids, Direction::Outgoing, |_| false)
+          .collect(),
         context.clone(),
       )
       .count()
@@ -1092,36 +1096,35 @@ pub mod test_support {
 /// Represents the state of a particular walk through a Graph. Implements Iterator and has the same
 /// lifetime as the Graph itself.
 ///
-struct Walk<'a, N: Node> {
+struct Walk<'a, N: Node, F>
+where
+  F: Fn(&N) -> bool,
+{
   graph: &'a InnerGraph<N>,
   direction: Direction,
   deque: VecDeque<EntryId>,
   walked: HashSet<EntryId, FNV>,
-  stop_at_uncacheable: bool,
+  stop_walking_predicate: F,
 }
 
-impl<'a, N: Node + 'a> Iterator for Walk<'a, N> {
+impl<'a, N: Node + 'a, F: Fn(&N) -> bool> Iterator for Walk<'a, N, F> {
   type Item = EntryId;
 
   fn next(&mut self) -> Option<Self::Item> {
     while let Some(id) = self.deque.pop_front() {
-      // NOTE Consider not returning uncacheable nodes as part of the walk using the same
-      // conditions below for not adding children. Uncacheable nodes don't need to be dirty because
-      // they aren't re-run in the same session even if they are dirtied. And they are always
-      // run by their dependents in a new session, hence "uncacheable".
-      if !self.walked.insert(id) {
+      // Visit this node and it neighbors if this node has not yet be visited and we aren't
+      // stopping our walk at this node, based on if it satifies the stop_walking_predicate.
+      // This mechanism gives us a way to selectively dirty parts of the graph respecting node boundaries
+      // like uncacheable nodes, which sholdn't be dirtied.
+      if !self.walked.insert(id)
+        || (self.stop_walking_predicate)(self.graph.entry_for_id(id).unwrap().node())
+      {
         continue;
       }
 
-      // Add neighbors if this node is cacheable or we are not stopping when
-      // hitting uncacheable nodes. This mechanism gives us a way to not
-      // dirty the dependents of uncacheable nodes, which would cause them
-      // to re-run in cases where we dont ever want that.
-      if !self.stop_at_uncacheable || self.graph.entry_for_id(id).unwrap().node().cacheable() {
-        self
-          .deque
-          .extend(self.graph.pg.neighbors_directed(id, self.direction));
-      }
+      self
+        .deque
+        .extend(self.graph.pg.neighbors_directed(id, self.direction));
       return Some(id);
     }
 
