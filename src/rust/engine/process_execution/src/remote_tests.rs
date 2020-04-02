@@ -33,7 +33,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tokio::runtime::Handle;
 use tokio::time::delay_for;
-use workunit_store::{WorkUnit, WorkUnitStore};
+use workunit_store::{WorkUnit, WorkUnitStore, WorkunitMetadata};
 
 #[derive(Debug, PartialEq)]
 enum StdoutType {
@@ -2328,6 +2328,7 @@ async fn remote_workunits_are_stored() {
       },
       span_id: String::from("ignore"),
       parent_id: None,
+      metadata: WorkunitMetadata::default(),
     },
     WorkUnit {
       name: String::from("remote execution worker input fetching"),
@@ -2337,6 +2338,7 @@ async fn remote_workunits_are_stored() {
       },
       span_id: String::from("ignore"),
       parent_id: None,
+      metadata: WorkunitMetadata::default(),
     },
     WorkUnit {
       name: String::from("remote execution worker command executing"),
@@ -2346,6 +2348,7 @@ async fn remote_workunits_are_stored() {
       },
       span_id: String::from("ignore"),
       parent_id: None,
+      metadata: WorkunitMetadata::default(),
     },
     WorkUnit {
       name: String::from("remote execution worker output uploading"),
@@ -2355,6 +2358,7 @@ async fn remote_workunits_are_stored() {
       },
       span_id: String::from("ignore"),
       parent_id: None,
+      metadata: WorkunitMetadata::default(),
     }
   };
 

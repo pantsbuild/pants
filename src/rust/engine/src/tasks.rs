@@ -203,7 +203,14 @@ pub struct Task {
   pub gets: Vec<Get>,
   pub func: Function,
   pub cacheable: bool,
-  pub display_info: Option<String>,
+  pub display_info: DisplayInfo,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq, Default)]
+pub struct DisplayInfo {
+  pub name: Option<String>,
+  pub desc: Option<String>,
+  pub rule_type: Option<String>,
 }
 
 ///
@@ -303,7 +310,7 @@ impl Tasks {
       clause: Vec::new(),
       gets: Vec::new(),
       func: func,
-      display_info: None,
+      display_info: DisplayInfo::default(),
     });
   }
 
@@ -328,12 +335,16 @@ impl Tasks {
       .push(Select::new(product));
   }
 
-  pub fn add_display_info(&mut self, display_info: String) {
+  pub fn add_display_info(&mut self, name: String, desc: String, rule_type: String) {
     let mut task = self
       .preparing
       .as_mut()
       .expect("Must `begin()` a task creation before adding display info!");
-    task.display_info = Some(display_info);
+    task.display_info = DisplayInfo {
+      name: Some(name),
+      desc: Some(desc),
+      rule_type: Some(rule_type),
+    };
   }
 
   pub fn task_end(&mut self) {
