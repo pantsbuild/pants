@@ -1,7 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Dict, Iterable, Optional, Tuple, Union
+from typing import Dict, Iterable, Optional, Tuple, Union, cast
 
 from pants.backend.native.subsystems.native_build_step import ToolchainVariant
 from pants.backend.native.targets.external_native_library import ConanRequirement
@@ -13,12 +13,14 @@ from pants.engine.target import (
     Dependencies,
     InvalidFieldTypeException,
     PrimitiveField,
+    ScalarField,
+    SequenceField,
     Sources,
     StringField,
     StringSequenceField,
     Target,
 )
-from pants.util.collections import ensure_list, ensure_str_list
+from pants.util.collections import ensure_str_list
 from pants.util.frozendict import FrozenDict
 
 # -----------------------------------------------------------------------------------------------
@@ -36,8 +38,10 @@ class CppSources(Sources):
     default = ("*.h", "*.hpp", "*.cpp")
 
 
-class CtypesNativeLibrary(PrimitiveField):
+class CtypesNativeLibrary(ScalarField):
     alias = "ctypes_native_library"
+    expected_type = NativeArtifact
+    expected_type_description = "a `native_artifact` object"
     value: NativeArtifact
     required = True
 
@@ -45,12 +49,7 @@ class CtypesNativeLibrary(PrimitiveField):
     def compute_value(
         cls, raw_value: Optional[NativeArtifact], *, address: Address
     ) -> NativeArtifact:
-        value = super().compute_value(raw_value, address=address)
-        if not isinstance(value, NativeArtifact):
-            raise InvalidFieldTypeException(
-                address, cls.alias, value, expected_type="a `native_artifact` object"
-            )
-        return value
+        return cast(NativeArtifact, super().compute_value(raw_value, address=address))
 
 
 class NativeFatalWarnings(BoolField):
@@ -115,30 +114,20 @@ class CppLibrary(Target):
 # -----------------------------------------------------------------------------------------------
 
 
-class ConanPackages(PrimitiveField):
+class ConanPackages(SequenceField):
     """The `ConanRequirement`s to resolve into a `packaged_native_library()` target."""
 
     alias = "packages"
-    value: Optional[Tuple[ConanRequirement, ...]]
+    expected_element_type = ConanRequirement
+    expected_type_description = "an iterable of `conan_requirement` objects (e.g. a list)"
+    value: Tuple[ConanRequirement, ...]
     required = True
 
     @classmethod
     def compute_value(
         cls, raw_value: Optional[Iterable[ConanRequirement]], *, address: Address
-    ) -> Optional[Tuple[ConanRequirement, ...]]:
-        value_or_default = super().compute_value(raw_value, address=address)
-        if value_or_default is None:
-            return None
-        try:
-            ensure_list(value_or_default, expected_type=ConanRequirement)
-        except ValueError:
-            raise InvalidFieldTypeException(
-                address,
-                cls.alias,
-                value_or_default,
-                expected_type="an iterable of `conan_requirement` objects (e.g. a list)",
-            )
-        return tuple(sorted(value_or_default))
+    ) -> Tuple[ConanRequirement, ...]:
+        return cast(Tuple[ConanRequirement, ...], super().compute_value(raw_value, address=address))
 
 
 class ConanNativeLibrary(Target):
