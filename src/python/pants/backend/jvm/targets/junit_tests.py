@@ -53,9 +53,6 @@ class JUnitTests(RuntimePlatformMixin, JvmTarget):
         :param str cwd: working directory (relative to the build root) for the tests under this
           target. If unspecified (None), the working directory will be controlled by junit_run's --cwd
           and --chroot options.
-        :param str test_platform: Deprecated. The name of the platform (defined under the jvm-platform subsystem) to
-          use for running tests (that is, a key into the --jvm-platform-platforms dictionary). If
-          unspecified, the platform will default to the same one used for compilation.
         :param int timeout: A timeout (in seconds) which covers the total runtime of all tests in this
           target. Only applied if `--test-junit-timeouts` is set to True.
         :param list extra_jvm_options: A list of options to be passed to the jvm when running the

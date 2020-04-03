@@ -56,8 +56,6 @@ class ScalaLibrary(ExportableJvmLibrary):
           don't use this at all.
           Prefer using ``dependencies`` to express non-circular dependencies.
         :type java_sources: address spec or list of address specs
-        :param resources: An optional list of paths (DEPRECATED) or ``resources``
-          targets containing resources that belong on this library's classpath.
         """
         payload = payload or Payload()
         payload.add_fields(
