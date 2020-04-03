@@ -121,18 +121,29 @@ class FieldInfo:
         else:
             raw_value_type = get_type_hints(field.__init__)["raw_value"]
         type_hint = pretty_print_type_hint(raw_value_type)
+
+        # Check if the field only allows for certain choices.
+        if issubclass(field, StringField) and field.valid_choices is not None:
+            valid_choices = sorted(
+                field.valid_choices
+                if isinstance(field.valid_choices, tuple)
+                else (choice.value for choice in field.valid_choices)
+            )
+            type_hint = " | ".join([*(repr(c) for c in valid_choices), "None"])
+
         if field.required:
             # We hackily remove `None` as a valid option for the field when it's required. This
             # greatly simplifies Field definitions because it means that they don't need to
             # override the type hints for `PrimitiveField.compute_value()` and
             # `AsyncField.sanitize_raw_value()` to indicate that `None` is an invalid type.
             type_hint = type_hint.replace(" | None", "")
+
         return cls(
             alias=field.alias,
             description=description,
             type_hint=type_hint,
             required=field.required,
-            default=str(field.default) if not field.required else None,
+            default=repr(field.default) if not field.required else None,
         )
 
     def format_for_cli(self, console: Console) -> str:

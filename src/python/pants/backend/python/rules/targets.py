@@ -165,6 +165,7 @@ class PexInheritPath(StringField):
     """
 
     alias = "inherit_path"
+    valid_choices = ("false", "fallback", "prefer")
 
     # TODO(#9388): deprecate allowing this to be a `bool`.
     @classmethod

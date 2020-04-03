@@ -17,6 +17,10 @@ from pants.engine.target import (
     Target,
 )
 
+# -----------------------------------------------------------------------------------------------
+# `files` target
+# -----------------------------------------------------------------------------------------------
+
 
 class FilesSources(Sources):
     required = True
@@ -33,6 +37,11 @@ class Files(Target):
 
     alias = "files"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, FilesSources)
+
+
+# -----------------------------------------------------------------------------------------------
+# `resources` target
+# -----------------------------------------------------------------------------------------------
 
 
 class ResourcesSources(Sources):
@@ -52,6 +61,11 @@ class Resources(Target):
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, ResourcesSources)
 
 
+# -----------------------------------------------------------------------------------------------
+# `target` generic target
+# -----------------------------------------------------------------------------------------------
+
+
 class GenericTarget(Target):
     """A generic target with no specific target type.
 
@@ -60,6 +74,11 @@ class GenericTarget(Target):
 
     alias = "target"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, Sources)
+
+
+# -----------------------------------------------------------------------------------------------
+# `alias` target
+# -----------------------------------------------------------------------------------------------
 
 
 class AliasTargetRequestedAddress(StringField):
@@ -79,6 +98,11 @@ class AliasTarget(Target):
 
     alias = "alias"
     core_fields = (*COMMON_TARGET_FIELDS, AliasTargetRequestedAddress)
+
+
+# -----------------------------------------------------------------------------------------------
+# `prep_command` target
+# -----------------------------------------------------------------------------------------------
 
 
 class PrepCommandExecutable(StringField):
@@ -135,6 +159,11 @@ class PrepCommand(Target):
         PrepCommandEnviron,
         PrepCommandGoals,
     )
+
+
+# -----------------------------------------------------------------------------------------------
+# `remote_sources` targets
+# -----------------------------------------------------------------------------------------------
 
 
 class RemoteSourcesTargetRequestedAddress(StringField):

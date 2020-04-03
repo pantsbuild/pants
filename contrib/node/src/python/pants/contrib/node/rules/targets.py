@@ -9,7 +9,6 @@ from pants.engine.target import (
     BoolField,
     Dependencies,
     IntField,
-    InvalidFieldException,
     InvalidFieldTypeException,
     PrimitiveField,
     Sources,
@@ -18,6 +17,10 @@ from pants.engine.target import (
 )
 from pants.fs.archive import TYPE_NAMES_PRESERVE_SYMLINKS
 from pants.util.frozendict import FrozenDict
+
+# -----------------------------------------------------------------------------------------------
+# Common fields
+# -----------------------------------------------------------------------------------------------
 
 
 class NodePackageName(StringField):
@@ -40,25 +43,18 @@ class NodePackageName(StringField):
 COMMON_NODE_FIELDS = (*COMMON_TARGET_FIELDS, NodePackageName)
 
 
-class NodeBundleArchiveFormat(StringField):
-    """The archive format to use for the generated bundle.
+# -----------------------------------------------------------------------------------------------
+# `node_bundle` target
+# -----------------------------------------------------------------------------------------------
 
-    Choose from `tar`, `tgz`, or `tbz2`.
-    """
+
+class NodeBundleArchiveFormat(StringField):
+    """The archive format to use for the generated bundle."""
 
     alias = "archive"
     value: str
+    valid_choices = tuple(sorted(TYPE_NAMES_PRESERVE_SYMLINKS))
     default = "tgz"
-
-    @classmethod
-    def compute_value(cls, raw_value: Optional[str], *, address: Address) -> str:
-        value_or_default = super().compute_value(raw_value, address=address)
-        if value_or_default not in TYPE_NAMES_PRESERVE_SYMLINKS:
-            raise InvalidFieldException(
-                f"The {repr(cls.alias)} field in target {address} must be one of "
-                f"{list(TYPE_NAMES_PRESERVE_SYMLINKS)}, but was {repr(raw_value)}."
-            )
-        return value_or_default
 
 
 class NodeBundleRequestedModule(StringField):
@@ -73,6 +69,11 @@ class NodeBundle(Target):
 
     alias = "node_bundle"
     core_fields = (*COMMON_NODE_FIELDS, NodeBundleArchiveFormat, NodeBundleRequestedModule)
+
+
+# -----------------------------------------------------------------------------------------------
+# `node_module` target
+# -----------------------------------------------------------------------------------------------
 
 
 class NodePackageManager(StringField):
@@ -194,6 +195,11 @@ class NodeModule(Target):
     )
 
 
+# -----------------------------------------------------------------------------------------------
+# `node_preinstalled_module` target
+# -----------------------------------------------------------------------------------------------
+
+
 class NodeDependenciesArchiveUrl(StringField):
     """The location of a tar.gz file containing containing a node_modules directory."""
 
@@ -209,6 +215,11 @@ class NodePreinstalledModule(Target):
 
     alias = "node_preinstalled_module"
     core_fields = (*NodeModule.core_fields, NodeDependenciesArchiveUrl)
+
+
+# -----------------------------------------------------------------------------------------------
+# `node_remote_module` target
+# -----------------------------------------------------------------------------------------------
 
 
 class NodeRemoteVersion(StringField):
@@ -228,6 +239,11 @@ class NodeRemoteModule(Target):
 
     alias = "node_remote_module"
     core_fields = (*COMMON_NODE_FIELDS, NodeRemoteVersion)
+
+
+# -----------------------------------------------------------------------------------------------
+# `node_test` target
+# -----------------------------------------------------------------------------------------------
 
 
 class NodeTestScriptName(StringField):

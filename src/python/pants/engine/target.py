@@ -3,6 +3,7 @@
 
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import PurePath
 from typing import Any, ClassVar, Dict, Iterable, Optional, Tuple, Type, TypeVar, Union, cast
 
@@ -608,6 +609,21 @@ class RequiredFieldMissingException(InvalidFieldException):
         super().__init__(f"The {repr(field_alias)} field in target {address} must be defined.")
 
 
+class InvalidFieldChoiceException(InvalidFieldException):
+    def __init__(
+        self,
+        address: Address,
+        field_alias: str,
+        raw_value: Optional[Any],
+        *,
+        valid_choices: Iterable[Any],
+    ) -> None:
+        super().__init__(
+            f"The {repr(field_alias)} field in target {address} must be one of "
+            f"{sorted(valid_choices)}, but was {repr(raw_value)}."
+        )
+
+
 # -----------------------------------------------------------------------------------------------
 # Field templates
 # -----------------------------------------------------------------------------------------------
@@ -656,16 +672,35 @@ class FloatField(PrimitiveField, metaclass=ABCMeta):
 
 
 class StringField(PrimitiveField, metaclass=ABCMeta):
+    """A field whose value is a string.
+
+    If you expect the string to only be one of several values, set the class property
+    `valid_choices`.
+    """
+
     value: Optional[str]
     default: ClassVar[Optional[str]] = None
+    valid_choices: ClassVar[Optional[Union[Type[Enum], Tuple[str, ...]]]] = None
 
     @classmethod
     def compute_value(cls, raw_value: Optional[str], *, address: Address) -> Optional[str]:
         value_or_default = super().compute_value(raw_value, address=address)
-        if value_or_default is not None and not isinstance(value_or_default, str):
+        if value_or_default is None:
+            return None
+        if not isinstance(value_or_default, str):
             raise InvalidFieldTypeException(
                 address, cls.alias, value_or_default, expected_type="a string",
             )
+        if cls.valid_choices is not None:
+            valid_choices = set(
+                cls.valid_choices
+                if isinstance(cls.valid_choices, tuple)
+                else (choice.value for choice in cls.valid_choices)
+            )
+            if value_or_default not in valid_choices:
+                raise InvalidFieldChoiceException(
+                    address, cls.alias, value_or_default, valid_choices=valid_choices
+                )
         return value_or_default
 
 

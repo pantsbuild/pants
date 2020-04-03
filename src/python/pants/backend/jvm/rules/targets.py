@@ -1,7 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Dict, Iterable, Optional, Tuple, Union
+from typing import Iterable, Optional, Tuple, Union
 
 from pants.backend.jvm.subsystems import shader
 from pants.backend.jvm.targets.jvm_binary import JarRules
@@ -23,8 +23,7 @@ from pants.engine.target import (
 )
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
-from pants.util.collections import ensure_list, ensure_str_list
-from pants.util.frozendict import FrozenDict
+from pants.util.collections import ensure_list
 
 # -----------------------------------------------------------------------------------------------
 # Common JVM Fields
@@ -58,7 +57,7 @@ class JvmExcludes(PrimitiveField):
         return tuple(sorted(value_or_default))
 
 
-class JvmServices(PrimitiveField):
+class JvmServices(DictStringToStringSequenceField):
     """A dictionary mapping service interface names to the classes owned by this target that
     implement them.
 
@@ -69,30 +68,6 @@ class JvmServices(PrimitiveField):
     """
 
     alias = "services"
-    value: Optional[FrozenDict[str, Tuple[str, ...]]] = None
-    default = None
-
-    @classmethod
-    def compute_value(
-        cls, raw_value: Optional[Dict[str, Iterable[str]]], *, address: Address
-    ) -> Optional[FrozenDict[str, Tuple[str, ...]]]:
-        value_or_default = super().compute_value(raw_value, address=address)
-        if value_or_default is None:
-            return None
-        invalid_type_exception = InvalidFieldTypeException(
-            address,
-            cls.alias,
-            value_or_default,
-            expected_type=(
-                "a dictionary of service interface name (string) to an iterable of class names"
-            ),
-        )
-        if not isinstance(value_or_default, dict):
-            raise invalid_type_exception
-        try:
-            return FrozenDict({k: ensure_str_list(v) for k, v in value_or_default.items()})
-        except ValueError:
-            raise invalid_type_exception
 
 
 class JvmPlatform(StringField):
@@ -452,15 +427,19 @@ class JunitExtraEnvVars(DictStringToStringField):
     alias = "extra_env_vars"
 
 
-# TODO: add an enum-like validation feature to StringField. Hook it up to `target-types2`. Allow
-#  either defining as a class property a list of valid strings _or_ passing an Enum type.
 class JunitConcurrency(StringField):
-    """One of 'SERIAL', 'PARALLEL_CLASSES', 'PARALLEL_METHODS', or 'PARALLEL_CLASSES_AND_METHODS'.
+    """The concurrency approach to use with tests.
 
     Overrides the setting of --test-junit-default-concurrency.
     """
 
     alias = "concurrency"
+    valid_choices = (
+        "SERIAL",
+        "PARALLEL_CLASSES",
+        "PARALLEL_METHODS",
+        "PARALLEL_CLASSES_AND_METHODS",
+    )
 
 
 class JunitNumThreads(IntField):
