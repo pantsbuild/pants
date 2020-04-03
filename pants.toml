@@ -89,6 +89,7 @@ pants_ignore.add = [
   # We shouldn't walk or watch the rust compiler artifacts because it is slow.
   "/src/rust/engine/target",
 ]
+files_not_found_behavior = "error"
 
 [cache]
 # Caching is on globally by default, but we disable it here for development purposes.
