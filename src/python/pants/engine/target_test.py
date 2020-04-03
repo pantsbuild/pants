@@ -27,6 +27,7 @@ from pants.engine.target import (
     PrimitiveField,
     RequiredFieldMissingException,
     ScalarField,
+    SequenceField,
     Sources,
     StringField,
     StringOrStringSequenceField,
@@ -458,24 +459,52 @@ def test_string_field_valid_choices() -> None:
         GivenEnum("carrot", address=addr)
 
 
+def test_sequence_field() -> None:
+    @dataclass(frozen=True)
+    class CustomObject:
+        pass
+
+    class Example(SequenceField):
+        alias = "example"
+        expected_element_type = CustomObject
+        expected_type_description = "an iterable of `CustomObject` instances"
+
+        @classmethod
+        def compute_value(
+            cls, raw_value: Optional[Iterable[CustomObject]], *, address: Address
+        ) -> Optional[Tuple[CustomObject, ...]]:
+            return super().compute_value(raw_value, address=address)
+
+    addr = Address.parse(":example")
+
+    def assert_flexible_constructor(raw_value: Iterable[CustomObject]) -> None:
+        assert Example(raw_value, address=addr).value == tuple(raw_value)
+
+    assert_flexible_constructor([CustomObject(), CustomObject()])
+    assert_flexible_constructor((CustomObject(), CustomObject()))
+    assert_flexible_constructor(OrderedSet([CustomObject(), CustomObject()]))
+
+    # Must be given a sequence, not a single element.
+    with pytest.raises(InvalidFieldTypeException) as exc:
+        Example(CustomObject(), address=addr)
+    assert Example.expected_type_description in str(exc.value)
+
+    # All elements must be the expected type.
+    with pytest.raises(InvalidFieldTypeException):
+        Example([CustomObject(), 1, CustomObject()], address=addr)
+
+
 def test_string_sequence_field() -> None:
     class Example(StringSequenceField):
         alias = "example"
 
     addr = Address.parse(":example")
-
-    def assert_flexible_constructor(raw_value: Iterable[str]) -> None:
-        assert Example(raw_value, address=addr).value == tuple(raw_value)
-
-    for v in [("hello", "world"), ["hello", "world"], OrderedSet(["hello", "world"])]:
-        assert_flexible_constructor(v)
-
-    def assert_invalid_type(raw_value: Any) -> None:
-        with pytest.raises(InvalidFieldTypeException):
-            Example(raw_value, address=addr)
-
-    for v in [0, object(), "strings are technically iterable...", [0, 1], ["hello", 1]]:
-        assert_invalid_type(v)
+    assert Example(["hello", "world"], address=addr).value == ("hello", "world")
+    assert Example(None, address=addr).value is None
+    with pytest.raises(InvalidFieldTypeException):
+        Example("strings are technically iterable...", address=addr)
+    with pytest.raises(InvalidFieldTypeException):
+        Example(["hello", 0, "world"], address=addr)
 
 
 def test_string_or_string_sequence_field() -> None:
@@ -483,20 +512,10 @@ def test_string_or_string_sequence_field() -> None:
         alias = "example"
 
     addr = Address.parse(":example")
-
-    def assert_flexible_constructor(raw_value: Iterable[str]) -> None:
-        assert Example(raw_value, address=addr).value == tuple(raw_value)
-
-    for v in [("hello", "world"), ["hello", "world"], OrderedSet(["hello", "world"])]:
-        assert_flexible_constructor(v)
+    assert Example(["hello", "world"], address=addr).value == ("hello", "world")
     assert Example("hello world", address=addr).value == ("hello world",)
-
-    def assert_invalid_type(raw_value: Any) -> None:
-        with pytest.raises(InvalidFieldTypeException):
-            Example(raw_value, address=addr)
-
-    for v in [0, object(), [0, 1], ["hello", 1]]:
-        assert_invalid_type(v)
+    with pytest.raises(InvalidFieldTypeException):
+        Example(["hello", 0, "world"], address=addr)
 
 
 def test_dict_string_to_string_field() -> None:

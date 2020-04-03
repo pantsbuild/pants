@@ -5,7 +5,19 @@ from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import Any, ClassVar, Dict, Iterable, Generic, Optional, Tuple, Type, TypeVar, Union, cast
+from typing import (
+    Any,
+    ClassVar,
+    Dict,
+    Generic,
+    Iterable,
+    Optional,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+    cast,
+)
 
 from typing_extensions import final
 
@@ -23,7 +35,7 @@ from pants.engine.objects import Collection
 from pants.engine.rules import RootRule, UnionMembership, rule
 from pants.engine.selectors import Get
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper, Filespec
-from pants.util.collections import ensure_str_list
+from pants.util.collections import ensure_list, ensure_str_list
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
@@ -733,30 +745,58 @@ class StringField(ScalarField, metaclass=ABCMeta):
         return value_or_default
 
 
-class StringSequenceField(PrimitiveField, metaclass=ABCMeta):
-    value: Optional[Tuple[str, ...]]
-    default: ClassVar[Optional[Tuple[str, ...]]] = None
+class SequenceField(Generic[T], PrimitiveField, metaclass=ABCMeta):
+    """A field whose value is a homogeneous sequence.
+
+    Subclasses must define the class properties `expected_element_type` and
+    `expected_type_description`. They should also override the type hints for the classmethod
+    `compute_value` so that we use the correct type annotation in generated documentation.
+
+        class Example(SequenceField):
+            alias = "example"
+            expected_element_type = MyPluginObject
+            expected_type_description = "an iterable of `my_plugin` objects"
+
+            @classmethod
+            def compute_value(
+                cls, raw_value: Optional[Iterable[MyPluginObject]], *, address: Address
+            ) -> Optional[Tuple[MyPluginObject, ...]]:
+                return super().compute_value(raw_value, address=address)
+    """
+
+    expected_element_type: ClassVar[Type[T]]
+    expected_type_description: ClassVar[str]
+    value: Optional[Tuple[T, ...]]
+    default: ClassVar[Optional[Tuple[T, ...]]] = None
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Iterable[Any]], *, address: Address
+    ) -> Optional[Tuple[T, ...]]:
+        value_or_default = super().compute_value(raw_value, address=address)
+        if value_or_default is None:
+            return None
+        try:
+            ensure_list(value_or_default, expected_type=cls.expected_element_type)
+        except ValueError:
+            raise InvalidFieldTypeException(
+                address, cls.alias, raw_value, expected_type=cls.expected_type_description,
+            )
+        return tuple(value_or_default)
+
+
+class StringSequenceField(SequenceField, metaclass=ABCMeta):
+    expected_element_type = str
+    expected_type_description = "an iterable of strings (e.g. a list of strings)"
 
     @classmethod
     def compute_value(
         cls, raw_value: Optional[Iterable[str]], *, address: Address
     ) -> Optional[Tuple[str, ...]]:
-        value_or_default = super().compute_value(raw_value, address=address)
-        if value_or_default is None:
-            return None
-        try:
-            ensure_str_list(value_or_default)
-        except ValueError:
-            raise InvalidFieldTypeException(
-                address,
-                cls.alias,
-                raw_value,
-                expected_type="an iterable of strings (e.g. a list of strings)",
-            )
-        return tuple(value_or_default)
+        return super().compute_value(raw_value, address=address)
 
 
-class StringOrStringSequenceField(PrimitiveField, metaclass=ABCMeta):
+class StringOrStringSequenceField(SequenceField, metaclass=ABCMeta):
     """The raw_value may either be a string or be an iterable of strings.
 
     This is syntactic sugar that we use for certain fields to make BUILD files simpler when the user
@@ -765,28 +805,18 @@ class StringOrStringSequenceField(PrimitiveField, metaclass=ABCMeta):
     Generally, this should not be used by any new Fields. This mechanism is a misfeature.
     """
 
-    value: Optional[Tuple[str, ...]]
-    default: ClassVar[Optional[Tuple[str, ...]]] = None
+    expected_element_type = str
+    expected_type_description = (
+        "either a single string or an iterable of strings (e.g. a list of strings)"
+    )
 
     @classmethod
     def compute_value(
         cls, raw_value: Optional[Union[str, Iterable[str]]], *, address: Address
     ) -> Optional[Tuple[str, ...]]:
-        value_or_default = super().compute_value(raw_value, address=address)
-        if value_or_default is None:
-            return None
-        try:
-            str_list = ensure_str_list(value_or_default, allow_single_str=True)
-        except ValueError:
-            raise InvalidFieldTypeException(
-                address,
-                cls.alias,
-                value_or_default,
-                expected_type=(
-                    "either a single string or an iterable of strings (e.g. a list of strings)"
-                ),
-            )
-        return tuple(str_list)
+        if isinstance(raw_value, str):
+            return (raw_value,)
+        return super().compute_value(raw_value, address=address)
 
 
 class DictStringToStringField(PrimitiveField, metaclass=ABCMeta):
