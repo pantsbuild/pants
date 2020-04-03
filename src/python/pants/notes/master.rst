@@ -4,6 +4,159 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.27.0.dev2 (4/3/2020)
+-----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Add a feature gate to disable the engine fs watcher introduced in #9318 (#9416)
+  `PR #9416 <https://github.com/pantsbuild/pants/pull/9416>`_
+
+* Change `ensure_list` to not accept a single element by default (#9463)
+  `PR #9463 <https://github.com/pantsbuild/pants/pull/9463>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Make the list of JS lintable extensions configurable (#9423)
+  `PR #9423 <https://github.com/pantsbuild/pants/pull/9423>`_
+
+* Improve formatting of `./pants help` (#9411)
+  `PR #9411 <https://github.com/pantsbuild/pants/pull/9411>`_
+
+* Improve formatting of `./pants goals` and `./pants target-types2` (#9414)
+  `PR #9414 <https://github.com/pantsbuild/pants/pull/9414>`_
+
+* Improve formatting of `target-types2 --details` (#9410)
+  `PR #9410 <https://github.com/pantsbuild/pants/pull/9410>`_
+
+* Implement Cobertura output option for #9275 (#9325)
+  `PR #9325 <https://github.com/pantsbuild/pants/pull/9325>`_
+
+* Add notify fs watcher to engine. (#9318)
+  `PR #9318 <https://github.com/pantsbuild/pants/pull/9318>`_
+
+* Pass all `python_binary` fields to V2 `binary` and `run`  (#9449)
+  `PR #9449 <https://github.com/pantsbuild/pants/pull/9449>`_
+
+* Add `list-v2` to work with the Target API (#9433)
+  `PR #9433 <https://github.com/pantsbuild/pants/pull/9433>`_
+
+* Port `filedeps2` to use the Target API and add the missing `--transitive` option (#9459)
+  `PR #9459 <https://github.com/pantsbuild/pants/pull/9459>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix equality and hashing of `engine.Collection` (#9437)
+  `PR #9437 <https://github.com/pantsbuild/pants/pull/9437>`_
+
+* fix accidentally double-registering setuptools for ipex (#9341)
+  `PR #9341 <https://github.com/pantsbuild/pants/pull/9341>`_
+
+* fix --tag filtering when a TargetAdaptor has None for the 'tags' kwarg (#9443)
+  `PR #9443 <https://github.com/pantsbuild/pants/pull/9443>`_
+
+* Eliminate PEX_ROOT warning for CreatePex. (#9418)
+  `PR #9418 <https://github.com/pantsbuild/pants/pull/9418>`_
+
+* Don't rerun uncachable nodes if they are dirtied while running. (#9452)
+  `PR #9452 <https://github.com/pantsbuild/pants/pull/9452>`_
+
+* Ignore notify events for pants_ignore patterns. (#9406)
+  `PR #9406 <https://github.com/pantsbuild/pants/pull/9406>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Provide better TypeError in extern_identify hash failure (#9430)
+  `PR #9430 <https://github.com/pantsbuild/pants/pull/9430>`_
+
+* Allow a `StringField` to require one of several choices (enum) (#9461)
+  `PR #9461 <https://github.com/pantsbuild/pants/pull/9461>`_
+
+* Formalize marking fields as required (must be defined in the BUILD file) (#9392)
+  `PR #9392 <https://github.com/pantsbuild/pants/pull/9392>`_
+
+* Add `DictStringToStringField` and `DictStringToStringSequenceField` field templates (#9455)
+  `PR #9455 <https://github.com/pantsbuild/pants/pull/9455>`_
+
+* Add support for getting the direct and transitive dependencies of a Target (#9440)
+  `PR #9440 <https://github.com/pantsbuild/pants/pull/9440>`_
+
+* Fallback in `target-types2` to the docstring from parent Fields when not available (#9404)
+  `PR #9404 <https://github.com/pantsbuild/pants/pull/9404>`_
+
+* Add Target API bindings for `contrib/cpp` and `backend/native` (#9445)
+  `PR #9445 <https://github.com/pantsbuild/pants/pull/9445>`_
+
+* Add Target API bindings for `backend/jvm` (#9460)
+  `PR #9460 <https://github.com/pantsbuild/pants/pull/9460>`_
+
+* Add Target API bindings for `contrib/node` and `contrib/scalajs` (#9447)
+  `PR #9447 <https://github.com/pantsbuild/pants/pull/9447>`_
+
+* Add Target API bindings for `contrib/go` (#9444)
+  `PR #9444 <https://github.com/pantsbuild/pants/pull/9444>`_
+
+* Add Target API bindings for `build_graph` target types (#9425)
+  `PR #9425 <https://github.com/pantsbuild/pants/pull/9425>`_
+
+* Store the `Filespec` on the `Sources` field (#9458)
+  `PR #9458 <https://github.com/pantsbuild/pants/pull/9458>`_
+
+* Remove unused JarDependency parameter. (#9457)
+  `PR #9457 <https://github.com/pantsbuild/pants/pull/9457>`_
+
+* Remove unused variables from _register_rules (#9432)
+  `PR #9432 <https://github.com/pantsbuild/pants/pull/9432>`_
+
+* Fix misleading comment. (#9424)
+  `PR #9424 <https://github.com/pantsbuild/pants/pull/9424>`_
+
+Testing
+~~~~~~~
+
+* Use `GlobMatchErrorBehavior.error` in `TestBase` (#9456)
+  `PR #9456 <https://github.com/pantsbuild/pants/pull/9456>`_
+
+* Cache `native_engine.so` in AWS in CI to avoid unnecessary Rust compilation (#9413)
+  `PR #9413 <https://github.com/pantsbuild/pants/pull/9413>`_
+
+* Store CI objects in S3 based on lifetime. (#9438)
+  `PR #9438 <https://github.com/pantsbuild/pants/pull/9438>`_
+
+* Refactor CI bootstrap shards setup to prepare for caching `native_engine.so` (#9409)
+  `PR #9409 <https://github.com/pantsbuild/pants/pull/9409>`_
+
+* Fix uploading `native_engine.so` to AWS too many times in CI (#9451)
+  `PR #9451 <https://github.com/pantsbuild/pants/pull/9451>`_
+
+* Move Build Wheels shards lower in CI order (#9383)
+  `PR #9383 <https://github.com/pantsbuild/pants/pull/9383>`_
+
+* Skip 2 flaky tests and bump 2 test timeouts (#9422)
+  `PR #9422 <https://github.com/pantsbuild/pants/pull/9422>`_
+
+* Skip flaky artifact cache and RSC compile tests (#9439)
+  `PR #9439 <https://github.com/pantsbuild/pants/pull/9439>`_
+
+* Skip flaky `TestArtifactCache` test. (#9427)
+  `PR #9427 <https://github.com/pantsbuild/pants/pull/9427>`_
+
+* Skip flaky `TestPantsDaemonIntegration` test. (#9421)
+  `PR #9421 <https://github.com/pantsbuild/pants/pull/9421>`_
+
+* Skip flaky PytestRunTimeoutIntegrationTest test. (#9442)
+  `PR #9442 <https://github.com/pantsbuild/pants/pull/9442>`_
+
+* break up flaky python integration tests that keep timing out (#9408)
+  `PR #9408 <https://github.com/pantsbuild/pants/pull/9408>`_
+
+* Fix incorrect guidance for running fmt. (#9419)
+  `PR #9419 <https://github.com/pantsbuild/pants/pull/9419>`_
+
 1.27.0.dev1 (3/26/2020)
 -----------------------
 
