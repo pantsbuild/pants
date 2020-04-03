@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import PurePath
 from typing import Any, ClassVar, Dict, Iterable, List, Optional, Tuple
 
@@ -20,6 +21,7 @@ from pants.engine.target import (
     DictStringToStringSequenceField,
     HydratedSources,
     HydrateSourcesRequest,
+    InvalidFieldChoiceException,
     InvalidFieldException,
     InvalidFieldTypeException,
     PrimitiveField,
@@ -400,6 +402,33 @@ def test_required_field() -> None:
 # -----------------------------------------------------------------------------------------------
 # Test Field templates
 # -----------------------------------------------------------------------------------------------
+
+
+def test_string_field_valid_choices() -> None:
+    class GivenStrings(StringField):
+        alias = "example"
+        valid_choices = ("kale", "spinach")
+
+    class LeafyGreens(Enum):
+        KALE = "kale"
+        SPINACH = "spinach"
+
+    class GivenEnum(StringField):
+        alias = "example"
+        valid_choices = LeafyGreens
+        default = LeafyGreens.KALE.value
+
+    addr = Address.parse(":example")
+    assert GivenStrings("spinach", address=addr).value == "spinach"
+    assert GivenEnum("spinach", address=addr).value == "spinach"
+
+    assert GivenStrings(None, address=addr).value is None
+    assert GivenEnum(None, address=addr).value == "kale"
+
+    with pytest.raises(InvalidFieldChoiceException):
+        GivenStrings("carrot", address=addr)
+    with pytest.raises(InvalidFieldChoiceException):
+        GivenEnum("carrot", address=addr)
 
 
 def test_string_sequence_field() -> None:

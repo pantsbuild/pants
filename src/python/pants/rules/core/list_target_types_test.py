@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from contextlib import contextmanager
+from enum import Enum
 from textwrap import dedent
 from typing import Optional, cast
 from unittest.mock import Mock
@@ -57,10 +58,27 @@ class FortranTests(Target):
     core_fields = (FortranVersion, FortranTimeout)
 
 
+class ArchiveFormat(Enum):
+    TGZ = ".tgz"
+    TAR = ".tar"
+
+
+class ArchiveFormatField(StringField):
+    alias = "archive_format"
+    valid_choices = ArchiveFormat
+    default = ArchiveFormat.TGZ.value
+
+
+class ErrorBehavior(StringField):
+    alias = "error_behavior"
+    valid_choices = ("ignore", "warn", "error")
+    required = True
+
+
 # Note no docstring.
 class FortranBinary(Target):
     alias = "fortran_binary"
-    core_fields = (FortranVersion,)
+    core_fields = (FortranVersion, ArchiveFormatField, ErrorBehavior)
 
 
 def run_goal(
@@ -147,6 +165,12 @@ def test_list_single() -> None:
         --------------
 
         Valid fields:
+
+            archive_format
+                type: '.tar' | '.tgz' | None, default: '.tgz'
+
+            error_behavior
+                type: 'error' | 'ignore' | 'warn', required
 
             fortran_version
                 type: str | None, default: None
