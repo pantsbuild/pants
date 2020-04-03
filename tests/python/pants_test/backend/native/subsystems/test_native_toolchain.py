@@ -45,7 +45,7 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
         self.llvm_version = llvm_subsystem.version()
 
     def _sched(self, *args, **kwargs):
-        return self.mk_scheduler(rules=self.rules, *args, **kwargs)
+        return self.mk_scheduler(rules=self.rules(), *args, **kwargs)
 
     def test_gcc_version(self):
         scheduler = self._sched()
