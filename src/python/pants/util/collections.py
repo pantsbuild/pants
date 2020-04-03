@@ -67,18 +67,21 @@ def assert_single_element(iterable: Iterable[_T]) -> _T:
     raise ValueError(f"iterable {iterable!r} has more than one element.")
 
 
-def ensure_list(val: Union[Any, Iterable[Any]], *, expected_type: Type[_T]) -> List[_T]:
-    """Given either a single value or an iterable of values, always return a list.
+def ensure_list(
+    val: Union[Any, Iterable[Any]], *, expected_type: Type[_T], allow_single_scalar: bool = False
+) -> List[_T]:
+    """Ensure that every element of an iterable is the expected type and convert the result to a
+    list.
 
-    This performs runtime type checking to ensure that every element of the list is the expected
-    type.
+    If `allow_single_scalar` is True, a single value T will be wrapped into a `List[T]`.
     """
     if isinstance(val, expected_type):
+        if not allow_single_scalar:
+            raise ValueError(f"The value {val} must be wrapped in an iterable (e.g. a list).")
         return [val]
     if not isinstance(val, collections.abc.Iterable):
         raise ValueError(
-            f"The value {val} (type {type(val)}) did not have the expected type {expected_type} "
-            "nor was it an iterable."
+            f"The value {val} (type {type(val)}) was not an iterable of {expected_type}."
         )
     result: List[_T] = []
     for i, x in enumerate(val):
@@ -91,6 +94,9 @@ def ensure_list(val: Union[Any, Iterable[Any]], *, expected_type: Type[_T]) -> L
     return result
 
 
-def ensure_str_list(val: Union[str, Iterable[str]]) -> List[str]:
-    """Given either a single string or an iterable of strings, always return a list."""
-    return ensure_list(val, expected_type=str)
+def ensure_str_list(val: Union[str, Iterable[str]], *, allow_single_str: bool = False) -> List[str]:
+    """Ensure that every element of an iterable is a string and convert the result to a list.
+
+    If `allow_single_str` is True, a single `str` will be wrapped into a `List[str]`.
+    """
+    return ensure_list(val, expected_type=str, allow_single_scalar=allow_single_str)
