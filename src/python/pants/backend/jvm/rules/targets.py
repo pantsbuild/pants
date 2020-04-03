@@ -3,6 +3,7 @@
 
 from typing import Any, Dict, Iterable, Optional, Tuple, Union
 
+from pants.backend.jvm.subsystems import shader
 from pants.backend.jvm.targets.jvm_binary import JarRules
 from pants.build_graph.address import Address
 from pants.engine.target import (
@@ -30,6 +31,7 @@ from pants.util.frozendict import FrozenDict
 # -----------------------------------------------------------------------------------------------
 
 
+# TODO: factor out a generic `SequenceField` which takes the expected type as a class property.
 class JvmExcludes(PrimitiveField):
     """`exclude` objects to filter this target's transitive dependencies against."""
 
@@ -306,6 +308,7 @@ class JarsField(PrimitiveField):
     value: Tuple[JarDependency, ...]
     required = True
 
+    # TODO: factor out a common Sequence field.
     @classmethod
     def compute_value(
         cls, raw_value: Optional[Iterable[JarDependency]], *, address: Address
@@ -530,6 +533,7 @@ class JvmBinaryDeployExcludes(JvmExcludes):
     alias = "deploy_excludes"
 
 
+# TODO: factor out a common SingleValueField(?) class.
 class JvmBinaryDeployJarRules(PrimitiveField):
     """A `jar_rules` object for packaging this binary in a deploy JAR."""
 
@@ -565,12 +569,15 @@ class JvmBinaryShadingRules(PrimitiveField):
     """
 
     alias = "shading_rules"
-    value: Tuple[Any, ...]
+    value: Optional[Tuple[Union[shader.UnaryRule, shader.RelocateRule], ...]]
     default = None
 
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[Iterable[Any]], *, address: Address
+        cls,
+        raw_value: Optional[Iterable[Union[shader.UnaryRule, shader.RelocateRule]]],
+        *,
+        address: Address
     ) -> Tuple[Any, ...]:
         value_or_default = super().compute_value(raw_value, address=address)
         return tuple(value_or_default)
@@ -619,9 +626,7 @@ class JvmPrepCommandGoal(StringField):
     default = "test"
 
 
-class JvmPrepCommandOptions(StringSequenceField):
-    """Extra options to pass the JVM."""
-
+class JvmPrepCommandOptions(ExtraJvmOptions):
     alias = "jvm_options"
 
 
