@@ -14,7 +14,8 @@ class TestBinaryCreate(JvmBinaryTaskTestBase):
         return BinaryCreate
 
     def test_jvm_binaries_products(self):
-        self.add_to_build_file("bar", 'jvm_binary(name = "bar-binary", source = "Bar.java")')
+        self.create_file("bar/Bar.java")
+        self.add_to_build_file("bar", 'jvm_binary(name = "bar-binary", sources = ["Bar.java"])')
         binary_target = self.target("//bar:bar-binary")
         context = self.context(target_roots=[binary_target])
         classpath_products = self.ensure_classpath_products(context)
@@ -58,11 +59,12 @@ class TestBinaryCreate(JvmBinaryTaskTestBase):
         )
         foo_jar_lib = self.target("3rdparty/jvm/org/example:foo")
 
+        self.create_file("bar/Bar.java")
         self.add_to_build_file(
             "bar",
             """jvm_binary(
               name = "bar-binary",
-              source = "Bar.java",
+              sources = ["Bar.java"],
               dependencies = ["3rdparty/jvm/org/example:foo"],
               deploy_excludes = [exclude(org = "org.pantsbuild")],
             )""",

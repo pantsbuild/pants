@@ -36,10 +36,12 @@ class FilesetRelPathWrapperTest(TestBase):
         self.create_link("y", "z/w/y")
 
     def test_no_dir_glob(self) -> None:
+        self.create_file("y/f.txt")
         self.add_to_build_file("y/BUILD", 'dummy_target(name="y", sources=["*"])')
         self.context().scan()
 
     def test_no_dir_glob_question(self) -> None:
+        self.create_file("y/?")
         self.add_to_build_file("y/BUILD", 'dummy_target(name="y", sources=["?"])')
         self.context().scan()
 
@@ -59,6 +61,7 @@ class FilesetRelPathWrapperTest(TestBase):
         )
 
     def test_glob_mid_single(self) -> None:
+        self.create_file("y/a/dir/Fleem.java")
         self._spec_test('["a/*/Fleem.java"]', {"globs": ["y/a/*/Fleem.java"]})
 
     def test_glob_to_spec_list(self) -> None:
@@ -112,25 +115,17 @@ class FilesetRelPathWrapperTest(TestBase):
         )
 
     def test_subdir_glob(self) -> None:
+        self.create_file("y/dir/f.scala")
         self.add_to_build_file("y/BUILD", 'dummy_target(name="y", sources=["dir/*.scala"])')
         self.context().scan()
 
     def test_subdir_glob_question(self) -> None:
+        self.create_file("y/dir/?.scala")
         self.add_to_build_file("y/BUILD", 'dummy_target(name="y", sources=["dir/?.scala"])')
         self.context().scan()
 
-    def test_subdir_bracket_glob(self) -> None:
-        self.add_to_build_file(
-            "y/BUILD",
-            dedent(
-                """
-                dummy_target(name="y", sources=["dir/[dir1, dir2]/*.scala"])
-                """
-            ),
-        )
-        self.context().scan()
-
     def test_subdir_with_dir_glob(self) -> None:
+        self.create_file("y/dir/test/f.scala")
         self.add_to_build_file("y/BUILD", 'dummy_target(name="y", sources=["dir/**/*.scala"])')
         self.context().scan()
 

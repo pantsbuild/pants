@@ -73,6 +73,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
 
         self.b_org = "com.example"
         self.b_name = "b"
+        self.create_file("src/java/targets/z.java")
         self.add_to_build_file(
             "src/java/targets",
             dedent(
@@ -109,6 +110,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
             ),
         )
 
+        self.create_file("src/java/targets/w.java")
         self.add_to_build_file(
             "src/java/targets",
             dedent(

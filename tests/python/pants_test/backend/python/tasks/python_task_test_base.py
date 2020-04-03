@@ -34,11 +34,11 @@ class PythonTaskTestBase(TaskTestBase):
         :API: public
         """
         sources = (
-            None
+            []
             if source_contents_map is None
             else ["__init__.py"] + list(source_contents_map.keys())
         )
-        sources_strs = [f"'{s}'" for s in sources] if sources else None
+        sources_strs = [f"'{s}'" for s in sources]
         self.add_to_build_file(
             relpath=relpath,
             target=dedent(
@@ -54,7 +54,7 @@ class PythonTaskTestBase(TaskTestBase):
                 """
             ).format(
                 name=name,
-                sources_clause=f"sources=[{','.join(sources_strs)}]," if sources_strs else "",
+                sources_clause=f"sources=[{','.join(sources_strs)}],",
                 dependencies=",".join(map(repr, dependencies)),
                 provides_clause=f"provides={provides}," if provides else "",
             ),

@@ -69,6 +69,7 @@ class BaseReverseDepmapTest(ConsoleTaskTestBase):
         add_to_build_file("overlaps", "four", alias=True, deps=["common/b"])
         add_to_build_file("overlaps", "five", deps=["overlaps:four"])
 
+        self.create_file("resources/a/a.resource")
         self.add_to_build_file(
             "resources/a",
             dedent(
@@ -95,6 +96,7 @@ class BaseReverseDepmapTest(ConsoleTaskTestBase):
         )
 
         # Compile idl tests
+        self.create_file("src/thrift/example/1.thrift")
         self.add_to_build_file(
             "src/thrift/example",
             dedent(
@@ -123,6 +125,7 @@ class BaseReverseDepmapTest(ConsoleTaskTestBase):
             ),
         )
 
+        self.create_file("src/thrift/example/1.java")
         self.add_to_build_file(
             "src/thrift/example",
             dedent(
@@ -155,6 +158,7 @@ class BaseReverseDepmapTest(ConsoleTaskTestBase):
         )
 
         # External Dependency tests
+        self.create_file("src/java/example/1.java")
         self.add_to_build_file(
             "src/java/example",
             dedent(
@@ -168,6 +172,7 @@ class BaseReverseDepmapTest(ConsoleTaskTestBase):
             ),
         )
 
+        self.create_file("src/java/example/2.java")
         self.add_to_build_file(
             "src/java/example",
             dedent(

@@ -30,7 +30,11 @@ class DependenciesIntegrationTest(GoalRuleTestBase):
 
     def create_python_library(self, path: str, *, dependencies: Optional[List[str]] = None) -> None:
         self.create_library(
-            path=path, target_type="python_library", name="target", dependencies=dependencies or []
+            path=path,
+            target_type="python_library",
+            name="target",
+            dependencies=dependencies or [],
+            sources=[],
         )
 
     def create_python_requirement_library(self, name: str) -> None:

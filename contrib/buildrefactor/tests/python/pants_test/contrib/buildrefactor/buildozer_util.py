@@ -3,10 +3,10 @@
 
 
 def prepare_dependencies(self):
-    self.add_to_build_file("a", 'java_library(name="a")')
-    self.add_to_build_file("b", 'java_library(name="b", dependencies=["a:a"])')
-    self.add_to_build_file("c", 'java_library(name="c", dependencies=["a:a"])')
-    self.add_to_build_file("d", 'java_library(name="d", dependencies=["a:a", "b"])')
+    self.add_to_build_file("a", 'java_library(name="a", sources=[])')
+    self.add_to_build_file("b", 'java_library(name="b", sources=[], dependencies=["a:a"])')
+    self.add_to_build_file("c", 'java_library(name="c", sources=[], dependencies=["a:a"])')
+    self.add_to_build_file("d", 'java_library(name="d", sources=[], dependencies=["a:a", "b"])')
 
     targets = {"a": self.make_target("a")}
     targets["b"] = self.make_target("b", dependencies=[targets["a"]])

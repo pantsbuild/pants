@@ -50,7 +50,7 @@ class JavaAntlrLibraryTest(TestBase):
                 dedent(
                     """
                     java_antlr_library(name='foo',
-                      sources=['foo'],
+                      sources=[],
                       compiler='antlr9'
                     )"""
                 ),

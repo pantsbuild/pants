@@ -46,7 +46,7 @@ class FileNotFoundBehavior(Enum):
         deprecated_conditional(
             lambda: self == type(self).ignore,
             removal_version="1.29.0.dev2",
-            entity_description="--files-not-found-behavior-option=ignore",
+            entity_description="--files-not-found-behavior=ignore",
             hint_message=(
                 "If you currently set `--files-not-found-behavior=ignore`, you will "
                 "need to instead either set `--files-not-found-behavior=warn` (the "

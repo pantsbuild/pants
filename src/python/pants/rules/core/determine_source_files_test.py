@@ -67,11 +67,10 @@ class DetermineSourceFilesTest(TestBase):
         sources_field_cls: Type[SourcesField] = SourcesField,
     ) -> Tuple[SourcesField, OriginSpec]:
         sources_field = sources_field_cls(
-            sources.source_files, address=Address.parse(f"{sources.source_root}:lib")
+            sources.source_files if include_sources else [],
+            address=Address.parse(f"{sources.source_root}:lib"),
         )
-        self.create_files(
-            path=sources.source_root, files=(sources.source_files if include_sources else [])
-        )
+        self.create_files(path=sources.source_root, files=sources.source_files)
         if origin is None:
             origin = SiblingAddresses(sources.source_root)
         return sources_field, origin
