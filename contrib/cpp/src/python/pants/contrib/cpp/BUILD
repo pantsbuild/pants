@@ -4,9 +4,10 @@
 contrib_plugin(
   name='plugin',
   dependencies=[
-    'contrib/cpp/src/python/pants/contrib/cpp/targets:targets',
-    'contrib/cpp/src/python/pants/contrib/cpp/tasks:tasks',
-    'contrib/cpp/src/python/pants/contrib/cpp/toolchain:toolchain',
+    'contrib/cpp/src/python/pants/contrib/cpp/rules',
+    'contrib/cpp/src/python/pants/contrib/cpp/targets',
+    'contrib/cpp/src/python/pants/contrib/cpp/tasks',
+    'contrib/cpp/src/python/pants/contrib/cpp/toolchain',
     'src/python/pants/build_graph',
     'src/python/pants/goal:task_registrar',
   ],
