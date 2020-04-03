@@ -3,8 +3,8 @@
 
 from pants.backend.native.rules.targets import (
     CLibrary,
+    ConanNativeLibrary,
     CppLibrary,
-    ExternalNativeLibrary,
     PackagedNativeLibrary,
 )
 from pants.backend.native.subsystems.binaries.binutils import create_binutils_rules
@@ -72,4 +72,4 @@ def rules():
 
 
 def targets2():
-    return [CLibrary, CppLibrary, ExternalNativeLibrary, PackagedNativeLibrary]
+    return [CLibrary, CppLibrary, ConanNativeLibrary, PackagedNativeLibrary]

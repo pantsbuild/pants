@@ -22,12 +22,18 @@ from pants.engine.target import (
 from pants.util.collections import ensure_list, ensure_str_list
 from pants.util.frozendict import FrozenDict
 
+# -----------------------------------------------------------------------------------------------
+# `ctypes_compatible_c_library` and `ctypes_compatible_cpp_library` targets
+# -----------------------------------------------------------------------------------------------
+
 
 class CSources(Sources):
     default = ("*.h", "*.c")
 
 
 class CppSources(Sources):
+    # TODO: Add support for all the different C++ file extensions, including `.cc` and `.cxx`. See
+    #  https://stackoverflow.com/a/1546107.
     default = ("*.h", "*.hpp", "*.cpp")
 
 
@@ -53,6 +59,8 @@ class NativeFatalWarnings(BoolField):
     default = False
 
 
+# NB: This is very similar to the JvmStrictDeps field in `backend/jvm`. Consider using the same
+# field for both purposes.
 class NativeStrictDeps(BoolField):
     """Whether to include only dependencies directly declared in the BUILD file.
 
@@ -113,6 +121,11 @@ class CppLibrary(Target):
     core_fields = (*NATIVE_LIBRARY_COMMON_FIELDS, CppSources)
 
 
+# -----------------------------------------------------------------------------------------------
+# `external_native_library` target
+# -----------------------------------------------------------------------------------------------
+
+
 class ConanPackages(PrimitiveField):
     """The `ConanRequirement`s to resolve into a `packaged_native_library()` target."""
 
@@ -139,11 +152,16 @@ class ConanPackages(PrimitiveField):
         return tuple(sorted(value_or_default))
 
 
-class ExternalNativeLibrary(Target):
+class ConanNativeLibrary(Target):
     """A set of Conan package strings to be passed to the Conan package manager."""
 
     alias = "external_native_library"
     core_fields = (*COMMON_TARGET_FIELDS, ConanPackages)
+
+
+# -----------------------------------------------------------------------------------------------
+# `packaged_native_library` target
+# -----------------------------------------------------------------------------------------------
 
 
 class NativeIncludeRelpath(StringField):
