@@ -296,7 +296,7 @@ fn exhaust_uncacheable_retries() {
       .with_delays(delays)
   };
 
-  let sleep_per_invalidation = Duration::from_millis(50);
+  let sleep_per_invalidation = Duration::from_millis(10);
   let graph2 = graph.clone();
   let (send, recv) = mpsc::channel();
   let _join = thread::spawn(move || loop {
