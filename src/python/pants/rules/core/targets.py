@@ -73,7 +73,7 @@ class GenericTarget(Target):
     """
 
     alias = "target"
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies)
+    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, Sources)
 
 
 # -----------------------------------------------------------------------------------------------

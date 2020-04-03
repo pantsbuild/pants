@@ -9,6 +9,7 @@ publish = false
 boxfuture = { path = "../boxfuture" }
 fnv = "1.0.5"
 futures01 = { package = "futures", version = "0.1" }
+futures = { version = "0.3", features = ["compat"] }
 hashing = { path = "../hashing" }
 indexmap = "1.0.2"
 log = "0.4"
@@ -17,3 +18,4 @@ petgraph = "0.4.5"
 
 [dev-dependencies]
 rand = "0.6"
+env_logger = "0.5.4"

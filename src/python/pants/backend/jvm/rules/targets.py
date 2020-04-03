@@ -1,7 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Any, Iterable, Optional, Tuple, Union
+from typing import Iterable, Optional, Tuple, Union
 
 from pants.backend.jvm.subsystems import shader
 from pants.backend.jvm.targets.jvm_binary import JarRules
@@ -557,8 +557,10 @@ class JvmBinaryShadingRules(PrimitiveField):
         raw_value: Optional[Iterable[Union[shader.UnaryRule, shader.RelocateRule]]],
         *,
         address: Address
-    ) -> Tuple[Any, ...]:
+    ) -> Optional[Tuple[Union[shader.UnaryRule, shader.RelocateRule], ...]]:
         value_or_default = super().compute_value(raw_value, address=address)
+        if value_or_default is None:
+            return None
         return tuple(value_or_default)
 
 
