@@ -253,6 +253,7 @@ class JarBuilderTest(BaseJarTaskTest):
                 """
                 java_agent(
                   name='fake_agent',
+                  sources=[],
                   premain='bob',
                   agent_class='fred',
                   can_redefine=True,

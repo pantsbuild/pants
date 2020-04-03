@@ -330,6 +330,7 @@ class TestSetupPy(SetupPyTestBase):
                 """
                 python_library(
                   name='foo1',
+                  sources=[],
                   dependencies=[
                     'foo/bar'
                   ],
@@ -340,6 +341,7 @@ class TestSetupPy(SetupPyTestBase):
                 )
                 python_library(
                   name='foo2',
+                  sources=[],
                   dependencies=[
                     'foo/bar'
                   ],

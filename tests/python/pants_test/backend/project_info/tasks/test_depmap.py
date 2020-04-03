@@ -116,6 +116,7 @@ class DepmapTest(BaseDepmapTest):
                 """
             ),
         )
+        self.create_file("resources/a/a.resource")
         self.add_to_build_file(
             "resources/a",
             dedent(

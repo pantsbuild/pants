@@ -165,17 +165,21 @@ class TestGenerateChroot(TestSetupPyBase):
             "src/python/invalid_binary/BUILD",
             textwrap.dedent(
                 """
-                python_library(name='not_a_binary')
+                python_library(name='not_a_binary', sources=[])
                 python_binary(name='no_entrypoint')
                 python_library(
-                  name='invalid_bin1',
-                  provides=setup_py(name='invalid_bin1', version='1.1.1').with_binaries(
-                  foo=':not_a_binary')
+                    name='invalid_bin1',
+                    sources=[],
+                    provides=setup_py(
+                        name='invalid_bin1', version='1.1.1'
+                    ).with_binaries(foo=':not_a_binary')
                 )
                 python_library(
-                  name='invalid_bin2',
-                  provides=setup_py(name='invalid_bin2', version='1.1.1').with_binaries(
-                  foo=':no_entrypoint')
+                    name='invalid_bin2',
+                    sources=[],
+                    provides=setup_py(
+                        name='invalid_bin2', version='1.1.1'
+                    ).with_binaries(foo=':no_entrypoint')
                 )
                 """
             ),
@@ -334,19 +338,21 @@ class TestGetRequirements(TestSetupPyBase):
             ),
         )
         self.create_file(
-            "src/python/foo/bar/baz/BUILD", "python_library(dependencies=['3rdparty:ext1'])"
+            "src/python/foo/bar/baz/BUILD",
+            "python_library(dependencies=['3rdparty:ext1'], sources=[])",
         )
         self.create_file(
             "src/python/foo/bar/qux/BUILD",
-            "python_library(dependencies=['3rdparty:ext2', 'src/python/foo/bar/baz'])",
+            "python_library(dependencies=['3rdparty:ext2', 'src/python/foo/bar/baz'], sources=[])",
         )
         self.create_file(
             "src/python/foo/bar/BUILD",
             textwrap.dedent(
                 """
                 python_library(
-                  dependencies=['src/python/foo/bar/baz', 'src/python/foo/bar/qux'],
-                  provides=setup_py(name='bar', version='9.8.7')
+                    sources=[],
+                    dependencies=['src/python/foo/bar/baz', 'src/python/foo/bar/qux'],
+                    provides=setup_py(name='bar', version='9.8.7'),
                 )
               """
             ),
@@ -356,8 +362,9 @@ class TestGetRequirements(TestSetupPyBase):
             textwrap.dedent(
                 """
                 python_library(
-                  dependencies=['3rdparty:ext3', 'src/python/foo/bar'],
-                  provides=setup_py(name='corge', version='2.2.2')
+                    sources=[],
+                    dependencies=['3rdparty:ext3', 'src/python/foo/bar'],
+                    provides=setup_py(name='corge', version='2.2.2'),
                 )
                 """
             ),
@@ -458,8 +465,8 @@ class TestGetOwnedDependencies(TestSetupPyBase):
             "src/python/foo/bar/baz/BUILD",
             textwrap.dedent(
                 """
-                python_library(name='baz1')
-                python_library(name='baz2')
+                python_library(name='baz1', sources=[])
+                python_library(name='baz2', sources=[])
                 """
             ),
         )
@@ -467,11 +474,17 @@ class TestGetOwnedDependencies(TestSetupPyBase):
             "src/python/foo/bar/BUILD",
             textwrap.dedent(
                 """
-                python_library(name='bar1',
-                               dependencies=['src/python/foo/bar/baz:baz1'],
-                               provides=setup_py(name='bar1', version='1.1.1'))
-                python_library(name='bar2',
-                               dependencies=[':bar-resources', 'src/python/foo/bar/baz:baz2'])
+                python_library(
+                    name='bar1',
+                    sources=[],
+                    dependencies=['src/python/foo/bar/baz:baz1'],
+                    provides=setup_py(name='bar1', version='1.1.1'),
+                )
+                python_library(
+                    name='bar2',
+                    sources=[],
+                    dependencies=[':bar-resources', 'src/python/foo/bar/baz:baz2'],
+                )
                 resources(name='bar-resources')
                 """
             ),
@@ -480,9 +493,12 @@ class TestGetOwnedDependencies(TestSetupPyBase):
             "src/python/foo/BUILD",
             textwrap.dedent(
                 """
-                python_library(name='foo',
-                               dependencies=['src/python/foo/bar:bar1', 'src/python/foo/bar:bar2'],
-                               provides=setup_py(name='foo', version='3.4.5'))
+                python_library(
+                    name='foo',
+                    sources=[],
+                    dependencies=['src/python/foo/bar:bar1', 'src/python/foo/bar:bar2'],
+                    provides=setup_py(name='foo', version='3.4.5'),
+                )
                 """
             ),
         )
@@ -535,8 +551,8 @@ class TestGetExportingOwner(TestSetupPyBase):
             "src/python/foo/bar/baz/BUILD",
             textwrap.dedent(
                 """
-                python_library(name='baz1')
-                python_library(name='baz2')
+                python_library(name='baz1', sources=[])
+                python_library(name='baz2', sources=[])
                 """
             ),
         )
@@ -544,11 +560,17 @@ class TestGetExportingOwner(TestSetupPyBase):
             "src/python/foo/bar/BUILD",
             textwrap.dedent(
                 """
-                python_library(name='bar1',
-                               dependencies=['src/python/foo/bar/baz:baz1'],
-                               provides=setup_py(name='bar1', version='1.1.1'))
-                python_library(name='bar2',
-                               dependencies=[':bar-resources', 'src/python/foo/bar/baz:baz2'])
+                python_library(
+                    name='bar1',
+                    sources=[],
+                    dependencies=['src/python/foo/bar/baz:baz1'],
+                    provides=setup_py(name='bar1', version='1.1.1'),
+                )
+                python_library(
+                    name='bar2',
+                    sources=[],
+                    dependencies=[':bar-resources', 'src/python/foo/bar/baz:baz2'],
+                )
                 resources(name='bar-resources')
                 """
             ),
@@ -557,13 +579,19 @@ class TestGetExportingOwner(TestSetupPyBase):
             "src/python/foo/BUILD",
             textwrap.dedent(
                 """
-                python_library(name='foo1',
-                               dependencies=['src/python/foo/bar/baz:baz2'],
-                               provides=setup_py(name='foo1', version='0.1.2'))
-                python_library(name='foo2')
-                python_library(name='foo3',
-                               dependencies=['src/python/foo/bar:bar2'],
-                               provides=setup_py(name='foo3', version='3.4.5'))
+                python_library(
+                    name='foo1',
+                    sources=[],
+                    dependencies=['src/python/foo/bar/baz:baz2'],
+                    provides=setup_py(name='foo1', version='0.1.2'),
+                )
+                python_library(name='foo2', sources=[])
+                python_library(
+                    name='foo3',
+                    sources=[],
+                    dependencies=['src/python/foo/bar:bar2'],
+                    provides=setup_py(name='foo3', version='3.4.5'),
+                )
                 """
             ),
         )
@@ -585,10 +613,13 @@ class TestGetExportingOwner(TestSetupPyBase):
             "src/python/siblings/BUILD",
             textwrap.dedent(
                 """
-                python_library(name='sibling1')
-                python_library(name='sibling2',
-                               dependencies=['src/python/siblings:sibling1'],
-                               provides=setup_py(name='siblings', version='2.2.2'))
+                python_library(name='sibling1', sources=[])
+                python_library(
+                    name='sibling2',
+                    sources=[],
+                    dependencies=['src/python/siblings:sibling1'],
+                    provides=setup_py(name='siblings', version='2.2.2'),
+                )
                 """
             ),
         )
@@ -601,7 +632,7 @@ class TestGetExportingOwner(TestSetupPyBase):
             "src/python/notanancestor/aaa/BUILD",
             textwrap.dedent(
                 """
-                python_library(name='aaa')
+                python_library(name='aaa', sources=[])
                 """
             ),
         )
@@ -609,9 +640,12 @@ class TestGetExportingOwner(TestSetupPyBase):
             "src/python/notanancestor/bbb/BUILD",
             textwrap.dedent(
                 """
-                python_library(name='bbb',
-                               dependencies=['src/python/notanancestor/aaa'],
-                               provides=setup_py(name='bbb', version='11.22.33'))
+                python_library(
+                    name='bbb',
+                    sources=[],
+                    dependencies=['src/python/notanancestor/aaa'],
+                    provides=setup_py(name='bbb', version='11.22.33'),
+                )
                 """
             ),
         )
@@ -624,7 +658,7 @@ class TestGetExportingOwner(TestSetupPyBase):
             "src/python/aaa/bbb/ccc/BUILD",
             textwrap.dedent(
                 """
-                python_library(name='ccc')
+                python_library(name='ccc', sources=[])
                 """
             ),
         )
@@ -632,9 +666,12 @@ class TestGetExportingOwner(TestSetupPyBase):
             "src/python/aaa/bbb/BUILD",
             textwrap.dedent(
                 """
-                python_library(name='bbb',
-                               dependencies=['src/python/aaa/bbb/ccc'],
-                               provides=setup_py(name='bbb', version='1.1.1'))
+                python_library(
+                    name='bbb',
+                    sources=[],
+                    dependencies=['src/python/aaa/bbb/ccc'],
+                    provides=setup_py(name='bbb', version='1.1.1'),
+                )
                 """
             ),
         )
@@ -642,9 +679,12 @@ class TestGetExportingOwner(TestSetupPyBase):
             "src/python/aaa/BUILD",
             textwrap.dedent(
                 """
-                python_library(name='aaa',
-                               dependencies=['src/python/aaa/bbb/ccc'],
-                               provides=setup_py(name='aaa', version='2.2.2'))
+                python_library(
+                    name='aaa',
+                    sources=[],
+                    dependencies=['src/python/aaa/bbb/ccc'],
+                    provides=setup_py(name='aaa', version='2.2.2'),
+                )
                 """
             ),
         )

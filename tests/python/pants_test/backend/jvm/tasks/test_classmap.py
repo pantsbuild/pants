@@ -20,6 +20,7 @@ class ClassmapTaskTest(ConsoleTaskTestBase, JvmBinaryTaskTestBase):
         super().setUp()
         init_subsystem(Target.Arguments)
 
+        self.create_files("a", files=["a1.java", "a2.java"])
         self.add_to_build_file(
             "a", 'java_library(sources=["a1.java", "a2.java"])',
         )
@@ -33,7 +34,7 @@ class ClassmapTaskTest(ConsoleTaskTestBase, JvmBinaryTaskTestBase):
         )
 
         self.add_to_build_file(
-            "c", 'java_library(dependencies=["a", "b"])',
+            "c", 'java_library(dependencies=["a", "b"], sources=[])',
         )
 
         self.target_a = self.target("a")

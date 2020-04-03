@@ -111,6 +111,7 @@ class PrepareServicesTest(TaskTestBase):
             """
 java_library(
   name = "target",
+  sources=[],
   services = {
     "ServiceInterfaceA": ["ServiceImplA1, ServiceImplA2"],
     "ServiceInterfaceB": [],

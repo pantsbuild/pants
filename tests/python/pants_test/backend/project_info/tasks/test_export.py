@@ -222,6 +222,7 @@ class ExportTest(ConsoleTaskTestBase):
             "project_info:unrecognized_target_type", target_type=JvmTarget,
         )
 
+        self.create_file("src/python/x/f.py")
         self.add_to_build_file(
             "src/python/x/BUILD",
             """
@@ -229,6 +230,7 @@ class ExportTest(ConsoleTaskTestBase):
             """.strip(),
         )
 
+        self.create_files("src/python/y", files=["subdir/f.py", "Test.py"])
         self.add_to_build_file(
             "src/python/y/BUILD",
             dedent(
@@ -240,6 +242,7 @@ class ExportTest(ConsoleTaskTestBase):
             ),
         )
 
+        self.create_file("src/python/exclude/f.py")
         self.add_to_build_file(
             "src/python/exclude/BUILD",
             """
@@ -254,6 +257,7 @@ class ExportTest(ConsoleTaskTestBase):
             """.strip(),
         )
 
+        self.create_file("src/python/has_reqs/f.py")
         self.add_to_build_file(
             "src/python/has_reqs/BUILD",
             textwrap.dedent(

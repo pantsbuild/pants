@@ -68,6 +68,7 @@ class PayloadTest(TestBase):
         self.context().scan()
 
     def test_single_source(self):
+        self.create_file("y/Source.scala")
         self.add_to_build_file("y/BUILD", 'java_library(name="y", sources=["Source.scala"])')
         self.context().scan()
 

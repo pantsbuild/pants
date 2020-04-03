@@ -213,7 +213,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
                 """
                 python_tests(
                   name='hello',
-                  sources=['some_file.py'],
+                  sources=[],
                 )
                 """
             ),
