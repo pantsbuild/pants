@@ -162,7 +162,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_execution_extra_platform_properties=[],
     remote_execution_headers={},
     process_execution_local_enable_nailgun=False,
-    experimental_fs_watcher=False,
+    experimental_fs_watcher=True,
 )
 
 
@@ -940,7 +940,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
         register(
             "--experimental-fs-watcher",
             type=bool,
-            default=False,
+            default=True,
             advanced=True,
             help="Whether to use the engine filesystem watcher which registers the workspace"
             " for kernel file change events",
