@@ -121,7 +121,6 @@ class JarDependency:
     intransitive: bool
     excludes: Tuple[Exclude, ...]
     base_path: str
-    output_as_cobertura: bool
 
     def __init__(
         self,
@@ -137,7 +136,6 @@ class JarDependency:
         intransitive: bool = False,
         excludes: Optional[Sequence[Exclude]] = None,
         base_path: Optional[str] = None,
-        output_as_cobertura: bool = False,
     ) -> None:
         self.org = org
         self.base_name = name
@@ -154,7 +152,6 @@ class JarDependency:
         if os.path.isabs(base_path):
             base_path = os.path.relpath(base_path, get_buildroot())
         self.base_path = base_path
-        self.output_as_cobertura = output_as_cobertura
 
     def __str__(self):
         return "JarDependency({})".format(self.coordinate)
