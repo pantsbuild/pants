@@ -26,6 +26,7 @@ from pants.engine.target import (
     InvalidFieldTypeException,
     PrimitiveField,
     RequiredFieldMissingException,
+    ScalarField,
     Sources,
     StringField,
     StringOrStringSequenceField,
@@ -402,6 +403,32 @@ def test_required_field() -> None:
 # -----------------------------------------------------------------------------------------------
 # Test Field templates
 # -----------------------------------------------------------------------------------------------
+
+
+def test_scalar_field() -> None:
+    @dataclass(frozen=True)
+    class CustomObject:
+        pass
+
+    class Example(ScalarField):
+        alias = "example"
+        expected_type = CustomObject
+        expected_type_description = "a `CustomObject` instance"
+
+        @classmethod
+        def compute_value(
+            cls, raw_value: Optional[CustomObject], *, address: Address
+        ) -> Optional[CustomObject]:
+            return super().compute_value(raw_value, address=address)
+
+    addr = Address.parse(":example")
+
+    with pytest.raises(InvalidFieldTypeException) as exc:
+        Example(1, address=addr)
+    assert Example.expected_type_description in str(exc.value)
+
+    assert Example(CustomObject(), address=addr).value == CustomObject()
+    assert Example(None, address=addr).value is None
 
 
 def test_string_field_valid_choices() -> None:

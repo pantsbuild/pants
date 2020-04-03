@@ -5,7 +5,7 @@ from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import Any, ClassVar, Dict, Iterable, Optional, Tuple, Type, TypeVar, Union, cast
+from typing import Any, ClassVar, Dict, Iterable, Generic, Optional, Tuple, Type, TypeVar, Union, cast
 
 from typing_extensions import final
 
@@ -628,8 +628,53 @@ class InvalidFieldChoiceException(InvalidFieldException):
 # Field templates
 # -----------------------------------------------------------------------------------------------
 
+T = TypeVar("T")
+
+
+class ScalarField(Generic[T], PrimitiveField, metaclass=ABCMeta):
+    """A field with a scalar value (vs. a compound value like a sequence or dict).
+
+    Subclasses must define the class properties `expected_type` and `expected_type_description`.
+    They should also override the type hints for the classmethod `compute_value` so that we use the
+    correct type annotation in generated documentation.
+
+        class Example(ScalarField):
+            alias = "example"
+            expected_type = MyPluginObject
+            expected_type_description = "a `my_plugin` object"
+
+            @classmethod
+            def compute_value(
+                cls, raw_value: Optional[MyPluginObject], *, address: Address
+            ) -> Optional[MyPluginObject]:
+                return super().compute_value(raw_value, address=address)
+    """
+
+    expected_type: ClassVar[Type[T]]
+    expected_type_description: ClassVar[str]
+    value: Optional[T]
+    default: ClassVar[Optional[T]] = None
+
+    @classmethod
+    def compute_value(cls, raw_value: Optional[Any], *, address: Address) -> Optional[T]:
+        value_or_default = super().compute_value(raw_value, address=address)
+        if value_or_default is not None and not isinstance(value_or_default, cls.expected_type):
+            raise InvalidFieldTypeException(
+                address, cls.alias, raw_value, expected_type=cls.expected_type_description,
+            )
+        return value_or_default
+
 
 class BoolField(PrimitiveField, metaclass=ABCMeta):
+    """A field whose value is a boolean.
+
+    Subclasses must define the class property `default`.
+
+        class ZipSafe(BoolField):
+            alias = "zip_safe"
+            default = True
+    """
+
     value: bool
     default: ClassVar[bool]
 
@@ -643,55 +688,39 @@ class BoolField(PrimitiveField, metaclass=ABCMeta):
         return value_or_default
 
 
-class IntField(PrimitiveField, metaclass=ABCMeta):
-    value: Optional[int]
-    default: ClassVar[Optional[int]] = None
+class IntField(ScalarField, metaclass=ABCMeta):
+    expected_type = int
+    expected_type_description = "an integer"
 
     @classmethod
     def compute_value(cls, raw_value: Optional[int], *, address: Address) -> Optional[int]:
-        value_or_default = super().compute_value(raw_value, address=address)
-        if value_or_default is not None and not isinstance(value_or_default, int):
-            raise InvalidFieldTypeException(
-                address, cls.alias, raw_value, expected_type="an integer",
-            )
-        return value_or_default
+        return super().compute_value(raw_value, address=address)
 
 
-class FloatField(PrimitiveField, metaclass=ABCMeta):
-    value: Optional[float]
-    default: ClassVar[Optional[float]] = None
+class FloatField(ScalarField, metaclass=ABCMeta):
+    expected_type = float
+    expected_type_description = "a float"
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[int], *, address: Address) -> Optional[float]:
-        value_or_default = super().compute_value(raw_value, address=address)
-        if value_or_default is not None and not isinstance(value_or_default, float):
-            raise InvalidFieldTypeException(
-                address, cls.alias, value_or_default, expected_type="a float",
-            )
-        return value_or_default
+    def compute_value(cls, raw_value: Optional[float], *, address: Address) -> Optional[float]:
+        return super().compute_value(raw_value, address=address)
 
 
-class StringField(PrimitiveField, metaclass=ABCMeta):
+class StringField(ScalarField, metaclass=ABCMeta):
     """A field whose value is a string.
 
     If you expect the string to only be one of several values, set the class property
     `valid_choices`.
     """
 
-    value: Optional[str]
-    default: ClassVar[Optional[str]] = None
+    expected_type = str
+    expected_type_description = "a string"
     valid_choices: ClassVar[Optional[Union[Type[Enum], Tuple[str, ...]]]] = None
 
     @classmethod
     def compute_value(cls, raw_value: Optional[str], *, address: Address) -> Optional[str]:
         value_or_default = super().compute_value(raw_value, address=address)
-        if value_or_default is None:
-            return None
-        if not isinstance(value_or_default, str):
-            raise InvalidFieldTypeException(
-                address, cls.alias, value_or_default, expected_type="a string",
-            )
-        if cls.valid_choices is not None:
+        if value_or_default is not None and cls.valid_choices is not None:
             valid_choices = set(
                 cls.valid_choices
                 if isinstance(cls.valid_choices, tuple)
