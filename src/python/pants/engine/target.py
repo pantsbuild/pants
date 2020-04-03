@@ -21,6 +21,7 @@ from pants.engine.fs import (
 from pants.engine.objects import Collection
 from pants.engine.rules import RootRule, UnionMembership, rule
 from pants.engine.selectors import Get
+from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper, Filespec
 from pants.util.collections import ensure_str_list
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
@@ -846,6 +847,7 @@ class Sources(AsyncField):
     alias = "sources"
     sanitized_raw_value: Optional[Tuple[str, ...]]
     default: ClassVar[Optional[Tuple[str, ...]]] = None
+    expected_file_extensions: ClassVar[Optional[Tuple[str, ...]]] = None
 
     @classmethod
     def sanitize_raw_value(
@@ -854,20 +856,43 @@ class Sources(AsyncField):
         value_or_default = super().sanitize_raw_value(raw_value, address=address)
         if value_or_default is None:
             return None
+        invalid_field_type = InvalidFieldTypeException(
+            address,
+            cls.alias,
+            value_or_default,
+            expected_type="an iterable of strings (e.g. a list of strings)",
+        )
+        if isinstance(value_or_default, str):
+            raise invalid_field_type
         try:
             ensure_str_list(value_or_default)
         except ValueError:
-            raise InvalidFieldTypeException(
-                address,
-                cls.alias,
-                value_or_default,
-                expected_type="an iterable of strings (e.g. a list of strings)",
-            )
+            raise invalid_field_type
         return tuple(sorted(value_or_default))
 
-    def validate_snapshot(self, _: Snapshot) -> None:
-        """Perform any validation on the resulting snapshot, e.g. ensuring that all files end in
-        `.py`."""
+    def validate_snapshot(self, snapshot: Snapshot) -> None:
+        """Perform any additional validation on the resulting snapshot, e.g. ensuring that there are
+        only a certain number of resolved files.
+
+        To enforce that the resulting files end in certain extensions, such as `.py` or `.java`, set
+        the class property `expected_file_extensions`.
+        """
+        if self.expected_file_extensions:
+            bad_files = [
+                fp
+                for fp in snapshot.files
+                if not PurePath(fp).suffix in self.expected_file_extensions
+            ]
+            if bad_files:
+                expected = (
+                    f"one of {sorted(self.expected_file_extensions)}"
+                    if len(self.expected_file_extensions) > 1
+                    else repr(self.expected_file_extensions[0])
+                )
+                raise InvalidFieldException(
+                    f"The {repr(self.alias)} field in target {self.address} must only contain "
+                    f"files that end in {expected}, but it had these files: {sorted(bad_files)}."
+                )
 
     @final
     @property
@@ -880,6 +905,24 @@ class Sources(AsyncField):
             return f"!{PurePath(self.address.spec_path, glob[1:])}"
         return str(PurePath(self.address.spec_path, glob))
 
+    @final
+    @property
+    def filespec(self) -> Filespec:
+        """The original globs, returned in the Filespec dict format.
+
+        The globs will be relativized to the build root.
+        """
+        includes = []
+        excludes = []
+        for glob in self.sanitized_raw_value or ():
+            if glob.startswith("!"):
+                excludes.append(glob[1:])
+            else:
+                includes.append(glob)
+        return FilesetRelPathWrapper.to_filespec(
+            args=includes, exclude=[excludes], root=self.address.spec_path
+        )
+
 
 @dataclass(frozen=True)
 class HydrateSourcesRequest:
@@ -889,6 +932,10 @@ class HydrateSourcesRequest:
 @dataclass(frozen=True)
 class HydratedSources:
     snapshot: Snapshot
+    filespec: Filespec
+
+    def eager_fileset_with_spec(self, *, address: Address) -> EagerFilesetWithSpec:
+        return EagerFilesetWithSpec(address.spec_path, self.filespec, self.snapshot)
 
 
 @rule
@@ -896,16 +943,16 @@ async def hydrate_sources(
     request: HydrateSourcesRequest, glob_match_error_behavior: GlobMatchErrorBehavior
 ) -> HydratedSources:
     sources_field = request.field
-    globs: Iterable[str]
-    if sources_field.sanitized_raw_value is not None:
-        globs = ensure_str_list(sources_field.sanitized_raw_value)
-        conjunction = GlobExpansionConjunction.all_match
-    else:
-        if sources_field.default is None:
-            return HydratedSources(EMPTY_SNAPSHOT)
-        globs = sources_field.default
-        conjunction = GlobExpansionConjunction.any_match
+    globs = sources_field.sanitized_raw_value
 
+    if globs is None:
+        return HydratedSources(EMPTY_SNAPSHOT, sources_field.filespec)
+
+    conjunction = (
+        GlobExpansionConjunction.all_match
+        if not sources_field.default or (set(globs) != set(sources_field.default))
+        else GlobExpansionConjunction.any_match
+    )
     snapshot = await Get[Snapshot](
         PathGlobs(
             (sources_field.prefix_glob_with_address(glob) for glob in globs),
@@ -921,7 +968,7 @@ async def hydrate_sources(
         )
     )
     sources_field.validate_snapshot(snapshot)
-    return HydratedSources(snapshot)
+    return HydratedSources(snapshot, sources_field.filespec)
 
 
 # TODO: figure out what support looks like for this with the Target API. The expected value is an
