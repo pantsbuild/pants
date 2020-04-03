@@ -295,7 +295,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         return [RootRule(SourcesField)]
 
     @classmethod
-    def target_types(cls) -> Sequence[Target]:
+    def target_types(cls) -> Sequence[Type[Target]]:
         return ()
 
     @classmethod

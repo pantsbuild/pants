@@ -1,24 +1,29 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pathlib import Path
-from typing import Set
+import itertools
+from pathlib import PurePath
+from typing import Iterable
 
 from pants.base.build_root import BuildRoot
 from pants.build_graph.address import Address, BuildFileAddress
+from pants.engine.addressable import Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
-from pants.engine.legacy.graph import TransitiveHydratedTargets
 from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get, MultiGet
+from pants.engine.target import (
+    HydratedSources,
+    HydrateSourcesRequest,
+    Sources,
+    Target,
+    Targets,
+    TransitiveTargets,
+)
 
 
 class FiledepsOptions(LineOriented, GoalSubsystem):
-    """List all source and BUILD files a target transitively depends on.
-
-    Files may be listed with absolute or relative paths and any BUILD files implied in the
-    transitive closure of targets are also included.
-    """
+    """List all source and BUILD files a target depends on."""
 
     name = "filedeps2"
 
@@ -29,12 +34,25 @@ class FiledepsOptions(LineOriented, GoalSubsystem):
             "--absolute",
             type=bool,
             default=True,
-            help="If True, output with absolute path; else, output with path relative to the build root",
+            help=(
+                "If True, output with absolute path; else, output with path relative to the "
+                "build root."
+            ),
         )
         register(
             "--globs",
             type=bool,
-            help="Instead of outputting filenames, output globs (ignoring excludes)",
+            default=False,
+            help=(
+                "Instead of outputting filenames, output the original globs used in the BUILD "
+                "file. This will not include exclude globs (i.e. globs that start with `!`)."
+            ),
+        )
+        register(
+            "--transitive",
+            type=bool,
+            default=False,
+            help="If True, include the files used by dependencies in the output.",
         )
 
 
@@ -44,33 +62,40 @@ class Filedeps(Goal):
 
 @goal_rule
 async def file_deps(
-    console: Console,
-    options: FiledepsOptions,
-    build_root: BuildRoot,
-    transitive_hydrated_targets: TransitiveHydratedTargets,
+    console: Console, options: FiledepsOptions, build_root: BuildRoot, addresses: Addresses,
 ) -> Filedeps:
-    unique_rel_paths: Set[str] = set()
+    targets: Iterable[Target]
+    if options.values.transitive:
+        transitive_targets = await Get[TransitiveTargets](Addresses, addresses)
+        targets = transitive_targets.closure
+    else:
+        targets = await Get[Targets](Addresses, addresses)
+
     build_file_addresses = await MultiGet(
-        Get[BuildFileAddress](Address, hydrated_target.adaptor.address)
-        for hydrated_target in transitive_hydrated_targets.closure
+        Get[BuildFileAddress](Address, tgt.address) for tgt in targets
     )
-    for hydrated_target, build_file_address in zip(
-        transitive_hydrated_targets.closure, build_file_addresses
-    ):
-        unique_rel_paths.add(build_file_address.rel_path)
-        adaptor = hydrated_target.adaptor
-        if adaptor.has_sources():
-            sources_paths = (
-                adaptor.sources.snapshot.files
-                if not options.values.globs
-                else adaptor.sources.filespec["globs"]
+    unique_rel_paths = {bfa.rel_path for bfa in build_file_addresses}
+
+    if options.values.globs:
+        unique_rel_paths.update(
+            itertools.chain.from_iterable(tgt.get(Sources).filespec["globs"] for tgt in targets)
+        )
+    else:
+        all_hydrated_sources = await MultiGet(
+            Get[HydratedSources](HydrateSourcesRequest, tgt.get(Sources).request) for tgt in targets
+        )
+        unique_rel_paths.update(
+            itertools.chain.from_iterable(
+                hydrated_sources.snapshot.files for hydrated_sources in all_hydrated_sources
             )
-            unique_rel_paths.update(sources_paths)
+        )
 
     with options.line_oriented(console) as print_stdout:
         for rel_path in sorted(unique_rel_paths):
             final_path = (
-                str(Path(build_root.path, rel_path)) if options.values.absolute else rel_path
+                PurePath(build_root.path, rel_path).as_posix()
+                if options.values.absolute
+                else rel_path
             )
             print_stdout(final_path)
 
@@ -78,6 +103,4 @@ async def file_deps(
 
 
 def rules():
-    return [
-        file_deps,
-    ]
+    return [file_deps]
