@@ -217,7 +217,7 @@ class FileDepsTest(GoalRuleTestBase):
         self.assert_filedeps(targets=["src/java"], expected=expected)
         self.assert_filedeps(targets=["src/scala"], expected=expected)
 
-    @skip("Unskip once we have JVM bindings.")
+    @skip("Unskip once we have codegen bindings.")
     def test_filter_out_synthetic_targets(self) -> None:
         self.create_library(
             path="src/thrift/storage",
