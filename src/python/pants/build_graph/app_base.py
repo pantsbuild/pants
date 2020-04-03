@@ -139,7 +139,7 @@ class Bundle:
 
         # A fileset is either a string or a list of file paths. All globs are expected to already
         # have been expanded.
-        fileset = ensure_str_list(fileset)
+        fileset = ensure_str_list(fileset, allow_single_str=True)
         assert all("*" not in fp for fp in fileset), (
             "All globs should have already been hydrated for the `bundle(fileset=)` field. "
             f"Given the fileset: {fileset}"

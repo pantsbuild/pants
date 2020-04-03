@@ -52,13 +52,15 @@ class EXE:
 @contextmanager
 def distribution(files=None, executables=None, java_home=None, dist_dir=None):
     # NB attempt to include the java version in the tmp dir name for better test failure messages.
-    executables_as_list = ensure_list(executables or (), expected_type=EXE)
+    executables_as_list = ensure_list(
+        executables or (), expected_type=EXE, allow_single_scalar=True
+    )
     if executables_as_list:
         dist_prefix = "jvm_{}_".format(executables_as_list[0]._version)
     else:
         dist_prefix = "jvm_na_"
     with temporary_dir(root_dir=dist_dir, prefix=dist_prefix) as dist_root:
-        for f in ensure_str_list(files or ()):
+        for f in ensure_str_list(files or (), allow_single_str=True):
             touch(os.path.join(dist_root, f))
         for executable in executables_as_list:
             path = os.path.join(dist_root, executable.relpath)

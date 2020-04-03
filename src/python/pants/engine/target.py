@@ -38,7 +38,7 @@ ImmutableValue = Any
 
 class Field(ABC):
     alias: ClassVar[str]
-    default: ClassVar[Any]
+    default: ClassVar[ImmutableValue]
     required: ClassVar[bool] = False
 
     # This is a little weird to have an abstract __init__(). We do this to ensure that all
@@ -680,18 +680,15 @@ class StringSequenceField(PrimitiveField, metaclass=ABCMeta):
         value_or_default = super().compute_value(raw_value, address=address)
         if value_or_default is None:
             return None
-        invalid_type_exception = InvalidFieldTypeException(
-            address,
-            cls.alias,
-            raw_value,
-            expected_type="an iterable of strings (e.g. a list of strings)",
-        )
-        if isinstance(value_or_default, str):
-            raise invalid_type_exception
         try:
             ensure_str_list(value_or_default)
         except ValueError:
-            raise invalid_type_exception
+            raise InvalidFieldTypeException(
+                address,
+                cls.alias,
+                raw_value,
+                expected_type="an iterable of strings (e.g. a list of strings)",
+            )
         return tuple(value_or_default)
 
 
@@ -715,7 +712,7 @@ class StringOrStringSequenceField(PrimitiveField, metaclass=ABCMeta):
         if value_or_default is None:
             return None
         try:
-            str_list = ensure_str_list(value_or_default)
+            str_list = ensure_str_list(value_or_default, allow_single_str=True)
         except ValueError:
             raise InvalidFieldTypeException(
                 address,
@@ -770,7 +767,7 @@ class DictStringToStringSequenceField(PrimitiveField, metaclass=ABCMeta):
             raise invalid_type_exception
         result = {}
         for k, v in value_or_default.items():
-            if not isinstance(k, str) or isinstance(v, str):
+            if not isinstance(k, str):
                 raise invalid_type_exception
             try:
                 result[k] = tuple(ensure_str_list(v))
@@ -862,8 +859,6 @@ class Sources(AsyncField):
             value_or_default,
             expected_type="an iterable of strings (e.g. a list of strings)",
         )
-        if isinstance(value_or_default, str):
-            raise invalid_field_type
         try:
             ensure_str_list(value_or_default)
         except ValueError:

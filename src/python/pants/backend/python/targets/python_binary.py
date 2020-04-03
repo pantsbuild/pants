@@ -109,10 +109,14 @@ class PythonBinary(PythonTarget):
                 "inherit_path": PrimitiveField(inherit_path),
                 "zip_safe": PrimitiveField(bool(zip_safe)),
                 "always_write_cache": PrimitiveField(bool(always_write_cache)),
-                "repositories": PrimitiveField(ensure_str_list(repositories or [])),
-                "indices": PrimitiveField(ensure_str_list(indices or [])),
+                "repositories": PrimitiveField(
+                    ensure_str_list(repositories or [], allow_single_str=True)
+                ),
+                "indices": PrimitiveField(ensure_str_list(indices or [], allow_single_str=True)),
                 "ignore_errors": PrimitiveField(bool(ignore_errors)),
-                "platforms": PrimitiveField(tuple(ensure_str_list(platforms or []))),
+                "platforms": PrimitiveField(
+                    tuple(ensure_str_list(platforms or [], allow_single_str=True))
+                ),
                 "shebang": PrimitiveField(shebang),
                 "emit_warnings": PrimitiveField(self.Defaults.should_emit_warnings(emit_warnings)),
             }

@@ -79,7 +79,9 @@ class UnpackedWheels(ImportWheelsMixin, Target):
                 "module_name": PrimitiveField(module_name),
                 "include_patterns": PrimitiveField(include_patterns or ()),
                 "exclude_patterns": PrimitiveField(exclude_patterns or ()),
-                "compatibility": PrimitiveField(ensure_str_list(compatibility or ())),
+                "compatibility": PrimitiveField(
+                    ensure_str_list(compatibility or (), allow_single_str=True)
+                ),
                 "within_data_subdir": PrimitiveField(within_data_subdir),
                 # TODO: consider supporting transitive deps like UnpackedJars!
                 # TODO: consider supporting `platforms` as in PythonBinary!

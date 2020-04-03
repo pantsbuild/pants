@@ -106,7 +106,7 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
         self._workdir = workdir
         self._ng_stdout = os.path.join(workdir, "stdout")
         self._ng_stderr = os.path.join(workdir, "stderr")
-        self._nailgun_classpath = ensure_str_list(nailgun_classpath)
+        self._nailgun_classpath = ensure_str_list(nailgun_classpath, allow_single_str=True)
         self._startup_timeout = startup_timeout
         self._connect_timeout = connect_timeout
         self._connect_attempts = connect_attempts

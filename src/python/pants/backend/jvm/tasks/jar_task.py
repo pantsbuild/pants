@@ -148,7 +148,7 @@ class Jar:
 
         :param iterable classpath: a list of paths
         """
-        self._classpath = self._classpath + ensure_str_list(classpath)
+        self._classpath = self._classpath + ensure_str_list(classpath, allow_single_str=True)
 
     def write(self, src, dest=None):
         """Schedules a write of the file at ``src`` to the ``dest`` path in this jar.

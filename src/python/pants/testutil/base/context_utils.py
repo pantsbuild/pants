@@ -133,7 +133,11 @@ def create_context_from_options(
     Other params are as for ``Context``.
     """
     run_tracker = TestContext.DummyRunTracker()
-    target_roots = ensure_list(target_roots, expected_type=Target) if target_roots else []
+    target_roots = (
+        ensure_list(target_roots, expected_type=Target, allow_single_scalar=True)
+        if target_roots
+        else []
+    )
     return TestContext(
         options=options,
         run_tracker=run_tracker,
