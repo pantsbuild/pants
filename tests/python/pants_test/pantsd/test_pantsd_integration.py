@@ -427,7 +427,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         test_build_file = os.path.join(test_path, "BUILD")
         test_src_file = os.path.join(test_path, "some_file.py")
         has_source_root_regex = r'"source_root": ".*/{}"'.format(test_path)
-        export_cmd = ["export", test_path]
+        export_cmd = ["--files-not-found-behavior=warn", "export", test_path]
 
         try:
             with self.pantsd_successful_run_context() as (pantsd_run, checker, workdir, _):
