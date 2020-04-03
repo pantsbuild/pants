@@ -10,10 +10,19 @@ from pants.engine.target import (
     Target,
 )
 
+# -----------------------------------------------------------------------------------------------
+# Common fields
+# -----------------------------------------------------------------------------------------------
+
 
 class GoSources(Sources):
     # NB: We glob on `*` due to the way resources and .c companion files are handled.
     default = ("*", "!BUILD", "!BUILD.*")
+
+
+# -----------------------------------------------------------------------------------------------
+# `go_binary` target
+# -----------------------------------------------------------------------------------------------
 
 
 class GoBuildFlags(StringField):
@@ -29,11 +38,21 @@ class GoBinary(Target):
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, GoSources, GoBuildFlags)
 
 
+# -----------------------------------------------------------------------------------------------
+# `go_library` target
+# -----------------------------------------------------------------------------------------------
+
+
 class GoLibrary(Target):
     """A Go package."""
 
     alias = "go_library"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, GoSources)
+
+
+# -----------------------------------------------------------------------------------------------
+# `go_protobuf_library` target
+# -----------------------------------------------------------------------------------------------
 
 
 class GoProtobufSources(Sources):
@@ -53,11 +72,21 @@ class GoProtobufLibrary(Target):
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, GoProtobufSources, ProtocPlugins)
 
 
+# -----------------------------------------------------------------------------------------------
+# `go_thrift_library` target
+# -----------------------------------------------------------------------------------------------
+
+
 class GoThriftLibrary(Target):
     """A Go library generated from Thrift IDL files."""
 
     alias = "go_thrift_library"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, Sources)
+
+
+# -----------------------------------------------------------------------------------------------
+# `go_remote_library` and `go_remote_libraries` targets
+# -----------------------------------------------------------------------------------------------
 
 
 class GoPackage(StringField):

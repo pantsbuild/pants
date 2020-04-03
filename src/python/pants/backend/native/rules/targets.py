@@ -11,7 +11,6 @@ from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
     Dependencies,
-    InvalidFieldException,
     InvalidFieldTypeException,
     PrimitiveField,
     Sources,
@@ -79,17 +78,7 @@ class ToolchainVariantField(StringField):
     """
 
     alias = "toolchain_variant"
-
-    @classmethod
-    def compute_value(cls, raw_value: Optional[str], *, address: Address) -> Optional[str]:
-        value = super().compute_value(raw_value, address=address)
-        valid_options = list(ToolchainVariant.__members__.keys())
-        if value not in valid_options:
-            raise InvalidFieldException(
-                f"The {repr(cls.alias)} field in target {address} must be one of {valid_options}, "
-                f"but was {repr(raw_value)}."
-            )
-        return value
+    valid_choices = ToolchainVariant
 
 
 class NativeCompilerOptionSets(StringSequenceField):
