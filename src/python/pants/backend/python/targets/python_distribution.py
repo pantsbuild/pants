@@ -40,7 +40,11 @@ class PythonDistribution(PythonTarget):
 
         payload = payload or Payload()
         payload.add_fields(
-            {"setup_requires": PrimitiveField(ensure_str_list(setup_requires or ()))}
+            {
+                "setup_requires": PrimitiveField(
+                    ensure_str_list(setup_requires or (), allow_single_str=True)
+                )
+            }
         )
         super().__init__(address=address, payload=payload, sources=sources, **kwargs)
 

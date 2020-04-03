@@ -33,7 +33,11 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
         :rtype: dict
         """
         export_out_file = os.path.join(workdir, "export_out.txt")
-        args = ["export", f"--output-file={export_out_file}", *ensure_str_list(test_target)]
+        args = [
+            "export",
+            f"--output-file={export_out_file}",
+            *ensure_str_list(test_target, allow_single_str=True),
+        ]
         libs_args = ["--no-export-libraries"] if not load_libs else self._confs_args
         if load_libs and only_default:
             libs_args = []

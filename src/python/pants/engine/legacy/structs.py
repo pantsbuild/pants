@@ -318,7 +318,7 @@ class PythonTargetAdaptor(TargetAdaptor):
     def compatibility(self) -> Optional[List[str]]:
         if "compatibility" not in self._kwargs:
             return None
-        return ensure_str_list(self._kwargs["compatibility"])
+        return ensure_str_list(self._kwargs["compatibility"], allow_single_str=True)
 
 
 class PythonBinaryAdaptor(PythonTargetAdaptor):

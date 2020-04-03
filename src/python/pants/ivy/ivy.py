@@ -31,7 +31,7 @@ class Ivy:
         :param ivy_resolution_cache_dir: path to store downloaded ivy artifacts
         :param extra_jvm_options: list of strings to add to command line when invoking Ivy
         """
-        self._classpath = ensure_str_list(classpath)
+        self._classpath = ensure_str_list(classpath, allow_single_str=True)
         self._ivy_settings = ivy_settings
         if self._ivy_settings and not isinstance(self._ivy_settings, str):
             raise ValueError(
