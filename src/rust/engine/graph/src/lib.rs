@@ -169,7 +169,7 @@ impl<N: Node> InnerGraph<N> {
     let mut roots = VecDeque::new();
     roots.push_back(root);
     self
-      .walk(roots, direction, |_, _| false)
+      .walk(roots, direction, |_| false)
       .any(|eid| eid == needle)
   }
 
@@ -291,7 +291,7 @@ impl<N: Node> InnerGraph<N> {
   /// The Walk will iterate over all nodes that descend from the roots in the direction of
   /// traversal but won't necessarily be in topological order.
   ///
-  fn walk<F: Fn(&EntryId, &Self) -> bool>(
+  fn walk<F: Fn(&EntryId) -> bool>(
     &self,
     roots: VecDeque<EntryId>,
     direction: Direction,
@@ -338,7 +338,7 @@ impl<N: Node> InnerGraph<N> {
       .walk(
         root_ids.iter().cloned().collect(),
         Direction::Incoming,
-        |id, graph| !graph.entry_for_id(*id).unwrap().node().cacheable(),
+        |id| !self.entry_for_id(*id).unwrap().node().cacheable(),
       )
       .filter(|eid| !root_ids.contains(eid))
       .collect();
@@ -400,7 +400,7 @@ impl<N: Node> InnerGraph<N> {
       .cloned()
       .collect();
 
-    for eid in self.walk(root_entries, Direction::Outgoing, |_, _| false) {
+    for eid in self.walk(root_entries, Direction::Outgoing, |_| false) {
       let entry = self.unsafe_entry_for_id(eid);
       let node_str = entry.format(context);
 
@@ -617,7 +617,7 @@ impl<N: Node> InnerGraph<N> {
     self
       .digests_internal(
         self
-          .walk(root_ids, Direction::Outgoing, |_, _| false)
+          .walk(root_ids, Direction::Outgoing, |_| false)
           .collect(),
         context.clone(),
       )
@@ -1098,7 +1098,7 @@ pub mod test_support {
 ///
 struct Walk<'a, N: Node, F>
 where
-  F: Fn(&EntryId, &'a InnerGraph<N>) -> bool,
+  F: Fn(&EntryId) -> bool,
 {
   graph: &'a InnerGraph<N>,
   direction: Direction,
@@ -1107,7 +1107,7 @@ where
   stop_walking_predicate: F,
 }
 
-impl<'a, N: Node + 'a, F: Fn(&EntryId, &InnerGraph<N>) -> bool> Iterator for Walk<'a, N, F> {
+impl<'a, N: Node + 'a, F: Fn(&EntryId) -> bool> Iterator for Walk<'a, N, F> {
   type Item = EntryId;
 
   fn next(&mut self) -> Option<Self::Item> {
@@ -1116,7 +1116,7 @@ impl<'a, N: Node + 'a, F: Fn(&EntryId, &InnerGraph<N>) -> bool> Iterator for Wal
       // stopping our walk at this node, based on if it satifies the stop_walking_predicate.
       // This mechanism gives us a way to selectively dirty parts of the graph respecting node boundaries
       // like uncacheable nodes, which sholdn't be dirtied.
-      if !self.walked.insert(id) || (self.stop_walking_predicate)(&id, self.graph) {
+      if !self.walked.insert(id) || (self.stop_walking_predicate)(&id) {
         continue;
       }
 
