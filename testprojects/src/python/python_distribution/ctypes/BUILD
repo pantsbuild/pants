@@ -27,7 +27,7 @@ python_dist(
 
 python_binary(
   name='bin',
-  source='main.py',
+  sources=['main.py'],
   dependencies=[
     ':ctypes',
   ],
@@ -36,7 +36,7 @@ python_binary(
 
 python_binary(
   name='with_platforms',
-  source='main.py',
+  sources=['main.py'],
   dependencies=[
     ':ctypes',
     'testprojects/3rdparty/python:numpy',

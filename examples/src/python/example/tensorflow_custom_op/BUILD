@@ -41,7 +41,7 @@ ctypes_compatible_cpp_library(
 
 python_binary(
   name='show-tf-version',
-  source='show_tf_version.py',
+  sources=['show_tf_version.py'],
   dependencies=[
     'examples/3rdparty/python:tensorflow',
   ],

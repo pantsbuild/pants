@@ -64,7 +64,7 @@ jvm_app(
 
 jvm_binary(
   name = 'bundle-bin',
-  source = 'BundleMain.java',
+  sources = ['BundleMain.java'],
   main = 'org.pantsbuild.testproject.bundle.BundleMain',
   basename = 'bundle-example-bin',
   dependencies = [
@@ -76,7 +76,7 @@ jvm_binary(
 # Tests resources ordering via integration test.
 jvm_binary(
   name='bundle-resource-ordering',
-  source='BundleMain.java',
+  sources=['BundleMain.java'],
   main='org.pantsbuild.testproject.bundle.BundleMain',
   dependencies=[
     '3rdparty:guava',

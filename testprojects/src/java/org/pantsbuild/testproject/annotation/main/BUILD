@@ -4,7 +4,7 @@
 #  Test project for resource mapping feature
 
 jvm_binary(
-  source='Main.java',
+  sources=['Main.java'],
   main='org.pantsbuild.testproject.annotation.main.Main',
   basename = 'annotation-example',
   dependencies=[

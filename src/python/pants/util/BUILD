@@ -154,7 +154,7 @@ python_library(
 
 python_binary(
   name = 's3_log_aggregator',
-  source = 's3_log_aggregator.py',
+  sources = ['s3_log_aggregator.py'],
   entry_point = 'pants.util.s3_log_aggregator',
   dependencies = [
     '3rdparty/python:s3logparse'

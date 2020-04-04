@@ -32,7 +32,7 @@ python_library(
 
 page(
   name = 'readme',
-  source = 'README.md',
+  sources = ['README.md'],
   links = [
     'src/python/pants:readme',
   ]

@@ -1,145 +1,145 @@
 page(
   name='alias',
-  source='alias.md',
+  sources=['alias.md'],
 )
 
 page(
   name='bundle',
-  source='bundle.md',
+  sources=['bundle.md'],
 )
 
 page(
   name='clean',
-  source='clean.md',
+  sources=['clean.md'],
 )
 
 page(
   name='cli_args',
-  source='cli_args.md',
+  sources=['cli_args.md'],
 )
 
 page(
   name='common_tasks',
-  source='index.md',
+  sources=['index.md'],
 )
 
 page(
   name='compile',
-  source='compile.md',
+  sources=['compile.md'],
 )
 
 page(
   name='dependencies',
-  source='dependencies.md',
+  sources=['dependencies.md'],
 )
 
 page(
   name='file_bundles',
-  source='file_bundles.md',
+  sources=['file_bundles.md'],
 )
 
 page(
   name='globs',
-  source='globs.md',
+  sources=['globs.md'],
 )
 
 page(
   name='jvm_binary',
-  source='jvm_binary.md',
+  sources=['jvm_binary.md'],
 )
 
 page(
   name='jvm_library',
-  source='jvm_library.md',
+  sources=['jvm_library.md'],
 )
 
 page(
   name='jvm_options',
-  source='jvm_options.md',
+  sources=['jvm_options.md'],
 )
 
 page(
   name='jvm_tests',
-  source='jvm_tests.md',
+  sources=['jvm_tests.md'],
 )
 
 page(
   name='list_goals',
-  source='list_goals.md',
+  sources=['list_goals.md'],
 )
 
 page(
   name='list_targets',
-  source='list_targets.md'
+  sources=['list_targets.md']
 )
 
 page(
   name='login',
-  source='login.md'
+  sources=['login.md']
 )
 
 page(
   name='multiple_jvm_versions',
-  source='multiple_jvm_versions.md',
+  sources=['multiple_jvm_versions.md'],
 )
 
 page(
   name='pex',
-  source='pex.md',
+  sources=['pex.md'],
 )
 
 page(
   name='python_library',
-  source='python_library.md',
+  sources=['python_library.md'],
 )
 
 page(
   name='python_tests',
-  source='python_tests.md',
+  sources=['python_tests.md'],
 )
 
 page(
   name='repl',
-  source='repl.md',
+  sources=['repl.md'],
 )
 
 page(
   name='resources',
-  source='resources.md',
+  sources=['resources.md'],
 )
 
 page(
   name='run',
-  source='run.md'
+  sources=['run.md']
 )
 
 page(
   name='server',
-  source='server.md',
+  sources=['server.md'],
 )
 
 page(
   name='target_aggregate',
-  source='target_aggregate.md',
+  sources=['target_aggregate.md'],
 )
 
 page(
   name='test',
-  source='test.md',
+  sources=['test.md'],
 )
 
 page(
   name='test_suite',
-  source='test_suite.md',
+  sources=['test_suite.md'],
 )
 
 page(
   name='thrift_gen',
-  source='thrift_gen.md',
+  sources=['thrift_gen.md'],
 )
 
 
 page(
   name='python_proto_gen',
-  source='python_proto_gen.md',
+  sources=['python_proto_gen.md'],
 )

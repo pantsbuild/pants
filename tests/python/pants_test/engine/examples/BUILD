@@ -3,7 +3,7 @@
 
 page(
   name='readme',
-  source='README.md',
+  sources=['README.md'],
 )
 
 python_library(

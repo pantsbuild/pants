@@ -8,6 +8,6 @@ jvm_binary(
     'examples/src/wire/org/pantsbuild/example/element',
     'examples/src/wire/org/pantsbuild/example/temperature',
   ],
-  source='WireElementExample.java',
+  sources=['WireElementExample.java'],
   main='org.pantsbuild.example.wire.element.WireElementExample',
 )

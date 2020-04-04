@@ -8,5 +8,5 @@ files(
 
 files(
   name = 'isort_cfg',
-  source = '.isort.cfg',
+  sources = ['.isort.cfg'],
 )

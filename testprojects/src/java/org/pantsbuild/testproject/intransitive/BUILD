@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 jvm_binary(
-  source='A.java',
+  sources=['A.java'],
   main='org.pantsbuild.testproject.intransitive.A',
   dependencies=[
     ':diamond',

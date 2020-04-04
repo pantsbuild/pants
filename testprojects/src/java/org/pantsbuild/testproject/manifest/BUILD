@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 jvm_binary(
-  source = 'Manifest.java',
+  sources = ['Manifest.java'],
   name = 'manifest-with-source',
   main = 'org.pantsbuild.testproject.manifest.Manifest',
   manifest_entries = {
