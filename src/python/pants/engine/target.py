@@ -942,11 +942,13 @@ class Sources(AsyncField):
                             " or ".join(str(n) for n in self.expected_num_files) + " files"
                         )
                     else:
-                        expected_str = f"a number of files in the range {self.expected_num_files}"
+                        expected_str = (
+                            f"a number of files in the range `{self.expected_num_files}`"
+                        )
                 else:
                     expected_str = pluralize(self.expected_num_files, "file")
                 raise InvalidFieldException(
-                    f"The {repr(self.alias)} field in target {self.address} must only have "
+                    f"The {repr(self.alias)} field in target {self.address} must have "
                     f"{expected_str}, but it had {pluralize(num_files, 'file')}."
                 )
 

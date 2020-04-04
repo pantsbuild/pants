@@ -608,10 +608,10 @@ class TestSources(TestBase):
 
         with pytest.raises(ExecutionError) as exc:
             hydrate(ExpectedNumber, [])
-        assert "must only have 2 files" in str(exc.value)
+        assert "must have 2 files" in str(exc.value)
         with pytest.raises(ExecutionError) as exc:
             hydrate(ExpectedRange, ["f1.txt", "f2.txt"])
-        assert "must only have 1 or 3 files" in str(exc.value)
+        assert "must have 1 or 3 files" in str(exc.value)
 
         # Also check that we support valid # files.
         assert hydrate(ExpectedNumber, ["f1.txt", "f2.txt"]).snapshot.files == ("f1.txt", "f2.txt")
