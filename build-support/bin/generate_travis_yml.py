@@ -678,10 +678,13 @@ def rust_tests_osx() -> Dict:
         **_RUST_TESTS_BASE,
         "name": "Rust tests - OSX",
         "os": "osx",
-        # We need to use xcode8.3 because newer versions of OSX won't let new kexts be installed
-        # without travis taking some action, and we need the osxfuse kext.
-        # See https://github.com/travis-ci/travis-ci/issues/10017
-        "osx_image": "xcode8.3",
+        # We need to use xcode8 because:
+        # 1) versions of OSX newer than xcode8.3 won't let new kexts be installed without travis
+        #    taking some action, and we need the osxfuse kext.
+        #      See https://github.com/travis-ci/travis-ci/issues/10017
+        # 2) xcode 8.3 fails to compile grpc-sys:
+        #      See https://gist.github.com/stuhood/856a9b09bbaa86141f36c9925c14fae7
+        "osx_image": "xcode8",
         "before_install": [
             './build-support/bin/install_python_for_ci.sh "${PYENV_PY36_VERSION}"',
             # We don't use the standard travis "addons" section here because it will either silently
