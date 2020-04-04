@@ -659,7 +659,7 @@ impl CommandRunner {
         }
 
         let status = execute_response.take_status();
-        if grpcio::RpcStatusCode::from(status.get_code()) == grpcio::RpcStatusCode::Ok {
+        if grpcio::RpcStatusCode::from(status.get_code()) == grpcio::RpcStatusCode::OK {
           let mut execution_attempts = std::mem::replace(&mut attempts.attempts, vec![]);
           execution_attempts.push(attempts.current_attempt);
           return populate_fallible_execution_result(
@@ -678,8 +678,8 @@ impl CommandRunner {
     };
 
     match grpcio::RpcStatusCode::from(status.get_code()) {
-      grpcio::RpcStatusCode::Ok => unreachable!(),
-      grpcio::RpcStatusCode::FailedPrecondition => {
+      grpcio::RpcStatusCode::OK => unreachable!(),
+      grpcio::RpcStatusCode::FAILED_PRECONDITION => {
         if status.get_details().len() != 1 {
           return future::err(ExecutionError::Fatal(format!(
             "Received multiple details in FailedPrecondition ExecuteResponse's status field: {:?}",
@@ -750,11 +750,11 @@ impl CommandRunner {
         future::err(ExecutionError::MissingDigests(missing_digests)).to_boxed()
       }
       code => match code {
-        grpcio::RpcStatusCode::Aborted
-        | grpcio::RpcStatusCode::Internal
-        | grpcio::RpcStatusCode::ResourceExhausted
-        | grpcio::RpcStatusCode::Unavailable
-        | grpcio::RpcStatusCode::Unknown => {
+        grpcio::RpcStatusCode::ABORTED
+        | grpcio::RpcStatusCode::INTERNAL
+        | grpcio::RpcStatusCode::RESOURCE_EXHAUSTED
+        | grpcio::RpcStatusCode::UNAVAILABLE
+        | grpcio::RpcStatusCode::UNKNOWN => {
           future::err(ExecutionError::Retryable(status.get_message().to_owned())).to_boxed()
         }
         _ => future::err(ExecutionError::Fatal(format!(
@@ -1184,7 +1184,7 @@ fn rpcerror_recover_cancelled(
 ) -> Result<bazel_protos::operations::Operation, grpcio::Error> {
   // If the error represented cancellation, return an Operation for the given Operation name.
   match &err {
-    &grpcio::Error::RpcFailure(ref rs) if rs.status == grpcio::RpcStatusCode::Cancelled => {
+    &grpcio::Error::RpcFailure(ref rs) if rs.status == grpcio::RpcStatusCode::CANCELLED => {
       let mut next_operation = bazel_protos::operations::Operation::new();
       next_operation.set_name(operation_name);
       return Ok(next_operation);

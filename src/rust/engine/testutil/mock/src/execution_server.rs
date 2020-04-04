@@ -110,7 +110,7 @@ impl TestServer {
   /// The address on which this server is listening over insecure HTTP transport.
   ///
   pub fn address(&self) -> String {
-    let bind_addr = self.server_transport.bind_addrs().first().unwrap();
+    let bind_addr = self.server_transport.bind_addrs().next().unwrap();
     format!("{}:{}", bind_addr.0, bind_addr.1)
   }
 }
@@ -216,7 +216,7 @@ impl MockResponder {
       }
     } else {
       sink.fail(grpcio::RpcStatus::new(
-        grpcio::RpcStatusCode::InvalidArgument,
+        grpcio::RpcStatusCode::INVALID_ARGUMENT,
         Some("Did not expect further requests from client.".to_string()),
       ));
     }
@@ -241,7 +241,7 @@ impl MockResponder {
               .map_err(|_| ()),
           )
         } else if let Err(status) = op {
-          sink.fail(status);
+          ctx.spawn(sink.fail(status).then(|_| Ok(())));
         } else {
           // Cancel the request by dropping the sink.
           drop(sink)
@@ -250,7 +250,7 @@ impl MockResponder {
       None => ctx.spawn(
         sink
           .fail(grpcio::RpcStatus::new(
-            grpcio::RpcStatusCode::InvalidArgument,
+            grpcio::RpcStatusCode::INVALID_ARGUMENT,
             Some("Did not expect further requests from client.".to_string()),
           ))
           .map(|_| ())
@@ -275,7 +275,7 @@ impl bazel_protos::remote_execution_grpc::Execution for MockResponder {
       ctx.spawn(
         sink
           .fail(grpcio::RpcStatus::new(
-            grpcio::RpcStatusCode::InvalidArgument,
+            grpcio::RpcStatusCode::INVALID_ARGUMENT,
             Some(format!(
               "Did not expect this request. Expected: {:?}, Got: {:?}",
               self.mock_execution.execute_request, req
@@ -318,7 +318,7 @@ impl bazel_protos::operations_grpc::Operations for MockResponder {
     sink: grpcio::UnarySink<bazel_protos::operations::ListOperationsResponse>,
   ) {
     sink.fail(grpcio::RpcStatus::new(
-      grpcio::RpcStatusCode::Unimplemented,
+      grpcio::RpcStatusCode::UNIMPLEMENTED,
       None,
     ));
   }
@@ -330,7 +330,7 @@ impl bazel_protos::operations_grpc::Operations for MockResponder {
     sink: grpcio::UnarySink<bazel_protos::empty::Empty>,
   ) {
     sink.fail(grpcio::RpcStatus::new(
-      grpcio::RpcStatusCode::Unimplemented,
+      grpcio::RpcStatusCode::UNIMPLEMENTED,
       None,
     ));
   }

@@ -277,7 +277,7 @@ impl ByteStore {
               .map(|(_client, bytes)| Some(bytes.freeze()))
               .or_else(|e| match e {
                 grpcio::Error::RpcFailure(grpcio::RpcStatus {
-                  status: grpcio::RpcStatusCode::NotFound,
+                  status: grpcio::RpcStatusCode::NOT_FOUND,
                   ..
                 }) => Ok(None),
                 _ => Err(format!(
