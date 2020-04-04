@@ -1,3 +1,4 @@
 python_binary(
-  sources = ['main.py']
+  sources = ['main.py'],
+  tags={"nolint"},
 )

@@ -25,13 +25,15 @@ python_binary(
     # range is the one selected.
     ':lib_py3',
     ':lib_py23',
-  ]
+  ],
+  tags={"nolint"},
 )
 
 python_library(
   name='lib_py3',
   sources=['lib_py3.py'],
-  compatibility=['CPython>3']
+  compatibility=['CPython>3'],
+  tags={"nolint"},
 )
 
 python_tests(
@@ -42,7 +44,8 @@ python_tests(
   dependencies=[
     ':main_py3'
   ],
-  compatibility=['CPython>3']
+  compatibility=['CPython>3'],
+  tags={"nolint"},
 )
 
 python_binary(
@@ -54,13 +57,15 @@ python_binary(
     # range is the one selected.
     ':lib_py2',
     ':lib_py23',
-  ]
+  ],
+  tags={"nolint"},
 )
 
 python_library(
   name='lib_py2',
   sources=['lib_py2.py'],
-  compatibility=['CPython>2.7.6,<3']
+  compatibility=['CPython>2.7.6,<3'],
+  tags={"nolint"},
 )
 
 python_tests(
@@ -71,7 +76,8 @@ python_tests(
   dependencies=[
     ':main_py2'
   ],
-  compatibility=['CPython>2.7.6,<3']
+  compatibility=['CPython>2.7.6,<3'],
+  tags={"nolint"},
 )
 
 python_binary(
@@ -80,13 +86,15 @@ python_binary(
   compatibility=['CPython>2.7'],
   dependencies=[
     ':lib_py23'
-  ]
+  ],
+  tags={"nolint"},
 )
 
 python_library(
   name='lib_py23',
   sources=['lib_py23.py'],
-  compatibility=['CPython>2.7']
+  compatibility=['CPython>2.7'],
+  tags={"nolint"},
 )
 
 python_tests(
@@ -97,5 +105,6 @@ python_tests(
   dependencies=[
     ':main_py23'
   ],
-  compatibility=['CPython>2.7']
+  compatibility=['CPython>2.7'],
+  tags={"nolint"},
 )
