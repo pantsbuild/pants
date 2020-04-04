@@ -14,10 +14,10 @@ from pants.backend.python.rules.pex import (
 )
 from pants.backend.python.rules.pex_from_targets import LegacyPexFromTargetsRequest
 from pants.backend.python.rules.pytest_coverage import (
+    COVERAGE_PLUGIN_INPUT,
     Coveragerc,
     CoveragercRequest,
     PytestCoverageData,
-    get_coverage_plugin_input,
 )
 from pants.backend.python.rules.targets import PythonCoverage, PythonTestsTimeout
 from pants.backend.python.subsystems.pytest import PyTest
@@ -98,7 +98,7 @@ async def setup_pytest_for_target(
 
     run_coverage = test_options.values.run_coverage
     plugin_file_digest: Optional[Digest] = (
-        await Get[Digest](InputFilesContent, get_coverage_plugin_input()) if run_coverage else None
+        await Get[Digest](InputFilesContent, COVERAGE_PLUGIN_INPUT) if run_coverage else None
     )
 
     pytest_pex_request = pex_request(
