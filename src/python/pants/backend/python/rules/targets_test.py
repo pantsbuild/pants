@@ -5,13 +5,10 @@ from typing import Optional
 
 import pytest
 
-from pants.backend.python.rules.targets import PythonBinarySources, Timeout
+from pants.backend.python.rules.targets import Timeout
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.build_graph.address import Address
-from pants.engine.rules import RootRule
-from pants.engine.scheduler import ExecutionError
-from pants.engine.target import HydratedSources, HydrateSourcesRequest, InvalidFieldException
-from pants.engine.target import rules as target_rules
+from pants.engine.target import InvalidFieldException
 from pants.testutil.subsystem.util import global_subsystem_instance
 from pants.testutil.test_base import TestBase
 
@@ -65,28 +62,3 @@ class TestTimeout(TestBase):
 
     def test_timeouts_disabled(self) -> None:
         self.assert_timeout_calculated(field_value=10, timeouts_enabled=False, expected=None)
-
-
-class TestPythonSources(TestBase):
-    @classmethod
-    def rules(cls):
-        return [*target_rules(), RootRule(HydrateSourcesRequest)]
-
-    def test_python_binary_sources_validation(self) -> None:
-        self.create_files(path="", files=["f1.py", "f2.py"])
-        address = Address.parse(":binary")
-
-        zero_sources = PythonBinarySources(None, address=address)
-        assert (
-            self.request_single_product(HydratedSources, zero_sources.request).snapshot.files == ()
-        )
-
-        one_source = PythonBinarySources(["f1.py"], address=address)
-        assert self.request_single_product(HydratedSources, one_source.request).snapshot.files == (
-            "f1.py",
-        )
-
-        multiple_sources = PythonBinarySources(["f1.py", "f2.py"], address=address)
-        with pytest.raises(ExecutionError) as exc:
-            self.request_single_product(HydratedSources, multiple_sources.request)
-        assert "has 2 sources" in str(exc.value)

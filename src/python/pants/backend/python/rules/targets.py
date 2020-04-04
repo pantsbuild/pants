@@ -6,8 +6,6 @@ from typing import Optional, Tuple, Union
 
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.build_graph.address import Address
-from pants.engine.fs import Snapshot
-from pants.engine.objects import union
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
@@ -23,30 +21,13 @@ from pants.engine.target import (
 from pants.python.python_setup import PythonSetup
 from pants.rules.core.determine_source_files import SourceFiles
 
+# -----------------------------------------------------------------------------------------------
+# Common fields
+# -----------------------------------------------------------------------------------------------
 
-@union
+
 class PythonSources(Sources):
     expected_file_extensions = (".py",)
-
-
-class PythonLibrarySources(PythonSources):
-    default = ("*.py", "!test_*.py", "!*_test.py", "!conftest.py")
-
-
-class PythonTestsSources(PythonSources):
-    default = ("test_*.py", "*_test.py", "conftest.py")
-
-
-class PythonBinarySources(PythonSources):
-    def validate_snapshot(self, snapshot: Snapshot) -> None:
-        super().validate_snapshot(snapshot)
-        if len(snapshot.files) not in [0, 1]:
-            raise InvalidFieldException(
-                f"The {repr(self.alias)} field in target {self.address} must only have 0 or 1 "
-                f"files because it is a binary target, but it has {len(snapshot.files)} sources: "
-                f"{sorted(snapshot.files)}.\n\nTo use any additional files, put them in a "
-                "`python_library` and then add that `python_library` as a `dependency`."
-            )
 
 
 class Compatibility(StringOrStringSequenceField):
@@ -67,67 +48,16 @@ class Compatibility(StringOrStringSequenceField):
         return python_setup.compatibility_or_constraints(self.value)
 
 
-class Coverage(StringOrStringSequenceField):
-    """The module(s) whose coverage should be generated, e.g. `['pants.util']`."""
-
-    alias = "coverage"
-
-    def determine_packages_to_cover(
-        self, *, specified_source_files: SourceFiles
-    ) -> Tuple[str, ...]:
-        """Either return the specified `coverage` field value or, if not defined, attempt to
-        generate packages with a heuristic that tests have the same package name as their source
-        code.
-
-        This heuristic about package names works when either the tests live in the same folder as
-        their source code, or there is a parallel file structure with the same top-level package
-        names, e.g. `src/python/project` and `tests/python/project` (but not
-        `tests/python/test_project`).
-        """
-        if self.value is not None:
-            return self.value
-        return tuple(
-            sorted(
-                {
-                    # Turn file paths into package names.
-                    os.path.dirname(source_file).replace(os.sep, ".")
-                    for source_file in specified_source_files.snapshot.files
-                }
-            )
-        )
+COMMON_PYTHON_FIELDS = (*COMMON_TARGET_FIELDS, Dependencies, Compatibility, ProvidesField)
 
 
-class Timeout(IntField):
-    """A timeout (in seconds) which covers the total runtime of all tests in this target.
+# -----------------------------------------------------------------------------------------------
+# `python_binary` target
+# -----------------------------------------------------------------------------------------------
 
-    This only applies if `--pytest-timeouts` is set to True.
-    """
 
-    alias = "timeout"
-
-    @classmethod
-    def compute_value(cls, raw_value: Optional[int], *, address: Address) -> Optional[int]:
-        value = super().compute_value(raw_value, address=address)
-        if value is not None and value < 1:
-            raise InvalidFieldException(
-                f"The value for the `timeout` field in target {address} must be > 0, but was "
-                f"{value}."
-            )
-        return value
-
-    def calculate_from_global_options(self, pytest: PyTest) -> Optional[int]:
-        """Determine the timeout (in seconds) after applying global `pytest` options."""
-        if not pytest.timeouts_enabled:
-            return None
-        if self.value is None:
-            if pytest.timeout_default is None:
-                return None
-            result = pytest.timeout_default
-        else:
-            result = self.value
-        if pytest.timeout_maximum is not None:
-            return min(result, pytest.timeout_maximum)
-        return result
+class PythonBinarySources(PythonSources):
+    expected_num_files = range(0, 2)
 
 
 class PythonEntryPoint(StringField):
@@ -236,9 +166,6 @@ class PexEmitWarnings(BoolField):
     default = True
 
 
-COMMON_PYTHON_FIELDS = (*COMMON_TARGET_FIELDS, Dependencies, Compatibility, ProvidesField)
-
-
 class PythonBinary(Target):
     """A Python target that can be converted into an executable Pex file.
 
@@ -264,9 +191,90 @@ class PythonBinary(Target):
     )
 
 
+# -----------------------------------------------------------------------------------------------
+# `python_library` target
+# -----------------------------------------------------------------------------------------------
+
+
+class PythonLibrarySources(PythonSources):
+    default = ("*.py", "!test_*.py", "!*_test.py", "!conftest.py")
+
+
 class PythonLibrary(Target):
     alias = "python_library"
     core_fields = (*COMMON_PYTHON_FIELDS, PythonLibrarySources)
+
+
+# -----------------------------------------------------------------------------------------------
+# `python_tests` target
+# -----------------------------------------------------------------------------------------------
+
+
+class PythonTestsSources(PythonSources):
+    default = ("test_*.py", "*_test.py", "conftest.py")
+
+
+class Coverage(StringOrStringSequenceField):
+    """The module(s) whose coverage should be generated, e.g. `['pants.util']`."""
+
+    alias = "coverage"
+
+    def determine_packages_to_cover(
+        self, *, specified_source_files: SourceFiles
+    ) -> Tuple[str, ...]:
+        """Either return the specified `coverage` field value or, if not defined, attempt to
+        generate packages with a heuristic that tests have the same package name as their source
+        code.
+
+        This heuristic about package names works when either the tests live in the same folder as
+        their source code, or there is a parallel file structure with the same top-level package
+        names, e.g. `src/python/project` and `tests/python/project` (but not
+        `tests/python/test_project`).
+        """
+        if self.value is not None:
+            return self.value
+        return tuple(
+            sorted(
+                {
+                    # Turn file paths into package names.
+                    os.path.dirname(source_file).replace(os.sep, ".")
+                    for source_file in specified_source_files.snapshot.files
+                }
+            )
+        )
+
+
+class Timeout(IntField):
+    """A timeout (in seconds) which covers the total runtime of all tests in this target.
+
+    This only applies if `--pytest-timeouts` is set to True.
+    """
+
+    alias = "timeout"
+
+    @classmethod
+    def compute_value(cls, raw_value: Optional[int], *, address: Address) -> Optional[int]:
+        value = super().compute_value(raw_value, address=address)
+        if value is not None and value < 1:
+            raise InvalidFieldException(
+                f"The value for the `timeout` field in target {address} must be > 0, but was "
+                f"{value}."
+            )
+        return value
+
+    def calculate_from_global_options(self, pytest: PyTest) -> Optional[int]:
+        """Determine the timeout (in seconds) after applying global `pytest` options."""
+        if not pytest.timeouts_enabled:
+            return None
+        if self.value is None:
+            if pytest.timeout_default is None:
+                return None
+            result = pytest.timeout_default
+        else:
+            result = self.value
+        if pytest.timeout_maximum is not None:
+            return min(result, pytest.timeout_maximum)
+        return result
 
 
 class PythonTests(Target):
