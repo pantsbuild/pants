@@ -435,15 +435,18 @@ class GlobalOptions(Subsystem):
             help="Paths to ignore for all filesystem operations performed by pants "
             "(e.g. BUILD file scanning, glob matching, etc). "
             "Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore). "
-            "The `--pants-distdir` and `--pants-workdir` locations are inherently ignored.",
+            "The `--pants-distdir` and `--pants-workdir` locations are inherently ignored."
+            "--pants-ignore can be used in tandem with --pants-use-gitignore, and any rules "
+            "specified here apply after rules specified in a .gitignore file.",
         )
         register(
             "--pants-use-gitignore",
             advanced=True,
             type=bool,
-            default=False,
-            help="Make use of .gitignore files when determining whether to ignore filesystem "
-            "operations performed by pants. This may be used together with `--pants-ignore`.",
+            default=True,
+            help="Make use of a root .gitignore file when determining whether to ignore filesystem "
+            "operations performed by pants. If used together with `--pants-ignore`, any exclude/include "
+            "patterns specified there apply after .gitignore rules.",
         )
         register(
             "--owners-not-found-behavior",
