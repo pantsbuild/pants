@@ -30,7 +30,7 @@ class PythonSources(Sources):
     expected_file_extensions = (".py",)
 
 
-class Compatibility(StringOrStringSequenceField):
+class PythonInterpreterCompatibility(StringOrStringSequenceField):
     """A string for Python interpreter constraints on this target.
 
     This should be written in Requirement-style format, e.g. `CPython==2.7.*` or `CPython>=3.6,<4`.
@@ -48,7 +48,12 @@ class Compatibility(StringOrStringSequenceField):
         return python_setup.compatibility_or_constraints(self.value)
 
 
-COMMON_PYTHON_FIELDS = (*COMMON_TARGET_FIELDS, Dependencies, Compatibility, ProvidesField)
+COMMON_PYTHON_FIELDS = (
+    *COMMON_TARGET_FIELDS,
+    Dependencies,
+    ProvidesField,
+    PythonInterpreterCompatibility,
+)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -214,7 +219,7 @@ class PythonTestsSources(PythonSources):
     default = ("test_*.py", "*_test.py", "conftest.py")
 
 
-class Coverage(StringOrStringSequenceField):
+class PythonCoverage(StringOrStringSequenceField):
     """The module(s) whose coverage should be generated, e.g. `['pants.util']`."""
 
     alias = "coverage"
@@ -244,7 +249,7 @@ class Coverage(StringOrStringSequenceField):
         )
 
 
-class Timeout(IntField):
+class PythonTestsTimeout(IntField):
     """A timeout (in seconds) which covers the total runtime of all tests in this target.
 
     This only applies if `--pytest-timeouts` is set to True.
@@ -281,4 +286,4 @@ class PythonTests(Target):
     """Python tests (either Pytest-style or unittest style)."""
 
     alias = "python_tests"
-    core_fields = (*COMMON_PYTHON_FIELDS, PythonTestsSources, Coverage, Timeout)
+    core_fields = (*COMMON_PYTHON_FIELDS, PythonTestsSources, PythonCoverage, PythonTestsTimeout)
