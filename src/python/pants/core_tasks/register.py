@@ -1,6 +1,11 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+"""Core goals for Pants to operate correctly.
+
+These are always activated and cannot be disabled.
+"""
+
 from pants.core_tasks.bash_completion import BashCompletion
 from pants.core_tasks.clean import Clean
 from pants.core_tasks.deferred_sources_mapper import DeferredSourcesMapper

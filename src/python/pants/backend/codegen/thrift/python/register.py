@@ -1,6 +1,11 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+"""Generate Python targets from Thrift.
+
+See https://thrift.apache.org.
+"""
+
 from pants.backend.codegen.thrift.python.apache_thrift_py_gen import ApacheThriftPyGen
 from pants.backend.codegen.thrift.python.py_thrift_namespace_clash_check import (
     PyThriftNamespaceClashCheck,

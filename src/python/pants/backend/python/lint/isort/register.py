@@ -1,6 +1,11 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+"""Autoformatter for Python import statements.
+
+See https://timothycrosley.github.io/isort/.
+"""
+
 from pants.backend.python.lint import python_formatter
 from pants.backend.python.lint.isort import rules as isort_rules
 from pants.backend.python.lint.isort.isort_prep import IsortPrep

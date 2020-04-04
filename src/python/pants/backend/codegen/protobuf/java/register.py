@@ -1,6 +1,11 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+"""Generate Java targets from Protocol Buffers (Protobufs).
+
+See https://developers.google.com/protocol-buffers/.
+"""
+
 from pants.backend.codegen.protobuf.java.java_protobuf_library import JavaProtobufLibrary
 from pants.backend.codegen.protobuf.java.protobuf_gen import ProtobufGen
 from pants.build_graph.build_file_aliases import BuildFileAliases

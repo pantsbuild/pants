@@ -1,6 +1,8 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+"""Support for using C and C++ with Python distributions via `ctypes`."""
+
 from pants.backend.native.rules.targets import (
     CLibrary,
     ConanNativeLibrary,

@@ -1,6 +1,11 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+"""Deprecated custom Python lints.
+
+Instead, use the V2 backend `pants.backend.python.lint.flake8`.
+"""
+
 from pants.base.deprecated import deprecated_module
 from pants.goal.task_registrar import TaskRegistrar as task
 

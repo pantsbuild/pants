@@ -1,6 +1,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+"""Enable this backend to turn on every single codegen backend within `pants.backend.codegen`."""
+
 from pants.backend.codegen.antlr.java.antlr_java_gen import AntlrJavaGen
 from pants.backend.codegen.antlr.java.java_antlr_library import JavaAntlrLibrary
 from pants.backend.codegen.antlr.python.antlr_py_gen import AntlrPyGen

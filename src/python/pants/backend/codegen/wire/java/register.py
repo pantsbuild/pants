@@ -1,6 +1,8 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+"""Generate Java targets from the Wire protocol."""
+
 from pants.backend.codegen.wire.java.java_wire_library import JavaWireLibrary
 from pants.backend.codegen.wire.java.wire_gen import WireGen
 from pants.build_graph.build_file_aliases import BuildFileAliases
