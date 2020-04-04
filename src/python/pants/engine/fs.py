@@ -194,7 +194,7 @@ class PathGlobsAndRoot:
     digest_hint: Optional[Digest]
 
     def __init__(
-        self, path_globs: PathGlobs, root: str, *, digest_hint: Optional[Digest] = None
+        self, path_globs: PathGlobs, root: str, digest_hint: Optional[Digest] = None
     ) -> None:
         self.path_globs = path_globs
         self.root = root
