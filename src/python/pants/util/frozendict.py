@@ -15,6 +15,8 @@ class FrozenDict(Mapping[K, V]):
     are not safe to use.
     """
 
+    __slots__ = ("_data", "_hash")
+
     def __init__(self, item: Optional[Union[Mapping[K, V], Iterable[Tuple[K, V]]]] = None) -> None:
         """Creates a `FrozenDict` from a mapping object or a sequence of tuples representing
         entries.

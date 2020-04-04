@@ -33,6 +33,8 @@ T = TypeVar("T")
 class _AbstractOrderedSet(AbstractSet[T]):
     """Common functionality shared between OrderedSet and FrozenOrderedSet."""
 
+    __slots__ = ("_items",)
+
     def __init__(self, iterable: Optional[Iterable[T]] = None) -> None:
         # Using a dictionary, rather than using the recipe's original `self |= iterable`, results
         # in a ~20% performance increase for the constructor.
@@ -209,6 +211,8 @@ class FrozenOrderedSet(_AbstractOrderedSet[T]):
 
     This is safe to use with the V2 engine.
     """
+
+    __slots__ = ("_hash",)
 
     def __init__(self, iterable: Optional[Iterable[T]] = None) -> None:
         super().__init__(iterable)
