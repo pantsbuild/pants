@@ -108,7 +108,7 @@ class FieldInfo:
                     DictStringToStringField,
                     DictStringToStringSequenceField,
                     FloatField,
-                    Generic,
+                    Generic,  # type: ignore[arg-type]
                     IntField,
                     ScalarField,
                     SequenceField,
