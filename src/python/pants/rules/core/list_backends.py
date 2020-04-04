@@ -68,7 +68,8 @@ class BackendInfo:
     description: Optional[str]
     is_v1: bool
     is_v2: bool
-    is_activated: bool
+    is_v1_activated: bool
+    is_v2_activated: bool
 
     @classmethod
     def create(
@@ -91,25 +92,26 @@ class BackendInfo:
                 for entry_point in entry_points
             )
 
-        activated_backends = {
+        activated_v1_backends = {
             "pants.build_graph",
             "pants.core_tasks",
-            "pants.rules.core",
             *global_options.options.backend_packages,
-            *global_options.options.backend_packages2,
         }
+        activated_v2_backends = {"pants.rules.core", *global_options.options.backend_packages2}
 
         return cls(
             name=module_name,
             description=hackily_get_module_docstring(file_content.content.decode()),
             is_v1=any_entry_points_registered(v1_entry_points),
             is_v2=any_entry_points_registered(v2_entry_points),
-            is_activated=module_name in activated_backends,
+            is_v1_activated=module_name in activated_v1_backends,
+            is_v2_activated=module_name in activated_v2_backends,
         )
 
-    def format_for_cli(self, *, console: Console, longest_backend: int) -> str:
+    def format_for_cli(self, console: Console, *, longest_backend: int, is_v2: bool) -> str:
         chars_before_description = longest_backend + 3
-        activated_icon = "*" if self.is_activated else " "
+        is_activated = self.is_v2_activated if is_v2 else self.is_v1_activated
+        activated_icon = "*" if is_activated else " "
         name = console.cyan(f"{self.name}{activated_icon}".ljust(chars_before_description))
         if not self.description:
             description = "<no description>"
@@ -147,7 +149,9 @@ def format_section(
         f"\n{formatted_title}\n",
         instructions,
         *(
-            backend.format_for_cli(console=console, longest_backend=longest_backend)
+            backend.format_for_cli(
+                console, longest_backend=longest_backend, is_v2=version_number == 2
+            )
             for backend in sorted(backends, key=lambda backend: backend.name)
         ),
     ]
