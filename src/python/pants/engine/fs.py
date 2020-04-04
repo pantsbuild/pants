@@ -3,7 +3,7 @@
 
 import os
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import PurePath
 from typing import TYPE_CHECKING, Iterable, Optional, Tuple
 
 from pants.engine.objects import Collection
@@ -22,17 +22,26 @@ if TYPE_CHECKING:
     from pants.engine.scheduler import SchedulerSession
 
 
-@dataclass(frozen=True)
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class FileContent:
     """The content of a file."""
 
+    __slots__ = ("_is_frozen", "path", "content", "is_executable")
+
     path: str
     content: bytes
-    is_executable: bool = False
+    is_executable: bool
+
+    def __init__(self, path: str, content: bytes, is_executable: bool = False):
+        self.path = path
+        self.content = content
+        self.is_executable = is_executable
 
     def __repr__(self):
-        return "FileContent(path={}, content=(len:{}), is_executable={})".format(
-            self.path, len(self.content), self.is_executable,
+        return (
+            f"FileContent(path={self.path}, content=(len:{len(self.content)}), "
+            f"is_executable={self.is_executable})"
         )
 
 
@@ -59,6 +68,14 @@ class PathGlobs:
     to be aware of any changes to this object's definition.
     """
 
+    __slots__ = (
+        "_is_frozen",
+        "globs",
+        "glob_match_error_behavior",
+        "conjunction",
+        "description_of_origin",
+    )
+
     globs: Tuple[str, ...]
     glob_match_error_behavior: GlobMatchErrorBehavior
     conjunction: GlobExpansionConjunction
@@ -67,6 +84,7 @@ class PathGlobs:
     def __init__(
         self,
         globs: Iterable[str],
+        *,
         glob_match_error_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.ignore,
         conjunction: GlobExpansionConjunction = GlobExpansionConjunction.any_match,
         description_of_origin: Optional[str] = None,
@@ -124,6 +142,8 @@ class Digest:
     https://github.com/pantsbuild/pants/issues/5802
     """
 
+    __slots__ = ("fingerprint", "serialized_bytes_length")
+
     fingerprint: str
     serialized_bytes_length: int
 
@@ -155,7 +175,8 @@ class Digest:
         safe_file_dump(self._path(digested_path), payload=payload)
 
 
-@dataclass(frozen=True)
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class PathGlobsAndRoot:
     """A set of PathGlobs to capture relative to some root (which may exist outside of the
     buildroot).
@@ -166,9 +187,18 @@ class PathGlobsAndRoot:
     already stored.
     """
 
+    __slots__ = ("_is_frozen", "path_globs", "root", "digest_hint")
+
     path_globs: PathGlobs
     root: str
-    digest_hint: Optional[Digest] = None
+    digest_hint: Optional[Digest]
+
+    def __init__(
+        self, path_globs: PathGlobs, root: str, *, digest_hint: Optional[Digest] = None
+    ) -> None:
+        self.path_globs = path_globs
+        self.root = root
+        self.digest_hint = digest_hint
 
 
 @dataclass(frozen=True)
@@ -178,6 +208,8 @@ class Snapshot:
     Snapshots are used to make it easier to isolate process execution by fixing the contents of the
     files being operated on and easing their movement to and from isolated execution sandboxes.
     """
+
+    __slots__ = ("directory_digest", "files", "dirs")
 
     directory_digest: Digest
     files: Tuple[str, ...]
@@ -192,12 +224,16 @@ class Snapshot:
 class SnapshotSubset:
     """A request to create a subset of a snapshot."""
 
+    __slots__ = ("directory_digest", "globs")
+
     directory_digest: Digest
     globs: PathGlobs
 
 
 @dataclass(frozen=True)
 class DirectoriesToMerge:
+    __slots__ = ("directories",)
+
     directories: Tuple[Digest, ...]
 
     def __post_init__(self) -> None:
@@ -209,26 +245,37 @@ class DirectoriesToMerge:
 
 @dataclass(frozen=True)
 class DirectoryWithPrefixToStrip:
+    __slots__ = ("directory_digest", "prefix")
+
     directory_digest: Digest
     prefix: str
 
 
 @dataclass(frozen=True)
 class DirectoryWithPrefixToAdd:
+    __slots__ = ("directory_digest", "prefix")
+
     directory_digest: Digest
     prefix: str
 
 
-@dataclass(frozen=True)
+@dataclass(unsafe_hash=True)
 class DirectoryToMaterialize:
     """A request to materialize the contents of a directory digest at the build root, optionally
     with a path prefix (relative to the build root)."""
 
+    __slots__ = ("directory_digest", "path_prefix")
+
     directory_digest: Digest
-    path_prefix: str = ""  # i.e., we default to the root level of the build root
+    path_prefix: str
+
+    def __init__(self, directory_digest: Digest, *, path_prefix: str = "") -> None:
+        self.directory_digest = directory_digest
+        self.path_prefix = path_prefix  # i.e., we default to the root level of the build root
+        self.__post_init__()
 
     def __post_init__(self) -> None:
-        if Path(self.path_prefix).is_absolute():
+        if PurePath(self.path_prefix).is_absolute():
             raise ValueError(
                 f"The path_prefix must be relative for {self}, as the engine materializes directories "
                 f"relative to the build root."
@@ -243,6 +290,8 @@ class DirectoriesToMaterialize(Collection[DirectoryToMaterialize]):
 class MaterializeDirectoryResult:
     """Result of materializing a directory, contains the full output paths."""
 
+    __slots__ = ("output_paths",)
+
     output_paths: Tuple[str, ...]
 
 
@@ -252,6 +301,8 @@ class MaterializeDirectoriesResult(Collection[MaterializeDirectoryResult]):
 
 @dataclass(frozen=True)
 class UrlToFetch:
+    __slots__ = ("url", "digest")
+
     url: str
     digest: Digest
 
@@ -294,7 +345,9 @@ EMPTY_SNAPSHOT = Snapshot(directory_digest=EMPTY_DIRECTORY_DIGEST, files=(), dir
 class SingleFileExecutable:
     """Wraps a `Snapshot` and ensures that it only contains a single file."""
 
-    _exe_filename: Path
+    __slots__ = ("_is_frozen", "_exe_filename", "directory_digest")
+
+    _exe_filename: PurePath
     directory_digest: Digest
 
     @property
@@ -314,7 +367,7 @@ class SingleFileExecutable:
         if snapshot.directory_digest == EMPTY_DIRECTORY_DIGEST:
             self._raise_validation_error(snapshot, "have a non-empty digest!")
 
-        self._exe_filename = Path(snapshot.files[0])
+        self._exe_filename = PurePath(snapshot.files[0])
         self.directory_digest = snapshot.directory_digest
 
 

@@ -11,7 +11,7 @@ import threading
 import uuid
 from collections import defaultdict
 from contextlib import contextmanager
-from pathlib import Path
+from pathlib import PurePath
 from typing import (
     Any,
     Callable,
@@ -75,7 +75,7 @@ def fast_relpath_optional(path: str, start: str) -> Optional[str]:
     return None
 
 
-def ensure_relative_file_name(path: Path) -> str:
+def ensure_relative_file_name(path: PurePath) -> str:
     """Return a string representing the `path`, with a leading './'.
 
     This ensures that the returned string can be used as the executable file when executing a

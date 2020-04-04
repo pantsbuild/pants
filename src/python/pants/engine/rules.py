@@ -298,6 +298,8 @@ class UnionRule:
     """Specify that an instance of `union_member` can be substituted wherever `union_base` is
     used."""
 
+    __slots__ = ("union_base", "union_member")
+
     union_base: Type
     union_member: Type
 
@@ -311,6 +313,8 @@ class UnionRule:
 
 @dataclass(frozen=True)
 class UnionMembership:
+    __slots__ = ("union_rules",)
+
     union_rules: Dict[Type, OrderedSet[Type]]
 
     def is_member(self, union_type, putative_member):
@@ -366,6 +370,18 @@ class TaskRule(Rule):
     should always prefer the `@rule` constructor, and in cases where that is too constraining
     (likely due to #4535) please bump or open a ticket to explain the usecase.
     """
+
+    __slots__ = (
+        "_is_frozen",
+        "_output_type",
+        "input_selectors",
+        "input_gets",
+        "func",
+        "_dependency_rules",
+        "_dependency_optionables",
+        "cacheable",
+        "name",
+    )
 
     _output_type: Type
     input_selectors: Tuple[Type, ...]
@@ -428,6 +444,8 @@ class RootRule(Rule):
     might be when a value is provided as a root subject at the beginning of an execution.
     """
 
+    __slots__ = ("_is_frozen", "_output_type")
+
     _output_type: Type
 
     def __init__(self, output_type: Type) -> None:
@@ -448,6 +466,8 @@ class RootRule(Rule):
 
 @dataclass(frozen=True)
 class NormalizedRules:
+    __slots__ = ("rules", "union_rules")
+
     rules: FrozenOrderedSet
     union_rules: Dict[Type, OrderedSet[Type]]
 
@@ -455,6 +475,8 @@ class NormalizedRules:
 @dataclass(frozen=True)
 class RuleIndex:
     """Holds a normalized index of Rules used to instantiate Nodes."""
+
+    __slots__ = ("rules", "roots", "union_rules")
 
     rules: Dict
     roots: FrozenOrderedSet

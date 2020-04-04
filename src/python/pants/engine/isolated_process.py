@@ -18,6 +18,8 @@ _default_timeout_seconds = 15 * 60
 
 @dataclass(frozen=True)
 class ProductDescription:
+    __slots__ = ("value",)
+
     value: str
 
 
@@ -25,6 +27,21 @@ class ProductDescription:
 @dataclass(unsafe_hash=True)
 class ExecuteProcessRequest:
     """Request for execution with args and snapshots to extract."""
+
+    __slots__ = (
+        "_is_frozen",
+        "argv",
+        "input_files",
+        "description",
+        "working_directory",
+        "env",
+        "output_files",
+        "output_directories",
+        "timeout_seconds",
+        "unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule",
+        "jdk_home",
+        "is_nailgunnable",
+    )
 
     # TODO: add a method to hack together a `process_executor` invocation command line which
     # reproduces this process execution request to make debugging remote executions effortless!
@@ -73,6 +90,8 @@ class ExecuteProcessRequest:
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class MultiPlatformExecuteProcessRequest:
+    __slots__ = ("_is_frozen", "platform_constraints", "execute_process_requests")
+
     # args collects a set of tuples representing platform constraints mapped to a req,
     # just like a dict constructor can.
     platform_constraints: Tuple[str, ...]
@@ -115,6 +134,8 @@ class ExecuteProcessResult:
     Requesting one of these will raise an exception if the exit code is non-zero.
     """
 
+    __slots__ = ("stdout", "stderr", "output_directory_digest")
+
     stdout: bytes
     stderr: bytes
     output_directory_digest: Digest
@@ -126,6 +147,8 @@ class FallibleExecuteProcessResult:
 
     Requesting one of these will not raise an exception if the exit code is non-zero.
     """
+
+    __slots__ = ("stdout", "stderr", "exit_code", "output_directory_digest")
 
     stdout: bytes
     stderr: bytes
@@ -139,6 +162,8 @@ class FallibleExecuteProcessResultWithPlatform:
 
     Contains information about what platform a request ran on.
     """
+
+    __slots__ = ("stdout", "stderr", "exit_code", "output_directory_digest", "platform")
 
     stdout: bytes
     stderr: bytes

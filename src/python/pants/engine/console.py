@@ -41,6 +41,8 @@ class Console:
 
     side_effecting = True
 
+    __slots__ = ("_stdout", "_stderr", "_use_colors")
+
     def __init__(
         self, stdout=None, stderr=None, use_colors: bool = True, session: Optional[Any] = None
     ):
