@@ -51,6 +51,8 @@ class Repl(Goal):
 
 @dataclass(frozen=True)
 class ReplBinary:
+    __slots__ = ("digest", "binary_name")
+
     digest: Digest
     binary_name: str
 
@@ -107,6 +109,4 @@ async def run_repl(
 
 
 def rules():
-    return [
-        run_repl,
-    ]
+    return [run_repl]

@@ -27,6 +27,8 @@ from pants.engine.selectors import Get
 class DownloadedClocScript:
     """Cloc script as downloaded from the pantsbuild binaries repo."""
 
+    __slots__ = ("exe",)
+
     exe: SingleFileExecutable
 
     @property

@@ -68,7 +68,9 @@ class MockTestRunner(TestRunner, metaclass=ABCMeta):
     @property
     def test_result(self) -> TestResult:
         address = self.adaptor_with_origin.adaptor.address
-        return TestResult(self.status(address), self.stdout(address), self.stderr(address))
+        return TestResult(
+            self.status(address), self.stdout(address), self.stderr(address), coverage_data=None
+        )
 
 
 class SuccessfulTestRunner(MockTestRunner):

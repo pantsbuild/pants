@@ -121,7 +121,7 @@ class Goal:
     value to indicate whether the rule exited cleanly.
     """
 
-    __slots__ = ("exit_code", "subsystem_cls")
+    __slots__ = ("exit_code",)
 
     exit_code: int
     subsystem_cls: ClassVar[Type[GoalSubsystem]]

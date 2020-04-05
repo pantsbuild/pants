@@ -25,16 +25,20 @@ from pants.engine.target import Sources as SourcesField
 from pants.engine.target import rules as target_rules
 from pants.rules.core.targets import FilesSources
 from pants.source.source_root import NoSourceRootError, SourceRootConfig
+from pants.util.meta import frozen_after_init
 
 
 @dataclass(frozen=True)
 class SourceRootStrippedSources:
     """Wrapper for a snapshot of files whose source roots have been stripped."""
 
+    __slots__ = ("snapshot",)
+
     snapshot: Snapshot
 
 
-@dataclass(frozen=True)
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class StripSnapshotRequest:
     """A request to strip source roots for every file in the snapshot.
 
@@ -44,11 +48,18 @@ class StripSnapshotRequest:
     rather than every file.
     """
 
+    __slots__ = ("_is_frozen", "snapshot", "representative_path")
+
     snapshot: Snapshot
-    representative_path: Optional[str] = None
+    representative_path: Optional[str]
+
+    def __init__(self, snapshot: Snapshot, *, representative_path: Optional[str] = None) -> None:
+        self.snapshot = snapshot
+        self.representative_path = representative_path
 
 
-@dataclass(frozen=True)
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class StripSourcesFieldRequest:
     """A request to strip source roots for every file in a `Sources` field.
 
@@ -57,8 +68,16 @@ class StripSourcesFieldRequest:
     with precise file arguments.
     """
 
+    __slots__ = ("_is_frozen", "sources_field", "specified_files_snapshot")
+
     sources_field: SourcesField
-    specified_files_snapshot: Optional[Snapshot] = None
+    specified_files_snapshot: Optional[Snapshot]
+
+    def __init__(
+        self, sources_field: SourcesField, *, specified_files_snapshot: Optional[str] = None
+    ) -> None:
+        self.sources_field = sources_field
+        self.specified_files_snapshot = specified_files_snapshot
 
 
 @rule

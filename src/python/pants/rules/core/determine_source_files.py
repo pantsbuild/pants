@@ -24,8 +24,10 @@ from pants.util.meta import frozen_after_init
 @dataclass(frozen=True)
 class SourceFiles:
     """A merged snapshot of the `sources` fields of multiple targets, possibly containing a subset
-    of the `sources` when using `LegacySpecifiedSourceFilesRequest` (instead of
-    `LegacyAllSourceFilesRequest`)."""
+    of the `sources` when using `SpecifiedSourceFilesRequest` (instead of
+    `AllSourceFilesRequest`)."""
+
+    __slots__ = ("snapshot",)
 
     snapshot: Snapshot
 
@@ -37,8 +39,10 @@ class SourceFiles:
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class AllSourceFilesRequest:
+    __slots__ = ("sources_fields", "strip_source_roots")
+
     sources_fields: Tuple[SourcesField, ...]
-    strip_source_roots: bool = False
+    strip_source_roots: bool
 
     def __init__(
         self, sources_fields: Iterable[SourcesField], *, strip_source_roots: bool = False
@@ -50,8 +54,10 @@ class AllSourceFilesRequest:
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class SpecifiedSourceFilesRequest:
+    __slots__ = ("sources_fields_with_origins", "strip_source_roots")
+
     sources_fields_with_origins: Tuple[Tuple[SourcesField, OriginSpec], ...]
-    strip_source_roots: bool = False
+    strip_source_roots: bool
 
     def __init__(
         self,

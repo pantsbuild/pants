@@ -26,6 +26,8 @@ from pants.rules.core.lint import Linter
 
 @dataclass(frozen=True)
 class FmtResult:
+    __slots__ = ("digest", "stdout", "stderr")
+
     digest: Digest
     stdout: str
     stderr: str

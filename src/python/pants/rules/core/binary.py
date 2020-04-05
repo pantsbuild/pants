@@ -68,6 +68,8 @@ class BinaryConfiguration(ABC):
 @union
 @dataclass(frozen=True)
 class CreatedBinary:
+    __slots__ = ("digest", "binary_name")
+
     digest: Digest
     binary_name: str
 

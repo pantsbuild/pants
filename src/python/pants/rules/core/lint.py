@@ -17,6 +17,8 @@ from pants.engine.selectors import Get, MultiGet
 
 @dataclass(frozen=True)
 class LintResult:
+    __slots__ = ("exit_code", "stdout", "stderr")
+
     exit_code: int
     stdout: str
     stderr: str

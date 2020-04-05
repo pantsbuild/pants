@@ -34,10 +34,12 @@ class Status(Enum):
 
 @dataclass(frozen=True)
 class TestResult:
+    __slots__ = ("status", "stdout", "stderr", "coverage_data")
+
     status: Status
     stdout: str
     stderr: str
-    coverage_data: Optional["CoverageData"] = None
+    coverage_data: Optional["CoverageData"]
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False

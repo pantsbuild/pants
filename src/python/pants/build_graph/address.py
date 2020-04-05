@@ -186,6 +186,8 @@ class Address:
                 ),
             )
 
+    __slots__ = ("_spec_path", "_target_name", "_hash")
+
     def __init__(self, spec_path: str, target_name: str) -> None:
         """
         :param spec_path: The path from the root of the repo to this Target.
@@ -273,6 +275,8 @@ class BuildFileAddress(Address):
 
     :API: public
     """
+
+    __slots__ = ("rel_path",)
 
     def __init__(
         self,
