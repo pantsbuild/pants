@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import Any, ClassVar, Dict, Iterable, List, Optional, Tuple
+from typing import Any, ClassVar, Dict, Iterable, List, Optional, Tuple, Type
 
 import pytest
 from typing_extensions import final
@@ -590,3 +590,34 @@ class TestSources(TestBase):
         assert self.request_single_product(
             HydratedSources, valid_sources.request
         ).snapshot.files == ("src/fortran/s.f95",)
+
+    def test_expected_num_files(self) -> None:
+        class ExpectedNumber(Sources):
+            expected_num_files = 2
+
+        class ExpectedRange(Sources):
+            # We allow for 1 or 3 files
+            expected_num_files = range(1, 4, 2)
+
+        self.create_files("", files=["f1.txt", "f2.txt", "f3.txt", "f4.txt"])
+
+        def hydrate(sources_cls: Type[Sources], sources: Iterable[str]) -> HydratedSources:
+            return self.request_single_product(
+                HydratedSources, sources_cls(sources, address=Address.parse(":example")).request
+            )
+
+        with pytest.raises(ExecutionError) as exc:
+            hydrate(ExpectedNumber, [])
+        assert "must have 2 files" in str(exc.value)
+        with pytest.raises(ExecutionError) as exc:
+            hydrate(ExpectedRange, ["f1.txt", "f2.txt"])
+        assert "must have 1 or 3 files" in str(exc.value)
+
+        # Also check that we support valid # files.
+        assert hydrate(ExpectedNumber, ["f1.txt", "f2.txt"]).snapshot.files == ("f1.txt", "f2.txt")
+        assert hydrate(ExpectedRange, ["f1.txt"]).snapshot.files == ("f1.txt",)
+        assert hydrate(ExpectedRange, ["f1.txt", "f2.txt", "f3.txt"]).snapshot.files == (
+            "f1.txt",
+            "f2.txt",
+            "f3.txt",
+        )

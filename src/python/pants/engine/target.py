@@ -27,6 +27,7 @@ from pants.util.collections import ensure_str_list
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.strutil import pluralize
 
 # -----------------------------------------------------------------------------------------------
 # Core Field abstractions
@@ -880,6 +881,7 @@ class Sources(AsyncField):
     sanitized_raw_value: Optional[Tuple[str, ...]]
     default: ClassVar[Optional[Tuple[str, ...]]] = None
     expected_file_extensions: ClassVar[Optional[Tuple[str, ...]]] = None
+    expected_num_files: ClassVar[Optional[Union[int, range]]] = None
 
     @classmethod
     def sanitize_raw_value(
@@ -901,13 +903,16 @@ class Sources(AsyncField):
         return tuple(sorted(value_or_default))
 
     def validate_snapshot(self, snapshot: Snapshot) -> None:
-        """Perform any additional validation on the resulting snapshot, e.g. ensuring that there are
-        only a certain number of resolved files.
+        """Perform any additional validation on the resulting snapshot, e.g. ensuring that certain
+        banned files are not used.
 
         To enforce that the resulting files end in certain extensions, such as `.py` or `.java`, set
         the class property `expected_file_extensions`.
+
+        To enforce that there are only a certain number of resulting files, such as binary targets
+        checking for only 0-1 sources, set the class property `expected_num_files`.
         """
-        if self.expected_file_extensions:
+        if self.expected_file_extensions is not None:
             bad_files = [
                 fp
                 for fp in snapshot.files
@@ -922,6 +927,27 @@ class Sources(AsyncField):
                 raise InvalidFieldException(
                     f"The {repr(self.alias)} field in target {self.address} must only contain "
                     f"files that end in {expected}, but it had these files: {sorted(bad_files)}."
+                )
+        if self.expected_num_files is not None:
+            num_files = len(snapshot.files)
+            is_bad_num_files = (
+                num_files not in self.expected_num_files
+                if isinstance(self.expected_num_files, range)
+                else num_files != self.expected_num_files
+            )
+            if is_bad_num_files:
+                if isinstance(self.expected_num_files, range):
+                    if len(self.expected_num_files) == 2:
+                        expected_str = (
+                            " or ".join(str(n) for n in self.expected_num_files) + " files"
+                        )
+                    else:
+                        expected_str = f"a number of files in the range `{self.expected_num_files}`"
+                else:
+                    expected_str = pluralize(self.expected_num_files, "file")
+                raise InvalidFieldException(
+                    f"The {repr(self.alias)} field in target {self.address} must have "
+                    f"{expected_str}, but it had {pluralize(num_files, 'file')}."
                 )
 
     @final
