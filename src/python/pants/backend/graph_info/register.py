@@ -1,6 +1,9 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+"""Various goals for insights on your project's graph, such as finding the path between any two
+targets."""
+
 from pants.backend.graph_info.tasks.cloc import CountLinesOfCode
 from pants.backend.graph_info.tasks.dependees import ReverseDepmap
 from pants.backend.graph_info.tasks.filemap import Filemap

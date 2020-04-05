@@ -1,6 +1,11 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+"""Generate Python targets from Protocol Buffers (Protobufs) and gRPC.
+
+See https://grpc.io.
+"""
+
 from pants.backend.codegen.grpcio.python.grpcio_prep import GrpcioPrep
 from pants.backend.codegen.grpcio.python.grpcio_run import GrpcioRun
 from pants.backend.codegen.grpcio.python.python_grpcio_library import PythonGrpcioLibrary
