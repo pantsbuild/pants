@@ -177,7 +177,7 @@ impl StubCAS {
   /// The address on which this server is listening over insecure HTTP transport.
   ///
   pub fn address(&self) -> String {
-    let bind_addr = self.server_transport.bind_addrs().first().unwrap();
+    let bind_addr = self.server_transport.bind_addrs().next().unwrap();
     format!("{}:{}", bind_addr.0, bind_addr.1)
   }
 
@@ -209,14 +209,18 @@ macro_rules! check_auth {
       if authorization_headers.len() != 1
         || authorization_headers[0] != required_auth_header.as_bytes()
       {
-        $sink.fail(grpcio::RpcStatus::new(
-          grpcio::RpcStatusCode::Unauthenticated,
-          Some(format!(
-            "Bad Authorization header; want {:?} got {:?}",
-            required_auth_header.as_bytes(),
-            authorization_headers
-          )),
-        ));
+        $ctx.spawn(
+          $sink
+            .fail(grpcio::RpcStatus::new(
+              grpcio::RpcStatusCode::UNAUTHENTICATED,
+              Some(format!(
+                "Bad Authorization header; want {:?} got {:?}",
+                required_auth_header.as_bytes(),
+                authorization_headers
+              )),
+            ))
+            .then(|_| Ok(())),
+        );
         return;
       }
     }
@@ -238,7 +242,7 @@ impl StubCASResponder {
       || parts.get(1) != Some(&"blobs")
     {
       return Err(grpcio::RpcStatus::new(
-        grpcio::RpcStatusCode::InvalidArgument,
+        grpcio::RpcStatusCode::INVALID_ARGUMENT,
         Some(format!(
           "Bad resource name format {} - want {}/blobs/some-sha256/size",
           req.get_resource_name(),
@@ -249,13 +253,13 @@ impl StubCASResponder {
     let digest = parts[2];
     let fingerprint = Fingerprint::from_hex_string(digest).map_err(|e| {
       grpcio::RpcStatus::new(
-        grpcio::RpcStatusCode::InvalidArgument,
+        grpcio::RpcStatusCode::INVALID_ARGUMENT,
         Some(format!("Bad digest {}: {}", digest, e)),
       )
     })?;
     if self.always_errors {
       return Err(grpcio::RpcStatus::new(
-        grpcio::RpcStatusCode::Internal,
+        grpcio::RpcStatusCode::INTERNAL,
         Some("StubCAS is configured to always fail".to_owned()),
       ));
     }
@@ -273,7 +277,7 @@ impl StubCASResponder {
           .collect(),
       ),
       None => Err(grpcio::RpcStatus::new(
-        grpcio::RpcStatusCode::NotFound,
+        grpcio::RpcStatusCode::NOT_FOUND,
         Some(format!("Did not find digest {}", fingerprint)),
       )),
     }
@@ -319,7 +323,7 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
         ),
       ),
       Err(err) => {
-        sink.fail(err);
+        ctx.spawn(sink.fail(err).then(|_| Ok(())));
       }
     }
   }
@@ -350,7 +354,7 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
               Some(ref resource_name) => {
                 if resource_name != req.get_resource_name() {
                   return Err(grpcio::Error::RpcFailure(grpcio::RpcStatus::new(
-                    grpcio::RpcStatusCode::InvalidArgument,
+                    grpcio::RpcStatusCode::INVALID_ARGUMENT,
                     Some(format!(
                       "All resource names in stream must be the same. Got {} but earlier saw {}",
                       req.get_resource_name(),
@@ -362,7 +366,7 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
             }
             if req.get_write_offset() != want_next_offset {
               return Err(grpcio::Error::RpcFailure(grpcio::RpcStatus::new(
-                grpcio::RpcStatusCode::InvalidArgument,
+                grpcio::RpcStatusCode::INVALID_ARGUMENT,
                 Some(format!(
                   "Missing chunk. Expected next offset {}, got next offset: {}",
                   want_next_offset,
@@ -378,12 +382,12 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
         })
         .map_err(move |err: grpcio::Error| match err {
           grpcio::Error::RpcFailure(status) => status,
-          e => grpcio::RpcStatus::new(grpcio::RpcStatusCode::Unknown, Some(format!("{:?}", e))),
+          e => grpcio::RpcStatus::new(grpcio::RpcStatusCode::UNKNOWN, Some(format!("{:?}", e))),
         })
         .and_then(
           move |(maybe_resource_name, bytes)| match maybe_resource_name {
             None => Err(grpcio::RpcStatus::new(
-              grpcio::RpcStatusCode::InvalidArgument,
+              grpcio::RpcStatusCode::INVALID_ARGUMENT,
               Some("Stream saw no messages".to_owned()),
             )),
             Some(resource_name) => {
@@ -394,7 +398,7 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
                 || parts.get(3) != Some(&"blobs")
               {
                 return Err(grpcio::RpcStatus::new(
-                  grpcio::RpcStatusCode::InvalidArgument,
+                  grpcio::RpcStatusCode::INVALID_ARGUMENT,
                   Some(format!("Bad resource name: {}", resource_name)),
                 ));
               }
@@ -402,7 +406,7 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
                 Ok(f) => f,
                 Err(err) => {
                   return Err(grpcio::RpcStatus::new(
-                    grpcio::RpcStatusCode::InvalidArgument,
+                    grpcio::RpcStatusCode::INVALID_ARGUMENT,
                     Some(format!(
                       "Bad fingerprint in resource name: {}: {}",
                       parts[4], err
@@ -414,14 +418,14 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
                 Ok(s) => s,
                 Err(err) => {
                   return Err(grpcio::RpcStatus::new(
-                    grpcio::RpcStatusCode::InvalidArgument,
+                    grpcio::RpcStatusCode::INVALID_ARGUMENT,
                     Some(format!("Bad size in resource name: {}: {}", parts[5], err)),
                   ));
                 }
               };
               if size != bytes.len() {
                 return Err(grpcio::RpcStatus::new(
-                  grpcio::RpcStatusCode::InvalidArgument,
+                  grpcio::RpcStatusCode::INVALID_ARGUMENT,
                   Some(format!(
                     "Size was incorrect: resource name said size={} but got {}",
                     size,
@@ -432,7 +436,7 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
 
               if always_errors {
                 return Err(grpcio::RpcStatus::new(
-                  grpcio::RpcStatusCode::Internal,
+                  grpcio::RpcStatusCode::INTERNAL,
                   Some("StubCAS is configured to always fail".to_owned()),
                 ));
               }
@@ -463,7 +467,7 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
     sink: grpcio::UnarySink<bazel_protos::bytestream::QueryWriteStatusResponse>,
   ) {
     sink.fail(grpcio::RpcStatus::new(
-      grpcio::RpcStatusCode::Unimplemented,
+      grpcio::RpcStatusCode::UNIMPLEMENTED,
       None,
     ));
   }
@@ -480,14 +484,14 @@ impl bazel_protos::remote_execution_grpc::ContentAddressableStorage for StubCASR
 
     if self.always_errors {
       sink.fail(grpcio::RpcStatus::new(
-        grpcio::RpcStatusCode::Internal,
+        grpcio::RpcStatusCode::INTERNAL,
         Some("StubCAS is configured to always fail".to_owned()),
       ));
       return;
     }
     if req.instance_name != self.instance_name() {
       sink.fail(grpcio::RpcStatus::new(
-        grpcio::RpcStatusCode::NotFound,
+        grpcio::RpcStatusCode::NOT_FOUND,
         Some(format!(
           "Wrong instance_name; want {:?} got {:?}",
           self.instance_name(),
@@ -515,7 +519,7 @@ impl bazel_protos::remote_execution_grpc::ContentAddressableStorage for StubCASR
     sink: grpcio::UnarySink<bazel_protos::remote_execution::BatchUpdateBlobsResponse>,
   ) {
     sink.fail(grpcio::RpcStatus::new(
-      grpcio::RpcStatusCode::Unimplemented,
+      grpcio::RpcStatusCode::UNIMPLEMENTED,
       None,
     ));
   }

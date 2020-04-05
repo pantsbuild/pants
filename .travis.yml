@@ -2000,7 +2000,7 @@ jobs:
     if: commit_message !~ /\[ci skip-rust-tests\]/
     name: Rust tests - OSX
     os: osx
-    osx_image: xcode8.3
+    osx_image: xcode8
     script:
     - ./build-support/bin/ci.py --rust-tests
     - ./build-support/bin/release.sh -f

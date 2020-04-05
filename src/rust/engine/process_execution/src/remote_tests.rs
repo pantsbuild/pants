@@ -588,7 +588,7 @@ async fn server_rejecting_execute_request_gives_error() {
   let error = run_command_remote(mock_server.address(), execute_request)
     .await
     .expect_err("Want Err");
-  assert_that(&error).contains("InvalidArgument");
+  assert_that(&error).contains("INVALID_ARGUMENT");
   assert_that(&error).contains("Did not expect this request");
 }
 
@@ -1591,7 +1591,7 @@ async fn execute_missing_file_uploads_if_known_status() {
     let op_name = "cat".to_owned();
 
     let status = grpcio::RpcStatus {
-      status: grpcio::RpcStatusCode::FailedPrecondition,
+      status: grpcio::RpcStatusCode::FAILED_PRECONDITION,
       details: None,
       status_proto_bytes: Some(
         make_precondition_failure_status(vec![missing_preconditionfailure_violation(
@@ -1925,14 +1925,14 @@ async fn extract_execute_response_other_status() {
     let mut response = bazel_protos::remote_execution::ExecuteResponse::new();
     response.set_status({
       let mut status = bazel_protos::status::Status::new();
-      status.set_code(grpcio::RpcStatusCode::PermissionDenied as i32);
+      status.set_code(grpcio::RpcStatusCode::PERMISSION_DENIED.into());
       status
     });
     response
   }));
 
   match extract_execute_response(operation, Platform::Linux).await {
-    Err(ExecutionError::Fatal(err)) => assert_contains(&err, "PermissionDenied"),
+    Err(ExecutionError::Fatal(err)) => assert_contains(&err, "PERMISSION_DENIED"),
     other => assert!(false, "Want fatal error, got {:?}", other),
   };
 }
@@ -2396,7 +2396,7 @@ fn make_incomplete_operation(operation_name: &str) -> MockOperation {
 
 fn make_retryable_operation_failure() -> MockOperation {
   let mut status = bazel_protos::status::Status::new();
-  status.set_code(grpcio::RpcStatusCode::Aborted as i32);
+  status.set_code(grpcio::RpcStatusCode::ABORTED.into());
   status.set_message(String::from("the bot running the task appears to be lost"));
 
   let mut operation = bazel_protos::operations::Operation::new();
@@ -2533,7 +2533,7 @@ fn make_precondition_failure_status(
   violations: Vec<bazel_protos::error_details::PreconditionFailure_Violation>,
 ) -> bazel_protos::status::Status {
   let mut status = bazel_protos::status::Status::new();
-  status.set_code(grpcio::RpcStatusCode::FailedPrecondition as i32);
+  status.set_code(grpcio::RpcStatusCode::FAILED_PRECONDITION.into());
   status.mut_details().push(make_any_proto(&{
     let mut precondition_failure = bazel_protos::error_details::PreconditionFailure::new();
     for violation in violations.into_iter() {
