@@ -33,7 +33,7 @@ class FileContent:
     content: bytes
     is_executable: bool
 
-    def __init__(self, path: str, content: bytes, is_executable: bool = False):
+    def __init__(self, path: str, content: bytes, is_executable: bool = False) -> None:
         self.path = path
         self.content = content
         self.is_executable = is_executable

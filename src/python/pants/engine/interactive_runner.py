@@ -37,7 +37,7 @@ class InteractiveProcessRequest:
         env: Iterable[str] = (),
         input_files: Digest = EMPTY_DIRECTORY_DIGEST,
         run_in_workspace: bool = False
-    ):
+    ) -> None:
         self.argv = tuple(argv)
         self.env = tuple(env)
         self.input_files = input_files
