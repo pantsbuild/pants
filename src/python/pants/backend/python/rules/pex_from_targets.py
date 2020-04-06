@@ -9,6 +9,7 @@ from pants.backend.python.rules.pex import PexInterpreterConstraints, PexRequest
 from pants.backend.python.rules.targets import (
     PythonInterpreterCompatibility,
     PythonRequirementsField,
+    PythonRequirementsFileSources,
     PythonSources,
 )
 from pants.engine.addressable import Addresses
@@ -48,7 +49,11 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
             python_targets.append(tgt)
         if tgt.has_field(PythonRequirementsField):
             python_requirement_targets.append(tgt)
-        if tgt.has_field(FilesSources) or tgt.has_field(ResourcesSources):
+        # NB: PythonRequirementsFileSources is a subclass of FilesSources. We filter it out so that
+        # requirements.txt is not included in the PEX.
+        if tgt.has_field(ResourcesSources) or (
+            tgt.has_field(FilesSources) and not tgt.has_field(PythonRequirementsFileSources)
+        ):
             resource_targets.append(tgt)
 
     interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
