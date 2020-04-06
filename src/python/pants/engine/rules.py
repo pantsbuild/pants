@@ -29,11 +29,13 @@ class NamedRuleType(Enum):
 
 
 @dataclass(frozen=True)
-class RuleAnnotationFields:
+class RuleAnnotations:
     name: Optional[str] = None
     desc: Optional[str] = None
     rule_type: Optional[NamedRuleType] = None
 
+
+DEFAULT_RULE_ANNOTATIONS = RuleAnnotations()
 
 def side_effecting(cls):
     """Annotates a class to indicate that it is a side-effecting type, which needs to be handled
@@ -100,7 +102,7 @@ def _make_rule(
     parameter_types: typing.Iterable[Type],
     *,
     cacheable: bool,
-    anno_fields: RuleAnnotationFields,
+    annotations: RuleAnnotations,
 ) -> Callable[[Callable], Callable]:
     """A @decorator that declares that a particular static function may be used as a TaskRule.
 
@@ -173,14 +175,11 @@ def _make_rule(
         dependency_rules = (subsystem_rule(return_type.subsystem_cls),) if is_goal_cls else None
 
         # Set a default name for Goal classes if one is not explicitly provided
-        effective_name = anno_fields.name
+        effective_name = annotations.name
         if effective_name is None:
-            if is_goal_cls:
-                effective_name = return_type.name
-            else:
-                effective_name = func.__name__
-        effective_annotations = RuleAnnotationFields(
-            name=effective_name, desc=anno_fields.desc, rule_type=anno_fields.rule_type
+            effective_name = return_type.name if is_goal_cls else func.__name__
+        normalized_annotations = RuleAnnotations(
+            name=effective_name, desc=annotations.desc, rule_type=annotations.rule_type
         )
 
         # Set our own custom `__line_number__` dunder so that the engine may visualize the line number.
@@ -193,7 +192,7 @@ def _make_rule(
             input_gets=tuple(gets),
             dependency_rules=dependency_rules,
             cacheable=cacheable,
-            annotations=effective_annotations,
+            annotations=normalized_annotations,
         )
 
         return func
@@ -252,10 +251,10 @@ def rule_decorator(*args, **kwargs) -> Callable:
     rule_type: Optional[NamedRuleType] = kwargs.get("rule_type")
 
     if kwargs.get("named_rule"):
-        anno_fields = RuleAnnotationFields(name=name, desc=desc, rule_type=rule_type)
+        annotations = RuleAnnotations(name=name, desc=desc, rule_type=rule_type)
     else:
-        anno_fields = RuleAnnotationFields()
-        if any([name, desc, rule_type]):
+        annotations = DEFAULT_RULE_ANNOTATIONS
+        if any(x is not None for x in (name, desc, rule_type)):
             raise UnrecognizedRuleArgument(
                 f"@rules that are not @named_rules or @goal_rules do not accept keyword arguments"
             )
@@ -292,7 +291,7 @@ def rule_decorator(*args, **kwargs) -> Callable:
         for parameter in inspect.signature(func).parameters
     )
     validate_parameter_types(func_id, parameter_types, cacheable)
-    return _make_rule(return_type, parameter_types, cacheable=cacheable, anno_fields=anno_fields)(
+    return _make_rule(return_type, parameter_types, cacheable=cacheable, annotations=annotations)(
         func
     )
 
@@ -412,7 +411,7 @@ class TaskRule(Rule):
     _dependency_rules: Tuple
     _dependency_optionables: Tuple
     cacheable: bool
-    annotations: RuleAnnotationFields
+    annotations: RuleAnnotations
 
     def __init__(
         self,
@@ -423,7 +422,7 @@ class TaskRule(Rule):
         dependency_rules: Optional[Tuple] = None,
         dependency_optionables: Optional[Tuple] = None,
         cacheable: bool = True,
-        annotations: RuleAnnotationFields = RuleAnnotationFields(),
+        annotations: RuleAnnotations = DEFAULT_RULE_ANNOTATIONS,
     ):
         self._output_type = output_type
         self.input_selectors = input_selectors
