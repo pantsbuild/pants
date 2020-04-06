@@ -7,6 +7,7 @@ from textwrap import dedent
 from pants.backend.python.register import build_file_aliases as register_python
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.build_graph.address import Address
+from pants.build_graph.resources import Resources
 from pants.testutil.subsystem.util import init_subsystem
 from pants.testutil.task_test_base import TaskTestBase
 
@@ -19,9 +20,11 @@ class PythonTaskTestBase(TaskTestBase):
     @classmethod
     def alias_groups(cls):
         """
-    :API: public
-    """
-        return register_python()
+        :API: public
+        """
+        aliases = register_python()
+        aliases.target_types["resources"] = Resources
+        return aliases
 
     def setUp(self):
         super().setUp()
