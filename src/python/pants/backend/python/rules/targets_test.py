@@ -5,7 +5,7 @@ from typing import Optional
 
 import pytest
 
-from pants.backend.python.rules.targets import Timeout
+from pants.backend.python.rules.targets import PythonTestsTimeout
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.build_graph.address import Address
 from pants.engine.target import InvalidFieldException
@@ -16,10 +16,10 @@ from pants.testutil.test_base import TestBase
 class TestTimeout(TestBase):
     def test_timeout_validation(self) -> None:
         with pytest.raises(InvalidFieldException):
-            Timeout(-100, address=Address.parse(":tests"))
+            PythonTestsTimeout(-100, address=Address.parse(":tests"))
         with pytest.raises(InvalidFieldException):
-            Timeout(0, address=Address.parse(":tests"))
-        assert Timeout(5, address=Address.parse(":tests")).value == 5
+            PythonTestsTimeout(0, address=Address.parse(":tests"))
+        assert PythonTestsTimeout(5, address=Address.parse(":tests")).value == 5
 
     def assert_timeout_calculated(
         self,
@@ -40,7 +40,7 @@ class TestTimeout(TestBase):
                 }
             },
         )
-        field = Timeout(field_value, address=Address.parse(":tests"))
+        field = PythonTestsTimeout(field_value, address=Address.parse(":tests"))
         assert field.calculate_from_global_options(pytest) == expected
 
     def test_valid_field_timeout(self) -> None:

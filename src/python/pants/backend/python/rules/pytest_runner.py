@@ -19,7 +19,7 @@ from pants.backend.python.rules.pytest_coverage import (
     PytestCoverageData,
     get_coverage_plugin_input,
 )
-from pants.backend.python.rules.targets import Coverage, Timeout
+from pants.backend.python.rules.targets import PythonCoverage, PythonTestsTimeout
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.addressable import Addresses
@@ -198,14 +198,14 @@ async def setup_pytest_for_target(
             "--cov-report=",  # To not generate any output. https://pytest-cov.readthedocs.io/en/latest/config.html
         ]
         # TODO: replace this with proper usage of the Target API.
-        coverage_field = Coverage(getattr(adaptor, "coverage", None), address=adaptor.address)
+        coverage_field = PythonCoverage(getattr(adaptor, "coverage", None), address=adaptor.address)
         for package in coverage_field.determine_packages_to_cover(
             specified_source_files=specified_source_files
         ):
             coverage_args.extend(["--cov", package])
 
     # TODO: replace this with proper usage of the Target API.
-    timeout_field = Timeout(getattr(adaptor, "timeout", None), address=adaptor.address)
+    timeout_field = PythonTestsTimeout(getattr(adaptor, "timeout", None), address=adaptor.address)
 
     specified_source_file_names = sorted(specified_source_files.snapshot.files)
     return TestTargetSetup(

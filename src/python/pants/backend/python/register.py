@@ -18,16 +18,31 @@ from pants.backend.python.rules import (
     repl,
     run_setup_py,
 )
-from pants.backend.python.rules.targets import PythonBinary, PythonLibrary, PythonTests
+from pants.backend.python.rules.targets import (
+    PythonApp,
+    PythonBinary,
+    PythonDistribution,
+    PythonLibrary,
+    PythonRequirementLibrary,
+    PythonRequirementsFile,
+    PythonTests,
+    UnpackedWheels,
+)
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
-from pants.backend.python.targets.python_app import PythonApp
+from pants.backend.python.targets.python_app import PythonApp as PythonAppV1
 from pants.backend.python.targets.python_binary import PythonBinary as PythonBinaryV1
-from pants.backend.python.targets.python_distribution import PythonDistribution
+from pants.backend.python.targets.python_distribution import (
+    PythonDistribution as PythonDistributionV1,
+)
 from pants.backend.python.targets.python_library import PythonLibrary as PythonLibraryV1
-from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
-from pants.backend.python.targets.python_requirements_file import PythonRequirementsFile
+from pants.backend.python.targets.python_requirement_library import (
+    PythonRequirementLibrary as PythonRequirementLibraryV1,
+)
+from pants.backend.python.targets.python_requirements_file import (
+    PythonRequirementsFile as PythonRequirementsFileV1,
+)
 from pants.backend.python.targets.python_tests import PythonTests as PythonTestsV1
-from pants.backend.python.targets.unpacked_whls import UnpackedWheels
+from pants.backend.python.targets.unpacked_whls import UnpackedWheels as UnpackedWheelsV1
 from pants.backend.python.tasks.build_local_python_distributions import (
     BuildLocalPythonDistributions,
 )
@@ -46,7 +61,6 @@ from pants.backend.python.tasks.select_interpreter import SelectInterpreter
 from pants.backend.python.tasks.setup_py import SetupPy
 from pants.backend.python.tasks.unpack_wheels import UnpackWheels
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.build_graph.resources import Resources
 from pants.goal.task_registrar import TaskRegistrar as task
 from pants.python.pex_build_util import PexBuilderWrapper
 from pants.python.python_requirement import PythonRequirement
@@ -63,15 +77,14 @@ def global_subsystems():
 def build_file_aliases():
     return BuildFileAliases(
         targets={
-            PythonApp.alias(): PythonApp,
+            PythonAppV1.alias(): PythonAppV1,
             PythonBinaryV1.alias(): PythonBinaryV1,
             PythonLibraryV1.alias(): PythonLibraryV1,
             PythonTestsV1.alias(): PythonTestsV1,
-            PythonDistribution.alias(): PythonDistribution,
-            "python_requirement_library": PythonRequirementLibrary,
-            PythonRequirementsFile.alias(): PythonRequirementsFile,
-            Resources.alias(): Resources,
-            UnpackedWheels.alias(): UnpackedWheels,
+            PythonDistributionV1.alias(): PythonDistributionV1,
+            "python_requirement_library": PythonRequirementLibraryV1,
+            PythonRequirementsFileV1.alias(): PythonRequirementsFileV1,
+            UnpackedWheelsV1.alias(): UnpackedWheelsV1,
         },
         objects={
             "python_requirement": PythonRequirement,
@@ -126,4 +139,13 @@ def rules():
 
 
 def targets2():
-    return [PythonBinary, PythonLibrary, PythonTests]
+    return [
+        PythonApp,
+        PythonBinary,
+        PythonDistribution,
+        PythonLibrary,
+        PythonRequirementLibrary,
+        PythonRequirementsFile,
+        PythonTests,
+        UnpackedWheels,
+    ]
