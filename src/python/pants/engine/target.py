@@ -601,7 +601,12 @@ class RegisteredTargetTypes:
 
 
 class InvalidFieldException(Exception):
-    pass
+    """Use when there's an issue with a particular field.
+
+    Suggested template:
+
+         f"The {repr(alias)} field in target {address} must ..., but ..."
+    """
 
 
 class InvalidFieldTypeException(InvalidFieldException):

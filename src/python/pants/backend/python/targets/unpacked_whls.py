@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class UnpackedWheels(ImportWheelsMixin, Target):
-    """A set of sources extracted from JAR files.
+    """A set of sources extracted from wheel files.
 
     NB: Currently, wheels are always resolved for the 'current' platform.
 

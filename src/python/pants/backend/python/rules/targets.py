@@ -2,10 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os.path
-from typing import Optional, Tuple, Union
+from typing import Iterable, Optional, Tuple, Union, cast
 
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.build_graph.address import Address
+from pants.engine.fs import Snapshot
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
@@ -13,13 +14,17 @@ from pants.engine.target import (
     IntField,
     InvalidFieldException,
     ProvidesField,
+    SequenceField,
     Sources,
     StringField,
     StringOrStringSequenceField,
+    StringSequenceField,
     Target,
 )
+from pants.python.python_requirement import PythonRequirement
 from pants.python.python_setup import PythonSetup
 from pants.rules.core.determine_source_files import SourceFiles
+from pants.rules.core.targets import FilesSources
 
 # -----------------------------------------------------------------------------------------------
 # Common fields
@@ -54,6 +59,16 @@ COMMON_PYTHON_FIELDS = (
     ProvidesField,
     PythonInterpreterCompatibility,
 )
+
+
+# -----------------------------------------------------------------------------------------------
+# `python_app` target
+# -----------------------------------------------------------------------------------------------
+
+# TODO: add support for apps, including `bundle`.
+class PythonApp(Target):
+    alias = "python_app"
+    core_fields = ()
 
 
 # -----------------------------------------------------------------------------------------------
@@ -287,3 +302,155 @@ class PythonTests(Target):
 
     alias = "python_tests"
     core_fields = (*COMMON_PYTHON_FIELDS, PythonTestsSources, PythonCoverage, PythonTestsTimeout)
+
+
+# -----------------------------------------------------------------------------------------------
+# `python_distribution` target
+# -----------------------------------------------------------------------------------------------
+
+
+class PythonDistributionSources(PythonSources):
+    default = ("*.py",)
+
+    def validate_snapshot(self, snapshot: Snapshot) -> None:
+        if "setup.py" not in snapshot.files:
+            raise InvalidFieldException(
+                f"The {repr(self.alias)} field in target {self.address} must include "
+                f"`setup.py`. All resolved files: {sorted(snapshot.files)}."
+            )
+
+
+class PythonDistributionSetupRequires(StringSequenceField):
+    """A list of pip-style requirement strings to provide during the invocation of setup.py."""
+
+    alias = "setup_requires"
+
+
+class PythonDistribution(Target):
+    """A Python distribution target that accepts a user-defined setup.py."""
+
+    alias = "python_dist"
+    core_fields = (
+        *COMMON_PYTHON_FIELDS,
+        PythonDistributionSources,
+        PythonDistributionSetupRequires,
+    )
+
+
+# -----------------------------------------------------------------------------------------------
+# `python_requirement_library` target
+# -----------------------------------------------------------------------------------------------
+
+
+class PythonRequirementsField(SequenceField):
+    """A sequence of `python_requirement` objects."""
+
+    alias = "requirements"
+    expected_element_type = PythonRequirement
+    expected_type_description = "an iterable of `python_requirement` objects (e.g. a list)"
+    required = True
+    value: Tuple[PythonRequirement, ...]
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Iterable[PythonRequirement]], *, address: Address
+    ) -> Tuple[PythonRequirement, ...]:
+        return cast(
+            Tuple[PythonRequirement, ...], super().compute_value(raw_value, address=address)
+        )
+
+
+class PythonRequirementLibrary(Target):
+    """A set of Pip requirements."""
+
+    alias = "python_requirement_library"
+    core_fields = (*COMMON_TARGET_FIELDS, PythonRequirementsField)
+
+
+# -----------------------------------------------------------------------------------------------
+# `_python_requirements_file` target
+# -----------------------------------------------------------------------------------------------
+
+
+# NB: This subclasses FilesSources to ensure that we still properly handle stripping source roots,
+# but we still new type so that we can distinguish between normal FilesSources vs. this field.
+class PythonRequirementsFileSources(FilesSources):
+    pass
+
+
+# TODO: filter out private targets from `./pants target-types2`? Simply check for `_`. This
+#  probably depends on how common this private target pattern will end being, which is unclear now
+#  that we have Configurations for ad hoc, internal combinations of fields.
+class PythonRequirementsFile(Target):
+    """A private, helper target type for requirements.txt files."""
+
+    alias = "_python_requirements_file"
+    core_fields = (*COMMON_TARGET_FIELDS, PythonRequirementsFileSources)
+
+
+# -----------------------------------------------------------------------------------------------
+# `unpacked_wheels` target
+# -----------------------------------------------------------------------------------------------
+
+
+class UnpackedWheelsModuleName(StringField):
+    """The name of the specific Python module containing headers and/or libraries to extract (e.g.
+    'tensorflow')."""
+
+    alias = "module_name"
+    required = True
+
+
+class UnpackedWheelsRequestedLibraries(StringSequenceField):
+    """Addresses of python_requirement_library targets that specify the wheels you want to
+    unpack."""
+
+    alias = "libraries"
+    required = True
+
+
+class UnpackedWheelsIncludePatterns(StringSequenceField):
+    """Fileset patterns to include from the archive."""
+
+    alias = "include_patterns"
+
+
+class UnpackedWheelsExcludePatterns(StringSequenceField):
+    """Fileset patterns to exclude from the archive.
+
+    Exclude patterns are processed before include_patterns.
+    """
+
+    alias = "exclude_patterns"
+
+
+class UnpackedWheelsWithinDataSubdir(BoolField):
+    """If True, descend into '<name>-<version>.data/' when matching `include_patterns`.
+
+    For Python wheels which declare any non-code data, this is usually needed to extract that
+    without manually specifying the relative path, including the package version.
+
+    For example, when `data_files` is used in a setup.py, `within_data_subdir=True` will allow
+    specifying `include_patterns` matching exactly what is specified in the setup.py.
+    """
+
+    alias = "within_data_subdir"
+    default = False
+
+
+class UnpackedWheels(Target):
+    """A set of sources extracted from wheel files.
+
+    Currently, wheels are always resolved for the 'current' platform.
+    """
+
+    alias = "unpacked_whls"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        PythonInterpreterCompatibility,
+        UnpackedWheelsModuleName,
+        UnpackedWheelsRequestedLibraries,
+        UnpackedWheelsIncludePatterns,
+        UnpackedWheelsExcludePatterns,
+        UnpackedWheelsWithinDataSubdir,
+    )
