@@ -7,10 +7,15 @@ from pants.backend.python.rules.inject_init import InitInjectedSnapshot, InjectI
 from pants.backend.python.rules.inject_init import rules as inject_init_rules
 from pants.engine.fs import Snapshot
 from pants.engine.legacy.graph import HydratedTargets
-from pants.engine.rules import rule
+from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
+from pants.engine.target import Sources, Targets
 from pants.rules.core import determine_source_files
-from pants.rules.core.determine_source_files import LegacyAllSourceFilesRequest, SourceFiles
+from pants.rules.core.determine_source_files import (
+    AllSourceFilesRequest,
+    LegacyAllSourceFilesRequest,
+    SourceFiles,
+)
 
 
 @dataclass(frozen=True)
@@ -32,6 +37,15 @@ class ImportablePythonSources:
 
 
 @rule
+async def prepare_python_sources(targets: Targets) -> ImportablePythonSources:
+    stripped_sources = await Get[SourceFiles](
+        AllSourceFilesRequest((tgt.get(Sources) for tgt in targets), strip_source_roots=True)
+    )
+    init_injected = await Get[InitInjectedSnapshot](InjectInitRequest(stripped_sources.snapshot))
+    return ImportablePythonSources(init_injected.snapshot)
+
+
+@rule
 async def legacy_prepare_python_sources(
     hydrated_targets: HydratedTargets,
 ) -> ImportablePythonSources:
@@ -46,7 +60,9 @@ async def legacy_prepare_python_sources(
 
 def rules():
     return [
+        prepare_python_sources,
         legacy_prepare_python_sources,
         *determine_source_files.rules(),
         *inject_init_rules(),
+        RootRule(Targets),
     ]
