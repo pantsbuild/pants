@@ -127,10 +127,7 @@ async def setup_pytest_for_target(
             # requirements which will lead to problems when APIs that are used by either
             # `pytest:main` or the tests themselves break between the two versions.
             ":".join(
-                (
-                    pytest_pex_request.output_filename,
-                    requirements_pex_request.output_filename,
-                )
+                (pytest_pex_request.output_filename, requirements_pex_request.output_filename)
             ),
         ),
     )
