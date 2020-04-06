@@ -3,7 +3,7 @@
 
 import textwrap
 from dataclasses import dataclass
-from typing import Optional, Sequence, Type, get_type_hints
+from typing import Generic, Optional, Sequence, Type, get_type_hints
 
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
@@ -18,6 +18,8 @@ from pants.engine.target import (
     IntField,
     PrimitiveField,
     RegisteredTargetTypes,
+    ScalarField,
+    SequenceField,
     StringField,
     StringOrStringSequenceField,
     StringSequenceField,
@@ -106,7 +108,10 @@ class FieldInfo:
                     DictStringToStringField,
                     DictStringToStringSequenceField,
                     FloatField,
+                    Generic,  # type: ignore[arg-type]
                     IntField,
+                    ScalarField,
+                    SequenceField,
                     StringField,
                     StringOrStringSequenceField,
                     StringSequenceField,

@@ -1,7 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Iterable, Optional, Tuple, Union
+from typing import Iterable, Optional, Tuple, Union, cast
 
 from pants.backend.jvm.subsystems import shader
 from pants.backend.jvm.targets.jvm_binary import JarRules
@@ -13,9 +13,10 @@ from pants.engine.target import (
     DictStringToStringField,
     DictStringToStringSequenceField,
     IntField,
-    InvalidFieldTypeException,
     PrimitiveField,
     ProvidesField,
+    ScalarField,
+    SequenceField,
     Sources,
     StringField,
     StringSequenceField,
@@ -23,38 +24,24 @@ from pants.engine.target import (
 )
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
-from pants.util.collections import ensure_list
 
 # -----------------------------------------------------------------------------------------------
 # Common JVM Fields
 # -----------------------------------------------------------------------------------------------
 
 
-# TODO: factor out a generic `SequenceField` which takes the expected type as a class property.
-class JvmExcludes(PrimitiveField):
+class JvmExcludes(SequenceField):
     """`exclude` objects to filter this target's transitive dependencies against."""
 
     alias = "excludes"
-    value: Optional[Tuple[Exclude, ...]]
-    default = None
+    expected_element_type = Exclude
+    expected_type_description = "an iterable of `exclude` objects (e.g. a list)"
 
     @classmethod
     def compute_value(
         cls, raw_value: Optional[Iterable[Exclude]], *, address: Address
     ) -> Optional[Tuple[Exclude, ...]]:
-        value_or_default = super().compute_value(raw_value, address=address)
-        if value_or_default is None:
-            return None
-        try:
-            ensure_list(value_or_default, expected_type=Exclude)
-        except ValueError:
-            raise InvalidFieldTypeException(
-                address,
-                cls.alias,
-                value_or_default,
-                expected_type="an iterable of `exclude` objects (e.g. a list)",
-            )
-        return tuple(sorted(value_or_default))
+        return super().compute_value(raw_value, address=address)
 
 
 class JvmServices(DictStringToStringSequenceField):
@@ -276,29 +263,20 @@ class NetrcCredentials(Target):
 # -----------------------------------------------------------------------------------------------
 
 
-class JarsField(PrimitiveField):
+class JarsField(SequenceField):
     """A list of `jar` objects to depend upon."""
 
     alias = "jars"
+    expected_element_type = JarDependency
+    expected_type_description = "an iterable of `jar` objects (e.g. a list)"
     value: Tuple[JarDependency, ...]
     required = True
 
-    # TODO: factor out a common Sequence field.
     @classmethod
     def compute_value(
         cls, raw_value: Optional[Iterable[JarDependency]], *, address: Address
     ) -> Tuple[JarDependency, ...]:
-        value = super().compute_value(raw_value, address=address)
-        try:
-            ensure_list(value, expected_type=JarDependency)
-        except ValueError:
-            raise InvalidFieldTypeException(
-                address,
-                cls.alias,
-                value,
-                expected_type="an iterable of `jar` objects (e.g. a list)",
-            )
-        return tuple(value)
+        return cast(Tuple[JarDependency, ...], super().compute_value(raw_value, address=address))
 
 
 class ManagedJarDependenciesAddress(StringField):
@@ -512,24 +490,18 @@ class JvmBinaryDeployExcludes(JvmExcludes):
     alias = "deploy_excludes"
 
 
-# TODO: factor out a common SingleValueField(?) class.
-class JvmBinaryDeployJarRules(PrimitiveField):
+class JvmBinaryDeployJarRules(ScalarField):
     """A `jar_rules` object for packaging this binary in a deploy JAR."""
 
     alias = "deploy_jar_rules"
-    value: Optional[JarRules]
-    default = None
+    expected_type = JarRules
+    expected_type_description = "a `jar_rules` object"
 
     @classmethod
     def compute_value(
         cls, raw_value: Optional[JarRules], *, address: Address
     ) -> Optional[JarRules]:
-        value_or_default = super().compute_value(raw_value, address=address)
-        if value_or_default is not None and not isinstance(value_or_default, JarRules):
-            raise InvalidFieldTypeException(
-                address, cls.alias, value_or_default, expected_type="a `jar_rules` object"
-            )
-        return value_or_default
+        return super().compute_value(raw_value, address=address)
 
 
 class JvmBinaryManifestEntries(DictStringToStringField):

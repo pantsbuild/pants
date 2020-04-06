@@ -11,6 +11,7 @@ from pants.engine.target import (
     Dependencies,
     InvalidFieldTypeException,
     PrimitiveField,
+    ScalarField,
     Sources,
     StringField,
     StringSequenceField,
@@ -176,7 +177,7 @@ class RemoteSourcesTargetRequestedAddress(StringField):
     required = True
 
 
-class RemoteSourcesTargetType(PrimitiveField):
+class RemoteSourcesTargetType(ScalarField):
     """The target type of the synthetic target to generate.
 
     Use the raw symbol rather than a string, e.g. `java_library` rather than `"java_library"`.
@@ -184,6 +185,8 @@ class RemoteSourcesTargetType(PrimitiveField):
 
     alias = "dest"
     required = True
+    expected_type = type
+    expected_type_description = "a target type like java_library or python_library (no quotes)"
     value: Type[TargetV1]
 
     @classmethod
