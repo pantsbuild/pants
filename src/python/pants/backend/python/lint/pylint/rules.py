@@ -7,14 +7,14 @@ from typing import Optional, Tuple
 
 from pants.backend.python.lint.pylint.subsystem import Pylint
 from pants.backend.python.lint.python_linter import PythonLinter
-from pants.backend.python.rules import download_pex_bin, pex, prepare_chrooted_python_sources
+from pants.backend.python.rules import download_pex_bin, importable_python_sources, pex
+from pants.backend.python.rules.importable_python_sources import ImportablePythonSources
 from pants.backend.python.rules.pex import (
     CreatePex,
     Pex,
     PexInterpreterConstraints,
     PexRequirements,
 )
-from pants.backend.python.rules.prepare_chrooted_python_sources import ChrootedPythonSources
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.build_graph.address import Address
@@ -67,7 +67,7 @@ async def lint(
             ht.adaptor.dependencies for ht in hydrated_targets
         )
     )
-    chrooted_python_sources = await Get[ChrootedPythonSources](
+    chrooted_python_sources = await Get[ImportablePythonSources](
         HydratedTargets([*hydrated_targets, *dependencies])
     )
 
@@ -137,7 +137,7 @@ def rules():
         *download_pex_bin.rules(),
         *determine_source_files.rules(),
         *pex.rules(),
-        *prepare_chrooted_python_sources.rules(),
+        *importable_python_sources.rules(),
         *strip_source_roots.rules(),
         *python_native_code.rules(),
         *subprocess_environment.rules(),

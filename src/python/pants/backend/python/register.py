@@ -8,10 +8,10 @@ from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.python_requirements import PythonRequirements
 from pants.backend.python.rules import (
     download_pex_bin,
+    importable_python_sources,
     inject_init,
     pex,
     pex_from_target_closure,
-    prepare_chrooted_python_sources,
     pytest_coverage,
     pytest_runner,
     python_create_binary,
@@ -112,7 +112,7 @@ def rules():
     return (
         *download_pex_bin.rules(),
         *inject_init.rules(),
-        *prepare_chrooted_python_sources.rules(),
+        *importable_python_sources.rules(),
         *pex.rules(),
         *pex_from_target_closure.rules(),
         *pytest_coverage.rules(),

@@ -4,13 +4,13 @@
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
+from pants.backend.python.rules.importable_python_sources import ImportablePythonSources
 from pants.backend.python.rules.pex import (
     CreatePex,
     Pex,
     PexInterpreterConstraints,
     PexRequirements,
 )
-from pants.backend.python.rules.prepare_chrooted_python_sources import ChrootedPythonSources
 from pants.engine.addressable import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
@@ -56,10 +56,10 @@ async def create_pex_from_target_closure(
     if request.additional_input_files:
         input_digests.append(request.additional_input_files)
     if request.include_source_files:
-        chrooted_sources = await Get[ChrootedPythonSources](
+        prepared_sources = await Get[ImportablePythonSources](
             HydratedTargets(python_targets + resource_targets)
         )
-        input_digests.append(chrooted_sources.snapshot.directory_digest)
+        input_digests.append(prepared_sources.snapshot.directory_digest)
     merged_input_digest = await Get[Digest](DirectoriesToMerge(directories=tuple(input_digests)))
     requirements = PexRequirements.create_from_adaptors(
         adaptors=all_target_adaptors, additional_requirements=request.additional_requirements
@@ -79,6 +79,4 @@ async def create_pex_from_target_closure(
 
 
 def rules():
-    return [
-        create_pex_from_target_closure,
-    ]
+    return [create_pex_from_target_closure]
