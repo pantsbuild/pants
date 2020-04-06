@@ -30,7 +30,7 @@ class SchedulerService(PantsService):
     def __init__(
         self,
         *,
-        fs_event_service: FSEventService,
+        fs_event_service: Optional[FSEventService],
         legacy_graph_scheduler: LegacyGraphScheduler,
         build_root: str,
         invalidation_globs: List[str],
@@ -77,21 +77,23 @@ class SchedulerService(PantsService):
         """Service setup."""
         super().setup(services)
         # Register filesystem event handlers on an FSEventService instance.
-        self._fs_event_service.register_all_files_handler(
-            self._enqueue_fs_event, self._fs_event_service.PANTS_ALL_FILES_SUBSCRIPTION_NAME
-        )
+        if self._fs_event_service is not None:
+            self._fs_event_service.register_all_files_handler(
+                self._enqueue_fs_event, self._fs_event_service.PANTS_ALL_FILES_SUBSCRIPTION_NAME
+            )
 
         # N.B. We compute the invalidating fileset eagerly at launch with an assumption that files
         # that exist at startup are the only ones that can affect the running daemon.
-        if self._invalidation_globs:
-            self._invalidating_snapshot = self._get_snapshot()
-            self._invalidating_files = self._invalidating_snapshot.files
-            self._logger.info("watching invalidating files: {}".format(self._invalidating_files))
+        if self._fs_event_service is not None:
+            if self._invalidation_globs:
+                self._invalidating_snapshot = self._get_snapshot()
+                self._invalidating_files = self._invalidating_snapshot.files
+                self._logger.info("watching invalidating files: {}".format(self._invalidating_files))
 
-        if self._pantsd_pidfile:
-            self._fs_event_service.register_pidfile_handler(
-                self._pantsd_pidfile, self._enqueue_fs_event
-            )
+            if self._pantsd_pidfile:
+                self._fs_event_service.register_pidfile_handler(
+                    self._pantsd_pidfile, self._enqueue_fs_event
+                )
 
     def _enqueue_fs_event(self, event):
         """Watchman filesystem event handler for BUILD/requirements.txt updates.
@@ -176,6 +178,7 @@ class SchedulerService(PantsService):
         # The first watchman event for all_files is a listing of all files - ignore it.
         if (
             not is_initial_event
+            and self._fs_event_service is not None
             and subscription == self._fs_event_service.PANTS_ALL_FILES_SUBSCRIPTION_NAME
         ):
             self._handle_batch_event(files)
