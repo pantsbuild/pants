@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from textwrap import dedent
 from typing import List
 
-from pants.engine.rules import RootRule, named_rule, rule
+from pants.engine.rules import NamedRuleType, RootRule, named_rule, rule
 from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Get, MultiGet
 from pants.reporting.streaming_workunit_handler import StreamingWorkunitHandler
@@ -97,7 +97,7 @@ class Omega:
 
 
 @named_rule(name="rule_one")
-async def rule_one(i: Input) -> Beta:
+async def rule_one_function(i: Input) -> Beta:
     """This rule should be the first one executed by the engine, and thus have no parent."""
     a = Alpha()
     o = await Get[Omega](Alpha, a)
@@ -105,7 +105,7 @@ async def rule_one(i: Input) -> Beta:
     return b
 
 
-@named_rule(name="rule_two")
+@named_rule
 async def rule_two(a: Alpha) -> Omega:
     """This rule should be invoked in the body of `rule_one` and therefore its workunit should be a
     child of `rule_one`'s workunit."""
@@ -113,14 +113,14 @@ async def rule_two(a: Alpha) -> Omega:
     return Omega()
 
 
-@named_rule(name="rule_three")
+@named_rule(desc="Rule number 3")
 async def rule_three(o: Omega) -> Beta:
     """This rule should be invoked in the body of `rule_one` and therefore its workunit should be a
     child of `rule_one`'s workunit."""
     return Beta()
 
 
-@named_rule(name="rule_four")
+@named_rule(rule_type=NamedRuleType.Format, desc="Rule number 4")
 def rule_four(a: Alpha) -> Gamma:
     """This rule should be invoked in the body of `rule_two` and therefore its workunit should be a
     child of `rule_two`'s workunit."""
@@ -356,8 +356,8 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
         assert len(tracker.workunits) == 10
         assert tracker.finished
 
-    def test_streaming_workunits_parent_id(self):
-        rules = [RootRule(Input), rule_one, rule_two, rule_three, rule_four]
+    def test_streaming_workunits_parent_id_and_rule_metadata(self):
+        rules = [RootRule(Input), rule_one_function, rule_two, rule_three, rule_four]
         scheduler = self.mk_scheduler(
             rules, include_trace_on_error=False, should_report_workunits=True
         )
@@ -381,3 +381,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
         assert r2["parent_id"] == r1["span_id"]
         assert r3["parent_id"] == r1["span_id"]
         assert r4["parent_id"] == r2["span_id"]
+
+        assert r3["desc"] == "Rule number 3"
+        assert r4["desc"] == "Rule number 4"
+        assert r4["rule_type"] == "Format"
