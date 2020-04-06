@@ -188,8 +188,8 @@ class Scheduler:
 
         anno = rule.annotations
         if anno.name:
-            desc = anno.desc or ""
-            rule_type = anno.rule_type.name if anno.rule_type else ""
+            desc = anno.desc if anno.desc else ""
+            rule_type = anno.rule_type.value if anno.rule_type else ""
             self._native.lib.tasks_add_display_info(
                 tasks, anno.name.encode(), desc.encode(), rule_type.encode(),
             )

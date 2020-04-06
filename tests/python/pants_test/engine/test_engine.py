@@ -120,7 +120,7 @@ async def rule_three(o: Omega) -> Beta:
     return Beta()
 
 
-@named_rule(rule_type=NamedRuleType.Format, desc="Rule number 4")
+@named_rule(rule_type=NamedRuleType("format"), desc="Rule number 4")
 def rule_four(a: Alpha) -> Gamma:
     """This rule should be invoked in the body of `rule_two` and therefore its workunit should be a
     child of `rule_two`'s workunit."""
@@ -384,4 +384,4 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
 
         assert r3["desc"] == "Rule number 3"
         assert r4["desc"] == "Rule number 4"
-        assert r4["rule_type"] == "Format"
+        assert r4["rule_type"] == "format"

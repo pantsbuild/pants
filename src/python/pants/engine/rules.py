@@ -22,9 +22,10 @@ from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 
 class NamedRuleType(Enum):
-    Test = "test"
-    Format = "format"
-    Build = "build"
+    TEST = "test"
+    BUILD = "build"
+    LINT = "lint"
+    FORMAT = "format"
 
 
 @dataclass(frozen=True)
