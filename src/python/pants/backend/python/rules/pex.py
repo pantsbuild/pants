@@ -171,7 +171,7 @@ class PexInterpreterConstraints:
 
 
 @dataclass(frozen=True)
-class CreatePex:
+class PexRequest:
     """Represents a generic request to create a PEX from its inputs."""
 
     output_filename: str
@@ -221,7 +221,7 @@ class PexDebug:
 
 @rule(name="Create PEX")
 async def create_pex(
-    request: CreatePex,
+    request: PexRequest,
     pex_bin: DownloadedPexBin,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
@@ -332,7 +332,4 @@ async def create_pex(
 
 
 def rules():
-    return [
-        create_pex,
-        subsystem_rule(PythonSetup),
-    ]
+    return [create_pex, subsystem_rule(PythonSetup)]

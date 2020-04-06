@@ -10,9 +10,9 @@ from pants.backend.python.lint.python_linter import PythonLinter
 from pants.backend.python.rules import download_pex_bin, importable_python_sources, pex
 from pants.backend.python.rules.importable_python_sources import ImportablePythonSources
 from pants.backend.python.rules.pex import (
-    CreatePex,
     Pex,
     PexInterpreterConstraints,
+    PexRequest,
     PexRequirements,
 )
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
@@ -79,7 +79,7 @@ async def lint(
         python_setup=python_setup,
     )
     requirements_pex = await Get[Pex](
-        CreatePex(
+        PexRequest(
             output_filename="pylint.pex",
             requirements=PexRequirements(pylint.get_requirement_specs()),
             interpreter_constraints=interpreter_constraints,

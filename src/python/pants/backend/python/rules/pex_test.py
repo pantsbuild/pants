@@ -12,9 +12,9 @@ from pkg_resources import Requirement
 
 from pants.backend.python.rules import download_pex_bin
 from pants.backend.python.rules.pex import (
-    CreatePex,
     Pex,
     PexInterpreterConstraints,
+    PexRequest,
     PexRequirements,
 )
 from pants.backend.python.rules.pex import rules as pex_rules
@@ -159,7 +159,7 @@ class PexTest(TestBase):
             *download_pex_bin.rules(),
             *python_native_code.rules(),
             *subprocess_environment.rules(),
-            RootRule(CreatePex),
+            RootRule(PexRequest),
         )
 
     def create_pex_and_get_all_data(
@@ -172,7 +172,7 @@ class PexTest(TestBase):
         additional_pants_args: Tuple[str, ...] = (),
         additional_pex_args: Tuple[str, ...] = (),
     ) -> Dict:
-        request = CreatePex(
+        request = PexRequest(
             output_filename="test.pex",
             requirements=requirements,
             interpreter_constraints=interpreter_constraints,

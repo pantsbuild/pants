@@ -7,9 +7,9 @@ from typing import Any, List, Optional, Tuple, Union, cast
 
 from pants.backend.python.rules.importable_python_sources import ImportablePythonSources
 from pants.backend.python.rules.pex import (
-    CreatePex,
     Pex,
     PexInterpreterConstraints,
+    PexRequest,
     PexRequirements,
 )
 from pants.backend.python.rules.pex_from_targets import LegacyPexFromTargetsRequest
@@ -86,7 +86,7 @@ async def setup_pytest_for_target(
     # Ensure all pexes we merge via PEX_PATH to form the test runner use the interpreter constraints
     # of the tests. This is handled by CreatePexFromTargetClosure, but we must pass this through for
     # CreatePex requests.
-    create_pex = functools.partial(CreatePex, interpreter_constraints=interpreter_constraints)
+    pex_request = functools.partial(PexRequest, interpreter_constraints=interpreter_constraints)
 
     # NB: We set `--not-zip-safe` because Pytest plugin discovery, which uses
     # `importlib_metadata` and thus `zipp`, does not play nicely when doing import magic directly
@@ -101,7 +101,7 @@ async def setup_pytest_for_target(
         await Get[Digest](InputFilesContent, get_coverage_plugin_input()) if run_coverage else None
     )
 
-    create_pytest_pex_request = create_pex(
+    pytest_pex_request = pex_request(
         output_filename="pytest.pex",
         requirements=PexRequirements(pytest.get_requirement_strings()),
         additional_args=additional_args_for_pytest,
@@ -115,7 +115,7 @@ async def setup_pytest_for_target(
         additional_args=additional_args_for_pytest,
     )
 
-    create_test_runner_pex = create_pex(
+    test_runner_pex_request = pex_request(
         output_filename="test_runner.pex",
         entry_point="pytest:main",
         interpreter_constraints=interpreter_constraints,
@@ -128,7 +128,7 @@ async def setup_pytest_for_target(
             # `pytest:main` or the tests themselves break between the two versions.
             ":".join(
                 (
-                    create_pytest_pex_request.output_filename,
+                    pytest_pex_request.output_filename,
                     requirements_pex_request.output_filename,
                 )
             ),
@@ -152,9 +152,9 @@ async def setup_pytest_for_target(
     # Some awkward code follows in order to execute 5-6 items concurrently given the current state
     # of MultiGet typing / API. Improve this since we should encourage full concurrency in general.
     requests: List[Get[Any]] = [
-        Get[Pex](CreatePex, create_pytest_pex_request),
+        Get[Pex](PexRequest, pytest_pex_request),
         Get[Pex](LegacyPexFromTargetsRequest, requirements_pex_request),
-        Get[Pex](CreatePex, create_test_runner_pex),
+        Get[Pex](PexRequest, test_runner_pex_request),
         Get[ImportablePythonSources](HydratedTargets(python_targets + resource_targets)),
         Get[SourceFiles](LegacySpecifiedSourceFilesRequest, specified_source_files_request),
     ]

@@ -8,9 +8,9 @@ from pants.backend.python.lint.docformatter.subsystem import Docformatter
 from pants.backend.python.lint.python_formatter import PythonFormatter
 from pants.backend.python.rules import download_pex_bin, pex
 from pants.backend.python.rules.pex import (
-    CreatePex,
     Pex,
     PexInterpreterConstraints,
+    PexRequest,
     PexRequirements,
 )
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
@@ -70,7 +70,7 @@ async def setup(
     adaptors_with_origins = request.formatter.adaptors_with_origins
 
     requirements_pex = await Get[Pex](
-        CreatePex(
+        PexRequest(
             output_filename="docformatter.pex",
             requirements=PexRequirements(docformatter.get_requirement_specs()),
             interpreter_constraints=PexInterpreterConstraints(
