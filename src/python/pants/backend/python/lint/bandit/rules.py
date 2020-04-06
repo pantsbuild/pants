@@ -17,7 +17,7 @@ from pants.backend.python.subsystems import python_native_code, subprocess_envir
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
-from pants.engine.rules import UnionRule, named_rule, subsystem_rule
+from pants.engine.rules import NamedRuleType, UnionRule, named_rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
@@ -44,7 +44,7 @@ def generate_args(*, specified_source_files: SourceFiles, bandit: Bandit) -> Tup
     return tuple(args)
 
 
-@named_rule(name="Lint using Bandit")
+@named_rule(name="bandit_lint", desc="Lint using Bandit", rule_type=NamedRuleType("lint"))
 async def lint(
     linter: BanditLinter,
     bandit: Bandit,

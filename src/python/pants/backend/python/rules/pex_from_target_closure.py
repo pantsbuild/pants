@@ -33,7 +33,7 @@ class CreatePexFromTargetClosure:
     additional_input_files: Optional[Digest] = None
 
 
-@named_rule(name="Create PEX from targets")
+@named_rule(desc="Create PEX from targets")
 async def create_pex_from_target_closure(
     request: CreatePexFromTargetClosure, python_setup: PythonSetup
 ) -> Pex:

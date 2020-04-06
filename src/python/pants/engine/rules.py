@@ -37,6 +37,7 @@ class RuleAnnotations:
 
 DEFAULT_RULE_ANNOTATIONS = RuleAnnotations()
 
+
 def side_effecting(cls):
     """Annotates a class to indicate that it is a side-effecting type, which needs to be handled
     specially with respect to rule caching semantics."""

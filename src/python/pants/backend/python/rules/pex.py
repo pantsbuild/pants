@@ -253,7 +253,7 @@ class PexDebug:
         self.log_level.log(logger, *args, **kwargs)
 
 
-@named_rule(name="Create PEX")
+@named_rule(desc="Create PEX")
 async def create_pex(
     request: PexRequest,
     pex_bin: DownloadedPexBin,

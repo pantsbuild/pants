@@ -17,7 +17,7 @@ from pants.backend.python.subsystems import python_native_code, subprocess_envir
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
-from pants.engine.rules import UnionRule, named_rule, subsystem_rule
+from pants.engine.rules import NamedRuleType, UnionRule, named_rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
@@ -44,7 +44,7 @@ def generate_args(*, specified_source_files: SourceFiles, flake8: Flake8) -> Tup
     return tuple(args)
 
 
-@named_rule(name="Lint using Flake8")
+@named_rule(name="flake8_lint", desc="Lint using Flake8", rule_type=NamedRuleType("lint"))
 async def lint(
     linter: Flake8Linter,
     flake8: Flake8,

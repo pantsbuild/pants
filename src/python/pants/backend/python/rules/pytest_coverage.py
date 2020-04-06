@@ -256,7 +256,7 @@ class MergedCoverageData:
     coverage_data: Digest
 
 
-@named_rule(name="Merge coverage reports")
+@named_rule(desc="Merge coverage reports")
 async def merge_coverage_data(
     data_batch: PytestCoverageDataBatch,
     transitive_targets: TransitiveHydratedTargets,
@@ -328,7 +328,7 @@ class PytestCoverageData(CoverageData):
         return PytestCoverageDataBatch
 
 
-@named_rule(name="Generate coverage report")
+@named_rule(desc="Generate coverage report")
 async def generate_coverage_report(
     transitive_targets: TransitiveHydratedTargets,
     python_setup: PythonSetup,

@@ -46,7 +46,7 @@ class LambdexSetup:
     requirements_pex: Pex
 
 
-@named_rule(name="Create Python AWS Lambda")
+@named_rule(desc="Create Python AWS Lambda")
 async def create_python_awslambda(
     config: PythonAwsLambdaConfiguration,
     lambdex_setup: LambdexSetup,
@@ -81,7 +81,7 @@ async def create_python_awslambda(
     return CreatedAWSLambda(digest=result.output_directory_digest, name=pex_filename)
 
 
-@named_rule(name="Set up lambdex")
+@named_rule(desc="Set up lambdex")
 async def setup_lambdex(lambdex: Lambdex) -> LambdexSetup:
     requirements_pex = await Get[Pex](
         PexRequest(
