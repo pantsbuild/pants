@@ -5,6 +5,7 @@ import functools
 from dataclasses import dataclass
 from typing import Any, List, Optional, Tuple, Union, cast
 
+from pants.backend.python.rules.importable_python_sources import ImportablePythonSources
 from pants.backend.python.rules.pex import (
     CreatePex,
     Pex,
@@ -12,7 +13,6 @@ from pants.backend.python.rules.pex import (
     PexRequirements,
 )
 from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
-from pants.backend.python.rules.prepare_chrooted_python_sources import ChrootedPythonSources
 from pants.backend.python.rules.pytest_coverage import (
     Coveragerc,
     CoveragercRequest,
@@ -155,7 +155,7 @@ async def setup_pytest_for_target(
         Get[Pex](CreatePex, create_pytest_pex_request),
         Get[Pex](CreatePexFromTargetClosure, create_requirements_pex_request),
         Get[Pex](CreatePex, create_test_runner_pex),
-        Get[ChrootedPythonSources](HydratedTargets(python_targets + resource_targets)),
+        Get[ImportablePythonSources](HydratedTargets(python_targets + resource_targets)),
         Get[SourceFiles](LegacySpecifiedSourceFilesRequest, specified_source_files_request),
     ]
     if run_coverage:
@@ -172,8 +172,8 @@ async def setup_pytest_for_target(
         *rest,
     ) = cast(
         Union[
-            Tuple[Pex, Pex, Pex, ChrootedPythonSources, SourceFiles],
-            Tuple[Pex, Pex, Pex, ChrootedPythonSources, SourceFiles, Coveragerc],
+            Tuple[Pex, Pex, Pex, ImportablePythonSources, SourceFiles],
+            Tuple[Pex, Pex, Pex, ImportablePythonSources, SourceFiles, Coveragerc],
         ],
         await MultiGet(requests),
     )

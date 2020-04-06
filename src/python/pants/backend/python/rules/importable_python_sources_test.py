@@ -5,9 +5,9 @@ from pathlib import PurePath
 from typing import List, Optional
 from unittest.mock import Mock
 
-from pants.backend.python.rules.prepare_chrooted_python_sources import ChrootedPythonSources
-from pants.backend.python.rules.prepare_chrooted_python_sources import (
-    rules as prepare_chrooted_python_sources_rules,
+from pants.backend.python.rules.importable_python_sources import ImportablePythonSources
+from pants.backend.python.rules.importable_python_sources import (
+    rules as importable_python_sources_rules,
 )
 from pants.build_graph.address import Address
 from pants.build_graph.files import Files
@@ -18,14 +18,10 @@ from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
 
-class PrepareChrootedPythonSourcesTest(TestBase):
+class ImportablePythonSourcesTest(TestBase):
     @classmethod
     def rules(cls):
-        return (
-            *super().rules(),
-            *prepare_chrooted_python_sources_rules(),
-            RootRule(HydratedTargets),
-        )
+        return (*super().rules(), *importable_python_sources_rules(), RootRule(HydratedTargets))
 
     def make_hydrated_target(
         self, *, source_paths: List[str], type_alias: Optional[str] = None,
@@ -50,7 +46,7 @@ class PrepareChrootedPythonSourcesTest(TestBase):
             source_paths=["src/python/project/resources/loose_file.txt"], type_alias=Files.alias(),
         )
         result = self.request_single_product(
-            ChrootedPythonSources,
+            ImportablePythonSources,
             Params(
                 HydratedTargets([target_with_init, target_without_init, files_target]),
                 create_options_bootstrapper(),

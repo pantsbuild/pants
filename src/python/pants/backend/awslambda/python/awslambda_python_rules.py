@@ -7,9 +7,9 @@ from pants.backend.awslambda.common.awslambda_common_rules import AWSLambdaTarge
 from pants.backend.awslambda.python.lambdex import Lambdex
 from pants.backend.python.rules import (
     download_pex_bin,
+    importable_python_sources,
     pex,
     pex_from_target_closure,
-    prepare_chrooted_python_sources,
 )
 from pants.backend.python.rules.pex import (
     CreatePex,
@@ -94,9 +94,9 @@ def rules():
         UnionRule(AWSLambdaTarget, PythonAWSLambdaAdaptor),
         subsystem_rule(Lambdex),
         *download_pex_bin.rules(),
+        *importable_python_sources.rules(),
         *pex.rules(),
         *pex_from_target_closure.rules(),
-        *prepare_chrooted_python_sources.rules(),
         *python_native_code.rules(),
         *strip_source_roots.rules(),
         *subprocess_environment.rules(),

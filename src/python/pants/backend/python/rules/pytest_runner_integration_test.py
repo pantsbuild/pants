@@ -8,9 +8,9 @@ from typing import List, Optional
 
 from pants.backend.python.rules import (
     download_pex_bin,
+    importable_python_sources,
     pex,
     pex_from_target_closure,
-    prepare_chrooted_python_sources,
     pytest_coverage,
     pytest_runner,
 )
@@ -112,7 +112,7 @@ class PythonTestRunnerIntegrationTest(TestBase):
             *determine_source_files.rules(),
             *pex.rules(),
             *pex_from_target_closure.rules(),
-            *prepare_chrooted_python_sources.rules(),
+            *importable_python_sources.rules(),
             *python_native_code.rules(),
             *strip_source_roots.rules(),
             *subprocess_environment.rules(),
