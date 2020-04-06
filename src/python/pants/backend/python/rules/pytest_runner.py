@@ -12,7 +12,7 @@ from pants.backend.python.rules.pex import (
     PexInterpreterConstraints,
     PexRequirements,
 )
-from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
+from pants.backend.python.rules.pex_from_targets import LegacyPexFromTargetsRequest
 from pants.backend.python.rules.pytest_coverage import (
     Coveragerc,
     CoveragercRequest,
@@ -108,7 +108,7 @@ async def setup_pytest_for_target(
         input_files_digest=plugin_file_digest,
     )
 
-    create_requirements_pex_request = CreatePexFromTargetClosure(
+    requirements_pex_request = LegacyPexFromTargetsRequest(
         addresses=test_addresses,
         output_filename="requirements.pex",
         include_source_files=False,
@@ -129,7 +129,7 @@ async def setup_pytest_for_target(
             ":".join(
                 (
                     create_pytest_pex_request.output_filename,
-                    create_requirements_pex_request.output_filename,
+                    requirements_pex_request.output_filename,
                 )
             ),
         ),
@@ -153,7 +153,7 @@ async def setup_pytest_for_target(
     # of MultiGet typing / API. Improve this since we should encourage full concurrency in general.
     requests: List[Get[Any]] = [
         Get[Pex](CreatePex, create_pytest_pex_request),
-        Get[Pex](CreatePexFromTargetClosure, create_requirements_pex_request),
+        Get[Pex](LegacyPexFromTargetsRequest, requirements_pex_request),
         Get[Pex](CreatePex, create_test_runner_pex),
         Get[ImportablePythonSources](HydratedTargets(python_targets + resource_targets)),
         Get[SourceFiles](LegacySpecifiedSourceFilesRequest, specified_source_files_request),

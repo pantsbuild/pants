@@ -5,12 +5,7 @@ from dataclasses import dataclass
 from typing import Optional, Tuple
 
 from pants.backend.python.rules.importable_python_sources import ImportablePythonSources
-from pants.backend.python.rules.pex import (
-    CreatePex,
-    Pex,
-    PexInterpreterConstraints,
-    PexRequirements,
-)
+from pants.backend.python.rules.pex import CreatePex, PexInterpreterConstraints, PexRequirements
 from pants.engine.addressable import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
@@ -21,7 +16,7 @@ from pants.python.python_setup import PythonSetup
 
 
 @dataclass(frozen=True)
-class CreatePexFromTargetClosure:
+class LegacyPexFromTargetsRequest:
     """Represents a request to create a PEX from the closure of a set of targets."""
 
     addresses: Addresses
@@ -34,9 +29,9 @@ class CreatePexFromTargetClosure:
 
 
 @rule(name="Create PEX from targets")
-async def create_pex_from_target_closure(
-    request: CreatePexFromTargetClosure, python_setup: PythonSetup
-) -> Pex:
+async def legacy_pex_from_targets(
+    request: LegacyPexFromTargetsRequest, python_setup: PythonSetup
+) -> CreatePex:
     transitive_hydrated_targets = await Get[TransitiveHydratedTargets](Addresses, request.addresses)
     all_targets = transitive_hydrated_targets.closure
 
@@ -65,7 +60,7 @@ async def create_pex_from_target_closure(
         adaptors=all_target_adaptors, additional_requirements=request.additional_requirements
     )
 
-    create_pex_request = CreatePex(
+    return CreatePex(
         output_filename=request.output_filename,
         requirements=requirements,
         interpreter_constraints=interpreter_constraints,
@@ -74,9 +69,6 @@ async def create_pex_from_target_closure(
         additional_args=request.additional_args,
     )
 
-    pex = await Get[Pex](CreatePex, create_pex_request)
-    return pex
-
 
 def rules():
-    return [create_pex_from_target_closure]
+    return [legacy_pex_from_targets]

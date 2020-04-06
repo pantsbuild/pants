@@ -9,7 +9,7 @@ from pants.backend.python.rules import (
     download_pex_bin,
     importable_python_sources,
     pex,
-    pex_from_target_closure,
+    pex_from_targets,
 )
 from pants.backend.python.rules.pex import (
     CreatePex,
@@ -17,7 +17,7 @@ from pants.backend.python.rules.pex import (
     PexInterpreterConstraints,
     PexRequirements,
 )
-from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
+from pants.backend.python.rules.pex_from_targets import LegacyPexFromTargetsRequest
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.addressable import Addresses
@@ -44,13 +44,13 @@ async def create_python_awslambda(
 ) -> CreatedAWSLambda:
     # TODO: We must enforce that everything is built for Linux, no matter the local platform.
     pex_filename = f"{lambda_tgt_adaptor.address.target_name}.pex"
-    pex_request = CreatePexFromTargetClosure(
+    pex_request = LegacyPexFromTargetsRequest(
         addresses=Addresses([lambda_tgt_adaptor.address]),
         entry_point=None,
         output_filename=pex_filename,
     )
 
-    pex = await Get[Pex](CreatePexFromTargetClosure, pex_request)
+    pex = await Get[Pex](LegacyPexFromTargetsRequest, pex_request)
     merged_input_files = await Get[Digest](
         DirectoriesToMerge(
             directories=(pex.directory_digest, lambdex_setup.requirements_pex.directory_digest)
@@ -96,7 +96,7 @@ def rules():
         *download_pex_bin.rules(),
         *importable_python_sources.rules(),
         *pex.rules(),
-        *pex_from_target_closure.rules(),
+        *pex_from_targets.rules(),
         *python_native_code.rules(),
         *strip_source_roots.rules(),
         *subprocess_environment.rules(),

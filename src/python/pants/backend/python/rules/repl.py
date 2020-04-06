@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import ClassVar
 
 from pants.backend.python.rules.pex import Pex
-from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
+from pants.backend.python.rules.pex_from_targets import LegacyPexFromTargetsRequest
 from pants.backend.python.subsystems.ipython import IPython
 from pants.engine.addressable import Addresses
 from pants.engine.legacy.graph import TransitiveHydratedTargets
@@ -30,11 +30,11 @@ async def run_python_repl(repl: PythonRepl) -> ReplBinary:
     python_addresses = Addresses(
         ht.adaptor.address for ht in targets.closure if isinstance(ht.adaptor, PythonTargetAdaptor)
     )
-    create_pex = CreatePexFromTargetClosure(
+    create_pex = LegacyPexFromTargetsRequest(
         addresses=python_addresses, output_filename="python-repl.pex",
     )
 
-    repl_pex = await Get[Pex](CreatePexFromTargetClosure, create_pex)
+    repl_pex = await Get[Pex](LegacyPexFromTargetsRequest, create_pex)
     return ReplBinary(digest=repl_pex.directory_digest, binary_name=repl_pex.output_filename,)
 
 
@@ -51,14 +51,14 @@ async def run_ipython_repl(repl: IPythonRepl, ipython: IPython) -> ReplBinary:
         ht.adaptor.address for ht in targets.closure if isinstance(ht.adaptor, PythonTargetAdaptor)
     )
 
-    create_pex = CreatePexFromTargetClosure(
+    create_pex = LegacyPexFromTargetsRequest(
         addresses=python_addresses,
         output_filename="ipython-repl.pex",
         entry_point=ipython.get_entry_point(),
         additional_requirements=ipython.get_requirement_specs(),
     )
 
-    repl_pex = await Get[Pex](CreatePexFromTargetClosure, create_pex)
+    repl_pex = await Get[Pex](LegacyPexFromTargetsRequest, create_pex)
     return ReplBinary(digest=repl_pex.directory_digest, binary_name=repl_pex.output_filename,)
 
 
