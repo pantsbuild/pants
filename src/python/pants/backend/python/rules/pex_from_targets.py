@@ -42,13 +42,13 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
     all_targets = transitive_targets.closure
 
     python_targets = []
-    python_requirement_targets = []
     resource_targets = []
+    python_requirement_fields = []
     for tgt in all_targets:
         if tgt.has_field(PythonSources):
             python_targets.append(tgt)
         if tgt.has_field(PythonRequirementsField):
-            python_requirement_targets.append(tgt)
+            python_requirement_fields.append(tgt[PythonRequirementsField])
         # NB: PythonRequirementsFileSources is a subclass of FilesSources. We filter it out so that
         # requirements.txt is not included in the PEX.
         if tgt.has_field(ResourcesSources) or (
@@ -71,8 +71,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
     merged_input_digest = await Get[Digest](DirectoriesToMerge(directories=tuple(input_digests)))
 
     requirements = PexRequirements.create_from_requirement_fields(
-        (tgt[PythonRequirementsField] for tgt in python_requirement_targets),
-        additional_requirements=request.additional_requirements,
+        python_requirement_fields, additional_requirements=request.additional_requirements
     )
 
     return PexRequest(
