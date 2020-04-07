@@ -30,10 +30,10 @@ from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.java.jar.jar_dependency_utils import M2Coordinate
 from pants.python.pex_build_util import has_python_requirements
+from pants.source.source_root import SourceRootConfig
 from pants.task.console_task import ConsoleTask
 from pants.util.memo import memoized_property
 from pants.util.ordered_set import OrderedSet
-from pants.source.source_root import SourceRootConfig
 
 
 class SourceRootTypes:

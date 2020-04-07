@@ -418,6 +418,7 @@ class ExportTest(ConsoleTaskTestBase):
                 },
             ],
             "scope": "default",
+            "source_root": "project_info:jvm_target",
             "target_type": "SOURCE",
             "transitive": True,
             "pants_target_type": "scala_library",
