@@ -47,7 +47,7 @@ from pants.engine.legacy.structs import (
 )
 from pants.engine.objects import Collection
 from pants.engine.parser import HydratedStruct
-from pants.engine.rules import RootRule, rule
+from pants.engine.rules import RootRule, UnionMembership, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
     Dependencies,
@@ -632,7 +632,9 @@ async def hydrate_target(hydrated_struct: HydratedStruct) -> HydratedTarget:
 
 @rule
 async def resolve_target(
-    hydrated_struct: HydratedStruct, registered_target_types: RegisteredTargetTypes
+    hydrated_struct: HydratedStruct,
+    registered_target_types: RegisteredTargetTypes,
+    union_membership: UnionMembership,
 ) -> WrappedTarget:
     kwargs = hydrated_struct.value.kwargs().copy()
     type_alias = kwargs.pop("type_alias")
@@ -667,6 +669,17 @@ async def resolve_target(
             f"Target type {repr(type_alias)} is not recognized. All valid target types: "
             f"{sorted(registered_target_types.aliases)}.",
         )
+
+    # Not every target type has the Dependencies field registered, but the StructWithDependencies
+    # code means that `kwargs` will always have an entry. We must remove `dependencies` from
+    # `kwargs` for target types without the value, otherwise we'll get an "unrecognized field"
+    # error. But, we also need to be careful to error if the user did explicitly specify
+    # `dependencies` in the BUILD file.
+    if kwargs["dependencies"] is None and not target_type.class_has_field(
+        Dependencies, union_membership=union_membership
+    ):
+        kwargs.pop("dependencies")
+
     return WrappedTarget(target_type(kwargs, address=address))
 
 
