@@ -149,8 +149,8 @@ async def setup(
     return Setup(process_request)
 
 
-@named_rule(name="black_fmt", desc="Format using Black")
-async def fmt(formatter: BlackFormatter, black: Black) -> FmtResult:
+@named_rule(desc="Format using Black")
+async def black_fmt(formatter: BlackFormatter, black: Black) -> FmtResult:
     if black.options.skip:
         return FmtResult.noop()
     setup = await Get[Setup](SetupRequest(formatter, check_only=False))
@@ -158,8 +158,8 @@ async def fmt(formatter: BlackFormatter, black: Black) -> FmtResult:
     return FmtResult.from_execute_process_result(result)
 
 
-@named_rule(name="black_lint", desc="Lint using Black")
-async def lint(formatter: BlackFormatter, black: Black) -> LintResult:
+@named_rule(desc="Lint using Black")
+async def black_lint(formatter: BlackFormatter, black: Black) -> LintResult:
     if black.options.skip:
         return LintResult.noop()
     setup = await Get[Setup](SetupRequest(formatter, check_only=True))
@@ -170,8 +170,8 @@ async def lint(formatter: BlackFormatter, black: Black) -> LintResult:
 def rules():
     return [
         setup,
-        fmt,
-        lint,
+        black_fmt,
+        black_lint,
         subsystem_rule(Black),
         UnionRule(PythonFormatter, BlackFormatter),
         UnionRule(Linter, BlackFormatter),

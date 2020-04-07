@@ -44,8 +44,8 @@ def generate_args(*, specified_source_files: SourceFiles, flake8: Flake8) -> Tup
     return tuple(args)
 
 
-@named_rule(name="flake8_lint", desc="Lint using Flake8")
-async def lint(
+@named_rule(desc="Lint using Flake8")
+async def flake8_lint(
     linter: Flake8Linter,
     flake8: Flake8,
     python_setup: PythonSetup,
@@ -121,7 +121,7 @@ async def lint(
 
 def rules():
     return [
-        lint,
+        flake8_lint,
         subsystem_rule(Flake8),
         UnionRule(Linter, Flake8Linter),
         *download_pex_bin.rules(),

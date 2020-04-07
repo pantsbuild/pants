@@ -126,8 +126,10 @@ async def setup(
     return Setup(process_request)
 
 
-@named_rule(name="docformatter_fmt", desc="Format Python docstrings with docformatter")
-async def fmt(formatter: DocformatterFormatter, docformatter: Docformatter) -> FmtResult:
+@named_rule(desc="Format Python docstrings with docformatter")
+async def docformatter_fmt(
+    formatter: DocformatterFormatter, docformatter: Docformatter
+) -> FmtResult:
     if docformatter.options.skip:
         return FmtResult.noop()
     setup = await Get[Setup](SetupRequest(formatter, check_only=False))
@@ -135,8 +137,10 @@ async def fmt(formatter: DocformatterFormatter, docformatter: Docformatter) -> F
     return FmtResult.from_execute_process_result(result)
 
 
-@named_rule(name="docformatter_lint", desc="Lint Python docstrings with docformatter")
-async def lint(formatter: DocformatterFormatter, docformatter: Docformatter) -> LintResult:
+@named_rule(desc="Lint Python docstrings with docformatter")
+async def docformatter_lint(
+    formatter: DocformatterFormatter, docformatter: Docformatter
+) -> LintResult:
     if docformatter.options.skip:
         return LintResult.noop()
     setup = await Get[Setup](SetupRequest(formatter, check_only=True))
@@ -147,8 +151,8 @@ async def lint(formatter: DocformatterFormatter, docformatter: Docformatter) -> 
 def rules():
     return [
         setup,
-        fmt,
-        lint,
+        docformatter_fmt,
+        docformatter_lint,
         subsystem_rule(Docformatter),
         UnionRule(PythonFormatter, DocformatterFormatter),
         UnionRule(Linter, DocformatterFormatter),

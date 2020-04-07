@@ -142,8 +142,8 @@ async def setup(
     return Setup(process_request)
 
 
-@named_rule(name="isort_fmt", desc="Format using isort")
-async def fmt(formatter: IsortFormatter, isort: Isort) -> FmtResult:
+@named_rule(desc="Format using isort")
+async def isort_fmt(formatter: IsortFormatter, isort: Isort) -> FmtResult:
     if isort.options.skip:
         return FmtResult.noop()
     setup = await Get[Setup](SetupRequest(formatter, check_only=False))
@@ -151,8 +151,8 @@ async def fmt(formatter: IsortFormatter, isort: Isort) -> FmtResult:
     return FmtResult.from_execute_process_result(result)
 
 
-@named_rule(name="isort_lint", desc="Lint using isort")
-async def lint(formatter: IsortFormatter, isort: Isort) -> LintResult:
+@named_rule(desc="Lint using isort")
+async def isort_lint(formatter: IsortFormatter, isort: Isort) -> LintResult:
     if isort.options.skip:
         return LintResult.noop()
     setup = await Get[Setup](SetupRequest(formatter, check_only=True))
@@ -163,8 +163,8 @@ async def lint(formatter: IsortFormatter, isort: Isort) -> LintResult:
 def rules():
     return [
         setup,
-        fmt,
-        lint,
+        isort_fmt,
+        isort_lint,
         subsystem_rule(Isort),
         UnionRule(PythonFormatter, IsortFormatter),
         UnionRule(Linter, IsortFormatter),

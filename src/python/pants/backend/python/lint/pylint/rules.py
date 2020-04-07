@@ -44,8 +44,8 @@ def generate_args(*, specified_source_files: SourceFiles, pylint: Pylint) -> Tup
     return tuple(args)
 
 
-@named_rule(name="pylint_lint", desc="Lint using Pylint")
-async def lint(
+@named_rule(desc="Lint using Pylint")
+async def pylint_lint(
     linter: PylintLinter,
     pylint: Pylint,
     python_setup: PythonSetup,
@@ -131,7 +131,7 @@ async def lint(
 
 def rules():
     return [
-        lint,
+        pylint_lint,
         subsystem_rule(Pylint),
         UnionRule(Linter, PylintLinter),
         *download_pex_bin.rules(),

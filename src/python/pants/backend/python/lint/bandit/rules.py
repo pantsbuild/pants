@@ -44,8 +44,8 @@ def generate_args(*, specified_source_files: SourceFiles, bandit: Bandit) -> Tup
     return tuple(args)
 
 
-@named_rule(name="bandit_lint", desc="Lint using Bandit")
-async def lint(
+@named_rule(desc="Lint using Bandit")
+async def bandit_lint(
     linter: BanditLinter,
     bandit: Bandit,
     python_setup: PythonSetup,
@@ -121,7 +121,7 @@ async def lint(
 
 def rules():
     return [
-        lint,
+        bandit_lint,
         subsystem_rule(Bandit),
         UnionRule(Linter, BanditLinter),
         *download_pex_bin.rules(),
