@@ -23,5 +23,5 @@ def register_goals():
     task(name="protoc", action=ProtobufGen).install("gen")
 
 
-def target2():
+def targets2():
     return [JavaProtobufLibrary]
