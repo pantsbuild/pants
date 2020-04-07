@@ -49,7 +49,7 @@ class Fib:
     val: int
 
 
-@named_rule(name="fib")
+@named_rule
 async def fib(n: int) -> Fib:
     if n < 2:
         return Fib(n)
@@ -96,7 +96,7 @@ class Omega:
     pass
 
 
-@named_rule(name="rule_one")
+@named_rule(canonical_name="rule_one")
 async def rule_one_function(i: Input) -> Beta:
     """This rule should be the first one executed by the engine, and thus have no parent."""
     a = Alpha()

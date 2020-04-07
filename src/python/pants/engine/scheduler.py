@@ -187,9 +187,10 @@ class Scheduler:
             self._native.lib.tasks_add_select(tasks, self._to_type(selector))
 
         anno = rule.annotations
-        if anno.name:
+        if anno.canonical_name:
+            name = anno.canonical_name
             desc = anno.desc if anno.desc else ""
-            self._native.lib.tasks_add_display_info(tasks, anno.name.encode(), desc.encode())
+            self._native.lib.tasks_add_display_info(tasks, name.encode(), desc.encode())
 
         def add_get_edge(product, subject):
             self._native.lib.tasks_add_get(tasks, self._to_type(product), self._to_type(subject))

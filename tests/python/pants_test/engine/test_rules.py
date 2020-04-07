@@ -290,16 +290,16 @@ class RuleArgumentAnnotationTest(unittest.TestCase):
 
         self.assertIsNotNone(a_named_rule.rule)
         annotations = a_named_rule.rule.annotations
-        self.assertEqual(annotations.name, "a_named_rule")
+        self.assertEqual(annotations.canonical_name, "a_named_rule")
         self.assertEqual(annotations.desc, None)
 
-        @named_rule(name="something_different", desc="Human readable desc")
+        @named_rule(canonical_name="something_different", desc="Human readable desc")
         def another_named_rule(a: int, b: str) -> bool:
             return False
 
         self.assertIsNotNone(a_named_rule.rule)
         annotations = another_named_rule.rule.annotations
-        self.assertEqual(annotations.name, "something_different")
+        self.assertEqual(annotations.canonical_name, "something_different")
         self.assertEqual(annotations.desc, "Human readable desc")
 
     def test_bogus_rules(self):
@@ -325,15 +325,15 @@ class RuleArgumentAnnotationTest(unittest.TestCase):
         def some_goal_rule() -> Example:
             return Example(exit_code=0)
 
-        name = some_goal_rule.rule.annotations.name
+        name = some_goal_rule.rule.annotations.canonical_name
         self.assertEqual(name, "example")
 
     def test_can_override_goal_rule_name(self):
-        @goal_rule(name="some_other_name")
+        @goal_rule(canonical_name="some_other_name")
         def some_goal_rule() -> Example:
             return Example(exit_code=0)
 
-        name = some_goal_rule.rule.annotations.name
+        name = some_goal_rule.rule.annotations.canonical_name
         self.assertEqual(name, "some_other_name")
 
 

@@ -22,7 +22,7 @@ from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 @dataclass(frozen=True)
 class RuleAnnotations:
-    name: Optional[str] = None
+    canonical_name: Optional[str] = None
     desc: Optional[str] = None
 
 
@@ -166,11 +166,13 @@ def _make_rule(
         # Register dependencies for @goal_rule/Goal.
         dependency_rules = (subsystem_rule(return_type.subsystem_cls),) if is_goal_cls else None
 
-        # Set a default name for Goal classes if one is not explicitly provided
-        effective_name = annotations.name
+        # Set a default canonical name if one is not explicitly provided. For Goal classes
+        # this is the name of the Goal; for other named ruled this is the __name__ of the function
+        # that implements it.
+        effective_name = annotations.canonical_name
         if effective_name is None:
             effective_name = return_type.name if is_goal_cls else func.__name__
-        normalized_annotations = RuleAnnotations(name=effective_name, desc=annotations.desc)
+        normalized_annotations = RuleAnnotations(canonical_name=effective_name, desc=annotations.desc)
 
         # Set our own custom `__line_number__` dunder so that the engine may visualize the line number.
         func.__line_number__ = func.__code__.co_firstlineno
@@ -222,7 +224,7 @@ def _ensure_type_annotation(
     return type_annotation
 
 
-PUBLIC_RULE_DECORATOR_ARGUMENTS = {"name", "desc"}
+PUBLIC_RULE_DECORATOR_ARGUMENTS = {"canonical_name", "desc"}
 # We don't want @rule-writers to use 'cacheable' as a kwarg directly, but rather
 # set it implicitly based on whether the rule annotation is @rule or @goal_rule.
 # So we leave it out of PUBLIC_RULE_DECORATOR_ARGUMENTS.
@@ -236,14 +238,14 @@ def rule_decorator(*args, **kwargs) -> Callable:
             f"type-annotated. Given {args}."
         )
 
-    name: Optional[str] = kwargs.get("name")
+    canonical_name: Optional[str] = kwargs.get("canonical_name")
     desc: Optional[str] = kwargs.get("desc")
 
     if kwargs.get("named_rule"):
-        annotations = RuleAnnotations(name=name, desc=desc)
+        annotations = RuleAnnotations(canonical_name=canonical_name, desc=desc)
     else:
         annotations = DEFAULT_RULE_ANNOTATIONS
-        if any(x is not None for x in (name, desc)):
+        if any(x is not None for x in (canonical_name, desc)):
             raise UnrecognizedRuleArgument(
                 f"@rules that are not @named_rules or @goal_rules do not accept keyword arguments"
             )
