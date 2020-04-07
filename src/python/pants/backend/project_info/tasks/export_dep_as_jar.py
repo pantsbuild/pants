@@ -82,6 +82,13 @@ class ExportDepAsJar(ConsoleTask):
             "This option will be going away to ensure that Pants always does the right "
             "thing.",
         )
+        register(
+            "--respect-strict-deps",
+            type=bool,
+            default=True,
+            help="If true, strict deps are respected like the JVM compile task; otherwise it is "
+            "ignored, and this can be useful as a workaround or for debugging purposes.",
+        )
 
     @property
     def act_transitively(self):
@@ -438,8 +445,10 @@ class ExportDepAsJar(ConsoleTask):
                 library_entry["sources"] = jarred_sources.name
         return library_entry
 
-    @staticmethod
-    def _is_strict_deps(target: Target) -> bool:
+    def _is_strict_deps(self, target: Target) -> bool:
+        if not self.get_options().respect_strict_deps:
+            return False
+
         return isinstance(
             target, JvmTarget
         ) and DependencyContext.global_instance().defaulted_property(target, "strict_deps")
