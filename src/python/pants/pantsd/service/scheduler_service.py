@@ -5,6 +5,7 @@ import logging
 import os
 import queue
 import threading
+import time
 from typing import List, Optional, Set
 
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
@@ -26,6 +27,7 @@ class SchedulerService(PantsService):
     """
 
     QUEUE_SIZE = 64
+    INVALIDATION_WATCHER_LIVENESS_CHECK_INTERVAL = 1
 
     def __init__(
         self,
@@ -180,6 +182,7 @@ class SchedulerService(PantsService):
         # The first watchman event for all_files is a listing of all files - ignore it.
         if (
             not is_initial_event
+            and self._fs_event_service is not None
             and subscription == self._fs_event_service.PANTS_ALL_FILES_SUBSCRIPTION_NAME
         ):
             self._handle_batch_event(files)
@@ -193,14 +196,23 @@ class SchedulerService(PantsService):
 
         self._event_queue.task_done()
 
+    def _check_invalidation_watcher_liveness(self):
+        time.sleep(self.INVALIDATION_WATCHER_LIVENESS_CHECK_INTERVAL)
+        if not self._scheduler.check_invalidation_watcher_liveness():
+            # Watcher failed for some reason
+            self._logger.critical(
+                "The graph invalidation watcher failed, so we are shutting down. Check the pantsd.log for details"
+            )
+            self.terminate()
+
     def prepare_graph(self, options: Options) -> LegacyGraphSession:
         # If any nodes exist in the product graph, wait for the initial watchman event to avoid
         # racing watchman startup vs invalidation events.
-        graph_len = self._scheduler.graph_len()
-        if graph_len > 0:
-            if self._fs_event_service is not None:
-                self._logger.debug(f"graph len was {graph_len}, waiting for initial watchman event")
-                self._watchman_is_running.wait()
+        if self._fs_event_service is not None and self._scheduler.graph_len() > 0:
+            self._logger.debug(
+                f"fs event service is running and graph_len > 0: waiting for initial watchman event"
+            )
+            self._watchman_is_running.wait()
 
         global_options = options.for_global_scope()
         build_id = RunTracker.global_instance().run_id
@@ -276,7 +288,10 @@ class SchedulerService(PantsService):
     def run(self):
         """Main service entrypoint."""
         while not self._state.is_terminating:
-            self._process_event_queue()
+            if self._fs_event_service is not None:
+                self._process_event_queue()
+            else:
+                self._check_invalidation_watcher_liveness()
             self._state.maybe_pause()
 
 

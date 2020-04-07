@@ -78,83 +78,15 @@ impl InvalidationWatcher {
             )
           })?
       }
+    }
 
-      thread::spawn(move || {
-        logging::set_thread_destination(logging::Destination::Pantsd);
-        loop {
-          let event_res = watch_receiver.recv_timeout(Duration::from_millis(100));
-          let graph = if let Some(g) = graph.upgrade() {
-            g
-          } else {
-            // The Graph has been dropped: we're done.
-            break;
-          };
-          match event_res {
-            Ok(Ok(ev)) => {
-              let paths: HashSet<_> = ev
-                .paths
-                .into_iter()
-                .filter_map(|path| {
-                  // relativize paths to build root.
-                  let path_relative_to_build_root = if path.starts_with(&canonical_build_root) {
-                    // Unwrapping is fine because we check that the path starts with
-                    // the build root above.
-                    path.strip_prefix(&canonical_build_root).unwrap().into()
-                  } else {
-                    path
-                  };
-                  // To avoid having to stat paths for events we will eventually ignore we "lie" to the ignorer
-                  // to say that no path is a directory, they could be if someone chmod's or creates a dir.
-                  // This maintains correctness by ensuring that at worst we have false negative events, where a directory
-                  // only glob (one that ends in `/` ) was supposed to ignore a directory path, but didn't because we claimed it was a file. That
-                  // directory path will be used to invalidate nodes, but won't invalidate anything because its path is somewhere
-                  // out of our purview.
-                  if ignorer.is_ignored_or_child_of_ignored_path(
-                    &path_relative_to_build_root,
-                    /* is_dir */ false,
-                  ) {
-                    None
-                  } else {
-                    Some(path_relative_to_build_root)
-                  }
-                })
-                .map(|path_relative_to_build_root| {
-                  let mut paths_to_invalidate: Vec<PathBuf> = vec![];
-                  if let Some(parent_dir) = path_relative_to_build_root.parent() {
-                    paths_to_invalidate.push(parent_dir.to_path_buf());
-                  }
-                  paths_to_invalidate.push(path_relative_to_build_root);
-                  paths_to_invalidate
-                })
-                .flatten()
-                .collect();
-              // Only invalidate stuff if we have paths that weren't filtered out by gitignore.
-              if !paths.is_empty() {
-                debug!("notify invalidating {:?} because of {:?}", paths, ev.kind);
-                InvalidationWatcher::invalidate(&graph, &paths, "notify");
-              };
-            }
-            Ok(Err(err)) => {
-              if let notify::ErrorKind::PathNotFound = err.kind {
-                warn!("Path(s) did not exist: {:?}", err.paths);
-                continue;
-              } else {
-                error!("File watcher failing with: {}", err);
-                break;
-              }
-            }
-            Err(RecvTimeoutError::Timeout) => continue,
-            Err(RecvTimeoutError::Disconnected) => {
-              // The Watcher is gone: we're done.
-              break;
-            }
-          };
-        }
-        debug!("Watch thread exiting.");
-        // Signal that we're exiting (which we would also do by just dropping the channel).
-        let _ = thread_liveness_sender.send(());
-      });
-    };
+    InvalidationWatcher::start_background_thread(
+      graph,
+      ignorer,
+      canonical_build_root,
+      thread_liveness_sender,
+      watch_receiver,
+    );
 
     Ok(InvalidationWatcher {
       watcher: Arc::new(Mutex::new(watcher)),
@@ -162,6 +94,101 @@ impl InvalidationWatcher {
       liveness: thread_liveness_receiver,
       enabled,
     })
+  }
+
+  // Public for testing purposes.
+  pub fn start_background_thread(
+    graph: Weak<Graph<NodeKey>>,
+    ignorer: Arc<GitignoreStyleExcludes>,
+    canonical_build_root: PathBuf,
+    liveness_sender: crossbeam_channel::Sender<()>,
+    watch_receiver: Receiver<notify::Result<notify::Event>>,
+  ) {
+    thread::spawn(move || {
+      logging::set_thread_destination(logging::Destination::Pantsd);
+      loop {
+        let event_res = watch_receiver.recv_timeout(Duration::from_millis(10));
+        let graph = if let Some(g) = graph.upgrade() {
+          g
+        } else {
+          // The Graph has been dropped: we're done.
+          break;
+        };
+        match event_res {
+          Ok(Ok(ev)) => {
+            let paths: HashSet<_> = ev
+              .paths
+              .into_iter()
+              .filter_map(|path| {
+                // relativize paths to build root.
+                let path_relative_to_build_root = if path.starts_with(&canonical_build_root) {
+                  // Unwrapping is fine because we check that the path starts with
+                  // the build root above.
+                  path.strip_prefix(&canonical_build_root).unwrap().into()
+                } else {
+                  path
+                };
+                // To avoid having to stat paths for events we will eventually ignore we "lie" to the ignorer
+                // to say that no path is a directory, they could be if someone chmod's or creates a dir.
+                // This maintains correctness by ensuring that at worst we have false negative events, where a directory
+                // only glob (one that ends in `/` ) was supposed to ignore a directory path, but didn't because we claimed it was a file. That
+                // directory path will be used to invalidate nodes, but won't invalidate anything because its path is somewhere
+                // out of our purview.
+                if ignorer.is_ignored_or_child_of_ignored_path(
+                  &path_relative_to_build_root,
+                  /* is_dir */ false,
+                ) {
+                  None
+                } else {
+                  Some(path_relative_to_build_root)
+                }
+              })
+              .map(|path_relative_to_build_root| {
+                let mut paths_to_invalidate: Vec<PathBuf> = vec![];
+                if let Some(parent_dir) = path_relative_to_build_root.parent() {
+                  paths_to_invalidate.push(parent_dir.to_path_buf());
+                }
+                paths_to_invalidate.push(path_relative_to_build_root);
+                paths_to_invalidate
+              })
+              .flatten()
+              .collect();
+            // Only invalidate stuff if we have paths that weren't filtered out by gitignore.
+            if !paths.is_empty() {
+              debug!("notify invalidating {:?} because of {:?}", paths, ev.kind);
+              InvalidationWatcher::invalidate(&graph, &paths, "notify");
+            };
+          }
+          Ok(Err(err)) => {
+            if let notify::ErrorKind::PathNotFound = err.kind {
+              warn!("Path(s) did not exist: {:?}", err.paths);
+              continue;
+            } else {
+              error!("File watcher failing with: {}", err);
+              break;
+            }
+          }
+          Err(RecvTimeoutError::Timeout) => continue,
+          Err(RecvTimeoutError::Disconnected) => {
+            // The Watcher is gone: we're done.
+            break;
+          }
+        };
+      }
+      debug!("Watch thread exiting.");
+      // Signal that we're exiting (which we would also do by just dropping the channel).
+      let _ = liveness_sender.send(());
+    });
+  }
+
+  pub fn is_alive(&self) -> bool {
+    if let Ok(()) = self.liveness.try_recv() {
+      // The watcher background thread set the exit condition. Return false to signal that
+      // the watcher is not alive.
+      false
+    } else {
+      true
+    }
   }
 
   ///
