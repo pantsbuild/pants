@@ -88,7 +88,9 @@ class SchedulerService(PantsService):
             if self._invalidation_globs:
                 self._invalidating_snapshot = self._get_snapshot()
                 self._invalidating_files = self._invalidating_snapshot.files
-                self._logger.info("watching invalidating files: {}".format(self._invalidating_files))
+                self._logger.info(
+                    "watching invalidating files: {}".format(self._invalidating_files)
+                )
 
             if self._pantsd_pidfile:
                 self._fs_event_service.register_pidfile_handler(
@@ -178,7 +180,6 @@ class SchedulerService(PantsService):
         # The first watchman event for all_files is a listing of all files - ignore it.
         if (
             not is_initial_event
-            and self._fs_event_service is not None
             and subscription == self._fs_event_service.PANTS_ALL_FILES_SUBSCRIPTION_NAME
         ):
             self._handle_batch_event(files)
@@ -197,8 +198,9 @@ class SchedulerService(PantsService):
         # racing watchman startup vs invalidation events.
         graph_len = self._scheduler.graph_len()
         if graph_len > 0:
-            self._logger.debug(f"graph len was {graph_len}, waiting for initial watchman event")
-            self._watchman_is_running.wait()
+            if self._fs_event_service is not None:
+                self._logger.debug(f"graph len was {graph_len}, waiting for initial watchman event")
+                self._watchman_is_running.wait()
 
         global_options = options.for_global_scope()
         build_id = RunTracker.global_instance().run_id
