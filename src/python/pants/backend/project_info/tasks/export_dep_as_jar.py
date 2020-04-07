@@ -48,11 +48,6 @@ class FlatDependenciesInfo:
             compile_deps=FrozenOrderedSet(), runtime_deps=FrozenOrderedSet(),
         )
 
-    def with_single_taget(target: Target) -> "FlatDependenciesInfo":
-        return FlatDependenciesInfo(
-            compile_deps=FrozenOrderedSet({target}), runtime_deps=FrozenOrderedSet({target}),
-        )
-
     def __add__(self, other: "FlatDependenciesInfo") -> "FlatDependenciesInfo":
         return FlatDependenciesInfo(
             compile_deps=self.compile_deps.union(other.compile_deps),
@@ -282,6 +277,7 @@ class ExportDepAsJar(ConsoleTask):
             "targets": [],
             "source_dependencies_in_classpath": [],
             "compile_libraries": [],
+            "runtime_libraries": [],
             "roots": [],
             "id": current_target.id,
             "target_type": ExportDepAsJar._get_target_type(
@@ -338,11 +334,19 @@ class ExportDepAsJar(ConsoleTask):
         libraries_for_target = set(
             [self._jar_id(jar) for jar in iter_transitive_jars(current_target)]
         )
+        compile_libraries_for_target = libraries_for_target.copy()
         for dep in sorted(
             flat_non_modulizable_deps_for_modulizable_targets[current_target].compile_deps
         ):
-            libraries_for_target.update(_full_library_set_for_target(dep))
-        info["compile_libraries"].extend(libraries_for_target)
+            compile_libraries_for_target.update(_full_library_set_for_target(dep))
+        info["compile_libraries"].extend(compile_libraries_for_target)
+
+        runtime_libraries_for_target = libraries_for_target.copy()
+        for dep in sorted(
+            flat_non_modulizable_deps_for_modulizable_targets[current_target].runtime_deps
+        ):
+            runtime_libraries_for_target.update(_full_library_set_for_target(dep))
+        info["runtime_libraries"].extend(runtime_libraries_for_target)
 
         info["roots"] = [
             {
@@ -516,13 +520,13 @@ class ExportDepAsJar(ConsoleTask):
             dep_list: List[Target],
             field_accessor: Callable[[FlatDependenciesInfo], FrozenOrderedSet[Target]],
         ) -> FrozenOrderedSet[Target]:
-            aggregated_entries = OrderedSet()
+            aggregated_entries: OrderedSet[Target] = OrderedSet()
             for dep in dep_list:
                 dep_entry: FrozenOrderedSet[Target] = field_accessor(
                     flat_deps.get(dep, FlatDependenciesInfo.empty())
                 )
                 aggregated_entries.update(dep_entry.union({dep}))
-            return aggregated_entries
+            return FrozenOrderedSet(aggregated_entries)
 
         def insert_entry_for_target(target: Target) -> None:
             # Compile dependencies take into account strict_deps...

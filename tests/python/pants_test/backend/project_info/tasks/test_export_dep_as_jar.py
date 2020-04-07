@@ -624,7 +624,7 @@ class ExportDepAsJarTestSuiteOne(ExportDepAsJarTest):
             "org.apache:apache-jar:12.12.2012", result["targets"][spec]["compile_libraries"]
         )
 
-    def test_libraries_respect_strict_deps(self):
+    def test_compile_libraries_respect_strict_deps(self):
         enabled_spec = self.strict_deps_enabled.address.spec
         enabled_result = self.execute_export_json(enabled_spec)["targets"][enabled_spec]
         disabled_spec = self.strict_deps_disabled.address.spec
@@ -636,6 +636,19 @@ class ExportDepAsJarTestSuiteOne(ExportDepAsJarTest):
 
         assert transitive_dependency_library_entry in disabled_result["compile_libraries"]
         assert transitive_dependency_library_entry not in enabled_result["compile_libraries"]
+
+    def test_runtime_libraries_ignore_strict_deps(self):
+        enabled_spec = self.strict_deps_enabled.address.spec
+        enabled_result = self.execute_export_json(enabled_spec)["targets"][enabled_spec]
+        disabled_spec = self.strict_deps_disabled.address.spec
+        disabled_result = self.execute_export_json(disabled_spec)["targets"][disabled_spec]
+
+        # Both the targets under test transitively depend on this target
+        # which shouldn't be in the compile classpath, but it should be in the runtime_classpath
+        transitive_dependency_library_entry = self.jvm_target_with_sources.id
+
+        assert transitive_dependency_library_entry in disabled_result["runtime_libraries"]
+        assert transitive_dependency_library_entry in enabled_result["runtime_libraries"]
 
     def test_transitive_targets(self):
         # Address of the dependency that shouldn't appear in the strict deps case.
