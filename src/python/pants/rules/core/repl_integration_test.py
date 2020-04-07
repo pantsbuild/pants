@@ -5,7 +5,7 @@ from pants.backend.python.rules import (
     download_pex_bin,
     importable_python_sources,
     pex,
-    pex_from_target_closure,
+    pex_from_targets,
     repl,
 )
 from pants.backend.python.rules.repl import PythonRepl
@@ -32,7 +32,7 @@ class ReplTest(GoalRuleTestBase):
             *pex.rules(),
             *download_pex_bin.rules(),
             *importable_python_sources.rules(),
-            *pex_from_target_closure.rules(),
+            *pex_from_targets.rules(),
             *python_native_code.rules(),
             *strip_source_roots.rules(),
             *subprocess_environment.rules(),

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Optional, Tuple
 
 from pants.backend.python.rules.pex import Pex
-from pants.backend.python.rules.pex_from_target_closure import CreatePexFromTargetClosure
+from pants.backend.python.rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.rules.targets import (
     PexAlwaysWriteCache,
     PexEmitWarnings,
@@ -84,14 +84,14 @@ async def create_python_binary(config: PythonBinaryConfiguration) -> CreatedBina
         else:
             entry_point = None
 
-    request = CreatePexFromTargetClosure(
-        addresses=Addresses([config.address]),
-        entry_point=entry_point,
-        output_filename=f"{config.address.target_name}.pex",
-        additional_args=config.generate_additional_args(),
+    pex = await Get[Pex](
+        PexFromTargetsRequest(
+            addresses=Addresses([config.address]),
+            entry_point=entry_point,
+            output_filename=f"{config.address.target_name}.pex",
+            additional_args=config.generate_additional_args(),
+        )
     )
-
-    pex = await Get[Pex](CreatePexFromTargetClosure, request)
     return CreatedBinary(digest=pex.directory_digest, binary_name=pex.output_filename)
 
 

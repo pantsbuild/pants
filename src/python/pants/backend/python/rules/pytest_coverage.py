@@ -15,9 +15,9 @@ import pkg_resources
 
 from pants.backend.python.rules.inject_init import InitInjectedSnapshot, InjectInitRequest
 from pants.backend.python.rules.pex import (
-    CreatePex,
     Pex,
     PexInterpreterConstraints,
+    PexRequest,
     PexRequirements,
 )
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
@@ -236,7 +236,7 @@ async def setup_coverage(coverage: PytestCoverage) -> CoverageSetup:
     plugin_file_digest = await Get[Digest](InputFilesContent, get_coverage_plugin_input())
     output_pex_filename = "coverage.pex"
     requirements_pex = await Get[Pex](
-        CreatePex(
+        PexRequest(
             output_filename=output_pex_filename,
             requirements=PexRequirements(coverage.get_requirement_specs()),
             interpreter_constraints=PexInterpreterConstraints(

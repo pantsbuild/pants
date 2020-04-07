@@ -10,7 +10,10 @@ from pkg_resources import Requirement
 
 from pants.backend.python.rules.download_pex_bin import DownloadedPexBin
 from pants.backend.python.rules.hermetic_pex import HermeticPex
-from pants.backend.python.rules.targets import PythonInterpreterCompatibility
+from pants.backend.python.rules.targets import (
+    PythonInterpreterCompatibility,
+    PythonRequirementsField,
+)
 from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.fs import (
@@ -43,6 +46,18 @@ class PexRequirements:
 
     def __init__(self, requirements: Optional[Iterable[str]] = None) -> None:
         self.requirements = FrozenOrderedSet(sorted(requirements or ()))
+
+    @classmethod
+    def create_from_requirement_fields(
+        cls,
+        fields: Iterable[PythonRequirementsField],
+        *,
+        additional_requirements: Iterable[str] = (),
+    ) -> "PexRequirements":
+        field_requirements = {
+            str(python_req.requirement) for field in fields for python_req in field.value
+        }
+        return PexRequirements({*field_requirements, *additional_requirements})
 
     @classmethod
     def create_from_adaptors(
@@ -171,7 +186,7 @@ class PexInterpreterConstraints:
 
 
 @dataclass(frozen=True)
-class CreatePex:
+class PexRequest:
     """Represents a generic request to create a PEX from its inputs."""
 
     output_filename: str
@@ -221,7 +236,7 @@ class PexDebug:
 
 @rule(name="Create PEX")
 async def create_pex(
-    request: CreatePex,
+    request: PexRequest,
     pex_bin: DownloadedPexBin,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
@@ -332,7 +347,4 @@ async def create_pex(
 
 
 def rules():
-    return [
-        create_pex,
-        subsystem_rule(PythonSetup),
-    ]
+    return [create_pex, subsystem_rule(PythonSetup)]

@@ -8,9 +8,9 @@ from dataclasses import dataclass
 from typing import List, Set, Tuple
 
 from pants.backend.python.rules.pex import (
-    CreatePex,
     Pex,
     PexInterpreterConstraints,
+    PexRequest,
     PexRequirements,
 )
 from pants.backend.python.rules.setup_py_util import (
@@ -660,7 +660,7 @@ async def setup_setuptools(setuptools: Setuptools) -> SetuptoolsSetup:
     # Note that this pex has no entrypoint. We use it to run our generated setup.py, which
     # in turn imports from and invokes setuptools.
     requirements_pex = await Get[Pex](
-        CreatePex(
+        PexRequest(
             output_filename="setuptools.pex",
             requirements=PexRequirements(setuptools.get_requirement_specs()),
             interpreter_constraints=PexInterpreterConstraints(
