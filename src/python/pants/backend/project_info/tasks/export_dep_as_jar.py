@@ -318,7 +318,7 @@ class ExportDepAsJar(ConsoleTask):
             if isinstance(current_target, RuntimePlatformMixin):
                 # We ignore typing here because mypy doesn't behave well with multiple inheritance:
                 # ref: https://github.com/python/mypy/issues/3603
-                info["runtime_platform"] = current_target.runtime_platform.name  # type: [misc]
+                info["runtime_platform"] = current_target.runtime_platform.name  # type: ignore[misc]
 
         info["source_dependencies_in_classpath"] = self._compute_transitive_source_dependencies(
             current_target, info["targets"], modulizable_target_set
