@@ -4,10 +4,12 @@
 python_library(
   dependencies = [
     'src/python/pants/backend/codegen/thrift/lib',
+    'src/python/pants/backend/jvm/rules',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'src/python/pants/goal:task_registrar',
+    'src/python/pants/engine:target',
     'src/python/pants/option',
     'src/python/pants/subsystem',
     'src/python/pants/task',

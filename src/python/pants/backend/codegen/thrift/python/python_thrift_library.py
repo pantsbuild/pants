@@ -16,9 +16,6 @@ class PythonThriftLibrary(PythonTarget):
           namespace, beware https://issues.apache.org/jira/browse/THRIFT-515)
         :type sources: ``Fileset`` or list of strings. Paths are relative to the
           BUILD file's directory.
-        :param resources: non-Python resources, e.g. templates, keys, other data (it is
-          recommended that your application uses the pkgutil package to access these
-          resources in a .zip-module friendly way.)
         """
 
         super().__init__(**kwargs)

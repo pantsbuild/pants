@@ -7,6 +7,7 @@ python_library(
     'src/python/pants/backend/python/targets',
     'src/python/pants/base:exceptions',
     'src/python/pants/engine:fs',
+    'src/python/pants/engine:targets',
     'src/python/pants/goal:task_registrar',
     'src/python/pants/task',
   ],
