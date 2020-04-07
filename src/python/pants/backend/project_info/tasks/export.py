@@ -33,6 +33,7 @@ from pants.python.pex_build_util import has_python_requirements
 from pants.task.console_task import ConsoleTask
 from pants.util.memo import memoized_property
 from pants.util.ordered_set import OrderedSet
+from pants.source.source_root import SourceRootConfig
 
 
 class SourceRootTypes:
@@ -181,6 +182,7 @@ class ExportTask(ResolveRequirementsTaskBase, CoursierMixin):
         targets_map = {}
         resource_target_map = {}
         python_interpreter_targets_mapping = defaultdict(list)
+        source_roots = SourceRootConfig.global_instance().get_source_roots()
 
         if self.get_options().libraries:
             # NB(gmalmquist): This supports mocking the classpath_products in tests.
@@ -305,6 +307,9 @@ class ExportTask(ResolveRequirementsTaskBase, CoursierMixin):
 
             if classpath_products:
                 info["libraries"] = [self._jar_id(lib) for lib in target_libraries]
+
+            # Source root for the current target as provided by SourceRootConfig
+            info["source_root"] = source_roots.find_by_path(current_target.address.spec).path
             targets_map[current_target.address.spec] = info
 
         for target in targets:
