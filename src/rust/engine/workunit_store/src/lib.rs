@@ -55,7 +55,6 @@ pub struct StartedWorkUnit {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
 pub struct WorkunitMetadata {
   pub desc: Option<String>,
-  pub rule_type: Option<String>,
 }
 
 impl StartedWorkUnit {

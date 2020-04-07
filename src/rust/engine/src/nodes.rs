@@ -1058,14 +1058,13 @@ impl Node for NodeKey {
         let maybe_display_info = self.display_info();
 
         let desc = maybe_display_info.and_then(|di| di.desc.as_ref().cloned());
-        let rule_type = maybe_display_info.and_then(|di| di.rule_type.as_ref().cloned());
 
         StartedWorkUnit {
           name: node_name.to_string(),
           start_time: std::time::SystemTime::now(),
           span_id: span_id.clone(),
           parent_id,
-          metadata: WorkunitMetadata { desc, rule_type },
+          metadata: WorkunitMetadata { desc },
         }
       });
       let maybe_span_id = if user_facing_name.is_some() {

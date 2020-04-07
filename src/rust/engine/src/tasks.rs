@@ -210,7 +210,6 @@ pub struct Task {
 pub struct DisplayInfo {
   pub name: Option<String>,
   pub desc: Option<String>,
-  pub rule_type: Option<String>,
 }
 
 ///
@@ -335,7 +334,7 @@ impl Tasks {
       .push(Select::new(product));
   }
 
-  pub fn add_display_info(&mut self, name: String, desc: String, rule_type: String) {
+  pub fn add_display_info(&mut self, name: String, desc: String) {
     let mut task = self
       .preparing
       .as_mut()
@@ -343,7 +342,6 @@ impl Tasks {
     task.display_info = DisplayInfo {
       name: Some(name),
       desc: Some(desc),
-      rule_type: Some(rule_type),
     };
   }
 

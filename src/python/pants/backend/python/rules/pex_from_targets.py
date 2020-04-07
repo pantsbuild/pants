@@ -16,7 +16,7 @@ from pants.engine.addressable import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
 from pants.engine.legacy.structs import FilesAdaptor, PythonTargetAdaptor, ResourcesAdaptor
-from pants.engine.rules import RootRule, rule
+from pants.engine.rules import RootRule, named_rule
 from pants.engine.selectors import Get
 from pants.engine.target import Targets, TransitiveTargets
 from pants.python.python_setup import PythonSetup
@@ -57,7 +57,7 @@ class PexFromTargetsRequest:
         self.additional_input_files = additional_input_files
 
 
-@rule(name="Create a PEX from targets")
+@named_rule(desc="Create a PEX from targets")
 async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonSetup) -> PexRequest:
     transitive_targets = await Get[TransitiveTargets](Addresses, request.addresses)
     all_targets = transitive_targets.closure
@@ -119,7 +119,7 @@ class LegacyPexFromTargetsRequest:
     additional_input_files: Optional[Digest] = None
 
 
-@rule(name="Create PEX from targets")
+@named_rule(desc="Create PEX from targets")
 async def legacy_pex_from_targets(
     request: LegacyPexFromTargetsRequest, python_setup: PythonSetup
 ) -> PexRequest:

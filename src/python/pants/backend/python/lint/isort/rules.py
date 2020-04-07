@@ -21,7 +21,7 @@ from pants.engine.isolated_process import (
     ExecuteProcessResult,
     FallibleExecuteProcessResult,
 )
-from pants.engine.rules import NamedRuleType, UnionRule, named_rule, rule, subsystem_rule
+from pants.engine.rules import UnionRule, named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.custom_types import GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior
@@ -142,7 +142,7 @@ async def setup(
     return Setup(process_request)
 
 
-@named_rule(name="isort_fmt", desc="Format using isort", rule_type=NamedRuleType("format"))
+@named_rule(name="isort_fmt", desc="Format using isort")
 async def fmt(formatter: IsortFormatter, isort: Isort) -> FmtResult:
     if isort.options.skip:
         return FmtResult.noop()
@@ -151,7 +151,7 @@ async def fmt(formatter: IsortFormatter, isort: Isort) -> FmtResult:
     return FmtResult.from_execute_process_result(result)
 
 
-@named_rule(name="isort_lint", desc="Lint using isort", rule_type=NamedRuleType("lint"))
+@named_rule(name="isort_lint", desc="Lint using isort")
 async def lint(formatter: IsortFormatter, isort: Isort) -> LintResult:
     if isort.options.skip:
         return LintResult.noop()

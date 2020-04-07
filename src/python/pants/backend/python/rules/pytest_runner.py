@@ -224,7 +224,7 @@ async def setup_pytest_for_target(
     )
 
 
-@named_rule(desc="Run pytest", rule_type=NamedRuleType("test"))
+@named_rule(desc="Run pytest")
 async def run_python_test(
     config: PythonTestConfiguration,
     test_setup: TestTargetSetup,
@@ -254,7 +254,7 @@ async def run_python_test(
     return TestResult.from_fallible_execute_process_result(result, coverage_data=coverage_data)
 
 
-@named_rule(desc="Run pytest in an interactive process", rule_type=NamedRuleType("test"))
+@named_rule(desc="Run pytest in an interactive process")
 async def debug_python_test(test_setup: TestTargetSetup) -> TestDebugRequest:
     run_request = InteractiveProcessRequest(
         argv=(test_setup.test_runner_pex.output_filename, *test_setup.args),
