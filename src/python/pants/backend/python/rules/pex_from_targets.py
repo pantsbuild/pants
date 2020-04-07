@@ -16,7 +16,7 @@ from pants.engine.addressable import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
 from pants.engine.legacy.structs import FilesAdaptor, PythonTargetAdaptor, ResourcesAdaptor
-from pants.engine.rules import rule
+from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
 from pants.engine.target import Targets, TransitiveTargets
 from pants.python.python_setup import PythonSetup
@@ -140,4 +140,9 @@ async def legacy_pex_from_targets(
 
 
 def rules():
-    return [pex_from_targets, legacy_pex_from_targets]
+    return [
+        pex_from_targets,
+        RootRule(PexFromTargetsRequest),
+        legacy_pex_from_targets,
+        RootRule(LegacyPexFromTargetsRequest),
+    ]
