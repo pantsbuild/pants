@@ -50,7 +50,8 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         if tgt.has_field(PythonRequirementsField):
             python_requirement_fields.append(tgt[PythonRequirementsField])
         # NB: PythonRequirementsFileSources is a subclass of FilesSources. We filter it out so that
-        # requirements.txt is not included in the PEX.
+        # requirements.txt is not included in the PEX and so that irrelevant changes to it (e.g.
+        # whitespace changes) do not invalidate the PEX.
         if tgt.has_field(ResourcesSources) or (
             tgt.has_field(FilesSources) and not tgt.has_field(PythonRequirementsFileSources)
         ):
