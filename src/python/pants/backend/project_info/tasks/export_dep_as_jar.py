@@ -252,7 +252,7 @@ class ExportDepAsJar(ConsoleTask):
             # this means 'dependencies'
             "targets": [],
             "source_dependencies_in_classpath": [],
-            "libraries": [],
+            "compile_libraries": [],
             "roots": [],
             "id": current_target.id,
             "target_type": ExportDepAsJar._get_target_type(
@@ -311,7 +311,7 @@ class ExportDepAsJar(ConsoleTask):
         )
         for dep in sorted(flat_non_modulizable_deps_for_modulizable_targets[current_target]):
             libraries_for_target.update(_full_library_set_for_target(dep))
-        info["libraries"].extend(libraries_for_target)
+        info["compile_libraries"].extend(libraries_for_target)
 
         info["roots"] = [
             {
