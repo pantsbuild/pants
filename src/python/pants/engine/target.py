@@ -310,7 +310,6 @@ class Target(ABC):
         for alias, value in unhydrated_values.items():
             if alias not in aliases_to_field_types:
                 raise InvalidFieldException(
-                    address,
                     f"Unrecognized field `{alias}={value}` in target {address}. Valid fields for "
                     f"the target type `{self.alias}`: {sorted(aliases_to_field_types.keys())}.",
                 )

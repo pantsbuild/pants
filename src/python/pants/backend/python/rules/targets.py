@@ -385,10 +385,7 @@ class PythonRequirementsFile(Target):
     """A private, helper target type for requirements.txt files."""
 
     alias = "_python_requirements_file"
-    # TODO: fix handling of Dependencies. This target shouldn't actually have to register the
-    #  Dependencies field but we need to because StructWithDependencies will try always passing the
-    #  value to the Target constructor.
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, PythonRequirementsFileSources)
+    core_fields = (*COMMON_TARGET_FIELDS, PythonRequirementsFileSources)
 
 
 # -----------------------------------------------------------------------------------------------
