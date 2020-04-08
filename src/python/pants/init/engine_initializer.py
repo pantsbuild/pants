@@ -304,7 +304,7 @@ class EngineInitializer:
         """Construct and return the components necessary for LegacyBuildGraph construction."""
         build_root = get_buildroot()
         bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
-        use_gitignore = bootstrap_options.pants_use_gitignore
+        use_gitignore = bootstrap_options.pants_ignore_use_gitignore
 
         return EngineInitializer.setup_legacy_graph_extended(
             OptionsInitializer.compute_pants_ignore(build_root, bootstrap_options),

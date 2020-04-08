@@ -436,11 +436,11 @@ class GlobalOptions(Subsystem):
             "(e.g. BUILD file scanning, glob matching, etc). "
             "Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore). "
             "The `--pants-distdir` and `--pants-workdir` locations are inherently ignored."
-            "--pants-ignore can be used in tandem with --pants-use-gitignore, and any rules "
+            "--pants-ignore can be used in tandem with --pants-ignore-use-gitignore, and any rules "
             "specified here apply after rules specified in a .gitignore file.",
         )
         register(
-            "--pants-use-gitignore",
+            "--pants-ignore-use-gitignore",
             advanced=True,
             type=bool,
             default=True,
