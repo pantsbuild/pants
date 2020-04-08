@@ -1108,7 +1108,7 @@ class BundlesField(AsyncField):
 
     alias = "bundles"
     # TODO: What should this type be? Our goal is to get rid of `TargetAdaptor`, so
-    #  `BundleAdaptor` should likely go away.
+    #  `BundleAdaptor` should likely go away. This also results in a dependency cycle..
     sanitized_raw_value: Optional[Tuple[BundleAdaptor, ...]]
     default = None
 
