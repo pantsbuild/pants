@@ -10,12 +10,12 @@ files(
 # latter as the sentinel filename per https://github.com/pantsbuild/pants/pull/8105.
 files(
   name = 'build_root',
-  source = "BUILD_ROOT",
+  sources = ["BUILD_ROOT"],
 )
 
 files(
   name = 'build_tools',
-  source = 'BUILD.tools',
+  sources = ['BUILD.tools'],
   dependencies = [
     ':scalajs_3rdparty_directory',
   ],
@@ -23,12 +23,12 @@ files(
 
 files(
   name = 'gitignore',
-  source = '.gitignore',
+  sources = ['.gitignore'],
 )
 
 files(
   name = 'isort_cfg',
-  source = '.isort.cfg',
+  sources = ['.isort.cfg'],
 )
 
 files(
@@ -38,17 +38,17 @@ files(
 
 files(
   name = 'pants_toml',
-  source = 'pants.toml',
+  sources = ['pants.toml'],
 )
 
 files(
   name = 'pyproject',
-  source = 'pyproject.toml',
+  sources = ['pyproject.toml'],
 )
 
 # NB: This is used for integration tests. This is generated automatically via `./pants` and
 # `build-support/bin/bootstrap_pants_pex.sh`.
 files(
   name = 'pants_pex',
-  source = 'pants.pex',
+  sources = ['pants.pex'],
 )
