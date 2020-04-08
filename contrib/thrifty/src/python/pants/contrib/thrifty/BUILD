@@ -3,6 +3,10 @@
 
 python_library(
   sources=['java_thrifty_gen.py', 'java_thrifty_library.py'],
+  dependencies=[
+    "src/python/pants/backend/jvm/rules",
+    "src/python/pants/engine:target",
+  ],
   tags={"partially_type_checked"},
 )
 
