@@ -56,6 +56,8 @@ class PythonInterpreterCompatibility(StringOrStringSequenceField):
 COMMON_PYTHON_FIELDS = (
     *COMMON_TARGET_FIELDS,
     Dependencies,
+    # TODO(#9388): Only register the Provides field on PythonBinary and PythonLibrary, not things
+    #  like PythonTests.
     ProvidesField,
     PythonInterpreterCompatibility,
 )
