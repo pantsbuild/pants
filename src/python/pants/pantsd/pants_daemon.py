@@ -207,7 +207,7 @@ class PantsDaemon(FingerprintedProcessManager):
             """
             should_shutdown_after_run = bootstrap_options.shutdown_pantsd_after_run
             fs_event_service = (
-                FSEventService(watchman, build_root,) if bootstrap_options.enable_watchman else None
+                FSEventService(watchman, build_root,) if bootstrap_options.watchman_enable else None
             )
 
             pidfile_absolute = PantsDaemon.metadata_file_path(

@@ -36,7 +36,7 @@ class WatchmanLauncher:
             bootstrap_options.watchman_startup_timeout,
             bootstrap_options.watchman_socket_timeout,
             bootstrap_options.watchman_socket_path,
-            bootstrap_options.enable_watchman,
+            bootstrap_options.watchman_enable,
             bootstrap_options.pants_subprocessdir,
         )
 
@@ -48,7 +48,7 @@ class WatchmanLauncher:
         watchman_supportdir,
         startup_timeout,
         socket_timeout,
-        enable_watchman,
+        watchman_enable,
         socket_path_override=None,
         metadata_base_dir=None,
     ):
@@ -59,7 +59,7 @@ class WatchmanLauncher:
         :param watchman_supportdir: The supportdir for BinaryUtil.
         :param socket_timeout: The watchman client socket timeout (in seconds).
         :param socket_path_override: The overridden target path of the watchman socket, if any.
-        :param enable_watchman: Whether to start watchman when asked to maybe launch.
+        :param watchman_enable: Whether to start watchman when asked to maybe launch.
         :param metadata_base_dir: The ProcessManager metadata base directory.
         """
         self._binary_util = binary_util
@@ -68,7 +68,7 @@ class WatchmanLauncher:
         self._startup_timeout = startup_timeout
         self._socket_timeout = socket_timeout
         self._socket_path_override = socket_path_override
-        self._enable_watchman = enable_watchman
+        self._watchman_enable = watchman_enable
         self._log_level = log_level
         self._logger = logging.getLogger(__name__)
         self._metadata_base_dir = metadata_base_dir
@@ -97,7 +97,7 @@ class WatchmanLauncher:
         )
 
     def maybe_launch(self):
-        if self._enable_watchman and not self.watchman.is_alive():
+        if self._watchman_enable and not self.watchman.is_alive():
             self._logger.debug("launching watchman")
             try:
                 self.watchman.launch()
@@ -115,8 +115,8 @@ class WatchmanLauncher:
             self.maybe_terminate()
 
     def maybe_terminate(self):
-        if not self._enable_watchman and self.watchman.is_alive():
-            self._logger.debug("watchman was running, but will be killed because it was disabled")
+        if not self._watchman_enable and self.watchman.is_alive():
+            self._logger.info("Watchman was running, but will be killed because it was disabled.")
             self.terminate()
 
     def terminate(self):

@@ -646,7 +646,7 @@ class GlobalOptions(Subsystem):
 
         # Watchman options.
         register(
-            "--enable-watchman",
+            "--watchman-enable",
             type=bool,
             advanced=True,
             default=True,
