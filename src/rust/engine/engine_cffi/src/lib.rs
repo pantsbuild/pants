@@ -614,6 +614,11 @@ pub extern "C" fn graph_invalidate_all_paths(scheduler_ptr: *mut Scheduler) -> u
 }
 
 #[no_mangle]
+pub extern "C" fn check_invalidation_watcher_liveness(scheduler_ptr: *mut Scheduler) -> bool {
+  with_scheduler(scheduler_ptr, |scheduler| scheduler.core.watcher.is_alive())
+}
+
+#[no_mangle]
 pub extern "C" fn graph_len(scheduler_ptr: *mut Scheduler) -> u64 {
   with_scheduler(scheduler_ptr, |scheduler| scheduler.core.graph.len() as u64)
 }

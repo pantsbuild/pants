@@ -9,7 +9,7 @@ import time
 import traceback
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import TYPE_CHECKING, Any, Dict, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Tuple, cast
 
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE
@@ -241,6 +241,9 @@ class Scheduler:
 
     def invalidate_all_files(self):
         return self._native.lib.graph_invalidate_all_paths(self._scheduler)
+
+    def check_invalidation_watcher_liveness(self) -> bool:
+        return cast(bool, self._native.lib.check_invalidation_watcher_liveness(self._scheduler))
 
     def graph_len(self):
         return self._native.lib.graph_len(self._scheduler)

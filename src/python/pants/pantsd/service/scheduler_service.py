@@ -6,6 +6,7 @@ import os
 import queue
 import sys
 import threading
+import time
 from typing import List, Optional, Set, Tuple, cast
 
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
@@ -28,11 +29,12 @@ class SchedulerService(PantsService):
     """
 
     QUEUE_SIZE = 64
+    INVALIDATION_WATCHER_LIVENESS_CHECK_INTERVAL = 1
 
     def __init__(
         self,
         *,
-        fs_event_service: FSEventService,
+        fs_event_service: Optional[FSEventService],
         legacy_graph_scheduler: LegacyGraphScheduler,
         build_root: str,
         invalidation_globs: List[str],
@@ -79,21 +81,25 @@ class SchedulerService(PantsService):
         """Service setup."""
         super().setup(services)
         # Register filesystem event handlers on an FSEventService instance.
-        self._fs_event_service.register_all_files_handler(
-            self._enqueue_fs_event, self._fs_event_service.PANTS_ALL_FILES_SUBSCRIPTION_NAME
-        )
+        if self._fs_event_service is not None:
+            self._fs_event_service.register_all_files_handler(
+                self._enqueue_fs_event, self._fs_event_service.PANTS_ALL_FILES_SUBSCRIPTION_NAME
+            )
 
         # N.B. We compute the invalidating fileset eagerly at launch with an assumption that files
         # that exist at startup are the only ones that can affect the running daemon.
-        if self._invalidation_globs:
-            self._invalidating_snapshot = self._get_snapshot()
-            self._invalidating_files = self._invalidating_snapshot.files
-            self._logger.info("watching invalidating files: {}".format(self._invalidating_files))
+        if self._fs_event_service is not None:
+            if self._invalidation_globs:
+                self._invalidating_snapshot = self._get_snapshot()
+                self._invalidating_files = self._invalidating_snapshot.files
+                self._logger.info(
+                    "watching invalidating files: {}".format(self._invalidating_files)
+                )
 
-        if self._pantsd_pidfile:
-            self._fs_event_service.register_pidfile_handler(
-                self._pantsd_pidfile, self._enqueue_fs_event
-            )
+            if self._pantsd_pidfile:
+                self._fs_event_service.register_pidfile_handler(
+                    self._pantsd_pidfile, self._enqueue_fs_event
+                )
 
     def _enqueue_fs_event(self, event):
         """Watchman filesystem event handler for BUILD/requirements.txt updates.
@@ -178,6 +184,7 @@ class SchedulerService(PantsService):
         # The first watchman event for all_files is a listing of all files - ignore it.
         if (
             not is_initial_event
+            and self._fs_event_service is not None
             and subscription == self._fs_event_service.PANTS_ALL_FILES_SUBSCRIPTION_NAME
         ):
             self._handle_batch_event(files)
@@ -191,12 +198,14 @@ class SchedulerService(PantsService):
 
         self._event_queue.task_done()
 
-    def product_graph_len(self):
-        """Provides the size of the captive product graph.
-
-        :returns: The node count for the captive product graph.
-        """
-        return self._scheduler.graph_len()
+    def _check_invalidation_watcher_liveness(self):
+        time.sleep(self.INVALIDATION_WATCHER_LIVENESS_CHECK_INTERVAL)
+        if not self._scheduler.check_invalidation_watcher_liveness():
+            # Watcher failed for some reason
+            self._logger.critical(
+                "The graph invalidation watcher failed, so we are shutting down. Check the pantsd.log for details"
+            )
+            self.terminate()
 
     def prepare_v1_graph_run_v2(
         self, options: Options, options_bootstrapper: OptionsBootstrapper,
@@ -208,10 +217,9 @@ class SchedulerService(PantsService):
         """
         # If any nodes exist in the product graph, wait for the initial watchman event to avoid
         # racing watchman startup vs invalidation events.
-        graph_len = self._scheduler.graph_len()
-        if graph_len > 0:
+        if self._fs_event_service is not None and self._scheduler.graph_len() > 0:
             self._logger.debug(
-                "graph len was {}, waiting for initial watchman event".format(graph_len)
+                f"fs event service is running and graph_len > 0: waiting for initial watchman event"
             )
             self._watchman_is_running.wait()
         build_id = RunTracker.global_instance().run_id
@@ -289,7 +297,10 @@ class SchedulerService(PantsService):
     def run(self):
         """Main service entrypoint."""
         while not self._state.is_terminating:
-            self._process_event_queue()
+            if self._fs_event_service is not None:
+                self._process_event_queue()
+            else:
+                self._check_invalidation_watcher_liveness()
             self._state.maybe_pause()
 
 
