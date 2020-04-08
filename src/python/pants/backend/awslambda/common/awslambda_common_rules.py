@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import dataclasses
+import itertools
 import os
 from abc import ABC
 from dataclasses import dataclass
@@ -15,7 +16,7 @@ from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.objects import union
 from pants.engine.rules import UnionMembership, goal_rule
 from pants.engine.selectors import Get, MultiGet
-from pants.engine.target import Field, Target, Targets
+from pants.engine.target import Field, RegisteredTargetTypes, Target, Targets
 from pants.rules.core.distdir import DistDir
 
 
@@ -42,6 +43,16 @@ class AWSLambdaConfiguration(ABC):
     @classmethod
     def is_valid(cls, tgt: Target) -> bool:
         return tgt.has_fields(cls.required_fields)
+
+    @classmethod
+    def valid_target_types(
+        cls, target_types: Iterable[Type[Target]], *, union_membership: UnionMembership
+    ) -> Tuple[Type[Target], ...]:
+        return tuple(
+            target_type
+            for target_type in target_types
+            if target_type.class_has_fields(cls.required_fields, union_membership=union_membership)
+        )
 
     @classmethod
     def create(cls, tgt: Target) -> "AWSLambdaConfiguration":
@@ -77,6 +88,7 @@ async def create_awslambda(
     console: Console,
     options: AWSLambdaOptions,
     union_membership: UnionMembership,
+    registered_target_types: RegisteredTargetTypes,
     distdir: DistDir,
     buildroot: BuildRoot,
     workspace: Workspace,
@@ -91,8 +103,17 @@ async def create_awslambda(
         if config_type.is_valid(tgt)
     )
     if not configs:
-        console.print_stderr("No valid...")
-        return AWSLambdaGoal(exit_code=1)
+        all_valid_target_types = itertools.chain.from_iterable(
+            config_type.valid_target_types(
+                registered_target_types.types, union_membership=union_membership
+            )
+            for config_type in config_types
+        )
+        formatted_target_types = sorted(target_type.alias for target_type in all_valid_target_types)
+        raise ValueError(
+            f"None of the provided targets work with the goal `{options.name}`. This goal "
+            f"works with the following target types: {formatted_target_types}."
+        )
 
     awslambdas = await MultiGet(
         Get[CreatedAWSLambda](AWSLambdaConfiguration, config) for config in configs
