@@ -97,7 +97,7 @@ impl InvalidationWatcher {
   }
 
   // Public for testing purposes.
-  pub fn start_background_thread(
+  pub(crate) fn start_background_thread(
     graph: Weak<Graph<NodeKey>>,
     ignorer: Arc<GitignoreStyleExcludes>,
     canonical_build_root: PathBuf,

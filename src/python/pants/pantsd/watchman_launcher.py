@@ -35,8 +35,8 @@ class WatchmanLauncher:
             bootstrap_options.watchman_supportdir,
             bootstrap_options.watchman_startup_timeout,
             bootstrap_options.watchman_socket_timeout,
-            bootstrap_options.watchman_socket_path,
             bootstrap_options.watchman_enable,
+            bootstrap_options.watchman_socket_path,
             bootstrap_options.pants_subprocessdir,
         )
 
@@ -97,24 +97,24 @@ class WatchmanLauncher:
         )
 
     def maybe_launch(self):
-        if self._watchman_enable and not self.watchman.is_alive():
-            self._logger.debug("launching watchman")
-            try:
-                self.watchman.launch()
-            except (Watchman.ExecutionError, Watchman.InvalidCommandOutput) as e:
-                self._logger.critical("failed to launch watchman: {!r})".format(e))
-                raise
+        if self._watchman_enable:
+            if not self.watchman.is_alive():
+                self._logger.debug("launching watchman")
+                try:
+                    self.watchman.launch()
+                except (Watchman.ExecutionError, Watchman.InvalidCommandOutput) as e:
+                    self._logger.critical("failed to launch watchman: {!r})".format(e))
+                    raise
             self._logger.debug(
                 "watchman is running, pid={pid} socket={socket}".format(
                     pid=self.watchman.pid, socket=self.watchman.socket
                 )
             )
-
             return self.watchman
         else:
             self.maybe_terminate()
 
-    def maybe_terminate(self):
+    def maybe_terminate(self) -> None:
         if not self._watchman_enable and self.watchman.is_alive():
             self._logger.info("Watchman was running, but will be killed because it was disabled.")
             self.terminate()
