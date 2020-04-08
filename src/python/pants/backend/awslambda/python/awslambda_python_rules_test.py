@@ -7,13 +7,15 @@ from typing import Tuple
 from zipfile import ZipFile
 
 from pants.backend.awslambda.common.awslambda_common_rules import CreatedAWSLambda
+from pants.backend.awslambda.python.awslambda_python_rules import PythonAwsLambdaConfiguration
 from pants.backend.awslambda.python.awslambda_python_rules import rules as awslambda_python_rules
+from pants.backend.awslambda.python.targets import PythonAWSLambda
+from pants.backend.python.rules.targets import PythonLibrary
 from pants.build_graph.address import Address
 from pants.engine.fs import FilesContent
-from pants.engine.legacy.graph import HydratedTarget
-from pants.engine.legacy.structs import PythonAWSLambdaAdaptor
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
+from pants.engine.target import WrappedTarget
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
@@ -21,22 +23,24 @@ from pants.testutil.test_base import TestBase
 class TestPythonAWSLambdaCreation(TestBase):
     @classmethod
     def rules(cls):
-        return (*super().rules(), *awslambda_python_rules(), RootRule(PythonAWSLambdaAdaptor))
+        return (*super().rules(), *awslambda_python_rules(), RootRule(PythonAwsLambdaConfiguration))
+
+    @classmethod
+    def target_types(cls):
+        return [PythonAWSLambda, PythonLibrary]
 
     def create_python_awslambda(self, addr: str) -> Tuple[str, bytes]:
-        target = self.request_single_product(HydratedTarget, Address.parse(addr))
+        target = self.request_single_product(WrappedTarget, Address.parse(addr)).target
         created_awslambda = self.request_single_product(
             CreatedAWSLambda,
             Params(
-                target.adaptor,
+                PythonAwsLambdaConfiguration.create(target),
                 create_options_bootstrapper(
                     args=["--backend-packages2=pants.backend.awslambda.python"]
                 ),
             ),
         )
-        files_content = list(
-            self.request_single_product(FilesContent, Params(created_awslambda.digest))
-        )
+        files_content = self.request_single_product(FilesContent, created_awslambda.digest)
         assert len(files_content) == 1
         return created_awslambda.name, files_content[0].content
 

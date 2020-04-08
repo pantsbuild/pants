@@ -7,6 +7,7 @@ python_library(
     'src/python/pants/backend/codegen/ragel/subsystems',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
+    'src/python/pants/engine:target',
     'src/python/pants/goal:task_registrar',
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
