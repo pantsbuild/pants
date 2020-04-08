@@ -248,22 +248,22 @@ async def run_tests(
     union_membership: UnionMembership,
     registered_target_types: RegisteredTargetTypes,
 ) -> Test:
-    test_config_types: Iterable[Type[TestConfiguration]] = union_membership.union_rules[
+    config_types: Iterable[Type[TestConfiguration]] = union_membership.union_rules[
         TestConfiguration
     ]
 
     if options.values.debug:
         target_with_origin = targets_with_origins.expect_single()
         target = target_with_origin.target
-        valid_test_config_types = [
-            config_type for config_type in test_config_types if config_type.is_valid(target)
+        valid_config_types = [
+            config_type for config_type in config_types if config_type.is_valid(target)
         ]
-        if not valid_test_config_types:
+        if not valid_config_types:
             all_valid_target_types = itertools.chain.from_iterable(
                 config_type.valid_target_types(
                     registered_target_types.types, union_membership=union_membership
                 )
-                for config_type in test_config_types
+                for config_type in config_types
             )
             formatted_target_types = sorted(
                 target_type.alias for target_type in all_valid_target_types
@@ -273,19 +273,19 @@ async def run_tests(
                 f"{formatted_target_types}\n\nYou used {target.address} with target "
                 f"type {repr(target.alias)}."
             )
-        if len(valid_test_config_types) > 1:
+        if len(valid_config_types) > 1:
             possible_config_types = sorted(
-                config_type.__name__ for config_type in valid_test_config_types
+                config_type.__name__ for config_type in valid_config_types
             )
             raise ValueError(
                 f"Multiple of the registered test implementations work for {target.address} "
                 f"(target type {repr(target.alias)}). It is ambiguous which implementation to use. "
                 f"Possible implementations: {possible_config_types}."
             )
-        test_config_type = valid_test_config_types[0]
+        config_type = valid_config_types[0]
         logger.info(f"Starting test in debug mode: {target.address.reference()}")
         request = await Get[TestDebugRequest](
-            TestConfiguration, test_config_type.create(target_with_origin)
+            TestConfiguration, config_type.create(target_with_origin)
         )
         debug_result = interactive_runner.run_local_interactive_process(request.ipr)
         return Test(debug_result.process_exit_code)
@@ -293,20 +293,20 @@ async def run_tests(
     # TODO: possibly factor out this filtering out of empty `sources`. We do this at this level of
     #  abstraction, rather than in the test runners, because the test runners often will use
     #  auto-discovery when given no input files.
-    test_configs = tuple(
-        test_config_type.create(target_with_origin)
+    configs = tuple(
+        config_type.create(target_with_origin)
         for target_with_origin in targets_with_origins
-        for test_config_type in test_config_types
-        if test_config_type.is_valid(target_with_origin.target)
+        for config_type in config_types
+        if config_type.is_valid(target_with_origin.target)
     )
     all_hydrated_sources = await MultiGet(
         Get[HydratedSources](HydrateSourcesRequest, test_target.sources.request)
-        for test_target in test_configs
+        for test_target in configs
     )
 
     results = await MultiGet(
-        Get[AddressAndTestResult](WrappedTestConfiguration(test_config))
-        for test_config, hydrated_sources in zip(test_configs, all_hydrated_sources)
+        Get[AddressAndTestResult](WrappedTestConfiguration(config))
+        for config, hydrated_sources in zip(configs, all_hydrated_sources)
         if hydrated_sources.snapshot.files
     )
 
