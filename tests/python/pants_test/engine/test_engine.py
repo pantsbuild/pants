@@ -382,5 +382,5 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
         assert r3["parent_id"] == r1["span_id"]
         assert r4["parent_id"] == r2["span_id"]
 
-        assert r3["desc"] == "Rule number 3"
-        assert r4["desc"] == "Rule number 4"
+        assert r3["description"] == "Rule number 3"
+        assert r4["description"] == "Rule number 4"

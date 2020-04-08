@@ -430,7 +430,10 @@ fn workunits_to_py_tuple_value<'a>(workunits: impl Iterator<Item = &'a WorkUnit>
       }
 
       if let Some(desc) = &workunit.metadata.desc.as_ref() {
-        workunit_zipkin_trace_info.push((externs::store_utf8("desc"), externs::store_utf8(desc)));
+        workunit_zipkin_trace_info.push((
+          externs::store_utf8("description"),
+          externs::store_utf8(desc),
+        ));
       }
 
       externs::store_dict(&workunit_zipkin_trace_info.as_slice())
