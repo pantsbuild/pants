@@ -8,6 +8,7 @@ python_library(
     'src/python/pants/backend/python/targets',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
+    'src/python/pants/engine:target',
     'src/python/pants/goal:task_registrar',
     'src/python/pants/option',
     'src/python/pants/task',

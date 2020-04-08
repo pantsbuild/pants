@@ -4,6 +4,7 @@
 contrib_plugin(
   name='plugin',
   dependencies=[
+    'contrib/jax_ws/src/python/pants/contrib/jax_ws/rules',
     'contrib/jax_ws/src/python/pants/contrib/jax_ws/targets',
     'contrib/jax_ws/src/python/pants/contrib/jax_ws/tasks',
     'src/python/pants/build_graph',

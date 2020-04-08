@@ -10,15 +10,22 @@ from pants.backend.codegen.thrift.python.apache_thrift_py_gen import ApacheThrif
 from pants.backend.codegen.thrift.python.py_thrift_namespace_clash_check import (
     PyThriftNamespaceClashCheck,
 )
-from pants.backend.codegen.thrift.python.python_thrift_library import PythonThriftLibrary
+from pants.backend.codegen.thrift.python.python_thrift_library import (
+    PythonThriftLibrary as PythonThriftLibraryV1,
+)
+from pants.backend.codegen.thrift.python.targets import PythonThriftLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 
 
 def build_file_aliases():
-    return BuildFileAliases(targets={"python_thrift_library": PythonThriftLibrary})
+    return BuildFileAliases(targets={"python_thrift_library": PythonThriftLibraryV1})
 
 
 def register_goals():
     task(name="thrift-py", action=ApacheThriftPyGen).install("gen")
     task(name="py-thrift-namespace-clash-check", action=PyThriftNamespaceClashCheck).install("gen")
+
+
+def targets2():
+    return [PythonThriftLibrary]
