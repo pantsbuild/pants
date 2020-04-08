@@ -40,6 +40,10 @@ from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import chmod_plus_x, safe_open
 from pants.util.osutil import get_os_name, normalize_os_name
 
+# runtime_libraries should be the same as compile_libraries for non-strict-deps targets,
+# so we'll often test them together.
+LIBRARIES_ENTRIES = ["compile_libraries", "runtime_libraries"]
+
 
 class ExportDepAsJarTest(ConsoleTaskTestBase):
     @classmethod
@@ -354,11 +358,12 @@ class ExportDepAsJarTestSuiteOne(ExportDepAsJarTest):
             sorted(["java/project_info:java_lib"]),
             sorted(result["targets"]["project_info:third"]["targets"]),
         )
-        self.assertEqual(
-            sorted(["org.scala-lang:scala-library:2.10.5", "org.apache:apache-jar:12.12.2012"]),
-            sorted(result["targets"]["project_info:third"]["compile_libraries"]),
-        )
 
+        for libraries_entry in LIBRARIES_ENTRIES:
+            self.assertEqual(
+                sorted(["org.scala-lang:scala-library:2.10.5", "org.apache:apache-jar:12.12.2012"]),
+                sorted(result["targets"]["project_info:third"][libraries_entry]),
+            )
         self.assertEqual(1, len(result["targets"]["project_info:third"]["roots"]))
         source_root = result["targets"]["project_info:third"]["roots"][0]
         self.assertEqual("com.foo", source_root["package_prefix"])
@@ -368,16 +373,18 @@ class ExportDepAsJarTestSuiteOne(ExportDepAsJarTest):
 
     def test_jvm_app(self):
         result = self.execute_export_json("project_info:jvm_app")
-        self.assertEqual(
-            sorted(["org.apache:apache-jar:12.12.2012"]),
-            sorted(result["targets"]["project_info:jvm_app"]["compile_libraries"]),
-        )
+        for libraries_entry in LIBRARIES_ENTRIES:
+            self.assertEqual(
+                sorted(["org.apache:apache-jar:12.12.2012"]),
+                sorted(result["targets"]["project_info:jvm_app"][libraries_entry]),
+            )
 
     def test_jvm_target(self):
         self.maxDiff = None
         result = self.execute_export_json("project_info:jvm_target")
         jvm_target = result["targets"]["project_info:jvm_target"]
         jvm_target["compile_libraries"] = sorted(jvm_target["compile_libraries"])
+        jvm_target["runtime_libraries"] = sorted(jvm_target["runtime_libraries"])
         expected_jvm_target = {
             "scalac_args": [],
             "javac_args": [],
@@ -390,6 +397,9 @@ class ExportDepAsJarTestSuiteOne(ExportDepAsJarTest):
                 ]
             },
             "compile_libraries": sorted(
+                ["org.apache:apache-jar:12.12.2012", "org.scala-lang:scala-library:2.10.5"]
+            ),
+            "runtime_libraries": sorted(
                 ["org.apache:apache-jar:12.12.2012", "org.scala-lang:scala-library:2.10.5"]
             ),
             "id": "project_info.jvm_target",
@@ -418,30 +428,36 @@ class ExportDepAsJarTestSuiteOne(ExportDepAsJarTest):
         result = self.execute_export_json("project_info:java_test")
         self.assertEqual("TEST", result["targets"]["project_info:java_test"]["target_type"])
         # Note that the junit dep gets auto-injected via the JUnit subsystem.
-        self.assertEqual(
-            sorted(
-                [
-                    "org.apache:apache-jar:12.12.2012",
-                    "junit:junit:{}".format(JUnit.LIBRARY_REV),
-                    "project_info.test_resource",
-                ]
-            ),
-            sorted(result["targets"]["project_info:java_test"]["compile_libraries"]),
-        )
+
+        for libraries_entry in LIBRARIES_ENTRIES:
+            self.assertEqual(
+                sorted(
+                    [
+                        "org.apache:apache-jar:12.12.2012",
+                        "junit:junit:{}".format(JUnit.LIBRARY_REV),
+                        "project_info.test_resource",
+                    ]
+                ),
+                sorted(result["targets"]["project_info:java_test"][libraries_entry]),
+            )
 
     def test_jvm_binary(self):
         result = self.execute_export_json("project_info:jvm_binary")
-        self.assertEqual(
-            sorted(["org.apache:apache-jar:12.12.2012"]),
-            sorted(result["targets"]["project_info:jvm_binary"]["compile_libraries"]),
-        )
+
+        for libraries_entry in LIBRARIES_ENTRIES:
+            self.assertEqual(
+                sorted(["org.apache:apache-jar:12.12.2012"]),
+                sorted(result["targets"]["project_info:jvm_binary"][libraries_entry]),
+            )
 
     def test_top_dependency(self):
         result = self.execute_export_json("project_info:top_dependency")
-        self.assertEqual(
-            sorted(["project_info.jvm_binary", "org.apache:apache-jar:12.12.2012"]),
-            sorted(result["targets"]["project_info:top_dependency"]["compile_libraries"]),
-        )
+
+        for libraries_entry in LIBRARIES_ENTRIES:
+            self.assertEqual(
+                sorted(["project_info.jvm_binary", "org.apache:apache-jar:12.12.2012"]),
+                sorted(result["targets"]["project_info:top_dependency"][libraries_entry]),
+            )
         self.assertEqual([], result["targets"]["project_info:top_dependency"]["targets"])
 
     def test_format_flag(self):
@@ -453,17 +469,20 @@ class ExportDepAsJarTestSuiteOne(ExportDepAsJarTest):
     def test_target_types_with_resource_as_deps(self):
         result = self.execute_export_json("project_info:target_type")
         self.assertEqual("SOURCE", result["targets"]["project_info:target_type"]["target_type"])
-        self.assertIn(
-            "project_info.resource",
-            result["targets"]["project_info:target_type"]["compile_libraries"],
-        )
+
+        for libraries_entry in LIBRARIES_ENTRIES:
+            self.assertIn(
+                "project_info.resource",
+                result["targets"]["project_info:target_type"][libraries_entry],
+            )
         self.assertTrue(result["libraries"]["project_info.resource"]["default"].endswith(".jar"))
 
     def test_target_types_with_resource_as_root(self):
         result = self.execute_export_json(*["project_info:target_type", "project_info:resource"])
         self.assertEqual("SOURCE", result["targets"]["project_info:target_type"]["target_type"])
         self.assertEqual("RESOURCE", result["targets"]["project_info:resource"]["target_type"])
-        self.assertEqual([], result["targets"]["project_info:resource"]["compile_libraries"])
+        for libraries_entry in LIBRARIES_ENTRIES:
+            self.assertEqual([], result["targets"]["project_info:resource"][libraries_entry])
         roots = result["targets"]["project_info:resource"]["roots"]
         self.assertEqual(1, len(roots))
         self.assertEqual(os.path.join(self.build_root, "project_info"), roots[0]["source_root"])
@@ -572,14 +591,15 @@ class ExportDepAsJarTestSuiteOne(ExportDepAsJarTest):
         result = self.execute_export_json(
             "project_info:scala_with_source_dep", "project_info:jvm_target"
         )
-        self.assertNotIn(
-            "project_info.scala_with_source_dep",
-            result["targets"]["project_info:scala_with_source_dep"]["compile_libraries"],
-        )
-        self.assertNotIn(
-            "project_info.jvm_target",
-            result["targets"]["project_info:scala_with_source_dep"]["compile_libraries"],
-        )
+        for libraries_entry in LIBRARIES_ENTRIES:
+            self.assertNotIn(
+                "project_info.scala_with_source_dep",
+                result["targets"]["project_info:scala_with_source_dep"][libraries_entry],
+            )
+            self.assertNotIn(
+                "project_info.jvm_target",
+                result["targets"]["project_info:scala_with_source_dep"][libraries_entry],
+            )
         self.assertNotIn("project_info.scala_with_source_dep", result["libraries"].keys())
         self.assertNotIn("project_info.jvm_target", result["libraries"].keys())
 
@@ -587,42 +607,48 @@ class ExportDepAsJarTestSuiteOne(ExportDepAsJarTest):
         a_spec = self.linear_build_graph["a"].address.spec
         b_spec = self.linear_build_graph["b"].address.spec
         result_a = self.execute_export_json(a_spec)
-        self.assertEquals(
-            sorted(
-                [
-                    "project_info.b",
-                    "project_info.c",
-                    "project_info.d",
-                    "project_info.e",
-                    "org.scala-lang:scala-library:2.10.5",
-                ]
-            ),
-            sorted(result_a["targets"][a_spec]["compile_libraries"]),
-        )
+        for libraries_entry in LIBRARIES_ENTRIES:
+            self.assertEquals(
+                sorted(
+                    [
+                        "project_info.b",
+                        "project_info.c",
+                        "project_info.d",
+                        "project_info.e",
+                        "org.scala-lang:scala-library:2.10.5",
+                    ]
+                ),
+                sorted(result_a["targets"][a_spec][libraries_entry]),
+            )
+
         result_ab = self.execute_export_json(a_spec, b_spec)
-        self.assertEquals(
-            sorted(["org.scala-lang:scala-library:2.10.5"]),
-            sorted(result_ab["targets"][a_spec]["compile_libraries"]),
-        )
+        for libraries_entry in LIBRARIES_ENTRIES:
+            self.assertEquals(
+                sorted(["org.scala-lang:scala-library:2.10.5"]),
+                sorted(result_ab["targets"][a_spec][libraries_entry]),
+            )
         self.assertIn(b_spec, result_ab["targets"][a_spec]["targets"])
-        self.assertEquals(
-            sorted(
-                [
-                    "project_info.c",
-                    "project_info.d",
-                    "project_info.e",
-                    "org.scala-lang:scala-library:2.10.5",
-                ]
-            ),
-            sorted(result_ab["targets"][b_spec]["compile_libraries"]),
-        )
+
+        for libraries_entry in LIBRARIES_ENTRIES:
+            self.assertEquals(
+                sorted(
+                    [
+                        "project_info.c",
+                        "project_info.d",
+                        "project_info.e",
+                        "org.scala-lang:scala-library:2.10.5",
+                    ]
+                ),
+                sorted(result_ab["targets"][b_spec][libraries_entry]),
+            )
 
     def test_imports_3rdparty_jars_from_transitive_dependencies(self):
         spec = self.scala_with_source_dep.address.spec
         result = self.execute_export_json(spec)
-        self.assertIn(
-            "org.apache:apache-jar:12.12.2012", result["targets"][spec]["compile_libraries"]
-        )
+        for libraries_entry in LIBRARIES_ENTRIES:
+            self.assertIn(
+                "org.apache:apache-jar:12.12.2012", result["targets"][spec][libraries_entry]
+            )
 
     def test_compile_libraries_respect_strict_deps(self):
         enabled_spec = self.strict_deps_enabled.address.spec
