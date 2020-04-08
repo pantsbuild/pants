@@ -113,18 +113,18 @@ async def coordinator_of_binaries(
     registered_target_types: RegisteredTargetTypes,
 ) -> CreatedBinary:
     target = wrapped_target.target
-    binary_config_types: Iterable[Type[BinaryConfiguration]] = union_membership.union_rules[
+    config_types: Iterable[Type[BinaryConfiguration]] = union_membership.union_rules[
         BinaryConfiguration
     ]
-    valid_binary_config_types = [
-        config_type for config_type in binary_config_types if config_type.is_valid(target)
+    valid_config_types = [
+        config_type for config_type in config_types if config_type.is_valid(target)
     ]
-    if not valid_binary_config_types:
+    if not valid_config_types:
         all_valid_target_types = itertools.chain.from_iterable(
             config_type.valid_target_types(
                 registered_target_types.types, union_membership=union_membership
             )
-            for config_type in binary_config_types
+            for config_type in config_types
         )
         formatted_target_types = sorted(target_type.alias for target_type in all_valid_target_types)
         # TODO: this is a leaky abstraction that the error message knows this rule is being used
@@ -139,10 +139,8 @@ async def coordinator_of_binaries(
     #  with one implementation. But, we don't necessarily need to enforce this with `./v2 binary`.
     #  See https://github.com/pantsbuild/pants/pull/9345#discussion_r395221542 for some possible
     #  semantics for `./v2 binary`.
-    if len(valid_binary_config_types) > 1:
-        possible_config_types = sorted(
-            config_type.__name__ for config_type in valid_binary_config_types
-        )
+    if len(valid_config_types) > 1:
+        possible_config_types = sorted(config_type.__name__ for config_type in valid_config_types)
         # TODO: improve this error message. (It's never actually triggered yet because we only have
         #  Python implemented with V2.) A better error message would explain to users how they can
         #  resolve the issue.
@@ -151,7 +149,7 @@ async def coordinator_of_binaries(
             f"(target type {repr(target.alias)}). It is ambiguous which implementation to use. "
             f"Possible implementations: {possible_config_types}."
         )
-    config_type = valid_binary_config_types[0]
+    config_type = valid_config_types[0]
     return await Get[CreatedBinary](BinaryConfiguration, config_type.create(target))
 
 
