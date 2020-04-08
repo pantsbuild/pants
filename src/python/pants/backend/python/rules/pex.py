@@ -196,8 +196,6 @@ class PexRequest:
     interpreter_constraints: PexInterpreterConstraints
     input_files_digest: Optional[Digest]
     entry_point: Optional[str]
-    indexes: Optional[Tuple[str, ...]]
-    repos: Optional[Tuple[str, ...]]
     additional_args: Tuple[str, ...]
 
     def __init__(
@@ -208,8 +206,6 @@ class PexRequest:
         interpreter_constraints=PexInterpreterConstraints(),
         input_files_digest: Optional[Digest] = None,
         entry_point: Optional[str] = None,
-        indexes: Optional[Iterable[str]] = None,
-        repos: Optional[Iterable[str]] = None,
         additional_args: Iterable[str] = (),
     ) -> None:
         self.output_filename = output_filename
@@ -217,8 +213,6 @@ class PexRequest:
         self.interpreter_constraints = interpreter_constraints
         self.input_files_digest = input_files_digest
         self.entry_point = entry_point
-        self.indexes = tuple(indexes) if indexes is not None else None
-        self.repos = tuple(repos) if repos is not None else None
         self.additional_args = tuple(additional_args)
 
 
@@ -277,6 +271,13 @@ async def create_pex(
         "--output-file",
         request.output_filename,
         *request.interpreter_constraints.generate_pex_arg_list(),
+        # NB: In setting `--no-pypi`, we rely on the default value of `--python-repos-indexes`
+        # including PyPI, which will override `--no-pypi` and result in using PyPI in the default
+        # case. Why set `--no-pypi`, then? We need to do this so that
+        # `--python-repos-repos=['custom_url']` will only point to that index and not include PyPI.
+        "--no-pypi",
+        *(f"--index={index}" for index in python_repos.indexes),
+        *(f"--repo={repo}" for repo in python_repos.repos),
         *request.additional_args,
     ]
 
@@ -293,17 +294,6 @@ async def create_pex(
 
     if request.entry_point is not None:
         argv.extend(["--entry-point", request.entry_point])
-
-    indexes_value = request.indexes if request.indexes is not None else python_repos.indexes
-    if indexes_value is not None:
-        if not indexes_value:
-            argv.append("--no-index")
-        else:
-            argv.extend(f"--index={index}" for index in indexes_value)
-
-    repos_value = request.repos if request.repos is not None else python_repos.repos
-    if repos_value is not None:
-        argv.extend(f"--repo={repo}" for repo in repos_value)
 
     if python_setup.requirement_constraints is not None:
         argv.extend(["--constraints", python_setup.requirement_constraints])

@@ -32,8 +32,6 @@ class PexFromTargetsRequest:
     addresses: Addresses
     output_filename: str
     entry_point: Optional[str]
-    indexes: Optional[Tuple[str, ...]]
-    repos: Optional[Tuple[str, ...]]
     additional_args: Tuple[str, ...]
     additional_requirements: Tuple[str, ...]
     include_source_files: bool
@@ -45,8 +43,6 @@ class PexFromTargetsRequest:
         *,
         output_filename: str,
         entry_point: Optional[str] = None,
-        indexes: Optional[Iterable[str]] = None,
-        repos: Optional[Iterable[str]] = None,
         additional_args: Iterable[str] = (),
         additional_requirements: Iterable[str] = (),
         include_source_files: bool = True,
@@ -55,8 +51,6 @@ class PexFromTargetsRequest:
         self.addresses = addresses
         self.output_filename = output_filename
         self.entry_point = entry_point
-        self.indexes = tuple(indexes) if indexes is not None else None
-        self.repos = tuple(repos) if repos is not None else None
         self.additional_args = tuple(additional_args)
         self.additional_requirements = tuple(additional_requirements)
         self.include_source_files = include_source_files
@@ -107,8 +101,6 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         requirements=requirements,
         interpreter_constraints=interpreter_constraints,
         entry_point=request.entry_point,
-        indexes=request.indexes,
-        repos=request.repos,
         input_files_digest=merged_input_digest,
         additional_args=request.additional_args,
     )

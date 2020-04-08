@@ -10,9 +10,7 @@ from pants.backend.python.rules.targets import (
     PexAlwaysWriteCache,
     PexEmitWarnings,
     PexIgnoreErrors,
-    PexIndexes,
     PexInheritPath,
-    PexRepositories,
     PexShebang,
     PexZipSafe,
     PythonBinarySources,
@@ -37,9 +35,7 @@ class PythonBinaryConfiguration(BinaryConfiguration):
     always_write_cache: PexAlwaysWriteCache
     emit_warnings: PexEmitWarnings
     ignore_errors: PexIgnoreErrors
-    indexes: PexIndexes
     inherit_path: PexInheritPath
-    repositories: PexRepositories
     shebang: PexShebang
     zip_safe: PexZipSafe
     platforms: PythonPlatforms
@@ -81,8 +77,6 @@ async def create_python_binary(config: PythonBinaryConfiguration) -> CreatedBina
         PexFromTargetsRequest(
             addresses=Addresses([config.address]),
             entry_point=entry_point,
-            indexes=config.indexes.value,
-            repos=config.repositories.value,
             output_filename=f"{config.address.target_name}.pex",
             additional_args=config.generate_additional_args(),
         )
