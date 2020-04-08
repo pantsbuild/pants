@@ -188,7 +188,13 @@ class PexAlwaysWriteCache(BoolField):
 
 
 class PexRepositories(StringOrStringSequenceField):
-    """Repositories for Pex to query for dependencies."""
+    """Repositories for Pex to query for dependencies.
+
+    In Pex and Pip, this option corresponds to the `--find-links` option.
+
+    This field defaults to the value set in `--python-repo-repos` and it will override the global
+    option when configured on a target.
+    """
 
     alias = "repositories"
 
@@ -198,6 +204,11 @@ class PexIndexes(StringOrStringSequenceField):
 
     If set to an empty list, i.e. `indices=[]`, then Pex will use no indices (meaning it will not
     use PyPI).
+
+    The values should be compliant with PEP 503.
+
+    This field defaults to the value set in `--python-repo-indexes` and it will override the global
+    option when configured on a target.
     """
 
     alias = "indices"

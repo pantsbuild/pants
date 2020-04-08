@@ -52,15 +52,8 @@ class PythonBinaryConfiguration(BinaryConfiguration):
             args.append("--no-emit-warnings")
         if self.ignore_errors.value is True:
             args.append("--ignore-errors")
-        if self.indexes.value is not None:
-            if not self.indexes.value:
-                args.append("--no-index")
-            else:
-                args.extend([f"--index={index}" for index in self.indexes.value])
         if self.inherit_path.value is not None:
             args.append(f"--inherit-path={self.inherit_path.value}")
-        if self.repositories.value is not None:
-            args.extend([f"--repo={repo}" for repo in self.repositories.value])
         if self.shebang.value is not None:
             args.append(f"--python-shebang={self.shebang.value}")
         if self.platforms.value is not None:
@@ -88,6 +81,8 @@ async def create_python_binary(config: PythonBinaryConfiguration) -> CreatedBina
         PexFromTargetsRequest(
             addresses=Addresses([config.address]),
             entry_point=entry_point,
+            indexes=config.indexes.value,
+            repos=config.repositories.value,
             output_filename=f"{config.address.target_name}.pex",
             additional_args=config.generate_additional_args(),
         )

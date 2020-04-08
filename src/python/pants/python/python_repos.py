@@ -1,14 +1,15 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from typing import List, cast
+
 from pants.subsystem.subsystem import Subsystem
 
 
 class PythonRepos(Subsystem):
-    """A python code repository.
+    """External Python code repositories, such as PyPI.
 
-    Note that this is part of the Pants core, and not the python backend, because it's used to
-    bootstrap Pants plugins.
+    These options may be used to point to custom cheeseshops when resolving requirements.
     """
 
     options_scope = "python-repos"
@@ -22,7 +23,10 @@ class PythonRepos(Subsystem):
             type=list,
             default=[],
             fingerprint=True,
-            help="URLs of code repositories.",
+            help=(
+                "URLs of code repositories to look for requirements. In Pip and Pex, this option "
+                "corresponds to the `--find-links` option."
+            ),
         )
         register(
             "--indexes",
@@ -30,13 +34,17 @@ class PythonRepos(Subsystem):
             type=list,
             fingerprint=True,
             default=["https://pypi.org/simple/"],
-            help="URLs of code repository indexes.",
+            help=(
+                "URLs of code repository indexes to look for requirements. If set to an empty "
+                "list, then Pex will use no indices (meaning it will not use PyPI). The values "
+                "should be compliant with PEP 503."
+            ),
         )
 
     @property
-    def repos(self):
-        return self.get_options().repos
+    def repos(self) -> List[str]:
+        return cast(List[str], self.options.repos)
 
     @property
-    def indexes(self):
-        return self.get_options().indexes
+    def indexes(self) -> List[str]:
+        return cast(List[str], self.options.indexes)

@@ -32,6 +32,7 @@ from pants.engine.legacy.structs import PythonTargetAdaptor, TargetAdaptor
 from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.rules import rule, subsystem_rule
 from pants.engine.selectors import Get
+from pants.python.python_repos import PythonRepos
 from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
@@ -185,16 +186,40 @@ class PexInterpreterConstraints:
         return args
 
 
-@dataclass(frozen=True)
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class PexRequest:
     """Represents a generic request to create a PEX from its inputs."""
 
     output_filename: str
-    requirements: PexRequirements = PexRequirements()
-    interpreter_constraints: PexInterpreterConstraints = PexInterpreterConstraints()
-    entry_point: Optional[str] = None
-    input_files_digest: Optional[Digest] = None
-    additional_args: Tuple[str, ...] = ()
+    requirements: PexRequirements
+    interpreter_constraints: PexInterpreterConstraints
+    input_files_digest: Optional[Digest]
+    entry_point: Optional[str]
+    indexes: Optional[Tuple[str, ...]]
+    repos: Optional[Tuple[str, ...]]
+    additional_args: Tuple[str, ...]
+
+    def __init__(
+        self,
+        *,
+        output_filename: str,
+        requirements: PexRequirements = PexRequirements(),
+        interpreter_constraints=PexInterpreterConstraints(),
+        input_files_digest: Optional[Digest] = None,
+        entry_point: Optional[str] = None,
+        indexes: Optional[Iterable[str]] = None,
+        repos: Optional[Iterable[str]] = None,
+        additional_args: Iterable[str] = (),
+    ) -> None:
+        self.output_filename = output_filename
+        self.requirements = requirements
+        self.interpreter_constraints = interpreter_constraints
+        self.input_files_digest = input_files_digest
+        self.entry_point = entry_point
+        self.indexes = tuple(indexes) if indexes is not None else None
+        self.repos = tuple(repos) if repos is not None else None
+        self.additional_args = tuple(additional_args)
 
 
 @dataclass(frozen=True)
@@ -239,6 +264,7 @@ async def create_pex(
     request: PexRequest,
     pex_bin: DownloadedPexBin,
     python_setup: PythonSetup,
+    python_repos: PythonRepos,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
     pex_build_environment: PexBuildEnvironment,
     platform: Platform,
@@ -267,6 +293,17 @@ async def create_pex(
 
     if request.entry_point is not None:
         argv.extend(["--entry-point", request.entry_point])
+
+    indexes_value = request.indexes if request.indexes is not None else python_repos.indexes
+    if indexes_value is not None:
+        if not indexes_value:
+            argv.append("--no-index")
+        else:
+            argv.extend(f"--index={index}" for index in indexes_value)
+
+    repos_value = request.repos if request.repos is not None else python_repos.repos
+    if repos_value is not None:
+        argv.extend(f"--repo={repo}" for repo in repos_value)
 
     if python_setup.requirement_constraints is not None:
         argv.extend(["--constraints", python_setup.requirement_constraints])
@@ -347,4 +384,4 @@ async def create_pex(
 
 
 def rules():
-    return [create_pex, subsystem_rule(PythonSetup)]
+    return [create_pex, subsystem_rule(PythonSetup), subsystem_rule(PythonRepos)]

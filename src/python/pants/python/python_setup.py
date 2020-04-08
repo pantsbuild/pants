@@ -57,7 +57,7 @@ class PythonSetup(Subsystem):
             metavar="<platform>",
             default=["current"],
             fingerprint=True,
-            help="A list of platforms to be supported by this python environment. Each platform"
+            help="A list of platforms to be supported by this Python environment. Each platform"
             "is a string, as returned by pkg_resources.get_supported_platform().",
         )
         register(

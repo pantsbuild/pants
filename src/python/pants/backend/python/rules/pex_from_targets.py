@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Iterable, Optional, Tuple
 
 from pants.backend.python.rules.importable_python_sources import ImportablePythonSources
 from pants.backend.python.rules.pex import PexInterpreterConstraints, PexRequest, PexRequirements
@@ -21,19 +21,46 @@ from pants.engine.selectors import Get
 from pants.engine.target import Targets, TransitiveTargets
 from pants.python.python_setup import PythonSetup
 from pants.rules.core.targets import FilesSources, ResourcesSources
+from pants.util.meta import frozen_after_init
 
 
-@dataclass(frozen=True)
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class PexFromTargetsRequest:
     """Request to create a PEX from the closure of a set of targets."""
 
     addresses: Addresses
     output_filename: str
-    entry_point: Optional[str] = None
-    additional_requirements: Tuple[str, ...] = ()
-    include_source_files: bool = True
-    additional_args: Tuple[str, ...] = ()
-    additional_input_files: Optional[Digest] = None
+    entry_point: Optional[str]
+    indexes: Optional[Tuple[str, ...]]
+    repos: Optional[Tuple[str, ...]]
+    additional_args: Tuple[str, ...]
+    additional_requirements: Tuple[str, ...]
+    include_source_files: bool
+    additional_input_files: Optional[Digest]
+
+    def __init__(
+        self,
+        addresses: Addresses,
+        *,
+        output_filename: str,
+        entry_point: Optional[str] = None,
+        indexes: Optional[Iterable[str]] = None,
+        repos: Optional[Iterable[str]] = None,
+        additional_args: Iterable[str] = (),
+        additional_requirements: Iterable[str] = (),
+        include_source_files: bool = True,
+        additional_input_files: Optional[Digest] = None
+    ) -> None:
+        self.addresses = addresses
+        self.output_filename = output_filename
+        self.entry_point = entry_point
+        self.indexes = tuple(indexes) if indexes is not None else None
+        self.repos = tuple(repos) if repos is not None else None
+        self.additional_args = tuple(additional_args)
+        self.additional_requirements = tuple(additional_requirements)
+        self.include_source_files = include_source_files
+        self.additional_input_files = additional_input_files
 
 
 @rule(name="Create a PEX from targets")
@@ -80,6 +107,8 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         requirements=requirements,
         interpreter_constraints=interpreter_constraints,
         entry_point=request.entry_point,
+        indexes=request.indexes,
+        repos=request.repos,
         input_files_digest=merged_input_digest,
         additional_args=request.additional_args,
     )
