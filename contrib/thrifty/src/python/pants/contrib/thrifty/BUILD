@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  sources=['java_thrifty_gen.py', 'java_thrifty_library.py'],
+  sources=['java_thrifty_gen.py', 'java_thrifty_library.py', 'targets.py'],
   dependencies=[
     "src/python/pants/backend/jvm/rules",
     "src/python/pants/engine:target",
