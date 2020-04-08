@@ -1,16 +1,20 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import itertools
 from enum import Enum
 from typing import Set
 
+from pants.backend.jvm.rules.targets import JarsField
+from pants.backend.python.rules.targets import PythonRequirementsField
 from pants.engine.addressable import Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
-from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
-from pants.engine.legacy.structs import PythonRequirementLibraryAdaptor
 from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get
+from pants.engine.target import Dependencies as DependenciesField
+from pants.engine.target import Targets, TransitiveTargets
+from pants.util.ordered_set import FrozenOrderedSet
 
 
 class DependencyType(Enum):
@@ -32,14 +36,19 @@ class DependenciesOptions(LineOriented, GoalSubsystem):
             "--transitive",
             default=False,
             type=bool,
-            help="Run dependencies against transitive dependencies of targets specified on the command line.",
+            help=(
+                "Run dependencies against transitive dependencies of targets specified on the "
+                "command line."
+            ),
         )
         register(
             "--type",
             type=DependencyType,
             default=DependencyType.SOURCE,
-            help="Which types of dependencies to find, where `source` means source code dependencies "
-            "and `3rdparty` means third-party requirements and JARs.",
+            help=(
+                "Which types of dependencies to find, where `source` means source code "
+                "dependencies and `3rdparty` means third-party requirements and JARs."
+            ),
         )
 
 
@@ -51,43 +60,47 @@ class Dependencies(Goal):
 async def dependencies(
     console: Console, addresses: Addresses, options: DependenciesOptions,
 ) -> Dependencies:
-    address_strings: Set[str] = set()
-    third_party_requirements: Set[str] = set()
-
     if options.values.transitive:
-        transitive_targets = await Get[TransitiveHydratedTargets](Addresses, addresses)
-        hydrated_targets = HydratedTargets(
-            transitive_targets.closure - set(transitive_targets.roots)
-        )
+        transitive_targets = await Get[TransitiveTargets](Addresses, addresses)
+        targets = Targets(transitive_targets.closure - FrozenOrderedSet(transitive_targets.roots))
     else:
-        targets = await Get[HydratedTargets](Addresses, addresses)
-        direct_dependency_addresses = [
-            dep for target in targets for dep in target.adaptor.dependencies
-        ]
-        hydrated_targets = await Get[HydratedTargets](
-            Addresses, Addresses(direct_dependency_addresses)
+        target_roots = await Get[Targets](Addresses, addresses)
+        targets = await Get[Targets](
+            Addresses(
+                itertools.chain.from_iterable(
+                    tgt.get(DependenciesField).value or () for tgt in target_roots
+                )
+            )
         )
 
-    should_include_third_party = options.values.type in [
+    include_3rdparty = options.values.type in [
         DependencyType.THIRD_PARTY,
         DependencyType.SOURCE_AND_THIRD_PARTY,
     ]
-    should_include_source = options.values.type in [
+    include_source = options.values.type in [
         DependencyType.SOURCE,
         DependencyType.SOURCE_AND_THIRD_PARTY,
     ]
 
-    for target in hydrated_targets:
-        if should_include_third_party:
-            if isinstance(target.adaptor, PythonRequirementLibraryAdaptor):
+    address_strings = set()
+    third_party_requirements: Set[str] = set()
+    for tgt in targets:
+        if include_source:
+            address_strings.add(tgt.address.spec)
+        if include_3rdparty:
+            if tgt.has_field(PythonRequirementsField):
                 third_party_requirements.update(
-                    str(requirement.requirement) for requirement in target.adaptor.requirements
+                    str(python_req.requirement) for python_req in tgt[PythonRequirementsField].value
                 )
-                # TODO(#8762): Support jvm third party deps when there is some sort of JarLibraryAdaptor.
-        if should_include_source:
-            address_strings.update(
-                target.adaptor.address.spec for hydrated_target in hydrated_targets
-            )
+            if tgt.has_field(JarsField):
+                third_party_requirements.update(
+                    (
+                        f"{jar.org}:{jar.name}:{jar.rev}"
+                        if jar.rev is not None
+                        else f"{jar.org}:{jar.name}"
+                    )
+                    for jar in tgt[JarsField].value
+                )
 
     with options.line_oriented(console) as print_stdout:
         for address in sorted(address_strings):
@@ -99,6 +112,4 @@ async def dependencies(
 
 
 def rules():
-    return [
-        dependencies,
-    ]
+    return [dependencies]
