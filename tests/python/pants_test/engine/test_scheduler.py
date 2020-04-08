@@ -270,29 +270,20 @@ class SchedulerWithNestedRaiseTest(TestBase):
     def test_unhashable_failure(self):
         """Test that unhashable Get(...) params result in a structured error."""
 
-        def assert_has_cffi_extern_traceback_header(exc_str):
-            self.assertTrue(
-                exc_str.startswith(
-                    dedent(
-                        """\
-                        1 Exception raised in CFFI extern methods:
-                        Traceback (most recent call last):
-                        """
-                    )
-                ),
-                f"exc_str was: {exc_str}",
-            )
-
-        def assert_has_end_of_cffi_extern_error_traceback(exc_str):
-            self.assertIn(
+        def assert_has_cffi_extern_traceback_header(exception: str) -> None:
+            assert exception.startswith(
                 dedent(
                     """\
+                    1 Exception raised in CFFI extern methods:
                     Traceback (most recent call last):
-                      File LOCATION-INFO, in identify
-                        hash_ = hash(obj)
-                      File "<string>", line 2, in __hash__
-                    TypeError: unhashable type: 'list'
+                    """
+                )
+            )
 
+        def assert_has_end_of_cffi_extern_error_traceback(exception: str) -> None:
+            assert "TypeError: unhashable type: 'list'" in exception
+            canonical_exception_text = dedent(
+                """\
                     The above exception was the direct cause of the following exception:
 
                     Traceback (most recent call last):
@@ -302,10 +293,9 @@ class SchedulerWithNestedRaiseTest(TestBase):
                         raise TypeError(f"failed to hash object {obj}: {e}") from e
                     TypeError: failed to hash object CollectionType(items=[1, 2, 3]): unhashable type: 'list'
                     """
-                ),
-                exc_str,
-                f"exc_str was: {exc_str}",
             )
+
+            assert canonical_exception_text in exception
 
         resulting_engine_error = dedent(
             """\
@@ -318,8 +308,6 @@ class SchedulerWithNestedRaiseTest(TestBase):
         with self.assertRaises(ExecutionError) as cm:
             self.request_single_product(C, Params(CollectionType([1, 2, 3])))
         exc_str = remove_locations_from_traceback(str(cm.exception))
-        # TODO: convert these manual self.assertTrue() conditionals to a self.assertStartsWith() method
-        # in TestBase!
         assert_has_cffi_extern_traceback_header(exc_str)
         assert_has_end_of_cffi_extern_error_traceback(exc_str)
         self.assertIn(
