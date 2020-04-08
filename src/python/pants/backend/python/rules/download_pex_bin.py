@@ -37,16 +37,16 @@ class DownloadedPexBin(HermeticPex):
     class Factory(Script):
         options_scope = "download-pex-bin"
         name = "pex"
-        default_version = "v2.1.7"
+        default_version = "v2.1.9"
 
         # Note: You can compute the digest and size using:
         # curl -L https://github.com/pantsbuild/pex/releases/download/vX.Y.Z/pex | tee >(wc -c) >(shasum -a 256) >/dev/null
         default_versions_and_digests = {
             PlatformConstraint.none: ToolForPlatform(
                 digest=Digest(
-                    "375ab4a405a6db57f3afd8d60eca666e61931b44f156dc78ac7d8e47bddc96d6", 2620451
+                    "4e2677ce7270dd04d767e93e1904c90aa8c7f4f53b76f3615215970b45d100d7", 2624111
                 ),
-                version=ToolVersion("v2.1.7"),
+                version=ToolVersion("v2.1.9"),
             ),
         }
 
