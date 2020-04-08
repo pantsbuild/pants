@@ -17,7 +17,7 @@ class PythonAwsLambdaHandler(StringField):
 
 
 class PythonAWSLambda(Target):
-    """A self-contained Python function suitable for uploading to AWS Lambda.."""
+    """A self-contained Python function suitable for uploading to AWS Lambda."""
 
     alias = "python_awslambda"
     core_fields = (
