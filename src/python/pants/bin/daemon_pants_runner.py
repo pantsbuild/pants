@@ -1,6 +1,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import logging
 import sys
 import termios
 import time
@@ -11,6 +12,8 @@ from typing import Callable, Iterator, List, Mapping, Optional
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode, Exiter
 from pants.bin.local_pants_runner import LocalPantsRunner
+from pants.engine.rules import UnionMembership
+from pants.help.help_printer import HelpPrinter
 from pants.init.logging import encapsulated_global_logger
 from pants.init.specs_calculator import SpecsCalculator
 from pants.init.util import clean_global_runtime_state
@@ -24,6 +27,8 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.service.scheduler_service import SchedulerService
 from pants.util.contextutil import hermetic_environment_as, stdio_as
 from pants.util.socket import teardown_socket
+
+logger = logging.getLogger(__name__)
 
 
 class PantsRunFailCheckerExiter(Exiter):
@@ -251,7 +256,7 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
                 clean_global_runtime_state(reset_subsystem=True)
 
                 options_bootstrapper = OptionsBootstrapper.create(args=self.args, env=self.env)
-                options, _ = LocalPantsRunner.parse_options(options_bootstrapper)
+                options, build_config = LocalPantsRunner.parse_options(options_bootstrapper)
 
                 global_options = options.for_global_scope()
                 session = self.scheduler_service.prepare_graph(options)
@@ -263,16 +268,31 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
                     tags=tuple(global_options.tag) if global_options.tag else (),
                 )
 
-                exit_code = self.scheduler_service.graph_run_v2(
-                    session, specs, options, options_bootstrapper
-                )
-                with ExceptionSink.exiter_as_until_exception(lambda _: PantsRunFailCheckerExiter()):
-                    runner = LocalPantsRunner.create(self.env, options_bootstrapper, specs, session)
+                if options.help_request:
+                    help_printer = HelpPrinter(
+                        options=options,
+                        union_membership=UnionMembership(build_config.union_rules()),
+                    )
+                    exit_code = help_printer.print_help()
+                else:
+                    exit_code = self.scheduler_service.graph_run_v2(
+                        session, specs, options, options_bootstrapper
+                    )
 
-                    env_start_time = self.env.pop("PANTSD_RUNTRACKER_CLIENT_START_TIME", None)
-                    start_time = float(env_start_time) if env_start_time else None
-                    runner.set_start_time(start_time)
-                    runner.run()
+                # self.scheduler_service.graph_run_v2 will already run v2 or ambiguous goals. We should
+                # only enter this code path if v1 is set.
+                if global_options.v1:
+                    with ExceptionSink.exiter_as_until_exception(
+                        lambda _: PantsRunFailCheckerExiter()
+                    ):
+                        runner = LocalPantsRunner.create(
+                            self.env, options_bootstrapper, specs, session
+                        )
+
+                        env_start_time = self.env.pop("PANTSD_RUNTRACKER_CLIENT_START_TIME", None)
+                        start_time = float(env_start_time) if env_start_time else None
+                        runner.set_start_time(start_time)
+                        runner.run()
 
             except KeyboardInterrupt:
                 self._exiter.exit_and_fail("Interrupted by user.\n")
