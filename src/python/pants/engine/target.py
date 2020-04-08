@@ -23,6 +23,7 @@ from typing_extensions import final
 
 from pants.base.specs import OriginSpec
 from pants.build_graph.address import Address
+from pants.build_graph.app_base import Bundle
 from pants.engine.addressable import assert_single_address
 from pants.engine.fs import (
     EMPTY_SNAPSHOT,
@@ -31,6 +32,7 @@ from pants.engine.fs import (
     PathGlobs,
     Snapshot,
 )
+from pants.engine.legacy.structs import BundleAdaptor
 from pants.engine.objects import Collection
 from pants.engine.rules import RootRule, UnionMembership, rule
 from pants.engine.selectors import Get
@@ -953,16 +955,15 @@ class Sources(AsyncField):
         value_or_default = super().sanitize_raw_value(raw_value, address=address)
         if value_or_default is None:
             return None
-        invalid_field_type = InvalidFieldTypeException(
-            address,
-            cls.alias,
-            value_or_default,
-            expected_type="an iterable of strings (e.g. a list of strings)",
-        )
         try:
             ensure_str_list(value_or_default)
         except ValueError:
-            raise invalid_field_type
+            raise InvalidFieldTypeException(
+                address,
+                cls.alias,
+                value_or_default,
+                expected_type="an iterable of strings (e.g. a list of strings)",
+            )
         return tuple(sorted(value_or_default))
 
     def validate_snapshot(self, snapshot: Snapshot) -> None:
@@ -1098,6 +1099,45 @@ class ProvidesField(PrimitiveField):
 
     alias = "provides"
     default: ClassVar[Optional[Any]] = None
+
+
+# TODO: Add logic to hydrate this and convert it into V1 + work with `filedeps2`.
+class BundlesField(AsyncField):
+    """One or more `bundle` objects that describe "extra files" that should be included with this
+    app (e.g. config files, startup scripts)."""
+
+    alias = "bundles"
+    # TODO: What should this type be? Our goal is to get rid of `TargetAdaptor`, so
+    #  `BundleAdaptor` should likely go away.
+    sanitized_raw_value: Optional[Tuple[BundleAdaptor, ...]]
+    default = None
+
+    # NB: The type hint for `raw_value` is a lie. While we do expect end-users to use
+    # Iterable[Bundle], the TargetAdaptor code will have already converted those strings
+    # into a List[BundleAdaptor]. But, that's an implementation detail and we don't want our
+    # documentation, which is auto-generated from these type hints, to leak that.
+    @classmethod
+    def sanitize_raw_value(
+        cls, raw_value: Optional[Iterable[Bundle]], *, address: Address
+    ) -> Optional[Tuple[BundleAdaptor, ...]]:
+        value_or_default = super().sanitize_raw_value(raw_value, address=address)
+        if value_or_default is None:
+            return None
+        try:
+            ensure_list(value_or_default, expected_type=BundleAdaptor)
+        except ValueError:
+            raise InvalidFieldTypeException(
+                address,
+                cls.alias,
+                value_or_default,
+                expected_type="an iterable of `bundle` objects (e.g. a list)",
+            )
+        return cast(Tuple[BundleAdaptor, ...], tuple(value_or_default))
+
+    @final
+    @property
+    def request(self):
+        raise NotImplementedError
 
 
 def rules():

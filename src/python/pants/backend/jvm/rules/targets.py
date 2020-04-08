@@ -9,6 +9,7 @@ from pants.build_graph.address import Address
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
+    BundlesField,
     Dependencies,
     DictStringToStringField,
     DictStringToStringSequenceField,
@@ -22,6 +23,7 @@ from pants.engine.target import (
     StringSequenceField,
     Target,
 )
+from pants.fs.archive import TYPE_NAMES
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
 
@@ -449,10 +451,59 @@ class JunitTests(Target):
 # `jvm_app` target
 # -----------------------------------------------------------------------------------------------
 
-# TODO: create common code for App types, including the Bundle field.
+
+class JvmAppBinaryField(StringField):
+    """Target spec of the `jvm_binary` that contains the app main."""
+
+    alias = "binary"
+
+
+class JvmAppBasename(StringField):
+    """Name of this application, if different from the `name`.
+
+    Pants uses this in the `bundle` goal to name the distribution artifact.
+    """
+
+    alias = "basename"
+
+
+class JvmAppArchiveFormat(StringField):
+    """Create an archive of this type from the bundle."""
+
+    alias = "archive"
+    valid_choices = tuple(sorted(TYPE_NAMES))
+
+
+class JvmAppDeployJarToggle(BoolField):
+    """If True, pack all 3rdparty and internal JAR classfiles into a single deployjar in the
+    bundle's root dir.
+
+    If unset, all JARs will go into the bundle's libs directory; the root will only contain a
+    synthetic jar with its manifest's Class-Path set to those JARs.
+    """
+
+    alias = "deployjar"
+    default = False
+
+
 class JvmApp(Target):
+    """A deployable JVM application.
+
+    Invoking the `bundle` goal on one of these targets creates a self-contained artifact suitable
+    for deployment on some other machine. The artifact contains the executable JAR, its
+    dependencies, and extra files like config files, startup scripts, etc.
+    """
+
     alias = "jvm_app"
-    core_fields = ()
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        Dependencies,
+        BundlesField,
+        JvmAppBinaryField,
+        JvmAppBasename,
+        JvmAppArchiveFormat,
+        JvmAppDeployJarToggle,
+    )
 
 
 # -----------------------------------------------------------------------------------------------

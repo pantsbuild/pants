@@ -10,6 +10,7 @@ from pants.engine.fs import Snapshot
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
+    BundlesField,
     Dependencies,
     IntField,
     InvalidFieldException,
@@ -21,6 +22,7 @@ from pants.engine.target import (
     StringSequenceField,
     Target,
 )
+from pants.fs.archive import TYPE_NAMES
 from pants.python.python_requirement import PythonRequirement
 from pants.python.python_setup import PythonSetup
 from pants.rules.core.determine_source_files import SourceFiles
@@ -65,10 +67,46 @@ COMMON_PYTHON_FIELDS = (
 # `python_app` target
 # -----------------------------------------------------------------------------------------------
 
-# TODO: add support for apps, including `bundle`.
+
+class PythonAppBinaryField(StringField):
+    """Target spec of the `python_binary` that contains the app main."""
+
+    alias = "binary"
+
+
+class PythonAppBasename(StringField):
+    """Name of this application, if different from the `name`.
+
+    Pants uses this in the `bundle` goal to name the distribution artifact.
+    """
+
+    alias = "basename"
+
+
+class PythonAppArchiveFormat(StringField):
+    """Create an archive of this type from the bundle."""
+
+    alias = "archive"
+    valid_choices = tuple(sorted(TYPE_NAMES))
+
+
 class PythonApp(Target):
+    """A deployable Python application.
+
+    Invoking the `bundle` goal on one of these targets creates a self-contained artifact suitable
+    for deployment on some other machine. The artifact contains the executable PEX, its
+    dependencies, and extra files like config files, startup scripts, etc.
+    """
+
     alias = "python_app"
-    core_fields = ()
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        Dependencies,
+        BundlesField,
+        PythonAppBinaryField,
+        PythonAppBasename,
+        PythonAppArchiveFormat,
+    )
 
 
 # -----------------------------------------------------------------------------------------------
