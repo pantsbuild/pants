@@ -5,7 +5,12 @@
 
 from pants.backend.awslambda.common import awslambda_common_rules
 from pants.backend.awslambda.python import awslambda_python_rules
+from pants.backend.awslambda.python.targets import PythonAWSLambda
 
 
 def rules():
     return [*awslambda_common_rules.rules(), *awslambda_python_rules.rules()]
+
+
+def targets2():
+    return [PythonAWSLambda]
