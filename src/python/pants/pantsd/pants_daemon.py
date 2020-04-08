@@ -206,7 +206,9 @@ class PantsDaemon(FingerprintedProcessManager):
             :returns: A PantsServices instance.
             """
             should_shutdown_after_run = bootstrap_options.shutdown_pantsd_after_run
-            fs_event_service = FSEventService(watchman, build_root,)
+            fs_event_service = (
+                FSEventService(watchman, build_root,) if bootstrap_options.watchman_enable else None
+            )
 
             pidfile_absolute = PantsDaemon.metadata_file_path(
                 "pantsd", "pid", bootstrap_options.pants_subprocessdir
@@ -221,6 +223,7 @@ class PantsDaemon(FingerprintedProcessManager):
                     "pantsd processes."
                 )
 
+            # TODO make SchedulerService handle fs_event_service_being None
             scheduler_service = SchedulerService(
                 fs_event_service=fs_event_service,
                 legacy_graph_scheduler=legacy_graph_scheduler,
@@ -242,7 +245,16 @@ class PantsDaemon(FingerprintedProcessManager):
             store_gc_service = StoreGCService(legacy_graph_scheduler.scheduler)
 
             return PantsServices(
-                services=(fs_event_service, scheduler_service, pailgun_service, store_gc_service),
+                services=tuple(
+                    service
+                    for service in (
+                        fs_event_service,
+                        scheduler_service,
+                        pailgun_service,
+                        store_gc_service,
+                    )
+                    if service is not None
+                ),
                 port_map=dict(pailgun=pailgun_service.pailgun_port),
             )
 

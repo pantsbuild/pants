@@ -1,9 +1,11 @@
 use crate::nodes::{DigestFile, NodeKey, NodeResult};
 use crate::watch::InvalidationWatcher;
+use crossbeam_channel;
 use fs::{File, GitignoreStyleExcludes};
 use graph::entry::{EntryResult, EntryState, Generation, RunToken};
 use graph::{test_support::TestGraph, EntryId, Graph};
 use hashing::EMPTY_DIGEST;
+use notify;
 use std::fs::create_dir;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -143,4 +145,37 @@ fn ignore_file_events_matching_patterns_in_pants_ignore() {
       assert!(false, "Node was invalidated even though it was ignored")
     }
   }
+}
+
+#[test]
+fn test_liveness() {
+  init_logger();
+  let (tempdir, file_path) = setup_fs();
+  let build_root = tempdir.path().to_path_buf();
+  let (graph, _entry_id) = setup_graph(
+    file_path
+      .clone()
+      .strip_prefix(build_root.clone())
+      .unwrap()
+      .to_path_buf(),
+  );
+
+  let ignorer = GitignoreStyleExcludes::create(&[]).unwrap();
+  let (liveness_sender, liveness_receiver) = crossbeam_channel::unbounded();
+  let (event_sender, event_receiver) = crossbeam_channel::unbounded();
+  InvalidationWatcher::start_background_thread(
+    Arc::downgrade(&graph),
+    ignorer,
+    build_root,
+    liveness_sender,
+    event_receiver,
+  );
+  event_sender
+    .send(Err(notify::Error::generic(
+      "This should kill the background thread",
+    )))
+    .unwrap();
+  assert!(liveness_receiver
+    .recv_timeout(Duration::from_millis(100))
+    .is_ok());
 }
