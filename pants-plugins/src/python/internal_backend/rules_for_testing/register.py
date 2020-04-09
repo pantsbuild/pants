@@ -19,7 +19,7 @@ class ListAndDieForTesting(Goal):
 
 @goal_rule
 def fast_list_and_die_for_testing(console: Console, addresses: Addresses) -> ListAndDieForTesting:
-    for address in addresses.dependencies:
+    for address in addresses:
         console.print_stdout(address.spec)
     return ListAndDieForTesting(exit_code=42)
 

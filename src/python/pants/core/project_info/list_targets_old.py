@@ -89,7 +89,7 @@ async def list_targets(console: Console, list_options: ListOptions, addresses: A
         print_fn = lambda address: address.spec
 
     with list_options.line_oriented(console) as print_stdout:
-        if not collection.dependencies:
+        if not collection:
             console.print_stderr("WARNING: No targets were matched in goal `{}`.".format("list"))
 
         for item in collection:

@@ -68,7 +68,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         result = self.execute_expecting_one_result(
             scheduler, FilesContent, snapshot.directory_digest
         ).value
-        return {f.path: f.content for f in result.dependencies}
+        return {f.path: f.content for f in result}
 
     def assert_walk_dirs(self, filespecs_or_globs, paths, **kwargs):
         self.assert_walk_snapshot("dirs", filespecs_or_globs, paths, **kwargs)

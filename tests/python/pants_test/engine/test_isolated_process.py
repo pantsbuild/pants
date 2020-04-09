@@ -348,7 +348,7 @@ class IsolatedProcessTest(TestBase, unittest.TestCase):
         )
 
         self.assertEqual(
-            files_content_result.dependencies, (FileContent("roland", b"European Burmese", False),)
+            files_content_result, FilesContent([FileContent("roland", b"European Burmese", False)])
         )
 
     def test_timeout(self):
@@ -379,9 +379,7 @@ class Simple {
         )
 
         result = self.request_single_product(JavacCompileResult, request)
-        files_content = self.request_single_product(
-            FilesContent, result.directory_digest
-        ).dependencies
+        files_content = self.request_single_product(FilesContent, result.directory_digest)
 
         self.assertEqual(
             tuple(sorted(("simple/Simple.java", "simple/Simple.class",))),

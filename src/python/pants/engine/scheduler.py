@@ -650,7 +650,7 @@ class SchedulerSession:
         If you need to materialize multiple, you should use the parallel materialize_directories()
         instead.
         """
-        return self.materialize_directories((directory_to_materialize,)).dependencies[0]
+        return self.materialize_directories((directory_to_materialize,))[0]
 
     def materialize_directories(
         self, directories_to_materialize: Tuple[DirectoryToMaterialize, ...]

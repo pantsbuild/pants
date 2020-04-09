@@ -346,6 +346,9 @@ class AddressSpecs:
     def __iter__(self) -> Iterator[AddressSpec]:
         return iter(self.dependencies)
 
+    def __bool__(self) -> bool:
+        return bool(self.dependencies)
+
 
 class FilesystemSpec(Spec, metaclass=ABCMeta):
     pass
@@ -440,14 +443,12 @@ class FilesystemSpecs(Collection[FilesystemSpec]):
     @memoized_property
     def includes(self) -> Tuple[Union[FilesystemLiteralSpec, FilesystemGlobSpec], ...]:
         return tuple(
-            spec
-            for spec in self.dependencies
-            if isinstance(spec, (FilesystemGlobSpec, FilesystemLiteralSpec))
+            spec for spec in self if isinstance(spec, (FilesystemGlobSpec, FilesystemLiteralSpec))
         )
 
     @memoized_property
     def ignores(self) -> Tuple[FilesystemIgnoreSpec, ...]:
-        return tuple(spec for spec in self.dependencies if isinstance(spec, FilesystemIgnoreSpec))
+        return tuple(spec for spec in self if isinstance(spec, FilesystemIgnoreSpec))
 
     @staticmethod
     def _generate_path_globs(
@@ -489,7 +490,7 @@ class Specs:
     filesystem_specs: FilesystemSpecs
 
     def __post_init__(self) -> None:
-        if self.address_specs.dependencies and self.filesystem_specs.dependencies:
+        if self.address_specs and self.filesystem_specs:
             raise AmbiguousSpecs(
                 "Both address specs and filesystem specs given. Please use only one type of spec.\n\n"
                 f"Address specs: {', '.join(spec.to_spec_string() for spec in self.address_specs)}\n"
@@ -503,7 +504,7 @@ class Specs:
         It is guaranteed that there will only ever be AddressSpecs or FilesystemSpecs, but not both,
         through validation in the constructor.
         """
-        return self.filesystem_specs if self.filesystem_specs.dependencies else self.address_specs
+        return self.filesystem_specs if self.filesystem_specs else self.address_specs
 
 
 OriginSpec = Union[AddressSpec, FilesystemResolvedSpec]
