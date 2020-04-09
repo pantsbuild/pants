@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 COMMIT_MSG_FILEPATH=$1
-COMMIT_MSG_SRC=$2
 
 # NB: prepare-commit-msg runs in the context of GIT_WORK_TREE, ie: pwd == REPO_ROOT
 source build-support/common.sh
@@ -35,32 +34,32 @@ NUM_JVM_FILES=$(echo "${CHANGED_FILES})" | grep -c -E \
   -e "^tests/scala" \
   -e "^zinc")
 
-# Check if we were called with `--amend` to avoid putting skip labels multiple times.
-IS_AMEND=false
-if [ "${COMMIT_MSG_SRC}" = "commit" ]; then
-  IS_AMEND=true
-fi
+# To avoid putting skip labels multiple times, check if the labels already exist
+# in the commit message.
+grep "\[ci skip-rust-tests\]" "${COMMIT_MSG_FILEPATH}" > /dev/null
+HAS_RUST_SKIP=$?
+grep "\[ci skip-jvm-tests\]" "${COMMIT_MSG_FILEPATH}" > /dev/null
+HAS_JVM_SKIP=$?
+grep "\[ci skip\]" "${COMMIT_MSG_FILEPATH}" > /dev/null
+HAS_CI_SKIP=$?
 
-if [ "${IS_AMEND}" = "false" ] && [ "${NUM_NON_MD_FILES}" -eq 0 ]; then
+if [[ "${HAS_CI_SKIP}" -eq 1 ]] && [ "${NUM_NON_MD_FILES}" -eq 0 ]; then
 cat <<EOF >> "${COMMIT_MSG_FILEPATH}"
-
 # Delete this line to force a full CI run for documentation-only changes.
-[ci skip]  # Documentation-only change.
+[ci skip]
 EOF
 fi
 
-if [ "${IS_AMEND}" = "false" ] && [ "${NUM_RUST_FILES}" -eq 0 ]; then
+if [[ "${HAS_RUST_SKIP}" -eq 1 ]] && [ "${NUM_RUST_FILES}" -eq 0 ]; then
 cat <<EOF >> "${COMMIT_MSG_FILEPATH}"
-
 # Delete this line to force CI to run Clippy and the Rust tests.
-[ci skip-rust-tests]  # No Rust changes made.
+[ci skip-rust-tests]
 EOF
 fi
 
-if [ "${IS_AMEND}" = "false" ] && [ "${NUM_JVM_FILES}" -eq 0 ]; then
+if [[ "${HAS_JVM_SKIP}" -eq 1 ]] && [ "${NUM_JVM_FILES}" -eq 0 ]; then
 cat <<EOF >> "${COMMIT_MSG_FILEPATH}"
-
 # Delete this line to force CI to run the JVM tests.
-[ci skip-jvm-tests]  # No JVM changes made.
+[ci skip-jvm-tests]
 EOF
 fi
