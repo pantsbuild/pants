@@ -273,7 +273,11 @@ def deprecated(
 
 
 def deprecated_module(
-    removal_version: str, hint_message: Optional[str] = None, stacklevel: int = 3
+    removal_version: str,
+    hint_message: Optional[str] = None,
+    *,
+    stacklevel: int = 3,
+    deprecation_start_version: Optional[str] = None,
 ) -> None:
     """Marks an entire module as deprecated.
 
@@ -285,7 +289,13 @@ def deprecated_module(
     :param hint_message: An optional hint pointing to alternatives to the deprecation.
     :param stacklevel: The stacklevel to pass to warnings.warn.
     """
-    warn_or_error(removal_version, "module", hint_message, stacklevel=stacklevel)
+    warn_or_error(
+        removal_version,
+        "module",
+        hint_message,
+        stacklevel=stacklevel,
+        deprecation_start_version=deprecation_start_version,
+    )
 
 
 def resolve_conflicting_options(

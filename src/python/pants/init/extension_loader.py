@@ -45,7 +45,8 @@ def load_backends_and_plugins(
     if "pants.backend.python.lint.isort" in backends1:
         warn_or_error(
             deprecated_entity_description="The V1 isort implementation",
-            removal_version="1.29.0.dev0",
+            removal_version="1.30.0.dev0",
+            deprecation_start_version="1.28.0.dev0",
             hint=(
                 "The original isort implementation is being replaced by an improved implementation "
                 "made possible by the V2 engine. This new implementation brings these benefits:\n\n"
