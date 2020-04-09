@@ -14,18 +14,22 @@ from pants.backend.python.rules import (
     pytest_coverage,
     pytest_runner,
 )
-from pants.backend.python.rules.pytest_runner import PytestRunner
+from pants.backend.python.rules.pytest_runner import PythonTestConfiguration
+from pants.backend.python.rules.targets import PythonLibrary, PythonRequirementLibrary, PythonTests
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
-from pants.backend.python.targets.python_library import PythonLibrary
-from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
-from pants.backend.python.targets.python_tests import PythonTests
+from pants.backend.python.targets.python_library import PythonLibrary as PythonLibraryV1
+from pants.backend.python.targets.python_requirement_library import (
+    PythonRequirementLibrary as PythonRequirementLibraryV1,
+)
+from pants.backend.python.targets.python_tests import PythonTests as PythonTestsV1
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
+from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.fs import FileContent
 from pants.engine.interactive_runner import InteractiveRunner
-from pants.engine.legacy.structs import PythonTestsAdaptor, PythonTestsAdaptorWithOrigin
 from pants.engine.rules import RootRule, subsystem_rule
 from pants.engine.selectors import Params
+from pants.engine.target import TargetWithOrigin
 from pants.python.python_requirement import PythonRequirement
 from pants.rules.core import determine_source_files, strip_source_roots
 from pants.rules.core.test import Status, TestDebugRequest, TestOptions, TestResult
@@ -34,7 +38,9 @@ from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
 
-class PythonTestRunnerIntegrationTest(TestBase):
+# TODO: Figure out what testing should look like with the Target API. Should we still call
+#  self.add_to_build_file(), for example?
+class PytestRunnerIntegrationTest(TestBase):
 
     source_root = "tests/python/pants_test"
     good_source = FileContent(path="test_good.py", content=b"def test():\n  pass\n")
@@ -95,12 +101,16 @@ class PythonTestRunnerIntegrationTest(TestBase):
     def alias_groups(cls) -> BuildFileAliases:
         return BuildFileAliases(
             targets={
-                "python_library": PythonLibrary,
-                "python_tests": PythonTests,
-                "python_requirement_library": PythonRequirementLibrary,
+                "python_library": PythonLibraryV1,
+                "python_tests": PythonTestsV1,
+                "python_requirement_library": PythonRequirementLibraryV1,
             },
             objects={"python_requirement": PythonRequirement},
         )
+
+    @classmethod
+    def target_types(cls):
+        return [PythonLibrary, PythonTests, PythonRequirementLibrary]
 
     @classmethod
     def rules(cls):
@@ -117,7 +127,7 @@ class PythonTestRunnerIntegrationTest(TestBase):
             *strip_source_roots.rules(),
             *subprocess_environment.rules(),
             subsystem_rule(TestOptions),
-            RootRule(PytestRunner),
+            RootRule(PythonTestConfiguration),
         )
 
     def run_pytest(
@@ -132,18 +142,12 @@ class PythonTestRunnerIntegrationTest(TestBase):
         if passthrough_args:
             args.append(f"--pytest-args='{passthrough_args}'")
         options_bootstrapper = create_options_bootstrapper(args=args)
+        address = Address(self.source_root, "target")
         if origin is None:
-            origin = SingleAddress(directory=self.source_root, name="target")
-        # TODO: We must use the V1 target's `_sources_field.sources` field to set the TargetAdaptor's
-        # sources attribute. The adaptor will not auto-populate this field. However, it will
-        # auto-populate things like `dependencies` and this was not necessary before using
-        # PythonTestsAdaptorWithOrigin. Why is this necessary in test code?
-        v1_target = self.target(f"{self.source_root}:target")
-        adaptor = PythonTestsAdaptor(
-            address=v1_target.address.to_address(), sources=v1_target._sources_field.sources,
-        )
+            origin = SingleAddress(directory=address.spec_path, name=address.target_name)
+        tgt = PythonTests({}, address=address)
         params = Params(
-            PytestRunner(PythonTestsAdaptorWithOrigin(adaptor, origin)), options_bootstrapper
+            PythonTestConfiguration.create(TargetWithOrigin(tgt, origin)), options_bootstrapper
         )
         test_result = self.request_single_product(TestResult, params)
         debug_request = self.request_single_product(TestDebugRequest, params)
