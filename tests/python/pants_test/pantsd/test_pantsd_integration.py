@@ -200,7 +200,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                 # The runner can sometimes exit more slowly than the thin client caller.
                 time.sleep(3)
 
-    def test_pantsd_aligned_output(self):
+    def test_pantsd_aligned_output(self) -> None:
         # Set for pytest output display.
         self.maxDiff = None
 
@@ -216,8 +216,12 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             print(f"(cmd, run) = ({cmd}, {run.stdout_data}, {run.stderr_data})")
             self.assertNotEqual(run.stdout_data, "", f"Empty stdout for {cmd}")
 
-        for run_pairs in zip(non_daemon_runs, daemon_runs):
-            self.assertEqual(*(run.stdout_data for run in run_pairs))
+        for run_pair in zip(non_daemon_runs, daemon_runs):
+            non_daemon_stdout = run_pair[0].stdout_data
+            daemon_stdout = run_pair[1].stdout_data
+
+            for line_pair in zip(non_daemon_stdout.splitlines(), daemon_stdout.splitlines()):
+                assert line_pair[0] == line_pair[1]
 
     @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/7622")
     def test_pantsd_filesystem_invalidation(self):
