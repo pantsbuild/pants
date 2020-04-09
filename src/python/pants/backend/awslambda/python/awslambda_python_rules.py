@@ -27,7 +27,6 @@ from pants.backend.python.subsystems.subprocess_environment import SubprocessEnc
 from pants.engine.addressable import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge
 from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
-from pants.engine.legacy.structs import PythonAWSLambdaAdaptor
 from pants.engine.rules import UnionRule, named_rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.python.python_setup import PythonSetup
