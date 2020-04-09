@@ -793,6 +793,9 @@ class SequenceField(Generic[T], PrimitiveField, metaclass=ABCMeta):
 
 
 class StringSequenceField(SequenceField, metaclass=ABCMeta):
+    value: Optional[Tuple[str, ...]]
+    default: ClassVar[Optional[Tuple[str, ...]]] = None
+
     expected_element_type = str
     expected_type_description = "an iterable of strings (e.g. a list of strings)"
 
@@ -811,6 +814,9 @@ class StringOrStringSequenceField(SequenceField, metaclass=ABCMeta):
 
     Generally, this should not be used by any new Fields. This mechanism is a misfeature.
     """
+
+    value: Optional[Tuple[str, ...]]
+    default: ClassVar[Optional[Tuple[str, ...]]] = None
 
     expected_element_type = str
     expected_type_description = (

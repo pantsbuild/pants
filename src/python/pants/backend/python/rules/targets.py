@@ -58,6 +58,8 @@ class PythonInterpreterCompatibility(StringOrStringSequenceField):
 COMMON_PYTHON_FIELDS = (
     *COMMON_TARGET_FIELDS,
     Dependencies,
+    # TODO(#9388): Only register the Provides field on PythonBinary and PythonLibrary, not things
+    #  like PythonTests.
     ProvidesField,
     PythonInterpreterCompatibility,
 )
@@ -185,22 +187,6 @@ class PexAlwaysWriteCache(BoolField):
     default = False
 
 
-class PexRepositories(StringOrStringSequenceField):
-    """Repositories for Pex to query for dependencies."""
-
-    alias = "repositories"
-
-
-class PexIndexes(StringOrStringSequenceField):
-    """Additional indices for Pex to use for packages.
-
-    If set to an empty list, i.e. `indices=[]`, then Pex will use no indices (meaning it will not
-    use PyPI).
-    """
-
-    alias = "indices"
-
-
 class PexIgnoreErrors(BoolField):
     """Should we ignore when Pex cannot resolve dependencies?"""
 
@@ -241,8 +227,6 @@ class PythonBinary(Target):
         PexInheritPath,
         PexZipSafe,
         PexAlwaysWriteCache,
-        PexRepositories,
-        PexIndexes,
         PexIgnoreErrors,
         PexShebang,
         PexEmitWarnings,

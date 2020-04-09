@@ -199,7 +199,7 @@ def assert_equal_with_printing(
     test_case.assertEqual(expected, str_actual)
 
 
-def remove_locations_from_traceback(trace):
+def remove_locations_from_traceback(trace: str) -> str:
     location_pattern = re.compile(r'"/.*", line \d+')
     address_pattern = re.compile(r"0x[0-9a-f]+")
     new_trace = location_pattern.sub("LOCATION-INFO", trace)

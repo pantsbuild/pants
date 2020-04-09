@@ -4,6 +4,7 @@
 contrib_plugin(
   name='plugin',
   dependencies=[
+    'contrib/awslambda/python/src/python/pants/contrib/awslambda/python/rules',
     'contrib/awslambda/python/src/python/pants/contrib/awslambda/python/subsystems',
     'contrib/awslambda/python/src/python/pants/contrib/awslambda/python/targets',
     'contrib/awslambda/python/src/python/pants/contrib/awslambda/python/tasks',

@@ -67,8 +67,6 @@ class PythonBinary(PythonTarget):
         inherit_path=False,  # pex option
         zip_safe=True,  # pex option
         always_write_cache=False,  # pex option
-        repositories=None,  # pex option
-        indices=None,  # pex option
         ignore_errors=False,  # pex option
         shebang=None,  # pex option
         emit_warnings=None,  # pex option
@@ -87,8 +85,6 @@ class PythonBinary(PythonTarget):
         :param zip_safe: whether or not this binary is safe to run in compacted (zip-file) form
         :param always_write_cache: whether or not the .deps cache of this PEX file should always
           be written to disk.
-        :param repositories: a list of repositories to query for dependencies.
-        :param indices: a list of indices to use for packages.
         :param ignore_errors: should we ignore inability to resolve dependencies?
         :param str shebang: Use this shebang for the generated pex.
         :param bool emit_warnings: Whether or not to emit pex warnings.
@@ -109,10 +105,6 @@ class PythonBinary(PythonTarget):
                 "inherit_path": PrimitiveField(inherit_path),
                 "zip_safe": PrimitiveField(bool(zip_safe)),
                 "always_write_cache": PrimitiveField(bool(always_write_cache)),
-                "repositories": PrimitiveField(
-                    ensure_str_list(repositories or [], allow_single_str=True)
-                ),
-                "indices": PrimitiveField(ensure_str_list(indices or [], allow_single_str=True)),
                 "ignore_errors": PrimitiveField(bool(ignore_errors)),
                 "platforms": PrimitiveField(
                     tuple(ensure_str_list(platforms or [], allow_single_str=True))
@@ -148,16 +140,6 @@ class PythonBinary(PythonTarget):
     def platforms(self):
         return self.payload.platforms
 
-    # TODO(wickman) These should likely be attributes on PythonLibrary targets
-    # and not PythonBinary targets, or at the very worst, both.
-    @property
-    def repositories(self):
-        return self.payload.repositories
-
-    @property
-    def indices(self):
-        return self.payload.indices
-
     @classmethod
     def translate_source_path_to_py_module_specifier(self, source: str) -> str:
         source_base, _ = os.path.splitext(source)
@@ -181,10 +163,6 @@ class PythonBinary(PythonTarget):
     @property
     def pexinfo(self):
         info = PexInfo.default()
-        for repo in self.repositories:
-            info.add_repository(repo)
-        for index in self.indices:
-            info.add_index(index)
         info.zip_safe = self.payload.zip_safe
         info.always_write_cache = self.payload.always_write_cache
         info.inherit_path = self.payload.inherit_path
