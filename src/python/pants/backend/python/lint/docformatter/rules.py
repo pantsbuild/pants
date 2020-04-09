@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Tuple
 
 from pants.backend.python.lint.docformatter.subsystem import Docformatter
-from pants.backend.python.lint.python_formatter import PythonFormatter
+from pants.backend.python.lint.python_formatter import PythonFmtConfigurations
 from pants.backend.python.rules import download_pex_bin, pex
 from pants.backend.python.rules.pex import (
     Pex,
@@ -13,31 +13,39 @@ from pants.backend.python.rules.pex import (
     PexRequest,
     PexRequirements,
 )
+from pants.backend.python.rules.targets import PythonSources
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.fs import Digest, DirectoriesToMerge
 from pants.engine.isolated_process import FallibleProcessResult, Process, ProcessResult
+from pants.engine.objects import Collection
 from pants.engine.rules import UnionRule, named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.python.python_setup import PythonSetup
 from pants.rules.core import determine_source_files, strip_source_roots
 from pants.rules.core.determine_source_files import (
-    LegacyAllSourceFilesRequest,
-    LegacySpecifiedSourceFilesRequest,
+    AllSourceFilesRequest,
     SourceFiles,
+    SpecifiedSourceFilesRequest,
 )
-from pants.rules.core.fmt import FmtResult
-from pants.rules.core.lint import Linter, LintResult
+from pants.rules.core.fmt import FmtConfiguration, FmtConfigurations, FmtResult
+from pants.rules.core.lint import LinterConfigurations, LintResult
 
 
 @dataclass(frozen=True)
-class DocformatterFormatter(PythonFormatter):
-    pass
+class DocformatterConfiguration(FmtConfiguration):
+    required_fields = (PythonSources,)
+
+    sources: PythonSources
+
+
+class DocformatterConfigurations(FmtConfigurations, Collection[DocformatterConfiguration]):
+    config_type = DocformatterConfiguration
 
 
 @dataclass(frozen=True)
 class SetupRequest:
-    formatter: DocformatterFormatter
+    configs: DocformatterConfigurations
     check_only: bool
 
 
@@ -63,8 +71,6 @@ async def setup(
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> Setup:
-    adaptors_with_origins = request.formatter.adaptors_with_origins
-
     requirements_pex = await Get[Pex](
         PexRequest(
             output_filename="docformatter.pex",
@@ -76,18 +82,16 @@ async def setup(
         )
     )
 
-    if request.formatter.prior_formatter_result is None:
+    if request.configs.prior_formatter_result is None:
         all_source_files = await Get[SourceFiles](
-            LegacyAllSourceFilesRequest(
-                adaptor_with_origin.adaptor for adaptor_with_origin in adaptors_with_origins
-            )
+            AllSourceFilesRequest(config.sources for config in request.configs)
         )
         all_source_files_snapshot = all_source_files.snapshot
     else:
-        all_source_files_snapshot = request.formatter.prior_formatter_result
+        all_source_files_snapshot = request.configs.prior_formatter_result
 
     specified_source_files = await Get[SourceFiles](
-        LegacySpecifiedSourceFilesRequest(adaptors_with_origins)
+        SpecifiedSourceFilesRequest((config.sources, config.origin) for config in request.configs)
     )
 
     merged_input_files = await Get[Digest](
@@ -99,12 +103,7 @@ async def setup(
         ),
     )
 
-    address_references = ", ".join(
-        sorted(
-            adaptor_with_origin.adaptor.address.reference()
-            for adaptor_with_origin in adaptors_with_origins
-        )
-    )
+    address_references = ", ".join(sorted(config.address.reference() for config in request.configs))
 
     process = requirements_pex.create_execute_request(
         python_setup=python_setup,
@@ -124,22 +123,22 @@ async def setup(
 
 @named_rule(desc="Format Python docstrings with docformatter")
 async def docformatter_fmt(
-    formatter: DocformatterFormatter, docformatter: Docformatter
+    configs: DocformatterConfigurations, docformatter: Docformatter
 ) -> FmtResult:
     if docformatter.options.skip:
         return FmtResult.noop()
-    setup = await Get[Setup](SetupRequest(formatter, check_only=False))
+    setup = await Get[Setup](SetupRequest(configs, check_only=False))
     result = await Get[ProcessResult](Process, setup.process)
     return FmtResult.from_process_result(result)
 
 
 @named_rule(desc="Lint Python docstrings with docformatter")
 async def docformatter_lint(
-    formatter: DocformatterFormatter, docformatter: Docformatter
+    configs: DocformatterConfigurations, docformatter: Docformatter
 ) -> LintResult:
     if docformatter.options.skip:
         return LintResult.noop()
-    setup = await Get[Setup](SetupRequest(formatter, check_only=True))
+    setup = await Get[Setup](SetupRequest(configs, check_only=True))
     result = await Get[FallibleProcessResult](Process, setup.process)
     return LintResult.from_fallible_process_result(result)
 
@@ -150,8 +149,8 @@ def rules():
         docformatter_fmt,
         docformatter_lint,
         subsystem_rule(Docformatter),
-        UnionRule(PythonFormatter, DocformatterFormatter),
-        UnionRule(Linter, DocformatterFormatter),
+        UnionRule(PythonFmtConfigurations, DocformatterConfigurations),
+        UnionRule(LinterConfigurations, DocformatterConfigurations),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),
         *pex.rules(),

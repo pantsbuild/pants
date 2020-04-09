@@ -3,49 +3,60 @@
 
 from abc import ABCMeta
 from dataclasses import dataclass
-from typing import Iterable, List, Optional, Type
+from typing import Iterable, List, Type
 
-from pants.backend.python.lint.python_linter import PYTHON_TARGET_TYPES, PythonLinter
+from pants.backend.python.rules.targets import PythonSources
 from pants.engine.fs import Digest, Snapshot
-from pants.engine.legacy.structs import TargetAdaptorWithOrigin
 from pants.engine.objects import union
 from pants.engine.rules import UnionMembership, UnionRule, rule
 from pants.engine.selectors import Get
-from pants.rules.core.determine_source_files import LegacyAllSourceFilesRequest, SourceFiles
-from pants.rules.core.fmt import FmtResult, Formatter, LanguageFmtResults, LanguageFormatters
+from pants.rules.core.determine_source_files import AllSourceFilesRequest, SourceFiles
+from pants.rules.core.fmt import (
+    FmtConfigurations,
+    FmtResult,
+    LanguageFmtResults,
+    LanguageFmtTargets,
+)
+
+
+@dataclass(frozen=True)
+class PythonFmtTargets(LanguageFmtTargets):
+    required_fields = (PythonSources,)
 
 
 @union
-@dataclass(frozen=True)
-class PythonFormatter(Formatter, PythonLinter, metaclass=ABCMeta):
-    prior_formatter_result: Optional[Snapshot] = None
-
-
-@dataclass(frozen=True)
-class PythonFormatters(LanguageFormatters):
-    @staticmethod
-    def belongs_to_language(adaptor_with_origin: TargetAdaptorWithOrigin) -> bool:
-        return isinstance(adaptor_with_origin, PYTHON_TARGET_TYPES)
+class PythonFmtConfigurations(FmtConfigurations, metaclass=ABCMeta):
+    pass
 
 
 @rule
 async def format_python_target(
-    python_formatters: PythonFormatters, union_membership: UnionMembership
+    python_fmt_targets: PythonFmtTargets, union_membership: UnionMembership
 ) -> LanguageFmtResults:
-    adaptors_with_origins = python_formatters.adaptors_with_origins
+    targets_with_origins = python_fmt_targets.targets_with_origins
+    # import pdb; pdb.set_trace()
     original_sources = await Get[SourceFiles](
-        LegacyAllSourceFilesRequest(
-            adaptor_with_origin.adaptor for adaptor_with_origin in adaptors_with_origins
+        AllSourceFilesRequest(
+            target_with_origin.target[PythonSources]
+            for target_with_origin in python_fmt_targets.targets_with_origins
         )
     )
     prior_formatter_result = original_sources.snapshot
 
     results: List[FmtResult] = []
-    formatters: Iterable[Type[PythonFormatter]] = union_membership.union_rules[PythonFormatter]
-    for formatter in formatters:
+    config_collection_types: Iterable[Type[PythonFmtConfigurations]] = union_membership.union_rules[
+        PythonFmtConfigurations
+    ]
+    for config_collection_type in config_collection_types:
         result = await Get[FmtResult](
-            PythonFormatter,
-            formatter(adaptors_with_origins, prior_formatter_result=prior_formatter_result),
+            PythonFmtConfigurations,
+            config_collection_type(
+                (
+                    config_collection_type.config_type.create(target_with_origin)
+                    for target_with_origin in targets_with_origins
+                ),
+                prior_formatter_result=prior_formatter_result,
+            ),
         )
         if result != FmtResult.noop():
             results.append(result)
@@ -56,4 +67,4 @@ async def format_python_target(
 
 
 def rules():
-    return [format_python_target, UnionRule(LanguageFormatters, PythonFormatters)]
+    return [format_python_target, UnionRule(LanguageFmtTargets, PythonFmtTargets)]
