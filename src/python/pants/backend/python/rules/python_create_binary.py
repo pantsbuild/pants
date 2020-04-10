@@ -4,8 +4,11 @@
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
-from pants.backend.python.rules.pex import Pex
-from pants.backend.python.rules.pex_from_targets import PexFromTargetsRequest
+from pants.backend.python.rules.pex import TwoStepPex
+from pants.backend.python.rules.pex_from_targets import (
+    PexFromTargetsRequest,
+    TwoStepPexFromTargetsRequest,
+)
 from pants.backend.python.rules.targets import (
     PexAlwaysWriteCache,
     PexEmitWarnings,
@@ -73,14 +76,17 @@ async def create_python_binary(config: PythonBinaryConfiguration) -> CreatedBina
         else:
             entry_point = None
 
-    pex = await Get[Pex](
-        PexFromTargetsRequest(
-            addresses=Addresses([config.address]),
-            entry_point=entry_point,
-            output_filename=f"{config.address.target_name}.pex",
-            additional_args=config.generate_additional_args(),
+    two_step_pex = await Get[TwoStepPex](
+        TwoStepPexFromTargetsRequest(
+            PexFromTargetsRequest(
+                addresses=Addresses([config.address]),
+                entry_point=entry_point,
+                output_filename=f"{config.address.target_name}.pex",
+                additional_args=config.generate_additional_args(),
+            )
         )
     )
+    pex = two_step_pex.pex
     return CreatedBinary(digest=pex.directory_digest, binary_name=pex.output_filename)
 
 
