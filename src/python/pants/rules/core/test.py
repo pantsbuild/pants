@@ -109,7 +109,7 @@ class TestConfiguration(ABC):
         all_expected_fields: Dict[str, Type[Field]] = {
             dataclass_field.name: dataclass_field.type
             for dataclass_field in dataclasses.fields(cls)
-            if issubclass(dataclass_field.type, Field)
+            if isinstance(dataclass_field.type, type) and issubclass(dataclass_field.type, Field)  # type: ignore[misc]
         }
         tgt = target_with_origin.target
         return cls(
