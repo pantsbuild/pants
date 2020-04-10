@@ -246,6 +246,8 @@ class PythonLibrarySources(PythonSources):
 
 
 class PythonLibrary(Target):
+    """A Python library that may be imported by other targets."""
+
     alias = "python_library"
     core_fields = (*COMMON_PYTHON_FIELDS, PythonLibrarySources)
 
