@@ -111,6 +111,7 @@ class PythonApp(Target):
         PythonAppBasename,
         PythonAppArchiveFormat,
     )
+    v1_only = True
 
 
 # -----------------------------------------------------------------------------------------------
@@ -245,6 +246,8 @@ class PythonLibrarySources(PythonSources):
 
 
 class PythonLibrary(Target):
+    """A Python library that may be imported by other targets."""
+
     alias = "python_library"
     core_fields = (*COMMON_PYTHON_FIELDS, PythonLibrarySources)
 
@@ -359,6 +362,7 @@ class PythonDistribution(Target):
         PythonDistributionSources,
         PythonDistributionSetupRequires,
     )
+    v1_only = True
 
 
 # -----------------------------------------------------------------------------------------------
@@ -486,3 +490,4 @@ class UnpackedWheels(Target):
         UnpackedWheelsExcludePatterns,
         UnpackedWheelsWithinDataSubdir,
     )
+    v1_only = True

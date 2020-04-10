@@ -96,7 +96,7 @@ class AliasDependencies(Dependencies):
     """
 
 
-# TODO: figure out how to support aliases in V2. Is this a simple example of codegen, perhaps?
+# TODO: figure out how to support aliases in V2. When adding support, unmark this as `v1_only`.
 class AliasTarget(Target):
     """A target that gets replaced by the address specified in the `target` field.
 
@@ -105,6 +105,7 @@ class AliasTarget(Target):
 
     alias = "alias"
     core_fields = (*COMMON_TARGET_FIELDS, AliasDependencies, AliasTargetRequestedAddress)
+    v1_only = True
 
 
 # -----------------------------------------------------------------------------------------------
@@ -166,6 +167,7 @@ class PrepCommand(Target):
         PrepCommandEnviron,
         PrepCommandGoals,
     )
+    v1_only = True
 
 
 # -----------------------------------------------------------------------------------------------
@@ -240,3 +242,4 @@ class RemoteSources(Target):
         RemoteSourcesTargetType,
         RemoteSourcesArgs,
     )
+    v1_only = True

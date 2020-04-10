@@ -79,3 +79,4 @@ class JavaThriftLibrary(Target):
         JavaThriftIncludePaths,
         JavaThriftCompilerArgs,
     )
+    v1_only = True

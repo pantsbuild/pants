@@ -14,3 +14,4 @@ class JavaThriftyLibrary(Target):
 
     alias = "java_thrifty_library"
     core_fields = (*COMMON_JVM_FIELDS, JavaThriftySources)
+    v1_only = True

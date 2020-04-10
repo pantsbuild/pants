@@ -10,3 +10,4 @@ class JavaAvroLibrary(Target):
 
     alias = "java_avro_library"
     core_fields = (*COMMON_JVM_FIELDS, Sources)
+    v1_only = True

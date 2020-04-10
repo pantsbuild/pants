@@ -26,3 +26,4 @@ class PythonAWSLambda(Target):
         PythonAwsLambdaBinaryField,
         PythonAwsLambdaHandler,
     )
+    v1_only = True

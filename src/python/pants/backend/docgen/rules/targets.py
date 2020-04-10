@@ -78,3 +78,4 @@ class Page(Target):
 
     alias = "page"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, PageSources, PageSourcesFormat, PageLinks)
+    v1_only = True

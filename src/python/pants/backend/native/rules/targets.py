@@ -99,6 +99,7 @@ class CLibrary(Target):
 
     alias = "ctypes_compatible_c_library"
     core_fields = (*NATIVE_LIBRARY_COMMON_FIELDS, CSources)
+    v1_only = True
 
 
 class CppLibrary(Target):
@@ -106,6 +107,7 @@ class CppLibrary(Target):
 
     alias = "ctypes_compatible_cpp_library"
     core_fields = (*NATIVE_LIBRARY_COMMON_FIELDS, CppSources)
+    v1_only = True
 
 
 # -----------------------------------------------------------------------------------------------
@@ -134,6 +136,7 @@ class ConanNativeLibrary(Target):
 
     alias = "external_native_library"
     core_fields = (*COMMON_TARGET_FIELDS, ConanPackages)
+    v1_only = True
 
 
 # -----------------------------------------------------------------------------------------------
@@ -223,3 +226,4 @@ class PackagedNativeLibrary(Target):
         NativeLibRelpath,
         NativeLibNames,
     )
+    v1_only = True

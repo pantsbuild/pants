@@ -10,3 +10,4 @@ class PythonGrpcioLibrary(Target):
 
     alias = "python_grpcio_library"
     core_fields = (*COMMON_PYTHON_FIELDS, Sources)
+    v1_only = True

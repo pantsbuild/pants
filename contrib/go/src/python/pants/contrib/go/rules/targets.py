@@ -36,6 +36,7 @@ class GoBinary(Target):
 
     alias = "go_binary"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, GoSources, GoBuildFlags)
+    v1_only = True
 
 
 # -----------------------------------------------------------------------------------------------
@@ -48,6 +49,7 @@ class GoLibrary(Target):
 
     alias = "go_library"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, GoSources)
+    v1_only = True
 
 
 # -----------------------------------------------------------------------------------------------
@@ -70,6 +72,7 @@ class GoProtobufLibrary(Target):
 
     alias = "go_protobuf_library"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, GoProtobufSources, ProtocPlugins)
+    v1_only = True
 
 
 # -----------------------------------------------------------------------------------------------
@@ -82,6 +85,7 @@ class GoThriftLibrary(Target):
 
     alias = "go_thrift_library"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, Sources)
+    v1_only = True
 
 
 # -----------------------------------------------------------------------------------------------
@@ -115,6 +119,7 @@ class GoRemoteLibrary(Target):
 
     alias = "go_remote_library"
     core_fields = (*COMMON_TARGET_FIELDS, GoPackage, GoRevision)
+    v1_only = True
 
 
 class GoPackages(StringSequenceField):
@@ -132,3 +137,4 @@ class GoRemoteLibraries(Target):
 
     alias = "go_remote_libraries"
     core_fields = (*COMMON_TARGET_FIELDS, GoPackages, GoRevision)
+    v1_only = True

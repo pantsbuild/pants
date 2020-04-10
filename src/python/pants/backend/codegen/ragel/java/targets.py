@@ -10,3 +10,4 @@ class JavaRagelLibrary(Target):
 
     alias = "java_ragel_library"
     core_fields = (*COMMON_JVM_FIELDS, Sources)
+    v1_only = True

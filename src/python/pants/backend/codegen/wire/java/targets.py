@@ -85,3 +85,4 @@ class JavaWireLibrary(Target):
         JavaWireNoOptionsToggle,
         JavaWireOrderedSources,
     )
+    v1_only = True

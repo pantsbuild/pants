@@ -69,6 +69,7 @@ class NodeBundle(Target):
 
     alias = "node_bundle"
     core_fields = (*COMMON_NODE_FIELDS, NodeBundleArchiveFormat, NodeBundleRequestedModule)
+    v1_only = True
 
 
 # -----------------------------------------------------------------------------------------------
@@ -193,6 +194,7 @@ class NodeModule(Target):
         NodeBinExecutables,
         NodeScope,
     )
+    v1_only = True
 
 
 # -----------------------------------------------------------------------------------------------
@@ -215,6 +217,7 @@ class NodePreinstalledModule(Target):
 
     alias = "node_preinstalled_module"
     core_fields = (*NodeModule.core_fields, NodeDependenciesArchiveUrl)
+    v1_only = True
 
 
 # -----------------------------------------------------------------------------------------------
@@ -239,6 +242,7 @@ class NodeRemoteModule(Target):
 
     alias = "node_remote_module"
     core_fields = (*COMMON_NODE_FIELDS, NodeRemoteVersion)
+    v1_only = True
 
 
 # -----------------------------------------------------------------------------------------------
@@ -271,3 +275,4 @@ class NodeTest(Target):
         NodeTestScriptName,
         NodeTestTimeout,
     )
+    v1_only = True
