@@ -328,3 +328,16 @@ def resolve_conflicting_options(
     if old_configured:
         return old_container.get(old_option)
     return new_container.get(new_option)
+
+
+def _deprecated_contrib_plugin(plugin_name: str) -> None:
+    warn_or_error(
+        removal_version="1.29.0.dev0",
+        deprecated_entity_description=f"the {plugin_name} plugin",
+        hint=(
+            f"The {repr(plugin_name)} plugin is being removed due to low usage.\n\nTo prepare for "
+            f"this change, please remove {repr(plugin_name)} from 'plugins' in `pants.toml` or "
+            "`pants.ini`.\n\nIf you still depend on this plugin, please email us at "
+            "pantsbuild@gmail.com or message us on Slack and we will keep this plugin."
+        ),
+    )

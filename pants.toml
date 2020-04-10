@@ -76,6 +76,9 @@ backend_packages2 = [
   "pants.backend.native",
   "internal_backend.rules_for_testing",
 ]
+ignore_pants_warnings = [
+  "DEPRECATED: the pantsbuild.pants.contrib"
+]
 
 # The pants script in this repo consumes these files to run pants
 pantsd_invalidation_globs.add = ["src/python/**/*.py"]

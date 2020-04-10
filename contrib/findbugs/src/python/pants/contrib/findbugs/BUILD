@@ -9,7 +9,7 @@ contrib_plugin(
     'src/python/pants/goal:task_registrar',
   ],
   distribution_name='pantsbuild.pants.contrib.findbugs',
-  description='FindBugs pants plugin',
+  description='FindBugs pants plugin (deprecated)',
   register_goals=True,
   tags = {"partially_type_checked"},
 )

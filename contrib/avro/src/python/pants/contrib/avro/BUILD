@@ -11,7 +11,7 @@ contrib_plugin(
     'src/python/pants/goal:task_registrar',
   ],
   distribution_name='pantsbuild.pants.contrib.avro',
-  description='Avro Java code generation support for pants',
+  description='Avro Java code generation support for pants (deprecated)',
   build_file_aliases=True,
   register_goals=True,
   tags = {"partially_type_checked"},
