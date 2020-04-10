@@ -194,7 +194,8 @@ class PexRequest:
     output_filename: str
     requirements: PexRequirements
     interpreter_constraints: PexInterpreterConstraints
-    input_files_digest: Optional[Digest]
+    sources: Optional[Digest]
+    additional_inputs: Optional[Digest]
     entry_point: Optional[str]
     additional_args: Tuple[str, ...]
 
@@ -204,14 +205,16 @@ class PexRequest:
         output_filename: str,
         requirements: PexRequirements = PexRequirements(),
         interpreter_constraints=PexInterpreterConstraints(),
-        input_files_digest: Optional[Digest] = None,
+        sources: Optional[Digest] = None,
+        additional_inputs: Optional[Digest] = None,
         entry_point: Optional[str] = None,
         additional_args: Iterable[str] = (),
     ) -> None:
         self.output_filename = output_filename
         self.requirements = requirements
         self.interpreter_constraints = interpreter_constraints
-        self.input_files_digest = input_files_digest
+        self.sources = sources
+        self.additional_inputs = additional_inputs
         self.entry_point = entry_point
         self.additional_args = tuple(additional_args)
 
@@ -314,18 +317,17 @@ async def create_pex(
             )
         )
 
-    sources_digest = (
-        request.input_files_digest if request.input_files_digest else EMPTY_DIRECTORY_DIGEST
-    )
     sources_digest_as_subdir = await Get[Digest](
-        DirectoryWithPrefixToAdd(sources_digest, source_dir_name)
+        DirectoryWithPrefixToAdd(request.sources or EMPTY_DIRECTORY_DIGEST, source_dir_name)
     )
+    additional_inputs_digest = request.additional_inputs or EMPTY_DIRECTORY_DIGEST
 
     merged_digest = await Get[Digest](
         DirectoriesToMerge(
             directories=(
                 pex_bin.directory_digest,
                 sources_digest_as_subdir,
+                additional_inputs_digest,
                 constraint_file_snapshot.directory_digest,
             )
         )
