@@ -87,7 +87,13 @@ class AliasTargetRequestedAddress(StringField):
     `src/python/project:lib`."""
 
     alias = "target"
-    required = True
+
+
+class AliasDependencies(Dependencies):
+    """This field must not be explicitly defined for `alias` targets.
+
+    The `alias()` macro will fill in the value automatically.
+    """
 
 
 # TODO: figure out how to support aliases in V2. Is this a simple example of codegen, perhaps?
@@ -98,7 +104,7 @@ class AliasTarget(Target):
     """
 
     alias = "alias"
-    core_fields = (*COMMON_TARGET_FIELDS, AliasTargetRequestedAddress)
+    core_fields = (*COMMON_TARGET_FIELDS, AliasDependencies, AliasTargetRequestedAddress)
 
 
 # -----------------------------------------------------------------------------------------------
