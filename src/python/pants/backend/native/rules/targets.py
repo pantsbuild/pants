@@ -42,14 +42,13 @@ class CtypesNativeLibrary(ScalarField):
     alias = "ctypes_native_library"
     expected_type = NativeArtifact
     expected_type_description = "a `native_artifact` object"
-    value: NativeArtifact
-    required = True
+    value: Optional[NativeArtifact]
 
     @classmethod
     def compute_value(
         cls, raw_value: Optional[NativeArtifact], *, address: Address
-    ) -> NativeArtifact:
-        return cast(NativeArtifact, super().compute_value(raw_value, address=address))
+    ) -> Optional[NativeArtifact]:
+        return super().compute_value(raw_value, address=address)
 
 
 class NativeFatalWarnings(BoolField):
@@ -81,7 +80,7 @@ class ToolchainVariantField(StringField):
 
 
 class NativeCompilerOptionSets(StringSequenceField):
-    alias = "compiler_options_sets"
+    alias = "compiler_option_sets"
 
 
 NATIVE_LIBRARY_COMMON_FIELDS = (

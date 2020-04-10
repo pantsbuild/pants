@@ -34,7 +34,9 @@ from pants.rules.core.targets import FilesSources
 
 
 class PythonSources(Sources):
-    expected_file_extensions = (".py",)
+    # We allow `.c` for compatibility with native wheels, e.g. `src/python/pants:pants-packaged`.
+    # This should possibly be revisited.
+    expected_file_extensions = (".py", ".c")
 
 
 class PythonInterpreterCompatibility(StringOrStringSequenceField):
@@ -353,7 +355,7 @@ class PythonDistributionSources(PythonSources):
     default = ("*.py",)
 
     def validate_snapshot(self, snapshot: Snapshot) -> None:
-        if "setup.py" not in snapshot.files:
+        if self.prefix_glob_with_address("setup.py") not in snapshot.files:
             raise InvalidFieldException(
                 f"The {repr(self.alias)} field in target {self.address} must include "
                 f"`setup.py`. All resolved files: {sorted(snapshot.files)}."
@@ -476,6 +478,14 @@ class UnpackedWheelsWithinDataSubdir(BoolField):
 
     alias = "within_data_subdir"
     default = False
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Union[bool, str]], *, address: Address
+    ) -> Union[bool, str]:
+        if isinstance(raw_value, str):
+            return raw_value
+        return super().compute_value(raw_value, address=address)
 
 
 class UnpackedWheels(Target):

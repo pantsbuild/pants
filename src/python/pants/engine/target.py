@@ -909,7 +909,24 @@ class NoCacheField(BoolField):
     default = False
 
 
-COMMON_TARGET_FIELDS = (Tags, DescriptionField, NoCacheField)
+# TODO(#9388): remove?
+class ScopeField(StringField):
+    """A V1-only field for the scope of the target, which is used by the JVM to determine the
+    target's inclusion in the class path.
+
+    See `pants.build_graph.target_scopes.Scopes`.
+    """
+
+    alias = "scope"
+
+
+# TODO(#9388): Remove.
+class IntransitiveField(BoolField):
+    alias = "_transitive"
+    default = False
+
+
+COMMON_TARGET_FIELDS = (Tags, DescriptionField, NoCacheField, ScopeField, IntransitiveField)
 
 
 # NB: To hydrate the dependencies into Targets, use

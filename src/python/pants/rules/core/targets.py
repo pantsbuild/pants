@@ -1,22 +1,22 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Any, Dict, Optional, Type, cast
+import collections.abc
+from typing import Any, Dict, Optional
 
 from pants.build_graph.address import Address
-from pants.build_graph.target import Target as TargetV1
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
     Dependencies,
     InvalidFieldTypeException,
     PrimitiveField,
-    ScalarField,
     Sources,
     StringField,
     StringSequenceField,
     Target,
 )
+from pants.util.frozendict import FrozenDict
 
 # -----------------------------------------------------------------------------------------------
 # `files` target
@@ -177,7 +177,7 @@ class RemoteSourcesTargetRequestedAddress(StringField):
     required = True
 
 
-class RemoteSourcesTargetType(ScalarField):
+class RemoteSourcesTargetType(StringField):
     """The target type of the synthetic target to generate.
 
     Use the raw symbol rather than a string, e.g. `java_library` rather than `"java_library"`.
@@ -185,17 +185,6 @@ class RemoteSourcesTargetType(ScalarField):
 
     alias = "dest"
     required = True
-    expected_type = type
-    expected_type_description = "a target type like java_library or python_library (no quotes)"
-    value: Type[TargetV1]
-
-    @classmethod
-    def compute_value(
-        cls, raw_value: Optional[Type[TargetV1]], *, address: Address
-    ) -> Type[TargetV1]:
-        # TODO: Once we switch over symbols to refer to V2 targets, we will need to convert back
-        # the V2 target to the V1 target before passing this down to the V1 code.
-        return cast(Type[TargetV1], super().compute_value(raw_value, address=address))
 
 
 class RemoteSourcesArgs(PrimitiveField):
@@ -203,19 +192,31 @@ class RemoteSourcesArgs(PrimitiveField):
     dependencies are supplied automatically)."""
 
     alias = "args"
-    value: Optional[Dict[str, Any]]
+    value: Optional[FrozenDict[str, Any]]
     default = None
+
+    @classmethod
+    def sanitize_dict(cls, d: Dict[str, Any]) -> FrozenDict[str, Any]:
+        result = d.copy()
+        for k, v in d.items():
+            if not isinstance(v, str) and isinstance(v, collections.abc.Iterable):
+                result[k] = tuple(v)
+            if isinstance(v, dict):
+                result[k] = cls.sanitize_dict(v)
+        return FrozenDict(result)
 
     @classmethod
     def compute_value(
         cls, raw_value: Optional[Dict[str, Any]], *, address: Address
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[FrozenDict[str, Any]]:
         value_or_default = super().compute_value(raw_value, address=address)
-        if value_or_default is not None and not isinstance(value_or_default, dict):
+        if value_or_default is None:
+            return None
+        if not isinstance(value_or_default, dict):
             raise InvalidFieldTypeException(
                 address, cls.alias, value_or_default, expected_type="a dictionary"
             )
-        return value_or_default
+        return cls.sanitize_dict(value_or_default)
 
 
 # TODO: figure out what support looks like for this in V2. Is this an example of codegen?

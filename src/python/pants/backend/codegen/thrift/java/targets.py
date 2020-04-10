@@ -18,7 +18,7 @@ class JavaThriftCompiler(StringField):
     The default is defined in the global options under `--thrift-default-compiler`.
     """
 
-    alias = "compilers"
+    alias = "compiler"
     valid_choices = ("thrift", "scrooge")
 
 
@@ -40,7 +40,7 @@ class JavaThriftNamespaceMap(DictStringToStringField):
 class JavaThriftLinterStrict(BoolField):
     """If True, fail if thrift linter produces any warnings."""
 
-    alias = "namespace_map"
+    alias = "thrift_linter_strict"
     default = False
 
 
@@ -52,6 +52,10 @@ class JavaThriftDefaultNamespace(StringField):
     """
 
     alias = "default_java_namespace"
+
+
+class JavaThriftIncludePaths(StringSequenceField):
+    alias = "include_paths"
 
 
 class JavaThriftCompilerArgs(StringSequenceField):
@@ -72,5 +76,6 @@ class JavaThriftLibrary(Target):
         JavaThriftNamespaceMap,
         JavaThriftLinterStrict,
         JavaThriftDefaultNamespace,
+        JavaThriftIncludePaths,
         JavaThriftCompilerArgs,
     )
