@@ -66,6 +66,7 @@ class UnpackedWheels(ImportWheelsMixin, Target):
                                         `include_patterns` matching exactly what is specified in the
                                         setup.py.
         """
+        # NB: Update python/rules/targets.py to no longer allow `str` when removing this deprecation.
         deprecated_conditional(
             lambda: type(within_data_subdir) not in (bool, type(None)),
             removal_version="1.28.0.dev2",

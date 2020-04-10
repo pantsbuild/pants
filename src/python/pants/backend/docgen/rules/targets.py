@@ -7,6 +7,7 @@ from pants.backend.docgen.targets.doc import WikiArtifact
 from pants.build_graph.address import Address
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    Dependencies,
     SequenceField,
     Sources,
     StringField,
@@ -76,4 +77,4 @@ class Page(Target):
     """
 
     alias = "page"
-    core_fields = (*COMMON_TARGET_FIELDS, PageSources, PageSourcesFormat, PageLinks)
+    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, PageSources, PageSourcesFormat, PageLinks)

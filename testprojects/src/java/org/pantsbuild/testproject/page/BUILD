@@ -16,5 +16,7 @@ page(name="circular",
      ]
 )
 
-page(name="senserst",
-     source="sense.rst")
+page(
+  name="senserst",
+  sources=["sense.rst"],
+)

@@ -441,6 +441,7 @@ class JunitTests(Target):
         ExtraJvmOptions,
         JunitTestsSources,
         JunitTestsCwd,
+        JunitTimeout,
         JunitExtraEnvVars,
         JunitConcurrency,
         JunitNumThreads,
@@ -559,7 +560,7 @@ class JvmBinaryManifestEntries(DictStringToStringField):
     """A dict that specifies entries for `ManifestEntries` for adding to MANIFEST.MF when packaging
     this binary."""
 
-    alias = "manifset_entries"
+    alias = "manifest_entries"
 
 
 class JvmBinaryShadingRules(PrimitiveField):

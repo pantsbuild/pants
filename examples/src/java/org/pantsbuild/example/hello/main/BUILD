@@ -29,6 +29,8 @@ jvm_binary(name = 'main-bin',
 
 # README page:
 
-page(name="readme",
-  source="README.md")
+page(
+  name="readme",
+  sources=["README.md"],
+)
 
