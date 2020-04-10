@@ -480,7 +480,7 @@ class UnpackedWheelsWithinDataSubdir(BoolField):
     default = False
 
     @classmethod
-    def compute_value(
+    def compute_value(  # type: ignore[override]
         cls, raw_value: Optional[Union[bool, str]], *, address: Address
     ) -> Union[bool, str]:
         if isinstance(raw_value, str):
