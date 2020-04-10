@@ -240,7 +240,7 @@ async def setup_coverage(coverage: PytestCoverage) -> CoverageSetup:
                 coverage.default_interpreter_constraints
             ),
             entry_point=coverage.get_entry_point(),
-            input_files_digest=plugin_file_digest,
+            sources=plugin_file_digest,
         )
     )
     return CoverageSetup(requirements_pex)

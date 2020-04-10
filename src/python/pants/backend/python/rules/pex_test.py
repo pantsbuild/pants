@@ -168,7 +168,8 @@ class PexTest(TestBase):
         requirements=PexRequirements(),
         entry_point=None,
         interpreter_constraints=PexInterpreterConstraints(),
-        input_files: Optional[Digest] = None,
+        sources: Optional[Digest] = None,
+        additional_inputs: Optional[Digest] = None,
         additional_pants_args: Tuple[str, ...] = (),
         additional_pex_args: Tuple[str, ...] = (),
     ) -> Dict:
@@ -177,10 +178,11 @@ class PexTest(TestBase):
             requirements=requirements,
             interpreter_constraints=interpreter_constraints,
             entry_point=entry_point,
-            input_files_digest=input_files,
+            sources=sources,
+            additional_inputs=additional_inputs,
             additional_args=additional_pex_args,
         )
-        requirements_pex = self.request_single_product(
+        pex = self.request_single_product(
             Pex,
             Params(
                 request,
@@ -189,14 +191,18 @@ class PexTest(TestBase):
                 ),
             ),
         )
-        self.scheduler.materialize_directory(
-            DirectoryToMaterialize(requirements_pex.directory_digest),
-        )
-        with zipfile.ZipFile(os.path.join(self.build_root, "test.pex"), "r") as pex:
-            with pex.open("PEX-INFO", "r") as pex_info:
+        self.scheduler.materialize_directory(DirectoryToMaterialize(pex.directory_digest),)
+        pex_path = os.path.join(self.build_root, "test.pex")
+        with zipfile.ZipFile(pex_path, "r") as zipfp:
+            with zipfp.open("PEX-INFO", "r") as pex_info:
                 pex_info_content = pex_info.readline().decode()
-                pex_list = pex.namelist()
-        return {"pex": requirements_pex, "info": json.loads(pex_info_content), "files": pex_list}
+                pex_list = zipfp.namelist()
+        return {
+            "pex": pex,
+            "local_path": pex_path,
+            "info": json.loads(pex_info_content),
+            "files": pex_list,
+        }
 
     def create_pex_and_get_pex_info(
         self,
@@ -204,7 +210,7 @@ class PexTest(TestBase):
         requirements=PexRequirements(),
         entry_point=None,
         interpreter_constraints=PexInterpreterConstraints(),
-        input_files: Optional[Digest] = None,
+        sources: Optional[Digest] = None,
         additional_pants_args: Tuple[str, ...] = (),
         additional_pex_args: Tuple[str, ...] = (),
     ) -> Dict:
@@ -214,22 +220,22 @@ class PexTest(TestBase):
                 requirements=requirements,
                 entry_point=entry_point,
                 interpreter_constraints=interpreter_constraints,
-                input_files=input_files,
+                sources=sources,
                 additional_pants_args=additional_pants_args,
                 additional_pex_args=additional_pex_args,
             )["info"],
         )
 
     def test_pex_execution(self) -> None:
-        input_files_content = InputFilesContent(
+        sources_content = InputFilesContent(
             (
                 FileContent(path="main.py", content=b'print("from main")'),
                 FileContent(path="subdir/sub.py", content=b'print("from sub")'),
             )
         )
 
-        input_files = self.request_single_product(Digest, input_files_content)
-        pex_output = self.create_pex_and_get_all_data(entry_point="main", input_files=input_files)
+        sources = self.request_single_product(Digest, sources_content)
+        pex_output = self.create_pex_and_get_all_data(entry_point="main", sources=sources)
 
         pex_files = pex_output["files"]
         self.assertTrue("pex" not in pex_files)
@@ -291,3 +297,21 @@ class PexTest(TestBase):
     def test_additional_args(self) -> None:
         pex_info = self.create_pex_and_get_pex_info(additional_pex_args=("--not-zip-safe",))
         assert pex_info["zip_safe"] is False
+
+    def test_additional_inputs(self) -> None:
+        # We use pex's --preamble-file option to set a custom premable from a file.
+        # This verifies that the file was indeed provided as additional input to the pex call.
+        preamble_file = "custom_preamble.txt"
+        preamble = "#!CUSTOM PREAMBLE\n"
+        additional_inputs_content = InputFilesContent(
+            (FileContent(path=preamble_file, content=preamble.encode()),)
+        )
+        additional_inputs = self.request_single_product(Digest, additional_inputs_content)
+        additional_pex_args = (f"--preamble-file={preamble_file}",)
+        pex_output = self.create_pex_and_get_all_data(
+            additional_inputs=additional_inputs, additional_pex_args=additional_pex_args
+        )
+        with zipfile.ZipFile(pex_output["local_path"], "r") as zipfp:
+            with zipfp.open("__main__.py", "r") as main:
+                main_content = main.read().decode()
+        assert main_content[: len(preamble)] == preamble

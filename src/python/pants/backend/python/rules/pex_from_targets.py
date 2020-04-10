@@ -35,7 +35,8 @@ class PexFromTargetsRequest:
     additional_args: Tuple[str, ...]
     additional_requirements: Tuple[str, ...]
     include_source_files: bool
-    additional_input_files: Optional[Digest]
+    additional_sources: Optional[Digest]
+    additional_inputs: Optional[Digest]
 
     def __init__(
         self,
@@ -46,7 +47,8 @@ class PexFromTargetsRequest:
         additional_args: Iterable[str] = (),
         additional_requirements: Iterable[str] = (),
         include_source_files: bool = True,
-        additional_input_files: Optional[Digest] = None
+        additional_sources: Optional[Digest] = None,
+        additional_inputs: Optional[Digest] = None
     ) -> None:
         self.addresses = addresses
         self.output_filename = output_filename
@@ -54,7 +56,8 @@ class PexFromTargetsRequest:
         self.additional_args = tuple(additional_args)
         self.additional_requirements = tuple(additional_requirements)
         self.include_source_files = include_source_files
-        self.additional_input_files = additional_input_files
+        self.additional_sources = additional_sources
+        self.additional_inputs = additional_inputs
 
 
 @named_rule(desc="Create a PEX from targets")
@@ -83,8 +86,8 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
     )
 
     input_digests = []
-    if request.additional_input_files:
-        input_digests.append(request.additional_input_files)
+    if request.additional_sources:
+        input_digests.append(request.additional_sources)
     if request.include_source_files:
         prepared_sources = await Get[ImportablePythonSources](
             Targets(python_targets + resource_targets)
@@ -101,7 +104,8 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         requirements=requirements,
         interpreter_constraints=interpreter_constraints,
         entry_point=request.entry_point,
-        input_files_digest=merged_input_digest,
+        sources=merged_input_digest,
+        additional_inputs=request.additional_inputs,
         additional_args=request.additional_args,
     )
 
@@ -116,7 +120,7 @@ class LegacyPexFromTargetsRequest:
     additional_requirements: Tuple[str, ...] = ()
     include_source_files: bool = True
     additional_args: Tuple[str, ...] = ()
-    additional_input_files: Optional[Digest] = None
+    additional_sources: Optional[Digest] = None
 
 
 @named_rule(desc="Create PEX from targets")
@@ -137,15 +141,15 @@ async def legacy_pex_from_targets(
         adaptors=all_target_adaptors, python_setup=python_setup
     )
 
-    input_digests = []
-    if request.additional_input_files:
-        input_digests.append(request.additional_input_files)
+    source_digests = []
+    if request.additional_sources:
+        source_digests.append(request.additional_sources)
     if request.include_source_files:
         prepared_sources = await Get[ImportablePythonSources](
             HydratedTargets(python_targets + resource_targets)
         )
-        input_digests.append(prepared_sources.snapshot.directory_digest)
-    merged_input_digest = await Get[Digest](DirectoriesToMerge(directories=tuple(input_digests)))
+        source_digests.append(prepared_sources.snapshot.directory_digest)
+    merged_sources_digest = await Get[Digest](DirectoriesToMerge(directories=tuple(source_digests)))
     requirements = PexRequirements.create_from_adaptors(
         adaptors=all_target_adaptors, additional_requirements=request.additional_requirements
     )
@@ -155,7 +159,7 @@ async def legacy_pex_from_targets(
         requirements=requirements,
         interpreter_constraints=interpreter_constraints,
         entry_point=request.entry_point,
-        input_files_digest=merged_input_digest,
+        sources=merged_sources_digest,
         additional_args=request.additional_args,
     )
 
