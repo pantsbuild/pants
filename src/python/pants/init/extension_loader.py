@@ -63,8 +63,8 @@ def load_backends_and_plugins(
             f"due to low usage:\n\n  * {formatted_backends}\n\nTo prepare for this "
             f"change, add this to your `pants.toml`:\n\n{toml_config}\n\nOr add this to your "
             f"`pants.ini`:\n\n{ini_config}\n\nIf you still depend on any of these backends, please "
-            "email us at pantsbuild@gmail.com or message us on Slack and we will keep the "
-            "backend."
+            "email pants-devel <pants-devel@googlegroups.com> or message us on Slack and we will "
+            "keep the backend."
         )
         warn_or_error(
             deprecated_entity_description="the antlr, jaxb, ragel, and wire codegen backends",
