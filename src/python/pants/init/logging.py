@@ -179,9 +179,6 @@ def setup_logging(
     # logging control and we don't need to be the middleman plumbing an option for each python
     # standard logging knob.
 
-    log_filename = None
-    file_handler = None
-
     # A custom log handler for sub-debug trace logging.
     def trace(self, message, *args, **kwargs):
         if self.isEnabledFor(LogLevel.TRACE.level):

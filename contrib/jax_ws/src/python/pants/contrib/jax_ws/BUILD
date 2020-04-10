@@ -11,7 +11,7 @@ contrib_plugin(
     'src/python/pants/goal:task_registrar',
   ],
   distribution_name='pantsbuild.pants.contrib.jax_ws',
-  description='JAX-WS Pants plugin',
+  description='JAX-WS Pants plugin (deprecated)',
   build_file_aliases=True,
   register_goals=True,
   tags = {"partially_type_checked"},

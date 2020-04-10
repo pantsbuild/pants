@@ -12,7 +12,7 @@ contrib_plugin(
     'src/python/pants/goal:task_registrar',
   ],
   distribution_name='pantsbuild.pants.contrib.cpp',
-  description='C++ pants plugin.',
+  description='C++ pants plugin (deprecated).',
   build_file_aliases=True,
   register_goals=True,
   tags = {"partially_type_checked"},

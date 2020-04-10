@@ -18,7 +18,7 @@ contrib_plugin(
   ],
   tags = {"partially_type_checked"},
   distribution_name='pantsbuild.pants.contrib.thrifty',
-  description='Microsoft Thrifty thrift generator pants plugins.',
+  description='Microsoft Thrifty thrift generator pants plugins (deprecated).',
   additional_classifiers=[
     'Topic :: Software Development :: Code Generators'
   ],

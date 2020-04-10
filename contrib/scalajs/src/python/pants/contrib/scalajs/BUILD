@@ -14,7 +14,7 @@ contrib_plugin(
   ],
   tags = {'partially_type_checked'},
   distribution_name='pantsbuild.pants.contrib.scalajs',
-  description='scala.js support for pants.',
+  description='scala.js support for pants (deprecated).',
   build_file_aliases=True,
   register_goals=True,
   global_subsystems=True

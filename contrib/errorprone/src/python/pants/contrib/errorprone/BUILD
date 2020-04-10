@@ -9,7 +9,7 @@ contrib_plugin(
     'src/python/pants/goal:task_registrar',
   ],
   distribution_name='pantsbuild.pants.contrib.errorprone',
-  description='Error Prone pants plugin',
+  description='Error Prone pants plugin (deprecated)',
   register_goals=True,
   tags = {"partially_type_checked"},
 )
