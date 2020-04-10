@@ -3,6 +3,7 @@
 
 import importlib
 import traceback
+from textwrap import fill, indent
 from typing import Dict, List
 
 from pkg_resources import Requirement, WorkingSet
@@ -42,31 +43,92 @@ def load_backends_and_plugins(
     :param backends2: v2 backends to load.
     :param build_configuration: The BuildConfiguration (for adding aliases).
     """
+    used_deprecated_backends = set(backends1).intersection(
+        {
+            "pants.backend.codegen.antlr.java",
+            "pants.backend.codegen.antlr.python",
+            "pants.backend.codegen.jaxb",
+            "pants.backend.codegen.ragel.java",
+            "pants.backend.codegen.wire.java",
+        }
+    )
+    if used_deprecated_backends:
+        formatted_backends = "\n  * ".join(sorted(used_deprecated_backends))
+        toml_backends = ",\n  ".join(repr(backend) for backend in sorted(used_deprecated_backends))
+        toml_config = indent(f"[GLOBAL]\nbackend_packages.remove = [\n  {toml_backends},\n]", "  ",)
+        ini_backends = ",\n    ".join(repr(backend) for backend in sorted(used_deprecated_backends))
+        ini_config = indent(f"[GLOBAL]\nbackend_packages = -[\n    {ini_backends},\n  ]", "  ")
+        msg = (
+            "\nYou have activated the following backend packages, which are planned to be removed "
+            f"due to low usage:\n\n  * {formatted_backends}\n\nTo prepare for this "
+            f"change, add this to your `pants.toml`:\n\n{toml_config}\n\nOr add this to your "
+            f"`pants.ini`:\n\n{ini_config}\n\nIf you still depend on any of these backends, please "
+            "email pants-devel <pants-devel@googlegroups.com> or message us on Slack and we will "
+            "keep the backend."
+        )
+        warn_or_error(
+            deprecated_entity_description="the antlr, jaxb, ragel, and wire codegen backends",
+            removal_version="1.29.0.dev0",
+            hint="\n".join(fill(line, 80) for line in msg.splitlines()),
+            stacklevel=4,
+        )
     if "pants.backend.python.lint.isort" in backends1:
+        reasons = [
+            indent(fill(reason, 78), "  ")
+            for reason in [
+                "1) Avoids unnecessary prework. This new implementation should be faster to run.",
+                (
+                    "2) Has less verbose output. Pants will now only show what isort itself outputs. "
+                    "(Use `--v2-ui` if you want to see the work Pants is doing behind-the-scenes.)"
+                ),
+                (
+                    "3) Works with `./pants lint` automatically. When you run `./pants lint`, Pants "
+                    "will run isort in check-only mode."
+                ),
+                (
+                    "4) Works with precise file arguments. If you say `./pants fmt f1.py`, Pants "
+                    "will only run over the file `f1.py`, whereas the old implementation would run "
+                    "over every file belonging to the target that owns `f1.py`."
+                ),
+            ]
+        ]
+        msg_lines = [
+            fill(
+                (
+                    "The original isort implementation is being replaced by an improved "
+                    "implementation made possible by the V2 engine. This new implementation "
+                    "brings these benefits:"
+                ),
+                80,
+            ),
+            "",
+            *(f"{reason}\n" for reason in reasons),
+            "",
+            fill(
+                (
+                    "To prepare for this change, add to the `GLOBAL` section in your `pants.toml` "
+                    "the line `backend_packages.remove = ['pants.backend.python.lint.isort']` "
+                    "(or `backend_packages = -['pants.backend.python.lint.isort']` to your "
+                    "`pants.ini`)."
+                ),
+                80,
+            ),
+            "",
+            fill(
+                (
+                    "If you still want to use isort, add `backend_packages2.add = "
+                    "['pants.backend.python.lint.isort']` to `pants.toml` or `backend_packages2 = "
+                    "+['pants.backend.python.lint.isort']` to your `pants.ini`. Ensure that you "
+                    "have `--v2` enabled (the default value)."
+                ),
+                80,
+            ),
+        ]
         warn_or_error(
             deprecated_entity_description="The V1 isort implementation",
             removal_version="1.30.0.dev0",
             deprecation_start_version="1.28.0.dev0",
-            hint=(
-                "The original isort implementation is being replaced by an improved implementation "
-                "made possible by the V2 engine. This new implementation brings these benefits:\n\n"
-                "\t1) Avoids unnecessary prework. This new implementation should be faster to "
-                "run.\n"
-                "\t2) Has less verbose output. Pants will now only show what isort itself outputs. "
-                "(Use `--v2-ui` if you want to see the work Pants is doing behind-the-scenes.)\n"
-                "\t3) Works with `./pants lint` automatically. When you run `./pants lint`, Pants "
-                "will run isort in check-only mode.\n"
-                "\t4) Works with precise file arguments. If you say `./pants fmt f1.py`, Pants "
-                "will only run over the file `f1.py`, whereas the old implementation would run "
-                "over every file belonging to the target that owns `f1.py`."
-                "\n\nTo prepare for this change, add to the `GLOBAL` section in your `pants.toml` "
-                "the line `backend_packages.remove = ['pants.backend.python.lint.isort']` "
-                "(or `backend_packages = -['pants.backend.python.lint.isort']` to your "
-                "`pants.ini`). Then, if you still want to use isort, add "
-                "`backend_packages2.add = ['pants.backend.python.lint.isort']` to `pants.toml` or "
-                "`backend_packages2 = +['pants.backend.python.lint.isort']` to your `pants.ini`. "
-                "Ensure that you have `--v2` enabled (the default value)."
-            ),
+            hint="\n".join(msg_lines),
         )
     load_build_configuration_from_source(build_configuration, backends1, backends2)
     load_plugins(build_configuration, plugins1, working_set, is_v1_plugin=True)

@@ -337,7 +337,7 @@ def _deprecated_contrib_plugin(plugin_name: str) -> None:
         hint=(
             f"The {repr(plugin_name)} plugin is being removed due to low usage.\n\nTo prepare for "
             f"this change, please remove {repr(plugin_name)} from 'plugins' in `pants.toml` or "
-            "`pants.ini`.\n\nIf you still depend on this plugin, please email us at "
-            "pantsbuild@gmail.com or message us on Slack and we will keep this plugin."
+            "`pants.ini`.\n\nIf you still depend on this plugin, please email pants-devel "
+            "<pants-devel@googlegroups.com> or message us on Slack and we will keep this plugin."
         ),
     )

@@ -77,7 +77,8 @@ backend_packages2 = [
   "internal_backend.rules_for_testing",
 ]
 ignore_pants_warnings = [
-  "DEPRECATED: the pantsbuild.pants.contrib"
+  "DEPRECATED: the pantsbuild.pants.contrib",
+  "DEPRECATED: the antlr, jaxb, ragel, and wire codegen backends",
 ]
 
 # The pants script in this repo consumes these files to run pants
