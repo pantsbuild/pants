@@ -83,18 +83,13 @@ class DownloadedPexBin(HermeticPex):
         """
 
         env = dict(env) if env else {}
-        env.update(
-            # We ask Pex to --disable-cache so we shouldn't also set a PEX_ROOT (asking it to
-            # cache).
-            PEX_ROOT="",
-            **pex_build_environment.invocation_environment_dict,
-        )
+        env.update(**pex_build_environment.invocation_environment_dict,)
 
         return super().create_execute_request(
             python_setup=python_setup,
             subprocess_encoding_environment=subprocess_encoding_environment,
             pex_path=self.executable,
-            pex_args=["--disable-cache"] + list(pex_args),
+            pex_args=list(pex_args),
             description=description,
             input_files=input_files or self.directory_digest,
             env=env,
