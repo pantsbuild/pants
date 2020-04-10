@@ -3,6 +3,7 @@
 
 import importlib
 import traceback
+from textwrap import fill, indent
 from typing import Dict, List
 
 from pkg_resources import Requirement, WorkingSet
@@ -42,6 +43,35 @@ def load_backends_and_plugins(
     :param backends2: v2 backends to load.
     :param build_configuration: The BuildConfiguration (for adding aliases).
     """
+    used_deprecated_backends = set(backends1).intersection(
+        {
+            "pants.backend.codegen.antlr.java",
+            "pants.backend.codegen.antlr.python",
+            "pants.backend.codegen.jaxb",
+            "pants.backend.codegen.ragel.java",
+            "pants.backend.codegen.wire.java",
+        }
+    )
+    if used_deprecated_backends:
+        formatted_backends = "\n  * ".join(sorted(used_deprecated_backends))
+        toml_backends = ",\n  ".join(repr(backend) for backend in sorted(used_deprecated_backends))
+        toml_config = indent(f"[GLOBAL]\nbackend_packages.remove = [\n  {toml_backends},\n]", "  ",)
+        ini_backends = ",\n    ".join(repr(backend) for backend in sorted(used_deprecated_backends))
+        ini_config = indent(f"[GLOBAL]\nbackend_packages = -[\n    {ini_backends},\n  ]", "  ")
+        msg = (
+            "\nYou have activated the following backend packages, which are planned to be removed "
+            f"due to low usage:\n\n  * {formatted_backends}\n\nTo prepare for this "
+            f"change, add this to your `pants.toml`:\n\n{toml_config}\n\nOr add this to your "
+            f"`pants.ini`:\n\n{ini_config}\n\nIf you still depend on any of these backends, please "
+            "email us at pantsbuild@gmail.com or message us on Slack and we will keep the "
+            "backend."
+        )
+        warn_or_error(
+            deprecated_entity_description="the antlr, jaxb, ragel, and wire codegen backends",
+            removal_version="1.29.0.dev0",
+            hint="\n".join(fill(line, 80) for line in msg.splitlines()),
+            stacklevel=4,
+        )
     if "pants.backend.python.lint.isort" in backends1:
         warn_or_error(
             deprecated_entity_description="The V1 isort implementation",
