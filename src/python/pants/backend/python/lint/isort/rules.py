@@ -21,7 +21,7 @@ from pants.engine.isolated_process import (
     ExecuteProcessResult,
     FallibleExecuteProcessResult,
 )
-from pants.engine.rules import UnionRule, rule, subsystem_rule
+from pants.engine.rules import UnionRule, named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.custom_types import GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior
@@ -142,8 +142,8 @@ async def setup(
     return Setup(process_request)
 
 
-@rule(name="Format using isort")
-async def fmt(formatter: IsortFormatter, isort: Isort) -> FmtResult:
+@named_rule(desc="Format using isort")
+async def isort_fmt(formatter: IsortFormatter, isort: Isort) -> FmtResult:
     if isort.options.skip:
         return FmtResult.noop()
     setup = await Get[Setup](SetupRequest(formatter, check_only=False))
@@ -151,8 +151,8 @@ async def fmt(formatter: IsortFormatter, isort: Isort) -> FmtResult:
     return FmtResult.from_execute_process_result(result)
 
 
-@rule(name="Lint using isort")
-async def lint(formatter: IsortFormatter, isort: Isort) -> LintResult:
+@named_rule(desc="Lint using isort")
+async def isort_lint(formatter: IsortFormatter, isort: Isort) -> LintResult:
     if isort.options.skip:
         return LintResult.noop()
     setup = await Get[Setup](SetupRequest(formatter, check_only=True))
@@ -163,8 +163,8 @@ async def lint(formatter: IsortFormatter, isort: Isort) -> LintResult:
 def rules():
     return [
         setup,
-        fmt,
-        lint,
+        isort_fmt,
+        isort_lint,
         subsystem_rule(Isort),
         UnionRule(PythonFormatter, IsortFormatter),
         UnionRule(Linter, IsortFormatter),

@@ -253,19 +253,16 @@ class SchedulerWithNestedRaiseTest(TestBase):
             nested_raise,
         ]
 
-    # TODO(#8675) - This test (and others like it) that rely on matching a specific string repr of a complex python object is fragile.
     def test_get_type_match_failure(self):
         """Test that Get(...)s are now type-checked during rule execution, to allow for union
         types."""
-        expected_msg = (
-            "Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Task(Task { "
-            "product: A, clause: [Select { product: TypeCheckFailWrapper }], gets: [Get { product: A, "
-            f"subject: B }}], func: {fmt_rust_function(a_typecheck_fail_test)}(), cacheable: true, display_info: "
-            "None }) })) did not declare a dependency on JustGet(Get { product: A, subject: A })"
-        )
-        with assert_execution_error(self, expected_msg):
+
+        with self.assertRaises(ExecutionError) as cm:
             # `a_typecheck_fail_test` above expects `wrapper.inner` to be a `B`.
             self.request_single_product(A, Params(TypeCheckFailWrapper(A())))
+
+        expected_regex = "Exception: WithDeps.*did not declare a dependency on JustGet"
+        assert re.search(expected_regex, str(cm.exception))
 
     def test_unhashable_failure(self):
         """Test that unhashable Get(...) params result in a structured error."""

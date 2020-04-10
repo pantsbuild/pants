@@ -39,6 +39,7 @@ use graph::{Entry, Node, NodeError, NodeTracer, NodeVisualizer};
 use store::{self, StoreFileByDigest};
 use workunit_store::{
   generate_random_64bit_string, scope_task_parent_id, StartedWorkUnit, WorkUnit, WorkUnitStore,
+  WorkunitMetadata,
 };
 
 pub type NodeFuture<T> = BoxFuture<T, Failure>;
@@ -770,10 +771,6 @@ pub struct Task {
 }
 
 impl Task {
-  fn get_display_info(&self) -> Option<&String> {
-    self.task.display_info.as_ref()
-  }
-
   fn gen_get(
     context: &Context,
     params: &Params,
@@ -1036,6 +1033,13 @@ impl NodeKey {
       | &NodeKey::DownloadedFile { .. } => None,
     }
   }
+
+  pub fn display_info(&self) -> Option<&tasks::DisplayInfo> {
+    match self {
+      NodeKey::Task(ref task) => Some(&task.task.display_info),
+      _ => None,
+    }
+  }
 }
 
 impl Node for NodeKey {
@@ -1049,11 +1053,19 @@ impl Node for NodeKey {
       let user_facing_name = self.user_facing_name();
       let span_id = generate_random_64bit_string();
       let parent_id = workunit_store::get_parent_id();
-      let maybe_started_workunit = user_facing_name.as_ref().map(|node_name| StartedWorkUnit {
-        name: node_name.to_string(),
-        start_time: std::time::SystemTime::now(),
-        span_id: span_id.clone(),
-        parent_id,
+
+      let maybe_started_workunit = user_facing_name.as_ref().map(|node_name| {
+        let maybe_display_info = self.display_info();
+
+        let desc = maybe_display_info.and_then(|di| di.desc.as_ref().cloned());
+
+        StartedWorkUnit {
+          name: node_name.to_string(),
+          start_time: std::time::SystemTime::now(),
+          span_id: span_id.clone(),
+          parent_id,
+          metadata: WorkunitMetadata { desc },
+        }
       });
       let maybe_span_id = if user_facing_name.is_some() {
         Some(span_id)
@@ -1125,7 +1137,7 @@ impl Node for NodeKey {
 
   fn user_facing_name(&self) -> Option<String> {
     match self {
-      NodeKey::Task(ref task) => task.get_display_info().map(|s| s.to_owned()),
+      NodeKey::Task(ref task) => task.task.display_info.name.as_ref().map(|s| s.to_owned()),
       NodeKey::Snapshot(_) => Some(format!("{}", self)),
       NodeKey::MultiPlatformExecuteProcess(mp_epr) => mp_epr.0.user_facing_name(),
       NodeKey::DigestFile(..) => None,

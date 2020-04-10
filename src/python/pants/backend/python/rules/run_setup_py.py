@@ -50,7 +50,7 @@ from pants.engine.legacy.graph import (
 )
 from pants.engine.legacy.structs import PythonBinaryAdaptor, PythonTargetAdaptor, ResourcesAdaptor
 from pants.engine.objects import Collection
-from pants.engine.rules import goal_rule, rule, subsystem_rule
+from pants.engine.rules import goal_rule, named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.option.custom_types import shell_str
 from pants.python.python_setup import PythonSetup
@@ -535,7 +535,7 @@ def _is_exported(target: HydratedTarget) -> bool:
     return getattr(target.adaptor, "provides", None) is not None
 
 
-@rule(name="Compute distribution's 3rd party requirements")
+@named_rule(desc="Compute distribution's 3rd party requirements")
 async def get_requirements(dep_owner: DependencyOwner) -> ExportedTargetRequirements:
     tht = await Get[TransitiveHydratedTargets](
         Addresses([dep_owner.exported_target.hydrated_target.adaptor.address])
@@ -581,7 +581,7 @@ async def get_requirements(dep_owner: DependencyOwner) -> ExportedTargetRequirem
     return ExportedTargetRequirements(tuple(req_strs))
 
 
-@rule(name="Find all code to be published in the distribution")
+@named_rule(desc="Find all code to be published in the distribution")
 async def get_owned_dependencies(dependency_owner: DependencyOwner) -> OwnedDependencies:
     """Find the dependencies of dependency_owner that are owned by it.
 
@@ -604,7 +604,7 @@ async def get_owned_dependencies(dependency_owner: DependencyOwner) -> OwnedDepe
     return OwnedDependencies(OwnedDependency(t) for t in owned_dependencies)
 
 
-@rule(name="Get exporting owner for target")
+@named_rule(desc="Get exporting owner for target")
 async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarget:
     """Find the exported target that owns the given target (and therefore exports it).
 
@@ -655,7 +655,7 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
     )
 
 
-@rule(name="Set up setuptools")
+@named_rule(desc="Set up setuptools")
 async def setup_setuptools(setuptools: Setuptools) -> SetuptoolsSetup:
     # Note that this pex has no entrypoint. We use it to run our generated setup.py, which
     # in turn imports from and invokes setuptools.

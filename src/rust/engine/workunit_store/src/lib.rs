@@ -41,6 +41,7 @@ pub struct WorkUnit {
   pub time_span: TimeSpan,
   pub span_id: String,
   pub parent_id: Option<String>,
+  pub metadata: WorkunitMetadata,
 }
 
 pub struct StartedWorkUnit {
@@ -48,6 +49,12 @@ pub struct StartedWorkUnit {
   pub start_time: std::time::SystemTime,
   pub span_id: String,
   pub parent_id: Option<String>,
+  pub metadata: WorkunitMetadata,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
+pub struct WorkunitMetadata {
+  pub desc: Option<String>,
 }
 
 impl StartedWorkUnit {
@@ -57,6 +64,7 @@ impl StartedWorkUnit {
       time_span: TimeSpan::since(&self.start_time),
       span_id: self.span_id,
       parent_id: self.parent_id,
+      metadata: self.metadata,
     }
   }
 }
@@ -69,6 +77,7 @@ impl WorkUnit {
       time_span,
       span_id,
       parent_id,
+      metadata: WorkunitMetadata::default(),
     }
   }
 }

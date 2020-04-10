@@ -27,7 +27,7 @@ from pants.backend.python.subsystems.subprocess_environment import SubprocessEnc
 from pants.engine.addressable import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge
 from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
-from pants.engine.rules import UnionRule, rule, subsystem_rule
+from pants.engine.rules import UnionRule, named_rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.python.python_setup import PythonSetup
 from pants.rules.core import strip_source_roots
@@ -45,7 +45,7 @@ class LambdexSetup:
     requirements_pex: Pex
 
 
-@rule(name="Create Python AWS Lambda")
+@named_rule(desc="Create Python AWS Lambda")
 async def create_python_awslambda(
     config: PythonAwsLambdaConfiguration,
     lambdex_setup: LambdexSetup,
@@ -80,7 +80,7 @@ async def create_python_awslambda(
     return CreatedAWSLambda(digest=result.output_directory_digest, name=pex_filename)
 
 
-@rule(name="Set up lambdex")
+@named_rule(desc="Set up lambdex")
 async def setup_lambdex(lambdex: Lambdex) -> LambdexSetup:
     requirements_pex = await Get[Pex](
         PexRequest(

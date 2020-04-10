@@ -34,7 +34,7 @@ from pants.engine.fs import Digest, DirectoriesToMerge, InputFilesContent
 from pants.engine.interactive_runner import InteractiveProcessRequest
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.legacy.graph import HydratedTargets
-from pants.engine.rules import UnionRule, rule, subsystem_rule
+from pants.engine.rules import UnionRule, named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Targets, TransitiveTargets
 from pants.option.global_options import GlobalOptions
@@ -224,7 +224,7 @@ async def setup_pytest_for_target(
     )
 
 
-@rule(name="Run pytest")
+@named_rule(desc="Run pytest")
 async def run_python_test(
     config: PythonTestConfiguration,
     test_setup: TestTargetSetup,
@@ -254,7 +254,7 @@ async def run_python_test(
     return TestResult.from_fallible_execute_process_result(result, coverage_data=coverage_data)
 
 
-@rule(name="Run pytest in an interactive process")
+@named_rule(desc="Run pytest in an interactive process")
 async def debug_python_test(test_setup: TestTargetSetup) -> TestDebugRequest:
     run_request = InteractiveProcessRequest(
         argv=(test_setup.test_runner_pex.output_filename, *test_setup.args),

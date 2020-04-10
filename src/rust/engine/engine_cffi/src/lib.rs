@@ -428,6 +428,14 @@ fn workunits_to_py_tuple_value<'a>(workunits: impl Iterator<Item = &'a WorkUnit>
           externs::store_utf8(parent_id),
         ));
       }
+
+      if let Some(desc) = &workunit.metadata.desc.as_ref() {
+        workunit_zipkin_trace_info.push((
+          externs::store_utf8("description"),
+          externs::store_utf8(desc),
+        ));
+      }
+
       externs::store_dict(&workunit_zipkin_trace_info.as_slice())
     })
     .collect::<Vec<_>>();
@@ -573,12 +581,15 @@ pub extern "C" fn tasks_add_select(tasks_ptr: *mut Tasks, product: TypeId) {
 }
 
 #[no_mangle]
-pub extern "C" fn tasks_add_display_info(tasks_ptr: *mut Tasks, name_ptr: *const raw::c_char) {
-  let name: String = unsafe { CStr::from_ptr(name_ptr) }
-    .to_string_lossy()
-    .into_owned();
+pub extern "C" fn tasks_add_display_info(
+  tasks_ptr: *mut Tasks,
+  name_ptr: *const raw::c_char,
+  desc_ptr: *const raw::c_char,
+) {
+  let name = unsafe { str_ptr_to_string(name_ptr) };
+  let desc = unsafe { str_ptr_to_string(desc_ptr) };
   with_tasks(tasks_ptr, |tasks| {
-    tasks.add_display_info(name);
+    tasks.add_display_info(name, desc);
   })
 }
 
@@ -1191,6 +1202,10 @@ fn write_to_file(path: &Path, graph: &RuleGraph<Rule>) -> io::Result<()> {
   let file = File::create(path)?;
   let mut f = io::BufWriter::new(file);
   graph.visualize(&mut f)
+}
+
+unsafe fn str_ptr_to_string(ptr: *const raw::c_char) -> String {
+  CStr::from_ptr(ptr).to_string_lossy().into_owned()
 }
 
 ///
