@@ -151,6 +151,7 @@ def create_scheduler(rules, union_rules=None, validate=True, native=None):
     return Scheduler(
         native=native,
         ignore_patterns=tree.ignore_patterns,
+        use_gitignore=False,
         build_root=tree.build_root,
         local_store_dir="./.pants.d",
         rules=rules,

@@ -132,25 +132,38 @@ pub struct GitignoreStyleExcludes {
 
 impl GitignoreStyleExcludes {
   pub fn create(patterns: &[String]) -> Result<Arc<Self>, String> {
-    if patterns.is_empty() {
+    Self::create_with_gitignore_file(patterns, None)
+  }
+
+  pub fn create_with_gitignore_file(
+    patterns: &[String],
+    gitignore_path: Option<PathBuf>,
+  ) -> Result<Arc<Self>, String> {
+    if patterns.is_empty() && gitignore_path.is_none() {
       return Ok(EMPTY_IGNORE.clone());
     }
 
-    let gitignore = Self::create_gitignore(patterns)
-      .map_err(|e| format!("Could not parse glob excludes {:?}: {:?}", patterns, e))?;
+    let mut ignore_builder = GitignoreBuilder::new("");
+
+    if let Some(path) = gitignore_path {
+      if let Some(err) = ignore_builder.add(path) {
+        return Err(format!("Error adding .gitignore path: {:?}", err));
+      }
+    }
+    for pattern in patterns {
+      ignore_builder
+        .add_line(None, pattern.as_str())
+        .map_err(|e| format!("Could not parse glob excludes {:?}: {:?}", patterns, e))?;
+    }
+
+    let gitignore = ignore_builder
+      .build()
+      .map_err(|e| format!("Could not build gitignore: {:?}", e))?;
 
     Ok(Arc::new(Self {
       patterns: patterns.to_vec(),
       gitignore,
     }))
-  }
-
-  fn create_gitignore(patterns: &[String]) -> Result<Gitignore, ::ignore::Error> {
-    let mut ignore_builder = GitignoreBuilder::new("");
-    for pattern in patterns {
-      ignore_builder.add_line(None, pattern.as_str())?;
-    }
-    ignore_builder.build()
   }
 
   fn exclude_patterns(&self) -> &[String] {

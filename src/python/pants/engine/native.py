@@ -10,7 +10,7 @@ import sysconfig
 import traceback
 from contextlib import closing
 from types import CoroutineType
-from typing import Any, Iterable, NamedTuple, Tuple, Type, cast
+from typing import Any, Iterable, List, NamedTuple, Tuple, Type, cast
 
 import cffi
 import pkg_resources
@@ -930,7 +930,8 @@ class Native(metaclass=SingletonMetaclass):
         root_subject_types,
         build_root,
         local_store_dir,
-        ignore_patterns,
+        ignore_patterns: List[str],
+        use_gitignore: bool,
         execution_options,
     ):
         """Create and return an ExternContext and native Scheduler."""
@@ -981,6 +982,7 @@ class Native(metaclass=SingletonMetaclass):
             self.context.utf8_buf(build_root),
             self.context.utf8_buf(local_store_dir),
             self.context.utf8_buf_buf(ignore_patterns),
+            use_gitignore,
             self.to_ids_buf(root_subject_types),
             # Remote execution config.
             execution_options.remote_execution,

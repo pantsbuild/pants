@@ -63,6 +63,7 @@ class SchedulerTestBase:
         scheduler = Scheduler(
             native=self._native,
             ignore_patterns=project_tree.ignore_patterns,
+            use_gitignore=False,
             build_root=project_tree.build_root,
             local_store_dir=local_store_dir,
             rules=rules,

@@ -304,8 +304,11 @@ class EngineInitializer:
         """Construct and return the components necessary for LegacyBuildGraph construction."""
         build_root = get_buildroot()
         bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
+        use_gitignore = bootstrap_options.pants_ignore_use_gitignore
+
         return EngineInitializer.setup_legacy_graph_extended(
             OptionsInitializer.compute_pants_ignore(build_root, bootstrap_options),
+            use_gitignore,
             bootstrap_options.local_store_dir,
             bootstrap_options.build_file_imports,
             options_bootstrapper,
@@ -325,6 +328,7 @@ class EngineInitializer:
     @staticmethod
     def setup_legacy_graph_extended(
         pants_ignore_patterns: List[str],
+        use_gitignore: bool,
         local_store_dir,
         build_file_imports_behavior: BuildFileImportsBehavior,
         options_bootstrapper: OptionsBootstrapper,
@@ -442,6 +446,7 @@ class EngineInitializer:
         scheduler = Scheduler(
             native=native,
             ignore_patterns=pants_ignore_patterns,
+            use_gitignore=use_gitignore,
             build_root=build_root,
             local_store_dir=local_store_dir,
             rules=rules,
