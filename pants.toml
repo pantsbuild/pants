@@ -64,7 +64,7 @@ backend_packages.add = [
 ]
 backend_packages.remove = [
   # We use the V2 isort implementation.
-  "pants.backend.python.lint.isort",
+  #"pants.backend.python.lint.isort",
 ]
 backend_packages2 = [
   "pants.backend.project_info",
