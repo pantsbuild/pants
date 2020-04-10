@@ -175,11 +175,12 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         """
         build_root = get_buildroot()
 
-        options, build_config = LocalPantsRunner.parse_options(options_bootstrapper)
-        global_options = options.for_global_scope()
+        global_options = options_bootstrapper.bootstrap_options.for_global_scope()
         # This works as expected due to the encapsulated_logger in DaemonPantsRunner and
         # we don't have to gate logging setup anymore.
         setup_logging_from_options(global_options)
+
+        options, build_config = LocalPantsRunner.parse_options(options_bootstrapper)
 
         # Option values are usually computed lazily on demand,
         # but command line options are eagerly computed for validation.
