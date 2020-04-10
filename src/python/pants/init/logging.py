@@ -61,7 +61,7 @@ def setup_logging_to_stderr(python_logger: Logger, log_level: LogLevel) -> None:
 
 
 def setup_logging_from_options(
-    bootstrap_options: OptionValueContainer,
+    bootstrap_options: OptionValueContainer, *, captured_warnings: List[warnings.WarningMessage]
 ) -> Optional[FileLoggingSetupResult]:
     # N.B. quiet help says 'Squelches all console output apart from errors'.
     level = (
@@ -75,6 +75,7 @@ def setup_logging_from_options(
         log_dir=log_dir,
         console_stream=sys.stderr,
         warnings_filter_regexes=bootstrap_options.ignore_pants_warnings,
+        captured_warnings=captured_warnings,
     )
 
 
@@ -124,6 +125,7 @@ def setup_logging(
     scope: Optional[str] = None,
     log_name: Optional[str] = None,
     warnings_filter_regexes: Optional[List[str]] = None,
+    captured_warnings: Optional[List[warnings.WarningMessage]] = None,
 ) -> FileLoggingSetupResult:
     ...
 
@@ -138,6 +140,7 @@ def setup_logging(
     scope: Optional[str] = None,
     log_name: Optional[str] = None,
     warnings_filter_regexes: Optional[List[str]] = None,
+    captured_warnings: Optional[List[warnings.WarningMessage]] = None,
 ) -> None:
     ...
 
@@ -151,6 +154,7 @@ def setup_logging(
     scope: Optional[str] = None,
     log_name: Optional[str] = None,
     warnings_filter_regexes: Optional[List[str]] = None,
+    captured_warnings: Optional[List[warnings.WarningMessage]] = None,
 ) -> Optional[FileLoggingSetupResult]:
     """Configures logging for a given scope, by default the global scope.
 
@@ -169,6 +173,8 @@ def setup_logging(
 
     :param warnings_filter_regexes: A series of regexes to ignore warnings for, typically from the
                                     `ignore_pants_warnings` option.
+    :param warnings_filter_regexes: A list of WarningMessages that should be printed after logging
+                                    is set up.
     :returns: The file logging setup configured if any.
     """
 
@@ -178,9 +184,6 @@ def setup_logging(
     # TODO(John Sirois): Support logging.config.fileConfig so a site can setup fine-grained
     # logging control and we don't need to be the middleman plumbing an option for each python
     # standard logging knob.
-
-    log_filename = None
-    file_handler = None
 
     # A custom log handler for sub-debug trace logging.
     def trace(self, message, *args, **kwargs):
@@ -206,6 +209,14 @@ def setup_logging(
         warnings.filterwarnings(action="ignore", message=message_regexp)
 
     _maybe_configure_extended_logging(logger)
+
+    for captured_warning in captured_warnings or ():
+        warnings.warn_explicit(
+            message=captured_warning.message,
+            category=captured_warning.category,
+            filename=captured_warning.filename,
+            lineno=captured_warning.lineno,
+        )
 
     if not log_dir:
         return None
