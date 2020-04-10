@@ -196,6 +196,7 @@ class AnnotationProcessor(Target):
         ScalacPluginArgs,
         AnnotationProcessorsField,
     )
+    v1_only = True
 
 
 # -----------------------------------------------------------------------------------------------
@@ -217,6 +218,7 @@ class JvmBenchmark(Target):
         ScalacPluginArgs,
         JvmRuntimePlatform,
     )
+    v1_only = True
 
 
 # -----------------------------------------------------------------------------------------------
@@ -248,6 +250,7 @@ class JvmCredentials(Target):
 
     alias = "credentials"
     core_fields = (*COMMON_TARGET_FIELDS, CredentialsUsername, CredentialsPassword)
+    v1_only = True
 
 
 class NetrcCredentials(Target):
@@ -258,6 +261,7 @@ class NetrcCredentials(Target):
 
     alias = "netrc_credentials"
     core_fields = COMMON_TARGET_FIELDS
+    v1_only = True
 
 
 # -----------------------------------------------------------------------------------------------
@@ -296,6 +300,7 @@ class JarLibrary(Target):
 
     alias = "jar_library"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, JarsField, ManagedJarDependenciesAddress)
+    v1_only = True
 
 
 # -----------------------------------------------------------------------------------------------
@@ -312,6 +317,7 @@ class JavaLibrary(Target):
 
     alias = "java_library"
     core_fields = (*COMMON_JVM_FIELDS, JavaLibrarySources)
+    v1_only = True
 
 
 # -----------------------------------------------------------------------------------------------
@@ -371,6 +377,7 @@ class JavaAgent(Target):
         JavaAgentCanRetransform,
         JavaAgentCanSetNativeMethodPrefix,
     )
+    v1_only = True
 
 
 # -----------------------------------------------------------------------------------------------
@@ -446,6 +453,7 @@ class JunitTests(Target):
         JunitConcurrency,
         JunitNumThreads,
     )
+    v1_only = True
 
 
 # -----------------------------------------------------------------------------------------------
@@ -505,6 +513,7 @@ class JvmApp(Target):
         JvmAppArchiveFormat,
         JvmAppDeployJarToggle,
     )
+    v1_only = True
 
 
 # -----------------------------------------------------------------------------------------------
@@ -604,6 +613,7 @@ class JvmBinary(Target):
         JvmBinaryManifestEntries,
         JvmBinaryShadingRules,
     )
+    v1_only = True
 
 
 # -----------------------------------------------------------------------------------------------
@@ -670,6 +680,7 @@ class JvmPrepCommand(Target):
         JvmPrepCommandGoal,
         JvmPrepCommandOptions,
     )
+    v1_only = True
 
 
 # -----------------------------------------------------------------------------------------------
@@ -701,6 +712,7 @@ class ManagedJarDependencies(Target):
 
     alias = "managed_jar_dependencies"
     core_fields = (*COMMON_TARGET_FIELDS, ManagedJarDependenciesArtifacts)
+    v1_only = True
 
 
 # -----------------------------------------------------------------------------------------------
@@ -734,6 +746,7 @@ class ScalaLibrary(Target):
         ScalaSources,
         JavaSourcesForScala,
     )
+    v1_only = True
 
 
 # -----------------------------------------------------------------------------------------------
@@ -762,6 +775,7 @@ class JavacPlugin(Target):
 
     alias = "javac_plugin"
     core_fields = (*JavaLibrary.core_fields, JvmPluginClassname, JvmPluginName)
+    v1_only = True
 
 
 class ScalacPlugin(Target):
@@ -769,6 +783,7 @@ class ScalacPlugin(Target):
 
     alias = "scalac_plugin"
     core_fields = (*ScalaLibrary.core_fields, JvmPluginClassname, JvmPluginName)
+    v1_only = True
 
 
 # -----------------------------------------------------------------------------------------------
@@ -816,3 +831,4 @@ class UnpackedJars(Target):
         UnpackedJarsExcludePatterns,
         UnpackedJarsIntransitiveToggle,
     )
+    v1_only = True

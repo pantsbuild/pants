@@ -22,3 +22,4 @@ class JaxWsLibrary(Target):
 
     alias = "jax_ws_library"
     core_fields = (*COMMON_JVM_FIELDS, Sources, JaxWsXjcArgs, JaxWsExtraArgs)
+    v1_only = True

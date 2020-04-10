@@ -25,6 +25,7 @@ from pants.engine.target import (
     StringSequenceField,
     Target,
 )
+from pants.option.global_options import GlobalOptions
 from pants.util.objects import get_docstring, get_docstring_summary, pretty_print_type_hint
 
 
@@ -54,10 +55,15 @@ class TargetTypes(Goal):
 class AbbreviatedTargetInfo:
     alias: str
     description: Optional[str]
+    v1_only: bool
 
     @classmethod
     def create(cls, target_type: Type[Target]) -> "AbbreviatedTargetInfo":
-        return cls(alias=target_type.alias, description=get_docstring_summary(target_type))
+        return cls(
+            alias=target_type.alias,
+            description=get_docstring_summary(target_type),
+            v1_only=target_type.v1_only,
+        )
 
     def format_for_cli(self, console: Console, *, longest_target_alias: int) -> str:
         chars_before_description = longest_target_alias + 2
@@ -82,6 +88,7 @@ class FieldInfo:
     type_hint: str
     required: bool
     default: Optional[str]
+    v1_only: bool
 
     @classmethod
     def create(cls, field: Type[Field]) -> "FieldInfo":
@@ -149,6 +156,7 @@ class FieldInfo:
             type_hint=type_hint,
             required=field.required,
             default=repr(field.default) if not field.required else None,
+            v1_only=field.v1_only,
         )
 
     def format_for_cli(self, console: Console) -> str:
@@ -181,7 +189,7 @@ class VerboseTargetInfo:
             ],
         )
 
-    def format_for_cli(self, console: Console) -> str:
+    def format_for_cli(self, console: Console, *, v1_disabled: bool) -> str:
         output = [console.green(f"{self.alias}\n{'-' * len(self.alias)}\n")]
         if self.description:
             output.append(f"{self.description}\n")
@@ -191,7 +199,7 @@ class VerboseTargetInfo:
                 *sorted(
                     f"{field.format_for_cli(console)}\n"
                     for field in self.fields
-                    if not field.alias.startswith("_")
+                    if not field.alias.startswith("_") and (not v1_disabled or not field.v1_only)
                 ),
             ]
         )
@@ -202,12 +210,14 @@ class VerboseTargetInfo:
 def list_target_types(
     registered_target_types: RegisteredTargetTypes,
     union_membership: UnionMembership,
-    options: TargetTypesOptions,
+    target_types_options: TargetTypesOptions,
+    global_options: GlobalOptions,
     console: Console,
 ) -> TargetTypes:
-    with options.line_oriented(console) as print_stdout:
-        if options.values.details:
-            alias = options.values.details
+    v1_disabled = not global_options.options.v1
+    with target_types_options.line_oriented(console) as print_stdout:
+        if target_types_options.values.details:
+            alias = target_types_options.values.details
             target_type = registered_target_types.aliases_to_types.get(alias)
             if target_type is None:
                 raise ValueError(
@@ -218,7 +228,7 @@ def list_target_types(
                 target_type, union_membership=union_membership
             )
             print_stdout("")
-            print_stdout(verbose_target_info.format_for_cli(console))
+            print_stdout(verbose_target_info.format_for_cli(console, v1_disabled=v1_disabled))
         else:
             title_text = "Target types"
             title = console.green(f"{title_text}\n{'-' * len(title_text)}")
@@ -241,6 +251,7 @@ def list_target_types(
                     target_info.format_for_cli(console, longest_target_alias=longest_target_alias)
                     for target_info in target_infos
                     if not target_info.alias.startswith("_")
+                    and (not v1_disabled or not target_info.v1_only)
                 ),
             ]
             print_stdout("\n".join(lines).rstrip())

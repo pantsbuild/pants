@@ -28,6 +28,7 @@ class CppBinary(Target):
 
     alias = "cpp_binary"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, Sources, CppExternalLibraries)
+    v1_only = True
 
 
 # -----------------------------------------------------------------------------------------------
@@ -40,3 +41,4 @@ class CppLibrary(Target):
 
     alias = "cpp_library"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, Sources)
+    v1_only = True

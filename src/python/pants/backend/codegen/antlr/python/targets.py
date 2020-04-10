@@ -27,3 +27,4 @@ class PythonAntlrLibrary(Target):
 
     alias = "python_antlr_library"
     core_fields = (*COMMON_PYTHON_FIELDS, Sources, AntlrModule, AntlrVersion)
+    v1_only = True

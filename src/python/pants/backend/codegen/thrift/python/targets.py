@@ -10,3 +10,4 @@ class PythonThriftLibrary(Target):
 
     alias = "python_thrift_library"
     core_fields = (*COMMON_PYTHON_FIELDS, Sources)
+    v1_only = True

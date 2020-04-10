@@ -111,6 +111,7 @@ class PythonApp(Target):
         PythonAppBasename,
         PythonAppArchiveFormat,
     )
+    v1_only = True
 
 
 # -----------------------------------------------------------------------------------------------
@@ -359,6 +360,7 @@ class PythonDistribution(Target):
         PythonDistributionSources,
         PythonDistributionSetupRequires,
     )
+    v1_only = True
 
 
 # -----------------------------------------------------------------------------------------------
@@ -486,3 +488,4 @@ class UnpackedWheels(Target):
         UnpackedWheelsExcludePatterns,
         UnpackedWheelsWithinDataSubdir,
     )
+    v1_only = True

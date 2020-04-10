@@ -30,3 +30,4 @@ class JaxbLibrary(Target):
 
     alias = "jaxb_library"
     core_fields = (*COMMON_JVM_FIELDS, Sources, JaxbJavaPackage, JaxbLanguage)
+    v1_only = True

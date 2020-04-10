@@ -14,6 +14,7 @@ class ScalaJSBinary(Target):
 
     alias = "scala_js_binary"
     core_fields = NodeModule.core_fields
+    v1_only = True
 
 
 class ScalaJSLibrary(Target):
@@ -25,3 +26,4 @@ class ScalaJSLibrary(Target):
 
     alias = "scala_js_library"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, Sources)
+    v1_only = True

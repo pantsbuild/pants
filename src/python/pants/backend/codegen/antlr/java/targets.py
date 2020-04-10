@@ -33,3 +33,4 @@ class JavaAntlrLibrary(Target):
 
     alias = "java_antlr_library"
     core_fields = (*COMMON_JVM_FIELDS, JavaAntlrSources, AntlrCompiler, AntlrPackage)
+    v1_only = True
