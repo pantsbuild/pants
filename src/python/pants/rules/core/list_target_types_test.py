@@ -91,6 +91,7 @@ def run_goal(
             RegisteredTargetTypes.create([FortranBinary, FortranLibrary, FortranTests]),
             union_membership or UnionMembership({}),
             MockOptions(details=details_target),
+            Mock(),
             console,
         ],
     )
