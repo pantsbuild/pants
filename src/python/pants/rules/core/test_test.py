@@ -4,7 +4,7 @@
 from abc import ABCMeta, abstractmethod
 from pathlib import PurePath
 from textwrap import dedent
-from typing import List, Optional, Tuple, Type, cast
+from typing import List, Optional, Tuple, Type
 from unittest.mock import Mock
 
 import pytest
@@ -17,19 +17,20 @@ from pants.engine.fs import (
     Digest,
     FileContent,
     InputFilesContent,
-    Snapshot,
     Workspace,
 )
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.rules import UnionMembership
 from pants.engine.target import (
-    HydratedSources,
-    HydrateSourcesRequest,
     RegisteredTargetTypes,
     Sources,
     Target,
     TargetsWithOrigins,
     TargetWithOrigin,
+)
+from pants.rules.core.configurations_with_sources import (
+    ConfigurationsWithSources,
+    ConfigurationsWithSourcesRequest,
 )
 from pants.rules.core.test import (
     AddressAndTestResult,
@@ -194,15 +195,10 @@ class TestTest(TestBase):
                     mock=lambda _: TestDebugRequest(self.make_ipr()),
                 ),
                 MockGet(
-                    product_type=HydratedSources,
-                    subject_type=HydrateSourcesRequest,
-                    mock=lambda _: HydratedSources(
-                        Snapshot(
-                            directory_digest=EMPTY_DIRECTORY_DIGEST,
-                            files=cast(Tuple[str, ...], ("test.hs",) if include_sources else ()),
-                            dirs=(),
-                        ),
-                        filespec={"globs": []},
+                    product_type=ConfigurationsWithSources,
+                    subject_type=ConfigurationsWithSourcesRequest,
+                    mock=lambda request: ConfigurationsWithSources(
+                        request.configs if include_sources else ()
                     ),
                 ),
                 MockGet(

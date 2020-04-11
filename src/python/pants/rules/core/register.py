@@ -10,6 +10,7 @@ from pants.engine.target import rules as target_rules
 from pants.rules.core import (
     binary,
     cloc,
+    configurations_with_sources,
     determine_source_files,
     distdir,
     filedeps,
@@ -51,6 +52,7 @@ def rules():
         *repl.rules(),
         *run.rules(),
         *strip_source_roots.rules(),
+        *configurations_with_sources.rules(),
         *distdir.rules(),
         *test.rules(),
         *target_rules(),

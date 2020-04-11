@@ -4,6 +4,7 @@
 python_library(
   dependencies = [
     '3rdparty/python:dataclasses',
+    '3rdparty/python:typing-extensions',
     'src/python/pants:version',
     'src/python/pants/backend/graph_info/subsystems',
     'src/python/pants/base:build_root',
