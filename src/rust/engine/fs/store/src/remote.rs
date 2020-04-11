@@ -116,7 +116,7 @@ impl ByteStore {
   pub async fn store_bytes(
     &self,
     bytes: Bytes,
-    workunit_store: WorkUnitStore,
+    _workunit_store: WorkUnitStore,
   ) -> Result<Digest, String> {
     let start_time = std::time::SystemTime::now();
 
@@ -222,12 +222,14 @@ impl ByteStore {
         .compat()
         .await;
 
-    let workunit = WorkUnit::new(
-      workunit_name.clone(),
-      TimeSpan::since(&start_time),
-      workunit_store::get_parent_id(),
-    );
-    workunit_store.add_workunit(workunit);
+    if let Some(workunit_state) = workunit_store::get_workunit_state() {
+      let workunit = WorkUnit::new(
+        workunit_name.clone(),
+        TimeSpan::since(&start_time),
+        workunit_state.parent_id,
+      );
+      workunit_state.store.add_workunit(workunit);
+    }
 
     result
   }
@@ -240,7 +242,7 @@ impl ByteStore {
     _entry_type: EntryType,
     digest: Digest,
     f: F,
-    workunit_store: WorkUnitStore,
+    _workunit_store: WorkUnitStore,
   ) -> Result<Option<T>, String> {
     let start_time = std::time::SystemTime::now();
 
@@ -304,12 +306,14 @@ impl ByteStore {
       .compat()
       .await;
 
-    let workunit = WorkUnit::new(
-      workunit_name.clone(),
-      TimeSpan::since(&start_time),
-      workunit_store::get_parent_id(),
-    );
-    workunit_store.add_workunit(workunit);
+    if let Some(workunit_state) = workunit_store::get_workunit_state() {
+      let workunit = WorkUnit::new(
+        workunit_name.clone(),
+        TimeSpan::since(&start_time),
+        workunit_state.parent_id,
+      );
+      workunit_state.store.add_workunit(workunit);
+    }
 
     result
   }
@@ -330,7 +334,7 @@ impl ByteStore {
       "list_missing_digests({})",
       store.instance_name.clone().unwrap_or_default()
     );
-    let workunit_store = workunit_store;
+    let _workunit_store = workunit_store;
     self
       .with_cas_client(move |client| {
         client
@@ -350,12 +354,14 @@ impl ByteStore {
           })
       })
       .then(move |future| {
-        let workunit = WorkUnit::new(
-          workunit_name.clone(),
-          TimeSpan::since(&start_time),
-          workunit_store::get_parent_id(),
-        );
-        workunit_store.add_workunit(workunit);
+        if let Some(workunit_state) = workunit_store::get_workunit_state() {
+          let workunit = WorkUnit::new(
+            workunit_name.clone(),
+            TimeSpan::since(&start_time),
+            workunit_state.parent_id,
+          );
+          workunit_state.store.add_workunit(workunit);
+        }
         future
       })
   }

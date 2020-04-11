@@ -29,7 +29,7 @@ use crate::{
 };
 use std;
 use std::cmp::min;
-use workunit_store::{get_parent_id, WorkUnit, WorkUnitStore};
+use workunit_store::{WorkUnit, WorkUnitStore};
 
 // Environment variable which is exclusively used for cache key invalidation.
 // This may be not specified in an ExecuteProcessRequest, and may be populated only by the
@@ -587,7 +587,7 @@ impl CommandRunner {
         trace!("Got (nested) execute response: {:?}", execute_response);
         if execute_response.get_result().has_execution_metadata() {
           let metadata = execute_response.get_result().get_execution_metadata();
-          let parent_id = get_parent_id();
+          let parent_id = workunit_store::expect_workunit_state().parent_id;
           let result_cached = execute_response.get_cached_result();
 
           match TimeSpan::from_start_and_end(

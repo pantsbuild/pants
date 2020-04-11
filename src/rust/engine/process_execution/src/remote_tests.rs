@@ -2277,6 +2277,7 @@ fn workunits_with_constant_span_id(workunit_store: &WorkUnitStore) -> HashSet<Wo
 #[tokio::test]
 async fn remote_workunits_are_stored() {
   let workunit_store = WorkUnitStore::new();
+  workunit_store.init_thread_state(None);
   let op_name = "gimme-foo".to_string();
   let testdata = TestData::roland();
   let testdata_empty = TestData::empty();

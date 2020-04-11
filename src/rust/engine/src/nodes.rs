@@ -38,7 +38,7 @@ use rule_graph;
 use graph::{Entry, Node, NodeError, NodeTracer, NodeVisualizer};
 use store::{self, StoreFileByDigest};
 use workunit_store::{
-  generate_random_64bit_string, scope_task_parent_id, StartedWorkUnit, WorkUnit, WorkUnitStore,
+  new_span_id, scope_task_workunit_state, StartedWorkUnit, WorkUnit, WorkUnitStore,
   WorkunitMetadata,
 };
 
@@ -1061,35 +1061,28 @@ impl Node for NodeKey {
   type Error = Failure;
 
   fn run(self, context: Context) -> NodeFuture<NodeResult> {
-    let (maybe_started_workunit, maybe_span_id) = if context.session.should_handle_workunits() {
-      let user_facing_name = self.user_facing_name();
-      let span_id = generate_random_64bit_string();
-      let parent_id = workunit_store::get_parent_id();
+    let mut workunit_state = workunit_store::expect_workunit_state();
+    let maybe_started_workunit = if context.session.should_handle_workunits() {
+      self.user_facing_name().map(|node_name| {
+        let span_id = new_span_id();
+        let desc = self.display_info().and_then(|di| di.desc.as_ref().cloned());
 
-      let maybe_started_workunit = user_facing_name.as_ref().map(|node_name| {
-        let maybe_display_info = self.display_info();
-
-        let desc = maybe_display_info.and_then(|di| di.desc.as_ref().cloned());
+        // We're starting a new workunit: record our parent, and set the current parent to our span.
+        let parent_id = std::mem::replace(&mut workunit_state.parent_id, Some(span_id.clone()));
 
         StartedWorkUnit {
-          name: node_name.to_string(),
+          name: node_name,
           start_time: std::time::SystemTime::now(),
-          span_id: span_id.clone(),
-          parent_id,
+          span_id: span_id,
+          parent_id: parent_id,
           metadata: WorkunitMetadata { desc },
         }
-      });
-      let maybe_span_id = if user_facing_name.is_some() {
-        Some(span_id)
-      } else {
-        None
-      };
-      (maybe_started_workunit, maybe_span_id)
+      })
     } else {
-      (None, None)
+      None
     };
 
-    scope_task_parent_id(maybe_span_id, async move {
+    scope_task_workunit_state(Some(workunit_state), async move {
       let context2 = context.clone();
       let maybe_watch = if let Some(path) = self.fs_subject() {
         let abs_path = context.core.build_root.join(path);

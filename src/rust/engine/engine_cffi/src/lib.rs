@@ -822,7 +822,7 @@ pub extern "C" fn set_panic_handler() {
 
     error!("{}", panic_str);
 
-    let panic_file_bug_str = "Please file a bug at https://github.com/pantsbuild/pants/issues.";
+    let panic_file_bug_str = "Please set RUST_BACKTRACE=1, re-run, and then file a bug at https://github.com/pantsbuild/pants/issues.";
     error!("{}", panic_file_bug_str);
   }));
 }
@@ -903,33 +903,35 @@ pub extern "C" fn capture_snapshots(
       return e.into();
     }
   };
-  let workunit_store = with_session(session_ptr, |session| session.workunit_store());
 
   with_scheduler(scheduler_ptr, |scheduler| {
-    let core = scheduler.core.clone();
-    let snapshot_futures = path_globs_and_roots
-      .into_iter()
-      .map(|(path_globs, root, digest_hint)| {
-        let core = core.clone();
-        let workunit_store = workunit_store.clone();
-        async move {
-          let snapshot = store::Snapshot::capture_snapshot_from_arbitrary_root(
-            core.store(),
-            core.executor.clone(),
-            root,
-            path_globs,
-            digest_hint,
-            workunit_store,
-          )
-          .await?;
-          let res: Result<_, String> = Ok(nodes::Snapshot::store_snapshot(&core, &snapshot));
-          res
-        }
-      })
-      .collect::<Vec<_>>();
-    core.executor.block_on(
-      future03::try_join_all(snapshot_futures).map_ok(|values| externs::store_tuple(&values)),
-    )
+    with_session(session_ptr, |session| {
+      let workunit_store = session.workunit_store();
+      let core = scheduler.core.clone();
+      let snapshot_futures = path_globs_and_roots
+        .into_iter()
+        .map(|(path_globs, root, digest_hint)| {
+          let core = core.clone();
+          let workunit_store = workunit_store.clone();
+          async move {
+            let snapshot = store::Snapshot::capture_snapshot_from_arbitrary_root(
+              core.store(),
+              core.executor.clone(),
+              root,
+              path_globs,
+              digest_hint,
+              workunit_store,
+            )
+            .await?;
+            let res: Result<_, String> = Ok(nodes::Snapshot::store_snapshot(&core, &snapshot));
+            res
+          }
+        })
+        .collect::<Vec<_>>();
+      core.executor.block_on(
+        future03::try_join_all(snapshot_futures).map_ok(|values| externs::store_tuple(&values)),
+      )
+    })
   })
   .into()
 }
@@ -952,20 +954,22 @@ pub extern "C" fn merge_directories(
       return e.into();
     }
   };
-  let workunit_store = with_session(session_ptr, |session| session.workunit_store());
 
   with_scheduler(scheduler_ptr, |scheduler| {
-    scheduler
-      .core
-      .executor
-      .block_on(store::Snapshot::merge_directories(
-        scheduler.core.store(),
-        digests,
-        workunit_store,
-      ))
-      .map(|dir| nodes::Snapshot::store_directory(&scheduler.core, &dir))
-      .into()
+    with_session(session_ptr, |session| {
+      let workunit_store = session.workunit_store();
+      scheduler
+        .core
+        .executor
+        .block_on(store::Snapshot::merge_directories(
+          scheduler.core.store(),
+          digests,
+          workunit_store,
+        ))
+        .map(|dir| nodes::Snapshot::store_directory(&scheduler.core, &dir))
+    })
   })
+  .into()
 }
 
 #[no_mangle]
@@ -1083,60 +1087,63 @@ pub extern "C" fn materialize_directories(
       return e.into();
     }
   };
-  let workunit_store = with_session(session_ptr, |session| session.workunit_store());
   with_scheduler(scheduler_ptr, |scheduler| {
-    let types = &scheduler.core.types;
-    let construct_materialize_directories_results = types.construct_materialize_directories_results;
-    let construct_materialize_directory_result = types.construct_materialize_directory_result;
-    future::join_all(
-      digests_and_path_prefixes
-        .into_iter()
-        .map(|(digest, path_prefix)| {
-          // NB: all DirectoryToMaterialize paths are validated in Python to be relative paths.
-          // Here, we join them with the build root.
-          let mut destination = PathBuf::new();
-          destination.push(scheduler.core.build_root.clone());
-          destination.push(path_prefix);
-          let metadata = scheduler.core.store().materialize_directory(
-            destination.clone(),
-            digest,
-            workunit_store.clone(),
-          );
-          metadata.map(|m| (destination, m))
-        })
-        .collect::<Vec<_>>(),
-    )
-    .map(move |metadata_list| {
-      let entries: Vec<Value> = metadata_list
-        .iter()
-        .map(
-          |(output_dir, metadata): &(PathBuf, store::DirectoryMaterializeMetadata)| {
-            let path_list = metadata.to_path_list();
-            let path_values: Vec<Value> = path_list
-              .into_iter()
-              .map(|rel_path: String| {
-                let mut path = PathBuf::new();
-                path.push(output_dir);
-                path.push(rel_path);
-                externs::store_utf8(&path.to_string_lossy())
-              })
-              .collect();
+    with_session(session_ptr, |session| {
+      let workunit_store = session.workunit_store();
+      let types = &scheduler.core.types;
+      let construct_materialize_directories_results =
+        types.construct_materialize_directories_results;
+      let construct_materialize_directory_result = types.construct_materialize_directory_result;
+      future::join_all(
+        digests_and_path_prefixes
+          .into_iter()
+          .map(|(digest, path_prefix)| {
+            // NB: all DirectoryToMaterialize paths are validated in Python to be relative paths.
+            // Here, we join them with the build root.
+            let mut destination = PathBuf::new();
+            destination.push(scheduler.core.build_root.clone());
+            destination.push(path_prefix);
+            let metadata = scheduler.core.store().materialize_directory(
+              destination.clone(),
+              digest,
+              workunit_store.clone(),
+            );
+            metadata.map(|m| (destination, m))
+          })
+          .collect::<Vec<_>>(),
+      )
+      .map(move |metadata_list| {
+        let entries: Vec<Value> = metadata_list
+          .iter()
+          .map(
+            |(output_dir, metadata): &(PathBuf, store::DirectoryMaterializeMetadata)| {
+              let path_list = metadata.to_path_list();
+              let path_values: Vec<Value> = path_list
+                .into_iter()
+                .map(|rel_path: String| {
+                  let mut path = PathBuf::new();
+                  path.push(output_dir);
+                  path.push(rel_path);
+                  externs::store_utf8(&path.to_string_lossy())
+                })
+                .collect();
 
-            externs::unsafe_call(
-              &construct_materialize_directory_result,
-              &[externs::store_tuple(&path_values)],
-            )
-          },
-        )
-        .collect();
+              externs::unsafe_call(
+                &construct_materialize_directory_result,
+                &[externs::store_tuple(&path_values)],
+              )
+            },
+          )
+          .collect();
 
-      let output: Value = externs::unsafe_call(
-        &construct_materialize_directories_results,
-        &[externs::store_tuple(&entries)],
-      );
-      output
+        let output: Value = externs::unsafe_call(
+          &construct_materialize_directories_results,
+          &[externs::store_tuple(&entries)],
+        );
+        output
+      })
+      .wait()
     })
-    .wait()
   })
   .into()
 }
@@ -1238,6 +1245,8 @@ where
   F: FnOnce(&Session) -> T,
 {
   let session = unsafe { Box::from_raw(session_ptr) };
+  // TODO: A parent_id should be an explicit requirement at each callsite.
+  session.workunit_store().init_thread_state(None);
   let t = f(&session);
   mem::forget(session);
   t
