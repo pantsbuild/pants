@@ -15,6 +15,10 @@ from pants.engine.objects import Collection, union
 from pants.engine.rules import UnionMembership, goal_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Field, Sources, Target, TargetsWithOrigins, TargetWithOrigin
+from pants.rules.core.filter_empty_sources import (
+    ConfigurationsWithSources,
+    ConfigurationsWithSourcesRequest,
+)
 
 
 @dataclass(frozen=True)
@@ -130,31 +134,39 @@ async def lint(
         LinterConfigurations
     ]
 
-    if options.values.per_target_caching:
-        results = await MultiGet(
-            Get[LintResult](
-                LinterConfigurations,
-                config_collection_type(
-                    [config_collection_type.config_type.create(target_with_origin)]
-                ),
-            )
+    config_collections = (
+        config_collection_type(
+            config_collection_type.config_type.create(target_with_origin)
             for target_with_origin in targets_with_origins
-            for config_collection_type in config_collection_types
             if config_collection_type.config_type.is_valid(target_with_origin.target)
         )
-    else:
-        config_collections = (
-            config_collection_type(
-                config_collection_type.config_type.create(target_with_origin)
-                for target_with_origin in targets_with_origins
-                if config_collection_type.config_type.is_valid(target_with_origin.target)
-            )
-            for config_collection_type in config_collection_types
+        for config_collection_type in config_collection_types
+    )
+    config_collections_with_sources = await MultiGet(
+        Get[ConfigurationsWithSources](ConfigurationsWithSourcesRequest(config_collection))
+        for config_collection in config_collections
+    )
+    # NB: We must convert back the generic ConfigurationsWithSources objects back into their
+    # corresponding LinterConfigurations, e.g. back to IsortConfigurations, in order for the union
+    # rule to work.
+    valid_config_collections = tuple(
+        config_collection_cls(config_collection)
+        for config_collection_cls, config_collection in zip(
+            config_collection_types, config_collections_with_sources
         )
+        if config_collection
+    )
+
+    if options.values.per_target_caching:
+        results = await MultiGet(
+            Get[LintResult](LinterConfigurations, config_collection.__class__([config]))
+            for config_collection in valid_config_collections
+            for config in config_collection
+        )
+    else:
         results = await MultiGet(
             Get[LintResult](LinterConfigurations, config_collection)
-            for config_collection in config_collections
-            if config_collection
+            for config_collection in valid_config_collections
         )
 
     if not results:

@@ -4,12 +4,14 @@
 from abc import ABCMeta, abstractmethod
 from typing import Iterable, List, Optional, Tuple, Type
 
-import pytest
-
 from pants.base.specs import SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.rules import UnionMembership
 from pants.engine.target import Sources, Target, TargetsWithOrigins, TargetWithOrigin
+from pants.rules.core.filter_empty_sources import (
+    ConfigurationsWithSources,
+    ConfigurationsWithSourcesRequest,
+)
 from pants.rules.core.lint import (
     Lint,
     LinterConfiguration,
@@ -141,12 +143,18 @@ class LintTest(TestBase):
                     subject_type=LinterConfigurations,
                     mock=lambda config_collection: config_collection.lint_result,
                 ),
+                MockGet(
+                    product_type=ConfigurationsWithSources,
+                    subject_type=ConfigurationsWithSourcesRequest,
+                    mock=lambda configs: ConfigurationsWithSources(
+                        configs if include_sources else ()
+                    ),
+                ),
             ],
             union_membership=union_membership,
         )
         return result.exit_code, console.stdout.getvalue()
 
-    @pytest.mark.skip(reason="add functionality")
     def test_empty_target_noops(self) -> None:
         def assert_noops(per_target_caching: bool) -> None:
             exit_code, stdout = self.run_lint_rule(
@@ -264,6 +272,6 @@ class LintTest(TestBase):
         stdout = get_stdout(per_target_caching=True)
         assert stdout.splitlines() == [
             config_collection.stdout([address])
-            for address in [good_address, bad_address]
             for config_collection in [ConditionallySucceedsConfigurations, SuccessfulConfigurations]
+            for address in [good_address, bad_address]
         ]
