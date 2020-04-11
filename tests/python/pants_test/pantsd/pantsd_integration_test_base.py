@@ -5,13 +5,17 @@ import functools
 import os
 import time
 from contextlib import contextmanager
+from typing import Any, Dict, Iterator, Optional, Tuple
 
 import psutil
 from colors import bold, cyan, magenta
 
 from pants.pantsd.process_manager import ProcessManager
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest, read_pantsd_log
-from pants.testutil.process_test_util import no_lingering_process_by_command
+from pants.testutil.process_test_util import (
+    TrackedProcessesContext,
+    no_lingering_process_by_command,
+)
 from pants.util.collections import recursively_update
 
 
@@ -22,7 +26,7 @@ def banner(s):
 
 
 class PantsDaemonMonitor(ProcessManager):
-    def __init__(self, runner_process_context, metadata_base_dir=None):
+    def __init__(self, runner_process_context: TrackedProcessesContext, metadata_base_dir=None):
         """
         :param runner_process_context: A TrackedProcessContext that can be used to inspect live
           pantsd instances created in this context.
@@ -84,7 +88,9 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
         return False
 
     @contextmanager
-    def pantsd_test_context(self, log_level="info", extra_config=None):
+    def pantsd_test_context(
+        self, *, log_level: str = "info", extra_config: Optional[Dict[str, Any]] = None
+    ) -> Iterator[Tuple[str, Dict[str, Any], PantsDaemonMonitor]]:
         with no_lingering_process_by_command("pantsd") as runner_process_context:
             with self.temporary_workdir() as workdir_base:
                 pid_dir = os.path.join(workdir_base, ".pids")
@@ -107,11 +113,11 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
                 print(f">>> config: \n{pantsd_config}\n")
 
                 checker = PantsDaemonMonitor(runner_process_context, pid_dir)
-                self.assert_runner(workdir, pantsd_config, ["kill-pantsd"], expected_runs=1)
+                self.assert_runner(workdir, pantsd_config, ["kill-pantsd"])
                 try:
                     yield workdir, pantsd_config, checker
                     self.assert_runner(
-                        workdir, pantsd_config, ["kill-pantsd"], expected_runs=1,
+                        workdir, pantsd_config, ["kill-pantsd"],
                     )
                     checker.assert_stopped()
                 finally:
@@ -128,13 +134,17 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
     @contextmanager
     def pantsd_run_context(
         self,
-        log_level="info",
-        extra_config=None,
-        extra_env=None,
-        success=True,
-        no_track_run_counts=False,
+        log_level: str = "info",
+        extra_config: Optional[Dict[str, Any]] = None,
+        extra_env: Optional[Dict[str, str]] = None,
+        success: bool = True,
+        no_track_run_counts: bool = False,
     ):
-        with self.pantsd_test_context(log_level, extra_config) as (workdir, pantsd_config, checker):
+        with self.pantsd_test_context(log_level=log_level, extra_config=extra_config) as (
+            workdir,
+            pantsd_config,
+            checker,
+        ):
             yield (
                 functools.partial(
                     self.assert_runner,
@@ -156,7 +166,14 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
             return 0
 
     def assert_runner(
-        self, workdir, config, cmd, extra_config={}, extra_env={}, expected_runs=1, success=True
+        self,
+        workdir: str,
+        config,
+        cmd,
+        extra_config={},
+        extra_env={},
+        success=True,
+        expected_runs: int = 1,
     ):
         combined_config = config.copy()
         recursively_update(combined_config, extra_config)

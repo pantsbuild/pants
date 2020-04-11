@@ -3,7 +3,7 @@
 
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any
+from typing import Iterator, Set
 
 import psutil
 
@@ -12,7 +12,7 @@ class ProcessStillRunning(AssertionError):
     """Raised when a process shouldn't be running but is."""
 
 
-def _safe_iter_matching_processes(name):
+def _safe_iter_matching_processes(name: str) -> Iterator[psutil.Process]:
     for proc in psutil.process_iter():
         try:
             if name in "".join(proc.cmdline()):
@@ -31,7 +31,7 @@ def _make_process_table(processes):
 
 
 @contextmanager
-def no_lingering_process_by_command(name):
+def no_lingering_process_by_command(name: str):
     """Asserts that no process exists for a given command with a helpful error, excluding existing
     processes outside of the scope of the contextmanager."""
     context = TrackedProcessesContext(name, set(_safe_iter_matching_processes(name)))
@@ -47,10 +47,10 @@ def no_lingering_process_by_command(name):
 
 @dataclass(frozen=True)
 class TrackedProcessesContext:
-    name: Any
-    before_processes: Any
+    name: str
+    before_processes: Set[psutil.Process]
 
-    def current_processes(self):
+    def current_processes(self) -> Set[psutil.Process]:
         """Returns the current set of matching processes created since the context was entered."""
         after_processes = set(_safe_iter_matching_processes(self.name))
         return after_processes.difference(self.before_processes)

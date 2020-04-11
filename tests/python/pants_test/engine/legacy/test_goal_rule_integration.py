@@ -46,9 +46,11 @@ class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
 
     def test_v2_list_loop(self):
         # Create a BUILD file in a nested temporary directory, and add additional targets to it.
-        with self.pantsd_test_context() as (workdir, config, checker), temporary_dir(
-            root_dir=get_buildroot()
-        ) as tmpdir:
+        with self.pantsd_test_context(log_level="info") as (
+            workdir,
+            config,
+            checker,
+        ), temporary_dir(root_dir=get_buildroot()) as tmpdir:
             rel_tmpdir = fast_relpath(tmpdir, get_buildroot())
 
             def dump(content):
