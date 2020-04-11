@@ -7,7 +7,7 @@ from pathlib import PurePath
 from typing import Optional, Tuple
 
 from pants.backend.python.lint.black.subsystem import Black
-from pants.backend.python.lint.python_formatter import PythonFmtConfigurations
+from pants.backend.python.lint.python_fmt import PythonFmtConfigurations
 from pants.backend.python.rules import download_pex_bin, pex
 from pants.backend.python.rules.pex import (
     Pex,

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Tuple
 
 from pants.backend.python.lint.docformatter.subsystem import Docformatter
-from pants.backend.python.lint.python_formatter import PythonFmtConfigurations
+from pants.backend.python.lint.python_fmt import PythonFmtConfigurations
 from pants.backend.python.rules import download_pex_bin, pex
 from pants.backend.python.rules.pex import (
     Pex,

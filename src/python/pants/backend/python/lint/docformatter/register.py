@@ -6,9 +6,9 @@
 See https://github.com/myint/docformatter.
 """
 
-from pants.backend.python.lint import python_formatter
+from pants.backend.python.lint import python_fmt
 from pants.backend.python.lint.docformatter.rules import rules as docformatter_rules
 
 
 def rules():
-    return (*docformatter_rules(), *python_formatter.rules())
+    return (*docformatter_rules(), *python_fmt.rules())

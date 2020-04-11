@@ -7,7 +7,7 @@ from pants.backend.python.lint.black.rules import BlackConfigurations
 from pants.backend.python.lint.black.rules import rules as black_rules
 from pants.backend.python.lint.isort.rules import IsortConfigurations
 from pants.backend.python.lint.isort.rules import rules as isort_rules
-from pants.backend.python.lint.python_formatter import PythonFmtTargets, format_python_target
+from pants.backend.python.lint.python_fmt import PythonFmtTargets, format_python_target
 from pants.backend.python.rules.targets import PythonLibrary
 from pants.base.specs import SingleAddress
 from pants.build_graph.address import Address
@@ -20,7 +20,7 @@ from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
 
-class PythonFormatterIntegrationTest(TestBase):
+class PythonFmtIntegrationTest(TestBase):
     @classmethod
     def rules(cls):
         return (
