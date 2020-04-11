@@ -247,7 +247,7 @@ class TestTest(TestBase):
         exit_code, stdout = self.run_test_rule(
             config=ConditionallySucceedsConfiguration,
             targets=[
-                self.make_target_with_origin(address=good_address),
+                self.make_target_with_origin(good_address),
                 self.make_target_with_origin(bad_address),
             ],
         )
