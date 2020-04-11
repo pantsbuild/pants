@@ -5,7 +5,12 @@ from dataclasses import dataclass
 from typing import Iterable, Optional, Tuple
 
 from pants.backend.python.rules.importable_python_sources import ImportablePythonSources
-from pants.backend.python.rules.pex import PexInterpreterConstraints, PexRequest, PexRequirements
+from pants.backend.python.rules.pex import (
+    PexInterpreterConstraints,
+    PexRequest,
+    PexRequirements,
+    TwoStepPexRequest,
+)
 from pants.backend.python.rules.targets import (
     PythonInterpreterCompatibility,
     PythonRequirementsField,
@@ -16,7 +21,7 @@ from pants.engine.addressable import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
 from pants.engine.legacy.structs import FilesAdaptor, PythonTargetAdaptor, ResourcesAdaptor
-from pants.engine.rules import RootRule, named_rule
+from pants.engine.rules import RootRule, named_rule, rule
 from pants.engine.selectors import Get
 from pants.engine.target import Targets, TransitiveTargets
 from pants.python.python_setup import PythonSetup
@@ -58,6 +63,21 @@ class PexFromTargetsRequest:
         self.include_source_files = include_source_files
         self.additional_sources = additional_sources
         self.additional_inputs = additional_inputs
+
+
+@dataclass(frozen=True)
+class TwoStepPexFromTargetsRequest:
+    """Request to create a PEX from the closure of a set of targets, in two steps.
+
+    First we create a requirements-only pex. Then we create the full pex on top of that
+    requirements pex, instead of having the full pex directly resolve its requirements.
+
+    This allows us to re-use the requirements-only pex when no requirements have changed (which is
+    the overwhelmingly common case), thus avoiding spurious re-resolves of the same requirements
+    over and over again.
+    """
+
+    pex_from_targets_request: PexFromTargetsRequest
 
 
 @named_rule(desc="Create a PEX from targets")
@@ -108,6 +128,12 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         additional_inputs=request.additional_inputs,
         additional_args=request.additional_args,
     )
+
+
+@rule
+async def two_step_pex_from_targets(req: TwoStepPexFromTargetsRequest) -> TwoStepPexRequest:
+    pex_request = await Get[PexRequest](PexFromTargetsRequest, req.pex_from_targets_request)
+    return TwoStepPexRequest(pex_request=pex_request)
 
 
 @dataclass(frozen=True)
@@ -167,7 +193,9 @@ async def legacy_pex_from_targets(
 def rules():
     return [
         pex_from_targets,
+        two_step_pex_from_targets,
         RootRule(PexFromTargetsRequest),
+        RootRule(TwoStepPexFromTargetsRequest),
         legacy_pex_from_targets,
         RootRule(LegacyPexFromTargetsRequest),
     ]

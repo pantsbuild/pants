@@ -1,6 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import dataclasses
 import itertools
 import logging
 from dataclasses import dataclass
@@ -30,7 +31,7 @@ from pants.engine.fs import (
 from pants.engine.isolated_process import ExecuteProcessResult, MultiPlatformExecuteProcessRequest
 from pants.engine.legacy.structs import PythonTargetAdaptor, TargetAdaptor
 from pants.engine.platform import Platform, PlatformConstraint
-from pants.engine.rules import named_rule, subsystem_rule
+from pants.engine.rules import RootRule, named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.python.python_repos import PythonRepos
 from pants.python.python_setup import PythonSetup
@@ -189,7 +190,7 @@ class PexInterpreterConstraints:
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class PexRequest:
-    """Represents a generic request to create a PEX from its inputs."""
+    """A generic request to create a PEX from its inputs."""
 
     output_filename: str
     requirements: PexRequirements
@@ -220,11 +221,37 @@ class PexRequest:
 
 
 @dataclass(frozen=True)
+class TwoStepPexRequest:
+    """A request to create a PEX in two steps.
+
+    First we create a requirements-only pex. Then we create the full pex on top of that
+    requirements pex, instead of having the full pex directly resolve its requirements.
+
+    This allows us to re-use the requirements-only pex when no requirements have changed (which is
+    the overwhelmingly common case), thus avoiding spurious re-resolves of the same requirements
+    over and over again.
+    """
+
+    pex_request: PexRequest
+
+
+@dataclass(frozen=True)
 class Pex(HermeticPex):
     """Wrapper for a digest containing a pex file created with some filename."""
 
     directory_digest: Digest
     output_filename: str
+
+
+@dataclass(frozen=True)
+class TwoStepPex:
+    """The result of creating a PEX in two steps.
+
+    TODO(9320): A workaround for https://github.com/pantsbuild/pants/issues/9320. Really we
+      just want the rules to directly return a Pex.
+    """
+
+    pex: Pex
 
 
 logger = logging.getLogger(__name__)
@@ -375,5 +402,41 @@ async def create_pex(
     )
 
 
+@rule
+async def two_step_create_pex(two_step_pex_request: TwoStepPexRequest) -> TwoStepPex:
+    """Create a pex in two steps: a requirements-only pex and then a full pex from it."""
+    request = two_step_pex_request.pex_request
+    req_pex_name = "__requirements.pex"
+
+    # Create a pex containing just the requirements.
+    requirements_pex_request = PexRequest(
+        output_filename=req_pex_name,
+        requirements=request.requirements,
+        interpreter_constraints=request.interpreter_constraints,
+        # TODO: Do we need to pass all the additional args to the requirements pex creation?
+        #  Some of them may affect resolution behavior, but others may be irrelevant.
+        #  For now we err on the side of caution.
+        additional_args=request.additional_args,
+    )
+    requirements_pex = await Get[Pex](PexRequest, requirements_pex_request)
+
+    # Now create a full pex on top of the requirements pex.
+    full_pex_request = dataclasses.replace(
+        request,
+        requirements=PexRequirements(),
+        additional_inputs=requirements_pex.directory_digest,
+        additional_args=(*request.additional_args, f"--requirements-pex={req_pex_name}"),
+    )
+    full_pex = await Get[Pex](PexRequest, full_pex_request)
+    return TwoStepPex(pex=full_pex)
+
+
 def rules():
-    return [create_pex, subsystem_rule(PythonSetup), subsystem_rule(PythonRepos)]
+    return [
+        create_pex,
+        two_step_create_pex,
+        RootRule(PexRequest),
+        RootRule(TwoStepPexRequest),
+        subsystem_rule(PythonSetup),
+        subsystem_rule(PythonRepos),
+    ]
