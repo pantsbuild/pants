@@ -1021,7 +1021,6 @@ async fn ensure_inline_stdio_is_stored() {
     assert_eq!(
       local_store
         .load_file_bytes_with(test_stdout.digest(), |v| v, WorkUnitStore::new())
-        .compat()
         .await
         .unwrap()
         .unwrap()
@@ -1031,7 +1030,6 @@ async fn ensure_inline_stdio_is_stored() {
     assert_eq!(
       local_store
         .load_file_bytes_with(test_stderr.digest(), |v| v, WorkUnitStore::new())
-        .compat()
         .await
         .unwrap()
         .unwrap()
@@ -1536,12 +1534,10 @@ async fn execute_missing_file_uploads_if_known() {
   .expect("Failed to make store");
   store
     .store_file_bytes(roland.bytes(), false)
-    .compat()
     .await
     .expect("Saving file bytes to store");
   store
     .record_directory(&TestDirectory::containing_roland().directory(), false)
-    .compat()
     .await
     .expect("Saving directory bytes to store");
   let command_runner = CommandRunner::new(
@@ -1651,7 +1647,7 @@ async fn execute_missing_file_uploads_if_known_status() {
   .expect("Failed to make store");
   store
     .store_file_bytes(roland.bytes(), false)
-    .wait()
+    .await
     .expect("Saving file bytes to store");
 
   let result = CommandRunner::new(

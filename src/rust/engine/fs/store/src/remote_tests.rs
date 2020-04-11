@@ -142,7 +142,6 @@ async fn write_file_one_chunk() {
   assert_eq!(
     store
       .store_bytes(testdata.bytes(), WorkUnitStore::new())
-      .compat()
       .await,
     Ok(testdata.digest())
   );
@@ -176,7 +175,6 @@ async fn write_file_multiple_chunks() {
   assert_eq!(
     store
       .store_bytes(all_the_henries.clone(), WorkUnitStore::new())
-      .compat()
       .await,
     Ok(big_file_digest())
   );
@@ -207,7 +205,6 @@ async fn write_empty_file() {
   assert_eq!(
     store
       .store_bytes(empty_file.bytes(), WorkUnitStore::new())
-      .compat()
       .await,
     Ok(empty_file.digest())
   );
@@ -226,7 +223,6 @@ async fn write_file_errors() {
   let store = new_byte_store(&cas);
   let error = store
     .store_bytes(TestData::roland().bytes(), WorkUnitStore::new())
-    .compat()
     .await
     .expect_err("Want error");
   assert!(
@@ -256,7 +252,6 @@ async fn write_connection_error() {
   .unwrap();
   let error = store
     .store_bytes(TestData::roland().bytes(), WorkUnitStore::new())
-    .compat()
     .await
     .expect_err("Want error");
   assert!(
@@ -395,6 +390,5 @@ async fn load_bytes(
 ) -> Result<Option<Bytes>, String> {
   store
     .load_bytes_with(entry_type, digest, |b| b, WorkUnitStore::new())
-    .compat()
     .await
 }

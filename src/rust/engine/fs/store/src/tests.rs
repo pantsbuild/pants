@@ -74,7 +74,6 @@ pub fn extra_big_file_bytes() -> Bytes {
 pub async fn load_file_bytes(store: &Store, digest: Digest) -> Result<Option<Bytes>, String> {
   let option = store
     .load_file_bytes_with(digest, |bytes| bytes, WorkUnitStore::new())
-    .compat()
     .await?;
   Ok(option.map(|(bytes, _metadata)| bytes))
 }
@@ -127,7 +126,6 @@ async fn load_file_prefers_local() {
 
   crate::local_tests::new_store(dir.path())
     .store_bytes(EntryType::File, testdata.bytes(), false)
-    .compat()
     .await
     .expect("Store failed");
 
@@ -147,7 +145,6 @@ async fn load_directory_prefers_local() {
 
   crate::local_tests::new_store(dir.path())
     .store_bytes(EntryType::Directory, testdir.bytes(), false)
-    .compat()
     .await
     .expect("Store failed");
 
@@ -155,7 +152,6 @@ async fn load_directory_prefers_local() {
   assert_eq!(
     new_store(dir.path(), cas.address())
       .load_directory(testdir.digest(), WorkUnitStore::new())
-      .compat()
       .await
       .unwrap()
       .unwrap()
@@ -200,7 +196,6 @@ async fn load_directory_falls_back_and_backfills() {
   assert_eq!(
     new_store(dir.path(), cas.address())
       .load_directory(testdir.digest(), WorkUnitStore::new())
-      .compat()
       .await
       .unwrap()
       .unwrap()
@@ -255,7 +250,6 @@ async fn load_recursive_directory() {
   assert_eq!(
     new_local_store(dir.path())
       .load_directory(testdir_digest, WorkUnitStore::new())
-      .compat()
       .await
       .unwrap()
       .unwrap()
@@ -265,7 +259,6 @@ async fn load_recursive_directory() {
   assert_eq!(
     new_local_store(dir.path())
       .load_directory(recursive_testdir_digest, WorkUnitStore::new())
-      .compat()
       .await
       .unwrap()
       .unwrap()
@@ -301,7 +294,6 @@ async fn load_directory_missing_is_none() {
         TestDirectory::containing_roland().digest(),
         WorkUnitStore::new()
       )
-      .compat()
       .await,
     Ok(None)
   );
@@ -337,7 +329,6 @@ async fn load_directory_remote_error_is_error() {
   let cas = StubCAS::always_errors();
   let error = new_store(dir.path(), cas.address())
     .load_directory(TestData::roland().digest(), WorkUnitStore::new())
-    .compat()
     .await
     .expect_err("Want error");
   assert!(
@@ -360,7 +351,6 @@ async fn malformed_remote_directory_is_error() {
   let cas = new_cas(1024);
   new_store(dir.path(), cas.address())
     .load_directory(testdata.digest(), WorkUnitStore::new())
-    .compat()
     .await
     .expect_err("Want error");
 
@@ -408,7 +398,6 @@ async fn non_canonical_remote_directory_is_error() {
     .build();
   new_store(dir.path(), cas.address())
     .load_directory(directory_digest.clone(), WorkUnitStore::new())
-    .compat()
     .await
     .expect_err("Want error");
 
@@ -500,7 +489,6 @@ async fn expand_flat_directory() {
 
   new_local_store(dir.path())
     .record_directory(&testdir.directory(), false)
-    .compat()
     .await
     .expect("Error storing directory locally");
 
@@ -529,12 +517,10 @@ async fn expand_recursive_directory() {
 
   new_local_store(dir.path())
     .record_directory(&recursive_testdir.directory(), false)
-    .compat()
     .await
     .expect("Error storing directory locally");
   new_local_store(dir.path())
     .record_directory(&testdir.directory(), false)
-    .compat()
     .await
     .expect("Error storing directory locally");
 
@@ -578,7 +564,6 @@ async fn expand_directory_missing_subdir() {
 
   new_local_store(dir.path())
     .record_directory(&recursive_testdir.directory(), false)
-    .compat()
     .await
     .expect("Error storing directory locally");
 
@@ -606,7 +591,6 @@ async fn uploads_files() {
 
   new_local_store(dir.path())
     .store_file_bytes(testdata.bytes(), false)
-    .compat()
     .await
     .expect("Error storing file locally");
 
@@ -634,12 +618,10 @@ async fn uploads_directories_recursively() {
 
   new_local_store(dir.path())
     .record_directory(&testdir.directory(), false)
-    .compat()
     .await
     .expect("Error storing directory locally");
   new_local_store(dir.path())
     .store_file_bytes(testdata.bytes(), false)
-    .compat()
     .await
     .expect("Error storing file locally");
 
@@ -672,12 +654,10 @@ async fn uploads_files_recursively_when_under_three_digests_ignoring_items_alrea
 
   new_local_store(dir.path())
     .record_directory(&testdir.directory(), false)
-    .compat()
     .await
     .expect("Error storing directory locally");
   new_local_store(dir.path())
     .store_file_bytes(testdata.bytes(), false)
-    .compat()
     .await
     .expect("Error storing file locally");
 
@@ -718,17 +698,14 @@ async fn does_not_reupload_file_already_in_cas_when_requested_with_three_other_d
 
   new_local_store(dir.path())
     .record_directory(&testdir.directory(), false)
-    .compat()
     .await
     .expect("Error storing directory locally");
   new_local_store(dir.path())
     .store_file_bytes(roland.bytes(), false)
-    .compat()
     .await
     .expect("Error storing file locally");
   new_local_store(dir.path())
     .store_file_bytes(catnip.bytes(), false)
-    .compat()
     .await
     .expect("Error storing file locally");
 
@@ -773,7 +750,6 @@ async fn does_not_reupload_big_file_already_in_cas() {
 
   new_local_store(dir.path())
     .store_file_bytes(extra_big_file_bytes(), false)
-    .compat()
     .await
     .expect("Error storing file locally");
 
@@ -831,7 +807,6 @@ async fn upload_missing_file_in_directory() {
 
   new_local_store(dir.path())
     .record_directory(&testdir.directory(), false)
-    .compat()
     .await
     .expect("Error storing directory locally");
 
@@ -862,7 +837,6 @@ async fn uploading_digest_with_wrong_size_is_error() {
 
   new_local_store(dir.path())
     .store_file_bytes(testdata.bytes(), false)
-    .compat()
     .await
     .expect("Error storing file locally");
 
@@ -891,17 +865,14 @@ async fn instance_name_upload() {
 
   new_local_store(dir.path())
     .record_directory(&testdir.directory(), false)
-    .compat()
     .await
     .expect("Error storing directory locally");
   new_local_store(dir.path())
     .store_file_bytes(TestData::roland().bytes(), false)
-    .compat()
     .await
     .expect("Error storing roland locally");
   new_local_store(dir.path())
     .store_file_bytes(TestData::catnip().bytes(), false)
-    .compat()
     .await
     .expect("Error storing catnip locally");
 
@@ -955,7 +926,6 @@ async fn instance_name_download() {
   assert_eq!(
     store_with_remote
       .load_file_bytes_with(TestData::roland().digest(), |b| b, WorkUnitStore::new())
-      .compat()
       .await
       .unwrap()
       .unwrap()
@@ -976,17 +946,14 @@ async fn auth_upload() {
 
   new_local_store(dir.path())
     .record_directory(&testdir.directory(), false)
-    .compat()
     .await
     .expect("Error storing directory locally");
   new_local_store(dir.path())
     .store_file_bytes(TestData::roland().bytes(), false)
-    .compat()
     .await
     .expect("Error storing roland locally");
   new_local_store(dir.path())
     .store_file_bytes(TestData::catnip().bytes(), false)
-    .compat()
     .await
     .expect("Error storing catnip locally");
 
@@ -1040,7 +1007,6 @@ async fn auth_download() {
   assert_eq!(
     store_with_remote
       .load_file_bytes_with(TestData::roland().digest(), |b| b, WorkUnitStore::new())
-      .compat()
       .await
       .unwrap()
       .unwrap()
@@ -1079,7 +1045,6 @@ async fn materialize_file() {
   let store = new_local_store(store_dir.path());
   store
     .store_file_bytes(testdata.bytes(), false)
-    .compat()
     .await
     .expect("Error saving bytes");
   store
@@ -1102,7 +1067,6 @@ async fn materialize_file_executable() {
   let store = new_local_store(store_dir.path());
   store
     .store_file_bytes(testdata.bytes(), false)
-    .compat()
     .await
     .expect("Error saving bytes");
   store
@@ -1144,22 +1108,18 @@ async fn materialize_directory() {
   let store = new_local_store(store_dir.path());
   store
     .record_directory(&recursive_testdir.directory(), false)
-    .compat()
     .await
     .expect("Error saving recursive Directory");
   store
     .record_directory(&testdir.directory(), false)
-    .compat()
     .await
     .expect("Error saving Directory");
   store
     .store_file_bytes(roland.bytes(), false)
-    .compat()
     .await
     .expect("Error saving file bytes");
   store
     .store_file_bytes(catnip.bytes(), false)
-    .compat()
     .await
     .expect("Error saving catnip file bytes");
 
@@ -1199,12 +1159,10 @@ async fn materialize_directory_executable() {
   let store = new_local_store(store_dir.path());
   store
     .record_directory(&testdir.directory(), false)
-    .compat()
     .await
     .expect("Error saving Directory");
   store
     .store_file_bytes(catnip.bytes(), false)
-    .compat()
     .await
     .expect("Error saving catnip file bytes");
 
@@ -1256,22 +1214,18 @@ async fn contents_for_directory() {
   let store = new_local_store(store_dir.path());
   store
     .record_directory(&recursive_testdir.directory(), false)
-    .compat()
     .await
     .expect("Error saving recursive Directory");
   store
     .record_directory(&testdir.directory(), false)
-    .compat()
     .await
     .expect("Error saving Directory");
   store
     .store_file_bytes(roland.bytes(), false)
-    .compat()
     .await
     .expect("Error saving file bytes");
   store
     .store_file_bytes(catnip.bytes(), false)
-    .compat()
     .await
     .expect("Error saving catnip file bytes");
 
@@ -1382,17 +1336,14 @@ async fn returns_upload_summary_on_empty_cas() {
   let local_store = new_local_store(dir.path());
   local_store
     .record_directory(&testdir.directory(), false)
-    .compat()
     .await
     .expect("Error storing directory locally");
   local_store
     .store_file_bytes(testroland.bytes(), false)
-    .compat()
     .await
     .expect("Error storing file locally");
   local_store
     .store_file_bytes(testcatnip.bytes(), false)
-    .compat()
     .await
     .expect("Error storing file locally");
   let mut summary = new_store(dir.path(), cas.address())
@@ -1434,17 +1385,14 @@ async fn summary_does_not_count_things_in_cas() {
   let local_store = new_local_store(dir.path());
   local_store
     .record_directory(&testdir.directory(), false)
-    .compat()
     .await
     .expect("Error storing directory locally");
   local_store
     .store_file_bytes(testroland.bytes(), false)
-    .compat()
     .await
     .expect("Error storing file locally");
   local_store
     .store_file_bytes(testcatnip.bytes(), false)
-    .compat()
     .await
     .expect("Error storing file locally");
 
@@ -1501,22 +1449,18 @@ async fn materialize_directory_metadata_all_local() {
   let store = new_local_store(dir.path());
   store
     .record_directory(&outer_dir.directory(), false)
-    .compat()
     .await
     .expect("Error storing directory locally");
   store
     .record_directory(&nested_dir.directory(), false)
-    .compat()
     .await
     .expect("Error storing directory locally");
   store
     .record_directory(&inner_dir.directory(), false)
-    .compat()
     .await
     .expect("Error storing directory locally");
   store
     .store_file_bytes(file.bytes(), false)
-    .compat()
     .await
     .expect("Error storing file locally");
 
@@ -1569,17 +1513,14 @@ async fn materialize_directory_metadata_mixed() {
   let store = new_store(dir.path(), cas.address());
   store
     .record_directory(&outer_dir.directory(), false)
-    .compat()
     .await
     .expect("Error storing directory locally");
   store
     .record_directory(&inner_dir.directory(), false)
-    .compat()
     .await
     .expect("Error storing directory locally");
   store
     .store_file_bytes(file.bytes(), false)
-    .compat()
     .await
     .expect("Error storing file locally");
 

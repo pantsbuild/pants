@@ -33,7 +33,7 @@ use rand;
 
 use serde_json;
 
-use boxfuture::{try_future, BoxFuture, Boxable};
+use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
 use clap::{value_t, App, Arg, SubCommand};
 use fs::GlobMatching;
@@ -365,7 +365,6 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
               |bytes| io::stdout().write_all(&bytes).unwrap(),
               workunit_store::WorkUnitStore::new(),
             )
-            .compat()
             .await?;
           write_result
             .ok_or_else(|| {
@@ -450,7 +449,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           args.value_of("root").unwrap(),
         ));
         let store_copy = store.clone();
-        let digest = posix_fs
+        let paths = posix_fs
           .expand(fs::PathGlobs::create(
             &args
               .values_of("globs")
@@ -462,24 +461,20 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             fs::StrictGlobMatching::Ignore,
             fs::GlobExpansionConjunction::AllMatch,
           )?)
-          .compat()
-          .map_err(|e| format!("Error expanding globs: {:?}", e))
-          .and_then(move |paths| {
-            Snapshot::from_path_stats(
-              store_copy.clone(),
-              &store::OneOffStoreFileByDigest::new(store_copy, posix_fs),
-              paths,
-              workunit_store::WorkUnitStore::new(),
-            )
-          })
-          .map(|snapshot| snapshot.digest)
+          .await
+          .map_err(|e| format!("Error expanding globs: {:?}", e))?;
+
+        let snapshot = Snapshot::from_path_stats(
+          store_copy.clone(),
+          store::OneOffStoreFileByDigest::new(store_copy, posix_fs),
+          paths,
+          workunit_store::WorkUnitStore::new(),
+        )
+        .await?;
+
+        let report = ensure_uploaded_to_remote(&store, store_has_remote, snapshot.digest)
           .compat()
           .await?;
-
-        let report = ensure_uploaded_to_remote(&store, store_has_remote, digest)
-          .compat()
-          .await
-          .unwrap();
         print_upload_summary(args.value_of("output-mode"), &report);
 
         Ok(())
@@ -492,18 +487,21 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           .parse::<usize>()
           .expect("size_bytes must be a non-negative number");
         let digest = Digest(fingerprint, size_bytes);
-        let proto_bytes = match args.value_of("output-format").unwrap() {
-          "binary" => store
-            .load_directory(digest, workunit_store::WorkUnitStore::new())
-            .compat()
-            .await
-            .map(|maybe_d| maybe_d.map(|(d, _metadata)| d.write_to_bytes().unwrap())),
-          "text" => store
-            .load_directory(digest, workunit_store::WorkUnitStore::new())
-            .compat()
-            .await
-            .map(|maybe_p| maybe_p.map(|(p, _metadata)| format!("{:?}\n", p).as_bytes().to_vec())),
-          "recursive-file-list" => expand_files(store, digest).compat().await.map(|maybe_v| {
+        let proto_bytes: Option<Vec<u8>> = match args.value_of("output-format").unwrap() {
+          "binary" => {
+            let maybe_directory = store
+              .load_directory(digest, workunit_store::WorkUnitStore::new())
+              .await?;
+            maybe_directory.map(|(d, _metadata)| d.write_to_bytes().unwrap())
+          }
+          "text" => {
+            let maybe_p = store
+              .load_directory(digest, workunit_store::WorkUnitStore::new())
+              .await?;
+            maybe_p.map(|(p, _metadata)| format!("{:?}\n", p).as_bytes().to_vec())
+          }
+          "recursive-file-list" => {
+            let maybe_v = expand_files(store, digest).compat().await?;
             maybe_v
               .map(|v| {
                 v.into_iter()
@@ -512,24 +510,22 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
                   .join("")
               })
               .map(String::into_bytes)
-          }),
-          "recursive-file-list-with-digests" => {
-            expand_files(store, digest).compat().await.map(|maybe_v| {
-              maybe_v
-                .map(|v| {
-                  v.into_iter()
-                    .map(|(name, digest)| format!("{} {} {}\n", name, digest.0, digest.1))
-                    .collect::<Vec<String>>()
-                    .join("")
-                })
-                .map(String::into_bytes)
-            })
           }
-          format => Err(format!(
-            "Unexpected value of --output-format arg: {}",
-            format
-          )),
-        }?;
+          "recursive-file-list-with-digests" => {
+            let maybe_v = expand_files(store, digest).compat().await?;
+            maybe_v
+              .map(|v| {
+                v.into_iter()
+                  .map(|(name, digest)| format!("{} {} {}\n", name, digest.0, digest.1))
+                  .collect::<Vec<String>>()
+                  .join("")
+              })
+              .map(String::into_bytes)
+          }
+          format => {
+            return Err(format!("Unexpected value of --output-format arg: {}", format).into())
+          }
+        };
         match proto_bytes {
           Some(bytes) => {
             io::stdout().write_all(&bytes).unwrap();
@@ -553,23 +549,19 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
       let digest = Digest(fingerprint, size_bytes);
       let v = match store
         .load_file_bytes_with(digest, |bytes| bytes, workunit_store::WorkUnitStore::new())
-        .compat()
         .await?
       {
         None => {
-          store
+          let maybe_dir = store
             .load_directory(digest, workunit_store::WorkUnitStore::new())
-            .map(|maybe_dir| {
-              maybe_dir.map(|(dir, _metadata)| {
-                Bytes::from(
-                  dir
-                    .write_to_bytes()
-                    .expect("Error serializing Directory proto"),
-                )
-              })
-            })
-            .compat()
-            .await?
+            .await?;
+          maybe_dir.map(|(dir, _metadata)| {
+            Bytes::from(
+              dir
+                .write_to_bytes()
+                .expect("Error serializing Directory proto"),
+            )
+          })
         }
         Some((bytes, _metadata)) => Some(bytes),
       };
@@ -627,38 +619,49 @@ fn expand_files_helper(
   prefix: String,
   files: Arc<Mutex<Vec<(String, Digest)>>>,
 ) -> BoxFuture<Option<()>, String> {
-  store
-    .load_directory(digest, workunit_store::WorkUnitStore::new())
-    .and_then(|maybe_dir| match maybe_dir {
+  Box::pin(async move {
+    let maybe_dir = store
+      .load_directory(digest, workunit_store::WorkUnitStore::new())
+      .await?;
+    match maybe_dir {
       Some((dir, _metadata)) => {
         {
           let mut files_unlocked = files.lock();
           for file in dir.get_files() {
             let file_digest: Result<Digest, String> = file.get_digest().into();
-            files_unlocked.push((format!("{}{}", prefix, file.name), try_future!(file_digest)));
+            files_unlocked.push((format!("{}{}", prefix, file.name), file_digest?));
           }
         }
+        let subdirs_and_digests = dir
+          .get_directories()
+          .iter()
+          .map(move |subdir| {
+            let digest: Result<Digest, String> = subdir.get_digest().into();
+            digest.map(|digest| (subdir, digest))
+          })
+          .collect::<Result<Vec<_>, _>>()?;
         future::join_all(
-          dir
-            .get_directories()
-            .iter()
-            .map(move |dir| {
-              let digest: Result<Digest, String> = dir.get_digest().into();
+          subdirs_and_digests
+            .into_iter()
+            .map(move |(subdir, digest)| {
               expand_files_helper(
                 store.clone(),
-                try_future!(digest),
-                format!("{}{}/", prefix, dir.name),
+                digest,
+                format!("{}{}/", prefix, subdir.name),
                 files.clone(),
               )
             })
             .collect::<Vec<_>>(),
         )
         .map(|_| Some(()))
-        .to_boxed()
+        .compat()
+        .await
       }
-      None => future::ok(None).to_boxed(),
-    })
-    .to_boxed()
+      None => Ok(None),
+    }
+  })
+  .compat()
+  .to_boxed()
 }
 
 fn make_posix_fs<P: AsRef<Path>>(executor: task_executor::Executor, root: P) -> fs::PosixFS {

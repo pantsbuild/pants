@@ -27,8 +27,6 @@
 
 use std::future::Future;
 
-use futures::future::{BoxFuture, FutureExt};
-
 use tokio::runtime::{Handle, Runtime};
 
 #[derive(Clone)]
@@ -124,12 +122,10 @@ impl Executor {
   /// it has caused significant performance regressions, so for how we continue to use our legacy
   /// I/O CpuPool. Hopefully we can delete this method at some point.
   ///
-  /// TODO: See the note on references in ASYNC.md.
-  ///
-  pub fn spawn_blocking<'a, 'b, F: FnOnce() -> R + Send + 'static, R: Send + 'static>(
-    &'a self,
+  pub async fn spawn_blocking<F: FnOnce() -> R + Send + 'static, R: Send + 'static>(
+    &self,
     f: F,
-  ) -> BoxFuture<'b, R> {
+  ) -> R {
     let logging_destination = logging::get_destination();
     let workunit_parent_id = workunit_store::get_parent_id();
     // NB: We unwrap here because the only thing that should cause an error in a spawned task is a
@@ -139,8 +135,8 @@ impl Executor {
       workunit_store::set_thread_parent_id(workunit_parent_id);
       f()
     })
-    .map(|res| res.unwrap())
-    .boxed()
+    .await
+    .unwrap()
   }
 
   ///
