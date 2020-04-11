@@ -562,18 +562,18 @@ function build_pex() {
   case "${mode}" in
     build)
       # NB: When building locally, we explicitly target our local Py3.
-      local platform_flags=("--python=$(which "$PY")")
+      local distribution_target_flags=("--python=$(command -v "$PY")")
       local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${platform}.${dest_suffix}"
       local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.${platform}.${dest_suffix}"
       ;;
     fetch)
-      local platform_flags=()
+      local distribution_target_flags=()
       # TODO: once we add Python 3.7 PEX support, which requires first building Py37 wheels,
       # we'll want to release one big flexible Pex that works with Python 3.6+.
       abis=("cp-36-m")
       for platform in "${linux_platform_noabi}" "${osx_platform_noabi}"; do
         for abi in "${abis[@]}"; do
-          platform_flags=("${platform_flags[@]}" "--platform=${platform}-${abi}")
+          distribution_target_flags=("${distribution_target_flags[@]}" "--platform=${platform}-${abi}")
         done
       done
       local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${dest_suffix}"
@@ -608,7 +608,7 @@ function build_pex() {
     --no-emit-warnings \
     --no-strip-pex-env \
     --script=pants \
-    "${platform_flags[@]}" \
+    "${distribution_target_flags[@]}" \
     "${requirements[@]}"
 
   if [[ "${PANTS_PEX_RELEASE}" == "stable" ]]; then
