@@ -98,7 +98,7 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
 
     @contextmanager
     def pantsd_test_context(
-        self, *, log_level: str = "info", extra_config: Optional[Dict[str, Any]] = None
+        self, *, log_level: str = "warning", extra_config: Optional[Dict[str, Any]] = None
     ) -> Iterator[Tuple[str, Dict[str, Any], PantsDaemonMonitor]]:
         with no_lingering_process_by_command("pantsd") as runner_process_context:
             with self.temporary_workdir() as workdir_base:
@@ -143,7 +143,7 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
     @contextmanager
     def pantsd_run_context(
         self,
-        log_level: str = "info",
+        log_level: str = "warning",
         extra_config: Optional[Dict[str, Any]] = None,
         extra_env: Optional[Dict[str, str]] = None,
         success: bool = True,

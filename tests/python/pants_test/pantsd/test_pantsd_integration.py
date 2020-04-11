@@ -45,7 +45,7 @@ def launch_file_toucher(f):
 
 class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     def test_pantsd_compile(self):
-        with self.pantsd_successful_run_context(log_level="debug") as ctx:
+        with self.pantsd_successful_run_context() as ctx:
             # This tests a deeper pantsd-based run by actually invoking a full compile.
             ctx.runner(["compile", "examples/src/scala/org/pantsbuild/example/hello/welcome"])
             ctx.checker.assert_started()
