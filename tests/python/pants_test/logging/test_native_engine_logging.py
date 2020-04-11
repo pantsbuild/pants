@@ -26,9 +26,9 @@ class NativeEngineLoggingTest(PantsRunIntegrationTest):
 
 class PantsdNativeLoggingTest(PantsDaemonIntegrationTestBase):
     def test_pantsd_file_logging(self):
-        with self.pantsd_successful_run_context("debug") as (pantsd_run, checker, workdir, _):
-            daemon_run = pantsd_run(["list", "3rdparty::"])
-            checker.assert_started()
+        with self.pantsd_successful_run_context("debug") as ctx:
+            daemon_run = ctx.runner(["list", "3rdparty::"])
+            ctx.checker.assert_started()
 
             self.assert_run_contains_log(
                 "connecting to pantsd on port",
@@ -37,7 +37,7 @@ class PantsdNativeLoggingTest(PantsDaemonIntegrationTestBase):
                 daemon_run,
             )
 
-            pantsd_log = "\n".join(read_pantsd_log(workdir))
+            pantsd_log = "\n".join(read_pantsd_log(ctx.workdir))
             self.assert_contains_log(
                 "logging initialized", "DEBUG", "pants.pantsd.pants_daemon", pantsd_log,
             )

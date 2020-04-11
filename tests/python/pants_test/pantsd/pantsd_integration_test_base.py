@@ -5,7 +5,8 @@ import functools
 import os
 import time
 from contextlib import contextmanager
-from typing import Any, Dict, Iterator, Optional, Tuple
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, Iterator, Optional, Tuple
 
 import psutil
 from colors import bold, cyan, magenta
@@ -81,6 +82,14 @@ class PantsDaemonMonitor(ProcessManager):
         return self._pid
 
 
+@dataclass(frozen=True)
+class PantsdRunContext:
+    runner: Callable[..., Any]
+    checker: PantsDaemonMonitor
+    workdir: str
+    pantsd_config: Dict[str, Any]
+
+
 class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
     @classmethod
     def use_pantsd_env_var(cls):
@@ -115,7 +124,7 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
                 checker = PantsDaemonMonitor(runner_process_context, pid_dir)
                 self.assert_runner(workdir, pantsd_config, ["kill-pantsd"])
                 try:
-                    yield workdir, pantsd_config, checker
+                    yield (workdir, pantsd_config, checker)
                     self.assert_runner(
                         workdir, pantsd_config, ["kill-pantsd"],
                     )
@@ -127,8 +136,8 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
                     banner("END pantsd.log")
 
     @contextmanager
-    def pantsd_successful_run_context(self, *args, **kwargs):
-        with self.pantsd_run_context(*args, success=True, **kwargs) as context:
+    def pantsd_successful_run_context(self, *args, **kwargs) -> Iterator[PantsdRunContext]:
+        with self.pantsd_run_context(*args, success=True, **kwargs) as context:  # type: ignore[misc]
             yield context
 
     @contextmanager
@@ -139,23 +148,17 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
         extra_env: Optional[Dict[str, str]] = None,
         success: bool = True,
         no_track_run_counts: bool = False,
-    ):
+    ) -> Iterator[PantsdRunContext]:
         with self.pantsd_test_context(log_level=log_level, extra_config=extra_config) as (
             workdir,
             pantsd_config,
             checker,
         ):
-            yield (
-                functools.partial(
-                    self.assert_runner,
-                    workdir,
-                    pantsd_config,
-                    extra_env=extra_env,
-                    success=success,
-                ),
-                checker,
-                workdir,
-                pantsd_config,
+            runner = functools.partial(
+                self.assert_runner, workdir, pantsd_config, extra_env=extra_env, success=success,
+            )
+            yield PantsdRunContext(
+                runner=runner, checker=checker, workdir=workdir, pantsd_config=pantsd_config
             )
 
     def _run_count(self, workdir):
