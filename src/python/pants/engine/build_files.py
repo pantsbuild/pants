@@ -107,6 +107,8 @@ async def hydrate_struct(address_mapper: AddressMapper, address: Address) -> Hyd
     """
     address_family = await Get[AddressFamily](Dir(address.spec_path))
     struct = address_family.addressables_as_address_keyed.get(address)
+    if struct is None:
+        _raise_did_you_mean(address_family, address.target_name)
 
     inline_dependencies = []
 
