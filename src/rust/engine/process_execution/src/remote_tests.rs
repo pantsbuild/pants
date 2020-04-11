@@ -1020,7 +1020,7 @@ async fn ensure_inline_stdio_is_stored() {
   {
     assert_eq!(
       local_store
-        .load_file_bytes_with(test_stdout.digest(), |v| v, WorkUnitStore::new())
+        .load_file_bytes_with(test_stdout.digest(), |v| v,)
         .await
         .unwrap()
         .unwrap()
@@ -1029,7 +1029,7 @@ async fn ensure_inline_stdio_is_stored() {
     );
     assert_eq!(
       local_store
-        .load_file_bytes_with(test_stderr.digest(), |v| v, WorkUnitStore::new())
+        .load_file_bytes_with(test_stderr.digest(), |v| v,)
         .await
         .unwrap()
         .unwrap()
@@ -2299,12 +2299,10 @@ async fn remote_workunits_are_stored() {
     Platform::Linux,
   );
 
-  let workunit_store_2 = workunit_store.clone();
   future::lazy(move || {
     command_runner.extract_execute_response(
       OperationOrStatus::Operation(operation),
       &mut ExecutionHistory::default(),
-      workunit_store_2,
     )
   })
   .compat()
@@ -2630,7 +2628,6 @@ async fn extract_execute_response(
     .extract_execute_response(
       OperationOrStatus::Operation(operation),
       &mut ExecutionHistory::default(),
-      WorkUnitStore::new(),
     )
     .compat()
     .await
@@ -2646,7 +2643,7 @@ async fn extract_output_files_from_response(
   let executor = task_executor::Executor::new(Handle::current());
   let store_dir = TempDir::new().unwrap();
   let store = make_store(store_dir.path(), &cas, executor.clone());
-  crate::remote::extract_output_files(store, &execute_response, WorkUnitStore::new())
+  crate::remote::extract_output_files(store, &execute_response)
     .compat()
     .await
 }

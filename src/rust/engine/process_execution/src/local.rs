@@ -29,7 +29,6 @@ use crate::{
 };
 
 use bytes::{Bytes, BytesMut};
-use workunit_store::WorkUnitStore;
 
 #[derive(Clone)]
 pub struct CommandRunner {
@@ -97,7 +96,6 @@ impl CommandRunner {
         store.clone(),
         OneOffStoreFileByDigest::new(store, posix_fs),
         path_stats,
-        WorkUnitStore::new(),
       )
       .await
     })
@@ -327,18 +325,12 @@ pub trait CapturedWorkdir {
       req.unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule;
 
     store
-      .materialize_directory(
-        workdir_path.clone(),
-        req.input_files,
-        context.workunit_store.clone(),
-      )
+      .materialize_directory(workdir_path.clone(), req.input_files)
       .and_then({
-        let workunit_store = context.workunit_store.clone();
         move |_metadata| {
           store2.materialize_directory(
             workdir_path4,
             unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule,
-            workunit_store,
           )
         }
       })

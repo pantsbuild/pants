@@ -50,7 +50,6 @@ use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
-use workunit_store::WorkUnitStore;
 
 use parking_lot::Mutex;
 
@@ -287,11 +286,7 @@ impl Store {
     }
 
     impl StoreFileByDigest<String> for Digester {
-      fn store_by_digest(
-        &self,
-        _: fs::File,
-        _: WorkUnitStore,
-      ) -> BoxFuture<hashing::Digest, String> {
+      fn store_by_digest(&self, _: fs::File) -> BoxFuture<hashing::Digest, String> {
         future::ok(self.digest).to_boxed()
       }
     }
@@ -306,7 +301,6 @@ impl Store {
           is_executable: is_executable,
         },
       }],
-      WorkUnitStore::new(),
     )
     .await
   }
@@ -323,7 +317,6 @@ impl Store {
     &self,
     digest: Digest,
     f: F,
-    workunit_store: WorkUnitStore,
   ) -> Result<Option<(T, LoadMetadata)>, String> {
     // No transformation or verification is needed for files, so we pass in a pair of functions
     // which always succeed, whether the underlying bytes are coming from a local or remote store.
@@ -336,7 +329,6 @@ impl Store {
         digest,
         move |v: Bytes| Ok(f_local(v)),
         move |v: Bytes| Ok(f_remote(v)),
-        workunit_store,
       )
       .await
   }
@@ -370,7 +362,6 @@ impl Store {
   pub async fn load_directory(
     &self,
     digest: Digest,
-    workunit_store: WorkUnitStore,
   ) -> Result<Option<(bazel_protos::remote_execution::Directory, LoadMetadata)>, String> {
     self
       .load_bytes_with(
@@ -401,7 +392,6 @@ impl Store {
           bazel_protos::verify_directory_canonical(&directory)?;
           Ok(directory)
         },
-        workunit_store,
       )
       .await
   }
@@ -421,7 +411,6 @@ impl Store {
     digest: Digest,
     f_local: FLocal,
     f_remote: FRemote,
-    workunit_store: WorkUnitStore,
   ) -> Result<Option<(T, LoadMetadata)>, String> {
     let local = self.local.clone();
     let maybe_remote = self.remote.clone();
@@ -436,12 +425,7 @@ impl Store {
       (None, None) => Ok(None),
       (None, Some(remote)) => {
         let maybe_bytes = remote
-          .load_bytes_with(
-            entry_type,
-            digest,
-            move |bytes: Bytes| bytes,
-            workunit_store.clone(),
-          )
+          .load_bytes_with(entry_type, digest, move |bytes: Bytes| bytes)
           .await?;
 
         match maybe_bytes {
@@ -473,7 +457,6 @@ impl Store {
   pub fn ensure_remote_has_recursive(
     &self,
     digests: Vec<Digest>,
-    workunit_store: WorkUnitStore,
   ) -> BoxFuture<UploadSummary, String> {
     let start_time = Instant::now();
 
@@ -492,7 +475,7 @@ impl Store {
           expanded_digests.insert(digest, EntryType::File);
         }
         Ok(Some(EntryType::Directory)) => {
-          expanding_futures.push(self.expand_directory(digest, workunit_store.clone()));
+          expanding_futures.push(self.expand_directory(digest));
         }
         Ok(None) => {
           return future::err(format!("Failed to upload digest {:?}: Not found", digest))
@@ -508,7 +491,6 @@ impl Store {
     let local = self.local.clone();
     let remote = remote.clone();
     let remote2 = remote.clone();
-    let workunit_store2 = workunit_store.clone();
     future::join_all(expanding_futures)
       .map(move |futures| {
         for mut digests in futures {
@@ -524,7 +506,7 @@ impl Store {
             .to_boxed();
         }
         let request = remote.find_missing_blobs_request(ingested_digests.keys());
-        let f = remote.list_missing_digests(request, workunit_store.clone());
+        let f = remote.list_missing_digests(request);
         f.map(move |digests_to_upload| (digests_to_upload, ingested_digests))
           .to_boxed()
       })
@@ -536,15 +518,12 @@ impl Store {
               let entry_type = ingested_digests[&digest];
               let local = local.clone();
               let remote = remote2.clone();
-              let workunit_store = workunit_store2.clone();
 
               Box::pin(async move {
                 let maybe_upload = local
                   .load_bytes_with(entry_type, digest, move |bytes| {
                     let remote = remote.clone();
-                    let workunit_store = workunit_store.clone();
-                    Box::pin(async move { remote.store_bytes(bytes, workunit_store).await })
-                      .compat()
+                    Box::pin(async move { remote.store_bytes(bytes).await }).compat()
                   })
                   .await?;
                 match maybe_upload {
@@ -579,15 +558,10 @@ impl Store {
   /// Download a directory from Remote ByteStore recursively to the local one. Called only with the
   /// Digest of a Directory.
   ///
-  pub fn ensure_local_has_recursive_directory(
-    &self,
-    dir_digest: Digest,
-    workunit_store: WorkUnitStore,
-  ) -> BoxFuture<(), String> {
+  pub fn ensure_local_has_recursive_directory(&self, dir_digest: Digest) -> BoxFuture<(), String> {
     let loaded_directory = {
       let store = self.clone();
-      let workunit_store = workunit_store.clone();
-      let res = async move { store.load_directory(dir_digest, workunit_store).await };
+      let res = async move { store.load_directory(dir_digest).await };
       res.boxed().compat()
     };
 
@@ -606,16 +580,9 @@ impl Store {
           .map(|file_node| {
             let file_digest = try_future!(file_node.get_digest().into());
             let store = store.clone();
-            let workunit_store = workunit_store.clone();
             Box::pin(async move {
               store
-                .load_bytes_with(
-                  EntryType::File,
-                  file_digest,
-                  |_| Ok(()),
-                  |_| Ok(()),
-                  workunit_store,
-                )
+                .load_bytes_with(EntryType::File, file_digest, |_| Ok(()), |_| Ok(()))
                 .await
             })
             .compat()
@@ -629,7 +596,7 @@ impl Store {
           .iter()
           .map(move |child_dir| {
             let child_digest = try_future!(child_dir.get_digest().into());
-            store.ensure_local_has_recursive_directory(child_digest, workunit_store.clone())
+            store.ensure_local_has_recursive_directory(child_digest)
           })
           .collect::<Vec<_>>();
         future::join_all(file_futures)
@@ -683,24 +650,16 @@ impl Store {
     }
   }
 
-  pub fn expand_directory(
-    &self,
-    digest: Digest,
-    workunit_store: WorkUnitStore,
-  ) -> BoxFuture<HashMap<Digest, EntryType>, String> {
+  pub fn expand_directory(&self, digest: Digest) -> BoxFuture<HashMap<Digest, EntryType>, String> {
     self
-      .walk(
-        digest,
-        |_, _, digest, directory| {
-          let mut digest_types = Vec::new();
-          digest_types.push((digest, EntryType::Directory));
-          for file in directory.get_files() {
-            digest_types.push((try_future!(file.get_digest().into()), EntryType::File));
-          }
-          future::ok(digest_types).to_boxed()
-        },
-        workunit_store,
-      )
+      .walk(digest, |_, _, digest, directory| {
+        let mut digest_types = Vec::new();
+        digest_types.push((digest, EntryType::Directory));
+        for file in directory.get_files() {
+          digest_types.push((try_future!(file.get_digest().into()), EntryType::File));
+        }
+        future::ok(digest_types).to_boxed()
+      })
       .map(|digest_pairs_per_directory| {
         Iterator::flatten(digest_pairs_per_directory.into_iter().map(Vec::into_iter)).collect()
       })
@@ -715,7 +674,6 @@ impl Store {
     &self,
     destination: PathBuf,
     digest: Digest,
-    workunit_store: WorkUnitStore,
   ) -> BoxFuture<DirectoryMaterializeMetadata, String> {
     let root = Arc::new(Mutex::new(None));
     self
@@ -723,7 +681,6 @@ impl Store {
         destination,
         RootOrParentMetadataBuilder::Root(root.clone()),
         digest,
-        workunit_store,
       )
       .map(|()| Arc::try_unwrap(root).unwrap().into_inner().unwrap().build())
       .to_boxed()
@@ -734,7 +691,6 @@ impl Store {
     destination: PathBuf,
     root_or_parent_metadata: RootOrParentMetadataBuilder,
     digest: Digest,
-    workunit_store: WorkUnitStore,
   ) -> BoxFuture<(), String> {
     if let RootOrParentMetadataBuilder::Root(..) = root_or_parent_metadata {
       try_future!(fs::safe_create_dir_all(&destination));
@@ -744,8 +700,7 @@ impl Store {
 
     let loaded_directory = {
       let store = self.clone();
-      let workunit_store = workunit_store.clone();
-      let res = async move { store.load_directory(digest, workunit_store).await };
+      let res = async move { store.load_directory(digest).await };
       res.boxed().compat()
     };
 
@@ -787,12 +742,7 @@ impl Store {
             let child_files = child_files.clone();
             let name = file_node.get_name().to_owned();
             store
-              .materialize_file(
-                path,
-                digest,
-                file_node.is_executable,
-                workunit_store.clone(),
-              )
+              .materialize_file(path, digest, file_node.is_executable)
               .map(move |metadata| child_files.lock().insert(name, metadata))
               .to_boxed()
           })
@@ -811,7 +761,7 @@ impl Store {
               child_files.clone(),
             ));
 
-            store.materialize_directory_helper(path, builder, digest, workunit_store.clone())
+            store.materialize_directory_helper(path, builder, digest)
           })
           .collect::<Vec<_>>();
         future::join_all(file_futures)
@@ -826,37 +776,32 @@ impl Store {
     destination: PathBuf,
     digest: Digest,
     is_executable: bool,
-    workunit_store: WorkUnitStore,
   ) -> BoxFuture<LoadMetadata, String> {
     let store = self.clone();
     let res = async move {
       let write_result = store
-        .load_file_bytes_with(
-          digest,
-          move |bytes| {
-            if destination.exists() {
-              std::fs::remove_file(&destination)
-            } else {
-              Ok(())
-            }
-            .and_then(|_| {
-              OpenOptions::new()
-                .create(true)
-                .write(true)
-                .mode(if is_executable { 0o755 } else { 0o644 })
-                .open(&destination)
-            })
-            .and_then(|mut f| {
-              f.write_all(&bytes)?;
-              // See `materialize_directory`, but we fundamentally materialize files for other
-              // processes to read; as such, we must ensure data is flushed to disk and visible
-              // to them as opposed to just our process.
-              f.sync_all()
-            })
-            .map_err(|e| format!("Error writing file {:?}: {:?}", destination, e))
-          },
-          workunit_store,
-        )
+        .load_file_bytes_with(digest, move |bytes| {
+          if destination.exists() {
+            std::fs::remove_file(&destination)
+          } else {
+            Ok(())
+          }
+          .and_then(|_| {
+            OpenOptions::new()
+              .create(true)
+              .write(true)
+              .mode(if is_executable { 0o755 } else { 0o644 })
+              .open(&destination)
+          })
+          .and_then(|mut f| {
+            f.write_all(&bytes)?;
+            // See `materialize_directory`, but we fundamentally materialize files for other
+            // processes to read; as such, we must ensure data is flushed to disk and visible
+            // to them as opposed to just our process.
+            f.sync_all()
+          })
+          .map_err(|e| format!("Error writing file {:?}: {:?}", destination, e))
+        })
         .await?;
 
       match write_result {
@@ -869,46 +814,34 @@ impl Store {
   }
 
   // Returns files sorted by their path.
-  pub fn contents_for_directory(
-    &self,
-    digest: Digest,
-    workunit_store: WorkUnitStore,
-  ) -> BoxFuture<Vec<FileContent>, String> {
-    let workunit_store_clone = workunit_store.clone();
+  pub fn contents_for_directory(&self, digest: Digest) -> BoxFuture<Vec<FileContent>, String> {
     self
-      .walk(
-        digest,
-        move |store, path_so_far, _, directory| {
-          future::join_all(
-            directory
-              .get_files()
-              .iter()
-              .map(|file_node| {
-                let path = path_so_far.join(file_node.get_name());
-                let is_executable = file_node.is_executable;
-                let file_node_digest: Result<_, _> = file_node.get_digest().into();
-                let store = store.clone();
-                let workunit_store = workunit_store.clone();
-                let res = async move {
-                  let maybe_bytes = store
-                    .load_file_bytes_with(file_node_digest?, |b| b, workunit_store)
-                    .await?;
-                  maybe_bytes
-                    .ok_or_else(|| format!("Couldn't find file contents for {:?}", path))
-                    .map(|(content, _metadata)| FileContent {
-                      path,
-                      content,
-                      is_executable,
-                    })
-                };
-                res.boxed().compat().to_boxed()
-              })
-              .collect::<Vec<_>>(),
-          )
-          .to_boxed()
-        },
-        workunit_store_clone,
-      )
+      .walk(digest, move |store, path_so_far, _, directory| {
+        future::join_all(
+          directory
+            .get_files()
+            .iter()
+            .map(|file_node| {
+              let path = path_so_far.join(file_node.get_name());
+              let is_executable = file_node.is_executable;
+              let file_node_digest: Result<_, _> = file_node.get_digest().into();
+              let store = store.clone();
+              let res = async move {
+                let maybe_bytes = store.load_file_bytes_with(file_node_digest?, |b| b).await?;
+                maybe_bytes
+                  .ok_or_else(|| format!("Couldn't find file contents for {:?}", path))
+                  .map(|(content, _metadata)| FileContent {
+                    path,
+                    content,
+                    is_executable,
+                  })
+              };
+              res.boxed().compat().to_boxed()
+            })
+            .collect::<Vec<_>>(),
+        )
+        .to_boxed()
+      })
       .map(|file_contents_per_directory| {
         let mut vec =
           Iterator::flatten(file_contents_per_directory.into_iter().map(Vec::into_iter))
@@ -941,18 +874,11 @@ impl Store {
     &self,
     digest: Digest,
     f: F,
-    workunit_store: WorkUnitStore,
   ) -> BoxFuture<Vec<T>, String> {
     let f = Arc::new(f);
     let accumulator = Arc::new(Mutex::new(Vec::new()));
     self
-      .walk_helper(
-        digest,
-        PathBuf::new(),
-        f,
-        accumulator.clone(),
-        workunit_store,
-      )
+      .walk_helper(digest, PathBuf::new(), f, accumulator.clone())
       .map(|()| {
         Arc::try_unwrap(accumulator)
           .unwrap_or_else(|_| panic!("walk_helper violated its contract."))
@@ -978,11 +904,10 @@ impl Store {
     path_so_far: PathBuf,
     f: Arc<F>,
     accumulator: Arc<Mutex<Vec<T>>>,
-    workunit_store: WorkUnitStore,
   ) -> BoxFuture<(), String> {
     let store = self.clone();
     let res = async move {
-      let maybe_directory = store.load_directory(digest, workunit_store.clone()).await?;
+      let maybe_directory = store.load_directory(digest).await?;
       match maybe_directory {
         Some((directory, _metadata)) => {
           let result_for_directory = f(&store, &path_so_far, digest, &directory).compat().await?;
@@ -997,13 +922,7 @@ impl Store {
               .map(move |dir_node| {
                 let subdir_digest = try_future!(dir_node.get_digest().into());
                 let path = path_so_far.join(dir_node.get_name());
-                store.walk_helper(
-                  subdir_digest,
-                  path,
-                  f.clone(),
-                  accumulator.clone(),
-                  workunit_store.clone(),
-                )
+                store.walk_helper(subdir_digest, path, f.clone(), accumulator.clone())
               })
               .collect::<Vec<_>>(),
           )

@@ -360,11 +360,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             .expect("size_bytes must be a non-negative number");
           let digest = Digest(fingerprint, size_bytes);
           let write_result = store
-            .load_file_bytes_with(
-              digest,
-              |bytes| io::stdout().write_all(&bytes).unwrap(),
-              workunit_store::WorkUnitStore::new(),
-            )
+            .load_file_bytes_with(digest, |bytes| io::stdout().write_all(&bytes).unwrap())
             .await?;
           write_result
             .ok_or_else(|| {
@@ -393,7 +389,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           match file {
             fs::Stat::File(f) => {
               let digest = store::OneOffStoreFileByDigest::new(store.clone(), Arc::new(posix_fs))
-                .store_by_digest(f, workunit_store::WorkUnitStore::new())
+                .store_by_digest(f)
                 .compat()
                 .await
                 .unwrap();
@@ -429,7 +425,7 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           .expect("size_bytes must be a non-negative number");
         let digest = Digest(fingerprint, size_bytes);
         store
-          .materialize_directory(destination, digest, workunit_store::WorkUnitStore::new())
+          .materialize_directory(destination, digest)
           .compat()
           .await
           .map(|metadata| {
@@ -468,7 +464,6 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           store_copy.clone(),
           store::OneOffStoreFileByDigest::new(store_copy, posix_fs),
           paths,
-          workunit_store::WorkUnitStore::new(),
         )
         .await?;
 
@@ -489,15 +484,11 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         let digest = Digest(fingerprint, size_bytes);
         let proto_bytes: Option<Vec<u8>> = match args.value_of("output-format").unwrap() {
           "binary" => {
-            let maybe_directory = store
-              .load_directory(digest, workunit_store::WorkUnitStore::new())
-              .await?;
+            let maybe_directory = store.load_directory(digest).await?;
             maybe_directory.map(|(d, _metadata)| d.write_to_bytes().unwrap())
           }
           "text" => {
-            let maybe_p = store
-              .load_directory(digest, workunit_store::WorkUnitStore::new())
-              .await?;
+            let maybe_p = store.load_directory(digest).await?;
             maybe_p.map(|(p, _metadata)| format!("{:?}\n", p).as_bytes().to_vec())
           }
           "recursive-file-list" => {
@@ -547,14 +538,9 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         .parse::<usize>()
         .expect("size_bytes must be a non-negative number");
       let digest = Digest(fingerprint, size_bytes);
-      let v = match store
-        .load_file_bytes_with(digest, |bytes| bytes, workunit_store::WorkUnitStore::new())
-        .await?
-      {
+      let v = match store.load_file_bytes_with(digest, |bytes| bytes).await? {
         None => {
-          let maybe_dir = store
-            .load_directory(digest, workunit_store::WorkUnitStore::new())
-            .await?;
+          let maybe_dir = store.load_directory(digest).await?;
           maybe_dir.map(|(dir, _metadata)| {
             Bytes::from(
               dir
@@ -620,9 +606,7 @@ fn expand_files_helper(
   files: Arc<Mutex<Vec<(String, Digest)>>>,
 ) -> BoxFuture<Option<()>, String> {
   Box::pin(async move {
-    let maybe_dir = store
-      .load_directory(digest, workunit_store::WorkUnitStore::new())
-      .await?;
+    let maybe_dir = store.load_directory(digest).await?;
     match maybe_dir {
       Some((dir, _metadata)) => {
         {
@@ -681,7 +665,7 @@ fn ensure_uploaded_to_remote(
 ) -> impl Future<Item = SummaryWithDigest, Error = String> {
   let summary = if store_has_remote {
     store
-      .ensure_remote_has_recursive(vec![digest], workunit_store::WorkUnitStore::new())
+      .ensure_remote_has_recursive(vec![digest])
       .map(Some)
       .to_boxed()
   } else {

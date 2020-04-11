@@ -38,8 +38,7 @@ use rule_graph;
 use graph::{Entry, Node, NodeError, NodeTracer, NodeVisualizer};
 use store::{self, StoreFileByDigest};
 use workunit_store::{
-  new_span_id, scope_task_workunit_state, StartedWorkUnit, WorkUnit, WorkUnitStore,
-  WorkunitMetadata,
+  new_span_id, scope_task_workunit_state, StartedWorkUnit, WorkUnit, WorkunitMetadata,
 };
 
 pub type NodeFuture<T> = BoxFuture<T, Failure>;
@@ -75,7 +74,7 @@ impl VFS<Failure> for Context {
 }
 
 impl StoreFileByDigest<Failure> for Context {
-  fn store_by_digest(&self, file: File, _: WorkUnitStore) -> BoxFuture<hashing::Digest, Failure> {
+  fn store_by_digest(&self, file: File) -> BoxFuture<hashing::Digest, Failure> {
     self.get(DigestFile(file))
   }
 }
@@ -488,14 +487,9 @@ impl Snapshot {
         .expand(path_globs)
         .map_err(|e| throw(&format!("{}", e)))
         .await?;
-      store::Snapshot::from_path_stats(
-        context.core.store(),
-        context.clone(),
-        path_stats,
-        WorkUnitStore::new(),
-      )
-      .map_err(|e| throw(&format!("Snapshot failed: {}", e)))
-      .await
+      store::Snapshot::from_path_stats(context.core.store(), context.clone(), path_stats)
+        .map_err(|e| throw(&format!("Snapshot failed: {}", e)))
+        .await
     })
     .compat()
     .to_boxed()
@@ -613,7 +607,6 @@ impl DownloadedFile {
     core: Arc<Core>,
     url: Url,
     digest: hashing::Digest,
-    workunit_store: WorkUnitStore,
   ) -> BoxFuture<store::Snapshot, String> {
     let file_name = try_future!(url
       .path_segments()
@@ -622,10 +615,7 @@ impl DownloadedFile {
       .ok_or_else(|| format!("Error getting the file name from the parsed URL: {}", url)));
 
     Box::pin(async move {
-      let maybe_bytes = core
-        .store()
-        .load_file_bytes_with(digest, |_| (), workunit_store)
-        .await?;
+      let maybe_bytes = core.store().load_file_bytes_with(digest, |_| ()).await?;
       if maybe_bytes.is_none() {
         DownloadedFile::download(core.clone(), url, file_name.clone(), digest)
           .compat()
@@ -756,12 +746,7 @@ impl WrappedNode for DownloadedFile {
     .map_err(|str| throw(&str)));
 
     self
-      .load_or_download(
-        context.core.clone(),
-        url,
-        expected_digest,
-        context.session.workunit_store(),
-      )
+      .load_or_download(context.core, url, expected_digest)
       .map(Arc::new)
       .map_err(|err| throw(&err))
       .to_boxed()

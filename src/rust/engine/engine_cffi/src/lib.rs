@@ -517,6 +517,8 @@ pub extern "C" fn scheduler_execute(
   with_scheduler(scheduler_ptr, |scheduler| {
     with_execution_request(execution_request_ptr, |execution_request| {
       with_session(session_ptr, |session| {
+        // TODO: A parent_id should be an explicit argument.
+        session.workunit_store().init_thread_state(None);
         match scheduler.execute(execution_request, session) {
           Ok(raw_results) => Box::into_raw(RawNodes::create(raw_results)),
           //TODO: Passing a raw null pointer to Python is a less-than-ideal way
@@ -906,13 +908,13 @@ pub extern "C" fn capture_snapshots(
 
   with_scheduler(scheduler_ptr, |scheduler| {
     with_session(session_ptr, |session| {
-      let workunit_store = session.workunit_store();
+      // TODO: A parent_id should be an explicit argument.
+      session.workunit_store().init_thread_state(None);
       let core = scheduler.core.clone();
       let snapshot_futures = path_globs_and_roots
         .into_iter()
         .map(|(path_globs, root, digest_hint)| {
           let core = core.clone();
-          let workunit_store = workunit_store.clone();
           async move {
             let snapshot = store::Snapshot::capture_snapshot_from_arbitrary_root(
               core.store(),
@@ -920,7 +922,6 @@ pub extern "C" fn capture_snapshots(
               root,
               path_globs,
               digest_hint,
-              workunit_store,
             )
             .await?;
             let res: Result<_, String> = Ok(nodes::Snapshot::store_snapshot(&core, &snapshot));
@@ -957,14 +958,14 @@ pub extern "C" fn merge_directories(
 
   with_scheduler(scheduler_ptr, |scheduler| {
     with_session(session_ptr, |session| {
-      let workunit_store = session.workunit_store();
+      // TODO: A parent_id should be an explicit argument.
+      session.workunit_store().init_thread_state(None);
       scheduler
         .core
         .executor
         .block_on(store::Snapshot::merge_directories(
           scheduler.core.store(),
           digests,
-          workunit_store,
         ))
         .map(|dir| nodes::Snapshot::store_directory(&scheduler.core, &dir))
     })
@@ -1014,7 +1015,6 @@ pub extern "C" fn run_local_interactive_process(
             scheduler.core.store().materialize_directory(
               destination,
               digest,
-              session.workunit_store(),
             ).wait()?;
           }
         }
@@ -1089,7 +1089,8 @@ pub extern "C" fn materialize_directories(
   };
   with_scheduler(scheduler_ptr, |scheduler| {
     with_session(session_ptr, |session| {
-      let workunit_store = session.workunit_store();
+      // TODO: A parent_id should be an explicit argument.
+      session.workunit_store().init_thread_state(None);
       let types = &scheduler.core.types;
       let construct_materialize_directories_results =
         types.construct_materialize_directories_results;
@@ -1103,11 +1104,10 @@ pub extern "C" fn materialize_directories(
             let mut destination = PathBuf::new();
             destination.push(scheduler.core.build_root.clone());
             destination.push(path_prefix);
-            let metadata = scheduler.core.store().materialize_directory(
-              destination.clone(),
-              digest,
-              workunit_store.clone(),
-            );
+            let metadata = scheduler
+              .core
+              .store()
+              .materialize_directory(destination.clone(), digest);
             metadata.map(|m| (destination, m))
           })
           .collect::<Vec<_>>(),
@@ -1245,8 +1245,6 @@ where
   F: FnOnce(&Session) -> T,
 {
   let session = unsafe { Box::from_raw(session_ptr) };
-  // TODO: A parent_id should be an explicit requirement at each callsite.
-  session.workunit_store().init_thread_state(None);
   let t = f(&session);
   mem::forget(session);
   t

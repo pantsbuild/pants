@@ -77,13 +77,12 @@ fn directory_digest_to_files_content(
   context: Context,
   directory_digest_val: Value,
 ) -> NodeFuture<Value> {
-  let workunit_store = context.session.workunit_store();
   future::result(lift_digest(&directory_digest_val).map_err(|str| throw(&str)))
     .and_then(move |digest| {
       context
         .core
         .store()
-        .contents_for_directory(digest, workunit_store)
+        .contents_for_directory(digest)
         .map_err(|str| throw(&str))
         .map(move |files_content| Snapshot::store_files_content(&context, &files_content))
     })
@@ -91,8 +90,7 @@ fn directory_digest_to_files_content(
 }
 
 fn directory_with_prefix_to_strip_to_digest(context: Context, request: Value) -> NodeFuture<Value> {
-  let core = context.core.clone();
-  let workunit_store = context.session.workunit_store();
+  let core = context.core;
 
   Box::pin(async move {
     let input_digest = lift_digest(&externs::project_ignoring_type(
@@ -100,13 +98,8 @@ fn directory_with_prefix_to_strip_to_digest(context: Context, request: Value) ->
       "directory_digest",
     ))?;
     let prefix = externs::project_str(&request, "prefix");
-    let digest = store::Snapshot::strip_prefix(
-      core.store(),
-      input_digest,
-      PathBuf::from(prefix),
-      workunit_store,
-    )
-    .await?;
+    let digest =
+      store::Snapshot::strip_prefix(core.store(), input_digest, PathBuf::from(prefix)).await?;
     let res: Result<_, String> = Ok(Snapshot::store_directory(&core, &digest));
     res
   })
@@ -135,12 +128,11 @@ fn directory_with_prefix_to_add_to_digest(context: Context, request: Value) -> N
 }
 
 fn digest_to_snapshot(context: Context, directory_digest_val: Value) -> NodeFuture<Value> {
-  let workunit_store = context.session.workunit_store();
   let core = context.core.clone();
   let store = context.core.store();
   Box::pin(async move {
     let digest = lift_digest(&directory_digest_val)?;
-    let snapshot = store::Snapshot::from_digest(store, digest, workunit_store).await?;
+    let snapshot = store::Snapshot::from_digest(store, digest).await?;
     let res: Result<_, String> = Ok(Snapshot::store_snapshot(&core, &snapshot));
     res
   })
@@ -150,7 +142,6 @@ fn digest_to_snapshot(context: Context, directory_digest_val: Value) -> NodeFutu
 }
 
 fn directories_to_merge_to_digest(context: Context, request: Value) -> NodeFuture<Value> {
-  let workunit_store = context.session.workunit_store();
   let core = context.core;
   let digests: Result<Vec<hashing::Digest>, String> =
     externs::project_multi(&request, "directories")
@@ -158,7 +149,7 @@ fn directories_to_merge_to_digest(context: Context, request: Value) -> NodeFutur
       .map(|val| lift_digest(&val))
       .collect();
   Box::pin(async move {
-    let digest = store::Snapshot::merge_directories(core.store(), digests?, workunit_store).await?;
+    let digest = store::Snapshot::merge_directories(core.store(), digests?).await?;
     let res: Result<_, String> = Ok(Snapshot::store_directory(&core, &digest));
     res
   })
@@ -184,7 +175,6 @@ fn path_globs_to_snapshot(context: Context, val: Value) -> NodeFuture<Value> {
 }
 
 fn input_files_content_to_digest(context: Context, files_content: Value) -> NodeFuture<Value> {
-  let workunit_store = context.session.workunit_store();
   let file_values = externs::project_multi(&files_content, "dependencies");
   let digests: Vec<_> = file_values
     .iter()
@@ -208,8 +198,7 @@ fn input_files_content_to_digest(context: Context, files_content: Value) -> Node
 
   Box::pin(async move {
     let digests = future03::try_join_all(digests).await?;
-    let digest =
-      store::Snapshot::merge_directories(context.core.store(), digests, workunit_store).await?;
+    let digest = store::Snapshot::merge_directories(context.core.store(), digests).await?;
     let res: Result<_, String> = Ok(Snapshot::store_directory(&context.core, &digest));
     res
   })
@@ -219,7 +208,6 @@ fn input_files_content_to_digest(context: Context, files_content: Value) -> Node
 }
 
 fn snapshot_subset_to_snapshot(context: Context, value: Value) -> NodeFuture<Value> {
-  let workunit_store = context.session.workunit_store();
   let globs = externs::project_ignoring_type(&value, "globs");
   let store = context.core.store();
 
@@ -227,9 +215,7 @@ fn snapshot_subset_to_snapshot(context: Context, value: Value) -> NodeFuture<Val
     let path_globs = Snapshot::lift_path_globs(&globs)?;
     let original_digest = lift_digest(&externs::project_ignoring_type(&value, "directory_digest"))?;
 
-    let snapshot =
-      store::Snapshot::get_snapshot_subset(store, original_digest, path_globs, workunit_store)
-        .await?;
+    let snapshot = store::Snapshot::get_snapshot_subset(store, original_digest, path_globs).await?;
 
     Ok(Snapshot::store_snapshot(&context.core, &snapshot))
   })

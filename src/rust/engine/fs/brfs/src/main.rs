@@ -48,7 +48,6 @@ use std::path::Path;
 use std::sync::Arc;
 use store::Store;
 use tokio::runtime::Handle;
-use workunit_store::WorkUnitStore;
 
 const TTL: time::Timespec = time::Timespec { sec: 0, nsec: 0 };
 
@@ -180,11 +179,10 @@ impl BuildResultFS {
       }
       Vacant(entry) => {
         let store = self.store.clone();
-        match self.runtime.block_on(async move {
-          store
-            .load_file_bytes_with(digest, |_| (), WorkUnitStore::new())
-            .await
-        }) {
+        match self
+          .runtime
+          .block_on(async move { store.load_file_bytes_with(digest, |_| ()).await })
+        {
           Ok(Some(((), _metadata))) => {
             let executable_inode = self.next_inode;
             self.next_inode += 1;
@@ -227,7 +225,7 @@ impl BuildResultFS {
         let store = self.store.clone();
         match self
           .runtime
-          .block_on(async move { store.load_directory(digest, WorkUnitStore::new()).await })
+          .block_on(async move { store.load_directory(digest).await })
         {
           Ok(Some(_)) => {
             // TODO: Kick off some background futures to pre-load the contents of this Directory into
@@ -321,7 +319,7 @@ impl BuildResultFS {
           let store = self.store.clone();
           let maybe_directory = self
             .runtime
-            .block_on(async move { store.load_directory(digest, WorkUnitStore::new()).await });
+            .block_on(async move { store.load_directory(digest).await });
 
           match maybe_directory {
             Ok(Some((directory, _metadata))) => {
@@ -454,11 +452,7 @@ impl fuse::Filesystem for BuildResultFS {
               let parent_digest = cache_entry.digest;
               self
                 .runtime
-                .block_on(async move {
-                  store
-                    .load_directory(parent_digest, WorkUnitStore::new())
-                    .await
-                })
+                .block_on(async move { store.load_directory(parent_digest).await })
                 .map_err(|err| {
                   error!("Error reading directory {:?}: {}", parent_digest, err);
                   libc::EINVAL
@@ -554,16 +548,12 @@ impl fuse::Filesystem for BuildResultFS {
             .runtime
             .block_on(async move {
               store
-                .load_file_bytes_with(
-                  digest,
-                  move |bytes| {
-                    let begin = std::cmp::min(offset as usize, bytes.len());
-                    let end = std::cmp::min(offset as usize + size as usize, bytes.len());
-                    let mut reply = reply.lock();
-                    reply.take().unwrap().data(&bytes.slice(begin, end));
-                  },
-                  WorkUnitStore::new(),
-                )
+                .load_file_bytes_with(digest, move |bytes| {
+                  let begin = std::cmp::min(offset as usize, bytes.len());
+                  let end = std::cmp::min(offset as usize + size as usize, bytes.len());
+                  let mut reply = reply.lock();
+                  reply.take().unwrap().data(&bytes.slice(begin, end));
+                })
                 .await
             })
             .map(|v| {
