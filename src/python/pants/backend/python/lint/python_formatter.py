@@ -34,7 +34,6 @@ async def format_python_target(
     python_fmt_targets: PythonFmtTargets, union_membership: UnionMembership
 ) -> LanguageFmtResults:
     targets_with_origins = python_fmt_targets.targets_with_origins
-    # import pdb; pdb.set_trace()
     original_sources = await Get[SourceFiles](
         AllSourceFilesRequest(
             target_with_origin.target[PythonSources]
@@ -42,6 +41,7 @@ async def format_python_target(
         )
     )
     prior_formatter_result = original_sources.snapshot
+    # print(prior_formatter_result)
 
     results: List[FmtResult] = []
     config_collection_types: Iterable[Type[PythonFmtConfigurations]] = union_membership.union_rules[
