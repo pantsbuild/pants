@@ -28,7 +28,7 @@ from pants.engine.target import (
     TargetsWithOrigins,
     TargetWithOrigin,
 )
-from pants.rules.core.configurations_with_sources import (
+from pants.rules.core.filter_empty_sources import (
     ConfigurationsWithSources,
     ConfigurationsWithSourcesRequest,
 )
