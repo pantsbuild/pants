@@ -195,6 +195,7 @@ def rules():
         pex_from_targets,
         two_step_pex_from_targets,
         RootRule(PexFromTargetsRequest),
+        RootRule(TwoStepPexFromTargetsRequest),
         legacy_pex_from_targets,
         RootRule(LegacyPexFromTargetsRequest),
     ]

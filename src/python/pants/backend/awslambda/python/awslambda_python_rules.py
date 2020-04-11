@@ -64,7 +64,7 @@ async def create_python_awslambda(
         )
     )
 
-    pex_result = await Get[TwoStepPex](PexFromTargetsRequest, pex_request)
+    pex_result = await Get[TwoStepPex](TwoStepPexFromTargetsRequest, pex_request)
     merged_input_files = await Get[Digest](
         DirectoriesToMerge(
             directories=(
