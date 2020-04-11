@@ -88,7 +88,6 @@ impl CommandRunner {
       GlobExpansionConjunction::AllMatch,
     ));
 
-    let store = store.clone();
     Box::pin(async move {
       let path_stats = posix_fs
         .expand(output_globs)

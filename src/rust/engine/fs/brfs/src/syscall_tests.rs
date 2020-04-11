@@ -4,7 +4,6 @@
 use super::mount;
 use super::tests::digest_to_filepath;
 use crate::tests::make_dirs;
-use futures::compat::Future01CompatExt;
 use libc;
 use std::ffi::CString;
 use std::path::Path;
@@ -24,7 +23,6 @@ async fn read_file_by_digest_exact_bytes() {
 
   store
     .store_file_bytes(test_bytes.bytes(), false)
-    .compat()
     .await
     .expect("Storing bytes");
 

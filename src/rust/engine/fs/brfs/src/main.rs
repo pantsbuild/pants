@@ -38,7 +38,6 @@ use serverset;
 
 use time;
 
-use futures::compat::Future01CompatExt;
 use hashing::{Digest, Fingerprint};
 use log::{debug, error, warn};
 use parking_lot::Mutex;
@@ -179,74 +178,77 @@ impl BuildResultFS {
           non_executable_inode
         }))
       }
-      Vacant(entry) => match self.runtime.block_on(
-        self
-          .store
-          .load_file_bytes_with(digest, |_| (), WorkUnitStore::new())
-          .compat(),
-      ) {
-        Ok(Some(((), _metadata))) => {
-          let executable_inode = self.next_inode;
-          self.next_inode += 1;
-          let non_executable_inode = self.next_inode;
-          self.next_inode += 1;
-          entry.insert((executable_inode, non_executable_inode));
-          self.inode_digest_cache.insert(
-            executable_inode,
-            InodeDetails {
-              digest: digest,
-              entry_type: EntryType::File,
-              is_executable: true,
-            },
-          );
-          self.inode_digest_cache.insert(
-            non_executable_inode,
-            InodeDetails {
-              digest: digest,
-              entry_type: EntryType::File,
-              is_executable: false,
-            },
-          );
-          Ok(Some(if is_executable {
-            executable_inode
-          } else {
-            non_executable_inode
-          }))
+      Vacant(entry) => {
+        let store = self.store.clone();
+        match self.runtime.block_on(async move {
+          store
+            .load_file_bytes_with(digest, |_| (), WorkUnitStore::new())
+            .await
+        }) {
+          Ok(Some(((), _metadata))) => {
+            let executable_inode = self.next_inode;
+            self.next_inode += 1;
+            let non_executable_inode = self.next_inode;
+            self.next_inode += 1;
+            entry.insert((executable_inode, non_executable_inode));
+            self.inode_digest_cache.insert(
+              executable_inode,
+              InodeDetails {
+                digest: digest,
+                entry_type: EntryType::File,
+                is_executable: true,
+              },
+            );
+            self.inode_digest_cache.insert(
+              non_executable_inode,
+              InodeDetails {
+                digest: digest,
+                entry_type: EntryType::File,
+                is_executable: false,
+              },
+            );
+            Ok(Some(if is_executable {
+              executable_inode
+            } else {
+              non_executable_inode
+            }))
+          }
+          Ok(None) => Ok(None),
+          Err(err) => Err(err),
         }
-        Ok(None) => Ok(None),
-        Err(err) => Err(err),
-      },
+      }
     }
   }
 
   pub fn inode_for_directory(&mut self, digest: Digest) -> Result<Option<Inode>, String> {
     match self.directory_inode_cache.entry(digest) {
       Occupied(entry) => Ok(Some(*entry.get())),
-      Vacant(entry) => match self.runtime.block_on(
-        self
-          .store
-          .load_directory(digest, WorkUnitStore::new())
-          .compat(),
-      ) {
-        Ok(Some(_)) => {
-          // TODO: Kick off some background futures to pre-load the contents of this Directory into
-          // an in-memory cache. Keep a background CPU pool driving those Futures.
-          let inode = self.next_inode;
-          self.next_inode += 1;
-          entry.insert(inode);
-          self.inode_digest_cache.insert(
-            inode,
-            InodeDetails {
-              digest: digest,
-              entry_type: EntryType::Directory,
-              is_executable: true,
-            },
-          );
-          Ok(Some(inode))
+      Vacant(entry) => {
+        let store = self.store.clone();
+        match self
+          .runtime
+          .block_on(async move { store.load_directory(digest, WorkUnitStore::new()).await })
+        {
+          Ok(Some(_)) => {
+            // TODO: Kick off some background futures to pre-load the contents of this Directory into
+            // an in-memory cache. Keep a background CPU pool driving those Futures.
+            let inode = self.next_inode;
+            self.next_inode += 1;
+            entry.insert(inode);
+            self.inode_digest_cache.insert(
+              inode,
+              InodeDetails {
+                digest: digest,
+                entry_type: EntryType::Directory,
+                is_executable: true,
+              },
+            );
+            Ok(Some(inode))
+          }
+          Ok(None) => Ok(None),
+          Err(err) => Err(err),
         }
-        Ok(None) => Ok(None),
-        Err(err) => Err(err),
-      },
+      }
     }
   }
 
@@ -316,12 +318,10 @@ impl BuildResultFS {
           entry_type: EntryType::Directory,
           ..
         }) => {
-          let maybe_directory = self.runtime.block_on(
-            self
-              .store
-              .load_directory(digest, WorkUnitStore::new())
-              .compat(),
-          );
+          let store = self.store.clone();
+          let maybe_directory = self
+            .runtime
+            .block_on(async move { store.load_directory(digest, WorkUnitStore::new()).await });
 
           match maybe_directory {
             Ok(Some((directory, _metadata))) => {
@@ -450,15 +450,15 @@ impl fuse::Filesystem for BuildResultFS {
             .ok_or(libc::ENOENT);
           maybe_cache_entry
             .and_then(|cache_entry| {
+              let store = self.store.clone();
               let parent_digest = cache_entry.digest;
               self
                 .runtime
-                .block_on(
-                  self
-                    .store
+                .block_on(async move {
+                  store
                     .load_directory(parent_digest, WorkUnitStore::new())
-                    .compat(),
-                )
+                    .await
+                })
                 .map_err(|err| {
                   error!("Error reading directory {:?}: {}", parent_digest, err);
                   libc::EINVAL
@@ -549,11 +549,11 @@ impl fuse::Filesystem for BuildResultFS {
           let reply2 = reply.clone();
           // TODO: Read from a cache of Futures driven from a CPU pool, so we can merge in-flight
           // requests, rather than reading from the store directly here.
+          let store = self.store.clone();
           let result: Result<(), ()> = self
             .runtime
-            .block_on(
-              self
-                .store
+            .block_on(async move {
+              store
                 .load_file_bytes_with(
                   digest,
                   move |bytes| {
@@ -564,8 +564,8 @@ impl fuse::Filesystem for BuildResultFS {
                   },
                   WorkUnitStore::new(),
                 )
-                .compat(),
-            )
+                .await
+            })
             .map(|v| {
               if v.is_none() {
                 let maybe_reply = reply2.lock().take();
