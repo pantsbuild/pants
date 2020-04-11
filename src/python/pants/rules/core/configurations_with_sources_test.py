@@ -42,4 +42,4 @@ class ConfigurationsWithSourcesTest(TestBase):
             ConfigurationsWithSources,
             ConfigurationsWithSourcesRequest([valid_config, invalid_config]),
         )
-        assert result.configs == (valid_config,)
+        assert tuple(result) == (valid_config,)

@@ -304,7 +304,7 @@ async def run_tests(
 
     results = await MultiGet(
         Get[AddressAndTestResult](WrappedTestConfiguration(config))
-        for config in configs_with_sources.configs
+        for config in configs_with_sources
     )
 
     did_any_fail = False

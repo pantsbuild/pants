@@ -197,8 +197,8 @@ class TestTest(TestBase):
                 MockGet(
                     product_type=ConfigurationsWithSources,
                     subject_type=ConfigurationsWithSourcesRequest,
-                    mock=lambda request: ConfigurationsWithSources(
-                        request.configs if include_sources else ()
+                    mock=lambda configs: ConfigurationsWithSources(
+                        configs if include_sources else ()
                     ),
                 ),
                 MockGet(
