@@ -1,6 +1,6 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
+import dataclasses
 from dataclasses import dataclass
 from typing import Iterable, Optional, Tuple
 
@@ -42,6 +42,9 @@ class PexFromTargetsRequest:
     include_source_files: bool
     additional_sources: Optional[Digest]
     additional_inputs: Optional[Digest]
+    # A human-readable description to use in the UI.  This field doesn't participate
+    # in comparison (and therefore hashing), as it doesn't affect the result.
+    description: Optional[str] = dataclasses.field(compare=False)
 
     def __init__(
         self,
@@ -53,7 +56,8 @@ class PexFromTargetsRequest:
         additional_requirements: Iterable[str] = (),
         include_source_files: bool = True,
         additional_sources: Optional[Digest] = None,
-        additional_inputs: Optional[Digest] = None
+        additional_inputs: Optional[Digest] = None,
+        description: Optional[str] = None
     ) -> None:
         self.addresses = addresses
         self.output_filename = output_filename
@@ -63,6 +67,7 @@ class PexFromTargetsRequest:
         self.include_source_files = include_source_files
         self.additional_sources = additional_sources
         self.additional_inputs = additional_inputs
+        self.description = description
 
 
 @dataclass(frozen=True)
@@ -127,6 +132,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         sources=merged_input_digest,
         additional_inputs=request.additional_inputs,
         additional_args=request.additional_args,
+        description=request.description,
     )
 
 

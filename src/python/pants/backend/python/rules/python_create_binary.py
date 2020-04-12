@@ -76,13 +76,15 @@ async def create_python_binary(config: PythonBinaryConfiguration) -> CreatedBina
         else:
             entry_point = None
 
+    output_filename = f"{config.address.target_name}.pex"
     two_step_pex = await Get[TwoStepPex](
         TwoStepPexFromTargetsRequest(
             PexFromTargetsRequest(
                 addresses=Addresses([config.address]),
                 entry_point=entry_point,
-                output_filename=f"{config.address.target_name}.pex",
+                output_filename=output_filename,
                 additional_args=config.generate_additional_args(),
+                description=f"Building {output_filename}",
             )
         )
     )
