@@ -8,7 +8,6 @@ use std::path::PathBuf;
 use store::Store;
 use tempfile::TempDir;
 use tokio::runtime::Handle;
-use workunit_store::WorkUnitStore;
 
 fn mock_nailgun_runner(workdir_base: Option<PathBuf>) -> CommandRunner {
   let store_dir = TempDir::new().unwrap();
@@ -120,7 +119,6 @@ async fn materialize_with_jdk(
     dir,
     jdk_path,
     EMPTY_DIGEST,
-    WorkUnitStore::new(),
   );
   materializer.compat().await
 }

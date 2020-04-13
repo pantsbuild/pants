@@ -16,7 +16,7 @@ use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
 use uuid;
-use workunit_store::{WorkUnit, WorkUnitStore};
+use workunit_store::WorkUnit;
 
 #[derive(Clone)]
 pub struct ByteStore {
@@ -113,11 +113,7 @@ impl ByteStore {
     )
   }
 
-  pub async fn store_bytes(
-    &self,
-    bytes: Bytes,
-    workunit_store: WorkUnitStore,
-  ) -> Result<Digest, String> {
+  pub async fn store_bytes(&self, bytes: Bytes) -> Result<Digest, String> {
     let start_time = std::time::SystemTime::now();
 
     let mut hasher = Sha256::default();
@@ -222,12 +218,14 @@ impl ByteStore {
         .compat()
         .await;
 
-    let workunit = WorkUnit::new(
-      workunit_name.clone(),
-      TimeSpan::since(&start_time),
-      workunit_store::get_parent_id(),
-    );
-    workunit_store.add_workunit(workunit);
+    if let Some(workunit_state) = workunit_store::get_workunit_state() {
+      let workunit = WorkUnit::new(
+        workunit_name.clone(),
+        TimeSpan::since(&start_time),
+        workunit_state.parent_id,
+      );
+      workunit_state.store.add_workunit(workunit);
+    }
 
     result
   }
@@ -240,7 +238,6 @@ impl ByteStore {
     _entry_type: EntryType,
     digest: Digest,
     f: F,
-    workunit_store: WorkUnitStore,
   ) -> Result<Option<T>, String> {
     let start_time = std::time::SystemTime::now();
 
@@ -304,12 +301,14 @@ impl ByteStore {
       .compat()
       .await;
 
-    let workunit = WorkUnit::new(
-      workunit_name.clone(),
-      TimeSpan::since(&start_time),
-      workunit_store::get_parent_id(),
-    );
-    workunit_store.add_workunit(workunit);
+    if let Some(workunit_state) = workunit_store::get_workunit_state() {
+      let workunit = WorkUnit::new(
+        workunit_name.clone(),
+        TimeSpan::since(&start_time),
+        workunit_state.parent_id,
+      );
+      workunit_state.store.add_workunit(workunit);
+    }
 
     result
   }
@@ -321,7 +320,6 @@ impl ByteStore {
   pub fn list_missing_digests(
     &self,
     request: bazel_protos::remote_execution::FindMissingBlobsRequest,
-    workunit_store: WorkUnitStore,
   ) -> impl Future<Item = HashSet<Digest>, Error = String> {
     let start_time = std::time::SystemTime::now();
 
@@ -330,7 +328,6 @@ impl ByteStore {
       "list_missing_digests({})",
       store.instance_name.clone().unwrap_or_default()
     );
-    let workunit_store = workunit_store;
     self
       .with_cas_client(move |client| {
         client
@@ -350,12 +347,14 @@ impl ByteStore {
           })
       })
       .then(move |future| {
-        let workunit = WorkUnit::new(
-          workunit_name.clone(),
-          TimeSpan::since(&start_time),
-          workunit_store::get_parent_id(),
-        );
-        workunit_store.add_workunit(workunit);
+        if let Some(workunit_state) = workunit_store::get_workunit_state() {
+          let workunit = WorkUnit::new(
+            workunit_name.clone(),
+            TimeSpan::since(&start_time),
+            workunit_state.parent_id,
+          );
+          workunit_state.store.add_workunit(workunit);
+        }
         future
       })
   }

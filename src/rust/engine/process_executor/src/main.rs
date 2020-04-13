@@ -44,7 +44,6 @@ use std::process::exit;
 use std::time::Duration;
 use store::{BackoffConfig, Store};
 use tokio::runtime::Handle;
-use workunit_store::WorkUnitStore;
 
 /// A binary which takes args of format:
 ///  process_executor --env=FOO=bar --env=SOME=value --input-digest=abc123 --input-digest-length=80
@@ -400,7 +399,7 @@ async fn main() {
 
   if let Some(output) = args.value_of("materialize-output-to").map(PathBuf::from) {
     store
-      .materialize_directory(output, result.output_directory, WorkUnitStore::new())
+      .materialize_directory(output, result.output_directory)
       .compat()
       .await
       .unwrap();

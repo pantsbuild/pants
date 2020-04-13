@@ -68,7 +68,7 @@ impl crate::CommandRunner for CommandRunner {
 
     let command_runner = self.clone();
     self
-      .lookup(key, context.clone())
+      .lookup(key)
       .then(move |maybe_result| {
         match maybe_result {
           Ok(Some(result)) => return future::ok(result).to_boxed(),
@@ -108,7 +108,6 @@ impl CommandRunner {
   fn lookup(
     &self,
     fingerprint: Fingerprint,
-    context: Context,
   ) -> impl Future<Item = Option<FallibleExecuteProcessResultWithPlatform>, Error = String> {
     use bazel_protos::remote_execution::ExecuteResponse;
     let file_store = self.file_store.clone();
@@ -137,7 +136,6 @@ impl CommandRunner {
           file_store,
           execute_response,
           vec![],
-          context.workunit_store,
           platform,
         )
         .map(Some)

@@ -29,7 +29,7 @@ use crate::{
 };
 use std;
 use std::cmp::min;
-use workunit_store::{get_parent_id, WorkUnit, WorkUnitStore};
+use workunit_store::{WorkUnit, WorkUnitStore};
 
 // Environment variable which is exclusively used for cache key invalidation.
 // This may be not specified in an ExecuteProcessRequest, and may be populated only by the
@@ -272,11 +272,9 @@ impl super::CommandRunner for CommandRunner {
           .join(self.store_proto_locally(&action))
           .and_then({
             let store = store.clone();
-            let workunit_store = context.workunit_store.clone();
             move |(command_digest, action_digest)| {
               store.ensure_remote_has_recursive(
                 vec![command_digest, action_digest, input_files],
-                workunit_store,
               )
             }
           })
@@ -323,10 +321,9 @@ impl super::CommandRunner for CommandRunner {
                   let operations_client = operations_client.clone();
                   let command_runner = command_runner.clone();
                   let build_id = context.build_id.to_string();
-                  let workunit_store = context.workunit_store.clone();
 
                   let f = command_runner
-                    .extract_execute_response(operation, &mut history, context.workunit_store.clone());
+                    .extract_execute_response(operation, &mut history);
                   f.then(move |value| {
                     match value {
                       Ok(result) => {
@@ -370,7 +367,7 @@ impl super::CommandRunner for CommandRunner {
 
                             command_runner.retry_execution(
                               execute_request,
-                              store.ensure_remote_has_recursive(missing_digests, workunit_store.clone()).map(|_| ()).to_boxed(),
+                              store.ensure_remote_has_recursive(missing_digests).map(|_| ()).to_boxed(),
                               build_id,
                               history,
                               maybe_cancel_remote_exec_token,
@@ -560,7 +557,6 @@ impl CommandRunner {
     &self,
     operation_or_status: OperationOrStatus,
     attempts: &mut ExecutionHistory,
-    workunit_store: WorkUnitStore,
   ) -> BoxFuture<FallibleExecuteProcessResultWithPlatform, ExecutionError> {
     trace!("Got operation response: {:?}", operation_or_status);
 
@@ -587,7 +583,9 @@ impl CommandRunner {
         trace!("Got (nested) execute response: {:?}", execute_response);
         if execute_response.get_result().has_execution_metadata() {
           let metadata = execute_response.get_result().get_execution_metadata();
-          let parent_id = get_parent_id();
+          let workunit_state = workunit_store::expect_workunit_state();
+          let workunit_store = workunit_state.store;
+          let parent_id = workunit_state.parent_id;
           let result_cached = execute_response.get_cached_result();
 
           match TimeSpan::from_start_and_end(
@@ -672,7 +670,6 @@ impl CommandRunner {
             self.store.clone(),
             execute_response,
             execution_attempts,
-            workunit_store,
             self.platform,
           )
           .map_err(ExecutionError::Fatal)
@@ -959,20 +956,11 @@ pub fn populate_fallible_execution_result(
   store: Store,
   execute_response: bazel_protos::remote_execution::ExecuteResponse,
   execution_attempts: Vec<ExecutionStats>,
-  workunit_store: WorkUnitStore,
   platform: Platform,
 ) -> impl Future<Item = FallibleExecuteProcessResultWithPlatform, Error = String> {
-  extract_stdout(&store, &execute_response, workunit_store.clone())
-    .join(extract_stderr(
-      &store,
-      &execute_response,
-      workunit_store.clone(),
-    ))
-    .join(extract_output_files(
-      store,
-      &execute_response,
-      workunit_store,
-    ))
+  extract_stdout(&store, &execute_response)
+    .join(extract_stderr(&store, &execute_response))
+    .join(extract_output_files(store, &execute_response))
     .and_then(move |((stdout, stderr), output_directory)| {
       Ok(FallibleExecuteProcessResultWithPlatform {
         stdout: stdout,
@@ -988,7 +976,6 @@ pub fn populate_fallible_execution_result(
 fn extract_stdout(
   store: &Store,
   execute_response: &bazel_protos::remote_execution::ExecuteResponse,
-  workunit_store: WorkUnitStore,
 ) -> BoxFuture<Bytes, String> {
   if execute_response.get_result().has_stdout_digest() {
     let store = store.clone();
@@ -998,7 +985,7 @@ fn extract_stdout(
       try_future!(stdout_digest_result.map_err(|err| format!("Error extracting stdout: {}", err)));
     Box::pin(async move {
       let (bytes, _metadata) = store
-        .load_file_bytes_with(stdout_digest, |v| v, workunit_store)
+        .load_file_bytes_with(stdout_digest, |v| v)
         .map_err(move |error| {
           format!(
             "Error fetching stdout digest ({:?}): {:?}",
@@ -1035,7 +1022,6 @@ fn extract_stdout(
 fn extract_stderr(
   store: &Store,
   execute_response: &bazel_protos::remote_execution::ExecuteResponse,
-  workunit_store: WorkUnitStore,
 ) -> BoxFuture<Bytes, String> {
   if execute_response.get_result().has_stderr_digest() {
     let store = store.clone();
@@ -1046,7 +1032,7 @@ fn extract_stderr(
 
     Box::pin(async move {
       let (bytes, _metadata) = store
-        .load_file_bytes_with(stderr_digest, |v| v, workunit_store)
+        .load_file_bytes_with(stderr_digest, |v| v)
         .map_err(move |error| {
           format!(
             "Error fetching stderr digest ({:?}): {:?}",
@@ -1083,7 +1069,6 @@ fn extract_stderr(
 pub fn extract_output_files(
   store: Store,
   execute_response: &bazel_protos::remote_execution::ExecuteResponse,
-  workunit_store: WorkUnitStore,
 ) -> BoxFuture<Digest, String> {
   // Get Digests of output Directories.
   // Then we'll make a Directory for the output files, and merge them.
@@ -1156,7 +1141,7 @@ pub fn extract_output_files(
   }
 
   impl StoreFileByDigest<String> for StoreOneOffRemoteDigest {
-    fn store_by_digest(&self, file: File, _: WorkUnitStore) -> BoxFuture<Digest, String> {
+    fn store_by_digest(&self, file: File) -> BoxFuture<Digest, String> {
       match self.map_of_paths_to_digests.get(&file.path) {
         Some(digest) => future::ok(*digest),
         None => future::err(format!(
@@ -1173,7 +1158,6 @@ pub fn extract_output_files(
       store.clone(),
       StoreOneOffRemoteDigest::new(path_map),
       &path_stats,
-      workunit_store.clone(),
     )
     .map_err(move |error| {
       format!(
@@ -1186,7 +1170,7 @@ pub fn extract_output_files(
       future03::try_join(files_digest, future03::try_join_all(directory_digests)).await?;
 
     directory_digests.push(files_digest);
-    Snapshot::merge_directories(store, directory_digests, workunit_store)
+    Snapshot::merge_directories(store, directory_digests)
       .map_err(|err| format!("Error when merging output files and directories: {}", err))
       .await
   })

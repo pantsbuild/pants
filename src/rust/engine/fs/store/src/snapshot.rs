@@ -21,7 +21,6 @@ use std::iter::Iterator;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::Arc;
-use workunit_store::WorkUnitStore;
 
 #[derive(Eq, Hash, PartialEq)]
 pub struct Snapshot {
@@ -44,7 +43,6 @@ impl Snapshot {
     store: Store,
     file_digester: S,
     mut path_stats: Vec<PathStat>,
-    workunit_store: WorkUnitStore,
   ) -> Result<Snapshot, String> {
     path_stats.sort_by(|a, b| a.path().cmp(b.path()));
 
@@ -59,45 +57,32 @@ impl Snapshot {
         path_stats
       ));
     }
-    let digest = Snapshot::ingest_directory_from_sorted_path_stats(
-      store,
-      file_digester,
-      &path_stats,
-      workunit_store,
-    )
-    .await?;
+    let digest =
+      Snapshot::ingest_directory_from_sorted_path_stats(store, file_digester, &path_stats).await?;
 
     Ok(Snapshot { digest, path_stats })
   }
 
-  pub async fn from_digest(
-    store: Store,
-    digest: Digest,
-    workunit_store: WorkUnitStore,
-  ) -> Result<Snapshot, String> {
+  pub async fn from_digest(store: Store, digest: Digest) -> Result<Snapshot, String> {
     let path_stats_per_directory = store
-      .walk(
-        digest,
-        |_, path_so_far, _, directory| {
-          let mut path_stats = Vec::new();
-          path_stats.extend(directory.get_directories().iter().map(move |dir_node| {
-            let path = path_so_far.join(dir_node.get_name());
-            PathStat::dir(path.clone(), Dir(path))
-          }));
-          path_stats.extend(directory.get_files().iter().map(move |file_node| {
-            let path = path_so_far.join(file_node.get_name());
-            PathStat::file(
-              path.clone(),
-              File {
-                path,
-                is_executable: file_node.is_executable,
-              },
-            )
-          }));
-          future::ok(path_stats).to_boxed()
-        },
-        workunit_store,
-      )
+      .walk(digest, |_, path_so_far, _, directory| {
+        let mut path_stats = Vec::new();
+        path_stats.extend(directory.get_directories().iter().map(move |dir_node| {
+          let path = path_so_far.join(dir_node.get_name());
+          PathStat::dir(path.clone(), Dir(path))
+        }));
+        path_stats.extend(directory.get_files().iter().map(move |file_node| {
+          let path = path_so_far.join(file_node.get_name());
+          PathStat::file(
+            path.clone(),
+            File {
+              path,
+              is_executable: file_node.is_executable,
+            },
+          )
+        }));
+        future::ok(path_stats).to_boxed()
+      })
       .compat()
       .await?;
 
@@ -115,17 +100,11 @@ impl Snapshot {
     store: Store,
     file_digester: S,
     path_stats: &[PathStat],
-    workunit_store: WorkUnitStore,
   ) -> Result<Digest, String> {
     let mut sorted_path_stats = path_stats.to_owned();
     sorted_path_stats.sort_by(|a, b| a.path().cmp(b.path()));
-    Snapshot::ingest_directory_from_sorted_path_stats(
-      store,
-      file_digester,
-      &sorted_path_stats,
-      workunit_store,
-    )
-    .await
+    Snapshot::ingest_directory_from_sorted_path_stats(store, file_digester, &sorted_path_stats)
+      .await
   }
 
   ///
@@ -138,7 +117,6 @@ impl Snapshot {
     store: Store,
     file_digester: S,
     path_stats: &[PathStat],
-    workunit_store: WorkUnitStore,
   ) -> Pin<Box<dyn std::future::Future<Output = Result<Digest, String>> + Send>> {
     let mut file_futures = Vec::new();
     let mut dir_futures: Vec<
@@ -162,10 +140,9 @@ impl Snapshot {
           PathStat::File { ref stat, .. } => {
             let is_executable = stat.is_executable;
             let stat = stat.clone();
-            let workunit_store = workunit_store.clone();
             let file_digester = file_digester.clone();
             file_futures.push(async move {
-              let digest_future = file_digester.store_by_digest(stat, workunit_store);
+              let digest_future = file_digester.store_by_digest(stat);
               let digest = digest_future
                 .compat()
                 .await
@@ -194,7 +171,6 @@ impl Snapshot {
         }
       } else {
         let store = store.clone();
-        let workunit_store = workunit_store.clone();
         let file_digester = file_digester.clone();
         dir_futures.push(Box::pin(async move {
           // TODO: Memoize this in the graph
@@ -202,7 +178,6 @@ impl Snapshot {
             store,
             file_digester,
             &paths_of_child_dir(path_group),
-            workunit_store,
           )
           .await?;
 
@@ -236,11 +211,7 @@ impl Snapshot {
   /// error, and in cases where overwriting a file is desirable, explicitly removing a duplicated
   /// copy should be straightforward.
   ///
-  pub async fn merge(
-    store: Store,
-    snapshots: &[Snapshot],
-    workunit_store: WorkUnitStore,
-  ) -> Result<Snapshot, String> {
+  pub async fn merge(store: Store, snapshots: &[Snapshot]) -> Result<Snapshot, String> {
     // We dedupe PathStats by their symbolic names, as those will be their names within the
     // `Directory` structure. Only `Dir+Dir` collisions are legal.
     let path_stats = {
@@ -264,12 +235,8 @@ impl Snapshot {
       uniq_paths.into_iter().map(|(_, v)| v).collect()
     };
     // Recursively merge the Digests in the Snapshots.
-    let root_digest = Self::merge_directories(
-      store,
-      snapshots.iter().map(|s| s.digest).collect(),
-      workunit_store,
-    )
-    .await?;
+    let root_digest =
+      Self::merge_directories(store, snapshots.iter().map(|s| s.digest).collect()).await?;
     Ok(Snapshot {
       digest: root_digest,
       path_stats: path_stats,
@@ -288,7 +255,6 @@ impl Snapshot {
   pub fn merge_directories(
     store: Store,
     dir_digests: Vec<Digest>,
-    workunit_store: WorkUnitStore,
   ) -> Pin<Box<dyn std::future::Future<Output = Result<Digest, String>> + Send + 'static>> {
     Box::pin(async move {
       if dir_digests.is_empty() {
@@ -303,7 +269,7 @@ impl Snapshot {
           .into_iter()
           .map(|digest| {
             store
-              .load_directory(digest, workunit_store.clone())
+              .load_directory(digest)
               .and_then(move |maybe_directory| {
                 future03::ready(
                   maybe_directory
@@ -366,13 +332,12 @@ impl Snapshot {
           .into_iter()
           .map(move |(child_name, group)| {
             let store = store.clone();
-            let workunit_store = workunit_store.clone();
             let digests_result = group
               .map(|d| d.get_digest().into())
               .collect::<Result<Vec<_>, String>>();
             async move {
               let digests = digests_result?;
-              let merged_digest = Self::merge_directories(store, digests, workunit_store).await?;
+              let merged_digest = Self::merge_directories(store, digests).await?;
               let mut child_dir = bazel_protos::remote_execution::DirectoryNode::new();
               child_dir.set_name(child_name);
               child_dir.set_digest((&merged_digest).into());
@@ -405,11 +370,9 @@ impl Snapshot {
     store: Store,
     root_digest: Digest,
     prefix: PathBuf,
-    workunit_store: WorkUnitStore,
   ) -> Result<Digest, String> {
     let store2 = store.clone();
-    let mut dir =
-      Self::get_directory_or_err(store.clone(), root_digest, workunit_store.clone()).await?;
+    let mut dir = Self::get_directory_or_err(store.clone(), root_digest).await?;
     let mut already_stripped = PathBuf::new();
     let mut prefix = prefix;
     loop {
@@ -473,7 +436,7 @@ impl Snapshot {
                 .get_digest()
                 .into();
             already_stripped = already_stripped.join(component_to_strip);
-            dir = Self::get_directory_or_err(store.clone(), maybe_digest?, workunit_store.clone()).await?;
+            dir = Self::get_directory_or_err(store.clone(), maybe_digest?).await?;
             prefix = remaining_prefix;
           }
         }
@@ -517,9 +480,8 @@ impl Snapshot {
   async fn get_directory_or_err(
     store: Store,
     digest: Digest,
-    workunit_store: WorkUnitStore,
   ) -> Result<bazel_protos::remote_execution::Directory, String> {
-    let maybe_dir = store.load_directory(digest, workunit_store).await?;
+    let maybe_dir = store.load_directory(digest).await?;
     maybe_dir
       .map(|(dir, _metadata)| dir)
       .ok_or_else(|| format!("{:?} was not known", digest))
@@ -544,12 +506,11 @@ impl Snapshot {
     root_path: P,
     path_globs: PathGlobs,
     digest_hint: Option<Digest>,
-    workunit_store: WorkUnitStore,
   ) -> Result<Snapshot, String> {
     // Attempt to use the digest hint to load a Snapshot without expanding the globs; otherwise,
     // expand the globs to capture a Snapshot.
     let snapshot_result = if let Some(digest) = digest_hint {
-      Snapshot::from_digest(store.clone(), digest, workunit_store.clone()).await
+      Snapshot::from_digest(store.clone(), digest).await
     } else {
       Err("No digest hint provided.".to_string())
     };
@@ -572,7 +533,6 @@ impl Snapshot {
         store.clone(),
         OneOffStoreFileByDigest::new(store, posix_fs),
         path_stats,
-        workunit_store,
       )
       .await
     }
@@ -582,7 +542,6 @@ impl Snapshot {
     store: Store,
     digest: Digest,
     path_globs: PathGlobs,
-    workunit_store: WorkUnitStore,
   ) -> Result<Snapshot, String> {
     use bazel_protos::remote_execution::{Directory, DirectoryNode, FileNode};
 
@@ -635,10 +594,8 @@ impl Snapshot {
       future::ok((path_stats, StoreManyFileDigests { hash })).to_boxed()
     };
 
-    let path_stats_and_stores_per_directory: Vec<(Vec<PathStat>, StoreManyFileDigests)> = store
-      .walk(digest, traverser, workunit_store.clone())
-      .compat()
-      .await?;
+    let path_stats_and_stores_per_directory: Vec<(Vec<PathStat>, StoreManyFileDigests)> =
+      store.walk(digest, traverser).compat().await?;
 
     let mut final_store = StoreManyFileDigests::new();
     let mut path_stats: Vec<PathStat> = vec![];
@@ -648,7 +605,7 @@ impl Snapshot {
     }
 
     path_stats.sort_by(|l, r| l.path().cmp(&r.path()));
-    Snapshot::from_path_stats(store, final_store, path_stats, workunit_store).await
+    Snapshot::from_path_stats(store, final_store, path_stats).await
   }
 }
 
@@ -695,7 +652,7 @@ fn osstring_as_utf8(path: OsString) -> Result<String, String> {
 // It is a separate trait so that caching implementations can be written which wrap the Store (used
 // to store the bytes) and VFS (used to read the files off disk if needed).
 pub trait StoreFileByDigest<Error> {
-  fn store_by_digest(&self, file: File, workunit_store: WorkUnitStore) -> BoxFuture<Digest, Error>;
+  fn store_by_digest(&self, file: File) -> BoxFuture<Digest, Error>;
 }
 
 ///
@@ -714,12 +671,7 @@ impl OneOffStoreFileByDigest {
 }
 
 impl StoreFileByDigest<String> for OneOffStoreFileByDigest {
-  fn store_by_digest(
-    &self,
-    file: File,
-    // TODO PC: is this needed for the remote trait?
-    _: WorkUnitStore,
-  ) -> BoxFuture<Digest, String> {
+  fn store_by_digest(&self, file: File) -> BoxFuture<Digest, String> {
     let store = self.store.clone();
     let posix_fs = self.posix_fs.clone();
     let res = async move {
@@ -751,7 +703,7 @@ impl StoreManyFileDigests {
 }
 
 impl StoreFileByDigest<String> for StoreManyFileDigests {
-  fn store_by_digest(&self, file: File, _: WorkUnitStore) -> BoxFuture<Digest, String> {
+  fn store_by_digest(&self, file: File) -> BoxFuture<Digest, String> {
     future::result(self.hash.get(&file.path).copied().ok_or_else(|| {
       format!(
         "Could not find file {} when storing file by digest",
