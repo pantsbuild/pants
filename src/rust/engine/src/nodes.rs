@@ -1149,6 +1149,19 @@ impl Node for NodeKey {
       NodeKey::Select(..) => None,
     }
   }
+
+  fn long_running(&self) -> bool {
+    match self {
+      NodeKey::MultiPlatformExecuteProcess(_) => true,
+      NodeKey::Task(_) => false,
+      NodeKey::Snapshot(_) => false,
+      NodeKey::DigestFile(..) => false,
+      NodeKey::DownloadedFile(..) => false,
+      NodeKey::ReadLink(..) => false,
+      NodeKey::Scandir(..) => false,
+      NodeKey::Select(..) => false,
+    }
+  }
 }
 
 impl Display for NodeKey {

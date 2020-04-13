@@ -47,6 +47,12 @@ pub trait Node: Clone + Debug + Display + Eq + Hash + Send + 'static {
   fn user_facing_name(&self) -> Option<String> {
     None
   }
+
+  /// Used to determine whether this Node is expected to run long enough for it to
+  /// be worthwhile to graph its running time.
+  fn long_running(&self) -> bool {
+    false
+  }
 }
 
 pub trait NodeError: Clone + Debug + Eq + Send {

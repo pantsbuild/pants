@@ -28,6 +28,7 @@
 use hashing;
 
 use petgraph;
+use petgraph::graph::NodeIndex;
 
 // make the entry module public for testing purposes. We use it to contruct mock
 // graph entries in the notify watch tests.
@@ -268,10 +269,7 @@ impl<N: Node> InnerGraph<N> {
     {
       let critical_path = {
         let mut next = paths[index];
-        let mut path = vec![graph
-          .node_weight(petgraph::graph::NodeIndex::new(index))
-          .unwrap()
-          .unwrap()];
+        let mut path = vec![graph.node_weight(NodeIndex::new(index)).unwrap().unwrap()];
         while next != Some(src) && next != None {
           if let Some(entry) = graph.node_weight(next.unwrap()).unwrap() {
             path.push(*entry);
@@ -556,7 +554,7 @@ impl<N: Node> InnerGraph<N> {
   ///
   fn heavy_hitters(&self, roots: &[N], k: usize) -> HashMap<String, Duration> {
     let now = Instant::now();
-    let queue_entry = |id| {
+    let get_queue_entry = |id: EntryId| -> Option<(Duration, EntryId)> {
       self
         .entry_for_id(id)
         .and_then(|entry| entry.current_running_duration(now))
@@ -564,17 +562,17 @@ impl<N: Node> InnerGraph<N> {
     };
 
     let mut queue: BinaryHeap<(Duration, EntryId)> = BinaryHeap::with_capacity(k);
-    let mut visited: HashSet<EntryId, FNV> = HashSet::default();
-    let mut res = HashMap::new();
 
     // Initialize the queue.
     queue.extend(
       roots
         .iter()
         .filter_map(|nk| self.entry_id(nk))
-        .filter_map(|eid| queue_entry(*eid)),
+        .filter_map(|eid| get_queue_entry(*eid)),
     );
 
+    let mut visited: HashSet<EntryId, FNV> = HashSet::default();
+    let mut res = HashMap::new();
     while let Some((duration, id)) = queue.pop() {
       if !visited.insert(id) {
         continue;
@@ -584,18 +582,20 @@ impl<N: Node> InnerGraph<N> {
       let mut deps = self
         .pg
         .neighbors_directed(id, Direction::Outgoing)
-        .filter_map(&queue_entry)
+        .filter_map(&get_queue_entry)
         .peekable();
 
       if deps.peek().is_none() {
         // If the entry has no running deps, it is a leaf. Emit it.
         let node = self.unsafe_entry_for_id(id).node();
-        let output = node
-          .user_facing_name()
-          .unwrap_or_else(|| format!("{}", node));
-        res.insert(output, duration);
-        if res.len() >= k {
-          break;
+        if node.long_running() {
+          let output = node
+            .user_facing_name()
+            .unwrap_or_else(|| format!("{}", node));
+          res.insert(output, duration);
+          if res.len() >= k {
+            break;
+          }
         }
       } else {
         // Otherwise, assume it is blocked on the running dependencies and expand them.
