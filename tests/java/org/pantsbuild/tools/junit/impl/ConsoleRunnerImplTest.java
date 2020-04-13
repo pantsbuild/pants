@@ -12,6 +12,9 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import com.google.common.base.Charsets;
 import com.google.common.collect.Lists;
@@ -409,11 +412,11 @@ public class ConsoleRunnerImplTest {
     }
   }
 
-  private <T> Matcher<Iterable<? super T>> hasExactlyOneOf(final Matcher<? super T> elemMatcher) {
+  private <T> Matcher<Iterable<T>> hasExactlyOneOf(final Matcher<T> elemMatcher) {
     return new ExactlyOneOf<T>(elemMatcher);
   }
 
-  private static class ExactlyOneOf<T> extends TypeSafeDiagnosingMatcher<Iterable<? super T>> {
+  private static class ExactlyOneOf<T> extends TypeSafeDiagnosingMatcher<Iterable<T>> {
     private final Matcher<? super T> elemMatcher;
 
     public ExactlyOneOf(Matcher<? super T> elemMatcher) {
@@ -421,23 +424,23 @@ public class ConsoleRunnerImplTest {
     }
 
     @Override
-    protected boolean matchesSafely(Iterable<? super T> collection,
+    protected boolean matchesSafely(Iterable<T> iterable,
                                     Description mismatchDescription) {
-      boolean foundOne = false;
-      String s;
-      for (Object t : collection) {
-        if (elemMatcher.matches(t)) {
-          if (foundOne) {
-            mismatchDescription.appendText("found more than one");
-            return false;
-          }
-          foundOne = true;
-        }
+      List<T> filtered = StreamSupport.stream(iterable.spliterator(), false)
+          .filter(new Predicate<T>() {
+            @Override public boolean test(T input) {
+              return elemMatcher.matches(input);
+            }
+          }).collect(Collectors.toList());
+      if (filtered.isEmpty()) {
+        mismatchDescription.appendText("found none in " + iterable);
+        return false;
+      } else if (filtered.size() > 1) {
+        mismatchDescription.appendText("found more than one");
+        return false;
+      } else {
+        return true;
       }
-      if (!foundOne) {
-        mismatchDescription.appendText("found none in " + collection);
-      }
-      return foundOne;
     }
 
     @Override
