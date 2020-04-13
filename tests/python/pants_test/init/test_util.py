@@ -19,11 +19,11 @@ class UtilTest(TestBase):
             )
             yield bootstrap_options
 
-    def assertExists(self, path):
+    def assert_exists(self, path):
         self.assertTrue(os.path.exists(path))
 
     def assert_symlink(self, path):
-        assert os.path.islink(path)
+        self.assertTrue(os.path.islink(path))
 
     def physical_workdir(self, bootstrap_options):
         if bootstrap_options.pants_physical_workdir_base:
