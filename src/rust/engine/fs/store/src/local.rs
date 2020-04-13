@@ -1,10 +1,7 @@
 use super::{EntryType, ShrinkBehavior, GIGABYTES};
 
-use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::Bytes;
 use digest::{Digest as DigestTrait, FixedOutput};
-use futures::future::{FutureExt, TryFutureExt};
-use futures01::{future, Future};
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use lmdb::Error::NotFound;
 use lmdb::{self, Cursor, Database, RwTransaction, Transaction, WriteFlags};
@@ -261,18 +258,18 @@ impl ByteStore {
     Ok(())
   }
 
-  pub fn store_bytes(
+  pub async fn store_bytes(
     &self,
     entry_type: EntryType,
     bytes: Bytes,
     initial_lease: bool,
-  ) -> impl Future<Item = Digest, Error = String> {
+  ) -> Result<Digest, String> {
     let dbs = match entry_type {
       EntryType::Directory => self.inner.directory_dbs.clone(),
       EntryType::File => self.inner.file_dbs.clone(),
     };
     let bytes2 = bytes.clone();
-    self
+    let digest = self
       .inner
       .executor
       .spawn_blocking(move || {
@@ -281,32 +278,24 @@ impl ByteStore {
           hasher.input(&bytes);
           Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice())
         };
-        Ok(Digest(fingerprint, bytes.len()))
+        Digest(fingerprint, bytes.len())
       })
-      .boxed()
-      .compat()
-      .and_then(move |digest| {
-        future::done(dbs)
-          .and_then(move |db| {
-            db.store_bytes(digest.0, bytes2, initial_lease)
-              .boxed()
-              .compat()
-          })
-          .map(move |()| digest)
-      })
+      .await;
+    dbs?.store_bytes(digest.0, bytes2, initial_lease).await?;
+    Ok(digest)
   }
 
-  pub fn load_bytes_with<T: Send + 'static, F: Fn(Bytes) -> T + Send + Sync + 'static>(
+  pub async fn load_bytes_with<T: Send + 'static, F: Fn(Bytes) -> T + Send + Sync + 'static>(
     &self,
     entry_type: EntryType,
     digest: Digest,
     f: F,
-  ) -> BoxFuture<Option<T>, String> {
+  ) -> Result<Option<T>, String> {
     if digest == EMPTY_DIGEST {
       // Avoid expensive I/O for this super common case.
       // Also, this allows some client-provided operations (like merging snapshots) to work
       // without needing to first store the empty snapshot.
-      return future::ok(Some(f(Bytes::new()))).to_boxed();
+      return Ok(Some(f(Bytes::new())));
     }
 
     let dbs = match entry_type {
@@ -314,13 +303,13 @@ impl ByteStore {
       EntryType::File => self.inner.file_dbs.clone(),
     };
 
-    try_future!(dbs).load_bytes_with(digest.0, move |bytes| {
-                if bytes.len() == digest.1 {
-                    Ok(f(bytes))
-                } else {
-                    Err(format!("Got hash collision reading from store - digest {:?} was requested, but retrieved bytes with that fingerprint had length {}. Congratulations, you may have broken sha256! Underlying bytes: {:?}", digest, bytes.len(), bytes))
-                }
-            }).boxed().compat().to_boxed()
+    dbs?.load_bytes_with(digest.0, move |bytes| {
+        if bytes.len() == digest.1 {
+            Ok(f(bytes))
+        } else {
+            Err(format!("Got hash collision reading from store - digest {:?} was requested, but retrieved bytes with that fingerprint had length {}. Congratulations, you may have broken sha256! Underlying bytes: {:?}", digest, bytes.len(), bytes))
+        }
+    }).await
   }
 
   pub fn all_digests(&self, entry_type: EntryType) -> Result<Vec<Digest>, String> {

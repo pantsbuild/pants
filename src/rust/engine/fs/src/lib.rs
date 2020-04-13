@@ -31,7 +31,7 @@ pub use crate::glob_matching::GlobMatching;
 use ::ignore::gitignore::{Gitignore, GitignoreBuilder};
 use async_trait::async_trait;
 use bytes::Bytes;
-use futures::future::{self, BoxFuture, TryFutureExt};
+use futures::future::{self, TryFutureExt};
 use glob::{MatchOptions, Pattern};
 use lazy_static::lazy_static;
 use std::cmp::min;
@@ -644,17 +644,12 @@ impl PosixFS {
     })
   }
 
-  ///
-  /// TODO: See the note on references in ASYNC.md.
-  ///
-  pub fn scandir<'a, 'b>(
-    &'a self,
-    dir_relative_to_root: Dir,
-  ) -> BoxFuture<'b, Result<DirectoryListing, io::Error>> {
+  pub async fn scandir(&self, dir_relative_to_root: Dir) -> Result<DirectoryListing, io::Error> {
     let vfs = self.clone();
     self
       .executor
       .spawn_blocking(move || vfs.scandir_sync(&dir_relative_to_root))
+      .await
   }
 
   fn scandir_sync(&self, dir_relative_to_root: &Dir) -> Result<DirectoryListing, io::Error> {
@@ -707,77 +702,66 @@ impl PosixFS {
     self.ignore.is_ignored(stat)
   }
 
-  ///
-  /// TODO: See the note on references in ASYNC.md.
-  ///
-  pub fn read_file<'a, 'b, 'c>(
-    &'a self,
-    file: &'b File,
-  ) -> BoxFuture<'c, Result<FileContent, io::Error>> {
+  pub async fn read_file(&self, file: &File) -> Result<FileContent, io::Error> {
     let path = file.path.clone();
     let path_abs = self.root.0.join(&file.path);
-    let executor = self.executor.clone();
-    Box::pin(async move {
-      executor
-        .spawn_blocking(move || {
-          let is_executable = path_abs.metadata()?.permissions().mode() & 0o100 == 0o100;
-          std::fs::File::open(&path_abs)
-            .and_then(|mut f| {
-              let mut content = Vec::new();
-              f.read_to_end(&mut content)?;
-              Ok(FileContent {
-                path: path,
-                content: Bytes::from(content),
-                is_executable,
-              })
+    self
+      .executor
+      .spawn_blocking(move || {
+        let is_executable = path_abs.metadata()?.permissions().mode() & 0o100 == 0o100;
+        std::fs::File::open(&path_abs)
+          .and_then(|mut f| {
+            let mut content = Vec::new();
+            f.read_to_end(&mut content)?;
+            Ok(FileContent {
+              path: path,
+              content: Bytes::from(content),
+              is_executable,
             })
-            .map_err(|e| {
-              io::Error::new(
-                e.kind(),
-                format!("Failed to read file {:?}: {}", path_abs, e),
-              )
-            })
-        })
-        .await
-    })
+          })
+          .map_err(|e| {
+            io::Error::new(
+              e.kind(),
+              format!("Failed to read file {:?}: {}", path_abs, e),
+            )
+          })
+      })
+      .await
   }
 
-  ///
-  /// TODO: See the note on references in ASYNC.md.
-  ///
-  pub fn read_link<'a, 'b, 'c>(
-    &'a self,
-    link: &'b Link,
-  ) -> BoxFuture<'c, Result<PathBuf, io::Error>> {
+  pub async fn read_link(&self, link: &Link) -> Result<PathBuf, io::Error> {
     let link_parent = link.0.parent().map(Path::to_owned);
     let link_abs = self.root.0.join(link.0.as_path());
-    self.executor.spawn_blocking(move || {
-      link_abs
-        .read_link()
-        .and_then(|path_buf| {
-          if path_buf.is_absolute() {
-            Err(io::Error::new(
-              io::ErrorKind::InvalidData,
-              format!("Absolute symlink: {:?}", link_abs),
-            ))
-          } else {
-            link_parent
-              .map(|parent| parent.join(path_buf))
-              .ok_or_else(|| {
-                io::Error::new(
-                  io::ErrorKind::InvalidData,
-                  format!("Symlink without a parent?: {:?}", link_abs),
-                )
-              })
-          }
-        })
-        .map_err(|e| {
-          io::Error::new(
-            e.kind(),
-            format!("Failed to read link {:?}: {}", link_abs, e),
-          )
-        })
-    })
+    self
+      .executor
+      .spawn_blocking(move || {
+        link_abs
+          .read_link()
+          .and_then(|path_buf| {
+            if path_buf.is_absolute() {
+              Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("Absolute symlink: {:?}", link_abs),
+              ))
+            } else {
+              link_parent
+                .map(|parent| parent.join(path_buf))
+                .ok_or_else(|| {
+                  io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("Symlink without a parent?: {:?}", link_abs),
+                  )
+                })
+            }
+          })
+          .map_err(|e| {
+            io::Error::new(
+              e.kind(),
+              format!("Failed to read link {:?}: {}", link_abs, e),
+            )
+          })
+      })
+      .await
   }
 
   ///

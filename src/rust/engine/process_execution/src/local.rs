@@ -29,7 +29,6 @@ use crate::{
 };
 
 use bytes::{Bytes, BytesMut};
-use workunit_store::WorkUnitStore;
 
 #[derive(Clone)]
 pub struct CommandRunner {
@@ -88,19 +87,20 @@ impl CommandRunner {
       GlobExpansionConjunction::AllMatch,
     ));
 
-    posix_fs
-      .expand(output_globs)
-      .compat()
-      .map_err(|err| format!("Error expanding output globs: {}", err))
-      .and_then(|path_stats| {
-        Snapshot::from_path_stats(
-          store.clone(),
-          &OneOffStoreFileByDigest::new(store, posix_fs),
-          path_stats,
-          WorkUnitStore::new(),
-        )
-      })
-      .to_boxed()
+    Box::pin(async move {
+      let path_stats = posix_fs
+        .expand(output_globs)
+        .map_err(|err| format!("Error expanding output globs: {}", err))
+        .await?;
+      Snapshot::from_path_stats(
+        store.clone(),
+        OneOffStoreFileByDigest::new(store, posix_fs),
+        path_stats,
+      )
+      .await
+    })
+    .compat()
+    .to_boxed()
   }
 }
 
@@ -325,18 +325,12 @@ pub trait CapturedWorkdir {
       req.unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule;
 
     store
-      .materialize_directory(
-        workdir_path.clone(),
-        req.input_files,
-        context.workunit_store.clone(),
-      )
+      .materialize_directory(workdir_path.clone(), req.input_files)
       .and_then({
-        let workunit_store = context.workunit_store.clone();
         move |_metadata| {
           store2.materialize_directory(
             workdir_path4,
             unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule,
-            workunit_store,
           )
         }
       })

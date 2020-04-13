@@ -1,5 +1,3 @@
-use futures::compat::Future01CompatExt;
-use futures01::future::Future;
 use hashing::{Digest, Fingerprint};
 use tempfile;
 use testutil::data::TestDirectory;
@@ -15,7 +13,6 @@ use fs::{
 use std;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use workunit_store::WorkUnitStore;
 
 const STR: &str = "European Burmese";
 
@@ -50,11 +47,9 @@ async fn snapshot_one_file() {
   make_file(&dir.path().join(&file_name), STR.as_bytes(), 0o600);
 
   let path_stats = expand_all_sorted(posix_fs).await;
-  let snapshot =
-    Snapshot::from_path_stats(store, &digester, path_stats.clone(), WorkUnitStore::new())
-      .compat()
-      .await
-      .unwrap();
+  let snapshot = Snapshot::from_path_stats(store, digester, path_stats.clone())
+    .await
+    .unwrap();
   assert_eq!(
     snapshot,
     Snapshot {
@@ -80,11 +75,9 @@ async fn snapshot_recursive_directories() {
   make_file(&dir.path().join(&roland), STR.as_bytes(), 0o600);
 
   let path_stats = expand_all_sorted(posix_fs).await;
-  let snapshot =
-    Snapshot::from_path_stats(store, &digester, path_stats.clone(), WorkUnitStore::new())
-      .compat()
-      .await
-      .unwrap();
+  let snapshot = Snapshot::from_path_stats(store, digester, path_stats.clone())
+    .await
+    .unwrap();
   assert_eq!(
     snapshot,
     Snapshot {
@@ -110,19 +103,12 @@ async fn snapshot_from_digest() {
   make_file(&dir.path().join(&roland), STR.as_bytes(), 0o600);
 
   let path_stats = expand_all_sorted(posix_fs).await;
-  let expected_snapshot = Snapshot::from_path_stats(
-    store.clone(),
-    &digester,
-    path_stats.clone(),
-    WorkUnitStore::new(),
-  )
-  .compat()
-  .await
-  .unwrap();
+  let expected_snapshot = Snapshot::from_path_stats(store.clone(), digester, path_stats.clone())
+    .await
+    .unwrap();
   assert_eq!(
     expected_snapshot,
-    Snapshot::from_digest(store, expected_snapshot.digest, WorkUnitStore::new())
-      .compat()
+    Snapshot::from_digest(store, expected_snapshot.digest,)
       .await
       .unwrap()
   );
@@ -145,15 +131,9 @@ async fn snapshot_recursive_directories_including_empty() {
   let mut unsorted_path_stats = sorted_path_stats.clone();
   unsorted_path_stats.reverse();
   assert_eq!(
-    Snapshot::from_path_stats(
-      store,
-      &digester,
-      unsorted_path_stats.clone(),
-      WorkUnitStore::new(),
-    )
-    .compat()
-    .await
-    .unwrap(),
+    Snapshot::from_path_stats(store, digester, unsorted_path_stats.clone(),)
+      .await
+      .unwrap(),
     Snapshot {
       digest: Digest(
         Fingerprint::from_hex_string(
@@ -176,21 +156,17 @@ async fn merge_directories_two_files() {
 
   store
     .record_directory(&containing_roland.directory(), false)
-    .compat()
     .await
     .expect("Storing roland directory");
   store
     .record_directory(&containing_treats.directory(), false)
-    .compat()
     .await
     .expect("Storing treats directory");
 
   let result = Snapshot::merge_directories(
     store,
     vec![containing_treats.digest(), containing_roland.digest()],
-    WorkUnitStore::new(),
   )
-  .compat()
   .await;
 
   assert_eq!(
@@ -208,21 +184,17 @@ async fn merge_directories_clashing_files() {
 
   store
     .record_directory(&containing_roland.directory(), false)
-    .compat()
     .await
     .expect("Storing roland directory");
   store
     .record_directory(&containing_wrong_roland.directory(), false)
-    .compat()
     .await
     .expect("Storing wrong roland directory");
 
   let err = Snapshot::merge_directories(
     store,
     vec![containing_roland.digest(), containing_wrong_roland.digest()],
-    WorkUnitStore::new(),
   )
-  .compat()
   .await
   .expect_err("Want error merging");
 
@@ -242,12 +214,10 @@ async fn merge_directories_same_files() {
 
   store
     .record_directory(&containing_roland.directory(), false)
-    .compat()
     .await
     .expect("Storing roland directory");
   store
     .record_directory(&containing_roland_and_treats.directory(), false)
-    .compat()
     .await
     .expect("Storing treats directory");
 
@@ -257,9 +227,7 @@ async fn merge_directories_same_files() {
       containing_roland.digest(),
       containing_roland_and_treats.digest(),
     ],
-    WorkUnitStore::new(),
   )
-  .compat()
   .await;
 
   assert_eq!(
@@ -291,31 +259,22 @@ async fn snapshot_merge_two_files() {
 
   let snapshot1 = Snapshot::from_path_stats(
     store.clone(),
-    &digester,
+    digester.clone(),
     vec![dir.clone(), file1.clone()],
-    WorkUnitStore::new(),
   )
-  .compat()
   .await
   .unwrap();
 
-  let snapshot2 = Snapshot::from_path_stats(
-    store.clone(),
-    &digester,
-    vec![dir.clone(), file2.clone()],
-    WorkUnitStore::new(),
-  )
-  .compat()
-  .await
-  .unwrap();
+  let snapshot2 =
+    Snapshot::from_path_stats(store.clone(), digester, vec![dir.clone(), file2.clone()])
+      .await
+      .unwrap();
 
-  let merged = Snapshot::merge(store.clone(), &[snapshot1, snapshot2], WorkUnitStore::new())
-    .compat()
+  let merged = Snapshot::merge(store.clone(), &[snapshot1, snapshot2])
     .await
     .unwrap();
   let merged_root_directory = store
-    .load_directory(merged.digest, WorkUnitStore::new())
-    .compat()
+    .load_directory(merged.digest)
     .await
     .unwrap()
     .unwrap()
@@ -329,8 +288,7 @@ async fn snapshot_merge_two_files() {
   let merged_child_dirnode_digest: Result<Digest, String> =
     merged_child_dirnode.get_digest().into();
   let merged_child_directory = store
-    .load_directory(merged_child_dirnode_digest.unwrap(), WorkUnitStore::new())
-    .compat()
+    .load_directory(merged_child_dirnode_digest.unwrap())
     .await
     .unwrap()
     .unwrap()
@@ -358,24 +316,15 @@ async fn snapshot_merge_colliding() {
     false,
   );
 
-  let snapshot1 = Snapshot::from_path_stats(
-    store.clone(),
-    &digester,
-    vec![file.clone()],
-    WorkUnitStore::new(),
-  )
-  .compat()
-  .await
-  .unwrap();
+  let snapshot1 = Snapshot::from_path_stats(store.clone(), digester.clone(), vec![file.clone()])
+    .await
+    .unwrap();
 
-  let snapshot2 =
-    Snapshot::from_path_stats(store.clone(), &digester, vec![file], WorkUnitStore::new())
-      .compat()
-      .await
-      .unwrap();
+  let snapshot2 = Snapshot::from_path_stats(store.clone(), digester, vec![file])
+    .await
+    .unwrap();
 
-  let merged_res =
-    Snapshot::merge(store.clone(), &[snapshot1, snapshot2], WorkUnitStore::new()).wait();
+  let merged_res = Snapshot::merge(store.clone(), &[snapshot1, snapshot2]).await;
 
   match merged_res {
     Err(ref msg) if msg.contains("contained duplicate path") && msg.contains("roland") => (),
@@ -393,14 +342,10 @@ async fn strip_empty_prefix() {
   let dir = TestDirectory::nested();
   store
     .record_directory(&dir.directory(), false)
-    .compat()
     .await
     .expect("Error storing directory");
 
-  let result =
-    super::Snapshot::strip_prefix(store, dir.digest(), PathBuf::from(""), WorkUnitStore::new())
-      .compat()
-      .await;
+  let result = super::Snapshot::strip_prefix(store, dir.digest(), PathBuf::from("")).await;
   assert_eq!(result, Ok(dir.digest()));
 }
 
@@ -411,23 +356,14 @@ async fn strip_non_empty_prefix() {
   let dir = TestDirectory::nested();
   store
     .record_directory(&dir.directory(), false)
-    .compat()
     .await
     .expect("Error storing directory");
   store
     .record_directory(&TestDirectory::containing_roland().directory(), false)
-    .compat()
     .await
     .expect("Error storing directory");
 
-  let result = super::Snapshot::strip_prefix(
-    store,
-    dir.digest(),
-    PathBuf::from("cats"),
-    WorkUnitStore::new(),
-  )
-  .compat()
-  .await;
+  let result = super::Snapshot::strip_prefix(store, dir.digest(), PathBuf::from("cats")).await;
   assert_eq!(result, Ok(TestDirectory::containing_roland().digest()));
 }
 
@@ -438,18 +374,11 @@ async fn strip_prefix_empty_subdir() {
   let dir = TestDirectory::containing_falcons_dir();
   store
     .record_directory(&dir.directory(), false)
-    .compat()
     .await
     .expect("Error storing directory");
 
-  let result = super::Snapshot::strip_prefix(
-    store,
-    dir.digest(),
-    PathBuf::from("falcons/peregrine"),
-    WorkUnitStore::new(),
-  )
-  .compat()
-  .await;
+  let result =
+    super::Snapshot::strip_prefix(store, dir.digest(), PathBuf::from("falcons/peregrine")).await;
   assert_eq!(result, Ok(TestDirectory::empty().digest()));
 }
 
@@ -457,10 +386,7 @@ async fn strip_prefix_empty_subdir() {
 async fn strip_dir_not_in_store() {
   let (store, _, _, _) = setup();
   let digest = TestDirectory::nested().digest();
-  let result =
-    super::Snapshot::strip_prefix(store, digest, PathBuf::from("cats"), WorkUnitStore::new())
-      .compat()
-      .await;
+  let result = super::Snapshot::strip_prefix(store, digest, PathBuf::from("cats")).await;
   assert_eq!(result, Err(format!("{:?} was not known", digest)));
 }
 
@@ -470,17 +396,9 @@ async fn strip_subdir_not_in_store() {
   let dir = TestDirectory::nested();
   store
     .record_directory(&dir.directory(), false)
-    .compat()
     .await
     .expect("Error storing directory");
-  let result = super::Snapshot::strip_prefix(
-    store,
-    dir.digest(),
-    PathBuf::from("cats"),
-    WorkUnitStore::new(),
-  )
-  .compat()
-  .await;
+  let result = super::Snapshot::strip_prefix(store, dir.digest(), PathBuf::from("cats")).await;
   assert_eq!(
     result,
     Err(format!(
@@ -497,22 +415,13 @@ async fn strip_prefix_non_matching_file() {
   let child_dir = TestDirectory::containing_roland();
   store
     .record_directory(&dir.directory(), false)
-    .compat()
     .await
     .expect("Error storing directory");
   store
     .record_directory(&child_dir.directory(), false)
-    .compat()
     .await
     .expect("Error storing directory");
-  let result = super::Snapshot::strip_prefix(
-    store,
-    dir.digest(),
-    PathBuf::from("cats"),
-    WorkUnitStore::new(),
-  )
-  .compat()
-  .await;
+  let result = super::Snapshot::strip_prefix(store, dir.digest(), PathBuf::from("cats")).await;
 
   assert_eq!(result, Err(format!("Cannot strip prefix cats from root directory {:?} - root directory contained non-matching file named: treats", dir.digest())));
 }
@@ -524,22 +433,14 @@ async fn strip_prefix_non_matching_dir() {
   let child_dir = TestDirectory::nested_dir_and_file();
   store
     .record_directory(&dir.directory(), false)
-    .compat()
     .await
     .expect("Error storing directory");
   store
     .record_directory(&child_dir.directory(), false)
-    .compat()
     .await
     .expect("Error storing directory");
-  let result = super::Snapshot::strip_prefix(
-    store,
-    dir.digest(),
-    PathBuf::from("animals/cats"),
-    WorkUnitStore::new(),
-  )
-  .compat()
-  .await;
+  let result =
+    super::Snapshot::strip_prefix(store, dir.digest(), PathBuf::from("animals/cats")).await;
 
   assert_eq!(result, Err(format!("Cannot strip prefix animals/cats from root directory {:?} - subdirectory animals contained non-matching directory named: birds", dir.digest())));
 }
@@ -550,22 +451,13 @@ async fn strip_subdir_not_in_dir() {
   let dir = TestDirectory::nested();
   store
     .record_directory(&dir.directory(), false)
-    .compat()
     .await
     .expect("Error storing directory");
   store
     .record_directory(&TestDirectory::containing_roland().directory(), false)
-    .compat()
     .await
     .expect("Error storing directory");
-  let result = super::Snapshot::strip_prefix(
-    store,
-    dir.digest(),
-    PathBuf::from("cats/ugly"),
-    WorkUnitStore::new(),
-  )
-  .compat()
-  .await;
+  let result = super::Snapshot::strip_prefix(store, dir.digest(), PathBuf::from("cats/ugly")).await;
   assert_eq!(result, Err(format!("Cannot strip prefix cats/ugly from root directory {:?} - subdirectory cats didn't contain a directory named ugly but did contain file named: roland", dir.digest())));
 }
 
