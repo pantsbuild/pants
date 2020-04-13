@@ -419,6 +419,8 @@ async def two_step_create_pex(two_step_pex_request: TwoStepPexRequest) -> TwoSte
     request = two_step_pex_request.pex_request
     req_pex_name = "__requirements.pex"
 
+    additional_inputs: Optional[Digest]
+
     # Create a pex containing just the requirements.
     if request.requirements.requirements:
         requirements_pex_request = PexRequest(
