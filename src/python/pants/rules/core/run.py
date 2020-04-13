@@ -1,17 +1,18 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import itertools
 from pathlib import PurePath
+from typing import Dict, Iterable, List, Type
 
 from pants.base.build_root import BuildRoot
-from pants.build_graph.address import Address
-from pants.engine.addressable import Addresses
 from pants.engine.console import Console
 from pants.engine.fs import DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
-from pants.engine.rules import goal_rule
+from pants.engine.rules import UnionMembership, goal_rule
 from pants.engine.selectors import Get
+from pants.engine.target import RegisteredTargetTypes, Target, Targets
 from pants.option.custom_types import shell_str
 from pants.option.global_options import GlobalOptions
 from pants.rules.core.binary import BinaryConfiguration, CreatedBinary
@@ -49,12 +50,61 @@ async def run(
     workspace: Workspace,
     runner: InteractiveRunner,
     build_root: BuildRoot,
-    addresses: Addresses,
+    targets: Targets,
     options: RunOptions,
     global_options: GlobalOptions,
+    union_membership: UnionMembership,
+    registered_target_types: RegisteredTargetTypes,
 ) -> Run:
-    address = addresses.expect_single()
-    binary = await Get[CreatedBinary](Address, address)
+    config_types: Iterable[Type[BinaryConfiguration]] = union_membership.union_rules[
+        BinaryConfiguration
+    ]
+    valid_config_types_by_target: Dict[Target, List[Type[BinaryConfiguration]]] = {}
+    for target in targets:
+        for config_type in config_types:
+            if config_type.is_valid(target):
+                valid_config_types_by_target.setdefault(target, []).append(config_type)
+
+    if not valid_config_types_by_target:
+        all_valid_target_types = itertools.chain.from_iterable(
+            config_type.valid_target_types(
+                registered_target_types.types, union_membership=union_membership
+            )
+            for config_type in config_types
+        )
+        valid_target_type_aliases = sorted(
+            target_type.alias for target_type in all_valid_target_types
+        )
+        raise ValueError(
+            f"The `run` goal only works with the following target types: "
+            f"{', '.join(valid_target_type_aliases)}\n\nYou used {target.address} with target type "
+            f"{target.alias}."
+        )
+
+    if len(valid_config_types_by_target) > 1:
+        binary_target_addresses = sorted(
+            binary_target.address.spec for binary_target in valid_config_types_by_target
+        )
+        raise ValueError(
+            f"The `run` goal only works on one binary target but was given multiple targets that "
+            f"can produce a binary: {', '.join(binary_target_addresses)}\n\nPlease select one of "
+            f"these targets to run."
+        )
+
+    target, valid_config_types = valid_config_types_by_target.popitem()
+    if len(valid_config_types) > 1:
+        possible_config_types = sorted(config_type.__name__ for config_type in valid_config_types)
+        # TODO: improve this error message. (It's never actually triggered yet because we only have
+        #  Python implemented with V2.) A better error message would explain to users how they can
+        #  resolve the issue.
+        raise ValueError(
+            f"Multiple of the registered binary implementations work for {target.address} "
+            f"(target type {repr(target.alias)}). It is ambiguous which implementation to use. "
+            f"Possible implementations: {possible_config_types}."
+        )
+    config_type = valid_config_types[0]
+
+    binary = await Get[CreatedBinary](BinaryConfiguration, config_type.create(target))
 
     workdir = global_options.options.pants_workdir
 
@@ -64,7 +114,7 @@ async def run(
             DirectoryToMaterialize(binary.digest, path_prefix=path_relative_to_build_root)
         )
 
-        console.write_stdout(f"Running target: {address}\n")
+        console.write_stdout(f"Running target: {target.address}\n")
         full_path = PurePath(tmpdir, binary.binary_name).as_posix()
         run_request = InteractiveProcessRequest(
             argv=(full_path, *options.values.args), run_in_workspace=True,
@@ -74,12 +124,14 @@ async def run(
             result = runner.run_local_interactive_process(run_request)
             exit_code = result.process_exit_code
             if result.process_exit_code == 0:
-                console.write_stdout(f"{address} ran successfully.\n")
+                console.write_stdout(f"{target.address} ran successfully.\n")
             else:
-                console.write_stderr(f"{address} failed with code {result.process_exit_code}!\n")
+                console.write_stderr(
+                    f"{target.address} failed with code {result.process_exit_code}!\n"
+                )
 
         except Exception as e:
-            console.write_stderr(f"Exception when attempting to run {address}: {e!r}\n")
+            console.write_stderr(f"Exception when attempting to run {target.address}: {e!r}\n")
             exit_code = -1
 
     return Run(exit_code)
