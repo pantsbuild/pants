@@ -887,7 +887,9 @@ impl WrappedNode for Task {
           .task
           .clause
           .into_iter()
-          .map(|s| Select::new_from_edges(params.clone(), s.product, edges).run(context.clone()))
+          .map(|type_id| {
+            Select::new_from_edges(params.clone(), type_id, edges).run(context.clone())
+          })
           .collect::<Vec<_>>(),
       )
     };

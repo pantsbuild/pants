@@ -61,7 +61,7 @@ impl rule_graph::Rule for Rule {
         ..
       }) => clause
         .iter()
-        .map(|s| DependencyKey::JustSelect(*s))
+        .map(|t| DependencyKey::JustSelect(Select::new(*t)))
         .chain(gets.iter().map(|g| DependencyKey::JustGet(*g)))
         .collect(),
       &Rule::Intrinsic(Intrinsic { ref input, .. }) => {
@@ -123,7 +123,7 @@ impl Rule {
     let select_clauses = task
       .clause
       .iter()
-      .map(|c| c.product.to_string())
+      .map(|type_id| type_id.to_string())
       .collect::<Vec<_>>();
     let select_clause_threshold = visualization_params.map(|p| p.select_clause_threshold);
 
@@ -199,7 +199,7 @@ impl fmt::Display for Rule {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Task {
   pub product: TypeId,
-  pub clause: Vec<Select>,
+  pub clause: Vec<TypeId>,
   pub gets: Vec<Get>,
   pub func: Function,
   pub cacheable: bool,
@@ -331,7 +331,7 @@ impl Tasks {
       .as_mut()
       .expect("Must `begin()` a task creation before adding clauses!")
       .clause
-      .push(Select::new(product));
+      .push(product);
   }
 
   pub fn add_display_info(&mut self, name: String, desc: String) {
