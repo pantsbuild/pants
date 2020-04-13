@@ -37,11 +37,11 @@ class UtilTest(TestBase):
     def test_init_workdir(self) -> None:
         with self.physical_workdir_base() as bootstrap_options:
             # Assert pants_workdir exists
-            self.assertExists(self.pants_workdir)
+            self.assert_exists(self.pants_workdir)
 
             init_workdir(bootstrap_options)
 
             # Assert pants_workdir is a symlink after init_workdir above
             self.assert_symlink(self.pants_workdir)
             # Assert symlink target's physical dir exists
-            self.assertExists(os.path.join(self.physical_workdir(bootstrap_options)))
+            self.assert_exists(os.path.join(self.physical_workdir(bootstrap_options)))
