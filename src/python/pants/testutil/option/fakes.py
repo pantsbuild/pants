@@ -7,7 +7,7 @@ from pants.option.global_options import GlobalOptions
 from pants.option.option_util import is_list_option
 from pants.option.parser import Parser
 from pants.option.parser_hierarchy import enclosing_scope
-from pants.option.ranked_value import RankedValue
+from pants.option.ranked_value import Rank, RankedValue
 from pants.option.scope import GLOBAL_SCOPE
 
 
@@ -36,13 +36,13 @@ class _FakeOptionValues(object):
 
     def get_rank(self, key):
         value = self._option_values[key]
-        return value.rank if isinstance(value, RankedValue) else RankedValue.FLAG
+        return value.rank if isinstance(value, RankedValue) else Rank.FLAG
 
     def is_flagged(self, key):
-        return self.get_rank(key) == RankedValue.FLAG
+        return self.get_rank(key) == Rank.FLAG
 
     def is_default(self, key):
-        return self.get_rank(key) in (RankedValue.NONE, RankedValue.HARDCODED)
+        return self.get_rank(key) in (Rank.NONE, Rank.HARDCODED)
 
     @property
     def option_values(self):
@@ -59,7 +59,7 @@ def _options_registration_function(defaults, fingerprintables):
                 default = False
             if kwargs.get("type") == list:
                 default = []
-        defaults[option_dest] = RankedValue(RankedValue.HARDCODED, default)
+        defaults[option_dest] = RankedValue(Rank.HARDCODED, default)
 
         fingerprint = kwargs.get("fingerprint", False)
         if fingerprint:

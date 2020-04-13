@@ -31,14 +31,14 @@ class OptionValueContainer:
         var)."""
         ret = []
         for k, v in self._value_map.items():
-            if v.rank > RankedValue.CONFIG_DEFAULT:
+            if v.rank > Rank.CONFIG_DEFAULT:
                 ret.append(k)
         return ret
 
     def get_rank(self, key: Key) -> Rank:
         """Returns the rank of the value at the specified key.
 
-        Returns one of the constants in RankedValue.
+        Returns one of the constants in Rank.
         """
         ranked_value = self._value_map.get(key)
         if ranked_value is None:
@@ -48,7 +48,7 @@ class OptionValueContainer:
     def is_flagged(self, key: Key) -> bool:
         """Returns `True` if the value for the specified key was supplied via a flag.
 
-        A convenience equivalent to `get_rank(key) == RankedValue.FLAG`.
+        A convenience equivalent to `get_rank(key) == Rank.FLAG`.
 
         This check can be useful to determine whether or not a user explicitly set an option for this
         run.  Although a user might also set an option explicitly via an environment variable, ie via:
@@ -59,7 +59,7 @@ class OptionValueContainer:
         :returns: `True` if the option was explicitly flagged by the user from the command line.
         :rtype: bool
         """
-        return self.get_rank(key) == RankedValue.FLAG
+        return self.get_rank(key) == Rank.FLAG
 
     def is_default(self, key: Key) -> bool:
         """Returns `True` if the value for the specified key was not supplied by the user.
@@ -70,7 +70,7 @@ class OptionValueContainer:
         :returns: `True` if the user did not set the value for this option.
         :rtype: bool
         """
-        return self.get_rank(key) in (RankedValue.NONE, RankedValue.HARDCODED)
+        return self.get_rank(key) in (Rank.NONE, Rank.HARDCODED)
 
     def get(self, key: Key, default: Optional[Value] = None):
         # Support dict-like dynamic access.  See also __getitem__ below.
@@ -98,17 +98,12 @@ class OptionValueContainer:
         return ranked_val.value
 
     def _set(self, key: Key, value: RankedValue) -> None:
-        if key in self._value_map:
-            existing_value = self._value_map[key]
-            existing_rank = existing_value.rank
-        else:
-            existing_rank = RankedValue.NONE
-
         if not isinstance(value, RankedValue):
             raise AttributeError(f"Value must be of type RankedValue: {value}")
 
-        new_rank = value.rank
-        if new_rank >= existing_rank:
+        existing_value = self._value_map.get(key)
+        existing_rank = existing_value.rank if existing_value is not None else Rank.NONE
+        if value.rank >= existing_rank:
             # We set values from outer scopes before values from inner scopes, so
             # in case of equal rank we overwrite. That way that the inner scope value wins.
             self._value_map[key] = value
@@ -117,7 +112,7 @@ class OptionValueContainer:
     def __getitem__(self, key: Key):
         return self.__getattr__(key)
 
-    # Support attribute setting, e.g., opts.foo = RankedValue(RankedValue.HARDCODED, 42).
+    # Support attribute setting, e.g., opts.foo = RankedValue(Rank.HARDCODED, 42).
     def __setattr__(self, key: Key, value: RankedValue) -> None:
         if key == "_value_map":
             return super().__setattr__(key, value)

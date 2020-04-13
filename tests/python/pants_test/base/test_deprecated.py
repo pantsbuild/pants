@@ -23,7 +23,7 @@ from pants.base.deprecated import (
     warn_or_error,
 )
 from pants.option.option_value_container import OptionValueContainer
-from pants.option.ranked_value import RankedValue
+from pants.option.ranked_value import Rank, RankedValue
 from pants.testutil.test_base import TestBase
 from pants.util.collections import assert_single_element
 
@@ -260,10 +260,10 @@ class DeprecatedTest(TestBase):
         )
         old_val = "ancient"
         new_val = "modern"
-        old_default_rv = RankedValue(RankedValue.HARDCODED, old_val)
-        new_default_rv = RankedValue(RankedValue.HARDCODED, new_val)
-        old_configured_rv = RankedValue(RankedValue.FLAG, old_val)
-        new_configured_rv = RankedValue(RankedValue.FLAG, new_val)
+        old_default_rv = RankedValue(Rank.HARDCODED, old_val)
+        new_default_rv = RankedValue(Rank.HARDCODED, new_val)
+        old_configured_rv = RankedValue(Rank.FLAG, old_val)
+        new_configured_rv = RankedValue(Rank.FLAG, new_val)
 
         def assert_option_resolved(
             *, old_configured: bool = False, new_configured: bool = False, expected: str,
