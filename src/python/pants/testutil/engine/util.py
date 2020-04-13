@@ -48,7 +48,7 @@ class MockGet:
 
 
 def _create_scoped_options(
-    default_rank: int, **options: Union[RankedValue, Value]
+    default_rank: Rank, **options: Union[RankedValue, Value]
 ) -> OptionValueContainer:
     scoped_options = OptionValueContainer()
     for key, value in options.items():
@@ -63,7 +63,7 @@ GS = TypeVar("GS", bound=GoalSubsystem)
 
 def create_goal_subsystem(
     goal_subsystem_type: Type[GS],
-    default_rank: Rank = RankedValue.NONE,
+    default_rank: Rank = Rank.NONE,
     **options: Union[RankedValue, Value],
 ) -> GS:
     """Creates a new goal subsystem instance populated with the given option values.
@@ -82,9 +82,7 @@ SS = TypeVar("SS", bound=Subsystem)
 
 
 def create_subsystem(
-    subsystem_type: Type[SS],
-    default_rank: Rank = RankedValue.NONE,
-    **options: Union[RankedValue, Value],
+    subsystem_type: Type[SS], default_rank: Rank = Rank.NONE, **options: Union[RankedValue, Value],
 ) -> SS:
     """Creates a new subsystem instance populated with the given option values.
 
