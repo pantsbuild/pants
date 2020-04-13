@@ -83,7 +83,7 @@ impl Intrinsics {
     intrinsics.insert(
       Intrinsic {
         product: types.process_result,
-        inputs: vec![types.multi_platform_process_request],
+        inputs: vec![types.multi_platform_process_request, types.platform],
       },
       Box::new(multi_platform_process_request_to_process_result),
     );
@@ -114,13 +114,18 @@ fn multi_platform_process_request_to_process_result(
   context: Context,
   args: Vec<Value>,
 ) -> NodeFuture<Value> {
+  let process_val = &args[0];
+  // TODO: The platform will be used in a followup.
+  let _platform_val = &args[1];
   let core = context.core.clone();
-  future::result(MultiPlatformExecuteProcess::lift(&args[0]).map_err(|str| {
-    throw(&format!(
-      "Error lifting MultiPlatformExecuteProcess: {}",
-      str
-    ))
-  }))
+  future::result(
+    MultiPlatformExecuteProcess::lift(process_val).map_err(|str| {
+      throw(&format!(
+        "Error lifting MultiPlatformExecuteProcess: {}",
+        str
+      ))
+    }),
+  )
   .and_then(move |process_request| context.get(process_request))
   .map(move |result| {
     let platform_name: String = result.0.platform.into();
