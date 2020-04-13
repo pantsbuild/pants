@@ -40,8 +40,8 @@ mod cffi_externs;
 
 use engine::externs::*;
 use engine::{
-  externs, nodes, Core, ExecutionRequest, ExecutionTermination, Function, Handle, Key, Params,
-  RootResult, Rule, Scheduler, Session, Tasks, TypeId, Types, Value,
+  externs, nodes, Core, ExecutionRequest, ExecutionTermination, Function, Handle, Intrinsics, Key,
+  Params, RootResult, Rule, Scheduler, Session, Tasks, TypeId, Types, Value,
 };
 use futures::future::{self as future03, TryFutureExt};
 use futures01::{future, Future};
@@ -289,9 +289,10 @@ fn make_core(
   let ignore_patterns = ignore_patterns_buf
     .to_strings()
     .map_err(|err| format!("Failed to decode ignore patterns as UTF8: {:?}", err))?;
+  let intrinsics = Intrinsics::new(&types);
   #[allow(clippy::redundant_closure)] // I couldn't find an easy way to remove this closure.
   let mut tasks = with_tasks(tasks_ptr, |tasks| tasks.clone());
-  tasks.intrinsics_set(&types);
+  tasks.intrinsics_set(&intrinsics);
   // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
   let remote_store_servers_vec = remote_store_servers_buf
     .to_strings()
@@ -354,6 +355,7 @@ fn make_core(
     root_type_ids,
     tasks,
     types,
+    intrinsics,
     PathBuf::from(build_root_buf.to_os_string()),
     &ignore_patterns,
     use_gitignore,

@@ -23,6 +23,7 @@ pub struct Types {
   pub dir: TypeId,
   pub file: TypeId,
   pub link: TypeId,
+  pub platform: TypeId,
   pub multi_platform_process_request: TypeId,
   pub process_result: TypeId,
   pub coroutine: TypeId,

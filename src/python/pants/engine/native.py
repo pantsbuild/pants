@@ -579,6 +579,7 @@ class EngineTypes(NamedTuple):
     dir: TypeId
     file: TypeId
     link: TypeId
+    platform: TypeId
     multi_platform_process_request: TypeId
     process_result: TypeId
     coroutine: TypeId
@@ -962,6 +963,7 @@ class Native(metaclass=SingletonMetaclass):
             dir=ti(Dir),
             file=ti(File),
             link=ti(Link),
+            platform=ti(Platform),
             multi_platform_process_request=ti(MultiPlatformExecuteProcessRequest),
             process_result=ti(FallibleExecuteProcessResultWithPlatform),
             coroutine=ti(CoroutineType),
