@@ -199,6 +199,9 @@ class PexRequest:
     additional_inputs: Optional[Digest]
     entry_point: Optional[str]
     additional_args: Tuple[str, ...]
+    # A human-readable description to use in the UI.  This field doesn't participate
+    # in comparison (and therefore hashing), as it doesn't affect the result.
+    description: Optional[str] = dataclasses.field(compare=False)
 
     def __init__(
         self,
@@ -210,6 +213,7 @@ class PexRequest:
         additional_inputs: Optional[Digest] = None,
         entry_point: Optional[str] = None,
         additional_args: Iterable[str] = (),
+        description: Optional[str] = None,
     ) -> None:
         self.output_filename = output_filename
         self.requirements = requirements
@@ -218,6 +222,7 @@ class PexRequest:
         self.additional_inputs = additional_inputs
         self.entry_point = entry_point
         self.additional_args = tuple(additional_args)
+        self.description = description
 
 
 @dataclass(frozen=True)
@@ -369,6 +374,12 @@ async def create_pex(
     # (execution_platform_constraint, target_platform_constraint) of this dictionary is "The output of
     # this command is intended for `target_platform_constraint` iff it is run on `execution_platform
     # constraint`".
+    description = request.description
+    if description is None:
+        if request.requirements.requirements:
+            description = f"Resolving {', '.join(request.requirements.requirements)}"
+        else:
+            description = f"Building PEX"
     execute_process_request = MultiPlatformExecuteProcessRequest(
         {
             (
@@ -380,7 +391,7 @@ async def create_pex(
                 pex_build_environment=pex_build_environment,
                 pex_args=argv,
                 input_files=merged_digest,
-                description=f"Resolving {', '.join(request.requirements.requirements)}",
+                description=description,
                 output_files=(request.output_filename,),
             )
         }
@@ -408,24 +419,33 @@ async def two_step_create_pex(two_step_pex_request: TwoStepPexRequest) -> TwoSte
     request = two_step_pex_request.pex_request
     req_pex_name = "__requirements.pex"
 
+    additional_inputs: Optional[Digest]
+
     # Create a pex containing just the requirements.
-    requirements_pex_request = PexRequest(
-        output_filename=req_pex_name,
-        requirements=request.requirements,
-        interpreter_constraints=request.interpreter_constraints,
-        # TODO: Do we need to pass all the additional args to the requirements pex creation?
-        #  Some of them may affect resolution behavior, but others may be irrelevant.
-        #  For now we err on the side of caution.
-        additional_args=request.additional_args,
-    )
-    requirements_pex = await Get[Pex](PexRequest, requirements_pex_request)
+    if request.requirements.requirements:
+        requirements_pex_request = PexRequest(
+            output_filename=req_pex_name,
+            requirements=request.requirements,
+            interpreter_constraints=request.interpreter_constraints,
+            # TODO: Do we need to pass all the additional args to the requirements pex creation?
+            #  Some of them may affect resolution behavior, but others may be irrelevant.
+            #  For now we err on the side of caution.
+            additional_args=request.additional_args,
+            description=f"Resolving {', '.join(request.requirements.requirements)}",
+        )
+        requirements_pex = await Get[Pex](PexRequest, requirements_pex_request)
+        additional_inputs = requirements_pex.directory_digest
+        additional_args = (*request.additional_args, f"--requirements-pex={req_pex_name}")
+    else:
+        additional_inputs = None
+        additional_args = request.additional_args
 
     # Now create a full pex on top of the requirements pex.
     full_pex_request = dataclasses.replace(
         request,
         requirements=PexRequirements(),
-        additional_inputs=requirements_pex.directory_digest,
-        additional_args=(*request.additional_args, f"--requirements-pex={req_pex_name}"),
+        additional_inputs=additional_inputs,
+        additional_args=additional_args,
     )
     full_pex = await Get[Pex](PexRequest, full_pex_request)
     return TwoStepPex(pex=full_pex)
