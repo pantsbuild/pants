@@ -14,7 +14,6 @@ from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE,
 from pants.bin.local_pants_runner import LocalPantsRunner
 from pants.engine.rules import UnionMembership
 from pants.help.help_printer import HelpPrinter
-from pants.init.logging import encapsulated_global_logger
 from pants.init.specs_calculator import SpecsCalculator
 from pants.init.util import clean_global_runtime_state
 from pants.java.nailgun_io import (
@@ -248,7 +247,7 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
             self.maybe_shutdown_socket, finalizer
         ), hermetic_environment_as(
             **self.env
-        ), encapsulated_global_logger():
+        ):
 
             exit_code = PANTS_SUCCEEDED_EXIT_CODE
             try:

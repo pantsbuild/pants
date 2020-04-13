@@ -1,16 +1,14 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import copy
 import http.client
 import logging
 import os
 import sys
 import warnings
-from contextlib import contextmanager
 from dataclasses import dataclass
 from logging import Handler, Logger, LogRecord, StreamHandler
-from typing import Iterator, List, Optional, TextIO, overload
+from typing import List, Optional, TextIO, overload
 
 import pants.util.logging as pants_logging
 from pants.base.exception_sink import ExceptionSink
@@ -226,23 +224,3 @@ def create_native_stderr_log_handler(
         raise e
 
     return NativeHandler(log_level, native, stream)
-
-
-@contextmanager
-def encapsulated_global_logger() -> Iterator[None]:
-    """Record all the handlers of the current global logger, yield, and reset that logger.
-
-    This is useful in the case where we want to easily restore state after calling setup_logging.
-    For instance, when DaemonPantsRunner creates an instance of LocalPantsRunner it sets up specific
-    nailgunned logging, which we want to undo once the LocalPantsRunner has finished runnnig.
-    """
-    global_logger = logging.getLogger()
-    old_handlers = copy.copy(global_logger.handlers)
-    try:
-        yield
-    finally:
-        new_handlers = global_logger.handlers
-        for handler in new_handlers:
-            global_logger.removeHandler(handler)
-        for handler in old_handlers:
-            global_logger.addHandler(handler)
