@@ -23,11 +23,11 @@ class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
         self.assertIn("examples/src/java/org/pantsbuild/example/hello/main:readme", output_lines)
 
     def test_v2_list_does_not_cache(self):
-        with self.pantsd_successful_run_context() as (runner, checker, workdir, pantsd_config):
+        with self.pantsd_successful_run_context() as ctx:
 
             def run_list():
-                result = runner(["list", self.list_target])
-                checker.assert_started()
+                result = ctx.runner(["list", self.list_target])
+                ctx.checker.assert_started()
                 return result
 
             first_run = run_list().stdout_data.splitlines()
