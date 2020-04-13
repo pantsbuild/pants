@@ -433,15 +433,17 @@ async def two_step_create_pex(two_step_pex_request: TwoStepPexRequest) -> TwoSte
         )
         requirements_pex = await Get[Pex](PexRequest, requirements_pex_request)
         additional_inputs = requirements_pex.directory_digest
+        additional_args = (*request.additional_args, f"--requirements-pex={req_pex_name}")
     else:
         additional_inputs = None
+        additional_args = request.additional_args
 
     # Now create a full pex on top of the requirements pex.
     full_pex_request = dataclasses.replace(
         request,
         requirements=PexRequirements(),
         additional_inputs=additional_inputs,
-        additional_args=(*request.additional_args, f"--requirements-pex={req_pex_name}"),
+        additional_args=additional_args,
     )
     full_pex = await Get[Pex](PexRequest, full_pex_request)
     return TwoStepPex(pex=full_pex)
