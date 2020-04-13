@@ -34,31 +34,9 @@ set -e
 ADDED_FILES=($(./build-support/bin/get_added_files.sh))
 MERGE_BASE="$(git_merge_base)"
 
-echo "* Checking packages"
-./build-support/bin/check_packages.sh "${DIRS_TO_CHECK[@]}" || exit 1
-
-echo "* Checking headers"
-./build-support/bin/check_header.py "${DIRS_TO_CHECK[@]}" --files-added "${ADDED_FILES[@]}" || exit 1
-
-echo "* Checking for banned imports"
-./build-support/bin/check_banned_imports.py || exit 1
-
-echo "* Checking shell scripts via shellcheck"
-./build-support/bin/shellcheck.py || exit 1
-
-echo "* Checking shell scripts via our custom linter"
-./build-support/bin/check_shell.sh || exit 1
-
 # When travis builds a tag, it does so in a shallow clone without master fetched, which
 # fails in pants changed.
 if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
-  echo "* Checking formatting and Flake8"
-  ./v2 --changed-since="${MERGE_BASE}" --tag='-nolint' lint || \
-    die "If there were formatting errors, run \`./v2 --changed-since=$(git rev-parse --symbolic "${MERGE_BASE}") fmt\`"
-
-  echo "* Checking types"
-  ./build-support/bin/mypy.py || exit 1
-
   if git diff "${MERGE_BASE}" --name-only | grep '\.rs$' > /dev/null; then
     echo "* Checking formatting of Rust files"
     ./build-support/bin/check_rust_formatting.sh || exit 1
@@ -73,6 +51,13 @@ if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
     build-support/bin/check_rust_target_headers.sh || exit 1
   fi
 
+  echo "* Checking types"
+  ./build-support/bin/mypy.py || exit 1
+
+  echo "* Checking formatting and Flake8"
+  ./v2 --changed-since="${MERGE_BASE}" --tag='-nolint' lint || \
+    die "If there were formatting errors, run \`./v2 --changed-since=$(git rev-parse --symbolic "${MERGE_BASE}") fmt\`"
+
   if git diff "${MERGE_BASE}" --name-only | grep build-support/bin/generate_travis_yml.py > /dev/null; then
     echo "* Checking .travis.yml generation"
     actual_travis_yml=$(<.travis.yml)
@@ -83,3 +68,18 @@ if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
 else
   echo "* Skipping import/lint checks in partial working copy."
 fi
+
+echo "* Checking shell scripts via shellcheck"
+./build-support/bin/shellcheck.py || exit 1
+
+echo "* Checking shell scripts via our custom linter"
+./build-support/bin/check_shell.sh || exit 1
+
+echo "* Checking packages"
+./build-support/bin/check_packages.sh "${DIRS_TO_CHECK[@]}" || exit 1
+
+echo "* Checking headers"
+./build-support/bin/check_header.py "${DIRS_TO_CHECK[@]}" --files-added "${ADDED_FILES[@]}" || exit 1
+
+echo "* Checking for banned imports"
+./build-support/bin/check_banned_imports.py || exit 1
