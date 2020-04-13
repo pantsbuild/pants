@@ -6,7 +6,7 @@ import itertools
 import os
 from abc import ABC
 from dataclasses import dataclass
-from typing import ClassVar, Dict, Iterable, Tuple, Type
+from typing import ClassVar, Dict, Iterable, List, Mapping, Sequence, Tuple, Type
 
 from pants.base.build_root import BuildRoot
 from pants.build_graph.address import Address
@@ -83,36 +83,35 @@ class Binary(Goal):
     subsystem_cls = BinaryOptions
 
 
-@goal_rule
-async def create_binary(
+def gather_valid_binary_configuration_types(
+    goal_subsytem: GoalSubsystem,
     targets_with_origins: TargetsWithOrigins,
-    console: Console,
-    workspace: Workspace,
-    options: BinaryOptions,
-    distdir: DistDir,
-    buildroot: BuildRoot,
     union_membership: UnionMembership,
     registered_target_types: RegisteredTargetTypes,
-) -> Binary:
+) -> Mapping[Target, Sequence[Type[BinaryConfiguration]]]:
     config_types: Iterable[Type[BinaryConfiguration]] = union_membership.union_rules[
         BinaryConfiguration
     ]
-    valid_configurations = []
+    valid_config_types_by_target: Dict[Target, List[Type[BinaryConfiguration]]] = {}
     valid_target_aliases = set()
     for target_with_origin in targets_with_origins:
         for config_type in config_types:
             if config_type.is_valid(target_with_origin.target):
-                valid_configurations.append(config_type.create(target_with_origin.target))
+                valid_config_types_by_target.setdefault(target_with_origin.target, []).append(
+                    config_type
+                )
                 valid_target_aliases.add(target_with_origin.target.alias)
 
-    if not valid_configurations:
+    if not valid_config_types_by_target:
         all_valid_target_types = itertools.chain.from_iterable(
             config_type.valid_target_types(
                 registered_target_types.types, union_membership=union_membership
             )
             for config_type in config_types
         )
-        target_aliases = sorted(target_type.alias for target_type in all_valid_target_types)
+        all_valid_target_aliases = sorted(
+            target_type.alias for target_type in all_valid_target_types
+        )
         invalid_target_aliases = sorted(
             {
                 target_with_origin.target.alias
@@ -126,15 +125,37 @@ async def create_binary(
                 for target_with_origin in targets_with_origins
             }
         )
+        bulleted_list_sep = "\n  * "
         raise ValueError(
-            f"The `binary` goal only works with the following target types: "
-            f"{', '.join(target_aliases)}\n\nYou specified {' '.join(specs)} which only included "
-            f"the following target types: {', '.join(invalid_target_aliases)}."
+            f"The `{goal_subsytem.name}` goal only works with the following target types:"
+            f"{bulleted_list_sep}{bulleted_list_sep.join(all_valid_target_aliases)}\n\n"
+            f"You specified `{' '.join(specs)}` which only included the following target types:"
+            f"{bulleted_list_sep}{bulleted_list_sep.join(invalid_target_aliases)}"
         )
+    return valid_config_types_by_target
 
+
+@goal_rule
+async def create_binary(
+    targets_with_origins: TargetsWithOrigins,
+    console: Console,
+    workspace: Workspace,
+    options: BinaryOptions,
+    distdir: DistDir,
+    buildroot: BuildRoot,
+    union_membership: UnionMembership,
+    registered_target_types: RegisteredTargetTypes,
+) -> Binary:
+    valid_config_types_by_target = gather_valid_binary_configuration_types(
+        goal_subsytem=options,
+        targets_with_origins=targets_with_origins,
+        union_membership=union_membership,
+        registered_target_types=registered_target_types,
+    )
     binaries = await MultiGet(
-        Get[CreatedBinary](BinaryConfiguration, binary_configuration)
-        for binary_configuration in valid_configurations
+        Get[CreatedBinary](BinaryConfiguration, valid_config_type.create(target))
+        for target, valid_config_types in valid_config_types_by_target.items()
+        for valid_config_type in valid_config_types
     )
     merged_digest = await Get[Digest](
         DirectoriesToMerge(tuple(binary.digest for binary in binaries))
