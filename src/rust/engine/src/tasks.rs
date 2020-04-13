@@ -5,8 +5,8 @@ use std::collections::HashMap;
 use std::fmt;
 
 use crate::core::{Function, TypeId};
+use crate::intrinsics::Intrinsics;
 use crate::selectors::{DependencyKey, Get, Select};
-use crate::types::Types;
 
 use rule_graph;
 
@@ -20,6 +20,10 @@ pub enum Rule {
 
 impl rule_graph::DisplayForGraph for Rule {
   fn fmt_for_graph(&self) -> String {
+    let visualization_params = Some(GraphVisualizationParameters {
+      select_clause_threshold: 2,
+      get_clause_threshold: 1,
+    });
     match self {
       Rule::Task(ref task) => {
         let FormattedTaskRuleElements {
@@ -28,13 +32,7 @@ impl rule_graph::DisplayForGraph for Rule {
           clause_portion,
           product,
           get_portion,
-        } = Self::extract_task_elements(
-          task,
-          Some(GraphVisualizationParameters {
-            select_clause_threshold: 2,
-            get_clause_threshold: 1,
-          }),
-        );
+        } = Self::extract_task_elements(task, visualization_params);
 
         format!(
           "@{}({}) -> {}{}\n{}",
@@ -43,7 +41,8 @@ impl rule_graph::DisplayForGraph for Rule {
       }
       Rule::Intrinsic(ref intrinsic) => format!(
         "@rule(<intrinsic>({}) -> {})",
-        intrinsic.input, intrinsic.product,
+        Self::formatted_select_clause(&intrinsic.inputs, visualization_params),
+        intrinsic.product,
       ),
     }
   }
@@ -64,9 +63,10 @@ impl rule_graph::Rule for Rule {
         .map(|t| DependencyKey::JustSelect(Select::new(*t)))
         .chain(gets.iter().map(|g| DependencyKey::JustGet(*g)))
         .collect(),
-      &Rule::Intrinsic(Intrinsic { ref input, .. }) => {
-        vec![DependencyKey::JustSelect(Select::new(*input))]
-      }
+      &Rule::Intrinsic(Intrinsic { ref inputs, .. }) => inputs
+        .iter()
+        .map(|t| DependencyKey::JustSelect(Select::new(*t)))
+        .collect(),
     }
   }
 
@@ -114,26 +114,32 @@ struct GraphVisualizationParameters {
 }
 
 impl Rule {
+  fn formatted_select_clause(
+    clause: &[TypeId],
+    visualization_params: Option<GraphVisualizationParameters>,
+  ) -> String {
+    let select_clauses = clause
+      .iter()
+      .map(|type_id| type_id.to_string())
+      .collect::<Vec<_>>();
+    let select_clause_threshold = visualization_params.map(|p| p.select_clause_threshold);
+
+    match select_clause_threshold {
+      None => select_clauses.join(", "),
+      Some(select_clause_threshold) if select_clauses.len() <= select_clause_threshold => {
+        select_clauses.join(", ")
+      }
+      Some(_) => format!("\n{},\n", select_clauses.join(",\n")),
+    }
+  }
+
   fn extract_task_elements(
     task: &Task,
     visualization_params: Option<GraphVisualizationParameters>,
   ) -> FormattedTaskRuleElements {
     let product = format!("{}", task.product);
 
-    let select_clauses = task
-      .clause
-      .iter()
-      .map(|type_id| type_id.to_string())
-      .collect::<Vec<_>>();
-    let select_clause_threshold = visualization_params.map(|p| p.select_clause_threshold);
-
-    let clause_portion = match select_clause_threshold {
-      None => select_clauses.join(", "),
-      Some(select_clause_threshold) if select_clauses.len() <= select_clause_threshold => {
-        select_clauses.join(", ")
-      }
-      Some(_) => format!("\n{},\n", select_clauses.join(",\n")),
-    };
+    let clause_portion = Self::formatted_select_clause(&task.clause, visualization_params);
 
     let get_clauses = task
       .gets
@@ -190,7 +196,8 @@ impl fmt::Display for Rule {
       &Rule::Intrinsic(ref intrinsic) => write!(
         f,
         "@rule(<intrinsic>({}) -> {})",
-        intrinsic.input, intrinsic.product,
+        Self::formatted_select_clause(&intrinsic.inputs, None),
+        intrinsic.product,
       ),
     }
   }
@@ -210,6 +217,12 @@ pub struct Task {
 pub struct DisplayInfo {
   pub name: Option<String>,
   pub desc: Option<String>,
+}
+
+#[derive(Eq, Hash, PartialEq, Clone, Debug)]
+pub struct Intrinsic {
+  pub product: TypeId,
+  pub inputs: Vec<TypeId>,
 }
 
 ///
@@ -245,52 +258,9 @@ impl Tasks {
     &self.rules
   }
 
-  pub fn intrinsics_set(&mut self, types: &Types) {
-    let intrinsics = vec![
-      Intrinsic {
-        product: types.directory_digest,
-        input: types.input_files_content,
-      },
-      Intrinsic {
-        product: types.snapshot,
-        input: types.path_globs,
-      },
-      Intrinsic {
-        product: types.snapshot,
-        input: types.url_to_fetch,
-      },
-      Intrinsic {
-        product: types.snapshot,
-        input: types.directory_digest,
-      },
-      Intrinsic {
-        product: types.files_content,
-        input: types.directory_digest,
-      },
-      Intrinsic {
-        product: types.directory_digest,
-        input: types.directories_to_merge,
-      },
-      Intrinsic {
-        product: types.directory_digest,
-        input: types.directory_with_prefix_to_strip,
-      },
-      Intrinsic {
-        product: types.directory_digest,
-        input: types.directory_with_prefix_to_add,
-      },
-      Intrinsic {
-        product: types.process_result,
-        input: types.multi_platform_process_request,
-      },
-      Intrinsic {
-        product: types.snapshot,
-        input: types.snapshot_subset,
-      },
-    ];
-
-    for intrinsic in intrinsics {
-      self.insert_rule(intrinsic.product, Rule::Intrinsic(intrinsic))
+  pub fn intrinsics_set(&mut self, intrinsics: &Intrinsics) {
+    for intrinsic in intrinsics.keys() {
+      self.insert_rule(intrinsic.product, Rule::Intrinsic(intrinsic.clone()))
     }
   }
 
@@ -365,10 +335,4 @@ impl Tasks {
     );
     rules.push(rule);
   }
-}
-
-#[derive(Eq, Hash, PartialEq, Clone, Copy, Debug)]
-pub struct Intrinsic {
-  pub product: TypeId,
-  pub input: TypeId,
 }

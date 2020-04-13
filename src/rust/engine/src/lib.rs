@@ -45,6 +45,7 @@ mod watch;
 pub use crate::context::Core;
 pub use crate::core::{Function, Key, Params, TypeId, Value};
 pub use crate::handles::Handle;
+pub use crate::intrinsics::Intrinsics;
 pub use crate::scheduler::{
   ExecutionRequest, ExecutionTermination, RootResult, Scheduler, Session,
 };

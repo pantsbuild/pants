@@ -20,9 +20,8 @@ use url::Url;
 use crate::context::{Context, Core};
 use crate::core::{throw, Failure, Key, Params, TypeId, Value};
 use crate::externs;
-use crate::intrinsics;
 use crate::selectors;
-use crate::tasks::{self, Intrinsic, Rule};
+use crate::tasks::{self, Rule};
 use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::{self, BufMut};
 use fs::{
@@ -172,10 +171,21 @@ impl WrappedNode for Select {
             task: task.clone(),
             entry: Arc::new(self.entry.clone()),
           }),
-          &Rule::Intrinsic(Intrinsic { product, input }) => self
-            .select_product(&context, input, "intrinsic")
-            .and_then(move |value| intrinsics::run_intrinsic(input, product, context, value))
-            .to_boxed(),
+          &Rule::Intrinsic(ref intrinsic) => {
+            let intrinsic = intrinsic.clone();
+            future::join_all(
+              intrinsic
+                .inputs
+                .iter()
+                .map(|type_id| self.select_product(&context, *type_id, "intrinsic"))
+                .collect::<Vec<_>>(),
+            )
+            .and_then(move |values| {
+              let core = context.core.clone();
+              core.intrinsics.run(intrinsic, context, values)
+            })
+            .to_boxed()
+          }
         }
       }
       &rule_graph::Entry::Param(type_id) => {
