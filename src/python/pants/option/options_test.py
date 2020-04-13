@@ -40,7 +40,7 @@ from pants.option.optionable import Optionable
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.parser import Parser
-from pants.option.ranked_value import RankedValue
+from pants.option.ranked_value import Rank, RankedValue
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.testutil.option.fakes import create_options
 from pants.testutil.test_base import TestBase
@@ -1359,14 +1359,14 @@ class OptionsTest(TestBase):
         self.assertEqual("@/does/not/exist", options.for_scope("fromfile").string)
 
     def test_ranked_value_equality(self) -> None:
-        none = RankedValue(RankedValue.NONE, None)
-        some = RankedValue(RankedValue.HARDCODED, "some")
-        self.assertEqual("(NONE, None)", str(none))
-        self.assertEqual("(HARDCODED, some)", str(some))
+        none = RankedValue(Rank.NONE, None)
+        some = RankedValue(Rank.HARDCODED, "some")
+        self.assertEqual(RankedValue(Rank.NONE, None), none)
+        self.assertEqual(RankedValue(Rank.HARDCODED, "some"), some)
         self.assertNotEqual(some, none)
-        self.assertEqual(some, RankedValue(RankedValue.HARDCODED, "some"))
-        self.assertNotEqual(some, RankedValue(RankedValue.HARDCODED, "few"))
-        self.assertNotEqual(some, RankedValue(RankedValue.CONFIG, "some"))
+        self.assertEqual(some, RankedValue(Rank.HARDCODED, "some"))
+        self.assertNotEqual(some, RankedValue(Rank.HARDCODED, "few"))
+        self.assertNotEqual(some, RankedValue(Rank.CONFIG, "some"))
 
     def test_pants_global_designdoc_example(self) -> None:
         # The example from the design doc.

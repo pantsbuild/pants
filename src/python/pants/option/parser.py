@@ -63,7 +63,7 @@ from pants.option.errors import (
 from pants.option.option_tracker import OptionTracker
 from pants.option.option_util import flatten_shlexed_list, is_dict_option, is_list_option
 from pants.option.option_value_container import OptionValueContainer
-from pants.option.ranked_value import RankedValue
+from pants.option.ranked_value import Rank, RankedValue
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
 from pants.util.meta import frozen_after_init
 
@@ -295,7 +295,7 @@ class Parser:
                 )
 
             # If the option is explicitly given, check deprecation and mutual exclusion.
-            if val.rank > RankedValue.HARDCODED:
+            if val.rank > Rank.HARDCODED:
                 self._check_deprecated(name, kwargs)
 
                 mutex_dest = kwargs.get("mutually_exclusive_group")
@@ -404,7 +404,7 @@ class Parser:
         Each yielded item is an (args, kwargs) pair, as passed to register(), except that kwargs
         will be normalized in the following ways:
           - It will always have 'dest' explicitly set.
-          - It will always have 'default' explicitly set, and the value will be a RankedValue.
+          - It will always have 'default' explicitly set, and the value will be a Rank.
           - For recursive options, the original registrar will also have 'recursive_root' set.
 
         Note that recursive options we inherit from a parent will also be yielded here, with
@@ -633,15 +633,15 @@ class Parser:
     def _compute_value(self, dest, kwargs, flag_val_strs):
         """Compute the value to use for an option.
 
-        The source of the default value is chosen according to the ranking in RankedValue.
+        The source of the default value is chosen according to the ranking in Rank.
         """
         # Helper function to convert a string to a value of the option's type.
         def to_value_type(val_str):
             if val_str is None:
                 return None
-            if kwargs.get("type") == bool:
-                return self._ensure_bool(val_str)
             type_arg = kwargs.get("type", str)
+            if type_arg == bool:
+                return self._ensure_bool(val_str)
             try:
                 return self._wrap_type(type_arg)(val_str)
             except (TypeError, ValueError) as e:
@@ -771,9 +771,9 @@ class Parser:
         # Record info about the derivation of each of the contributing values.
         detail_history = []
         for ranked_val in ranked_vals:
-            if ranked_val.rank in (RankedValue.CONFIG, RankedValue.CONFIG_DEFAULT):
+            if ranked_val.rank in (Rank.CONFIG, Rank.CONFIG_DEFAULT):
                 details = config_details
-            elif ranked_val.rank == RankedValue.ENVIRONMENT:
+            elif ranked_val.rank == Rank.ENVIRONMENT:
                 details = env_details
             else:
                 details = None

@@ -15,7 +15,7 @@ from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import ExecutionGraph
 from pants.backend.jvm.tasks.jvm_compile.rsc.rsc_compile import RscCompile, _create_desandboxify_fn
 from pants.java.jar.jar_dependency import JarDependency
-from pants.option.ranked_value import RankedValue
+from pants.option.ranked_value import Rank, RankedValue
 from pants.testutil.jvm.nailgun_task_test_base import NailgunTaskTestBase
 from pants.testutil.subsystem.util import init_subsystem
 from pants.util.contextutil import temporary_dir
@@ -205,7 +205,7 @@ class RscCompileTest(NailgunTaskTestBase):
             workflow = RscCompile.JvmCompileWorkflowType.rsc_and_zinc
             key_str = "rsc"
 
-        self.set_options(workflow=RankedValue(value=workflow, rank=RankedValue.CONFIG,))
+        self.set_options(workflow=RankedValue(value=workflow, rank=Rank.CONFIG,))
         self.init_dependencies_for_scala_libraries()
 
         scala_dep = self.make_target(

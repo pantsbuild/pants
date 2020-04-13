@@ -20,7 +20,7 @@ from pants.init.engine_initializer import LegacyGraphSession
 from pants.java.nailgun_executor import NailgunProcessGroup
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.option.ranked_value import RankedValue
+from pants.option.ranked_value import Rank
 from pants.reporting.reporting import Reporting
 from pants.task.task import QuietTaskMixin
 
@@ -98,7 +98,7 @@ class GoalRunnerFactory:
         if self._explain:
             return True
 
-        if self._global_options.get_rank("quiet") > RankedValue.HARDCODED:
+        if self._global_options.get_rank("quiet") > Rank.HARDCODED:
             return self._global_options.quiet
 
         return any(goal.has_task_of_type(QuietTaskMixin) for goal in goals)
