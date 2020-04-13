@@ -32,6 +32,7 @@ class MypyPluginIntegrationTest(PantsRunIntegrationTest):
         cmd = [
             "--backend-packages=pants.contrib.mypy",
             f'--mypy-config={cls.example_dir / "mypy.ini"}',
+            "--mypy-version=mypy==0.720",
             "lint.mypy",
         ]
         if include_requirements:

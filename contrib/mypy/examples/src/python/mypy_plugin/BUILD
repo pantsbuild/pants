@@ -21,7 +21,6 @@ python_library(
   dependencies=[
     ':django-stubs',
   ],
-  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -31,7 +30,6 @@ python_library(
     ':django',
     ':settings',
   ],
-  tags = {'partially_type_checked'},
 )
 
 python_library(
