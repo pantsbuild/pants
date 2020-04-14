@@ -44,8 +44,10 @@ def init_workdir(global_options):
       # Exists and is correct: ensure that the destination exists.
       safe_mkdir(workdir_dst)
   else:
+    # Remove existing physical workdir (.pants.d dir)
     safe_rmtree(workdir_src)
-    absolute_symlink(workdir_dst, workdir_src)
+    # Create both symlink workdir (.pants.d dir) and its destination/physical workdir
+    create_symlink_to_clean_workdir()
   return workdir_src
 
 

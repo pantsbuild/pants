@@ -58,3 +58,11 @@ target(
     'src/python/pants/backend/native',
   ],
 )
+
+python_library(
+  name = 'util',
+  sources = ['util.py'],
+  dependencies=[
+    ':init',
+  ]
+)

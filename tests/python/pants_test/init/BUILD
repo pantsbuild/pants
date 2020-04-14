@@ -13,6 +13,7 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
+    'src/python/pants/fs',
     'src/python/pants/goal',
     'src/python/pants/goal:task_registrar',
     'src/python/pants/init',
@@ -27,4 +28,13 @@ python_tests(
     'src/python/pants/testutil:test_base',
   ],
   tags = {"partially_type_checked"},
+)
+
+python_tests(
+  name = 'test_util',
+  sources = ['test_util.py'],
+  dependencies = [
+    'src/python/pants/init:util',
+    'src/python/pants/testutil:test_base'
+  ]
 )
