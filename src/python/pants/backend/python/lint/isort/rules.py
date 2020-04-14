@@ -18,7 +18,6 @@ from pants.backend.python.subsystems import python_native_code, subprocess_envir
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
 from pants.engine.isolated_process import FallibleProcessResult, Process, ProcessResult
-from pants.engine.objects import Collection
 from pants.engine.rules import UnionRule, named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.custom_types import GlobExpansionConjunction
@@ -41,7 +40,7 @@ class IsortConfiguration(FmtConfiguration):
     sources: PythonSources
 
 
-class IsortConfigurations(FmtConfigurations, Collection[IsortConfiguration]):
+class IsortConfigurations(FmtConfigurations):
     config_type = IsortConfiguration
 
 

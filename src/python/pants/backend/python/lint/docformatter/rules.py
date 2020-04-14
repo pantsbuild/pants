@@ -18,7 +18,6 @@ from pants.backend.python.subsystems import python_native_code, subprocess_envir
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.fs import Digest, DirectoriesToMerge
 from pants.engine.isolated_process import FallibleProcessResult, Process, ProcessResult
-from pants.engine.objects import Collection
 from pants.engine.rules import UnionRule, named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.python.python_setup import PythonSetup
@@ -39,7 +38,7 @@ class DocformatterConfiguration(FmtConfiguration):
     sources: PythonSources
 
 
-class DocformatterConfigurations(FmtConfigurations, Collection[DocformatterConfiguration]):
+class DocformatterConfigurations(FmtConfigurations):
     config_type = DocformatterConfiguration
 
 

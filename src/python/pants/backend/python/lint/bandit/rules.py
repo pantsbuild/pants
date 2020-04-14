@@ -17,7 +17,6 @@ from pants.backend.python.subsystems import python_native_code, subprocess_envir
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
 from pants.engine.isolated_process import FallibleProcessResult, Process
-from pants.engine.objects import Collection
 from pants.engine.rules import UnionRule, named_rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.global_options import GlobMatchErrorBehavior
@@ -39,7 +38,7 @@ class BanditConfiguration(LinterConfiguration):
     compatibility: PythonInterpreterCompatibility
 
 
-class BanditConfigurations(LinterConfigurations, Collection[BanditConfiguration]):
+class BanditConfigurations(LinterConfigurations):
     config_type = BanditConfiguration
 
 

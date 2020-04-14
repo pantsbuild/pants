@@ -19,7 +19,6 @@ from pants.backend.python.subsystems.subprocess_environment import SubprocessEnc
 from pants.engine.addressable import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
 from pants.engine.isolated_process import FallibleProcessResult, Process
-from pants.engine.objects import Collection
 from pants.engine.rules import UnionRule, named_rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.engine.target import Dependencies, Targets
@@ -39,7 +38,7 @@ class PylintConfiguration(LinterConfiguration):
     compatibility: PythonInterpreterCompatibility
 
 
-class PylintConfigurations(LinterConfigurations, Collection[PylintConfiguration]):
+class PylintConfigurations(LinterConfigurations):
     config_type = PylintConfiguration
 
 
