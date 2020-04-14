@@ -17,8 +17,8 @@ from pants.engine.fs import (
 )
 from pants.engine.isolated_process import (
     Process,
-    ExecuteProcessResult,
-    FallibleExecuteProcessResult,
+    ProcessResult,
+    FallibleProcessResult,
     ProcessExecutionFailure,
 )
 from pants.engine.rules import RootRule, rule
@@ -88,7 +88,7 @@ async def cat_files_process_result_concatted(cat_exe_req: CatExecutionRequest) -
         input_files=cat_files_snapshot.directory_digest,
         description="cat some files",
     )
-    cat_process_result = await Get[ExecuteProcessResult](Process, process_request)
+    cat_process_result = await Get[ProcessResult](Process, process_request)
     return Concatted(cat_process_result.stdout.decode())
 
 
@@ -129,7 +129,7 @@ async def get_javac_version_output(
         description=javac_version_command.description,
         input_files=EMPTY_DIRECTORY_DIGEST,
     )
-    javac_version_proc_result = await Get[ExecuteProcessResult](
+    javac_version_proc_result = await Get[ProcessResult](
         Process, javac_version_proc_req,
     )
 
@@ -192,7 +192,7 @@ async def javac_compile_process_result(
         output_directories=output_dirs,
         description="javac compilation",
     )
-    javac_proc_result = await Get[ExecuteProcessResult](Process, process_request)
+    javac_proc_result = await Get[ProcessResult](Process, process_request)
 
     return JavacCompileResult(
         javac_proc_result.stdout.decode(),
@@ -233,7 +233,7 @@ class TestInputFileCreation(TestBase):
             description="cat the contents of this file",
         )
 
-        result = self.request_single_product(ExecuteProcessResult, req)
+        result = self.request_single_product(ProcessResult, req)
         self.assertEqual(result.stdout, file_contents)
 
     def test_multiple_file_creation(self):
@@ -252,7 +252,7 @@ class TestInputFileCreation(TestBase):
             description="cat the contents of this file",
         )
 
-        result = self.request_single_product(ExecuteProcessResult, req)
+        result = self.request_single_product(ProcessResult, req)
         self.assertEqual(result.stdout, b"hellogoodbye")
 
     def test_file_in_directory_creation(self):
@@ -268,7 +268,7 @@ class TestInputFileCreation(TestBase):
             description="Cat a file in a directory to make sure that doesn't break",
         )
 
-        result = self.request_single_product(ExecuteProcessResult, req)
+        result = self.request_single_product(ProcessResult, req)
         self.assertEqual(result.stdout, content)
 
     def test_not_executable(self):
@@ -283,7 +283,7 @@ class TestInputFileCreation(TestBase):
         )
 
         with self.assertRaisesWithMessageContaining(ExecutionError, "Permission"):
-            self.request_single_product(ExecuteProcessResult, req)
+            self.request_single_product(ProcessResult, req)
 
     def test_executable(self):
         file_name = "echo.sh"
@@ -298,7 +298,7 @@ class TestInputFileCreation(TestBase):
             argv=("./echo.sh",), input_files=digest, description="cat the contents of this file",
         )
 
-        result = self.request_single_product(ExecuteProcessResult, req)
+        result = self.request_single_product(ProcessResult, req)
         self.assertEqual(result.stdout, b"Hello\n")
 
 
@@ -335,7 +335,7 @@ class IsolatedProcessTest(TestBase, unittest.TestCase):
             input_files=EMPTY_DIRECTORY_DIGEST,
         )
 
-        execute_process_result = self.request_single_product(ExecuteProcessResult, request)
+        execute_process_result = self.request_single_product(ProcessResult, request)
 
         self.assertEqual(
             execute_process_result.output_directory_digest,
@@ -360,7 +360,7 @@ class IsolatedProcessTest(TestBase, unittest.TestCase):
             description="sleepy-cat",
             input_files=EMPTY_DIRECTORY_DIGEST,
         )
-        result = self.request_single_product(FallibleExecuteProcessResult, request)
+        result = self.request_single_product(FallibleProcessResult, request)
         self.assertNotEqual(result.exit_code, 0)
         self.assertIn(b"Exceeded timeout", result.stdout)
         self.assertIn(b"sleepy-cat", result.stdout)
@@ -424,7 +424,7 @@ class Broken {
                 description="cat JDK roland",
                 jdk_home=temp_dir,
             )
-            result = self.request_single_product(ExecuteProcessResult, request)
+            result = self.request_single_product(ProcessResult, request)
             self.assertEqual(result.stdout, b"European Burmese")
 
     def test_fallible_failing_command_returns_exited_result(self):
@@ -434,7 +434,7 @@ class Broken {
             input_files=EMPTY_DIRECTORY_DIGEST,
         )
 
-        result = self.request_single_product(FallibleExecuteProcessResult, request)
+        result = self.request_single_product(FallibleProcessResult, request)
 
         self.assertEqual(result.exit_code, 1)
 
@@ -446,5 +446,5 @@ class Broken {
         )
 
         with self.assertRaises(ExecutionError) as cm:
-            self.request_single_product(ExecuteProcessResult, request)
+            self.request_single_product(ProcessResult, request)
         self.assertIn("process 'one-cat' failed with exit code 1.", str(cm.exception))

@@ -12,7 +12,7 @@ from pants.base.worker_pool import SubprocPool
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.target import Target
 from pants.engine.isolated_process import (
-    FallibleExecuteProcessResult,
+    FallibleProcessResult,
     ProductDescription,
     fallible_to_exec_result_or_raise,
 )
@@ -411,7 +411,7 @@ class Context:
         :param execute_process_request: The Process to run.
         :param name: A descriptive name representing the process being executed.
         :param labels: A tuple of WorkUnitLabels.
-        :return: An ExecuteProcessResult with information about the execution.
+        :return: An ProcessResult with information about the execution.
 
         Note that this is an unstable, experimental API, which is subject to change with no notice.
         """
@@ -419,7 +419,7 @@ class Context:
             name=name, labels=labels, cmd=" ".join(execute_process_request.argv),
         ) as workunit:
             result = self._scheduler.product_request(
-                FallibleExecuteProcessResult, [execute_process_request]
+                FallibleProcessResult, [execute_process_request]
             )[0]
             workunit.output("stdout").write(result.stdout)
             workunit.output("stderr").write(result.stderr)

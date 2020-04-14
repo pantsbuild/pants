@@ -7,7 +7,7 @@ from typing import Iterable, Tuple, Type
 
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.isolated_process import FallibleExecuteProcessResult
+from pants.engine.isolated_process import FallibleProcessResult
 from pants.engine.legacy.graph import HydratedTargetsWithOrigins
 from pants.engine.legacy.structs import TargetAdaptorWithOrigin
 from pants.engine.objects import union
@@ -27,7 +27,7 @@ class LintResult:
 
     @staticmethod
     def from_fallible_execute_process_result(
-        process_result: FallibleExecuteProcessResult,
+        process_result: FallibleProcessResult,
     ) -> "LintResult":
         return LintResult(
             exit_code=process_result.exit_code,

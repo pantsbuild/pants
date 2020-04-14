@@ -20,7 +20,7 @@ from pants.backend.python.rules.pex import (
 from pants.backend.python.rules.pex import rules as pex_rules
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.engine.fs import Digest, DirectoryToMaterialize, FileContent, InputFilesContent
-from pants.engine.isolated_process import Process, ExecuteProcessResult
+from pants.engine.isolated_process import Process, ProcessResult
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.python.python_setup import PythonSetup
@@ -252,7 +252,7 @@ class PexTest(TestBase):
             input_files=pex_output["pex"].directory_digest,
             description="Run the pex and make sure it works",
         )
-        result = self.request_single_product(ExecuteProcessResult, req)
+        result = self.request_single_product(ProcessResult, req)
         self.assertEqual(result.stdout, b"from main\n")
 
     def test_resolves_dependencies(self) -> None:

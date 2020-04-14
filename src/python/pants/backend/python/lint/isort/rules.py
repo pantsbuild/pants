@@ -18,8 +18,8 @@ from pants.backend.python.subsystems.subprocess_environment import SubprocessEnc
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
 from pants.engine.isolated_process import (
     Process,
-    ExecuteProcessResult,
-    FallibleExecuteProcessResult,
+    ProcessResult,
+    FallibleProcessResult,
 )
 from pants.engine.rules import UnionRule, named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get
@@ -147,7 +147,7 @@ async def isort_fmt(formatter: IsortFormatter, isort: Isort) -> FmtResult:
     if isort.options.skip:
         return FmtResult.noop()
     setup = await Get[Setup](SetupRequest(formatter, check_only=False))
-    result = await Get[ExecuteProcessResult](Process, setup.process_request)
+    result = await Get[ProcessResult](Process, setup.process_request)
     return FmtResult.from_execute_process_result(result)
 
 
@@ -156,7 +156,7 @@ async def isort_lint(formatter: IsortFormatter, isort: Isort) -> LintResult:
     if isort.options.skip:
         return LintResult.noop()
     setup = await Get[Setup](SetupRequest(formatter, check_only=True))
-    result = await Get[FallibleExecuteProcessResult](Process, setup.process_request)
+    result = await Get[FallibleProcessResult](Process, setup.process_request)
     return LintResult.from_fallible_execute_process_result(result)
 
 

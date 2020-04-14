@@ -19,7 +19,7 @@ use testutil::{as_bytes, owned_string_vec};
 use crate::remote::{CommandRunner, ExecutionError, ExecutionHistory, OperationOrStatus};
 use crate::{
   CommandRunner as CommandRunnerTrait, Context, Process,
-  ProcessMetadata, FallibleExecuteProcessResultWithPlatform,
+  ProcessMetadata, FallibleProcessResultWithPlatform,
   MultiPlatformProcess, Platform, PlatformConstraint,
 };
 use maplit::{btreemap, hashset};
@@ -627,7 +627,7 @@ async fn successful_execution_after_one_getoperation() {
 
   assert_eq!(
     result.without_execution_attempts(),
-    FallibleExecuteProcessResultWithPlatform {
+    FallibleProcessResultWithPlatform {
       stdout: as_bytes("foo"),
       stderr: as_bytes(""),
       exit_code: 0,
@@ -677,7 +677,7 @@ async fn retries_retriable_errors() {
 
   assert_eq!(
     result.without_execution_attempts(),
-    FallibleExecuteProcessResultWithPlatform {
+    FallibleProcessResultWithPlatform {
       stdout: as_bytes("foo"),
       stderr: as_bytes(""),
       exit_code: 0,
@@ -859,7 +859,7 @@ async fn extract_response_with_digest_stdout() {
     .await
     .unwrap()
     .without_execution_attempts(),
-    FallibleExecuteProcessResultWithPlatform {
+    FallibleProcessResultWithPlatform {
       stdout: testdata.bytes(),
       stderr: testdata_empty.bytes(),
       exit_code: 0,
@@ -891,7 +891,7 @@ async fn extract_response_with_digest_stderr() {
     .await
     .unwrap()
     .without_execution_attempts(),
-    FallibleExecuteProcessResultWithPlatform {
+    FallibleProcessResultWithPlatform {
       stdout: testdata_empty.bytes(),
       stderr: testdata.bytes(),
       exit_code: 0,
@@ -923,7 +923,7 @@ async fn extract_response_with_digest_stdout_osx_remote() {
     .await
     .unwrap()
     .without_execution_attempts(),
-    FallibleExecuteProcessResultWithPlatform {
+    FallibleProcessResultWithPlatform {
       stdout: testdata.bytes(),
       stderr: testdata_empty.bytes(),
       exit_code: 0,
@@ -1005,7 +1005,7 @@ async fn ensure_inline_stdio_is_stored() {
     .unwrap();
   assert_eq!(
     result.without_execution_attempts(),
-    FallibleExecuteProcessResultWithPlatform {
+    FallibleProcessResultWithPlatform {
       stdout: test_stdout.bytes(),
       stderr: test_stderr.bytes(),
       exit_code: 0,
@@ -1076,7 +1076,7 @@ async fn successful_execution_after_four_getoperations() {
 
   assert_eq!(
     result.without_execution_attempts(),
-    FallibleExecuteProcessResultWithPlatform {
+    FallibleProcessResultWithPlatform {
       stdout: as_bytes("foo"),
       stderr: as_bytes(""),
       exit_code: 0,
@@ -1195,7 +1195,7 @@ async fn dropped_request_cancels() {
     Platform::Linux,
   );
 
-  let successful_mock_result = FallibleExecuteProcessResultWithPlatform {
+  let successful_mock_result = FallibleProcessResultWithPlatform {
     stdout: as_bytes("foo-fast"),
     stderr: as_bytes(""),
     exit_code: 0,
@@ -1265,7 +1265,7 @@ async fn retry_for_cancelled_channel() {
 
   assert_eq!(
     result.without_execution_attempts(),
-    FallibleExecuteProcessResultWithPlatform {
+    FallibleProcessResultWithPlatform {
       stdout: as_bytes("foo"),
       stderr: as_bytes(""),
       exit_code: 0,
@@ -1562,7 +1562,7 @@ async fn execute_missing_file_uploads_if_known() {
     .unwrap();
   assert_eq!(
     result.without_execution_attempts(),
-    FallibleExecuteProcessResultWithPlatform {
+    FallibleProcessResultWithPlatform {
       stdout: roland.bytes(),
       stderr: Bytes::from(""),
       exit_code: 0,
@@ -1668,7 +1668,7 @@ async fn execute_missing_file_uploads_if_known_status() {
   .wait();
   assert_eq!(
     result,
-    Ok(FallibleExecuteProcessResultWithPlatform {
+    Ok(FallibleProcessResultWithPlatform {
       stdout: roland.bytes(),
       stderr: Bytes::from(""),
       exit_code: 0,
@@ -1778,7 +1778,7 @@ async fn extract_execute_response_unknown_code() {
 
 #[tokio::test]
 async fn extract_execute_response_success() {
-  let want_result = FallibleExecuteProcessResultWithPlatform {
+  let want_result = FallibleProcessResultWithPlatform {
     stdout: as_bytes("roland"),
     stderr: Bytes::from("simba"),
     exit_code: 17,
@@ -2546,7 +2546,7 @@ fn make_precondition_failure_status(
 async fn run_command_remote(
   address: String,
   request: MultiPlatformProcess,
-) -> Result<FallibleExecuteProcessResultWithPlatform, String> {
+) -> Result<FallibleProcessResultWithPlatform, String> {
   let cas = mock::StubCAS::builder()
     .file(&TestData::roland())
     .directory(&TestDirectory::containing_roland())
@@ -2611,7 +2611,7 @@ fn make_store(store_dir: &Path, cas: &mock::StubCAS, executor: task_executor::Ex
 async fn extract_execute_response(
   operation: bazel_protos::operations::Operation,
   remote_platform: Platform,
-) -> Result<FallibleExecuteProcessResultWithPlatform, ExecutionError> {
+) -> Result<FallibleProcessResultWithPlatform, ExecutionError> {
   let cas = mock::StubCAS::builder()
     .file(&TestData::roland())
     .directory(&TestDirectory::containing_roland())

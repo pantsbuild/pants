@@ -3,7 +3,7 @@ use testutil;
 
 use crate::{
   CommandRunner as CommandRunnerTrait, Context, Process,
-  FallibleExecuteProcessResultWithPlatform, Platform, PlatformConstraint, RelativePath,
+  FallibleProcessResultWithPlatform, Platform, PlatformConstraint, RelativePath,
 };
 use futures::compat::Future01CompatExt;
 use hashing::EMPTY_DIGEST;
@@ -40,7 +40,7 @@ async fn stdout() {
 
   assert_eq!(
     result.unwrap(),
-    FallibleExecuteProcessResultWithPlatform {
+    FallibleProcessResultWithPlatform {
       stdout: as_bytes("foo"),
       stderr: as_bytes(""),
       exit_code: 0,
@@ -72,7 +72,7 @@ async fn stdout_and_stderr_and_exit_code() {
 
   assert_eq!(
     result.unwrap(),
-    FallibleExecuteProcessResultWithPlatform {
+    FallibleProcessResultWithPlatform {
       stdout: as_bytes("foo"),
       stderr: as_bytes("bar"),
       exit_code: 1,
@@ -105,7 +105,7 @@ async fn capture_exit_code_signal() {
 
   assert_eq!(
     result.unwrap(),
-    FallibleExecuteProcessResultWithPlatform {
+    FallibleProcessResultWithPlatform {
       stdout: as_bytes(""),
       stderr: as_bytes(""),
       exit_code: -15,
@@ -225,7 +225,7 @@ async fn output_files_none() {
   .await;
   assert_eq!(
     result.unwrap(),
-    FallibleExecuteProcessResultWithPlatform {
+    FallibleProcessResultWithPlatform {
       stdout: as_bytes(""),
       stderr: as_bytes(""),
       exit_code: 0,
@@ -260,7 +260,7 @@ async fn output_files_one() {
 
   assert_eq!(
     result.unwrap(),
-    FallibleExecuteProcessResultWithPlatform {
+    FallibleProcessResultWithPlatform {
       stdout: as_bytes(""),
       stderr: as_bytes(""),
       exit_code: 0,
@@ -300,7 +300,7 @@ async fn output_dirs() {
 
   assert_eq!(
     result.unwrap(),
-    FallibleExecuteProcessResultWithPlatform {
+    FallibleProcessResultWithPlatform {
       stdout: as_bytes(""),
       stderr: as_bytes(""),
       exit_code: 0,
@@ -341,7 +341,7 @@ async fn output_files_many() {
 
   assert_eq!(
     result.unwrap(),
-    FallibleExecuteProcessResultWithPlatform {
+    FallibleProcessResultWithPlatform {
       stdout: as_bytes(""),
       stderr: as_bytes(""),
       exit_code: 0,
@@ -380,7 +380,7 @@ async fn output_files_execution_failure() {
 
   assert_eq!(
     result.unwrap(),
-    FallibleExecuteProcessResultWithPlatform {
+    FallibleProcessResultWithPlatform {
       stdout: as_bytes(""),
       stderr: as_bytes(""),
       exit_code: 1,
@@ -417,7 +417,7 @@ async fn output_files_partial_output() {
 
   assert_eq!(
     result.unwrap(),
-    FallibleExecuteProcessResultWithPlatform {
+    FallibleProcessResultWithPlatform {
       stdout: as_bytes(""),
       stderr: as_bytes(""),
       exit_code: 0,
@@ -452,7 +452,7 @@ async fn output_overlapping_file_and_dir() {
 
   assert_eq!(
     result.unwrap(),
-    FallibleExecuteProcessResultWithPlatform {
+    FallibleProcessResultWithPlatform {
       stdout: as_bytes(""),
       stderr: as_bytes(""),
       exit_code: 0,
@@ -486,7 +486,7 @@ async fn jdk_symlink() {
   .await;
   assert_eq!(
     result,
-    Ok(FallibleExecuteProcessResultWithPlatform {
+    Ok(FallibleProcessResultWithPlatform {
       stdout: roland,
       stderr: as_bytes(""),
       exit_code: 0,
@@ -606,7 +606,7 @@ async fn all_containing_directories_for_outputs_are_created() {
 
   assert_eq!(
     result.unwrap(),
-    FallibleExecuteProcessResultWithPlatform {
+    FallibleProcessResultWithPlatform {
       stdout: as_bytes(""),
       stderr: as_bytes(""),
       exit_code: 0,
@@ -641,7 +641,7 @@ async fn output_empty_dir() {
 
   assert_eq!(
     result.unwrap(),
-    FallibleExecuteProcessResultWithPlatform {
+    FallibleProcessResultWithPlatform {
       stdout: as_bytes(""),
       stderr: as_bytes(""),
       exit_code: 0,
@@ -698,7 +698,7 @@ async fn local_only_scratch_files_materialized() {
 
   assert_eq!(
     result.unwrap(),
-    FallibleExecuteProcessResultWithPlatform {
+    FallibleProcessResultWithPlatform {
       stdout: as_bytes(""),
       stderr: as_bytes(""),
       exit_code: 0,
@@ -784,7 +784,7 @@ async fn working_directory() {
 
   assert_eq!(
     result.unwrap(),
-    FallibleExecuteProcessResultWithPlatform {
+    FallibleProcessResultWithPlatform {
       stdout: as_bytes("roland\n"),
       stderr: as_bytes(""),
       exit_code: 0,
@@ -797,7 +797,7 @@ async fn working_directory() {
 
 async fn run_command_locally(
   req: Process,
-) -> Result<FallibleExecuteProcessResultWithPlatform, String> {
+) -> Result<FallibleProcessResultWithPlatform, String> {
   let work_dir = TempDir::new().unwrap();
   run_command_locally_in_dir_with_cleanup(req, work_dir.path().to_owned()).await
 }
@@ -805,7 +805,7 @@ async fn run_command_locally(
 async fn run_command_locally_in_dir_with_cleanup(
   req: Process,
   dir: PathBuf,
-) -> Result<FallibleExecuteProcessResultWithPlatform, String> {
+) -> Result<FallibleProcessResultWithPlatform, String> {
   run_command_locally_in_dir(req, dir, true, None, None).await
 }
 
@@ -815,7 +815,7 @@ async fn run_command_locally_in_dir(
   cleanup: bool,
   store: Option<Store>,
   executor: Option<task_executor::Executor>,
-) -> Result<FallibleExecuteProcessResultWithPlatform, String> {
+) -> Result<FallibleProcessResultWithPlatform, String> {
   let store_dir = TempDir::new().unwrap();
   let executor = executor.unwrap_or_else(|| task_executor::Executor::new(Handle::current()));
   let store =

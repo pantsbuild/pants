@@ -32,7 +32,7 @@ from pants.backend.python.subsystems.subprocess_environment import SubprocessEnc
 from pants.engine.addressable import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge, InputFilesContent
 from pants.engine.interactive_runner import InteractiveProcessRequest
-from pants.engine.isolated_process import Process, FallibleExecuteProcessResult
+from pants.engine.isolated_process import Process, FallibleProcessResult
 from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.rules import UnionRule, named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
@@ -249,7 +249,7 @@ async def run_python_test(
         ),
         env=env,
     )
-    result = await Get[FallibleExecuteProcessResult](Process, request)
+    result = await Get[FallibleProcessResult](Process, request)
     coverage_data = PytestCoverageData(result.output_directory_digest) if run_coverage else None
     return TestResult.from_fallible_execute_process_result(result, coverage_data=coverage_data)
 

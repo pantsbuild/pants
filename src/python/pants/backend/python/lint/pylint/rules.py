@@ -19,7 +19,7 @@ from pants.backend.python.subsystems import python_native_code, subprocess_envir
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.build_graph.address import Address
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
-from pants.engine.isolated_process import Process, FallibleExecuteProcessResult
+from pants.engine.isolated_process import Process, FallibleProcessResult
 from pants.engine.legacy.graph import HydratedTarget, HydratedTargets
 from pants.engine.rules import UnionRule, named_rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
@@ -125,7 +125,7 @@ async def pylint_lint(
         input_files=merged_input_files,
         description=f"Run Pylint for {address_references}",
     )
-    result = await Get[FallibleExecuteProcessResult](Process, request)
+    result = await Get[FallibleProcessResult](Process, request)
     return LintResult.from_fallible_execute_process_result(result)
 
 

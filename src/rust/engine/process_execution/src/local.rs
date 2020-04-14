@@ -24,7 +24,7 @@ use tokio::time::timeout;
 use tokio_util::codec::{BytesCodec, FramedRead};
 
 use crate::{
-  Context, Process, FallibleExecuteProcessResultWithPlatform,
+  Context, Process, FallibleProcessResultWithPlatform,
   MultiPlatformProcess, Platform, PlatformConstraint,
 };
 
@@ -250,7 +250,7 @@ impl super::CommandRunner for CommandRunner {
     &self,
     req: MultiPlatformProcess,
     context: Context,
-  ) -> BoxFuture<FallibleExecuteProcessResultWithPlatform, String> {
+  ) -> BoxFuture<FallibleProcessResultWithPlatform, String> {
     let req = self.extract_compatible_request(&req).unwrap();
     self.run_and_capture_workdir(
       req,
@@ -292,7 +292,7 @@ pub trait CapturedWorkdir {
     cleanup_local_dirs: bool,
     workdir_base: &Path,
     platform: Platform,
-  ) -> BoxFuture<FallibleExecuteProcessResultWithPlatform, String>
+  ) -> BoxFuture<FallibleProcessResultWithPlatform, String>
   where
     Self: Send + Sync + Clone + 'static,
   {
@@ -403,7 +403,7 @@ pub trait CapturedWorkdir {
         };
 
         output_snapshot
-          .map(move |snapshot| FallibleExecuteProcessResultWithPlatform {
+          .map(move |snapshot| FallibleProcessResultWithPlatform {
             stdout: child_results.stdout,
             stderr: child_results.stderr,
             exit_code: child_results.exit_code,
@@ -428,7 +428,7 @@ pub trait CapturedWorkdir {
           Ok(fallible_execute_process_result) => Ok(fallible_execute_process_result),
           Err(msg) => {
             if msg == "deadline has elapsed" {
-              Ok(FallibleExecuteProcessResultWithPlatform {
+              Ok(FallibleProcessResultWithPlatform {
                 stdout: Bytes::from(format!(
                   "Exceeded timeout of {:?} for local process execution, {}",
                   req_timeout, req_description

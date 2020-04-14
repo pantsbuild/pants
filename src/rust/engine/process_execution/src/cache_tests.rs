@@ -1,6 +1,6 @@
 use crate::{
   CommandRunner as CommandRunnerTrait, Context, Process,
-  ProcessMetadata, FallibleExecuteProcessResultWithPlatform, PlatformConstraint,
+  ProcessMetadata, FallibleProcessResultWithPlatform, PlatformConstraint,
 };
 use futures::compat::Future01CompatExt;
 use hashing::EMPTY_DIGEST;
@@ -16,8 +16,8 @@ use testutil::data::TestData;
 use tokio::runtime::Handle;
 
 struct RoundtripResults {
-  uncached: Result<FallibleExecuteProcessResultWithPlatform, String>,
-  maybe_cached: Result<FallibleExecuteProcessResultWithPlatform, String>,
+  uncached: Result<FallibleProcessResultWithPlatform, String>,
+  maybe_cached: Result<FallibleProcessResultWithPlatform, String>,
 }
 
 async fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {

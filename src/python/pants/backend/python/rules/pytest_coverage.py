@@ -30,7 +30,7 @@ from pants.engine.fs import (
     FilesContent,
     InputFilesContent,
 )
-from pants.engine.isolated_process import Process, ExecuteProcessResult
+from pants.engine.isolated_process import Process, ProcessResult
 from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
 from pants.engine.rules import RootRule, UnionRule, named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
@@ -315,7 +315,7 @@ async def merge_coverage_data(
         description=f"Merge coverage reports.",
     )
 
-    result = await Get[ExecuteProcessResult](Process, request)
+    result = await Get[ProcessResult](Process, request)
     return MergedCoverageData(coverage_data=result.output_directory_digest)
 
 
@@ -379,7 +379,7 @@ async def generate_coverage_report(
         description=f"Generate coverage report.",
     )
 
-    result = await Get[ExecuteProcessResult](Process, request)
+    result = await Get[ProcessResult](Process, request)
     if report_type == ReportType.CONSOLE:
         return ConsoleCoverageReport(result.stdout.decode())
 

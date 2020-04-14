@@ -1,6 +1,6 @@
 use crate::{
   Context, Process, ProcessMetadata,
-  FallibleExecuteProcessResultWithPlatform, MultiPlatformProcess, Platform,
+  FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform,
 };
 use std::sync::Arc;
 
@@ -62,7 +62,7 @@ impl crate::CommandRunner for CommandRunner {
     &self,
     req: MultiPlatformProcess,
     context: Context,
-  ) -> BoxFuture<FallibleExecuteProcessResultWithPlatform, String> {
+  ) -> BoxFuture<FallibleProcessResultWithPlatform, String> {
     let digest = crate::digest(req.clone(), &self.metadata);
     let key = digest.0;
 
@@ -108,7 +108,7 @@ impl CommandRunner {
   fn lookup(
     &self,
     fingerprint: Fingerprint,
-  ) -> impl Future<Item = Option<FallibleExecuteProcessResultWithPlatform>, Error = String> {
+  ) -> impl Future<Item = Option<FallibleProcessResultWithPlatform>, Error = String> {
     use bazel_protos::remote_execution::ExecuteResponse;
     let file_store = self.file_store.clone();
 
@@ -151,7 +151,7 @@ impl CommandRunner {
   fn store(
     &self,
     fingerprint: Fingerprint,
-    result: &FallibleExecuteProcessResultWithPlatform,
+    result: &FallibleProcessResultWithPlatform,
   ) -> impl Future<Item = (), Error = String> {
     let mut execute_response = bazel_protos::remote_execution::ExecuteResponse::new();
     execute_response.set_cached_result(true);

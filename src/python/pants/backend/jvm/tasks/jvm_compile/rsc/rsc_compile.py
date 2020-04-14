@@ -27,7 +27,7 @@ from pants.engine.fs import (
     PathGlobs,
     PathGlobsAndRoot,
 )
-from pants.engine.isolated_process import Process, FallibleExecuteProcessResult
+from pants.engine.isolated_process import Process, FallibleProcessResult
 from pants.java.jar.jar_dependency import JarDependency
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.task.scm_publish_mixin import Semver
@@ -54,7 +54,7 @@ def fast_relpath_collection(collection):
 
 
 def stdout_contents(wu):
-    if isinstance(wu, FallibleExecuteProcessResult):
+    if isinstance(wu, FallibleProcessResult):
         return wu.stdout.rstrip()
     with open(wu.output_paths()["stdout"]) as f:
         return f.read().rstrip()

@@ -17,7 +17,7 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.isolated_process import Process, ExecuteProcessResult
+from pants.engine.isolated_process import Process, ProcessResult
 from pants.engine.legacy.graph import SourcesSnapshots
 from pants.engine.rules import goal_rule, rule, subsystem_rule
 from pants.engine.selectors import Get
@@ -113,7 +113,7 @@ async def run_cloc(
         description="cloc",
     )
 
-    exec_result = await Get[ExecuteProcessResult](Process, req)
+    exec_result = await Get[ProcessResult](Process, req)
     files_content = await Get[FilesContent](Digest, exec_result.output_directory_digest)
 
     file_outputs = {fc.path: fc.content.decode() for fc in files_content}

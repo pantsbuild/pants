@@ -109,7 +109,7 @@ class MultiPlatformProcess:
 
 
 @dataclass(frozen=True)
-class ExecuteProcessResult:
+class ProcessResult:
     """Result of successfully executing a process.
 
     Requesting one of these will raise an exception if the exit code is non-zero.
@@ -121,7 +121,7 @@ class ExecuteProcessResult:
 
 
 @dataclass(frozen=True)
-class FallibleExecuteProcessResult:
+class FallibleProcessResult:
     """Result of executing a process.
 
     Requesting one of these will not raise an exception if the exit code is non-zero.
@@ -134,7 +134,7 @@ class FallibleExecuteProcessResult:
 
 
 @dataclass(frozen=True)
-class FallibleExecuteProcessResultWithPlatform:
+class FallibleProcessResultWithPlatform:
     """Result of executing a process.
 
     Contains information about what platform a request ran on.
@@ -193,12 +193,12 @@ def upcast_execute_process_request(
 
 @rule
 def fallible_to_exec_result_or_raise(
-    fallible_result: FallibleExecuteProcessResult, description: ProductDescription
-) -> ExecuteProcessResult:
-    """Converts a FallibleExecuteProcessResult to a ExecuteProcessResult or raises an error."""
+    fallible_result: FallibleProcessResult, description: ProductDescription
+) -> ProcessResult:
+    """Converts a FallibleProcessResult to a ProcessResult or raises an error."""
 
     if fallible_result.exit_code == 0:
-        return ExecuteProcessResult(
+        return ProcessResult(
             fallible_result.stdout, fallible_result.stderr, fallible_result.output_directory_digest,
         )
     else:
@@ -212,9 +212,9 @@ def fallible_to_exec_result_or_raise(
 
 @rule
 def remove_platform_information(
-    res: FallibleExecuteProcessResultWithPlatform,
-) -> FallibleExecuteProcessResult:
-    return FallibleExecuteProcessResult(
+    res: FallibleProcessResultWithPlatform,
+) -> FallibleProcessResult:
+    return FallibleProcessResult(
         exit_code=res.exit_code,
         stdout=res.stdout,
         stderr=res.stderr,

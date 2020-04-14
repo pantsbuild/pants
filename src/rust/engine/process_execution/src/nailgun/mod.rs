@@ -16,7 +16,7 @@ use crate::local::CapturedWorkdir;
 use crate::nailgun::nailgun_pool::NailgunProcessName;
 use crate::{
   Context, Process, ProcessMetadata,
-  FallibleExecuteProcessResultWithPlatform, MultiPlatformProcess, Platform,
+  FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform,
   PlatformConstraint,
 };
 
@@ -168,7 +168,7 @@ impl super::CommandRunner for CommandRunner {
     &self,
     req: MultiPlatformProcess,
     context: Context,
-  ) -> BoxFuture<FallibleExecuteProcessResultWithPlatform, String> {
+  ) -> BoxFuture<FallibleProcessResultWithPlatform, String> {
     let original_request = self.extract_compatible_request(&req).unwrap();
 
     if !original_request.is_nailgunnable {
