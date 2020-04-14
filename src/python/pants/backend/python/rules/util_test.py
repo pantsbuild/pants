@@ -3,12 +3,12 @@
 
 import pytest
 
-from pants.backend.python.rules.setup_py_util import (
+from pants.backend.python.rules.util import (
     declares_pkg_resources_namespace_package,
     distutils_repr,
     is_python2,
 )
-from pants.option.ranked_value import RankedValue
+from pants.option.ranked_value import Rank, RankedValue
 from pants.python.python_setup import PythonSetup
 from pants.subsystem.subsystem import Subsystem
 from pants.testutil.subsystem.util import init_subsystem
@@ -97,7 +97,7 @@ def test_is_python2(constraints, compatibilities):
         PythonSetup,
         {
             PythonSetup.options_scope: {
-                "interpreter_constraints": RankedValue(RankedValue.CONFIG, constraints)
+                "interpreter_constraints": RankedValue(Rank.CONFIG, constraints)
             }
         },
     )
@@ -121,7 +121,7 @@ def test_is_not_python2(constraints, compatibilities):
         PythonSetup,
         {
             PythonSetup.options_scope: {
-                "interpreter_constraints": RankedValue(RankedValue.CONFIG, constraints)
+                "interpreter_constraints": RankedValue(Rank.CONFIG, constraints)
             }
         },
     )

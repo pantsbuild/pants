@@ -2,7 +2,6 @@ use tempfile;
 use testutil;
 
 use crate::mount;
-use futures::compat::Future01CompatExt;
 use hashing;
 use store::Store;
 use testutil::{
@@ -40,7 +39,6 @@ async fn read_file_by_digest() {
 
   store
     .store_file_bytes(test_bytes.bytes(), false)
-    .compat()
     .await
     .expect("Storing bytes");
 
@@ -66,12 +64,10 @@ async fn list_directory() {
 
   store
     .store_file_bytes(test_bytes.bytes(), false)
-    .compat()
     .await
     .expect("Storing bytes");
   store
     .record_directory(&test_directory.directory(), false)
-    .compat()
     .await
     .expect("Storing directory");
 
@@ -96,12 +92,10 @@ async fn read_file_from_directory() {
 
   store
     .store_file_bytes(test_bytes.bytes(), false)
-    .compat()
     .await
     .expect("Storing bytes");
   store
     .record_directory(&test_directory.directory(), false)
-    .compat()
     .await
     .expect("Storing directory");
 
@@ -130,22 +124,18 @@ async fn list_recursive_directory() {
 
   store
     .store_file_bytes(test_bytes.bytes(), false)
-    .compat()
     .await
     .expect("Storing bytes");
   store
     .store_file_bytes(treat_bytes.bytes(), false)
-    .compat()
     .await
     .expect("Storing bytes");
   store
     .record_directory(&test_directory.directory(), false)
-    .compat()
     .await
     .expect("Storing directory");
   store
     .record_directory(&recursive_directory.directory(), false)
-    .compat()
     .await
     .expect("Storing directory");
 
@@ -173,22 +163,18 @@ async fn read_file_from_recursive_directory() {
 
   store
     .store_file_bytes(test_bytes.bytes(), false)
-    .compat()
     .await
     .expect("Storing bytes");
   store
     .store_file_bytes(treat_bytes.bytes(), false)
-    .compat()
     .await
     .expect("Storing bytes");
   store
     .record_directory(&test_directory.directory(), false)
-    .compat()
     .await
     .expect("Storing directory");
   store
     .record_directory(&recursive_directory.directory(), false)
-    .compat()
     .await
     .expect("Storing directory");
 
@@ -219,12 +205,10 @@ async fn files_are_correctly_executable() {
 
   store
     .store_file_bytes(treat_bytes.bytes(), false)
-    .compat()
     .await
     .expect("Storing bytes");
   store
     .record_directory(&directory.directory(), false)
-    .compat()
     .await
     .expect("Storing directory");
 

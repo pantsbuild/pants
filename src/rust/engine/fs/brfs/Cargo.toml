@@ -12,8 +12,7 @@ dirs = "1"
 env_logger = "0.5.4"
 errno = "0.2.3"
 fuse = "0.3.1"
-futures01 = { package = "futures", version = "0.1" }
-futures = { version = "0.3", features = ["compat"] }
+futures = "0.3"
 hashing = { path = "../../hashing" }
 libc = "0.2.39"
 log = "0.4.1"

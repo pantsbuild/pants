@@ -5,7 +5,6 @@ from abc import ABCMeta, abstractmethod
 from pathlib import PurePath
 from textwrap import dedent
 from typing import List, Optional, Tuple, Type
-from unittest.mock import Mock
 
 import pytest
 
@@ -41,19 +40,14 @@ from pants.rules.core.test import (
     Test,
     TestConfiguration,
     TestDebugRequest,
+    TestOptions,
     TestResult,
     WrappedTestConfiguration,
     run_tests,
 )
-from pants.testutil.engine.util import MockConsole, MockGet, run_rule
+from pants.testutil.engine.util import MockConsole, MockGet, create_goal_subsystem, run_rule
 from pants.testutil.test_base import TestBase
 from pants.util.ordered_set import OrderedSet
-
-
-# TODO(#9141): replace this with a proper util to create `GoalSubsystem`s
-class MockOptions:
-    def __init__(self, **values):
-        self.values = Mock(**values)
 
 
 class MockTarget(Target):
@@ -158,7 +152,7 @@ class TestTest(TestBase):
         include_sources: bool = True,
     ) -> Tuple[int, str]:
         console = MockConsole(use_colors=False)
-        options = MockOptions(debug=debug, run_coverage=False)
+        options = create_goal_subsystem(TestOptions, debug=debug, run_coverage=False)
         interactive_runner = InteractiveRunner(self.scheduler)
         workspace = Workspace(self.scheduler)
         union_membership = UnionMembership({TestConfiguration: OrderedSet([config])})

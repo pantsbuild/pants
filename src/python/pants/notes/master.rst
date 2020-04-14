@@ -4,6 +4,177 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.27.0.dev3 (4/13/2020)
+-----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Deprecate `source` in favor of `sources` (#9471)
+  `PR #9471 <https://github.com/pantsbuild/pants/pull/9471>`_
+
+* Deprecate unused backends (#9512)
+  `PR #9512 <https://github.com/pantsbuild/pants/pull/9512>`_
+
+* Deprecate unused plugins (#9508)
+  `PR #9508 <https://github.com/pantsbuild/pants/pull/9508>`_
+
+* Remove broken `indices` and `repos` fields from `python_binary` (#9497)
+  `PR #9497 <https://github.com/pantsbuild/pants/pull/9497>`_
+
+* Delay deprecation of `lint.pythonstyle` and V1 isort to 1.28.0.dev0 (#9503)
+  `PR #9503 <https://github.com/pantsbuild/pants/pull/9503>`_
+
+* Upgrade to pex 2.1.9. (#9489)
+  `PR #9489 <https://github.com/pantsbuild/pants/pull/9489>`_
+
+* Update node.js dependencies. (#9474)
+  `PR #9474 <https://github.com/pantsbuild/pants/pull/9474>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Add `./pants backends` to list all available backend packages (#9468)
+  `PR #9468 <https://github.com/pantsbuild/pants/pull/9468>`_
+
+* Add --pants-use-gitignore option (#9310)
+  `PR #9310 <https://github.com/pantsbuild/pants/pull/9310>`_
+
+* Wire up `python-repos` options to V2 Pex usage (#9495)
+  `PR #9495 <https://github.com/pantsbuild/pants/pull/9495>`_
+
+* Port `dependencies2` to use the Target API and to work with JARs (#9494)
+  `PR #9494 <https://github.com/pantsbuild/pants/pull/9494>`_
+
+* Add a flag to prevent the FsEventService and watchman from starting (#9487)
+  `PR #9487 <https://github.com/pantsbuild/pants/pull/9487>`_
+
+* Add respect strict dep option for export-dep-as-jar (#9482)
+  `PR #9482 <https://github.com/pantsbuild/pants/pull/9482>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix mistakes with Target API bindings (#9505)
+  `PR #9505 <https://github.com/pantsbuild/pants/pull/9505>`_
+
+* Fix Python 3.8 runtime type error (#9502)
+  `PR #9502 <https://github.com/pantsbuild/pants/pull/9502>`_
+
+* Fix `--ignore-pants-warning` not working with deprecated modules when not using Pantsd (#9507)
+  `PR #9507 <https://github.com/pantsbuild/pants/pull/9507>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Add a mypy plugin to support @total_ordering. (#9525)
+  `PR #9525 <https://github.com/pantsbuild/pants/pull/9525>`_
+
+* Allow intrinsics to have multiple input arguments (#9527)
+  `PR #9527 <https://github.com/pantsbuild/pants/pull/9527>`_
+
+* Port the fs crate(s) to async-await (#9473)
+  `PR #9473 <https://github.com/pantsbuild/pants/pull/9473>`_
+
+* Bump to grpcio 0.5.1. (#9470)
+  `PR #9470 <https://github.com/pantsbuild/pants/pull/9470>`_
+
+* Bump to tokio 0.2.16. (#9467)
+  `PR #9467 <https://github.com/pantsbuild/pants/pull/9467>`_
+
+* Revert "Bump to tokio 0.2.16. (#9467)" (#9477)
+  `PR #9477 <https://github.com/pantsbuild/pants/pull/9477>`_
+
+* Rename `CreatePex` to `PexRequest` and add Target API support  (#9480)
+  `PR #9480 <https://github.com/pantsbuild/pants/pull/9480>`_
+
+* Rename `ChrootedPythonSources` to `ImportablePythonSources` and add Target API support (#9479)
+  `PR #9479 <https://github.com/pantsbuild/pants/pull/9479>`_
+
+* Attach a description to PexRequests. (#9523)
+  `PR #9523 <https://github.com/pantsbuild/pants/pull/9523>`_
+
+* Add `ScalarField` and `SequenceField` templates (#9465)
+  `PR #9465 <https://github.com/pantsbuild/pants/pull/9465>`_
+
+* Allow `Sources` subclasses to specify the # of expected files (#9466)
+  `PR #9466 <https://github.com/pantsbuild/pants/pull/9466>`_
+
+* Fix targets that do not have a `dependencies` field with the Target API  (#9481)
+  `PR #9481 <https://github.com/pantsbuild/pants/pull/9481>`_
+
+* Don't show V1 bindings when exclusively using V2 (#9511)
+  `PR #9511 <https://github.com/pantsbuild/pants/pull/9511>`_
+
+* Port AWS Lambda (V1 and V2) to use the Target API (#9491)
+  `PR #9491 <https://github.com/pantsbuild/pants/pull/9491>`_
+
+* Port `./v2 test` to use the Target API (#9484)
+  `PR #9484 <https://github.com/pantsbuild/pants/pull/9484>`_
+
+* Add Target API bindings for `python_dist`, `python_requirement_library`, and `unpacked_whls` (#9475)
+  `PR #9475 <https://github.com/pantsbuild/pants/pull/9475>`_
+
+* Add Target API bindings for `backend/codegen` and `backend/docgen` (#9486)
+  `PR #9486 <https://github.com/pantsbuild/pants/pull/9486>`_
+
+* Add Target API bindings for `python_app` and `jvm_app` (#9490)
+  `PR #9490 <https://github.com/pantsbuild/pants/pull/9490>`_
+
+* Add Target API bindings for `pants-plugins` (#9488)
+  `PR #9488 <https://github.com/pantsbuild/pants/pull/9488>`_
+
+* Avoid needless instantiation of LocalPantsRunner (#9501)
+  `PR #9501 <https://github.com/pantsbuild/pants/pull/9501>`_
+
+* Revert "Avoid needless instantiation of LocalPantsRunner (#9450)" (#9499)
+  `PR #9499 <https://github.com/pantsbuild/pants/pull/9499>`_
+
+* Avoid needless instantiation of LocalPantsRunner (#9450)
+  `PR #9450 <https://github.com/pantsbuild/pants/pull/9450>`_
+
+* Add some type annotations to pantsd test helpers (#9517)
+  `PR #9517 <https://github.com/pantsbuild/pants/pull/9517>`_
+
+* Move the WorkUnitStore to a thread/task local (#9522)
+  `PR #9522 <https://github.com/pantsbuild/pants/pull/9522>`_
+
+* Avoid recomputing a BuildFileAddress when subclassing will do. (#9472)
+  `PR #9472 <https://github.com/pantsbuild/pants/pull/9472>`_
+
+* Do not mix platforms and interpreter constraints while building release pexes (#9515)
+  `PR #9515 <https://github.com/pantsbuild/pants/pull/9515>`_
+
+* Distinguish pex sources from additional input files. (#9514)
+  `PR #9514 <https://github.com/pantsbuild/pants/pull/9514>`_
+
+* Build PEX files in two steps. (#9516)
+  `PR #9516 <https://github.com/pantsbuild/pants/pull/9516>`_
+
+* Leverage `PEX_ROOT` for Pex CLI. (#9513)
+  `PR #9513 <https://github.com/pantsbuild/pants/pull/9513>`_
+
+* Create `@named_rule`s and add additional annotations to rules (#9453)
+  `PR #9453 <https://github.com/pantsbuild/pants/pull/9453>`_
+
+* [IDE] Precompute flattened dependencies for modulizable targets (#9311)
+  `PR #9311 <https://github.com/pantsbuild/pants/pull/9311>`_
+
+* Reorder commit hooks by stack depth. (#9524)
+  `PR #9524 <https://github.com/pantsbuild/pants/pull/9524>`_
+
+* Improve CI skips in git commit hooks (#9496)
+  `PR #9496 <https://github.com/pantsbuild/pants/pull/9496>`_
+
+* Add `convert_source_to_sources.py` script to help users migrate away from deprecated `source` field (#9309)
+  `PR #9309 <https://github.com/pantsbuild/pants/pull/9309>`_
+
+Testing
+~~~~~~~
+
+* Fix test that depends on a Python stdlib line number (#9493)
+  `PR #9493 <https://github.com/pantsbuild/pants/pull/9493>`_
+
 1.27.0.dev2 (4/3/2020)
 -----------------------
 

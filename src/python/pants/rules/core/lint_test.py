@@ -3,23 +3,16 @@
 
 from abc import ABCMeta, abstractmethod
 from typing import Iterable, List, Tuple, Type
-from unittest.mock import Mock
 
 from pants.build_graph.address import Address
 from pants.engine.legacy.graph import HydratedTargetsWithOrigins, HydratedTargetWithOrigin
 from pants.engine.legacy.structs import TargetAdaptorWithOrigin
 from pants.engine.rules import UnionMembership
 from pants.rules.core.fmt_test import FmtTest
-from pants.rules.core.lint import Lint, Linter, LintResult, lint
-from pants.testutil.engine.util import MockConsole, MockGet, run_rule
+from pants.rules.core.lint import Lint, Linter, LintOptions, LintResult, lint
+from pants.testutil.engine.util import MockConsole, MockGet, create_goal_subsystem, run_rule
 from pants.testutil.test_base import TestBase
 from pants.util.ordered_set import OrderedSet
-
-
-# TODO(#9141): replace this with a proper util to create `GoalSubsystem`s
-class MockOptions:
-    def __init__(self, **values):
-        self.values = Mock(**values)
 
 
 class MockLinter(Linter, metaclass=ABCMeta):
@@ -107,7 +100,7 @@ class LintTest(TestBase):
             rule_args=[
                 console,
                 HydratedTargetsWithOrigins(targets),
-                MockOptions(per_target_caching=per_target_caching),
+                create_goal_subsystem(LintOptions, per_target_caching=per_target_caching),
                 union_membership,
             ],
             mock_gets=[

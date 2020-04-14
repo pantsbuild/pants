@@ -13,6 +13,7 @@ use futures01::Future;
 
 use crate::core::{Failure, TypeId};
 use crate::handles::maybe_drop_handles;
+use crate::intrinsics::Intrinsics;
 use crate::nodes::{NodeKey, WrappedNode};
 use crate::scheduler::Session;
 use crate::tasks::{Rule, Tasks};
@@ -48,6 +49,7 @@ pub struct Core {
   pub tasks: Tasks,
   pub rule_graph: RuleGraph<Rule>,
   pub types: Types,
+  pub intrinsics: Intrinsics,
   pub runtime: Runtime,
   pub executor: task_executor::Executor,
   store: Store,
@@ -63,6 +65,7 @@ impl Core {
     root_subject_types: Vec<TypeId>,
     tasks: Tasks,
     types: Types,
+    intrinsics: Intrinsics,
     build_root: PathBuf,
     ignore_patterns: &[String],
     use_gitignore: bool,
@@ -272,7 +275,8 @@ impl Core {
       graph,
       tasks,
       rule_graph,
-      types: types,
+      types,
+      intrinsics,
       runtime,
       executor: executor.clone(),
       store,

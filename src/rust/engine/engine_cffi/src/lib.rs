@@ -28,22 +28,22 @@
 // just the one minor call as unsafe, than to mark the whole function as unsafe which may hide
 // other unsafeness.
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
-
 // This crate is a wrapper around the engine crate which exposes a C interface which we can access
 // from Python using cffi.
 //
 // The engine crate contains some C interop which we use, notably externs which are functions and
 // types from Python which we can read from our Rust. This particular wrapper crate is just for how
 // we expose ourselves back to Python.
+#![type_length_limit = "1744838"]
 
 mod cffi_externs;
 
 use engine::externs::*;
 use engine::{
-  externs, nodes, Core, ExecutionRequest, ExecutionTermination, Function, Handle, Key, Params,
-  RootResult, Rule, Scheduler, Session, Tasks, TypeId, Types, Value,
+  externs, nodes, Core, ExecutionRequest, ExecutionTermination, Function, Handle, Intrinsics, Key,
+  Params, RootResult, Rule, Scheduler, Session, Tasks, TypeId, Types, Value,
 };
-use futures::compat::Future01CompatExt;
+use futures::future::{self as future03, TryFutureExt};
 use futures01::{future, Future};
 use hashing::{Digest, EMPTY_DIGEST};
 use log::{error, warn, Log};
@@ -289,9 +289,10 @@ fn make_core(
   let ignore_patterns = ignore_patterns_buf
     .to_strings()
     .map_err(|err| format!("Failed to decode ignore patterns as UTF8: {:?}", err))?;
+  let intrinsics = Intrinsics::new(&types);
   #[allow(clippy::redundant_closure)] // I couldn't find an easy way to remove this closure.
   let mut tasks = with_tasks(tasks_ptr, |tasks| tasks.clone());
-  tasks.intrinsics_set(&types);
+  tasks.intrinsics_set(&intrinsics);
   // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
   let remote_store_servers_vec = remote_store_servers_buf
     .to_strings()
@@ -354,6 +355,7 @@ fn make_core(
     root_type_ids,
     tasks,
     types,
+    intrinsics,
     PathBuf::from(build_root_buf.to_os_string()),
     &ignore_patterns,
     use_gitignore,
@@ -517,6 +519,8 @@ pub extern "C" fn scheduler_execute(
   with_scheduler(scheduler_ptr, |scheduler| {
     with_execution_request(execution_request_ptr, |execution_request| {
       with_session(session_ptr, |session| {
+        // TODO: A parent_id should be an explicit argument.
+        session.workunit_store().init_thread_state(None);
         match scheduler.execute(execution_request, session) {
           Ok(raw_results) => Box::into_raw(RawNodes::create(raw_results)),
           //TODO: Passing a raw null pointer to Python is a less-than-ideal way
@@ -822,7 +826,7 @@ pub extern "C" fn set_panic_handler() {
 
     error!("{}", panic_str);
 
-    let panic_file_bug_str = "Please file a bug at https://github.com/pantsbuild/pants/issues.";
+    let panic_file_bug_str = "Please set RUST_BACKTRACE=1, re-run, and then file a bug at https://github.com/pantsbuild/pants/issues.";
     error!("{}", panic_file_bug_str);
   }));
 }
@@ -903,31 +907,34 @@ pub extern "C" fn capture_snapshots(
       return e.into();
     }
   };
-  let workunit_store = with_session(session_ptr, |session| session.workunit_store());
 
   with_scheduler(scheduler_ptr, |scheduler| {
-    let core = scheduler.core.clone();
-    core.executor.block_on(
-      future::join_all(
-        path_globs_and_roots
-          .into_iter()
-          .map(|(path_globs, root, digest_hint)| {
-            let core = core.clone();
-            store::Snapshot::capture_snapshot_from_arbitrary_root(
+    with_session(session_ptr, |session| {
+      // TODO: A parent_id should be an explicit argument.
+      session.workunit_store().init_thread_state(None);
+      let core = scheduler.core.clone();
+      let snapshot_futures = path_globs_and_roots
+        .into_iter()
+        .map(|(path_globs, root, digest_hint)| {
+          let core = core.clone();
+          async move {
+            let snapshot = store::Snapshot::capture_snapshot_from_arbitrary_root(
               core.store(),
               core.executor.clone(),
               root,
               path_globs,
               digest_hint,
-              workunit_store.clone(),
             )
-            .map(move |snapshot| nodes::Snapshot::store_snapshot(&core, &snapshot))
-          })
-          .collect::<Vec<_>>(),
+            .await?;
+            let res: Result<_, String> = Ok(nodes::Snapshot::store_snapshot(&core, &snapshot));
+            res
+          }
+        })
+        .collect::<Vec<_>>();
+      core.executor.block_on(
+        future03::try_join_all(snapshot_futures).map_ok(|values| externs::store_tuple(&values)),
       )
-      .map(|values| externs::store_tuple(&values))
-      .compat(),
-    )
+    })
   })
   .into()
 }
@@ -950,19 +957,22 @@ pub extern "C" fn merge_directories(
       return e.into();
     }
   };
-  let workunit_store = with_session(session_ptr, |session| session.workunit_store());
 
   with_scheduler(scheduler_ptr, |scheduler| {
-    scheduler
-      .core
-      .executor
-      .block_on(
-        store::Snapshot::merge_directories(scheduler.core.store(), digests, workunit_store)
-          .compat(),
-      )
-      .map(|dir| nodes::Snapshot::store_directory(&scheduler.core, &dir))
-      .into()
+    with_session(session_ptr, |session| {
+      // TODO: A parent_id should be an explicit argument.
+      session.workunit_store().init_thread_state(None);
+      scheduler
+        .core
+        .executor
+        .block_on(store::Snapshot::merge_directories(
+          scheduler.core.store(),
+          digests,
+        ))
+        .map(|dir| nodes::Snapshot::store_directory(&scheduler.core, &dir))
+    })
   })
+  .into()
 }
 
 #[no_mangle]
@@ -1007,7 +1017,6 @@ pub extern "C" fn run_local_interactive_process(
             scheduler.core.store().materialize_directory(
               destination,
               digest,
-              session.workunit_store(),
             ).wait()?;
           }
         }
@@ -1080,60 +1089,63 @@ pub extern "C" fn materialize_directories(
       return e.into();
     }
   };
-  let workunit_store = with_session(session_ptr, |session| session.workunit_store());
   with_scheduler(scheduler_ptr, |scheduler| {
-    let types = &scheduler.core.types;
-    let construct_materialize_directories_results = types.construct_materialize_directories_results;
-    let construct_materialize_directory_result = types.construct_materialize_directory_result;
-    future::join_all(
-      digests_and_path_prefixes
-        .into_iter()
-        .map(|(digest, path_prefix)| {
-          // NB: all DirectoryToMaterialize paths are validated in Python to be relative paths.
-          // Here, we join them with the build root.
-          let mut destination = PathBuf::new();
-          destination.push(scheduler.core.build_root.clone());
-          destination.push(path_prefix);
-          let metadata = scheduler.core.store().materialize_directory(
-            destination.clone(),
-            digest,
-            workunit_store.clone(),
-          );
-          metadata.map(|m| (destination, m))
-        })
-        .collect::<Vec<_>>(),
-    )
-    .map(move |metadata_list| {
-      let entries: Vec<Value> = metadata_list
-        .iter()
-        .map(
-          |(output_dir, metadata): &(PathBuf, store::DirectoryMaterializeMetadata)| {
-            let path_list = metadata.to_path_list();
-            let path_values: Vec<Value> = path_list
-              .into_iter()
-              .map(|rel_path: String| {
-                let mut path = PathBuf::new();
-                path.push(output_dir);
-                path.push(rel_path);
-                externs::store_utf8(&path.to_string_lossy())
-              })
-              .collect();
+    with_session(session_ptr, |session| {
+      // TODO: A parent_id should be an explicit argument.
+      session.workunit_store().init_thread_state(None);
+      let types = &scheduler.core.types;
+      let construct_materialize_directories_results =
+        types.construct_materialize_directories_results;
+      let construct_materialize_directory_result = types.construct_materialize_directory_result;
+      future::join_all(
+        digests_and_path_prefixes
+          .into_iter()
+          .map(|(digest, path_prefix)| {
+            // NB: all DirectoryToMaterialize paths are validated in Python to be relative paths.
+            // Here, we join them with the build root.
+            let mut destination = PathBuf::new();
+            destination.push(scheduler.core.build_root.clone());
+            destination.push(path_prefix);
+            let metadata = scheduler
+              .core
+              .store()
+              .materialize_directory(destination.clone(), digest);
+            metadata.map(|m| (destination, m))
+          })
+          .collect::<Vec<_>>(),
+      )
+      .map(move |metadata_list| {
+        let entries: Vec<Value> = metadata_list
+          .iter()
+          .map(
+            |(output_dir, metadata): &(PathBuf, store::DirectoryMaterializeMetadata)| {
+              let path_list = metadata.to_path_list();
+              let path_values: Vec<Value> = path_list
+                .into_iter()
+                .map(|rel_path: String| {
+                  let mut path = PathBuf::new();
+                  path.push(output_dir);
+                  path.push(rel_path);
+                  externs::store_utf8(&path.to_string_lossy())
+                })
+                .collect();
 
-            externs::unsafe_call(
-              &construct_materialize_directory_result,
-              &[externs::store_tuple(&path_values)],
-            )
-          },
-        )
-        .collect();
+              externs::unsafe_call(
+                &construct_materialize_directory_result,
+                &[externs::store_tuple(&path_values)],
+              )
+            },
+          )
+          .collect();
 
-      let output: Value = externs::unsafe_call(
-        &construct_materialize_directories_results,
-        &[externs::store_tuple(&entries)],
-      );
-      output
+        let output: Value = externs::unsafe_call(
+          &construct_materialize_directories_results,
+          &[externs::store_tuple(&entries)],
+        );
+        output
+      })
+      .wait()
     })
-    .wait()
   })
   .into()
 }

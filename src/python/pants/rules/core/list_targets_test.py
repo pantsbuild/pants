@@ -1,29 +1,16 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from contextlib import contextmanager
 from textwrap import dedent
 from typing import List, Optional, Tuple, cast
-from unittest.mock import Mock
 
 from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.repository import Repository
 from pants.build_graph.address import Address
 from pants.engine.addressable import Addresses
 from pants.engine.target import DescriptionField, ProvidesField, Target, Targets
-from pants.rules.core.list_targets import list_targets
-from pants.testutil.engine.util import MockConsole, MockGet, run_rule
-
-
-# TODO(#9141): replace this with a proper util to create `GoalSubsystem`s
-class MockOptions:
-    def __init__(self, **values):
-        self.values = Mock(**values)
-        self.name = "list"
-
-    @contextmanager
-    def line_oriented(self, console: MockConsole):
-        yield lambda msg: console.print_stdout(msg)
+from pants.rules.core.list_targets import ListOptions, list_targets
+from pants.testutil.engine.util import MockConsole, MockGet, create_goal_subsystem, run_rule
 
 
 class MockTarget(Target):
@@ -43,7 +30,10 @@ def run_goal(
         list_targets,
         rule_args=[
             Addresses(tgt.address for tgt in targets),
-            MockOptions(
+            create_goal_subsystem(
+                ListOptions,
+                sep="\\n",
+                output_file=None,
                 documented=show_documented,
                 provides=show_provides,
                 provides_columns=provides_columns or "address,artifact_id",

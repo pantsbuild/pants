@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from typing import cast
-from unittest.mock import Mock
 
 from pants.base.build_root import BuildRoot
 from pants.build_graph.address import Address
@@ -11,15 +10,15 @@ from pants.engine.fs import Digest, FileContent, InputFilesContent, Workspace
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.option.global_options import GlobalOptions
 from pants.rules.core.binary import CreatedBinary
-from pants.rules.core.run import Run, run
-from pants.testutil.engine.util import MockConsole, MockGet, run_rule
+from pants.rules.core.run import Run, RunOptions, run
+from pants.testutil.engine.util import (
+    MockConsole,
+    MockGet,
+    create_goal_subsystem,
+    create_subsystem,
+    run_rule,
+)
 from pants.testutil.test_base import TestBase
-
-
-# TODO(#9141): replace this with a proper util to create `GoalSubsystem`s
-class MockOptions:
-    def __init__(self, **values):
-        self.values = Mock(**values)
 
 
 class RunTest(TestBase):
@@ -44,8 +43,8 @@ class RunTest(TestBase):
                 interactive_runner,
                 BuildRoot(),
                 Addresses([Address.parse(address_spec)]),
-                MockOptions(args=[]),
-                GlobalOptions.global_instance(),
+                create_goal_subsystem(RunOptions, args=[]),
+                create_subsystem(GlobalOptions, pants_workdir=self.pants_workdir),
             ],
             mock_gets=[
                 MockGet(

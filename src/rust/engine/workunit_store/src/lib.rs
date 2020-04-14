@@ -71,7 +71,7 @@ impl StartedWorkUnit {
 
 impl WorkUnit {
   pub fn new(name: String, time_span: TimeSpan, parent_id: Option<String>) -> WorkUnit {
-    let span_id = generate_random_64bit_string();
+    let span_id = new_span_id();
     WorkUnit {
       name,
       time_span,
@@ -103,6 +103,13 @@ impl WorkUnitStore {
     }
   }
 
+  pub fn init_thread_state(&self, parent_id: Option<String>) {
+    set_thread_workunit_state(Some(WorkUnitState {
+      store: self.clone(),
+      parent_id,
+    }))
+  }
+
   pub fn get_workunits(&self) -> Arc<Mutex<WorkUnitInnerStore>> {
     self.inner.clone()
   }
@@ -127,7 +134,7 @@ impl WorkUnitStore {
   }
 }
 
-pub fn generate_random_64bit_string() -> String {
+pub fn new_span_id() -> String {
   let mut rng = thread_rng();
   let random_u64: u64 = rng.gen();
   hex_16_digit_string(random_u64)
@@ -137,41 +144,55 @@ fn hex_16_digit_string(number: u64) -> String {
   format!("{:016.x}", number)
 }
 
+///
+/// The per-thread/task state that tracks the current workunit store, and workunit parent id.
+///
+#[derive(Clone)]
+pub struct WorkUnitState {
+  pub store: WorkUnitStore,
+  pub parent_id: Option<String>,
+}
+
 thread_local! {
-  static THREAD_PARENT_ID: RefCell<Option<String>> = RefCell::new(None)
+  static THREAD_WORKUNIT_STATE: RefCell<Option<WorkUnitState>> = RefCell::new(None)
 }
 
 task_local! {
-  static TASK_PARENT_ID: Option<String>;
+  static TASK_WORKUNIT_STATE: Option<WorkUnitState>;
 }
 
 ///
 /// Set the current parent_id for a Thread, but _not_ for a Task. Tasks must always be spawned
-/// by callers using the `scope_task_parent_id` helper (generally via task_executor::Executor.)
+/// by callers using the `scope_task_workunit_state` helper (generally via task_executor::Executor.)
 ///
-pub fn set_thread_parent_id(parent_id: Option<String>) {
-  THREAD_PARENT_ID.with(|thread_parent_id| {
-    *thread_parent_id.borrow_mut() = parent_id;
+pub fn set_thread_workunit_state(workunit_state: Option<WorkUnitState>) {
+  THREAD_WORKUNIT_STATE.with(|thread_workunit_state| {
+    *thread_workunit_state.borrow_mut() = workunit_state;
   })
 }
 
+pub fn get_workunit_state() -> Option<WorkUnitState> {
+  if let Ok(Some(workunit_state)) =
+    TASK_WORKUNIT_STATE.try_with(|workunit_state| workunit_state.clone())
+  {
+    Some(workunit_state)
+  } else {
+    THREAD_WORKUNIT_STATE.with(|thread_workunit_state| (*thread_workunit_state.borrow()).clone())
+  }
+}
+
+pub fn expect_workunit_state() -> WorkUnitState {
+  get_workunit_state().expect("A WorkUnitStore has not been set for this thread.")
+}
+
 ///
-/// Propagate the current parent_id to a Future representing a newly spawned Task. Usage of
-/// this method should mostly be contained to task_executor::Executor.
+/// Propagate the given WorkUnitState to a Future representing a newly spawned Task.
 ///
-pub async fn scope_task_parent_id<F>(parent_id: Option<String>, f: F) -> F::Output
+pub async fn scope_task_workunit_state<F>(workunit_state: Option<WorkUnitState>, f: F) -> F::Output
 where
   F: Future,
 {
-  TASK_PARENT_ID.scope(parent_id, f).await
-}
-
-pub fn get_parent_id() -> Option<String> {
-  if let Ok(Some(parent_id)) = TASK_PARENT_ID.try_with(|parent_id| parent_id.clone()) {
-    Some(parent_id)
-  } else {
-    THREAD_PARENT_ID.with(|parent_id| parent_id.borrow().clone())
-  }
+  TASK_WORKUNIT_STATE.scope(workunit_state, f).await
 }
 
 #[cfg(test)]

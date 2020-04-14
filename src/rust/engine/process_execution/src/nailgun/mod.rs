@@ -246,9 +246,8 @@ impl CapturedWorkdir for CommandRunner {
     let nailgun_pool = self.nailgun_pool.clone();
     let req2 = req.clone();
     let workdir_for_this_nailgun = self.get_nailgun_workdir(&nailgun_name)?;
-    let build_id = context.build_id.clone();
+    let build_id = context.build_id;
     let store = self.inner.store.clone();
-    let workunit_store = context.workunit_store;
 
     // Streams to read child output from
     let (stdio_write, stdio_read) = child_channel::<ChildOutput>();
@@ -268,7 +267,6 @@ impl CapturedWorkdir for CommandRunner {
             build_id,
             store,
             req.input_files,
-            workunit_store,
           )
           .compat()
       })

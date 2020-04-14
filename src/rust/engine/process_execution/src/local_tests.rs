@@ -665,12 +665,10 @@ async fn local_only_scratch_files_materialized() {
   let roland_directory_digest = TestDirectory::containing_roland().digest();
   store
     .record_directory(&TestDirectory::containing_roland().directory(), true)
-    .compat()
     .await
     .expect("Error saving directory");
   store
     .store_file_bytes(TestData::roland().bytes(), false)
-    .compat()
     .await
     .expect("Error saving file bytes");
 
@@ -750,17 +748,14 @@ async fn working_directory() {
   // from the ./cats directory.
   store
     .store_file_bytes(TestData::roland().bytes(), false)
-    .compat()
     .await
     .expect("Error saving file bytes");
   store
     .record_directory(&TestDirectory::containing_roland().directory(), true)
-    .compat()
     .await
     .expect("Error saving directory");
   store
     .record_directory(&TestDirectory::nested().directory(), true)
-    .compat()
     .await
     .expect("Error saving directory");
 

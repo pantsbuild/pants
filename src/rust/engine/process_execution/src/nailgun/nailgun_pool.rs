@@ -23,7 +23,6 @@ use crate::ExecuteProcessRequest;
 use digest::Digest as DigestTrait;
 use sha2::Sha256;
 use store::Store;
-use workunit_store::WorkUnitStore;
 
 lazy_static! {
   static ref NAILGUN_PORT_REGEX: Regex = Regex::new(r".*\s+port\s+(\d+)\.$").unwrap();
@@ -51,13 +50,12 @@ impl NailgunPool {
     workdir_for_server: PathBuf,
     requested_jdk_home: PathBuf,
     input_files: Digest,
-    workunit_store: WorkUnitStore,
   ) -> BoxFuture<(), String> {
     // Materialize the directory for running the nailgun server, if we need to.
     let workdir_for_server2 = workdir_for_server.clone();
 
     // TODO(#8481) This materializes the input files in the client req, which is a superset of the files we need (we only need the classpath, not the input files)
-    store.materialize_directory(workdir_for_server.clone(), input_files, workunit_store)
+    store.materialize_directory(workdir_for_server.clone(), input_files)
     .and_then(move |_metadata| {
       let jdk_home_in_workdir = &workdir_for_server.clone().join(".jdk");
       let jdk_home_in_workdir2 = jdk_home_in_workdir.clone();
@@ -104,7 +102,6 @@ impl NailgunPool {
     build_id_requesting_connection: String,
     store: Store,
     input_files: Digest,
-    workunit_store: WorkUnitStore,
   ) -> BoxFuture<Port, String> {
     let processes = self.processes.clone();
 
@@ -120,7 +117,7 @@ impl NailgunPool {
     ));
 
     Self::materialize_workdir_for_server(
-      store, workdir_path.clone(), jdk_path, input_files, workunit_store
+      store, workdir_path.clone(), jdk_path, input_files
     ).and_then(move |_| {
       debug!("Locking nailgun process pool so that only one can be connecting at a time.");
       let mut processes = processes.lock();

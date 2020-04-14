@@ -19,10 +19,11 @@ def main() -> None:
                 # still want to run MyPy against it so that we can enforce the type hints that may be there
                 # already and we can make sure that we don't revert in adding code that MyPy flags as an
                 # error.
-                "--tag=type_checked,partially_type_checked",
+                "--tag=+type_checked,+partially_type_checked,-nolint",
                 "--backend-packages=pants.contrib.mypy",
                 "--mypy-config=build-support/mypy/mypy.ini",
-                "lint",
+                "lint.mypy",
+                "--include-requirements",
                 *globs,
             ],
             check=True,

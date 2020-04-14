@@ -373,10 +373,6 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
         """Classpath entries containing scalac plugins."""
         return []
 
-    def always_do_after_compile(self, compile_context):
-        """Perform an action after compilation, whether cached or not."""
-        return
-
     def post_compile_extra_resources(self, compile_context):
         """Produces a dictionary of any extra, out-of-band resources for a target.
 
@@ -656,9 +652,6 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
                 exec_graph.execute(worker_pool, self.context.log)
             except ExecutionFailure as e:
                 raise TaskError(f"Compilation failure: {e!r}")
-        for vt in invalidation_check.all_vts:
-            compile_context = self.select_runtime_context(compile_contexts[vt.target])
-            self.always_do_after_compile(compile_context)
 
     def _record_compile_classpath(self, classpath, target, outdir):
         relative_classpaths = [
@@ -1060,6 +1053,10 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
         record("sources_len", sources_len)
         record("incremental", is_incremental)
 
+    def record_extra_target_stats(self, ctx):
+        """Report some additional stats for one of the subclasses by overriding this method."""
+        return
+
     def _collect_invalid_compile_dependencies(self, compile_target, invalid_target_set):
         all_strict_deps = DependencyContext.global_instance().dependencies_respecting_strict_deps(
             compile_target
@@ -1236,6 +1233,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
                 is_incremental,
                 "compile",
             )
+            self.record_extra_target_stats(ctx)
 
         # Update the products with the latest classes.
         output_classpath_product.add_for_target(
