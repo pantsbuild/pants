@@ -49,7 +49,9 @@ class PythonTarget(Target):
             {
                 "sources": self.create_sources_field(sources, address.spec_path, key_arg="sources"),
                 "provides": provides,
-                "compatibility": PrimitiveField(ensure_str_list(compatibility or ())),
+                "compatibility": PrimitiveField(
+                    ensure_str_list(compatibility or (), allow_single_str=True)
+                ),
             }
         )
         super().__init__(address=address, payload=payload, **kwargs)

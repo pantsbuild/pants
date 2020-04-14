@@ -89,6 +89,6 @@ class ClocTest(GoalRuleTestBase):
 
     def test_no_sources_exits_gracefully(self) -> None:
         py_dir = "src/py/foo"
-        self.add_to_build_file(py_dir, "python_library()")
+        self.add_to_build_file(py_dir, "python_library(sources=[])")
         output = self.execute_rule(args=[py_dir])
         assert output.strip() == ""

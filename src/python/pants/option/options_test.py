@@ -40,7 +40,7 @@ from pants.option.optionable import Optionable
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.parser import Parser
-from pants.option.ranked_value import RankedValue
+from pants.option.ranked_value import Rank, RankedValue
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.testutil.option.fakes import create_options
 from pants.testutil.test_base import TestBase
@@ -883,13 +883,13 @@ class OptionsTest(TestBase):
             self.assertEqual(expected_val, val)
 
         check_pants_foo(
-            "AAA", {"PANTS_GLOBAL_PANTS_FOO": "AAA", "PANTS_PANTS_FOO": "BBB", "PANTS_FOO": "CCC",}
+            "AAA", {"PANTS_GLOBAL_PANTS_FOO": "AAA", "PANTS_PANTS_FOO": "BBB", "PANTS_FOO": "CCC"}
         )
-        check_pants_foo("BBB", {"PANTS_PANTS_FOO": "BBB", "PANTS_FOO": "CCC",})
-        check_pants_foo("CCC", {"PANTS_FOO": "CCC",})
+        check_pants_foo("BBB", {"PANTS_PANTS_FOO": "BBB", "PANTS_FOO": "CCC"})
+        check_pants_foo("CCC", {"PANTS_FOO": "CCC"})
         check_pants_foo(None, {})
         # Check that an empty string is distinct from no value being specified.
-        check_pants_foo("", {"PANTS_PANTS_FOO": "", "PANTS_FOO": "CCC",})
+        check_pants_foo("", {"PANTS_PANTS_FOO": "", "PANTS_FOO": "CCC"})
 
         # A global option that doesn't begin with 'pants-': Setting BAR_BAZ should have no effect.
 
@@ -898,10 +898,10 @@ class OptionsTest(TestBase):
             self.assertEqual(expected_val, val)
 
         check_bar_baz(
-            "AAA", {"PANTS_GLOBAL_BAR_BAZ": "AAA", "PANTS_BAR_BAZ": "BBB", "BAR_BAZ": "CCC",}
+            "AAA", {"PANTS_GLOBAL_BAR_BAZ": "AAA", "PANTS_BAR_BAZ": "BBB", "BAR_BAZ": "CCC"}
         )
-        check_bar_baz("BBB", {"PANTS_BAR_BAZ": "BBB", "BAR_BAZ": "CCC",})
-        check_bar_baz(None, {"BAR_BAZ": "CCC",})
+        check_bar_baz("BBB", {"PANTS_BAR_BAZ": "BBB", "BAR_BAZ": "CCC"})
+        check_bar_baz(None, {"BAR_BAZ": "CCC"})
         check_bar_baz(None, {})
 
     def test_scoped_env_vars(self) -> None:
@@ -1359,14 +1359,14 @@ class OptionsTest(TestBase):
         self.assertEqual("@/does/not/exist", options.for_scope("fromfile").string)
 
     def test_ranked_value_equality(self) -> None:
-        none = RankedValue(RankedValue.NONE, None)
-        some = RankedValue(RankedValue.HARDCODED, "some")
-        self.assertEqual("(NONE, None)", str(none))
-        self.assertEqual("(HARDCODED, some)", str(some))
+        none = RankedValue(Rank.NONE, None)
+        some = RankedValue(Rank.HARDCODED, "some")
+        self.assertEqual(RankedValue(Rank.NONE, None), none)
+        self.assertEqual(RankedValue(Rank.HARDCODED, "some"), some)
         self.assertNotEqual(some, none)
-        self.assertEqual(some, RankedValue(RankedValue.HARDCODED, "some"))
-        self.assertNotEqual(some, RankedValue(RankedValue.HARDCODED, "few"))
-        self.assertNotEqual(some, RankedValue(RankedValue.CONFIG, "some"))
+        self.assertEqual(some, RankedValue(Rank.HARDCODED, "some"))
+        self.assertNotEqual(some, RankedValue(Rank.HARDCODED, "few"))
+        self.assertNotEqual(some, RankedValue(Rank.CONFIG, "some"))
 
     def test_pants_global_designdoc_example(self) -> None:
         # The example from the design doc.
@@ -1633,9 +1633,9 @@ class OptionsTest(TestBase):
         options = Options.create(
             env={},
             config=self._create_config(
-                {"DEFAULT": {"foo": "aa"}, DummyOptionable1.options_scope: {"foo": "xx"},}
+                {"DEFAULT": {"foo": "aa"}, DummyOptionable1.options_scope: {"foo": "xx"}}
             ),
-            known_scope_infos=[global_scope(), DummyOptionable1.get_scope_info(),],
+            known_scope_infos=[global_scope(), DummyOptionable1.get_scope_info()],
             args=shlex.split("./pants"),
         )
 

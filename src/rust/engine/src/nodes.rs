@@ -10,16 +10,18 @@ use std::sync::Arc;
 use std::time::Duration;
 use std::{self, fmt};
 
+use async_trait::async_trait;
+use futures::compat::Future01CompatExt;
+use futures::future::{FutureExt, TryFutureExt};
+use futures::stream::StreamExt;
 use futures01::future::{self, Future};
-use futures01::Stream;
 use url::Url;
 
 use crate::context::{Context, Core};
 use crate::core::{throw, Failure, Key, Params, TypeId, Value};
 use crate::externs;
-use crate::intrinsics;
 use crate::selectors;
-use crate::tasks::{self, Intrinsic, Rule};
+use crate::tasks::{self, Rule};
 use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::{self, BufMut};
 use fs::{
@@ -27,15 +29,13 @@ use fs::{
   PathGlobs, PathStat, StrictGlobMatching, VFS,
 };
 use hashing;
-use process_execution::{
-  self, ExecuteProcessRequest, MultiPlatformExecuteProcessRequest, PlatformConstraint, RelativePath,
-};
+use process_execution::{self, MultiPlatformProcess, PlatformConstraint, Process, RelativePath};
 use rule_graph;
 
 use graph::{Entry, Node, NodeError, NodeTracer, NodeVisualizer};
 use store::{self, StoreFileByDigest};
 use workunit_store::{
-  generate_random_64bit_string, set_parent_id, StartedWorkUnit, WorkUnit, WorkUnitStore,
+  new_span_id, scope_task_workunit_state, StartedWorkUnit, WorkUnit, WorkunitMetadata,
 };
 
 pub type NodeFuture<T> = BoxFuture<T, Failure>;
@@ -48,13 +48,14 @@ fn err<O: Send + 'static>(failure: Failure) -> NodeFuture<O> {
   future::err(failure).to_boxed()
 }
 
+#[async_trait]
 impl VFS<Failure> for Context {
-  fn read_link(&self, link: &Link) -> NodeFuture<PathBuf> {
-    self.get(ReadLink(link.clone())).map(|res| res.0).to_boxed()
+  async fn read_link(&self, link: &Link) -> Result<PathBuf, Failure> {
+    Ok(self.get(ReadLink(link.clone())).compat().await?.0)
   }
 
-  fn scandir(&self, dir: Dir) -> NodeFuture<Arc<DirectoryListing>> {
-    self.get(Scandir(dir))
+  async fn scandir(&self, dir: Dir) -> Result<Arc<DirectoryListing>, Failure> {
+    self.get(Scandir(dir)).compat().await
   }
 
   fn is_ignored(&self, stat: &fs::Stat) -> bool {
@@ -70,7 +71,7 @@ impl VFS<Failure> for Context {
 }
 
 impl StoreFileByDigest<Failure> for Context {
-  fn store_by_digest(&self, file: File, _: WorkUnitStore) -> BoxFuture<hashing::Digest, Failure> {
+  fn store_by_digest(&self, file: File) -> BoxFuture<hashing::Digest, Failure> {
     self.get(DigestFile(file))
   }
 }
@@ -168,10 +169,21 @@ impl WrappedNode for Select {
             task: task.clone(),
             entry: Arc::new(self.entry.clone()),
           }),
-          &Rule::Intrinsic(Intrinsic { product, input }) => self
-            .select_product(&context, input, "intrinsic")
-            .and_then(move |value| intrinsics::run_intrinsic(input, product, context, value))
-            .to_boxed(),
+          &Rule::Intrinsic(ref intrinsic) => {
+            let intrinsic = intrinsic.clone();
+            future::join_all(
+              intrinsic
+                .inputs
+                .iter()
+                .map(|type_id| self.select_product(&context, *type_id, "intrinsic"))
+                .collect::<Vec<_>>(),
+            )
+            .and_then(move |values| {
+              let core = context.core.clone();
+              core.intrinsics.run(intrinsic, context, values)
+            })
+            .to_boxed()
+          }
         }
       }
       &rule_graph::Entry::Param(type_id) => {
@@ -212,13 +224,13 @@ pub fn lift_digest(digest: &Value) -> Result<hashing::Digest, String> {
 /// A Node that represents a set of processes to execute on specific platforms.
 ///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct MultiPlatformExecuteProcess(MultiPlatformExecuteProcessRequest);
+pub struct MultiPlatformExecuteProcess(MultiPlatformProcess);
 
 impl MultiPlatformExecuteProcess {
   fn lift_execute_process(
     value: &Value,
     target_platform: PlatformConstraint,
-  ) -> Result<ExecuteProcessRequest, String> {
+  ) -> Result<Process, String> {
     let env = externs::project_tuple_encoded_map(&value, "env")?;
 
     let working_directory = {
@@ -272,7 +284,7 @@ impl MultiPlatformExecuteProcess {
       ))
       .map_err(|err| format!("Error parsing digest {}", err))?;
 
-    Ok(process_execution::ExecuteProcessRequest {
+    Ok(process_execution::Process {
       argv: externs::project_multi_strs(&value, "argv"),
       env,
       working_directory,
@@ -302,27 +314,25 @@ impl MultiPlatformExecuteProcess {
         )
       })
       .collect();
-    let requests = externs::project_multi(&value, "execute_process_requests");
-    if constraint_parts.len() / 2 != requests.len() {
+    let processes = externs::project_multi(&value, "processes");
+    if constraint_parts.len() / 2 != processes.len() {
       return Err(format!(
-        "Size of constraint keys and requests does not match: {} vs. {}",
+        "Sizes of constraint keys and processes do not match: {} vs. {}",
         constraint_parts.len() / 2,
-        requests.len()
+        processes.len()
       ));
     }
 
-    let mut request_by_constraint: BTreeMap<
-      (PlatformConstraint, PlatformConstraint),
-      ExecuteProcessRequest,
-    > = BTreeMap::new();
-    for (constraint_key, execute_process) in constraint_key_pairs.iter().zip(requests.iter()) {
+    let mut request_by_constraint: BTreeMap<(PlatformConstraint, PlatformConstraint), Process> =
+      BTreeMap::new();
+    for (constraint_key, execute_process) in constraint_key_pairs.iter().zip(processes.iter()) {
       let underlying_req =
         MultiPlatformExecuteProcess::lift_execute_process(execute_process, constraint_key.1)?;
       request_by_constraint.insert(constraint_key.clone(), underlying_req.clone());
     }
-    Ok(MultiPlatformExecuteProcess(
-      MultiPlatformExecuteProcessRequest(request_by_constraint),
-    ))
+    Ok(MultiPlatformExecuteProcess(MultiPlatformProcess(
+      request_by_constraint,
+    )))
   }
 }
 
@@ -364,7 +374,7 @@ impl WrappedNode for MultiPlatformExecuteProcess {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ProcessResult(pub process_execution::FallibleExecuteProcessResult);
+pub struct ProcessResult(pub process_execution::FallibleProcessResultWithPlatform);
 
 ///
 /// A Node that represents reading the destination of a symlink (non-recursively).
@@ -379,13 +389,18 @@ impl WrappedNode for ReadLink {
   type Item = LinkDest;
 
   fn run(self, context: Context) -> NodeFuture<LinkDest> {
-    context
-      .core
-      .vfs
-      .read_link(&self.0)
-      .map(LinkDest)
-      .map_err(|e| throw(&format!("{}", e)))
-      .to_boxed()
+    Box::pin(async move {
+      let node = self;
+      let link_dest = context
+        .core
+        .vfs
+        .read_link(&node.0)
+        .await
+        .map_err(|e| throw(&format!("{}", e)))?;
+      Ok(LinkDest(link_dest))
+    })
+    .compat()
+    .to_boxed()
   }
 }
 
@@ -405,19 +420,22 @@ impl WrappedNode for DigestFile {
   type Item = hashing::Digest;
 
   fn run(self, context: Context) -> NodeFuture<hashing::Digest> {
-    context
-      .core
-      .vfs
-      .read_file(&self.0)
-      .map_err(|e| throw(&format!("{}", e)))
-      .and_then(move |c| {
-        context
-          .core
-          .store()
-          .store_file_bytes(c.content, true)
-          .map_err(|e| throw(&e))
-      })
-      .to_boxed()
+    Box::pin(async move {
+      let content = context
+        .core
+        .vfs
+        .read_file(&self.0)
+        .map_err(|e| throw(&format!("{}", e)))
+        .await?;
+      context
+        .core
+        .store()
+        .store_file_bytes(content.content, true)
+        .map_err(|e| throw(&e))
+        .await
+    })
+    .compat()
+    .to_boxed()
   }
 }
 
@@ -438,13 +456,17 @@ impl WrappedNode for Scandir {
   type Item = Arc<DirectoryListing>;
 
   fn run(self, context: Context) -> NodeFuture<Arc<DirectoryListing>> {
-    context
-      .core
-      .vfs
-      .scandir(self.0)
-      .map(Arc::new)
-      .map_err(|e| throw(&format!("{}", e)))
-      .to_boxed()
+    Box::pin(async move {
+      let directory_listing = context
+        .core
+        .vfs
+        .scandir(self.0)
+        .await
+        .map_err(|e| throw(&format!("{}", e)))?;
+      Ok(Arc::new(directory_listing))
+    })
+    .compat()
+    .to_boxed()
   }
 }
 
@@ -465,20 +487,18 @@ impl Snapshot {
     // Recursively expand PathGlobs into PathStats.
     // We rely on Context::expand tracking dependencies for scandirs,
     // and store::Snapshot::from_path_stats tracking dependencies for file digests.
-    context
-      .expand(path_globs)
-      .map_err(|e| format!("{}", e))
-      .and_then(move |path_stats| {
-        store::Snapshot::from_path_stats(
-          context.core.store(),
-          &context,
-          path_stats,
-          WorkUnitStore::new(),
-        )
-        .map_err(move |e| format!("Snapshot failed: {}", e))
-      })
-      .map_err(|e| throw(&e))
-      .to_boxed()
+
+    Box::pin(async move {
+      let path_stats = context
+        .expand(path_globs)
+        .map_err(|e| throw(&format!("{}", e)))
+        .await?;
+      store::Snapshot::from_path_stats(context.core.store(), context.clone(), path_stats)
+        .map_err(|e| throw(&format!("Snapshot failed: {}", e)))
+        .await
+    })
+    .compat()
+    .to_boxed()
   }
 
   pub fn lift_path_globs(item: &Value) -> Result<PathGlobs, String> {
@@ -593,7 +613,6 @@ impl DownloadedFile {
     core: Arc<Core>,
     url: Url,
     digest: hashing::Digest,
-    workunit_store: WorkUnitStore,
   ) -> BoxFuture<store::Snapshot, String> {
     let file_name = try_future!(url
       .path_segments()
@@ -601,20 +620,20 @@ impl DownloadedFile {
       .map(str::to_owned)
       .ok_or_else(|| format!("Error getting the file name from the parsed URL: {}", url)));
 
-    core
-      .store()
-      .load_file_bytes_with(digest, |_| (), workunit_store)
-      .and_then(move |maybe_bytes| {
-        maybe_bytes
-          .map(|((), _metadata)| future::ok(()).to_boxed())
-          .unwrap_or_else(|| DownloadedFile::download(core.clone(), url, file_name.clone(), digest))
-          .and_then(move |()| {
-            core
-              .store()
-              .snapshot_of_one_file(PathBuf::from(file_name), digest, true)
-          })
-      })
-      .to_boxed()
+    Box::pin(async move {
+      let maybe_bytes = core.store().load_file_bytes_with(digest, |_| ()).await?;
+      if maybe_bytes.is_none() {
+        DownloadedFile::download(core.clone(), url, file_name.clone(), digest)
+          .compat()
+          .await?;
+      }
+      core
+        .store()
+        .snapshot_of_one_file(PathBuf::from(file_name), digest, true)
+        .await
+    })
+    .compat()
+    .to_boxed()
   }
 
   fn download(
@@ -628,6 +647,7 @@ impl DownloadedFile {
       .http_client
       .get(url.clone())
       .send()
+      .compat()
       .map_err(|err| format!("Error downloading file: {}", err))
       .and_then(move |response| {
         // Handle common HTTP errors.
@@ -676,25 +696,25 @@ impl DownloadedFile {
           }
         }
 
-        let hasher = hashing::WriterHasher::new(SizeLimiter {
-          writer: bytes::BytesMut::with_capacity(expected_digest.1).writer(),
-          written: 0,
-          size_limit: expected_digest.1,
-        });
+        let digest_and_bytes = async move {
+          let mut hasher = hashing::WriterHasher::new(SizeLimiter {
+            writer: bytes::BytesMut::with_capacity(expected_digest.1).writer(),
+            written: 0,
+            size_limit: expected_digest.1,
+          });
 
-        response
-          .into_body()
-          .map_err(|err| format!("Error reading URL fetch response: {}", err))
-          .fold(hasher, |mut hasher, chunk| {
+          let mut response_stream = response.bytes_stream();
+          while let Some(next_chunk) = response_stream.next().await {
+            let chunk =
+              next_chunk.map_err(|err| format!("Error reading URL fetch response: {}", err))?;
             hasher
               .write_all(&chunk)
-              .map(|_| hasher)
-              .map_err(|err| format!("Error hashing/writing URL fetch response: {}", err))
-          })
-          .map(|hasher| {
-            let (digest, bytewriter) = hasher.finish();
-            (digest, bytewriter.writer.into_inner().freeze())
-          })
+              .map_err(|err| format!("Error hashing/capturing URL fetch response: {}", err))?;
+          }
+          let (digest, bytewriter) = hasher.finish();
+          Ok((digest, bytewriter.writer.into_inner().freeze()))
+        };
+        digest_and_bytes.boxed().compat().to_boxed()
       })
       .and_then(move |(actual_digest, buf)| {
         if expected_digest != actual_digest {
@@ -705,11 +725,12 @@ impl DownloadedFile {
           .to_boxed();
         }
 
-        core
-          .store()
-          .store_file_bytes(buf, true)
-          .map(|_| ())
-          .to_boxed()
+        Box::pin(async move {
+          let _ = core.store().store_file_bytes(buf, true).await?;
+          Ok(())
+        })
+        .compat()
+        .to_boxed()
       })
       .to_boxed()
   }
@@ -731,12 +752,7 @@ impl WrappedNode for DownloadedFile {
     .map_err(|str| throw(&str)));
 
     self
-      .load_or_download(
-        context.core.clone(),
-        url,
-        expected_digest,
-        context.session.workunit_store(),
-      )
+      .load_or_download(context.core, url, expected_digest)
       .map(Arc::new)
       .map_err(|err| throw(&err))
       .to_boxed()
@@ -758,10 +774,6 @@ pub struct Task {
 }
 
 impl Task {
-  fn get_display_info(&self) -> Option<&String> {
-    self.task.display_info.as_ref()
-  }
-
   fn gen_get(
     context: &Context,
     params: &Params,
@@ -881,7 +893,9 @@ impl WrappedNode for Task {
           .task
           .clause
           .into_iter()
-          .map(|s| Select::new_from_edges(params.clone(), s.product, edges).run(context.clone()))
+          .map(|type_id| {
+            Select::new_from_edges(params.clone(), type_id, edges).run(context.clone())
+          })
           .collect::<Vec<_>>(),
       )
     };
@@ -1024,6 +1038,13 @@ impl NodeKey {
       | &NodeKey::DownloadedFile { .. } => None,
     }
   }
+
+  pub fn display_info(&self) -> Option<&tasks::DisplayInfo> {
+    match self {
+      NodeKey::Task(ref task) => Some(&task.task.display_info),
+      _ => None,
+    }
+  }
 }
 
 impl Node for NodeKey {
@@ -1033,48 +1054,64 @@ impl Node for NodeKey {
   type Error = Failure;
 
   fn run(self, context: Context) -> NodeFuture<NodeResult> {
-    let (maybe_started_workunit, maybe_span_id) = if context.session.should_handle_workunits() {
-      let user_facing_name = self.user_facing_name();
-      let span_id = generate_random_64bit_string();
-      let parent_id = workunit_store::get_parent_id();
-      let maybe_started_workunit = user_facing_name.as_ref().map(|node_name| StartedWorkUnit {
-        name: node_name.to_string(),
-        start_time: std::time::SystemTime::now(),
-        span_id: span_id.clone(),
-        parent_id,
-      });
-      let maybe_span_id = if user_facing_name.is_some() {
-        Some(span_id)
-      } else {
-        None
-      };
-      (maybe_started_workunit, maybe_span_id)
+    let mut workunit_state = workunit_store::expect_workunit_state();
+    let maybe_started_workunit = if context.session.should_handle_workunits() {
+      self.user_facing_name().map(|node_name| {
+        let span_id = new_span_id();
+        let desc = self.display_info().and_then(|di| di.desc.as_ref().cloned());
+
+        // We're starting a new workunit: record our parent, and set the current parent to our span.
+        let parent_id = std::mem::replace(&mut workunit_state.parent_id, Some(span_id.clone()));
+
+        StartedWorkUnit {
+          name: node_name,
+          start_time: std::time::SystemTime::now(),
+          span_id: span_id,
+          parent_id: parent_id,
+          metadata: WorkunitMetadata { desc },
+        }
+      })
     } else {
-      (None, None)
+      None
     };
 
-    let context2 = context.clone();
-    future::lazy(|| {
-      if let Some(span_id) = maybe_span_id {
-        set_parent_id(span_id);
-      }
-      match self {
-        NodeKey::DigestFile(n) => n.run(context).map(NodeResult::from).to_boxed(),
-        NodeKey::DownloadedFile(n) => n.run(context).map(NodeResult::from).to_boxed(),
-        NodeKey::MultiPlatformExecuteProcess(n) => n.run(context).map(NodeResult::from).to_boxed(),
-        NodeKey::ReadLink(n) => n.run(context).map(NodeResult::from).to_boxed(),
-        NodeKey::Scandir(n) => n.run(context).map(NodeResult::from).to_boxed(),
-        NodeKey::Select(n) => n.run(context).map(NodeResult::from).to_boxed(),
-        NodeKey::Snapshot(n) => n.run(context).map(NodeResult::from).to_boxed(),
-        NodeKey::Task(n) => n.run(context).map(NodeResult::from).to_boxed(),
-      }
-    })
-    .inspect(move |_: &NodeResult| {
+    scope_task_workunit_state(Some(workunit_state), async move {
+      let context2 = context.clone();
+      let maybe_watch = if let Some(path) = self.fs_subject() {
+        let abs_path = context.core.build_root.join(path);
+        context
+          .core
+          .watcher
+          .watch(abs_path)
+          .map_err(|e| Context::mk_error(&format!("{:?}", e)))
+          .await
+      } else {
+        Ok(())
+      };
+
+      let result = match maybe_watch {
+        Ok(()) => match self {
+          NodeKey::DigestFile(n) => n.run(context).map(NodeResult::from).compat().await,
+          NodeKey::DownloadedFile(n) => n.run(context).map(NodeResult::from).compat().await,
+          NodeKey::MultiPlatformExecuteProcess(n) => {
+            n.run(context).map(NodeResult::from).compat().await
+          }
+          NodeKey::ReadLink(n) => n.run(context).map(NodeResult::from).compat().await,
+          NodeKey::Scandir(n) => n.run(context).map(NodeResult::from).compat().await,
+          NodeKey::Select(n) => n.run(context).map(NodeResult::from).compat().await,
+          NodeKey::Snapshot(n) => n.run(context).map(NodeResult::from).compat().await,
+          NodeKey::Task(n) => n.run(context).map(NodeResult::from).compat().await,
+        },
+        Err(e) => Err(e),
+      };
       if let Some(started_workunit) = maybe_started_workunit {
         let workunit: WorkUnit = started_workunit.finish();
         context2.session.workunit_store().add_workunit(workunit)
       }
+      result
     })
+    .boxed()
+    .compat()
     .to_boxed()
   }
 
@@ -1089,7 +1126,7 @@ impl Node for NodeKey {
     }
   }
 
-  fn cacheable(&self, _context: &Self::Context) -> bool {
+  fn cacheable(&self) -> bool {
     match self {
       &NodeKey::Task(ref s) => s.task.cacheable,
       _ => true,
@@ -1098,7 +1135,7 @@ impl Node for NodeKey {
 
   fn user_facing_name(&self) -> Option<String> {
     match self {
-      NodeKey::Task(ref task) => task.get_display_info().map(|s| s.to_owned()),
+      NodeKey::Task(ref task) => task.task.display_info.name.as_ref().map(|s| s.to_owned()),
       NodeKey::Snapshot(_) => Some(format!("{}", self)),
       NodeKey::MultiPlatformExecuteProcess(mp_epr) => mp_epr.0.user_facing_name(),
       NodeKey::DigestFile(..) => None,
@@ -1130,6 +1167,12 @@ impl Display for NodeKey {
 impl NodeError for Failure {
   fn invalidated() -> Failure {
     Failure::Invalidated
+  }
+
+  fn exhausted() -> Failure {
+    Context::mk_error(
+      "Exhausted retries for uncacheable node. The filesystem was changing too much.",
+    )
   }
 
   fn cyclic(mut path: Vec<String>) -> Failure {

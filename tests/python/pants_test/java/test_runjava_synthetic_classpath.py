@@ -31,7 +31,7 @@ class SyntheticClasspathTest(NailgunTaskTestBase):
             try:
                 # Download a jar that echoes things.
                 fetcher.download(
-                    "https://repo1.maven.org/maven2/io/get-coursier/echo/1.0.0/echo-1.0.0.jar",
+                    "https://maven-central.storage-download.googleapis.com/maven2/io/get-coursier/echo/1.0.0/echo-1.0.0.jar",
                     path_or_fd=temp_path.name,
                     timeout_secs=2,
                 )

@@ -197,18 +197,7 @@ impl<'t, R: Rule> GraphMaker<'t, R> {
     }
   }
 
-  pub fn sub_graph(&self, param_type: R::TypeId, product_type: R::TypeId) -> RuleGraph<R> {
-    // TODO: Update to support rendering a subgraph given a set of ParamTypes.
-    let param_types = vec![param_type].into_iter().collect();
-
-    if let Some(beginning_root) = self.gen_root_entry(&param_types, product_type) {
-      self.construct_graph(vec![beginning_root])
-    } else {
-      RuleGraph::default()
-    }
-  }
-
-  pub fn full_graph(&self) -> RuleGraph<R> {
+  pub fn graph(&self) -> RuleGraph<R> {
     self.construct_graph(self.gen_root_entries(&self.tasks.keys().cloned().collect()))
   }
 
@@ -883,7 +872,7 @@ fn entry_with_deps_str<R: Rule>(entry: &EntryWithDeps<R>) -> String {
 
 impl<R: Rule> RuleGraph<R> {
   pub fn new(tasks: &HashMap<R::TypeId, Vec<R>>, root_param_types: Vec<R::TypeId>) -> RuleGraph<R> {
-    GraphMaker::new(tasks, root_param_types).full_graph()
+    GraphMaker::new(tasks, root_param_types).graph()
   }
 
   pub fn find_root_edges<I: IntoIterator<Item = R::TypeId>>(
@@ -891,16 +880,67 @@ impl<R: Rule> RuleGraph<R> {
     param_inputs: I,
     product: R::TypeId,
   ) -> Result<RuleEdges<R>, String> {
+    let (_, edges) = self.find_root(param_inputs, product)?;
+    Ok(edges)
+  }
+
+  ///
+  /// Create a copy of this RuleGraph filtered to only the subgraph below the root matched by the
+  /// given product and params.
+  ///
+  pub fn subgraph<I: IntoIterator<Item = R::TypeId>>(
+    &self,
+    param_inputs: I,
+    product: R::TypeId,
+  ) -> Result<RuleGraph<R>, String> {
+    let (root, _) = self.find_root(param_inputs, product)?;
+
+    // Walk the graph, starting from root entries.
+    let mut entry_stack: Vec<_> = vec![root];
+    let mut reachable = HashMap::new();
+    while let Some(entry) = entry_stack.pop() {
+      if reachable.contains_key(&entry) {
+        continue;
+      }
+
+      if let Some(edges) = self.rule_dependency_edges.get(&entry) {
+        reachable.insert(entry, edges.clone());
+
+        entry_stack.extend(edges.all_dependencies().filter_map(|e| match e {
+          Entry::WithDeps(e) => Some(e.clone()),
+          _ => None,
+        }));
+      } else {
+        return Err(format!("Unknown entry in RuleGraph: {:?}", entry));
+      }
+    }
+
+    Ok(RuleGraph {
+      root_param_types: self.root_param_types.clone(),
+      rule_dependency_edges: reachable,
+      unfulfillable_rules: UnfulfillableRuleMap::default(),
+      unreachable_rules: Vec::default(),
+    })
+  }
+
+  ///
+  /// Find the entrypoint in this RuleGraph for the given product and params.
+  ///
+  pub fn find_root<I: IntoIterator<Item = R::TypeId>>(
+    &self,
+    param_inputs: I,
+    product: R::TypeId,
+  ) -> Result<(EntryWithDeps<R>, RuleEdges<R>), String> {
     let params: ParamTypes<_> = param_inputs.into_iter().collect();
     let dependency_key = R::DependencyKey::new_root(product);
-    let root = RootEntry {
-      params: params.clone(),
-      dependency_key,
-    };
 
     // Attempt to find an exact match.
-    if let Some(re) = self.rule_dependency_edges.get(&EntryWithDeps::Root(root)) {
-      return Ok(re.clone());
+    let maybe_root = EntryWithDeps::Root(RootEntry {
+      params: params.clone(),
+      dependency_key,
+    });
+    if let Some(edges) = self.rule_dependency_edges.get(&maybe_root) {
+      return Ok((maybe_root, edges.clone()));
     }
 
     // Otherwise, scan for partial/subset matches.
@@ -920,7 +960,10 @@ impl<R: Rule> RuleGraph<R> {
       .collect::<Vec<_>>();
 
     match subset_matches.len() {
-      1 => Ok(subset_matches[0].1.clone()),
+      1 => {
+        let (root_entry, edges) = subset_matches[0];
+        Ok((root_entry.clone(), edges.clone()))
+      }
       0 if params.is_subset(&self.root_param_types) => {
         // The Params were all registered as RootRules, but the combination wasn't legal.
         let mut suggestions: Vec<_> = self

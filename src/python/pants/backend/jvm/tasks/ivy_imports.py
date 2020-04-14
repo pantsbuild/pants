@@ -4,12 +4,12 @@
 from pants.backend.jvm.targets.import_jars_mixin import ImportJarsMixin
 from pants.backend.jvm.tasks.classpath_entry import ArtifactClasspathEntry
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
-from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
+from pants.backend.jvm.tasks.coursier_resolve import CoursierMixin
 from pants.backend.jvm.tasks.jar_import_products import JarImportProducts
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 
 
-class IvyImports(IvyTaskMixin, NailgunTask):
+class IvyImports(CoursierMixin, NailgunTask):
     """Resolves jar files for imported_targets on `ImportJarsMixin` targets.
 
     One use case is for JavaProtobufLibrary, which includes imports for jars containing .proto
@@ -44,10 +44,11 @@ class IvyImports(IvyTaskMixin, NailgunTask):
 
         imports_classpath = ClasspathProducts(self.get_options().pants_workdir)
         self.resolve(
-            executor=self.create_java_executor(),
             targets=all_targets,
-            classpath_products=imports_classpath,
-            invalidate_dependents=True,
+            compile_classpath=imports_classpath,
+            sources=False,
+            javadoc=False,
+            executor=self.create_java_executor(),
         )
 
         for target in targets:

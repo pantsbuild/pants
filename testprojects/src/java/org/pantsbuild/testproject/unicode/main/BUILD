@@ -9,6 +9,6 @@ jvm_binary(
     'testprojects/src/java/org/pantsbuild/testproject/unicode/cucumber',
     'testprojects/src/scala/org/pantsbuild/testproject/unicode/shapeless',
   ],
-  source = 'CucumberMain.java',
+  sources = ['CucumberMain.java'],
   main = 'org.pantsbuild.testproject.unicode.main.CucumberMain',
 )

@@ -12,7 +12,7 @@ from pants.base.worker_pool import SubprocPool
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.target import Target
 from pants.engine.isolated_process import (
-    FallibleExecuteProcessResult,
+    FallibleProcessResult,
     ProductDescription,
     fallible_to_exec_result_or_raise,
 )
@@ -403,37 +403,29 @@ class Context:
             build_graph.inject_address_closure(address)
         return build_graph
 
-    def execute_process_synchronously_without_raising(
-        self, execute_process_request, name, labels=None
-    ):
+    def execute_process_synchronously_without_raising(self, process, name, labels=None):
         """Executes a process (possibly remotely), and returns information about its output.
 
-        :param execute_process_request: The ExecuteProcessRequest to run.
+        :param process: The Process to run.
         :param name: A descriptive name representing the process being executed.
         :param labels: A tuple of WorkUnitLabels.
-        :return: An ExecuteProcessResult with information about the execution.
+        :return: An ProcessResult with information about the execution.
 
         Note that this is an unstable, experimental API, which is subject to change with no notice.
         """
-        with self.new_workunit(
-            name=name, labels=labels, cmd=" ".join(execute_process_request.argv),
-        ) as workunit:
-            result = self._scheduler.product_request(
-                FallibleExecuteProcessResult, [execute_process_request]
-            )[0]
+        with self.new_workunit(name=name, labels=labels, cmd=" ".join(process.argv),) as workunit:
+            result = self._scheduler.product_request(FallibleProcessResult, [process])[0]
             workunit.output("stdout").write(result.stdout)
             workunit.output("stderr").write(result.stderr)
             workunit.set_outcome(WorkUnit.FAILURE if result.exit_code else WorkUnit.SUCCESS)
             return result
 
-    def execute_process_synchronously_or_raise(self, execute_process_request, name, labels=None):
+    def execute_process_synchronously_or_raise(self, process, name, labels=None):
         """Execute process synchronously, and throw if the return code is not 0.
 
         See execute_process_synchronously for the api docs.
         """
-        fallible_result = self.execute_process_synchronously_without_raising(
-            execute_process_request, name, labels
-        )
+        fallible_result = self.execute_process_synchronously_without_raising(process, name, labels)
         return fallible_to_exec_result_or_raise(
-            fallible_result, ProductDescription(execute_process_request.description)
+            fallible_result, ProductDescription(process.description)
         )

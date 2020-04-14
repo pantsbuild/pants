@@ -2,11 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import inspect
-import typing
 from abc import ABC, abstractmethod
 from collections import namedtuple
-from collections.abc import Iterable
-from typing import Generic, Iterator, TypeVar
+from typing import Any, Iterable, Sequence, TypeVar, Union, overload
 
 from pants.util.meta import decorated_type_checkable
 
@@ -154,26 +152,53 @@ class Validatable(ABC):
         """
 
 
-_C = TypeVar("_C")
+T = TypeVar("T")
 
 
-class Collection(Generic[_C], Iterable):
-    """Constructs classes representing collections of objects of a particular type.
+class Collection(Sequence[T]):
+    """A light newtype around immutable sequences for use with the V2 engine.
 
-    The produced class will expose its values under a field named dependencies - this is a stable API
-    which may be consumed e.g. over FFI from the engine.
+    This should be subclassed when you want to create a distinct collection type, such as:
 
-    Python consumers of a Collection should prefer to use its standard iteration API.
+        @dataclass(frozen=True)
+        class Example:
+            val1: str
+
+        class Examples(Collection[Example]):
+            pass
     """
 
-    def __init__(self, dependencies: typing.Iterable[_C]) -> None:
+    def __init__(self, dependencies: Iterable[T]) -> None:
+        # TODO: rename to `items`, `elements`, or even make this private. Python consumers should
+        #  not directly access this.
         self.dependencies = tuple(dependencies)
 
-    def __iter__(self) -> Iterator[_C]:
-        return iter(self.dependencies)
+    @overload  # noqa: F811
+    def __getitem__(self, index: int) -> T:
+        ...
 
-    def __bool__(self) -> bool:
-        return bool(self.dependencies)
+    @overload  # noqa: F811
+    def __getitem__(self, index: slice) -> "Collection[T]":
+        ...
+
+    def __getitem__(self, index: Union[int, slice]) -> Union[T, "Collection[T]"]:  # noqa: F811
+        if isinstance(index, int):
+            return self.dependencies[index]
+        return self.__class__(self.dependencies[index])
+
+    def __len__(self) -> int:
+        return len(self.dependencies)
+
+    def __eq__(self, other: Union[Any, "Collection"]) -> bool:
+        if not isinstance(other, self.__class__):
+            return NotImplemented
+        return self.dependencies == other.dependencies
+
+    def __hash__(self) -> int:
+        return hash(self.dependencies)
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({list(self.dependencies)})"
 
 
 @decorated_type_checkable

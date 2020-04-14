@@ -5,6 +5,7 @@ import logging
 
 from pants.binaries.binary_util import BinaryToolFetcher, BinaryUtil
 from pants.pantsd.watchman import Watchman
+from pants.util.logging import LogLevel
 from pants.util.memo import testable_memoized_property
 
 
@@ -34,6 +35,7 @@ class WatchmanLauncher:
             bootstrap_options.watchman_supportdir,
             bootstrap_options.watchman_startup_timeout,
             bootstrap_options.watchman_socket_timeout,
+            bootstrap_options.watchman_enable,
             bootstrap_options.watchman_socket_path,
             bootstrap_options.pants_subprocessdir,
         )
@@ -46,6 +48,7 @@ class WatchmanLauncher:
         watchman_supportdir,
         startup_timeout,
         socket_timeout,
+        watchman_enable,
         socket_path_override=None,
         metadata_base_dir=None,
     ):
@@ -56,6 +59,7 @@ class WatchmanLauncher:
         :param watchman_supportdir: The supportdir for BinaryUtil.
         :param socket_timeout: The watchman client socket timeout (in seconds).
         :param socket_path_override: The overridden target path of the watchman socket, if any.
+        :param watchman_enable: Whether to start watchman when asked to maybe launch.
         :param metadata_base_dir: The ProcessManager metadata base directory.
         """
         self._binary_util = binary_util
@@ -64,18 +68,19 @@ class WatchmanLauncher:
         self._startup_timeout = startup_timeout
         self._socket_timeout = socket_timeout
         self._socket_path_override = socket_path_override
+        self._watchman_enable = watchman_enable
         self._log_level = log_level
         self._logger = logging.getLogger(__name__)
         self._metadata_base_dir = metadata_base_dir
 
     @staticmethod
-    def _convert_log_level(level):
+    def _convert_log_level(log_level):
         """Convert a given pants log level string into a watchman log level string."""
         # N.B. Enabling true Watchman debug logging (log level 2) can generate an absurd amount of log
         # data (10s of gigabytes over the course of an ~hour for an active fs) and is not particularly
         # helpful except for debugging Watchman itself. Thus, here we intentionally avoid this level
         # in the mapping of pants log level -> watchman.
-        return {"warn": "0", "info": "1", "debug": "1"}.get(level, "1")
+        return {LogLevel.WARN: "0", LogLevel.INFO: "1", LogLevel.DEBUG: "1"}.get(log_level, "1")
 
     @testable_memoized_property
     def watchman(self):
@@ -92,21 +97,27 @@ class WatchmanLauncher:
         )
 
     def maybe_launch(self):
-        if not self.watchman.is_alive():
-            self._logger.debug("launching watchman")
-            try:
-                self.watchman.launch()
-            except (Watchman.ExecutionError, Watchman.InvalidCommandOutput) as e:
-                self._logger.fatal("failed to launch watchman: {!r})".format(e))
-                raise
-
-        self._logger.debug(
-            "watchman is running, pid={pid} socket={socket}".format(
-                pid=self.watchman.pid, socket=self.watchman.socket
+        if self._watchman_enable:
+            if not self.watchman.is_alive():
+                self._logger.debug("launching watchman")
+                try:
+                    self.watchman.launch()
+                except (Watchman.ExecutionError, Watchman.InvalidCommandOutput) as e:
+                    self._logger.critical("failed to launch watchman: {!r})".format(e))
+                    raise
+            self._logger.debug(
+                "watchman is running, pid={pid} socket={socket}".format(
+                    pid=self.watchman.pid, socket=self.watchman.socket
+                )
             )
-        )
+            return self.watchman
+        else:
+            self.maybe_terminate()
 
-        return self.watchman
+    def maybe_terminate(self) -> None:
+        if not self._watchman_enable and self.watchman.is_alive():
+            self._logger.info("Watchman was running, but will be killed because it was disabled.")
+            self.terminate()
 
     def terminate(self):
         self.watchman.terminate()

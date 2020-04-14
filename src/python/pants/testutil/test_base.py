@@ -11,7 +11,7 @@ from collections import defaultdict
 from contextlib import contextmanager
 from tempfile import mkdtemp
 from textwrap import dedent
-from typing import Any, Iterable, List, Optional, Type, TypeVar, Union, cast
+from typing import Any, Iterable, List, Optional, Sequence, Type, TypeVar, Union, cast
 
 from pants.base.build_root import BuildRoot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
@@ -20,13 +20,14 @@ from pants.base.specs import AddressSpec, AddressSpecs, FilesystemSpecs, Specs
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.build_graph.target import Target
-from pants.engine.fs import PathGlobs, PathGlobsAndRoot, Snapshot
+from pants.build_graph.target import Target as TargetV1
+from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, PathGlobsAndRoot, Snapshot
 from pants.engine.legacy.graph import HydratedField
 from pants.engine.legacy.structs import SourceGlobs, SourcesField
 from pants.engine.rules import RootRule
 from pants.engine.scheduler import SchedulerSession
 from pants.engine.selectors import Params
+from pants.engine.target import Target
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.util import clean_global_runtime_state
 from pants.option.global_options import BuildFileImportsBehavior
@@ -206,7 +207,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     def make_target(
         self,
         spec="",
-        target_type=Target,
+        target_type=TargetV1,
         dependencies=None,
         derived_from=None,
         synthetic=False,
@@ -286,7 +287,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         """
         :API: public
         """
-        return BuildFileAliases(targets={"target": Target})
+        return BuildFileAliases(targets={"target": TargetV1})
 
     @classmethod
     def rules(cls):
@@ -294,10 +295,15 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         return [RootRule(SourcesField)]
 
     @classmethod
+    def target_types(cls) -> Sequence[Type[Target]]:
+        return ()
+
+    @classmethod
     def build_config(cls):
         build_config = BuildConfiguration()
         build_config.register_aliases(cls.alias_groups())
         build_config.register_rules(cls.rules())
+        build_config.register_targets(cls.target_types())
         return build_config
 
     def setUp(self):
@@ -335,7 +341,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
         self._build_configuration = self.build_config()
         self._inited_target = False
-        subsystem_util.init_subsystem(Target.TagAssignments)
+        subsystem_util.init_subsystem(TargetV1.TagAssignments)
 
     def buildroot_files(self, relpath=None):
         """Returns the set of all files under the test build root.
@@ -407,8 +413,10 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         # `cls.alias_groups` rather than having them be provided by bootstrap options.
         graph_session = EngineInitializer.setup_legacy_graph_extended(
             pants_ignore_patterns=[],
+            use_gitignore=False,
             local_store_dir=local_store_dir,
             build_file_imports_behavior=BuildFileImportsBehavior.error,
+            glob_match_error_behavior=GlobMatchErrorBehavior.error,
             native=init_native(),
             options_bootstrapper=options_bootstrapper,
             build_root=self.build_root,
@@ -566,7 +574,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
         :rtype: list of type objects, all subclasses of Subsystem
         """
-        return Target.subsystems()
+        return TargetV1.subsystems()
 
     def _init_target_subsystem(self):
         if not self._inited_target:
@@ -574,13 +582,13 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
             self._inited_target = True
 
     def target(self, spec):
-        """Resolves the given target address to a Target object.
+        """Resolves the given target address to a V1 Target object.
 
         :API: public
 
         address: The BUILD target address to resolve.
 
-        Returns the corresponding Target or else None if the address does not point to a defined Target.
+        Returns the corresponding V1 Target or else None if the address does not point to a defined Target.
         """
         self._init_target_subsystem()
 
@@ -589,7 +597,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         return self.build_graph.get_target(address)
 
     def targets(self, address_spec):
-        """Resolves a target spec to one or more Target objects.
+        """Resolves a target spec to one or more V1 Target objects.
 
         :API: public
 
@@ -636,7 +644,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         if sources:
             self.create_files(path, sources)
 
-        sources_str = f"sources={repr(sources)}," if sources else ""
+        sources_str = f"sources={repr(sources)}," if sources is not None else ""
         if java_sources is not None:
             formatted_java_sources = ",".join(f'"{str_target}"' for str_target in java_sources)
             java_sources_str = f"java_sources=[{formatted_java_sources}],"

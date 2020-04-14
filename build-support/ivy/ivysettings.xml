@@ -31,7 +31,7 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
            maven central due to all RBE traffic appearing to them as coming from a single IP.
            There's no harm in trying this even outside RBE, as it is world-visible. -->
       <ibiblio name="maven-central-mirror" m2compatible="true" descriptor="required"
-               root="https://maven-central.storage-download.googleapis.com/repos/central/data"/>
+               root="https://maven-central.storage-download.googleapis.com/maven2"/>
 
       <ibiblio name="maven-central" m2compatible="true" descriptor="required"/>
 

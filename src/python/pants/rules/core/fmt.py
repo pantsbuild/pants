@@ -15,7 +15,7 @@ from pants.engine.fs import (
     Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.isolated_process import ExecuteProcessResult
+from pants.engine.isolated_process import ProcessResult
 from pants.engine.legacy.graph import HydratedTargetsWithOrigins
 from pants.engine.legacy.structs import TargetAdaptorWithOrigin
 from pants.engine.objects import union
@@ -35,7 +35,7 @@ class FmtResult:
         return FmtResult(digest=EMPTY_DIRECTORY_DIGEST, stdout="", stderr="")
 
     @staticmethod
-    def from_execute_process_result(process_result: ExecuteProcessResult) -> "FmtResult":
+    def from_process_result(process_result: ProcessResult) -> "FmtResult":
         return FmtResult(
             digest=process_result.output_directory_digest,
             stdout=process_result.stdout.decode(),
@@ -179,7 +179,7 @@ async def fmt(
             console.print_stderr(result.stderr)
 
     # Since the rules to produce FmtResult should use ExecuteRequest, rather than
-    # FallibleExecuteProcessRequest, we assume that there were no failures.
+    # FallibleProcess, we assume that there were no failures.
     return Fmt(exit_code=0)
 
 

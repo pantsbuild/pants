@@ -6,11 +6,25 @@ coverage>=4.5,<4.6
 dataclasses==0.6
 docutils==0.14
 fasteners==0.15.0
+
+# The MyPy requirement should be maintained in lockstep with the requirement the Pants repo uses
+# for the mypy task since it configures custom MyPy plugins. That requirement can be found via:
+#
+#   ./pants \
+#     --backend-packages=pants.contrib.mypy \
+#       options \
+#         --output-format=json \
+#         --scope=mypy \
+#         --name=version \
+#     | jq -r '."mypy.version".value'
+#
+mypy==0.761
+
 Markdown==2.1.1
 packaging==16.8
 parameterized==0.6.1
 pathspec==0.5.9
-pex==2.1.6
+pex==2.1.9
 psutil==5.6.3
 Pygments==2.3.1
 pyopenssl==17.3.0

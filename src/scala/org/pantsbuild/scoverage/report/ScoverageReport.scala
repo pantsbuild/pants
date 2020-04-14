@@ -8,7 +8,7 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
 import scoverage.{ Coverage, IOUtils, Serializer }
-import scoverage.report.{ ScoverageHtmlWriter, ScoverageXmlWriter }
+import scoverage.report.{ CoberturaXmlWriter, ScoverageHtmlWriter, ScoverageXmlWriter }
 
 object ScoverageReport {
   val Scoverage = "scoverage"
@@ -172,6 +172,12 @@ object ScoverageReport {
         prepareFile(reportDirXml, settings, "xml")
         logger.info(s"Writing XML scoverage reports to [$reportDirXml]")
         new ScoverageXmlWriter(Seq(sourceDir), reportDirXml, false).write(coverage)
+
+        if (settings.outputAsCobertura) {
+          // Cobertura Output
+          logger.info(s"Writing XML scoverage in Cobertura format reports to [$reportDirXml]")
+          new CoberturaXmlWriter(Seq(sourceDir), reportDirXml).write(coverage)
+        }
       }
 
       if (!settings.xmlDebugDirPath.isEmpty) {

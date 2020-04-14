@@ -2,33 +2,36 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std;
+use std::collections::BTreeMap;
 use std::convert::{Into, TryInto};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
+use futures::compat::Future01CompatExt;
 use futures01::Future;
 
 use crate::core::{Failure, TypeId};
 use crate::handles::maybe_drop_handles;
+use crate::intrinsics::Intrinsics;
 use crate::nodes::{NodeKey, WrappedNode};
 use crate::scheduler::Session;
 use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
+use crate::watch::InvalidationWatcher;
 use boxfuture::{BoxFuture, Boxable};
 use core::clone::Clone;
-use fs::{safe_create_dir_all_ioerror, PosixFS};
+use fs::{safe_create_dir_all_ioerror, GitignoreStyleExcludes, PosixFS};
 use graph::{EntryId, Graph, NodeContext};
 use process_execution::{
-  self, speculate::SpeculatingCommandRunner, BoundedCommandRunner, ExecuteProcessRequestMetadata,
-  PlatformConstraint,
+  self, speculate::SpeculatingCommandRunner, BoundedCommandRunner, Platform, ProcessMetadata,
 };
 use rand::seq::SliceRandom;
 use reqwest;
 use rule_graph::RuleGraph;
 use sharded_lmdb::ShardedLmdb;
-use std::collections::BTreeMap;
 use store::Store;
+use tokio::runtime::{Builder, Runtime};
 
 const GIGABYTES: usize = 1024 * 1024 * 1024;
 
@@ -41,15 +44,18 @@ const GIGABYTES: usize = 1024 * 1024 * 1024;
 /// https://github.com/tokio-rs/tokio/issues/369 is resolved.
 ///
 pub struct Core {
-  pub graph: Graph<NodeKey>,
+  pub graph: Arc<Graph<NodeKey>>,
   pub tasks: Tasks,
   pub rule_graph: RuleGraph<Rule>,
   pub types: Types,
+  pub intrinsics: Intrinsics,
+  pub runtime: Runtime,
   pub executor: task_executor::Executor,
   store: Store,
   pub command_runner: Box<dyn process_execution::CommandRunner>,
-  pub http_client: reqwest::r#async::Client,
+  pub http_client: reqwest::Client,
   pub vfs: PosixFS,
+  pub watcher: InvalidationWatcher,
   pub build_root: PathBuf,
 }
 
@@ -58,8 +64,10 @@ impl Core {
     root_subject_types: Vec<TypeId>,
     tasks: Tasks,
     types: Types,
+    intrinsics: Intrinsics,
     build_root: PathBuf,
     ignore_patterns: &[String],
+    use_gitignore: bool,
     local_store_dir: PathBuf,
     remote_execution: bool,
     remote_store_servers: Vec<String>,
@@ -82,12 +90,24 @@ impl Core {
     process_execution_use_local_cache: bool,
     remote_execution_headers: BTreeMap<String, String>,
     process_execution_local_enable_nailgun: bool,
+    experimental_fs_watcher: bool,
   ) -> Result<Core, String> {
     // Randomize CAS address order to avoid thundering herds from common config.
     let mut remote_store_servers = remote_store_servers;
     remote_store_servers.shuffle(&mut rand::thread_rng());
 
-    let executor = task_executor::Executor::new();
+    let runtime = Builder::new()
+      // This use of Builder (rather than just Runtime::new()) is to allow us to lower the
+      // max_threads setting. As of tokio `0.2.13`, the core threads default to num_cpus, and
+      // the max threads default to a fixed value of 512. In practice, it appears to be slower
+      // to allow 512 threads, and with the default stack size, 512 threads would use 1GB of RAM.
+      .core_threads(num_cpus::get())
+      .max_threads(num_cpus::get() * 4)
+      .threaded_scheduler()
+      .enable_all()
+      .build()
+      .map_err(|e| format!("Failed to start the runtime: {}", e))?;
+    let executor = task_executor::Executor::new(runtime.handle().clone());
     // We re-use these certs for both the execution and store service; they're generally tied together.
     let root_ca_certs = if let Some(path) = remote_root_ca_certs_path {
       Some(
@@ -135,7 +155,7 @@ impl Core {
       })
       .map_err(|e| format!("Could not initialize Store: {:?}", e))?;
 
-    let process_execution_metadata = ExecuteProcessRequestMetadata {
+    let process_execution_metadata = ProcessMetadata {
       instance_name: remote_instance_name,
       cache_key_gen_version: remote_execution_process_cache_namespace,
       platform_properties: remote_execution_extra_platform_properties,
@@ -180,7 +200,7 @@ impl Core {
             store.clone(),
             // TODO if we ever want to configure the remote platform to be something else we
             // need to take an option all the way down here and into the remote::CommandRunner struct.
-            PlatformConstraint::Linux,
+            Platform::Linux,
             executor.clone(),
             std::time::Duration::from_secs(300),
             std::time::Duration::from_millis(500),
@@ -211,31 +231,62 @@ impl Core {
         executor.clone(),
       )
       .map_err(|err| format!("Could not initialize store for process cache: {:?}", err))?;
-      command_runner = Box::new(process_execution::cache::CommandRunner {
-        underlying: command_runner.into(),
+      command_runner = Box::new(process_execution::cache::CommandRunner::new(
+        command_runner.into(),
         process_execution_store,
-        file_store: store.clone(),
-        metadata: process_execution_metadata,
-      })
+        store.clone(),
+        process_execution_metadata,
+      ));
     }
+    let graph = Arc::new(Graph::new());
 
-    let http_client = reqwest::r#async::Client::new();
+    let http_client = reqwest::Client::new();
     let rule_graph = RuleGraph::new(tasks.as_map(), root_subject_types);
 
+    let gitignore_file = if use_gitignore {
+      let gitignore_path = build_root.join(".gitignore");
+      if Path::is_file(&gitignore_path) {
+        Some(gitignore_path)
+      } else {
+        None
+      }
+    } else {
+      None
+    };
+    let ignorer =
+      GitignoreStyleExcludes::create_with_gitignore_file(&ignore_patterns, gitignore_file)
+        .map_err(|e| {
+          format!(
+            "Could not parse build ignore inputs {:?}: {:?}",
+            ignore_patterns, e
+          )
+        })?;
+
+    let watcher = InvalidationWatcher::new(
+      Arc::downgrade(&graph),
+      executor.clone(),
+      build_root.clone(),
+      ignorer.clone(),
+      experimental_fs_watcher,
+    )?;
+
     Ok(Core {
-      graph: Graph::new(),
-      tasks: tasks,
-      rule_graph: rule_graph,
-      types: types,
+      graph,
+      tasks,
+      rule_graph,
+      types,
+      intrinsics,
+      runtime,
       executor: executor.clone(),
       store,
       command_runner,
       http_client,
       // TODO: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
-      vfs: PosixFS::new(&build_root, &ignore_patterns, executor)
+      vfs: PosixFS::new(&build_root, ignorer, executor)
         .map_err(|e| format!("Could not initialize VFS: {:?}", e))?,
-      build_root: build_root,
+      build_root,
+      watcher,
     })
   }
 
@@ -309,6 +360,8 @@ impl NodeContext for Context {
   where
     F: Future<Item = (), Error = ()> + Send + 'static,
   {
-    self.core.executor.spawn_and_ignore(future);
+    self.core.executor.spawn_and_ignore(async move {
+      let _ = future.compat().await;
+    });
   }
 }

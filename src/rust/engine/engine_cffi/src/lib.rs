@@ -28,27 +28,28 @@
 // just the one minor call as unsafe, than to mark the whole function as unsafe which may hide
 // other unsafeness.
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
-
 // This crate is a wrapper around the engine crate which exposes a C interface which we can access
 // from Python using cffi.
 //
 // The engine crate contains some C interop which we use, notably externs which are functions and
 // types from Python which we can read from our Rust. This particular wrapper crate is just for how
 // we expose ourselves back to Python.
+#![type_length_limit = "1744838"]
 
 mod cffi_externs;
 
 use engine::externs::*;
 use engine::{
-  externs, nodes, Core, ExecutionRequest, ExecutionTermination, Function, Handle, Key, Params,
-  RootResult, Rule, Scheduler, Session, Tasks, TypeId, Types, Value,
+  externs, nodes, Core, ExecutionRequest, ExecutionTermination, Function, Handle, Intrinsics, Key,
+  Params, RootResult, Rule, Scheduler, Session, Tasks, TypeId, Types, Value,
 };
+use futures::future::{self as future03, TryFutureExt};
 use futures01::{future, Future};
 use hashing::{Digest, EMPTY_DIGEST};
 use log::{error, warn, Log};
 use logging::logger::LOGGER;
 use logging::{Destination, Logger};
-use rule_graph::{GraphMaker, RuleGraph};
+use rule_graph::RuleGraph;
 use std::any::Any;
 use std::borrow::Borrow;
 use std::ffi::CStr;
@@ -184,6 +185,7 @@ pub extern "C" fn scheduler_create(
   build_root_buf: Buffer,
   local_store_dir_buf: Buffer,
   ignore_patterns_buf: BufferBuffer,
+  use_gitignore: bool,
   root_type_ids: TypeIdBuffer,
   remote_execution: bool,
   remote_store_servers_buf: BufferBuffer,
@@ -206,6 +208,7 @@ pub extern "C" fn scheduler_create(
   process_execution_use_local_cache: bool,
   remote_execution_headers_buf: BufferBuffer,
   process_execution_local_enable_nailgun: bool,
+  experimental_fs_watcher: bool,
 ) -> RawResult {
   match make_core(
     tasks_ptr,
@@ -213,6 +216,7 @@ pub extern "C" fn scheduler_create(
     build_root_buf,
     local_store_dir_buf,
     ignore_patterns_buf,
+    use_gitignore,
     root_type_ids,
     remote_execution,
     remote_store_servers_buf,
@@ -235,6 +239,7 @@ pub extern "C" fn scheduler_create(
     process_execution_use_local_cache,
     remote_execution_headers_buf,
     process_execution_local_enable_nailgun,
+    experimental_fs_watcher,
   ) {
     Ok(core) => RawResult {
       is_throw: false,
@@ -255,6 +260,7 @@ fn make_core(
   build_root_buf: Buffer,
   local_store_dir_buf: Buffer,
   ignore_patterns_buf: BufferBuffer,
+  use_gitignore: bool,
   root_type_ids: TypeIdBuffer,
   remote_execution: bool,
   remote_store_servers_buf: BufferBuffer,
@@ -277,14 +283,16 @@ fn make_core(
   process_execution_use_local_cache: bool,
   remote_execution_headers_buf: BufferBuffer,
   process_execution_local_enable_nailgun: bool,
+  experimental_fs_watcher: bool,
 ) -> Result<Core, String> {
   let root_type_ids = root_type_ids.to_vec();
   let ignore_patterns = ignore_patterns_buf
     .to_strings()
     .map_err(|err| format!("Failed to decode ignore patterns as UTF8: {:?}", err))?;
+  let intrinsics = Intrinsics::new(&types);
   #[allow(clippy::redundant_closure)] // I couldn't find an easy way to remove this closure.
   let mut tasks = with_tasks(tasks_ptr, |tasks| tasks.clone());
-  tasks.intrinsics_set(&types);
+  tasks.intrinsics_set(&intrinsics);
   // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
   let remote_store_servers_vec = remote_store_servers_buf
     .to_strings()
@@ -347,8 +355,10 @@ fn make_core(
     root_type_ids,
     tasks,
     types,
+    intrinsics,
     PathBuf::from(build_root_buf.to_os_string()),
     &ignore_patterns,
+    use_gitignore,
     PathBuf::from(local_store_dir_buf.to_os_string()),
     remote_execution,
     remote_store_servers_vec,
@@ -385,6 +395,7 @@ fn make_core(
     process_execution_use_local_cache,
     remote_execution_headers,
     process_execution_local_enable_nailgun,
+    experimental_fs_watcher,
   )
 }
 
@@ -423,6 +434,14 @@ fn workunits_to_py_tuple_value<'a>(workunits: impl Iterator<Item = &'a WorkUnit>
           externs::store_utf8(parent_id),
         ));
       }
+
+      if let Some(desc) = &workunit.metadata.desc.as_ref() {
+        workunit_zipkin_trace_info.push((
+          externs::store_utf8("description"),
+          externs::store_utf8(desc),
+        ));
+      }
+
       externs::store_dict(&workunit_zipkin_trace_info.as_slice())
     })
     .collect::<Vec<_>>();
@@ -500,6 +519,8 @@ pub extern "C" fn scheduler_execute(
   with_scheduler(scheduler_ptr, |scheduler| {
     with_execution_request(execution_request_ptr, |execution_request| {
       with_session(session_ptr, |session| {
+        // TODO: A parent_id should be an explicit argument.
+        session.workunit_store().init_thread_state(None);
         match scheduler.execute(execution_request, session) {
           Ok(raw_results) => Box::into_raw(RawNodes::create(raw_results)),
           //TODO: Passing a raw null pointer to Python is a less-than-ideal way
@@ -568,12 +589,15 @@ pub extern "C" fn tasks_add_select(tasks_ptr: *mut Tasks, product: TypeId) {
 }
 
 #[no_mangle]
-pub extern "C" fn tasks_add_display_info(tasks_ptr: *mut Tasks, name_ptr: *const raw::c_char) {
-  let name: String = unsafe { CStr::from_ptr(name_ptr) }
-    .to_string_lossy()
-    .into_owned();
+pub extern "C" fn tasks_add_display_info(
+  tasks_ptr: *mut Tasks,
+  name_ptr: *const raw::c_char,
+  desc_ptr: *const raw::c_char,
+) {
+  let name = unsafe { str_ptr_to_string(name_ptr) };
+  let desc = unsafe { str_ptr_to_string(desc_ptr) };
   with_tasks(tasks_ptr, |tasks| {
-    tasks.add_display_info(name);
+    tasks.add_display_info(name, desc);
   })
 }
 
@@ -606,6 +630,11 @@ pub extern "C" fn graph_invalidate_all_paths(scheduler_ptr: *mut Scheduler) -> u
   with_scheduler(scheduler_ptr, |scheduler| {
     scheduler.invalidate_all_paths() as u64
   })
+}
+
+#[no_mangle]
+pub extern "C" fn check_invalidation_watcher_liveness(scheduler_ptr: *mut Scheduler) -> bool {
+  with_scheduler(scheduler_ptr, |scheduler| scheduler.core.watcher.is_alive())
 }
 
 #[no_mangle]
@@ -735,37 +764,41 @@ pub extern "C" fn validator_run(scheduler_ptr: *mut Scheduler) -> PyResult {
 #[no_mangle]
 pub extern "C" fn rule_graph_visualize(
   scheduler_ptr: *mut Scheduler,
-  subject_types: TypeIdBuffer,
   path_ptr: *const raw::c_char,
-) {
+) -> PyResult {
   with_scheduler(scheduler_ptr, |scheduler| {
     let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
     let path = PathBuf::from(path_str);
 
     // TODO(#7117): we want to represent union types in the graph visualizer somehow!!!
-    let graph = graph_full(scheduler, subject_types.to_vec());
-    write_to_file(path.as_path(), &graph).unwrap_or_else(|e| {
-      println!("Failed to visualize to {}: {:?}", path.display(), e);
-    });
+    write_to_file(path.as_path(), &scheduler.core.rule_graph)
+      .map_err(|e| format!("Failed to visualize to {}: {:?}", path.display(), e))
+      .into()
   })
 }
 
 #[no_mangle]
 pub extern "C" fn rule_subgraph_visualize(
   scheduler_ptr: *mut Scheduler,
-  subject_type: TypeId,
+  param_types: TypeIdBuffer,
   product_type: TypeId,
   path_ptr: *const raw::c_char,
-) {
+) -> PyResult {
   with_scheduler(scheduler_ptr, |scheduler| {
     let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
     let path = PathBuf::from(path_str);
 
     // TODO(#7117): we want to represent union types in the graph visualizer somehow!!!
-    let graph = graph_sub(scheduler, subject_type, product_type);
-    write_to_file(path.as_path(), &graph).unwrap_or_else(|e| {
-      println!("Failed to visualize to {}: {:?}", path.display(), e);
-    });
+    match scheduler
+      .core
+      .rule_graph
+      .subgraph(param_types.to_vec(), product_type)
+    {
+      Ok(subgraph) => write_to_file(path.as_path(), &subgraph)
+        .map_err(|e| format!("Failed to visualize to {}: {:?}", path.display(), e))
+        .into(),
+      e @ Err(_) => e.map(|_| ()).into(),
+    }
   })
 }
 
@@ -793,7 +826,7 @@ pub extern "C" fn set_panic_handler() {
 
     error!("{}", panic_str);
 
-    let panic_file_bug_str = "Please file a bug at https://github.com/pantsbuild/pants/issues.";
+    let panic_file_bug_str = "Please set RUST_BACKTRACE=1, re-run, and then file a bug at https://github.com/pantsbuild/pants/issues.";
     error!("{}", panic_file_bug_str);
   }));
 }
@@ -874,30 +907,34 @@ pub extern "C" fn capture_snapshots(
       return e.into();
     }
   };
-  let workunit_store = with_session(session_ptr, |session| session.workunit_store());
 
   with_scheduler(scheduler_ptr, |scheduler| {
-    let core = scheduler.core.clone();
-    core.executor.block_on(
-      future::join_all(
-        path_globs_and_roots
-          .into_iter()
-          .map(|(path_globs, root, digest_hint)| {
-            let core = core.clone();
-            store::Snapshot::capture_snapshot_from_arbitrary_root(
+    with_session(session_ptr, |session| {
+      // TODO: A parent_id should be an explicit argument.
+      session.workunit_store().init_thread_state(None);
+      let core = scheduler.core.clone();
+      let snapshot_futures = path_globs_and_roots
+        .into_iter()
+        .map(|(path_globs, root, digest_hint)| {
+          let core = core.clone();
+          async move {
+            let snapshot = store::Snapshot::capture_snapshot_from_arbitrary_root(
               core.store(),
               core.executor.clone(),
               root,
               path_globs,
               digest_hint,
-              workunit_store.clone(),
             )
-            .map(move |snapshot| nodes::Snapshot::store_snapshot(&core, &snapshot))
-          })
-          .collect::<Vec<_>>(),
+            .await?;
+            let res: Result<_, String> = Ok(nodes::Snapshot::store_snapshot(&core, &snapshot));
+            res
+          }
+        })
+        .collect::<Vec<_>>();
+      core.executor.block_on(
+        future03::try_join_all(snapshot_futures).map_ok(|values| externs::store_tuple(&values)),
       )
-      .map(|values| externs::store_tuple(&values)),
-    )
+    })
   })
   .into()
 }
@@ -920,20 +957,22 @@ pub extern "C" fn merge_directories(
       return e.into();
     }
   };
-  let workunit_store = with_session(session_ptr, |session| session.workunit_store());
 
   with_scheduler(scheduler_ptr, |scheduler| {
-    scheduler
-      .core
-      .executor
-      .block_on(store::Snapshot::merge_directories(
-        scheduler.core.store(),
-        digests,
-        workunit_store,
-      ))
-      .map(|dir| nodes::Snapshot::store_directory(&scheduler.core, &dir))
-      .into()
+    with_session(session_ptr, |session| {
+      // TODO: A parent_id should be an explicit argument.
+      session.workunit_store().init_thread_state(None);
+      scheduler
+        .core
+        .executor
+        .block_on(store::Snapshot::merge_directories(
+          scheduler.core.store(),
+          digests,
+        ))
+        .map(|dir| nodes::Snapshot::store_directory(&scheduler.core, &dir))
+    })
   })
+  .into()
 }
 
 #[no_mangle]
@@ -975,13 +1014,10 @@ pub extern "C" fn run_local_interactive_process(
               None => unreachable!()
             };
 
-            let write_operation = scheduler.core.store().materialize_directory(
+            scheduler.core.store().materialize_directory(
               destination,
               digest,
-              session.workunit_store(),
-            );
-
-            scheduler.core.executor.spawn_on_io_pool(write_operation).wait()?;
+            ).wait()?;
           }
         }
 
@@ -1053,61 +1089,63 @@ pub extern "C" fn materialize_directories(
       return e.into();
     }
   };
-  let workunit_store = with_session(session_ptr, |session| session.workunit_store());
   with_scheduler(scheduler_ptr, |scheduler| {
-    let types = &scheduler.core.types;
-    let construct_materialize_directories_results = types.construct_materialize_directories_results;
-    let construct_materialize_directory_result = types.construct_materialize_directory_result;
-    let work_future = future::join_all(
-      digests_and_path_prefixes
-        .into_iter()
-        .map(|(digest, path_prefix)| {
-          // NB: all DirectoryToMaterialize paths are validated in Python to be relative paths.
-          // Here, we join them with the build root.
-          let mut destination = PathBuf::new();
-          destination.push(scheduler.core.build_root.clone());
-          destination.push(path_prefix);
-          let metadata = scheduler.core.store().materialize_directory(
-            destination.clone(),
-            digest,
-            workunit_store.clone(),
-          );
-          metadata.map(|m| (destination, m))
-        })
-        .collect::<Vec<_>>(),
-    )
-    .map(move |metadata_list| {
-      let entries: Vec<Value> = metadata_list
-        .iter()
-        .map(
-          |(output_dir, metadata): &(PathBuf, store::DirectoryMaterializeMetadata)| {
-            let path_list = metadata.to_path_list();
-            let path_values: Vec<Value> = path_list
-              .into_iter()
-              .map(|rel_path: String| {
-                let mut path = PathBuf::new();
-                path.push(output_dir);
-                path.push(rel_path);
-                externs::store_utf8(&path.to_string_lossy())
-              })
-              .collect();
+    with_session(session_ptr, |session| {
+      // TODO: A parent_id should be an explicit argument.
+      session.workunit_store().init_thread_state(None);
+      let types = &scheduler.core.types;
+      let construct_materialize_directories_results =
+        types.construct_materialize_directories_results;
+      let construct_materialize_directory_result = types.construct_materialize_directory_result;
+      future::join_all(
+        digests_and_path_prefixes
+          .into_iter()
+          .map(|(digest, path_prefix)| {
+            // NB: all DirectoryToMaterialize paths are validated in Python to be relative paths.
+            // Here, we join them with the build root.
+            let mut destination = PathBuf::new();
+            destination.push(scheduler.core.build_root.clone());
+            destination.push(path_prefix);
+            let metadata = scheduler
+              .core
+              .store()
+              .materialize_directory(destination.clone(), digest);
+            metadata.map(|m| (destination, m))
+          })
+          .collect::<Vec<_>>(),
+      )
+      .map(move |metadata_list| {
+        let entries: Vec<Value> = metadata_list
+          .iter()
+          .map(
+            |(output_dir, metadata): &(PathBuf, store::DirectoryMaterializeMetadata)| {
+              let path_list = metadata.to_path_list();
+              let path_values: Vec<Value> = path_list
+                .into_iter()
+                .map(|rel_path: String| {
+                  let mut path = PathBuf::new();
+                  path.push(output_dir);
+                  path.push(rel_path);
+                  externs::store_utf8(&path.to_string_lossy())
+                })
+                .collect();
 
-            externs::unsafe_call(
-              &construct_materialize_directory_result,
-              &[externs::store_tuple(&path_values)],
-            )
-          },
-        )
-        .collect();
+              externs::unsafe_call(
+                &construct_materialize_directory_result,
+                &[externs::store_tuple(&path_values)],
+              )
+            },
+          )
+          .collect();
 
-      let output: Value = externs::unsafe_call(
-        &construct_materialize_directories_results,
-        &[externs::store_tuple(&entries)],
-      );
-      output
-    });
-
-    scheduler.core.executor.spawn_on_io_pool(work_future).wait()
+        let output: Value = externs::unsafe_call(
+          &construct_materialize_directories_results,
+          &[externs::store_tuple(&entries)],
+        );
+        output
+      })
+      .wait()
+    })
   })
   .into()
 }
@@ -1120,7 +1158,7 @@ pub extern "C" fn init_logging(level: u64, show_rust_3rdparty_logs: bool) {
 
 #[no_mangle]
 pub extern "C" fn setup_pantsd_logger(log_file_ptr: *const raw::c_char, level: u64) -> PyResult {
-  logging::set_destination(Destination::Pantsd);
+  logging::set_thread_destination(Destination::Pantsd);
 
   let path_str = unsafe { CStr::from_ptr(log_file_ptr).to_string_lossy().into_owned() };
   let path = PathBuf::from(path_str);
@@ -1134,7 +1172,7 @@ pub extern "C" fn setup_pantsd_logger(log_file_ptr: *const raw::c_char, level: u
 // Might be called before externs are set, therefore can't return a PyResult
 #[no_mangle]
 pub extern "C" fn setup_stderr_logger(level: u64) {
-  logging::set_destination(Destination::Stderr);
+  logging::set_thread_destination(Destination::Stderr);
   LOGGER
     .set_stderr_logger(level)
     .expect("Error setting up STDERR logger");
@@ -1173,23 +1211,17 @@ pub extern "C" fn flush_log() {
 
 #[no_mangle]
 pub extern "C" fn override_thread_logging_destination(destination: Destination) {
-  logging::set_destination(destination);
-}
-
-fn graph_full(scheduler: &Scheduler, subject_types: Vec<TypeId>) -> RuleGraph<Rule> {
-  let graph_maker = GraphMaker::new(scheduler.core.tasks.as_map(), subject_types);
-  graph_maker.full_graph()
-}
-
-fn graph_sub(scheduler: &Scheduler, subject_type: TypeId, product_type: TypeId) -> RuleGraph<Rule> {
-  let graph_maker = GraphMaker::new(scheduler.core.tasks.as_map(), vec![subject_type]);
-  graph_maker.sub_graph(subject_type, product_type)
+  logging::set_thread_destination(destination);
 }
 
 fn write_to_file(path: &Path, graph: &RuleGraph<Rule>) -> io::Result<()> {
   let file = File::create(path)?;
   let mut f = io::BufWriter::new(file);
   graph.visualize(&mut f)
+}
+
+unsafe fn str_ptr_to_string(ptr: *const raw::c_char) -> String {
+  CStr::from_ptr(ptr).to_string_lossy().into_owned()
 }
 
 ///
@@ -1202,7 +1234,7 @@ where
   F: FnOnce(&Scheduler) -> T,
 {
   let scheduler = unsafe { Box::from_raw(scheduler_ptr) };
-  let t = f(&scheduler);
+  let t = scheduler.core.runtime.enter(|| f(&scheduler));
   mem::forget(scheduler);
   t
 }

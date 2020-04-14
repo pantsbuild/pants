@@ -29,10 +29,12 @@ use hashing;
 
 use petgraph;
 
-mod entry;
+// make the entry module public for testing purposes. We use it to contruct mock
+// graph entries in the notify watch tests.
+pub mod entry;
 mod node;
 
-pub use crate::entry::Entry;
+pub use crate::entry::{Entry, EntryState};
 use crate::entry::{Generation, RunToken};
 
 use std::collections::binary_heap::BinaryHeap;
@@ -45,6 +47,8 @@ use std::time::{Duration, Instant};
 
 use fnv::FnvHasher;
 
+use futures::compat::Future01CompatExt;
+use futures::future::{FutureExt, TryFutureExt};
 use futures01::future::{self, Future};
 use indexmap::IndexSet;
 use log::{debug, trace, warn};
@@ -164,7 +168,9 @@ impl<N: Node> InnerGraph<N> {
     // Search for an existing path from dst to src.
     let mut roots = VecDeque::new();
     roots.push_back(root);
-    self.walk(roots, direction).any(|eid| eid == needle)
+    self
+      .walk(roots, direction, |_| false)
+      .any(|eid| eid == needle)
   }
 
   ///
@@ -285,12 +291,18 @@ impl<N: Node> InnerGraph<N> {
   /// The Walk will iterate over all nodes that descend from the roots in the direction of
   /// traversal but won't necessarily be in topological order.
   ///
-  fn walk(&self, roots: VecDeque<EntryId>, direction: Direction) -> Walk<'_, N> {
+  fn walk<F: Fn(&EntryId) -> bool>(
+    &self,
+    roots: VecDeque<EntryId>,
+    direction: Direction,
+    stop_walking_predicate: F,
+  ) -> Walk<'_, N, F> {
     Walk {
       graph: self,
       direction: direction,
       deque: roots,
       walked: HashSet::default(),
+      stop_walking_predicate,
     }
   }
 
@@ -323,7 +335,11 @@ impl<N: Node> InnerGraph<N> {
       .collect();
     // And their transitive dependencies, which will be dirtied.
     let transitive_ids: Vec<_> = self
-      .walk(root_ids.iter().cloned().collect(), Direction::Incoming)
+      .walk(
+        root_ids.iter().cloned().collect(),
+        Direction::Incoming,
+        |id| !self.entry_for_id(*id).unwrap().node().cacheable(),
+      )
       .filter(|eid| !root_ids.contains(eid))
       .collect();
 
@@ -384,7 +400,7 @@ impl<N: Node> InnerGraph<N> {
       .cloned()
       .collect();
 
-    for eid in self.walk(root_entries, Direction::Outgoing) {
+    for eid in self.walk(root_entries, Direction::Outgoing, |_| false) {
       let entry = self.unsafe_entry_for_id(eid);
       let node_str = entry.format(context);
 
@@ -600,7 +616,9 @@ impl<N: Node> InnerGraph<N> {
       .collect();
     self
       .digests_internal(
-        self.walk(root_ids, Direction::Outgoing).collect(),
+        self
+          .walk(root_ids, Direction::Outgoing, |_| false)
+          .collect(),
         context.clone(),
       )
       .count()
@@ -661,7 +679,7 @@ impl<N: Node> Graph<N> {
     context: &N::Context,
     dst_node: N,
   ) -> BoxFuture<N::Item, N::Error> {
-    let maybe_entry_and_id = {
+    let maybe_entries_and_id = {
       // Get or create the destination, and then insert the dep and return its state.
       let mut inner = self.inner.lock();
       if inner.draining {
@@ -693,16 +711,44 @@ impl<N: Node> Graph<N> {
         // All edges get a weight of 1.0 so that we can Bellman-Ford over the graph, treating each
         // edge as having equal weight.
         inner.pg.add_edge(src_id, dst_id, 1.0);
+        let src_entry = inner.entry_for_id(src_id).cloned().unwrap();
         inner
           .entry_for_id(dst_id)
           .cloned()
-          .map(|entry| (entry, dst_id))
+          .map(|dst_entry| (src_entry, dst_entry, dst_id))
       }
     };
 
     // Declare the dep, and return the state of the destination.
-    if let Some((mut entry, entry_id)) = maybe_entry_and_id {
-      entry.get(context, entry_id).map(|(res, _)| res).to_boxed()
+    if let Some((src_entry, mut entry, entry_id)) = maybe_entries_and_id {
+      if src_entry.node().cacheable() {
+        entry.get(context, entry_id).map(|(res, _)| res).to_boxed()
+      } else {
+        // Src node is uncacheable, which means it is side-effecting, and can only be allowed to run once.
+        // We retry its dependencies a number of times here in case a side effect of the Node invalidated
+        // some of its dependencies, or another (external) process causes invalidation.
+        let context2 = context.clone();
+        let mut counter: usize = 8;
+        let uncached_node = async move {
+          loop {
+            counter -= 1;
+            if counter == 0 {
+              break Err(N::Error::exhausted());
+            }
+            let dep_res = entry
+              .get(&context2, entry_id)
+              .map(|(res, _)| res)
+              .compat()
+              .await;
+            match dep_res {
+              Ok(r) => break Ok(r),
+              Err(err) if err == N::Error::invalidated() => continue,
+              Err(other_err) => break Err(other_err),
+            }
+          }
+        };
+        uncached_node.boxed().compat().to_boxed()
+      }
     } else {
       future::err(N::Error::invalidated()).to_boxed()
     }
@@ -867,7 +913,7 @@ impl<N: Node> Graph<N> {
   /// TODO: We don't track which generation actually added which edges, so over time nodes will end
   /// up with spurious dependencies. This is mostly sound, but may lead to over-invalidation and
   /// doing more work than is necessary.
-  /// As an example, if generation 0 or X depends on A and B, and generation 1 of X depends on C,
+  /// As an example, if generation 0 of X depends on A and B, and generation 1 of X depends on C,
   /// nothing will prune the dependencies from X onto A and B, so generation 1 of X will have
   /// dependencies on A, B, and C in the graph, even though running it only depends on C.
   /// At some point we should address this, but we must be careful with how we do so; anything which
@@ -902,7 +948,7 @@ impl<N: Node> Graph<N> {
           // If a dependency is uncacheable or currently dirty, this Node should complete as dirty,
           // independent of matching Generation values. This is to allow for the behaviour that an
           // uncacheable Node should always have dirty dependents, transitively.
-          if !entry.node().cacheable(context) || !entry.is_clean(context) {
+          if !entry.node().cacheable() || !entry.is_clean(context) {
             has_dirty_dependencies = true;
           }
           entry.generation()
@@ -1009,27 +1055,71 @@ impl<N: Node> Graph<N> {
   }
 }
 
+// This module provides a trait which contains functions that
+// should only be used in tests. A user must explicitly import the trait
+// to use the extra test functions, and they should only be imported into
+// test modules.
+pub mod test_support {
+  use super::{EntryId, EntryState, Graph, Node};
+  pub trait TestGraph<N: Node> {
+    fn set_fixture_entry_state_for_id(&self, id: EntryId, state: EntryState<N>);
+    fn add_fixture_entry(&self, node: N) -> EntryId;
+    fn entry_state(&self, id: EntryId) -> &str;
+  }
+  impl<N: Node> TestGraph<N> for Graph<N> {
+    fn set_fixture_entry_state_for_id(&self, id: EntryId, state: EntryState<N>) {
+      let mut inner = self.inner.lock();
+      let entry = inner.entry_for_id_mut(id).unwrap();
+      let mut entry_state = entry.state.lock();
+      *entry_state = state;
+    }
+
+    fn add_fixture_entry(&self, node: N) -> EntryId {
+      let mut inner = self.inner.lock();
+      inner.ensure_entry(node)
+    }
+
+    fn entry_state(&self, id: EntryId) -> &str {
+      let mut inner = self.inner.lock();
+      let entry = inner.entry_for_id_mut(id).unwrap();
+      let entry_state = entry.state.lock();
+      match *entry_state {
+        EntryState::Completed { .. } => "completed",
+        EntryState::Running { .. } => "running",
+        EntryState::NotStarted { .. } => "not started",
+      }
+    }
+  }
+}
+
 ///
 /// Represents the state of a particular walk through a Graph. Implements Iterator and has the same
 /// lifetime as the Graph itself.
 ///
-struct Walk<'a, N: Node> {
+struct Walk<'a, N: Node, F>
+where
+  F: Fn(&EntryId) -> bool,
+{
   graph: &'a InnerGraph<N>,
   direction: Direction,
   deque: VecDeque<EntryId>,
   walked: HashSet<EntryId, FNV>,
+  stop_walking_predicate: F,
 }
 
-impl<'a, N: Node + 'a> Iterator for Walk<'a, N> {
+impl<'a, N: Node + 'a, F: Fn(&EntryId) -> bool> Iterator for Walk<'a, N, F> {
   type Item = EntryId;
 
   fn next(&mut self) -> Option<Self::Item> {
     while let Some(id) = self.deque.pop_front() {
-      if !self.walked.insert(id) {
+      // Visit this node and it neighbors if this node has not yet be visited and we aren't
+      // stopping our walk at this node, based on if it satifies the stop_walking_predicate.
+      // This mechanism gives us a way to selectively dirty parts of the graph respecting node boundaries
+      // like uncacheable nodes, which sholdn't be dirtied.
+      if !self.walked.insert(id) || (self.stop_walking_predicate)(&id) {
         continue;
       }
 
-      // Queue the neighbors of the entry and then return it.
       self
         .deque
         .extend(self.graph.pg.neighbors_directed(id, self.direction));

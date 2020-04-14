@@ -31,7 +31,7 @@ class PythonDistribution(PythonTarget):
         :param list setup_requires: A list of python requirements to provide during the invocation of
                                     setup.py.
         """
-        if not "setup.py" in sources:
+        if "setup.py" not in sources:
             raise TargetDefinitionException(
                 self,
                 "A file named setup.py must be in the same "
@@ -40,7 +40,11 @@ class PythonDistribution(PythonTarget):
 
         payload = payload or Payload()
         payload.add_fields(
-            {"setup_requires": PrimitiveField(ensure_str_list(setup_requires or ()))}
+            {
+                "setup_requires": PrimitiveField(
+                    ensure_str_list(setup_requires or (), allow_single_str=True)
+                )
+            }
         )
         super().__init__(address=address, payload=payload, sources=sources, **kwargs)
 

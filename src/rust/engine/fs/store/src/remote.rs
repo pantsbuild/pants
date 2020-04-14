@@ -1,10 +1,11 @@
 use super::{BackoffConfig, EntryType};
 
 use bazel_protos::{self, call_option};
-use boxfuture::{try_future, BoxFuture, Boxable};
+use boxfuture::{try_future, Boxable};
 use bytes::{Bytes, BytesMut};
 use concrete_time::TimeSpan;
 use digest::{Digest as DigestTrait, FixedOutput};
+use futures::compat::Future01CompatExt;
 use futures01::{future, Future, IntoFuture, Sink, Stream};
 use grpcio;
 use hashing::{Digest, Fingerprint};
@@ -15,7 +16,7 @@ use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
 use uuid;
-use workunit_store::{WorkUnit, WorkUnitStore};
+use workunit_store::WorkUnit;
 
 #[derive(Clone)]
 pub struct ByteStore {
@@ -112,11 +113,7 @@ impl ByteStore {
     )
   }
 
-  pub fn store_bytes(
-    &self,
-    bytes: Bytes,
-    workunit_store: WorkUnitStore,
-  ) -> BoxFuture<Digest, String> {
+  pub async fn store_bytes(&self, bytes: Bytes) -> Result<Digest, String> {
     let start_time = std::time::SystemTime::now();
 
     let mut hasher = Sha256::default();
@@ -132,110 +129,116 @@ impl ByteStore {
       digest.1,
     );
     let workunit_name = format!("store_bytes({})", resource_name.clone());
-    let workunit_store = workunit_store;
     let store = self.clone();
-    self
-      .with_byte_stream_client(move |client| {
-        match client
-          .write_opt(try_future!(call_option(&store.headers, None)).timeout(store.upload_timeout))
-          .map(|v| (v, client))
-        {
-          Err(err) => future::err(format!(
-            "Error attempting to connect to upload digest {:?}: {:?}",
-            digest, err
-          ))
-          .to_boxed(),
-          Ok(((sender, receiver), _client)) => {
-            let chunk_size_bytes = store.chunk_size_bytes;
-            let resource_name = resource_name.clone();
-            let bytes = bytes.clone();
-            let stream =
-              futures01::stream::unfold::<_, _, future::FutureResult<_, grpcio::Error>, _>(
-                (0, false),
-                move |(offset, has_sent_any)| {
-                  if offset >= bytes.len() && has_sent_any {
-                    None
-                  } else {
-                    let mut req = bazel_protos::bytestream::WriteRequest::new();
-                    req.set_resource_name(resource_name.clone());
-                    req.set_write_offset(offset as i64);
-                    let next_offset = min(offset + chunk_size_bytes, bytes.len());
-                    req.set_finish_write(next_offset == bytes.len());
-                    req.set_data(bytes.slice(offset, next_offset));
-                    Some(future::ok((
-                      (req, grpcio::WriteFlags::default()),
-                      (next_offset, true),
-                    )))
-                  }
-                },
-              );
 
-            sender
-              .send_all(stream)
-              .map(|_| ())
-              .or_else(move |e| {
-                match e {
-                  // Some implementations of the remote execution API early-return if the blob has
-                  // been concurrently uploaded by another client. In this case, they return a
-                  // WriteResponse with a committed_size equal to the digest's entire size before
-                  // closing the stream.
-                  // Because the server then closes the stream, the client gets an RpcFinished
-                  // error in this case. We ignore this, and will later on verify that the
-                  // committed_size we received from the server is equal to the expected one. If
-                  // these are not equal, the upload will be considered a failure at that point.
-                  // Whether this type of response will become part of the official API is up for
-                  // discussion: see
-                  // https://groups.google.com/d/topic/remote-execution-apis/NXUe3ItCw68/discussion.
-                  grpcio::Error::RpcFinished(None) => Ok(()),
-                  e => Err(format!(
-                    "Error attempting to upload digest {:?}: {:?}",
-                    digest, e
-                  )),
-                }
-              })
-              .and_then(move |()| {
-                receiver.map_err(move |e| {
-                  format!(
-                    "Error from server when uploading digest {:?}: {:?}",
-                    digest, e
-                  )
+    let result =
+      self
+        .with_byte_stream_client(move |client| {
+          match client
+            .write_opt(try_future!(call_option(&store.headers, None)).timeout(store.upload_timeout))
+            .map(|v| (v, client))
+          {
+            Err(err) => future::err(format!(
+              "Error attempting to connect to upload digest {:?}: {:?}",
+              digest, err
+            ))
+            .to_boxed(),
+            Ok(((sender, receiver), _client)) => {
+              let chunk_size_bytes = store.chunk_size_bytes;
+              let resource_name = resource_name.clone();
+              let bytes = bytes.clone();
+              let stream =
+                futures01::stream::unfold::<_, _, future::FutureResult<_, grpcio::Error>, _>(
+                  (0, false),
+                  move |(offset, has_sent_any)| {
+                    if offset >= bytes.len() && has_sent_any {
+                      None
+                    } else {
+                      let mut req = bazel_protos::bytestream::WriteRequest::new();
+                      req.set_resource_name(resource_name.clone());
+                      req.set_write_offset(offset as i64);
+                      let next_offset = min(offset + chunk_size_bytes, bytes.len());
+                      req.set_finish_write(next_offset == bytes.len());
+                      req.set_data(bytes.slice(offset, next_offset));
+                      Some(future::ok((
+                        (req, grpcio::WriteFlags::default()),
+                        (next_offset, true),
+                      )))
+                    }
+                  },
+                );
+
+              sender
+                .send_all(stream)
+                .map(|_| ())
+                .or_else(move |e| {
+                  match e {
+                    // Some implementations of the remote execution API early-return if the blob has
+                    // been concurrently uploaded by another client. In this case, they return a
+                    // WriteResponse with a committed_size equal to the digest's entire size before
+                    // closing the stream.
+                    // Because the server then closes the stream, the client gets an RpcFinished
+                    // error in this case. We ignore this, and will later on verify that the
+                    // committed_size we received from the server is equal to the expected one. If
+                    // these are not equal, the upload will be considered a failure at that point.
+                    // Whether this type of response will become part of the official API is up for
+                    // discussion: see
+                    // https://groups.google.com/d/topic/remote-execution-apis/NXUe3ItCw68/discussion.
+                    grpcio::Error::RpcFinished(None) => Ok(()),
+                    e => Err(format!(
+                      "Error attempting to upload digest {:?}: {:?}",
+                      digest, e
+                    )),
+                  }
                 })
-              })
-              .and_then(move |received| {
-                if received.get_committed_size() == len as i64 {
-                  Ok(digest)
-                } else {
-                  Err(format!(
-                    "Uploading file with digest {:?}: want commited size {} but got {}",
-                    digest,
-                    len,
-                    received.get_committed_size()
-                  ))
-                }
-              })
-              .to_boxed()
+                .and_then(move |()| {
+                  receiver.map_err(move |e| {
+                    format!(
+                      "Error from server when uploading digest {:?}: {:?}",
+                      digest, e
+                    )
+                  })
+                })
+                .and_then(move |received| {
+                  if received.get_committed_size() == len as i64 {
+                    Ok(digest)
+                  } else {
+                    Err(format!(
+                      "Uploading file with digest {:?}: want commited size {} but got {}",
+                      digest,
+                      len,
+                      received.get_committed_size()
+                    ))
+                  }
+                })
+                .to_boxed()
+            }
           }
-        }
-      })
-      .then(move |future| {
-        let workunit = WorkUnit::new(
-          workunit_name.clone(),
-          TimeSpan::since(&start_time),
-          workunit_store::get_parent_id(),
-        );
-        workunit_store.add_workunit(workunit);
-        future
-      })
-      .to_boxed()
+        })
+        .compat()
+        .await;
+
+    if let Some(workunit_state) = workunit_store::get_workunit_state() {
+      let workunit = WorkUnit::new(
+        workunit_name.clone(),
+        TimeSpan::since(&start_time),
+        workunit_state.parent_id,
+      );
+      workunit_state.store.add_workunit(workunit);
+    }
+
+    result
   }
 
-  pub fn load_bytes_with<T: Send + 'static, F: Fn(Bytes) -> T + Send + Sync + Clone + 'static>(
+  pub async fn load_bytes_with<
+    T: Send + 'static,
+    F: Fn(Bytes) -> T + Send + Sync + Clone + 'static,
+  >(
     &self,
     _entry_type: EntryType,
     digest: Digest,
     f: F,
-    workunit_store: WorkUnitStore,
-  ) -> BoxFuture<Option<T>, String> {
+  ) -> Result<Option<T>, String> {
     let start_time = std::time::SystemTime::now();
 
     let store = self.clone();
@@ -246,8 +249,8 @@ impl ByteStore {
       digest.1
     );
     let workunit_name = format!("load_bytes_with({})", resource_name.clone());
-    let workunit_store = workunit_store;
-    self
+
+    let result = self
       .with_byte_stream_client(move |client| {
         match client
           .read_opt(
@@ -277,7 +280,7 @@ impl ByteStore {
               .map(|(_client, bytes)| Some(bytes.freeze()))
               .or_else(|e| match e {
                 grpcio::Error::RpcFailure(grpcio::RpcStatus {
-                  status: grpcio::RpcStatusCode::NotFound,
+                  status: grpcio::RpcStatusCode::NOT_FOUND,
                   ..
                 }) => Ok(None),
                 _ => Err(format!(
@@ -295,16 +298,19 @@ impl ByteStore {
           .to_boxed(),
         }
       })
-      .then(move |future| {
-        let workunit = WorkUnit::new(
-          workunit_name.clone(),
-          TimeSpan::since(&start_time),
-          workunit_store::get_parent_id(),
-        );
-        workunit_store.add_workunit(workunit);
-        future
-      })
-      .to_boxed()
+      .compat()
+      .await;
+
+    if let Some(workunit_state) = workunit_store::get_workunit_state() {
+      let workunit = WorkUnit::new(
+        workunit_name.clone(),
+        TimeSpan::since(&start_time),
+        workunit_state.parent_id,
+      );
+      workunit_state.store.add_workunit(workunit);
+    }
+
+    result
   }
 
   ///
@@ -314,7 +320,6 @@ impl ByteStore {
   pub fn list_missing_digests(
     &self,
     request: bazel_protos::remote_execution::FindMissingBlobsRequest,
-    workunit_store: WorkUnitStore,
   ) -> impl Future<Item = HashSet<Digest>, Error = String> {
     let start_time = std::time::SystemTime::now();
 
@@ -323,7 +328,6 @@ impl ByteStore {
       "list_missing_digests({})",
       store.instance_name.clone().unwrap_or_default()
     );
-    let workunit_store = workunit_store;
     self
       .with_cas_client(move |client| {
         client
@@ -343,12 +347,14 @@ impl ByteStore {
           })
       })
       .then(move |future| {
-        let workunit = WorkUnit::new(
-          workunit_name.clone(),
-          TimeSpan::since(&start_time),
-          workunit_store::get_parent_id(),
-        );
-        workunit_store.add_workunit(workunit);
+        if let Some(workunit_state) = workunit_store::get_workunit_state() {
+          let workunit = WorkUnit::new(
+            workunit_name.clone(),
+            TimeSpan::since(&start_time),
+            workunit_state.parent_id,
+          );
+          workunit_state.store.add_workunit(workunit);
+        }
         future
       })
   }

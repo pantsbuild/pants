@@ -338,7 +338,7 @@ class BuildFileParserExposedContextAwareObjectFactoryTest(TestWithBuildFileParse
                 "create_java_libraries": cls.create_java_libraries,
                 "path_util": cls.path_relative_util,
             },
-            objects={"artifact": cls.Artifact, "jar": cls.Jar,},
+            objects={"artifact": cls.Artifact, "jar": cls.Jar},
         )
 
     def test_context_aware_object_factories(self):

@@ -158,22 +158,6 @@ class TestNailgunProtocol(unittest.TestCase):
         chunk_type, payload = NailgunProtocol.read_chunk(self.client_sock)
         self.assertEqual((chunk_type, payload), (ChunkType.EXIT, self.TEST_OUTPUT))
 
-    def test_send_pgrp(self):
-        test_pgrp = -1
-        NailgunProtocol.send_pgrp(self.server_sock, test_pgrp)
-        chunk_type, payload = NailgunProtocol.read_chunk(self.client_sock, return_bytes=True)
-        self.assertEqual(
-            (chunk_type, payload), (ChunkType.PGRP, NailgunProtocol.encode_int(test_pgrp))
-        )
-
-    def test_send_pid(self):
-        test_pid = 1
-        NailgunProtocol.send_pid(self.server_sock, test_pid)
-        chunk_type, payload = NailgunProtocol.read_chunk(self.client_sock, return_bytes=True)
-        self.assertEqual(
-            (chunk_type, payload), (ChunkType.PID, NailgunProtocol.encode_int(test_pid))
-        )
-
     def test_send_exit_with_code(self):
         return_code = 1
         NailgunProtocol.send_exit_with_code(self.server_sock, return_code)
@@ -238,7 +222,7 @@ class TestNailgunProtocol(unittest.TestCase):
 
         self.assertEqual(
             NailgunProtocol.isatty_to_env(mock_stdin, mock_stdout, mock_stderr),
-            {"NAILGUN_TTY_0": b"0", "NAILGUN_TTY_1": b"0", "NAILGUN_TTY_2": b"0",},
+            {"NAILGUN_TTY_0": b"0", "NAILGUN_TTY_1": b"0", "NAILGUN_TTY_2": b"0"},
         )
 
     def test_construct_chunk(self):

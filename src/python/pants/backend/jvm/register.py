@@ -1,6 +1,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+"""Support for both Java and Scala."""
+
 from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.ossrh_publication_metadata import (
     Developer,
@@ -9,31 +11,54 @@ from pants.backend.jvm.ossrh_publication_metadata import (
     Scm,
 )
 from pants.backend.jvm.repository import Repository as repo
+from pants.backend.jvm.rules.targets import (
+    AnnotationProcessor,
+    JarLibrary,
+    JavaAgent,
+    JavacPlugin,
+    JavaLibrary,
+    JunitTests,
+    JvmApp,
+    JvmBenchmark,
+    JvmBinary,
+    JvmCredentials,
+    JvmPrepCommand,
+    ManagedJarDependencies,
+    NetrcCredentials,
+    ScalacPlugin,
+    ScalaLibrary,
+    UnpackedJars,
+)
 from pants.backend.jvm.scala_artifact import ScalaArtifact
 from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagementSetup
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.scoverage_platform import ScoveragePlatform
 from pants.backend.jvm.subsystems.shader import Shading
-from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
-from pants.backend.jvm.targets.benchmark import Benchmark
-from pants.backend.jvm.targets.credentials import LiteralCredentials, NetrcCredentials
-from pants.backend.jvm.targets.jar_library import JarLibrary
-from pants.backend.jvm.targets.java_agent import JavaAgent
-from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.backend.jvm.targets.javac_plugin import JavacPlugin
-from pants.backend.jvm.targets.junit_tests import JUnitTests
-from pants.backend.jvm.targets.jvm_app import JvmApp
-from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, JvmBinary, Skip
-from pants.backend.jvm.targets.jvm_prep_command import JvmPrepCommand
-from pants.backend.jvm.targets.managed_jar_dependencies import (
-    ManagedJarDependencies,
-    ManagedJarLibraries,
+from pants.backend.jvm.targets.annotation_processor import (
+    AnnotationProcessor as AnnotationProcessorV1,
 )
+from pants.backend.jvm.targets.benchmark import Benchmark as BenchmarkV1
+from pants.backend.jvm.targets.credentials import LiteralCredentials as LiteralCredentialsV1
+from pants.backend.jvm.targets.credentials import NetrcCredentials as NetrcCredentialsV1
+from pants.backend.jvm.targets.jar_library import JarLibrary as JarLibraryV1
+from pants.backend.jvm.targets.java_agent import JavaAgent as JavaAgentV1
+from pants.backend.jvm.targets.java_library import JavaLibrary as JavaLibraryV1
+from pants.backend.jvm.targets.javac_plugin import JavacPlugin as JavacPluginV1
+from pants.backend.jvm.targets.junit_tests import JUnitTests as JUnitTestsV1
+from pants.backend.jvm.targets.jvm_app import JvmApp as JvmAppV1
+from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules
+from pants.backend.jvm.targets.jvm_binary import JvmBinary as JvmBinaryV1
+from pants.backend.jvm.targets.jvm_binary import Skip
+from pants.backend.jvm.targets.jvm_prep_command import JvmPrepCommand as JvmPrepCommandV1
+from pants.backend.jvm.targets.managed_jar_dependencies import (
+    ManagedJarDependencies as ManagedJarDependenciesV1,
+)
+from pants.backend.jvm.targets.managed_jar_dependencies import ManagedJarLibraries
 from pants.backend.jvm.targets.scala_exclude import ScalaExclude
 from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
-from pants.backend.jvm.targets.scala_library import ScalaLibrary
-from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
-from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
+from pants.backend.jvm.targets.scala_library import ScalaLibrary as ScalaLibraryV1
+from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin as ScalacPluginV1
+from pants.backend.jvm.targets.unpacked_jars import UnpackedJars as UnpackedJarsV1
 from pants.backend.jvm.tasks.analysis_extraction import AnalysisExtraction
 from pants.backend.jvm.tasks.benchmark_run import BenchmarkRun
 from pants.backend.jvm.tasks.binary_create import BinaryCreate
@@ -47,7 +72,6 @@ from pants.backend.jvm.tasks.coursier_resolve import CoursierResolve
 from pants.backend.jvm.tasks.detect_duplicates import DuplicateDetector
 from pants.backend.jvm.tasks.ivy_imports import IvyImports
 from pants.backend.jvm.tasks.ivy_outdated import IvyOutdated
-from pants.backend.jvm.tasks.ivy_resolve import IvyResolve
 from pants.backend.jvm.tasks.jar_create import JarCreate
 from pants.backend.jvm.tasks.jar_publish import JarPublish
 from pants.backend.jvm.tasks.javadoc_gen import JavadocGen
@@ -86,22 +110,22 @@ from pants.java.jar.jar_dependency import JarDependencyParseContextWrapper
 def build_file_aliases():
     return BuildFileAliases(
         targets={
-            "annotation_processor": AnnotationProcessor,
-            "benchmark": Benchmark,
-            "credentials": LiteralCredentials,
-            "jar_library": JarLibrary,
-            "java_agent": JavaAgent,
-            "java_library": JavaLibrary,
-            "javac_plugin": JavacPlugin,
-            "junit_tests": JUnitTests,
-            "jvm_app": JvmApp,
-            "jvm_binary": JvmBinary,
-            "jvm_prep_command": JvmPrepCommand,
-            "managed_jar_dependencies": ManagedJarDependencies,
-            "netrc_credentials": NetrcCredentials,
-            "scala_library": ScalaLibrary,
-            "scalac_plugin": ScalacPlugin,
-            "unpacked_jars": UnpackedJars,
+            "annotation_processor": AnnotationProcessorV1,
+            "benchmark": BenchmarkV1,
+            "credentials": LiteralCredentialsV1,
+            "jar_library": JarLibraryV1,
+            "java_agent": JavaAgentV1,
+            "java_library": JavaLibraryV1,
+            "javac_plugin": JavacPluginV1,
+            "junit_tests": JUnitTestsV1,
+            "jvm_app": JvmAppV1,
+            "jvm_binary": JvmBinaryV1,
+            "jvm_prep_command": JvmPrepCommandV1,
+            "managed_jar_dependencies": ManagedJarDependenciesV1,
+            "netrc_credentials": NetrcCredentialsV1,
+            "scala_library": ScalaLibraryV1,
+            "scalac_plugin": ScalacPluginV1,
+            "unpacked_jars": UnpackedJarsV1,
         },
         objects={
             "artifact": Artifact,
@@ -167,7 +191,6 @@ def register_goals():
     task(name="zinc", action=AnalysisExtraction).install("analysis")
 
     # Dependency resolution.
-    task(name="ivy", action=IvyResolve).install("resolve", first=True)
     task(name="coursier", action=CoursierResolve).install("resolve")
     task(name="ivy-imports", action=IvyImports).install("imports")
     task(name="unpack-jars", action=UnpackJars).install()
@@ -238,3 +261,24 @@ def register_goals():
     task(name="compile-jvm-prep-command", action=RunCompileJvmPrepCommand).install(
         "compile", first=True
     )
+
+
+def targets2():
+    return [
+        AnnotationProcessor,
+        JvmBenchmark,
+        JvmCredentials,
+        JarLibrary,
+        JavaAgent,
+        JavaLibrary,
+        JavacPlugin,
+        JunitTests,
+        JvmApp,
+        JvmBinary,
+        JvmPrepCommand,
+        ManagedJarDependencies,
+        NetrcCredentials,
+        ScalaLibrary,
+        ScalacPlugin,
+        UnpackedJars,
+    ]

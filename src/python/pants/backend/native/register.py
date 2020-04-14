@@ -1,19 +1,30 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+"""Support for using C and C++ with Python distributions via `ctypes`."""
+
+from pants.backend.native.rules.targets import (
+    CLibrary,
+    ConanNativeLibrary,
+    CppLibrary,
+    PackagedNativeLibrary,
+)
 from pants.backend.native.subsystems.binaries.binutils import create_binutils_rules
 from pants.backend.native.subsystems.binaries.gcc import create_gcc_rules
 from pants.backend.native.subsystems.binaries.llvm import create_llvm_rules
 from pants.backend.native.subsystems.native_build_settings import NativeBuildSettings
 from pants.backend.native.subsystems.native_toolchain import create_native_toolchain_rules
 from pants.backend.native.subsystems.xcode_cli_tools import create_xcode_cli_tools_rules
+from pants.backend.native.targets.external_native_library import ConanRequirement
 from pants.backend.native.targets.external_native_library import (
-    ConanRequirement,
-    ExternalNativeLibrary,
+    ExternalNativeLibrary as ExternalNativeLibraryV1,
 )
 from pants.backend.native.targets.native_artifact import NativeArtifact
-from pants.backend.native.targets.native_library import CLibrary, CppLibrary
-from pants.backend.native.targets.packaged_native_library import PackagedNativeLibrary
+from pants.backend.native.targets.native_library import CLibrary as CLibraryV1
+from pants.backend.native.targets.native_library import CppLibrary as CppLibraryV1
+from pants.backend.native.targets.packaged_native_library import (
+    PackagedNativeLibrary as PackagedNativeLibraryV1,
+)
 from pants.backend.native.tasks.c_compile import CCompile
 from pants.backend.native.tasks.conan_fetch import ConanFetch
 from pants.backend.native.tasks.conan_prep import ConanPrep
@@ -26,10 +37,10 @@ from pants.goal.task_registrar import TaskRegistrar as task
 def build_file_aliases():
     return BuildFileAliases(
         targets={
-            CLibrary.alias(): CLibrary,
-            CppLibrary.alias(): CppLibrary,
-            ExternalNativeLibrary.alias(): ExternalNativeLibrary,
-            PackagedNativeLibrary.alias(): PackagedNativeLibrary,
+            CLibraryV1.alias(): CLibraryV1,
+            CppLibraryV1.alias(): CppLibraryV1,
+            ExternalNativeLibraryV1.alias(): ExternalNativeLibraryV1,
+            PackagedNativeLibraryV1.alias(): PackagedNativeLibraryV1,
         },
         objects={
             ConanRequirement.alias(): ConanRequirement,
@@ -54,9 +65,13 @@ def register_goals():
 
 def rules():
     return (
-        create_native_toolchain_rules()
-        + create_xcode_cli_tools_rules()
-        + create_binutils_rules()
-        + create_gcc_rules()
-        + create_llvm_rules()
+        *create_native_toolchain_rules(),
+        *create_xcode_cli_tools_rules(),
+        *create_binutils_rules(),
+        *create_gcc_rules(),
+        *create_llvm_rules(),
     )
+
+
+def targets2():
+    return [CLibrary, CppLibrary, ConanNativeLibrary, PackagedNativeLibrary]

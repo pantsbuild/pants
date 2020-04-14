@@ -3,8 +3,6 @@
 
 package org.pantsbuild.tools.junit.impl;
 
-import com.google.common.base.Charsets;
-import com.google.common.collect.Lists;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -12,7 +10,18 @@ import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.List;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
+
+import com.google.common.base.Charsets;
+import com.google.common.collect.Lists;
+
+import org.hamcrest.Description;
+import org.hamcrest.Matcher;
+import org.hamcrest.TypeSafeDiagnosingMatcher;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -153,8 +162,8 @@ public class ConsoleRunnerImplTest {
         useExperimentalRunner,
         outputStream,
         System.err  // TODO, if there's an error reported on system err, it doesn't show up in
-                    // the test failures.
-        );
+        // the test failures.
+    );
 
     try {
       runner.run(tests);
@@ -191,7 +200,8 @@ public class ConsoleRunnerImplTest {
 
     failFast = true;
     output = runTestExpectingFailure(AllFailingTest.class);
-    assertThat(output, containsString("There was 1 failure:"));
+    assertThat(Arrays.asList(output.split("\n")),
+        hasExactlyOneOf(containsString("There was 1 failure:")));
     assertThat(output, containsString("Tests run: 1,  Failures: 1"));
   }
 
@@ -399,6 +409,44 @@ public class ConsoleRunnerImplTest {
           Charsets.UTF_8);
     } catch (IOException e) {
       throw new RuntimeException(e);
+    }
+  }
+
+  private <T> Matcher<Iterable<T>> hasExactlyOneOf(final Matcher<T> elemMatcher) {
+    return new ExactlyOneOf<T>(elemMatcher);
+  }
+
+  private static class ExactlyOneOf<T> extends TypeSafeDiagnosingMatcher<Iterable<T>> {
+    private final Matcher<? super T> elemMatcher;
+
+    public ExactlyOneOf(Matcher<? super T> elemMatcher) {
+      this.elemMatcher = elemMatcher;
+    }
+
+    @Override
+    protected boolean matchesSafely(Iterable<T> iterable,
+                                    Description mismatchDescription) {
+      List<T> filtered = StreamSupport.stream(iterable.spliterator(), false)
+          .filter(new Predicate<T>() {
+            @Override public boolean test(T input) {
+              return elemMatcher.matches(input);
+            }
+          }).collect(Collectors.toList());
+      if (filtered.isEmpty()) {
+        mismatchDescription.appendText("found none in " + iterable);
+        return false;
+      } else if (filtered.size() > 1) {
+        mismatchDescription.appendText("found more than one");
+        return false;
+      } else {
+        return true;
+      }
+    }
+
+    @Override
+    public void describeTo(Description description) {
+      description.appendText("exactly one of ");
+      elemMatcher.describeTo(description);
     }
   }
 }

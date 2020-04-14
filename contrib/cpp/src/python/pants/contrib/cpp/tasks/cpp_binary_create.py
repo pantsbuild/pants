@@ -83,7 +83,7 @@ class CppBinaryCreate(CppTask):
         cmd.extend((f"-L{L}" for L in library_dirs))
         cmd.extend((f"-l{l}" for l in libraries))
         cmd.extend(["-o" + binary_path])
-        if self.get_options().ld_options != None:
+        if self.get_options().ld_options is not None:
             cmd.extend((f"-Wl,{o}" for o in self.get_options().ld_options.split(" ")))
 
         with self.context.new_workunit(

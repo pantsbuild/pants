@@ -5,7 +5,9 @@ python_library(
   dependencies=[
     '3rdparty/python:dataclasses',
     '3rdparty/python:setuptools',
+    'src/python/pants/backend/python/rules/coverage_plugin:plugin',
     'src/python/pants/backend/python/subsystems',
+    'src/python/pants/backend/python/subsystems/ipex',
     'src/python/pants/build_graph',
     'src/python/pants/engine/legacy:graph',
     'src/python/pants/engine:build_files',
@@ -13,11 +15,12 @@ python_library(
     'src/python/pants/engine:isolated_process',
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
+    'src/python/pants/engine:target',
     'src/python/pants/option',
     'src/python/pants/python',
     'src/python/pants/rules/core',
     'src/python/pants/source:source',
-    'src/python/pants/backend/python/rules/coverage_plugin:plugin',
+    'src/python/pants/util:logging',
   ],
   tags = {"partially_type_checked"},
 )

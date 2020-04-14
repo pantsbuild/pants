@@ -7,6 +7,6 @@ publish = false
 
 [dependencies]
 concrete_time = { path = "../concrete_time" }
-futures01 = { package = "futures", version = "0.1" }
 parking_lot = "0.6"
 rand = "0.6"
+tokio = { version = "0.2", features = ["rt-util"] }

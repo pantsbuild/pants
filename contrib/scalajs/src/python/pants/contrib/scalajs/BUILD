@@ -5,6 +5,7 @@ contrib_plugin(
   name='plugin',
   dependencies=[
     'contrib/node/src/python/pants/contrib/node:plugin',
+    'contrib/scalajs/src/python/pants/contrib/scalajs/rules',
     'contrib/scalajs/src/python/pants/contrib/scalajs/subsystems',
     'contrib/scalajs/src/python/pants/contrib/scalajs/targets',
     'contrib/scalajs/src/python/pants/contrib/scalajs/tasks',
@@ -13,7 +14,7 @@ contrib_plugin(
   ],
   tags = {'partially_type_checked'},
   distribution_name='pantsbuild.pants.contrib.scalajs',
-  description='scala.js support for pants.',
+  description='scala.js support for pants (deprecated).',
   build_file_aliases=True,
   register_goals=True,
   global_subsystems=True

@@ -20,14 +20,14 @@ from pants.base.build_environment import get_buildroot
 from pants.base.workunit import WorkUnitLabel
 from pants.binaries.binary_tool import NativeTool
 from pants.engine.fs import DirectoryToMaterialize, PathGlobs, PathGlobsAndRoot
-from pants.engine.isolated_process import ExecuteProcessRequest
+from pants.engine.isolated_process import Process
 from pants.java.distribution.distribution import Distribution
 from pants.java.jar.jar_dependency import JarDependency
 from pants.util.dirutil import fast_relpath, safe_delete, safe_mkdir, safe_mkdir_for
 from pants.util.fileutil import safe_hardlink_or_copy
 from pants.util.memo import memoized_method, memoized_property
 
-_ZINC_COMPILER_VERSION = "0.0.17"
+_ZINC_COMPILER_VERSION = "0.0.20"
 
 
 class Zinc:
@@ -91,7 +91,7 @@ class Zinc:
             cls.register_jvm_tool(
                 register,
                 Zinc.ZINC_BOOTSTRAPPER_TOOL_NAME,
-                classpath=[JarDependency("org.pantsbuild", "zinc-bootstrapper_2.12", "0.0.12"),],
+                classpath=[JarDependency("org.pantsbuild", "zinc-bootstrapper_2.12", "0.0.12")],
                 main=Zinc.ZINC_BOOTSTRAPER_MAIN,
                 custom_rules=shader_rules,
             )
@@ -352,7 +352,7 @@ class Zinc:
             + ["-cp", bootstrapper, Zinc.ZINC_BOOTSTRAPER_MAIN]
             + bootstrapper_args
         )
-        req = ExecuteProcessRequest(
+        req = Process(
             argv=argv,
             input_files=inputs_digest,
             output_files=(self._relative_to_buildroot(bridge_jar),),

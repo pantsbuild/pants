@@ -4,6 +4,7 @@
 
 python_library(
   dependencies=[
+    'src/python/pants/base:build_root',
     'src/python/pants/build_graph',
     'src/python/pants/engine:addressable',
     'src/python/pants/engine:console',
@@ -11,7 +12,7 @@ python_library(
     'src/python/pants/engine:goal',
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
-    'src/python/pants/engine/legacy:graph',
+    'src/python/pants/engine:target',
     'src/python/pants/rules/core',
   ],
   tags = {'partially_type_checked'},

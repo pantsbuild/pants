@@ -3,7 +3,7 @@
 
 jvm_binary(
   basename='protobuf-unpacked-jars-example',
-  source='ExampleProtobufExternalArchive.java',
+  sources=['ExampleProtobufExternalArchive.java'],
   main='org.pantsbuild.example.protobuf.unpacked_jars.ExampleProtobufExternalArchive',
   dependencies=[
     '3rdparty:protobuf-java',

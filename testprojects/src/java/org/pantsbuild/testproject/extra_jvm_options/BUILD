@@ -19,5 +19,5 @@ jvm_app(
 
 python_binary(
     name='python_app',
-    source='main.py',
+    sources=['main.py'],
 )

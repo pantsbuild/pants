@@ -523,7 +523,7 @@ class ClasspathProductsTest(TestBase):
                 classpath_products,
                 [a],
                 base_dir,
-                ["a.b.b-0.jar", "a.b.b-1", "a.b.b-2.jar",],
+                ["a.b.b-0.jar", "a.b.b-1", "a.b.b-2.jar"],
                 {
                     "a.b.b-classpath.txt": "{}/a.jar:{}/resources:{}/{}\n".format(
                         self.pants_workdir, self.pants_workdir, self.pants_workdir, jar_path
@@ -539,7 +539,7 @@ class ClasspathProductsTest(TestBase):
             classpath_products,
             [a],
             base_dir,
-            ["a.b.b-0.jar",],
+            ["a.b.b-0.jar"],
             {"a.b.b-classpath.txt": f"{self.pants_workdir}/a.jar\n"},
         )
 

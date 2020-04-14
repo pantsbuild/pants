@@ -15,8 +15,17 @@ files(
 )
 
 python_binary(
+   name = 'bootstrap_and_deploy_ci_pants_pex',
+   sources = ['bootstrap_and_deploy_ci_pants_pex.py'],
+   dependencies = [
+     ':common',
+   ],
+   tags = {'type_checked'},
+ )
+
+python_binary(
   name = 'check_banned_imports',
-  source = 'check_banned_imports.py',
+  sources = ['check_banned_imports.py'],
   dependencies = [
     ':common',
   ],
@@ -25,7 +34,7 @@ python_binary(
 
 python_binary(
   name = 'check_header',
-  source = 'check_header.py',
+  sources = ['check_header.py'],
   dependencies = [
     ':common',
   ],
@@ -34,7 +43,7 @@ python_binary(
 
 python_binary(
   name = 'check_pants_pex_abi',
-  source = 'check_pants_pex_abi.py',
+  sources = ['check_pants_pex_abi.py'],
   dependencies = [
     ':common',
   ],
@@ -43,7 +52,7 @@ python_binary(
 
 python_binary(
   name = 'ci',
-  source = 'ci.py',
+  sources = ['ci.py'],
   dependencies = [
     ':common',
   ],
@@ -52,13 +61,13 @@ python_binary(
 
 python_library(
   name = 'common',
-  source = 'common.py',
+  sources = ['common.py'],
   tags = {'type_checked'},
 )
 
 python_binary(
   name = 'deploy_to_s3',
-  source = 'deploy_to_s3.py',
+  sources = ['deploy_to_s3.py'],
   dependencies = [
     ':common',
   ],
@@ -67,7 +76,7 @@ python_binary(
 
 python_binary(
   name = 'generate_travis_yml',
-  sources = 'generate_travis_yml.py',
+  sources = ['generate_travis_yml.py'],
   dependencies = [
     '3rdparty/python:PyYAML',
   ],
@@ -76,7 +85,7 @@ python_binary(
 
 python_binary(
   name = 'get_rbe_token',
-  sources = 'get_rbe_token.py',
+  sources = ['get_rbe_token.py'],
   dependencies = [
     '3rdparty/python:ansicolors',
     '3rdparty/python:requests',
@@ -86,7 +95,7 @@ python_binary(
 
 python_binary(
   name = 'mypy',
-  source = 'mypy.py',
+  sources = ['mypy.py'],
   dependencies = [
     ':common',
   ],
@@ -95,7 +104,7 @@ python_binary(
 
 python_binary(
   name = 'shellcheck',
-  source = 'shellcheck.py',
+  sources = ['shellcheck.py'],
   dependencies = [
     ':common',
   ],

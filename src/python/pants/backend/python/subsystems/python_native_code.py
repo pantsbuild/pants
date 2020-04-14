@@ -5,14 +5,14 @@ import logging
 import os
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import Tuple
+from typing import Dict, Tuple
 
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.native_library import NativeLibrary
-from pants.backend.python.subsystems import pex_build_util
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.base.exceptions import IncompatiblePlatformsError
 from pants.engine.rules import rule, subsystem_rule
+from pants.python import pex_build_util
 from pants.python.python_setup import PythonSetup
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
@@ -143,7 +143,7 @@ class PexBuildEnvironment:
     ld_flags: Tuple[str, ...]
 
     @property
-    def invocation_environment_dict(self):
+    def invocation_environment_dict(self) -> Dict[str, str]:
         return {
             "CPPFLAGS": safe_shlex_join(self.cpp_flags),
             "LDFLAGS": safe_shlex_join(self.ld_flags),

@@ -3,10 +3,10 @@
 
 python_library(
   dependencies=[
-    ':plugins',
     '3rdparty/python:dataclasses',
     '3rdparty/python:pex',
     '3rdparty/python:setuptools',
+    ':plugins',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_root',
     'src/python/pants/base:exception_sink',
@@ -35,6 +35,7 @@ python_library(
     'src/python/pants/rules/core',
     'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:logging',
     'src/python/pants/util:memo',
     'src/python/pants/util:ordered_set',
     'src/python/pants:version',
@@ -60,4 +61,13 @@ target(
     'src/python/pants/backend/python/lint/pylint',
     'src/python/pants/backend/native',
   ],
+)
+
+python_library(
+  name = 'util',
+  sources = ['util.py'],
+  dependencies=[
+    ':init',
+    'src/python/pants/testutil:test_base'
+  ]
 )

@@ -7,26 +7,26 @@ from typing import Optional, Tuple
 
 from pants.backend.python.lint.pylint.subsystem import Pylint
 from pants.backend.python.lint.python_linter import PythonLinter
-from pants.backend.python.rules import download_pex_bin, pex, prepare_chrooted_python_sources
+from pants.backend.python.rules import download_pex_bin, importable_python_sources, pex
+from pants.backend.python.rules.importable_python_sources import ImportablePythonSources
 from pants.backend.python.rules.pex import (
-    CreatePex,
     Pex,
     PexInterpreterConstraints,
+    PexRequest,
     PexRequirements,
 )
-from pants.backend.python.rules.prepare_chrooted_python_sources import ChrootedPythonSources
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.build_graph.address import Address
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
-from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
+from pants.engine.isolated_process import FallibleProcessResult, Process
 from pants.engine.legacy.graph import HydratedTarget, HydratedTargets
-from pants.engine.rules import UnionRule, rule, subsystem_rule
+from pants.engine.rules import UnionRule, named_rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
 from pants.rules.core import determine_source_files, strip_source_roots
-from pants.rules.core.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
+from pants.rules.core.determine_source_files import LegacySpecifiedSourceFilesRequest, SourceFiles
 from pants.rules.core.lint import Linter, LintResult
 
 
@@ -44,8 +44,8 @@ def generate_args(*, specified_source_files: SourceFiles, pylint: Pylint) -> Tup
     return tuple(args)
 
 
-@rule(name="Lint using Pylint")
-async def lint(
+@named_rule(desc="Lint using Pylint")
+async def pylint_lint(
     linter: PylintLinter,
     pylint: Pylint,
     python_setup: PythonSetup,
@@ -67,7 +67,7 @@ async def lint(
             ht.adaptor.dependencies for ht in hydrated_targets
         )
     )
-    chrooted_python_sources = await Get[ChrootedPythonSources](
+    chrooted_python_sources = await Get[ImportablePythonSources](
         HydratedTargets([*hydrated_targets, *dependencies])
     )
 
@@ -79,7 +79,7 @@ async def lint(
         python_setup=python_setup,
     )
     requirements_pex = await Get[Pex](
-        CreatePex(
+        PexRequest(
             output_filename="pylint.pex",
             requirements=PexRequirements(pylint.get_requirement_specs()),
             interpreter_constraints=interpreter_constraints,
@@ -107,7 +107,7 @@ async def lint(
     )
 
     specified_source_files = await Get[SourceFiles](
-        SpecifiedSourceFilesRequest(adaptors_with_origins, strip_source_roots=True)
+        LegacySpecifiedSourceFilesRequest(adaptors_with_origins, strip_source_roots=True)
     )
 
     address_references = ", ".join(
@@ -125,19 +125,19 @@ async def lint(
         input_files=merged_input_files,
         description=f"Run Pylint for {address_references}",
     )
-    result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, request)
-    return LintResult.from_fallible_execute_process_result(result)
+    result = await Get[FallibleProcessResult](Process, request)
+    return LintResult.from_fallible_process_result(result)
 
 
 def rules():
     return [
-        lint,
+        pylint_lint,
         subsystem_rule(Pylint),
         UnionRule(Linter, PylintLinter),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),
         *pex.rules(),
-        *prepare_chrooted_python_sources.rules(),
+        *importable_python_sources.rules(),
         *strip_source_roots.rules(),
         *python_native_code.rules(),
         *subprocess_environment.rules(),

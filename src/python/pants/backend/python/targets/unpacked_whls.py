@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class UnpackedWheels(ImportWheelsMixin, Target):
-    """A set of sources extracted from JAR files.
+    """A set of sources extracted from wheel files.
 
     NB: Currently, wheels are always resolved for the 'current' platform.
 
@@ -66,6 +66,7 @@ class UnpackedWheels(ImportWheelsMixin, Target):
                                         `include_patterns` matching exactly what is specified in the
                                         setup.py.
         """
+        # NB: Update python/rules/targets.py to no longer allow `str` when removing this deprecation.
         deprecated_conditional(
             lambda: type(within_data_subdir) not in (bool, type(None)),
             removal_version="1.28.0.dev2",
@@ -79,7 +80,9 @@ class UnpackedWheels(ImportWheelsMixin, Target):
                 "module_name": PrimitiveField(module_name),
                 "include_patterns": PrimitiveField(include_patterns or ()),
                 "exclude_patterns": PrimitiveField(exclude_patterns or ()),
-                "compatibility": PrimitiveField(ensure_str_list(compatibility or ())),
+                "compatibility": PrimitiveField(
+                    ensure_str_list(compatibility or (), allow_single_str=True)
+                ),
                 "within_data_subdir": PrimitiveField(within_data_subdir),
                 # TODO: consider supporting transitive deps like UnpackedJars!
                 # TODO: consider supporting `platforms` as in PythonBinary!

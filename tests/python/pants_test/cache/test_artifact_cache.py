@@ -1,8 +1,11 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import logging
 import os
+import unittest.mock
 from contextlib import contextmanager
+from typing import Iterator
 
 import pytest
 
@@ -14,11 +17,13 @@ from pants.cache.artifact_cache import (
 )
 from pants.cache.local_artifact_cache import LocalArtifactCache, TempLocalArtifactCache
 from pants.cache.pinger import BestUrlSelector, InvalidRESTfulCacheProtoError
-from pants.cache.restful_artifact_cache import RESTfulArtifactCache
+from pants.cache.restful_artifact_cache import RequestsSession, RESTfulArtifactCache
 from pants.invalidation.build_invalidator import CacheKey
+from pants.testutil.subsystem.util import init_subsystems
 from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir, temporary_file, temporary_file_path
 from pants.util.dirutil import safe_mkdir
+from pants.util.meta import classproperty
 from pants_test.cache.cache_server import cache_server
 
 TEST_CONTENT1 = b"muppet"
@@ -26,11 +31,21 @@ TEST_CONTENT2 = b"kermit"
 
 
 class TestArtifactCache(TestBase):
+    @classproperty
+    def subsystems(cls):
+        return super().subsystems + (RequestsSession.Factory,)
+
     @contextmanager
-    def setup_local_cache(self):
+    def setup_local_cache(self, seperate_extraction_root=False):
         with temporary_dir() as artifact_root:
-            with temporary_dir() as cache_root:
-                yield LocalArtifactCache(artifact_root, cache_root, compression=1)
+            with temporary_dir() as artifact_extraction_root:
+                with temporary_dir() as cache_root:
+                    extraction_root = (
+                        artifact_extraction_root if seperate_extraction_root else artifact_root
+                    )
+                    yield LocalArtifactCache(
+                        artifact_root, extraction_root, cache_root, compression=1
+                    )
 
     @contextmanager
     def setup_server(self, return_failed=False, cache_root=None):
@@ -40,9 +55,32 @@ class TestArtifactCache(TestBase):
     @contextmanager
     def setup_rest_cache(self, local=None, return_failed=False):
         with temporary_dir() as artifact_root:
-            local = local or TempLocalArtifactCache(artifact_root, 0)
+            local = local or TempLocalArtifactCache(artifact_root, artifact_root, 0)
             with self.setup_server(return_failed=return_failed) as server:
                 yield RESTfulArtifactCache(artifact_root, BestUrlSelector([server.url]), local)
+
+    @contextmanager
+    def restore_max_retries_flag(self) -> Iterator[None]:
+        try:
+            yield
+        finally:
+            RequestsSession._max_retries_exceeded = False
+
+    @contextmanager
+    def override_check_for_max_retry(self, should_check: bool) -> Iterator[None]:
+        patch_opts = dict(autospec=True, spec_set=True)
+        with self.restore_max_retries_flag(), unittest.mock.patch.object(
+            RequestsSession, "should_check_for_max_retry_error", **patch_opts
+        ) as check_max_retry_predicate:
+            check_max_retry_predicate.return_value = should_check
+            yield
+
+    def setUp(self):
+        super().setUp()
+        # Init engine because decompression now goes through native code.
+        self._init_engine()
+        TarballArtifact.NATIVE_BINARY = self._scheduler._scheduler._native
+        init_subsystems([RequestsSession.Factory])
 
     @contextmanager
     def setup_test_file(self, parent):
@@ -53,17 +91,15 @@ class TestArtifactCache(TestBase):
             f.close()
             yield path
 
-    def setUp(self):
-        super().setUp()
-        # Init engine because decompression now goes through native code.
-        self._init_engine()
-        TarballArtifact.NATIVE_BINARY = self._scheduler._scheduler._native
-
     def test_local_cache(self):
         with self.setup_local_cache() as artifact_cache:
             self.do_test_artifact_cache(artifact_cache)
 
-    @pytest.mark.flaky(retries=1)  # https://github.com/pantsbuild/pants/issues/6838
+    def test_local_cache_with_seperate_extraction_root(self):
+        with self.setup_local_cache(seperate_extraction_root=True) as artifact_cache:
+            self.do_test_artifact_cache(artifact_cache)
+
+    @pytest.mark.skip(reason="flaky: https://github.com/pantsbuild/pants/issues/6838")
     def test_restful_cache(self):
         with self.assertRaises(InvalidRESTfulCacheProtoError):
             RESTfulArtifactCache("foo", BestUrlSelector(["ftp://localhost/bar"]), "foo")
@@ -71,12 +107,12 @@ class TestArtifactCache(TestBase):
         with self.setup_rest_cache() as artifact_cache:
             self.do_test_artifact_cache(artifact_cache)
 
-    @pytest.mark.flaky(retries=1)  # https://github.com/pantsbuild/pants/issues/6838
+    @pytest.mark.skip(reason="flaky: https://github.com/pantsbuild/pants/issues/6838")
     def test_restful_cache_failover(self):
         bad_url = "http://badhost:123"
 
         with temporary_dir() as artifact_root:
-            local = TempLocalArtifactCache(artifact_root, 0)
+            local = TempLocalArtifactCache(artifact_root, artifact_root, 0)
 
             # With fail-over, rest call second time will succeed
             with self.setup_server() as good_server:
@@ -108,7 +144,10 @@ class TestArtifactCache(TestBase):
             self.assertTrue(bool(artifact_cache.use_cached_files(key)))
 
             # Check that it was recovered correctly.
-            with open(path, "rb") as infile:
+            extracted_file_path = os.path.join(
+                artifact_cache.artifact_extraction_root, os.path.basename(path)
+            )
+            with open(extracted_file_path, "rb") as infile:
                 content = infile.read()
             self.assertEqual(content, TEST_CONTENT1)
 
@@ -116,11 +155,12 @@ class TestArtifactCache(TestBase):
             artifact_cache.delete(key)
             self.assertFalse(artifact_cache.has(key))
 
+    @pytest.mark.skip(reason="flaky: https://github.com/pantsbuild/pants/issues/9426")
     def test_local_backed_remote_cache(self):
         """make sure that the combined cache finds what it should and that it backfills."""
         with self.setup_server() as server:
             with self.setup_local_cache() as local:
-                tmp = TempLocalArtifactCache(local.artifact_root, 0)
+                tmp = TempLocalArtifactCache(local.artifact_root, local.artifact_extraction_root, 0)
                 remote = RESTfulArtifactCache(
                     local.artifact_root, BestUrlSelector([server.url]), tmp
                 )
@@ -168,7 +208,9 @@ class TestArtifactCache(TestBase):
         with temporary_dir() as remote_cache_dir:
             with self.setup_server(cache_root=remote_cache_dir) as server:
                 with self.setup_local_cache() as local:
-                    tmp = TempLocalArtifactCache(local.artifact_root, compression=1)
+                    tmp = TempLocalArtifactCache(
+                        local.artifact_root, local.artifact_extraction_root, compression=1
+                    )
                     remote = RESTfulArtifactCache(
                         local.artifact_root, BestUrlSelector([server.url]), tmp
                     )
@@ -198,7 +240,7 @@ class TestArtifactCache(TestBase):
                         self.assertTrue(os.path.exists(results_dir))
                         self.assertTrue(len(os.listdir(results_dir)) == 0)
 
-    @pytest.mark.flaky(retries=1)  # https://github.com/pantsbuild/pants/issues/6838
+    @pytest.mark.skip(reason="flaky: https://github.com/pantsbuild/pants/issues/6838")
     def test_multiproc(self):
         key = CacheKey("muppet_key", "fake_hash")
 
@@ -206,13 +248,13 @@ class TestArtifactCache(TestBase):
             self.assertFalse(call_use_cached_files((cache, key, None)))
             with self.setup_test_file(cache.artifact_root) as path:
                 call_insert((cache, key, [path], False))
-            self.assertTrue(call_use_cached_files((cache, key, None)))
+                self.assertTrue(call_use_cached_files((cache, key, None)))
 
         with self.setup_rest_cache() as cache:
             self.assertFalse(call_use_cached_files((cache, key, None)))
             with self.setup_test_file(cache.artifact_root) as path:
                 call_insert((cache, key, [path], False))
-            self.assertTrue(call_use_cached_files((cache, key, None)))
+                self.assertTrue(call_use_cached_files((cache, key, None)))
 
     def test_failed_multiproc(self):
         key = CacheKey("muppet_key", "fake_hash")
@@ -222,8 +264,47 @@ class TestArtifactCache(TestBase):
             self.assertFalse(call_use_cached_files((cache, key, None)))
             with self.setup_test_file(cache.artifact_root) as path:
                 call_insert((cache, key, [path], False))
-            self.assertFalse(call_use_cached_files((cache, key, None)))
+                self.assertFalse(call_use_cached_files((cache, key, None)))
 
+    @pytest.mark.skip(reason="flaky: https://github.com/pantsbuild/pants/issues/6838")
+    def test_noops_after_max_retries_exceeded(self):
+        key = CacheKey("muppet_key", "fake_hash")
+
+        with self.setup_rest_cache() as cache:
+            # Assert that the artifact doesn't exist, then insert it and check that it exists.
+            self.assertFalse(call_use_cached_files((cache, key, None)))
+            with self.setup_test_file(cache.artifact_root) as path:
+                call_insert((cache, key, [path], False))
+                self.assertTrue(call_use_cached_files((cache, key, None)))
+
+            # No failed requests should have occurred yet, so no retries should have been triggered.
+            self.assertFalse(RequestsSession._max_retries_exceeded)
+
+            # Now assert that when max retries are exceeded, the cache returns 404s.
+            with self.restore_max_retries_flag():
+                RequestsSession._max_retries_exceeded = True
+                self.assertFalse(call_use_cached_files((cache, key, None)))
+            # After the flag is toggled back, the cache successfully finds the entry.
+            self.assertTrue(call_use_cached_files((cache, key, None)))
+
+    def test_max_retries_exceeded(self):
+        key = CacheKey("muppet_key", "fake_hash")
+
+        # Assert that the global "retries exceeded" flag is set when retries are exceeded.
+        with self.override_check_for_max_retry(should_check=True), self.setup_rest_cache(
+            return_failed="connection-error"
+        ) as cache, self.captured_logging(logging.WARNING) as captured:
+
+            self.assertFalse(call_use_cached_files((cache, key, None)))
+            self.assertTrue(RequestsSession._max_retries_exceeded)
+
+            _, retry_warning = tuple(captured.warnings())
+            self.assertIn(
+                "Maximum retries were exceeded for the current connection pool. Avoiding the remote cache for the rest of the pants process lifetime.",
+                retry_warning,
+            )
+
+    @pytest.mark.skip(reason="flaky: https://github.com/pantsbuild/pants/issues/9436")
     def test_successful_request_cleans_result_dir(self):
         key = CacheKey("muppet_key", "fake_hash")
 

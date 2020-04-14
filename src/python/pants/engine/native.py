@@ -10,7 +10,7 @@ import sysconfig
 import traceback
 from contextlib import closing
 from types import CoroutineType
-from typing import Any, Iterable, NamedTuple, Tuple, Type, cast
+from typing import Any, Iterable, List, NamedTuple, Tuple, Type, cast
 
 import cffi
 import pkg_resources
@@ -33,11 +33,9 @@ from pants.engine.fs import (
     UrlToFetch,
 )
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveProcessResult
-from pants.engine.isolated_process import (
-    FallibleExecuteProcessResult,
-    MultiPlatformExecuteProcessRequest,
-)
+from pants.engine.isolated_process import FallibleProcessResultWithPlatform, MultiPlatformProcess
 from pants.engine.objects import union
+from pants.engine.platform import Platform
 from pants.engine.selectors import Get
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import read_file, safe_mkdir, safe_mkdtemp
@@ -578,16 +576,18 @@ class EngineTypes(NamedTuple):
     dir: TypeId
     file: TypeId
     link: TypeId
-    multi_platform_process_request: TypeId
+    platform: TypeId
+    multi_platform_process: TypeId
     process_result: TypeId
     coroutine: TypeId
     url_to_fetch: TypeId
     string: TypeId
     bytes: TypeId
     construct_interactive_process_result: Function
-    interactive_process_request: TypeId
+    interactive_process: TypeId
     interactive_process_result: TypeId
     snapshot_subset: TypeId
+    construct_platform: Function
 
 
 class PyResult(NamedTuple):
@@ -681,7 +681,10 @@ class ExternContext:
 
     def identify(self, obj):
         """Return an Ident-shaped tuple for the given object."""
-        hash_ = hash(obj)
+        try:
+            hash_ = hash(obj)
+        except TypeError as e:
+            raise TypeError(f"failed to hash object {obj}: {e}") from e
         type_id = self.to_id(type(obj))
         return (hash_, TypeId(type_id))
 
@@ -925,7 +928,8 @@ class Native(metaclass=SingletonMetaclass):
         root_subject_types,
         build_root,
         local_store_dir,
-        ignore_patterns,
+        ignore_patterns: List[str],
+        use_gitignore: bool,
         execution_options,
     ):
         """Create and return an ExternContext and native Scheduler."""
@@ -944,7 +948,7 @@ class Native(metaclass=SingletonMetaclass):
             construct_file_content=func(FileContent),
             construct_files_content=func(FilesContent),
             files_content=ti(FilesContent),
-            construct_process_result=func(FallibleExecuteProcessResult),
+            construct_process_result=func(FallibleProcessResultWithPlatform),
             construct_materialize_directories_results=func(MaterializeDirectoriesResult),
             construct_materialize_directory_result=func(MaterializeDirectoryResult),
             address=ti(Address),
@@ -956,16 +960,18 @@ class Native(metaclass=SingletonMetaclass):
             dir=ti(Dir),
             file=ti(File),
             link=ti(Link),
-            multi_platform_process_request=ti(MultiPlatformExecuteProcessRequest),
-            process_result=ti(FallibleExecuteProcessResult),
+            platform=ti(Platform),
+            multi_platform_process=ti(MultiPlatformProcess),
+            process_result=ti(FallibleProcessResultWithPlatform),
             coroutine=ti(CoroutineType),
             url_to_fetch=ti(UrlToFetch),
             string=ti(str),
             bytes=ti(bytes),
             construct_interactive_process_result=func(InteractiveProcessResult),
-            interactive_process_request=ti(InteractiveProcessRequest),
+            interactive_process=ti(InteractiveProcessRequest),
             interactive_process_result=ti(InteractiveProcessResult),
             snapshot_subset=ti(SnapshotSubset),
+            construct_platform=func(Platform),
         )
 
         scheduler_result = self.lib.scheduler_create(
@@ -975,6 +981,7 @@ class Native(metaclass=SingletonMetaclass):
             self.context.utf8_buf(build_root),
             self.context.utf8_buf(local_store_dir),
             self.context.utf8_buf_buf(ignore_patterns),
+            use_gitignore,
             self.to_ids_buf(root_subject_types),
             # Remote execution config.
             execution_options.remote_execution,
@@ -999,6 +1006,7 @@ class Native(metaclass=SingletonMetaclass):
             execution_options.process_execution_use_local_cache,
             self.context.utf8_dict(execution_options.remote_execution_headers),
             execution_options.process_execution_local_enable_nailgun,
+            execution_options.experimental_fs_watcher,
         )
         if scheduler_result.is_throw:
             value = self.context.from_value(scheduler_result.throw_handle)

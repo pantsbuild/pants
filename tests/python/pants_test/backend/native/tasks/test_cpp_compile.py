@@ -7,7 +7,7 @@ from pants.backend.native.subsystems.native_build_step import ToolchainVariant
 from pants.backend.native.targets.native_library import CppLibrary, NativeLibrary
 from pants.backend.native.tasks.cpp_compile import CppCompile
 from pants.backend.native.tasks.native_compile import ObjectFiles
-from pants.option.ranked_value import RankedValue
+from pants.option.ranked_value import Rank, RankedValue
 from pants_test.backend.native.tasks.native_task_test_base import (
     NativeCompileTestMixin,
     NativeTaskTestBase,
@@ -83,7 +83,7 @@ class CppCompileTest(NativeTaskTestBase, NativeCompileTestMixin):
         # Test that a target-level toolchain_variant overrides a config.
         self.set_options_for_scope(
             "native-build-step",
-            toolchain_variant=RankedValue(rank=RankedValue.CONFIG, value=ToolchainVariant.gnu),
+            toolchain_variant=RankedValue(rank=Rank.CONFIG, value=ToolchainVariant.gnu),
         )
         self._assert_compiler_toolchain_variant("gcc", no_toolchain_variant_target)
 
@@ -97,6 +97,6 @@ class CppCompileTest(NativeTaskTestBase, NativeCompileTestMixin):
         # setting.
         self.set_options_for_scope(
             "native-build-step",
-            toolchain_variant=RankedValue(rank=RankedValue.FLAG, value=ToolchainVariant.gnu),
+            toolchain_variant=RankedValue(rank=Rank.FLAG, value=ToolchainVariant.gnu),
         )
         self._assert_compiler_toolchain_variant("gcc", cpp_lib_target)

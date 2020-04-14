@@ -44,7 +44,7 @@ class TestCollections(unittest.TestCase):
         self.assertEqual([64, 8], cubes[4])
 
     def test_recursively_update(self) -> None:
-        d1 = {"a": 1, "b": {"c": 2, "o": "z",}, "z": {"y": 0,}}
+        d1 = {"a": 1, "b": {"c": 2, "o": "z"}, "z": {"y": 0}}
         d2 = {"e": 3, "b": {"f": 4, "o": 9}, "g": {"h": 5}, "z": 7}
         recursively_update(d1, d2)
         self.assertEqual(d1, {"a": 1, "b": {"c": 2, "f": 4, "o": 9}, "e": 3, "g": {"h": 5}, "z": 7})
@@ -64,11 +64,19 @@ class TestCollections(unittest.TestCase):
         self.assertEqual(expected_msg, str(cm.exception))
 
     def test_ensure_list(self) -> None:
-        # Single elements should be converted to a one-element list
-        assert ensure_list(0, expected_type=int) == [0]
-        assert ensure_list(True, expected_type=bool) == [True]
+        # Reject single values by default, even if they're the expected type.
+        with pytest.raises(ValueError):
+            ensure_list(0, expected_type=int)
+        with pytest.raises(ValueError):
+            ensure_list(False, expected_type=bool)
+
+        # Allow wrapping single values into a list.
+        assert ensure_list(0, expected_type=int, allow_single_scalar=True) == [0]
+        assert ensure_list(True, expected_type=bool, allow_single_scalar=True) == [True]
         arbitrary_object = object()
-        assert ensure_list(arbitrary_object, expected_type=object) == [arbitrary_object]
+        assert ensure_list(arbitrary_object, expected_type=object, allow_single_scalar=True) == [
+            arbitrary_object
+        ]
 
         ensure_int_list = partial(ensure_list, expected_type=int)
 
@@ -84,15 +92,19 @@ class TestCollections(unittest.TestCase):
 
         # Perform runtime type checks
         with pytest.raises(ValueError):
-            ensure_int_list("bad")
+            ensure_int_list(["bad"])
         with pytest.raises(ValueError):
-            ensure_int_list(0.0)
+            ensure_int_list([0.0])
         with pytest.raises(ValueError):
             ensure_int_list([0, 1, "sneaky", 2, 3])
 
     def test_ensure_str_list(self) -> None:
-        assert ensure_str_list("hello") == ["hello"]
-        assert ensure_str_list(["hello", "there"]) == ["hello", "there"]
+        assert ensure_str_list(("hello", "there")) == ["hello", "there"]
+
+        assert ensure_str_list("hello", allow_single_str=True) == ["hello"]
+        with pytest.raises(ValueError):
+            ensure_str_list("hello")
+
         with pytest.raises(ValueError):
             ensure_str_list(0)  # type: ignore[arg-type]
         with pytest.raises(ValueError):

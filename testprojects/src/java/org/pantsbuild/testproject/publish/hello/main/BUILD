@@ -16,7 +16,7 @@ jvm_binary(name = 'main-bin',
   dependencies = [
     'testprojects/src/java/org/pantsbuild/testproject/publish/hello/greet',
   ],
-  source = 'HelloMain.java',
+  sources = ['HelloMain.java'],
   main = 'org.pantsbuild.testproject.publish.hello.main.HelloMain',
   basename = 'hello-example',
 )

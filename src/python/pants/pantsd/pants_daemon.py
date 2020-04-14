@@ -7,6 +7,7 @@ import sys
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass
+from typing import Optional
 
 from setproctitle import setproctitle as set_process_title
 
@@ -19,6 +20,7 @@ from pants.engine.rules import UnionMembership
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.logging import init_rust_logger, setup_logging
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
+from pants.option.option_value_container import OptionValueContainer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.options_fingerprinter import OptionsFingerprinter
 from pants.option.scope import GLOBAL_SCOPE
@@ -30,6 +32,7 @@ from pants.pantsd.service.scheduler_service import SchedulerService
 from pants.pantsd.service.store_gc_service import StoreGCService
 from pants.pantsd.watchman_launcher import WatchmanLauncher
 from pants.util.contextutil import stdio_as
+from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.strutil import ensure_text
 
@@ -112,12 +115,11 @@ class PantsDaemon(FingerprintedProcessManager):
 
     class Factory:
         @classmethod
-        def maybe_launch(cls, options_bootstrapper):
+        def maybe_launch(cls, options_bootstrapper) -> "PantsDaemon.Handle":
             """Creates and launches a daemon instance if one does not already exist.
 
             :param OptionsBootstrapper options_bootstrapper: The bootstrap options.
             :returns: A Handle for the running pantsd instance.
-            :rtype: PantsDaemon.Handle
             """
             stub_pantsd = cls.create(options_bootstrapper, full_init=False)
             with stub_pantsd._services.lifecycle_lock:
@@ -147,7 +149,7 @@ class PantsDaemon(FingerprintedProcessManager):
                 return pantsd.launch()
 
         @classmethod
-        def create(cls, options_bootstrapper, full_init=True):
+        def create(cls, options_bootstrapper, full_init=True) -> "PantsDaemon":
             """
             :param OptionsBootstrapper options_bootstrapper: The bootstrap options.
             :param bool full_init: Whether or not to fully initialize an engine et al for the purposes
@@ -160,6 +162,9 @@ class PantsDaemon(FingerprintedProcessManager):
             bootstrap_options_values = bootstrap_options.for_global_scope()
             # TODO: https://github.com/pantsbuild/pants/issues/3479
             watchman = WatchmanLauncher.create(bootstrap_options_values).watchman
+
+            native: Optional[Native] = None
+            build_root: Optional[str] = None
 
             if full_init:
                 build_root = get_buildroot()
@@ -176,15 +181,13 @@ class PantsDaemon(FingerprintedProcessManager):
                     union_membership=UnionMembership(build_config.union_rules()),
                 )
             else:
-                build_root = None
-                native = None
                 services = PantsServices()
 
             return PantsDaemon(
                 native=native,
                 build_root=build_root,
                 work_dir=bootstrap_options_values.pants_workdir,
-                log_level=bootstrap_options_values.level.upper(),
+                log_level=bootstrap_options_values.level,
                 services=services,
                 metadata_base_dir=bootstrap_options_values.pants_subprocessdir,
                 bootstrap_options=bootstrap_options,
@@ -203,7 +206,9 @@ class PantsDaemon(FingerprintedProcessManager):
             :returns: A PantsServices instance.
             """
             should_shutdown_after_run = bootstrap_options.shutdown_pantsd_after_run
-            fs_event_service = FSEventService(watchman, build_root,)
+            fs_event_service = (
+                FSEventService(watchman, build_root,) if bootstrap_options.watchman_enable else None
+            )
 
             pidfile_absolute = PantsDaemon.metadata_file_path(
                 "pantsd", "pid", bootstrap_options.pants_subprocessdir
@@ -218,6 +223,7 @@ class PantsDaemon(FingerprintedProcessManager):
                     "pantsd processes."
                 )
 
+            # TODO make SchedulerService handle fs_event_service_being None
             scheduler_service = SchedulerService(
                 fs_event_service=fs_event_service,
                 legacy_graph_scheduler=legacy_graph_scheduler,
@@ -239,19 +245,28 @@ class PantsDaemon(FingerprintedProcessManager):
             store_gc_service = StoreGCService(legacy_graph_scheduler.scheduler)
 
             return PantsServices(
-                services=(fs_event_service, scheduler_service, pailgun_service, store_gc_service),
+                services=tuple(
+                    service
+                    for service in (
+                        fs_event_service,
+                        scheduler_service,
+                        pailgun_service,
+                        store_gc_service,
+                    )
+                    if service is not None
+                ),
                 port_map=dict(pailgun=pailgun_service.pailgun_port),
             )
 
     def __init__(
         self,
-        native,
-        build_root,
-        work_dir,
-        log_level,
-        services,
-        metadata_base_dir,
-        bootstrap_options=None,
+        native: Optional[Native],
+        build_root: Optional[str],
+        work_dir: str,
+        log_level: LogLevel,
+        services: PantsServices,
+        metadata_base_dir: str,
+        bootstrap_options: Optional[OptionValueContainer] = None,
     ):
         """
         :param Native native: A `Native` instance.
@@ -336,9 +351,9 @@ class PantsDaemon(FingerprintedProcessManager):
             init_rust_logger(self._log_level, self._log_show_rust_3rdparty)
             result = setup_logging(
                 self._log_level,
+                native=self._native,
                 log_dir=self._log_dir,
                 log_name=self.LOG_NAME,
-                native=self._native,
                 warnings_filter_regexes=self._bootstrap_options.for_global_scope(),
             )
             self._native.override_thread_logging_destination_to_just_pantsd()
@@ -490,13 +505,12 @@ class PantsDaemon(FingerprintedProcessManager):
         )
         return self.needs_restart(new_fingerprint)
 
-    def launch(self):
+    def launch(self) -> "PantsDaemon.Handle":
         """Launches pantsd in a subprocess.
 
         N.B. This should always be called under care of the `lifecycle_lock`.
 
         :returns: A Handle for the pantsd instance.
-        :rtype: PantsDaemon.Handle
         """
         self.terminate(include_watchman=False)
         self.watchman_launcher.maybe_launch()

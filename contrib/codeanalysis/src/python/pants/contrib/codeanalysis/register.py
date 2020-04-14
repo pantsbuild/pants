@@ -1,6 +1,11 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+"""Support for the Kythe ecosystem.
+
+See https://www.kythe.io.
+"""
+
 from pants.goal.task_registrar import TaskRegistrar as task
 
 from pants.contrib.codeanalysis.tasks.bundle_entries import BundleEntries

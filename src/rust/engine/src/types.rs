@@ -23,6 +23,7 @@ pub struct Types {
   pub dir: TypeId,
   pub file: TypeId,
   pub link: TypeId,
+  pub platform: TypeId,
   pub multi_platform_process_request: TypeId,
   pub process_result: TypeId,
   pub coroutine: TypeId,
@@ -33,4 +34,5 @@ pub struct Types {
   pub interactive_process_request: TypeId,
   pub interactive_process_result: TypeId,
   pub snapshot_subset: TypeId,
+  pub construct_platform: Function,
 }

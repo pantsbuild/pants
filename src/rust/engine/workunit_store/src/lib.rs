@@ -26,10 +26,13 @@
 #![allow(clippy::mutex_atomic)]
 
 use concrete_time::TimeSpan;
-use futures01::task_local;
 use parking_lot::Mutex;
 use rand::thread_rng;
 use rand::Rng;
+use tokio::task_local;
+
+use std::cell::RefCell;
+use std::future::Future;
 use std::sync::Arc;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -38,6 +41,7 @@ pub struct WorkUnit {
   pub time_span: TimeSpan,
   pub span_id: String,
   pub parent_id: Option<String>,
+  pub metadata: WorkunitMetadata,
 }
 
 pub struct StartedWorkUnit {
@@ -45,6 +49,12 @@ pub struct StartedWorkUnit {
   pub start_time: std::time::SystemTime,
   pub span_id: String,
   pub parent_id: Option<String>,
+  pub metadata: WorkunitMetadata,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
+pub struct WorkunitMetadata {
+  pub desc: Option<String>,
 }
 
 impl StartedWorkUnit {
@@ -54,18 +64,20 @@ impl StartedWorkUnit {
       time_span: TimeSpan::since(&self.start_time),
       span_id: self.span_id,
       parent_id: self.parent_id,
+      metadata: self.metadata,
     }
   }
 }
 
 impl WorkUnit {
   pub fn new(name: String, time_span: TimeSpan, parent_id: Option<String>) -> WorkUnit {
-    let span_id = generate_random_64bit_string();
+    let span_id = new_span_id();
     WorkUnit {
       name,
       time_span,
       span_id,
       parent_id,
+      metadata: WorkunitMetadata::default(),
     }
   }
 }
@@ -89,6 +101,13 @@ impl WorkUnitStore {
         last_seen_workunit: 0,
       })),
     }
+  }
+
+  pub fn init_thread_state(&self, parent_id: Option<String>) {
+    set_thread_workunit_state(Some(WorkUnitState {
+      store: self.clone(),
+      parent_id,
+    }))
   }
 
   pub fn get_workunits(&self) -> Arc<Mutex<WorkUnitInnerStore>> {
@@ -115,7 +134,7 @@ impl WorkUnitStore {
   }
 }
 
-pub fn generate_random_64bit_string() -> String {
+pub fn new_span_id() -> String {
   let mut rng = thread_rng();
   let random_u64: u64 = rng.gen();
   hex_16_digit_string(random_u64)
@@ -125,27 +144,55 @@ fn hex_16_digit_string(number: u64) -> String {
   format!("{:016.x}", number)
 }
 
+///
+/// The per-thread/task state that tracks the current workunit store, and workunit parent id.
+///
+#[derive(Clone)]
+pub struct WorkUnitState {
+  pub store: WorkUnitStore,
+  pub parent_id: Option<String>,
+}
+
+thread_local! {
+  static THREAD_WORKUNIT_STATE: RefCell<Option<WorkUnitState>> = RefCell::new(None)
+}
+
 task_local! {
-  static TASK_PARENT_ID: Mutex<Option<String>> = Mutex::new(None)
+  static TASK_WORKUNIT_STATE: Option<WorkUnitState>;
 }
 
-pub fn set_parent_id(parent_id: String) {
-  if futures01::task::is_in_task() {
-    TASK_PARENT_ID.with(|task_parent_id| {
-      *task_parent_id.lock() = Some(parent_id);
-    })
-  }
+///
+/// Set the current parent_id for a Thread, but _not_ for a Task. Tasks must always be spawned
+/// by callers using the `scope_task_workunit_state` helper (generally via task_executor::Executor.)
+///
+pub fn set_thread_workunit_state(workunit_state: Option<WorkUnitState>) {
+  THREAD_WORKUNIT_STATE.with(|thread_workunit_state| {
+    *thread_workunit_state.borrow_mut() = workunit_state;
+  })
 }
 
-pub fn get_parent_id() -> Option<String> {
-  if futures01::task::is_in_task() {
-    TASK_PARENT_ID.with(|task_parent_id| {
-      let task_parent_id = task_parent_id.lock();
-      (*task_parent_id).clone()
-    })
+pub fn get_workunit_state() -> Option<WorkUnitState> {
+  if let Ok(Some(workunit_state)) =
+    TASK_WORKUNIT_STATE.try_with(|workunit_state| workunit_state.clone())
+  {
+    Some(workunit_state)
   } else {
-    None
+    THREAD_WORKUNIT_STATE.with(|thread_workunit_state| (*thread_workunit_state.borrow()).clone())
   }
+}
+
+pub fn expect_workunit_state() -> WorkUnitState {
+  get_workunit_state().expect("A WorkUnitStore has not been set for this thread.")
+}
+
+///
+/// Propagate the given WorkUnitState to a Future representing a newly spawned Task.
+///
+pub async fn scope_task_workunit_state<F>(workunit_state: Option<WorkUnitState>, f: F) -> F::Output
+where
+  F: Future,
+{
+  TASK_WORKUNIT_STATE.scope(workunit_state, f).await
 }
 
 #[cfg(test)]

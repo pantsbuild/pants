@@ -39,7 +39,10 @@ class CoursierSubsystem(Script):
             type=list,
             fingerprint=True,
             help="Maven style repos",
-            default=["https://repo1.maven.org/maven2"],
+            default=[
+                "https://maven-central.storage-download.googleapis.com/maven2",
+                "https://repo1.maven.org/maven2",
+            ],
         )
         register(
             "--fetch-options",

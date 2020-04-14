@@ -29,7 +29,7 @@ class WireGenTest(NailgunTaskTestBase):
         self.make_target(
             ":wire-compiler",
             JarLibrary,
-            jars=[JarDependency(org="com.squareup.wire", name="wire-compiler", rev=version),],
+            jars=[JarDependency(org="com.squareup.wire", name="wire-compiler", rev=version)],
         )
 
     def test_compiler_args(self):

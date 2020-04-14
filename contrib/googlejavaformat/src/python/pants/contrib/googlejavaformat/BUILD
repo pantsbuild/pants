@@ -14,7 +14,7 @@ contrib_plugin(
   ],
   tags = {'partially_type_checked'},
   distribution_name='pantsbuild.pants.contrib.googlejavaformat',
-  description='Google Java Format code formatter pants plugins.',
+  description='Google Java Format code formatter pants plugins (deprecated).',
   additional_classifiers=[
     'Topic :: Software Development :: Pre-processors'
   ],

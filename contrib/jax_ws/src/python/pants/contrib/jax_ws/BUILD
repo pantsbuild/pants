@@ -4,13 +4,14 @@
 contrib_plugin(
   name='plugin',
   dependencies=[
+    'contrib/jax_ws/src/python/pants/contrib/jax_ws/rules',
     'contrib/jax_ws/src/python/pants/contrib/jax_ws/targets',
     'contrib/jax_ws/src/python/pants/contrib/jax_ws/tasks',
     'src/python/pants/build_graph',
     'src/python/pants/goal:task_registrar',
   ],
   distribution_name='pantsbuild.pants.contrib.jax_ws',
-  description='JAX-WS Pants plugin',
+  description='JAX-WS Pants plugin (deprecated)',
   build_file_aliases=True,
   register_goals=True,
   tags = {"partially_type_checked"},

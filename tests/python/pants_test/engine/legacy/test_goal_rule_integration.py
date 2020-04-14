@@ -23,11 +23,11 @@ class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
         self.assertIn("examples/src/java/org/pantsbuild/example/hello/main:readme", output_lines)
 
     def test_v2_list_does_not_cache(self):
-        with self.pantsd_successful_run_context() as (runner, checker, workdir, pantsd_config):
+        with self.pantsd_successful_run_context() as ctx:
 
             def run_list():
-                result = runner(["list", self.list_target])
-                checker.assert_started()
+                result = ctx.runner(["list", self.list_target])
+                ctx.checker.assert_started()
                 return result
 
             first_run = run_list().stdout_data.splitlines()
@@ -46,9 +46,11 @@ class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
 
     def test_v2_list_loop(self):
         # Create a BUILD file in a nested temporary directory, and add additional targets to it.
-        with self.pantsd_test_context() as (workdir, config, checker), temporary_dir(
-            root_dir=get_buildroot()
-        ) as tmpdir:
+        with self.pantsd_test_context(log_level="info") as (
+            workdir,
+            config,
+            checker,
+        ), temporary_dir(root_dir=get_buildroot()) as tmpdir:
             rel_tmpdir = fast_relpath(tmpdir, get_buildroot())
 
             def dump(content):
@@ -59,7 +61,7 @@ class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
 
             # Launch the loop as a background process.
             handle = self.run_pants_with_workdir_without_waiting(
-                ["--no-v1", "--v2", "--loop", "--loop-max=3", "list", f"{tmpdir}:",],
+                ["--no-v1", "--v2", "--loop", "--loop-max=3", "list", f"{tmpdir}:"],
                 workdir,
                 config,
             )

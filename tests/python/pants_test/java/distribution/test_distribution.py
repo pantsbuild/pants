@@ -50,11 +50,19 @@ class EXE:
 
 
 @contextmanager
-def distribution(files=None, executables=None, java_home=None):
-    with temporary_dir() as dist_root:
-        for f in ensure_str_list(files or ()):
+def distribution(files=None, executables=None, java_home=None, dist_dir=None):
+    # NB attempt to include the java version in the tmp dir name for better test failure messages.
+    executables_as_list = ensure_list(
+        executables or (), expected_type=EXE, allow_single_scalar=True
+    )
+    if executables_as_list:
+        dist_prefix = "jvm_{}_".format(executables_as_list[0]._version)
+    else:
+        dist_prefix = "jvm_na_"
+    with temporary_dir(root_dir=dist_dir, prefix=dist_prefix) as dist_root:
+        for f in ensure_str_list(files or (), allow_single_str=True):
             touch(os.path.join(dist_root, f))
-        for executable in ensure_list(executables or (), expected_type=EXE):
+        for executable in executables_as_list:
             path = os.path.join(dist_root, executable.relpath)
             with safe_open(path, "w") as fp:
                 java_home = os.path.join(dist_root, java_home) if java_home else dist_root
@@ -269,19 +277,17 @@ class DistributionEnvLocationTest(unittest.TestCase):
 class DistributionLinuxLocationTest(unittest.TestCase):
     @contextmanager
     def locator(self):
-        with distribution(executables=EXE("bin/java", version="1")) as jdk1_home:
-            with distribution(executables=EXE("bin/java", version="2")) as jdk2_home:
-                with temporary_dir() as java_dist_dir1, temporary_dir() as java_dist_dir2:
-                    locator = _Locator(
-                        _UnknownEnvironment(
-                            _EnvVarEnvironment(), _LinuxEnvironment(java_dist_dir1, java_dist_dir2)
-                        )
-                    )
-                    jdk1_home_link = os.path.join(java_dist_dir1, "jdk1_home")
-                    jdk2_home_link = os.path.join(java_dist_dir2, "jdk2_home")
-                    os.symlink(jdk1_home, jdk1_home_link)
-                    os.symlink(jdk2_home, jdk2_home_link)
-                    yield locator, jdk1_home_link, jdk2_home_link
+        with temporary_dir() as java_dist_dir1, temporary_dir() as java_dist_dir2, distribution(
+            executables=EXE("bin/java", version="1"), dist_dir=java_dist_dir1
+        ) as jdk1_home, distribution(
+            executables=EXE("bin/java", version="2"), dist_dir=java_dist_dir2
+        ) as jdk2_home:
+            locator = _Locator(
+                _UnknownEnvironment(
+                    _EnvVarEnvironment(), _LinuxEnvironment(java_dist_dir1, java_dist_dir2)
+                )
+            )
+            yield locator, jdk1_home, jdk2_home
 
     def test_locate_jdk1(self):
         with env():
@@ -325,6 +331,27 @@ class DistributionLinuxLocationTest(unittest.TestCase):
                     self.assertEqual(jdk1_home, dist.home)
                     dist = locator.locate(minimum_version="1.1", maximum_version="2")
                     self.assertEqual(jdk2_home, dist.home)
+
+    def test_locate_java_home_cache_uses_lub(self):
+        # NB this ensures that looking into the cache follows a consistent ordering
+        # it looks up min=1, min=3, which puts both dists into the cache
+        # then it looks for min=1;max=3. Because traversing the cached dists goes lowest first,
+        # it finds 1.
+        with temporary_dir() as dist_dir, distribution(
+            executables=EXE("bin/java", version="1"), dist_dir=dist_dir
+        ) as jdk1_home, distribution(
+            executables=EXE("bin/java", version="3"), dist_dir=dist_dir
+        ) as jdk3_home:
+            locator = _Locator(
+                _UnknownEnvironment(_EnvVarEnvironment(), _LinuxEnvironment(dist_dir))
+            )
+            with env(JAVA_HOME=jdk1_home):
+                dist = locator.locate(minimum_version="1")
+                self.assertEqual(jdk1_home, dist.home)
+                dist = locator.locate(minimum_version="3")
+                self.assertEqual(jdk3_home, dist.home)
+                dist = locator.locate(minimum_version="1", maximum_version="3")
+                self.assertEqual(jdk1_home, dist.home)
 
 
 class DistributionOSXLocationTest(unittest.TestCase):

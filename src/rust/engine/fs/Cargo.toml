@@ -6,11 +6,11 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
-boxfuture = { path = "../boxfuture" }
+async-trait = "0.1"
 bytes = "0.4.5"
-futures01 = { package = "futures", version = "0.1" }
+futures = "0.3"
 glob = "0.2.11"
-ignore = "0.4.4"
+ignore = "0.4.11"
 lazy_static = "1"
 log = "0.4"
 parking_lot = "0.6"
@@ -19,4 +19,4 @@ tempfile = "3"
 
 [dev-dependencies]
 testutil = { path = "../testutil" }
-tokio = "0.1"
+tokio = { version = "0.2", features = ["rt-core", "macros"] }

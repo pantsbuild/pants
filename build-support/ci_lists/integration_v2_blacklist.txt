@@ -5,7 +5,6 @@ tests/python/pants_test/backend/jvm/tasks/jvm_compile/java:zinc_compile_integrat
 tests/python/pants_test/backend/jvm/tasks/jvm_compile/rsc:rsc_compile_integration
 tests/python/pants_test/backend/jvm/tasks/jvm_compile/zinc:zinc_compile_integration
 tests/python/pants_test/backend/jvm/tasks/jvm_compile/zinc:zinc_compile_integration_with_zjars
-tests/python/pants_test/backend/jvm/tasks:ivy_resolve_integration
 tests/python/pants_test/backend/jvm/tasks:jar_publish_integration
 tests/python/pants_test/backend/jvm/tasks:junit_run_integration
 tests/python/pants_test/backend/jvm/tasks:junit_tests_concurrency_integration

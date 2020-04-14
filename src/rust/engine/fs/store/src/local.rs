@@ -1,14 +1,12 @@
 use super::{EntryType, ShrinkBehavior, GIGABYTES};
 
-use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::Bytes;
 use digest::{Digest as DigestTrait, FixedOutput};
-use futures01::{future, Future};
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use lmdb::Error::NotFound;
 use lmdb::{self, Cursor, Database, RwTransaction, Transaction, WriteFlags};
 use sha2::Sha256;
-use sharded_lmdb::ShardedLmdb;
+use sharded_lmdb::{ShardedLmdb, VersionedFingerprint};
 use std;
 use std::collections::BinaryHeap;
 use std::path::Path;
@@ -63,12 +61,13 @@ impl ByteStore {
       // it _can_ be a Directory.
       return Ok(Some(EntryType::Directory));
     }
+    let effective_key = VersionedFingerprint::new(*fingerprint, ShardedLmdb::schema_version());
     {
       let (env, directory_database, _) = self.inner.directory_dbs.clone()?.get(fingerprint);
       let txn = env
         .begin_ro_txn()
         .map_err(|err| format!("Failed to begin read transaction: {:?}", err))?;
-      match txn.get(directory_database, &fingerprint.as_ref()) {
+      match txn.get(directory_database, &effective_key) {
         Ok(_) => return Ok(Some(EntryType::Directory)),
         Err(NotFound) => {}
         Err(err) => {
@@ -83,7 +82,7 @@ impl ByteStore {
     let txn = env
       .begin_ro_txn()
       .map_err(|err| format!("Failed to begin read transaction: {}", err))?;
-    match txn.get(file_database, &fingerprint.as_ref()) {
+    match txn.get(file_database, &effective_key) {
       Ok(_) => return Ok(Some(EntryType::File)),
       Err(NotFound) => {}
       Err(err) => {
@@ -175,10 +174,14 @@ impl ByteStore {
         env
           .begin_rw_txn()
           .and_then(|mut txn| {
-            txn.del(database, &aged_fingerprint.fingerprint.as_ref(), None)?;
+            let key = VersionedFingerprint::new(
+              aged_fingerprint.fingerprint,
+              ShardedLmdb::schema_version(),
+            );
+            txn.del(database, &key, None)?;
 
             txn
-              .del(lease_database, &aged_fingerprint.fingerprint.as_ref(), None)
+              .del(lease_database, &key, None)
               .or_else(|err| match err {
                 NotFound => Ok(()),
                 err => Err(err),
@@ -242,9 +245,11 @@ impl ByteStore {
           // 0 indicates unleased.
           .unwrap_or(0);
 
+        let v = VersionedFingerprint::from_bytes_unsafe(key);
+        let fingerprint = v.get_fingerprint();
         fingerprints_by_expired_ago.push(AgedFingerprint {
           expired_seconds_ago: expired_seconds_ago,
-          fingerprint: Fingerprint::from_bytes_unsafe(key),
+          fingerprint,
           size_bytes: bytes.len(),
           entry_type: entry_type,
         });
@@ -253,46 +258,44 @@ impl ByteStore {
     Ok(())
   }
 
-  pub fn store_bytes(
+  pub async fn store_bytes(
     &self,
     entry_type: EntryType,
     bytes: Bytes,
     initial_lease: bool,
-  ) -> impl Future<Item = Digest, Error = String> {
+  ) -> Result<Digest, String> {
     let dbs = match entry_type {
       EntryType::Directory => self.inner.directory_dbs.clone(),
       EntryType::File => self.inner.file_dbs.clone(),
     };
     let bytes2 = bytes.clone();
-    self
+    let digest = self
       .inner
       .executor
-      .spawn_on_io_pool(future::lazy(move || {
+      .spawn_blocking(move || {
         let fingerprint = {
           let mut hasher = Sha256::default();
           hasher.input(&bytes);
           Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice())
         };
-        Ok(Digest(fingerprint, bytes.len()))
-      }))
-      .and_then(move |digest| {
-        future::done(dbs)
-          .and_then(move |db| db.store_bytes(digest.0, bytes2, initial_lease))
-          .map(move |()| digest)
+        Digest(fingerprint, bytes.len())
       })
+      .await;
+    dbs?.store_bytes(digest.0, bytes2, initial_lease).await?;
+    Ok(digest)
   }
 
-  pub fn load_bytes_with<T: Send + 'static, F: Fn(Bytes) -> T + Send + Sync + 'static>(
+  pub async fn load_bytes_with<T: Send + 'static, F: Fn(Bytes) -> T + Send + Sync + 'static>(
     &self,
     entry_type: EntryType,
     digest: Digest,
     f: F,
-  ) -> BoxFuture<Option<T>, String> {
+  ) -> Result<Option<T>, String> {
     if digest == EMPTY_DIGEST {
       // Avoid expensive I/O for this super common case.
       // Also, this allows some client-provided operations (like merging snapshots) to work
       // without needing to first store the empty snapshot.
-      return future::ok(Some(f(Bytes::new()))).to_boxed();
+      return Ok(Some(f(Bytes::new())));
     }
 
     let dbs = match entry_type {
@@ -300,13 +303,13 @@ impl ByteStore {
       EntryType::File => self.inner.file_dbs.clone(),
     };
 
-    try_future!(dbs).load_bytes_with(digest.0, move |bytes| {
-                if bytes.len() == digest.1 {
-                    Ok(f(bytes))
-                } else {
-                    Err(format!("Got hash collision reading from store - digest {:?} was requested, but retrieved bytes with that fingerprint had length {}. Congratulations, you may have broken sha256! Underlying bytes: {:?}", digest, bytes.len(), bytes))
-                }
-            }).to_boxed()
+    dbs?.load_bytes_with(digest.0, move |bytes| {
+        if bytes.len() == digest.1 {
+            Ok(f(bytes))
+        } else {
+            Err(format!("Got hash collision reading from store - digest {:?} was requested, but retrieved bytes with that fingerprint had length {}. Congratulations, you may have broken sha256! Underlying bytes: {:?}", digest, bytes.len(), bytes))
+        }
+    }).await
   }
 
   pub fn all_digests(&self, entry_type: EntryType) -> Result<Vec<Digest>, String> {
@@ -323,7 +326,9 @@ impl ByteStore {
         .open_ro_cursor(*database)
         .map_err(|err| format!("Failed to open lmdb read cursor: {}", err))?;
       for (key, bytes) in cursor.iter() {
-        digests.push(Digest(Fingerprint::from_bytes_unsafe(key), bytes.len()));
+        let v = VersionedFingerprint::from_bytes_unsafe(key);
+        let fingerprint = v.get_fingerprint();
+        digests.push(Digest(fingerprint, bytes.len()));
       }
     }
     Ok(digests)

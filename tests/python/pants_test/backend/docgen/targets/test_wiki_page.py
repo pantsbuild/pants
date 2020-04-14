@@ -15,7 +15,7 @@ class WikiPageTest(TestBase):
     @classmethod
     def alias_groups(cls):
         return BuildFileAliases(
-            targets={"page": Page,},
+            targets={"page": Page},
             objects={
                 "Wiki": Wiki,
                 "wiki_artifact": WikiArtifact,
@@ -135,7 +135,7 @@ class WikiPageTest(TestBase):
         self.assertNotEqual(fingerprint_before, create_page_target("space2").payload.fingerprint())
 
     def test_no_sources(self):
-        self.add_to_build_file("", "page(name='page', sources=['does-not-exist.md'])")
+        self.add_to_build_file("", "page(name='page', sources=[])")
         with self.assertRaisesRegex(AddressLookupError, r"//:page.*exactly 1 source, but found 0"):
             self.target(":page")
 

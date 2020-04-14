@@ -90,7 +90,7 @@ class FindBugs(NailgunTask):
             "findbugs",
             classpath=[JarDependency(org="com.github.spotbugs", name="spotbugs", rev="3.1.3")],
             main=cls._FINDBUGS_MAIN,
-            custom_rules=[Shader.exclude_package("edu.umd.cs.findbugs", recursive=True),],
+            custom_rules=[Shader.exclude_package("edu.umd.cs.findbugs", recursive=True)],
         )
 
     @classmethod
@@ -235,7 +235,7 @@ class FindBugs(NailgunTask):
         if self.get_options().relaxed:
             args.extend(["-relaxed"])
 
-        if self.get_options().level == "debug":
+        if self.debug:
             args.extend(["-progress"])
 
         args.extend(target_jars)

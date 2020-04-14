@@ -29,9 +29,9 @@ mod glob_matching;
 pub use crate::glob_matching::GlobMatching;
 
 use ::ignore::gitignore::{Gitignore, GitignoreBuilder};
-use boxfuture::{BoxFuture, Boxable};
+use async_trait::async_trait;
 use bytes::Bytes;
-use futures01::{future, Future};
+use futures::future::{self, TryFutureExt};
 use glob::{MatchOptions, Pattern};
 use lazy_static::lazy_static;
 use std::cmp::min;
@@ -131,26 +131,39 @@ pub struct GitignoreStyleExcludes {
 }
 
 impl GitignoreStyleExcludes {
-  fn create(patterns: &[String]) -> Result<Arc<Self>, String> {
-    if patterns.is_empty() {
+  pub fn create(patterns: &[String]) -> Result<Arc<Self>, String> {
+    Self::create_with_gitignore_file(patterns, None)
+  }
+
+  pub fn create_with_gitignore_file(
+    patterns: &[String],
+    gitignore_path: Option<PathBuf>,
+  ) -> Result<Arc<Self>, String> {
+    if patterns.is_empty() && gitignore_path.is_none() {
       return Ok(EMPTY_IGNORE.clone());
     }
 
-    let gitignore = Self::create_gitignore(patterns)
-      .map_err(|e| format!("Could not parse glob excludes {:?}: {:?}", patterns, e))?;
+    let mut ignore_builder = GitignoreBuilder::new("");
+
+    if let Some(path) = gitignore_path {
+      if let Some(err) = ignore_builder.add(path) {
+        return Err(format!("Error adding .gitignore path: {:?}", err));
+      }
+    }
+    for pattern in patterns {
+      ignore_builder
+        .add_line(None, pattern.as_str())
+        .map_err(|e| format!("Could not parse glob excludes {:?}: {:?}", patterns, e))?;
+    }
+
+    let gitignore = ignore_builder
+      .build()
+      .map_err(|e| format!("Could not build gitignore: {:?}", e))?;
 
     Ok(Arc::new(Self {
       patterns: patterns.to_vec(),
       gitignore,
     }))
-  }
-
-  fn create_gitignore(patterns: &[String]) -> Result<Gitignore, ::ignore::Error> {
-    let mut ignore_builder = GitignoreBuilder::new("");
-    for pattern in patterns {
-      ignore_builder.add_line(None, pattern.as_str())?;
-    }
-    ignore_builder.build()
   }
 
   fn exclude_patterns(&self) -> &[String] {
@@ -167,6 +180,13 @@ impl GitignoreStyleExcludes {
 
   fn is_ignored_path(&self, path: &Path, is_dir: bool) -> bool {
     match self.gitignore.matched(path, is_dir) {
+      ::ignore::Match::None | ::ignore::Match::Whitelist(_) => false,
+      ::ignore::Match::Ignore(_) => true,
+    }
+  }
+
+  pub fn is_ignored_or_child_of_ignored_path(&self, path: &Path, is_dir: bool) -> bool {
+    match self.gitignore.matched_path_or_any_parents(path, is_dir) {
       ::ignore::Match::None | ::ignore::Match::Whitelist(_) => false,
       ::ignore::Match::Ignore(_) => true,
     }
@@ -587,15 +607,15 @@ pub struct PosixFS {
 impl PosixFS {
   pub fn new<P: AsRef<Path>>(
     root: P,
-    ignore_patterns: &[String],
+    ignorer: Arc<GitignoreStyleExcludes>,
     executor: task_executor::Executor,
   ) -> Result<PosixFS, String> {
-    Self::new_with_symlink_behavior(root, ignore_patterns, executor, SymlinkBehavior::Aware)
+    Self::new_with_symlink_behavior(root, ignorer, executor, SymlinkBehavior::Aware)
   }
 
   pub fn new_with_symlink_behavior<P: AsRef<Path>>(
     root: P,
-    ignore_patterns: &[String],
+    ignorer: Arc<GitignoreStyleExcludes>,
     executor: task_executor::Executor,
     symlink_behavior: SymlinkBehavior,
   ) -> Result<PosixFS, String> {
@@ -616,28 +636,20 @@ impl PosixFS {
       })
       .map_err(|e| format!("Could not canonicalize root {:?}: {:?}", root, e))?;
 
-    let ignore = GitignoreStyleExcludes::create(&ignore_patterns).map_err(|e| {
-      format!(
-        "Could not parse build ignore inputs {:?}: {:?}",
-        ignore_patterns, e
-      )
-    })?;
     Ok(PosixFS {
       root: canonical_root,
-      ignore: ignore,
+      ignore: ignorer,
       executor: executor,
       symlink_behavior: symlink_behavior,
     })
   }
 
-  pub fn scandir(
-    &self,
-    dir_relative_to_root: Dir,
-  ) -> impl Future<Item = DirectoryListing, Error = io::Error> {
+  pub async fn scandir(&self, dir_relative_to_root: Dir) -> Result<DirectoryListing, io::Error> {
     let vfs = self.clone();
-    self.executor.spawn_on_io_pool(future::lazy(move || {
-      vfs.scandir_sync(&dir_relative_to_root)
-    }))
+    self
+      .executor
+      .spawn_blocking(move || vfs.scandir_sync(&dir_relative_to_root))
+      .await
   }
 
   fn scandir_sync(&self, dir_relative_to_root: &Dir) -> Result<DirectoryListing, io::Error> {
@@ -690,60 +702,66 @@ impl PosixFS {
     self.ignore.is_ignored(stat)
   }
 
-  pub fn read_file(&self, file: &File) -> impl Future<Item = FileContent, Error = io::Error> {
+  pub async fn read_file(&self, file: &File) -> Result<FileContent, io::Error> {
     let path = file.path.clone();
     let path_abs = self.root.0.join(&file.path);
-    self.executor.spawn_on_io_pool(future::lazy(move || {
-      let is_executable = path_abs.metadata()?.permissions().mode() & 0o100 == 0o100;
-      std::fs::File::open(&path_abs)
-        .and_then(|mut f| {
-          let mut content = Vec::new();
-          f.read_to_end(&mut content)?;
-          Ok(FileContent {
-            path: path,
-            content: Bytes::from(content),
-            is_executable,
+    self
+      .executor
+      .spawn_blocking(move || {
+        let is_executable = path_abs.metadata()?.permissions().mode() & 0o100 == 0o100;
+        std::fs::File::open(&path_abs)
+          .and_then(|mut f| {
+            let mut content = Vec::new();
+            f.read_to_end(&mut content)?;
+            Ok(FileContent {
+              path: path,
+              content: Bytes::from(content),
+              is_executable,
+            })
           })
-        })
-        .map_err(|e| {
-          io::Error::new(
-            e.kind(),
-            format!("Failed to read file {:?}: {}", path_abs, e),
-          )
-        })
-    }))
+          .map_err(|e| {
+            io::Error::new(
+              e.kind(),
+              format!("Failed to read file {:?}: {}", path_abs, e),
+            )
+          })
+      })
+      .await
   }
 
-  pub fn read_link(&self, link: &Link) -> impl Future<Item = PathBuf, Error = io::Error> {
+  pub async fn read_link(&self, link: &Link) -> Result<PathBuf, io::Error> {
     let link_parent = link.0.parent().map(Path::to_owned);
     let link_abs = self.root.0.join(link.0.as_path());
-    self.executor.spawn_on_io_pool(future::lazy(move || {
-      link_abs
-        .read_link()
-        .and_then(|path_buf| {
-          if path_buf.is_absolute() {
-            Err(io::Error::new(
-              io::ErrorKind::InvalidData,
-              format!("Absolute symlink: {:?}", link_abs),
-            ))
-          } else {
-            link_parent
-              .map(|parent| parent.join(path_buf))
-              .ok_or_else(|| {
-                io::Error::new(
-                  io::ErrorKind::InvalidData,
-                  format!("Symlink without a parent?: {:?}", link_abs),
-                )
-              })
-          }
-        })
-        .map_err(|e| {
-          io::Error::new(
-            e.kind(),
-            format!("Failed to read link {:?}: {}", link_abs, e),
-          )
-        })
-    }))
+    self
+      .executor
+      .spawn_blocking(move || {
+        link_abs
+          .read_link()
+          .and_then(|path_buf| {
+            if path_buf.is_absolute() {
+              Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("Absolute symlink: {:?}", link_abs),
+              ))
+            } else {
+              link_parent
+                .map(|parent| parent.join(path_buf))
+                .ok_or_else(|| {
+                  io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("Symlink without a parent?: {:?}", link_abs),
+                  )
+                })
+            }
+          })
+          .map_err(|e| {
+            io::Error::new(
+              e.kind(),
+              format!("Failed to read link {:?}: {}", link_abs, e),
+            )
+          })
+      })
+      .await
   }
 
   ///
@@ -803,25 +821,35 @@ impl PosixFS {
     }
   }
 
-  pub fn stat_sync(&self, relative_path: PathBuf) -> Result<Stat, io::Error> {
+  pub fn stat_sync(&self, relative_path: PathBuf) -> Result<Option<Stat>, io::Error> {
     let abs_path = self.root.0.join(&relative_path);
     let metadata = match self.symlink_behavior {
-      SymlinkBehavior::Aware => fs::symlink_metadata(abs_path)?,
-      SymlinkBehavior::Oblivious => fs::metadata(abs_path)?,
+      SymlinkBehavior::Aware => fs::symlink_metadata(abs_path),
+      SymlinkBehavior::Oblivious => fs::metadata(abs_path),
     };
-    PosixFS::stat_internal(&self.root.0, relative_path, metadata.file_type(), || {
-      Ok(metadata)
-    })
+    let stat_result = metadata.and_then(|metadata| {
+      PosixFS::stat_internal(&self.root.0, relative_path, metadata.file_type(), || {
+        Ok(metadata)
+      })
+    });
+    match stat_result {
+      Ok(v) => Ok(Some(v)),
+      Err(err) => match err.kind() {
+        io::ErrorKind::NotFound => Ok(None),
+        _ => Err(err),
+      },
+    }
   }
 }
 
+#[async_trait]
 impl VFS<io::Error> for Arc<PosixFS> {
-  fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, io::Error> {
-    PosixFS::read_link(self, link).to_boxed()
+  async fn read_link(&self, link: &Link) -> Result<PathBuf, io::Error> {
+    PosixFS::read_link(self, link).await
   }
 
-  fn scandir(&self, dir: Dir) -> BoxFuture<Arc<DirectoryListing>, io::Error> {
-    PosixFS::scandir(self, dir).map(Arc::new).to_boxed()
+  async fn scandir(&self, dir: Dir) -> Result<Arc<DirectoryListing>, io::Error> {
+    Ok(Arc::new(PosixFS::scandir(self, dir).await?))
   }
 
   fn is_ignored(&self, stat: &Stat) -> bool {
@@ -833,13 +861,15 @@ impl VFS<io::Error> for Arc<PosixFS> {
   }
 }
 
+#[async_trait]
 pub trait PathStatGetter<E> {
-  fn path_stats(&self, paths: Vec<PathBuf>) -> BoxFuture<Vec<Option<PathStat>>, E>;
+  async fn path_stats(&self, paths: Vec<PathBuf>) -> Result<Vec<Option<PathStat>>, E>;
 }
 
+#[async_trait]
 impl PathStatGetter<io::Error> for Arc<PosixFS> {
-  fn path_stats(&self, paths: Vec<PathBuf>) -> BoxFuture<Vec<Option<PathStat>>, io::Error> {
-    future::join_all(
+  async fn path_stats(&self, paths: Vec<PathBuf>) -> Result<Vec<Option<PathStat>>, io::Error> {
+    future::try_join_all(
       paths
         .into_iter()
         .map(|path| {
@@ -847,40 +877,32 @@ impl PathStatGetter<io::Error> for Arc<PosixFS> {
           let fs2 = self.clone();
           self
             .executor
-            .spawn_on_io_pool(future::lazy(move || fs2.stat_sync(path)))
-            .then(|stat_result| match stat_result {
-              Ok(v) => Ok(Some(v)),
-              Err(err) => match err.kind() {
-                io::ErrorKind::NotFound => Ok(None),
-                _ => Err(err),
-              },
-            })
+            .spawn_blocking(move || fs2.stat_sync(path))
             .and_then(move |maybe_stat| {
-              match maybe_stat {
-                // Note: This will drop PathStats for symlinks which don't point anywhere.
-                Some(Stat::Link(link)) => fs.canonicalize(link.0.clone(), link),
-                Some(Stat::Dir(dir)) => {
-                  future::ok(Some(PathStat::dir(dir.0.clone(), dir))).to_boxed()
+              async move {
+                match maybe_stat {
+                  // Note: This will drop PathStats for symlinks which don't point anywhere.
+                  Some(Stat::Link(link)) => fs.canonicalize(link.0.clone(), link).await,
+                  Some(Stat::Dir(dir)) => Ok(Some(PathStat::dir(dir.0.clone(), dir))),
+                  Some(Stat::File(file)) => Ok(Some(PathStat::file(file.path.clone(), file))),
+                  None => Ok(None),
                 }
-                Some(Stat::File(file)) => {
-                  future::ok(Some(PathStat::file(file.path.clone(), file))).to_boxed()
-                }
-                None => future::ok(None).to_boxed(),
               }
             })
         })
         .collect::<Vec<_>>(),
     )
-    .to_boxed()
+    .await
   }
 }
 
 ///
 /// A context for filesystem operations parameterized on an error type 'E'.
 ///
+#[async_trait]
 pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
-  fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, E>;
-  fn scandir(&self, dir: Dir) -> BoxFuture<Arc<DirectoryListing>, E>;
+  async fn read_link(&self, link: &Link) -> Result<PathBuf, E>;
+  async fn scandir(&self, dir: Dir) -> Result<Arc<DirectoryListing>, E>;
   fn is_ignored(&self, stat: &Stat) -> bool;
   fn mk_error(msg: &str) -> E;
 }

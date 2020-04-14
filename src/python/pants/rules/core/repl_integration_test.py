@@ -3,9 +3,9 @@
 
 from pants.backend.python.rules import (
     download_pex_bin,
+    importable_python_sources,
     pex,
-    pex_from_target_closure,
-    prepare_chrooted_python_sources,
+    pex_from_targets,
     repl,
 )
 from pants.backend.python.rules.repl import PythonRepl
@@ -31,8 +31,8 @@ class ReplTest(GoalRuleTestBase):
             run_repl,
             *pex.rules(),
             *download_pex_bin.rules(),
-            *pex_from_target_closure.rules(),
-            *prepare_chrooted_python_sources.rules(),
+            *importable_python_sources.rules(),
+            *pex_from_targets.rules(),
             *python_native_code.rules(),
             *strip_source_roots.rules(),
             *subprocess_environment.rules(),
@@ -41,7 +41,7 @@ class ReplTest(GoalRuleTestBase):
 
     @classmethod
     def alias_groups(cls) -> BuildFileAliases:
-        return BuildFileAliases(targets={"python_library": PythonLibrary,})
+        return BuildFileAliases(targets={"python_library": PythonLibrary})
 
     def setup_python_library(self) -> None:
         library_source = FileContent(path="some_lib.py", content=b"class SomeClass:\n  pass\n")

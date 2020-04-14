@@ -22,11 +22,11 @@ class Executor(ABC):
 
     @staticmethod
     def _scrub_args(classpath, main, jvm_options, args):
-        classpath = ensure_str_list(classpath)
+        classpath = ensure_str_list(classpath, allow_single_str=True)
         if not isinstance(main, str) or not main:
             raise ValueError("A non-empty main classname is required, given: {}".format(main))
-        jvm_options = ensure_str_list(jvm_options or ())
-        args = ensure_str_list(args or ())
+        jvm_options = ensure_str_list(jvm_options or (), allow_single_str=True)
+        args = ensure_str_list(args or (), allow_single_str=True)
         return classpath, main, jvm_options, args
 
     class Error(Exception):

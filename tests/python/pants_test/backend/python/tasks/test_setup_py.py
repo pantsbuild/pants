@@ -154,7 +154,7 @@ class TestSetupPy(SetupPyTestBase):
         foo_bin_dep = self.create_python_library(relpath="foo/dep", name="dep")
 
         foo_bin = self.create_python_binary(
-            relpath="foo/bin", name="bin", entry_point="foo.bin:foo", dependencies=["foo/dep",]
+            relpath="foo/bin", name="bin", entry_point="foo.bin:foo", dependencies=["foo/dep"]
         )
 
         foo = self.create_python_library(
@@ -241,7 +241,7 @@ class TestSetupPy(SetupPyTestBase):
         req3 = create_requirement_lib("req3")
 
         self.create_python_library(
-            relpath="src/python/pants/base", name="base", dependencies=["req1", "req2",]
+            relpath="src/python/pants/base", name="base", dependencies=["req1", "req2"]
         )
         self.create_python_binary(
             relpath="src/python/pants/bin",
@@ -330,6 +330,7 @@ class TestSetupPy(SetupPyTestBase):
                 """
                 python_library(
                   name='foo1',
+                  sources=[],
                   dependencies=[
                     'foo/bar'
                   ],
@@ -340,6 +341,7 @@ class TestSetupPy(SetupPyTestBase):
                 )
                 python_library(
                   name='foo2',
+                  sources=[],
                   dependencies=[
                     'foo/bar'
                   ],
@@ -641,7 +643,7 @@ class TestSetupPyFindPackages(SetupPyTestBase):
         assert_single_chroot(["foo"], [], {"foo": ["blork.dat"]})
 
         resources = {
-            "foo": ["f0", os.path.join("bar", "baz", "f1"), os.path.join("bar", "baz", "f2"),]
+            "foo": ["f0", os.path.join("bar", "baz", "f1"), os.path.join("bar", "baz", "f2")]
         }
         assert_single_chroot(["foo"], [], resources)
 

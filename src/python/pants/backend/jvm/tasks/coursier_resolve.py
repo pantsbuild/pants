@@ -820,11 +820,6 @@ class CoursierResolve(CoursierMixin, NailgunTask):
         """Resolves the specified confs for the configured targets and returns an iterator over
         tuples of (conf, jar path)."""
 
-        jvm_resolve_subsystem = JvmResolveSubsystem.global_instance()
-        if jvm_resolve_subsystem.get_options().resolver != "coursier":
-            return
-
-        # executor = self.create_java_executor()
         classpath_products = self.context.products.get_data(
             "compile_classpath",
             init_func=ClasspathProducts.init_func(self.get_options().pants_workdir),

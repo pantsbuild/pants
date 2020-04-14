@@ -61,7 +61,6 @@ class PlainTextReporter(PlainTextReporterBase):
         tool_output_format: Any
 
     _COLOR_BY_LEVEL = {
-        Report.FATAL: red,
         Report.ERROR: red,
         Report.WARN: yellow,
         Report.INFO: green,
@@ -140,7 +139,7 @@ class PlainTextReporter(PlainTextReporterBase):
         label_format = self._get_label_format(workunit)
 
         if label_format == LabelFormat.FULL:
-            if not WorkUnitLabel.SUPPRESS_LABEL in workunit.labels:
+            if WorkUnitLabel.SUPPRESS_LABEL not in workunit.labels:
                 self._emit_indented_workunit_label(workunit)
             # Start output on a new line.
             tool_output_format = self._get_tool_output_format(workunit)

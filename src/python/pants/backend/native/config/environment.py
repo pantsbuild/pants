@@ -181,7 +181,7 @@ class _Executable(_ExtensibleAlgebraic):
         """
         lib_path_env_var: str = match(
             Platform.current,
-            {Platform.darwin: "DYLD_LIBRARY_PATH", Platform.linux: "LD_LIBRARY_PATH",},
+            {Platform.darwin: "DYLD_LIBRARY_PATH", Platform.linux: "LD_LIBRARY_PATH"},
         )
 
         return {

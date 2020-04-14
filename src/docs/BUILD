@@ -1,11 +1,11 @@
 page(
   name='1.0',
-  source='1.0.md',
+  sources=['1.0.md'],
 )
 
 page(
   name='3rdparty',
-  source='3rdparty.md',
+  sources=['3rdparty.md'],
   links=[
     'examples/src/java/org/pantsbuild/example:3rdparty_jvm',
     'examples/src/python/example:3rdparty_py',
@@ -14,12 +14,12 @@ page(
 
 page(
   name='announce_201409',
-  source='announce_201409.md',
+  sources=['announce_201409.md'],
 )
 
 page(
   name='architecture',
-  source='architecture.md',
+  sources=['architecture.md'],
   links=[
     ':architecture_pantsd',
   ]
@@ -27,7 +27,7 @@ page(
 
 page(
   name='build_files',
-  source='build_files.md',
+  sources=['build_files.md'],
   links=[
     ':first_tutorial',
   ]
@@ -35,27 +35,27 @@ page(
 
 page(
   name='committers',
-  source='committers.md',
+  sources=['committers.md'],
 )
 
 page(
   name='common_tasks',
-  source='common_tasks/index.md',
+  sources=['common_tasks/index.md'],
 )
 
 page(
     name='community',
-    source='community.md',
+    sources=['community.md'],
 )
 
 page(
     name='architecture_pantsd',
-    source='architecture_pantsd.md',
+    sources=['architecture_pantsd.md'],
 )
 
 page(
   name='first_concepts',
-  source='first_concepts.md',
+  sources=['first_concepts.md'],
   links=[
     ':first_tutorial',
   ]
@@ -63,7 +63,7 @@ page(
 
 page(
   name='first_tutorial',
-  source='first_tutorial.md',
+  sources=['first_tutorial.md'],
   links=[
     ':first_concepts',
     ':invoking',
@@ -74,12 +74,12 @@ page(
 
 page(
   name='ide_support',
-  source='ide_support.md',
+  sources=['ide_support.md'],
 )
 
 page(
   name='index',
-  source='index.md',
+  sources=['index.md'],
   links=[
     ':3rdparty',
     ':1.0',
@@ -107,7 +107,7 @@ page(
 
 page(
   name='invoking',
-  source='invoking.md',
+  sources=['invoking.md'],
   links=[
     ':first_tutorial',
     ':options',
@@ -117,7 +117,7 @@ page(
 
 page(
   name='install',
-  source='install.md',
+  sources=['install.md'],
   links=[
     ':setup_repo',
     ':options',
@@ -126,27 +126,27 @@ page(
 
 page(
   name='orgs',
-  source='orgs.md',
+  sources=['orgs.md'],
 )
 
 page(
     name='options',
-    source='options.md',
+    sources=['options.md'],
 )
 
 page(
   name='powered_by',
-  source='powered_by.md',
+  sources=['powered_by.md'],
 )
 
 page(
     name='reporting_server',
-    source='reporting_server.md',
+    sources=['reporting_server.md'],
 )
 
 page(
   name='setup_repo',
-  source='setup_repo.md',
+  sources=['setup_repo.md'],
   links=[
     ':build_files',
     ':first_concepts',
@@ -160,12 +160,12 @@ page(
 
 page(
   name='target_addresses',
-  source='target_addresses.md'
+  sources=['target_addresses.md']
 )
 
 page(
   name='tshoot',
-  source='tshoot.md',
+  sources=['tshoot.md'],
   links=[
     ':community',
     ':reporting_server',
@@ -175,7 +175,7 @@ page(
 
 page(
   name='dev',
-  source='dev.md',
+  sources=['dev.md'],
   links=[
     ':architecture',
     ':committers',
@@ -198,7 +198,7 @@ page(
 
 page(
   name='release_strategy',
-  source='release_strategy.md',
+  sources=['release_strategy.md'],
   links=[
     ':deprecation_policy',
     ':howto_contribute',
@@ -208,7 +208,7 @@ page(
 
 page(
   name='dev_tasks',
-  source='dev_tasks.md',
+  sources=['dev_tasks.md'],
   links=[
     ':howto_plugin',
     'src/docs:invoking',
@@ -217,32 +217,32 @@ page(
 
 page(
   name='dev_tasks_publish_extras',
-  source='dev_tasks_publish_extras.md',
+  sources=['dev_tasks_publish_extras.md'],
 )
 
 page(
   name='deprecation_policy',
-  source='deprecation_policy.md',
+  sources=['deprecation_policy.md'],
 )
 
 page(
   name='docs',
-  source='docs.md',
+  sources=['docs.md'],
 )
 
 page(
   name='export',
-  source='export.md',
+  sources=['export.md'],
 )
 
 page(
   name='howto_ask',
-  source='howto_ask.md',
+  sources=['howto_ask.md'],
 )
 
 page(
   name='howto_contribute',
-  source='howto_contribute.md',
+  sources=['howto_contribute.md'],
   links=[
     ':docs',
     ':howto_ask',
@@ -254,7 +254,7 @@ page(
 
 page(
   name='howto_develop',
-  source='howto_develop.md',
+  sources=['howto_develop.md'],
   links=[
     ':howto_contribute',
     'src/docs:first_tutorial',
@@ -263,7 +263,7 @@ page(
 
 page(
   name='howto_plugin',
-  source='howto_plugin.md',
+  sources=['howto_plugin.md'],
   links=[
     ':docs',
     ':howto_develop',
@@ -272,14 +272,14 @@ page(
 
 page(
   name='intellij',
-  source='intellij.md',
+  sources=['intellij.md'],
   links=[
     'src/docs:ide_support',
   ])
 
 page(
   name='internals',
-  source='internals.md',
+  sources=['internals.md'],
   links=[
     ':dev_tasks',
     'src/docs:first_concepts',
@@ -289,7 +289,7 @@ page(
 
 page(
   name='release',
-  source='release.md',
+  sources=['release.md'],
   links=[
     ':release_jvm',
     ':release_strategy',
@@ -298,7 +298,7 @@ page(
 
 page(
   name='release_jvm',
-  source='release_jvm.md',
+  sources=['release_jvm.md'],
   links=[
     'examples/src/java/org/pantsbuild/example:publish',
   ]
@@ -306,7 +306,7 @@ page(
 
 page(
   name='styleguide',
-  source='styleguide.md',
+  sources=['styleguide.md'],
   links=[
     ':howto_contribute',
   ]
@@ -314,5 +314,5 @@ page(
 
 page(
   name='why_use_pants',
-  source='why_use_pants.md'
+  sources=['why_use_pants.md']
 )

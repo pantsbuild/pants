@@ -32,7 +32,7 @@ class ConsoleListener extends TextListener {
     if (testsFinished) {
       // If this method is called after the testRunFinished callback then it means another listener
       // threw an exception in its testRunFinished callback. This is our chance to display the error
-      failure.getException().printStackTrace(out);
+      printFailure(failure, "Reported after run");
     } else {
       out.append(Util.isAssertionFailure(failure) ? 'F' : 'E');
     }

@@ -51,6 +51,7 @@
     "list_goals": "dist/markdown/html/src/docs/common_tasks/list_goals.html",
     "list_targets": "dist/markdown/html/src/docs/common_tasks/list_targets.html",
     "login": "dist/markdown/html/src/docs/common_tasks/login.html",
+    "multiple_jvm_versions": "dist/markdown/html/src/docs/common_tasks/multiple_jvm_versions.html",
     "node_readme": "dist/markdown/html/contrib/node/README.html",
     "notes-1.0.x": "dist/markdown/html/src/python/pants/notes/1.0.x.html",
     "notes-1.1.x": "dist/markdown/html/src/python/pants/notes/1.1.x.html",

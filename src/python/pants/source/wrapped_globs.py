@@ -274,7 +274,7 @@ class FilesetRelPathWrapper(ABC):
         return [ensure_string_wrapped_in_list(exclude) for exclude in raw_exclude]
 
     @classmethod
-    def to_filespec(cls, args: Iterable[str], root: str = "", exclude=None,) -> Filespec:
+    def to_filespec(cls, args: Iterable[str], root: str = "", exclude=None) -> Filespec:
         """Return a dict representation of this glob list, relative to the buildroot."""
         result: Filespec = {"globs": [os.path.join(root, arg) for arg in args]}
         if exclude:

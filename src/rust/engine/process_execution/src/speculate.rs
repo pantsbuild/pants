@@ -1,13 +1,13 @@
 use crate::{
-  CommandRunner, Context, ExecuteProcessRequest, FallibleExecuteProcessResult,
-  MultiPlatformExecuteProcessRequest,
+  CommandRunner, Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Process,
 };
 use boxfuture::{BoxFuture, Boxable};
+use futures::future::{FutureExt, TryFutureExt};
 use futures01::future::{err, ok, Either, Future};
 use log::{debug, trace};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
-use tokio_timer::Delay;
+use std::time::Duration;
+use tokio::time::delay_for;
 
 #[derive(Clone)]
 pub struct SpeculatingCommandRunner {
@@ -31,10 +31,13 @@ impl SpeculatingCommandRunner {
 
   fn speculate(
     &self,
-    req: MultiPlatformExecuteProcessRequest,
+    req: MultiPlatformProcess,
     context: Context,
-  ) -> BoxFuture<FallibleExecuteProcessResult, String> {
-    let delay = Delay::new(Instant::now() + self.speculation_timeout);
+  ) -> BoxFuture<FallibleProcessResultWithPlatform, String> {
+    let delay = delay_for(self.speculation_timeout)
+      .unit_error()
+      .boxed()
+      .compat();
     let req2 = req.clone();
     trace!(
       "Primary command runner queue length: {:?}",
@@ -57,11 +60,11 @@ impl SpeculatingCommandRunner {
         Ok(either_success) => {
           // .split() takes out the homogeneous success type for either primary or
           // secondary successes.
-          ok::<FallibleExecuteProcessResult, String>(either_success.split().0).to_boxed()
+          ok::<FallibleProcessResultWithPlatform, String>(either_success.split().0).to_boxed()
         }
         Err(Either::A((failed_primary_res, _))) => {
           debug!("primary request FAILED, aborting");
-          err::<FallibleExecuteProcessResult, String>(failed_primary_res).to_boxed()
+          err::<FallibleProcessResultWithPlatform, String>(failed_primary_res).to_boxed()
         }
         // We handle the case of the secondary failing specially. We only want to show
         // a failure to the user if the primary execution source fails. This maintains
@@ -85,10 +88,7 @@ impl SpeculatingCommandRunner {
 }
 
 impl CommandRunner for SpeculatingCommandRunner {
-  fn extract_compatible_request(
-    &self,
-    req: &MultiPlatformExecuteProcessRequest,
-  ) -> Option<ExecuteProcessRequest> {
+  fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
     match (
       self.primary.extract_compatible_request(req),
       self.secondary.extract_compatible_request(req),
@@ -101,9 +101,9 @@ impl CommandRunner for SpeculatingCommandRunner {
 
   fn run(
     &self,
-    req: MultiPlatformExecuteProcessRequest,
+    req: MultiPlatformProcess,
     context: Context,
-  ) -> BoxFuture<FallibleExecuteProcessResult, String> {
+  ) -> BoxFuture<FallibleProcessResultWithPlatform, String> {
     match (
       self.primary.extract_compatible_request(&req),
       self.secondary.extract_compatible_request(&req),

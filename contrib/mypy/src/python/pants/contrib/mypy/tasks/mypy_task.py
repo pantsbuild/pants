@@ -244,6 +244,7 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
                 extra_pexes.append(
                     self.context.products.get_data(ResolveRequirements.REQUIREMENTS_PEX)
                 )
+                mypy_interpreter = interpreter_for_targets
             else:
                 self.context.log.warn(
                     f"The --include-requirements option is set, but the current target's requirements have "

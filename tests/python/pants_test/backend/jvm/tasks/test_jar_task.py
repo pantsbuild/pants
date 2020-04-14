@@ -22,7 +22,7 @@ class BaseJarTaskTest(JarTaskTestBase):
         return (
             super()
             .alias_groups()
-            .merge(BuildFileAliases(targets={"java_agent": JavaAgent, "jvm_binary": JvmBinary,},))
+            .merge(BuildFileAliases(targets={"java_agent": JavaAgent, "jvm_binary": JvmBinary}))
         )
 
     def setUp(self):
@@ -172,7 +172,7 @@ class JarTaskTest(BaseJarTaskTest):
                     + "Class-Path: {}\r\n"
                     + "Created-By: org.pantsbuild.tools.jar.JarBuilder\r\n\r\n"
                 )
-                .format(" ".join(ensure_str_list(classpath)))
+                .format(" ".join(ensure_str_list(classpath, allow_single_str=True)))
                 .encode()
             )
 
@@ -253,6 +253,7 @@ class JarBuilderTest(BaseJarTaskTest):
                 """
                 java_agent(
                   name='fake_agent',
+                  sources=[],
                   premain='bob',
                   agent_class='fred',
                   can_redefine=True,

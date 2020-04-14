@@ -1,81 +1,86 @@
 use crate::remote::ByteStore;
 use crate::{EntryType, MEGABYTES};
 use bytes::Bytes;
+use futures::compat::Future01CompatExt;
 use hashing::Digest;
 use mock::StubCAS;
 use serverset::BackoffConfig;
 use std::collections::HashSet;
 use std::time::Duration;
 use testutil::data::{TestData, TestDirectory};
-use workunit_store::WorkUnitStore;
 
-use crate::tests::{big_file_bytes, big_file_digest, big_file_fingerprint, block_on, new_cas};
+use crate::tests::{big_file_bytes, big_file_digest, big_file_fingerprint, new_cas};
 
-#[test]
-fn loads_file() {
+#[tokio::test]
+async fn loads_file() {
   let testdata = TestData::roland();
   let cas = new_cas(10);
 
   assert_eq!(
-    load_file_bytes(&new_byte_store(&cas), testdata.digest()).unwrap(),
+    load_file_bytes(&new_byte_store(&cas), testdata.digest())
+      .await
+      .unwrap(),
     Some(testdata.bytes())
   );
 }
 
-#[test]
-fn missing_file() {
+#[tokio::test]
+async fn missing_file() {
   let cas = StubCAS::empty();
 
   assert_eq!(
-    load_file_bytes(&new_byte_store(&cas), TestData::roland().digest()),
+    load_file_bytes(&new_byte_store(&cas), TestData::roland().digest()).await,
     Ok(None)
   );
 }
 
-#[test]
-fn load_directory() {
+#[tokio::test]
+async fn load_directory() {
   let cas = new_cas(10);
   let testdir = TestDirectory::containing_roland();
 
   assert_eq!(
-    load_directory_proto_bytes(&new_byte_store(&cas), testdir.digest()),
+    load_directory_proto_bytes(&new_byte_store(&cas), testdir.digest()).await,
     Ok(Some(testdir.bytes()))
   );
 }
 
-#[test]
-fn missing_directory() {
+#[tokio::test]
+async fn missing_directory() {
   let cas = StubCAS::empty();
 
   assert_eq!(
     load_directory_proto_bytes(
       &new_byte_store(&cas),
       TestDirectory::containing_roland().digest()
-    ),
+    )
+    .await,
     Ok(None)
   );
 }
 
-#[test]
-fn load_file_grpc_error() {
+#[tokio::test]
+async fn load_file_grpc_error() {
   let cas = StubCAS::always_errors();
 
-  let error =
-    load_file_bytes(&new_byte_store(&cas), TestData::roland().digest()).expect_err("Want error");
+  let error = load_file_bytes(&new_byte_store(&cas), TestData::roland().digest())
+    .await
+    .expect_err("Want error");
   assert!(
     error.contains("StubCAS is configured to always fail"),
     format!("Bad error message, got: {}", error)
   )
 }
 
-#[test]
-fn load_directory_grpc_error() {
+#[tokio::test]
+async fn load_directory_grpc_error() {
   let cas = StubCAS::always_errors();
 
   let error = load_directory_proto_bytes(
     &new_byte_store(&cas),
     TestDirectory::containing_roland().digest(),
   )
+  .await
   .expect_err("Want error");
   assert!(
     error.contains("StubCAS is configured to always fail"),
@@ -83,58 +88,58 @@ fn load_directory_grpc_error() {
   )
 }
 
-#[test]
-fn fetch_less_than_one_chunk() {
+#[tokio::test]
+async fn fetch_less_than_one_chunk() {
   let testdata = TestData::roland();
   let cas = new_cas(testdata.bytes().len() + 1);
 
   assert_eq!(
-    load_file_bytes(&new_byte_store(&cas), testdata.digest()),
+    load_file_bytes(&new_byte_store(&cas), testdata.digest()).await,
     Ok(Some(testdata.bytes()))
   )
 }
 
-#[test]
-fn fetch_exactly_one_chunk() {
+#[tokio::test]
+async fn fetch_exactly_one_chunk() {
   let testdata = TestData::roland();
   let cas = new_cas(testdata.bytes().len());
 
   assert_eq!(
-    load_file_bytes(&new_byte_store(&cas), testdata.digest()),
+    load_file_bytes(&new_byte_store(&cas), testdata.digest()).await,
     Ok(Some(testdata.bytes()))
   )
 }
 
-#[test]
-fn fetch_multiple_chunks_exact() {
+#[tokio::test]
+async fn fetch_multiple_chunks_exact() {
   let testdata = TestData::roland();
   let cas = new_cas(1);
 
   assert_eq!(
-    load_file_bytes(&new_byte_store(&cas), testdata.digest()),
+    load_file_bytes(&new_byte_store(&cas), testdata.digest()).await,
     Ok(Some(testdata.bytes()))
   )
 }
 
-#[test]
-fn fetch_multiple_chunks_nonfactor() {
+#[tokio::test]
+async fn fetch_multiple_chunks_nonfactor() {
   let testdata = TestData::roland();
   let cas = new_cas(9);
 
   assert_eq!(
-    load_file_bytes(&new_byte_store(&cas), testdata.digest()),
+    load_file_bytes(&new_byte_store(&cas), testdata.digest()).await,
     Ok(Some(testdata.bytes()))
   )
 }
 
-#[test]
-fn write_file_one_chunk() {
+#[tokio::test]
+async fn write_file_one_chunk() {
   let testdata = TestData::roland();
   let cas = StubCAS::empty();
 
   let store = new_byte_store(&cas);
   assert_eq!(
-    block_on(store.store_bytes(testdata.bytes(), WorkUnitStore::new())),
+    store.store_bytes(testdata.bytes()).await,
     Ok(testdata.digest())
   );
 
@@ -142,8 +147,8 @@ fn write_file_one_chunk() {
   assert_eq!(blobs.get(&testdata.fingerprint()), Some(&testdata.bytes()));
 }
 
-#[test]
-fn write_file_multiple_chunks() {
+#[tokio::test]
+async fn write_file_multiple_chunks() {
   let cas = StubCAS::empty();
 
   let store = ByteStore::new(
@@ -165,7 +170,7 @@ fn write_file_multiple_chunks() {
   let fingerprint = big_file_fingerprint();
 
   assert_eq!(
-    block_on(store.store_bytes(all_the_henries.clone(), WorkUnitStore::new())),
+    store.store_bytes(all_the_henries.clone()).await,
     Ok(big_file_digest())
   );
 
@@ -186,14 +191,14 @@ fn write_file_multiple_chunks() {
   }
 }
 
-#[test]
-fn write_empty_file() {
+#[tokio::test]
+async fn write_empty_file() {
   let empty_file = TestData::empty();
   let cas = StubCAS::empty();
 
   let store = new_byte_store(&cas);
   assert_eq!(
-    block_on(store.store_bytes(empty_file.bytes(), WorkUnitStore::new())),
+    store.store_bytes(empty_file.bytes()).await,
     Ok(empty_file.digest())
   );
 
@@ -204,12 +209,14 @@ fn write_empty_file() {
   );
 }
 
-#[test]
-fn write_file_errors() {
+#[tokio::test]
+async fn write_file_errors() {
   let cas = StubCAS::always_errors();
 
   let store = new_byte_store(&cas);
-  let error = block_on(store.store_bytes(TestData::roland().bytes(), WorkUnitStore::new()))
+  let error = store
+    .store_bytes(TestData::roland().bytes())
+    .await
     .expect_err("Want error");
   assert!(
     error.contains("Error from server"),
@@ -221,8 +228,8 @@ fn write_file_errors() {
   );
 }
 
-#[test]
-fn write_connection_error() {
+#[tokio::test]
+async fn write_connection_error() {
   let store = ByteStore::new(
     vec![String::from("doesnotexist.example")],
     None,
@@ -236,7 +243,9 @@ fn write_connection_error() {
     1,
   )
   .unwrap();
-  let error = block_on(store.store_bytes(TestData::roland().bytes(), WorkUnitStore::new()))
+  let error = store
+    .store_bytes(TestData::roland().bytes())
+    .await
     .expect_err("Want error");
   assert!(
     error.contains("Error attempting to upload digest"),
@@ -244,22 +253,24 @@ fn write_connection_error() {
   );
 }
 
-#[test]
-fn list_missing_digests_none_missing() {
+#[tokio::test]
+async fn list_missing_digests_none_missing() {
   let cas = new_cas(1024);
 
   let store = new_byte_store(&cas);
   assert_eq!(
-    block_on(store.list_missing_digests(
-      store.find_missing_blobs_request(vec![TestData::roland().digest()].iter()),
-      WorkUnitStore::new(),
-    )),
+    store
+      .list_missing_digests(
+        store.find_missing_blobs_request(vec![TestData::roland().digest()].iter()),
+      )
+      .compat()
+      .await,
     Ok(HashSet::new())
   );
 }
 
-#[test]
-fn list_missing_digests_some_missing() {
+#[tokio::test]
+async fn list_missing_digests_some_missing() {
   let cas = StubCAS::empty();
 
   let store = new_byte_store(&cas);
@@ -270,33 +281,35 @@ fn list_missing_digests_some_missing() {
   digest_set.insert(digest);
 
   assert_eq!(
-    block_on(store.list_missing_digests(
-      store.find_missing_blobs_request(vec![digest].iter()),
-      WorkUnitStore::new(),
-    )),
+    store
+      .list_missing_digests(store.find_missing_blobs_request(vec![digest].iter()),)
+      .compat()
+      .await,
     Ok(digest_set)
   );
 }
 
-#[test]
-fn list_missing_digests_error() {
+#[tokio::test]
+async fn list_missing_digests_error() {
   let cas = StubCAS::always_errors();
 
   let store = new_byte_store(&cas);
 
-  let error = block_on(store.list_missing_digests(
-    store.find_missing_blobs_request(vec![TestData::roland().digest()].iter()),
-    WorkUnitStore::new(),
-  ))
-  .expect_err("Want error");
+  let error = store
+    .list_missing_digests(
+      store.find_missing_blobs_request(vec![TestData::roland().digest()].iter()),
+    )
+    .compat()
+    .await
+    .expect_err("Want error");
   assert!(
     error.contains("StubCAS is configured to always fail"),
     format!("Bad error message, got: {}", error)
   );
 }
 
-#[test]
-fn reads_from_multiple_cas_servers() {
+#[tokio::test]
+async fn reads_from_multiple_cas_servers() {
   let roland = TestData::roland();
   let catnip = TestData::catnip();
 
@@ -318,12 +331,12 @@ fn reads_from_multiple_cas_servers() {
   .unwrap();
 
   assert_eq!(
-    load_file_bytes(&store, roland.digest()),
+    load_file_bytes(&store, roland.digest()).await,
     Ok(Some(roland.bytes()))
   );
 
   assert_eq!(
-    load_file_bytes(&store, catnip.digest()),
+    load_file_bytes(&store, catnip.digest()).await,
     Ok(Some(catnip.bytes()))
   );
 
@@ -347,21 +360,21 @@ fn new_byte_store(cas: &StubCAS) -> ByteStore {
   .unwrap()
 }
 
-pub fn load_file_bytes(store: &ByteStore, digest: Digest) -> Result<Option<Bytes>, String> {
-  load_bytes(&store, EntryType::File, digest)
+pub async fn load_file_bytes(store: &ByteStore, digest: Digest) -> Result<Option<Bytes>, String> {
+  load_bytes(&store, EntryType::File, digest).await
 }
 
-pub fn load_directory_proto_bytes(
+pub async fn load_directory_proto_bytes(
   store: &ByteStore,
   digest: Digest,
 ) -> Result<Option<Bytes>, String> {
-  load_bytes(&store, EntryType::Directory, digest)
+  load_bytes(&store, EntryType::Directory, digest).await
 }
 
-fn load_bytes(
+async fn load_bytes(
   store: &ByteStore,
   entry_type: EntryType,
   digest: Digest,
 ) -> Result<Option<Bytes>, String> {
-  block_on(store.load_bytes_with(entry_type, digest, |b| b, WorkUnitStore::new()))
+  store.load_bytes_with(entry_type, digest, |b| b).await
 }

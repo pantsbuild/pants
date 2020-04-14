@@ -59,7 +59,7 @@ class AllRootsTest(TestBase):
         output = run_rule(
             list_roots.all_roots,
             rule_args=[source_root_config],
-            mock_gets=[MockGet(product_type=Snapshot, subject_type=PathGlobs, mock=provider_rule),],
+            mock_gets=[MockGet(product_type=Snapshot, subject_type=PathGlobs, mock=provider_rule)],
         )
 
         self.assertEqual(
@@ -75,6 +75,35 @@ class AllRootsTest(TestBase):
                 SourceRoot("fixed/root/jvm", ("java", "scala"), TEST),
             },
             set(output),
+        )
+
+    def test_all_roots_with_root_at_buildroot(self):
+        options = {
+            "pants_ignore": [],
+            "source_root_patterns": [],
+            "source_roots": {"": ["python"],},
+        }
+        options.update(self.options[""])  # We need inherited values for pants_workdir etc.
+
+        self.context(
+            for_subsystems=[SourceRootConfig], options={SourceRootConfig.options_scope: options}
+        )
+
+        source_root_config = SourceRootConfig.global_instance()
+
+        # This function mocks out reading real directories off the file system
+        def provider_rule(path_globs: PathGlobs) -> Snapshot:
+            dirs = ("foo",)  # A python package at the buildroot.
+            return Snapshot(Digest("abcdef", 10), (), dirs)
+
+        output = run_rule(
+            list_roots.all_roots,
+            rule_args=[source_root_config],
+            mock_gets=[MockGet(product_type=Snapshot, subject_type=PathGlobs, mock=provider_rule)],
+        )
+
+        self.assertEqual(
+            {SourceRoot("", ("python",), SourceRootCategories.SOURCE),}, set(output),
         )
 
 

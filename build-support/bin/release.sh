@@ -148,6 +148,7 @@ function execute_packaged_pants_with_internal_backends() {
         'pants.backend.native',\
         'pants.backend.project_info',\
         'pants.backend.python',\
+        'pants.cache',\
         'internal_backend.repositories',\
         'internal_backend.sitegen',\
         'internal_backend.utilities',\
@@ -560,32 +561,19 @@ function build_pex() {
   dest_suffix="py36.pex"
   case "${mode}" in
     build)
-      case "$(uname)" in
-        # NB: When building locally, we use a platform that does not refer to the ABI version, to
-        # avoid needing to introspect the python ABI for this machine.
-        Darwin)
-          local platform="${osx_platform_noabi}"
-          ;;
-        Linux)
-          local platform="${linux_platform_noabi}"
-          ;;
-        *)
-          echo >&2 "Unknown uname"
-          exit 1
-          ;;
-      esac
-      local platforms=("${platform}")
+      # NB: When building locally, we explicitly target our local Py3.
+      local distribution_target_flags=("--python=$(command -v "$PY")")
       local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${platform}.${dest_suffix}"
       local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.${platform}.${dest_suffix}"
       ;;
     fetch)
-      local platforms=()
+      local distribution_target_flags=()
       # TODO: once we add Python 3.7 PEX support, which requires first building Py37 wheels,
       # we'll want to release one big flexible Pex that works with Python 3.6+.
       abis=("cp-36-m")
       for platform in "${linux_platform_noabi}" "${osx_platform_noabi}"; do
         for abi in "${abis[@]}"; do
-          platforms=("${platforms[@]}" "${platform}-${abi}")
+          distribution_target_flags=("${distribution_target_flags[@]}" "--platform=${platform}-${abi}")
         done
       done
       local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${dest_suffix}"
@@ -612,20 +600,15 @@ function build_pex() {
     requirements=("${requirements[@]}" "${pkg_name}==${PANTS_UNSTABLE_VERSION}")
   done
 
-  local platform_flags=()
-  for platform in "${platforms[@]}"; do
-    platform_flags=("${platform_flags[@]}" "--platform=${platform}")
-  done
-
   # Pants depends on twitter.common libraries that trigger pex warnings for not properly declaring
   # their dependency on setuptools (for namespace package support). To prevent these known warnings
   # from polluting stderr we pass `--no-emit-warnings`.
   execute_pex \
     -o "${dest}" \
     --no-emit-warnings \
+    --no-strip-pex-env \
     --script=pants \
-    --interpreter-constraint="${interpreter_constraint}" \
-    "${platform_flags[@]}" \
+    "${distribution_target_flags[@]}" \
     "${requirements[@]}"
 
   if [[ "${PANTS_PEX_RELEASE}" == "stable" ]]; then

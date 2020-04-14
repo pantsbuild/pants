@@ -3,7 +3,9 @@ use tempfile;
 
 use boxfuture::{try_future, BoxFuture, Boxable};
 use fs::{self, GlobExpansionConjunction, GlobMatching, PathGlobs, StrictGlobMatching};
-use futures01::{future, Future, Stream};
+use futures::future::{FutureExt, TryFutureExt};
+use futures::stream::{BoxStream, StreamExt, TryStreamExt};
+use futures01::{future, Future};
 use log::info;
 use nails::execution::{ChildOutput, ExitCode};
 
@@ -13,21 +15,20 @@ use std::fs::create_dir_all;
 use std::ops::Neg;
 use std::os::unix::{fs::symlink, process::ExitStatusExt};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::sync::Arc;
 use store::{OneOffStoreFileByDigest, Snapshot, Store};
 
-use tokio::timer::Timeout;
-use tokio_codec::{BytesCodec, FramedRead};
-use tokio_process::CommandExt;
+use tokio::process::Command;
+use tokio::time::timeout;
+use tokio_util::codec::{BytesCodec, FramedRead};
 
 use crate::{
-  Context, ExecuteProcessRequest, FallibleExecuteProcessResult, MultiPlatformExecuteProcessRequest,
-  PlatformConstraint,
+  Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, PlatformConstraint,
+  Process,
 };
 
 use bytes::{Bytes, BytesMut};
-use workunit_store::WorkUnitStore;
 
 #[derive(Clone)]
 pub struct CommandRunner {
@@ -35,7 +36,7 @@ pub struct CommandRunner {
   executor: task_executor::Executor,
   work_dir_base: PathBuf,
   cleanup_local_dirs: bool,
-  platform_constraint: PlatformConstraint,
+  platform: Platform,
 }
 
 impl CommandRunner {
@@ -50,8 +51,12 @@ impl CommandRunner {
       executor,
       work_dir_base,
       cleanup_local_dirs,
-      platform_constraint: PlatformConstraint::current_platform_constraint().unwrap(),
+      platform: Platform::current().unwrap(),
     }
+  }
+
+  fn platform(&self) -> Platform {
+    self.platform
   }
 
   fn construct_output_snapshot(
@@ -82,18 +87,20 @@ impl CommandRunner {
       GlobExpansionConjunction::AllMatch,
     ));
 
-    posix_fs
-      .expand(output_globs)
-      .map_err(|err| format!("Error expanding output globs: {}", err))
-      .and_then(|path_stats| {
-        Snapshot::from_path_stats(
-          store.clone(),
-          &OneOffStoreFileByDigest::new(store, posix_fs),
-          path_stats,
-          WorkUnitStore::new(),
-        )
-      })
-      .to_boxed()
+    Box::pin(async move {
+      let path_stats = posix_fs
+        .expand(output_globs)
+        .map_err(|err| format!("Error expanding output globs: {}", err))
+        .await?;
+      Snapshot::from_path_stats(
+        store.clone(),
+        OneOffStoreFileByDigest::new(store, posix_fs),
+        path_stats,
+      )
+      .await
+    })
+    .compat()
+    .to_boxed()
   }
 }
 
@@ -139,33 +146,40 @@ impl StreamedHermeticCommand {
     self
   }
 
-  fn stream(&mut self) -> Result<impl Stream<Item = ChildOutput, Error = String> + Send, String> {
+  ///
+  /// TODO: See the note on references in ASYNC.md.
+  ///
+  fn stream<'a, 'b>(&'a mut self) -> Result<BoxStream<'b, Result<ChildOutput, String>>, String> {
     self
       .inner
       .stdin(Stdio::null())
       .stdout(Stdio::piped())
       .stderr(Stdio::piped())
-      .spawn_async()
+      .spawn()
       .map_err(|e| format!("Error launching process: {:?}", e))
       .and_then(|mut child| {
-        let stdout_stream = FramedRead::new(child.stdout().take().unwrap(), BytesCodec::new())
-          .map(|bytes| ChildOutput::Stdout(bytes.into()));
-        let stderr_stream = FramedRead::new(child.stderr().take().unwrap(), BytesCodec::new())
-          .map(|bytes| ChildOutput::Stderr(bytes.into()));
-        let exit_stream = child.into_stream().map(|exit_status| {
-          ChildOutput::Exit(ExitCode(
-            exit_status
-              .code()
-              .or_else(|| exit_status.signal().map(Neg::neg))
-              .expect("Child process should exit via returned code or signal."),
-          ))
-        });
+        let stdout_stream = FramedRead::new(child.stdout.take().unwrap(), BytesCodec::new())
+          .map_ok(|bytes| ChildOutput::Stdout(bytes.into()))
+          .boxed();
+        let stderr_stream = FramedRead::new(child.stderr.take().unwrap(), BytesCodec::new())
+          .map_ok(|bytes| ChildOutput::Stderr(bytes.into()))
+          .boxed();
+        let exit_stream = child
+          .into_stream()
+          .map_ok(|exit_status| {
+            ChildOutput::Exit(ExitCode(
+              exit_status
+                .code()
+                .or_else(|| exit_status.signal().map(Neg::neg))
+                .expect("Child process should exit via returned code or signal."),
+            ))
+          })
+          .boxed();
 
         Ok(
-          stdout_stream
-            .select(stderr_stream)
-            .select(exit_stream)
-            .map_err(|e| format!("Failed to consume process outputs: {:?}", e)),
+          futures::stream::select_all(vec![stdout_stream, stderr_stream, exit_stream])
+            .map_err(|e| format!("Failed to consume process outputs: {:?}", e))
+            .boxed(),
         )
       })
   }
@@ -181,44 +195,37 @@ pub struct ChildResults {
 }
 
 impl ChildResults {
-  pub fn collect_from<E>(
-    stream: impl Stream<Item = ChildOutput, Error = E> + Send,
-  ) -> impl Future<Item = ChildResults, Error = E> {
-    let init = (
-      BytesMut::with_capacity(8192),
-      BytesMut::with_capacity(8192),
-      0,
-    );
-    stream
-      .fold(
-        init,
-        |(mut stdout, mut stderr, mut exit_code), child_output| {
-          match child_output {
-            ChildOutput::Stdout(bytes) => stdout.extend_from_slice(&bytes),
-            ChildOutput::Stderr(bytes) => stderr.extend_from_slice(&bytes),
-            ChildOutput::Exit(code) => exit_code = code.0,
-          };
-          Ok((stdout, stderr, exit_code)) as Result<_, E>
-        },
-      )
-      .map(|(stdout, stderr, exit_code)| ChildResults {
+  pub fn collect_from(
+    mut stream: BoxStream<Result<ChildOutput, String>>,
+  ) -> futures::future::BoxFuture<Result<ChildResults, String>> {
+    let mut stdout = BytesMut::with_capacity(8192);
+    let mut stderr = BytesMut::with_capacity(8192);
+    let mut exit_code = 1;
+
+    Box::pin(async move {
+      while let Some(child_output_res) = stream.next().await {
+        match child_output_res? {
+          ChildOutput::Stdout(bytes) => stdout.extend_from_slice(&bytes),
+          ChildOutput::Stderr(bytes) => stderr.extend_from_slice(&bytes),
+          ChildOutput::Exit(code) => exit_code = code.0,
+        };
+      }
+      Ok(ChildResults {
         stdout: stdout.into(),
         stderr: stderr.into(),
         exit_code,
       })
+    })
   }
 }
 
 impl super::CommandRunner for CommandRunner {
-  fn extract_compatible_request(
-    &self,
-    req: &MultiPlatformExecuteProcessRequest,
-  ) -> Option<ExecuteProcessRequest> {
+  fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
     for compatible_constraint in vec![
       &(PlatformConstraint::None, PlatformConstraint::None),
-      &(self.platform_constraint, PlatformConstraint::None),
+      &(self.platform.into(), PlatformConstraint::None),
       &(
-        self.platform_constraint,
+        self.platform.into(),
         PlatformConstraint::current_platform_constraint().unwrap(),
       ),
     ]
@@ -238,9 +245,9 @@ impl super::CommandRunner for CommandRunner {
   ///
   fn run(
     &self,
-    req: MultiPlatformExecuteProcessRequest,
+    req: MultiPlatformProcess,
     context: Context,
-  ) -> BoxFuture<FallibleExecuteProcessResult, String> {
+  ) -> BoxFuture<FallibleProcessResultWithPlatform, String> {
     let req = self.extract_compatible_request(&req).unwrap();
     self.run_and_capture_workdir(
       req,
@@ -249,16 +256,17 @@ impl super::CommandRunner for CommandRunner {
       self.executor.clone(),
       self.cleanup_local_dirs,
       &self.work_dir_base,
+      self.platform(),
     )
   }
 }
 impl CapturedWorkdir for CommandRunner {
-  fn run_in_workdir(
-    &self,
-    workdir_path: &Path,
-    req: ExecuteProcessRequest,
+  fn run_in_workdir<'a, 'b, 'c>(
+    &'a self,
+    workdir_path: &'b Path,
+    req: Process,
     _context: Context,
-  ) -> Result<Box<dyn Stream<Item = ChildOutput, Error = String> + Send>, String> {
+  ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String> {
     StreamedHermeticCommand::new(&req.argv[0])
       .args(&req.argv[1..])
       .current_dir(if let Some(working_directory) = req.working_directory {
@@ -268,24 +276,20 @@ impl CapturedWorkdir for CommandRunner {
       })
       .envs(&req.env)
       .stream()
-      .map(|s| {
-        // NB: Converting from `impl Stream` to `Box<dyn Stream>` requires this odd dance.
-        let stream: Box<dyn Stream<Item = _, Error = _> + Send> = Box::new(s);
-        stream
-      })
   }
 }
 
 pub trait CapturedWorkdir {
   fn run_and_capture_workdir(
     &self,
-    req: ExecuteProcessRequest,
+    req: Process,
     context: Context,
     store: Store,
     executor: task_executor::Executor,
     cleanup_local_dirs: bool,
     workdir_base: &Path,
-  ) -> BoxFuture<FallibleExecuteProcessResult, String>
+    platform: Platform,
+  ) -> BoxFuture<FallibleProcessResultWithPlatform, String>
   where
     Self: Send + Sync + Clone + 'static,
   {
@@ -318,18 +322,12 @@ pub trait CapturedWorkdir {
       req.unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule;
 
     store
-      .materialize_directory(
-        workdir_path.clone(),
-        req.input_files,
-        context.workunit_store.clone(),
-      )
+      .materialize_directory(workdir_path.clone(), req.input_files)
       .and_then({
-        let workunit_store = context.workunit_store.clone();
         move |_metadata| {
           store2.materialize_directory(
             workdir_path4,
             unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule,
-            workunit_store,
           )
         }
       })
@@ -370,14 +368,19 @@ pub trait CapturedWorkdir {
       //   https://github.com/pantsbuild/pants/issues/6089
       .map(ChildResults::collect_from)
       .and_then(move |child_results_future| {
-        Timeout::new(child_results_future, req_timeout).map_err(|e| e.to_string())
+        timeout(req_timeout, child_results_future)
+          .boxed()
+          .compat()
+          .map_err(|e| e.to_string())
       })
+      .and_then(|res| res)
       .and_then(move |child_results| {
         let output_snapshot = if output_file_paths.is_empty() && output_dir_paths.is_empty() {
           future::ok(store::Snapshot::empty()).to_boxed()
         } else {
           // Use no ignore patterns, because we are looking for explicitly listed paths.
-          future::done(fs::PosixFS::new(workdir_path2, &[], executor))
+          future::done(fs::GitignoreStyleExcludes::create(&[]))
+            .and_then(|ignorer| future::done(fs::PosixFS::new(workdir_path2, ignorer, executor)))
             .map_err(|err| {
               format!(
                 "Error making posix_fs to fetch local process execution output files: {}",
@@ -397,12 +400,13 @@ pub trait CapturedWorkdir {
         };
 
         output_snapshot
-          .map(move |snapshot| FallibleExecuteProcessResult {
+          .map(move |snapshot| FallibleProcessResultWithPlatform {
             stdout: child_results.stdout,
             stderr: child_results.stderr,
             exit_code: child_results.exit_code,
             output_directory: snapshot.digest,
             execution_attempts: vec![],
+            platform,
           })
           .to_boxed()
       })
@@ -418,10 +422,10 @@ pub trait CapturedWorkdir {
           );
         } // Else, workdir gets dropped here
         match result {
-          Ok(fallible_execute_process_result) => Ok(fallible_execute_process_result),
+          Ok(fallible_process_result) => Ok(fallible_process_result),
           Err(msg) => {
             if msg == "deadline has elapsed" {
-              Ok(FallibleExecuteProcessResult {
+              Ok(FallibleProcessResultWithPlatform {
                 stdout: Bytes::from(format!(
                   "Exceeded timeout of {:?} for local process execution, {}",
                   req_timeout, req_description
@@ -430,6 +434,7 @@ pub trait CapturedWorkdir {
                 exit_code: -libc::SIGTERM,
                 output_directory: hashing::EMPTY_DIGEST,
                 execution_attempts: vec![],
+                platform,
               })
             } else {
               Err(msg)
@@ -440,10 +445,13 @@ pub trait CapturedWorkdir {
       .to_boxed()
   }
 
-  fn run_in_workdir(
-    &self,
-    workdir_path: &Path,
-    req: ExecuteProcessRequest,
+  ///
+  /// TODO: See the note on references in ASYNC.md.
+  ///
+  fn run_in_workdir<'a, 'b, 'c>(
+    &'a self,
+    workdir_path: &'b Path,
+    req: Process,
     context: Context,
-  ) -> Result<Box<dyn Stream<Item = ChildOutput, Error = String> + Send>, String>;
+  ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String>;
 }

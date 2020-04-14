@@ -8,19 +8,19 @@ from dataclasses import dataclass
 from typing import List, Set, Tuple
 
 from pants.backend.python.rules.pex import (
-    CreatePex,
     Pex,
     PexInterpreterConstraints,
+    PexRequest,
     PexRequirements,
 )
-from pants.backend.python.rules.setup_py_util import (
+from pants.backend.python.rules.setuptools import Setuptools
+from pants.backend.python.rules.util import (
     PackageDatum,
     distutils_repr,
     find_packages,
     is_python2,
     source_root_or_raise,
 )
-from pants.backend.python.rules.setuptools import Setuptools
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.base.specs import AddressSpecs, AscendantAddresses, SingleAddress
 from pants.build_graph.address import Address
@@ -41,7 +41,7 @@ from pants.engine.fs import (
     Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
+from pants.engine.isolated_process import Process, ProcessResult
 from pants.engine.legacy.graph import (
     HydratedTarget,
     HydratedTargets,
@@ -50,12 +50,15 @@ from pants.engine.legacy.graph import (
 )
 from pants.engine.legacy.structs import PythonBinaryAdaptor, PythonTargetAdaptor, ResourcesAdaptor
 from pants.engine.objects import Collection
-from pants.engine.rules import goal_rule, rule, subsystem_rule
+from pants.engine.rules import goal_rule, named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.option.custom_types import shell_str
 from pants.python.python_setup import PythonSetup
 from pants.rules.core.distdir import DistDir
-from pants.rules.core.strip_source_roots import SourceRootStrippedSources, StripTargetRequest
+from pants.rules.core.strip_source_roots import (
+    LegacySourceRootStrippedSources,
+    LegacyStripTargetRequest,
+)
 from pants.source.source_root import SourceRootConfig
 
 logger = logging.getLogger(__name__)
@@ -373,7 +376,7 @@ async def run_setup_py(
         output_directories=(dist_dir,),
         description=f"Run setuptools for {req.exported_target.hydrated_target.adaptor.address.reference()}",
     )
-    result = await Get[ExecuteProcessResult](ExecuteProcessRequest, request)
+    result = await Get[ProcessResult](Process, request)
     output_digest = await Get[Digest](
         DirectoryWithPrefixToStrip(result.output_directory_digest, dist_dir)
     )
@@ -448,7 +451,8 @@ async def get_sources(
 ) -> SetupPySources:
     targets = request.hydrated_targets
     stripped_srcs_list = await MultiGet(
-        Get[SourceRootStrippedSources](StripTargetRequest(target.adaptor)) for target in targets
+        Get[LegacySourceRootStrippedSources](LegacyStripTargetRequest(target.adaptor))
+        for target in targets
     )
 
     # Create a chroot with all the sources, and any ancestor __init__.py files that might be needed
@@ -531,7 +535,7 @@ def _is_exported(target: HydratedTarget) -> bool:
     return getattr(target.adaptor, "provides", None) is not None
 
 
-@rule(name="Compute distribution's 3rd party requirements")
+@named_rule(desc="Compute distribution's 3rd party requirements")
 async def get_requirements(dep_owner: DependencyOwner) -> ExportedTargetRequirements:
     tht = await Get[TransitiveHydratedTargets](
         Addresses([dep_owner.exported_target.hydrated_target.adaptor.address])
@@ -577,7 +581,7 @@ async def get_requirements(dep_owner: DependencyOwner) -> ExportedTargetRequirem
     return ExportedTargetRequirements(tuple(req_strs))
 
 
-@rule(name="Find all code to be published in the distribution")
+@named_rule(desc="Find all code to be published in the distribution")
 async def get_owned_dependencies(dependency_owner: DependencyOwner) -> OwnedDependencies:
     """Find the dependencies of dependency_owner that are owned by it.
 
@@ -600,7 +604,7 @@ async def get_owned_dependencies(dependency_owner: DependencyOwner) -> OwnedDepe
     return OwnedDependencies(OwnedDependency(t) for t in owned_dependencies)
 
 
-@rule(name="Get exporting owner for target")
+@named_rule(desc="Get exporting owner for target")
 async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarget:
     """Find the exported target that owns the given target (and therefore exports it).
 
@@ -651,12 +655,12 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
     )
 
 
-@rule(name="Set up setuptools")
+@named_rule(desc="Set up setuptools")
 async def setup_setuptools(setuptools: Setuptools) -> SetuptoolsSetup:
     # Note that this pex has no entrypoint. We use it to run our generated setup.py, which
     # in turn imports from and invokes setuptools.
     requirements_pex = await Get[Pex](
-        CreatePex(
+        PexRequest(
             output_filename="setuptools.pex",
             requirements=PexRequirements(setuptools.get_requirement_specs()),
             interpreter_constraints=PexInterpreterConstraints(

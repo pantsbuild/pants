@@ -20,7 +20,7 @@ class AntlrPyGenTest(NailgunTaskTestBase):
         return (
             super()
             .alias_groups()
-            .merge(BuildFileAliases(targets={"python_antlr_library": PythonAntlrLibrary,},))
+            .merge(BuildFileAliases(targets={"python_antlr_library": PythonAntlrLibrary}))
         )
 
     def test_antlr_py_gen(self):

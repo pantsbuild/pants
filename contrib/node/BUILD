@@ -3,7 +3,7 @@
 
 page(
   name='node_readme',
-  source='README.md',
+  sources=['README.md'],
 )
 
 files(

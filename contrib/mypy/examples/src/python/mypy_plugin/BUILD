@@ -17,26 +17,24 @@ python_requirement_library(
 
 python_library(
   name='settings',
-  source='settings.py',
+  sources=['settings.py'],
   dependencies=[
     ':django-stubs',
   ],
-  tags = {'partially_type_checked'},
 )
 
 python_library(
   name='valid',
-  source='valid.py',
+  sources=['valid.py'],
   dependencies=[
     ':django',
     ':settings',
   ],
-  tags = {'partially_type_checked'},
 )
 
 python_library(
   name='invalid',
-  source='invalid.py',
+  sources=['invalid.py'],
   dependencies=[
     ':django',
     ':settings',

@@ -6,7 +6,7 @@ import os
 from pants.backend.graph_info.subsystems.cloc_binary import ClocBinary
 from pants.base.workunit import WorkUnitLabel
 from pants.engine.fs import FilesContent, PathGlobs, PathGlobsAndRoot
-from pants.engine.isolated_process import ExecuteProcessRequest
+from pants.engine.isolated_process import Process
 from pants.task.console_task import ConsoleTask
 from pants.util.contextutil import temporary_dir
 
@@ -78,7 +78,7 @@ class CountLinesOfCode(ConsoleTask):
         )
 
         # The cloc script reaches into $PATH to look up perl. Let's assume it's in /usr/bin.
-        req = ExecuteProcessRequest(
+        req = Process(
             argv=cmd,
             input_files=directory_digest,
             output_files=("ignored", "report"),

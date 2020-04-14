@@ -2,22 +2,24 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+from typing import cast
 
 from pants.fs.fs import safe_filename_from_path
 from pants.goal.goal import Goal
 from pants.init.options_initializer import BuildConfigInitializer
+from pants.option.option_value_container import OptionValueContainer
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import absolute_symlink, safe_mkdir, safe_rmtree
 
 
-def init_workdir(global_options):
+def init_workdir(global_options: OptionValueContainer) -> str:
     """Given the bootstrap options (generally immediately after bootstrap), initialize the workdir.
 
     If it is in use, the "physical" workdir is a directory under the `pants_physical_workdir_base`
     that is unique to each working copy (via including the entire path to the working copy in its
     name using `safe_filename_from_path`).
     """
-    workdir_src = global_options.pants_workdir
+    workdir_src = cast(str, global_options.pants_workdir)
     if not global_options.pants_physical_workdir_base:
         safe_mkdir(workdir_src)
         return workdir_src
@@ -44,8 +46,10 @@ def init_workdir(global_options):
             # Exists and is correct: ensure that the destination exists.
             safe_mkdir(workdir_dst)
     else:
+        # Remove existing physical workdir (.pants.d dir)
         safe_rmtree(workdir_src)
-        absolute_symlink(workdir_dst, workdir_src)
+        # Create both symlink workdir (.pants.d dir) and its destination/physical workdir
+        create_symlink_to_clean_workdir()
     return workdir_src
 
 

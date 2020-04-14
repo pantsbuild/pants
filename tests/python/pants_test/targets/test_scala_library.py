@@ -21,7 +21,7 @@ class ScalaLibraryTest(TestBase):
                 "java_library": JavaLibrary,
                 "jar_library": JarLibrary,
             },
-            objects={"jar": JarDependency, "scala_jar": ScalaJarDependency,},
+            objects={"jar": JarDependency, "scala_jar": ScalaJarDependency},
         )
 
     def setUp(self):

@@ -10,28 +10,24 @@ from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.lint.python_formatter import PythonFormatter
 from pants.backend.python.rules import download_pex_bin, pex
 from pants.backend.python.rules.pex import (
-    CreatePex,
     Pex,
     PexInterpreterConstraints,
+    PexRequest,
     PexRequirements,
 )
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
-from pants.engine.isolated_process import (
-    ExecuteProcessRequest,
-    ExecuteProcessResult,
-    FallibleExecuteProcessResult,
-)
-from pants.engine.rules import UnionRule, rule, subsystem_rule
+from pants.engine.isolated_process import FallibleProcessResult, Process, ProcessResult
+from pants.engine.rules import UnionRule, named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
 from pants.rules.core import determine_source_files, strip_source_roots
 from pants.rules.core.determine_source_files import (
-    AllSourceFilesRequest,
+    LegacyAllSourceFilesRequest,
+    LegacySpecifiedSourceFilesRequest,
     SourceFiles,
-    SpecifiedSourceFilesRequest,
 )
 from pants.rules.core.fmt import FmtResult
 from pants.rules.core.lint import Linter, LintResult
@@ -50,7 +46,7 @@ class SetupRequest:
 
 @dataclass(frozen=True)
 class Setup:
-    process_request: ExecuteProcessRequest
+    process: Process
 
 
 def generate_args(
@@ -83,7 +79,7 @@ async def setup(
     adaptors_with_origins = request.formatter.adaptors_with_origins
 
     requirements_pex = await Get[Pex](
-        CreatePex(
+        PexRequest(
             output_filename="black.pex",
             requirements=PexRequirements(black.get_requirement_specs()),
             interpreter_constraints=PexInterpreterConstraints(
@@ -104,7 +100,7 @@ async def setup(
 
     if request.formatter.prior_formatter_result is None:
         all_source_files = await Get[SourceFiles](
-            AllSourceFilesRequest(
+            LegacyAllSourceFilesRequest(
                 adaptor_with_origin.adaptor for adaptor_with_origin in adaptors_with_origins
             )
         )
@@ -113,7 +109,7 @@ async def setup(
         all_source_files_snapshot = request.formatter.prior_formatter_result
 
     specified_source_files = await Get[SourceFiles](
-        SpecifiedSourceFilesRequest(adaptors_with_origins)
+        LegacySpecifiedSourceFilesRequest(adaptors_with_origins)
     )
 
     merged_input_files = await Get[Digest](
@@ -133,7 +129,7 @@ async def setup(
         )
     )
 
-    process_request = requirements_pex.create_execute_request(
+    process = requirements_pex.create_execute_request(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path="./black.pex",
@@ -146,32 +142,32 @@ async def setup(
         output_files=all_source_files_snapshot.files,
         description=f"Run black for {address_references}",
     )
-    return Setup(process_request)
+    return Setup(process)
 
 
-@rule(name="Format using Black")
-async def fmt(formatter: BlackFormatter, black: Black) -> FmtResult:
+@named_rule(desc="Format using Black")
+async def black_fmt(formatter: BlackFormatter, black: Black) -> FmtResult:
     if black.options.skip:
         return FmtResult.noop()
     setup = await Get[Setup](SetupRequest(formatter, check_only=False))
-    result = await Get[ExecuteProcessResult](ExecuteProcessRequest, setup.process_request)
-    return FmtResult.from_execute_process_result(result)
+    result = await Get[ProcessResult](Process, setup.process)
+    return FmtResult.from_process_result(result)
 
 
-@rule(name="Lint using Black")
-async def lint(formatter: BlackFormatter, black: Black) -> LintResult:
+@named_rule(desc="Lint using Black")
+async def black_lint(formatter: BlackFormatter, black: Black) -> LintResult:
     if black.options.skip:
         return LintResult.noop()
     setup = await Get[Setup](SetupRequest(formatter, check_only=True))
-    result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, setup.process_request)
-    return LintResult.from_fallible_execute_process_result(result)
+    result = await Get[FallibleProcessResult](Process, setup.process)
+    return LintResult.from_fallible_process_result(result)
 
 
 def rules():
     return [
         setup,
-        fmt,
-        lint,
+        black_fmt,
+        black_lint,
         subsystem_rule(Black),
         UnionRule(PythonFormatter, BlackFormatter),
         UnionRule(Linter, BlackFormatter),

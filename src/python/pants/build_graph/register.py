@@ -1,6 +1,11 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+"""Core BUILD file symbols for Pants to operate correctly.
+
+These are always activated and cannot be disabled.
+"""
+
 import os
 
 from pants.base.build_environment import get_buildroot, pants_version
@@ -17,8 +22,6 @@ from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.build_graph.target_scopes import ScopedDependencyFactory
 from pants.util.netrc import Netrc
-
-"""Register the elementary BUILD file constructs."""
 
 
 class BuildFilePath:
@@ -42,7 +45,7 @@ def build_file_aliases():
             "remote_sources": RemoteSources,
             "target": Target,
         },
-        objects={"get_buildroot": get_buildroot, "netrc": Netrc, "pants_version": pants_version,},
+        objects={"get_buildroot": get_buildroot, "netrc": Netrc, "pants_version": pants_version},
         context_aware_object_factories={
             "buildfile_path": BuildFilePath,
             "intransitive": IntransitiveDependencyFactory,

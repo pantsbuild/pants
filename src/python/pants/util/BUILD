@@ -4,6 +4,8 @@
 python_tests(
   name='tests',
   dependencies=[
+    '3rdparty/python:dataclasses',
+    ':frozendict',
     ':ordered_set',
   ],
   tags = {'type_checked'},
@@ -79,6 +81,18 @@ python_library(
 )
 
 python_library(
+  name = 'frozendict',
+  sources = ['frozendict.py'],
+  tags = {'type_checked'},
+)
+
+python_library(
+  name = 'logging',
+  sources = ['logging.py'],
+  tags = {'type_checked'},
+)
+
+python_library(
   name = 'memo',
   sources = ['memo.py'],
   dependencies = [
@@ -140,7 +154,7 @@ python_library(
 
 python_binary(
   name = 's3_log_aggregator',
-  source = 's3_log_aggregator.py',
+  sources = ['s3_log_aggregator.py'],
   entry_point = 'pants.util.s3_log_aggregator',
   dependencies = [
     '3rdparty/python:s3logparse'

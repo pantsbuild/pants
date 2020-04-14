@@ -8,12 +8,13 @@ use testutil::{
   data::{TestData, TestDirectory},
   file,
 };
+use tokio::runtime::Handle;
 
-#[test]
-fn missing_digest() {
+#[tokio::test]
+async fn missing_digest() {
   let (store_dir, mount_dir) = make_dirs();
 
-  let runtime = task_executor::Executor::new();
+  let runtime = task_executor::Executor::new(Handle::current());
 
   let store =
     Store::local_only(runtime.clone(), store_dir.path()).expect("Error creating local store");
@@ -26,18 +27,19 @@ fn missing_digest() {
     .exists());
 }
 
-#[test]
-fn read_file_by_digest() {
+#[tokio::test]
+async fn read_file_by_digest() {
   let (store_dir, mount_dir) = make_dirs();
-  let runtime = task_executor::Executor::new();
+  let runtime = task_executor::Executor::new(Handle::current());
 
   let store =
     Store::local_only(runtime.clone(), store_dir.path()).expect("Error creating local store");
 
   let test_bytes = TestData::roland();
 
-  runtime
-    .block_on(store.store_file_bytes(test_bytes.bytes(), false))
+  store
+    .store_file_bytes(test_bytes.bytes(), false)
+    .await
     .expect("Storing bytes");
 
   let _fs = mount(mount_dir.path(), store, runtime).expect("Mounting");
@@ -49,10 +51,10 @@ fn read_file_by_digest() {
   assert!(file::is_executable(&file_path));
 }
 
-#[test]
-fn list_directory() {
+#[tokio::test]
+async fn list_directory() {
   let (store_dir, mount_dir) = make_dirs();
-  let runtime = task_executor::Executor::new();
+  let runtime = task_executor::Executor::new(Handle::current());
 
   let store =
     Store::local_only(runtime.clone(), store_dir.path()).expect("Error creating local store");
@@ -60,11 +62,13 @@ fn list_directory() {
   let test_bytes = TestData::roland();
   let test_directory = TestDirectory::containing_roland();
 
-  runtime
-    .block_on(store.store_file_bytes(test_bytes.bytes(), false))
+  store
+    .store_file_bytes(test_bytes.bytes(), false)
+    .await
     .expect("Storing bytes");
-  runtime
-    .block_on(store.record_directory(&test_directory.directory(), false))
+  store
+    .record_directory(&test_directory.directory(), false)
+    .await
     .expect("Storing directory");
 
   let _fs = mount(mount_dir.path(), store, runtime).expect("Mounting");
@@ -75,10 +79,10 @@ fn list_directory() {
   assert_eq!(vec!["roland"], file::list_dir(&virtual_dir));
 }
 
-#[test]
-fn read_file_from_directory() {
+#[tokio::test]
+async fn read_file_from_directory() {
   let (store_dir, mount_dir) = make_dirs();
-  let runtime = task_executor::Executor::new();
+  let runtime = task_executor::Executor::new(Handle::current());
 
   let store =
     Store::local_only(runtime.clone(), store_dir.path()).expect("Error creating local store");
@@ -86,11 +90,13 @@ fn read_file_from_directory() {
   let test_bytes = TestData::roland();
   let test_directory = TestDirectory::containing_roland();
 
-  runtime
-    .block_on(store.store_file_bytes(test_bytes.bytes(), false))
+  store
+    .store_file_bytes(test_bytes.bytes(), false)
+    .await
     .expect("Storing bytes");
-  runtime
-    .block_on(store.record_directory(&test_directory.directory(), false))
+  store
+    .record_directory(&test_directory.directory(), false)
+    .await
     .expect("Storing directory");
 
   let _fs = mount(mount_dir.path(), store, runtime).expect("Mounting");
@@ -103,10 +109,10 @@ fn read_file_from_directory() {
   assert!(!file::is_executable(&roland));
 }
 
-#[test]
-fn list_recursive_directory() {
+#[tokio::test]
+async fn list_recursive_directory() {
   let (store_dir, mount_dir) = make_dirs();
-  let runtime = task_executor::Executor::new();
+  let runtime = task_executor::Executor::new(Handle::current());
 
   let store =
     Store::local_only(runtime.clone(), store_dir.path()).expect("Error creating local store");
@@ -116,17 +122,21 @@ fn list_recursive_directory() {
   let test_directory = TestDirectory::containing_roland();
   let recursive_directory = TestDirectory::recursive();
 
-  runtime
-    .block_on(store.store_file_bytes(test_bytes.bytes(), false))
+  store
+    .store_file_bytes(test_bytes.bytes(), false)
+    .await
     .expect("Storing bytes");
-  runtime
-    .block_on(store.store_file_bytes(treat_bytes.bytes(), false))
+  store
+    .store_file_bytes(treat_bytes.bytes(), false)
+    .await
     .expect("Storing bytes");
-  runtime
-    .block_on(store.record_directory(&test_directory.directory(), false))
+  store
+    .record_directory(&test_directory.directory(), false)
+    .await
     .expect("Storing directory");
-  runtime
-    .block_on(store.record_directory(&recursive_directory.directory(), false))
+  store
+    .record_directory(&recursive_directory.directory(), false)
+    .await
     .expect("Storing directory");
 
   let _fs = mount(mount_dir.path(), store, runtime).expect("Mounting");
@@ -138,10 +148,10 @@ fn list_recursive_directory() {
   assert_eq!(vec!["roland"], file::list_dir(&virtual_dir.join("cats")));
 }
 
-#[test]
-fn read_file_from_recursive_directory() {
+#[tokio::test]
+async fn read_file_from_recursive_directory() {
   let (store_dir, mount_dir) = make_dirs();
-  let runtime = task_executor::Executor::new();
+  let runtime = task_executor::Executor::new(Handle::current());
 
   let store =
     Store::local_only(runtime.clone(), store_dir.path()).expect("Error creating local store");
@@ -151,17 +161,21 @@ fn read_file_from_recursive_directory() {
   let test_directory = TestDirectory::containing_roland();
   let recursive_directory = TestDirectory::recursive();
 
-  runtime
-    .block_on(store.store_file_bytes(test_bytes.bytes(), false))
+  store
+    .store_file_bytes(test_bytes.bytes(), false)
+    .await
     .expect("Storing bytes");
-  runtime
-    .block_on(store.store_file_bytes(treat_bytes.bytes(), false))
+  store
+    .store_file_bytes(treat_bytes.bytes(), false)
+    .await
     .expect("Storing bytes");
-  runtime
-    .block_on(store.record_directory(&test_directory.directory(), false))
+  store
+    .record_directory(&test_directory.directory(), false)
+    .await
     .expect("Storing directory");
-  runtime
-    .block_on(store.record_directory(&recursive_directory.directory(), false))
+  store
+    .record_directory(&recursive_directory.directory(), false)
+    .await
     .expect("Storing directory");
 
   let _fs = mount(mount_dir.path(), store, runtime).expect("Mounting");
@@ -178,10 +192,10 @@ fn read_file_from_recursive_directory() {
   assert!(!file::is_executable(&roland));
 }
 
-#[test]
-fn files_are_correctly_executable() {
+#[tokio::test]
+async fn files_are_correctly_executable() {
   let (store_dir, mount_dir) = make_dirs();
-  let runtime = task_executor::Executor::new();
+  let runtime = task_executor::Executor::new(Handle::current());
 
   let store =
     Store::local_only(runtime.clone(), store_dir.path()).expect("Error creating local store");
@@ -189,11 +203,13 @@ fn files_are_correctly_executable() {
   let treat_bytes = TestData::catnip();
   let directory = TestDirectory::with_mixed_executable_files();
 
-  runtime
-    .block_on(store.store_file_bytes(treat_bytes.bytes(), false))
+  store
+    .store_file_bytes(treat_bytes.bytes(), false)
+    .await
     .expect("Storing bytes");
-  runtime
-    .block_on(store.record_directory(&directory.directory(), false))
+  store
+    .record_directory(&directory.directory(), false)
+    .await
     .expect("Storing directory");
 
   let _fs = mount(mount_dir.path(), store, runtime).expect("Mounting");

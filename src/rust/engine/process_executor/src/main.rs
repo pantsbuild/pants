@@ -31,8 +31,9 @@ use env_logger;
 use process_execution;
 
 use clap::{value_t, App, AppSettings, Arg};
+use futures::compat::Future01CompatExt;
 use hashing::{Digest, Fingerprint};
-use process_execution::{Context, ExecuteProcessRequestMetadata, PlatformConstraint, RelativePath};
+use process_execution::{Context, Platform, PlatformConstraint, ProcessMetadata, RelativePath};
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryFrom;
 use std::iter::{FromIterator, Iterator};
@@ -40,8 +41,7 @@ use std::path::PathBuf;
 use std::process::exit;
 use std::time::Duration;
 use store::{BackoffConfig, Store};
-use tokio::runtime::Runtime;
-use workunit_store::WorkUnitStore;
+use tokio::runtime::Handle;
 
 /// A binary which takes args of format:
 ///  process_executor --env=FOO=bar --env=SOME=value --input-digest=abc123 --input-digest-length=80
@@ -50,7 +50,8 @@ use workunit_store::WorkUnitStore;
 /// It outputs its output/err to stdout/err, and exits with its exit code.
 ///
 /// It does not perform $PATH lookup or shell expansion.
-fn main() {
+#[tokio::main]
+async fn main() {
   env_logger::init();
 
   let args = App::new("process_executor")
@@ -268,7 +269,7 @@ fn main() {
     .map(collection_from_keyvalues::<_, BTreeMap<_, _>>)
     .unwrap_or_default();
 
-  let executor = task_executor::Executor::new();
+  let executor = task_executor::Executor::new(Handle::current());
 
   let store = match (server_arg, args.value_of("cas-server")) {
     (Some(_server), Some(cas_server)) => {
@@ -325,7 +326,7 @@ fn main() {
     .map(|path| RelativePath::new(path).expect("working-directory must be a relative path"));
   let is_nailgunnable: bool = args.value_of("use-nailgun").unwrap().parse().unwrap();
 
-  let request = process_execution::ExecuteProcessRequest {
+  let request = process_execution::Process {
     argv,
     env,
     working_directory,
@@ -362,7 +363,7 @@ fn main() {
       Box::new(
         process_execution::remote::CommandRunner::new(
           address,
-          ExecuteProcessRequestMetadata {
+          ProcessMetadata {
             instance_name: remote_instance_arg,
             cache_key_gen_version: args.value_of("cache-key-gen-version").map(str::to_owned),
             platform_properties,
@@ -371,7 +372,7 @@ fn main() {
           oauth_bearer_token,
           headers,
           store.clone(),
-          PlatformConstraint::Linux,
+          Platform::Linux,
           executor,
           std::time::Duration::from_secs(300),
           std::time::Duration::from_millis(500),
@@ -388,15 +389,17 @@ fn main() {
     )) as Box<dyn process_execution::CommandRunner>,
   };
 
-  let mut runtime = Runtime::new().unwrap();
-
-  let result = runtime
-    .block_on(runner.run(request.into(), Context::default()))
+  let result = runner
+    .run(request.into(), Context::default())
+    .compat()
+    .await
     .expect("Error executing");
 
   if let Some(output) = args.value_of("materialize-output-to").map(PathBuf::from) {
-    runtime
-      .block_on(store.materialize_directory(output, result.output_directory, WorkUnitStore::new()))
+    store
+      .materialize_directory(output, result.output_directory)
+      .compat()
+      .await
       .unwrap();
   }
 

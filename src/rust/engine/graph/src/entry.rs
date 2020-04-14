@@ -18,10 +18,10 @@ use boxfuture::{BoxFuture, Boxable};
 /// the Node was `cleared`), the work is discarded. See `Entry::complete` for more information.
 ///
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) struct RunToken(u32);
+pub struct RunToken(u32);
 
 impl RunToken {
-  fn initial() -> RunToken {
+  pub fn initial() -> RunToken {
     RunToken(0)
   }
 
@@ -40,10 +40,10 @@ impl RunToken {
 /// incremented when the output of a node has changed.
 ///
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) struct Generation(u32);
+pub struct Generation(u32);
 
 impl Generation {
-  fn initial() -> Generation {
+  pub fn initial() -> Generation {
     Generation(0)
   }
 
@@ -65,7 +65,7 @@ impl Generation {
 /// If the value is Clean, the consumer can simply use the value as-is.
 ///
 #[derive(Clone, Debug)]
-pub(crate) enum EntryResult<N: Node> {
+pub enum EntryResult<N: Node> {
   Clean(Result<N::Item, N::Error>),
   Dirty(Result<N::Item, N::Error>),
   Uncacheable(
@@ -118,7 +118,7 @@ impl<N: Node> AsRef<Result<N::Item, N::Error>> for EntryResult<N> {
 
 #[allow(clippy::type_complexity)]
 #[derive(Debug)]
-pub(crate) enum EntryState<N: Node> {
+pub enum EntryState<N: Node> {
   // A node that has either been explicitly cleared, or has not yet started Running. In this state
   // there is no need for a dirty bit because the RunToken is either in its initial state, or has
   // been explicitly incremented when the node was cleared.
@@ -174,7 +174,7 @@ pub struct Entry<N: Node> {
   // maps is painful.
   node: N,
 
-  state: Arc<Mutex<EntryState<N>>>,
+  pub state: Arc<Mutex<EntryState<N>>>,
 }
 
 impl<N: Node> Entry<N> {
@@ -370,7 +370,7 @@ impl<N: Node> Entry<N> {
             entry_id,
             run_token,
             generation,
-            if self.node.cacheable(context) {
+            if self.node.cacheable() {
               Some(dep_generations)
             } else {
               None
@@ -473,7 +473,7 @@ impl<N: Node> Entry<N> {
         } else {
           // If the new result does not match the previous result, the generation increments.
           let (generation, next_result) = if let Some(result) = result {
-            let next_result = if !self.node.cacheable(context) {
+            let next_result = if !self.node.cacheable() {
               EntryResult::Uncacheable(result, context.session_id().clone())
             } else if has_dirty_dependencies {
               EntryResult::Dirty(result)

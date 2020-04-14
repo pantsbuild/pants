@@ -298,26 +298,28 @@ class Distribution:
 
 
 class _DistributionEnvironment(ABC):
-    class Location(namedtuple("Location", ["home_path", "bin_path"])):
+    class Location(namedtuple("Location", ["home_path", "bin_path", "via"])):
         """Represents the location of a java distribution."""
 
         @classmethod
-        def from_home(cls, home):
+        def from_home(cls, home, via=None):
             """Creates a location given the JAVA_HOME directory.
 
             :param string home: The path of the JAVA_HOME directory.
+            :param string via: An optional tag that specifies where the location was derived from.
             :returns: The java distribution location.
             """
-            return cls(home_path=home, bin_path=None)
+            return cls(home_path=home, bin_path=None, via=via)
 
         @classmethod
-        def from_bin(cls, bin_path):
+        def from_bin(cls, bin_path, via=None):
             """Creates a location given the `java` executable parent directory.
 
             :param string bin_path: The parent path of the `java` executable.
+            :param string via: An optional tag that specifies where the location was derived from.
             :returns: The java distribution location.
             """
-            return cls(home_path=None, bin_path=bin_path)
+            return cls(home_path=None, bin_path=bin_path, via=via)
 
     @property
     @abstractmethod
@@ -334,7 +336,7 @@ class _EnvVarEnvironment(_DistributionEnvironment):
     def jvm_locations(self):
         def env_home(home_env_var):
             home = os.environ.get(home_env_var)
-            return self.Location.from_home(home) if home else None
+            return self.Location.from_home(home, via=home_env_var) if home else None
 
         jdk_home = env_home("JDK_HOME")
         if jdk_home:
@@ -347,7 +349,7 @@ class _EnvVarEnvironment(_DistributionEnvironment):
         search_path = os.environ.get("PATH")
         if search_path:
             for bin_path in search_path.strip().split(os.pathsep):
-                yield self.Location.from_bin(bin_path)
+                yield self.Location.from_bin(bin_path, via="PATH")
 
 
 class _OSXEnvironment(_DistributionEnvironment):
@@ -387,7 +389,7 @@ class _OSXEnvironment(_DistributionEnvironment):
                 plist = subprocess.check_output([self._osx_java_home_exe, "--failfast", "--xml"])
                 for distribution in plistlib.loads(plist):
                     home = distribution["JVMHomePath"]
-                    yield self.Location.from_home(home)
+                    yield self.Location.from_home(home, via="OSX's java_home")
             except subprocess.CalledProcessError:
                 pass
 
@@ -402,18 +404,20 @@ class _LinuxEnvironment(_DistributionEnvironment):
         return cls(*cls._STANDARD_JAVA_DIST_DIRS)
 
     def __init__(self, *java_dist_dirs):
+        # java_dist_dirs are dirs containing subdirs that are java distribution's home directories.
         if len(java_dist_dirs) == 0:
             raise ValueError("Expected at least 1 java dist dir.")
         self._java_dist_dirs = java_dist_dirs
 
     @property
     def jvm_locations(self):
+        # NB returns all subdirs of each java_dist_dir
         for java_dist_dir in self._java_dist_dirs:
             if os.path.isdir(java_dist_dir):
                 for path in os.listdir(java_dist_dir):
                     home = os.path.join(java_dist_dir, path)
                     if os.path.isdir(home):
-                        yield self.Location.from_home(home)
+                        yield self.Location.from_home(home, via=java_dist_dir)
 
 
 class _ExplicitEnvironment(_DistributionEnvironment):
@@ -423,7 +427,7 @@ class _ExplicitEnvironment(_DistributionEnvironment):
     @property
     def jvm_locations(self):
         for home in self._homes:
-            yield self.Location.from_home(home)
+            yield self.Location.from_home(home, via="Explicit Env")
 
 
 class _UnknownEnvironment(_DistributionEnvironment):
@@ -457,8 +461,8 @@ class _Locator(object):
         :return: the Distribution, or None if no matching distribution is in the cache.
         :rtype: :class:`pants.java.distribution.Distribution`
         """
-
-        for dist in self._cache.values():
+        # NB Sort the cache values, ensuring a deterministic traversal, lowest versions first.
+        for dist in sorted(self._cache.values(), key=lambda d: d.version):
             if minimum_version and dist.version < minimum_version:
                 continue
             if maximum_version and dist.version > maximum_version:

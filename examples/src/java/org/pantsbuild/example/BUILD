@@ -22,7 +22,7 @@ target(
 
 page(
   name='readme',
-  source='README.md',
+  sources=['README.md'],
   links=[
     ':3rdparty_jvm',
     ':from_maven',
@@ -38,7 +38,7 @@ page(
 
 page(
   name='from_maven',
-  source='from_maven.md',
+  sources=['from_maven.md'],
   links=[
     ':3rdparty_jvm',
     ':readme',
@@ -47,7 +47,7 @@ page(
 
 page(
   name='publish',
-  source='publish.md',
+  sources=['publish.md'],
   links=[
     'src/docs:dev_tasks_publish_extras',
     'src/docs:howto_plugin',
@@ -56,7 +56,7 @@ page(
 
 page(
   name='3rdparty_jvm',
-  source='3rdparty_jvm.md',
+  sources=['3rdparty_jvm.md'],
   links=[
     'src/docs:3rdparty',
   ],
@@ -64,7 +64,7 @@ page(
 
 page(
   name='page',
-  source='page.md',
+  sources=['page.md'],
   dependencies=[
     'src/docs:howto_contribute'
   ]

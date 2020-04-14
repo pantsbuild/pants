@@ -7,6 +7,7 @@ from textwrap import dedent
 from pants.backend.python.register import build_file_aliases as register_python
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.build_graph.address import Address
+from pants.build_graph.resources import Resources
 from pants.testutil.subsystem.util import init_subsystem
 from pants.testutil.task_test_base import TaskTestBase
 
@@ -19,9 +20,11 @@ class PythonTaskTestBase(TaskTestBase):
     @classmethod
     def alias_groups(cls):
         """
-    :API: public
-    """
-        return register_python()
+        :API: public
+        """
+        aliases = register_python()
+        aliases.target_types["resources"] = Resources
+        return aliases
 
     def setUp(self):
         super().setUp()
@@ -34,11 +37,11 @@ class PythonTaskTestBase(TaskTestBase):
         :API: public
         """
         sources = (
-            None
+            []
             if source_contents_map is None
             else ["__init__.py"] + list(source_contents_map.keys())
         )
-        sources_strs = [f"'{s}'" for s in sources] if sources else None
+        sources_strs = [f"'{s}'" for s in sources]
         self.add_to_build_file(
             relpath=relpath,
             target=dedent(
@@ -54,7 +57,7 @@ class PythonTaskTestBase(TaskTestBase):
                 """
             ).format(
                 name=name,
-                sources_clause=f"sources=[{','.join(sources_strs)}]," if sources_strs else "",
+                sources_clause=f"sources=[{','.join(sources_strs)}],",
                 dependencies=",".join(map(repr, dependencies)),
                 provides_clause=f"provides={provides}," if provides else "",
             ),

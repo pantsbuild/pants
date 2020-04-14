@@ -20,6 +20,7 @@ from pants.engine.rules import (
     RuleIndex,
     UnrecognizedRuleArgument,
     goal_rule,
+    named_rule,
     rule,
 )
 from pants.engine.selectors import Get
@@ -282,34 +283,58 @@ class RuleIndexTest(TestBase):
 
 
 class RuleArgumentAnnotationTest(unittest.TestCase):
-    def test_name_kwarg(self):
-        @rule(name="A named rule")
-        def named_rule(a: int, b: str) -> bool:
+    def test_annoations_kwargs(self):
+        @named_rule
+        def a_named_rule(a: int, b: str) -> bool:
             return False
 
-        self.assertIsNotNone(named_rule.rule)
-        self.assertEqual(named_rule.rule.name, "A named rule")
+        self.assertIsNotNone(a_named_rule.rule)
+        annotations = a_named_rule.rule.annotations
+        self.assertEqual(annotations.canonical_name, "a_named_rule")
+        self.assertEqual(annotations.desc, None)
 
-    def test_bogus_rule(self):
+        @named_rule(canonical_name="something_different", desc="Human readable desc")
+        def another_named_rule(a: int, b: str) -> bool:
+            return False
+
+        self.assertIsNotNone(a_named_rule.rule)
+        annotations = another_named_rule.rule.annotations
+        self.assertEqual(annotations.canonical_name, "something_different")
+        self.assertEqual(annotations.desc, "Human readable desc")
+
+    def test_bogus_rules(self):
         with self.assertRaises(UnrecognizedRuleArgument):
 
-            @rule(bogus_kwarg="TOTALLY BOGUS!!!!!!")
-            def named_rule(a: int, b: str) -> bool:
+            @named_rule(bogus_kwarg="TOTALLY BOGUS!!!!!!")
+            def a_named_rule(a: int, b: str) -> bool:
                 return False
+
+        with self.assertRaises(UnrecognizedRuleArgument) as e:
+
+            @rule(desc="Some description")
+            def a_named_rule_2(a: int, b: str) -> bool:
+                return False
+
+        assert (
+            e.exception.args[0]
+            == "@rules that are not @named_rules or @goal_rules do not accept keyword arguments"
+        )
 
     def test_goal_rule_automatically_gets_name_from_goal(self):
         @goal_rule
         def some_goal_rule() -> Example:
             return Example(exit_code=0)
 
-        self.assertEqual(some_goal_rule.rule.name, "example")
+        name = some_goal_rule.rule.annotations.canonical_name
+        self.assertEqual(name, "example")
 
     def test_can_override_goal_rule_name(self):
-        @goal_rule(name="example but **COOLER**")
+        @goal_rule(canonical_name="some_other_name")
         def some_goal_rule() -> Example:
             return Example(exit_code=0)
 
-        self.assertEqual(some_goal_rule.rule.name, "example but **COOLER**")
+        name = some_goal_rule.rule.annotations.canonical_name
+        self.assertEqual(name, "some_other_name")
 
 
 class GraphVertexTypeAnnotationTest(unittest.TestCase):
@@ -798,7 +823,6 @@ class RuleGraphTest(TestBase):
                 {fmt_non_param_edge(b_from_suba, C, return_func=RuleFormatRequest(suba_from_c))}
                 {fmt_param_edge(C, C, RuleFormatRequest(suba_from_c))}
                 {fmt_param_edge(SubA, SubA, via_func=RuleFormatRequest(a, gets=[("B", "C")]), return_func=RuleFormatRequest(b_from_suba, C))}
-                {fmt_param_edge(SubA, SubA, RuleFormatRequest(b_from_suba))}
                 }}
                 """
             ).strip(),
@@ -1165,6 +1189,6 @@ class RuleGraphTest(TestBase):
 
     def create_subgraph(self, requested_product, rules, subject, validate=True):
         scheduler = create_scheduler(rules + _suba_root_rules, validate=validate)
-        return "\n".join(scheduler.rule_subgraph_visualization(type(subject), requested_product))
+        return "\n".join(scheduler.rule_subgraph_visualization([type(subject)], requested_product))
 
     assert_equal_with_printing = assert_equal_with_printing

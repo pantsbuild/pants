@@ -40,7 +40,7 @@ python_library(
 
 page(
   name='readme',
-  source='README.md',
+  sources=['README.md'],
 )
 
 python_library(
@@ -60,7 +60,7 @@ resources(
 
 page(
   name='changelog',
-  source='CHANGELOG.md',
+  sources=['CHANGELOG.md'],
   links=[
     'src/python/pants/notes:notes-1.0.x',
     'src/python/pants/notes:notes-master',

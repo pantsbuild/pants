@@ -17,11 +17,12 @@ digest = "0.8"
 fs = { path = "../fs" }
 futures01 = { package = "futures", version = "0.1" }
 futures = { version = "0.3", features = ["compat"] }
-grpcio = { git = "https://github.com/pantsbuild/grpc-rs.git", rev = "b582ef3dc4e8c7289093c8febff8dadf0997b532", default_features = false, features = ["protobuf-codec", "secure"] }
+# TODO: This is 0.5.1 + https://github.com/tikv/grpc-rs/pull/457.
+grpcio = { git = "https://github.com/pantsbuild/grpc-rs.git", rev = "d16fcfb4afbdd4c791e7c7e64e9748319ed8ad70", default_features = false, features = ["protobuf-codec", "secure"] }
 hashing = { path = "../hashing" }
 libc = "0.2.39"
 log = "0.4"
-nails = "0.3"
+nails = "0.4"
 protobuf = { version = "2.0.6", features = ["with-bytes"] }
 sha2 = "0.8"
 sharded_lmdb = {  path = "../sharded_lmdb" }
@@ -29,16 +30,16 @@ store = { path = "../fs/store" }
 task_executor = { path = "../task_executor" }
 tempfile = "3"
 concrete_time = { path = "../concrete_time" }
-tokio = "0.1"
-tokio-codec = "0.1"
-tokio-process = "0.2.1"
-tokio-timer = "0.2"
+tokio = { version = "0.2", features = ["process", "rt-threaded", "tcp", "time"] }
+tokio-util = { version = "0.2", features = ["codec"] }
 uname = "0.1.1"
 workunit_store = { path = "../workunit_store" }
 regex = "1.3.1"
 lazy_static = "1"
 parking_lot = "0.6"
 itertools = "0.8.0"
+serde = "1.0.104"
+bincode = "1.2.1"
 
 [dev-dependencies]
 maplit = "1.0.1"
@@ -47,3 +48,4 @@ parking_lot = "0.6"
 spectral = "0.6.0"
 tempfile = "3"
 testutil = { path = "../testutil" }
+tokio = { version = "0.2", features = ["macros"] }

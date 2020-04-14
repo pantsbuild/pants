@@ -14,7 +14,7 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.tasks.select_interpreter import SelectInterpreter
 from pants.base.exceptions import TaskError
-from pants.option.ranked_value import RankedValue
+from pants.option.ranked_value import Rank, RankedValue
 from pants.python.python_setup import PythonSetup
 from pants.testutil.task_test_base import TaskTestBase
 from pants.util.dirutil import chmod_plus_x, safe_mkdtemp
@@ -68,7 +68,7 @@ class SelectInterpreterTest(TaskTestBase):
 
         self.set_options_for_scope(
             PythonSetup.options_scope,
-            interpreter_constraints=RankedValue(RankedValue.CONFIG, ["IronPython>=2.55"]),
+            interpreter_constraints=RankedValue(Rank.CONFIG, ["IronPython>=2.55"]),
             interpreter_search_paths=[interpreter.binary for interpreter in self.fake_interpreters],
         )
 
@@ -184,7 +184,7 @@ class SelectInterpreterTest(TaskTestBase):
         self._select_interpreter_and_get_version([self.tgt1], should_invalidate=True)
         self.set_options_for_scope(
             PythonSetup.options_scope,
-            interpreter_constraints=RankedValue(RankedValue.CONFIG, ["IronPython>2.77.777"]),
+            interpreter_constraints=RankedValue(Rank.CONFIG, ["IronPython>2.77.777"]),
         )
         # After changing the global interpreter constraints, the task should invalidate.
         self._select_interpreter_and_get_version([self.tgt1], should_invalidate=True)

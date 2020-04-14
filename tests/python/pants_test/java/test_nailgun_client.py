@@ -71,7 +71,6 @@ class TestNailgunClientSession(unittest.TestCase):
     @unittest.mock.patch("psutil.Process", **PATCH_OPTS)
     def test_process_session(self, mock_psutil_process):
         mock_psutil_process.cmdline.return_value = ["mock", "process"]
-        NailgunProtocol.write_chunk(self.server_sock, ChunkType.PID, b"31337")
         NailgunProtocol.write_chunk(self.server_sock, ChunkType.START_READING_INPUT)
         NailgunProtocol.write_chunk(self.server_sock, ChunkType.STDOUT, self.TEST_PAYLOAD)
         NailgunProtocol.write_chunk(self.server_sock, ChunkType.STDERR, self.TEST_PAYLOAD)
@@ -84,12 +83,10 @@ class TestNailgunClientSession(unittest.TestCase):
         self.assertEqual(self.fake_stderr.content, self.TEST_PAYLOAD * 3)
         self.mock_stdin_reader.start.assert_called_once_with()
         self.mock_stdin_reader.stop.assert_called_once_with()
-        self.assertEqual(self.nailgun_client_session.remote_pid, 31337)
 
     @unittest.mock.patch("psutil.Process", **PATCH_OPTS)
     def test_process_session_bad_chunk(self, mock_psutil_process):
         mock_psutil_process.cmdline.return_value = ["mock", "process"]
-        NailgunProtocol.write_chunk(self.server_sock, ChunkType.PID, b"31337")
         NailgunProtocol.write_chunk(self.server_sock, ChunkType.START_READING_INPUT)
         NailgunProtocol.write_chunk(self.server_sock, self.BAD_CHUNK_TYPE, "")
 
@@ -145,7 +142,7 @@ class TestNailgunClient(unittest.TestCase):
     @unittest.mock.patch("pants.java.nailgun_client.NailgunClientSession", **PATCH_OPTS)
     def test_execute_propagates_connection_error_on_connect(self, mock_session, mock_try_connect):
         mock_try_connect.side_effect = NailgunClient.NailgunConnectionError(
-            "127.0.0.1:31337", 31337, -31336, Exception("oops"),
+            "127.0.0.1:31337", Exception("oops"),
         )
 
         with self.assertRaises(NailgunClient.NailgunConnectionError):
@@ -173,31 +170,6 @@ class TestNailgunClient(unittest.TestCase):
 
     @unittest.mock.patch("os.kill", **PATCH_OPTS)
     def test_send_control_c(self, mock_kill):
-        self.nailgun_client._maybe_last_pid = lambda: 31337
-        self.nailgun_client._maybe_last_pgrp = lambda: -31336
+        self.nailgun_client.remote_pid = 31337
         self.nailgun_client.maybe_send_signal(signal.SIGINT)
-        mock_kill.assert_has_calls(
-            [
-                # The pid is killed first, then the pgrp, if include_pgrp=True.
-                unittest.mock.call(31337, signal.SIGINT),
-                unittest.mock.call(-31336, signal.SIGINT),
-            ]
-        )
-
-    @unittest.mock.patch("os.kill", **PATCH_OPTS)
-    def test_send_signal_no_pgrp(self, mock_kill):
-        self.nailgun_client._maybe_last_pid = lambda: 111111
-        self.nailgun_client.maybe_send_signal(signal.SIGINT, include_pgrp=False)
-        mock_kill.assert_called_once_with(111111, signal.SIGINT)
-
-    @unittest.mock.patch("os.kill", **PATCH_OPTS)
-    def test_send_control_c_noop_none(self, mock_kill):
-        self.nailgun_client._session = None
-        self.nailgun_client.maybe_send_signal(signal.SIGINT)
-        mock_kill.assert_not_called()
-
-    @unittest.mock.patch("os.kill", **PATCH_OPTS)
-    def test_send_control_c_noop_nopid(self, mock_kill):
-        self.nailgun_client._session = unittest.mock.Mock(remote_pid=None, remote_pgrp=None)
-        self.nailgun_client.maybe_send_signal(signal.SIGINT)
-        mock_kill.assert_not_called()
+        mock_kill.assert_has_calls([unittest.mock.call(31337, signal.SIGINT)])

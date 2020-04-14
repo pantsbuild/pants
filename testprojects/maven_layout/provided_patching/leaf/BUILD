@@ -8,7 +8,7 @@
 # not match up with what the Common class expects.
 
 jvm_binary(name='one',
-  source='src/main/java/org/pantsbuild/testproject/provided_patching/UseShadow.java',
+  sources=['src/main/java/org/pantsbuild/testproject/provided_patching/UseShadow.java'],
   main='org.pantsbuild.testproject.provided_patching.UseShadow',
   dependencies=[
     'testprojects/maven_layout/provided_patching/two/src/main/java:common',
@@ -17,7 +17,7 @@ jvm_binary(name='one',
 )
 
 jvm_binary(name='two',
-  source='src/main/java/org/pantsbuild/testproject/provided_patching/UseShadow.java',
+  sources=['src/main/java/org/pantsbuild/testproject/provided_patching/UseShadow.java'],
   main='org.pantsbuild.testproject.provided_patching.UseShadow',
   dependencies=[
     'testprojects/maven_layout/provided_patching/three/src/main/java:common',
@@ -26,7 +26,7 @@ jvm_binary(name='two',
 )
 
 jvm_binary(name='three',
-  source='src/main/java/org/pantsbuild/testproject/provided_patching/UseShadow.java',
+  sources=['src/main/java/org/pantsbuild/testproject/provided_patching/UseShadow.java'],
   main='org.pantsbuild.testproject.provided_patching.UseShadow',
   dependencies=[
     'testprojects/maven_layout/provided_patching/one/src/main/java:common',
@@ -35,7 +35,7 @@ jvm_binary(name='three',
 )
 
 jvm_binary(name='fail',
-  source='src/main/java/org/pantsbuild/testproject/provided_patching/UseShadow.java',
+  sources=['src/main/java/org/pantsbuild/testproject/provided_patching/UseShadow.java'],
   main='org.pantsbuild.testproject.provided_patching.UseShadow',
   dependencies=[
     'testprojects/maven_layout/provided_patching/one/src/main/java:common',

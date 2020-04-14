@@ -25,7 +25,9 @@ class PythonTests(PythonTarget):
         :param int timeout: A timeout (in seconds) which covers the total runtime of all tests in this
           target. Only applied if `--test-pytest-timeouts` is set to True.
         """
-        self._coverage = ensure_str_list(coverage) if coverage is not None else []
+        self._coverage = (
+            ensure_str_list(coverage, allow_single_str=True) if coverage is not None else []
+        )
         self._timeout = timeout
         super().__init__(**kwargs)
 
@@ -39,6 +41,6 @@ class PythonTests(PythonTarget):
     @property
     def timeout(self):
         """
-    :API: public
-    """
+        :API: public
+        """
         return self._timeout

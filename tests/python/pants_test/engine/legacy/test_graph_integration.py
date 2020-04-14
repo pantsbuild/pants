@@ -114,6 +114,7 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
         with self.with_overwritten_file_content(build_path, f"{original_content}\n{new_content}"):
             yield
 
+    @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/8520")
     def test_missing_sources_warnings(self):
         target_to_unmatched_globs = {
             "missing-globs": ["*.a"],
@@ -144,6 +145,7 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
                         in pants_run.stderr_data
                     )
 
+    @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/8520")
     def test_existing_sources(self):
         target_full = f"{self._SOURCES_TARGET_BASE}:text"
         pants_run = self.run_pants(
@@ -178,6 +180,7 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
                 in pants_run.stderr_data
             )
 
+    @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/8520")
     def test_existing_bundles(self):
         target_full = f"{self._BUNDLE_TARGET_BASE}:mapper"
         pants_run = self.run_pants(
@@ -192,7 +195,7 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
         self.assert_failure(pants_run)
         self.assertIn("does not match any targets.", pants_run.stderr_data)
 
-    @unittest.skip("Flaky: https://github.com/pantsbuild/pants/issues/6787")
+    @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/6787")
     def test_error_message(self):
         with self.setup_bundle_target(), self.setup_sources_targets():
             for target in self._ERR_TARGETS:

@@ -45,24 +45,26 @@ python_binary(
         assert self.target(":binary2").entry_point == "bin.blork"
 
     def test_python_binary_with_entry_point_and_source(self):
+        self.create_file("blork.py")
+        self.create_file("bin/blork.py")
         self.add_to_build_file(
             "",
             """python_binary(
   name = "binary1",
   entry_point = "blork",
-  source = "blork.py",
+  sources = ["blork.py"],
 )
 
 python_binary(
   name = "binary2",
   entry_point = "blork:main",
-  source = "blork.py",
+  sources = ["blork.py"],
 )
 
 python_binary(
   name = "binary3",
   entry_point = "bin.blork:main",
-  source = "bin/blork.py",
+  sources = ["bin/blork.py"],
 )""",
         )
 

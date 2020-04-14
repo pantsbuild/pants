@@ -18,8 +18,7 @@ from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
 from twitter.common.dirutil.chroot import Chroot
 
-from pants.backend.python.rules.setup_py_util import distutils_repr
-from pants.backend.python.subsystems.pex_build_util import is_local_python_dist
+from pants.backend.python.rules.util import distutils_repr
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
@@ -30,6 +29,7 @@ from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import sort_targets
 from pants.build_graph.resources import Resources
+from pants.python.pex_build_util import is_local_python_dist
 from pants.python.setup_py_runner import SetupPyRunner
 from pants.task.task import Task
 from pants.util.contextutil import temporary_file

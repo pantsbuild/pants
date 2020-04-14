@@ -7,6 +7,7 @@ from collections.abc import MutableSequence, MutableSet
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable, List, Optional, Sequence, Tuple, Type, Union, cast
 
+from pants.base.deprecated import warn_or_error
 from pants.base.specs import OriginSpec
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
@@ -38,8 +39,6 @@ class TargetAdaptor(StructWithDeps):
 
     @property
     def address(self) -> Address:
-        # TODO: this isn't actually safe to override as not being Optional. There are
-        # some cases where this property is not defined. But, then we get a ton of MyPy issues.
         return cast(Address, super().address)
 
     def get_sources(self) -> Optional["GlobsWithConjunction"]:
@@ -64,6 +63,20 @@ class TargetAdaptor(StructWithDeps):
                     f"source must be a str containing a path relative to the target, but got {source} of "
                     f"type {type(source)}",
                 )
+            script_instructions = (
+                "curl -L -o convert_source_to_sources.py 'https://git.io/JvbN3' && chmod +x "
+                "convert_source_to_sources.py && ./convert_source_to_sources.py "
+                f"root_folder1/ root_folder2/"
+            )
+            warn_or_error(
+                deprecated_entity_description="using `source` instead of `sources` in a BUILD file",
+                removal_version="1.29.0.dev0",
+                hint=(
+                    f"Instead of `source={repr(source)}`, use `sources=[{repr(source)}]`. We "
+                    "recommend using our migration script to automate fixing your entire "
+                    f"repository by running `{script_instructions}`."
+                ),
+            )
             sources = [source]
 
         # N.B. Here we check specifically for `sources is None`, as it's possible for sources
@@ -276,6 +289,19 @@ class ResourcesAdaptor(TargetAdaptor):
     pass
 
 
+class FilesAdaptor(TargetAdaptor):
+    pass
+
+
+# The python_requirements macro generates python_requirement_library targets and makes them
+# depend on a _python_requirements_file() target, so that pantsd knows to invalidate correctly
+# when the requirements.txt file changes.  We don't want to use a regular files() target for
+# this, as we don't want to consider the requirements.txt a source for the purpose of building
+# pexes (e.g., we don't want whitespace changes to requirements.txt to invalidate the sources pex).
+class PythonRequirementsFileAdaptor(TargetAdaptor):
+    pass
+
+
 class RemoteSourcesAdaptor(TargetAdaptor):
     def __init__(self, dest=None, **kwargs):
         """
@@ -307,7 +333,7 @@ class PythonTargetAdaptor(TargetAdaptor):
     def compatibility(self) -> Optional[List[str]]:
         if "compatibility" not in self._kwargs:
             return None
-        return ensure_str_list(self._kwargs["compatibility"])
+        return ensure_str_list(self._kwargs["compatibility"], allow_single_str=True)
 
 
 class PythonBinaryAdaptor(PythonTargetAdaptor):

@@ -203,7 +203,7 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
         macro_factory = TargetMacro.Factory.wrap(lambda ctx: None, Target2)
 
         bfa = BuildFileAliases(
-            targets={"target1": Target1, "target2": macro_factory, "target3": Target3,},
+            targets={"target1": Target1, "target2": macro_factory, "target3": Target3},
             objects={},
             context_aware_object_factories={},
         )

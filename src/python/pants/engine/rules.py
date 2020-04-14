@@ -7,9 +7,8 @@ import itertools
 import sys
 import typing
 from abc import ABC, abstractmethod
-from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Callable, List, Optional, Tuple, Type, get_type_hints
+from typing import Callable, Dict, List, Optional, Tuple, Type, get_type_hints
 
 from pants.engine.goal import Goal
 from pants.engine.objects import union
@@ -19,6 +18,15 @@ from pants.util.collections import assert_single_element
 from pants.util.memo import memoized
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+
+
+@dataclass(frozen=True)
+class RuleAnnotations:
+    canonical_name: Optional[str] = None
+    desc: Optional[str] = None
+
+
+DEFAULT_RULE_ANNOTATIONS = RuleAnnotations()
 
 
 def side_effecting(cls):
@@ -85,8 +93,8 @@ def _make_rule(
     return_type: Type,
     parameter_types: typing.Iterable[Type],
     *,
-    cacheable: bool = True,
-    name: Optional[str] = None,
+    cacheable: bool,
+    annotations: RuleAnnotations,
 ) -> Callable[[Callable], Callable]:
     """A @decorator that declares that a particular static function may be used as a TaskRule.
 
@@ -158,11 +166,15 @@ def _make_rule(
         # Register dependencies for @goal_rule/Goal.
         dependency_rules = (subsystem_rule(return_type.subsystem_cls),) if is_goal_cls else None
 
-        # Set a default name for Goal classes if one is not explicitly provided
-        if is_goal_cls and name is None:
-            effective_name = return_type.name
-        else:
-            effective_name = name
+        # Set a default canonical name if one is not explicitly provided. For Goal classes
+        # this is the name of the Goal; for other named ruled this is the __name__ of the function
+        # that implements it.
+        effective_name = annotations.canonical_name
+        if effective_name is None:
+            effective_name = return_type.name if is_goal_cls else func.__name__
+        normalized_annotations = RuleAnnotations(
+            canonical_name=effective_name, desc=annotations.desc
+        )
 
         # Set our own custom `__line_number__` dunder so that the engine may visualize the line number.
         func.__line_number__ = func.__code__.co_firstlineno
@@ -174,7 +186,7 @@ def _make_rule(
             input_gets=tuple(gets),
             dependency_rules=dependency_rules,
             cacheable=cacheable,
-            name=effective_name,
+            annotations=normalized_annotations,
         )
 
         return func
@@ -214,11 +226,11 @@ def _ensure_type_annotation(
     return type_annotation
 
 
-PUBLIC_RULE_DECORATOR_ARGUMENTS = {"name"}
+PUBLIC_RULE_DECORATOR_ARGUMENTS = {"canonical_name", "desc"}
 # We don't want @rule-writers to use 'cacheable' as a kwarg directly, but rather
 # set it implicitly based on whether the rule annotation is @rule or @goal_rule.
 # So we leave it out of PUBLIC_RULE_DECORATOR_ARGUMENTS.
-IMPLICIT_PRIVATE_RULE_DECORATOR_ARGUMENTS = {"cacheable"}
+IMPLICIT_PRIVATE_RULE_DECORATOR_ARGUMENTS = {"cacheable", "named_rule"}
 
 
 def rule_decorator(*args, **kwargs) -> Callable:
@@ -227,6 +239,18 @@ def rule_decorator(*args, **kwargs) -> Callable:
             "The @rule decorator expects no arguments and for the function it decorates to be "
             f"type-annotated. Given {args}."
         )
+
+    canonical_name: Optional[str] = kwargs.get("canonical_name")
+    desc: Optional[str] = kwargs.get("desc")
+
+    if kwargs.get("named_rule"):
+        annotations = RuleAnnotations(canonical_name=canonical_name, desc=desc)
+    else:
+        annotations = DEFAULT_RULE_ANNOTATIONS
+        if any(x is not None for x in (canonical_name, desc)):
+            raise UnrecognizedRuleArgument(
+                f"@rules that are not @named_rules or @goal_rules do not accept keyword arguments"
+            )
 
     if (
         len(
@@ -237,13 +261,12 @@ def rule_decorator(*args, **kwargs) -> Callable:
         != 0
     ):
         raise UnrecognizedRuleArgument(
-            f"`@rule`s and `@goal_rule`s only accept the following keyword arguments: {PUBLIC_RULE_DECORATOR_ARGUMENTS}"
+            f"`@named_rule`s and `@goal_rule`s only accept the following keyword arguments: {PUBLIC_RULE_DECORATOR_ARGUMENTS}"
         )
 
     func = args[0]
 
     cacheable: bool = kwargs["cacheable"]
-    name: Optional[str] = kwargs.get("name")
 
     func_id = f"@rule {func.__module__}:{func.__name__}"
     type_hints = get_type_hints(func)
@@ -261,7 +284,9 @@ def rule_decorator(*args, **kwargs) -> Callable:
         for parameter in inspect.signature(func).parameters
     )
     validate_parameter_types(func_id, parameter_types, cacheable)
-    return _make_rule(return_type, parameter_types, cacheable=cacheable, name=name)(func)
+    return _make_rule(return_type, parameter_types, cacheable=cacheable, annotations=annotations)(
+        func
+    )
 
 
 def validate_parameter_types(
@@ -291,7 +316,11 @@ def rule(*args, **kwargs) -> Callable:
 
 
 def goal_rule(*args, **kwargs) -> Callable:
-    return inner_rule(*args, **kwargs, cacheable=False)
+    return inner_rule(*args, **kwargs, cacheable=False, named_rule=True)
+
+
+def named_rule(*args, **kwargs) -> Callable:
+    return inner_rule(*args, **kwargs, cacheable=True, named_rule=True)
 
 
 @dataclass(frozen=True)
@@ -312,7 +341,7 @@ class UnionRule:
 
 @dataclass(frozen=True)
 class UnionMembership:
-    union_rules: "OrderedDict[Type, OrderedSet[Type]]"
+    union_rules: Dict[Type, OrderedSet[Type]]
 
     def is_member(self, union_type, putative_member):
         members = self.union_rules.get(union_type)
@@ -375,7 +404,7 @@ class TaskRule(Rule):
     _dependency_rules: Tuple
     _dependency_optionables: Tuple
     cacheable: bool
-    name: Optional[str]
+    annotations: RuleAnnotations
 
     def __init__(
         self,
@@ -386,7 +415,7 @@ class TaskRule(Rule):
         dependency_rules: Optional[Tuple] = None,
         dependency_optionables: Optional[Tuple] = None,
         cacheable: bool = True,
-        name: Optional[str] = None,
+        annotations: RuleAnnotations = DEFAULT_RULE_ANNOTATIONS,
     ):
         self._output_type = output_type
         self.input_selectors = input_selectors
@@ -395,7 +424,7 @@ class TaskRule(Rule):
         self._dependency_rules = dependency_rules or ()
         self._dependency_optionables = dependency_optionables or ()
         self.cacheable = cacheable
-        self.name = name
+        self.annotations = annotations
 
     def __str__(self):
         return "(name={}, {}, {!r}, {}, gets={}, opts={})".format(
@@ -450,24 +479,23 @@ class RootRule(Rule):
 @dataclass(frozen=True)
 class NormalizedRules:
     rules: FrozenOrderedSet
-    union_rules: "OrderedDict[Type, OrderedSet[Type]]"
+    union_rules: Dict[Type, OrderedSet[Type]]
 
 
-# TODO: add typechecking here -- use dicts for `union_rules`.
 @dataclass(frozen=True)
 class RuleIndex:
     """Holds a normalized index of Rules used to instantiate Nodes."""
 
-    rules: OrderedDict
-    roots: OrderedSet
-    union_rules: "OrderedDict[Type, OrderedSet[Type]]"
+    rules: Dict
+    roots: FrozenOrderedSet
+    union_rules: Dict[Type, OrderedSet[Type]]
 
     @classmethod
     def create(cls, rule_entries, union_rules=None) -> "RuleIndex":
         """Creates a RuleIndex with tasks indexed by their output type."""
-        serializable_rules: OrderedDict = OrderedDict()
+        serializable_rules: Dict = {}
         serializable_roots: OrderedSet = OrderedSet()
-        union_rules = OrderedDict(union_rules or ())
+        union_rules = dict(union_rules or ())
 
         def add_task(product_type, rule):
             # TODO(#7311): make a defaultdict-like wrapper for OrderedDict if more widely used.
@@ -517,7 +545,7 @@ functions decorated with @rule.""".format(
                     )
                 )
 
-        return cls(serializable_rules, serializable_roots, union_rules)
+        return cls(serializable_rules, FrozenOrderedSet(serializable_roots), union_rules)
 
     def normalized_rules(self) -> NormalizedRules:
         rules = FrozenOrderedSet(

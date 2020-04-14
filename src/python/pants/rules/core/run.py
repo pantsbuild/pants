@@ -13,7 +13,8 @@ from pants.engine.interactive_runner import InteractiveProcessRequest, Interacti
 from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get
 from pants.option.custom_types import shell_str
-from pants.rules.core.binary import BinaryTarget, CreatedBinary
+from pants.option.global_options import GlobalOptions
+from pants.rules.core.binary import BinaryConfiguration, CreatedBinary
 from pants.util.contextutil import temporary_dir
 
 
@@ -22,8 +23,8 @@ class RunOptions(GoalSubsystem):
 
     name = "run"
 
-    # NB: To be runnable, you must be a BinaryTarget.
-    required_union_implementations = (BinaryTarget,)
+    # NB: To be runnable, there must be a BinaryConfiguration that works with the target.
+    required_union_implementations = (BinaryConfiguration,)
 
     @classmethod
     def register_options(cls, register) -> None:
@@ -50,13 +51,14 @@ async def run(
     build_root: BuildRoot,
     addresses: Addresses,
     options: RunOptions,
+    global_options: GlobalOptions,
 ) -> Run:
     address = addresses.expect_single()
     binary = await Get[CreatedBinary](Address, address)
 
-    with temporary_dir(
-        root_dir=PurePath(build_root.path, ".pants.d").as_posix(), cleanup=True
-    ) as tmpdir:
+    workdir = global_options.options.pants_workdir
+
+    with temporary_dir(root_dir=workdir, cleanup=True) as tmpdir:
         path_relative_to_build_root = PurePath(tmpdir).relative_to(build_root.path).as_posix()
         workspace.materialize_directory(
             DirectoryToMaterialize(binary.digest, path_prefix=path_relative_to_build_root)

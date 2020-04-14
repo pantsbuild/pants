@@ -3,7 +3,7 @@
 
 python_binary(
   name = 'reversion',
-  source = 'reversion.py',
+  sources = ['reversion.py'],
   dependencies = [
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',

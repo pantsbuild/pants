@@ -27,7 +27,7 @@ from pants.engine.fs import (
     PathGlobs,
     PathGlobsAndRoot,
 )
-from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
+from pants.engine.isolated_process import FallibleProcessResult, Process
 from pants.java.jar.jar_dependency import JarDependency
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.task.scm_publish_mixin import Semver
@@ -54,7 +54,7 @@ def fast_relpath_collection(collection):
 
 
 def stdout_contents(wu):
-    if isinstance(wu, FallibleExecuteProcessResult):
+    if isinstance(wu, FallibleProcessResult):
         return wu.stdout.rstrip()
     with open(wu.output_paths()["stdout"]) as f:
         return f.read().rstrip()
@@ -103,6 +103,7 @@ class RscCompileContext(CompileContext):
         post_compile_merge_dir,
         sources,
         workflow,
+        diagnostics_out,
     ):
         super().__init__(
             target,
@@ -113,6 +114,7 @@ class RscCompileContext(CompileContext):
             args_file,
             post_compile_merge_dir,
             sources,
+            diagnostics_out,
         )
         self.workflow = workflow
         self.rsc_jar_file = rsc_jar_file
@@ -230,7 +232,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
             classpath=[
                 JarDependency(org="com.twitter", name="rsc_2.12", rev="0.0.0-768-7357aa0a",),
             ],
-            custom_rules=[Shader.exclude_package("rsc", recursive=True),],
+            custom_rules=[Shader.exclude_package("rsc", recursive=True)],
         )
 
         scalac_outliner_version = "2.12.10"
@@ -761,7 +763,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
                         # NB: We want to ensure the 'runtime_classpath' product *only* contains the outputs of
                         # zinc compiles, and that the 'rsc_mixed_compile_classpath' entries for rsc-compatible targets
                         # *only* contain the output of an rsc compile for that target.
-                        output_products=[runtime_classpath_product,],
+                        output_products=[runtime_classpath_product],
                         dep_keys=list(all_zinc_rsc_invalid_dep_keys(invalid_dependencies)),
                     )
                 ),
@@ -770,7 +772,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
                     make_zinc_job(
                         compile_target,
                         input_product_key="rsc_mixed_compile_classpath",
-                        output_products=[runtime_classpath_product,],
+                        output_products=[runtime_classpath_product],
                         dep_keys=list(all_zinc_rsc_invalid_dep_keys(invalid_dependencies)),
                     )
                 ),
@@ -830,6 +832,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
                 post_compile_merge_dir=os.path.join(rsc_dir, "post_compile_merge_dir"),
                 sources=sources,
                 workflow=self._classify_target_compile_workflow(target),
+                diagnostics_out=None,
             ),
             zinc_cc=CompileContext(
                 target=target,
@@ -840,6 +843,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
                 args_file=os.path.join(zinc_dir, "zinc_args"),
                 post_compile_merge_dir=os.path.join(zinc_dir, "post_compile_merge_dir"),
                 sources=sources,
+                diagnostics_out=os.path.join(zinc_dir, "diagnostics.json"),
             ),
         )
 
@@ -865,9 +869,9 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         else:
             additional_snapshots = []
             initial_args = (
-                [distribution.java,]
+                [distribution.java]
                 + rsc_jvm_options
-                + ["-cp", os.pathsep.join(tool_classpath), main,]
+                + ["-cp", os.pathsep.join(tool_classpath), main]
             )
 
         (argfile_snapshot,) = self.context._scheduler.capture_snapshots(
@@ -896,7 +900,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
             + (argfile_snapshot.directory_digest,)
         )
 
-        epr = ExecuteProcessRequest(
+        epr = Process(
             argv=tuple(cmd),
             input_files=epr_input_files,
             output_files=(fast_relpath(ctx.rsc_jar_file.path, get_buildroot()),),
@@ -905,7 +909,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
             description=f"run {tool_name} for {ctx.target}",
             # TODO: These should always be unicodes
             # Since this is always hermetic, we need to use `underlying.home` because
-            # ExecuteProcessRequest requires an existing, local jdk location.
+            # Process requires an existing, local jdk location.
             jdk_home=distribution.underlying_home,
             is_nailgunnable=True,
         )
@@ -975,15 +979,9 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         ]
 
         zinc_args = []
+        zinc_args.extend(self.create_zinc_log_level_args())
         zinc_args.extend(
-            [
-                "-log-level",
-                self.get_options().level,
-                "-analysis-cache",
-                analysis_cache,
-                "-classpath",
-                os.pathsep.join(relative_classpath),
-            ]
+            ["-analysis-cache", analysis_cache, "-classpath", os.pathsep.join(relative_classpath)]
         )
 
         compiler_bridge_classpath_entry = self._zinc.compile_compiler_bridge(self.context)
@@ -1076,7 +1074,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
             classpath_entry = self._classpath_for_context(zinc_compile_context)
             relpath = fast_relpath(classpath_entry.path, get_buildroot())
             (classes_dir_snapshot,) = self.context._scheduler.capture_snapshots(
-                [PathGlobsAndRoot(PathGlobs([relpath]), get_buildroot(), Digest.load(relpath),),]
+                [PathGlobsAndRoot(PathGlobs([relpath]), get_buildroot(), Digest.load(relpath))]
             )
             classpath_entry.hydrate_missing_directory_digest(classes_dir_snapshot.directory_digest)
             # Re-validate the vts!

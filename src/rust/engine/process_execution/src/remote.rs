@@ -10,6 +10,8 @@ use bytes::Bytes;
 use concrete_time::TimeSpan;
 use digest::{Digest as DigestTrait, FixedOutput};
 use fs::{self, File, PathStat};
+use futures::compat::Future01CompatExt;
+use futures::future::{self as future03, FutureExt, TryFutureExt};
 use futures01::{future, Future, Stream};
 use grpcio;
 use hashing::{Digest, Fingerprint};
@@ -18,18 +20,18 @@ use log::{debug, trace, warn};
 use protobuf::{self, Message, ProtobufEnum};
 use sha2::Sha256;
 use store::{Snapshot, Store, StoreFileByDigest};
-use tokio_timer::Delay;
+use tokio::time::delay_for;
 
 use crate::{
-  Context, ExecuteProcessRequest, ExecuteProcessRequestMetadata, ExecutionStats,
-  FallibleExecuteProcessResult, MultiPlatformExecuteProcessRequest, PlatformConstraint,
+  Context, ExecutionStats, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform,
+  PlatformConstraint, Process, ProcessMetadata,
 };
 use std;
 use std::cmp::min;
-use workunit_store::{get_parent_id, WorkUnit, WorkUnitStore};
+use workunit_store::{WorkUnit, WorkUnitStore};
 
 // Environment variable which is exclusively used for cache key invalidation.
-// This may be not specified in an ExecuteProcessRequest, and may be populated only by the
+// This may be not specified in an Process, and may be populated only by the
 // CommandRunner.
 pub const CACHE_KEY_GEN_VERSION_ENV_VAR_NAME: &str = "PANTS_CACHE_KEY_GEN_VERSION";
 
@@ -77,13 +79,12 @@ impl Drop for CancelRemoteExecutionToken {
         .cancel_operation_async(&cancel_op_req)
       {
         Ok(receiver) => {
-          self.executor.spawn_and_ignore(receiver.then(move |res| {
-            match res {
+          self.executor.spawn_and_ignore(async move {
+            match receiver.compat().await {
               Ok(_) => debug!("Canceled operation {} successfully", operation_name),
               Err(err) => debug!("Failed to cancel operation {}, err {}", operation_name, err),
             }
-            Ok(())
-          }));
+          });
         }
         Err(err) => debug!(
           "Failed to schedule cancel operation: {}, err {}",
@@ -102,14 +103,14 @@ pub enum OperationOrStatus {
 
 #[derive(Clone)]
 pub struct CommandRunner {
-  metadata: ExecuteProcessRequestMetadata,
+  metadata: ProcessMetadata,
   headers: BTreeMap<String, String>,
   channel: grpcio::Channel,
   env: Arc<grpcio::Environment>,
   execution_client: Arc<bazel_protos::remote_execution_grpc::ExecutionClient>,
   operations_client: Arc<bazel_protos::operations_grpc::OperationsClient>,
   store: Store,
-  platform: PlatformConstraint,
+  platform: Platform,
   executor: task_executor::Executor,
   // We use a buffer time for queuing of process requests so that the process's requested timeout more
   // accurately reflects how long the caller intended the process to last.
@@ -150,6 +151,10 @@ impl CommandRunner {
   // our own polling rates.
   // In the future, we may want to remove this behavior if servers reliably support the full stream
   // behavior.
+
+  fn platform(&self) -> Platform {
+    self.platform
+  }
 
   fn oneshot_execute(
     &self,
@@ -193,15 +198,12 @@ impl CommandRunner {
 // we cancel a potential RPC. So we need to distinguish local vs. remote
 // requests and save enough state to BoxFuture or another abstraction around our execution results
 impl super::CommandRunner for CommandRunner {
-  fn extract_compatible_request(
-    &self,
-    req: &MultiPlatformExecuteProcessRequest,
-  ) -> Option<ExecuteProcessRequest> {
+  fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
     for compatible_constraint in vec![
       &(PlatformConstraint::None, PlatformConstraint::None),
-      &(self.platform, PlatformConstraint::None),
+      &(self.platform.into(), PlatformConstraint::None),
       &(
-        self.platform,
+        self.platform.into(),
         PlatformConstraint::current_platform_constraint().unwrap(),
       ),
     ]
@@ -235,16 +237,17 @@ impl super::CommandRunner for CommandRunner {
   ///
   fn run(
     &self,
-    req: MultiPlatformExecuteProcessRequest,
+    req: MultiPlatformProcess,
     context: Context,
-  ) -> BoxFuture<FallibleExecuteProcessResult, String> {
+  ) -> BoxFuture<FallibleProcessResultWithPlatform, String> {
+    let platform = self.platform();
     let compatible_underlying_request = self.extract_compatible_request(&req).unwrap();
     let operations_client = self.operations_client.clone();
     let store = self.store.clone();
     let execute_request_result =
       make_execute_request(&compatible_underlying_request, self.metadata.clone());
 
-    let ExecuteProcessRequest {
+    let Process {
       description,
       timeout,
       input_files,
@@ -265,11 +268,9 @@ impl super::CommandRunner for CommandRunner {
           .join(self.store_proto_locally(&action))
           .and_then({
             let store = store.clone();
-            let workunit_store = context.workunit_store.clone();
             move |(command_digest, action_digest)| {
               store.ensure_remote_has_recursive(
                 vec![command_digest, action_digest, input_files],
-                workunit_store,
               )
             }
           })
@@ -316,10 +317,9 @@ impl super::CommandRunner for CommandRunner {
                   let operations_client = operations_client.clone();
                   let command_runner = command_runner.clone();
                   let build_id = context.build_id.to_string();
-                  let workunit_store = context.workunit_store.clone();
 
                   let f = command_runner
-                    .extract_execute_response(operation, &mut history, context.workunit_store.clone());
+                    .extract_execute_response(operation, &mut history);
                   f.then(move |value| {
                     match value {
                       Ok(result) => {
@@ -363,7 +363,7 @@ impl super::CommandRunner for CommandRunner {
 
                             command_runner.retry_execution(
                               execute_request,
-                              store.ensure_remote_has_recursive(missing_digests, workunit_store.clone()).map(|_| ()).to_boxed(),
+                              store.ensure_remote_has_recursive(missing_digests).map(|_| ()).to_boxed(),
                               build_id,
                               history,
                               maybe_cancel_remote_exec_token,
@@ -392,7 +392,7 @@ impl super::CommandRunner for CommandRunner {
                               } = history;
                               current_attempt.remote_execution = Some(elapsed);
                               attempts.push(current_attempt);
-                              future::ok(future::Loop::Break(FallibleExecuteProcessResult {
+                              future::ok(future::Loop::Break(FallibleProcessResultWithPlatform {
                                 stdout: Bytes::from(format!(
                                   "Exceeded timeout of {:?} ({:?} for the process and {:?} for remoting buffer time) with {:?} for operation {}, {}",
                                   total_timeout, timeout, command_runner.queue_buffer_time, elapsed, operation_name, description
@@ -401,15 +401,19 @@ impl super::CommandRunner for CommandRunner {
                                 exit_code: -libc::SIGTERM,
                                 output_directory: hashing::EMPTY_DIGEST,
                                 execution_attempts: attempts,
+                                platform,
                               }))
                                   .to_boxed()
                             } else {
                               // maybe the delay here should be the min of remaining time and the backoff period
-                              Delay::new(Instant::now() + backoff_period)
-                                  .map_err(move |e| {
+                              delay_for(backoff_period)
+                                  .unit_error()
+                                  .boxed()
+                                  .compat()
+                                  .map_err(move |()| {
                                     format!(
-                                      "Future-Delay errored at operation result polling for {}, {}: {}",
-                                      operation_name, description, e
+                                      "Future-Delay errored at operation result polling for {}, {}",
+                                      operation_name, description
                                     )
                                   })
                                   .and_then(move |_| {
@@ -465,12 +469,12 @@ impl super::CommandRunner for CommandRunner {
 impl CommandRunner {
   pub fn new(
     address: &str,
-    metadata: ExecuteProcessRequestMetadata,
+    metadata: ProcessMetadata,
     root_ca_certs: Option<Vec<u8>>,
     oauth_bearer_token: Option<String>,
     headers: BTreeMap<String, String>,
     store: Store,
-    platform: PlatformConstraint,
+    platform: Platform,
     executor: task_executor::Executor,
     queue_buffer_time: Duration,
     backoff_incremental_wait: Duration,
@@ -529,13 +533,19 @@ impl CommandRunner {
     proto: &P,
   ) -> impl Future<Item = Digest, Error = String> {
     let store = self.store.clone();
-    future::done(
-      proto
-        .write_to_bytes()
-        .map_err(|e| format!("Error serializing proto {:?}", e)),
-    )
-    .and_then(move |command_bytes| store.store_file_bytes(Bytes::from(command_bytes), true))
-    .map_err(|e| format!("Error saving proto to local store: {:?}", e))
+    let maybe_command_bytes = proto
+      .write_to_bytes()
+      .map_err(|e| format!("Error serializing proto {:?}", e));
+
+    // Box and pin a stdlib future, and then convert it to a futures01 future via `compat()`.
+    Box::pin(async move {
+      let command_bytes = maybe_command_bytes?;
+      store
+        .store_file_bytes(Bytes::from(command_bytes), true)
+        .await
+        .map_err(|e| format!("Error saving proto to local store: {:?}", e))
+    })
+    .compat()
   }
 
   // Only public for tests
@@ -543,8 +553,7 @@ impl CommandRunner {
     &self,
     operation_or_status: OperationOrStatus,
     attempts: &mut ExecutionHistory,
-    workunit_store: WorkUnitStore,
-  ) -> BoxFuture<FallibleExecuteProcessResult, ExecutionError> {
+  ) -> BoxFuture<FallibleProcessResultWithPlatform, ExecutionError> {
     trace!("Got operation response: {:?}", operation_or_status);
 
     let status = match operation_or_status {
@@ -570,7 +579,9 @@ impl CommandRunner {
         trace!("Got (nested) execute response: {:?}", execute_response);
         if execute_response.get_result().has_execution_metadata() {
           let metadata = execute_response.get_result().get_execution_metadata();
-          let parent_id = get_parent_id();
+          let workunit_state = workunit_store::expect_workunit_state();
+          let workunit_store = workunit_state.store;
+          let parent_id = workunit_state.parent_id;
           let result_cached = execute_response.get_cached_result();
 
           match TimeSpan::from_start_and_end(
@@ -648,14 +659,14 @@ impl CommandRunner {
         }
 
         let status = execute_response.take_status();
-        if grpcio::RpcStatusCode::from(status.get_code()) == grpcio::RpcStatusCode::Ok {
+        if grpcio::RpcStatusCode::from(status.get_code()) == grpcio::RpcStatusCode::OK {
           let mut execution_attempts = std::mem::replace(&mut attempts.attempts, vec![]);
           execution_attempts.push(attempts.current_attempt);
           return populate_fallible_execution_result(
             self.store.clone(),
             execute_response,
             execution_attempts,
-            workunit_store,
+            self.platform,
           )
           .map_err(ExecutionError::Fatal)
           .to_boxed();
@@ -666,8 +677,8 @@ impl CommandRunner {
     };
 
     match grpcio::RpcStatusCode::from(status.get_code()) {
-      grpcio::RpcStatusCode::Ok => unreachable!(),
-      grpcio::RpcStatusCode::FailedPrecondition => {
+      grpcio::RpcStatusCode::OK => unreachable!(),
+      grpcio::RpcStatusCode::FAILED_PRECONDITION => {
         if status.get_details().len() != 1 {
           return future::err(ExecutionError::Fatal(format!(
             "Received multiple details in FailedPrecondition ExecuteResponse's status field: {:?}",
@@ -738,11 +749,11 @@ impl CommandRunner {
         future::err(ExecutionError::MissingDigests(missing_digests)).to_boxed()
       }
       code => match code {
-        grpcio::RpcStatusCode::Aborted
-        | grpcio::RpcStatusCode::Internal
-        | grpcio::RpcStatusCode::ResourceExhausted
-        | grpcio::RpcStatusCode::Unavailable
-        | grpcio::RpcStatusCode::Unknown => {
+        grpcio::RpcStatusCode::ABORTED
+        | grpcio::RpcStatusCode::INTERNAL
+        | grpcio::RpcStatusCode::RESOURCE_EXHAUSTED
+        | grpcio::RpcStatusCode::UNAVAILABLE
+        | grpcio::RpcStatusCode::UNKNOWN => {
           future::err(ExecutionError::Retryable(status.get_message().to_owned())).to_boxed()
         }
         _ => future::err(ExecutionError::Fatal(format!(
@@ -766,7 +777,7 @@ impl CommandRunner {
     maybe_cancel_remote_exec_token: Option<CancelRemoteExecutionToken>,
   ) -> BoxFuture<
     future::Loop<
-      FallibleExecuteProcessResult,
+      FallibleProcessResultWithPlatform,
       (
         ExecutionHistory,
         OperationOrStatus,
@@ -834,8 +845,8 @@ fn maybe_add_workunit(
 }
 
 pub fn make_execute_request(
-  req: &ExecuteProcessRequest,
-  metadata: ExecuteProcessRequestMetadata,
+  req: &Process,
+  metadata: ProcessMetadata,
 ) -> Result<
   (
     bazel_protos::remote_execution::Action,
@@ -859,7 +870,7 @@ pub fn make_execute_request(
     command.mut_environment_variables().push(env);
   }
 
-  let ExecuteProcessRequestMetadata {
+  let ProcessMetadata {
     instance_name,
     cache_key_gen_version,
     mut platform_properties,
@@ -941,26 +952,19 @@ pub fn populate_fallible_execution_result(
   store: Store,
   execute_response: bazel_protos::remote_execution::ExecuteResponse,
   execution_attempts: Vec<ExecutionStats>,
-  workunit_store: WorkUnitStore,
-) -> impl Future<Item = FallibleExecuteProcessResult, Error = String> {
-  extract_stdout(&store, &execute_response, workunit_store.clone())
-    .join(extract_stderr(
-      &store,
-      &execute_response,
-      workunit_store.clone(),
-    ))
-    .join(extract_output_files(
-      store,
-      &execute_response,
-      workunit_store,
-    ))
+  platform: Platform,
+) -> impl Future<Item = FallibleProcessResultWithPlatform, Error = String> {
+  extract_stdout(&store, &execute_response)
+    .join(extract_stderr(&store, &execute_response))
+    .join(extract_output_files(store, &execute_response))
     .and_then(move |((stdout, stderr), output_directory)| {
-      Ok(FallibleExecuteProcessResult {
+      Ok(FallibleProcessResultWithPlatform {
         stdout: stdout,
         stderr: stderr,
         exit_code: execute_response.get_result().get_exit_code(),
         output_directory: output_directory,
         execution_attempts: execution_attempts,
+        platform,
       })
     })
 }
@@ -968,85 +972,99 @@ pub fn populate_fallible_execution_result(
 fn extract_stdout(
   store: &Store,
   execute_response: &bazel_protos::remote_execution::ExecuteResponse,
-  workunit_store: WorkUnitStore,
 ) -> BoxFuture<Bytes, String> {
   if execute_response.get_result().has_stdout_digest() {
+    let store = store.clone();
     let stdout_digest_result: Result<Digest, String> =
       execute_response.get_result().get_stdout_digest().into();
     let stdout_digest =
       try_future!(stdout_digest_result.map_err(|err| format!("Error extracting stdout: {}", err)));
-    store
-      .load_file_bytes_with(stdout_digest, |v| v, workunit_store)
-      .map_err(move |error| {
-        format!(
-          "Error fetching stdout digest ({:?}): {:?}",
-          stdout_digest, error
-        )
-      })
-      .and_then(move |maybe_value| {
-        maybe_value.ok_or_else(|| {
+    Box::pin(async move {
+      let (bytes, _metadata) = store
+        .load_file_bytes_with(stdout_digest, |v| v)
+        .map_err(move |error| {
+          format!(
+            "Error fetching stdout digest ({:?}): {:?}",
+            stdout_digest, error
+          )
+        })
+        .await?
+        .ok_or_else(|| {
           format!(
             "Couldn't find stdout digest ({:?}), when fetching.",
             stdout_digest
           )
-        })
-      })
-      .map(|(bytes, _metadata)| bytes)
-      .to_boxed()
+        })?;
+      Ok(bytes)
+    })
+    .compat()
+    .to_boxed()
   } else {
+    let store = store.clone();
     let stdout_raw = Bytes::from(execute_response.get_result().get_stdout_raw());
     let stdout_copy = stdout_raw.clone();
-    store
-      .store_file_bytes(stdout_raw, true)
-      .map_err(move |error| format!("Error storing raw stdout: {:?}", error))
-      .map(|_| stdout_copy)
-      .to_boxed()
+    Box::pin(async move {
+      store
+        .store_file_bytes(stdout_raw, true)
+        .map_err(move |error| format!("Error storing raw stdout: {:?}", error))
+        .await?;
+      Ok(stdout_copy)
+    })
+    .compat()
+    .to_boxed()
   }
 }
 
 fn extract_stderr(
   store: &Store,
   execute_response: &bazel_protos::remote_execution::ExecuteResponse,
-  workunit_store: WorkUnitStore,
 ) -> BoxFuture<Bytes, String> {
   if execute_response.get_result().has_stderr_digest() {
+    let store = store.clone();
     let stderr_digest_result: Result<Digest, String> =
       execute_response.get_result().get_stderr_digest().into();
     let stderr_digest =
       try_future!(stderr_digest_result.map_err(|err| format!("Error extracting stderr: {}", err)));
-    store
-      .load_file_bytes_with(stderr_digest, |v| v, workunit_store)
-      .map_err(move |error| {
-        format!(
-          "Error fetching stderr digest ({:?}): {:?}",
-          stderr_digest, error
-        )
-      })
-      .and_then(move |maybe_value| {
-        maybe_value.ok_or_else(|| {
+
+    Box::pin(async move {
+      let (bytes, _metadata) = store
+        .load_file_bytes_with(stderr_digest, |v| v)
+        .map_err(move |error| {
+          format!(
+            "Error fetching stderr digest ({:?}): {:?}",
+            stderr_digest, error
+          )
+        })
+        .await?
+        .ok_or_else(|| {
           format!(
             "Couldn't find stderr digest ({:?}), when fetching.",
             stderr_digest
           )
-        })
-      })
-      .map(|(bytes, _metadata)| bytes)
-      .to_boxed()
+        })?;
+      Ok(bytes)
+    })
+    .compat()
+    .to_boxed()
   } else {
+    let store = store.clone();
     let stderr_raw = Bytes::from(execute_response.get_result().get_stderr_raw());
     let stderr_copy = stderr_raw.clone();
-    store
-      .store_file_bytes(stderr_raw, true)
-      .map_err(move |error| format!("Error storing raw stderr: {:?}", error))
-      .map(|_| stderr_copy)
-      .to_boxed()
+    Box::pin(async move {
+      store
+        .store_file_bytes(stderr_raw, true)
+        .map_err(move |error| format!("Error storing raw stderr: {:?}", error))
+        .await?;
+      Ok(stderr_copy)
+    })
+    .compat()
+    .to_boxed()
   }
 }
 
 pub fn extract_output_files(
   store: Store,
   execute_response: &bazel_protos::remote_execution::ExecuteResponse,
-  workunit_store: WorkUnitStore,
 ) -> BoxFuture<Digest, String> {
   // Get Digests of output Directories.
   // Then we'll make a Directory for the output files, and merge them.
@@ -1058,14 +1076,14 @@ pub fn extract_output_files(
     .get_output_directories()
     .to_owned();
   for dir in output_directories {
-    let digest_result: Result<Digest, String> = dir.get_tree_digest().into();
-    let mut digest = future::done(digest_result).to_boxed();
-    if !dir.get_path().is_empty() {
-      for component in dir.get_path().rsplit('/') {
-        let component = component.to_owned();
-        let store = store.clone();
-        digest = digest
-          .and_then(move |digest| {
+    let store = store.clone();
+    directory_digests.push(
+      (async move {
+        let digest_result: Result<Digest, String> = dir.get_tree_digest().into();
+        let mut digest = digest_result?;
+        if !dir.get_path().is_empty() {
+          for component in dir.get_path().rsplit('/') {
+            let component = component.to_owned();
             let mut directory = bazel_protos::remote_execution::Directory::new();
             directory.mut_directories().push({
               let mut node = bazel_protos::remote_execution::DirectoryNode::new();
@@ -1073,13 +1091,14 @@ pub fn extract_output_files(
               node.set_digest((&digest).into());
               node
             });
-            store.record_directory(&directory, true)
-          })
-          .to_boxed();
-      }
-    }
-    directory_digests
-      .push(digest.map_err(|err| format!("Error saving remote output directory: {}", err)));
+            digest = store.record_directory(&directory, true).await?;
+          }
+        }
+        let res: Result<_, String> = Ok(digest);
+        res
+      })
+      .map_err(|err| format!("Error saving remote output directory: {}", err)),
+    );
   }
 
   // Make a directory for the files
@@ -1118,7 +1137,7 @@ pub fn extract_output_files(
   }
 
   impl StoreFileByDigest<String> for StoreOneOffRemoteDigest {
-    fn store_by_digest(&self, file: File, _: WorkUnitStore) -> BoxFuture<Digest, String> {
+    fn store_by_digest(&self, file: File) -> BoxFuture<Digest, String> {
       match self.map_of_paths_to_digests.get(&file.path) {
         Some(digest) => future::ok(*digest),
         None => future::err(format!(
@@ -1130,24 +1149,28 @@ pub fn extract_output_files(
     }
   }
 
-  Snapshot::digest_from_path_stats(
-    store.clone(),
-    &StoreOneOffRemoteDigest::new(path_map),
-    &path_stats,
-    workunit_store.clone(),
-  )
-  .map_err(move |error| {
-    format!(
-      "Error when storing the output file directory info in the remote CAS: {:?}",
-      error
+  Box::pin(async move {
+    let files_digest = Snapshot::digest_from_path_stats(
+      store.clone(),
+      StoreOneOffRemoteDigest::new(path_map),
+      &path_stats,
     )
-  })
-  .join(future::join_all(directory_digests))
-  .and_then(|(files_digest, mut directory_digests)| {
+    .map_err(move |error| {
+      format!(
+        "Error when storing the output file directory info in the remote CAS: {:?}",
+        error
+      )
+    });
+
+    let (files_digest, mut directory_digests) =
+      future03::try_join(files_digest, future03::try_join_all(directory_digests)).await?;
+
     directory_digests.push(files_digest);
-    Snapshot::merge_directories(store, directory_digests, workunit_store)
+    Snapshot::merge_directories(store, directory_digests)
       .map_err(|err| format!("Error when merging output files and directories: {}", err))
+      .await
   })
+  .compat()
   .to_boxed()
 }
 
@@ -1170,7 +1193,7 @@ fn rpcerror_recover_cancelled(
 ) -> Result<bazel_protos::operations::Operation, grpcio::Error> {
   // If the error represented cancellation, return an Operation for the given Operation name.
   match &err {
-    &grpcio::Error::RpcFailure(ref rs) if rs.status == grpcio::RpcStatusCode::Cancelled => {
+    &grpcio::Error::RpcFailure(ref rs) if rs.status == grpcio::RpcStatusCode::CANCELLED => {
       let mut next_operation = bazel_protos::operations::Operation::new();
       next_operation.set_name(operation_name);
       return Ok(next_operation);

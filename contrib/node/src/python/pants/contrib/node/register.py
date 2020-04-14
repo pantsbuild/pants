@@ -1,18 +1,29 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+"""Support for JavaScript and Node.js."""
+
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 
+from pants.contrib.node.rules.targets import (
+    NodeBundle,
+    NodeModule,
+    NodePreinstalledModule,
+    NodeRemoteModule,
+    NodeTest,
+)
 from pants.contrib.node.subsystems.resolvers.node_preinstalled_module_resolver import (
     NodePreinstalledModuleResolver,
 )
 from pants.contrib.node.subsystems.resolvers.npm_resolver import NpmResolver
-from pants.contrib.node.targets.node_bundle import NodeBundle
-from pants.contrib.node.targets.node_module import NodeModule
-from pants.contrib.node.targets.node_preinstalled_module import NodePreinstalledModule
-from pants.contrib.node.targets.node_remote_module import NodeRemoteModule
-from pants.contrib.node.targets.node_test import NodeTest as NodeTestTarget
+from pants.contrib.node.targets.node_bundle import NodeBundle as NodeBundleV1
+from pants.contrib.node.targets.node_module import NodeModule as NodeModuleV1
+from pants.contrib.node.targets.node_preinstalled_module import (
+    NodePreinstalledModule as NodePreinstalledModuleV1,
+)
+from pants.contrib.node.targets.node_remote_module import NodeRemoteModule as NodeRemoteModuleV1
+from pants.contrib.node.targets.node_test import NodeTest as NodeTestTargetV1
 from pants.contrib.node.tasks.javascript_style import JavascriptStyleFmt, JavascriptStyleLint
 from pants.contrib.node.tasks.node_build import NodeBuild
 from pants.contrib.node.tasks.node_bundle import NodeBundle as NodeBundleTask
@@ -26,11 +37,11 @@ from pants.contrib.node.tasks.node_test import NodeTest as NodeTestTask
 def build_file_aliases():
     return BuildFileAliases(
         targets={
-            "node_bundle": NodeBundle,
-            "node_module": NodeModule,
-            "node_preinstalled_module": NodePreinstalledModule,
-            "node_remote_module": NodeRemoteModule,
-            "node_test": NodeTestTarget,
+            "node_bundle": NodeBundleV1,
+            "node_module": NodeModuleV1,
+            "node_preinstalled_module": NodePreinstalledModuleV1,
+            "node_remote_module": NodeRemoteModuleV1,
+            "node_test": NodeTestTargetV1,
         },
     )
 
@@ -51,3 +62,7 @@ def register_goals():
 
 def global_subsystems():
     return (NodePreinstalledModuleResolver, NpmResolver)
+
+
+def targets2():
+    return [NodeBundle, NodeModule, NodePreinstalledModule, NodeRemoteModule, NodeTest]

@@ -140,7 +140,7 @@ class ExportTest(ConsoleTaskTestBase):
         self.make_target(
             ":nailgun-server",
             JarLibrary,
-            jars=[JarDependency(org="com.martiansoftware", name="nailgun-server", rev="0.9.1"),],
+            jars=[JarDependency(org="com.martiansoftware", name="nailgun-server", rev="0.9.1")],
         )
 
         self.make_target(
@@ -222,6 +222,7 @@ class ExportTest(ConsoleTaskTestBase):
             "project_info:unrecognized_target_type", target_type=JvmTarget,
         )
 
+        self.create_file("src/python/x/f.py")
         self.add_to_build_file(
             "src/python/x/BUILD",
             """
@@ -229,6 +230,7 @@ class ExportTest(ConsoleTaskTestBase):
             """.strip(),
         )
 
+        self.create_files("src/python/y", files=["subdir/f.py", "Test.py"])
         self.add_to_build_file(
             "src/python/y/BUILD",
             dedent(
@@ -240,6 +242,7 @@ class ExportTest(ConsoleTaskTestBase):
             ),
         )
 
+        self.create_file("src/python/exclude/f.py")
         self.add_to_build_file(
             "src/python/exclude/BUILD",
             """
@@ -254,6 +257,7 @@ class ExportTest(ConsoleTaskTestBase):
             """.strip(),
         )
 
+        self.create_file("src/python/has_reqs/f.py")
         self.add_to_build_file(
             "src/python/has_reqs/BUILD",
             textwrap.dedent(
@@ -273,7 +277,7 @@ class ExportTest(ConsoleTaskTestBase):
     def execute_export(self, *specs, **options_overrides):
         options = {
             ScalaPlatform.options_scope: {"version": "custom"},
-            JvmResolveSubsystem.options_scope: {"resolver": "ivy"},
+            JvmResolveSubsystem.options_scope: {"resolver": "coursier"},
             JvmPlatform.options_scope: {
                 "default_platform": "java8",
                 "platforms": {"java8": {"source": "1.8", "target": "1.8"}},
@@ -358,7 +362,7 @@ class ExportTest(ConsoleTaskTestBase):
         result = self.execute_export_json("project_info:third")
 
         self.assertEqual(
-            ["project_info/com/foo/Bar.scala", "project_info/com/foo/Baz.scala",],
+            ["project_info/com/foo/Bar.scala", "project_info/com/foo/Baz.scala"],
             sorted(result["targets"]["project_info:third"]["sources"]),
         )
 

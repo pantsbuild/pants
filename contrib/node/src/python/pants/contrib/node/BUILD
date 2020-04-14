@@ -4,6 +4,8 @@
 contrib_plugin(
   name='plugin',
   dependencies=[
+    'contrib/node/src/python/pants/contrib/node/rules',
+    'contrib/node/src/python/pants/contrib/node/subsystems',
     'contrib/node/src/python/pants/contrib/node/subsystems/resolvers',
     'contrib/node/src/python/pants/contrib/node/targets',
     'contrib/node/src/python/pants/contrib/node/tasks',

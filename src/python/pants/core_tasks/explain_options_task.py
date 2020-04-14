@@ -7,7 +7,7 @@ from colors import black, blue, cyan, green, magenta, red, white
 from packaging.version import Version
 
 from pants.option.options_fingerprinter import CoercingOptionEncoder
-from pants.option.ranked_value import RankedValue
+from pants.option.ranked_value import Rank
 from pants.option.scope import GLOBAL_SCOPE
 from pants.task.console_task import ConsoleTask
 from pants.version import PANTS_SEMVER
@@ -29,9 +29,7 @@ class ExplainOptionsTask(ConsoleTask):
         register("--scope", help="Only show options in this scope. Use GLOBAL for global scope.")
         register("--name", help="Only show options with this name.")
         register(
-            "--rank",
-            choices=RankedValue.get_names(),
-            help="Only show options with at least this importance.",
+            "--rank", type=Rank, help="Only show options with at least this importance.",
         )
         register(
             "--show-history",
@@ -68,23 +66,23 @@ class ExplainOptionsTask(ConsoleTask):
         return option == pattern
 
     def _rank_filter(self, rank):
-        pattern = self.get_options().rank
-        if not pattern:
+        minimum_rank = self.get_options().rank
+        if not minimum_rank:
             return True
-        return rank >= RankedValue.get_rank_value(pattern)
+        return rank >= minimum_rank
 
     def _rank_color(self, rank):
         if not self.get_options().colors:
             return lambda x: x
-        if rank == RankedValue.NONE:
+        if rank == Rank.NONE:
             return white
-        if rank == RankedValue.HARDCODED:
+        if rank == Rank.HARDCODED:
             return white
-        if rank == RankedValue.ENVIRONMENT:
+        if rank == Rank.ENVIRONMENT:
             return red
-        if rank == RankedValue.CONFIG:
+        if rank == Rank.CONFIG:
             return blue
-        if rank == RankedValue.FLAG:
+        if rank == Rank.FLAG:
             return magenta
         return black
 
@@ -100,7 +98,7 @@ class ExplainOptionsTask(ConsoleTask):
         )
 
     def _format_record(self, record):
-        simple_rank = RankedValue.get_rank_name(record.rank)
+        simple_rank = record.rank.name
         if self.is_json():
             return record.value, simple_rank
         elif self.is_text():
@@ -116,7 +114,7 @@ class ExplainOptionsTask(ConsoleTask):
 
     def _show_history(self, history):
         for record in reversed(list(history)[:-1]):
-            if record.rank > RankedValue.NONE:
+            if record.rank > Rank.NONE:
                 yield "  overrode {}".format(self._format_record(record))
 
     def _force_option_parsing(self):

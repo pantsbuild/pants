@@ -13,7 +13,7 @@ target(
 
 page(
   name='readme',
-  source='README.md',
+  sources=['README.md'],
   links=[
     ':3rdparty_py',
     'src/docs:first_concepts',
@@ -22,7 +22,7 @@ page(
 
 page(
   name='3rdparty_py',
-  source='3rdparty_py.md',
+  sources=['3rdparty_py.md'],
   links=[
     'src/docs:3rdparty',
   ]

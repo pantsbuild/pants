@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from textwrap import dedent
 from typing import List
 
-from pants.engine.rules import RootRule, rule
+from pants.engine.rules import RootRule, named_rule, rule
 from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Get, MultiGet
 from pants.reporting.streaming_workunit_handler import StreamingWorkunitHandler
@@ -49,7 +49,7 @@ class Fib:
     val: int
 
 
-@rule(name="fib")
+@named_rule
 async def fib(n: int) -> Fib:
     if n < 2:
         return Fib(n)
@@ -96,8 +96,8 @@ class Omega:
     pass
 
 
-@rule(name="rule_one")
-async def rule_one(i: Input) -> Beta:
+@named_rule(canonical_name="rule_one")
+async def rule_one_function(i: Input) -> Beta:
     """This rule should be the first one executed by the engine, and thus have no parent."""
     a = Alpha()
     o = await Get[Omega](Alpha, a)
@@ -105,7 +105,7 @@ async def rule_one(i: Input) -> Beta:
     return b
 
 
-@rule(name="rule_two")
+@named_rule
 async def rule_two(a: Alpha) -> Omega:
     """This rule should be invoked in the body of `rule_one` and therefore its workunit should be a
     child of `rule_one`'s workunit."""
@@ -113,14 +113,14 @@ async def rule_two(a: Alpha) -> Omega:
     return Omega()
 
 
-@rule(name="rule_three")
+@named_rule(desc="Rule number 3")
 async def rule_three(o: Omega) -> Beta:
     """This rule should be invoked in the body of `rule_one` and therefore its workunit should be a
     child of `rule_one`'s workunit."""
     return Beta()
 
 
-@rule(name="rule_four")
+@named_rule(desc="Rule number 4")
 def rule_four(a: Alpha) -> Gamma:
     """This rule should be invoked in the body of `rule_two` and therefore its workunit should be a
     child of `rule_two`'s workunit."""
@@ -223,9 +223,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
         res = self.mk_scheduler().with_fork_context(fork_context_body)
         self.assertEquals(res, expected)
 
-    @unittest.skip(
-        "Inherently flaky as described in https://github.com/pantsbuild/pants/issues/6829"
-    )
+    @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/6829")
     def test_trace_multi(self):
         # Tests that when multiple distinct failures occur, they are each rendered.
 
@@ -329,7 +327,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
         finished: bool = False
 
         def add(self, workunits, **kwargs) -> None:
-            if kwargs["finished"] == True:
+            if kwargs["finished"] is True:
                 self.finished = True
             self.workunits.extend(workunits)
 
@@ -358,8 +356,8 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
         assert len(tracker.workunits) == 10
         assert tracker.finished
 
-    def test_streaming_workunits_parent_id(self):
-        rules = [RootRule(Input), rule_one, rule_two, rule_three, rule_four]
+    def test_streaming_workunits_parent_id_and_rule_metadata(self):
+        rules = [RootRule(Input), rule_one_function, rule_two, rule_three, rule_four]
         scheduler = self.mk_scheduler(
             rules, include_trace_on_error=False, should_report_workunits=True
         )
@@ -383,3 +381,6 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
         assert r2["parent_id"] == r1["span_id"]
         assert r3["parent_id"] == r1["span_id"]
         assert r4["parent_id"] == r2["span_id"]
+
+        assert r3["description"] == "Rule number 3"
+        assert r4["description"] == "Rule number 4"

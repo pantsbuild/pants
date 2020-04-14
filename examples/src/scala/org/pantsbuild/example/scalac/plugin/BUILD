@@ -76,5 +76,5 @@ scala_library(
 
 page(
   name='readme',
-  source='README.md',
+  sources=['README.md'],
 )

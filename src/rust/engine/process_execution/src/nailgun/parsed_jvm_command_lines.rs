@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use std::slice::Iter;
 
-/// Represents the result of parsing the args of a nailgunnable ExecuteProcessRequest
+/// Represents the result of parsing the args of a nailgunnable Process
 /// TODO(#8481) We may want to split the classpath by the ":", and store it as a Vec<String>
 ///         to allow for deep fingerprinting.
 #[derive(PartialEq, Eq, Debug)]
