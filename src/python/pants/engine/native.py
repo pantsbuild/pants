@@ -33,10 +33,7 @@ from pants.engine.fs import (
     UrlToFetch,
 )
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveProcessResult
-from pants.engine.isolated_process import (
-    FallibleExecuteProcessResultWithPlatform,
-    MultiPlatformExecuteProcessRequest,
-)
+from pants.engine.isolated_process import FallibleProcessResultWithPlatform, MultiPlatformProcess
 from pants.engine.objects import union
 from pants.engine.platform import Platform
 from pants.engine.selectors import Get
@@ -580,14 +577,14 @@ class EngineTypes(NamedTuple):
     file: TypeId
     link: TypeId
     platform: TypeId
-    multi_platform_process_request: TypeId
+    multi_platform_process: TypeId
     process_result: TypeId
     coroutine: TypeId
     url_to_fetch: TypeId
     string: TypeId
     bytes: TypeId
     construct_interactive_process_result: Function
-    interactive_process_request: TypeId
+    interactive_process: TypeId
     interactive_process_result: TypeId
     snapshot_subset: TypeId
     construct_platform: Function
@@ -951,7 +948,7 @@ class Native(metaclass=SingletonMetaclass):
             construct_file_content=func(FileContent),
             construct_files_content=func(FilesContent),
             files_content=ti(FilesContent),
-            construct_process_result=func(FallibleExecuteProcessResultWithPlatform),
+            construct_process_result=func(FallibleProcessResultWithPlatform),
             construct_materialize_directories_results=func(MaterializeDirectoriesResult),
             construct_materialize_directory_result=func(MaterializeDirectoryResult),
             address=ti(Address),
@@ -964,14 +961,14 @@ class Native(metaclass=SingletonMetaclass):
             file=ti(File),
             link=ti(Link),
             platform=ti(Platform),
-            multi_platform_process_request=ti(MultiPlatformExecuteProcessRequest),
-            process_result=ti(FallibleExecuteProcessResultWithPlatform),
+            multi_platform_process=ti(MultiPlatformProcess),
+            process_result=ti(FallibleProcessResultWithPlatform),
             coroutine=ti(CoroutineType),
             url_to_fetch=ti(UrlToFetch),
             string=ti(str),
             bytes=ti(bytes),
             construct_interactive_process_result=func(InteractiveProcessResult),
-            interactive_process_request=ti(InteractiveProcessRequest),
+            interactive_process=ti(InteractiveProcessRequest),
             interactive_process_result=ti(InteractiveProcessResult),
             snapshot_subset=ti(SnapshotSubset),
             construct_platform=func(Platform),

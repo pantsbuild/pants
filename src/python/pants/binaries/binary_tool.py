@@ -406,7 +406,7 @@ async def fetch_binary_tool(req: BinaryToolFetchRequest, url_set: BinaryToolUrlS
             f"urls for the request {req}"
         )
     # TODO: allow fetching a UrlToFetch with failure! Consider FallibleUrlToFetch analog to
-    # FallibleExecuteProcessResult!
+    # FallibleProcessResult!
     url_to_fetch = urls[0]
 
     return await Get[Snapshot](UrlToFetch(url_to_fetch, digest))

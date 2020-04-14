@@ -1,6 +1,6 @@
 use crate::{
-  Context, ExecuteProcessRequest, ExecuteProcessRequestMetadata,
-  FallibleExecuteProcessResultWithPlatform, MultiPlatformExecuteProcessRequest, Platform,
+  Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, Process,
+  ProcessMetadata,
 };
 use std::sync::Arc;
 
@@ -30,7 +30,7 @@ pub struct CommandRunner {
   underlying: Arc<dyn crate::CommandRunner>,
   process_execution_store: ShardedLmdb,
   file_store: Store,
-  metadata: ExecuteProcessRequestMetadata,
+  metadata: ProcessMetadata,
 }
 
 impl CommandRunner {
@@ -38,7 +38,7 @@ impl CommandRunner {
     underlying: Arc<dyn crate::CommandRunner>,
     process_execution_store: ShardedLmdb,
     file_store: Store,
-    metadata: ExecuteProcessRequestMetadata,
+    metadata: ProcessMetadata,
   ) -> CommandRunner {
     CommandRunner {
       underlying,
@@ -50,19 +50,16 @@ impl CommandRunner {
 }
 
 impl crate::CommandRunner for CommandRunner {
-  fn extract_compatible_request(
-    &self,
-    req: &MultiPlatformExecuteProcessRequest,
-  ) -> Option<ExecuteProcessRequest> {
+  fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
     self.underlying.extract_compatible_request(req)
   }
 
   // TODO: Maybe record WorkUnits for local cache checks.
   fn run(
     &self,
-    req: MultiPlatformExecuteProcessRequest,
+    req: MultiPlatformProcess,
     context: Context,
-  ) -> BoxFuture<FallibleExecuteProcessResultWithPlatform, String> {
+  ) -> BoxFuture<FallibleProcessResultWithPlatform, String> {
     let digest = crate::digest(req.clone(), &self.metadata);
     let key = digest.0;
 
@@ -108,7 +105,7 @@ impl CommandRunner {
   fn lookup(
     &self,
     fingerprint: Fingerprint,
-  ) -> impl Future<Item = Option<FallibleExecuteProcessResultWithPlatform>, Error = String> {
+  ) -> impl Future<Item = Option<FallibleProcessResultWithPlatform>, Error = String> {
     use bazel_protos::remote_execution::ExecuteResponse;
     let file_store = self.file_store.clone();
 
@@ -151,7 +148,7 @@ impl CommandRunner {
   fn store(
     &self,
     fingerprint: Fingerprint,
-    result: &FallibleExecuteProcessResultWithPlatform,
+    result: &FallibleProcessResultWithPlatform,
   ) -> impl Future<Item = (), Error = String> {
     let mut execute_response = bazel_protos::remote_execution::ExecuteResponse::new();
     execute_response.set_cached_result(true);

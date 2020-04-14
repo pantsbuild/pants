@@ -16,7 +16,7 @@ from pants.backend.python.rules.pex import (
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
-from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
+from pants.engine.isolated_process import FallibleProcessResult, Process
 from pants.engine.rules import UnionRule, named_rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.global_options import GlobMatchErrorBehavior
@@ -115,8 +115,8 @@ async def bandit_lint(
         input_files=merged_input_files,
         description=f"Run Bandit for {address_references}",
     )
-    result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, request)
-    return LintResult.from_fallible_execute_process_result(result)
+    result = await Get[FallibleProcessResult](Process, request)
+    return LintResult.from_fallible_process_result(result)
 
 
 def rules():

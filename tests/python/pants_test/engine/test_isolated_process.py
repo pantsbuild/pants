@@ -16,10 +16,10 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.isolated_process import (
-    ExecuteProcessRequest,
-    ExecuteProcessResult,
-    FallibleExecuteProcessResult,
+    FallibleProcessResult,
+    Process,
     ProcessExecutionFailure,
+    ProcessResult,
 )
 from pants.engine.rules import RootRule, rule
 from pants.engine.scheduler import ExecutionError
@@ -48,9 +48,9 @@ class ShellCat:
     generate an argv instead of doing it all in CatExecutionRequest.
 
     This can be used to encapsulate operations such as sanitizing command-line arguments which are
-    specific to the executable, which can reduce boilerplate for generating ExecuteProcessRequest
-    instances if the executable is used in different ways across multiple different types of process
-    execution requests.
+    specific to the executable, which can reduce boilerplate for generating Process instances if the
+    executable is used in different ways across multiple different types of process execution
+    requests.
     """
 
     binary_location: BinaryLocation
@@ -83,12 +83,12 @@ class CatExecutionRequest:
 async def cat_files_process_result_concatted(cat_exe_req: CatExecutionRequest) -> Concatted:
     cat_bin = cat_exe_req.shell_cat
     cat_files_snapshot = await Get[Snapshot](PathGlobs, cat_exe_req.path_globs)
-    process_request = ExecuteProcessRequest(
+    process = Process(
         argv=cat_bin.argv_from_snapshot(cat_files_snapshot),
         input_files=cat_files_snapshot.directory_digest,
         description="cat some files",
     )
-    cat_process_result = await Get[ExecuteProcessResult](ExecuteProcessRequest, process_request)
+    cat_process_result = await Get[ProcessResult](Process, process)
     return Concatted(cat_process_result.stdout.decode())
 
 
@@ -124,14 +124,12 @@ class JavacVersionOutput:
 async def get_javac_version_output(
     javac_version_command: JavacVersionExecutionRequest,
 ) -> JavacVersionOutput:
-    javac_version_proc_req = ExecuteProcessRequest(
+    javac_version_proc_req = Process(
         argv=javac_version_command.gen_argv(),
         description=javac_version_command.description,
         input_files=EMPTY_DIRECTORY_DIGEST,
     )
-    javac_version_proc_result = await Get[ExecuteProcessResult](
-        ExecuteProcessRequest, javac_version_proc_req,
-    )
+    javac_version_proc_result = await Get[ProcessResult](Process, javac_version_proc_req,)
 
     return JavacVersionOutput(javac_version_proc_result.stderr.decode())
 
@@ -186,13 +184,13 @@ async def javac_compile_process_result(
             raise ValueError(f"Can only compile .java files but got {java_file}")
     sources_snapshot = await Get[Snapshot](PathGlobs, PathGlobs(java_files))
     output_dirs = tuple({os.path.dirname(java_file) for java_file in java_files})
-    process_request = ExecuteProcessRequest(
+    process = Process(
         argv=javac_compile_req.argv_from_source_snapshot(sources_snapshot),
         input_files=sources_snapshot.directory_digest,
         output_directories=output_dirs,
         description="javac compilation",
     )
-    javac_proc_result = await Get[ExecuteProcessResult](ExecuteProcessRequest, process_request)
+    javac_proc_result = await Get[ProcessResult](Process, process)
 
     return JavacCompileResult(
         javac_proc_result.stdout.decode(),
@@ -208,9 +206,9 @@ def create_javac_compile_rules():
     ]
 
 
-class ExecuteProcessRequestTest(unittest.TestCase):
+class ProcessTest(unittest.TestCase):
     def test_create_from_snapshot_with_env(self):
-        req = ExecuteProcessRequest(
+        req = Process(
             argv=("foo",),
             description="Some process",
             env={"VAR": "VAL"},
@@ -227,13 +225,13 @@ class TestInputFileCreation(TestBase):
         input_file = InputFilesContent((FileContent(path=file_name, content=file_contents),))
         digest = self.request_single_product(Digest, input_file)
 
-        req = ExecuteProcessRequest(
+        req = Process(
             argv=("/bin/cat", file_name),
             input_files=digest,
             description="cat the contents of this file",
         )
 
-        result = self.request_single_product(ExecuteProcessResult, req)
+        result = self.request_single_product(ProcessResult, req)
         self.assertEqual(result.stdout, file_contents)
 
     def test_multiple_file_creation(self):
@@ -246,13 +244,13 @@ class TestInputFileCreation(TestBase):
 
         digest = self.request_single_product(Digest, input_files_content)
 
-        req = ExecuteProcessRequest(
+        req = Process(
             argv=("/bin/cat", "a.txt", "b.txt"),
             input_files=digest,
             description="cat the contents of this file",
         )
 
-        result = self.request_single_product(ExecuteProcessResult, req)
+        result = self.request_single_product(ProcessResult, req)
         self.assertEqual(result.stdout, b"hellogoodbye")
 
     def test_file_in_directory_creation(self):
@@ -262,13 +260,13 @@ class TestInputFileCreation(TestBase):
         input_file = InputFilesContent((FileContent(path=path, content=content),))
         digest = self.request_single_product(Digest, input_file)
 
-        req = ExecuteProcessRequest(
+        req = Process(
             argv=("/bin/cat", "somedir/filename"),
             input_files=digest,
             description="Cat a file in a directory to make sure that doesn't break",
         )
 
-        result = self.request_single_product(ExecuteProcessResult, req)
+        result = self.request_single_product(ProcessResult, req)
         self.assertEqual(result.stdout, content)
 
     def test_not_executable(self):
@@ -278,12 +276,12 @@ class TestInputFileCreation(TestBase):
         input_file = InputFilesContent((FileContent(path=file_name, content=file_contents),))
         digest = self.request_single_product(Digest, input_file)
 
-        req = ExecuteProcessRequest(
+        req = Process(
             argv=("./echo.sh",), input_files=digest, description="cat the contents of this file",
         )
 
         with self.assertRaisesWithMessageContaining(ExecutionError, "Permission"):
-            self.request_single_product(ExecuteProcessResult, req)
+            self.request_single_product(ProcessResult, req)
 
     def test_executable(self):
         file_name = "echo.sh"
@@ -294,11 +292,11 @@ class TestInputFileCreation(TestBase):
         )
         digest = self.request_single_product(Digest, input_file)
 
-        req = ExecuteProcessRequest(
+        req = Process(
             argv=("./echo.sh",), input_files=digest, description="cat the contents of this file",
         )
 
-        result = self.request_single_product(ExecuteProcessResult, req)
+        result = self.request_single_product(ProcessResult, req)
         self.assertEqual(result.stdout, b"Hello\n")
 
 
@@ -328,17 +326,17 @@ class IsolatedProcessTest(TestBase, unittest.TestCase):
         self.assertIn("javac", result.value)
 
     def test_write_file(self):
-        request = ExecuteProcessRequest(
+        request = Process(
             argv=("/bin/bash", "-c", "echo -n 'European Burmese' > roland"),
             description="echo roland",
             output_files=("roland",),
             input_files=EMPTY_DIRECTORY_DIGEST,
         )
 
-        execute_process_result = self.request_single_product(ExecuteProcessResult, request)
+        process_result = self.request_single_product(ProcessResult, request)
 
         self.assertEqual(
-            execute_process_result.output_directory_digest,
+            process_result.output_directory_digest,
             Digest(
                 fingerprint="63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16",
                 serialized_bytes_length=80,
@@ -346,7 +344,7 @@ class IsolatedProcessTest(TestBase, unittest.TestCase):
         )
 
         files_content_result = self.request_single_product(
-            FilesContent, execute_process_result.output_directory_digest,
+            FilesContent, process_result.output_directory_digest,
         )
 
         self.assertEqual(
@@ -354,13 +352,13 @@ class IsolatedProcessTest(TestBase, unittest.TestCase):
         )
 
     def test_timeout(self):
-        request = ExecuteProcessRequest(
+        request = Process(
             argv=("/bin/bash", "-c", "/bin/sleep 0.2; /bin/echo -n 'European Burmese'"),
             timeout_seconds=0.1,
             description="sleepy-cat",
             input_files=EMPTY_DIRECTORY_DIGEST,
         )
-        result = self.request_single_product(FallibleExecuteProcessResult, request)
+        result = self.request_single_product(FallibleProcessResult, request)
         self.assertNotEqual(result.exit_code, 0)
         self.assertIn(b"Exceeded timeout", result.stdout)
         self.assertIn(b"sleepy-cat", result.stdout)
@@ -418,33 +416,33 @@ class Broken {
         with temporary_dir() as temp_dir:
             with open(os.path.join(temp_dir, "roland"), "w") as f:
                 f.write("European Burmese")
-            request = ExecuteProcessRequest(
+            request = Process(
                 argv=("/bin/cat", ".jdk/roland"),
                 input_files=EMPTY_DIRECTORY_DIGEST,
                 description="cat JDK roland",
                 jdk_home=temp_dir,
             )
-            result = self.request_single_product(ExecuteProcessResult, request)
+            result = self.request_single_product(ProcessResult, request)
             self.assertEqual(result.stdout, b"European Burmese")
 
     def test_fallible_failing_command_returns_exited_result(self):
-        request = ExecuteProcessRequest(
+        request = Process(
             argv=("/bin/bash", "-c", "exit 1"),
             description="one-cat",
             input_files=EMPTY_DIRECTORY_DIGEST,
         )
 
-        result = self.request_single_product(FallibleExecuteProcessResult, request)
+        result = self.request_single_product(FallibleProcessResult, request)
 
         self.assertEqual(result.exit_code, 1)
 
     def test_non_fallible_failing_command_raises(self):
-        request = ExecuteProcessRequest(
+        request = Process(
             argv=("/bin/bash", "-c", "exit 1"),
             description="one-cat",
             input_files=EMPTY_DIRECTORY_DIGEST,
         )
 
         with self.assertRaises(ExecutionError) as cm:
-            self.request_single_product(ExecuteProcessResult, request)
+            self.request_single_product(ProcessResult, request)
         self.assertIn("process 'one-cat' failed with exit code 1.", str(cm.exception))

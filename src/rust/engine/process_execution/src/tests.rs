@@ -1,4 +1,4 @@
-use crate::{ExecuteProcessRequest, PlatformConstraint, RelativePath};
+use crate::{PlatformConstraint, Process, RelativePath};
 use hashing::{Digest, Fingerprint};
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeMap, BTreeSet};
@@ -6,9 +6,9 @@ use std::hash::{Hash, Hasher};
 use std::time::Duration;
 
 #[test]
-fn execute_process_request_equality() {
-  let execute_process_request_generator =
-        |description: String, timeout: Duration, unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: hashing::Digest| ExecuteProcessRequest {
+fn process_equality() {
+  let process_generator =
+        |description: String, timeout: Duration, unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: hashing::Digest| Process {
             argv: vec![],
             env: BTreeMap::new(),
             working_directory: None,
@@ -29,22 +29,22 @@ fn execute_process_request_equality() {
     hasher.finish()
   }
 
-  let a = execute_process_request_generator(
+  let a = process_generator(
     "One thing".to_string(),
     Duration::new(0, 0),
     hashing::EMPTY_DIGEST,
   );
-  let b = execute_process_request_generator(
+  let b = process_generator(
     "Another".to_string(),
     Duration::new(0, 0),
     hashing::EMPTY_DIGEST,
   );
-  let c = execute_process_request_generator(
+  let c = process_generator(
     "One thing".to_string(),
     Duration::new(5, 0),
     hashing::EMPTY_DIGEST,
   );
-  let d = execute_process_request_generator(
+  let d = process_generator(
     "One thing".to_string(),
     Duration::new(0, 0),
     Digest(
@@ -56,7 +56,7 @@ fn execute_process_request_equality() {
     ),
   );
 
-  // ExecuteProcessRequest should derive a PartialEq and Hash that ignores the description
+  // Process should derive a PartialEq and Hash that ignores the description
   assert!(a == b);
   assert!(hash(&a) == hash(&b));
 

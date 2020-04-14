@@ -41,7 +41,7 @@ from pants.engine.fs import (
     Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
+from pants.engine.isolated_process import Process, ProcessResult
 from pants.engine.legacy.graph import (
     HydratedTarget,
     HydratedTargets,
@@ -376,7 +376,7 @@ async def run_setup_py(
         output_directories=(dist_dir,),
         description=f"Run setuptools for {req.exported_target.hydrated_target.adaptor.address.reference()}",
     )
-    result = await Get[ExecuteProcessResult](ExecuteProcessRequest, request)
+    result = await Get[ProcessResult](Process, request)
     output_digest = await Get[Digest](
         DirectoryWithPrefixToStrip(result.output_directory_digest, dist_dir)
     )

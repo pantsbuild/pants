@@ -18,7 +18,7 @@ from pants.engine.console import Console
 from pants.engine.fs import Digest, DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
-from pants.engine.isolated_process import FallibleExecuteProcessResult
+from pants.engine.isolated_process import FallibleProcessResult
 from pants.engine.objects import union
 from pants.engine.rules import UnionMembership, goal_rule, rule
 from pants.engine.selectors import Get, MultiGet
@@ -53,10 +53,8 @@ class TestResult:
     __test__ = False
 
     @staticmethod
-    def from_fallible_execute_process_result(
-        process_result: FallibleExecuteProcessResult,
-        *,
-        coverage_data: Optional["CoverageData"] = None,
+    def from_fallible_process_result(
+        process_result: FallibleProcessResult, *, coverage_data: Optional["CoverageData"] = None,
     ) -> "TestResult":
         return TestResult(
             status=Status.SUCCESS if process_result.exit_code == 0 else Status.FAILURE,

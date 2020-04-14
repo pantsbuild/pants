@@ -192,7 +192,7 @@ impl AsRef<Path> for RelativePath {
 ///
 #[derive(Derivative, Clone, Debug, Eq)]
 #[derivative(PartialEq, Hash)]
-pub struct ExecuteProcessRequest {
+pub struct Process {
   ///
   /// The arguments to execute.
   ///
@@ -227,7 +227,7 @@ pub struct ExecuteProcessRequest {
   #[derivative(PartialEq = "ignore", Hash = "ignore")]
   pub description: String,
 
-  // This will be materialized for local ExecuteProcessRequest only.
+  // This will be materialized for local Process only.
   // Eventually we want to remove this.
   // Context: https://github.com/pantsbuild/pants/issues/8314
   // Think twice before using it.
@@ -248,17 +248,17 @@ pub struct ExecuteProcessRequest {
   pub is_nailgunnable: bool,
 }
 
-impl TryFrom<MultiPlatformExecuteProcessRequest> for ExecuteProcessRequest {
+impl TryFrom<MultiPlatformProcess> for Process {
   type Error = String;
 
-  fn try_from(req: MultiPlatformExecuteProcessRequest) -> Result<Self, Self::Error> {
+  fn try_from(req: MultiPlatformProcess) -> Result<Self, Self::Error> {
     match req
       .0
       .get(&(PlatformConstraint::None, PlatformConstraint::None))
     {
       Some(crossplatform_req) => Ok(crossplatform_req.clone()),
       None => Err(String::from(
-        "Cannot coerce to a simple ExecuteProcessRequest, no cross platform request exists.",
+        "Cannot coerce to a simple Process, no cross platform request exists.",
       )),
     }
   }
@@ -268,11 +268,9 @@ impl TryFrom<MultiPlatformExecuteProcessRequest> for ExecuteProcessRequest {
 /// A container of platform constrained processes.
 ///
 #[derive(Derivative, Clone, Debug, Eq, PartialEq, Hash)]
-pub struct MultiPlatformExecuteProcessRequest(
-  pub BTreeMap<(PlatformConstraint, PlatformConstraint), ExecuteProcessRequest>,
-);
+pub struct MultiPlatformProcess(pub BTreeMap<(PlatformConstraint, PlatformConstraint), Process>);
 
-impl MultiPlatformExecuteProcessRequest {
+impl MultiPlatformProcess {
   pub fn user_facing_name(&self) -> Option<String> {
     self
       .0
@@ -282,9 +280,9 @@ impl MultiPlatformExecuteProcessRequest {
   }
 }
 
-impl From<ExecuteProcessRequest> for MultiPlatformExecuteProcessRequest {
-  fn from(req: ExecuteProcessRequest) -> Self {
-    MultiPlatformExecuteProcessRequest(
+impl From<Process> for MultiPlatformProcess {
+  fn from(req: Process) -> Self {
+    MultiPlatformProcess(
       vec![((PlatformConstraint::None, PlatformConstraint::None), req)]
         .into_iter()
         .collect(),
@@ -293,12 +291,12 @@ impl From<ExecuteProcessRequest> for MultiPlatformExecuteProcessRequest {
 }
 
 ///
-/// Metadata surrounding an ExecuteProcessRequest which factors into its cache key when cached
+/// Metadata surrounding an Process which factors into its cache key when cached
 /// externally from the engine graph (e.g. when using remote execution or an external process
 /// cache).
 ///
 #[derive(Clone, Debug)]
-pub struct ExecuteProcessRequestMetadata {
+pub struct ProcessMetadata {
   pub instance_name: Option<String>,
   pub cache_key_gen_version: Option<String>,
   pub platform_properties: Vec<(String, String)>,
@@ -308,7 +306,7 @@ pub struct ExecuteProcessRequestMetadata {
 /// The result of running a process.
 ///
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct FallibleExecuteProcessResultWithPlatform {
+pub struct FallibleProcessResultWithPlatform {
   pub stdout: Bytes,
   pub stderr: Bytes,
   pub exit_code: i32,
@@ -322,7 +320,7 @@ pub struct FallibleExecuteProcessResultWithPlatform {
 }
 
 #[cfg(test)]
-impl FallibleExecuteProcessResultWithPlatform {
+impl FallibleProcessResultWithPlatform {
   pub fn without_execution_attempts(mut self) -> Self {
     self.execution_attempts = vec![];
     self
@@ -362,9 +360,9 @@ pub trait CommandRunner: Send + Sync {
   ///
   fn run(
     &self,
-    req: MultiPlatformExecuteProcessRequest,
+    req: MultiPlatformProcess,
     context: Context,
-  ) -> BoxFuture<FallibleExecuteProcessResultWithPlatform, String>;
+  ) -> BoxFuture<FallibleProcessResultWithPlatform, String>;
 
   ///
   /// Given a multi platform request which may have some platform
@@ -372,10 +370,7 @@ pub trait CommandRunner: Send + Sync {
   /// with the current command runners platform configuration. If so return the
   /// first candidate that will be run if the multi platform request is submitted to
   /// `fn run(..)`
-  fn extract_compatible_request(
-    &self,
-    req: &MultiPlatformExecuteProcessRequest,
-  ) -> Option<ExecuteProcessRequest>;
+  fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process>;
 
   fn num_waiters(&self) -> usize {
     panic!("This method is abstract and not implemented for this type")
@@ -383,10 +378,7 @@ pub trait CommandRunner: Send + Sync {
 }
 
 // TODO(#8513) possibly move to the MEPR struct, or to the hashing crate?
-pub fn digest(
-  req: MultiPlatformExecuteProcessRequest,
-  metadata: &ExecuteProcessRequestMetadata,
-) -> Digest {
+pub fn digest(req: MultiPlatformProcess, metadata: &ProcessMetadata) -> Digest {
   let mut hashes: Vec<String> = req
     .0
     .values()
@@ -428,9 +420,9 @@ impl CommandRunner for BoundedCommandRunner {
 
   fn run(
     &self,
-    req: MultiPlatformExecuteProcessRequest,
+    req: MultiPlatformProcess,
     context: Context,
-  ) -> BoxFuture<FallibleExecuteProcessResultWithPlatform, String> {
+  ) -> BoxFuture<FallibleProcessResultWithPlatform, String> {
     let inner = self.inner.clone();
     self
       .inner
@@ -442,10 +434,7 @@ impl CommandRunner for BoundedCommandRunner {
       .to_boxed()
   }
 
-  fn extract_compatible_request(
-    &self,
-    req: &MultiPlatformExecuteProcessRequest,
-  ) -> Option<ExecuteProcessRequest> {
+  fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
     self.inner.0.extract_compatible_request(&req)
   }
 }

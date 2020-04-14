@@ -29,9 +29,7 @@ use fs::{
   PathGlobs, PathStat, StrictGlobMatching, VFS,
 };
 use hashing;
-use process_execution::{
-  self, ExecuteProcessRequest, MultiPlatformExecuteProcessRequest, PlatformConstraint, RelativePath,
-};
+use process_execution::{self, MultiPlatformProcess, PlatformConstraint, Process, RelativePath};
 use rule_graph;
 
 use graph::{Entry, Node, NodeError, NodeTracer, NodeVisualizer};
@@ -226,13 +224,13 @@ pub fn lift_digest(digest: &Value) -> Result<hashing::Digest, String> {
 /// A Node that represents a set of processes to execute on specific platforms.
 ///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct MultiPlatformExecuteProcess(MultiPlatformExecuteProcessRequest);
+pub struct MultiPlatformExecuteProcess(MultiPlatformProcess);
 
 impl MultiPlatformExecuteProcess {
   fn lift_execute_process(
     value: &Value,
     target_platform: PlatformConstraint,
-  ) -> Result<ExecuteProcessRequest, String> {
+  ) -> Result<Process, String> {
     let env = externs::project_tuple_encoded_map(&value, "env")?;
 
     let working_directory = {
@@ -286,7 +284,7 @@ impl MultiPlatformExecuteProcess {
       ))
       .map_err(|err| format!("Error parsing digest {}", err))?;
 
-    Ok(process_execution::ExecuteProcessRequest {
+    Ok(process_execution::Process {
       argv: externs::project_multi_strs(&value, "argv"),
       env,
       working_directory,
@@ -316,27 +314,25 @@ impl MultiPlatformExecuteProcess {
         )
       })
       .collect();
-    let requests = externs::project_multi(&value, "execute_process_requests");
-    if constraint_parts.len() / 2 != requests.len() {
+    let processes = externs::project_multi(&value, "processes");
+    if constraint_parts.len() / 2 != processes.len() {
       return Err(format!(
-        "Size of constraint keys and requests does not match: {} vs. {}",
+        "Sizes of constraint keys and processes do not match: {} vs. {}",
         constraint_parts.len() / 2,
-        requests.len()
+        processes.len()
       ));
     }
 
-    let mut request_by_constraint: BTreeMap<
-      (PlatformConstraint, PlatformConstraint),
-      ExecuteProcessRequest,
-    > = BTreeMap::new();
-    for (constraint_key, execute_process) in constraint_key_pairs.iter().zip(requests.iter()) {
+    let mut request_by_constraint: BTreeMap<(PlatformConstraint, PlatformConstraint), Process> =
+      BTreeMap::new();
+    for (constraint_key, execute_process) in constraint_key_pairs.iter().zip(processes.iter()) {
       let underlying_req =
         MultiPlatformExecuteProcess::lift_execute_process(execute_process, constraint_key.1)?;
       request_by_constraint.insert(constraint_key.clone(), underlying_req.clone());
     }
-    Ok(MultiPlatformExecuteProcess(
-      MultiPlatformExecuteProcessRequest(request_by_constraint),
-    ))
+    Ok(MultiPlatformExecuteProcess(MultiPlatformProcess(
+      request_by_constraint,
+    )))
   }
 }
 
@@ -378,7 +374,7 @@ impl WrappedNode for MultiPlatformExecuteProcess {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ProcessResult(pub process_execution::FallibleExecuteProcessResultWithPlatform);
+pub struct ProcessResult(pub process_execution::FallibleProcessResultWithPlatform);
 
 ///
 /// A Node that represents reading the destination of a symlink (non-recursively).

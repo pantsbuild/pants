@@ -16,11 +16,7 @@ from pants.backend.python.rules.pex import (
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.fs import Digest, DirectoriesToMerge
-from pants.engine.isolated_process import (
-    ExecuteProcessRequest,
-    ExecuteProcessResult,
-    FallibleExecuteProcessResult,
-)
+from pants.engine.isolated_process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import UnionRule, named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.python.python_setup import PythonSetup
@@ -47,7 +43,7 @@ class SetupRequest:
 
 @dataclass(frozen=True)
 class Setup:
-    process_request: ExecuteProcessRequest
+    process: Process
 
 
 def generate_args(
@@ -110,7 +106,7 @@ async def setup(
         )
     )
 
-    process_request = requirements_pex.create_execute_request(
+    process = requirements_pex.create_execute_request(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path="./docformatter.pex",
@@ -123,7 +119,7 @@ async def setup(
         output_files=all_source_files_snapshot.files,
         description=f"Run docformatter for {address_references}",
     )
-    return Setup(process_request)
+    return Setup(process)
 
 
 @named_rule(desc="Format Python docstrings with docformatter")
@@ -133,8 +129,8 @@ async def docformatter_fmt(
     if docformatter.options.skip:
         return FmtResult.noop()
     setup = await Get[Setup](SetupRequest(formatter, check_only=False))
-    result = await Get[ExecuteProcessResult](ExecuteProcessRequest, setup.process_request)
-    return FmtResult.from_execute_process_result(result)
+    result = await Get[ProcessResult](Process, setup.process)
+    return FmtResult.from_process_result(result)
 
 
 @named_rule(desc="Lint Python docstrings with docformatter")
@@ -144,8 +140,8 @@ async def docformatter_lint(
     if docformatter.options.skip:
         return LintResult.noop()
     setup = await Get[Setup](SetupRequest(formatter, check_only=True))
-    result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, setup.process_request)
-    return LintResult.from_fallible_execute_process_result(result)
+    result = await Get[FallibleProcessResult](Process, setup.process)
+    return LintResult.from_fallible_process_result(result)
 
 
 def rules():

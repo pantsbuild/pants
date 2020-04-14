@@ -1,6 +1,6 @@
 use crate::{
-  CommandRunner as CommandRunnerTrait, Context, ExecuteProcessRequest,
-  ExecuteProcessRequestMetadata, FallibleExecuteProcessResultWithPlatform, PlatformConstraint,
+  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform,
+  PlatformConstraint, Process, ProcessMetadata,
 };
 use futures::compat::Future01CompatExt;
 use hashing::EMPTY_DIGEST;
@@ -16,8 +16,8 @@ use testutil::data::TestData;
 use tokio::runtime::Handle;
 
 struct RoundtripResults {
-  uncached: Result<FallibleExecuteProcessResultWithPlatform, String>,
-  maybe_cached: Result<FallibleExecuteProcessResultWithPlatform, String>,
+  uncached: Result<FallibleProcessResultWithPlatform, String>,
+  maybe_cached: Result<FallibleProcessResultWithPlatform, String>,
 }
 
 async fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
@@ -45,7 +45,7 @@ async fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
     })
     .unwrap();
 
-  let request = ExecuteProcessRequest {
+  let request = Process {
     argv: vec![
       testutil::path::find_bash(),
       format!("{}", script_path.display()),
@@ -75,7 +75,7 @@ async fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
   let process_execution_store =
     ShardedLmdb::new(cache_dir.path().to_owned(), max_lmdb_size, runtime.clone()).unwrap();
 
-  let metadata = ExecuteProcessRequestMetadata {
+  let metadata = ProcessMetadata {
     instance_name: None,
     cache_key_gen_version: None,
     platform_properties: vec![],
