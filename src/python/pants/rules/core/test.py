@@ -24,13 +24,15 @@ from pants.engine.rules import UnionMembership, goal_rule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
     Field,
-    HydratedSources,
-    HydrateSourcesRequest,
     RegisteredTargetTypes,
     Sources,
     Target,
     TargetsWithOrigins,
     TargetWithOrigin,
+)
+from pants.rules.core.filter_empty_sources import (
+    ConfigurationsWithSources,
+    ConfigurationsWithSourcesRequest,
 )
 
 # TODO(#6004): use proper Logging singleton, rather than static logger.
@@ -288,24 +290,19 @@ async def run_tests(
         debug_result = interactive_runner.run_local_interactive_process(request.ipr)
         return Test(debug_result.process_exit_code)
 
-    # TODO: possibly factor out this filtering out of empty `sources`. We do this at this level of
-    #  abstraction, rather than in the test runners, because the test runners often will use
-    #  auto-discovery when given no input files.
     configs = tuple(
         config_type.create(target_with_origin)
         for target_with_origin in targets_with_origins
         for config_type in config_types
         if config_type.is_valid(target_with_origin.target)
     )
-    all_hydrated_sources = await MultiGet(
-        Get[HydratedSources](HydrateSourcesRequest, test_target.sources.request)
-        for test_target in configs
+    configs_with_sources = await Get[ConfigurationsWithSources](
+        ConfigurationsWithSourcesRequest(configs)
     )
 
     results = await MultiGet(
         Get[AddressAndTestResult](WrappedTestConfiguration(config))
-        for config, hydrated_sources in zip(configs, all_hydrated_sources)
-        if hydrated_sources.snapshot.files
+        for config in configs_with_sources
     )
 
     did_any_fail = False
