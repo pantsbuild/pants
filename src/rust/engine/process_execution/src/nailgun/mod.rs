@@ -15,9 +15,8 @@ use tokio::net::TcpStream;
 use crate::local::CapturedWorkdir;
 use crate::nailgun::nailgun_pool::NailgunProcessName;
 use crate::{
-  Context, ExecuteProcessRequest, ExecuteProcessRequestMetadata,
-  FallibleExecuteProcessResultWithPlatform, MultiPlatformExecuteProcessRequest, Platform,
-  PlatformConstraint,
+  Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, PlatformConstraint,
+  Process, ProcessMetadata,
 };
 
 #[cfg(test)]
@@ -39,7 +38,7 @@ static NAILGUN_MAIN_CLASS: &str = "com.martiansoftware.nailgun.NGServer";
 static ARGS_TO_START_NAILGUN: [&str; 1] = [":0"];
 
 ///
-/// Constructs the ExecuteProcessRequest that would be used
+/// Constructs the Process that would be used
 /// to start the nailgun servers if we needed to.
 ///
 // TODO(#8481) We should calculate the input_files by deeply fingerprinting the classpath.
@@ -48,12 +47,12 @@ fn construct_nailgun_server_request(
   args_for_the_jvm: Vec<String>,
   jdk: PathBuf,
   platform_constraint: PlatformConstraint,
-) -> ExecuteProcessRequest {
+) -> Process {
   let mut full_args = args_for_the_jvm;
   full_args.push(NAILGUN_MAIN_CLASS.to_string());
   full_args.extend(ARGS_TO_START_NAILGUN.iter().map(|&a| a.to_string()));
 
-  ExecuteProcessRequest {
+  Process {
     argv: full_args,
     env: BTreeMap::new(),
     working_directory: None,
@@ -71,11 +70,11 @@ fn construct_nailgun_server_request(
 }
 
 fn construct_nailgun_client_request(
-  original_req: ExecuteProcessRequest,
+  original_req: Process,
   client_main_class: String,
   mut client_args: Vec<String>,
-) -> ExecuteProcessRequest {
-  let ExecuteProcessRequest {
+) -> Process {
+  let Process {
     argv: _argv,
     input_files,
     description,
@@ -90,7 +89,7 @@ fn construct_nailgun_client_request(
     is_nailgunnable,
   } = original_req;
   client_args.insert(0, client_main_class);
-  ExecuteProcessRequest {
+  Process {
     argv: client_args,
     input_files,
     description,
@@ -110,7 +109,7 @@ fn construct_nailgun_client_request(
 /// A command runner that can run local requests under nailgun.
 ///
 /// It should only be invoked with local requests.
-/// It will read a flag marking an `ExecuteProcessRequest` as nailgunnable.
+/// It will read a flag marking an `Process` as nailgunnable.
 /// If that flag is set, it will connect to a running nailgun server and run the command there.
 /// Otherwise, it will just delegate to the regular local runner.
 ///
@@ -119,7 +118,7 @@ pub struct CommandRunner {
   inner: Arc<super::local::CommandRunner>,
   nailgun_pool: NailgunPool,
   async_semaphore: async_semaphore::AsyncSemaphore,
-  metadata: ExecuteProcessRequestMetadata,
+  metadata: ProcessMetadata,
   workdir_base: PathBuf,
   executor: task_executor::Executor,
 }
@@ -127,7 +126,7 @@ pub struct CommandRunner {
 impl CommandRunner {
   pub fn new(
     runner: crate::local::CommandRunner,
-    metadata: ExecuteProcessRequestMetadata,
+    metadata: ProcessMetadata,
     workdir_base: PathBuf,
     executor: task_executor::Executor,
   ) -> Self {
@@ -166,9 +165,9 @@ impl CommandRunner {
 impl super::CommandRunner for CommandRunner {
   fn run(
     &self,
-    req: MultiPlatformExecuteProcessRequest,
+    req: MultiPlatformProcess,
     context: Context,
-  ) -> BoxFuture<FallibleExecuteProcessResultWithPlatform, String> {
+  ) -> BoxFuture<FallibleProcessResultWithPlatform, String> {
     let original_request = self.extract_compatible_request(&req).unwrap();
 
     if !original_request.is_nailgunnable {
@@ -198,10 +197,7 @@ impl super::CommandRunner for CommandRunner {
     )
   }
 
-  fn extract_compatible_request(
-    &self,
-    req: &MultiPlatformExecuteProcessRequest,
-  ) -> Option<ExecuteProcessRequest> {
+  fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
     // Request compatibility should be the same as for the local runner, so we just delegate this.
     self.inner.extract_compatible_request(req)
   }
@@ -211,7 +207,7 @@ impl CapturedWorkdir for CommandRunner {
   fn run_in_workdir<'a, 'b, 'c>(
     &'a self,
     workdir_path: &'b Path,
-    req: ExecuteProcessRequest,
+    req: Process,
     context: Context,
   ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String> {
     // Separate argument lists, to form distinct EPRs for (1) starting the nailgun server and (2) running the client in it.
@@ -239,7 +235,7 @@ impl CapturedWorkdir for CommandRunner {
     trace!("Extracted nailgun request:\n {:#?}", &nailgun_req);
 
     let nailgun_req_digest = crate::digest(
-      MultiPlatformExecuteProcessRequest::from(nailgun_req.clone()),
+      MultiPlatformProcess::from(nailgun_req.clone()),
       &self.metadata,
     );
 

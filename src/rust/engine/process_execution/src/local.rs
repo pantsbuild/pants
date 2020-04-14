@@ -24,8 +24,8 @@ use tokio::time::timeout;
 use tokio_util::codec::{BytesCodec, FramedRead};
 
 use crate::{
-  Context, ExecuteProcessRequest, FallibleExecuteProcessResultWithPlatform,
-  MultiPlatformExecuteProcessRequest, Platform, PlatformConstraint,
+  Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, PlatformConstraint,
+  Process,
 };
 
 use bytes::{Bytes, BytesMut};
@@ -220,10 +220,7 @@ impl ChildResults {
 }
 
 impl super::CommandRunner for CommandRunner {
-  fn extract_compatible_request(
-    &self,
-    req: &MultiPlatformExecuteProcessRequest,
-  ) -> Option<ExecuteProcessRequest> {
+  fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
     for compatible_constraint in vec![
       &(PlatformConstraint::None, PlatformConstraint::None),
       &(self.platform.into(), PlatformConstraint::None),
@@ -248,9 +245,9 @@ impl super::CommandRunner for CommandRunner {
   ///
   fn run(
     &self,
-    req: MultiPlatformExecuteProcessRequest,
+    req: MultiPlatformProcess,
     context: Context,
-  ) -> BoxFuture<FallibleExecuteProcessResultWithPlatform, String> {
+  ) -> BoxFuture<FallibleProcessResultWithPlatform, String> {
     let req = self.extract_compatible_request(&req).unwrap();
     self.run_and_capture_workdir(
       req,
@@ -267,7 +264,7 @@ impl CapturedWorkdir for CommandRunner {
   fn run_in_workdir<'a, 'b, 'c>(
     &'a self,
     workdir_path: &'b Path,
-    req: ExecuteProcessRequest,
+    req: Process,
     _context: Context,
   ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String> {
     StreamedHermeticCommand::new(&req.argv[0])
@@ -285,14 +282,14 @@ impl CapturedWorkdir for CommandRunner {
 pub trait CapturedWorkdir {
   fn run_and_capture_workdir(
     &self,
-    req: ExecuteProcessRequest,
+    req: Process,
     context: Context,
     store: Store,
     executor: task_executor::Executor,
     cleanup_local_dirs: bool,
     workdir_base: &Path,
     platform: Platform,
-  ) -> BoxFuture<FallibleExecuteProcessResultWithPlatform, String>
+  ) -> BoxFuture<FallibleProcessResultWithPlatform, String>
   where
     Self: Send + Sync + Clone + 'static,
   {
@@ -403,7 +400,7 @@ pub trait CapturedWorkdir {
         };
 
         output_snapshot
-          .map(move |snapshot| FallibleExecuteProcessResultWithPlatform {
+          .map(move |snapshot| FallibleProcessResultWithPlatform {
             stdout: child_results.stdout,
             stderr: child_results.stderr,
             exit_code: child_results.exit_code,
@@ -425,10 +422,10 @@ pub trait CapturedWorkdir {
           );
         } // Else, workdir gets dropped here
         match result {
-          Ok(fallible_execute_process_result) => Ok(fallible_execute_process_result),
+          Ok(fallible_process_result) => Ok(fallible_process_result),
           Err(msg) => {
             if msg == "deadline has elapsed" {
-              Ok(FallibleExecuteProcessResultWithPlatform {
+              Ok(FallibleProcessResultWithPlatform {
                 stdout: Bytes::from(format!(
                   "Exceeded timeout of {:?} for local process execution, {}",
                   req_timeout, req_description
@@ -454,7 +451,7 @@ pub trait CapturedWorkdir {
   fn run_in_workdir<'a, 'b, 'c>(
     &'a self,
     workdir_path: &'b Path,
-    req: ExecuteProcessRequest,
+    req: Process,
     context: Context,
   ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String>;
 }

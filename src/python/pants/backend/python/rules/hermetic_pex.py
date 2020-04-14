@@ -5,7 +5,7 @@ from typing import Any, Iterable, Mapping, Optional
 
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.fs import Digest
-from pants.engine.isolated_process import ExecuteProcessRequest
+from pants.engine.isolated_process import Process
 from pants.python.python_setup import PythonSetup
 from pants.util.strutil import create_path_env_var
 
@@ -24,8 +24,8 @@ class HermeticPex:
         input_files: Digest,
         env: Optional[Mapping[str, str]] = None,
         **kwargs: Any
-    ) -> ExecuteProcessRequest:
-        """Creates an ExecuteProcessRequest that will run a PEX hermetically.
+    ) -> Process:
+        """Creates an Process that will run a PEX hermetically.
 
         :param python_setup: The parameters for selecting python interpreters to use when invoking
                              the PEX.
@@ -37,7 +37,7 @@ class HermeticPex:
         :param input_files: The files that contain the pex itself and any input files it needs to
                             run against.
         :param env: The environment to run the PEX in.
-        :param **kwargs: Any additional :class:`ExecuteProcessRequest` kwargs to pass through.
+        :param **kwargs: Any additional :class:`Process` kwargs to pass through.
         """
 
         # NB: we use the hardcoded and generic bin name `python`, rather than something dynamic like
@@ -59,6 +59,6 @@ class HermeticPex:
         if env:
             hermetic_env.update(env)
 
-        return ExecuteProcessRequest(
+        return Process(
             argv=argv, input_files=input_files, description=description, env=hermetic_env, **kwargs
         )

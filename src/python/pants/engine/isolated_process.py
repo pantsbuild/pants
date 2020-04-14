@@ -23,7 +23,7 @@ class ProductDescription:
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class ExecuteProcessRequest:
+class Process:
     """Request for execution with args and snapshots to extract."""
 
     # TODO: add a method to hack together a `process_executor` invocation command line which
@@ -72,20 +72,17 @@ class ExecuteProcessRequest:
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class MultiPlatformExecuteProcessRequest:
+class MultiPlatformProcess:
     # args collects a set of tuples representing platform constraints mapped to a req,
     # just like a dict constructor can.
     platform_constraints: Tuple[str, ...]
-    execute_process_requests: Tuple[ExecuteProcessRequest, ...]
+    processes: Tuple[Process, ...]
 
     def __init__(
-        self,
-        request_dict: Dict[Tuple[PlatformConstraint, PlatformConstraint], ExecuteProcessRequest],
+        self, request_dict: Dict[Tuple[PlatformConstraint, PlatformConstraint], Process],
     ) -> None:
         if len(request_dict) == 0:
-            raise ValueError(
-                "At least one platform constrained ExecuteProcessRequest must be passed."
-            )
+            raise ValueError("At least one platform constrained Process must be passed.")
         validated_constraints = tuple(
             constraint.value
             for pair in request_dict.keys()
@@ -94,22 +91,22 @@ class MultiPlatformExecuteProcessRequest:
         )
         if len({req.description for req in request_dict.values()}) != 1:
             raise ValueError(
-                f"The `description` of all execute_process_requests in a {MultiPlatformExecuteProcessRequest.__name__} must be identical."
+                f"The `description` of all processes in a {MultiPlatformProcess.__name__} must be identical."
             )
 
         self.platform_constraints = validated_constraints
-        self.execute_process_requests = tuple(request_dict.values())
+        self.processes = tuple(request_dict.values())
 
     @property
     def product_description(self) -> ProductDescription:
         # we can safely extract the first description because we guarantee that at
         # least one request exists and that all of their descriptions are the same
         # in __new__
-        return ProductDescription(self.execute_process_requests[0].description)
+        return ProductDescription(self.processes[0].description)
 
 
 @dataclass(frozen=True)
-class ExecuteProcessResult:
+class ProcessResult:
     """Result of successfully executing a process.
 
     Requesting one of these will raise an exception if the exit code is non-zero.
@@ -121,7 +118,7 @@ class ExecuteProcessResult:
 
 
 @dataclass(frozen=True)
-class FallibleExecuteProcessResult:
+class FallibleProcessResult:
     """Result of executing a process.
 
     Requesting one of these will not raise an exception if the exit code is non-zero.
@@ -134,7 +131,7 @@ class FallibleExecuteProcessResult:
 
 
 @dataclass(frozen=True)
-class FallibleExecuteProcessResultWithPlatform:
+class FallibleProcessResultWithPlatform:
     """Result of executing a process.
 
     Contains information about what platform a request ran on.
@@ -174,31 +171,24 @@ stderr:
 
 
 @rule
-def get_multi_platform_request_description(
-    req: MultiPlatformExecuteProcessRequest,
-) -> ProductDescription:
+def get_multi_platform_request_description(req: MultiPlatformProcess,) -> ProductDescription:
     return req.product_description
 
 
 @rule
-def upcast_execute_process_request(
-    req: ExecuteProcessRequest,
-) -> MultiPlatformExecuteProcessRequest:
-    """This rule allows an ExecuteProcessRequest to be run as a platform compatible
-    MultiPlatformExecuteProcessRequest."""
-    return MultiPlatformExecuteProcessRequest(
-        {(PlatformConstraint.none, PlatformConstraint.none): req}
-    )
+def upcast_process(req: Process,) -> MultiPlatformProcess:
+    """This rule allows an Process to be run as a platform compatible MultiPlatformProcess."""
+    return MultiPlatformProcess({(PlatformConstraint.none, PlatformConstraint.none): req})
 
 
 @rule
 def fallible_to_exec_result_or_raise(
-    fallible_result: FallibleExecuteProcessResult, description: ProductDescription
-) -> ExecuteProcessResult:
-    """Converts a FallibleExecuteProcessResult to a ExecuteProcessResult or raises an error."""
+    fallible_result: FallibleProcessResult, description: ProductDescription
+) -> ProcessResult:
+    """Converts a FallibleProcessResult to a ProcessResult or raises an error."""
 
     if fallible_result.exit_code == 0:
-        return ExecuteProcessResult(
+        return ProcessResult(
             fallible_result.stdout, fallible_result.stderr, fallible_result.output_directory_digest,
         )
     else:
@@ -211,10 +201,8 @@ def fallible_to_exec_result_or_raise(
 
 
 @rule
-def remove_platform_information(
-    res: FallibleExecuteProcessResultWithPlatform,
-) -> FallibleExecuteProcessResult:
-    return FallibleExecuteProcessResult(
+def remove_platform_information(res: FallibleProcessResultWithPlatform,) -> FallibleProcessResult:
+    return FallibleProcessResult(
         exit_code=res.exit_code,
         stdout=res.stdout,
         stderr=res.stderr,
@@ -225,9 +213,9 @@ def remove_platform_information(
 def create_process_rules():
     """Creates rules that consume the intrinsic filesystem types."""
     return [
-        RootRule(ExecuteProcessRequest),
-        RootRule(MultiPlatformExecuteProcessRequest),
-        upcast_execute_process_request,
+        RootRule(Process),
+        RootRule(MultiPlatformProcess),
+        upcast_process,
         fallible_to_exec_result_or_raise,
         remove_platform_information,
         get_multi_platform_request_description,

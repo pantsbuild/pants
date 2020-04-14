@@ -23,16 +23,15 @@ use store::{Snapshot, Store, StoreFileByDigest};
 use tokio::time::delay_for;
 
 use crate::{
-  Context, ExecuteProcessRequest, ExecuteProcessRequestMetadata, ExecutionStats,
-  FallibleExecuteProcessResultWithPlatform, MultiPlatformExecuteProcessRequest, Platform,
-  PlatformConstraint,
+  Context, ExecutionStats, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform,
+  PlatformConstraint, Process, ProcessMetadata,
 };
 use std;
 use std::cmp::min;
 use workunit_store::{WorkUnit, WorkUnitStore};
 
 // Environment variable which is exclusively used for cache key invalidation.
-// This may be not specified in an ExecuteProcessRequest, and may be populated only by the
+// This may be not specified in an Process, and may be populated only by the
 // CommandRunner.
 pub const CACHE_KEY_GEN_VERSION_ENV_VAR_NAME: &str = "PANTS_CACHE_KEY_GEN_VERSION";
 
@@ -104,7 +103,7 @@ pub enum OperationOrStatus {
 
 #[derive(Clone)]
 pub struct CommandRunner {
-  metadata: ExecuteProcessRequestMetadata,
+  metadata: ProcessMetadata,
   headers: BTreeMap<String, String>,
   channel: grpcio::Channel,
   env: Arc<grpcio::Environment>,
@@ -199,10 +198,7 @@ impl CommandRunner {
 // we cancel a potential RPC. So we need to distinguish local vs. remote
 // requests and save enough state to BoxFuture or another abstraction around our execution results
 impl super::CommandRunner for CommandRunner {
-  fn extract_compatible_request(
-    &self,
-    req: &MultiPlatformExecuteProcessRequest,
-  ) -> Option<ExecuteProcessRequest> {
+  fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
     for compatible_constraint in vec![
       &(PlatformConstraint::None, PlatformConstraint::None),
       &(self.platform.into(), PlatformConstraint::None),
@@ -241,9 +237,9 @@ impl super::CommandRunner for CommandRunner {
   ///
   fn run(
     &self,
-    req: MultiPlatformExecuteProcessRequest,
+    req: MultiPlatformProcess,
     context: Context,
-  ) -> BoxFuture<FallibleExecuteProcessResultWithPlatform, String> {
+  ) -> BoxFuture<FallibleProcessResultWithPlatform, String> {
     let platform = self.platform();
     let compatible_underlying_request = self.extract_compatible_request(&req).unwrap();
     let operations_client = self.operations_client.clone();
@@ -251,7 +247,7 @@ impl super::CommandRunner for CommandRunner {
     let execute_request_result =
       make_execute_request(&compatible_underlying_request, self.metadata.clone());
 
-    let ExecuteProcessRequest {
+    let Process {
       description,
       timeout,
       input_files,
@@ -396,7 +392,7 @@ impl super::CommandRunner for CommandRunner {
                               } = history;
                               current_attempt.remote_execution = Some(elapsed);
                               attempts.push(current_attempt);
-                              future::ok(future::Loop::Break(FallibleExecuteProcessResultWithPlatform {
+                              future::ok(future::Loop::Break(FallibleProcessResultWithPlatform {
                                 stdout: Bytes::from(format!(
                                   "Exceeded timeout of {:?} ({:?} for the process and {:?} for remoting buffer time) with {:?} for operation {}, {}",
                                   total_timeout, timeout, command_runner.queue_buffer_time, elapsed, operation_name, description
@@ -473,7 +469,7 @@ impl super::CommandRunner for CommandRunner {
 impl CommandRunner {
   pub fn new(
     address: &str,
-    metadata: ExecuteProcessRequestMetadata,
+    metadata: ProcessMetadata,
     root_ca_certs: Option<Vec<u8>>,
     oauth_bearer_token: Option<String>,
     headers: BTreeMap<String, String>,
@@ -557,7 +553,7 @@ impl CommandRunner {
     &self,
     operation_or_status: OperationOrStatus,
     attempts: &mut ExecutionHistory,
-  ) -> BoxFuture<FallibleExecuteProcessResultWithPlatform, ExecutionError> {
+  ) -> BoxFuture<FallibleProcessResultWithPlatform, ExecutionError> {
     trace!("Got operation response: {:?}", operation_or_status);
 
     let status = match operation_or_status {
@@ -781,7 +777,7 @@ impl CommandRunner {
     maybe_cancel_remote_exec_token: Option<CancelRemoteExecutionToken>,
   ) -> BoxFuture<
     future::Loop<
-      FallibleExecuteProcessResultWithPlatform,
+      FallibleProcessResultWithPlatform,
       (
         ExecutionHistory,
         OperationOrStatus,
@@ -849,8 +845,8 @@ fn maybe_add_workunit(
 }
 
 pub fn make_execute_request(
-  req: &ExecuteProcessRequest,
-  metadata: ExecuteProcessRequestMetadata,
+  req: &Process,
+  metadata: ProcessMetadata,
 ) -> Result<
   (
     bazel_protos::remote_execution::Action,
@@ -874,7 +870,7 @@ pub fn make_execute_request(
     command.mut_environment_variables().push(env);
   }
 
-  let ExecuteProcessRequestMetadata {
+  let ProcessMetadata {
     instance_name,
     cache_key_gen_version,
     mut platform_properties,
@@ -957,12 +953,12 @@ pub fn populate_fallible_execution_result(
   execute_response: bazel_protos::remote_execution::ExecuteResponse,
   execution_attempts: Vec<ExecutionStats>,
   platform: Platform,
-) -> impl Future<Item = FallibleExecuteProcessResultWithPlatform, Error = String> {
+) -> impl Future<Item = FallibleProcessResultWithPlatform, Error = String> {
   extract_stdout(&store, &execute_response)
     .join(extract_stderr(&store, &execute_response))
     .join(extract_output_files(store, &execute_response))
     .and_then(move |((stdout, stderr), output_directory)| {
-      Ok(FallibleExecuteProcessResultWithPlatform {
+      Ok(FallibleProcessResultWithPlatform {
         stdout: stdout,
         stderr: stderr,
         exit_code: execute_response.get_result().get_exit_code(),
