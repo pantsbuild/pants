@@ -30,20 +30,24 @@ use parking_lot::Mutex;
 use rand::thread_rng;
 use rand::Rng;
 use tokio::task_local;
+use std::collections::HashMap;
 
 use std::cell::RefCell;
 use std::future::Future;
 use std::sync::Arc;
 
+pub type SpanId = String;
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct WorkUnit {
   pub name: String,
   pub time_span: TimeSpan,
-  pub span_id: String,
+  pub span_id: SpanId,
   pub parent_id: Option<String>,
   pub metadata: WorkunitMetadata,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct StartedWorkUnit {
   pub name: String,
   pub start_time: std::time::SystemTime,
@@ -82,6 +86,12 @@ impl WorkUnit {
   }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+enum WorkunitRecord {
+  Started(StartedWorkUnit),
+  Completed(WorkUnit),
+}
+
 #[derive(Clone, Default)]
 pub struct WorkUnitStore {
   inner: Arc<Mutex<WorkUnitInnerStore>>,
@@ -89,6 +99,9 @@ pub struct WorkUnitStore {
 
 #[derive(Default)]
 pub struct WorkUnitInnerStore {
+  workunit_records: HashMap<SpanId, WorkunitRecord>,
+  started_ids: Vec<SpanId>,
+  completed_ids: Vec<SpanId>,
   pub workunits: Vec<WorkUnit>,
   last_seen_workunit: usize,
 }
@@ -97,6 +110,9 @@ impl WorkUnitStore {
   pub fn new() -> WorkUnitStore {
     WorkUnitStore {
       inner: Arc::new(Mutex::new(WorkUnitInnerStore {
+        workunit_records: HashMap::new(),
+        started_ids: Vec::new(),
+        completed_ids: Vec::new(),
         workunits: Vec::new(),
         last_seen_workunit: 0,
       })),
@@ -114,6 +130,40 @@ impl WorkUnitStore {
     self.inner.clone()
   }
 
+  pub fn start_workunit(&self, name: String, parent_id: Option<SpanId>, metadata: WorkunitMetadata,) -> SpanId {
+    let span_id = new_span_id();
+    let started = StartedWorkUnit {
+      name,
+      span_id: span_id.clone(),
+      parent_id,
+      start_time: std::time::SystemTime::now(),
+      metadata,
+    };
+    let mut inner = self.inner.lock();
+    inner.workunit_records.insert(span_id.clone(), WorkunitRecord::Started(started));
+    inner.started_ids.push(span_id.clone());
+    span_id
+  }
+
+  pub fn complete_workunit(&self, span_id: SpanId) -> Result<(), String> {
+    use std::collections::hash_map::Entry;
+    let inner = &mut self.inner.lock();
+    match inner.workunit_records.entry(span_id.clone()) {
+      Entry::Vacant(_) => Err(format!("No previously-started workunit found for id: {}", span_id)),
+      Entry::Occupied(o) => {
+        match o.remove_entry() {
+          (span_id, WorkunitRecord::Started(started)) => {
+            let finished = started.finish();
+            inner.workunit_records.insert(span_id.clone(), WorkunitRecord::Completed(finished));
+            inner.completed_ids.push(span_id);
+            Ok(())
+          },
+          (span_id, WorkunitRecord::Completed(_)) => Err(format!("Workunit {} was already completed.", span_id)),
+        }
+      }
+    }
+  }
+
   pub fn add_workunit(&self, workunit: WorkUnit) {
     self.inner.lock().workunits.push(workunit);
   }
@@ -124,11 +174,23 @@ impl WorkUnitStore {
   {
     let mut inner_guard = (*self.inner).lock();
     let inner_store: &mut WorkUnitInnerStore = &mut *inner_guard;
-    let workunits = &inner_store.workunits;
-    let cur_len = workunits.len();
+
+    let workunit_records = &inner_store.workunit_records;
+    let completed_ids = &inner_store.completed_ids;
+    let cur_len = completed_ids.len();
     let latest: usize = inner_store.last_seen_workunit;
 
-    let output = f(&workunits[latest..cur_len]);
+    let workunits: Vec<WorkUnit> = inner_store
+      .completed_ids[latest..cur_len]
+      .iter()
+      .flat_map(|id| workunit_records.get(id))
+      .flat_map(|record| match record {
+        WorkunitRecord::Started(_) => None,
+        WorkunitRecord::Completed(c) => Some(c.clone()),
+      })
+      .collect();
+
+    let output = f(&workunits);
     inner_store.last_seen_workunit = cur_len;
     output
   }
