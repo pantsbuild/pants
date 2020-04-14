@@ -201,7 +201,7 @@ class DirectoriesToMerge:
     directories: Tuple[Digest, ...]
 
     def __post_init__(self) -> None:
-        non_digests = [v for v in self.directories if not isinstance(v, Digest)]  # type: ignore[misc]
+        non_digests = [v for v in self.directories if not isinstance(v, Digest)]  # type: ignore[unreachable]
         if non_digests:
             formatted_non_digests = "\n".join(f"* {v}" for v in non_digests)
             raise ValueError(f"Not all arguments are digests:\n\n{formatted_non_digests}")
