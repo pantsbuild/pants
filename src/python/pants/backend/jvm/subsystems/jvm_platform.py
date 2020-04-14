@@ -126,7 +126,8 @@ class JvmPlatform(Subsystem):
         :param iterable platforms: An iterable of platform settings.
         :param bool strict: If true, only distribution whose version matches the minimum
           required version can be returned, i.e, the max target_level of all the requested
-          platforms.
+          platforms. If false, platforms with the strict attribute set to true are treated as
+          though they are set to false.
         :param bool jdk: If true, the distribution must be a JDK.
         :returns: Distribution one of the selected distributions.
         """
