@@ -27,16 +27,17 @@ from pants.engine.legacy.structs import (
     TargetAdaptorWithOrigin,
 )
 from pants.engine.rules import UnionMembership
-from pants.rules.core.fmt import Fmt, FmtResult, LanguageFmtResults, LanguageFormatters, fmt
-from pants.testutil.engine.util import MockConsole, MockGet, run_rule
+from pants.rules.core.fmt import (
+    Fmt,
+    FmtOptions,
+    FmtResult,
+    LanguageFmtResults,
+    LanguageFormatters,
+    fmt,
+)
+from pants.testutil.engine.util import MockConsole, MockGet, create_goal_subsystem, run_rule
 from pants.testutil.test_base import TestBase
 from pants.util.ordered_set import OrderedSet
-
-
-# TODO(#9141): replace this with a proper util to create `GoalSubsystem`s
-class MockOptions:
-    def __init__(self, **values):
-        self.values = Mock(**values)
 
 
 class MockLanguageFormatters(LanguageFormatters, metaclass=ABCMeta):
@@ -132,7 +133,7 @@ class FmtTest(TestBase):
             rule_args=[
                 console,
                 HydratedTargetsWithOrigins(targets),
-                MockOptions(per_target_caching=per_target_caching),
+                create_goal_subsystem(FmtOptions, per_target_caching=per_target_caching),
                 Workspace(self.scheduler),
                 union_membership,
             ],

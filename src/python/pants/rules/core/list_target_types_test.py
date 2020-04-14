@@ -1,27 +1,21 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from contextlib import contextmanager
 from enum import Enum
 from textwrap import dedent
 from typing import Optional, cast
-from unittest.mock import Mock
 
 from pants.engine.rules import UnionMembership
 from pants.engine.target import BoolField, IntField, RegisteredTargetTypes, StringField, Target
-from pants.rules.core.list_target_types import list_target_types
-from pants.testutil.engine.util import MockConsole, run_rule
+from pants.option.global_options import GlobalOptions
+from pants.rules.core.list_target_types import TargetTypesOptions, list_target_types
+from pants.testutil.engine.util import (
+    MockConsole,
+    create_goal_subsystem,
+    create_subsystem,
+    run_rule,
+)
 from pants.util.ordered_set import OrderedSet
-
-
-# TODO(#9141): replace this with a proper util to create `GoalSubsystem`s
-class MockOptions:
-    def __init__(self, **values):
-        self.values = Mock(**values)
-
-    @contextmanager
-    def line_oriented(self, console: MockConsole):
-        yield lambda msg: console.print_stdout(msg)
 
 
 # Note no docstring.
@@ -90,8 +84,10 @@ def run_goal(
         rule_args=[
             RegisteredTargetTypes.create([FortranBinary, FortranLibrary, FortranTests]),
             union_membership or UnionMembership({}),
-            MockOptions(details=details_target),
-            Mock(),
+            create_goal_subsystem(
+                TargetTypesOptions, sep="\\n", output_file=None, details=details_target
+            ),
+            create_subsystem(GlobalOptions, v1=False),
             console,
         ],
     )
