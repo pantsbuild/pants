@@ -4,7 +4,7 @@
 import itertools
 from abc import ABCMeta
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, List, Optional, Tuple, Type
+from typing import ClassVar, Iterable, List, Optional, Tuple, Type, cast
 
 from pants.engine.console import Console
 from pants.engine.fs import (
@@ -20,7 +20,7 @@ from pants.engine.isolated_process import ProcessResult
 from pants.engine.objects import Collection, union
 from pants.engine.rules import UnionMembership, goal_rule
 from pants.engine.selectors import Get, MultiGet
-from pants.engine.target import Field, Target, TargetsWithOrigins
+from pants.engine.target import Field, Target, TargetsWithOrigins, TargetWithOrigin
 from pants.rules.core.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
 from pants.rules.core.lint import LinterConfiguration
 
@@ -48,6 +48,10 @@ class FmtResult:
 class FmtConfiguration(LinterConfiguration, metaclass=ABCMeta):
     """An ad hoc collection of the fields necessary for a particular auto-formatter to work with a
     target."""
+
+    @classmethod
+    def create(cls, target_with_origin: TargetWithOrigin) -> "FmtConfiguration":
+        return cast(FmtConfiguration, super().create(target_with_origin))
 
 
 class FmtConfigurations(Collection[FmtConfiguration]):
@@ -155,7 +159,7 @@ async def fmt(
 
     language_target_collections = tuple(
         language_target_collection_type(
-            tuple(
+            TargetsWithOrigins(
                 target_with_origin
                 for target_with_origin in targets_with_origins
                 if language_target_collection_type.belongs_to_language(target_with_origin.target)
@@ -192,7 +196,8 @@ async def fmt(
     if options.values.per_target_caching:
         per_language_results = await MultiGet(
             Get[LanguageFmtResults](
-                LanguageFmtTargets, language_target_collection.__class__([target_with_origin])
+                LanguageFmtTargets,
+                language_target_collection.__class__(TargetsWithOrigins([target_with_origin])),
             )
             for language_target_collection in valid_language_target_collections
             for target_with_origin in language_target_collection.targets_with_origins

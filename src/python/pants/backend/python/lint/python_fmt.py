@@ -1,7 +1,6 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from abc import ABCMeta
 from dataclasses import dataclass
 from typing import Iterable, List, Type
 
@@ -25,7 +24,7 @@ class PythonFmtTargets(LanguageFmtTargets):
 
 
 @union
-class PythonFmtConfigurations(FmtConfigurations, metaclass=ABCMeta):
+class PythonFmtConfigurations:
     pass
 
 
@@ -41,10 +40,9 @@ async def format_python_target(
         )
     )
     prior_formatter_result = original_sources.snapshot
-    # print(prior_formatter_result)
 
     results: List[FmtResult] = []
-    config_collection_types: Iterable[Type[PythonFmtConfigurations]] = union_membership.union_rules[
+    config_collection_types: Iterable[Type[FmtConfigurations]] = union_membership.union_rules[
         PythonFmtConfigurations
     ]
     for config_collection_type in config_collection_types:
