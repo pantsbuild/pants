@@ -332,6 +332,9 @@ class BaseZincCompile(JvmCompile):
                     )
 
     def post_compile_extra_resources(self, compile_context):
+        """Send the diagnostic counts to the reporting server."""
+        self._pass_diagnostics_to_reporting_server(compile_context)
+
         """Override `post_compile_extra_resources` to additionally include scalac_plugin info."""
         result = super().post_compile_extra_resources(compile_context)
         target = compile_context.target
@@ -569,7 +572,7 @@ class BaseZincCompile(JvmCompile):
             },
         )()
 
-    def always_do_after_compile(self, ctx):
+    def record_extra_target_stats(self, ctx):
         self._pass_diagnostics_to_reporting_server(ctx)
 
     def _aggregate_diagnostics(self, lsp_data):
