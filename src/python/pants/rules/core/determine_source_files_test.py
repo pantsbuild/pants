@@ -16,14 +16,13 @@ from pants.base.specs import (
 )
 from pants.build_graph.address import Address
 from pants.build_graph.files import Files
-from pants.engine.legacy.structs import TargetAdaptor, TargetAdaptorWithOrigin
+from pants.engine.legacy.structs import TargetAdaptor
 from pants.engine.selectors import Params
 from pants.engine.target import Sources as SourcesField
 from pants.engine.target import rules as target_rules
 from pants.rules.core.determine_source_files import (
     AllSourceFilesRequest,
     LegacyAllSourceFilesRequest,
-    LegacySpecifiedSourceFilesRequest,
     SourceFiles,
     SpecifiedSourceFilesRequest,
 )
@@ -285,46 +284,24 @@ class LegacyDetermineSourceFilesTest(TestBase):
         self,
         sources: TargetSources,
         *,
-        origin: Optional[OriginSpec] = None,
         include_sources: bool = True,
         type_alias: Optional[str] = None,
-    ) -> TargetAdaptorWithOrigin:
+    ) -> TargetAdaptor:
         sources_field = Mock()
         sources_field.snapshot = self.make_snapshot_of_empty_files(
             sources.source_file_absolute_paths if include_sources else []
         )
-        adaptor = TargetAdaptor(
+        return TargetAdaptor(
             address=Address.parse(f"{sources.source_root}:lib"),
             type_alias=type_alias,
             sources=sources_field,
         )
-        if origin is None:
-            origin = SiblingAddresses(sources.source_root)
-        return TargetAdaptorWithOrigin(adaptor, origin)
 
     def get_all_source_files(
-        self,
-        adaptors_with_origins: Iterable[TargetAdaptorWithOrigin],
-        *,
-        strip_source_roots: bool = False,
+        self, adaptors: Iterable[TargetAdaptor], *, strip_source_roots: bool = False,
     ) -> List[str]:
         request = LegacyAllSourceFilesRequest(
-            (adaptor_with_origin.adaptor for adaptor_with_origin in adaptors_with_origins),
-            strip_source_roots=strip_source_roots,
-        )
-        result = self.request_single_product(
-            SourceFiles, Params(request, create_options_bootstrapper())
-        )
-        return sorted(result.snapshot.files)
-
-    def get_specified_source_files(
-        self,
-        adaptors_with_origins: Iterable[TargetAdaptorWithOrigin],
-        *,
-        strip_source_roots: bool = False,
-    ) -> List[str]:
-        request = LegacySpecifiedSourceFilesRequest(
-            adaptors_with_origins, strip_source_roots=strip_source_roots,
+            (adaptor for adaptor in adaptors), strip_source_roots=strip_source_roots
         )
         result = self.request_single_product(
             SourceFiles, Params(request, create_options_bootstrapper())
@@ -332,19 +309,14 @@ class LegacyDetermineSourceFilesTest(TestBase):
         return sorted(result.snapshot.files)
 
     def test_address_specs(self) -> None:
-        target1 = self.mock_target(
-            SOURCES1, origin=SingleAddress(directory=SOURCES1.source_root, name="lib")
-        )
-        target2 = self.mock_target(SOURCES2, origin=SiblingAddresses(SOURCES2.source_root))
-        target3 = self.mock_target(SOURCES3, origin=DescendantAddresses(SOURCES3.source_root))
-        target4 = self.mock_target(SOURCES1, origin=AscendantAddresses(SOURCES1.source_root))
+        target1 = self.mock_target(SOURCES1)
+        target2 = self.mock_target(SOURCES2)
+        target3 = self.mock_target(SOURCES3)
+        target4 = self.mock_target(SOURCES1)
 
-        def assert_all_source_files_resolved(
-            target: TargetAdaptorWithOrigin, sources: TargetSources
-        ) -> None:
+        def assert_all_source_files_resolved(target: TargetAdaptor, sources: TargetSources) -> None:
             expected = sources.source_file_absolute_paths
             assert self.get_all_source_files([target]) == expected
-            assert self.get_specified_source_files([target]) == expected
 
         assert_all_source_files_resolved(target1, SOURCES1)
         assert_all_source_files_resolved(target2, SOURCES2)
@@ -361,55 +333,27 @@ class LegacyDetermineSourceFilesTest(TestBase):
             ]
         )
         assert self.get_all_source_files(combined_targets) == combined_expected
-        assert self.get_specified_source_files(combined_targets) == combined_expected
 
     def test_filesystem_specs(self) -> None:
-        # Literal file arg.
         target1_all_sources = SOURCES1.source_file_absolute_paths
-        target1_slice = slice(0, 1)
-        target1 = self.mock_target(SOURCES1, origin=FilesystemLiteralSpec(target1_all_sources[0]))
+        target1 = self.mock_target(SOURCES1)
 
-        # Glob file arg that matches the entire target's `sources`.
         target2_all_sources = SOURCES2.source_file_absolute_paths
-        target2_slice = slice(0, len(target2_all_sources))
-        target2_origin = FilesystemResolvedGlobSpec(
-            f"{SOURCES2.source_root}/*.py", files=tuple(target2_all_sources)
-        )
-        target2 = self.mock_target(SOURCES2, origin=target2_origin)
+        target2 = self.mock_target(SOURCES2)
 
-        # Glob file arg that only matches a subset of the target's `sources` _and_ includes resolved
-        # files not owned by the target.
         target3_all_sources = SOURCES3.source_file_absolute_paths
-        target3_slice = slice(0, 1)
-        target3_origin = FilesystemResolvedGlobSpec(
-            f"{SOURCES3.source_root}/*.java",
-            files=tuple(
-                PurePath(SOURCES3.source_root, name).as_posix()
-                for name in [SOURCES3.source_files[0], "other_target.java", "j.tmp.java"]
-            ),
-        )
-        target3 = self.mock_target(SOURCES3, origin=target3_origin)
+        target3 = self.mock_target(SOURCES3)
 
-        def assert_file_args_resolved(
-            target: TargetAdaptorWithOrigin, all_sources: List[str], expected_slice: slice
-        ) -> None:
+        def assert_file_args_resolved(target: TargetAdaptor, all_sources: List[str]) -> None:
             assert self.get_all_source_files([target]) == all_sources
-            assert self.get_specified_source_files([target]) == all_sources[expected_slice]
 
-        assert_file_args_resolved(target1, target1_all_sources, target1_slice)
-        assert_file_args_resolved(target2, target2_all_sources, target2_slice)
-        assert_file_args_resolved(target3, target3_all_sources, target3_slice)
+        assert_file_args_resolved(target1, target1_all_sources)
+        assert_file_args_resolved(target2, target2_all_sources)
+        assert_file_args_resolved(target3, target3_all_sources)
 
         combined_targets = [target1, target2, target3]
         assert self.get_all_source_files(combined_targets) == sorted(
             [*target1_all_sources, *target2_all_sources, *target3_all_sources]
-        )
-        assert self.get_specified_source_files(combined_targets) == sorted(
-            [
-                *target1_all_sources[target1_slice],
-                *target2_all_sources[target2_slice],
-                *target3_all_sources[target3_slice],
-            ]
         )
 
     def test_strip_source_roots(self) -> None:
@@ -421,22 +365,15 @@ class LegacyDetermineSourceFilesTest(TestBase):
         files_target = self.mock_target(SOURCES1, type_alias=Files.alias())
         files_expected = SOURCES1.source_file_absolute_paths
 
-        def assert_source_roots_stripped(
-            target: TargetAdaptorWithOrigin, sources: TargetSources
-        ) -> None:
+        def assert_source_roots_stripped(target: TargetAdaptor, sources: TargetSources) -> None:
             expected = sources.source_files
             assert self.get_all_source_files([target], strip_source_roots=True) == expected
-            assert self.get_specified_source_files([target], strip_source_roots=True) == expected
 
         assert_source_roots_stripped(target1, SOURCES1)
         assert_source_roots_stripped(target2, SOURCES2)
         assert_source_roots_stripped(target3, SOURCES3)
 
         assert self.get_all_source_files([files_target], strip_source_roots=True) == files_expected
-        assert (
-            self.get_specified_source_files([files_target], strip_source_roots=True)
-            == files_expected
-        )
 
         combined_targets = [target1, target2, target3, files_target]
         combined_expected = sorted(
@@ -451,14 +388,8 @@ class LegacyDetermineSourceFilesTest(TestBase):
             self.get_all_source_files(combined_targets, strip_source_roots=True)
             == combined_expected
         )
-        assert (
-            self.get_specified_source_files(combined_targets, strip_source_roots=True)
-            == combined_expected
-        )
 
     def test_gracefully_handle_no_sources(self) -> None:
         target = self.mock_target(SOURCES1, include_sources=False)
         assert self.get_all_source_files([target]) == []
-        assert self.get_specified_source_files([target]) == []
         assert self.get_all_source_files([target], strip_source_roots=True) == []
-        assert self.get_specified_source_files([target], strip_source_roots=True) == []
