@@ -1,6 +1,6 @@
 use crate::{
-  CommandRunner, Context, ExecuteProcessRequest, FallibleExecuteProcessResultWithPlatform,
-  MultiPlatformExecuteProcessRequest,
+  CommandRunner, Context, Process, FallibleExecuteProcessResultWithPlatform,
+  MultiPlatformProcess,
 };
 use boxfuture::{BoxFuture, Boxable};
 use futures::future::{FutureExt, TryFutureExt};
@@ -32,7 +32,7 @@ impl SpeculatingCommandRunner {
 
   fn speculate(
     &self,
-    req: MultiPlatformExecuteProcessRequest,
+    req: MultiPlatformProcess,
     context: Context,
   ) -> BoxFuture<FallibleExecuteProcessResultWithPlatform, String> {
     let delay = delay_for(self.speculation_timeout)
@@ -92,8 +92,8 @@ impl SpeculatingCommandRunner {
 impl CommandRunner for SpeculatingCommandRunner {
   fn extract_compatible_request(
     &self,
-    req: &MultiPlatformExecuteProcessRequest,
-  ) -> Option<ExecuteProcessRequest> {
+    req: &MultiPlatformProcess,
+  ) -> Option<Process> {
     match (
       self.primary.extract_compatible_request(req),
       self.secondary.extract_compatible_request(req),
@@ -106,7 +106,7 @@ impl CommandRunner for SpeculatingCommandRunner {
 
   fn run(
     &self,
-    req: MultiPlatformExecuteProcessRequest,
+    req: MultiPlatformProcess,
     context: Context,
   ) -> BoxFuture<FallibleExecuteProcessResultWithPlatform, String> {
     match (

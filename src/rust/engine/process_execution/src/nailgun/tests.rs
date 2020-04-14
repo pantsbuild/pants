@@ -1,5 +1,5 @@
 use crate::nailgun::{CommandRunner, ARGS_TO_START_NAILGUN, NAILGUN_MAIN_CLASS};
-use crate::{ExecuteProcessRequest, ExecuteProcessRequestMetadata, PlatformConstraint};
+use crate::{Process, ProcessMetadata, PlatformConstraint};
 use futures::compat::Future01CompatExt;
 use hashing::EMPTY_DIGEST;
 use std::fs::read_link;
@@ -15,7 +15,7 @@ fn mock_nailgun_runner(workdir_base: Option<PathBuf>) -> CommandRunner {
   let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
   let local_runner =
     crate::local::CommandRunner::new(store, executor.clone(), std::env::temp_dir(), true);
-  let metadata = ExecuteProcessRequestMetadata {
+  let metadata = ProcessMetadata {
     instance_name: None,
     cache_key_gen_version: None,
     platform_properties: vec![],
@@ -32,8 +32,8 @@ fn unique_temp_dir(base_dir: PathBuf, prefix: Option<String>) -> TempDir {
     .expect("Error making tempdir for local process execution: {:?}")
 }
 
-fn mock_nailgunnable_request(jdk_home: Option<PathBuf>) -> ExecuteProcessRequest {
-  ExecuteProcessRequest {
+fn mock_nailgunnable_request(jdk_home: Option<PathBuf>) -> Process {
+  Process {
     argv: vec![],
     env: Default::default(),
     working_directory: None,

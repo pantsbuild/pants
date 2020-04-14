@@ -17,7 +17,7 @@ from pants.backend.python.subsystems import python_native_code, subprocess_envir
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.fs import Digest, DirectoriesToMerge
 from pants.engine.isolated_process import (
-    ExecuteProcessRequest,
+    Process,
     ExecuteProcessResult,
     FallibleExecuteProcessResult,
 )
@@ -47,7 +47,7 @@ class SetupRequest:
 
 @dataclass(frozen=True)
 class Setup:
-    process_request: ExecuteProcessRequest
+    process_request: Process
 
 
 def generate_args(
@@ -133,7 +133,7 @@ async def docformatter_fmt(
     if docformatter.options.skip:
         return FmtResult.noop()
     setup = await Get[Setup](SetupRequest(formatter, check_only=False))
-    result = await Get[ExecuteProcessResult](ExecuteProcessRequest, setup.process_request)
+    result = await Get[ExecuteProcessResult](Process, setup.process_request)
     return FmtResult.from_execute_process_result(result)
 
 
@@ -144,7 +144,7 @@ async def docformatter_lint(
     if docformatter.options.skip:
         return LintResult.noop()
     setup = await Get[Setup](SetupRequest(formatter, check_only=True))
-    result = await Get[FallibleExecuteProcessResult](ExecuteProcessRequest, setup.process_request)
+    result = await Get[FallibleExecuteProcessResult](Process, setup.process_request)
     return LintResult.from_fallible_execute_process_result(result)
 
 

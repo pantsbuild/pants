@@ -1,8 +1,8 @@
 use crate::remote_tests::echo_foo_request;
 use crate::speculate::SpeculatingCommandRunner;
 use crate::{
-  CommandRunner, Context, ExecuteProcessRequest, FallibleExecuteProcessResultWithPlatform,
-  MultiPlatformExecuteProcessRequest, Platform, PlatformConstraint,
+  CommandRunner, Context, Process, FallibleExecuteProcessResultWithPlatform,
+  MultiPlatformProcess, Platform, PlatformConstraint,
 };
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
@@ -209,7 +209,7 @@ impl DelayedCommandRunner {
 impl CommandRunner for DelayedCommandRunner {
   fn run(
     &self,
-    _req: MultiPlatformExecuteProcessRequest,
+    _req: MultiPlatformProcess,
     _context: Context,
   ) -> BoxFuture<FallibleExecuteProcessResultWithPlatform, String> {
     let delay = delay_for(self.delay).unit_error().compat();
@@ -230,8 +230,8 @@ impl CommandRunner for DelayedCommandRunner {
 
   fn extract_compatible_request(
     &self,
-    req: &MultiPlatformExecuteProcessRequest,
-  ) -> Option<ExecuteProcessRequest> {
+    req: &MultiPlatformProcess,
+  ) -> Option<Process> {
     if self.is_compatible {
       Some(
         req

@@ -19,7 +19,7 @@ use regex::Regex;
 use hashing::{Digest, Fingerprint};
 use lazy_static::lazy_static;
 
-use crate::ExecuteProcessRequest;
+use crate::Process;
 use digest::Digest as DigestTrait;
 use sha2::Sha256;
 use store::Store;
@@ -87,7 +87,7 @@ impl NailgunPool {
   }
 
   ///
-  /// Given a `NailgunProcessName` and a `ExecuteProcessRequest` configuration,
+  /// Given a `NailgunProcessName` and a `Process` configuration,
   /// return a port of a nailgun server running under that name and configuration.
   ///
   /// If the server is not running, or if it's running with a different configuration,
@@ -96,7 +96,7 @@ impl NailgunPool {
   pub fn connect(
     &self,
     name: NailgunProcessName,
-    startup_options: ExecuteProcessRequest,
+    startup_options: Process,
     workdir_path: PathBuf,
     nailgun_req_digest: Digest,
     build_id_requesting_connection: String,
@@ -227,7 +227,7 @@ impl NailgunPool {
   fn start_new_nailgun(
     processes: &mut NailgunProcessMap,
     name: String,
-    startup_options: ExecuteProcessRequest,
+    startup_options: Process,
     workdir_path: &PathBuf,
     nailgun_server_fingerprint: NailgunProcessFingerprint,
     build_id: String,
@@ -286,7 +286,7 @@ fn read_port(child: &mut std::process::Child) -> Result<Port, String> {
 impl NailgunProcess {
   fn start_new(
     name: NailgunProcessName,
-    startup_options: ExecuteProcessRequest,
+    startup_options: Process,
     workdir_path: &PathBuf,
     nailgun_server_fingerprint: NailgunProcessFingerprint,
     build_id: String,

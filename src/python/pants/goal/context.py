@@ -408,7 +408,7 @@ class Context:
     ):
         """Executes a process (possibly remotely), and returns information about its output.
 
-        :param execute_process_request: The ExecuteProcessRequest to run.
+        :param execute_process_request: The Process to run.
         :param name: A descriptive name representing the process being executed.
         :param labels: A tuple of WorkUnitLabels.
         :return: An ExecuteProcessResult with information about the execution.

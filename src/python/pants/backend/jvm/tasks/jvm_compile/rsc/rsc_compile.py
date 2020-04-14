@@ -27,7 +27,7 @@ from pants.engine.fs import (
     PathGlobs,
     PathGlobsAndRoot,
 )
-from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
+from pants.engine.isolated_process import Process, FallibleExecuteProcessResult
 from pants.java.jar.jar_dependency import JarDependency
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.task.scm_publish_mixin import Semver
@@ -900,7 +900,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
             + (argfile_snapshot.directory_digest,)
         )
 
-        epr = ExecuteProcessRequest(
+        epr = Process(
             argv=tuple(cmd),
             input_files=epr_input_files,
             output_files=(fast_relpath(ctx.rsc_jar_file.path, get_buildroot()),),
@@ -909,7 +909,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
             description=f"run {tool_name} for {ctx.target}",
             # TODO: These should always be unicodes
             # Since this is always hermetic, we need to use `underlying.home` because
-            # ExecuteProcessRequest requires an existing, local jdk location.
+            # Process requires an existing, local jdk location.
             jdk_home=distribution.underlying_home,
             is_nailgunnable=True,
         )

@@ -2,7 +2,7 @@ use tempfile;
 use testutil;
 
 use crate::{
-  CommandRunner as CommandRunnerTrait, Context, ExecuteProcessRequest,
+  CommandRunner as CommandRunnerTrait, Context, Process,
   FallibleExecuteProcessResultWithPlatform, Platform, PlatformConstraint, RelativePath,
 };
 use futures::compat::Future01CompatExt;
@@ -22,7 +22,7 @@ use tokio::runtime::Handle;
 #[tokio::test]
 #[cfg(unix)]
 async fn stdout() {
-  let result = run_command_locally(ExecuteProcessRequest {
+  let result = run_command_locally(Process {
     argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
     env: BTreeMap::new(),
     working_directory: None,
@@ -54,7 +54,7 @@ async fn stdout() {
 #[tokio::test]
 #[cfg(unix)]
 async fn stdout_and_stderr_and_exit_code() {
-  let result = run_command_locally(ExecuteProcessRequest {
+  let result = run_command_locally(Process {
     argv: owned_string_vec(&["/bin/bash", "-c", "echo -n foo ; echo >&2 -n bar ; exit 1"]),
     env: BTreeMap::new(),
     working_directory: None,
@@ -87,7 +87,7 @@ async fn stdout_and_stderr_and_exit_code() {
 #[cfg(unix)]
 async fn capture_exit_code_signal() {
   // Launch a process that kills itself with a signal.
-  let result = run_command_locally(ExecuteProcessRequest {
+  let result = run_command_locally(Process {
     argv: owned_string_vec(&["/bin/bash", "-c", "kill $$"]),
     env: BTreeMap::new(),
     working_directory: None,
@@ -123,7 +123,7 @@ async fn env() {
   env.insert("FOO".to_string(), "foo".to_string());
   env.insert("BAR".to_string(), "not foo".to_string());
 
-  let result = run_command_locally(ExecuteProcessRequest {
+  let result = run_command_locally(Process {
     argv: owned_string_vec(&["/usr/bin/env"]),
     env: env.clone(),
     working_directory: None,
@@ -159,12 +159,12 @@ async fn env() {
 #[tokio::test]
 #[cfg(unix)]
 async fn env_is_deterministic() {
-  fn make_request() -> ExecuteProcessRequest {
+  fn make_request() -> Process {
     let mut env = BTreeMap::new();
     env.insert("FOO".to_string(), "foo".to_string());
     env.insert("BAR".to_string(), "not foo".to_string());
 
-    ExecuteProcessRequest {
+    Process {
       argv: owned_string_vec(&["/usr/bin/env"]),
       env: env,
       working_directory: None,
@@ -188,7 +188,7 @@ async fn env_is_deterministic() {
 
 #[tokio::test]
 async fn binary_not_found() {
-  run_command_locally(ExecuteProcessRequest {
+  run_command_locally(Process {
     argv: owned_string_vec(&["echo", "-n", "foo"]),
     env: BTreeMap::new(),
     working_directory: None,
@@ -208,7 +208,7 @@ async fn binary_not_found() {
 
 #[tokio::test]
 async fn output_files_none() {
-  let result = run_command_locally(ExecuteProcessRequest {
+  let result = run_command_locally(Process {
     argv: owned_string_vec(&[&find_bash(), "-c", "exit 0"]),
     env: BTreeMap::new(),
     working_directory: None,
@@ -238,7 +238,7 @@ async fn output_files_none() {
 
 #[tokio::test]
 async fn output_files_one() {
-  let result = run_command_locally(ExecuteProcessRequest {
+  let result = run_command_locally(Process {
     argv: vec![
       find_bash(),
       "-c".to_owned(),
@@ -273,7 +273,7 @@ async fn output_files_one() {
 
 #[tokio::test]
 async fn output_dirs() {
-  let result = run_command_locally(ExecuteProcessRequest {
+  let result = run_command_locally(Process {
     argv: vec![
       find_bash(),
       "-c".to_owned(),
@@ -313,7 +313,7 @@ async fn output_dirs() {
 
 #[tokio::test]
 async fn output_files_many() {
-  let result = run_command_locally(ExecuteProcessRequest {
+  let result = run_command_locally(Process {
     argv: vec![
       find_bash(),
       "-c".to_owned(),
@@ -354,7 +354,7 @@ async fn output_files_many() {
 
 #[tokio::test]
 async fn output_files_execution_failure() {
-  let result = run_command_locally(ExecuteProcessRequest {
+  let result = run_command_locally(Process {
     argv: vec![
       find_bash(),
       "-c".to_owned(),
@@ -393,7 +393,7 @@ async fn output_files_execution_failure() {
 
 #[tokio::test]
 async fn output_files_partial_output() {
-  let result = run_command_locally(ExecuteProcessRequest {
+  let result = run_command_locally(Process {
     argv: vec![
       find_bash(),
       "-c".to_owned(),
@@ -430,7 +430,7 @@ async fn output_files_partial_output() {
 
 #[tokio::test]
 async fn output_overlapping_file_and_dir() {
-  let result = run_command_locally(ExecuteProcessRequest {
+  let result = run_command_locally(Process {
     argv: vec![
       find_bash(),
       "-c".to_owned(),
@@ -469,7 +469,7 @@ async fn jdk_symlink() {
   let roland = TestData::roland().bytes();
   std::fs::write(preserved_work_tmpdir.path().join("roland"), roland.clone())
     .expect("Writing temporary file");
-  let result = run_command_locally(ExecuteProcessRequest {
+  let result = run_command_locally(Process {
     argv: vec!["/bin/cat".to_owned(), ".jdk/roland".to_owned()],
     env: BTreeMap::new(),
     working_directory: None,
@@ -503,7 +503,7 @@ async fn test_directory_preservation() {
   let preserved_work_root = preserved_work_tmpdir.path().to_owned();
 
   let result = run_command_locally_in_dir(
-    ExecuteProcessRequest {
+    Process {
       argv: vec![
         find_bash(),
         "-c".to_owned(),
@@ -549,7 +549,7 @@ async fn test_directory_preservation_error() {
   assert_eq!(testutil::file::list_dir(&preserved_work_root).len(), 0);
 
   run_command_locally_in_dir(
-    ExecuteProcessRequest {
+    Process {
       argv: vec!["doesnotexist".to_owned()],
       env: BTreeMap::new(),
       working_directory: None,
@@ -578,7 +578,7 @@ async fn test_directory_preservation_error() {
 
 #[tokio::test]
 async fn all_containing_directories_for_outputs_are_created() {
-  let result = run_command_locally(ExecuteProcessRequest {
+  let result = run_command_locally(Process {
     argv: vec![
       find_bash(),
       "-c".to_owned(),
@@ -619,7 +619,7 @@ async fn all_containing_directories_for_outputs_are_created() {
 
 #[tokio::test]
 async fn output_empty_dir() {
-  let result = run_command_locally(ExecuteProcessRequest {
+  let result = run_command_locally(Process {
     argv: vec![
       find_bash(),
       "-c".to_owned(),
@@ -674,7 +674,7 @@ async fn local_only_scratch_files_materialized() {
 
   let work_dir = TempDir::new().unwrap();
   let result = run_command_locally_in_dir(
-    ExecuteProcessRequest {
+    Process {
       argv: vec![find_bash(), "-c".to_owned(), format!("echo -n ''")],
       env: BTreeMap::new(),
       working_directory: None,
@@ -711,7 +711,7 @@ async fn local_only_scratch_files_materialized() {
 
 #[tokio::test]
 async fn timeout() {
-  let result = run_command_locally(ExecuteProcessRequest {
+  let result = run_command_locally(Process {
     argv: vec![
       find_bash(),
       "-c".to_owned(),
@@ -761,7 +761,7 @@ async fn working_directory() {
 
   let work_dir = TempDir::new().unwrap();
   let result = run_command_locally_in_dir(
-    ExecuteProcessRequest {
+    Process {
       argv: vec![find_bash(), "-c".to_owned(), "/bin/ls".to_string()],
       env: BTreeMap::new(),
       working_directory: Some(RelativePath::new("cats").unwrap()),
@@ -796,21 +796,21 @@ async fn working_directory() {
 }
 
 async fn run_command_locally(
-  req: ExecuteProcessRequest,
+  req: Process,
 ) -> Result<FallibleExecuteProcessResultWithPlatform, String> {
   let work_dir = TempDir::new().unwrap();
   run_command_locally_in_dir_with_cleanup(req, work_dir.path().to_owned()).await
 }
 
 async fn run_command_locally_in_dir_with_cleanup(
-  req: ExecuteProcessRequest,
+  req: Process,
   dir: PathBuf,
 ) -> Result<FallibleExecuteProcessResultWithPlatform, String> {
   run_command_locally_in_dir(req, dir, true, None, None).await
 }
 
 async fn run_command_locally_in_dir(
-  req: ExecuteProcessRequest,
+  req: Process,
   dir: PathBuf,
   cleanup: bool,
   store: Option<Store>,

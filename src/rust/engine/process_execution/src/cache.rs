@@ -1,6 +1,6 @@
 use crate::{
-  Context, ExecuteProcessRequest, ExecuteProcessRequestMetadata,
-  FallibleExecuteProcessResultWithPlatform, MultiPlatformExecuteProcessRequest, Platform,
+  Context, Process, ProcessMetadata,
+  FallibleExecuteProcessResultWithPlatform, MultiPlatformProcess, Platform,
 };
 use std::sync::Arc;
 
@@ -30,7 +30,7 @@ pub struct CommandRunner {
   underlying: Arc<dyn crate::CommandRunner>,
   process_execution_store: ShardedLmdb,
   file_store: Store,
-  metadata: ExecuteProcessRequestMetadata,
+  metadata: ProcessMetadata,
 }
 
 impl CommandRunner {
@@ -38,7 +38,7 @@ impl CommandRunner {
     underlying: Arc<dyn crate::CommandRunner>,
     process_execution_store: ShardedLmdb,
     file_store: Store,
-    metadata: ExecuteProcessRequestMetadata,
+    metadata: ProcessMetadata,
   ) -> CommandRunner {
     CommandRunner {
       underlying,
@@ -52,15 +52,15 @@ impl CommandRunner {
 impl crate::CommandRunner for CommandRunner {
   fn extract_compatible_request(
     &self,
-    req: &MultiPlatformExecuteProcessRequest,
-  ) -> Option<ExecuteProcessRequest> {
+    req: &MultiPlatformProcess,
+  ) -> Option<Process> {
     self.underlying.extract_compatible_request(req)
   }
 
   // TODO: Maybe record WorkUnits for local cache checks.
   fn run(
     &self,
-    req: MultiPlatformExecuteProcessRequest,
+    req: MultiPlatformProcess,
     context: Context,
   ) -> BoxFuture<FallibleExecuteProcessResultWithPlatform, String> {
     let digest = crate::digest(req.clone(), &self.metadata);

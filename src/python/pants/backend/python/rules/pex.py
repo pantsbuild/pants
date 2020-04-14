@@ -28,7 +28,7 @@ from pants.engine.fs import (
     PathGlobs,
     Snapshot,
 )
-from pants.engine.isolated_process import ExecuteProcessResult, MultiPlatformExecuteProcessRequest
+from pants.engine.isolated_process import ExecuteProcessResult, MultiPlatformProcess
 from pants.engine.legacy.structs import PythonTargetAdaptor, TargetAdaptor
 from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.rules import RootRule, named_rule, rule, subsystem_rule
@@ -380,7 +380,7 @@ async def create_pex(
             description = f"Resolving {', '.join(request.requirements.requirements)}"
         else:
             description = f"Building PEX"
-    execute_process_request = MultiPlatformExecuteProcessRequest(
+    execute_process_request = MultiPlatformProcess(
         {
             (
                 PlatformConstraint(platform.value),
@@ -398,7 +398,7 @@ async def create_pex(
     )
 
     result = await Get[ExecuteProcessResult](
-        MultiPlatformExecuteProcessRequest, execute_process_request
+        MultiPlatformProcess, execute_process_request
     )
 
     if pex_debug.might_log:

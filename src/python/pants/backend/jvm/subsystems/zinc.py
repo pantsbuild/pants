@@ -20,7 +20,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.workunit import WorkUnitLabel
 from pants.binaries.binary_tool import NativeTool
 from pants.engine.fs import DirectoryToMaterialize, PathGlobs, PathGlobsAndRoot
-from pants.engine.isolated_process import ExecuteProcessRequest
+from pants.engine.isolated_process import Process
 from pants.java.distribution.distribution import Distribution
 from pants.java.jar.jar_dependency import JarDependency
 from pants.util.dirutil import fast_relpath, safe_delete, safe_mkdir, safe_mkdir_for
@@ -352,7 +352,7 @@ class Zinc:
             + ["-cp", bootstrapper, Zinc.ZINC_BOOTSTRAPER_MAIN]
             + bootstrapper_args
         )
-        req = ExecuteProcessRequest(
+        req = Process(
             argv=argv,
             input_files=inputs_digest,
             output_files=(self._relative_to_buildroot(bridge_jar),),

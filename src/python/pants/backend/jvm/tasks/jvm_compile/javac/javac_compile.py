@@ -15,7 +15,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.engine.fs import DirectoryToMaterialize
-from pants.engine.isolated_process import ExecuteProcessRequest
+from pants.engine.isolated_process import Process
 from pants.java.distribution.distribution import DistributionLocator
 from pants.util.dirutil import fast_relpath, safe_walk
 from pants.util.meta import classproperty
@@ -245,7 +245,7 @@ class JavacCompile(JvmCompile):
             if f.endswith(".java")
         )
 
-        exec_process_request = ExecuteProcessRequest(
+        exec_process_request = Process(
             argv=tuple(cmd),
             input_files=input_snapshot.directory_digest,
             output_files=output_files,

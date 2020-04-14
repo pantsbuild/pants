@@ -18,9 +18,9 @@ use testutil::{as_bytes, owned_string_vec};
 
 use crate::remote::{CommandRunner, ExecutionError, ExecutionHistory, OperationOrStatus};
 use crate::{
-  CommandRunner as CommandRunnerTrait, Context, ExecuteProcessRequest,
-  ExecuteProcessRequestMetadata, FallibleExecuteProcessResultWithPlatform,
-  MultiPlatformExecuteProcessRequest, Platform, PlatformConstraint,
+  CommandRunner as CommandRunnerTrait, Context, Process,
+  ProcessMetadata, FallibleExecuteProcessResultWithPlatform,
+  MultiPlatformProcess, Platform, PlatformConstraint,
 };
 use maplit::{btreemap, hashset};
 use mock::execution_server::MockOperation;
@@ -54,7 +54,7 @@ enum StderrType {
 #[tokio::test]
 async fn local_only_scratch_files_ignored() {
   let input_directory = TestDirectory::containing_roland();
-  let req1 = ExecuteProcessRequest {
+  let req1 = Process {
     argv: owned_string_vec(&["/bin/echo", "yo"]),
     env: vec![("SOME".to_owned(), "value".to_owned())]
       .into_iter()
@@ -79,7 +79,7 @@ async fn local_only_scratch_files_ignored() {
     is_nailgunnable: false,
   };
 
-  let req2 = ExecuteProcessRequest {
+  let req2 = Process {
     argv: owned_string_vec(&["/bin/echo", "yo"]),
     env: vec![("SOME".to_owned(), "value".to_owned())]
       .into_iter()
@@ -113,7 +113,7 @@ async fn local_only_scratch_files_ignored() {
 #[tokio::test]
 async fn make_execute_request() {
   let input_directory = TestDirectory::containing_roland();
-  let req = ExecuteProcessRequest {
+  let req = Process {
     argv: owned_string_vec(&["/bin/echo", "yo"]),
     env: vec![("SOME".to_owned(), "value".to_owned())]
       .into_iter()
@@ -197,7 +197,7 @@ async fn make_execute_request() {
 #[tokio::test]
 async fn make_execute_request_with_instance_name() {
   let input_directory = TestDirectory::containing_roland();
-  let req = ExecuteProcessRequest {
+  let req = Process {
     argv: owned_string_vec(&["/bin/echo", "yo"]),
     env: vec![("SOME".to_owned(), "value".to_owned())]
       .into_iter()
@@ -276,7 +276,7 @@ async fn make_execute_request_with_instance_name() {
   assert_eq!(
     crate::remote::make_execute_request(
       &req,
-      ExecuteProcessRequestMetadata {
+      ProcessMetadata {
         instance_name: Some("dark-tower".to_owned()),
         cache_key_gen_version: None,
         platform_properties: vec![],
@@ -289,7 +289,7 @@ async fn make_execute_request_with_instance_name() {
 #[tokio::test]
 async fn make_execute_request_with_cache_key_gen_version() {
   let input_directory = TestDirectory::containing_roland();
-  let req = ExecuteProcessRequest {
+  let req = Process {
     argv: owned_string_vec(&["/bin/echo", "yo"]),
     env: vec![("SOME".to_owned(), "value".to_owned())]
       .into_iter()
@@ -373,7 +373,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
   assert_eq!(
     crate::remote::make_execute_request(
       &req,
-      ExecuteProcessRequestMetadata {
+      ProcessMetadata {
         instance_name: None,
         cache_key_gen_version: Some("meep".to_owned()),
         platform_properties: vec![],
@@ -386,7 +386,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
 #[tokio::test]
 async fn make_execute_request_with_jdk() {
   let input_directory = TestDirectory::containing_roland();
-  let req = ExecuteProcessRequest {
+  let req = Process {
     argv: owned_string_vec(&["/bin/echo", "yo"]),
     env: BTreeMap::new(),
     working_directory: None,
@@ -452,7 +452,7 @@ async fn make_execute_request_with_jdk() {
 #[tokio::test]
 async fn make_execute_request_with_jdk_and_extra_platform_properties() {
   let input_directory = TestDirectory::containing_roland();
-  let req = ExecuteProcessRequest {
+  let req = Process {
     argv: owned_string_vec(&["/bin/echo", "yo"]),
     env: BTreeMap::new(),
     working_directory: None,
@@ -536,7 +536,7 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
   assert_eq!(
     crate::remote::make_execute_request(
       &req,
-      ExecuteProcessRequestMetadata {
+      ProcessMetadata {
         instance_name: None,
         cache_key_gen_version: None,
         platform_properties: vec![
@@ -560,7 +560,7 @@ async fn server_rejecting_execute_request_gives_error() {
       mock::execution_server::MockExecution::new(
         "wrong-command".to_string(),
         crate::remote::make_execute_request(
-          &ExecuteProcessRequest {
+          &Process {
             argv: owned_string_vec(&["/bin/echo", "-n", "bar"]),
             env: BTreeMap::new(),
             working_directory: None,
@@ -1094,7 +1094,7 @@ async fn timeout_after_sufficiently_delayed_getoperations() {
   // 1 due to the request_timeout.
   let delayed_operation_time = Duration::new(2, 500);
 
-  let execute_request = ExecuteProcessRequest {
+  let execute_request = Process {
     argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
     env: BTreeMap::new(),
     working_directory: None,
@@ -1149,7 +1149,7 @@ async fn dropped_request_cancels() {
   let request_timeout = Duration::new(10, 0);
   let delayed_operation_time = Duration::new(5, 0);
 
-  let execute_request = ExecuteProcessRequest {
+  let execute_request = Process {
     argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
     env: BTreeMap::new(),
     working_directory: None,
@@ -2360,8 +2360,8 @@ async fn remote_workunits_are_stored() {
   assert!(got_workunits.is_superset(&want_workunits));
 }
 
-pub fn echo_foo_request() -> MultiPlatformExecuteProcessRequest {
-  let req = ExecuteProcessRequest {
+pub fn echo_foo_request() -> MultiPlatformProcess {
+  let req = Process {
     argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
     env: BTreeMap::new(),
     working_directory: None,
@@ -2545,7 +2545,7 @@ fn make_precondition_failure_status(
 
 async fn run_command_remote(
   address: String,
-  request: MultiPlatformExecuteProcessRequest,
+  request: MultiPlatformProcess,
 ) -> Result<FallibleExecuteProcessResultWithPlatform, String> {
   let cas = mock::StubCAS::builder()
     .file(&TestData::roland())
@@ -2678,8 +2678,8 @@ fn assert_contains(haystack: &str, needle: &str) {
   )
 }
 
-fn cat_roland_request() -> MultiPlatformExecuteProcessRequest {
-  let req = ExecuteProcessRequest {
+fn cat_roland_request() -> MultiPlatformProcess {
+  let req = Process {
     argv: owned_string_vec(&["/bin/cat", "roland"]),
     env: BTreeMap::new(),
     working_directory: None,
@@ -2697,8 +2697,8 @@ fn cat_roland_request() -> MultiPlatformExecuteProcessRequest {
   req.into()
 }
 
-fn echo_roland_request() -> MultiPlatformExecuteProcessRequest {
-  let req = ExecuteProcessRequest {
+fn echo_roland_request() -> MultiPlatformProcess {
+  let req = Process {
     argv: owned_string_vec(&["/bin/echo", "meoooow"]),
     env: BTreeMap::new(),
     working_directory: None,
@@ -2716,8 +2716,8 @@ fn echo_roland_request() -> MultiPlatformExecuteProcessRequest {
   req.into()
 }
 
-fn empty_request_metadata() -> ExecuteProcessRequestMetadata {
-  ExecuteProcessRequestMetadata {
+fn empty_request_metadata() -> ProcessMetadata {
+  ProcessMetadata {
     instance_name: None,
     cache_key_gen_version: None,
     platform_properties: vec![],

@@ -35,7 +35,7 @@ from pants.engine.fs import (
     PathGlobs,
     PathGlobsAndRoot,
 )
-from pants.engine.isolated_process import ExecuteProcessRequest
+from pants.engine.isolated_process import Process
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import fast_relpath
 from pants.util.enums import match
@@ -749,7 +749,7 @@ class BaseZincCompile(JvmCompile):
         #   2) allow jars to be materialized at the end of the run.
         output_directories = () if self.get_options().use_classpath_jars else (classes_dir,)
 
-        req = ExecuteProcessRequest(
+        req = Process(
             argv=tuple(argv),
             input_files=merged_input_digest,
             output_files=(jar_file, relpath_to_analysis),
@@ -772,7 +772,7 @@ class BaseZincCompile(JvmCompile):
         return res.output_directory_digest
 
     def _compute_local_only_inputs(self, classes_dir, relpath_to_analysis, jar_file):
-        """Compute for the scratch inputs for ExecuteProcessRequest.
+        """Compute for the scratch inputs for Process.
 
         If analysis file exists, then incremental compile is enabled. Otherwise, the compile is not
         incremental, an empty digest will be returned.

@@ -10,7 +10,7 @@ from pants.backend.python.subsystems.subprocess_environment import SubprocessEnc
 from pants.binaries.binary_tool import BinaryToolFetchRequest, Script, ToolForPlatform, ToolVersion
 from pants.binaries.binary_util import BinaryToolUrlGenerator
 from pants.engine.fs import Digest, SingleFileExecutable, Snapshot
-from pants.engine.isolated_process import ExecuteProcessRequest
+from pants.engine.isolated_process import Process
 from pants.engine.platform import PlatformConstraint
 from pants.engine.rules import rule, subsystem_rule
 from pants.engine.selectors import Get
@@ -64,8 +64,8 @@ class DownloadedPexBin(HermeticPex):
         input_files: Optional[Digest] = None,
         env: Optional[Mapping[str, str]] = None,
         **kwargs: Any,
-    ) -> ExecuteProcessRequest:
-        """Creates an ExecuteProcessRequest that will run the pex CLI tool hermetically.
+    ) -> Process:
+        """Creates an Process that will run the pex CLI tool hermetically.
 
         :param python_setup: The parameters for selecting python interpreters to use when invoking
                              the pex tool.
@@ -79,7 +79,7 @@ class DownloadedPexBin(HermeticPex):
                             tool itself. To merge in additional files, include the
                             `directory_digest` in `DirectoriesToMerge` request.
         :param env: The environment to run the PEX in.
-        :param kwargs: Any additional :class:`ExecuteProcessRequest` kwargs to pass through.
+        :param kwargs: Any additional :class:`Process` kwargs to pass through.
         """
 
         env = dict(env) if env else {}

@@ -30,7 +30,7 @@ use fs::{
 };
 use hashing;
 use process_execution::{
-  self, ExecuteProcessRequest, MultiPlatformExecuteProcessRequest, PlatformConstraint, RelativePath,
+  self, Process, MultiPlatformProcess, PlatformConstraint, RelativePath,
 };
 use rule_graph;
 
@@ -226,13 +226,13 @@ pub fn lift_digest(digest: &Value) -> Result<hashing::Digest, String> {
 /// A Node that represents a set of processes to execute on specific platforms.
 ///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct MultiPlatformExecuteProcess(MultiPlatformExecuteProcessRequest);
+pub struct MultiPlatformExecuteProcess(MultiPlatformProcess);
 
 impl MultiPlatformExecuteProcess {
   fn lift_execute_process(
     value: &Value,
     target_platform: PlatformConstraint,
-  ) -> Result<ExecuteProcessRequest, String> {
+  ) -> Result<Process, String> {
     let env = externs::project_tuple_encoded_map(&value, "env")?;
 
     let working_directory = {
@@ -286,7 +286,7 @@ impl MultiPlatformExecuteProcess {
       ))
       .map_err(|err| format!("Error parsing digest {}", err))?;
 
-    Ok(process_execution::ExecuteProcessRequest {
+    Ok(process_execution::Process {
       argv: externs::project_multi_strs(&value, "argv"),
       env,
       working_directory,
@@ -327,7 +327,7 @@ impl MultiPlatformExecuteProcess {
 
     let mut request_by_constraint: BTreeMap<
       (PlatformConstraint, PlatformConstraint),
-      ExecuteProcessRequest,
+      Process,
     > = BTreeMap::new();
     for (constraint_key, execute_process) in constraint_key_pairs.iter().zip(requests.iter()) {
       let underlying_req =
@@ -335,7 +335,7 @@ impl MultiPlatformExecuteProcess {
       request_by_constraint.insert(constraint_key.clone(), underlying_req.clone());
     }
     Ok(MultiPlatformExecuteProcess(
-      MultiPlatformExecuteProcessRequest(request_by_constraint),
+      MultiPlatformProcess(request_by_constraint),
     ))
   }
 }

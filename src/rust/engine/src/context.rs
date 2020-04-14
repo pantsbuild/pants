@@ -24,7 +24,7 @@ use core::clone::Clone;
 use fs::{safe_create_dir_all_ioerror, GitignoreStyleExcludes, PosixFS};
 use graph::{EntryId, Graph, NodeContext};
 use process_execution::{
-  self, speculate::SpeculatingCommandRunner, BoundedCommandRunner, ExecuteProcessRequestMetadata,
+  self, speculate::SpeculatingCommandRunner, BoundedCommandRunner, ProcessMetadata,
   Platform,
 };
 use rand::seq::SliceRandom;
@@ -156,7 +156,7 @@ impl Core {
       })
       .map_err(|e| format!("Could not initialize Store: {:?}", e))?;
 
-    let process_execution_metadata = ExecuteProcessRequestMetadata {
+    let process_execution_metadata = ProcessMetadata {
       instance_name: remote_instance_name,
       cache_key_gen_version: remote_execution_process_cache_namespace,
       platform_properties: remote_execution_extra_platform_properties,

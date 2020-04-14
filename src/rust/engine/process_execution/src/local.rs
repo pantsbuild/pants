@@ -24,8 +24,8 @@ use tokio::time::timeout;
 use tokio_util::codec::{BytesCodec, FramedRead};
 
 use crate::{
-  Context, ExecuteProcessRequest, FallibleExecuteProcessResultWithPlatform,
-  MultiPlatformExecuteProcessRequest, Platform, PlatformConstraint,
+  Context, Process, FallibleExecuteProcessResultWithPlatform,
+  MultiPlatformProcess, Platform, PlatformConstraint,
 };
 
 use bytes::{Bytes, BytesMut};
@@ -222,8 +222,8 @@ impl ChildResults {
 impl super::CommandRunner for CommandRunner {
   fn extract_compatible_request(
     &self,
-    req: &MultiPlatformExecuteProcessRequest,
-  ) -> Option<ExecuteProcessRequest> {
+    req: &MultiPlatformProcess,
+  ) -> Option<Process> {
     for compatible_constraint in vec![
       &(PlatformConstraint::None, PlatformConstraint::None),
       &(self.platform.into(), PlatformConstraint::None),
@@ -248,7 +248,7 @@ impl super::CommandRunner for CommandRunner {
   ///
   fn run(
     &self,
-    req: MultiPlatformExecuteProcessRequest,
+    req: MultiPlatformProcess,
     context: Context,
   ) -> BoxFuture<FallibleExecuteProcessResultWithPlatform, String> {
     let req = self.extract_compatible_request(&req).unwrap();
@@ -267,7 +267,7 @@ impl CapturedWorkdir for CommandRunner {
   fn run_in_workdir<'a, 'b, 'c>(
     &'a self,
     workdir_path: &'b Path,
-    req: ExecuteProcessRequest,
+    req: Process,
     _context: Context,
   ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String> {
     StreamedHermeticCommand::new(&req.argv[0])
@@ -285,7 +285,7 @@ impl CapturedWorkdir for CommandRunner {
 pub trait CapturedWorkdir {
   fn run_and_capture_workdir(
     &self,
-    req: ExecuteProcessRequest,
+    req: Process,
     context: Context,
     store: Store,
     executor: task_executor::Executor,
@@ -454,7 +454,7 @@ pub trait CapturedWorkdir {
   fn run_in_workdir<'a, 'b, 'c>(
     &'a self,
     workdir_path: &'b Path,
-    req: ExecuteProcessRequest,
+    req: Process,
     context: Context,
   ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String>;
 }

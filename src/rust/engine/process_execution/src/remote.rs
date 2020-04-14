@@ -23,8 +23,8 @@ use store::{Snapshot, Store, StoreFileByDigest};
 use tokio::time::delay_for;
 
 use crate::{
-  Context, ExecuteProcessRequest, ExecuteProcessRequestMetadata, ExecutionStats,
-  FallibleExecuteProcessResultWithPlatform, MultiPlatformExecuteProcessRequest, Platform,
+  Context, Process, ProcessMetadata, ExecutionStats,
+  FallibleExecuteProcessResultWithPlatform, MultiPlatformProcess, Platform,
   PlatformConstraint,
 };
 use std;
@@ -32,7 +32,7 @@ use std::cmp::min;
 use workunit_store::{WorkUnit, WorkUnitStore};
 
 // Environment variable which is exclusively used for cache key invalidation.
-// This may be not specified in an ExecuteProcessRequest, and may be populated only by the
+// This may be not specified in an Process, and may be populated only by the
 // CommandRunner.
 pub const CACHE_KEY_GEN_VERSION_ENV_VAR_NAME: &str = "PANTS_CACHE_KEY_GEN_VERSION";
 
@@ -104,7 +104,7 @@ pub enum OperationOrStatus {
 
 #[derive(Clone)]
 pub struct CommandRunner {
-  metadata: ExecuteProcessRequestMetadata,
+  metadata: ProcessMetadata,
   headers: BTreeMap<String, String>,
   channel: grpcio::Channel,
   env: Arc<grpcio::Environment>,
@@ -201,8 +201,8 @@ impl CommandRunner {
 impl super::CommandRunner for CommandRunner {
   fn extract_compatible_request(
     &self,
-    req: &MultiPlatformExecuteProcessRequest,
-  ) -> Option<ExecuteProcessRequest> {
+    req: &MultiPlatformProcess,
+  ) -> Option<Process> {
     for compatible_constraint in vec![
       &(PlatformConstraint::None, PlatformConstraint::None),
       &(self.platform.into(), PlatformConstraint::None),
@@ -241,7 +241,7 @@ impl super::CommandRunner for CommandRunner {
   ///
   fn run(
     &self,
-    req: MultiPlatformExecuteProcessRequest,
+    req: MultiPlatformProcess,
     context: Context,
   ) -> BoxFuture<FallibleExecuteProcessResultWithPlatform, String> {
     let platform = self.platform();
@@ -251,7 +251,7 @@ impl super::CommandRunner for CommandRunner {
     let execute_request_result =
       make_execute_request(&compatible_underlying_request, self.metadata.clone());
 
-    let ExecuteProcessRequest {
+    let Process {
       description,
       timeout,
       input_files,
@@ -473,7 +473,7 @@ impl super::CommandRunner for CommandRunner {
 impl CommandRunner {
   pub fn new(
     address: &str,
-    metadata: ExecuteProcessRequestMetadata,
+    metadata: ProcessMetadata,
     root_ca_certs: Option<Vec<u8>>,
     oauth_bearer_token: Option<String>,
     headers: BTreeMap<String, String>,
@@ -849,8 +849,8 @@ fn maybe_add_workunit(
 }
 
 pub fn make_execute_request(
-  req: &ExecuteProcessRequest,
-  metadata: ExecuteProcessRequestMetadata,
+  req: &Process,
+  metadata: ProcessMetadata,
 ) -> Result<
   (
     bazel_protos::remote_execution::Action,
@@ -874,7 +874,7 @@ pub fn make_execute_request(
     command.mut_environment_variables().push(env);
   }
 
-  let ExecuteProcessRequestMetadata {
+  let ProcessMetadata {
     instance_name,
     cache_key_gen_version,
     mut platform_properties,

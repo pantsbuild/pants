@@ -1,4 +1,4 @@
-use crate::{ExecuteProcessRequest, PlatformConstraint, RelativePath};
+use crate::{Process, PlatformConstraint, RelativePath};
 use hashing::{Digest, Fingerprint};
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeMap, BTreeSet};
@@ -8,7 +8,7 @@ use std::time::Duration;
 #[test]
 fn execute_process_request_equality() {
   let execute_process_request_generator =
-        |description: String, timeout: Duration, unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: hashing::Digest| ExecuteProcessRequest {
+        |description: String, timeout: Duration, unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: hashing::Digest| Process {
             argv: vec![],
             env: BTreeMap::new(),
             working_directory: None,
@@ -56,7 +56,7 @@ fn execute_process_request_equality() {
     ),
   );
 
-  // ExecuteProcessRequest should derive a PartialEq and Hash that ignores the description
+  // Process should derive a PartialEq and Hash that ignores the description
   assert!(a == b);
   assert!(hash(&a) == hash(&b));
 

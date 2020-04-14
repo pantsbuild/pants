@@ -30,7 +30,7 @@ from pants.backend.python.subsystems import python_native_code, subprocess_envir
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.addressable import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge
-from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
+from pants.engine.isolated_process import Process, ExecuteProcessResult
 from pants.engine.rules import UnionRule, named_rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.python.python_setup import PythonSetup
@@ -85,7 +85,7 @@ async def create_python_awslambda(
         output_files=(pex_filename,),
         description=f"Run Lambdex for {config.address.reference()}",
     )
-    result = await Get[ExecuteProcessResult](ExecuteProcessRequest, process_request)
+    result = await Get[ExecuteProcessResult](Process, process_request)
     return CreatedAWSLambda(digest=result.output_directory_digest, name=pex_filename)
 
 

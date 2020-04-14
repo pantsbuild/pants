@@ -179,7 +179,7 @@ async def fmt(
             console.print_stderr(result.stderr)
 
     # Since the rules to produce FmtResult should use ExecuteRequest, rather than
-    # FallibleExecuteProcessRequest, we assume that there were no failures.
+    # FallibleProcess, we assume that there were no failures.
     return Fmt(exit_code=0)
 
 

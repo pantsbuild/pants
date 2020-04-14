@@ -3,7 +3,7 @@
 
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST
 from pants.engine.isolated_process import (
-    ExecuteProcessRequest,
+    Process,
     FallibleExecuteProcessResultWithPlatform,
 )
 from pants.engine.platform import Platform
@@ -15,7 +15,7 @@ class PlatformTest(TestBase):
 
         this_platform = Platform.current
 
-        req = ExecuteProcessRequest(
+        req = Process(
             argv=("/bin/echo", "test"),
             input_files=EMPTY_DIRECTORY_DIGEST,
             description="Run some program that will exit cleanly.",

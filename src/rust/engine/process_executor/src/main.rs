@@ -34,7 +34,7 @@ use clap::{value_t, App, AppSettings, Arg};
 use futures::compat::Future01CompatExt;
 use hashing::{Digest, Fingerprint};
 use process_execution::{
-  Context, ExecuteProcessRequestMetadata, Platform, PlatformConstraint, RelativePath,
+  Context, ProcessMetadata, Platform, PlatformConstraint, RelativePath,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryFrom;
@@ -328,7 +328,7 @@ async fn main() {
     .map(|path| RelativePath::new(path).expect("working-directory must be a relative path"));
   let is_nailgunnable: bool = args.value_of("use-nailgun").unwrap().parse().unwrap();
 
-  let request = process_execution::ExecuteProcessRequest {
+  let request = process_execution::Process {
     argv,
     env,
     working_directory,
@@ -365,7 +365,7 @@ async fn main() {
       Box::new(
         process_execution::remote::CommandRunner::new(
           address,
-          ExecuteProcessRequestMetadata {
+          ProcessMetadata {
             instance_name: remote_instance_arg,
             cache_key_gen_version: args.value_of("cache-key-gen-version").map(str::to_owned),
             platform_properties,
