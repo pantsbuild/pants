@@ -176,7 +176,7 @@ async def fmt(
         per_language_results = await MultiGet(
             Get[LanguageFmtResults](LanguageFmtTargets, language_target_collection)
             for language_target_collection in language_target_collections
-            if language_target_collection
+            if language_target_collection.targets_with_origins
         )
 
     individual_results: List[FmtResult] = list(
