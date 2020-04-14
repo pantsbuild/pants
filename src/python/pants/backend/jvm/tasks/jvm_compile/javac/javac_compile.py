@@ -16,7 +16,6 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.engine.fs import DirectoryToMaterialize
 from pants.engine.isolated_process import ExecuteProcessRequest
-from pants.java.distribution.distribution import DistributionLocator
 from pants.util.dirutil import fast_relpath, safe_walk
 from pants.util.meta import classproperty
 
