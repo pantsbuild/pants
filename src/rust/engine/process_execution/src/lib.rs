@@ -252,10 +252,7 @@ impl TryFrom<MultiPlatformProcess> for Process {
   type Error = String;
 
   fn try_from(req: MultiPlatformProcess) -> Result<Self, Self::Error> {
-    match req
-      .0
-      .get(&(PlatformConstraint::None, PlatformConstraint::None))
-    {
+    match req.0.get(&PlatformConstraint::None) {
       Some(crossplatform_req) => Ok(crossplatform_req.clone()),
       None => Err(String::from(
         "Cannot coerce to a simple Process, no cross platform request exists.",
@@ -268,7 +265,7 @@ impl TryFrom<MultiPlatformProcess> for Process {
 /// A container of platform constrained processes.
 ///
 #[derive(Derivative, Clone, Debug, Eq, PartialEq, Hash)]
-pub struct MultiPlatformProcess(pub BTreeMap<(PlatformConstraint, PlatformConstraint), Process>);
+pub struct MultiPlatformProcess(pub BTreeMap<PlatformConstraint, Process>);
 
 impl MultiPlatformProcess {
   pub fn user_facing_name(&self) -> Option<String> {
@@ -282,11 +279,7 @@ impl MultiPlatformProcess {
 
 impl From<Process> for MultiPlatformProcess {
   fn from(req: Process) -> Self {
-    MultiPlatformProcess(
-      vec![((PlatformConstraint::None, PlatformConstraint::None), req)]
-        .into_iter()
-        .collect(),
-    )
+    MultiPlatformProcess(vec![(PlatformConstraint::None, req)].into_iter().collect())
   }
 }
 

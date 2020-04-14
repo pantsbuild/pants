@@ -221,16 +221,7 @@ impl ChildResults {
 
 impl super::CommandRunner for CommandRunner {
   fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
-    for compatible_constraint in vec![
-      &(PlatformConstraint::None, PlatformConstraint::None),
-      &(self.platform.into(), PlatformConstraint::None),
-      &(
-        self.platform.into(),
-        PlatformConstraint::current_platform_constraint().unwrap(),
-      ),
-    ]
-    .iter()
-    {
+    for compatible_constraint in vec![PlatformConstraint::None, self.platform.into()].iter() {
       if let Some(compatible_req) = req.0.get(compatible_constraint) {
         return Some(compatible_req.clone());
       }

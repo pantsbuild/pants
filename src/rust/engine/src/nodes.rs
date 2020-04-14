@@ -301,34 +301,24 @@ impl MultiPlatformExecuteProcess {
   }
 
   pub fn lift(value: &Value) -> Result<MultiPlatformExecuteProcess, String> {
-    let constraint_parts = externs::project_multi_strs(&value, "platform_constraints");
-    if constraint_parts.len() % 2 != 0 {
-      return Err("Error parsing platform_constraints: odd number of parts".to_owned());
-    }
-    let constraint_key_pairs: Vec<_> = constraint_parts
-      .chunks_exact(2)
-      .map(|constraint_key_pair| {
-        (
-          PlatformConstraint::try_from(&constraint_key_pair[0]).unwrap(),
-          PlatformConstraint::try_from(&constraint_key_pair[1]).unwrap(),
-        )
-      })
-      .collect();
+    let constraints = externs::project_multi_strs(&value, "platform_constraints")
+      .into_iter()
+      .map(|constraint| PlatformConstraint::try_from(&constraint))
+      .collect::<Result<Vec<_>, _>>()?;
     let processes = externs::project_multi(&value, "processes");
-    if constraint_parts.len() / 2 != processes.len() {
+    if constraints.len() != processes.len() {
       return Err(format!(
         "Sizes of constraint keys and processes do not match: {} vs. {}",
-        constraint_parts.len() / 2,
+        constraints.len(),
         processes.len()
       ));
     }
 
-    let mut request_by_constraint: BTreeMap<(PlatformConstraint, PlatformConstraint), Process> =
-      BTreeMap::new();
-    for (constraint_key, execute_process) in constraint_key_pairs.iter().zip(processes.iter()) {
+    let mut request_by_constraint: BTreeMap<PlatformConstraint, Process> = BTreeMap::new();
+    for (constraint, execute_process) in constraints.into_iter().zip(processes.iter()) {
       let underlying_req =
-        MultiPlatformExecuteProcess::lift_execute_process(execute_process, constraint_key.1)?;
-      request_by_constraint.insert(constraint_key.clone(), underlying_req.clone());
+        MultiPlatformExecuteProcess::lift_execute_process(execute_process, constraint)?;
+      request_by_constraint.insert(constraint, underlying_req);
     }
     Ok(MultiPlatformExecuteProcess(MultiPlatformProcess(
       request_by_constraint,

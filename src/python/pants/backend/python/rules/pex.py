@@ -376,10 +376,7 @@ async def create_pex(
             description = f"Building PEX"
     process = MultiPlatformProcess(
         {
-            (
-                PlatformConstraint(platform.value),
-                PlatformConstraint(platform.value),
-            ): pex_bin.create_execute_request(
+            PlatformConstraint(platform.value): pex_bin.create_execute_request(
                 python_setup=python_setup,
                 subprocess_encoding_environment=subprocess_encoding_environment,
                 pex_build_environment=pex_build_environment,
