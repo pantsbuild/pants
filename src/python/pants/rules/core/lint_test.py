@@ -33,10 +33,6 @@ class MockTarget(Target):
 class MockLinterConfiguration(LinterConfiguration):
     required_fields = (Sources,)
 
-    @classmethod
-    def is_valid(cls, _: Target) -> bool:
-        return True
-
 
 class MockLinterConfigurations(LinterConfigurations, metaclass=ABCMeta):
     config_type = MockLinterConfiguration
@@ -89,10 +85,12 @@ class ConditionallySucceedsConfigurations(MockLinterConfigurations):
         return f"Conditionally succeeds linter: {', '.join(str(address) for address in addresses)}"
 
 
+class InvalidField(Sources):
+    pass
+
+
 class InvalidConfiguration(MockLinterConfiguration):
-    @classmethod
-    def is_valid(cls, _: Target) -> bool:
-        return False
+    required_fields = (InvalidField,)
 
 
 class InvalidConfigurations(MockLinterConfigurations):
