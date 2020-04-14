@@ -20,7 +20,21 @@ from pants.util.strutil import ensure_text
 PackageDatum = Tuple[str, Tuple[str, ...]]
 
 
+def parse_interpreter_constraint(constraint: str) -> Requirement:
+    """Parse an interpreter constraint, e.g., CPython>=2.7,<3.
+
+    We allow shorthand such as `>=3.7`, which gets expanded to `CPython>=3.7`. See Pex's
+    interpreter.py's `parse_requirement()`.
+    """
+    try:
+        parsed_requirement = Requirement.parse(constraint)
+    except ValueError:
+        parsed_requirement = Requirement.parse(f"CPython{constraint}")
+    return parsed_requirement
+
+
 def source_root_or_raise(source_roots: SourceRoots, path: str) -> str:
+    """Find the source root for the given path, or raise if none is found."""
     source_root = source_roots.find_by_path(path)
     if not source_root:
         raise NoSourceRootError(f"Found no source root for {path}")
@@ -37,6 +51,7 @@ def source_root_or_raise(source_roots: SourceRoots, path: str) -> str:
 #
 # For more information, see http://bugs.python.org/issue13943.
 def distutils_repr(obj):
+    """Compute a string repr suitable for use in generated setup.py files."""
     output = io.StringIO()
     linesep = os.linesep
 
@@ -206,7 +221,7 @@ def is_python2(compatibilities: Iterable[Optional[List[str]]], python_setup: Pyt
     def iter_reqs():
         for compatibility in compatibilities:
             for constraint in python_setup.compatibility_or_constraints(compatibility):
-                yield Requirement.parse(constraint)
+                yield parse_interpreter_constraint(constraint)
 
     for req in iter_reqs():
         for python_27_ver in range(0, 17):  # The last python 2.7 version was 2.7.17.

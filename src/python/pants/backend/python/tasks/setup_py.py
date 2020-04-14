@@ -18,7 +18,7 @@ from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
 from twitter.common.dirutil.chroot import Chroot
 
-from pants.backend.python.rules.setup_py_util import distutils_repr
+from pants.backend.python.rules.util import distutils_repr
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
