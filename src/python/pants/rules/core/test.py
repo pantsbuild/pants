@@ -54,9 +54,7 @@ class TestResult:
 
     @staticmethod
     def from_fallible_execute_process_result(
-        process_result: FallibleProcessResult,
-        *,
-        coverage_data: Optional["CoverageData"] = None,
+        process_result: FallibleProcessResult, *, coverage_data: Optional["CoverageData"] = None,
     ) -> "TestResult":
         return TestResult(
             status=Status.SUCCESS if process_result.exit_code == 0 else Status.FAILURE,

@@ -33,10 +33,7 @@ from pants.engine.fs import (
     UrlToFetch,
 )
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveProcessResult
-from pants.engine.isolated_process import (
-    FallibleProcessResultWithPlatform,
-    MultiPlatformProcess,
-)
+from pants.engine.isolated_process import FallibleProcessResultWithPlatform, MultiPlatformProcess
 from pants.engine.objects import union
 from pants.engine.platform import Platform
 from pants.engine.selectors import Get

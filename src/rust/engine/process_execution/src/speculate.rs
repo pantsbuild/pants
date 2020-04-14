@@ -1,6 +1,5 @@
 use crate::{
-  CommandRunner, Context, Process, FallibleProcessResultWithPlatform,
-  MultiPlatformProcess,
+  CommandRunner, Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Process,
 };
 use boxfuture::{BoxFuture, Boxable};
 use futures::future::{FutureExt, TryFutureExt};
@@ -61,8 +60,7 @@ impl SpeculatingCommandRunner {
         Ok(either_success) => {
           // .split() takes out the homogeneous success type for either primary or
           // secondary successes.
-          ok::<FallibleProcessResultWithPlatform, String>(either_success.split().0)
-            .to_boxed()
+          ok::<FallibleProcessResultWithPlatform, String>(either_success.split().0).to_boxed()
         }
         Err(Either::A((failed_primary_res, _))) => {
           debug!("primary request FAILED, aborting");
@@ -90,10 +88,7 @@ impl SpeculatingCommandRunner {
 }
 
 impl CommandRunner for SpeculatingCommandRunner {
-  fn extract_compatible_request(
-    &self,
-    req: &MultiPlatformProcess,
-  ) -> Option<Process> {
+  fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
     match (
       self.primary.extract_compatible_request(req),
       self.secondary.extract_compatible_request(req),

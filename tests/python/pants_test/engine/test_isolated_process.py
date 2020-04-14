@@ -16,10 +16,10 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.isolated_process import (
-    Process,
-    ProcessResult,
     FallibleProcessResult,
+    Process,
     ProcessExecutionFailure,
+    ProcessResult,
 )
 from pants.engine.rules import RootRule, rule
 from pants.engine.scheduler import ExecutionError
@@ -48,9 +48,9 @@ class ShellCat:
     generate an argv instead of doing it all in CatExecutionRequest.
 
     This can be used to encapsulate operations such as sanitizing command-line arguments which are
-    specific to the executable, which can reduce boilerplate for generating Process
-    instances if the executable is used in different ways across multiple different types of process
-    execution requests.
+    specific to the executable, which can reduce boilerplate for generating Process instances if the
+    executable is used in different ways across multiple different types of process execution
+    requests.
     """
 
     binary_location: BinaryLocation
@@ -129,9 +129,7 @@ async def get_javac_version_output(
         description=javac_version_command.description,
         input_files=EMPTY_DIRECTORY_DIGEST,
     )
-    javac_version_proc_result = await Get[ProcessResult](
-        Process, javac_version_proc_req,
-    )
+    javac_version_proc_result = await Get[ProcessResult](Process, javac_version_proc_req,)
 
     return JavacVersionOutput(javac_version_proc_result.stderr.decode())
 

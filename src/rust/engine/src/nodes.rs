@@ -29,9 +29,7 @@ use fs::{
   PathGlobs, PathStat, StrictGlobMatching, VFS,
 };
 use hashing;
-use process_execution::{
-  self, Process, MultiPlatformProcess, PlatformConstraint, RelativePath,
-};
+use process_execution::{self, MultiPlatformProcess, PlatformConstraint, Process, RelativePath};
 use rule_graph;
 
 use graph::{Entry, Node, NodeError, NodeTracer, NodeVisualizer};
@@ -325,18 +323,16 @@ impl MultiPlatformExecuteProcess {
       ));
     }
 
-    let mut request_by_constraint: BTreeMap<
-      (PlatformConstraint, PlatformConstraint),
-      Process,
-    > = BTreeMap::new();
+    let mut request_by_constraint: BTreeMap<(PlatformConstraint, PlatformConstraint), Process> =
+      BTreeMap::new();
     for (constraint_key, execute_process) in constraint_key_pairs.iter().zip(requests.iter()) {
       let underlying_req =
         MultiPlatformExecuteProcess::lift_execute_process(execute_process, constraint_key.1)?;
       request_by_constraint.insert(constraint_key.clone(), underlying_req.clone());
     }
-    Ok(MultiPlatformExecuteProcess(
-      MultiPlatformProcess(request_by_constraint),
-    ))
+    Ok(MultiPlatformExecuteProcess(MultiPlatformProcess(
+      request_by_constraint,
+    )))
   }
 }
 

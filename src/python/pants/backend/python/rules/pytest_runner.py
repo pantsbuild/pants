@@ -32,7 +32,7 @@ from pants.backend.python.subsystems.subprocess_environment import SubprocessEnc
 from pants.engine.addressable import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge, InputFilesContent
 from pants.engine.interactive_runner import InteractiveProcessRequest
-from pants.engine.isolated_process import Process, FallibleProcessResult
+from pants.engine.isolated_process import FallibleProcessResult, Process
 from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.rules import UnionRule, named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet

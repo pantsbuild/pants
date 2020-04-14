@@ -268,9 +268,7 @@ impl TryFrom<MultiPlatformProcess> for Process {
 /// A container of platform constrained processes.
 ///
 #[derive(Derivative, Clone, Debug, Eq, PartialEq, Hash)]
-pub struct MultiPlatformProcess(
-  pub BTreeMap<(PlatformConstraint, PlatformConstraint), Process>,
-);
+pub struct MultiPlatformProcess(pub BTreeMap<(PlatformConstraint, PlatformConstraint), Process>);
 
 impl MultiPlatformProcess {
   pub fn user_facing_name(&self) -> Option<String> {
@@ -372,10 +370,7 @@ pub trait CommandRunner: Send + Sync {
   /// with the current command runners platform configuration. If so return the
   /// first candidate that will be run if the multi platform request is submitted to
   /// `fn run(..)`
-  fn extract_compatible_request(
-    &self,
-    req: &MultiPlatformProcess,
-  ) -> Option<Process>;
+  fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process>;
 
   fn num_waiters(&self) -> usize {
     panic!("This method is abstract and not implemented for this type")
@@ -383,10 +378,7 @@ pub trait CommandRunner: Send + Sync {
 }
 
 // TODO(#8513) possibly move to the MEPR struct, or to the hashing crate?
-pub fn digest(
-  req: MultiPlatformProcess,
-  metadata: &ProcessMetadata,
-) -> Digest {
+pub fn digest(req: MultiPlatformProcess, metadata: &ProcessMetadata) -> Digest {
   let mut hashes: Vec<String> = req
     .0
     .values()
@@ -442,10 +434,7 @@ impl CommandRunner for BoundedCommandRunner {
       .to_boxed()
   }
 
-  fn extract_compatible_request(
-    &self,
-    req: &MultiPlatformProcess,
-  ) -> Option<Process> {
+  fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
     self.inner.0.extract_compatible_request(&req)
   }
 }

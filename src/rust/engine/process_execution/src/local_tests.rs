@@ -2,8 +2,8 @@ use tempfile;
 use testutil;
 
 use crate::{
-  CommandRunner as CommandRunnerTrait, Context, Process,
-  FallibleProcessResultWithPlatform, Platform, PlatformConstraint, RelativePath,
+  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, Platform,
+  PlatformConstraint, Process, RelativePath,
 };
 use futures::compat::Future01CompatExt;
 use hashing::EMPTY_DIGEST;
@@ -795,9 +795,7 @@ async fn working_directory() {
   );
 }
 
-async fn run_command_locally(
-  req: Process,
-) -> Result<FallibleProcessResultWithPlatform, String> {
+async fn run_command_locally(req: Process) -> Result<FallibleProcessResultWithPlatform, String> {
   let work_dir = TempDir::new().unwrap();
   run_command_locally_in_dir_with_cleanup(req, work_dir.path().to_owned()).await
 }

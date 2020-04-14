@@ -79,13 +79,10 @@ class MultiPlatformProcess:
     execute_process_requests: Tuple[Process, ...]
 
     def __init__(
-        self,
-        request_dict: Dict[Tuple[PlatformConstraint, PlatformConstraint], Process],
+        self, request_dict: Dict[Tuple[PlatformConstraint, PlatformConstraint], Process],
     ) -> None:
         if len(request_dict) == 0:
-            raise ValueError(
-                "At least one platform constrained Process must be passed."
-            )
+            raise ValueError("At least one platform constrained Process must be passed.")
         validated_constraints = tuple(
             constraint.value
             for pair in request_dict.keys()
@@ -174,21 +171,14 @@ stderr:
 
 
 @rule
-def get_multi_platform_request_description(
-    req: MultiPlatformProcess,
-) -> ProductDescription:
+def get_multi_platform_request_description(req: MultiPlatformProcess,) -> ProductDescription:
     return req.product_description
 
 
 @rule
-def upcast_execute_process_request(
-    req: Process,
-) -> MultiPlatformProcess:
-    """This rule allows an Process to be run as a platform compatible
-    MultiPlatformProcess."""
-    return MultiPlatformProcess(
-        {(PlatformConstraint.none, PlatformConstraint.none): req}
-    )
+def upcast_execute_process_request(req: Process,) -> MultiPlatformProcess:
+    """This rule allows an Process to be run as a platform compatible MultiPlatformProcess."""
+    return MultiPlatformProcess({(PlatformConstraint.none, PlatformConstraint.none): req})
 
 
 @rule
@@ -211,9 +201,7 @@ def fallible_to_exec_result_or_raise(
 
 
 @rule
-def remove_platform_information(
-    res: FallibleProcessResultWithPlatform,
-) -> FallibleProcessResult:
+def remove_platform_information(res: FallibleProcessResultWithPlatform,) -> FallibleProcessResult:
     return FallibleProcessResult(
         exit_code=res.exit_code,
         stdout=res.stdout,

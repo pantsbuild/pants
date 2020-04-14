@@ -1,6 +1,6 @@
 use crate::{
-  CommandRunner as CommandRunnerTrait, Context, Process,
-  ProcessMetadata, FallibleProcessResultWithPlatform, PlatformConstraint,
+  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform,
+  PlatformConstraint, Process, ProcessMetadata,
 };
 use futures::compat::Future01CompatExt;
 use hashing::EMPTY_DIGEST;

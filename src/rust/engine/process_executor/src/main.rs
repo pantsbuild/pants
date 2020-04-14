@@ -33,9 +33,7 @@ use process_execution;
 use clap::{value_t, App, AppSettings, Arg};
 use futures::compat::Future01CompatExt;
 use hashing::{Digest, Fingerprint};
-use process_execution::{
-  Context, ProcessMetadata, Platform, PlatformConstraint, RelativePath,
-};
+use process_execution::{Context, Platform, PlatformConstraint, ProcessMetadata, RelativePath};
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryFrom;
 use std::iter::{FromIterator, Iterator};

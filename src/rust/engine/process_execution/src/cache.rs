@@ -1,6 +1,6 @@
 use crate::{
-  Context, Process, ProcessMetadata,
-  FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform,
+  Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, Process,
+  ProcessMetadata,
 };
 use std::sync::Arc;
 
@@ -50,10 +50,7 @@ impl CommandRunner {
 }
 
 impl crate::CommandRunner for CommandRunner {
-  fn extract_compatible_request(
-    &self,
-    req: &MultiPlatformProcess,
-  ) -> Option<Process> {
+  fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
     self.underlying.extract_compatible_request(req)
   }
 

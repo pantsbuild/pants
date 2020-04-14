@@ -1,5 +1,5 @@
 use crate::nailgun::{CommandRunner, ARGS_TO_START_NAILGUN, NAILGUN_MAIN_CLASS};
-use crate::{Process, ProcessMetadata, PlatformConstraint};
+use crate::{PlatformConstraint, Process, ProcessMetadata};
 use futures::compat::Future01CompatExt;
 use hashing::EMPTY_DIGEST;
 use std::fs::read_link;

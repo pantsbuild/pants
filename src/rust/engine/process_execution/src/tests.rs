@@ -1,4 +1,4 @@
-use crate::{Process, PlatformConstraint, RelativePath};
+use crate::{PlatformConstraint, Process, RelativePath};
 use hashing::{Digest, Fingerprint};
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeMap, BTreeSet};

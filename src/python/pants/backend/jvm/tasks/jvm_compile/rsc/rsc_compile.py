@@ -27,7 +27,7 @@ from pants.engine.fs import (
     PathGlobs,
     PathGlobsAndRoot,
 )
-from pants.engine.isolated_process import Process, FallibleProcessResult
+from pants.engine.isolated_process import FallibleProcessResult, Process
 from pants.java.jar.jar_dependency import JarDependency
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.task.scm_publish_mixin import Semver

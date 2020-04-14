@@ -24,8 +24,7 @@ use core::clone::Clone;
 use fs::{safe_create_dir_all_ioerror, GitignoreStyleExcludes, PosixFS};
 use graph::{EntryId, Graph, NodeContext};
 use process_execution::{
-  self, speculate::SpeculatingCommandRunner, BoundedCommandRunner, ProcessMetadata,
-  Platform,
+  self, speculate::SpeculatingCommandRunner, BoundedCommandRunner, Platform, ProcessMetadata,
 };
 use rand::seq::SliceRandom;
 use reqwest;

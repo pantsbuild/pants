@@ -18,9 +18,8 @@ use testutil::{as_bytes, owned_string_vec};
 
 use crate::remote::{CommandRunner, ExecutionError, ExecutionHistory, OperationOrStatus};
 use crate::{
-  CommandRunner as CommandRunnerTrait, Context, Process,
-  ProcessMetadata, FallibleProcessResultWithPlatform,
-  MultiPlatformProcess, Platform, PlatformConstraint,
+  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform,
+  MultiPlatformProcess, Platform, PlatformConstraint, Process, ProcessMetadata,
 };
 use maplit::{btreemap, hashset};
 use mock::execution_server::MockOperation;

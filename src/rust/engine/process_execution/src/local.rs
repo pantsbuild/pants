@@ -24,8 +24,8 @@ use tokio::time::timeout;
 use tokio_util::codec::{BytesCodec, FramedRead};
 
 use crate::{
-  Context, Process, FallibleProcessResultWithPlatform,
-  MultiPlatformProcess, Platform, PlatformConstraint,
+  Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, PlatformConstraint,
+  Process,
 };
 
 use bytes::{Bytes, BytesMut};
@@ -220,10 +220,7 @@ impl ChildResults {
 }
 
 impl super::CommandRunner for CommandRunner {
-  fn extract_compatible_request(
-    &self,
-    req: &MultiPlatformProcess,
-  ) -> Option<Process> {
+  fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
     for compatible_constraint in vec![
       &(PlatformConstraint::None, PlatformConstraint::None),
       &(self.platform.into(), PlatformConstraint::None),

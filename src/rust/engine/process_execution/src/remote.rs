@@ -23,9 +23,8 @@ use store::{Snapshot, Store, StoreFileByDigest};
 use tokio::time::delay_for;
 
 use crate::{
-  Context, Process, ProcessMetadata, ExecutionStats,
-  FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform,
-  PlatformConstraint,
+  Context, ExecutionStats, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform,
+  PlatformConstraint, Process, ProcessMetadata,
 };
 use std;
 use std::cmp::min;
@@ -199,10 +198,7 @@ impl CommandRunner {
 // we cancel a potential RPC. So we need to distinguish local vs. remote
 // requests and save enough state to BoxFuture or another abstraction around our execution results
 impl super::CommandRunner for CommandRunner {
-  fn extract_compatible_request(
-    &self,
-    req: &MultiPlatformProcess,
-  ) -> Option<Process> {
+  fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
     for compatible_constraint in vec![
       &(PlatformConstraint::None, PlatformConstraint::None),
       &(self.platform.into(), PlatformConstraint::None),

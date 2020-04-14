@@ -15,9 +15,8 @@ use tokio::net::TcpStream;
 use crate::local::CapturedWorkdir;
 use crate::nailgun::nailgun_pool::NailgunProcessName;
 use crate::{
-  Context, Process, ProcessMetadata,
-  FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform,
-  PlatformConstraint,
+  Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, PlatformConstraint,
+  Process, ProcessMetadata,
 };
 
 #[cfg(test)]
@@ -198,10 +197,7 @@ impl super::CommandRunner for CommandRunner {
     )
   }
 
-  fn extract_compatible_request(
-    &self,
-    req: &MultiPlatformProcess,
-  ) -> Option<Process> {
+  fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
     // Request compatibility should be the same as for the local runner, so we just delegate this.
     self.inner.extract_compatible_request(req)
   }
