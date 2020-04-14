@@ -5,8 +5,6 @@ from abc import ABCMeta, abstractmethod
 from pathlib import Path
 from typing import Iterable, List, Optional, Type, cast
 
-import pytest
-
 from pants.base.specs import SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.fs import (
@@ -18,6 +16,7 @@ from pants.engine.fs import (
 )
 from pants.engine.rules import UnionMembership
 from pants.engine.target import Sources, Target, TargetsWithOrigins, TargetWithOrigin
+from pants.rules.core.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
 from pants.rules.core.fmt import (
     Fmt,
     FmtOptions,
@@ -149,6 +148,11 @@ class FmtTest(TestBase):
                     mock=lambda language_targets_collection: language_targets_collection.language_fmt_results,
                 ),
                 MockGet(
+                    product_type=TargetsWithSources,
+                    subject_type=TargetsWithSourcesRequest,
+                    mock=lambda tgts: TargetsWithSources(tgts if include_sources else ()),
+                ),
+                MockGet(
                     product_type=Digest,
                     subject_type=DirectoriesToMerge,
                     mock=lambda _: result_digest,
@@ -171,7 +175,6 @@ class FmtTest(TestBase):
             assert smalltalk_file.is_file()
             assert smalltalk_file.read_text() == self.smalltalk_file.content.decode()
 
-    @pytest.mark.skip(reason="implement")
     def test_empty_target_noops(self) -> None:
         def assert_noops(*, per_target_caching: bool) -> None:
             stdout = self.run_fmt_rule(

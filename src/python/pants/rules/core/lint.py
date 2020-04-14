@@ -134,7 +134,7 @@ async def lint(
         LinterConfigurations
     ]
 
-    config_collections = (
+    config_collections = tuple(
         config_collection_type(
             config_collection_type.config_type.create(target_with_origin)
             for target_with_origin in targets_with_origins
