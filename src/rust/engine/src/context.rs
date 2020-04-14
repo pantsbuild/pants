@@ -10,7 +10,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::core::{Failure, TypeId};
-use crate::handles::maybe_drop_handles;
 use crate::intrinsics::Intrinsics;
 use crate::nodes::{NodeKey, WrappedNode};
 use crate::scheduler::Session;
@@ -341,8 +340,6 @@ impl Context {
   /// Get the future value for the given Node implementation.
   ///
   pub async fn get<N: WrappedNode>(&self, node: N) -> Result<N::Item, Failure> {
-    // TODO: Odd place for this... could do it periodically in the background?
-    maybe_drop_handles();
     let node_result = self
       .core
       .graph

@@ -9,6 +9,7 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
+cpython = { version = "0.5", features = ["extension-module"] }
 engine = { path = ".." }
 futures01 = { package = "futures", version = "0.1" }
 futures = { version = "0.3", features = ["compat"] }
@@ -23,9 +24,3 @@ tar_api = { path = "../tar_api" }
 tempfile = "3"
 tokio = { version = "0.2", features = ["rt-threaded"] }
 workunit_store = { path = "../workunit_store" }
-
-[build-dependencies]
-build_utils = { path = "../build_utils" }
-cbindgen = "0.8.6"
-cc = "1.0"
-walkdir = "2"

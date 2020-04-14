@@ -5,7 +5,7 @@ use crate::PythonLogLevel;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::future::Future;
@@ -270,6 +270,17 @@ impl<W: Write + Send + 'static> Log for MaybeWriteLogger<W> {
 pub enum Destination {
   Pantsd,
   Stderr,
+}
+
+impl TryFrom<&str> for Destination {
+  type Error = String;
+  fn try_from(dest: &str) -> Result<Self, Self::Error> {
+    match dest {
+      "pantsd" => Ok(Destination::Pantsd),
+      "stderr" => Ok(Destination::Stderr),
+      other => Err(format!("Unknown log destination: {:?}", other)),
+    }
+  }
 }
 
 thread_local! {

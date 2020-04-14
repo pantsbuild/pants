@@ -225,8 +225,6 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
                 1 Exception encountered:
 
                 Traceback (most recent call last):
-                  File LOCATION-INFO, in call
-                    val = func(*args)
                   File LOCATION-INFO, in nested_raise
                     fn_raises(x)
                   File LOCATION-INFO, in fn_raises

@@ -81,7 +81,7 @@ impl Intrinsics {
     intrinsics.insert(
       Intrinsic {
         product: types.process_result,
-        inputs: vec![types.multi_platform_process_request, types.platform],
+        inputs: vec![types.multi_platform_process, types.platform],
       },
       Box::new(multi_platform_process_request_to_process_result),
     );
@@ -154,14 +154,15 @@ fn directory_digest_to_files_content(
 ) -> BoxFuture<'static, NodeResult<Value>> {
   async move {
     let digest = lift_digest(&args[0]).map_err(|s| throw(&s))?;
-    let files_content = context
+    let snapshot = context
       .core
       .store()
       .contents_for_directory(digest)
       .compat()
       .await
+      .and_then(move |files_content| Snapshot::store_files_content(&context, &files_content))
       .map_err(|s| throw(&s))?;
-    Ok(Snapshot::store_files_content(&context, &files_content))
+    Ok(snapshot)
   }
   .boxed()
 }
@@ -207,8 +208,7 @@ fn digest_to_snapshot(context: Context, args: Vec<Value>) -> BoxFuture<'static, 
   async move {
     let digest = lift_digest(&args[0])?;
     let snapshot = store::Snapshot::from_digest(store, digest).await?;
-    let res: Result<_, String> = Ok(Snapshot::store_snapshot(&core, &snapshot));
-    res
+    Snapshot::store_snapshot(&core, &snapshot)
   }
   .map_err(|e: String| throw(&e))
   .boxed()
@@ -239,9 +239,11 @@ fn url_to_fetch_to_snapshot(
   let core = context.core.clone();
   async move {
     let snapshot = context
-      .get(DownloadedFile(externs::key_for(args.pop().unwrap())))
+      .get(DownloadedFile(externs::acquire_key_for(
+        args.pop().unwrap(),
+      )?))
       .await?;
-    Ok(Snapshot::store_snapshot(&core, &snapshot))
+    Ok(Snapshot::store_snapshot(&core, &snapshot).map_err(|err| throw(&err))?)
   }
   .boxed()
 }
@@ -253,9 +255,9 @@ fn path_globs_to_snapshot(
   let core = context.core.clone();
   async move {
     let snapshot = context
-      .get(Snapshot(externs::key_for(args.pop().unwrap())))
+      .get(Snapshot(externs::acquire_key_for(args.pop().unwrap())?))
       .await?;
-    Ok(Snapshot::store_snapshot(&core, &snapshot))
+    Ok(Snapshot::store_snapshot(&core, &snapshot).map_err(|err| throw(&err))?)
   }
   .boxed()
 }
@@ -308,7 +310,7 @@ fn snapshot_subset_to_snapshot(
 
     let snapshot = store::Snapshot::get_snapshot_subset(store, original_digest, path_globs).await?;
 
-    Ok(Snapshot::store_snapshot(&context.core, &snapshot))
+    Ok(Snapshot::store_snapshot(&context.core, &snapshot)?)
   }
   .map_err(|err: String| throw(&err))
   .boxed()
