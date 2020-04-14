@@ -230,33 +230,47 @@ impl EngineDisplay {
     counter
   }
 
-  // Renders one frame of the action portion of the screen.
-  fn render_actions(&mut self, start_row: usize) {
+  #[allow(dead_code)]
+  fn get_formatted_actions(&self) -> Vec<String> {
+    let width = self.terminal_size.0 as usize;
+    let sigil_len = self.sigil.to_string().graphemes(true).count();
+    let mut action_lines = vec![];
+
+    for (_worker_id, action) in self.action_map.iter() {
+      let mut graphemes = action.graphemes(true);
+
+      let first_line = format!(
+        "{}{}",
+        self.sigil,
+        graphemes
+          .by_ref()
+          .take(width - sigil_len - 1)
+          .collect::<String>()
+      );
+
+      action_lines.push(first_line);
+      loop {
+        let next_line = graphemes.by_ref().take(width).collect::<String>();
+        if next_line.is_empty() {
+          break;
+        } else {
+          action_lines.push(next_line);
+        }
+      }
+    }
+    action_lines
+  }
+
+  fn render_actions(&mut self, formatted_actions: Vec<String>, start_row: u16) {
     let cursor_start = self.cursor_start;
-    let worker_states = self.action_map.clone();
-
-    // For every active worker in the action map, jump to the exact cursor
-    // representing the swimlane for this worker and lay down a text label.
-    for (n, (_worker_id, action)) in worker_states.iter().enumerate() {
-      let line_shortened_output: String = format!(
-        "{blue}{sigil}{reset}{action}",
-        blue = color::Fg(color::LightBlue),
-        sigil = self.sigil,
-        reset = color::Fg(color::Reset),
-        action = action
-      )
-      .graphemes(true)
-      // Account for control characters.
-      .take(self.terminal_size.0 as usize + 14)
-      .collect();
-
+    for (n, line) in formatted_actions.iter().enumerate() {
       self
         .write(&format!(
-          "{pos}{entry}",
-          pos = cursor::Goto(1, cursor_start.1 + start_row as u16 + n as u16),
-          entry = line_shortened_output
+          "{pos}{line}",
+          pos = cursor::Goto(1, cursor_start.1 + start_row + n as u16),
+          line = line
         ))
-        .expect("could not write to terminal");
+        .expect("Couldn't write  to terminal.");
     }
   }
 
@@ -269,9 +283,10 @@ impl EngineDisplay {
     self.clear();
     // TODO: If the terminal size is smaller than the action map, we should fall back
     // to non-tty mode output to avoid.
-    let max_log_rows = self.terminal_size.1 as usize - self.action_map.len() - 1;
-    let rendered_count = self.render_logs(max_log_rows);
-    self.render_actions(rendered_count);
+    let formatted_actions = self.get_formatted_actions();
+    let max_log_rows = self.terminal_size.1 - formatted_actions.len() as u16;
+    let rendered_count = self.render_logs(max_log_rows as usize);
+    self.render_actions(formatted_actions, rendered_count as u16);
     if let Err(err) = self.flush() {
       return Err(format!("Could not flush terminal: {}", err));
     }
