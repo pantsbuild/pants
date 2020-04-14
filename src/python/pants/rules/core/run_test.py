@@ -4,12 +4,14 @@
 from typing import cast
 
 from pants.base.build_root import BuildRoot
+from pants.base.specs import SingleAddress
 from pants.build_graph.address import Address
-from pants.engine.addressable import Addresses
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Workspace
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
+from pants.engine.rules import UnionMembership
+from pants.engine.target import RegisteredTargetTypes, Target, TargetsWithOrigins, TargetWithOrigin
 from pants.option.global_options import GlobalOptions
-from pants.rules.core.binary import CreatedBinary
+from pants.rules.core.binary import BinaryConfiguration, CreatedBinary
 from pants.rules.core.run import Run, RunOptions, run
 from pants.testutil.engine.util import (
     MockConsole,
@@ -19,6 +21,7 @@ from pants.testutil.engine.util import (
     run_rule,
 )
 from pants.testutil.test_base import TestBase
+from pants.util.ordered_set import OrderedSet
 
 
 class RunTest(TestBase):
@@ -34,7 +37,16 @@ class RunTest(TestBase):
     ) -> Run:
         workspace = Workspace(self.scheduler)
         interactive_runner = InteractiveRunner(self.scheduler)
-        BuildRoot().path = self.build_root
+
+        class TestBinaryConfiguration(BinaryConfiguration):
+            required_fields = ()
+
+        class TestBinaryTarget(Target):
+            alias = "binary"
+            core_fields = ()
+
+        address = Address.parse(address_spec)
+        origin = SingleAddress(address.spec_path, address.target_name)
         res = run_rule(
             run,
             rule_args=[
@@ -42,14 +54,25 @@ class RunTest(TestBase):
                 workspace,
                 interactive_runner,
                 BuildRoot(),
-                Addresses([Address.parse(address_spec)]),
+                TargetsWithOrigins(
+                    [
+                        TargetWithOrigin(
+                            target=TestBinaryTarget(unhydrated_values={}, address=address),
+                            origin=origin,
+                        )
+                    ]
+                ),
                 create_goal_subsystem(RunOptions, args=[]),
                 create_subsystem(GlobalOptions, pants_workdir=self.pants_workdir),
+                UnionMembership(
+                    union_rules={BinaryConfiguration: OrderedSet([TestBinaryConfiguration])}
+                ),
+                RegisteredTargetTypes.create([TestBinaryTarget]),
             ],
             mock_gets=[
                 MockGet(
                     product_type=CreatedBinary,
-                    subject_type=Address,
+                    subject_type=TestBinaryConfiguration,
                     mock=lambda _: self.create_mock_binary(program_text),
                 ),
             ],
