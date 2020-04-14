@@ -3,7 +3,7 @@
 
 import pytest
 
-from pants.backend.python.rules.setup_py_util import (
+from pants.backend.python.rules.util import (
     declares_pkg_resources_namespace_package,
     distutils_repr,
     is_python2,

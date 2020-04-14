@@ -13,14 +13,14 @@ from pants.backend.python.rules.pex import (
     PexRequest,
     PexRequirements,
 )
-from pants.backend.python.rules.setup_py_util import (
+from pants.backend.python.rules.setuptools import Setuptools
+from pants.backend.python.rules.util import (
     PackageDatum,
     distutils_repr,
     find_packages,
     is_python2,
     source_root_or_raise,
 )
-from pants.backend.python.rules.setuptools import Setuptools
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.base.specs import AddressSpecs, AscendantAddresses, SingleAddress
 from pants.build_graph.address import Address

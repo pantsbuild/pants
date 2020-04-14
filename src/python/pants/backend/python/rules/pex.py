@@ -7,14 +7,13 @@ import logging
 from dataclasses import dataclass
 from typing import FrozenSet, Iterable, Iterator, List, NamedTuple, Optional, Sequence, Set, Tuple
 
-from pkg_resources import Requirement
-
 from pants.backend.python.rules.download_pex_bin import DownloadedPexBin
 from pants.backend.python.rules.hermetic_pex import HermeticPex
 from pants.backend.python.rules.targets import (
     PythonInterpreterCompatibility,
     PythonRequirementsField,
 )
+from pants.backend.python.rules.util import parse_interpreter_constraint
 from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.fs import (
@@ -115,12 +114,7 @@ class PexInterpreterConstraints:
             # Each element (a ParsedConstraint) will get ORed.
             parsed_constraint_set: Set[ParsedConstraint] = set()
             for constraint in constraint_set:
-                try:
-                    parsed_requirement = Requirement.parse(constraint)
-                except ValueError:
-                    # We allow the shorthand `>=3.7`, which gets expanded to `CPython>=3.7`. See
-                    # Pex's interpreter.py's `parse_requirement()`.
-                    parsed_requirement = Requirement.parse(f"CPython{constraint}")
+                parsed_requirement = parse_interpreter_constraint(constraint)
                 interpreter = parsed_requirement.project_name
                 specs = frozenset(parsed_requirement.specs)
                 parsed_constraint_set.add(ParsedConstraint(interpreter, specs))
