@@ -422,7 +422,7 @@ pub trait CapturedWorkdir {
           );
         } // Else, workdir gets dropped here
         match result {
-          Ok(fallible_execute_process_result) => Ok(fallible_execute_process_result),
+          Ok(fallible_process_result) => Ok(fallible_process_result),
           Err(msg) => {
             if msg == "deadline has elapsed" {
               Ok(FallibleProcessResultWithPlatform {

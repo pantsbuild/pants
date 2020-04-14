@@ -26,9 +26,7 @@ class LintResult:
         return LintResult(exit_code=0, stdout="", stderr="")
 
     @staticmethod
-    def from_fallible_execute_process_result(
-        process_result: FallibleProcessResult,
-    ) -> "LintResult":
+    def from_fallible_process_result(process_result: FallibleProcessResult,) -> "LintResult":
         return LintResult(
             exit_code=process_result.exit_code,
             stdout=process_result.stdout.decode(),

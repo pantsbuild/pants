@@ -83,12 +83,12 @@ class CatExecutionRequest:
 async def cat_files_process_result_concatted(cat_exe_req: CatExecutionRequest) -> Concatted:
     cat_bin = cat_exe_req.shell_cat
     cat_files_snapshot = await Get[Snapshot](PathGlobs, cat_exe_req.path_globs)
-    process_request = Process(
+    process = Process(
         argv=cat_bin.argv_from_snapshot(cat_files_snapshot),
         input_files=cat_files_snapshot.directory_digest,
         description="cat some files",
     )
-    cat_process_result = await Get[ProcessResult](Process, process_request)
+    cat_process_result = await Get[ProcessResult](Process, process)
     return Concatted(cat_process_result.stdout.decode())
 
 
@@ -184,13 +184,13 @@ async def javac_compile_process_result(
             raise ValueError(f"Can only compile .java files but got {java_file}")
     sources_snapshot = await Get[Snapshot](PathGlobs, PathGlobs(java_files))
     output_dirs = tuple({os.path.dirname(java_file) for java_file in java_files})
-    process_request = Process(
+    process = Process(
         argv=javac_compile_req.argv_from_source_snapshot(sources_snapshot),
         input_files=sources_snapshot.directory_digest,
         output_directories=output_dirs,
         description="javac compilation",
     )
-    javac_proc_result = await Get[ProcessResult](Process, process_request)
+    javac_proc_result = await Get[ProcessResult](Process, process)
 
     return JavacCompileResult(
         javac_proc_result.stdout.decode(),
@@ -333,10 +333,10 @@ class IsolatedProcessTest(TestBase, unittest.TestCase):
             input_files=EMPTY_DIRECTORY_DIGEST,
         )
 
-        execute_process_result = self.request_single_product(ProcessResult, request)
+        process_result = self.request_single_product(ProcessResult, request)
 
         self.assertEqual(
-            execute_process_result.output_directory_digest,
+            process_result.output_directory_digest,
             Digest(
                 fingerprint="63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16",
                 serialized_bytes_length=80,
@@ -344,7 +344,7 @@ class IsolatedProcessTest(TestBase, unittest.TestCase):
         )
 
         files_content_result = self.request_single_product(
-            FilesContent, execute_process_result.output_directory_digest,
+            FilesContent, process_result.output_directory_digest,
         )
 
         self.assertEqual(

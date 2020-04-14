@@ -76,7 +76,7 @@ async def create_python_awslambda(
 
     # NB: Lambdex modifies its input pex in-place, so the input file is also the output file.
     lambdex_args = ("build", "-e", config.handler.value, pex_filename)
-    process_request = lambdex_setup.requirements_pex.create_execute_request(
+    process = lambdex_setup.requirements_pex.create_execute_request(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path="./lambdex.pex",
@@ -85,7 +85,7 @@ async def create_python_awslambda(
         output_files=(pex_filename,),
         description=f"Run Lambdex for {config.address.reference()}",
     )
-    result = await Get[ProcessResult](Process, process_request)
+    result = await Get[ProcessResult](Process, process)
     return CreatedAWSLambda(digest=result.output_directory_digest, name=pex_filename)
 
 

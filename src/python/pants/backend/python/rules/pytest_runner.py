@@ -251,7 +251,7 @@ async def run_python_test(
     )
     result = await Get[FallibleProcessResult](Process, request)
     coverage_data = PytestCoverageData(result.output_directory_digest) if run_coverage else None
-    return TestResult.from_fallible_execute_process_result(result, coverage_data=coverage_data)
+    return TestResult.from_fallible_process_result(result, coverage_data=coverage_data)
 
 
 @named_rule(desc="Run pytest in an interactive process")

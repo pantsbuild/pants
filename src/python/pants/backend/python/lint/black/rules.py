@@ -46,7 +46,7 @@ class SetupRequest:
 
 @dataclass(frozen=True)
 class Setup:
-    process_request: Process
+    process: Process
 
 
 def generate_args(
@@ -129,7 +129,7 @@ async def setup(
         )
     )
 
-    process_request = requirements_pex.create_execute_request(
+    process = requirements_pex.create_execute_request(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path="./black.pex",
@@ -142,7 +142,7 @@ async def setup(
         output_files=all_source_files_snapshot.files,
         description=f"Run black for {address_references}",
     )
-    return Setup(process_request)
+    return Setup(process)
 
 
 @named_rule(desc="Format using Black")
@@ -150,8 +150,8 @@ async def black_fmt(formatter: BlackFormatter, black: Black) -> FmtResult:
     if black.options.skip:
         return FmtResult.noop()
     setup = await Get[Setup](SetupRequest(formatter, check_only=False))
-    result = await Get[ProcessResult](Process, setup.process_request)
-    return FmtResult.from_execute_process_result(result)
+    result = await Get[ProcessResult](Process, setup.process)
+    return FmtResult.from_process_result(result)
 
 
 @named_rule(desc="Lint using Black")
@@ -159,8 +159,8 @@ async def black_lint(formatter: BlackFormatter, black: Black) -> LintResult:
     if black.options.skip:
         return LintResult.noop()
     setup = await Get[Setup](SetupRequest(formatter, check_only=True))
-    result = await Get[FallibleProcessResult](Process, setup.process_request)
-    return LintResult.from_fallible_execute_process_result(result)
+    result = await Get[FallibleProcessResult](Process, setup.process)
+    return LintResult.from_fallible_process_result(result)
 
 
 def rules():

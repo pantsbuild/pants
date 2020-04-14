@@ -116,7 +116,7 @@ async def bandit_lint(
         description=f"Run Bandit for {address_references}",
     )
     result = await Get[FallibleProcessResult](Process, request)
-    return LintResult.from_fallible_execute_process_result(result)
+    return LintResult.from_fallible_process_result(result)
 
 
 def rules():

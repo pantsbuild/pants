@@ -577,14 +577,14 @@ class EngineTypes(NamedTuple):
     file: TypeId
     link: TypeId
     platform: TypeId
-    multi_platform_process_request: TypeId
+    multi_platform_process: TypeId
     process_result: TypeId
     coroutine: TypeId
     url_to_fetch: TypeId
     string: TypeId
     bytes: TypeId
     construct_interactive_process_result: Function
-    interactive_process_request: TypeId
+    interactive_process: TypeId
     interactive_process_result: TypeId
     snapshot_subset: TypeId
     construct_platform: Function
@@ -961,14 +961,14 @@ class Native(metaclass=SingletonMetaclass):
             file=ti(File),
             link=ti(Link),
             platform=ti(Platform),
-            multi_platform_process_request=ti(MultiPlatformProcess),
+            multi_platform_process=ti(MultiPlatformProcess),
             process_result=ti(FallibleProcessResultWithPlatform),
             coroutine=ti(CoroutineType),
             url_to_fetch=ti(UrlToFetch),
             string=ti(str),
             bytes=ti(bytes),
             construct_interactive_process_result=func(InteractiveProcessResult),
-            interactive_process_request=ti(InteractiveProcessRequest),
+            interactive_process=ti(InteractiveProcessRequest),
             interactive_process_result=ti(InteractiveProcessResult),
             snapshot_subset=ti(SnapshotSubset),
             construct_platform=func(Platform),

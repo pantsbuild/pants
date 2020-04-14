@@ -245,14 +245,14 @@ class JavacCompile(JvmCompile):
             if f.endswith(".java")
         )
 
-        exec_process_request = Process(
+        process = Process(
             argv=tuple(cmd),
             input_files=input_snapshot.directory_digest,
             output_files=output_files,
             description=f"Compiling {ctx.target.address.spec} with javac",
         )
         exec_result = self.context.execute_process_synchronously_without_raising(
-            exec_process_request, "javac", (WorkUnitLabel.TASK, WorkUnitLabel.JVM),
+            process, "javac", (WorkUnitLabel.TASK, WorkUnitLabel.JVM),
         )
 
         # Dump the output to the .pants.d directory where it's expected by downstream tasks.

@@ -35,7 +35,7 @@ class FmtResult:
         return FmtResult(digest=EMPTY_DIRECTORY_DIGEST, stdout="", stderr="")
 
     @staticmethod
-    def from_execute_process_result(process_result: ProcessResult) -> "FmtResult":
+    def from_process_result(process_result: ProcessResult) -> "FmtResult":
         return FmtResult(
             digest=process_result.output_directory_digest,
             stdout=process_result.stdout.decode(),

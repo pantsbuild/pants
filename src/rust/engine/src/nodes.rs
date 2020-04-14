@@ -314,18 +314,18 @@ impl MultiPlatformExecuteProcess {
         )
       })
       .collect();
-    let requests = externs::project_multi(&value, "execute_process_requests");
-    if constraint_parts.len() / 2 != requests.len() {
+    let processes = externs::project_multi(&value, "processes");
+    if constraint_parts.len() / 2 != processes.len() {
       return Err(format!(
-        "Size of constraint keys and requests does not match: {} vs. {}",
+        "Sizes of constraint keys and processes do not match: {} vs. {}",
         constraint_parts.len() / 2,
-        requests.len()
+        processes.len()
       ));
     }
 
     let mut request_by_constraint: BTreeMap<(PlatformConstraint, PlatformConstraint), Process> =
       BTreeMap::new();
-    for (constraint_key, execute_process) in constraint_key_pairs.iter().zip(requests.iter()) {
+    for (constraint_key, execute_process) in constraint_key_pairs.iter().zip(processes.iter()) {
       let underlying_req =
         MultiPlatformExecuteProcess::lift_execute_process(execute_process, constraint_key.1)?;
       request_by_constraint.insert(constraint_key.clone(), underlying_req.clone());

@@ -380,7 +380,7 @@ async def create_pex(
             description = f"Resolving {', '.join(request.requirements.requirements)}"
         else:
             description = f"Building PEX"
-    execute_process_request = MultiPlatformProcess(
+    process = MultiPlatformProcess(
         {
             (
                 PlatformConstraint(platform.value),
@@ -397,12 +397,12 @@ async def create_pex(
         }
     )
 
-    result = await Get[ProcessResult](MultiPlatformProcess, execute_process_request)
+    result = await Get[ProcessResult](MultiPlatformProcess, process)
 
     if pex_debug.might_log:
         lines = result.stderr.decode().splitlines()
         if lines:
-            pex_debug.log(f"Debug output from Pex for: {execute_process_request}")
+            pex_debug.log(f"Debug output from Pex for: {process}")
             for line in lines:
                 pex_debug.log(line)
 

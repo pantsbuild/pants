@@ -53,7 +53,7 @@ class TestResult:
     __test__ = False
 
     @staticmethod
-    def from_fallible_execute_process_result(
+    def from_fallible_process_result(
         process_result: FallibleProcessResult, *, coverage_data: Optional["CoverageData"] = None,
     ) -> "TestResult":
         return TestResult(

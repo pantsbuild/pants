@@ -76,7 +76,7 @@ class MultiPlatformProcess:
     # args collects a set of tuples representing platform constraints mapped to a req,
     # just like a dict constructor can.
     platform_constraints: Tuple[str, ...]
-    execute_process_requests: Tuple[Process, ...]
+    processes: Tuple[Process, ...]
 
     def __init__(
         self, request_dict: Dict[Tuple[PlatformConstraint, PlatformConstraint], Process],
@@ -91,18 +91,18 @@ class MultiPlatformProcess:
         )
         if len({req.description for req in request_dict.values()}) != 1:
             raise ValueError(
-                f"The `description` of all execute_process_requests in a {MultiPlatformProcess.__name__} must be identical."
+                f"The `description` of all processes in a {MultiPlatformProcess.__name__} must be identical."
             )
 
         self.platform_constraints = validated_constraints
-        self.execute_process_requests = tuple(request_dict.values())
+        self.processes = tuple(request_dict.values())
 
     @property
     def product_description(self) -> ProductDescription:
         # we can safely extract the first description because we guarantee that at
         # least one request exists and that all of their descriptions are the same
         # in __new__
-        return ProductDescription(self.execute_process_requests[0].description)
+        return ProductDescription(self.processes[0].description)
 
 
 @dataclass(frozen=True)
@@ -176,7 +176,7 @@ def get_multi_platform_request_description(req: MultiPlatformProcess,) -> Produc
 
 
 @rule
-def upcast_execute_process_request(req: Process,) -> MultiPlatformProcess:
+def upcast_process(req: Process,) -> MultiPlatformProcess:
     """This rule allows an Process to be run as a platform compatible MultiPlatformProcess."""
     return MultiPlatformProcess({(PlatformConstraint.none, PlatformConstraint.none): req})
 
@@ -215,7 +215,7 @@ def create_process_rules():
     return [
         RootRule(Process),
         RootRule(MultiPlatformProcess),
-        upcast_execute_process_request,
+        upcast_process,
         fallible_to_exec_result_or_raise,
         remove_platform_information,
         get_multi_platform_request_description,
