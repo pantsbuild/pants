@@ -4,7 +4,7 @@
 import dataclasses
 import itertools
 import logging
-from abc import ABC, abstractmethod
+from abc import ABC
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
@@ -140,13 +140,11 @@ class AddressAndTestResult:
 class CoverageData(ABC):
     """Base class for inputs to a coverage report.
 
-    Subclasses should add whichever fields they require - snapshots of coverage output or xml files, etc.
+    Subclasses should add whichever fields they require - snapshots of coverage output, XML files,
+    etc.
     """
 
-    @property
-    @abstractmethod
-    def batch_cls(self) -> Type["CoverageDataBatch"]:
-        pass
+    batch_cls: ClassVar[Type["CoverageDataBatch"]]
 
 
 @union

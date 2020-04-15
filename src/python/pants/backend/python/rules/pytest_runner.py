@@ -15,8 +15,8 @@ from pants.backend.python.rules.pex import (
 from pants.backend.python.rules.pex_from_targets import LegacyPexFromTargetsRequest
 from pants.backend.python.rules.pytest_coverage import (
     COVERAGE_PLUGIN_INPUT,
-    Coveragerc,
-    CoveragercRequest,
+    CoverageConfig,
+    CoverageConfigRequest,
     PytestCoverageData,
 )
 from pants.backend.python.rules.targets import (
@@ -171,8 +171,8 @@ async def setup_pytest_for_target(
             Addresses(tgt.address for tgt in python_targets)
         )
         requests.append(
-            Get[Coveragerc](
-                CoveragercRequest(HydratedTargets(hydrated_python_targets), test_time=True)
+            Get[CoverageConfig](
+                CoverageConfigRequest(HydratedTargets(hydrated_python_targets), is_test_time=True)
             ),
         )
 
@@ -186,7 +186,7 @@ async def setup_pytest_for_target(
     ) = cast(
         Union[
             Tuple[Pex, Pex, Pex, ImportablePythonSources, SourceFiles],
-            Tuple[Pex, Pex, Pex, ImportablePythonSources, SourceFiles, Coveragerc],
+            Tuple[Pex, Pex, Pex, ImportablePythonSources, SourceFiles, CoverageConfig],
         ],
         await MultiGet(requests),
     )
@@ -198,8 +198,8 @@ async def setup_pytest_for_target(
         test_runner_pex.directory_digest,
     ]
     if run_coverage:
-        coveragerc = rest[0]
-        directories_to_merge.append(coveragerc.digest)
+        coverage_config = rest[0]
+        directories_to_merge.append(coverage_config.digest)
 
     merged_input_files = await Get[Digest](
         DirectoriesToMerge(directories=tuple(directories_to_merge))
