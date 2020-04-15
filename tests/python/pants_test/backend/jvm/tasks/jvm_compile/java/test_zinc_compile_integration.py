@@ -226,7 +226,6 @@ class ZincCompileIntegrationTest(BaseCompileIT):
                         ["-ldebug", "compile", lib_spec],
                         workdir=workdir,
                         config=config,
-                        # cwd=tmp_build_root,
                     )
                     self.assert_success(pants_run)
                     self.assertIn(
@@ -241,7 +240,6 @@ class ZincCompileIntegrationTest(BaseCompileIT):
                         ["-ldebug", "compile", lib_spec],
                         workdir=workdir,
                         config=config,
-                        #    cwd=tmp_build_root,
                     )
                     self.assert_success(pants_run)
                     self.assertIn("Compiling 1 Scala source", pants_run.stdout_data)
