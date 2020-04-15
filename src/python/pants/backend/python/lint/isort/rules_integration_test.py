@@ -3,56 +3,55 @@
 
 from typing import List, Optional, Tuple
 
-from pants.backend.python.lint.isort.rules import IsortFormatter
+from pants.backend.python.lint.isort.rules import IsortConfiguration, IsortConfigurations
 from pants.backend.python.lint.isort.rules import rules as isort_rules
+from pants.backend.python.rules.targets import PythonLibrary
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.address import Address
-from pants.engine.fs import Digest, DirectoriesToMerge, FileContent, InputFilesContent, Snapshot
-from pants.engine.legacy.structs import TargetAdaptor, TargetAdaptorWithOrigin
+from pants.engine.fs import Digest, FileContent, InputFilesContent
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
+from pants.engine.target import TargetWithOrigin
+from pants.rules.core.determine_source_files import AllSourceFilesRequest, SourceFiles
 from pants.rules.core.fmt import FmtResult
 from pants.rules.core.lint import LintResult
-from pants.source.wrapped_globs import EagerFilesetWithSpec
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
 
 class IsortIntegrationTest(TestBase):
 
-    good_source = FileContent(path="test/good.py", content=b"from animals import cat, dog\n")
-    bad_source = FileContent(path="test/bad.py", content=b"from colors import green, blue\n")
-    fixed_bad_source = FileContent(path="test/bad.py", content=b"from colors import blue, green\n")
+    good_source = FileContent(path="good.py", content=b"from animals import cat, dog\n")
+    bad_source = FileContent(path="bad.py", content=b"from colors import green, blue\n")
+    fixed_bad_source = FileContent(path="bad.py", content=b"from colors import blue, green\n")
     # Note the as import. Isort by default keeps as imports on a new line, so this wouldn't be
     # reformatted by default. If we set the config/CLI args correctly, isort will combine the two
     # imports into one line.
     needs_config_source = FileContent(
-        path="test/config.py",
+        path="needs_config.py",
         content=b"from colors import blue\nfrom colors import green as verde\n",
     )
     fixed_needs_config_source = FileContent(
-        path="test/config.py", content=b"from colors import blue, green as verde\n"
+        path="needs_config.py", content=b"from colors import blue, green as verde\n"
     )
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *isort_rules(), RootRule(IsortFormatter))
+        return (*super().rules(), *isort_rules(), RootRule(IsortConfigurations))
 
     def make_target_with_origin(
         self, source_files: List[FileContent], *, origin: Optional[OriginSpec] = None,
-    ) -> TargetAdaptorWithOrigin:
-        input_snapshot = self.request_single_product(Snapshot, InputFilesContent(source_files))
-        adaptor = TargetAdaptor(
-            sources=EagerFilesetWithSpec("test", {"globs": []}, snapshot=input_snapshot),
-            address=Address.parse("test:target"),
-        )
+    ) -> TargetWithOrigin:
+        for source_file in source_files:
+            self.create_file(f"{source_file.path}", source_file.content.decode())
+        target = PythonLibrary({}, address=Address.parse(":target"))
         if origin is None:
-            origin = SingleAddress(directory="test", name="target")
-        return TargetAdaptorWithOrigin(adaptor, origin)
+            origin = SingleAddress(directory="", name="target")
+        return TargetWithOrigin(target, origin)
 
     def run_isort(
         self,
-        targets: List[TargetAdaptorWithOrigin],
+        targets: List[TargetWithOrigin],
         *,
         config: Optional[str] = None,
         passthrough_args: Optional[str] = None,
@@ -67,19 +66,20 @@ class IsortIntegrationTest(TestBase):
         if skip:
             args.append(f"--isort-skip")
         options_bootstrapper = create_options_bootstrapper(args=args)
+        configs = [IsortConfiguration.create(tgt) for tgt in targets]
         lint_result = self.request_single_product(
-            LintResult, Params(IsortFormatter(tuple(targets)), options_bootstrapper)
+            LintResult, Params(IsortConfigurations(configs), options_bootstrapper)
         )
         input_snapshot = self.request_single_product(
-            Snapshot,
-            DirectoriesToMerge(
-                tuple(target.adaptor.sources.snapshot.directory_digest for target in targets)
+            SourceFiles,
+            Params(
+                AllSourceFilesRequest(config.sources for config in configs), options_bootstrapper
             ),
         )
         fmt_result = self.request_single_product(
             FmtResult,
             Params(
-                IsortFormatter(tuple(targets), prior_formatter_result=input_snapshot),
+                IsortConfigurations(configs, prior_formatter_result=input_snapshot),
                 options_bootstrapper,
             ),
         )
@@ -100,19 +100,19 @@ class IsortIntegrationTest(TestBase):
         target = self.make_target_with_origin([self.bad_source])
         lint_result, fmt_result = self.run_isort([target])
         assert lint_result.exit_code == 1
-        assert "test/bad.py Imports are incorrectly sorted" in lint_result.stdout
+        assert "bad.py Imports are incorrectly sorted" in lint_result.stdout
         assert "Fixing" in fmt_result.stdout
-        assert "test/bad.py" in fmt_result.stdout
+        assert "bad.py" in fmt_result.stdout
         assert fmt_result.digest == self.get_digest([self.fixed_bad_source])
 
     def test_mixed_sources(self) -> None:
         target = self.make_target_with_origin([self.good_source, self.bad_source])
         lint_result, fmt_result = self.run_isort([target])
         assert lint_result.exit_code == 1
-        assert "test/bad.py Imports are incorrectly sorted" in lint_result.stdout
-        assert "test/good.py" not in lint_result.stdout
-        assert "Fixing" in fmt_result.stdout and "test/bad.py" in fmt_result.stdout
-        assert "test/good.py" not in fmt_result.stdout
+        assert "bad.py Imports are incorrectly sorted" in lint_result.stdout
+        assert "good.py" not in lint_result.stdout
+        assert "Fixing" in fmt_result.stdout and "bad.py" in fmt_result.stdout
+        assert "good.py" not in fmt_result.stdout
         assert fmt_result.digest == self.get_digest([self.good_source, self.fixed_bad_source])
 
     def test_multiple_targets(self) -> None:
@@ -122,10 +122,10 @@ class IsortIntegrationTest(TestBase):
         ]
         lint_result, fmt_result = self.run_isort(targets)
         assert lint_result.exit_code == 1
-        assert "test/bad.py Imports are incorrectly sorted" in lint_result.stdout
-        assert "test/good.py" not in lint_result.stdout
-        assert "Fixing" in fmt_result.stdout and "test/bad.py" in fmt_result.stdout
-        assert "test/good.py" not in fmt_result.stdout
+        assert "bad.py Imports are incorrectly sorted" in lint_result.stdout
+        assert "good.py" not in lint_result.stdout
+        assert "Fixing" in fmt_result.stdout and "bad.py" in fmt_result.stdout
+        assert "good.py" not in fmt_result.stdout
         assert fmt_result.digest == self.get_digest([self.good_source, self.fixed_bad_source])
 
     def test_precise_file_args(self) -> None:
@@ -144,18 +144,18 @@ class IsortIntegrationTest(TestBase):
             [target], config="[settings]\ncombine_as_imports=True\n",
         )
         assert lint_result.exit_code == 1
-        assert "test/config.py Imports are incorrectly sorted" in lint_result.stdout
+        assert "config.py Imports are incorrectly sorted" in lint_result.stdout
         assert "Fixing" in fmt_result.stdout
-        assert "test/config.py" in fmt_result.stdout
+        assert "config.py" in fmt_result.stdout
         assert fmt_result.digest == self.get_digest([self.fixed_needs_config_source])
 
     def test_respects_passthrough_args(self) -> None:
         target = self.make_target_with_origin([self.needs_config_source])
         lint_result, fmt_result = self.run_isort([target], passthrough_args="--combine-as",)
         assert lint_result.exit_code == 1
-        assert "test/config.py Imports are incorrectly sorted" in lint_result.stdout
+        assert "config.py Imports are incorrectly sorted" in lint_result.stdout
         assert "Fixing" in fmt_result.stdout
-        assert "test/config.py" in fmt_result.stdout
+        assert "config.py" in fmt_result.stdout
         assert fmt_result.digest == self.get_digest([self.fixed_needs_config_source])
 
     def test_skip(self) -> None:

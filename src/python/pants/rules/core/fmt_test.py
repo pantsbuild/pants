@@ -3,8 +3,7 @@
 
 from abc import ABCMeta, abstractmethod
 from pathlib import Path
-from typing import Iterable, List, Type, cast
-from unittest.mock import Mock
+from typing import Iterable, List, Optional, Type, cast
 
 from pants.base.specs import SingleAddress
 from pants.build_graph.address import Address
@@ -15,24 +14,15 @@ from pants.engine.fs import (
     FileContent,
     Workspace,
 )
-from pants.engine.legacy.graph import (
-    HydratedTarget,
-    HydratedTargetsWithOrigins,
-    HydratedTargetWithOrigin,
-)
-from pants.engine.legacy.structs import (
-    JvmBinaryAdaptor,
-    PythonTargetAdaptor,
-    TargetAdaptor,
-    TargetAdaptorWithOrigin,
-)
 from pants.engine.rules import UnionMembership
+from pants.engine.target import Sources, Target, TargetsWithOrigins, TargetWithOrigin
+from pants.rules.core.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
 from pants.rules.core.fmt import (
     Fmt,
     FmtOptions,
     FmtResult,
     LanguageFmtResults,
-    LanguageFormatters,
+    LanguageFmtTargets,
     fmt,
 )
 from pants.testutil.engine.util import MockConsole, MockGet, create_goal_subsystem, run_rule
@@ -40,7 +30,29 @@ from pants.testutil.test_base import TestBase
 from pants.util.ordered_set import OrderedSet
 
 
-class MockLanguageFormatters(LanguageFormatters, metaclass=ABCMeta):
+class FortranSources(Sources):
+    pass
+
+
+class FortranTarget(Target):
+    alias = "fortran"
+    core_fields = (FortranSources,)
+
+
+class SmalltalkSources(Sources):
+    pass
+
+
+class SmalltalkTarget(Target):
+    alias = "smalltalk"
+    core_fields = (SmalltalkSources,)
+
+
+class InvalidSources(Sources):
+    pass
+
+
+class MockLanguageTargets(LanguageFmtTargets, metaclass=ABCMeta):
     @staticmethod
     @abstractmethod
     def stdout(_: Iterable[Address]) -> str:
@@ -49,8 +61,7 @@ class MockLanguageFormatters(LanguageFormatters, metaclass=ABCMeta):
     @property
     def language_fmt_results(self) -> LanguageFmtResults:
         addresses = [
-            adaptor_with_origin.adaptor.address
-            for adaptor_with_origin in self.adaptors_with_origins
+            target_with_origin.target.address for target_with_origin in self.targets_with_origins
         ]
         # NB: Due to mocking `await Get[Digest](DirectoriesToMerge), the digest we use here does
         # not matter.
@@ -61,78 +72,71 @@ class MockLanguageFormatters(LanguageFormatters, metaclass=ABCMeta):
         )
 
 
-class PythonFormatters(MockLanguageFormatters):
-    @staticmethod
-    def belongs_to_language(adaptor_with_origin: TargetAdaptorWithOrigin) -> bool:
-        return isinstance(adaptor_with_origin.adaptor, PythonTargetAdaptor)
+class FortranTargets(MockLanguageTargets):
+    required_fields = (FortranSources,)
 
     @staticmethod
     def stdout(addresses: Iterable[Address]) -> str:
-        return f"Python formatters: {', '.join(str(address) for address in addresses)}"
+        return f"Fortran targets: {', '.join(str(address) for address in addresses)}"
 
 
-class JavaFormatters(MockLanguageFormatters):
-    @staticmethod
-    def belongs_to_language(adaptor_with_origin: TargetAdaptorWithOrigin) -> bool:
-        return isinstance(adaptor_with_origin.adaptor, JvmBinaryAdaptor)
+class SmalltalkTargets(MockLanguageTargets):
+    required_fields = (SmalltalkSources,)
 
     @staticmethod
     def stdout(addresses: Iterable[Address]) -> str:
-        return f"Java formatters: {', '.join(str(address) for address in addresses)}"
+        return f"Smalltalk targets: {', '.join(str(address) for address in addresses)}"
 
 
-class InvalidFormatters(MockLanguageFormatters):
-    @staticmethod
-    def belongs_to_language(_: TargetAdaptorWithOrigin) -> bool:
-        return False
+class InvalidTargets(MockLanguageTargets):
+    required_fields = (InvalidSources,)
 
     @staticmethod
     def stdout(addresses: Iterable[Address]) -> str:
-        return f"Invalid formatters: {', '.join(str(address) for address in addresses)}"
+        return f"Invalid targets: {', '.join(str(address) for address in addresses)}"
 
 
 class FmtTest(TestBase):
     def setUp(self) -> None:
         super().setUp()
-        self.python_file = FileContent("formatted.py", b"print('So Pythonic now!')\n")
-        self.java_file = FileContent(
-            "formatted.java", b"System.out.println('I may be verbose, but I'm pretty too.')\n"
-        )
-        self.python_digest = self.make_snapshot(
-            {self.python_file.path: self.python_file.content.decode()}
+        self.fortran_file = FileContent("formatted.f98", b"READ INPUT TAPE 5\n")
+        self.smalltalk_file = FileContent("formatted.st", b"y := self size + super size.')\n")
+        self.fortran_digest = self.make_snapshot(
+            {self.fortran_file.path: self.fortran_file.content.decode()}
         ).directory_digest
         self.merged_digest = self.make_snapshot(
-            {fc.path: fc.content.decode() for fc in (self.python_file, self.java_file)}
+            {fc.path: fc.content.decode() for fc in (self.fortran_file, self.smalltalk_file)}
         ).directory_digest
 
     @staticmethod
-    def make_hydrated_target_with_origin(
-        *,
-        name: str = "target",
-        adaptor_type: Type[TargetAdaptor] = PythonTargetAdaptor,
-        include_sources: bool = True,
-    ) -> HydratedTargetWithOrigin:
-        sources = Mock()
-        sources.snapshot = Mock()
-        sources.snapshot.files = ("f1",) if include_sources else ()
-        ht = HydratedTarget(adaptor_type(sources=sources, address=Address.parse(f"//:{name}")))
-        return HydratedTargetWithOrigin(ht, SingleAddress(directory="", name=name))
+    def make_target_with_origin(
+        address: Optional[Address] = None, *, target_cls: Type[Target] = FortranTarget
+    ) -> TargetWithOrigin:
+        if address is None:
+            address = Address.parse(":tests")
+        return TargetWithOrigin(
+            target_cls({}, address=address),
+            origin=SingleAddress(directory=address.spec_path, name=address.target_name),
+        )
 
     def run_fmt_rule(
         self,
         *,
-        language_formatters: List[Type[LanguageFormatters]],
-        targets: List[HydratedTargetWithOrigin],
+        language_target_collection_types: List[Type[LanguageFmtTargets]],
+        targets: List[TargetWithOrigin],
         result_digest: Digest,
         per_target_caching: bool,
+        include_sources: bool = True,
     ) -> str:
         console = MockConsole(use_colors=False)
-        union_membership = UnionMembership({LanguageFormatters: OrderedSet(language_formatters)})
+        union_membership = UnionMembership(
+            {LanguageFmtTargets: OrderedSet(language_target_collection_types)}
+        )
         result: Fmt = run_rule(
             fmt,
             rule_args=[
                 console,
-                HydratedTargetsWithOrigins(targets),
+                TargetsWithOrigins(targets),
                 create_goal_subsystem(FmtOptions, per_target_caching=per_target_caching),
                 Workspace(self.scheduler),
                 union_membership,
@@ -140,8 +144,13 @@ class FmtTest(TestBase):
             mock_gets=[
                 MockGet(
                     product_type=LanguageFmtResults,
-                    subject_type=LanguageFormatters,
-                    mock=lambda language_formatters: language_formatters.language_fmt_results,
+                    subject_type=LanguageFmtTargets,
+                    mock=lambda language_targets_collection: language_targets_collection.language_fmt_results,
+                ),
+                MockGet(
+                    product_type=TargetsWithSources,
+                    subject_type=TargetsWithSourcesRequest,
+                    mock=lambda tgts: TargetsWithSources(tgts if include_sources else ()),
                 ),
                 MockGet(
                     product_type=Digest,
@@ -154,26 +163,29 @@ class FmtTest(TestBase):
         assert result.exit_code == 0
         return cast(str, console.stdout.getvalue())
 
-    def assert_workspace_modified(self, *, python_formatted: bool, java_formatted: bool) -> None:
-        python_file = Path(self.build_root, self.python_file.path)
-        java_file = Path(self.build_root, self.java_file.path)
-        if python_formatted:
-            assert python_file.is_file()
-            assert python_file.read_text() == self.python_file.content.decode()
-        if java_formatted:
-            assert java_file.is_file()
-            assert java_file.read_text() == self.java_file.content.decode()
+    def assert_workspace_modified(
+        self, *, fortran_formatted: bool, smalltalk_formatted: bool
+    ) -> None:
+        fortran_file = Path(self.build_root, self.fortran_file.path)
+        smalltalk_file = Path(self.build_root, self.smalltalk_file.path)
+        if fortran_formatted:
+            assert fortran_file.is_file()
+            assert fortran_file.read_text() == self.fortran_file.content.decode()
+        if smalltalk_formatted:
+            assert smalltalk_file.is_file()
+            assert smalltalk_file.read_text() == self.smalltalk_file.content.decode()
 
     def test_empty_target_noops(self) -> None:
         def assert_noops(*, per_target_caching: bool) -> None:
             stdout = self.run_fmt_rule(
-                language_formatters=[PythonFormatters],
-                targets=[self.make_hydrated_target_with_origin(include_sources=False)],
-                result_digest=self.python_digest,
+                language_target_collection_types=[FortranTargets],
+                targets=[self.make_target_with_origin()],
+                result_digest=self.fortran_digest,
                 per_target_caching=per_target_caching,
+                include_sources=False,
             )
             assert stdout.strip() == ""
-            self.assert_workspace_modified(python_formatted=False, java_formatted=False)
+            self.assert_workspace_modified(fortran_formatted=False, smalltalk_formatted=False)
 
         assert_noops(per_target_caching=False)
         assert_noops(per_target_caching=True)
@@ -181,114 +193,104 @@ class FmtTest(TestBase):
     def test_invalid_target_noops(self) -> None:
         def assert_noops(*, per_target_caching: bool) -> None:
             stdout = self.run_fmt_rule(
-                language_formatters=[InvalidFormatters],
-                targets=[self.make_hydrated_target_with_origin()],
-                result_digest=self.python_digest,
+                language_target_collection_types=[InvalidTargets],
+                targets=[self.make_target_with_origin()],
+                result_digest=self.fortran_digest,
                 per_target_caching=per_target_caching,
             )
             assert stdout.strip() == ""
-            self.assert_workspace_modified(python_formatted=False, java_formatted=False)
+            self.assert_workspace_modified(fortran_formatted=False, smalltalk_formatted=False)
 
         assert_noops(per_target_caching=False)
         assert_noops(per_target_caching=True)
 
     def test_single_language_with_single_target(self) -> None:
+        address = Address.parse(":tests")
+        target_with_origin = self.make_target_with_origin(address)
+
         def assert_expected(*, per_target_caching: bool) -> None:
-            target_with_origin = self.make_hydrated_target_with_origin()
+
             stdout = self.run_fmt_rule(
-                language_formatters=[PythonFormatters],
+                language_target_collection_types=[FortranTargets],
                 targets=[target_with_origin],
-                result_digest=self.python_digest,
+                result_digest=self.fortran_digest,
                 per_target_caching=per_target_caching,
             )
-            assert stdout.strip() == PythonFormatters.stdout(
-                [target_with_origin.target.adaptor.address]
-            )
-            self.assert_workspace_modified(python_formatted=True, java_formatted=False)
+            assert stdout.strip() == FortranTargets.stdout([address])
+            self.assert_workspace_modified(fortran_formatted=True, smalltalk_formatted=False)
 
         assert_expected(per_target_caching=False)
         assert_expected(per_target_caching=True)
 
     def test_single_language_with_multiple_targets(self) -> None:
-        targets_with_origins = [
-            self.make_hydrated_target_with_origin(name="t1"),
-            self.make_hydrated_target_with_origin(name="t2"),
-        ]
-        addresses = [
-            target_with_origin.target.adaptor.address for target_with_origin in targets_with_origins
-        ]
+        addresses = [Address.parse(":t1"), Address.parse(":t2")]
 
         def get_stdout(*, per_target_caching: bool) -> str:
             stdout = self.run_fmt_rule(
-                language_formatters=[PythonFormatters],
-                targets=targets_with_origins,
-                result_digest=self.python_digest,
+                language_target_collection_types=[FortranTargets],
+                targets=[self.make_target_with_origin(addr) for addr in addresses],
+                result_digest=self.fortran_digest,
                 per_target_caching=per_target_caching,
             )
-            self.assert_workspace_modified(python_formatted=True, java_formatted=False)
+            self.assert_workspace_modified(fortran_formatted=True, smalltalk_formatted=False)
             return stdout
 
-        assert get_stdout(per_target_caching=False).strip() == PythonFormatters.stdout(addresses)
+        assert get_stdout(per_target_caching=False).strip() == FortranTargets.stdout(addresses)
         assert get_stdout(per_target_caching=True).splitlines() == [
-            PythonFormatters.stdout([address]) for address in addresses
+            FortranTargets.stdout([address]) for address in addresses
         ]
 
     def test_multiple_languages_with_single_targets(self) -> None:
-        python_target = self.make_hydrated_target_with_origin(
-            name="py", adaptor_type=PythonTargetAdaptor
-        )
-        java_target = self.make_hydrated_target_with_origin(
-            name="java", adaptor_type=JvmBinaryAdaptor
-        )
+        fortran_address = Address.parse(":fortran")
+        smalltalk_address = Address.parse(":smalltalk")
 
         def assert_expected(*, per_target_caching: bool) -> None:
             stdout = self.run_fmt_rule(
-                language_formatters=[PythonFormatters, JavaFormatters],
-                targets=[python_target, java_target],
+                language_target_collection_types=[FortranTargets, SmalltalkTargets],
+                targets=[
+                    self.make_target_with_origin(fortran_address, target_cls=FortranTarget),
+                    self.make_target_with_origin(smalltalk_address, target_cls=SmalltalkTarget),
+                ],
                 result_digest=self.merged_digest,
                 per_target_caching=per_target_caching,
             )
             assert stdout.splitlines() == [
-                PythonFormatters.stdout([python_target.target.adaptor.address]),
-                JavaFormatters.stdout([java_target.target.adaptor.address]),
+                FortranTargets.stdout([fortran_address]),
+                SmalltalkTargets.stdout([smalltalk_address]),
             ]
-            self.assert_workspace_modified(python_formatted=True, java_formatted=True)
+            self.assert_workspace_modified(fortran_formatted=True, smalltalk_formatted=True)
 
         assert_expected(per_target_caching=False)
         assert_expected(per_target_caching=True)
 
     def test_multiple_languages_with_multiple_targets(self) -> None:
-        python_targets = [
-            self.make_hydrated_target_with_origin(name="py1", adaptor_type=PythonTargetAdaptor),
-            self.make_hydrated_target_with_origin(name="py2", adaptor_type=PythonTargetAdaptor),
-        ]
-        java_targets = [
-            self.make_hydrated_target_with_origin(name="java1", adaptor_type=JvmBinaryAdaptor),
-            self.make_hydrated_target_with_origin(name="java2", adaptor_type=JvmBinaryAdaptor),
-        ]
+        fortran_addresses = [Address.parse(":py1"), Address.parse(":py2")]
+        smalltalk_addresses = [Address.parse(":py1"), Address.parse(":py2")]
 
-        python_addresses = [
-            target_with_origin.target.adaptor.address for target_with_origin in python_targets
+        fortran_targets = [
+            self.make_target_with_origin(addr, target_cls=FortranTarget)
+            for addr in fortran_addresses
         ]
-        java_addresses = [
-            target_with_origin.target.adaptor.address for target_with_origin in java_targets
+        smalltalk_targets = [
+            self.make_target_with_origin(addr, target_cls=SmalltalkTarget)
+            for addr in smalltalk_addresses
         ]
 
         def get_stdout(*, per_target_caching: bool) -> str:
             stdout = self.run_fmt_rule(
-                language_formatters=[PythonFormatters, JavaFormatters],
-                targets=[*python_targets, *java_targets],
+                language_target_collection_types=[FortranTargets, SmalltalkTargets],
+                targets=[*fortran_targets, *smalltalk_targets],
                 result_digest=self.merged_digest,
                 per_target_caching=per_target_caching,
             )
-            self.assert_workspace_modified(python_formatted=True, java_formatted=True)
+            self.assert_workspace_modified(fortran_formatted=True, smalltalk_formatted=True)
             return stdout
 
         assert get_stdout(per_target_caching=False).splitlines() == [
-            PythonFormatters.stdout(python_addresses),
-            JavaFormatters.stdout(java_addresses),
+            FortranTargets.stdout(fortran_addresses),
+            SmalltalkTargets.stdout(smalltalk_addresses),
         ]
         assert get_stdout(per_target_caching=True).splitlines() == [
-            *(PythonFormatters.stdout([address]) for address in python_addresses),
-            *(JavaFormatters.stdout([address]) for address in java_addresses),
+            *(FortranTargets.stdout([address]) for address in fortran_addresses),
+            *(SmalltalkTargets.stdout([address]) for address in smalltalk_addresses),
         ]
