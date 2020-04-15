@@ -35,7 +35,7 @@ use rule_graph;
 use graph::{Entry, Node, NodeError, NodeTracer, NodeVisualizer};
 use store::{self, StoreFileByDigest};
 use workunit_store::{
-  new_span_id, scope_task_workunit_state, StartedWorkUnit, WorkUnit, WorkunitMetadata,
+  new_span_id, scope_task_workunit_state, WorkunitMetadata,
 };
 
 pub type NodeFuture<T> = BoxFuture<T, Failure>;
@@ -1055,21 +1055,16 @@ impl Node for NodeKey {
 
   fn run(self, context: Context) -> NodeFuture<NodeResult> {
     let mut workunit_state = workunit_store::expect_workunit_state();
-    let maybe_started_workunit = if context.session.should_handle_workunits() {
+    let maybe_started_workunit_id: Option<String> = if context.session.should_handle_workunits() {
       self.user_facing_name().map(|node_name| {
         let span_id = new_span_id();
         let desc = self.display_info().and_then(|di| di.desc.as_ref().cloned());
 
         // We're starting a new workunit: record our parent, and set the current parent to our span.
         let parent_id = std::mem::replace(&mut workunit_state.parent_id, Some(span_id.clone()));
+        let metadata = WorkunitMetadata { desc };
 
-        StartedWorkUnit {
-          name: node_name,
-          start_time: std::time::SystemTime::now(),
-          span_id: span_id,
-          parent_id: parent_id,
-          metadata: WorkunitMetadata { desc },
-        }
+        context.session.workunit_store().start_workunit(span_id, node_name, parent_id, metadata)
       })
     } else {
       None
@@ -1104,9 +1099,8 @@ impl Node for NodeKey {
         },
         Err(e) => Err(e),
       };
-      if let Some(started_workunit) = maybe_started_workunit {
-        let workunit: WorkUnit = started_workunit.finish();
-        context2.session.workunit_store().add_workunit(workunit)
+      if let Some(id) = maybe_started_workunit_id {
+        let _ = context2.session.workunit_store().complete_workunit(id).unwrap();
       }
       result
     })

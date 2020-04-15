@@ -48,7 +48,7 @@ pub struct WorkUnit {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct StartedWorkUnit {
+struct StartedWorkUnit {
   pub name: String,
   pub start_time: std::time::SystemTime,
   pub span_id: String,
@@ -62,7 +62,7 @@ pub struct WorkunitMetadata {
 }
 
 impl StartedWorkUnit {
-  pub fn finish(self) -> WorkUnit {
+  fn finish(self) -> WorkUnit {
     WorkUnit {
       name: self.name,
       time_span: TimeSpan::since(&self.start_time),
@@ -130,8 +130,7 @@ impl WorkUnitStore {
     self.inner.clone()
   }
 
-  pub fn start_workunit(&self, name: String, parent_id: Option<SpanId>, metadata: WorkunitMetadata,) -> SpanId {
-    let span_id = new_span_id();
+  pub fn start_workunit(&self, span_id: SpanId, name: String, parent_id: Option<SpanId>, metadata: WorkunitMetadata,) -> SpanId {
     let started = StartedWorkUnit {
       name,
       span_id: span_id.clone(),
@@ -164,8 +163,19 @@ impl WorkUnitStore {
     }
   }
 
-  pub fn add_workunit(&self, workunit: WorkUnit) {
-    self.inner.lock().workunits.push(workunit);
+  pub fn add_completed_workunit(&self, name: String, time_span: TimeSpan, parent_id: Option<SpanId>)  {
+    let inner = &mut self.inner.lock();
+    let span_id = new_span_id();
+    let workunit = WorkunitRecord::Completed(WorkUnit {
+      name,
+      time_span,
+      span_id: span_id.clone(),
+      parent_id,
+      metadata: WorkunitMetadata::default(),
+    });
+
+    inner.workunit_records.insert(span_id.clone(), workunit);
+    inner.completed_ids.push(span_id);
   }
 
   pub fn with_latest_workunits<F, T>(&mut self, f: F) -> T
