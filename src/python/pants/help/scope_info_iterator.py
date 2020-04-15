@@ -89,5 +89,5 @@ class ScopeInfoIterator:
                                 for subsys_dep in subsys_deps(info.optionable_cls):
                                     yield subsys_dep
                 elif issubclass(scope_info.optionable_cls, SubsystemClientMixin):
-                    for subsys_dep in subsys_deps(scope_info.optionable_cls):  # type: ignore[misc]
+                    for subsys_dep in subsys_deps(scope_info.optionable_cls):
                         yield subsys_dep
