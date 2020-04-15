@@ -29,8 +29,8 @@ use concrete_time::TimeSpan;
 use parking_lot::Mutex;
 use rand::thread_rng;
 use rand::Rng;
-use tokio::task_local;
 use std::collections::HashMap;
+use tokio::task_local;
 
 use std::cell::RefCell;
 use std::future::Future;
@@ -130,7 +130,13 @@ impl WorkUnitStore {
     self.inner.clone()
   }
 
-  pub fn start_workunit(&self, span_id: SpanId, name: String, parent_id: Option<SpanId>, metadata: WorkunitMetadata,) -> SpanId {
+  pub fn start_workunit(
+    &self,
+    span_id: SpanId,
+    name: String,
+    parent_id: Option<SpanId>,
+    metadata: WorkunitMetadata,
+  ) -> SpanId {
     let started = StartedWorkUnit {
       name,
       span_id: span_id.clone(),
@@ -139,7 +145,9 @@ impl WorkUnitStore {
       metadata,
     };
     let mut inner = self.inner.lock();
-    inner.workunit_records.insert(span_id.clone(), WorkunitRecord::Started(started));
+    inner
+      .workunit_records
+      .insert(span_id.clone(), WorkunitRecord::Started(started));
     inner.started_ids.push(span_id.clone());
     span_id
   }
@@ -148,22 +156,32 @@ impl WorkUnitStore {
     use std::collections::hash_map::Entry;
     let inner = &mut self.inner.lock();
     match inner.workunit_records.entry(span_id.clone()) {
-      Entry::Vacant(_) => Err(format!("No previously-started workunit found for id: {}", span_id)),
-      Entry::Occupied(o) => {
-        match o.remove_entry() {
-          (span_id, WorkunitRecord::Started(started)) => {
-            let finished = started.finish();
-            inner.workunit_records.insert(span_id.clone(), WorkunitRecord::Completed(finished));
-            inner.completed_ids.push(span_id);
-            Ok(())
-          },
-          (span_id, WorkunitRecord::Completed(_)) => Err(format!("Workunit {} was already completed.", span_id)),
+      Entry::Vacant(_) => Err(format!(
+        "No previously-started workunit found for id: {}",
+        span_id
+      )),
+      Entry::Occupied(o) => match o.remove_entry() {
+        (span_id, WorkunitRecord::Started(started)) => {
+          let finished = started.finish();
+          inner
+            .workunit_records
+            .insert(span_id.clone(), WorkunitRecord::Completed(finished));
+          inner.completed_ids.push(span_id);
+          Ok(())
         }
-      }
+        (span_id, WorkunitRecord::Completed(_)) => {
+          Err(format!("Workunit {} was already completed.", span_id))
+        }
+      },
     }
   }
 
-  pub fn add_completed_workunit(&self, name: String, time_span: TimeSpan, parent_id: Option<SpanId>)  {
+  pub fn add_completed_workunit(
+    &self,
+    name: String,
+    time_span: TimeSpan,
+    parent_id: Option<SpanId>,
+  ) {
     let inner = &mut self.inner.lock();
     let span_id = new_span_id();
     let workunit = WorkunitRecord::Completed(WorkUnit {
@@ -190,8 +208,7 @@ impl WorkUnitStore {
     let cur_len = completed_ids.len();
     let latest: usize = inner_store.last_seen_workunit;
 
-    let workunits: Vec<WorkUnit> = inner_store
-      .completed_ids[latest..cur_len]
+    let workunits: Vec<WorkUnit> = inner_store.completed_ids[latest..cur_len]
       .iter()
       .flat_map(|id| workunit_records.get(id))
       .flat_map(|record| match record {

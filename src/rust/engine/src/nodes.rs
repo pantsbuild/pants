@@ -34,9 +34,7 @@ use rule_graph;
 
 use graph::{Entry, Node, NodeError, NodeTracer, NodeVisualizer};
 use store::{self, StoreFileByDigest};
-use workunit_store::{
-  new_span_id, scope_task_workunit_state, WorkunitMetadata,
-};
+use workunit_store::{new_span_id, scope_task_workunit_state, WorkunitMetadata};
 
 pub type NodeFuture<T> = BoxFuture<T, Failure>;
 
@@ -1064,7 +1062,10 @@ impl Node for NodeKey {
         let parent_id = std::mem::replace(&mut workunit_state.parent_id, Some(span_id.clone()));
         let metadata = WorkunitMetadata { desc };
 
-        context.session.workunit_store().start_workunit(span_id, node_name, parent_id, metadata)
+        context
+          .session
+          .workunit_store()
+          .start_workunit(span_id, node_name, parent_id, metadata)
       })
     } else {
       None
@@ -1100,7 +1101,11 @@ impl Node for NodeKey {
         Err(e) => Err(e),
       };
       if let Some(id) = maybe_started_workunit_id {
-        let _ = context2.session.workunit_store().complete_workunit(id).unwrap();
+        context2
+          .session
+          .workunit_store()
+          .complete_workunit(id)
+          .unwrap();
       }
       result
     })

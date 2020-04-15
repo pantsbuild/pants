@@ -223,7 +223,7 @@ impl ByteStore {
         workunit_name.clone(),
         TimeSpan::since(&start_time),
         parent_id,
-        );
+      );
     }
 
     result
@@ -304,7 +304,9 @@ impl ByteStore {
       let name = workunit_name.clone();
       let time_span = TimeSpan::since(&start_time);
       let parent_id = workunit_state.parent_id;
-      workunit_state.store.add_completed_workunit(name, time_span, parent_id);
+      workunit_state
+        .store
+        .add_completed_workunit(name, time_span, parent_id);
     }
 
     result
@@ -348,7 +350,9 @@ impl ByteStore {
           let name = workunit_name.clone();
           let time_span = TimeSpan::since(&start_time);
           let parent_id = workunit_state.parent_id;
-          workunit_state.store.add_completed_workunit(name, time_span, parent_id);
+          workunit_state
+            .store
+            .add_completed_workunit(name, time_span, parent_id);
         }
         future
       })

@@ -2261,15 +2261,15 @@ async fn extract_output_files_from_response_no_prefix() {
 }
 
 fn workunits_with_constant_span_id(workunit_store: &mut WorkUnitStore) -> HashSet<WorkUnit> {
-  workunit_store
-    .with_latest_workunits(|workunits|
-      workunits.iter()
+  workunit_store.with_latest_workunits(|workunits| {
+    workunits
+      .iter()
       .map(|workunit| WorkUnit {
         span_id: String::from("ignore"),
         ..workunit.clone()
       })
       .collect()
-    )
+  })
 }
 
 #[tokio::test]
