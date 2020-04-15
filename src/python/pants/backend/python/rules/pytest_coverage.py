@@ -21,6 +21,7 @@ from pants.backend.python.rules.pex import (
 )
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.build_graph.address import Address
 from pants.engine.fs import (
     Digest,
     DirectoriesToMerge,
@@ -36,10 +37,9 @@ from pants.engine.selectors import Get, MultiGet
 from pants.python.python_setup import PythonSetup
 from pants.rules.core.determine_source_files import LegacyAllSourceFilesRequest, SourceFiles
 from pants.rules.core.test import (
-    AddressAndTestResult,
     ConsoleCoverageReport,
     CoverageData,
-    CoverageDataBatch,
+    CoverageDataCollection,
     CoverageReport,
     FilesystemCoverageReport,
 )
@@ -116,15 +116,13 @@ COVERAGE_PLUGIN_INPUT = InputFilesContent(
 
 
 @dataclass(frozen=True)
-class PytestCoverageDataBatch(CoverageDataBatch):
-    addresses_and_test_results: Tuple[AddressAndTestResult, ...]
-
-
-@dataclass(frozen=True)
 class PytestCoverageData(CoverageData):
+    address: Address
     digest: Digest
 
-    batch_cls = PytestCoverageDataBatch
+
+class PytestCoverageDataCollection(CoverageDataCollection):
+    element_type = PytestCoverageData
 
 
 @dataclass(frozen=True)
@@ -269,7 +267,7 @@ class MergedCoverageData:
 
 @named_rule(desc="Merge Pytest coverage reports")
 async def merge_coverage_data(
-    data_batch: PytestCoverageDataBatch,
+    data_collection: PytestCoverageDataCollection,
     coverage_setup: CoverageSetup,
     transitive_targets: TransitiveHydratedTargets,
     python_setup: PythonSetup,
@@ -280,14 +278,8 @@ async def merge_coverage_data(
     # `.coverage`. We prefix each of these with their address so that we can write them all into a
     # single PEX.
     coverage_directory_digests = await MultiGet(
-        Get[Digest](
-            DirectoryWithPrefixToAdd(
-                result.test_result.coverage_data.digest,  # type: ignore[attr-defined]
-                prefix=result.address.path_safe_spec,
-            )
-        )
-        for result in data_batch.addresses_and_test_results
-        if result.test_result.coverage_data is not None
+        Get[Digest](DirectoryWithPrefixToAdd(data.digest, prefix=data.address.path_safe_spec))
+        for data in data_collection
     )
     sources = await Get[SourceFiles](
         LegacyAllSourceFilesRequest(
@@ -310,10 +302,7 @@ async def merge_coverage_data(
         ),
     )
 
-    prefixes = [
-        f"{result.address.path_safe_spec}/.coverage"
-        for result in data_batch.addresses_and_test_results
-    ]
+    prefixes = [f"{data.address.path_safe_spec}/.coverage" for data in data_collection]
     coverage_args = ("combine", *prefixes)
     process = coverage_setup.requirements_pex.create_execute_request(
         pex_path=f"./{coverage_setup.requirements_pex.output_filename}",
@@ -410,6 +399,6 @@ def rules():
         merge_coverage_data,
         setup_coverage,
         subsystem_rule(PytestCoverage),
-        UnionRule(CoverageDataBatch, PytestCoverageDataBatch),
+        UnionRule(CoverageDataCollection, PytestCoverageDataCollection),
         RootRule(CoverageConfigRequest),
     ]

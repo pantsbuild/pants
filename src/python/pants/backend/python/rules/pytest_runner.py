@@ -250,7 +250,9 @@ async def run_python_test(
         env=env,
     )
     result = await Get[FallibleProcessResult](Process, request)
-    coverage_data = PytestCoverageData(result.output_directory_digest) if run_coverage else None
+    coverage_data = (
+        PytestCoverageData(config.address, result.output_directory_digest) if run_coverage else None
+    )
     return TestResult.from_fallible_process_result(result, coverage_data=coverage_data)
 
 
