@@ -64,10 +64,10 @@ class LinterConfiguration(ABC):
             for dataclass_field in dataclasses.fields(cls)
             if isinstance(dataclass_field.type, type) and issubclass(dataclass_field.type, Field)  # type: ignore[misc]
         }
-        tgt = target_with_origin.target
+        tgt, origin = target_with_origin
         return cls(
             address=tgt.address,
-            origin=target_with_origin.origin,
+            origin=origin,
             **{  # type: ignore[arg-type]
                 dataclass_field_name: (
                     tgt[field_cls] if field_cls in cls.required_fields else tgt.get(field_cls)
