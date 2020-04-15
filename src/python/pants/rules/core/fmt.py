@@ -157,7 +157,7 @@ async def fmt(
         union_membership.union_rules[LanguageFmtTargets]
     )
 
-    language_target_collections = tuple(
+    language_target_collections: Iterable[LanguageFmtTargets] = tuple(
         language_target_collection_type(
             TargetsWithOrigins(
                 target_with_origin
@@ -167,7 +167,7 @@ async def fmt(
         )
         for language_target_collection_type in language_target_collection_types
     )
-    targets_with_sources = await MultiGet(
+    targets_with_sources: Iterable[TargetsWithSources] = await MultiGet(
         Get[TargetsWithSources](
             TargetsWithSourcesRequest(
                 target_with_origin.target
@@ -179,7 +179,7 @@ async def fmt(
     # NB: We must convert back the generic TargetsWithSources objects back into their
     # corresponding LanguageFmtTargets, e.g. back to PythonFmtTargets, in order for the union
     # rule to work.
-    valid_language_target_collections = tuple(
+    valid_language_target_collections: Iterable[LanguageFmtTargets] = tuple(
         language_target_collection_cls(
             TargetsWithOrigins(
                 target_with_origin

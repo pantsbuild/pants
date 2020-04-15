@@ -134,7 +134,7 @@ async def lint(
         LinterConfigurations
     ]
 
-    config_collections = tuple(
+    config_collections: Iterable[LinterConfigurations] = tuple(
         config_collection_type(
             config_collection_type.config_type.create(target_with_origin)
             for target_with_origin in targets_with_origins
@@ -142,14 +142,14 @@ async def lint(
         )
         for config_collection_type in config_collection_types
     )
-    config_collections_with_sources = await MultiGet(
+    config_collections_with_sources: Iterable[ConfigurationsWithSources] = await MultiGet(
         Get[ConfigurationsWithSources](ConfigurationsWithSourcesRequest(config_collection))
         for config_collection in config_collections
     )
     # NB: We must convert back the generic ConfigurationsWithSources objects back into their
     # corresponding LinterConfigurations, e.g. back to IsortConfigurations, in order for the union
     # rule to work.
-    valid_config_collections = tuple(
+    valid_config_collections: Iterable[LinterConfigurations] = tuple(
         config_collection_cls(config_collection)
         for config_collection_cls, config_collection in zip(
             config_collection_types, config_collections_with_sources
