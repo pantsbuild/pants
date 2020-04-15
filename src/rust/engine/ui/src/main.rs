@@ -37,7 +37,7 @@ use ui::EngineDisplay;
 // N.B. This is purely a demo/testing bin target for exercising the library.
 
 fn main() {
-  let mut display = EngineDisplay::new(0);
+  let mut display = EngineDisplay::new();
   display.start();
 
   let worker_ids = vec![
