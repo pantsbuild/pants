@@ -5,10 +5,9 @@ import logging
 import os.path
 from collections.abc import MutableSequence, MutableSet
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, List, Optional, Sequence, Tuple, Type, Union, cast
+from typing import Any, Callable, Iterable, List, Optional, Sequence, Tuple, Union, cast
 
 from pants.base.deprecated import warn_or_error
-from pants.base.specs import OriginSpec
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
 from pants.engine.addressable import addressable_sequence
@@ -363,99 +362,6 @@ class PythonRequirementLibraryAdaptor(TargetAdaptor):
 class PantsPluginAdaptor(PythonTargetAdaptor):
     def get_sources(self) -> "GlobsWithConjunction":
         return GlobsWithConjunction.for_literal_files(["register.py"])
-
-
-# TODO(#7490): Remove this once we have multiple params support so that rules can do something
-# like `await Get[TestResult](Params(Address(..), Origin(..)))`.
-@dataclass(frozen=True)
-class TargetAdaptorWithOrigin:
-    adaptor: TargetAdaptor
-    origin: OriginSpec
-
-    @staticmethod
-    def create(adaptor: TargetAdaptor, origin: OriginSpec) -> "TargetAdaptorWithOrigin":
-        adaptor_with_origin_cls: Type["TargetAdaptorWithOrigin"] = {
-            TargetAdaptor: TargetAdaptorWithOrigin,
-            AppAdaptor: AppAdaptorWithOrigin,
-            JvmAppAdaptor: JvmAppAdaptorWithOrigin,
-            JvmBinaryAdaptor: JvmBinaryAdaptorWithOrigin,
-            PythonAppAdaptor: PythonAppAdaptorWithOrigin,
-            ResourcesAdaptor: ResourcesAdaptorWithOrigin,
-            PageAdaptor: PageAdaptorWithOrigin,
-            RemoteSourcesAdaptor: RemoteSourcesAdaptorWithOrigin,
-            PythonTargetAdaptor: PythonTargetAdaptorWithOrigin,
-            PythonBinaryAdaptor: PythonBinaryAdaptorWithOrigin,
-            PythonTestsAdaptor: PythonTestsAdaptorWithOrigin,
-            PythonAWSLambdaAdaptor: PythonAWSLambdaAdaptorWithOrigin,
-            PythonRequirementLibraryAdaptor: PythonRequirementLibraryAdaptorWithOrigin,
-            PantsPluginAdaptor: PantsPluginAdaptorWithOrigin,
-        }.get(type(adaptor), TargetAdaptorWithOrigin)
-        return adaptor_with_origin_cls(adaptor, origin)
-
-
-@dataclass(frozen=True)
-class AppAdaptorWithOrigin(TargetAdaptorWithOrigin):
-    adaptor: AppAdaptor
-
-
-@dataclass(frozen=True)
-class JvmAppAdaptorWithOrigin(TargetAdaptorWithOrigin):
-    adaptor: JvmAppAdaptor
-
-
-@dataclass(frozen=True)
-class JvmBinaryAdaptorWithOrigin(TargetAdaptorWithOrigin):
-    adaptor: JvmBinaryAdaptor
-
-
-@dataclass(frozen=True)
-class PythonAppAdaptorWithOrigin(TargetAdaptorWithOrigin):
-    adaptor: PythonAppAdaptor
-
-
-@dataclass(frozen=True)
-class ResourcesAdaptorWithOrigin(TargetAdaptorWithOrigin):
-    adaptor: ResourcesAdaptor
-
-
-@dataclass(frozen=True)
-class PageAdaptorWithOrigin(TargetAdaptorWithOrigin):
-    adaptor: PageAdaptor
-
-
-@dataclass(frozen=True)
-class RemoteSourcesAdaptorWithOrigin(TargetAdaptorWithOrigin):
-    adaptor: RemoteSourcesAdaptor
-
-
-@dataclass(frozen=True)
-class PythonTargetAdaptorWithOrigin(TargetAdaptorWithOrigin):
-    adaptor: PythonTargetAdaptor
-
-
-@dataclass(frozen=True)
-class PythonBinaryAdaptorWithOrigin(TargetAdaptorWithOrigin):
-    adaptor: PythonBinaryAdaptor
-
-
-@dataclass(frozen=True)
-class PythonTestsAdaptorWithOrigin(TargetAdaptorWithOrigin):
-    adaptor: PythonTestsAdaptor
-
-
-@dataclass(frozen=True)
-class PythonAWSLambdaAdaptorWithOrigin(TargetAdaptorWithOrigin):
-    adaptor: PythonAWSLambdaAdaptor
-
-
-@dataclass(frozen=True)
-class PythonRequirementLibraryAdaptorWithOrigin(TargetAdaptorWithOrigin):
-    adaptor: PythonRequirementLibraryAdaptor
-
-
-@dataclass(frozen=True)
-class PantsPluginAdaptorWithOrigin(TargetAdaptorWithOrigin):
-    adaptor: PantsPluginAdaptor
 
 
 class SourceGlobs(Locatable):
