@@ -8,9 +8,6 @@ execution_strategy = "subprocess"
 # overhead or else just generally thrash the container and slow things down.
 travis_parallelism = 4
 
-[black]
-args = ["--quiet"]
-
 [compile.rsc]
 worker_count = "%(travis_parallelism)s"
 
