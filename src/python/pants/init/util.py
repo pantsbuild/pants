@@ -38,6 +38,9 @@ def init_workdir(global_options: OptionValueContainer) -> str:
         directly. For instance node_binary targets are built using ad-hoc build scripts which can do
         this.
         """
+        # Don't link anything unless this option is enabled.
+        if not global_options.pants_physical_workdir_source_control:
+            return
         for scm_state_dir in SOURCE_CONTROL_DIRS:
             scm_source_path = os.path.join(get_buildroot(), scm_state_dir)
             scm_target_path = os.path.join(workdir_dst, scm_state_dir)

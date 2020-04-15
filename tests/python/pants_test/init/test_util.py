@@ -17,12 +17,18 @@ class UtilTest(TestBase):
     def physical_workdir_base(self) -> OptionValueContainer:
         with temporary_dir() as physical_workdir_base:
             bootstrap_options = self.get_bootstrap_options(
-                [f"--pants-physical-workdir-base={physical_workdir_base}"]
+                [
+                    f"--pants-physical-workdir-base={physical_workdir_base}",
+                    "--pants-physical-workdir-source-control",
+                ]
             )
             yield bootstrap_options
 
     def assert_exists(self, path):
         self.assertTrue(os.path.exists(path))
+
+    def assert_not_exists(self, path):
+        self.assertFalse(os.path.exists(path))
 
     def assert_symlink(self, path):
         self.assertTrue(os.path.islink(path))
@@ -54,5 +60,17 @@ class UtilTest(TestBase):
             safe_mkdir(os.path.join(self.build_root, source_control_dirname))
             init_workdir(bootstrap_options)
             self.assert_exists(
+                os.path.join(self.physical_workdir(bootstrap_options), source_control_dirname)
+            )
+
+    def test_source_control_disabled(self):
+        source_control_dirname = ".git"
+        with temporary_dir() as physical_workdir_base:
+            bootstrap_options = self.get_bootstrap_options(
+                [f"--pants-physical-workdir-base={physical_workdir_base}"]
+            )
+            safe_mkdir(os.path.join(self.build_root, source_control_dirname))
+            init_workdir(bootstrap_options)
+            self.assert_not_exists(
                 os.path.join(self.physical_workdir(bootstrap_options), source_control_dirname)
             )

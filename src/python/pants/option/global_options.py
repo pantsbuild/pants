@@ -352,6 +352,15 @@ class GlobalOptions(Subsystem):
             "per-workspace subdirectory.",
         )
         register(
+            "--pants-physical-workdir-source-control",
+            advanced=True,
+            type=bool,
+            default=False,
+            help="If tasks run processes which need access to source control state "
+            "applying this option will add a link from the physical workdir back to "
+            "any existing source control directories.",
+        )
+        register(
             "--pants-supportdir",
             advanced=True,
             metavar="<dir>",
