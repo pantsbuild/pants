@@ -20,7 +20,6 @@ from pants.base.specs import (
     FilesystemMergedSpec,
     FilesystemResolvedGlobSpec,
     FilesystemSpecs,
-    OriginSpec,
     SingleAddress,
 )
 from pants.build_graph.address import Address, BuildFileAddress
@@ -30,12 +29,7 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
 from pants.build_graph.target import Target as TargetV1
-from pants.engine.addressable import (
-    Addresses,
-    AddressesWithOrigins,
-    AddressWithOrigin,
-    assert_single_address,
-)
+from pants.engine.addressable import Addresses, AddressesWithOrigins, AddressWithOrigin
 from pants.engine.fs import EMPTY_SNAPSHOT, PathGlobs, Snapshot
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.structs import (
@@ -455,28 +449,6 @@ class LegacyTransitiveHydratedTargets:
     closure: FrozenOrderedSet[LegacyHydratedTarget]
 
 
-# TODO(#7490): Remove this once we have multiple params support so that rules can do something
-# like `await Get[TestResult](Params(Address(..), Origin(..)))`.
-@dataclass(frozen=True)
-class HydratedTargetWithOrigin:
-    """A wrapper around HydratedTarget that preserves the original spec used to resolve the target.
-
-    This is useful for precise file arguments, where a goal like `./pants test` runs over only the
-    specified file arguments rather than the whole target.
-    """
-
-    target: HydratedTarget
-    origin: OriginSpec
-
-
-class HydratedTargetsWithOrigins(Collection[HydratedTargetWithOrigin]):
-    def expect_single(self) -> HydratedTargetWithOrigin:
-        assert_single_address(
-            [ht_with_origin.target.adaptor.address for ht_with_origin in self.dependencies]
-        )
-        return self.dependencies[0]
-
-
 @dataclass(frozen=True)
 class SourcesSnapshot:
     """Sources matched by command line specs, either directly via FilesystemSpecs or indirectly via
@@ -742,28 +714,9 @@ async def resolve_targets_with_origins(
 
 
 @rule
-async def hydrate_target_with_origin(
-    address_with_origin: AddressWithOrigin,
-) -> HydratedTargetWithOrigin:
-    ht = await Get[HydratedTarget](Address, address_with_origin.address)
-    return HydratedTargetWithOrigin(target=ht, origin=address_with_origin.origin)
-
-
-@rule
 async def hydrated_targets(addresses: Addresses) -> HydratedTargets:
     targets = await MultiGet(Get[HydratedTarget](Address, a) for a in addresses)
     return HydratedTargets(targets)
-
-
-@rule
-async def hydrated_targets_with_origins(
-    addresses_with_origins: AddressesWithOrigins,
-) -> HydratedTargetsWithOrigins:
-    targets_with_origins = await MultiGet(
-        Get[HydratedTargetWithOrigin](AddressWithOrigin, address_with_origin)
-        for address_with_origin in addresses_with_origins
-    )
-    return HydratedTargetsWithOrigins(targets_with_origins)
 
 
 def _eager_fileset_with_spec(
@@ -963,9 +916,7 @@ def create_legacy_graph_tasks():
         transitive_target,
         transitive_targets,
         hydrate_target,
-        hydrate_target_with_origin,
         hydrated_targets,
-        hydrated_targets_with_origins,
         find_owners,
         hydrate_sources,
         hydrate_bundles,
