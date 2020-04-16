@@ -100,7 +100,7 @@ class InvalidEntryPoint(Exception):
 
 @dataclass(frozen=True)
 class ExportedTarget:
-    """A target that explicitly exports a setup_py artifact, using a `provides=` stanza.
+    """A target that explicitly exports a setup.py artifact, using a `provides=` stanza.
 
     The code provided by this artifact can be from this target or from any targets it owns.
     """

@@ -60,10 +60,10 @@ class PythonInterpreterCompatibility(StringOrStringSequenceField):
 
 
 class PythonProvidesField(ScalarField, ProvidesField):
-    """A `setup_py` artifact that describes how to represent this target to the outside world."""
+    """The`setup.py` kwargs for the external artifact built from this target."""
 
     expected_type = PythonArtifact
-    expected_type_description = "a setup_py object"
+    expected_type_description = "setup_py(**kwargs)"
     value: Optional[PythonArtifact]
 
     @classmethod
