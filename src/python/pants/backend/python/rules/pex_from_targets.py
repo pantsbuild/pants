@@ -8,12 +8,14 @@ from typing import Iterable, Optional, Tuple
 from pants.backend.python.rules.importable_python_sources import ImportablePythonSources
 from pants.backend.python.rules.pex import (
     PexInterpreterConstraints,
+    PexPlatforms,
     PexRequest,
     PexRequirements,
     TwoStepPexRequest,
 )
+from pants.backend.python.rules.targets import PythonInterpreterCompatibility
+from pants.backend.python.rules.targets import PythonPlatforms as PythonPlatformsField
 from pants.backend.python.rules.targets import (
-    PythonInterpreterCompatibility,
     PythonRequirementsField,
     PythonRequirementsFileSources,
     PythonSources,
@@ -107,6 +109,9 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         ):
             resource_targets.append(tgt)
 
+    platforms = PexPlatforms.create_from_platforms_fields(
+        (tgt.get(PythonPlatformsField) for tgt in python_targets)
+    )
     interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
         (tgt.get(PythonInterpreterCompatibility) for tgt in python_targets), python_setup
     )
@@ -129,6 +134,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         output_filename=request.output_filename,
         requirements=requirements,
         interpreter_constraints=interpreter_constraints,
+        platforms=platforms,
         entry_point=request.entry_point,
         sources=merged_input_digest,
         additional_inputs=request.additional_inputs,

@@ -18,7 +18,6 @@ from pants.backend.python.rules.targets import (
     PexZipSafe,
     PythonBinarySources,
     PythonEntryPoint,
-    PythonPlatforms,
 )
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.engine.addressable import Addresses
@@ -41,7 +40,6 @@ class PythonBinaryConfiguration(BinaryConfiguration):
     inherit_path: PexInheritPath
     shebang: PexShebang
     zip_safe: PexZipSafe
-    platforms: PythonPlatforms
 
     def generate_additional_args(self) -> Tuple[str, ...]:
         args = []
@@ -55,8 +53,6 @@ class PythonBinaryConfiguration(BinaryConfiguration):
             args.append(f"--inherit-path={self.inherit_path.value}")
         if self.shebang.value is not None:
             args.append(f"--python-shebang={self.shebang.value}")
-        if self.platforms.value is not None:
-            args.extend([f"--platform={platform}" for platform in self.platforms.value])
         return tuple(args)
 
 

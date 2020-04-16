@@ -9,10 +9,9 @@ from typing import FrozenSet, Iterable, Iterator, List, NamedTuple, Optional, Se
 
 from pants.backend.python.rules.download_pex_bin import DownloadedPexBin
 from pants.backend.python.rules.hermetic_pex import HermeticPex
-from pants.backend.python.rules.targets import (
-    PythonInterpreterCompatibility,
-    PythonRequirementsField,
-)
+from pants.backend.python.rules.targets import PythonInterpreterCompatibility
+from pants.backend.python.rules.targets import PythonPlatforms as PythonPlatformsField
+from pants.backend.python.rules.targets import PythonRequirementsField
 from pants.backend.python.rules.util import parse_interpreter_constraint
 from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
@@ -183,12 +182,33 @@ class PexInterpreterConstraints:
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
+class PexPlatforms:
+    platforms: FrozenOrderedSet[str]
+
+    def __init__(self, platforms: Optional[Iterable[str]] = None) -> None:
+        self.platforms = FrozenOrderedSet(sorted(platforms or ()))
+
+    @classmethod
+    def create_from_platforms_fields(cls, fields: Iterable[PythonPlatformsField]) -> "PexPlatforms":
+        # TODO(#9562): wire to `--python-setup-platforms` once we know when/where it should be used.
+        return cls(itertools.chain.from_iterable(field.value or () for field in fields))
+
+    def generate_pex_arg_list(self) -> List[str]:
+        args = []
+        for platform in sorted(self.platforms):
+            args.extend(["--platform", platform])
+        return args
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class PexRequest:
     """A generic request to create a PEX from its inputs."""
 
     output_filename: str
     requirements: PexRequirements
     interpreter_constraints: PexInterpreterConstraints
+    platforms: PexPlatforms
     sources: Optional[Digest]
     additional_inputs: Optional[Digest]
     entry_point: Optional[str]
@@ -203,6 +223,7 @@ class PexRequest:
         output_filename: str,
         requirements: PexRequirements = PexRequirements(),
         interpreter_constraints=PexInterpreterConstraints(),
+        platforms=PexPlatforms(),
         sources: Optional[Digest] = None,
         additional_inputs: Optional[Digest] = None,
         entry_point: Optional[str] = None,
@@ -212,6 +233,7 @@ class PexRequest:
         self.output_filename = output_filename
         self.requirements = requirements
         self.interpreter_constraints = interpreter_constraints
+        self.platforms = platforms
         self.sources = sources
         self.additional_inputs = additional_inputs
         self.entry_point = entry_point
@@ -299,7 +321,6 @@ async def create_pex(
     argv = [
         "--output-file",
         request.output_filename,
-        *request.interpreter_constraints.generate_pex_arg_list(),
         # NB: In setting `--no-pypi`, we rely on the default value of `--python-repos-indexes`
         # including PyPI, which will override `--no-pypi` and result in using PyPI in the default
         # case. Why set `--no-pypi`, then? We need to do this so that
@@ -309,6 +330,16 @@ async def create_pex(
         *(f"--repo={repo}" for repo in python_repos.repos),
         *request.additional_args,
     ]
+
+    # NB: If `--platform` is specified, this signals that the PEX should not be built locally.
+    # `--interpreter-constraint` only makes sense in the context of building locally. These two
+    # flags are mutually exclusive. See https://github.com/pantsbuild/pex/issues/957.
+    if request.platforms.platforms:
+        # TODO(#9560): consider validating that these platforms are valid with the interpreter
+        #  constraints.
+        argv.extend(request.platforms.generate_pex_arg_list())
+    else:
+        argv.extend(request.interpreter_constraints.generate_pex_arg_list())
 
     pex_debug = PexDebug(log_level)
     argv.extend(pex_debug.iter_pex_args())
@@ -407,7 +438,7 @@ async def create_pex(
 
 @rule
 async def two_step_create_pex(two_step_pex_request: TwoStepPexRequest) -> TwoStepPex:
-    """Create a pex in two steps: a requirements-only pex and then a full pex from it."""
+    """Create a PEX in two steps: a requirements-only PEX and then a full PEX from it."""
     request = two_step_pex_request.pex_request
     req_pex_name = "__requirements.pex"
 
@@ -419,6 +450,7 @@ async def two_step_create_pex(two_step_pex_request: TwoStepPexRequest) -> TwoSte
             output_filename=req_pex_name,
             requirements=request.requirements,
             interpreter_constraints=request.interpreter_constraints,
+            platforms=request.platforms,
             # TODO: Do we need to pass all the additional args to the requirements pex creation?
             #  Some of them may affect resolution behavior, but others may be irrelevant.
             #  For now we err on the side of caution.
@@ -432,7 +464,7 @@ async def two_step_create_pex(two_step_pex_request: TwoStepPexRequest) -> TwoSte
         additional_inputs = None
         additional_args = request.additional_args
 
-    # Now create a full pex on top of the requirements pex.
+    # Now create a full PEX on top of the requirements PEX.
     full_pex_request = dataclasses.replace(
         request,
         requirements=PexRequirements(),
