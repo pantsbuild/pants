@@ -146,7 +146,10 @@ def load_backends_and_plugins(
                     "To prepare for this change, remove 'pants.contrib.awslambda.python' from the "
                     "`backend_packages` entry in the `GLOBAL` section in your `pants.toml` "
                     "(or `pants.ini`). Then add `pants.backend.awslambda.python` to the "
-                    "`backend_packages2` entry. Ensure that you have `--v2` enabled (the default)."
+                    "`backend_packages2` entry. Ensure that you have `--v2` enabled (the default). "
+                    "Then modify your BUILD files to remove the intermediate `python_binary` "
+                    "target and the `binary=` setting on the `python_awslambda` target. "
+                    "Finally, use the `awslambda` goal instead of the `bundle` goal."
                 ),
                 80,
             ),
