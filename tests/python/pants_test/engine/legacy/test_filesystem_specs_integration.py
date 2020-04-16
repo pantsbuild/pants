@@ -36,6 +36,13 @@ class FilesystemSpecsIntegrationTest(PantsRunIntegrationTest):
         pants_run = self.run_pants(["list", "src/fake.py"])
         self.assert_failure(pants_run)
         assert 'Unmatched glob from file arguments: "src/fake.py"' in pants_run.stderr_data
+        pants_run = self.run_pants(["--owners-not-found-behavior=ignore", "list", "src/fake.py"])
+        self.assert_success(pants_run)
+        assert 'Unmatched glob from file arguments: "src/fake.py"' not in pants_run.stderr_data
+        assert (
+            "No owning targets could be found for the file `src/fake.py`"
+            not in pants_run.stderr_data
+        )
 
     def test_no_owner(self) -> None:
         """Literal file args should fail when there is no owner, but globs should be fine."""
