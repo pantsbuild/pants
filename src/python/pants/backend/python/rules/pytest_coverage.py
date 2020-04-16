@@ -137,7 +137,7 @@ class CoverageConfig:
 
 
 @rule
-async def construct_coverage_config(
+async def create_coverage_config(
     coverage_config_request: CoverageConfigRequest, source_root_config: SourceRootConfig
 ) -> CoverageConfig:
     sources = await Get[SourceFiles](
@@ -394,7 +394,7 @@ async def generate_coverage_report(
 
 def rules():
     return [
-        construct_coverage_config,
+        create_coverage_config,
         generate_coverage_report,
         merge_coverage_data,
         setup_coverage,

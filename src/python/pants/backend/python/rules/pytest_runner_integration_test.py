@@ -11,9 +11,9 @@ from pants.backend.python.rules import (
     importable_python_sources,
     pex,
     pex_from_targets,
-    pytest_coverage,
     pytest_runner,
 )
+from pants.backend.python.rules.pytest_coverage import CoverageConfigRequest, create_coverage_config
 from pants.backend.python.rules.pytest_runner import PythonTestConfiguration
 from pants.backend.python.rules.targets import PythonLibrary, PythonRequirementLibrary, PythonTests
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
@@ -116,7 +116,7 @@ class PytestRunnerIntegrationTest(TestBase):
     def rules(cls):
         return (
             *super().rules(),
-            *pytest_coverage.rules(),
+            create_coverage_config,
             *pytest_runner.rules(),
             *download_pex_bin.rules(),
             *determine_source_files.rules(),
@@ -127,6 +127,7 @@ class PytestRunnerIntegrationTest(TestBase):
             *strip_source_roots.rules(),
             *subprocess_environment.rules(),
             subsystem_rule(TestOptions),
+            RootRule(CoverageConfigRequest),
             RootRule(PythonTestConfiguration),
         )
 
