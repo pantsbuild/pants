@@ -1,6 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from abc import ABC
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import ClassVar
@@ -19,11 +20,12 @@ from pants.util.contextutil import temporary_dir
 
 
 @union
-class ReplImplementation:
+@dataclass(frozen=True)
+class ReplImplementation(ABC):
     """This type proxies from the top-level `repl` goal to a specific REPL implementation for a
     specific language or languages."""
 
-    name: ClassVar[str] = ""
+    name: ClassVar[str]
     addresses: Addresses
 
 
@@ -70,7 +72,7 @@ async def run_repl(
     # We can guarantee that we will only even enter this `goal_rule` if there exists an implementer
     # of the `ReplImplementation` union because `LegacyGraphSession.run_goal_rules()` will not
     # execute this rule's body if there are no implementations registered.
-    membership = union_membership.union_rules[ReplImplementation]
+    membership: Iterable[Type[ReplImplementation]] = union_membership.union_rules[ReplImplementation]
     implementations = {impl.name: impl for impl in membership}
 
     default_repl = "python"

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import ClassVar
 
 from pants.backend.python.rules.pex import Pex
-from pants.backend.python.rules.pex_from_targets import LegacyPexFromTargetsRequest
+from pants.backend.python.rules.pex_from_targets import PexFromTargetsRequest, LegacyPexFromTargetsRequest
 from pants.backend.python.subsystems.ipython import IPython
 from pants.engine.addressable import Addresses
 from pants.engine.legacy.graph import TransitiveHydratedTargets
@@ -19,9 +19,8 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class PythonRepl:
-    name: ClassVar[str] = "python"
-    addresses: Addresses
+class PythonRepl(ReplImplementation):
+    name = "python"
 
 
 @rule
@@ -39,9 +38,8 @@ async def run_python_repl(repl: PythonRepl) -> ReplBinary:
 
 
 @dataclass(frozen=True)
-class IPythonRepl:
-    name: ClassVar[str] = "ipython"
-    addresses: Addresses
+class IPythonRepl(ReplImplementation):
+    name = "ipython"
 
 
 @rule
