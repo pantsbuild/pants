@@ -315,9 +315,11 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
 
     @dataclass
     class WorkunitTracker:
-        """This class records every non-empty batch of started and completed workunits
+        """This class records every non-empty batch of started and completed workunits.
+
         that the engine passes to it, saving them - in the order received from
-        the engine - in the _chunks members."""
+        the engine - in the _chunks members.
+        """
 
         finished_workunit_chunks: List[List[dict]] = field(default_factory=list)
         started_workunit_chunks: List[List[dict]] = field(default_factory=list)
@@ -330,7 +332,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
             started_workunits = kwargs.get("started_workunits")
             if started_workunits:
                 self.started_workunit_chunks.append(started_workunits)
-            
+
             if workunits:
                 self.finished_workunit_chunks.append(workunits)
 
@@ -387,7 +389,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
         # Because of the artifical delay in rule_one, it should have time to be reported as
         # started but not yet finished.
         started = list(itertools.chain.from_iterable(tracker.started_workunit_chunks))
-        assert len(list(item for item in started if item["name"] == "rule_one")) > 0 
+        assert len(list(item for item in started if item["name"] == "rule_one")) > 0
 
         assert {item["name"] for item in tracker.finished_workunit_chunks[1]} == {"rule_one"}
 

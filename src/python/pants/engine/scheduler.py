@@ -39,6 +39,7 @@ logger = logging.getLogger(__name__)
 
 WORKUNIT_TY = Dict[str, Any]
 
+
 @dataclass(frozen=True)
 class ExecutionRequest:
     """Holds the roots for an execution, which might have been requested by a user.
@@ -275,7 +276,7 @@ class Scheduler:
         result: Tuple[Tuple[WORKUNIT_TY], Tuple[WORKUNIT_TY]] = self._from_value(
             self._native.lib.poll_session_workunits(self._scheduler, session)
         )
-        return { "started": result[0], "completed": result[1] }
+        return {"started": result[0], "completed": result[1]}
 
     def _run_and_return_roots(self, session, execution_request):
         raw_roots = self._native.lib.scheduler_execute(self._scheduler, session, execution_request)
@@ -370,7 +371,7 @@ class SchedulerSession:
         return self._scheduler
 
     def poll_workunits(self) -> Dict[str, Tuple[WORKUNIT_TY, ...]]:
-        return self._scheduler.poll_workunits(self._session)
+        return self._scheduler.poll_workunits(self._session)  # type: ignore[no-any-return]
 
     def graph_len(self):
         return self._scheduler.graph_len()
