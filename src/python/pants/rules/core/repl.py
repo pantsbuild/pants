@@ -4,10 +4,9 @@
 from abc import ABC
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import ClassVar
+from typing import ClassVar, Iterable, Tuple, Type, cast
 
 from pants.base.build_root import BuildRoot
-from pants.engine.addressable import Addresses
 from pants.engine.console import Console
 from pants.engine.fs import Digest, DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
@@ -15,6 +14,7 @@ from pants.engine.interactive_runner import InteractiveProcessRequest, Interacti
 from pants.engine.objects import union
 from pants.engine.rules import UnionMembership, goal_rule
 from pants.engine.selectors import Get
+from pants.engine.target import Field, Target, Targets, TransitiveTargets
 from pants.option.global_options import GlobalOptions
 from pants.util.contextutil import temporary_dir
 
@@ -26,7 +26,13 @@ class ReplImplementation(ABC):
     specific language or languages."""
 
     name: ClassVar[str]
-    addresses: Addresses
+    required_fields: ClassVar[Tuple[Type[Field], ...]]
+
+    targets: Targets
+
+    @classmethod
+    def is_valid(cls, tgt: Target) -> bool:
+        return tgt.has_fields(cls.required_fields)
 
 
 class ReplOptions(GoalSubsystem):
@@ -63,7 +69,7 @@ async def run_repl(
     workspace: Workspace,
     runner: InteractiveRunner,
     options: ReplOptions,
-    addresses: Addresses,
+    transitive_targets: TransitiveTargets,
     build_root: BuildRoot,
     union_membership: UnionMembership,
     global_options: GlobalOptions,
@@ -72,21 +78,28 @@ async def run_repl(
     # We can guarantee that we will only even enter this `goal_rule` if there exists an implementer
     # of the `ReplImplementation` union because `LegacyGraphSession.run_goal_rules()` will not
     # execute this rule's body if there are no implementations registered.
-    membership: Iterable[Type[ReplImplementation]] = union_membership.union_rules[ReplImplementation]
+    membership: Iterable[Type[ReplImplementation]] = union_membership.union_rules[
+        ReplImplementation
+    ]
     implementations = {impl.name: impl for impl in membership}
 
     default_repl = "python"
-    repl_shell_name: str = options.values.shell or default_repl
+    repl_shell_name = cast(str, options.values.shell or default_repl)
 
-    repl_implementation = implementations.get(repl_shell_name)
-    if repl_implementation is None:
-        available = set(implementations.keys())
+    repl_implementation_cls = implementations.get(repl_shell_name)
+    if repl_implementation_cls is None:
+        available = sorted(set(implementations.keys()))
         console.write_stdout(
             f"{repl_shell_name} is not an installed REPL program. Available REPLs: {available}"
         )
         return Repl(-1)
 
-    repl_binary = await Get[ReplBinary](ReplImplementation, repl_implementation(addresses))
+    repl_impl = repl_implementation_cls(
+        targets=Targets(
+            tgt for tgt in transitive_targets.closure if repl_implementation_cls.is_valid(tgt)
+        )
+    )
+    repl_binary = await Get[ReplBinary](ReplImplementation, repl_impl)
 
     with temporary_dir(root_dir=global_options.options.pants_workdir, cleanup=False) as tmpdir:
         path_relative_to_build_root = PurePath(tmpdir).relative_to(build_root.path).as_posix()

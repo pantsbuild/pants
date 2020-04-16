@@ -9,8 +9,9 @@ from pants.backend.python.rules import (
     repl,
 )
 from pants.backend.python.rules.repl import PythonRepl
+from pants.backend.python.rules.targets import PythonLibrary
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
-from pants.backend.python.targets.python_library import PythonLibrary
+from pants.backend.python.targets.python_library import PythonLibrary as PythonLibraryV1
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.fs import FileContent
 from pants.engine.interactive_runner import InteractiveRunner
@@ -41,7 +42,11 @@ class ReplTest(GoalRuleTestBase):
 
     @classmethod
     def alias_groups(cls) -> BuildFileAliases:
-        return BuildFileAliases(targets={"python_library": PythonLibrary})
+        return BuildFileAliases(targets={"python_library": PythonLibraryV1})
+
+    @classmethod
+    def target_types(cls):
+        return [PythonLibrary]
 
     def setup_python_library(self) -> None:
         library_source = FileContent(path="some_lib.py", content=b"class SomeClass:\n  pass\n")
