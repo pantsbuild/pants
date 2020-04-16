@@ -240,7 +240,7 @@ class ExportTask(ResolveRequirementsTaskBase, CoursierMixin):
             if isinstance(current_target, PythonRequirementLibrary):
                 reqs = current_target.payload.get_field_value("requirements", set())
                 """:type : set[pants.python.python_requirement.PythonRequirement]"""
-                info["requirements"] = [req.key for req in reqs]
+                info["requirements"] = [str(req.requirement) for req in reqs]
 
             if isinstance(current_target, PythonTarget):
                 interpreter_for_target = self._interpreter_cache.select_interpreter_for_targets(
