@@ -33,7 +33,7 @@ from pants.rules.core.filter_empty_sources import (
 )
 from pants.rules.core.test import (
     AddressAndTestResult,
-    CoverageDataBatch,
+    CoverageDataCollection,
     CoverageReport,
     FilesystemCoverageReport,
     Status,
@@ -197,7 +197,7 @@ class TestTest(TestBase):
                 ),
                 MockGet(
                     product_type=CoverageReport,
-                    subject_type=CoverageDataBatch,
+                    subject_type=CoverageDataCollection,
                     mock=lambda _: FilesystemCoverageReport(
                         result_digest=EMPTY_DIRECTORY_DIGEST,
                         directory_to_materialize_to=PurePath("mockety/mock"),

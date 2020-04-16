@@ -4,11 +4,11 @@
 import dataclasses
 import itertools
 import logging
-from abc import ABC, abstractmethod
+from abc import ABC
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import ClassVar, Dict, Iterable, Optional, Tuple, Type
+from typing import ClassVar, Dict, Iterable, List, Optional, Tuple, Type, TypeVar
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import OriginSpec
@@ -19,7 +19,7 @@ from pants.engine.fs import Digest, DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.isolated_process import FallibleProcessResult
-from pants.engine.objects import union
+from pants.engine.objects import Collection, union
 from pants.engine.rules import UnionMembership, goal_rule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
@@ -140,18 +140,17 @@ class AddressAndTestResult:
 class CoverageData(ABC):
     """Base class for inputs to a coverage report.
 
-    Subclasses should add whichever fields they require - snapshots of coverage output or xml files, etc.
+    Subclasses should add whichever fields they require - snapshots of coverage output, XML files,
+    etc.
     """
 
-    @property
-    @abstractmethod
-    def batch_cls(self) -> Type["CoverageDataBatch"]:
-        pass
+
+_CD = TypeVar("_CD", bound=CoverageData)
 
 
 @union
-class CoverageDataBatch:
-    pass
+class CoverageDataCollection(Collection[_CD]):
+    element_type: Type[_CD]
 
 
 class CoverageReport(ABC):
@@ -334,22 +333,26 @@ async def run_tests(
         exit_code = PANTS_SUCCEEDED_EXIT_CODE
 
     if options.values.run_coverage:
-        # TODO: consider warning if a user uses `--coverage` but the language backend does not
-        # provide coverage support. This might be too chatty to be worth doing?
-        results_with_coverage = [x for x in results if x.test_result.coverage_data is not None]
-        coverage_data_collections = itertools.groupby(
-            results_with_coverage,
-            lambda address_and_test_result: (
-                address_and_test_result.test_result.coverage_data.batch_cls  # type: ignore[union-attr]
-            ),
-        )
+        all_coverage_data: Iterable[CoverageData] = [
+            result.test_result.coverage_data
+            for result in results
+            if result.test_result.coverage_data is not None
+        ]
+
+        coverage_types_to_collection_types: Dict[
+            Type[CoverageData], Type[CoverageDataCollection]
+        ] = {
+            collection_cls.element_type: collection_cls
+            for collection_cls in union_membership.union_rules[CoverageDataCollection]
+        }
+        coverage_collections: List[CoverageDataCollection] = []
+        for data_cls, data in itertools.groupby(all_coverage_data, lambda data: type(data)):
+            collection_cls = coverage_types_to_collection_types[data_cls]
+            coverage_collections.append(collection_cls(data))
 
         coverage_reports = await MultiGet(
-            Get[CoverageReport](
-                CoverageDataBatch,
-                coverage_batch_cls(tuple(addresses_and_test_results)),  # type: ignore[call-arg]
-            )
-            for coverage_batch_cls, addresses_and_test_results in coverage_data_collections
+            Get[CoverageReport](CoverageDataCollection, coverage_collection)
+            for coverage_collection in coverage_collections
         )
 
         coverage_report_files = []
