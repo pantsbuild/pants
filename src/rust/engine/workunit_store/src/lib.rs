@@ -48,7 +48,7 @@ pub struct WorkUnit {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-struct StartedWorkUnit {
+pub struct StartedWorkUnit {
   pub name: String,
   pub start_time: std::time::SystemTime,
   pub span_id: String,
@@ -103,7 +103,8 @@ pub struct WorkUnitInnerStore {
   started_ids: Vec<SpanId>,
   completed_ids: Vec<SpanId>,
   pub workunits: Vec<WorkUnit>,
-  last_seen_workunit: usize,
+  last_seen_started_idx: usize,
+  last_seen_completed_idx: usize,
 }
 
 impl WorkUnitStore {
@@ -112,9 +113,10 @@ impl WorkUnitStore {
       inner: Arc::new(Mutex::new(WorkUnitInnerStore {
         workunit_records: HashMap::new(),
         started_ids: Vec::new(),
+        last_seen_started_idx: 0,
         completed_ids: Vec::new(),
+        last_seen_completed_idx: 0,
         workunits: Vec::new(),
-        last_seen_workunit: 0,
       })),
     }
   }
@@ -198,17 +200,29 @@ impl WorkUnitStore {
 
   pub fn with_latest_workunits<F, T>(&mut self, f: F) -> T
   where
-    F: FnOnce(&[WorkUnit]) -> T,
+    F: FnOnce(&[StartedWorkUnit], &[WorkUnit]) -> T,
   {
     let mut inner_guard = (*self.inner).lock();
     let inner_store: &mut WorkUnitInnerStore = &mut *inner_guard;
 
     let workunit_records = &inner_store.workunit_records;
+
+    let cur_len = inner_store.started_ids.len();
+    let latest: usize = inner_store.last_seen_started_idx;
+    let started_workunits: Vec<StartedWorkUnit> = inner_store.started_ids[latest..cur_len]
+      .iter()
+      .flat_map(|id| workunit_records.get(id))
+      .flat_map(|record| match record {
+        WorkunitRecord::Completed(_) => None,
+        WorkunitRecord::Started(c) => Some(c.clone()),
+      })
+      .collect();
+    inner_store.last_seen_started_idx = cur_len;
+
     let completed_ids = &inner_store.completed_ids;
     let cur_len = completed_ids.len();
-    let latest: usize = inner_store.last_seen_workunit;
-
-    let workunits: Vec<WorkUnit> = inner_store.completed_ids[latest..cur_len]
+    let latest: usize = inner_store.last_seen_completed_idx;
+    let completed_workunits: Vec<WorkUnit> = inner_store.completed_ids[latest..cur_len]
       .iter()
       .flat_map(|id| workunit_records.get(id))
       .flat_map(|record| match record {
@@ -216,10 +230,9 @@ impl WorkUnitStore {
         WorkunitRecord::Completed(c) => Some(c.clone()),
       })
       .collect();
+    inner_store.last_seen_completed_idx = cur_len;
 
-    let output = f(&workunits);
-    inner_store.last_seen_workunit = cur_len;
-    output
+    f(&started_workunits, &completed_workunits)
   }
 }
 

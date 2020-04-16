@@ -37,6 +37,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+WORKUNIT_TY = Dict[str, Any]
+
 
 @dataclass(frozen=True)
 class ExecutionRequest:
@@ -270,11 +272,11 @@ class Scheduler:
     def _metrics(self, session):
         return self._from_value(self._native.lib.scheduler_metrics(self._scheduler, session))
 
-    def poll_workunits(self, session) -> Tuple[Dict[str, Any], ...]:
-        result: Tuple[Dict[str, Any], ...] = self._from_value(
+    def poll_workunits(self, session) -> Dict[str, Tuple[WORKUNIT_TY, ...]]:
+        result: Tuple[Tuple[WORKUNIT_TY], Tuple[WORKUNIT_TY]] = self._from_value(
             self._native.lib.poll_session_workunits(self._scheduler, session)
         )
-        return result
+        return {"started": result[0], "completed": result[1]}
 
     def _run_and_return_roots(self, session, execution_request):
         raw_roots = self._native.lib.scheduler_execute(self._scheduler, session, execution_request)
