@@ -72,14 +72,14 @@ python_tests(
 
 python_tests(
   name = 'goal_rule_integration',
-  sources = [ 'test_goal_rule_integration.py' ],
+  sources = ['test_goal_rule_integration.py'],
   dependencies = [
     'tests/python/pants_test/pantsd:pantsd_integration_test_base',
     'examples/src/scala/org/pantsbuild/example:hello_directory',
     'testprojects/tests/python/pants:dummies_directory',
   ],
   tags = {'integration', 'partially_type_checked'},
-  timeout = 270,
+  timeout = 330,
 )
 
 python_tests(
