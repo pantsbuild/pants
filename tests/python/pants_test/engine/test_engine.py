@@ -212,17 +212,6 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
             remove_locations_from_traceback(str(cm.exception)),
         )
 
-    def test_fork_context(self):
-        # A smoketest that confirms that we can successfully enter and exit the fork context, which
-        # implies acquiring and releasing all relevant Engine resources.
-        expected = "42"
-
-        def fork_context_body():
-            return expected
-
-        res = self.mk_scheduler().with_fork_context(fork_context_body)
-        self.assertEquals(res, expected)
-
     @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/6829")
     def test_trace_multi(self):
         # Tests that when multiple distinct failures occur, they are each rendered.
