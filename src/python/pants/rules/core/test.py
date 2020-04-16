@@ -1,17 +1,15 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import dataclasses
 import itertools
 import logging
-from abc import ABC
+from abc import ABC, ABCMeta
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import ClassVar, Dict, Iterable, List, Optional, Tuple, Type, TypeVar
+from typing import Dict, Iterable, List, Optional, Type, TypeVar
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
-from pants.base.specs import OriginSpec
 from pants.build_graph.address import Address
 from pants.engine import desktop
 from pants.engine.console import Console
@@ -23,12 +21,10 @@ from pants.engine.objects import Collection, union
 from pants.engine.rules import UnionMembership, goal_rule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
-    Field,
+    ConfigurationWithOrigin,
     RegisteredTargetTypes,
     Sources,
-    Target,
     TargetsWithOrigins,
-    TargetWithOrigin,
 )
 from pants.rules.core.filter_empty_sources import (
     ConfigurationsWithSources,
@@ -74,54 +70,13 @@ class TestDebugRequest:
     __test__ = False
 
 
-# TODO: Factor this out once porting fmt.py and lint.py to the Target API. See `binary.py` for a
-#  similar implementation (that one doesn't keep the `OriginSpec`).
 @union
-@dataclass(frozen=True)
-class TestConfiguration(ABC):
-    """An ad hoc collection of the fields necessary to run tests on a target."""
-
-    required_fields: ClassVar[Tuple[Type[Field], ...]]
-
-    address: Address
-    origin: OriginSpec
+class TestConfiguration(ConfigurationWithOrigin, metaclass=ABCMeta):
+    """The fields necessary to run tests on a target."""
 
     sources: Sources
 
     __test__ = False
-
-    @classmethod
-    def is_valid(cls, tgt: Target) -> bool:
-        return tgt.has_fields(cls.required_fields)
-
-    @classmethod
-    def valid_target_types(
-        cls, target_types: Iterable[Type[Target]], *, union_membership: UnionMembership
-    ) -> Tuple[Type[Target], ...]:
-        return tuple(
-            target_type
-            for target_type in target_types
-            if target_type.class_has_fields(cls.required_fields, union_membership=union_membership)
-        )
-
-    @classmethod
-    def create(cls, target_with_origin: TargetWithOrigin) -> "TestConfiguration":
-        all_expected_fields: Dict[str, Type[Field]] = {
-            dataclass_field.name: dataclass_field.type
-            for dataclass_field in dataclasses.fields(cls)
-            if isinstance(dataclass_field.type, type) and issubclass(dataclass_field.type, Field)  # type: ignore[unreachable]
-        }
-        tgt = target_with_origin.target
-        return cls(
-            address=tgt.address,
-            origin=target_with_origin.origin,
-            **{  # type: ignore[arg-type]
-                dataclass_field_name: (
-                    tgt[field_cls] if field_cls in cls.required_fields else tgt.get(field_cls)
-                )
-                for dataclass_field_name, field_cls in all_expected_fields.items()
-            },
-        )
 
 
 # NB: This is only used for the sake of coordinator_of_tests. Consider inlining that rule so that

@@ -1,6 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import dataclasses
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
@@ -599,6 +600,116 @@ class RegisteredTargetTypes:
     @property
     def types(self) -> Tuple[Type[Target], ...]:
         return tuple(self.aliases_to_types.values())
+
+
+# -----------------------------------------------------------------------------------------------
+# Configuration
+# -----------------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class _AbstractConfiguration(ABC):
+    required_fields: ClassVar[Tuple[Type[Field], ...]]
+
+    address: Address
+
+    @classmethod
+    def is_valid(cls, tgt: Target) -> bool:
+        return tgt.has_fields(cls.required_fields)
+
+    @classmethod
+    def valid_target_types(
+        cls, target_types: Iterable[Type[Target]], *, union_membership: UnionMembership
+    ) -> Tuple[Type[Target], ...]:
+        return tuple(
+            target_type
+            for target_type in target_types
+            if target_type.class_has_fields(cls.required_fields, union_membership=union_membership)
+        )
+
+
+def _get_config_fields_from_target(
+    configuration: Type[_AbstractConfiguration], target: Target
+) -> Dict[str, Field]:
+    all_expected_fields: Dict[str, Type[Field]] = {
+        dataclass_field.name: dataclass_field.type
+        for dataclass_field in dataclasses.fields(configuration)
+        if isinstance(dataclass_field.type, type) and issubclass(dataclass_field.type, Field)  # type: ignore[unreachable]
+    }
+    return {
+        dataclass_field_name: (
+            target[field_cls]
+            if field_cls in configuration.required_fields
+            else target.get(field_cls)
+        )
+        for dataclass_field_name, field_cls in all_expected_fields.items()
+    }
+
+
+_C = TypeVar("_C", bound="Configuration")
+
+
+class Configuration(_AbstractConfiguration, metaclass=ABCMeta):
+    """An ad hoc set of fields from a target which are used by rules.
+
+    Subclasses should declare all the fields they consume as dataclass attributes. They should also
+    indicate which of these are required, rather than optional, through the class property
+    `required_fields`. When a field is optional, the default constructor for the field will be used
+    for any targets that do not have that field registered.
+
+    Subclasses must set `@dataclass(frozen=True)` for their declared fields to be recognized.
+
+    For example:
+
+        @dataclass(frozen=True)
+        class FortranTestConfiguration(Configuration):
+            required_fields = (FortranSources,)
+
+            sources: FortranSources
+            fortran_version: FortranVersion
+
+    This configuration may then created from a `Target` through the `is_valid()` and `create()`
+    class methods:
+
+        configs = [
+            FortranTestConfiguration.create(tgt) for tgt in targets
+            if FortranTestConfiguration.is_valid(tgt)
+        ]
+
+    Configurations are consumed like any normal dataclass:
+
+        print(config.address)
+        print(config.sources)
+    """
+
+    @classmethod
+    def create(cls: Type[_C], tgt: Target) -> _C:
+        return cls(  # type: ignore[call-arg]
+            address=tgt.address, **_get_config_fields_from_target(cls, tgt)
+        )
+
+
+_CWO = TypeVar("_CWO", bound="ConfigurationWithOrigin")
+
+
+@dataclass(frozen=True)
+class ConfigurationWithOrigin(_AbstractConfiguration, metaclass=ABCMeta):
+    """An ad hoc set of fields from a target which are used by rules, along with the original spec
+    used to find the original target.
+
+    See Configuration for documentation on how subclasses should use this base class.
+    """
+
+    origin: OriginSpec
+
+    @classmethod
+    def create(cls: Type[_CWO], target_with_origin: TargetWithOrigin) -> _CWO:
+        tgt = target_with_origin.target
+        return cls(  # type: ignore[call-arg]
+            address=tgt.address,
+            origin=target_with_origin.origin,
+            **_get_config_fields_from_target(cls, tgt),
+        )
 
 
 # -----------------------------------------------------------------------------------------------

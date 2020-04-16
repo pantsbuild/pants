@@ -4,6 +4,7 @@
 from dataclasses import dataclass
 
 from pants.build_graph.address import Address
+from pants.engine.target import Configuration
 from pants.engine.target import Sources as SourcesField
 from pants.engine.target import Tags, Target
 from pants.rules.core.filter_empty_sources import (
@@ -23,7 +24,7 @@ class FilterEmptySourcesTest(TestBase):
 
     def test_filter_configurations(self) -> None:
         @dataclass(frozen=True)
-        class MockConfiguration:
+        class MockConfiguration(Configuration):
             sources: SourcesField
             # Another field to demo that we will preserve the whole Configuration data structure.
             tags: Tags
@@ -31,12 +32,12 @@ class FilterEmptySourcesTest(TestBase):
         self.create_file("f1.txt")
         valid_addr = Address.parse(":valid")
         valid_config = MockConfiguration(
-            SourcesField(["f1.txt"], address=valid_addr), Tags(None, address=valid_addr)
+            valid_addr, SourcesField(["f1.txt"], address=valid_addr), Tags(None, address=valid_addr)
         )
 
         empty_addr = Address.parse(":empty")
         empty_config = MockConfiguration(
-            SourcesField(None, address=empty_addr), Tags(None, address=empty_addr)
+            empty_addr, SourcesField(None, address=empty_addr), Tags(None, address=empty_addr)
         )
 
         result = self.request_single_product(

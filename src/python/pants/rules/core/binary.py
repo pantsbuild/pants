@@ -1,67 +1,26 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import dataclasses
 import itertools
 import os
-from abc import ABC
+from abc import ABCMeta
 from dataclasses import dataclass
-from typing import ClassVar, Dict, Iterable, List, Mapping, Sequence, Tuple, Type
+from typing import Dict, Iterable, List, Mapping, Sequence, Type
 
 from pants.base.build_root import BuildRoot
-from pants.build_graph.address import Address
 from pants.engine.console import Console
 from pants.engine.fs import Digest, DirectoriesToMerge, DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.objects import union
 from pants.engine.rules import UnionMembership, goal_rule
 from pants.engine.selectors import Get, MultiGet
-from pants.engine.target import Field, RegisteredTargetTypes, Target, TargetsWithOrigins
+from pants.engine.target import Configuration, RegisteredTargetTypes, Target, TargetsWithOrigins
 from pants.rules.core.distdir import DistDir
 
 
-# TODO: Factor this out once porting fmt.py and lint.py to the Target API.
 @union
-@dataclass(frozen=True)
-class BinaryConfiguration(ABC):
-    """An ad hoc collection of the fields necessary to create a binary from a target."""
-
-    required_fields: ClassVar[Tuple[Type[Field], ...]]
-
-    address: Address
-
-    @classmethod
-    def is_valid(cls, tgt: Target) -> bool:
-        return tgt.has_fields(cls.required_fields)
-
-    @classmethod
-    def valid_target_types(
-        cls, target_types: Iterable[Type[Target]], *, union_membership: UnionMembership
-    ) -> Tuple[Type[Target], ...]:
-        return tuple(
-            target_type
-            for target_type in target_types
-            if target_type.class_has_fields(cls.required_fields, union_membership=union_membership)
-        )
-
-    # TODO: this won't handle any non-Field attributes defined on the configuration. It also
-    # doesn't allow us to override the `default_raw_value` (do we really care about this?).
-    @classmethod
-    def create(cls, tgt: Target) -> "BinaryConfiguration":
-        all_expected_fields: Dict[str, Type[Field]] = {
-            dataclass_field.name: dataclass_field.type
-            for dataclass_field in dataclasses.fields(cls)
-            if isinstance(dataclass_field.type, type) and issubclass(dataclass_field.type, Field)  # type: ignore[unreachable]
-        }
-        return cls(  # type: ignore[call-arg]
-            address=tgt.address,
-            **{
-                dataclass_field_name: (
-                    tgt[field_cls] if field_cls in cls.required_fields else tgt.get(field_cls)
-                )
-                for dataclass_field_name, field_cls in all_expected_fields.items()
-            },
-        )
+class BinaryConfiguration(Configuration, metaclass=ABCMeta):
+    """The fields necessary to create a binary from a target."""
 
 
 @union
