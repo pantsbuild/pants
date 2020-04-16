@@ -31,18 +31,18 @@ from pants.backend.python.rules.run_setup_py import (
     get_sources,
     validate_args,
 )
+from pants.backend.python.rules.targets import PythonBinary, PythonLibrary, PythonRequirementLibrary
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.fs import Snapshot
-from pants.engine.legacy.graph import HydratedTarget, HydratedTargets
 from pants.engine.rules import RootRule
 from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Params
+from pants.engine.target import Target, Targets, WrappedTarget
 from pants.python.python_requirement import PythonRequirement
-from pants.rules.core.strip_source_roots import (
-    legacy_strip_source_roots_from_target,
-    strip_source_roots_from_snapshot,
-)
+from pants.rules.core.determine_source_files import rules as determine_source_files_rules
+from pants.rules.core.strip_source_roots import rules as strip_source_roots_rules
+from pants.rules.core.targets import Resources
 from pants.source.source_root import SourceRootConfig
 from pants.testutil.subsystem.util import init_subsystem
 from pants.testutil.test_base import TestBase
@@ -57,8 +57,12 @@ class TestSetupPyBase(TestBase):
             objects={"python_requirement": PythonRequirement, "setup_py": PythonArtifact}
         )
 
-    def tgt(self, addr: str) -> HydratedTarget:
-        return self.request_single_product(HydratedTarget, Params(Address.parse(addr)))
+    @classmethod
+    def target_types(cls):
+        return [PythonBinary, PythonLibrary, PythonRequirementLibrary, Resources]
+
+    def tgt(self, addr: str) -> Target:
+        return self.request_single_product(WrappedTarget, Params(Address.parse(addr))).target
 
 
 class TestGenerateChroot(TestSetupPyBase):
@@ -68,13 +72,13 @@ class TestGenerateChroot(TestSetupPyBase):
             generate_chroot,
             get_sources,
             get_requirements,
-            strip_source_roots_from_snapshot,
-            legacy_strip_source_roots_from_target,
             get_ancestor_init_py,
             get_owned_dependencies,
             get_exporting_owner,
             RootRule(SetupPyChrootRequest),
             RootRule(SourceRootConfig),
+            *determine_source_files_rules(),
+            *strip_source_roots_rules(),
         ]
 
     def assert_chroot(self, expected_files, expected_setup_kwargs, addr):
@@ -127,10 +131,18 @@ class TestGenerateChroot(TestSetupPyBase):
             "src/python/foo/BUILD",
             textwrap.dedent(
                 """
-                python_library(dependencies=['src/python/foo/bar/baz', 'src/python/foo/qux',
-                                             'src/python/foo/resources'],
-                               provides=setup_py(name='foo', version='1.2.3').with_binaries(
-                                 foo_main='src/python/foo/qux:bin'))
+                python_library(
+                    dependencies=[
+                        'src/python/foo/bar/baz',
+                        'src/python/foo/qux',
+                        'src/python/foo/resources',
+                    ],
+                    provides=setup_py(
+                        name='foo', version='1.2.3'
+                    ).with_binaries(
+                        foo_main='src/python/foo/qux:bin'
+                    )
+                )
                 """
             ),
         )
@@ -194,11 +206,11 @@ class TestGetSources(TestSetupPyBase):
     def rules(cls):
         return super().rules() + [
             get_sources,
-            strip_source_roots_from_snapshot,
-            legacy_strip_source_roots_from_target,
             get_ancestor_init_py,
             RootRule(SetupPySourcesRequest),
             RootRule(SourceRootConfig),
+            *determine_source_files_rules(),
+            *strip_source_roots_rules(),
         ]
 
     def assert_sources(
@@ -212,9 +224,7 @@ class TestGetSources(TestSetupPyBase):
         srcs = self.request_single_product(
             SetupPySources,
             Params(
-                SetupPySourcesRequest(
-                    HydratedTargets([self.tgt(addr) for addr in addrs]), py2=False
-                ),
+                SetupPySourcesRequest(Targets([self.tgt(addr) for addr in addrs]), py2=False),
                 SourceRootConfig.global_instance(),
             ),
         )
@@ -328,12 +338,18 @@ class TestGetRequirements(TestSetupPyBase):
             "3rdparty/BUILD",
             textwrap.dedent(
                 """
-                python_requirement_library(name='ext1',
-                  requirements=[python_requirement('ext1==1.22.333')])
-                python_requirement_library(name='ext2',
-                  requirements=[python_requirement('ext2==4.5.6')])
-                python_requirement_library(name='ext3',
-                  requirements=[python_requirement('ext3==0.0.1')])
+                python_requirement_library(
+                    name='ext1',
+                    requirements=[python_requirement('ext1==1.22.333')],
+                )
+                python_requirement_library(
+                    name='ext2',
+                    requirements=[python_requirement('ext2==4.5.6')],
+                )
+                python_requirement_library(
+                    name='ext3',
+                    requirements=[python_requirement('ext3==0.0.1')],
+                )
                 """
             ),
         )
@@ -379,8 +395,9 @@ class TestGetAncestorInitPy(TestSetupPyBase):
     def rules(cls):
         return super().rules() + [
             get_ancestor_init_py,
-            RootRule(HydratedTargets),
+            RootRule(Targets),
             RootRule(SourceRootConfig),
+            *determine_source_files_rules(),
         ]
 
     def assert_ancestor_init_py(
@@ -389,8 +406,7 @@ class TestGetAncestorInitPy(TestSetupPyBase):
         ancestor_init_py_files = self.request_single_product(
             AncestorInitPyFiles,
             Params(
-                HydratedTargets([self.tgt(addr) for addr in addrs]),
-                SourceRootConfig.global_instance(),
+                Targets([self.tgt(addr) for addr in addrs]), SourceRootConfig.global_instance(),
             ),
         )
         snapshots = [
@@ -454,7 +470,7 @@ class TestGetOwnedDependencies(TestSetupPyBase):
 
     def assert_owned(self, owned: Iterable[str], exported: str):
         assert sorted(owned) == sorted(
-            od.hydrated_target.adaptor.address.reference()
+            od.target.address.reference()
             for od in self.request_single_product(
                 OwnedDependencies, Params(DependencyOwner(ExportedTarget(self.tgt(exported))))
             )
@@ -485,7 +501,7 @@ class TestGetOwnedDependencies(TestSetupPyBase):
                     sources=[],
                     dependencies=[':bar-resources', 'src/python/foo/bar/baz:baz2'],
                 )
-                resources(name='bar-resources')
+                resources(name='bar-resources', sources=[])
                 """
             ),
         )
@@ -530,7 +546,7 @@ class TestGetExportingOwner(TestSetupPyBase):
             owner
             == self.request_single_product(
                 ExportedTarget, Params(OwnedDependency(self.tgt(owned)))
-            ).hydrated_target.adaptor.address.reference()
+            ).target.address.reference()
         )
 
     def assert_error(self, owned: str, exc_cls: Type[Exception]):
@@ -571,7 +587,7 @@ class TestGetExportingOwner(TestSetupPyBase):
                     sources=[],
                     dependencies=[':bar-resources', 'src/python/foo/bar/baz:baz2'],
                 )
-                resources(name='bar-resources')
+                resources(name='bar-resources', sources=[])
                 """
             ),
         )

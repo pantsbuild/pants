@@ -8,11 +8,12 @@ from typing import Dict, Iterable, List, Optional, Set, Tuple, cast
 
 from pkg_resources import Requirement
 
+from pants.backend.python.rules.targets import PythonSources
 from pants.engine.fs import FilesContent
-from pants.engine.legacy.graph import HydratedTarget
-from pants.engine.legacy.structs import PythonTargetAdaptor, ResourcesAdaptor
+from pants.engine.target import Target
 from pants.python.python_setup import PythonSetup
 from pants.rules.core.strip_source_roots import SourceRootStrippedSources
+from pants.rules.core.targets import ResourcesSources
 from pants.source.source_root import NoSourceRootError, SourceRoots
 from pants.util.strutil import ensure_text
 
@@ -103,7 +104,7 @@ def distutils_repr(obj):
 
 def find_packages(
     source_roots: SourceRoots,
-    tgts_and_stripped_srcs: Iterable[Tuple[HydratedTarget, SourceRootStrippedSources]],
+    tgts_and_stripped_srcs: Iterable[Tuple[Target, SourceRootStrippedSources]],
     init_py_contents: FilesContent,
     py2: bool,
 ) -> Tuple[Tuple[str, ...], Tuple[str, ...], Tuple[PackageDatum, ...]]:
@@ -116,7 +117,7 @@ def find_packages(
     packages: Set[str] = set()
     package_data: Dict[str, List[str]] = defaultdict(list)
     for tgt, stripped_srcs in tgts_and_stripped_srcs:
-        if isinstance(tgt.adaptor, PythonTargetAdaptor):
+        if tgt.has_field(PythonSources):
             for file in stripped_srcs.snapshot.files:
                 # Python 2: An __init__.py file denotes a package.
                 # Python 3: Any directory containing python source files is a package.
@@ -131,9 +132,9 @@ def find_packages(
 
     # Now find all package_data.
     for tgt, stripped_srcs in tgts_and_stripped_srcs:
-        if isinstance(tgt.adaptor, ResourcesAdaptor):
-            source_root = source_root_or_raise(source_roots, tgt.adaptor.address.spec_path)
-            resource_dir_relpath = os.path.relpath(tgt.adaptor.address.spec_path, source_root)
+        if tgt.has_field(ResourcesSources):
+            source_root = source_root_or_raise(source_roots, tgt.address.spec_path)
+            resource_dir_relpath = os.path.relpath(tgt.address.spec_path, source_root)
             # Find the closest enclosing package, if any.  Resources will be loaded relative to that.
             package: str = resource_dir_relpath.replace(os.path.sep, ".")
             while package and package not in packages:
@@ -215,7 +216,9 @@ def declares_pkg_resources_namespace_package(python_src: str) -> bool:
     return False
 
 
-def is_python2(compatibilities: Iterable[Optional[List[str]]], python_setup: PythonSetup) -> bool:
+def is_python2(
+    compatibilities: Iterable[Optional[Iterable[str]]], python_setup: PythonSetup
+) -> bool:
     """Checks if we should assume python2 code."""
 
     def iter_reqs():
@@ -224,7 +227,7 @@ def is_python2(compatibilities: Iterable[Optional[List[str]]], python_setup: Pyt
                 yield parse_interpreter_constraint(constraint)
 
     for req in iter_reqs():
-        for python_27_ver in range(0, 17):  # The last python 2.7 version was 2.7.17.
+        for python_27_ver in range(0, 18):  # The last python 2.7 version was 2.7.18.
             if req.specifier.contains(f"2.7.{python_27_ver}"):
                 # At least one constraint limits us to Python 2, so assume that.
                 return True
