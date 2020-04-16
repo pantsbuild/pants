@@ -542,8 +542,7 @@ pub extern "C" fn scheduler_metrics(
         .collect::<Vec<_>>();
       if session.should_record_zipkin_spans() {
         let workunits = session.workunit_store().get_workunits();
-        let locked = workunits.lock();
-        let mut iter = locked.workunits.iter();
+        let mut iter = workunits.iter();
         let value = workunits_to_py_tuple_value(&mut iter);
         values.push((externs::store_utf8("engine_workunits"), value));
       };

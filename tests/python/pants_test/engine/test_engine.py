@@ -315,13 +315,23 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
 
     @dataclass
     class WorkunitTracker:
+        """This class records every non-empty batch of started and completed workunits
+        that the engine passes to it, saving them - in the order received from
+        the engine - in the _chunks members."""
+
         finished_workunit_chunks: List[List[dict]] = field(default_factory=list)
+        started_workunit_chunks: List[List[dict]] = field(default_factory=list)
         finished: bool = False
 
         def add(self, workunits, **kwargs) -> None:
             if kwargs["finished"] is True:
                 self.finished = True
-            if len(workunits) != 0:
+
+            started_workunits = kwargs.get("started_workunits")
+            if started_workunits:
+                self.started_workunit_chunks.append(started_workunits)
+            
+            if workunits:
                 self.finished_workunit_chunks.append(workunits)
 
     def test_streaming_workunits_reporting(self):
@@ -367,20 +377,26 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
 
         assert tracker.finished
 
-        # rule_one should complete well-after the other rules because of the artificial delay in it caused by the sleep()
+        # rule_one should complete well-after the other rules because of the artificial delay in it caused by the sleep().
         assert {item["name"] for item in tracker.finished_workunit_chunks[0]} == {
             "rule_two",
             "rule_three",
             "rule_four",
         }
+
+        # Because of the artifical delay in rule_one, it should have time to be reported as
+        # started but not yet finished.
+        started = list(itertools.chain.from_iterable(tracker.started_workunit_chunks))
+        assert len(list(item for item in started if item["name"] == "rule_one")) > 0 
+
         assert {item["name"] for item in tracker.finished_workunit_chunks[1]} == {"rule_one"}
 
-        flattened = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+        finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
 
-        r1 = next(item for item in flattened if item["name"] == "rule_one")
-        r2 = next(item for item in flattened if item["name"] == "rule_two")
-        r3 = next(item for item in flattened if item["name"] == "rule_three")
-        r4 = next(item for item in flattened if item["name"] == "rule_four")
+        r1 = next(item for item in finished if item["name"] == "rule_one")
+        r2 = next(item for item in finished if item["name"] == "rule_two")
+        r3 = next(item for item in finished if item["name"] == "rule_three")
+        r4 = next(item for item in finished if item["name"] == "rule_four")
 
         assert r1.get("parent_id", None) is None
         assert r2["parent_id"] == r1["span_id"]

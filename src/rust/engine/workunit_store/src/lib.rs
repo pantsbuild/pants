@@ -102,7 +102,6 @@ pub struct WorkUnitInnerStore {
   workunit_records: HashMap<SpanId, WorkunitRecord>,
   started_ids: Vec<SpanId>,
   completed_ids: Vec<SpanId>,
-  pub workunits: Vec<WorkUnit>,
   last_seen_started_idx: usize,
   last_seen_completed_idx: usize,
 }
@@ -116,7 +115,6 @@ impl WorkUnitStore {
         last_seen_started_idx: 0,
         completed_ids: Vec::new(),
         last_seen_completed_idx: 0,
-        workunits: Vec::new(),
       })),
     }
   }
@@ -128,8 +126,19 @@ impl WorkUnitStore {
     }))
   }
 
-  pub fn get_workunits(&self) -> Arc<Mutex<WorkUnitInnerStore>> {
-    self.inner.clone()
+  pub fn get_workunits(&self) -> Vec<WorkUnit> {
+    let mut inner_guard = (*self.inner).lock();
+    let inner_store: &mut WorkUnitInnerStore = &mut *inner_guard;
+    let workunit_records = &inner_store.workunit_records;
+    inner_store
+      .completed_ids
+      .iter()
+      .flat_map(|id| workunit_records.get(id))
+      .flat_map(|record| match record {
+        WorkunitRecord::Started(_) => None,
+        WorkunitRecord::Completed(c) => Some(c.clone()),
+      })
+      .collect()
   }
 
   pub fn start_workunit(
