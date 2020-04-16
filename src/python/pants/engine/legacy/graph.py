@@ -878,10 +878,15 @@ async def sources_snapshots_from_address_specs(address_specs: AddressSpecs) -> S
 
 @rule
 async def sources_snapshots_from_filesystem_specs(
-    filesystem_specs: FilesystemSpecs,
+    filesystem_specs: FilesystemSpecs, global_options: GlobalOptions,
 ) -> SourcesSnapshots:
     """Resolve the snapshot associated with the provided filesystem specs."""
-    snapshot = await Get[Snapshot](PathGlobs, filesystem_specs.to_path_globs())
+    snapshot = await Get[Snapshot](
+        PathGlobs,
+        filesystem_specs.to_path_globs(
+            global_options.options.owners_not_found_behavior.to_glob_match_error_behavior()
+        ),
+    )
     return SourcesSnapshots([SourcesSnapshot(snapshot)])
 
 
@@ -896,7 +901,10 @@ async def addresses_with_origins_from_filesystem_specs(
     FilesystemMergedSpec.
     """
     pathglobs_per_include = (
-        filesystem_specs.path_globs_for_spec(spec) for spec in filesystem_specs.includes
+        filesystem_specs.path_globs_for_spec(
+            spec, global_options.options.owners_not_found_behavior.to_glob_match_error_behavior(),
+        )
+        for spec in filesystem_specs.includes
     )
     snapshot_per_include = await MultiGet(
         Get[Snapshot](PathGlobs, pg) for pg in pathglobs_per_include
