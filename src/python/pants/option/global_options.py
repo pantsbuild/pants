@@ -64,6 +64,9 @@ class OwnersNotFoundBehavior(Enum):
     warn = "warn"
     error = "error"
 
+    def to_glob_match_error_behavior(self) -> GlobMatchErrorBehavior:
+        return GlobMatchErrorBehavior(self.value)
+
 
 class BuildFileImportsBehavior(Enum):
     warn = "warn"
