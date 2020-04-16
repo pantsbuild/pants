@@ -19,6 +19,7 @@ from pants.backend.python.rules.pex import (
     PexRequest,
     PexRequirements,
 )
+from pants.backend.python.rules.targets import PythonSources
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.build_graph.address import Address
@@ -31,11 +32,11 @@ from pants.engine.fs import (
     InputFilesContent,
 )
 from pants.engine.isolated_process import Process, ProcessResult
-from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
 from pants.engine.rules import RootRule, UnionRule, named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
+from pants.engine.target import Sources, Targets, TransitiveTargets
 from pants.python.python_setup import PythonSetup
-from pants.rules.core.determine_source_files import LegacyAllSourceFilesRequest, SourceFiles
+from pants.rules.core.determine_source_files import AllSourceFilesRequest, SourceFiles
 from pants.rules.core.test import (
     ConsoleCoverageReport,
     CoverageData,
@@ -127,7 +128,7 @@ class PytestCoverageDataCollection(CoverageDataCollection):
 
 @dataclass(frozen=True)
 class CoverageConfigRequest:
-    hydrated_targets: HydratedTargets
+    targets: Targets
     is_test_time: bool
 
 
@@ -141,9 +142,8 @@ async def create_coverage_config(
     coverage_config_request: CoverageConfigRequest, source_root_config: SourceRootConfig
 ) -> CoverageConfig:
     sources = await Get[SourceFiles](
-        LegacyAllSourceFilesRequest(
-            (ht.adaptor for ht in coverage_config_request.hydrated_targets),
-            strip_source_roots=False,
+        AllSourceFilesRequest(
+            (tgt.get(Sources) for tgt in coverage_config_request.targets), strip_source_roots=False,
         )
     )
     init_injected = await Get[InitInjectedSnapshot](InjectInitRequest(sources.snapshot))
@@ -269,7 +269,7 @@ class MergedCoverageData:
 async def merge_coverage_data(
     data_collection: PytestCoverageDataCollection,
     coverage_setup: CoverageSetup,
-    transitive_targets: TransitiveHydratedTargets,
+    transitive_targets: TransitiveTargets,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> MergedCoverageData:
@@ -282,13 +282,13 @@ async def merge_coverage_data(
         for data in data_collection
     )
     sources = await Get[SourceFiles](
-        LegacyAllSourceFilesRequest(
-            (ht.adaptor for ht in transitive_targets.closure), strip_source_roots=False
+        AllSourceFilesRequest(
+            (tgt.get(Sources) for tgt in transitive_targets.closure), strip_source_roots=False
         )
     )
     sources_with_inits = await Get[InitInjectedSnapshot](InjectInitRequest(sources.snapshot))
     coverage_config = await Get[CoverageConfig](
-        CoverageConfigRequest(HydratedTargets(transitive_targets.closure), is_test_time=True)
+        CoverageConfigRequest(Targets(transitive_targets.closure), is_test_time=True)
     )
     merged_input_files: Digest = await Get(
         Digest,
@@ -323,25 +323,21 @@ async def generate_coverage_report(
     merged_coverage_data: MergedCoverageData,
     coverage_setup: CoverageSetup,
     coverage_subsystem: PytestCoverage,
-    transitive_targets: TransitiveHydratedTargets,
+    transitive_targets: TransitiveTargets,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> CoverageReport:
     """Takes all Python test results and generates a single coverage report."""
     requirements_pex = coverage_setup.requirements_pex
-    # TODO(#4535) We need a better way to do this kind of check that covers synthetic targets and rules extensibility.
-    python_targets = [
-        target
-        for target in transitive_targets.closure
-        if target.adaptor.type_alias in ("python_library", "python_tests")
-    ]
 
+    python_targets = [tgt for tgt in transitive_targets.closure if tgt.has_field(PythonSources)]
     coverage_config = await Get[CoverageConfig](
-        CoverageConfigRequest(HydratedTargets(python_targets), is_test_time=False)
+        CoverageConfigRequest(Targets(python_targets), is_test_time=False)
     )
+
     sources = await Get[SourceFiles](
-        LegacyAllSourceFilesRequest(
-            (ht.adaptor for ht in transitive_targets.closure), strip_source_roots=False
+        AllSourceFilesRequest(
+            (tgt.get(Sources) for tgt in transitive_targets.closure), strip_source_roots=False
         )
     )
     sources_with_inits_snapshot = await Get[InitInjectedSnapshot](
