@@ -189,9 +189,9 @@ class PexPlatforms:
         self.platforms = FrozenOrderedSet(sorted(platforms or ()))
 
     @classmethod
-    def create_from_platforms_fields(cls, fields: Iterable[PythonPlatformsField]) -> "PexPlatforms":
+    def create_from_platforms_field(cls, field: PythonPlatformsField) -> "PexPlatforms":
         # TODO(#9562): wire to `--python-setup-platforms` once we know when/where it should be used.
-        return cls(itertools.chain.from_iterable(field.value or () for field in fields))
+        return cls(field.value or ())
 
     def generate_pex_arg_list(self) -> List[str]:
         args = []

@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
-from pants.backend.python.rules.pex import TwoStepPex
+from pants.backend.python.rules.pex import PexPlatforms, TwoStepPex
 from pants.backend.python.rules.pex_from_targets import (
     PexFromTargetsRequest,
     TwoStepPexFromTargetsRequest,
@@ -19,6 +19,7 @@ from pants.backend.python.rules.targets import (
     PythonBinarySources,
     PythonEntryPoint,
 )
+from pants.backend.python.rules.targets import PythonPlatforms as PythonPlatformsField
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.engine.addressable import Addresses
 from pants.engine.rules import UnionRule, rule
@@ -40,6 +41,7 @@ class PythonBinaryConfiguration(BinaryConfiguration):
     inherit_path: PexInheritPath
     shebang: PexShebang
     zip_safe: PexZipSafe
+    platforms: PythonPlatformsField
 
     def generate_additional_args(self) -> Tuple[str, ...]:
         args = []
@@ -78,6 +80,7 @@ async def create_python_binary(config: PythonBinaryConfiguration) -> CreatedBina
             PexFromTargetsRequest(
                 addresses=Addresses([config.address]),
                 entry_point=entry_point,
+                platforms=PexPlatforms.create_from_platforms_field(config.platforms),
                 output_filename=output_filename,
                 additional_args=config.generate_additional_args(),
                 description=f"Building {output_filename}",
