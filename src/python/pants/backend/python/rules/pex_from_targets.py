@@ -164,6 +164,7 @@ async def legacy_pex_from_targets(
     all_targets = transitive_hydrated_targets.closure
 
     python_targets = [t for t in all_targets if isinstance(t.adaptor, PythonTargetAdaptor)]
+    # TODO: Remove the FileAdaptor and ResourcesAdaptor classes once we remove this rule.
     resource_targets = [
         t for t in all_targets if isinstance(t.adaptor, (FilesAdaptor, ResourcesAdaptor))
     ]

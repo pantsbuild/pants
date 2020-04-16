@@ -3,7 +3,7 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Iterable, List, Optional, Tuple, cast
+from typing import Any, Iterable, List, Optional, Tuple, Type, cast
 
 from pants.backend.docgen.targets.doc import Page
 from pants.backend.jvm.targets.jvm_app import JvmApp
@@ -21,6 +21,7 @@ from pants.binaries.binary_util import rules as binary_util_rules
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.remote_sources import RemoteSources
+from pants.build_graph.target import Target as TargetV1
 from pants.engine.build_files import create_graph_rules
 from pants.engine.console import Console
 from pants.engine.fs import Workspace, create_fs_rules
@@ -38,10 +39,7 @@ from pants.engine.legacy.structs import (
     PageAdaptor,
     PantsPluginAdaptor,
     PythonAppAdaptor,
-    PythonAWSLambdaAdaptor,
     PythonBinaryAdaptor,
-    PythonRequirementLibraryAdaptor,
-    PythonRequirementsFileAdaptor,
     PythonTargetAdaptor,
     PythonTestsAdaptor,
     RemoteSourcesAdaptor,
@@ -71,7 +69,7 @@ from pants.scm.subsystems.changed import rules as changed_rules
 logger = logging.getLogger(__name__)
 
 
-def _tuplify(v):
+def _tuplify(v: Optional[Iterable]) -> Optional[Tuple]:
     if v is None:
         return None
     if isinstance(v, tuple):
@@ -81,23 +79,27 @@ def _tuplify(v):
     return (v,)
 
 
-def _compute_default_sources_globs(base_class, target_type):
+def _compute_default_sources_globs(
+    v1_target_cls: Type[TargetV1],
+) -> Tuple[Optional[Tuple[str, ...]], Optional[Tuple[str, ...]]]:
     """Look up the default source globs for the type, and return as a tuple of (globs, excludes)."""
-    if not target_type.supports_default_sources() or target_type.default_sources_globs is None:
+    if not v1_target_cls.supports_default_sources() or v1_target_cls.default_sources_globs is None:
         return (None, None)
 
-    globs = _tuplify(target_type.default_sources_globs)
-    excludes = _tuplify(target_type.default_sources_exclude_globs)
+    globs = _tuplify(v1_target_cls.default_sources_globs)
+    excludes = _tuplify(v1_target_cls.default_sources_exclude_globs)
 
     return (globs, excludes)
 
 
-def _apply_default_sources_globs(base_class, target_type):
+def _apply_default_sources_globs(
+    adaptor_cls: Type[TargetAdaptor], v1_target_cls: Type[TargetV1]
+) -> None:
     """Mutates the given TargetAdaptor subclass to apply default sources from the given legacy
     target type."""
-    globs, excludes = _compute_default_sources_globs(base_class, target_type)
-    base_class.default_sources_globs = globs
-    base_class.default_sources_exclude_globs = excludes
+    globs, excludes = _compute_default_sources_globs(v1_target_cls)
+    adaptor_cls.default_sources_globs = globs  # type: ignore[assignment]
+    adaptor_cls.default_sources_exclude_globs = excludes  # type: ignore[assignment]
 
 
 # TODO: These calls mutate the adaptor classes for some known library types to copy over
@@ -113,13 +115,29 @@ _apply_default_sources_globs(PythonTestsAdaptor, PythonTests)
 _apply_default_sources_globs(RemoteSourcesAdaptor, RemoteSources)
 
 
-def _legacy_symbol_table(build_file_aliases: BuildFileAliases) -> SymbolTable:
+def _make_target_adaptor(
+    adaptor_cls: Type[TargetAdaptor], v1_target_cls: Type[TargetV1]
+) -> Type[TargetAdaptor]:
+    """Create an adaptor subclass for the given TargetAdaptor base class and legacy target type."""
+    globs, excludes = _compute_default_sources_globs(v1_target_cls)
+    if globs is None:
+        return adaptor_cls
+
+    class GlobsHandlingTargetAdaptor(adaptor_cls):  # type: ignore[misc,valid-type]
+        default_sources_globs = globs
+        default_sources_exclude_globs = excludes
+
+    return GlobsHandlingTargetAdaptor
+
+
+def _legacy_symbol_table(
+    build_file_aliases: BuildFileAliases, registered_target_types: RegisteredTargetTypes
+) -> SymbolTable:
     """Construct a SymbolTable for the given BuildFileAliases."""
     table = {
         alias: _make_target_adaptor(TargetAdaptor, target_type)
         for alias, target_type in build_file_aliases.target_types.items()
     }
-
     for alias, factory in build_file_aliases.target_macro_factories.items():
         # TargetMacro.Factory with more than one target type is deprecated.
         # For default sources, this means that TargetMacro Factories with more than one target_type
@@ -130,47 +148,29 @@ def _legacy_symbol_table(build_file_aliases: BuildFileAliases) -> SymbolTable:
         if len(factory.target_types) == 1:
             table[alias] = _make_target_adaptor(TargetAdaptor, tuple(factory.target_types)[0],)
 
-    # TODO: The alias replacement here is to avoid elevating "TargetAdaptors" into the public
-    # API until after https://github.com/pantsbuild/pants/issues/3560 has been completed.
-    # These should likely move onto Target subclasses as the engine gets deeper into beta
-    # territory.
+    # Now, register any target types only declared in V2 without a V1 equivalent.
+    table.update(
+        {
+            target_type.alias: TargetAdaptor
+            for target_type in registered_target_types.types
+            if target_type.alias not in table
+        }
+    )
+
     table["python_library"] = PythonTargetAdaptor
     table["jvm_app"] = JvmAppAdaptor
     table["jvm_binary"] = JvmBinaryAdaptor
     table["python_app"] = PythonAppAdaptor
     table["python_tests"] = PythonTestsAdaptor
     table["python_binary"] = PythonBinaryAdaptor
-    table["python_requirement_library"] = PythonRequirementLibraryAdaptor
     table["remote_sources"] = RemoteSourcesAdaptor
     table["resources"] = ResourcesAdaptor
     table["files"] = FilesAdaptor
     table["page"] = PageAdaptor
-    table["python_awslambda"] = PythonAWSLambdaAdaptor
-    # The leading underscore in the name is to emphasize that this is used by macros but is
-    # not intended to be used in user-authored BUILD files.
-    table["_python_requirements_file"] = PythonRequirementsFileAdaptor
-
-    # Note that these don't call _make_target_adaptor because we don't have a handy reference to the
-    # types being constructed. They don't have any default_sources behavior, so this should be ok,
-    # but if we end up doing more things in _make_target_adaptor, we should make sure they're
-    # applied here too.
     table["pants_plugin"] = PantsPluginAdaptor
     table["contrib_plugin"] = PantsPluginAdaptor
 
     return SymbolTable(table)
-
-
-def _make_target_adaptor(base_class, target_type):
-    """Create an adaptor subclass for the given TargetAdaptor base class and legacy target type."""
-    globs, excludes = _compute_default_sources_globs(base_class, target_type)
-    if globs is None:
-        return base_class
-
-    class GlobsHandlingTargetAdaptor(base_class):
-        default_sources_globs = globs
-        default_sources_exclude_globs = excludes
-
-    return GlobsHandlingTargetAdaptor
 
 
 @dataclass(frozen=True)
@@ -372,11 +372,9 @@ class EngineInitializer:
         build_file_aliases = build_configuration.registered_aliases()
         rules = build_configuration.rules()
 
-        symbol_table = _legacy_symbol_table(build_file_aliases)
-
-        # TODO: register this with the SymbolTable/LegacyPythonCallbacksParser so that the aliases
-        #  exposed by the Target API are interpreted correctly.
         registered_target_types = RegisteredTargetTypes.create(build_configuration.targets())
+
+        symbol_table = _legacy_symbol_table(build_file_aliases, registered_target_types)
 
         execution_options = execution_options or DEFAULT_EXECUTION_OPTIONS
 
