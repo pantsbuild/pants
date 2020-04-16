@@ -1,14 +1,15 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
+import re
 from dataclasses import dataclass
+from typing import Tuple
 
 from pants.backend.awslambda.common.awslambda_common_rules import (
     AWSLambdaConfiguration,
     CreatedAWSLambda,
 )
 from pants.backend.awslambda.python.lambdex import Lambdex
-from pants.backend.awslambda.python.targets import PythonAwsLambdaHandler
+from pants.backend.awslambda.python.targets import PythonAwsLambdaHandler, PythonAwsLambdaRuntime
 from pants.backend.python.rules import (
     download_pex_bin,
     importable_python_sources,
@@ -18,6 +19,7 @@ from pants.backend.python.rules import (
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
+    PexPlatforms,
     PexRequest,
     PexRequirements,
     TwoStepPex,
@@ -39,14 +41,30 @@ from pants.rules.core import strip_source_roots
 
 @dataclass(frozen=True)
 class PythonAwsLambdaConfiguration(AWSLambdaConfiguration):
-    required_fields = (PythonAwsLambdaHandler,)
+    required_fields = (PythonAwsLambdaHandler, PythonAwsLambdaRuntime)
 
     handler: PythonAwsLambdaHandler
+    runtime: PythonAwsLambdaRuntime
 
 
 @dataclass(frozen=True)
 class LambdexSetup:
     requirements_pex: Pex
+
+
+class InvalidAWSLambdaRuntime(Exception):
+    pass
+
+
+def get_interpreter_from_runtime(runtime: str, addr: str) -> Tuple[int, int]:
+    """Returns the Python version implied by the runtime, as (major, minor)."""
+    mo = re.match(r"python(?P<major>\d)\.(?P<minor>\d+)", runtime)
+    if not mo:
+        raise InvalidAWSLambdaRuntime(
+            f"runtime field in python_awslambda target at {addr} must "
+            f"be of the form pythonX.Y, but was {runtime}"
+        )
+    return (int(mo["major"]), int(mo["minor"]))
 
 
 @named_rule(desc="Create Python AWS Lambda")
@@ -58,9 +76,14 @@ async def create_python_awslambda(
 ) -> CreatedAWSLambda:
     # TODO: We must enforce that everything is built for Linux, no matter the local platform.
     pex_filename = f"{config.address.target_name}.pex"
+    py_major, py_minor = get_interpreter_from_runtime(config.runtime.value, config.address.spec)
+    platform = f"linux_x86_64-cp-{py_major}{py_minor}-cp{py_major}{py_minor}m"
     pex_request = TwoStepPexFromTargetsRequest(
         PexFromTargetsRequest(
-            addresses=Addresses([config.address]), entry_point=None, output_filename=pex_filename,
+            addresses=Addresses([config.address]),
+            entry_point=None,
+            output_filename=pex_filename,
+            platforms=PexPlatforms([platform]),
         )
     )
 

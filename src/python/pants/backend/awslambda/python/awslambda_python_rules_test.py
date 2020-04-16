@@ -6,8 +6,13 @@ from io import BytesIO
 from typing import Tuple
 from zipfile import ZipFile
 
+import pytest
+
 from pants.backend.awslambda.common.awslambda_common_rules import CreatedAWSLambda
-from pants.backend.awslambda.python.awslambda_python_rules import PythonAwsLambdaConfiguration
+from pants.backend.awslambda.python.awslambda_python_rules import (
+    PythonAwsLambdaConfiguration,
+    get_interpreter_from_runtime,
+)
 from pants.backend.awslambda.python.awslambda_python_rules import rules as awslambda_python_rules
 from pants.backend.awslambda.python.targets import PythonAWSLambda
 from pants.backend.python.rules.targets import PythonLibrary
@@ -18,6 +23,21 @@ from pants.engine.selectors import Params
 from pants.engine.target import WrappedTarget
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
+
+
+@pytest.mark.parametrize(
+    ["runtime", "expected_major", "expected_minor"],
+    (
+        # The available runtimes at the time of writing.
+        # See https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html.
+        ["python2.7", 2, 7],
+        ["python3.6", 3, 6],
+        ["python3.7", 3, 7],
+        ["python3.8", 3, 8],
+    ),
+)
+def test_get_interpreter_from_runtime(runtime, expected_major, expected_minor):
+    assert (expected_major, expected_minor) == get_interpreter_from_runtime(runtime, "")
 
 
 class TestPythonAWSLambdaCreation(TestBase):
@@ -67,7 +87,8 @@ class TestPythonAWSLambdaCreation(TestBase):
                 python_awslambda(
                   name='hello_world_lambda',
                   dependencies=[':hello_world'],
-                  handler='foo.bar.hello_world'
+                  handler='foo.bar.hello_world',
+                  runtime='python3.7'
                 )
                 """
             ),

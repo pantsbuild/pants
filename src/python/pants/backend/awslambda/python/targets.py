@@ -6,9 +6,17 @@ from pants.engine.target import StringField, Target
 
 
 class PythonAwsLambdaHandler(StringField):
-    """Lambda handler entrypoint (module.dotted.name:handler_func)."""
+    """AWS Lambda handler entrypoint (module.dotted.name:handler_func)."""
 
     alias = "handler"
+    required = True
+    value: str
+
+
+class PythonAwsLambdaRuntime(StringField):
+    """The identifier of the AWS Lambda runtime to target (pythonX.Y)."""
+
+    alias = "runtime"
     required = True
     value: str
 
@@ -17,4 +25,9 @@ class PythonAWSLambda(Target):
     """A self-contained Python function suitable for uploading to AWS Lambda."""
 
     alias = "python_awslambda"
-    core_fields = (*COMMON_PYTHON_FIELDS, PythonSources, PythonAwsLambdaHandler)
+    core_fields = (
+        *COMMON_PYTHON_FIELDS,
+        PythonSources,
+        PythonAwsLambdaHandler,
+        PythonAwsLambdaRuntime,
+    )
