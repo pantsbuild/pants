@@ -493,23 +493,6 @@ pub extern "C" fn scheduler_metrics(
   })
 }
 
-///
-/// Prepares to fork by shutting down any background threads used for execution, and then
-/// calling the given callback function (which should execute the fork) while holding exclusive
-/// access to all relevant locks.
-///
-#[no_mangle]
-pub extern "C" fn scheduler_fork_context(
-  scheduler_ptr: *mut Scheduler,
-  func: Function,
-) -> PyResult {
-  with_scheduler(scheduler_ptr, |_| {
-    externs::exclusive_call(&func.0)
-      .map_err(|f| format!("{:?}", f))
-      .into()
-  })
-}
-
 #[no_mangle]
 pub extern "C" fn scheduler_execute(
   scheduler_ptr: *mut Scheduler,

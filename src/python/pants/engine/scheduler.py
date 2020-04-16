@@ -276,11 +276,6 @@ class Scheduler:
         )
         return result
 
-    def with_fork_context(self, func):
-        """See the rustdocs for `scheduler_fork_context` for more information."""
-        res = self._native.lib.scheduler_fork_context(self._scheduler, Function(self._to_key(func)))
-        return self._raise_or_return(res)
-
     def _run_and_return_roots(self, session, execution_request):
         raw_roots = self._native.lib.scheduler_execute(self._scheduler, session, execution_request)
         if raw_roots == self._native.ffi.NULL:
@@ -442,9 +437,6 @@ class SchedulerSession:
     @staticmethod
     def engine_workunits(metrics):
         return metrics.get("engine_workunits")
-
-    def with_fork_context(self, func):
-        return self._scheduler.with_fork_context(func)
 
     def _maybe_visualize(self):
         if self._scheduler.visualize_to_dir is not None:
