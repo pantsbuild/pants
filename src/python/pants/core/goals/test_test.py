@@ -10,7 +10,6 @@ import pytest
 
 from pants.base.exceptions import ResolveError
 from pants.base.specs import SingleAddress
-from pants.build_graph.address import Address
 from pants.core.goals.test import (
     AddressAndTestResult,
     CoverageDataCollection,
@@ -29,6 +28,7 @@ from pants.core.util_rules.filter_empty_sources import (
     ConfigurationsWithSources,
     ConfigurationsWithSourcesRequest,
 )
+from pants.engine.addresses import Address
 from pants.engine.fs import (
     EMPTY_DIRECTORY_DIGEST,
     Digest,

@@ -6,9 +6,8 @@ from enum import Enum
 from typing import List, Optional, Tuple, cast
 
 from pants.base.specs import AddressSpecs, DescendantAddresses
-from pants.build_graph.address import Address
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.engine.addressable import Addresses
+from pants.engine.addresses import Address, Addresses
 from pants.engine.legacy.graph import (
     Owners,
     OwnersRequest,

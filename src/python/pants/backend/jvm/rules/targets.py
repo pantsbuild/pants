@@ -5,7 +5,7 @@ from typing import Iterable, Optional, Tuple, Union, cast
 
 from pants.backend.jvm.subsystems import shader
 from pants.backend.jvm.targets.jvm_binary import JarRules
-from pants.build_graph.address import Address
+from pants.engine.addresses import Address
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,

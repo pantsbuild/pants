@@ -3,13 +3,11 @@
 
 python_library(
   name = 'plugin',
-  sources = ['__init__.py', 'register.py'],
   dependencies = [
-    'src/python/pants/base:exceptions',
-    'src/python/pants/engine:addressable',
+    'src/python/pants/engine:addresses',
     'src/python/pants/engine:console',
+    'src/python/pants/engine:goal',
     'src/python/pants/engine:rules',
-    'src/python/pants/engine:selectors',
   ],
-  tags = {"partially_type_checked"},
+  tags = {"type_checked"},
 )

@@ -21,6 +21,7 @@ python_tests(
     'src/python/pants/backend/python/lint/isort',
     'src/python/pants/backend/python/subsystems',
     'src/python/pants/core/goals',
+    'src/python/pants/engine:addresses',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',

@@ -29,7 +29,7 @@ from pants.backend.python.rules.pex_from_targets import (
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.core.util_rules import strip_source_roots
-from pants.engine.addressable import Addresses
+from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge
 from pants.engine.isolated_process import Process, ProcessResult
 from pants.engine.rules import UnionRule, named_rule, subsystem_rule

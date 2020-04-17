@@ -10,7 +10,8 @@ from pants.base.exceptions import ResolveError
 from pants.base.project_tree import Dir
 from pants.base.specs import AddressSpecs, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
-from pants.engine.addressable import Addresses, addressable, addressable_dict
+from pants.engine.addressable import addressable, addressable_dict
+from pants.engine.addresses import Addresses
 from pants.engine.build_files import (
     ResolvedTypeMismatchError,
     addresses_with_origins_from_address_families,

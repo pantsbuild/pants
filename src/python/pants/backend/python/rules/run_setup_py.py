@@ -32,7 +32,6 @@ from pants.backend.python.rules.util import (
 )
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.base.specs import AddressSpecs, AscendantAddresses, SingleAddress
-from pants.build_graph.address import Address
 from pants.core.target_types import ResourcesSources
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
 from pants.core.util_rules.distdir import DistDir
@@ -40,7 +39,7 @@ from pants.core.util_rules.strip_source_roots import (
     SourceRootStrippedSources,
     StripSourcesFieldRequest,
 )
-from pants.engine.addressable import Addresses
+from pants.engine.addresses import Address, Addresses
 from pants.engine.console import Console
 from pants.engine.fs import (
     Digest,

@@ -19,7 +19,7 @@ from pants.backend.python.subsystems.subprocess_environment import SubprocessEnc
 from pants.core.goals.lint import LinterConfiguration, LinterConfigurations, LintResult
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
-from pants.engine.addressable import Addresses
+from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
 from pants.engine.isolated_process import FallibleProcessResult, Process
 from pants.engine.rules import UnionRule, named_rule, subsystem_rule

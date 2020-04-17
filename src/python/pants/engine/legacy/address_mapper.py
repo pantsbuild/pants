@@ -9,7 +9,7 @@ from pants.base.exceptions import ResolveError
 from pants.base.specs import AddressSpecs, DescendantAddresses, SiblingAddresses
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.address_mapper import AddressMapper
-from pants.engine.addressable import BuildFileAddresses
+from pants.engine.addresses import BuildFileAddresses
 from pants.util.dirutil import fast_relpath
 
 logger = logging.getLogger(__name__)

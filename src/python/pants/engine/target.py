@@ -22,9 +22,8 @@ from typing import (
 from typing_extensions import final
 
 from pants.base.specs import OriginSpec
-from pants.build_graph.address import Address
 from pants.build_graph.app_base import Bundle
-from pants.engine.addressable import assert_single_address
+from pants.engine.addresses import Address, assert_single_address
 from pants.engine.fs import (
     EMPTY_SNAPSHOT,
     GlobExpansionConjunction,

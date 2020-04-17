@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Iterable, List, Optional, Type, cast
 
 from pants.base.specs import SingleAddress
-from pants.build_graph.address import Address
 from pants.core.goals.fmt import (
     Fmt,
     FmtOptions,
@@ -16,6 +15,7 @@ from pants.core.goals.fmt import (
     fmt,
 )
 from pants.core.util_rules.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
+from pants.engine.addresses import Address
 from pants.engine.fs import (
     EMPTY_DIRECTORY_DIGEST,
     Digest,

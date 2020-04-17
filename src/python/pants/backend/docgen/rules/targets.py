@@ -4,7 +4,7 @@
 from typing import Iterable, Optional, Tuple
 
 from pants.backend.docgen.targets.doc import WikiArtifact
-from pants.build_graph.address import Address
+from pants.engine.addresses import Address
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     Dependencies,

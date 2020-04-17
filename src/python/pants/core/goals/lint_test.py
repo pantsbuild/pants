@@ -5,7 +5,6 @@ from abc import ABCMeta, abstractmethod
 from typing import Iterable, List, Optional, Tuple, Type
 
 from pants.base.specs import SingleAddress
-from pants.build_graph.address import Address
 from pants.core.goals.lint import (
     Lint,
     LinterConfiguration,
@@ -18,6 +17,7 @@ from pants.core.util_rules.filter_empty_sources import (
     ConfigurationsWithSources,
     ConfigurationsWithSourcesRequest,
 )
+from pants.engine.addresses import Address
 from pants.engine.rules import UnionMembership
 from pants.engine.target import Sources, Target, TargetsWithOrigins, TargetWithOrigin
 from pants.testutil.engine.util import MockConsole, MockGet, create_goal_subsystem, run_rule

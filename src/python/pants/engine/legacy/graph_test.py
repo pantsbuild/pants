@@ -4,7 +4,7 @@
 from textwrap import dedent
 
 from pants.build_graph.address import Address
-from pants.engine.addressable import Addresses
+from pants.engine.addresses import Addresses
 from pants.engine.rules import RootRule
 from pants.engine.target import (
     Dependencies,

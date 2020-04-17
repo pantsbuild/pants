@@ -9,7 +9,7 @@ from typing import Any, ClassVar, Dict, Iterable, List, Optional, Tuple, Type
 import pytest
 from typing_extensions import final
 
-from pants.build_graph.address import Address
+from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, PathGlobs, Snapshot
 from pants.engine.rules import RootRule, UnionMembership, rule
 from pants.engine.scheduler import ExecutionError
