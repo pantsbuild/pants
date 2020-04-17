@@ -761,7 +761,6 @@ pub extern "C" fn session_create(
   scheduler_ptr: *mut Scheduler,
   should_record_zipkin_spans: bool,
   should_render_ui: bool,
-  ui_worker_count: u64,
   build_id: Buffer,
   should_report_workunits: bool,
 ) -> *const Session {
@@ -773,7 +772,6 @@ pub extern "C" fn session_create(
       scheduler,
       should_record_zipkin_spans,
       should_render_ui,
-      ui_worker_count as usize,
       build_id,
       should_report_workunits,
     )))
