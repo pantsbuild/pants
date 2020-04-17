@@ -12,9 +12,9 @@ from pants.build_graph.address import Address
 from pants.build_graph.target import Target
 from pants.engine.addressable import addressable_sequence
 from pants.engine.fs import GlobExpansionConjunction, PathGlobs
-from pants.engine.objects import Locatable, union
-from pants.engine.rules import UnionRule
+from pants.engine.objects import Locatable
 from pants.engine.struct import Struct, StructWithDeps
+from pants.engine.unions import UnionRule, union
 from pants.source import wrapped_globs
 from pants.util.collections import ensure_str_list
 from pants.util.contextutil import exception_logging

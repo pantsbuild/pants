@@ -11,7 +11,7 @@ from typing_extensions import final
 
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, PathGlobs, Snapshot
-from pants.engine.rules import RootRule, UnionMembership, rule
+from pants.engine.rules import RootRule, rule
 from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Get
 from pants.engine.target import (
@@ -35,6 +35,7 @@ from pants.engine.target import (
     Target,
 )
 from pants.engine.target import rules as target_rules
+from pants.engine.unions import UnionMembership
 from pants.testutil.engine.util import MockGet, run_rule
 from pants.testutil.test_base import TestBase
 from pants.util.collections import ensure_str_list

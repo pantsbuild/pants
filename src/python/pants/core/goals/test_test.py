@@ -37,7 +37,6 @@ from pants.engine.fs import (
     Workspace,
 )
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
-from pants.engine.rules import UnionMembership
 from pants.engine.target import (
     RegisteredTargetTypes,
     Sources,
@@ -45,6 +44,7 @@ from pants.engine.target import (
     TargetsWithOrigins,
     TargetWithOrigin,
 )
+from pants.engine.unions import UnionMembership
 from pants.testutil.engine.util import MockConsole, MockGet, create_goal_subsystem, run_rule
 from pants.testutil.test_base import TestBase
 from pants.util.ordered_set import OrderedSet

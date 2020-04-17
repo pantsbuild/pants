@@ -32,8 +32,9 @@ from pants.core.util_rules import strip_source_roots
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge
 from pants.engine.isolated_process import Process, ProcessResult
-from pants.engine.rules import UnionRule, named_rule, subsystem_rule
+from pants.engine.rules import named_rule, subsystem_rule
 from pants.engine.selectors import Get
+from pants.engine.unions import UnionRule
 from pants.python.python_setup import PythonSetup
 
 

@@ -23,9 +23,10 @@ from pants.engine.fs import (
 )
 from pants.engine.native import Function, TypeId
 from pants.engine.nodes import Return, Throw
-from pants.engine.objects import Collection, union
+from pants.engine.objects import Collection
 from pants.engine.rules import Rule, RuleIndex, TaskRule
 from pants.engine.selectors import Params
+from pants.engine.unions import union
 from pants.option.global_options import ExecutionOptions
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import check_no_overlapping_paths

@@ -23,8 +23,8 @@ from pants.engine.fs import Digest, DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.isolated_process import FallibleProcessResult
-from pants.engine.objects import Collection, union
-from pants.engine.rules import UnionMembership, goal_rule, rule
+from pants.engine.objects import Collection
+from pants.engine.rules import goal_rule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
     Field,
@@ -34,6 +34,7 @@ from pants.engine.target import (
     TargetsWithOrigins,
     TargetWithOrigin,
 )
+from pants.engine.unions import UnionMembership, union
 
 # TODO(#6004): use proper Logging singleton, rather than static logger.
 logger = logging.getLogger(__name__)

@@ -8,6 +8,7 @@ python_library(
     'src/python/pants/core/util_rules',
     'src/python/pants/engine/legacy:structs',
     'src/python/pants/engine:rules',
+    'src/python/pants/engine:unions',
   ],
   tags = {"type_checked"},
 )

@@ -33,8 +33,9 @@ from pants.engine.fs import (
 )
 from pants.engine.legacy.structs import BundleAdaptor
 from pants.engine.objects import Collection
-from pants.engine.rules import RootRule, UnionMembership, rule
+from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
+from pants.engine.unions import UnionMembership
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper, Filespec
 from pants.util.collections import ensure_list, ensure_str_list
 from pants.util.frozendict import FrozenDict

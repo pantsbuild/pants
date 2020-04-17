@@ -41,7 +41,7 @@ from pants.engine.legacy.structs import (
 )
 from pants.engine.objects import Collection
 from pants.engine.parser import HydratedStruct
-from pants.engine.rules import RootRule, UnionMembership, rule
+from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
     Dependencies,
@@ -54,6 +54,7 @@ from pants.engine.target import (
     TransitiveTargets,
     WrappedTarget,
 )
+from pants.engine.unions import UnionMembership
 from pants.option.global_options import (
     GlobalOptions,
     GlobMatchErrorBehavior,

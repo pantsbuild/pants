@@ -23,8 +23,8 @@ from pants.engine.fs import (
     FileContent,
     Workspace,
 )
-from pants.engine.rules import UnionMembership
 from pants.engine.target import Sources, Target, TargetsWithOrigins, TargetWithOrigin
+from pants.engine.unions import UnionMembership
 from pants.testutil.engine.util import MockConsole, MockGet, create_goal_subsystem, run_rule
 from pants.testutil.test_base import TestBase
 from pants.util.ordered_set import OrderedSet

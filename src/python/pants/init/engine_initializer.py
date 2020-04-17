@@ -49,10 +49,11 @@ from pants.engine.mapper import AddressMapper
 from pants.engine.native import Native
 from pants.engine.parser import SymbolTable
 from pants.engine.platform import create_platform_rules
-from pants.engine.rules import RootRule, UnionMembership, rule
+from pants.engine.rules import RootRule, rule
 from pants.engine.scheduler import Scheduler, SchedulerSession
 from pants.engine.selectors import Params
 from pants.engine.target import RegisteredTargetTypes
+from pants.engine.unions import UnionMembership
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.option.global_options import (
     DEFAULT_EXECUTION_OPTIONS,
