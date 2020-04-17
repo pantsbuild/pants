@@ -4,6 +4,128 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.27.0rc0 (4/17/2020)
+----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Bump default MyPy to 0.770 (#9540)
+  `PR #9540 <https://github.com/pantsbuild/pants/pull/9540>`_
+
+* Report workunits that have started but that are not yet complete (#9552)
+  `PR #9552 <https://github.com/pantsbuild/pants/pull/9552>`_
+
+* Deprecate the v1 lambda task. (#9566)
+  `PR #9566 <https://github.com/pantsbuild/pants/pull/9566>`_
+
+New Features
+~~~~~~~~~~~~
+
+* More flexible binary and run rules. (#9529)
+  `PR #9529 <https://github.com/pantsbuild/pants/pull/9529>`_
+
+Bugfixes
+~~~~~~~~
+
+* Don't report diagnostics for cached targets (#9492)
+  `PR #9492 <https://github.com/pantsbuild/pants/pull/9492>`_
+
+* Add link back to source control dir from physical workdir (#9531)
+  `PR #9531 <https://github.com/pantsbuild/pants/pull/9531>`_
+
+* Fix V2 binary still using the `current` platform when `platforms` is specified (#9563)
+  `Issue #957 <https://github.com/pantsbuild/pex/issues/957>`_
+  `PR #9563 <https://github.com/pantsbuild/pants/pull/9563>`_
+
+* Propagate the owners_not_found_behavior to FilesystemSpec expansion. (#9551)
+  `PR #9551 <https://github.com/pantsbuild/pants/pull/9551>`_
+
+* [junit-runner] simplify fail fast (#9403)
+  `PR #9403 <https://github.com/pantsbuild/pants/pull/9403>`_
+
+* Fix workdir symlink's destination/physical dir not always created (#9504)
+  `PR #9504 <https://github.com/pantsbuild/pants/pull/9504>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Add rules to determine if configurations or targets have non-empty sources (#9521)
+  `PR #9521 <https://github.com/pantsbuild/pants/pull/9521>`_
+
+* Allow `target_types2` register.py entry point to register new symbols (#9558)
+  `PR #9558 <https://github.com/pantsbuild/pants/pull/9558>`_
+
+* Remove several unused TargetAdaptor utility rules (#9569)
+  `PR #9569 <https://github.com/pantsbuild/pants/pull/9569>`_
+
+* Remove the fork_context method and support code. (#9554)
+  `PR #9554 <https://github.com/pantsbuild/pants/pull/9554>`_
+
+* Convert repl goal to the new Targets API (#9565)
+  `PR #9565 <https://github.com/pantsbuild/pants/pull/9565>`_
+
+* Port V2 Pytest Coverage to use the Target API (#9556)
+  `PR #9556 <https://github.com/pantsbuild/pants/pull/9556>`_
+
+* Remove unused `HydratedTargetWithOrigin` (#9553)
+  `PR #9553 <https://github.com/pantsbuild/pants/pull/9553>`_
+
+* Port `setup-py2` to use the Target API (#9547)
+  `PR #9547 <https://github.com/pantsbuild/pants/pull/9547>`_
+
+* Some refactoring in EngineDisplay (#9546)
+  `PR #9546 <https://github.com/pantsbuild/pants/pull/9546>`_
+
+* Remove unused `TargetAdaptorWithOrigin` (#9544)
+  `PR #9544 <https://github.com/pantsbuild/pants/pull/9544>`_
+
+* Drop normpath comparison, the vast majority of which is covered by the other checks. (#9538)
+  `PR #9538 <https://github.com/pantsbuild/pants/pull/9538>`_
+
+* Port V2 `fmt` and `lint` to use Target API (#9537)
+  `PR #9537 <https://github.com/pantsbuild/pants/pull/9537>`_
+
+* Rename ExecuteProcessRequest to Process and ExecuteProcessResult to ProcessResult (#9535)
+  `PR #9535 <https://github.com/pantsbuild/pants/pull/9535>`_
+
+* Factor out a util function to parse a requirement constraint. (#9533)
+  `PR #9533 <https://github.com/pantsbuild/pants/pull/9533>`_
+
+* Utilities to create subsystem instances. (#9528)
+  `PR #9528 <https://github.com/pantsbuild/pants/pull/9528>`_
+
+* Convert RankedValue int ranks to Enum. (#9526)
+  `PR #9526 <https://github.com/pantsbuild/pants/pull/9526>`_
+
+* Add PantsdRunContext context to pantsd tests (#9518)
+  `PR #9518 <https://github.com/pantsbuild/pants/pull/9518>`_
+
+* Refactor V2 Pytest Coverage implementation (#9549)
+  `PR #9549 <https://github.com/pantsbuild/pants/pull/9549>`_
+
+Testing
+~~~~~~~
+
+* Unrevert black change and fix issue with it (#9545)
+  `PR #9545 <https://github.com/pantsbuild/pants/pull/9545>`_
+
+* Revert "quiet black formatter in CI (#9536)" (#9542)
+  `PR #9536 <https://github.com/pantsbuild/pants/pull/9536>`_
+  `PR #9542 <https://github.com/pantsbuild/pants/pull/9542>`_
+
+* quiet black formatter in CI (#9536)
+  `PR #9536 <https://github.com/pantsbuild/pants/pull/9536>`_
+
+* Bump timeouts for several tests and for remote execution (#9559)
+  `PR #9559 <https://github.com/pantsbuild/pants/pull/9559>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Prepare 1.26.0rc2. (#9550)
+  `PR #9550 <https://github.com/pantsbuild/pants/pull/9550>`_
+
 1.27.0.dev3 (4/13/2020)
 -----------------------
 
