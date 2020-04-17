@@ -523,7 +523,7 @@ impl Store {
                 let maybe_upload = local
                   .load_bytes_with(entry_type, digest, move |bytes| {
                     let remote = remote.clone();
-                    Box::pin(async move { remote.store_bytes(bytes).await }).compat()
+                    Box::pin(async move { remote.store_bytes(digest, bytes).await }).compat()
                   })
                   .await?;
                 match maybe_upload {

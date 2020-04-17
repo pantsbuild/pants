@@ -4,13 +4,11 @@ use bazel_protos::{self, call_option};
 use boxfuture::{try_future, Boxable};
 use bytes::{Bytes, BytesMut};
 use concrete_time::TimeSpan;
-use digest::{Digest as DigestTrait, FixedOutput};
 use futures::compat::Future01CompatExt;
 use futures01::{future, Future, IntoFuture, Sink, Stream};
 use grpcio;
-use hashing::{Digest, Fingerprint};
+use hashing::Digest;
 use serverset::{Retry, Serverset};
-use sha2::Sha256;
 use std::cmp::min;
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
@@ -112,14 +110,18 @@ impl ByteStore {
     )
   }
 
-  pub async fn store_bytes(&self, bytes: Bytes) -> Result<Digest, String> {
+  pub async fn store_bytes(&self, digest: Digest, bytes: Bytes) -> Result<Digest, String> {
     let start_time = std::time::SystemTime::now();
 
-    let mut hasher = Sha256::default();
-    hasher.input(&bytes);
-    let fingerprint = Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice());
-    let len = bytes.len();
-    let digest = Digest(fingerprint, len);
+    if digest.1 != bytes.len() {
+      return Err(format!(
+        "Digest length for {:?} mismatched bytes length: {}",
+        digest,
+        bytes.len()
+      ));
+    }
+    let len = digest.1;
+
     let resource_name = format!(
       "{}/uploads/{}/blobs/{}/{}",
       self.instance_name.clone().unwrap_or_default(),
