@@ -88,6 +88,11 @@ class JUnitTestsTest(TestBase):
             sorted(str(x) for x in test2.dependencies),
         )
 
+    def test_test_platform_sets_runtime_platform(self):
+        init_subsystem(JUnit)
+        target = self.make_target("//:test1", JUnitTests, sources=[], test_platform="b")
+        assert target.payload.runtime_platform == "b"
+
     def test_runtime_and_test_platform_error(self):
         with self.assertRaisesWithMessage(
             TargetDefinitionException,
