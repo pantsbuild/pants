@@ -35,23 +35,27 @@ from pants.engine.target import rules as target_rules
 
 def rules():
     return [
+        # project_info
         *cloc.rules(),
-        *binary.rules(),
-        *fmt.rules(),
-        *lint.rules(),
+        *filedeps.rules(),
         *list_backends.rules(),
         *list_roots.rules(),
         *list_target_types.rules(),
         *list_targets.rules(),
         *list_targets_old.rules(),
-        *determine_source_files.rules(),
-        *filedeps.rules(),
+        # goals
+        *binary.rules(),
+        *fmt.rules(),
+        *lint.rules(),
         *repl.rules(),
         *run.rules(),
-        *strip_source_roots.rules(),
-        *filter_empty_sources.rules(),
-        *distdir.rules(),
         *test.rules(),
+        # util_rules
+        *determine_source_files.rules(),
+        *distdir.rules(),
+        *filter_empty_sources.rules(),
+        *strip_source_roots.rules(),
+        # other
         *target_rules(),
     ]
 
