@@ -8,6 +8,7 @@ from typing import Iterable, Optional, Tuple
 from pants.backend.python.rules.importable_python_sources import ImportablePythonSources
 from pants.backend.python.rules.pex import (
     PexInterpreterConstraints,
+    PexPlatforms,
     PexRequest,
     PexRequirements,
     TwoStepPexRequest,
@@ -38,6 +39,7 @@ class PexFromTargetsRequest:
     addresses: Addresses
     output_filename: str
     entry_point: Optional[str]
+    platforms: PexPlatforms
     additional_args: Tuple[str, ...]
     additional_requirements: Tuple[str, ...]
     include_source_files: bool
@@ -53,6 +55,7 @@ class PexFromTargetsRequest:
         *,
         output_filename: str,
         entry_point: Optional[str] = None,
+        platforms: PexPlatforms = PexPlatforms(),
         additional_args: Iterable[str] = (),
         additional_requirements: Iterable[str] = (),
         include_source_files: bool = True,
@@ -63,6 +66,7 @@ class PexFromTargetsRequest:
         self.addresses = addresses
         self.output_filename = output_filename
         self.entry_point = entry_point
+        self.platforms = platforms
         self.additional_args = tuple(additional_args)
         self.additional_requirements = tuple(additional_requirements)
         self.include_source_files = include_source_files
@@ -129,6 +133,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         output_filename=request.output_filename,
         requirements=requirements,
         interpreter_constraints=interpreter_constraints,
+        platforms=request.platforms,
         entry_point=request.entry_point,
         sources=merged_input_digest,
         additional_inputs=request.additional_inputs,
