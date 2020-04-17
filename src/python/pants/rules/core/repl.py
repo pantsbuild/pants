@@ -122,6 +122,4 @@ async def run_repl(
 
 
 def rules():
-    return [
-        run_repl,
-    ]
+    return [run_repl]
