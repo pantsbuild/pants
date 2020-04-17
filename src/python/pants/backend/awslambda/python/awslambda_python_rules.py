@@ -58,7 +58,6 @@ async def create_python_awslambda(
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> CreatedAWSLambda:
-    # TODO: We must enforce that everything is built for Linux, no matter the local platform.
     pex_filename = f"{config.address.target_name}.pex"
     py_major, py_minor = config.runtime.to_interpreter_version()
     platform = f"linux_x86_64-cp-{py_major}{py_minor}-cp{py_major}{py_minor}m"
