@@ -5,13 +5,16 @@ from dataclasses import dataclass
 from typing import Iterable, Tuple, Union
 
 from pants.base.specs import AddressSpec, OriginSpec
+from pants.core.rule_utils import strip_source_roots
+from pants.core.rule_utils.strip_source_roots import (
+    SourceRootStrippedSources,
+    StripSourcesFieldRequest,
+)
 from pants.engine.fs import DirectoriesToMerge, PathGlobs, Snapshot, SnapshotSubset
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import HydratedSources, HydrateSourcesRequest
 from pants.engine.target import Sources as SourcesField
-from pants.rules.core import strip_source_roots
-from pants.rules.core.strip_source_roots import SourceRootStrippedSources, StripSourcesFieldRequest
 from pants.util.meta import frozen_after_init
 
 

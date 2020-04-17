@@ -10,6 +10,7 @@ from typing import ClassVar, Dict, Iterable, Tuple, Type
 
 from pants.base.build_root import BuildRoot
 from pants.build_graph.address import Address
+from pants.core.rule_utils.distdir import DistDir
 from pants.engine.console import Console
 from pants.engine.fs import Digest, DirectoriesToMerge, DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
@@ -17,7 +18,6 @@ from pants.engine.objects import union
 from pants.engine.rules import UnionMembership, goal_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Field, RegisteredTargetTypes, Target, Targets
-from pants.rules.core.distdir import DistDir
 
 
 class AWSLambdaError(Exception):

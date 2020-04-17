@@ -16,6 +16,14 @@ from pants.backend.python.rules.pex import (
 from pants.backend.python.rules.targets import PythonSources
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.core.goals.fmt import FmtConfiguration, FmtConfigurations, FmtResult
+from pants.core.goals.lint import LinterConfigurations, LintResult
+from pants.core.rule_utils import determine_source_files, strip_source_roots
+from pants.core.rule_utils.determine_source_files import (
+    AllSourceFilesRequest,
+    SourceFiles,
+    SpecifiedSourceFilesRequest,
+)
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
 from pants.engine.isolated_process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import UnionRule, named_rule, rule, subsystem_rule
@@ -23,14 +31,6 @@ from pants.engine.selectors import Get
 from pants.option.custom_types import GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
-from pants.rules.core import determine_source_files, strip_source_roots
-from pants.rules.core.determine_source_files import (
-    AllSourceFilesRequest,
-    SourceFiles,
-    SpecifiedSourceFilesRequest,
-)
-from pants.rules.core.fmt import FmtConfiguration, FmtConfigurations, FmtResult
-from pants.rules.core.lint import LinterConfigurations, LintResult
 
 
 @dataclass(frozen=True)

@@ -3,13 +3,13 @@
 
 from textwrap import dedent
 
-from pants.engine.fs import EMPTY_SNAPSHOT, Digest, FileContent, FilesContent, PathGlobs, Snapshot
-from pants.option.global_options import GlobalOptions
-from pants.rules.core.list_backends import (
+from pants.core.project_info.list_backends import (
     BackendsOptions,
     hackily_get_module_docstring,
     list_backends,
 )
+from pants.engine.fs import EMPTY_SNAPSHOT, Digest, FileContent, FilesContent, PathGlobs, Snapshot
+from pants.option.global_options import GlobalOptions
 from pants.source.source_root import SourceRootConfig
 from pants.testutil.engine.util import MockConsole, MockGet, create_goal_subsystem, run_rule
 from pants.testutil.subsystem.util import global_subsystem_instance
@@ -133,7 +133,7 @@ def test_list_backends() -> None:
                 ).encode(),
             ),
             FileContent(
-                "src/python/pants/rules/core/register.py",
+                "src/python/pants/core/register.py",
                 dedent(
                     '''\
                     """Core V2 rules.
@@ -198,7 +198,7 @@ def test_list_backends() -> None:
 
         pants.contrib.elixir    <no description>
 
-        pants.rules.core*       Core V2 rules. These are always activated.
+        pants.core*             Core V2 rules. These are always activated.
 
         """
     )

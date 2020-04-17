@@ -7,6 +7,8 @@ from typing import Iterable, Optional, Tuple, Union, cast
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.build_graph.address import Address
+from pants.core.rule_utils.determine_source_files import SourceFiles
+from pants.core.targets import FilesSources
 from pants.engine.fs import Snapshot
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -27,8 +29,6 @@ from pants.engine.target import (
 from pants.fs.archive import TYPE_NAMES
 from pants.python.python_requirement import PythonRequirement
 from pants.python.python_setup import PythonSetup
-from pants.rules.core.determine_source_files import SourceFiles
-from pants.rules.core.targets import FilesSources
 
 # -----------------------------------------------------------------------------------------------
 # Common fields

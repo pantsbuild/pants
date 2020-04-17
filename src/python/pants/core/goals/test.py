@@ -13,6 +13,10 @@ from typing import ClassVar, Dict, Iterable, List, Optional, Tuple, Type, TypeVa
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import OriginSpec
 from pants.build_graph.address import Address
+from pants.core.rule_utils.filter_empty_sources import (
+    ConfigurationsWithSources,
+    ConfigurationsWithSourcesRequest,
+)
 from pants.engine import desktop
 from pants.engine.console import Console
 from pants.engine.fs import Digest, DirectoryToMaterialize, Workspace
@@ -29,10 +33,6 @@ from pants.engine.target import (
     Target,
     TargetsWithOrigins,
     TargetWithOrigin,
-)
-from pants.rules.core.filter_empty_sources import (
-    ConfigurationsWithSources,
-    ConfigurationsWithSourcesRequest,
 )
 
 # TODO(#6004): use proper Logging singleton, rather than static logger.

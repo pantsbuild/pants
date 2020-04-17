@@ -9,11 +9,11 @@ from typing import Dict, Iterable, List, Optional, Set, Tuple, cast
 from pkg_resources import Requirement
 
 from pants.backend.python.rules.targets import PythonSources
+from pants.core.rule_utils.strip_source_roots import SourceRootStrippedSources
+from pants.core.targets import ResourcesSources
 from pants.engine.fs import FilesContent
 from pants.engine.target import Target
 from pants.python.python_setup import PythonSetup
-from pants.rules.core.strip_source_roots import SourceRootStrippedSources
-from pants.rules.core.targets import ResourcesSources
 from pants.source.source_root import NoSourceRootError, SourceRoots
 from pants.util.strutil import ensure_text
 

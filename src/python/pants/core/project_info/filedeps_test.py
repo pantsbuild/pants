@@ -16,9 +16,9 @@ from pants.backend.python.targets.python_library import PythonLibrary as PythonL
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.resources import Resources as ResourcesV1
 from pants.build_graph.target import Target as TargetV1
+from pants.core.project_info import filedeps
+from pants.core.targets import GenericTarget, Resources
 from pants.engine.target import rules as target_rules
-from pants.rules.core import filedeps
-from pants.rules.core.targets import GenericTarget, Resources
 from pants.testutil.goal_rule_test_base import GoalRuleTestBase
 
 

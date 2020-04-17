@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from pants.rules.core.distdir import DistDir, InvalidDistDir, validate_distdir
+from pants.core.rule_utils.distdir import DistDir, InvalidDistDir, validate_distdir
 
 
 def test_distdir():
