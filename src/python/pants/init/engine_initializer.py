@@ -33,7 +33,6 @@ from pants.engine.legacy.graph import LegacyBuildGraph, create_legacy_graph_task
 from pants.engine.legacy.options_parsing import create_options_parsing_rules
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
 from pants.engine.legacy.structs import (
-    FilesAdaptor,
     JvmAppAdaptor,
     JvmBinaryAdaptor,
     PageAdaptor,
@@ -43,7 +42,6 @@ from pants.engine.legacy.structs import (
     PythonTargetAdaptor,
     PythonTestsAdaptor,
     RemoteSourcesAdaptor,
-    ResourcesAdaptor,
     TargetAdaptor,
 )
 from pants.engine.legacy.structs import rules as structs_rules
@@ -164,8 +162,6 @@ def _legacy_symbol_table(
     table["python_tests"] = PythonTestsAdaptor
     table["python_binary"] = PythonBinaryAdaptor
     table["remote_sources"] = RemoteSourcesAdaptor
-    table["resources"] = ResourcesAdaptor
-    table["files"] = FilesAdaptor
     table["page"] = PageAdaptor
     table["pants_plugin"] = PantsPluginAdaptor
     table["contrib_plugin"] = PantsPluginAdaptor

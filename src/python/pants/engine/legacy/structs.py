@@ -284,14 +284,6 @@ class PythonAppAdaptor(AppAdaptor):
     pass
 
 
-class ResourcesAdaptor(TargetAdaptor):
-    pass
-
-
-class FilesAdaptor(TargetAdaptor):
-    pass
-
-
 class RemoteSourcesAdaptor(TargetAdaptor):
     def __init__(self, dest=None, **kwargs):
         """
