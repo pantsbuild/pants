@@ -11,7 +11,7 @@ from pants.core.goals.fmt import (
     LanguageFmtResults,
     LanguageFmtTargets,
 )
-from pants.core.rule_utils.determine_source_files import AllSourceFilesRequest, SourceFiles
+from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
 from pants.engine.fs import Digest, Snapshot
 from pants.engine.objects import union
 from pants.engine.rules import UnionMembership, UnionRule, rule

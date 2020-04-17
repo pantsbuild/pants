@@ -8,7 +8,7 @@ from typing import ClassVar, Dict, Iterable, Tuple, Type, TypeVar
 
 from pants.base.specs import OriginSpec
 from pants.build_graph.address import Address
-from pants.core.rule_utils.filter_empty_sources import (
+from pants.core.util_rules.filter_empty_sources import (
     ConfigurationsWithSources,
     ConfigurationsWithSourcesRequest,
 )

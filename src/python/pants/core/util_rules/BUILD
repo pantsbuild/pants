@@ -25,7 +25,7 @@ python_library(
 python_tests(
   name = "tests",
   dependencies = [
-    ':rule_utils',
+    ':util_rules',
     'src/python/pants/base:specs',
     'src/python/pants/build_graph',
     'src/python/pants/engine:scheduler',

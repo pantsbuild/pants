@@ -34,9 +34,9 @@ from pants.backend.python.rules.run_setup_py import (
 from pants.backend.python.rules.targets import PythonBinary, PythonLibrary, PythonRequirementLibrary
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.core.rule_utils.determine_source_files import rules as determine_source_files_rules
-from pants.core.rule_utils.strip_source_roots import rules as strip_source_roots_rules
 from pants.core.target_types import Resources
+from pants.core.util_rules.determine_source_files import rules as determine_source_files_rules
+from pants.core.util_rules.strip_source_roots import rules as strip_source_roots_rules
 from pants.engine.fs import Snapshot
 from pants.engine.rules import RootRule
 from pants.engine.scheduler import ExecutionError

@@ -16,12 +16,6 @@ from pants.core.project_info import (
     list_targets,
     list_targets_old,
 )
-from pants.core.rule_utils import (
-    determine_source_files,
-    distdir,
-    filter_empty_sources,
-    strip_source_roots,
-)
 from pants.core.target_types import (
     AliasTarget,
     Files,
@@ -29,6 +23,12 @@ from pants.core.target_types import (
     PrepCommand,
     RemoteSources,
     Resources,
+)
+from pants.core.util_rules import (
+    determine_source_files,
+    distdir,
+    filter_empty_sources,
+    strip_source_roots,
 )
 from pants.engine.target import rules as target_rules
 

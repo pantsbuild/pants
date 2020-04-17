@@ -14,7 +14,7 @@ from pants.core.goals.lint import (
     LintResult,
     lint,
 )
-from pants.core.rule_utils.filter_empty_sources import (
+from pants.core.util_rules.filter_empty_sources import (
     ConfigurationsWithSources,
     ConfigurationsWithSourcesRequest,
 )

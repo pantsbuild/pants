@@ -15,7 +15,7 @@ from pants.core.goals.fmt import (
     LanguageFmtTargets,
     fmt,
 )
-from pants.core.rule_utils.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
+from pants.core.util_rules.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
 from pants.engine.fs import (
     EMPTY_DIRECTORY_DIGEST,
     Digest,

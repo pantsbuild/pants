@@ -30,8 +30,8 @@ from pants.backend.python.rules.targets import (
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.core.goals.test import TestConfiguration, TestDebugRequest, TestOptions, TestResult
-from pants.core.rule_utils.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.core.target_types import FilesSources, ResourcesSources
+from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.engine.addressable import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge, InputFilesContent
 from pants.engine.interactive_runner import InteractiveProcessRequest

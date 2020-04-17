@@ -17,7 +17,7 @@ python_library(
     ':core',
     'src/python/pants/core/goals',
     'src/python/pants/core/project_info',
-    'src/python/pants/core/rule_utils',
+    'src/python/pants/core/util_rules',
     'src/python/pants/engine:target',
   ],
   tags = {"type_checked"},

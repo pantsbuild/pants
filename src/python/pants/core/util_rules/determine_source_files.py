@@ -5,8 +5,8 @@ from dataclasses import dataclass
 from typing import Iterable, Tuple, Union
 
 from pants.base.specs import AddressSpec, OriginSpec
-from pants.core.rule_utils import strip_source_roots
-from pants.core.rule_utils.strip_source_roots import (
+from pants.core.util_rules import strip_source_roots
+from pants.core.util_rules.strip_source_roots import (
     SourceRootStrippedSources,
     StripSourcesFieldRequest,
 )

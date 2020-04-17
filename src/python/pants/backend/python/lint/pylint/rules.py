@@ -17,8 +17,8 @@ from pants.backend.python.rules.targets import PythonInterpreterCompatibility, P
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.core.goals.lint import LinterConfiguration, LinterConfigurations, LintResult
-from pants.core.rule_utils import determine_source_files, strip_source_roots
-from pants.core.rule_utils.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
+from pants.core.util_rules import determine_source_files, strip_source_roots
+from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.engine.addressable import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
 from pants.engine.isolated_process import FallibleProcessResult, Process

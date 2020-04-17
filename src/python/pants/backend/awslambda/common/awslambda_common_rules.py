@@ -10,7 +10,7 @@ from typing import ClassVar, Dict, Iterable, Tuple, Type
 
 from pants.base.build_root import BuildRoot
 from pants.build_graph.address import Address
-from pants.core.rule_utils.distdir import DistDir
+from pants.core.util_rules.distdir import DistDir
 from pants.engine.console import Console
 from pants.engine.fs import Digest, DirectoriesToMerge, DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented

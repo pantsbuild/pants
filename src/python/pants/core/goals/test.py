@@ -13,7 +13,7 @@ from typing import ClassVar, Dict, Iterable, List, Optional, Tuple, Type, TypeVa
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import OriginSpec
 from pants.build_graph.address import Address
-from pants.core.rule_utils.filter_empty_sources import (
+from pants.core.util_rules.filter_empty_sources import (
     ConfigurationsWithSources,
     ConfigurationsWithSourcesRequest,
 )

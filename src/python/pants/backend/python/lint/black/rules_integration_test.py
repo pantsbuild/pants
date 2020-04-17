@@ -10,7 +10,7 @@ from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.address import Address
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResult
-from pants.core.rule_utils.determine_source_files import AllSourceFilesRequest, SourceFiles
+from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
 from pants.engine.fs import Digest, FileContent, InputFilesContent
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params

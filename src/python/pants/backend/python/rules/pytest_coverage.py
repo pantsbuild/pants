@@ -30,7 +30,7 @@ from pants.core.goals.test import (
     CoverageReport,
     FilesystemCoverageReport,
 )
-from pants.core.rule_utils.determine_source_files import AllSourceFilesRequest, SourceFiles
+from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
 from pants.engine.fs import (
     Digest,
     DirectoriesToMerge,

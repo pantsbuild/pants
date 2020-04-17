@@ -4,13 +4,13 @@
 from dataclasses import dataclass
 
 from pants.build_graph.address import Address
-from pants.core.rule_utils.filter_empty_sources import (
+from pants.core.util_rules.filter_empty_sources import (
     ConfigurationsWithSources,
     ConfigurationsWithSourcesRequest,
     TargetsWithSources,
     TargetsWithSourcesRequest,
 )
-from pants.core.rule_utils.filter_empty_sources import rules as filter_empty_sources_rules
+from pants.core.util_rules.filter_empty_sources import rules as filter_empty_sources_rules
 from pants.engine.target import Sources as SourcesField
 from pants.engine.target import Tags, Target
 from pants.testutil.test_base import TestBase

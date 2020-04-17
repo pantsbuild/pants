@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import ClassVar, Iterable, List, Optional, Tuple, Type, cast
 
 from pants.core.goals.lint import LinterConfiguration
-from pants.core.rule_utils.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
+from pants.core.util_rules.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
 from pants.engine.console import Console
 from pants.engine.fs import (
     EMPTY_DIRECTORY_DIGEST,

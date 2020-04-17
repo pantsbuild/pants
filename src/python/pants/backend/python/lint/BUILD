@@ -5,7 +5,7 @@ python_library(
   dependencies=[
     '3rdparty/python:dataclasses',
     'src/python/pants/core/goals',
-    'src/python/pants/core/rule_utils',
+    'src/python/pants/core/util_rules',
     'src/python/pants/engine/legacy:structs',
     'src/python/pants/engine:rules',
   ],

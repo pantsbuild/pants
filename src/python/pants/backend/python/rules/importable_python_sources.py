@@ -5,8 +5,8 @@ from dataclasses import dataclass
 
 from pants.backend.python.rules.inject_init import InitInjectedSnapshot, InjectInitRequest
 from pants.backend.python.rules.inject_init import rules as inject_init_rules
-from pants.core.rule_utils import determine_source_files
-from pants.core.rule_utils.determine_source_files import AllSourceFilesRequest, SourceFiles
+from pants.core.util_rules import determine_source_files
+from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
 from pants.engine.fs import Snapshot
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
