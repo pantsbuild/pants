@@ -5,7 +5,7 @@ use digest::{Digest as DigestTrait, FixedOutput};
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use lmdb::Error::NotFound;
 use lmdb::{self, Cursor, Database, RwTransaction, Transaction, WriteFlags};
-use log::debug;
+use log::info;
 use sha2::Sha256;
 use sharded_lmdb::{ShardedLmdb, VersionedFingerprint};
 use std;
@@ -282,7 +282,9 @@ impl ByteStore {
         Digest(fingerprint, bytes.len())
       })
       .await;
-    debug!("local store_bytes for {:?}: {:?}", entry_type, digest);
+    if digest.1 > 128000 {
+      info!("local store_bytes for {:?}: {:?}", entry_type, digest);
+    }
     dbs?.store_bytes(digest.0, bytes2, initial_lease).await?;
     Ok(digest)
   }
@@ -305,7 +307,9 @@ impl ByteStore {
       EntryType::File => self.inner.file_dbs.clone(),
     };
 
-    debug!("local load_bytes_with for {:?}: {:?}", entry_type, digest);
+    if digest.1 > 128000 {
+      info!("local load_bytes_with for {:?}: {:?}", entry_type, digest);
+    }
     dbs?.load_bytes_with(digest.0, move |bytes| {
         if bytes.len() == digest.1 {
             Ok(f(bytes))
