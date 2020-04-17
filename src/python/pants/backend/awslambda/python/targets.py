@@ -1,8 +1,12 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import re
+from typing import Optional, Tuple, cast
+
 from pants.backend.python.rules.targets import COMMON_PYTHON_FIELDS, PythonSources
-from pants.engine.target import StringField, Target
+from pants.build_graph.address import Address
+from pants.engine.target import InvalidFieldException, StringField, Target
 
 
 class PythonAwsLambdaHandler(StringField):
@@ -16,9 +20,26 @@ class PythonAwsLambdaHandler(StringField):
 class PythonAwsLambdaRuntime(StringField):
     """The identifier of the AWS Lambda runtime to target (pythonX.Y)."""
 
+    PYTHON_RUNTIME_REGEX = r"python(?P<major>\d)\.(?P<minor>\d+)"
+
     alias = "runtime"
     required = True
     value: str
+
+    @classmethod
+    def compute_value(cls, raw_value: Optional[str], *, address: Address) -> str:
+        value = cast(str, super().compute_value(raw_value, address=address))
+        if not re.match(cls.PYTHON_RUNTIME_REGEX, value):
+            raise InvalidFieldException(
+                f"runtime field in python_awslambda target at {address.spec} must "
+                f"be of the form pythonX.Y, but was {value}"
+            )
+        return value
+
+    def to_interpreter_version(self) -> Tuple[int, int]:
+        """Returns the Python version implied by the runtime, as (major, minor)."""
+        mo = re.match(self.PYTHON_RUNTIME_REGEX, self.value)
+        return int(mo["major"]), int(mo["minor"])
 
 
 class PythonAWSLambda(Target):

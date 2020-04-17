@@ -1,9 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import re
 from dataclasses import dataclass
-from typing import Tuple
 
 from pants.backend.awslambda.common.awslambda_common_rules import (
     AWSLambdaConfiguration,
@@ -53,21 +51,6 @@ class LambdexSetup:
     requirements_pex: Pex
 
 
-class InvalidAWSLambdaRuntime(Exception):
-    pass
-
-
-def get_interpreter_from_runtime(runtime: str, addr: str) -> Tuple[int, int]:
-    """Returns the Python version implied by the runtime, as (major, minor)."""
-    mo = re.match(r"python(?P<major>\d)\.(?P<minor>\d+)", runtime)
-    if not mo:
-        raise InvalidAWSLambdaRuntime(
-            f"runtime field in python_awslambda target at {addr} must "
-            f"be of the form pythonX.Y, but was {runtime}"
-        )
-    return (int(mo["major"]), int(mo["minor"]))
-
-
 @named_rule(desc="Create Python AWS Lambda")
 async def create_python_awslambda(
     config: PythonAwsLambdaConfiguration,
@@ -77,7 +60,7 @@ async def create_python_awslambda(
 ) -> CreatedAWSLambda:
     # TODO: We must enforce that everything is built for Linux, no matter the local platform.
     pex_filename = f"{config.address.target_name}.pex"
-    py_major, py_minor = get_interpreter_from_runtime(config.runtime.value, config.address.spec)
+    py_major, py_minor = config.runtime.to_interpreter_version()
     platform = f"linux_x86_64-cp-{py_major}{py_minor}-cp{py_major}{py_minor}m"
     pex_request = TwoStepPexFromTargetsRequest(
         PexFromTargetsRequest(
