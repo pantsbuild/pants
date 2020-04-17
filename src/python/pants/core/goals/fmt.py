@@ -6,6 +6,8 @@ from abc import ABCMeta
 from dataclasses import dataclass
 from typing import ClassVar, Iterable, List, Optional, Tuple, Type, cast
 
+from pants.core.goals.lint import LinterConfiguration
+from pants.core.util_rules.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
 from pants.engine.console import Console
 from pants.engine.fs import (
     EMPTY_DIRECTORY_DIGEST,
@@ -21,8 +23,6 @@ from pants.engine.objects import Collection, union
 from pants.engine.rules import UnionMembership, goal_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Field, Target, TargetsWithOrigins, TargetWithOrigin
-from pants.rules.core.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
-from pants.rules.core.lint import LinterConfiguration
 
 
 @dataclass(frozen=True)

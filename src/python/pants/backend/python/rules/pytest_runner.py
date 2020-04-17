@@ -29,6 +29,9 @@ from pants.backend.python.rules.targets import (
 )
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.core.goals.test import TestConfiguration, TestDebugRequest, TestOptions, TestResult
+from pants.core.target_types import FilesSources, ResourcesSources
+from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.engine.addressable import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge, InputFilesContent
 from pants.engine.interactive_runner import InteractiveProcessRequest
@@ -38,9 +41,6 @@ from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Targets, TransitiveTargets
 from pants.option.global_options import GlobalOptions
 from pants.python.python_setup import PythonSetup
-from pants.rules.core.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
-from pants.rules.core.targets import FilesSources, ResourcesSources
-from pants.rules.core.test import TestConfiguration, TestDebugRequest, TestOptions, TestResult
 
 
 @dataclass(frozen=True)

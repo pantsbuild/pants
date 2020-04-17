@@ -8,6 +8,10 @@ from typing import ClassVar, Dict, Iterable, Tuple, Type, TypeVar
 
 from pants.base.specs import OriginSpec
 from pants.build_graph.address import Address
+from pants.core.util_rules.filter_empty_sources import (
+    ConfigurationsWithSources,
+    ConfigurationsWithSourcesRequest,
+)
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.isolated_process import FallibleProcessResult
@@ -15,10 +19,6 @@ from pants.engine.objects import Collection, union
 from pants.engine.rules import UnionMembership, goal_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Field, Sources, Target, TargetsWithOrigins, TargetWithOrigin
-from pants.rules.core.filter_empty_sources import (
-    ConfigurationsWithSources,
-    ConfigurationsWithSourcesRequest,
-)
 
 
 @dataclass(frozen=True)

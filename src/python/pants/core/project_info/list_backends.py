@@ -97,7 +97,7 @@ class BackendInfo:
             "pants.core_tasks",
             *global_options.options.backend_packages,
         }
-        activated_v2_backends = {"pants.rules.core", *global_options.options.backend_packages2}
+        activated_v2_backends = {"pants.core", *global_options.options.backend_packages2}
 
         return cls(
             name=module_name,

@@ -7,6 +7,7 @@ from pathlib import PurePath
 from typing import Optional, cast
 
 from pants.build_graph.address import Address
+from pants.core.target_types import FilesSources
 from pants.engine.fs import (
     EMPTY_SNAPSHOT,
     Digest,
@@ -21,7 +22,6 @@ from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import HydratedSources, HydrateSourcesRequest
 from pants.engine.target import Sources as SourcesField
 from pants.engine.target import rules as target_rules
-from pants.rules.core.targets import FilesSources
 from pants.source.source_root import NoSourceRootError, SourceRootConfig
 
 

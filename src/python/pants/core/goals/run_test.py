@@ -6,13 +6,13 @@ from typing import cast
 from pants.base.build_root import BuildRoot
 from pants.base.specs import SingleAddress
 from pants.build_graph.address import Address
+from pants.core.goals.binary import BinaryConfiguration, CreatedBinary
+from pants.core.goals.run import Run, RunOptions, run
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Workspace
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.rules import UnionMembership
 from pants.engine.target import RegisteredTargetTypes, Target, TargetsWithOrigins, TargetWithOrigin
 from pants.option.global_options import GlobalOptions
-from pants.rules.core.binary import BinaryConfiguration, CreatedBinary
-from pants.rules.core.run import Run, RunOptions, run
 from pants.testutil.engine.util import (
     MockConsole,
     MockGet,

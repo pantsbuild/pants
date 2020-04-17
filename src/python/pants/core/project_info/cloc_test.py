@@ -3,7 +3,7 @@
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.rules.core import cloc
+from pants.core.project_info import cloc
 from pants.testutil.goal_rule_test_base import GoalRuleTestBase
 
 

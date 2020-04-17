@@ -6,16 +6,16 @@ from typing import List, Optional, Type, Union
 import pytest
 
 from pants.build_graph.address import Address
-from pants.engine.scheduler import ExecutionError
-from pants.engine.selectors import Params
-from pants.engine.target import Sources as SourcesField
-from pants.rules.core.strip_source_roots import (
+from pants.core.target_types import FilesSources
+from pants.core.util_rules.strip_source_roots import (
     SourceRootStrippedSources,
     StripSnapshotRequest,
     StripSourcesFieldRequest,
 )
-from pants.rules.core.strip_source_roots import rules as strip_source_root_rules
-from pants.rules.core.targets import FilesSources
+from pants.core.util_rules.strip_source_roots import rules as strip_source_root_rules
+from pants.engine.scheduler import ExecutionError
+from pants.engine.selectors import Params
+from pants.engine.target import Sources as SourcesField
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 

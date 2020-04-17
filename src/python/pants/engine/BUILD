@@ -242,7 +242,6 @@ python_library(
     ':rules',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:specs',
-    'src/python/pants/rules/core:core',
   ],
   tags = {"partially_type_checked"},
 )

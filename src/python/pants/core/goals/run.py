@@ -4,6 +4,11 @@
 from pathlib import PurePath
 
 from pants.base.build_root import BuildRoot
+from pants.core.goals.binary import (
+    BinaryConfiguration,
+    CreatedBinary,
+    gather_valid_binary_configuration_types,
+)
 from pants.engine.console import Console
 from pants.engine.fs import DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
@@ -13,11 +18,6 @@ from pants.engine.selectors import Get
 from pants.engine.target import RegisteredTargetTypes, TargetsWithOrigins
 from pants.option.custom_types import shell_str
 from pants.option.global_options import GlobalOptions
-from pants.rules.core.binary import (
-    BinaryConfiguration,
-    CreatedBinary,
-    gather_valid_binary_configuration_types,
-)
 from pants.util.contextutil import temporary_dir
 
 

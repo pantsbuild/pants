@@ -19,13 +19,13 @@ from pants.backend.python.rules.targets import (
     PythonRequirementsFileSources,
     PythonSources,
 )
+from pants.core.target_types import FilesSources, ResourcesSources
 from pants.engine.addressable import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge
 from pants.engine.rules import RootRule, named_rule, rule
 from pants.engine.selectors import Get
 from pants.engine.target import Targets, TransitiveTargets
 from pants.python.python_setup import PythonSetup
-from pants.rules.core.targets import FilesSources, ResourcesSources
 from pants.util.meta import frozen_after_init
 
 

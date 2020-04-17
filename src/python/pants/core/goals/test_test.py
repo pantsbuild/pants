@@ -11,6 +11,24 @@ import pytest
 from pants.base.exceptions import ResolveError
 from pants.base.specs import SingleAddress
 from pants.build_graph.address import Address
+from pants.core.goals.test import (
+    AddressAndTestResult,
+    CoverageDataCollection,
+    CoverageReport,
+    FilesystemCoverageReport,
+    Status,
+    Test,
+    TestConfiguration,
+    TestDebugRequest,
+    TestOptions,
+    TestResult,
+    WrappedTestConfiguration,
+    run_tests,
+)
+from pants.core.util_rules.filter_empty_sources import (
+    ConfigurationsWithSources,
+    ConfigurationsWithSourcesRequest,
+)
 from pants.engine.fs import (
     EMPTY_DIRECTORY_DIGEST,
     Digest,
@@ -26,24 +44,6 @@ from pants.engine.target import (
     Target,
     TargetsWithOrigins,
     TargetWithOrigin,
-)
-from pants.rules.core.filter_empty_sources import (
-    ConfigurationsWithSources,
-    ConfigurationsWithSourcesRequest,
-)
-from pants.rules.core.test import (
-    AddressAndTestResult,
-    CoverageDataCollection,
-    CoverageReport,
-    FilesystemCoverageReport,
-    Status,
-    Test,
-    TestConfiguration,
-    TestDebugRequest,
-    TestOptions,
-    TestResult,
-    WrappedTestConfiguration,
-    run_tests,
 )
 from pants.testutil.engine.util import MockConsole, MockGet, create_goal_subsystem, run_rule
 from pants.testutil.test_base import TestBase

@@ -13,11 +13,11 @@ from pants.backend.python.rules.targets import PythonLibrary
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.targets.python_library import PythonLibrary as PythonLibraryV1
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.core.goals.repl import Repl, run_repl
+from pants.core.util_rules import strip_source_roots
 from pants.engine.fs import FileContent
 from pants.engine.interactive_runner import InteractiveRunner
 from pants.engine.rules import RootRule
-from pants.rules.core import strip_source_roots
-from pants.rules.core.repl import Repl, run_repl
 from pants.testutil.goal_rule_test_base import GoalRuleTestBase
 
 

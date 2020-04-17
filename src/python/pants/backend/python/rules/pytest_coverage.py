@@ -23,6 +23,14 @@ from pants.backend.python.rules.targets import PythonSources
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.build_graph.address import Address
+from pants.core.goals.test import (
+    ConsoleCoverageReport,
+    CoverageData,
+    CoverageDataCollection,
+    CoverageReport,
+    FilesystemCoverageReport,
+)
+from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
 from pants.engine.fs import (
     Digest,
     DirectoriesToMerge,
@@ -36,14 +44,6 @@ from pants.engine.rules import RootRule, UnionRule, named_rule, rule, subsystem_
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Sources, Targets, TransitiveTargets
 from pants.python.python_setup import PythonSetup
-from pants.rules.core.determine_source_files import AllSourceFilesRequest, SourceFiles
-from pants.rules.core.test import (
-    ConsoleCoverageReport,
-    CoverageData,
-    CoverageDataCollection,
-    CoverageReport,
-    FilesystemCoverageReport,
-)
 from pants.source.source_root import SourceRootConfig
 
 # There are many moving parts in coverage, so here is a high level view of what's going on.

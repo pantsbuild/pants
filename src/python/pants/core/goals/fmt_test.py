@@ -7,6 +7,15 @@ from typing import Iterable, List, Optional, Type, cast
 
 from pants.base.specs import SingleAddress
 from pants.build_graph.address import Address
+from pants.core.goals.fmt import (
+    Fmt,
+    FmtOptions,
+    FmtResult,
+    LanguageFmtResults,
+    LanguageFmtTargets,
+    fmt,
+)
+from pants.core.util_rules.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
 from pants.engine.fs import (
     EMPTY_DIRECTORY_DIGEST,
     Digest,
@@ -16,15 +25,6 @@ from pants.engine.fs import (
 )
 from pants.engine.rules import UnionMembership
 from pants.engine.target import Sources, Target, TargetsWithOrigins, TargetWithOrigin
-from pants.rules.core.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
-from pants.rules.core.fmt import (
-    Fmt,
-    FmtOptions,
-    FmtResult,
-    LanguageFmtResults,
-    LanguageFmtTargets,
-    fmt,
-)
 from pants.testutil.engine.util import MockConsole, MockGet, create_goal_subsystem, run_rule
 from pants.testutil.test_base import TestBase
 from pants.util.ordered_set import OrderedSet
