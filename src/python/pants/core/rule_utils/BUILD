@@ -26,12 +26,12 @@ python_tests(
   name = "tests",
   dependencies = [
     ':rule_utils',
-    'src/python/pants/base:specs'
+    'src/python/pants/base:specs',
     'src/python/pants/build_graph',
     'src/python/pants/engine:scheduler',
     'src/python/pants/engine:selectors',
     'src/python/pants/engine:target',
-    'src/python/pants/testutil/option:util',
+    'src/python/pants/testutil/option',
     'src/python/pants/testutil:test_base',
   ],
   tags = {"partially_type_checked"},
