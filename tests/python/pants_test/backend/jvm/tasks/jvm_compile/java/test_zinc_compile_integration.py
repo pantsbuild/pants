@@ -10,7 +10,6 @@ from pants.base.build_environment import get_buildroot
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_open
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
 from pants_test.backend.jvm.tasks.missing_jvm_check import is_missing_jvm
 
@@ -223,9 +222,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
                 lib_spec, src_file_a, srcfile_content = _create_a_target_containing_two_sources()
                 with buildroot_manager.pushd():
                     pants_run = self.run_pants_with_workdir(
-                        ["-ldebug", "compile", lib_spec],
-                        workdir=workdir,
-                        config=config,
+                        ["-ldebug", "compile", lib_spec], workdir=workdir, config=config,
                     )
                     self.assert_success(pants_run)
                     self.assertIn(
@@ -237,9 +234,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
                     _create_file(src_file_a, srcfile_content.replace("hello", "bye"))
 
                     pants_run = self.run_pants_with_workdir(
-                        ["-ldebug", "compile", lib_spec],
-                        workdir=workdir,
-                        config=config,
+                        ["-ldebug", "compile", lib_spec], workdir=workdir, config=config,
                     )
                     self.assert_success(pants_run)
                     self.assertIn("Compiling 1 Scala source", pants_run.stdout_data)
