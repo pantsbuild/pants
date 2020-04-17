@@ -104,7 +104,4 @@ async def download_pex_bin(pex_binary_tool: DownloadedPexBin.Factory) -> Downloa
 
 
 def rules():
-    return [
-        download_pex_bin,
-        subsystem_rule(DownloadedPexBin.Factory),
-    ]
+    return [download_pex_bin, subsystem_rule(DownloadedPexBin.Factory)]

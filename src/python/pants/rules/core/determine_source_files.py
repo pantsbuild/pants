@@ -6,26 +6,20 @@ from typing import Iterable, Tuple, Union
 
 from pants.base.specs import AddressSpec, OriginSpec
 from pants.engine.fs import DirectoriesToMerge, PathGlobs, Snapshot, SnapshotSubset
-from pants.engine.legacy.structs import TargetAdaptor
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import HydratedSources, HydrateSourcesRequest
 from pants.engine.target import Sources as SourcesField
 from pants.rules.core import strip_source_roots
-from pants.rules.core.strip_source_roots import (
-    LegacySourceRootStrippedSources,
-    LegacyStripTargetRequest,
-    SourceRootStrippedSources,
-    StripSourcesFieldRequest,
-)
+from pants.rules.core.strip_source_roots import SourceRootStrippedSources, StripSourcesFieldRequest
 from pants.util.meta import frozen_after_init
 
 
 @dataclass(frozen=True)
 class SourceFiles:
     """A merged snapshot of the `sources` fields of multiple targets, possibly containing a subset
-    of the `sources` when using `LegacySpecifiedSourceFilesRequest` (instead of
-    `LegacyAllSourceFilesRequest`)."""
+    of the `sources` when using `SpecifiedSourceFilesRequest` (instead of
+    `AllSourceFilesRequest`)."""
 
     snapshot: Snapshot
 
@@ -147,38 +141,6 @@ async def determine_specified_source_files(request: SpecifiedSourceFilesRequest)
     return SourceFiles(result)
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
-class LegacyAllSourceFilesRequest:
-    adaptors: Tuple[TargetAdaptor, ...]
-    strip_source_roots: bool = False
-
-    def __init__(
-        self, adaptors: Iterable[TargetAdaptor], *, strip_source_roots: bool = False
-    ) -> None:
-        self.adaptors = tuple(adaptors)
-        self.strip_source_roots = strip_source_roots
-
-
-@rule
-async def legacy_determine_all_source_files(request: LegacyAllSourceFilesRequest) -> SourceFiles:
-    """Merge all the `sources` for targets into one snapshot."""
-    if request.strip_source_roots:
-        stripped_snapshots = await MultiGet(
-            Get[LegacySourceRootStrippedSources](LegacyStripTargetRequest(adaptor))
-            for adaptor in request.adaptors
-        )
-        input_snapshots = (stripped_snapshot.snapshot for stripped_snapshot in stripped_snapshots)
-    else:
-        input_snapshots = (
-            adaptor.sources.snapshot for adaptor in request.adaptors if adaptor.has_sources()
-        )
-    result = await Get[Snapshot](
-        DirectoriesToMerge(tuple(snapshot.directory_digest for snapshot in input_snapshots))
-    )
-    return SourceFiles(result)
-
-
 def rules():
     return [
         determine_all_source_files,
@@ -186,6 +148,4 @@ def rules():
         RootRule(AllSourceFilesRequest),
         RootRule(SpecifiedSourceFilesRequest),
         *strip_source_roots.rules(),
-        legacy_determine_all_source_files,
-        RootRule(LegacyAllSourceFilesRequest),
     ]

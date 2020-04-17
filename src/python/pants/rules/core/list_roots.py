@@ -61,8 +61,4 @@ async def list_roots(console: Console, options: RootsOptions, all_roots: AllSour
 
 
 def rules():
-    return [
-        subsystem_rule(SourceRootConfig),
-        all_roots,
-        list_roots,
-    ]
+    return [all_roots, list_roots, subsystem_rule(SourceRootConfig)]
