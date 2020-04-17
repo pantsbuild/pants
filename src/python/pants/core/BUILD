@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
+  sources = ['*.py', '!register.py', '!*_test.py'],
   dependencies = [
     'src/python/pants/build_graph',
     'src/python/pants/engine:target',
@@ -12,7 +13,7 @@ python_library(
 
 python_library(
   name = 'plugin',
-  sources = ['__init__.py', 'register.py'],
+  sources = ['register.py'],
   dependencies = [
     ':core',
     'src/python/pants/core/goals',
