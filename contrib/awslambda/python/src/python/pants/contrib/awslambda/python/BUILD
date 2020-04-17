@@ -17,8 +17,3 @@ contrib_plugin(
   build_file_aliases=True,
   register_goals=True,
 )
-
-files(
-  name='examples_directory',
-  sources=['examples/**/*'],
-)
