@@ -5,7 +5,6 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.project_info.rules.dependencies import DependencyType
-from pants.base.deprecated import deprecated_conditional
 from pants.base.payload_field import JarsField, PythonRequirementsField
 from pants.task.console_task import ConsoleTask
 from pants.util.ordered_set import OrderedSet
@@ -13,10 +12,6 @@ from pants.util.ordered_set import OrderedSet
 
 class Dependencies(ConsoleTask):
     """Print the target's dependencies."""
-
-    # TODO: In 1.28.0.dev0, once we default to `--no-transitive`, remove this and go back to using
-    # ConsoleTask's implementation of `--transitive`.
-    _register_console_transitivity_option = False
 
     @staticmethod
     def _is_jvm(target):
@@ -32,29 +27,6 @@ class Dependencies(ConsoleTask):
             help="Which types of dependencies to find, where `source` means source code dependencies "
             "and `3rdparty` means third-party requirements and JARs.",
         )
-        register(
-            "--transitive",
-            type=bool,
-            default=True,
-            fingerprint=True,
-            help="If True, use all targets in the build graph, else use only target roots.",
-        )
-
-    @property
-    def act_transitively(self):
-        # NB: Stop overriding this property once the deprecation is complete.
-        deprecated_conditional(
-            lambda: self.get_options().is_default("transitive"),
-            entity_description=f"Pants defaulting to `--dependencies-transitive`",
-            removal_version="1.28.0.dev0",
-            hint_message="Currently, Pants defaults to `--dependencies-transitive`, which means that it "
-            "will find all transitive dependencies for the target, rather than only direct "
-            "dependencies. This is a useful feature, but surprising to be the default."
-            "\n\nTo prepare for this change to the default value, set in `pants.toml` under "
-            "the section `dependencies` the value `transitive = false`. In Pants 1.28.0, "
-            "you can safely remove the setting.",
-        )
-        return self.get_options().transitive
 
     def console_output(self, unused_method_argument):
         ordered_closure = OrderedSet()
