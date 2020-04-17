@@ -8,7 +8,7 @@ from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.build_graph.address import Address
 from pants.core.rule_utils.determine_source_files import SourceFiles
-from pants.core.targets import FilesSources
+from pants.core.target_types import FilesSources
 from pants.engine.fs import Snapshot
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,

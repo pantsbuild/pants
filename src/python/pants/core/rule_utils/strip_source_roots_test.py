@@ -12,7 +12,7 @@ from pants.core.rule_utils.strip_source_roots import (
     StripSourcesFieldRequest,
 )
 from pants.core.rule_utils.strip_source_roots import rules as strip_source_root_rules
-from pants.core.targets import FilesSources
+from pants.core.target_types import FilesSources
 from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Params
 from pants.engine.target import Sources as SourcesField

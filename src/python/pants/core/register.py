@@ -22,7 +22,7 @@ from pants.core.rule_utils import (
     filter_empty_sources,
     strip_source_roots,
 )
-from pants.core.targets import (
+from pants.core.target_types import (
     AliasTarget,
     Files,
     GenericTarget,

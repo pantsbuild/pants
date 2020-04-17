@@ -21,7 +21,7 @@ from pants.core.rule_utils.determine_source_files import (
 )
 from pants.core.rule_utils.determine_source_files import rules as determine_source_files_rules
 from pants.core.rule_utils.strip_source_roots import rules as strip_source_roots_rules
-from pants.core.targets import FilesSources
+from pants.core.target_types import FilesSources
 from pants.engine.selectors import Params
 from pants.engine.target import Sources as SourcesField
 from pants.engine.target import rules as target_rules

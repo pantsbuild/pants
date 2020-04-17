@@ -19,7 +19,7 @@ from pants.backend.python.rules.targets import (
     PythonRequirementsFileSources,
     PythonSources,
 )
-from pants.core.targets import FilesSources, ResourcesSources
+from pants.core.target_types import FilesSources, ResourcesSources
 from pants.engine.addressable import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge
 from pants.engine.rules import RootRule, named_rule, rule

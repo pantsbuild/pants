@@ -39,7 +39,7 @@ from pants.core.rule_utils.strip_source_roots import (
     SourceRootStrippedSources,
     StripSourcesFieldRequest,
 )
-from pants.core.targets import ResourcesSources
+from pants.core.target_types import ResourcesSources
 from pants.engine.addressable import Addresses
 from pants.engine.console import Console
 from pants.engine.fs import (

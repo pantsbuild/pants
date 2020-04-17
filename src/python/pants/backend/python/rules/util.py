@@ -10,7 +10,7 @@ from pkg_resources import Requirement
 
 from pants.backend.python.rules.targets import PythonSources
 from pants.core.rule_utils.strip_source_roots import SourceRootStrippedSources
-from pants.core.targets import ResourcesSources
+from pants.core.target_types import ResourcesSources
 from pants.engine.fs import FilesContent
 from pants.engine.target import Target
 from pants.python.python_setup import PythonSetup
