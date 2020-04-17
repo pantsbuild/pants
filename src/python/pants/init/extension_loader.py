@@ -127,7 +127,6 @@ def load_backends_and_plugins(
         warn_or_error(
             deprecated_entity_description="The V1 isort implementation",
             removal_version="1.30.0.dev0",
-            deprecation_start_version="1.28.0.dev0",
             hint="\n".join(msg_lines),
         )
 
