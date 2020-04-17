@@ -7,7 +7,6 @@ contrib_plugin(
     'contrib/awslambda/python/src/python/pants/contrib/awslambda/python/rules',
     'contrib/awslambda/python/src/python/pants/contrib/awslambda/python/targets',
     'contrib/awslambda/python/src/python/pants/contrib/awslambda/python/tasks',
-    'src/python/pants/backend/awslambda/python',
     'src/python/pants/build_graph',
     'src/python/pants/goal:task_registrar',
   ],
