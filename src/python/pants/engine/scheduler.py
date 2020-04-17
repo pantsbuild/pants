@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from textwrap import dedent
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, cast
 
+from typing_extensions import TypedDict
+
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE
 from pants.engine.fs import (
@@ -36,6 +38,14 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
+
+
+Workunit = Dict[str, Any]
+
+
+class PolledWorkunits(TypedDict):
+    started: Tuple[Workunit, ...]
+    completed: Tuple[Workunit, ...]
 
 
 @dataclass(frozen=True)
@@ -270,11 +280,11 @@ class Scheduler:
     def _metrics(self, session):
         return self._from_value(self._native.lib.scheduler_metrics(self._scheduler, session))
 
-    def poll_workunits(self, session) -> Tuple[Dict[str, Any], ...]:
-        result: Tuple[Dict[str, Any], ...] = self._from_value(
+    def poll_workunits(self, session) -> PolledWorkunits:
+        result: Tuple[Tuple[Workunit], Tuple[Workunit]] = self._from_value(
             self._native.lib.poll_session_workunits(self._scheduler, session)
         )
-        return result
+        return {"started": result[0], "completed": result[1]}
 
     def _run_and_return_roots(self, session, execution_request):
         raw_roots = self._native.lib.scheduler_execute(self._scheduler, session, execution_request)
@@ -368,9 +378,8 @@ class SchedulerSession:
     def scheduler(self):
         return self._scheduler
 
-    def poll_workunits(self) -> Tuple[Dict[str, Any], ...]:
-        result: Tuple[Dict[str, Any], ...] = self._scheduler.poll_workunits(self._session)
-        return result
+    def poll_workunits(self) -> PolledWorkunits:
+        return cast(PolledWorkunits, self._scheduler.poll_workunits(self._session))
 
     def graph_len(self):
         return self._scheduler.graph_len()

@@ -61,7 +61,7 @@ use std::panic;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tempfile::TempDir;
-use workunit_store::WorkUnit;
+use workunit_store::{StartedWorkUnit, WorkUnit};
 
 #[cfg(test)]
 mod tests;
@@ -399,53 +399,105 @@ fn make_core(
   )
 }
 
+fn started_workunit_to_py_value(started_workunit: &StartedWorkUnit) -> Value {
+  use std::time::UNIX_EPOCH;
+  let duration = started_workunit
+    .start_time
+    .duration_since(UNIX_EPOCH)
+    .unwrap_or_else(|_| Duration::default());
+  let mut dict_entries = vec![
+    (
+      externs::store_utf8("name"),
+      externs::store_utf8(&started_workunit.name),
+    ),
+    (
+      externs::store_utf8("start_secs"),
+      externs::store_u64(duration.as_secs()),
+    ),
+    (
+      externs::store_utf8("start_nanos"),
+      externs::store_u64(duration.subsec_nanos() as u64),
+    ),
+    (
+      externs::store_utf8("span_id"),
+      externs::store_utf8(&started_workunit.span_id),
+    ),
+  ];
+
+  if let Some(parent_id) = &started_workunit.parent_id {
+    dict_entries.push((
+      externs::store_utf8("parent_id"),
+      externs::store_utf8(parent_id),
+    ));
+  }
+
+  if let Some(desc) = &started_workunit.metadata.desc.as_ref() {
+    dict_entries.push((
+      externs::store_utf8("description"),
+      externs::store_utf8(desc),
+    ));
+  }
+
+  externs::store_dict(&dict_entries.as_slice())
+}
+
+fn workunit_to_py_value(workunit: &WorkUnit) -> Value {
+  let mut dict_entries = vec![
+    (
+      externs::store_utf8("name"),
+      externs::store_utf8(&workunit.name),
+    ),
+    (
+      externs::store_utf8("start_secs"),
+      externs::store_u64(workunit.time_span.start.secs),
+    ),
+    (
+      externs::store_utf8("start_nanos"),
+      externs::store_u64(u64::from(workunit.time_span.start.nanos)),
+    ),
+    (
+      externs::store_utf8("duration_secs"),
+      externs::store_u64(workunit.time_span.duration.secs),
+    ),
+    (
+      externs::store_utf8("duration_nanos"),
+      externs::store_u64(u64::from(workunit.time_span.duration.nanos)),
+    ),
+    (
+      externs::store_utf8("span_id"),
+      externs::store_utf8(&workunit.span_id),
+    ),
+  ];
+  if let Some(parent_id) = &workunit.parent_id {
+    dict_entries.push((
+      externs::store_utf8("parent_id"),
+      externs::store_utf8(parent_id),
+    ));
+  }
+
+  if let Some(desc) = &workunit.metadata.desc.as_ref() {
+    dict_entries.push((
+      externs::store_utf8("description"),
+      externs::store_utf8(desc),
+    ));
+  }
+
+  externs::store_dict(&dict_entries.as_slice())
+}
+
 fn workunits_to_py_tuple_value<'a>(workunits: impl Iterator<Item = &'a WorkUnit>) -> Value {
   let workunit_values = workunits
-    .map(|workunit: &WorkUnit| {
-      let mut workunit_zipkin_trace_info = vec![
-        (
-          externs::store_utf8("name"),
-          externs::store_utf8(&workunit.name),
-        ),
-        (
-          externs::store_utf8("start_secs"),
-          externs::store_u64(workunit.time_span.start.secs),
-        ),
-        (
-          externs::store_utf8("start_nanos"),
-          externs::store_u64(u64::from(workunit.time_span.start.nanos)),
-        ),
-        (
-          externs::store_utf8("duration_secs"),
-          externs::store_u64(workunit.time_span.duration.secs),
-        ),
-        (
-          externs::store_utf8("duration_nanos"),
-          externs::store_u64(u64::from(workunit.time_span.duration.nanos)),
-        ),
-        (
-          externs::store_utf8("span_id"),
-          externs::store_utf8(&workunit.span_id),
-        ),
-      ];
-      if let Some(parent_id) = &workunit.parent_id {
-        workunit_zipkin_trace_info.push((
-          externs::store_utf8("parent_id"),
-          externs::store_utf8(parent_id),
-        ));
-      }
-
-      if let Some(desc) = &workunit.metadata.desc.as_ref() {
-        workunit_zipkin_trace_info.push((
-          externs::store_utf8("description"),
-          externs::store_utf8(desc),
-        ));
-      }
-
-      externs::store_dict(&workunit_zipkin_trace_info.as_slice())
-    })
+    .map(|workunit: &WorkUnit| workunit_to_py_value(workunit))
     .collect::<Vec<_>>();
+  externs::store_tuple(&workunit_values)
+}
 
+fn started_workunits_to_py_tuple_value<'a>(
+  workunits: impl Iterator<Item = &'a StartedWorkUnit>,
+) -> Value {
+  let workunit_values = workunits
+    .map(|started_workunit: &StartedWorkUnit| started_workunit_to_py_value(started_workunit))
+    .collect::<Vec<_>>();
   externs::store_tuple(&workunit_values)
 }
 
@@ -456,10 +508,17 @@ pub extern "C" fn poll_session_workunits(
 ) -> Handle {
   with_scheduler(scheduler_ptr, |_scheduler| {
     with_session(session_ptr, |session| {
-      let value = session.workunit_store().with_latest_workunits(|workunits| {
-        let mut iter = workunits.iter();
-        workunits_to_py_tuple_value(&mut iter)
-      });
+      let value = session
+        .workunit_store()
+        .with_latest_workunits(|started, completed| {
+          let mut started_iter = started.iter();
+          let started = started_workunits_to_py_tuple_value(&mut started_iter);
+
+          let mut completed_iter = completed.iter();
+          let completed = workunits_to_py_tuple_value(&mut completed_iter);
+
+          externs::store_tuple(&[started, completed])
+        });
       value.into()
     })
   })
@@ -483,8 +542,7 @@ pub extern "C" fn scheduler_metrics(
         .collect::<Vec<_>>();
       if session.should_record_zipkin_spans() {
         let workunits = session.workunit_store().get_workunits();
-        let locked = workunits.lock();
-        let mut iter = locked.workunits.iter();
+        let mut iter = workunits.iter();
         let value = workunits_to_py_tuple_value(&mut iter);
         values.push((externs::store_utf8("engine_workunits"), value));
       };

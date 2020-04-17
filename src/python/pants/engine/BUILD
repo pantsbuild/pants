@@ -233,6 +233,7 @@ python_library(
   sources=['scheduler.py'],
   dependencies=[
     '3rdparty/python:dataclasses',
+    '3rdparty/python:typing-extensions',
     ':fs',
     ':isolated_process',
     ':native',

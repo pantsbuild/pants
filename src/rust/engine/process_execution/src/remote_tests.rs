@@ -2260,22 +2260,21 @@ async fn extract_output_files_from_response_no_prefix() {
   )
 }
 
-fn workunits_with_constant_span_id(workunit_store: &WorkUnitStore) -> HashSet<WorkUnit> {
-  workunit_store
-    .get_workunits()
-    .lock()
-    .workunits
-    .iter()
-    .map(|workunit| WorkUnit {
-      span_id: String::from("ignore"),
-      ..workunit.clone()
-    })
-    .collect()
+fn workunits_with_constant_span_id(workunit_store: &mut WorkUnitStore) -> HashSet<WorkUnit> {
+  workunit_store.with_latest_workunits(|_, completed_workunits| {
+    completed_workunits
+      .iter()
+      .map(|workunit| WorkUnit {
+        span_id: String::from("ignore"),
+        ..workunit.clone()
+      })
+      .collect()
+  })
 }
 
 #[tokio::test]
 async fn remote_workunits_are_stored() {
-  let workunit_store = WorkUnitStore::new();
+  let mut workunit_store = WorkUnitStore::new();
   workunit_store.init_thread_state(None);
   let op_name = "gimme-foo".to_string();
   let testdata = TestData::roland();
@@ -2308,7 +2307,7 @@ async fn remote_workunits_are_stored() {
   .await
   .unwrap();
 
-  let got_workunits = workunits_with_constant_span_id(&workunit_store);
+  let got_workunits = workunits_with_constant_span_id(&mut workunit_store);
 
   use concrete_time::Duration;
   use concrete_time::TimeSpan;
