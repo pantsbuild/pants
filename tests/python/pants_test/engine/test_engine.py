@@ -104,7 +104,7 @@ async def rule_one_function(i: Input) -> Beta:
     a = Alpha()
     o = await Get[Omega](Alpha, a)
     b = await Get[Beta](Omega, o)
-    time.sleep(3)
+    time.sleep(1)
     return b
 
 
@@ -315,11 +315,8 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
 
     @dataclass
     class WorkunitTracker:
-        """This class records every non-empty batch of started and completed workunits.
-
-        that the engine passes to it, saving them - in the order received from
-        the engine - in the _chunks members.
-        """
+        """This class records every non-empty batch of started and completed workunits received from
+        the engine."""
 
         finished_workunit_chunks: List[List[dict]] = field(default_factory=list)
         started_workunit_chunks: List[List[dict]] = field(default_factory=list)
