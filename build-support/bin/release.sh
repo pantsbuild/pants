@@ -153,6 +153,11 @@ function execute_packaged_pants_with_internal_backends() {
         'internal_backend.sitegen',\
         'internal_backend.utilities',\
       ]" \
+      --backend-packages2="[\
+        'pants.backend.awslambda.python',\
+        'pants.backend.python',\
+        'pants.backend.project_info',\
+      ]" \
     "$@"
 }
 
