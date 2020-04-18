@@ -9,8 +9,8 @@ from dataclasses import dataclass
 from typing import ClassVar, Dict, Iterable, List, Mapping, Sequence, Tuple, Type
 
 from pants.base.build_root import BuildRoot
-from pants.build_graph.address import Address
 from pants.core.util_rules.distdir import DistDir
+from pants.engine.addresses import Address
 from pants.engine.console import Console
 from pants.engine.fs import Digest, DirectoriesToMerge, DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented

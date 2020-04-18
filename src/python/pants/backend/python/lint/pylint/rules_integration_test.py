@@ -10,9 +10,9 @@ from pants.backend.python.lint.pylint.rules import rules as pylint_rules
 from pants.backend.python.rules.targets import PythonInterpreterCompatibility, PythonLibrary
 from pants.backend.python.targets.python_library import PythonLibrary as PythonLibraryV1
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
-from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.lint import LintResult
+from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
 from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.rules import RootRule

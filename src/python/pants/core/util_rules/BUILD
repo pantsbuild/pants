@@ -7,8 +7,8 @@ python_library(
     '3rdparty/python:typing-extensions',
     'src/python/pants/base:build_root',
     'src/python/pants/base:specs',
-    'src/python/pants/build_graph',
     'src/python/pants/core',
+    'src/python/pants/engine:addresses',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:objects',
     'src/python/pants/engine:rules',
@@ -27,7 +27,7 @@ python_tests(
   dependencies = [
     ':util_rules',
     'src/python/pants/base:specs',
-    'src/python/pants/build_graph',
+    'src/python/pants/engine:addresses',
     'src/python/pants/engine:scheduler',
     'src/python/pants/engine:selectors',
     'src/python/pants/engine:target',

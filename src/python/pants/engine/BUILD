@@ -12,6 +12,7 @@ page(
 python_tests(
   name = 'tests',
   dependencies = [
+    ':addresses',
     ':console',
     ':goal',
     ':platform',
@@ -41,10 +42,21 @@ python_library(
   dependencies=[
     ':objects',
     'src/python/pants/build_graph',
-    'src/python/pants/util:memo',
     'src/python/pants/util:objects',
   ],
   tags = {"partially_type_checked"},
+)
+
+python_library(
+  name='addresses',
+  sources=['addresses.py'],
+  dependencies=[
+    ':objects',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:specs',
+    'src/python/pants/build_graph',
+  ],
+  tags = {"type_checked"},
 )
 
 python_library(

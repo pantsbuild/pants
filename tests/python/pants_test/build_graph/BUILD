@@ -21,7 +21,7 @@ python_tests(
   dependencies = [
     'src/python/pants/base:build_file',
     'src/python/pants/build_graph',
-    'src/python/pants/engine:addressable',
+    'src/python/pants/engine:addresses',
     'src/python/pants/engine:objects',
     'src/python/pants/engine:rules',
     'src/python/pants/engine/legacy:structs',

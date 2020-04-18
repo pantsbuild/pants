@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Optional, cast
 
-from pants.build_graph.address import Address
 from pants.core.target_types import FilesSources
+from pants.engine.addresses import Address
 from pants.engine.fs import (
     EMPTY_SNAPSHOT,
     Digest,

@@ -3,7 +3,7 @@
 
 from typing import Dict, Optional, Union
 
-from pants.build_graph.address import Address
+from pants.engine.addresses import Address
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
