@@ -37,7 +37,11 @@ class StreamingWorkunitHandler:
         # we report any workunits that were added after the last time the thread polled.
         workunits = self.scheduler.poll_workunits()
         for callback in self.callbacks:
-            callback(workunits=workunits, finished=True)
+            callback(
+                workunits=workunits["completed"],
+                started_workunits=workunits["started"],
+                finished=True,
+            )
 
     @contextmanager
     def session(self) -> Iterator[None]:
@@ -63,7 +67,11 @@ class _InnerHandler(threading.Thread):
         while not self.stop_request.isSet():
             workunits = self.scheduler.poll_workunits()
             for callback in self.callbacks:
-                callback(workunits=workunits, finished=False)
+                callback(
+                    workunits=workunits["completed"],
+                    started_workunits=workunits["started"],
+                    finished=False,
+                )
             self.stop_request.wait(timeout=self.report_interval)
 
     def join(self, timeout=None):

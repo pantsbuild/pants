@@ -33,6 +33,13 @@ from pants.backend.python.rules.util import (
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.base.specs import AddressSpecs, AscendantAddresses, SingleAddress
 from pants.build_graph.address import Address
+from pants.core.target_types import ResourcesSources
+from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
+from pants.core.util_rules.distdir import DistDir
+from pants.core.util_rules.strip_source_roots import (
+    SourceRootStrippedSources,
+    StripSourcesFieldRequest,
+)
 from pants.engine.addressable import Addresses
 from pants.engine.console import Console
 from pants.engine.fs import (
@@ -64,10 +71,6 @@ from pants.engine.target import (
 )
 from pants.option.custom_types import shell_str
 from pants.python.python_setup import PythonSetup
-from pants.rules.core.determine_source_files import AllSourceFilesRequest, SourceFiles
-from pants.rules.core.distdir import DistDir
-from pants.rules.core.strip_source_roots import SourceRootStrippedSources, StripSourcesFieldRequest
-from pants.rules.core.targets import ResourcesSources
 from pants.source.source_root import SourceRootConfig
 from pants.util.ordered_set import FrozenOrderedSet
 

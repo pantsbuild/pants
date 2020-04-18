@@ -16,6 +16,9 @@ from pants.backend.python.rules.pex import (
 from pants.backend.python.rules.targets import PythonInterpreterCompatibility, PythonSources
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.core.goals.lint import LinterConfiguration, LinterConfigurations, LintResult
+from pants.core.util_rules import determine_source_files, strip_source_roots
+from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.engine.addressable import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
 from pants.engine.isolated_process import FallibleProcessResult, Process
@@ -24,9 +27,6 @@ from pants.engine.selectors import Get
 from pants.engine.target import Dependencies, Targets
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
-from pants.rules.core import determine_source_files, strip_source_roots
-from pants.rules.core.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
-from pants.rules.core.lint import LinterConfiguration, LinterConfigurations, LintResult
 
 
 @dataclass(frozen=True)

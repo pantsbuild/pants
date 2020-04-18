@@ -32,7 +32,6 @@ python_library(
     'src/python/pants/option',
     'src/python/pants/process',
     'src/python/pants/python',
-    'src/python/pants/rules/core',
     'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:logging',
@@ -60,6 +59,7 @@ target(
     'src/python/pants/backend/python/lint/isort',
     'src/python/pants/backend/python/lint/pylint',
     'src/python/pants/backend/native',
+    'src/python/pants/core:plugin',
   ],
 )
 

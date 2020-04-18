@@ -233,6 +233,7 @@ python_library(
   sources=['scheduler.py'],
   dependencies=[
     '3rdparty/python:dataclasses',
+    '3rdparty/python:typing-extensions',
     ':fs',
     ':isolated_process',
     ':native',
@@ -241,7 +242,6 @@ python_library(
     ':rules',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:specs',
-    'src/python/pants/rules/core:core',
   ],
   tags = {"partially_type_checked"},
 )
