@@ -32,6 +32,7 @@ from pants.engine.rules import UnionRule, named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
+from pants.util.strutil import pluralize
 
 
 @dataclass(frozen=True)
@@ -138,7 +139,9 @@ async def setup(
         ),
         input_files=merged_input_files,
         output_files=all_source_files_snapshot.files,
-        description=f"Run black for {address_references}",
+        description=(
+            f"Run Black on {pluralize(len(request.configs), 'target')}: {address_references}."
+        ),
     )
     return Setup(process)
 

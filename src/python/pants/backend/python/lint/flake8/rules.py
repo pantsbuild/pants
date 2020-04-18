@@ -28,6 +28,7 @@ from pants.engine.rules import UnionRule, named_rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
+from pants.util.strutil import pluralize
 
 
 @dataclass(frozen=True)
@@ -110,7 +111,7 @@ async def flake8_lint(
         pex_path=f"./flake8.pex",
         pex_args=generate_args(specified_source_files=specified_source_files, flake8=flake8),
         input_files=merged_input_files,
-        description=f"Run Flake8 for {address_references}",
+        description=f"Run Flake8 on {pluralize(len(configs), 'target')}: {address_references}.",
     )
     result = await Get[FallibleProcessResult](Process, request)
     return LintResult.from_fallible_process_result(result)

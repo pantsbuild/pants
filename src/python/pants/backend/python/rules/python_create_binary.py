@@ -83,7 +83,6 @@ async def create_python_binary(config: PythonBinaryConfiguration) -> CreatedBina
                 platforms=PexPlatforms.create_from_platforms_field(config.platforms),
                 output_filename=output_filename,
                 additional_args=config.generate_additional_args(),
-                description=f"Building {output_filename}",
             )
         )
     )

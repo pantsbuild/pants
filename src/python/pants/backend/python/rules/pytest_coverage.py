@@ -309,7 +309,7 @@ async def merge_coverage_data(
         pex_args=coverage_args,
         input_files=merged_input_files,
         output_files=(".coverage",),
-        description=f"Merge Pytest coverage reports.",
+        description=f"Merge {len(prefixes)} Pytest coverage reports.",
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
     )
@@ -364,7 +364,7 @@ async def generate_coverage_report(
         input_files=merged_input_files,
         output_directories=("htmlcov",),
         output_files=("coverage.xml",),
-        description=f"Generate coverage report.",
+        description=f"Generate Pytest coverage report.",
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
     )
