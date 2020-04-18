@@ -265,7 +265,7 @@ class PexTest(TestBase):
         pex_info = self.create_pex_and_get_pex_info(requirements=requirements)
         # NB: We do not check for transitive dependencies, which PEX-INFO will include. We only check
         # that at least the dependencies we requested are included.
-        assert set(parse_requirements(requirements.requirements)).issubset(
+        assert set(parse_requirements(requirements)).issubset(
             set(parse_requirements(pex_info["requirements"]))
         )
 
@@ -297,7 +297,7 @@ class PexTest(TestBase):
     def test_interpreter_constraints(self) -> None:
         constraints = PexInterpreterConstraints(["CPython>=2.7,<3", "CPython>=3.6"])
         pex_info = self.create_pex_and_get_pex_info(interpreter_constraints=constraints)
-        assert set(pex_info["interpreter_constraints"]) == set(constraints.constraints)
+        assert set(pex_info["interpreter_constraints"]) == set(constraints)
 
     def test_additional_args(self) -> None:
         pex_info = self.create_pex_and_get_pex_info(additional_pex_args=("--not-zip-safe",))
