@@ -91,7 +91,7 @@ def setup_logging(
     scope: Optional[str] = None,
     logfile_name: str = "pants.log",
     warnings_filter_regexes: Optional[List[str]] = None,
-) -> Optional[FileLoggingSetupResult]:
+) -> Optional[NativeHandler]:
     """Configures logging for a given scope, by default the global scope.
 
     :param log_level: The logging level to enable.
@@ -159,4 +159,4 @@ def setup_logging(
     native_handler = NativeHandler(log_level, native, native_filename=log_path)
 
     logger.addHandler(native_handler)
-    return FileLoggingSetupResult(native_handler)
+    return native_handler
