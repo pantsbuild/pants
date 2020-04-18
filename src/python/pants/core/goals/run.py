@@ -46,7 +46,7 @@ class Run(Goal):
     subsystem_cls = RunOptions
 
 
-@goal_rule
+@goal_rule(desc="Run a script or executable")
 async def run(
     console: Console,
     workspace: Workspace,

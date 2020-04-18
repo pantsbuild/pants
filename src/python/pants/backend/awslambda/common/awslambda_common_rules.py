@@ -82,7 +82,7 @@ class AWSLambdaGoal(Goal):
     subsystem_cls = AWSLambdaOptions
 
 
-@goal_rule
+@goal_rule(desc="Generate an AWS Lambda")
 async def create_awslambda(
     targets: Targets,
     console: Console,

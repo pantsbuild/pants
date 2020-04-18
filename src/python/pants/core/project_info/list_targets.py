@@ -47,7 +47,7 @@ class List(Goal):
     subsystem_cls = ListOptions
 
 
-@goal_rule
+@goal_rule(desc="Find all targets matching the provided specs")
 async def list_targets(addresses: Addresses, options: ListOptions, console: Console) -> List:
     if not addresses.dependencies:
         console.print_stderr(f"WARNING: No targets were matched in goal `{options.name}`.")

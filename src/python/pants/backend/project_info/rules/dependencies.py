@@ -56,7 +56,7 @@ class Dependencies(Goal):
     subsystem_cls = DependenciesOptions
 
 
-@goal_rule
+@goal_rule(desc="Find the dependencies of targets")
 async def dependencies(
     console: Console, addresses: Addresses, options: DependenciesOptions,
 ) -> Dependencies:

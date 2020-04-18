@@ -158,7 +158,7 @@ def format_section(
     return "\n".join(lines)
 
 
-@goal_rule
+@goal_rule(desc="Find all available backends")
 async def list_backends(
     backend_options: BackendsOptions,
     source_roots_config: SourceRootConfig,

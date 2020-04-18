@@ -237,7 +237,7 @@ class Test(Goal):
     __test__ = False
 
 
-@goal_rule
+@goal_rule(desc="Run tests")
 async def run_tests(
     console: Console,
     options: TestOptions,

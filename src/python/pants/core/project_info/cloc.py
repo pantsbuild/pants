@@ -64,7 +64,7 @@ class CountLinesOfCode(Goal):
     subsystem_cls = CountLinesOfCodeOptions
 
 
-@goal_rule
+@goal_rule(desc="Count lines of code")
 async def run_cloc(
     console: Console,
     options: CountLinesOfCodeOptions,

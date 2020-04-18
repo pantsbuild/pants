@@ -42,7 +42,7 @@ class List(Goal):
     subsystem_cls = ListOptions
 
 
-@goal_rule
+@goal_rule(desc="Find all targets matching the provided specs")
 async def list_targets(console: Console, list_options: ListOptions, addresses: Addresses) -> List:
     provides = list_options.values.provides
     provides_columns = list_options.values.provides_columns

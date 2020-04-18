@@ -51,7 +51,7 @@ async def all_roots(source_root_config: SourceRootConfig) -> AllSourceRoots:
     return AllSourceRoots(all_source_roots)
 
 
-@goal_rule
+@goal_rule(desc="Find all source roots")
 async def list_roots(console: Console, options: RootsOptions, all_roots: AllSourceRoots) -> Roots:
     with options.line_oriented(console) as print_stdout:
         for src_root in sorted(all_roots, key=lambda x: x.path):

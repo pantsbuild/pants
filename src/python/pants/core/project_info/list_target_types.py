@@ -206,7 +206,7 @@ class VerboseTargetInfo:
         return "\n".join(output).rstrip()
 
 
-@goal_rule
+@goal_rule(desc="List all registered target types")
 def list_target_types(
     registered_target_types: RegisteredTargetTypes,
     union_membership: UnionMembership,
