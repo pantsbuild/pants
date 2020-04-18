@@ -31,18 +31,6 @@ class FileLoggingSetupResult:
     log_handler: Handler
 
 
-def _configure_requests_debug_logging() -> None:
-    http.client.HTTPConnection.debuglevel = 1  # type: ignore[attr-defined]
-    requests_logger = logging.getLogger("requests.packages.urllib3")
-    LogLevel.TRACE.set_level_for(requests_logger)
-    requests_logger.propagate = True
-
-
-def _maybe_configure_extended_logging(logger: Logger) -> None:
-    if logger.isEnabledFor(LogLevel.TRACE.level):
-        _configure_requests_debug_logging()
-
-
 def init_rust_logger(log_level: LogLevel, log_show_rust_3rdparty: bool) -> None:
     native = Native()
     native.init_rust_logging(log_level.level, log_show_rust_3rdparty)
@@ -191,7 +179,11 @@ def setup_logging(
     for message_regexp in warnings_filter_regexes or ():
         warnings.filterwarnings(action="ignore", message=message_regexp)
 
-    _maybe_configure_extended_logging(logger)
+    if logger.isEnabledFor(LogLevel.TRACE.level):
+        http.client.HTTPConnection.debuglevel = 1  # type: ignore[attr-defined]
+        requests_logger = logging.getLogger("requests.packages.urllib3")
+        LogLevel.TRACE.set_level_for(requests_logger)
+        requests_logger.propagate = True
 
     if not log_dir:
         return None
