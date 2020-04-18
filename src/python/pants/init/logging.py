@@ -13,7 +13,6 @@ from typing import List, Optional, TextIO, overload
 import pants.util.logging as pants_logging
 from pants.base.exception_sink import ExceptionSink
 from pants.engine.native import Native
-from pants.option.option_value_container import OptionValueContainer
 from pants.util.dirutil import safe_mkdir
 from pants.util.logging import LogLevel
 
@@ -56,24 +55,6 @@ def setup_logging_to_stderr(python_logger: Logger, log_level: LogLevel) -> None:
     python_logger.addHandler(handler)
     # Let the rust side filter levels; try to have the python side send everything to the rust logger.
     LogLevel.TRACE.set_level_for(python_logger)
-
-
-def setup_logging_from_options(
-    bootstrap_options: OptionValueContainer,
-) -> Optional[FileLoggingSetupResult]:
-    # N.B. quiet help says 'Squelches all console output apart from errors'.
-    level = (
-        LogLevel.ERROR if getattr(bootstrap_options, "quiet", False) else bootstrap_options.level
-    )
-    native = Native()
-    log_dir: Optional[str] = bootstrap_options.logdir
-    return setup_logging(
-        level,
-        native=native,
-        log_dir=log_dir,
-        console_stream=sys.stderr,
-        warnings_filter_regexes=bootstrap_options.ignore_pants_warnings,
-    )
 
 
 class NativeHandler(StreamHandler):
