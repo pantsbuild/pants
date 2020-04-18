@@ -67,7 +67,8 @@ class TestPythonAWSLambdaCreation(TestBase):
                 python_awslambda(
                   name='hello_world_lambda',
                   dependencies=[':hello_world'],
-                  handler='foo.bar.hello_world'
+                  handler='foo.bar.hello_world',
+                  runtime='python3.7'
                 )
                 """
             ),
