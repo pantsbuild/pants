@@ -34,7 +34,7 @@ class LoggingTest(TestBase):
         logger = logging.getLogger("my_file_logger")
         with temporary_dir() as log_dir:
             logging_setup_result = setup_logging(
-                log_level, log_dir=log_dir, scope=logger.name, native=native
+                log_level, log_dir=log_dir, native=native, scope=logger.name
             )
             yield logger, logging_setup_result
 

@@ -8,7 +8,7 @@ import sys
 import warnings
 from dataclasses import dataclass
 from logging import Handler, Logger, LogRecord, StreamHandler
-from typing import List, Optional, TextIO, overload
+from typing import List, Optional, TextIO
 
 import pants.util.logging as pants_logging
 from pants.base.exception_sink import ExceptionSink
@@ -91,42 +91,14 @@ def create_native_pantsd_file_log_handler(
     return NativeHandler(log_level, native, native_filename=native_filename)
 
 
-@overload
 def setup_logging(
     log_level: LogLevel,
     *,
-    native: Native,
-    log_dir: str,
-    console_stream: Optional[TextIO] = None,
-    scope: Optional[str] = None,
-    log_name: Optional[str] = None,
-    warnings_filter_regexes: Optional[List[str]] = None,
-) -> FileLoggingSetupResult:
-    ...
-
-
-@overload
-def setup_logging(
-    log_level: LogLevel,
-    *,
-    native: Native,
-    log_dir: None = None,
-    console_stream: Optional[TextIO] = None,
-    scope: Optional[str] = None,
-    log_name: Optional[str] = None,
-    warnings_filter_regexes: Optional[List[str]] = None,
-) -> None:
-    ...
-
-
-def setup_logging(
-    log_level: LogLevel,
-    *,
+    log_dir: Optional[str],
     native: Native,
     console_stream: Optional[TextIO] = None,
-    log_dir: Optional[str] = None,
     scope: Optional[str] = None,
-    log_name: Optional[str] = None,
+    logfile_name: str = "pants.log",
     warnings_filter_regexes: Optional[List[str]] = None,
 ) -> Optional[FileLoggingSetupResult]:
     """Configures logging for a given scope, by default the global scope.
@@ -142,7 +114,7 @@ def setup_logging(
     :param scope: A logging scope to configure.  The scopes are hierarchichal logger names, with
                   The '.' separator providing the scope hierarchy.  By default the root logger is
                   configured.
-    :param log_name: The base name of the log file (defaults to 'pants.log').
+    :param logfile_name: The base name of the log file (defaults to 'pants.log').
 
     :param warnings_filter_regexes: A series of regexes to ignore warnings for, typically from the
                                     `ignore_pants_warnings` option.
@@ -189,9 +161,9 @@ def setup_logging(
         return None
 
     safe_mkdir(log_dir)
-    log_filename = os.path.join(log_dir, log_name or "pants.log")
+    log_path = os.path.join(log_dir, logfile_name)
 
-    native_handler = create_native_pantsd_file_log_handler(log_level, native, log_filename)
+    native_handler = create_native_pantsd_file_log_handler(log_level, native, log_path)
     file_handler = native_handler
     logger.addHandler(native_handler)
-    return FileLoggingSetupResult(log_filename, file_handler)
+    return FileLoggingSetupResult(log_path, file_handler)
