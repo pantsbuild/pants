@@ -869,8 +869,6 @@ def main() -> None:
                 "include": [
                     *[bootstrap_linux(v) for v in PythonVersion],
                     *[bootstrap_osx(v) for v in PythonVersion],
-                    {**bootstrap_linux(PythonVersion.py36), "stage": Stage.bootstrap_cron.value},
-                    {**bootstrap_osx(PythonVersion.py36), "stage": Stage.bootstrap_cron.value},
                     *[lint(v) for v in PythonVersion],
                     clippy(),
                     cargo_audit(),
