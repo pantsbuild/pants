@@ -527,7 +527,6 @@ def cargo_audit() -> Dict:
         "stage": Stage.test_cron.value,
         "script": ["./build-support/bin/ci.py --cargo-audit"],
         "env": ["CACHE_NAME=cargo_audit"],
-        "if": SKIP_RUST_CONDITION,
     }
 
 

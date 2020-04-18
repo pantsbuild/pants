@@ -396,7 +396,6 @@ jobs:
     dist: xenial
     env:
     - CACHE_NAME=cargo_audit
-    if: commit_message !~ /\[ci skip-rust-tests\]/
     name: Cargo audit
     os: linux
     python:
