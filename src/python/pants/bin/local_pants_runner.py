@@ -180,12 +180,10 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         # This works as expected due to the encapsulated_logger in DaemonPantsRunner and
         # we don't have to gate logging setup anymore.
 
-        native = Native()
         level = LogLevel.ERROR if getattr(global_options, "quiet", False) else global_options.level
         setup_logging(
             level,
             log_dir=global_options.logdir,
-            native=native,
             console_stream=sys.stderr,
             warnings_filter_regexes=global_options.ignore_pants_warnings,
         )

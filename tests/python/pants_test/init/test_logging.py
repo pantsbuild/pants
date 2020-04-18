@@ -33,23 +33,23 @@ class LoggingTest(TestBase):
         native = self.scheduler._scheduler._native
         logger = logging.getLogger("my_file_logger")
         with temporary_dir() as tmpdir:
-            handler = setup_logging(log_level, log_dir=tmpdir, native=native, scope=logger.name)
+            handler = setup_logging(log_level, log_dir=tmpdir, scope=logger.name)
             log_file = Path(tmpdir, "pants.log")
             yield logger, handler, log_file
 
     def test_utf8_logging(self) -> None:
-        with self.logger(LogLevel.INFO) as (file_logger, logging_setup_result, log_file):
+        with self.logger(LogLevel.INFO) as (file_logger, log_handler, log_file):
             cat = "🐈"
             file_logger.info(cat)
-            logging_setup_result.log_handler.flush()
+            log_handler.flush()
             self.assertIn(cat, log_file.read_text())
 
     def test_file_logging(self) -> None:
-        with self.logger(LogLevel.INFO) as (file_logger, logging_setup_result, log_file):
+        with self.logger(LogLevel.INFO) as (file_logger, log_handler, log_file):
             file_logger.warning("this is a warning")
             file_logger.info("this is some info")
             file_logger.debug("this is some debug info")
-            logging_setup_result.log_handler.flush()
+            log_handler.flush()
 
             loglines = log_file.read_text().splitlines()
             self.assertEqual(2, len(loglines))

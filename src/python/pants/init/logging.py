@@ -27,15 +27,6 @@ def init_rust_logger(log_level: LogLevel, log_show_rust_3rdparty: bool) -> None:
     native.init_rust_logging(log_level.level, log_show_rust_3rdparty)
 
 
-def setup_logging_to_stderr(python_logger: Logger, log_level: LogLevel) -> None:
-    """We setup logging as loose as possible from the Python side, and let Rust do the filtering."""
-    native = Native()
-    handler = NativeHandler.create(log_level, native, stream=sys.stderr)
-    python_logger.addHandler(handler)
-    # Let the rust side filter levels; try to have the python side send everything to the rust logger.
-    LogLevel.TRACE.set_level_for(python_logger)
-
-
 class NativeHandler(StreamHandler):
     """This class is installed as a Python logging module handler (using  the logging.addHandler
     method) and proxies logs to the Rust logging infrastructure."""
@@ -77,11 +68,26 @@ class NativeHandler(StreamHandler):
         return NativeHandler(log_level, native, stream)
 
 
+def setup_logging_to_stderr(python_logger: Logger, level: LogLevel) -> None:
+    """Sets up Python logging to stderr, proxied to Rust via a NativeHandler.
+
+    We deliberately set the most verbose logging possible (i.e. the TRACE log level), here, and let
+    the Rust logging faculties take care of filtering.
+    """
+    native = Native()
+    handler = NativeHandler.create(level, native, stream=sys.stderr)
+    python_logger.addHandler(handler)
+    LogLevel.TRACE.set_level_for(python_logger)
+
+
+def setup_logging_to_file(level: LogLevel) -> None:
+    pass
+
+
 def setup_logging(
     log_level: LogLevel,
     *,
     log_dir: Optional[str],
-    native: Native,
     console_stream: Optional[TextIO] = None,
     scope: Optional[str] = None,
     log_filename: str = "pants.log",
@@ -90,7 +96,6 @@ def setup_logging(
     """Configures logging for a given scope, by default the global scope.
 
     :param log_level: The logging level to enable.
-    :param native: An instance of the Native FFI lib, to register rust logging.
     :param console_stream: The stream to use for default (console) logging. If None (default), this
                            will disable console logging.
     :param log_dir: An optional directory to emit logs files in.  If unspecified, no disk logging
@@ -106,6 +111,8 @@ def setup_logging(
                                     `ignore_pants_warnings` option.
     :returns: The file logging setup configured if any.
     """
+
+    native = Native()
 
     # TODO(John Sirois): Consider moving to straight python logging.  The divide between the
     # context/work-unit logging and standard python logging doesn't buy us anything.

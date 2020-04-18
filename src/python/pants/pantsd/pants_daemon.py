@@ -354,9 +354,9 @@ class PantsDaemon(FingerprintedProcessManager):
             # is launched with full_init=True. If PantsdDaemon is launched with
             # full_init=True, we can guarantee self._native is non-None.
             native = cast(Native, self._native)
+
             log_handler = setup_logging(
                 self._log_level,
-                native=native,
                 log_dir=self._log_dir,
                 log_filename=self.LOG_NAME,
                 warnings_filter_regexes=self._bootstrap_options.for_global_scope(),  # type: ignore[union-attr]
