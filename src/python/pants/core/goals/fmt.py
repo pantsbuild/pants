@@ -19,10 +19,11 @@ from pants.engine.fs import (
 )
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.isolated_process import ProcessResult
-from pants.engine.objects import Collection, union
-from pants.engine.rules import UnionMembership, goal_rule
+from pants.engine.objects import Collection
+from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Field, Target, TargetsWithOrigins, TargetWithOrigin
+from pants.engine.unions import UnionMembership, union
 
 
 @dataclass(frozen=True)

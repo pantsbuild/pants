@@ -40,9 +40,10 @@ from pants.engine.fs import (
     InputFilesContent,
 )
 from pants.engine.isolated_process import Process, ProcessResult
-from pants.engine.rules import RootRule, UnionRule, named_rule, rule, subsystem_rule
+from pants.engine.rules import RootRule, named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Sources, Targets, TransitiveTargets
+from pants.engine.unions import UnionRule
 from pants.python.python_setup import PythonSetup
 from pants.source.source_root import SourceRootConfig
 

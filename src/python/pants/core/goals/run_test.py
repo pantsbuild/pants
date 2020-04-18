@@ -10,8 +10,8 @@ from pants.core.goals.run import Run, RunOptions, run
 from pants.engine.addresses import Address
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Workspace
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
-from pants.engine.rules import UnionMembership
 from pants.engine.target import RegisteredTargetTypes, Target, TargetsWithOrigins, TargetWithOrigin
+from pants.engine.unions import UnionMembership
 from pants.option.global_options import GlobalOptions
 from pants.testutil.engine.util import (
     MockConsole,

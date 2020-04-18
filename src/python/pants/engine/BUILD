@@ -221,6 +221,7 @@ python_library(
   dependencies=[
     ':goal',
     ':selectors',
+    ':unions',
     'src/python/pants/util:collections',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
@@ -293,9 +294,20 @@ python_library(
   sources=['target.py'],
   dependencies=[
     ':rules',
+    ':unions',
     '3rdparty/python:typing-extensions',
     'src/python/pants/util:collections',
     'src/python/pants/util:frozendict',
+    'src/python/pants/util:meta',
+    'src/python/pants/util:ordered_set',
+  ],
+  tags = {'type_checked'},
+)
+
+python_library(
+  name='unions',
+  sources=['unions.py'],
+  dependencies=[
     'src/python/pants/util:meta',
     'src/python/pants/util:ordered_set',
   ],

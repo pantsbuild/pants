@@ -31,6 +31,7 @@ python_tests(
     'src/python/pants/engine:fs',
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
+    'src/python/pants/engine:unions',
     'src/python/pants/engine/legacy:structs',
     'src/python/pants/source',
     'src/python/pants/testutil:interpreter_selection_utils',

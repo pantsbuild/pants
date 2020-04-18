@@ -7,7 +7,7 @@ from typing import Generic, Optional, Sequence, Type, get_type_hints
 
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
-from pants.engine.rules import UnionMembership, goal_rule
+from pants.engine.rules import goal_rule
 from pants.engine.target import (
     AsyncField,
     BoolField,
@@ -25,6 +25,7 @@ from pants.engine.target import (
     StringSequenceField,
     Target,
 )
+from pants.engine.unions import UnionMembership
 from pants.option.global_options import GlobalOptions
 from pants.util.objects import get_docstring, get_docstring_summary, pretty_print_type_hint
 

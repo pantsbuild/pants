@@ -16,7 +16,7 @@ from pants.base.workunit import WorkUnit
 from pants.bin.goal_runner import GoalRunner
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.native import Native
-from pants.engine.rules import UnionMembership
+from pants.engine.unions import UnionMembership
 from pants.goal.run_tracker import RunTracker
 from pants.help.help_printer import HelpPrinter
 from pants.init.engine_initializer import EngineInitializer, LegacyGraphSession

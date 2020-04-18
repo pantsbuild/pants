@@ -70,6 +70,7 @@ python_library(
     'src/python/pants/base:exiter',
     'src/python/pants/binaries',
     'src/python/pants/engine:native',
+    'src/python/pants/engine:unions',
     'src/python/pants/goal:run_tracker',
     'src/python/pants/init',
     'src/python/pants/option',

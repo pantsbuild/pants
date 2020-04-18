@@ -13,9 +13,9 @@ from pants.core.goals.fmt import (
 )
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
 from pants.engine.fs import Digest, Snapshot
-from pants.engine.objects import union
-from pants.engine.rules import UnionMembership, UnionRule, rule
+from pants.engine.rules import rule
 from pants.engine.selectors import Get
+from pants.engine.unions import UnionMembership, UnionRule, union
 
 
 @dataclass(frozen=True)

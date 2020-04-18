@@ -27,6 +27,7 @@ python_library(
     'src/python/pants/engine:rules',
     'src/python/pants/engine:scheduler',
     'src/python/pants/engine:struct',
+    'src/python/pants/engine:unions',
     'src/python/pants/util:objects',
   ],
   tags = {"partially_type_checked"},

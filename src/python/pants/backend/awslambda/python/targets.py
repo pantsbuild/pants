@@ -5,7 +5,7 @@ import re
 from typing import Match, Optional, Tuple, cast
 
 from pants.backend.python.rules.targets import COMMON_PYTHON_FIELDS, PythonSources
-from pants.build_graph.address import Address
+from pants.engine.addresses import Address
 from pants.engine.target import InvalidFieldException, StringField, Target
 
 

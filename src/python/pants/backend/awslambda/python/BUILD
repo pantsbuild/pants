@@ -14,6 +14,7 @@ python_library(
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
     'src/python/pants/engine:target',
+    'src/python/pants/engine:unions',
     'src/python/pants/python',
   ],
   tags = {"type_checked"},
