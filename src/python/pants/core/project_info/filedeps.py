@@ -60,7 +60,7 @@ class Filedeps(Goal):
     subsystem_cls = FiledepsOptions
 
 
-@goal_rule(desc="Find all the files belonging to the specified targets")
+@goal_rule
 async def file_deps(
     console: Console, options: FiledepsOptions, build_root: BuildRoot, addresses: Addresses,
 ) -> Filedeps:

@@ -135,7 +135,7 @@ def gather_valid_binary_configuration_types(
     return valid_config_types_by_target
 
 
-@goal_rule(desc="Create binaries")
+@goal_rule
 async def create_binary(
     targets_with_origins: TargetsWithOrigins,
     console: Console,

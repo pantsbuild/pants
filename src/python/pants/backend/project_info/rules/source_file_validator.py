@@ -49,8 +49,6 @@ class ValidateOptions(GoalSubsystem):
 
 
 class Validate(Goal):
-    """Validate that files match regex patterns."""
-
     subsystem_cls = ValidateOptions
 
 
@@ -236,11 +234,9 @@ class MultiMatcher:
         return applicable_content_pattern_names, content_encoding
 
 
-# TODO: What should this goal be called? It can't be merged with Lint because this goal works with
-#  SourcesSnapshots rather than Addresses/Targets, which means that this goal can operate on files
-#  with no owning targets. Maybe `validate-regex` and consolidate the `sourcefile-validation`
-#  subsystem into the GoalSubsystem?
-@goal_rule(desc="Validate that all files match the configured regex patterns")
+# TODO: Switch this to `lint` once we figure out a good way for v1 tasks and v2 rules
+# to share goal names.
+@goal_rule
 async def validate(
     console: Console, sources_snapshots: SourcesSnapshots, validate_options: ValidateOptions,
 ) -> Validate:

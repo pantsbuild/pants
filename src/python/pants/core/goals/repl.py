@@ -63,7 +63,7 @@ class ReplBinary:
     binary_name: str
 
 
-@goal_rule(desc="Setup a REPL")
+@goal_rule
 async def run_repl(
     console: Console,
     workspace: Workspace,

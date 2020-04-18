@@ -123,7 +123,7 @@ class Lint(Goal):
     subsystem_cls = LintOptions
 
 
-@goal_rule("Lint")
+@goal_rule
 async def lint(
     console: Console,
     targets_with_origins: TargetsWithOrigins,

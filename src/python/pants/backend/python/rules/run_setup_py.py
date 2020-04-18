@@ -273,7 +273,7 @@ def validate_args(args: Tuple[str, ...]):
         raise InvalidSetupPyArgs("Cannot use the `upload` or `register` setup.py commands")
 
 
-@goal_rule(desc="Run setup.py commands")
+@goal_rule
 async def run_setup_pys(
     targets_with_origins: TargetsWithOrigins,
     options: SetupPyOptions,

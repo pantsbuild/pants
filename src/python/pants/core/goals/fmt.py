@@ -145,7 +145,7 @@ class Fmt(Goal):
     subsystem_cls = FmtOptions
 
 
-@goal_rule(desc="Autoformat")
+@goal_rule
 async def fmt(
     console: Console,
     targets_with_origins: TargetsWithOrigins,
