@@ -37,6 +37,9 @@ def setup_logging_to_stderr(python_logger: Logger, log_level: LogLevel) -> None:
 
 
 class NativeHandler(StreamHandler):
+    """This class is installed as a Python logging module handler (using  the logging.addHandler
+    method) and proxies logs to the Rust logging infrastructure."""
+
     def __init__(
         self,
         log_level: LogLevel,
