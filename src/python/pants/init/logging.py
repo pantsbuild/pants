@@ -27,7 +27,6 @@ logging.addLevelName(pants_logging.TRACE, "TRACE")
 class FileLoggingSetupResult:
     """A structured result for file logging setup."""
 
-    log_filename: str
     log_handler: Handler
 
 
@@ -164,6 +163,5 @@ def setup_logging(
     log_path = os.path.join(log_dir, logfile_name)
 
     native_handler = create_native_pantsd_file_log_handler(log_level, native, log_path)
-    file_handler = native_handler
     logger.addHandler(native_handler)
-    return FileLoggingSetupResult(log_path, file_handler)
+    return FileLoggingSetupResult(native_handler)
