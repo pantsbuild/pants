@@ -24,6 +24,7 @@ from typing_extensions import final
 from pants.base.specs import OriginSpec
 from pants.build_graph.app_base import Bundle
 from pants.engine.addresses import Address, assert_single_address
+from pants.engine.collection import Collection
 from pants.engine.fs import (
     EMPTY_SNAPSHOT,
     GlobExpansionConjunction,
@@ -32,7 +33,6 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.legacy.structs import BundleAdaptor
-from pants.engine.objects import Collection
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
 from pants.engine.unions import UnionMembership

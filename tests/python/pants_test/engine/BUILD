@@ -131,8 +131,8 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/engine:addresses',
     'src/python/pants/engine:build_files',
+    'src/python/pants/engine:collection',
     'src/python/pants/engine:mapper',
-    'src/python/pants/engine:objects',
     'src/python/pants/engine:struct',
     'src/python/pants/testutil/engine:util',
     'src/python/pants/util:dirutil',
@@ -207,16 +207,6 @@ python_library(
     'src/python/pants/engine:scheduler',
     'src/python/pants/testutil/engine:util',
     'src/python/pants/util:dirutil',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_tests(
-  name='objects',
-  sources=['test_objects.py'],
-  dependencies=[
-    'src/python/pants/engine:objects',
-    'src/python/pants/util:meta',
   ],
   tags = {"partially_type_checked"},
 )

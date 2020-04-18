@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Iterable, Optional, Tuple
 
-from pants.engine.objects import Collection
+from pants.engine.collection import Collection
 from pants.engine.rules import RootRule, side_effecting
 from pants.option.custom_types import GlobExpansionConjunction as GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior as GlobMatchErrorBehavior

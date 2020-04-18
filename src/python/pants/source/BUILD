@@ -10,6 +10,7 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:payload_field',
     'src/python/pants/base:project_tree',
+    'src/python/pants/engine:collection',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:native',
     'src/python/pants/option',

@@ -40,6 +40,7 @@ from pants.core.util_rules.strip_source_roots import (
     StripSourcesFieldRequest,
 )
 from pants.engine.addresses import Address, Addresses
+from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.fs import (
     Digest,
@@ -57,7 +58,6 @@ from pants.engine.fs import (
 )
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.isolated_process import Process, ProcessResult
-from pants.engine.objects import Collection
 from pants.engine.rules import goal_rule, named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (

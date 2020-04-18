@@ -14,6 +14,7 @@ from typing_extensions import TypedDict
 
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE
+from pants.engine.collection import Collection
 from pants.engine.fs import (
     Digest,
     DirectoryToMaterialize,
@@ -23,7 +24,6 @@ from pants.engine.fs import (
 )
 from pants.engine.native import Function, TypeId
 from pants.engine.nodes import Return, Throw
-from pants.engine.objects import Collection
 from pants.engine.rules import Rule, RuleIndex, TaskRule
 from pants.engine.selectors import Params
 from pants.engine.unions import union
