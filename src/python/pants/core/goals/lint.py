@@ -12,10 +12,10 @@ from pants.core.util_rules.filter_empty_sources import (
     ConfigurationsWithSourcesRequest,
 )
 from pants.engine.addresses import Address
+from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.isolated_process import FallibleProcessResult
-from pants.engine.objects import Collection
 from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Field, Sources, Target, TargetsWithOrigins, TargetWithOrigin

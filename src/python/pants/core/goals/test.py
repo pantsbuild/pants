@@ -18,12 +18,12 @@ from pants.core.util_rules.filter_empty_sources import (
 )
 from pants.engine import desktop
 from pants.engine.addresses import Address
+from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.fs import Digest, DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.isolated_process import FallibleProcessResult
-from pants.engine.objects import Collection
 from pants.engine.rules import goal_rule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (

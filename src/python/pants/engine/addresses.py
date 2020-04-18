@@ -8,7 +8,7 @@ from pants.base.exceptions import ResolveError
 from pants.base.specs import OriginSpec
 from pants.build_graph.address import Address as Address
 from pants.build_graph.address import BuildFileAddress as BuildFileAddress
-from pants.engine.objects import Collection
+from pants.engine.collection import Collection
 
 
 def assert_single_address(addresses: Sequence[Address]) -> None:

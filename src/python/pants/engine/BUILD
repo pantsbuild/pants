@@ -13,6 +13,7 @@ python_tests(
   name = 'tests',
   dependencies = [
     ':addresses',
+    ':collection',
     ':console',
     ':goal',
     ':platform',
@@ -51,7 +52,7 @@ python_library(
   name='addresses',
   sources=['addresses.py'],
   dependencies=[
-    ':objects',
+    ':collection',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:specs',
     'src/python/pants/build_graph',
@@ -75,7 +76,7 @@ python_library(
   sources=['fs.py'],
   dependencies=[
     '3rdparty/python:dataclasses',
-    ':objects',
+    ':collection',
     ':rules',
     ':selectors',
     'src/python/pants/base:project_tree',
@@ -118,6 +119,12 @@ python_library(
     'src/python/pants/util:ordered_set',
   ],
   tags = {'partially_type_checked'},
+)
+
+python_library(
+  name='collection',
+  sources=['collection.py'],
+  tags = {'type_checked'},
 )
 
 python_library(
@@ -247,11 +254,11 @@ python_library(
   dependencies=[
     '3rdparty/python:dataclasses',
     '3rdparty/python:typing-extensions',
+    ':collection',
     ':fs',
     ':isolated_process',
     ':native',
     ':nodes',
-    ':objects',
     ':rules',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:specs',
@@ -293,6 +300,7 @@ python_library(
   name='target',
   sources=['target.py'],
   dependencies=[
+    ':collection',
     ':rules',
     ':unions',
     '3rdparty/python:typing-extensions',

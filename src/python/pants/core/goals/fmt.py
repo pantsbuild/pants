@@ -8,6 +8,7 @@ from typing import ClassVar, Iterable, List, Optional, Tuple, Type, cast
 
 from pants.core.goals.lint import LinterConfiguration
 from pants.core.util_rules.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
+from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.fs import (
     EMPTY_DIRECTORY_DIGEST,
@@ -19,7 +20,6 @@ from pants.engine.fs import (
 )
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.isolated_process import ProcessResult
-from pants.engine.objects import Collection
 from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Field, Target, TargetsWithOrigins, TargetWithOrigin
