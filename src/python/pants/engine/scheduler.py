@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-import multiprocessing
 import os
 import sys
 import time
@@ -338,12 +337,7 @@ class Scheduler:
         return SchedulerSession(
             self,
             self._native.new_session(
-                self._scheduler,
-                zipkin_trace_v2,
-                v2_ui,
-                multiprocessing.cpu_count(),
-                build_id,
-                should_report_workunits,
+                self._scheduler, zipkin_trace_v2, v2_ui, build_id, should_report_workunits,
             ),
         )
 
