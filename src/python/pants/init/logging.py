@@ -81,7 +81,7 @@ def setup_logging(
     native: Native,
     console_stream: Optional[TextIO] = None,
     scope: Optional[str] = None,
-    logfile_name: str = "pants.log",
+    log_filename: str = "pants.log",
     warnings_filter_regexes: Optional[List[str]] = None,
 ) -> Optional[NativeHandler]:
     """Configures logging for a given scope, by default the global scope.
@@ -97,7 +97,7 @@ def setup_logging(
     :param scope: A logging scope to configure.  The scopes are hierarchichal logger names, with
                   The '.' separator providing the scope hierarchy.  By default the root logger is
                   configured.
-    :param logfile_name: The base name of the log file (defaults to 'pants.log').
+    :param log_filename: The base name of the log file (defaults to 'pants.log').
 
     :param warnings_filter_regexes: A series of regexes to ignore warnings for, typically from the
                                     `ignore_pants_warnings` option.
@@ -144,7 +144,7 @@ def setup_logging(
         return None
 
     safe_mkdir(log_dir)
-    log_path = os.path.join(log_dir, logfile_name)
+    log_path = os.path.join(log_dir, log_filename)
 
     fd = native.setup_pantsd_logger(log_path, log_level.level)
     ExceptionSink.reset_interactive_output_stream(os.fdopen(os.dup(fd), "a"))

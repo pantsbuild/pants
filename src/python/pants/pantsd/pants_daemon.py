@@ -349,16 +349,16 @@ class PantsDaemon(FingerprintedProcessManager):
         with stdio_as(stdin_fd=-1, stdout_fd=-1, stderr_fd=-1):
             # Reinitialize logging for the daemon context.
             init_rust_logger(self._log_level, self._log_show_rust_3rdparty)
-            # We can't statically prove it, but we won't execute `launch()` which
-            # calls `run_sync` which calls `_pantsd_logging` unless PantsDaemon
-            # is launched with full_init=True, which sets a non-None value for
-            # self._native.
+            # We can't statically prove it, but we won't execute `launch()` (which
+            # calls `run_sync` which calls `_pantsd_logging`) unless PantsDaemon
+            # is launched with full_init=True. If PantsdDaemon is launched with
+            # full_init=True, we can guarantee self._native is non-None.
             native = cast(Native, self._native)
             log_handler = setup_logging(
                 self._log_level,
                 native=native,
                 log_dir=self._log_dir,
-                logfile_name=self.LOG_NAME,
+                log_filename=self.LOG_NAME,
                 warnings_filter_regexes=self._bootstrap_options.for_global_scope(),  # type: ignore[union-attr]
             )
             # We know log_handler is never None because we did pass a non-None `log_dir`
