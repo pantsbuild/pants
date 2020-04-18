@@ -31,12 +31,6 @@ class PantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         _DAEMON_KILLING_GOALS = frozenset(["kill-pantsd", "clean-all"])
         return not frozenset(self.args).isdisjoint(_DAEMON_KILLING_GOALS)
 
-    @staticmethod
-    def _enable_rust_logging(global_bootstrap_options: OptionValueContainer) -> None:
-        log_level = global_bootstrap_options.level
-        init_rust_logger(log_level, global_bootstrap_options.log_show_rust_3rdparty)
-        setup_logging_to_stderr(logging.getLogger(None), log_level)
-
     def _should_run_with_pantsd(self, global_bootstrap_options: OptionValueContainer) -> bool:
         # The parent_build_id option is set only for pants commands (inner runs)
         # that were called by other pants command.
@@ -79,9 +73,10 @@ class PantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         workdir_src = init_workdir(global_bootstrap_options)
         ExceptionSink.reset_log_location(workdir_src)
 
-        # We enable Rust logging here,
-        # and everything before it will be routed through regular Python logging.
-        self._enable_rust_logging(global_bootstrap_options)
+        # We enable Rust logging here. Anything logged prior to this will be routed through regular Python logging.
+        log_level = global_bootstrap_options.level
+        init_rust_logger(log_level, global_bootstrap_options.log_show_rust_3rdparty)
+        setup_logging_to_stderr(logging.getLogger(None), log_level)
 
         ExceptionSink.reset_should_print_backtrace_to_terminal(
             global_bootstrap_options.print_exception_stacktrace
