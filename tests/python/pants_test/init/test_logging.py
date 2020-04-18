@@ -30,7 +30,10 @@ class LoggingTest(TestBase):
 
     @contextmanager
     def logger(self, log_level: LogLevel) -> Iterator[Tuple[Logger, NativeHandler, Path]]:
-        logger = logging.getLogger("my_file_logger")
+        native = self.scheduler._scheduler._native
+        print(f"Native: {native}")
+
+        logger = logging.getLogger(None)
         with temporary_dir() as tmpdir:
             handler = setup_logging(log_level, log_dir=tmpdir)
             log_file = Path(tmpdir, "pants.log")
