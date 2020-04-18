@@ -185,8 +185,8 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         level = LogLevel.ERROR if getattr(global_options, "quiet", False) else global_options.level
         setup_logging(
             level,
-            native=native,
             log_dir=log_dir,
+            native=native,
             console_stream=sys.stderr,
             warnings_filter_regexes=global_options.ignore_pants_warnings,
         )
