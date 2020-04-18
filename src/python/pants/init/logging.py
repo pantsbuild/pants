@@ -82,14 +82,6 @@ class NativeHandler(StreamHandler):
         return NativeHandler(log_level, native, stream)
 
 
-def create_native_pantsd_file_log_handler(
-    log_level: LogLevel, native: Native, native_filename: str
-) -> NativeHandler:
-    fd = native.setup_pantsd_logger(native_filename, log_level.level)
-    ExceptionSink.reset_interactive_output_stream(os.fdopen(os.dup(fd), "a"))
-    return NativeHandler(log_level, native, native_filename=native_filename)
-
-
 def setup_logging(
     log_level: LogLevel,
     *,
@@ -162,6 +154,9 @@ def setup_logging(
     safe_mkdir(log_dir)
     log_path = os.path.join(log_dir, logfile_name)
 
-    native_handler = create_native_pantsd_file_log_handler(log_level, native, log_path)
+    fd = native.setup_pantsd_logger(log_path, log_level.level)
+    ExceptionSink.reset_interactive_output_stream(os.fdopen(os.dup(fd), "a"))
+    native_handler = NativeHandler(log_level, native, native_filename=log_path)
+
     logger.addHandler(native_handler)
     return FileLoggingSetupResult(native_handler)
