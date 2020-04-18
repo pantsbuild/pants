@@ -89,7 +89,6 @@ def setup_logging(
     *,
     log_dir: Optional[str],
     console_stream: Optional[TextIO] = None,
-    scope: Optional[str] = None,
     log_filename: str = "pants.log",
     warnings_filter_regexes: Optional[List[str]] = None,
 ) -> Optional[NativeHandler]:
@@ -128,7 +127,7 @@ def setup_logging(
 
     logging.Logger.trace = trace  # type: ignore[attr-defined]
 
-    logger = logging.getLogger(scope)
+    logger = logging.getLogger(None)
     for handler in logger.handlers:
         logger.removeHandler(handler)
 
