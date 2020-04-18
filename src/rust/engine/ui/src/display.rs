@@ -82,7 +82,7 @@ impl EngineDisplay {
   /// Create a new EngineDisplay
   pub fn new() -> EngineDisplay {
     EngineDisplay {
-      sigil: "⚡",
+      sigil: "▶",
       divider: "▵".to_string(),
       terminal: Console::Uninitialized,
       action_map: BTreeMap::new(),
@@ -239,7 +239,7 @@ impl EngineDisplay {
     // representing the swimlane for this worker and lay down a text label.
     for (n, (_worker_id, action)) in worker_states.iter().enumerate() {
       let line_shortened_output: String = format!(
-        "{blue}{sigil}{reset}{action}",
+        "{blue}{sigil}{reset} {action}",
         blue = color::Fg(color::LightBlue),
         sigil = self.sigil,
         reset = color::Fg(color::Reset),
