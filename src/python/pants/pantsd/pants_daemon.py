@@ -290,7 +290,6 @@ class PantsDaemon(FingerprintedProcessManager):
             else True
         )
 
-        self._log_dir = os.path.join(work_dir, self.name)
         self._logger = logging.getLogger(__name__)
         # N.B. This Event is used as nothing more than a convenient atomic flag - nothing waits on it.
         self._kill_switch = threading.Event()
@@ -359,9 +358,9 @@ class PantsDaemon(FingerprintedProcessManager):
             # warnings_filter_regexes=self._bootstrap_options.for_global_scope(),  # type: ignore[union-attr]
 
             setup_logging_to_stderr(level)
-            log_handler = setup_logging_to_file(
-                level, log_dir=self._log_dir, log_filename=self.LOG_NAME
-            )
+
+            log_dir = os.path.join(self._work_dir, self.name)
+            log_handler = setup_logging_to_file(level, log_dir=log_dir, log_filename=self.LOG_NAME)
             native.override_thread_logging_destination_to_just_pantsd()
 
             # Do a python-level redirect of stdout/stderr, which will not disturb `0,1,2`.
