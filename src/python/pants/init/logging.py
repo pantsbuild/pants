@@ -51,7 +51,7 @@ def init_rust_logger(log_level: LogLevel, log_show_rust_3rdparty: bool) -> None:
 def setup_logging_to_stderr(python_logger: Logger, log_level: LogLevel) -> None:
     """We setup logging as loose as possible from the Python side, and let Rust do the filtering."""
     native = Native()
-    handler = create_native_stderr_log_handler(log_level, native, stream=sys.stderr)
+    handler = NativeHandler.create(log_level, native, stream=sys.stderr)
     python_logger.addHandler(handler)
     # Let the rust side filter levels; try to have the python side send everything to the rust logger.
     LogLevel.TRACE.set_level_for(python_logger)
@@ -83,6 +83,16 @@ class NativeHandler(StreamHandler):
             f"NativeHandler(id={id(self)}, level={self.level}, filename={self.native_filename}, "
             f"stream={self.stream})"
         )
+
+    @staticmethod
+    def create(log_level: LogLevel, native: Native, stream: TextIO) -> "NativeHandler":
+        try:
+            native.setup_stderr_logger(log_level.level)
+        except Exception as e:
+            print(f"Error setting up pantsd logger: {e!r}", file=sys.stderr)
+            raise e
+
+        return NativeHandler(log_level, native, stream)
 
 
 def create_native_pantsd_file_log_handler(
@@ -170,7 +180,7 @@ def setup_logging(
         logger.removeHandler(handler)
 
     if console_stream:
-        native_handler = create_native_stderr_log_handler(log_level, native, stream=console_stream)
+        native_handler = NativeHandler.create(log_level, native, stream=console_stream)
         logger.addHandler(native_handler)
 
     log_level.set_level_for(logger)
@@ -193,15 +203,3 @@ def setup_logging(
     file_handler = native_handler
     logger.addHandler(native_handler)
     return FileLoggingSetupResult(log_filename, file_handler)
-
-
-def create_native_stderr_log_handler(
-    log_level: LogLevel, native: Native, stream: Optional[TextIO] = None
-) -> NativeHandler:
-    try:
-        native.setup_stderr_logger(log_level.level)
-    except Exception as e:
-        print(f"Error setting up pantsd logger: {e!r}", file=sys.stderr)
-        raise e
-
-    return NativeHandler(log_level, native, stream)
