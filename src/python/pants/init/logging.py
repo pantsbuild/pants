@@ -6,8 +6,7 @@ import logging
 import os
 import sys
 import warnings
-from dataclasses import dataclass
-from logging import Handler, Logger, LogRecord, StreamHandler
+from logging import Logger, LogRecord, StreamHandler
 from typing import List, Optional, TextIO
 
 import pants.util.logging as pants_logging
@@ -21,13 +20,6 @@ from pants.util.logging import LogLevel
 # setup a 'WARN' logging level name that maps to 'WARNING'.
 logging.addLevelName(logging.WARNING, "WARN")
 logging.addLevelName(pants_logging.TRACE, "TRACE")
-
-
-@dataclass(frozen=True)
-class FileLoggingSetupResult:
-    """A structured result for file logging setup."""
-
-    log_handler: Handler
 
 
 def init_rust_logger(log_level: LogLevel, log_show_rust_3rdparty: bool) -> None:
