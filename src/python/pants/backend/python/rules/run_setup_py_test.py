@@ -331,7 +331,7 @@ class TestGetRequirements(TestSetupPyBase):
         reqs = self.request_single_product(
             ExportedTargetRequirements, Params(DependencyOwner(ExportedTarget(self.tgt(addr))))
         )
-        assert sorted(expected_req_strs) == sorted(reqs.requirement_strs)
+        assert sorted(expected_req_strs) == list(reqs)
 
     def test_get_requirements(self) -> None:
         self.create_file(
