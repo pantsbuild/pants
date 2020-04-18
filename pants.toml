@@ -401,10 +401,6 @@ timeout_default = 60
 timeouts = true
 timeout_default = 60
 
-[test.go]
-# TODO(#8649): Switch to --chroot.
-chroot = false
-
 [buildgen.go]
 materialize = true
 remote = true
