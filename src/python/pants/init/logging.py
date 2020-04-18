@@ -34,12 +34,11 @@ class NativeHandler(StreamHandler):
     def __init__(
         self,
         log_level: LogLevel,
-        native: Native,
         stream: Optional[TextIO] = None,
         native_filename: Optional[str] = None,
     ):
         super().__init__(stream)
-        self.native = native
+        self.native = Native()
         self.native_filename = native_filename
         self.setLevel(log_level.level)
 
@@ -58,14 +57,15 @@ class NativeHandler(StreamHandler):
         )
 
     @staticmethod
-    def create(log_level: LogLevel, native: Native, stream: TextIO) -> "NativeHandler":
+    def create(log_level: LogLevel, stream: TextIO) -> "NativeHandler":
         try:
+            native = Native()
             native.setup_stderr_logger(log_level.level)
         except Exception as e:
             print(f"Error setting up pantsd logger: {e!r}", file=sys.stderr)
             raise e
 
-        return NativeHandler(log_level, native, stream)
+        return NativeHandler(log_level, stream)
 
 
 def setup_logging_to_stderr(python_logger: Logger, level: LogLevel) -> None:
@@ -74,8 +74,7 @@ def setup_logging_to_stderr(python_logger: Logger, level: LogLevel) -> None:
     We deliberately set the most verbose logging possible (i.e. the TRACE log level), here, and let
     the Rust logging faculties take care of filtering.
     """
-    native = Native()
-    handler = NativeHandler.create(level, native, stream=sys.stderr)
+    handler = NativeHandler.create(level, stream=sys.stderr)
     python_logger.addHandler(handler)
     LogLevel.TRACE.set_level_for(python_logger)
 
@@ -132,7 +131,7 @@ def setup_logging(
         logger.removeHandler(handler)
 
     if console_stream:
-        native_handler = NativeHandler.create(log_level, native, stream=console_stream)
+        native_handler = NativeHandler.create(log_level, stream=console_stream)
         logger.addHandler(native_handler)
 
     log_level.set_level_for(logger)
@@ -157,7 +156,7 @@ def setup_logging(
 
     fd = native.setup_pantsd_logger(log_path, log_level.level)
     ExceptionSink.reset_interactive_output_stream(os.fdopen(os.dup(fd), "a"))
-    native_handler = NativeHandler(log_level, native, native_filename=log_path)
+    native_handler = NativeHandler(log_level, native_filename=log_path)
 
     logger.addHandler(native_handler)
     return native_handler

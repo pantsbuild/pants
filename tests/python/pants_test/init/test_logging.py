@@ -30,6 +30,7 @@ class LoggingTest(TestBase):
 
     @contextmanager
     def logger(self, log_level: LogLevel) -> Iterator[Tuple[Logger, NativeHandler, Path]]:
+        # This line needs to be here in order for tests to pass.
         native = self.scheduler._scheduler._native
         print(f"Native: {native}")
 
