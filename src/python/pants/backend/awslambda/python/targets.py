@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import re
-from typing import Optional, Tuple, cast
+from typing import Match, Optional, Tuple, cast
 
 from pants.backend.python.rules.targets import COMMON_PYTHON_FIELDS, PythonSources
 from pants.build_graph.address import Address
@@ -38,8 +38,8 @@ class PythonAwsLambdaRuntime(StringField):
 
     def to_interpreter_version(self) -> Tuple[int, int]:
         """Returns the Python version implied by the runtime, as (major, minor)."""
-        mo = re.match(self.PYTHON_RUNTIME_REGEX, self.value)
-        return int(mo["major"]), int(mo["minor"])
+        mo = cast(Match, re.match(self.PYTHON_RUNTIME_REGEX, self.value))
+        return int(mo.group("major")), int(mo.group("minor"))
 
 
 class PythonAWSLambda(Target):
