@@ -7,7 +7,7 @@ from logging import Logger
 from pathlib import Path
 from typing import Iterator, Tuple
 
-from pants.init.logging import FileLoggingSetupResult, setup_logging
+from pants.init.logging import NativeHandler, setup_logging
 from pants.testutil.engine.util import init_native
 from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
@@ -29,15 +29,13 @@ class LoggingTest(TestBase):
         )
 
     @contextmanager
-    def logger(self, log_level: LogLevel) -> Iterator[Tuple[Logger, FileLoggingSetupResult, Path]]:
+    def logger(self, log_level: LogLevel) -> Iterator[Tuple[Logger, NativeHandler, Path]]:
         native = self.scheduler._scheduler._native
         logger = logging.getLogger("my_file_logger")
         with temporary_dir() as tmpdir:
-            logging_setup_result = setup_logging(
-                log_level, log_dir=tmpdir, native=native, scope=logger.name
-            )
+            handler = setup_logging(log_level, log_dir=tmpdir, native=native, scope=logger.name)
             log_file = Path(tmpdir, "pants.log")
-            yield logger, logging_setup_result, log_file
+            yield logger, handler, log_file
 
     def test_utf8_logging(self) -> None:
         with self.logger(LogLevel.INFO) as (file_logger, logging_setup_result, log_file):
