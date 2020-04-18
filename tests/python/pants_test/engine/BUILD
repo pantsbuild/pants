@@ -129,6 +129,7 @@ python_tests(
   dependencies=[
     ':scheduler_test_base',
     'src/python/pants/build_graph',
+    'src/python/pants/engine:addresses',
     'src/python/pants/engine:build_files',
     'src/python/pants/engine:mapper',
     'src/python/pants/engine:objects',
