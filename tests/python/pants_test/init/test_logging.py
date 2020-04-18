@@ -7,7 +7,7 @@ from logging import Logger
 from pathlib import Path
 from typing import Iterator, Tuple
 
-from pants.init.logging import NativeHandler, setup_logging
+from pants.init.logging import NativeHandler, setup_logging_to_file
 from pants.testutil.engine.util import init_native
 from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
@@ -36,7 +36,7 @@ class LoggingTest(TestBase):
 
         logger = logging.getLogger(None)
         with temporary_dir() as tmpdir:
-            handler = setup_logging(log_level, log_dir=tmpdir)
+            handler = setup_logging_to_file(log_level, log_dir=tmpdir)
             log_file = Path(tmpdir, "pants.log")
             yield logger, handler, log_file
 

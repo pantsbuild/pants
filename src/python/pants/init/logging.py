@@ -6,7 +6,7 @@ import logging
 import os
 import sys
 import warnings
-from logging import Logger, LogRecord, StreamHandler
+from logging import LogRecord, StreamHandler
 from typing import List, Optional, TextIO
 
 import pants.util.logging as pants_logging
@@ -68,73 +68,18 @@ class NativeHandler(StreamHandler):
         )
 
 
-def setup_logging_to_stderr(python_logger: Logger, level: LogLevel) -> None:
-    """Sets up Python logging to stderr, proxied to Rust via a NativeHandler.
-
-    We deliberately set the most verbose logging possible (i.e. the TRACE log level), here, and let
-    the Rust logging faculties take care of filtering.
-    """
-    handler = NativeHandler(level, stream=sys.stderr)
-    python_logger.addHandler(handler)
-    LogLevel.TRACE.set_level_for(python_logger)
-
-
-def setup_logging_to_file(level: LogLevel) -> None:
-    pass
-
-
-def setup_logging(
-    log_level: LogLevel,
-    *,
-    log_dir: Optional[str],
-    console_stream: Optional[TextIO] = None,
-    log_filename: str = "pants.log",
-    warnings_filter_regexes: Optional[List[str]] = None,
-) -> Optional[NativeHandler]:
-    """Configures logging for a given scope, by default the global scope.
-
-    :param log_level: The logging level to enable.
-    :param console_stream: The stream to use for default (console) logging. If None (default), this
-                           will disable console logging.
-    :param log_dir: An optional directory to emit logs files in.  If unspecified, no disk logging
-                    will occur.  If supplied, the directory will be created if it does not already
-                    exist and all logs will be tee'd to a rolling set of log files in that
-                    directory.
-    :param scope: A logging scope to configure.  The scopes are hierarchichal logger names, with
-                  The '.' separator providing the scope hierarchy.  By default the root logger is
-                  configured.
-    :param log_filename: The base name of the log file (defaults to 'pants.log').
-
-    :param warnings_filter_regexes: A series of regexes to ignore warnings for, typically from the
-                                    `ignore_pants_warnings` option.
-    :returns: The file logging setup configured if any.
-    """
-
-    native = Native()
-
-    # TODO(John Sirois): Consider moving to straight python logging.  The divide between the
-    # context/work-unit logging and standard python logging doesn't buy us anything.
-
-    # TODO(John Sirois): Support logging.config.fileConfig so a site can setup fine-grained
-    # logging control and we don't need to be the middleman plumbing an option for each python
-    # standard logging knob.
-
-    # A custom log handler for sub-debug trace logging.
-    def trace(self, message, *args, **kwargs):
+def _common_logging_setup(level: LogLevel, warnings_filter_regexes: Optional[List[str]]) -> None:
+    def trace_fn(self, message, *args, **kwargs):
         if self.isEnabledFor(LogLevel.TRACE.level):
             self._log(LogLevel.TRACE.level, message, *args, **kwargs)
 
-    logging.Logger.trace = trace  # type: ignore[attr-defined]
+    logging.Logger.trace = trace_fn  # type: ignore[attr-defined]
 
     logger = logging.getLogger(None)
     for handler in logger.handlers:
         logger.removeHandler(handler)
 
-    if console_stream:
-        native_handler = NativeHandler(log_level, stream=console_stream)
-        logger.addHandler(native_handler)
-
-    log_level.set_level_for(logger)
+    level.set_level_for(logger)
 
     # This routes warnings through our loggers instead of straight to raw stderr.
     logging.captureWarnings(True)
@@ -148,15 +93,41 @@ def setup_logging(
         LogLevel.TRACE.set_level_for(requests_logger)
         requests_logger.propagate = True
 
-    if not log_dir:
-        return None
+
+def setup_logging_to_stderr(
+    level: LogLevel, *, warnings_filter_regexes: Optional[List[str]] = None
+) -> None:
+    """Sets up Python logging to stderr, proxied to Rust via a NativeHandler.
+
+    We deliberately set the most verbose logging possible (i.e. the TRACE log level), here, and let
+    the Rust logging faculties take care of filtering.
+    """
+    _common_logging_setup(level, warnings_filter_regexes)
+
+    python_logger = logging.getLogger(None)
+    handler = NativeHandler(level, stream=sys.stderr)
+    python_logger.addHandler(handler)
+    LogLevel.TRACE.set_level_for(python_logger)
+
+
+def setup_logging_to_file(
+    level: LogLevel,
+    *,
+    log_dir: str,
+    log_filename: str = "pants.log",
+    warnings_filter_regexes: Optional[List[str]] = None,
+) -> NativeHandler:
+    native = Native()
+    logger = logging.getLogger(None)
+
+    _common_logging_setup(level, warnings_filter_regexes)
 
     safe_mkdir(log_dir)
     log_path = os.path.join(log_dir, log_filename)
 
-    fd = native.setup_pantsd_logger(log_path, log_level.level)
+    fd = native.setup_pantsd_logger(log_path, level.level)
     ExceptionSink.reset_interactive_output_stream(os.fdopen(os.dup(fd), "a"))
-    native_handler = NativeHandler(log_level, native_filename=log_path)
+    native_handler = NativeHandler(level, native_filename=log_path)
 
     logger.addHandler(native_handler)
     return native_handler

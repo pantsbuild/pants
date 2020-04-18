@@ -76,7 +76,7 @@ class PantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         # We enable Rust logging here. Anything logged prior to this will be routed through regular Python logging.
         log_level = global_bootstrap_options.level
         init_rust_logger(log_level, global_bootstrap_options.log_show_rust_3rdparty)
-        setup_logging_to_stderr(logging.getLogger(None), log_level)
+        setup_logging_to_stderr(log_level)
 
         ExceptionSink.reset_should_print_backtrace_to_terminal(
             global_bootstrap_options.print_exception_stacktrace

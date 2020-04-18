@@ -18,7 +18,7 @@ from pants.bin.daemon_pants_runner import DaemonPantsRunner
 from pants.engine.native import Native
 from pants.engine.rules import UnionMembership
 from pants.init.engine_initializer import EngineInitializer
-from pants.init.logging import NativeHandler, init_rust_logger, setup_logging
+from pants.init.logging import init_rust_logger, setup_logging_to_file, setup_logging_to_stderr
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -355,15 +355,13 @@ class PantsDaemon(FingerprintedProcessManager):
             # full_init=True, we can guarantee self._native is non-None.
             native = cast(Native, self._native)
 
-            log_handler = setup_logging(
-                self._log_level,
-                log_dir=self._log_dir,
-                log_filename=self.LOG_NAME,
-                warnings_filter_regexes=self._bootstrap_options.for_global_scope(),  # type: ignore[union-attr]
+            level = self._log_level
+            # warnings_filter_regexes=self._bootstrap_options.for_global_scope(),  # type: ignore[union-attr]
+
+            setup_logging_to_stderr(level)
+            log_handler = setup_logging_to_file(
+                level, log_dir=self._log_dir, log_filename=self.LOG_NAME
             )
-            # We know log_handler is never None because we did pass a non-None `log_dir`
-            # to setup_logging.
-            log_handler = cast(NativeHandler, log_handler)
             native.override_thread_logging_destination_to_just_pantsd()
 
             # Do a python-level redirect of stdout/stderr, which will not disturb `0,1,2`.
