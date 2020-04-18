@@ -181,11 +181,10 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         # we don't have to gate logging setup anymore.
 
         native = Native()
-        log_dir: Optional[str] = global_options.logdir
         level = LogLevel.ERROR if getattr(global_options, "quiet", False) else global_options.level
         setup_logging(
             level,
-            log_dir=log_dir,
+            log_dir=global_options.logdir,
             native=native,
             console_stream=sys.stderr,
             warnings_filter_regexes=global_options.ignore_pants_warnings,
