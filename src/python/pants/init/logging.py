@@ -38,9 +38,20 @@ class NativeHandler(StreamHandler):
         native_filename: Optional[str] = None,
     ):
         super().__init__(stream)
+
+        if stream is not None and native_filename is not None:
+            raise RuntimeError("NativeHandler must output to either a stream or a file, not both")
+
         self.native = Native()
         self.native_filename = native_filename
         self.setLevel(log_level.level)
+        if stream:
+            try:
+                native = Native()
+                native.setup_stderr_logger(log_level.level)
+            except Exception as e:
+                print(f"Error setting up pantsd logger: {e!r}", file=sys.stderr)
+                raise e
 
     def emit(self, record: LogRecord) -> None:
         self.native.write_log(
@@ -56,17 +67,6 @@ class NativeHandler(StreamHandler):
             f"stream={self.stream})"
         )
 
-    @staticmethod
-    def create(log_level: LogLevel, stream: TextIO) -> "NativeHandler":
-        try:
-            native = Native()
-            native.setup_stderr_logger(log_level.level)
-        except Exception as e:
-            print(f"Error setting up pantsd logger: {e!r}", file=sys.stderr)
-            raise e
-
-        return NativeHandler(log_level, stream)
-
 
 def setup_logging_to_stderr(python_logger: Logger, level: LogLevel) -> None:
     """Sets up Python logging to stderr, proxied to Rust via a NativeHandler.
@@ -74,7 +74,7 @@ def setup_logging_to_stderr(python_logger: Logger, level: LogLevel) -> None:
     We deliberately set the most verbose logging possible (i.e. the TRACE log level), here, and let
     the Rust logging faculties take care of filtering.
     """
-    handler = NativeHandler.create(level, stream=sys.stderr)
+    handler = NativeHandler(level, stream=sys.stderr)
     python_logger.addHandler(handler)
     LogLevel.TRACE.set_level_for(python_logger)
 
@@ -131,7 +131,7 @@ def setup_logging(
         logger.removeHandler(handler)
 
     if console_stream:
-        native_handler = NativeHandler.create(log_level, stream=console_stream)
+        native_handler = NativeHandler(log_level, stream=console_stream)
         logger.addHandler(native_handler)
 
     log_level.set_level_for(logger)
