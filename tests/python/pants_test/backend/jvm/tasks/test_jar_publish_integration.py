@@ -262,7 +262,10 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                 with temporary_dir() as publish_dir:
                     with self.temporary_file_content(resource, resource_content):
                         # Validate that the target depends on the relevant resource.
-                        self.assertIn(resource, self.run_pants(["filedeps", target]).stdout_data)
+                        self.assertIn(
+                            resource,
+                            self.run_pants(["filedeps", "--transitive", target]).stdout_data,
+                        )
 
                         pants_run = self.run_pants_with_workdir(
                             [
