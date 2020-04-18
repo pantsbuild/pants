@@ -2011,13 +2011,13 @@ jobs:
     - mv dist/pants*.pex dist/deploy/pex/
     stage: Deploy Pants Pex Unstable
 stages:
-- if: type != cron
+- if: type = cron
   name: Bootstrap Pants
-- if: type = cron
-  name: Bootstrap Pants (Cron)
 - if: type != cron
-  name: Test Pants
+  name: Bootstrap Pants (Cron)
 - if: type = cron
+  name: Test Pants
+- if: type != cron
   name: Test Pants (Cron)
 - if: tag IS present AND tag =~ ^release_.*$
   name: Deploy Pants Pex
