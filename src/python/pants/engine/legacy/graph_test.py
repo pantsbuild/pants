@@ -1,77 +1,91 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from textwrap import dedent
+import functools
+import os
+from typing import cast
 
-from pants.build_graph.address import Address
-from pants.engine.addresses import Addresses
-from pants.engine.rules import RootRule
-from pants.engine.target import (
-    Dependencies,
-    Target,
-    Targets,
-    TransitiveTarget,
-    TransitiveTargets,
-    WrappedTarget,
-)
+from pants.build_graph.address_lookup_error import AddressLookupError
+from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
+from pants.build_graph.files import Files
 from pants.testutil.test_base import TestBase
-from pants.util.ordered_set import FrozenOrderedSet
 
 
-class MockTarget(Target):
-    alias = "target"
-    core_fields = (Dependencies,)
+# Macro that adds the specified tag.
+def macro(target_cls, tag, parse_context, tags=None, **kwargs):
+    tags = tags or set()
+    tags.add(tag)
+    parse_context.create_object(target_cls, tags=tags, **kwargs)
 
 
 class GraphTest(TestBase):
-    @classmethod
-    def rules(cls):
-        return (*super().rules(), RootRule(Addresses), RootRule(WrappedTarget))
+
+    _TAG = "tag_added_by_macro"
 
     @classmethod
-    def target_types(cls):
-        return (MockTarget,)
-
-    def test_transitive_targets(self) -> None:
-        t1 = MockTarget({}, address=Address.parse(":t1"))
-        t2 = MockTarget({Dependencies.alias: [t1.address]}, address=Address.parse(":t2"))
-        d1 = MockTarget({Dependencies.alias: [t1.address]}, address=Address.parse(":d1"))
-        d2 = MockTarget({Dependencies.alias: [t2.address]}, address=Address.parse(":d2"))
-        d3 = MockTarget({}, address=Address.parse(":d3"))
-        root = MockTarget(
-            {Dependencies.alias: [d1.address, d2.address, d3.address]},
-            address=Address.parse(":root"),
-        )
-
-        # TODO: possibly figure out how to deduplicate this when developing utilities for testing
-        #  with the Target API.
-        self.add_to_build_file(
-            "",
-            dedent(
-                """\
-                target(name='t1')
-                target(name='t2', dependencies=[':t1'])
-                target(name='d1', dependencies=[':t1'])
-                target(name='d2', dependencies=[':t2'])
-                target(name='d3')
-                target(name='root', dependencies=[':d1', ':d2', ':d3'])
-                """
+    def alias_groups(cls) -> BuildFileAliases:
+        return cast(
+            BuildFileAliases,
+            super()
+            .alias_groups()
+            .merge(
+                BuildFileAliases(
+                    targets={
+                        "files": Files,
+                        "tagged_files": TargetMacro.Factory.wrap(
+                            functools.partial(macro, Files, cls._TAG), Files
+                        ),
+                    }
+                )
             ),
         )
 
-        direct_deps = self.request_single_product(
-            Targets, Addresses(root[Dependencies].value)  # type: ignore[arg-type]
+    def test_with_missing_target_in_existing_build_file(self) -> None:
+        self.create_library(path="3rdparty/python", target_type="target", name="Markdown")
+        self.create_library(path="3rdparty/python", target_type="target", name="Pygments")
+        # When a target is missing,
+        #  the suggestions should be in order
+        #  and there should only be one copy of the error if tracing is off.
+        expected_message = (
+            '"rutabaga" was not found in namespace "3rdparty/python".'
+            ".*Did you mean one of:\n"
+            ".*:Markdown\n"
+            ".*:Pygments\n"
         )
-        assert direct_deps == Targets([d1, d2, d3])
+        with self.assertRaisesRegex(AddressLookupError, expected_message):
+            self.targets("3rdparty/python:rutabaga")
 
-        transitive_target = self.request_single_product(TransitiveTarget, WrappedTarget(root))
-        assert transitive_target.root == root
-        assert {
-            dep_transitive_target.root for dep_transitive_target in transitive_target.dependencies
-        } == {d1, d2, d3}
+    def test_with_missing_directory_fails(self) -> None:
+        with self.assertRaises(AddressLookupError) as cm:
+            self.targets("no-such-path:")
 
-        transitive_targets = self.request_single_product(
-            TransitiveTargets, Addresses([root.address, d2.address])
+        self.assertIn('Path "no-such-path" does not contain any BUILD files', str(cm.exception))
+
+    def test_invalidate_fsnode(self) -> None:
+        # NB: Invalidation is now more directly tested in unit tests in the `graph` crate.
+        self.create_library(path="src/example", target_type="target", name="things")
+        self.targets("src/example::")
+        invalidated_count = self.invalidate_for("src/example/BUILD")
+        self.assertGreater(invalidated_count, 0)
+
+    def test_sources_ordering(self) -> None:
+        input_sources = ["p", "a", "n", "t", "s", "b", "u", "i", "l", "d"]
+        expected_sources = sorted(input_sources)
+        self.create_library(
+            path="src/example", target_type="files", name="things", sources=input_sources
         )
-        assert transitive_targets.roots == (root, d2)
-        assert transitive_targets.closure == FrozenOrderedSet([root, d2, d1, d3, t2, t1])
+
+        target = self.target("src/example:things")
+        sources = [os.path.basename(s) for s in target.sources_relative_to_buildroot()]
+        self.assertEqual(expected_sources, sources)
+
+    def test_target_macro_override(self) -> None:
+        """Tests that we can "wrap" an existing target type with additional functionality.
+
+        Installs an additional TargetMacro that wraps `target` aliases to add a tag to all
+        definitions.
+        """
+
+        files = self.create_library(path="src/example", target_type="tagged_files", name="things")
+        self.assertIn(self._TAG, files.tags)
+        self.assertEqual(type(files), Files)

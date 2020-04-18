@@ -2,30 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
-  name = 'legacy_engine',
-  sources = ['test_legacy_engine.py'],
-  dependencies = [
-    'src/python/pants/base:exceptions',
-    'src/python/pants/engine:legacy_engine',
-    'src/python/pants/testutil/base:context_utils',
-    'src/python/pants/testutil/engine:engine_test_base',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_tests(
-  name='round_engine',
-  sources=['test_round_engine.py'],
-  dependencies = [
-    'src/python/pants/engine:legacy_engine',
-    'src/python/pants/task',
-    'src/python/pants/testutil:test_base',
-    'src/python/pants/testutil/engine:engine_test_base',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_tests(
   name='addressable',
   sources=['test_addressable.py'],
   dependencies=[

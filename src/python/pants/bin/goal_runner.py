@@ -11,7 +11,7 @@ from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_parser import BuildFileParser
 from pants.engine.addresses import Addresses
 from pants.engine.legacy.graph import LegacyBuildGraph
-from pants.engine.round_engine import RoundEngine
+from pants.engine.legacy.round_engine import RoundEngine
 from pants.engine.selectors import Params
 from pants.goal.context import Context
 from pants.goal.goal import Goal

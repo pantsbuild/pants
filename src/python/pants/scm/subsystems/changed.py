@@ -8,12 +8,8 @@ from typing import List, Optional, Tuple, cast
 from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.addresses import Address, Addresses
-from pants.engine.legacy.graph import (
-    Owners,
-    OwnersRequest,
-    _DependentGraph,
-    target_types_from_build_file_aliases,
-)
+from pants.engine.internals.graph import Owners, OwnersRequest
+from pants.engine.legacy.graph import _DependentGraph, target_types_from_build_file_aliases
 from pants.engine.mapper import AddressMapper
 from pants.engine.parser import HydratedStruct
 from pants.engine.rules import RootRule, rule

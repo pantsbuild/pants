@@ -27,10 +27,10 @@ from pants.engine.console import Console
 from pants.engine.fs import Workspace, create_fs_rules
 from pants.engine.goal import Goal
 from pants.engine.interactive_runner import InteractiveRunner, create_interactive_runner_rules
+from pants.engine.internals import graph, options_parsing
 from pants.engine.isolated_process import create_process_rules
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.graph import LegacyBuildGraph, create_legacy_graph_tasks
-from pants.engine.legacy.options_parsing import create_options_parsing_rules
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
 from pants.engine.legacy.structs import (
     JvmAppAdaptor,
@@ -420,13 +420,14 @@ class EngineInitializer:
             registered_target_types_singleton,
             union_membership_singleton,
             build_root_singleton,
+            *graph.rules(),
+            *options_parsing.rules(),
             *create_legacy_graph_tasks(),
             *create_fs_rules(),
             *create_interactive_runner_rules(),
             *create_process_rules(),
             *create_platform_rules(),
             *create_graph_rules(address_mapper),
-            *create_options_parsing_rules(),
             *structs_rules(),
             *changed_rules(),
             *binary_tool_rules(),
