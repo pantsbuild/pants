@@ -15,10 +15,10 @@ from pants.engine.fs import (
     InputFilesContent,
     SingleFileExecutable,
     Snapshot,
+    SourcesSnapshots,
 )
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.isolated_process import Process, ProcessResult
-from pants.engine.legacy.graph import SourcesSnapshots
 from pants.engine.rules import goal_rule, rule, subsystem_rule
 from pants.engine.selectors import Get
 

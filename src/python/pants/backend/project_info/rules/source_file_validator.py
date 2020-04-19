@@ -10,9 +10,8 @@ from typing import Tuple
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.engine.collection import Collection
 from pants.engine.console import Console
-from pants.engine.fs import Digest, FilesContent
+from pants.engine.fs import Digest, FilesContent, SourcesSnapshot, SourcesSnapshots
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.legacy.graph import SourcesSnapshot, SourcesSnapshots
 from pants.engine.rules import goal_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.subsystem.subsystem import Subsystem

@@ -25,19 +25,6 @@ python_tests(
 )
 
 python_library(
-  name = 'legacy_engine',
-  sources = ['legacy_engine.py', 'round_engine.py', 'round_manager.py'],
-  dependencies = [
-    'src/python/pants/base:exceptions',
-    'src/python/pants/base:workunit',
-    'src/python/pants/goal',
-    'src/python/pants/util:logging',
-    'src/python/pants/util:ordered_set',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_library(
   name='addressable',
   sources=['addressable.py'],
   dependencies=[

@@ -16,7 +16,6 @@ python_library(
     'src/python/pants/engine:selectors',
     'src/python/pants/engine:target',
     'src/python/pants/engine:unions',
-    'src/python/pants/engine/legacy:graph',
     'src/python/pants/option',
     'src/python/pants/source',
     'src/python/pants/util:objects',

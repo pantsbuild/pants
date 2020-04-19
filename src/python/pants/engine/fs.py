@@ -318,6 +318,26 @@ class SingleFileExecutable:
         self.directory_digest = snapshot.directory_digest
 
 
+@dataclass(frozen=True)
+class SourcesSnapshot:
+    """Sources matched by command line specs, either directly via FilesystemSpecs or indirectly via
+    AddressSpecs.
+
+    Note that the resolved sources do not need an owning target. Any source resolvable by
+    `PathGlobs` is valid here.
+    """
+
+    snapshot: Snapshot
+
+
+class SourcesSnapshots(Collection[SourcesSnapshot]):
+    """A collection of sources matched by command line specs.
+
+    `@goal_rule`s may request this when they only need source files to operate and do not need any
+    target information.
+    """
+
+
 def create_fs_rules():
     """Creates rules that consume the intrinsic filesystem types."""
     return [
