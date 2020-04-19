@@ -3,7 +3,6 @@
 
 import logging
 import os
-import sys
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Mapping, Optional, Tuple
@@ -21,7 +20,11 @@ from pants.engine.unions import UnionMembership
 from pants.goal.run_tracker import RunTracker
 from pants.help.help_printer import HelpPrinter
 from pants.init.engine_initializer import EngineInitializer, LegacyGraphSession
-from pants.init.logging import setup_logging
+from pants.init.logging import (
+    clear_previous_loggers,
+    setup_logging_to_file,
+    setup_logging_to_stderr,
+)
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.init.repro import Repro, Reproducer
 from pants.init.specs_calculator import SpecsCalculator
@@ -180,15 +183,13 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         # This works as expected due to the encapsulated_logger in DaemonPantsRunner and
         # we don't have to gate logging setup anymore.
 
-        native = Native()
         level = LogLevel.ERROR if getattr(global_options, "quiet", False) else global_options.level
-        setup_logging(
-            level,
-            log_dir=global_options.logdir,
-            native=native,
-            console_stream=sys.stderr,
-            warnings_filter_regexes=global_options.ignore_pants_warnings,
-        )
+        ignores = global_options.ignore_pants_warnings
+        clear_previous_loggers()
+        setup_logging_to_stderr(level, warnings_filter_regexes=ignores)
+        log_dir = global_options.logdir
+        if log_dir:
+            setup_logging_to_file(level, log_dir=log_dir, warnings_filter_regexes=ignores)
 
         options, build_config = LocalPantsRunner.parse_options(options_bootstrapper)
 

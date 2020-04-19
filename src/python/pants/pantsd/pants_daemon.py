@@ -18,7 +18,12 @@ from pants.bin.daemon_pants_runner import DaemonPantsRunner
 from pants.engine.native import Native
 from pants.engine.unions import UnionMembership
 from pants.init.engine_initializer import EngineInitializer
-from pants.init.logging import NativeHandler, init_rust_logger, setup_logging
+from pants.init.logging import (
+    clear_previous_loggers,
+    init_rust_logger,
+    setup_logging_to_file,
+    setup_logging_to_stderr,
+)
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -290,7 +295,6 @@ class PantsDaemon(FingerprintedProcessManager):
             else True
         )
 
-        self._log_dir = os.path.join(work_dir, self.name)
         self._logger = logging.getLogger(__name__)
         # N.B. This Event is used as nothing more than a convenient atomic flag - nothing waits on it.
         self._kill_switch = threading.Event()
@@ -354,16 +358,15 @@ class PantsDaemon(FingerprintedProcessManager):
             # is launched with full_init=True. If PantsdDaemon is launched with
             # full_init=True, we can guarantee self._native is non-None.
             native = cast(Native, self._native)
-            log_handler = setup_logging(
-                self._log_level,
-                native=native,
-                log_dir=self._log_dir,
-                log_filename=self.LOG_NAME,
-                warnings_filter_regexes=self._bootstrap_options.for_global_scope(),  # type: ignore[union-attr]
-            )
-            # We know log_handler is never None because we did pass a non-None `log_dir`
-            # to setup_logging.
-            log_handler = cast(NativeHandler, log_handler)
+
+            level = self._log_level
+            # TODO(gregs) - what is the right value for this warnings_filter_regexes line?
+            # warnings_filter_regexes=self._bootstrap_options.for_global_scope(),  # type: ignore[union-attr]
+            clear_previous_loggers()
+            setup_logging_to_stderr(level)
+            log_dir = os.path.join(self._work_dir, self.name)
+            log_handler = setup_logging_to_file(level, log_dir=log_dir, log_filename=self.LOG_NAME)
+
             native.override_thread_logging_destination_to_just_pantsd()
 
             # Do a python-level redirect of stdout/stderr, which will not disturb `0,1,2`.
