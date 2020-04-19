@@ -37,7 +37,7 @@ class TestExceptionSink(TestBase):
         sink = self._gen_sink_subclass()
         with self.assertRaisesWithMessageContaining(
             ExceptionSink.ExceptionSinkError,
-            "The provided exception sink path at '/does/not/exist' is not writable or could not be created",
+            "The provided log location path at '/does/not/exist' is not writable or could not be created",
         ):
             sink.reset_log_location("/does/not/exist")
 
@@ -48,7 +48,7 @@ class TestExceptionSink(TestBase):
         err_str = match(
             Platform.current,
             {
-                Platform.darwin: "The provided exception sink path at '/' is not writable or could not be created: [Errno 21] Is a directory: '/'.",
+                Platform.darwin: "The provided log location path at '/' is not writable or could not be created: [Errno 21] Is a directory: '/'.",
                 Platform.linux: "Error opening fatal error log streams for log location '/': [Errno 13] Permission denied: '/.pids'",
             },
         )
