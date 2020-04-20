@@ -20,7 +20,7 @@ def targets2():
 
 # Dummy v1 target to ensure that v1 tasks can still parse v2 BUILD files.
 class LegacyPythonAWSLambda(Target):
-    def __init__(self, handler=None, runtime=None, **kwargs):
+    def __init__(self, handler=None, runtime=None, sources=tuple(), **kwargs):
         super().__init__(**kwargs)
 
 

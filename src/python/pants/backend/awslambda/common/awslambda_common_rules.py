@@ -26,6 +26,8 @@ class AWSLambdaError(Exception):
 class CreatedAWSLambda:
     digest: Digest
     name: str
+    runtime: str
+    handler: str
 
 
 @union
@@ -86,8 +88,11 @@ async def create_awslambda(
         DirectoryToMaterialize(merged_digest, path_prefix=str(distdir.relpath))
     )
     with options.line_oriented(console) as print_stdout:
-        for path in result.output_paths:
-            print_stdout(f"Wrote {os.path.relpath(path, buildroot.path)}")
+        for awslambda, path in zip(awslambdas, result.output_paths):
+            print_stdout(f"Wrote code bundle to {os.path.relpath(path, buildroot.path)}")
+            print_stdout(f"  Runtime: {awslambda.runtime}")
+            print_stdout(f"  Handler: {awslambda.handler}")
+            print_stdout("")
     return AWSLambdaGoal(exit_code=0)
 
 
