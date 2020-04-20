@@ -1,24 +1,21 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import dataclasses
-from abc import ABC
+from abc import ABCMeta
 from dataclasses import dataclass
-from typing import ClassVar, Dict, Iterable, Tuple, Type, TypeVar
+from typing import ClassVar, Iterable, Type, TypeVar
 
-from pants.base.specs import OriginSpec
 from pants.core.util_rules.filter_empty_sources import (
     ConfigurationsWithSources,
     ConfigurationsWithSourcesRequest,
 )
-from pants.engine.addresses import Address
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.isolated_process import FallibleProcessResult
 from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get, MultiGet
-from pants.engine.target import Field, Sources, Target, TargetsWithOrigins, TargetWithOrigin
+from pants.engine.target import ConfigurationWithOrigin, Sources, TargetsWithOrigins
 from pants.engine.unions import UnionMembership, union
 
 
@@ -41,41 +38,10 @@ class LintResult:
         )
 
 
-# TODO: Factor this out.
-@dataclass(frozen=True)
-class LinterConfiguration(ABC):
-    """An ad hoc collection of the fields necessary for a particular linter to work with a
-    target."""
-
-    required_fields: ClassVar[Tuple[Type[Field], ...]]
-
-    address: Address
-    origin: OriginSpec
+class LinterConfiguration(ConfigurationWithOrigin, metaclass=ABCMeta):
+    """The fields necessary for a particular linter to work with a target."""
 
     sources: Sources
-
-    @classmethod
-    def is_valid(cls, tgt: Target) -> bool:
-        return tgt.has_fields(cls.required_fields)
-
-    @classmethod
-    def create(cls, target_with_origin: TargetWithOrigin) -> "LinterConfiguration":
-        all_expected_fields: Dict[str, Type[Field]] = {
-            dataclass_field.name: dataclass_field.type
-            for dataclass_field in dataclasses.fields(cls)
-            if isinstance(dataclass_field.type, type) and issubclass(dataclass_field.type, Field)  # type: ignore[unreachable]
-        }
-        tgt = target_with_origin.target
-        return cls(
-            address=tgt.address,
-            origin=target_with_origin.origin,
-            **{  # type: ignore[arg-type]
-                dataclass_field_name: (
-                    tgt[field_cls] if field_cls in cls.required_fields else tgt.get(field_cls)
-                )
-                for dataclass_field_name, field_cls in all_expected_fields.items()
-            },
-        )
 
 
 C = TypeVar("C", bound="LinterConfiguration")

@@ -9,6 +9,7 @@ from typing import Any, ClassVar, Dict, Iterable, List, Optional, Tuple, Type
 import pytest
 from typing_extensions import final
 
+from pants.base.specs import FilesystemLiteralSpec
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, PathGlobs, Snapshot
 from pants.engine.rules import RootRule, rule
@@ -17,6 +18,8 @@ from pants.engine.selectors import Get
 from pants.engine.target import (
     AsyncField,
     BoolField,
+    Configuration,
+    ConfigurationWithOrigin,
     DictStringToStringField,
     DictStringToStringSequenceField,
     HydratedSources,
@@ -33,6 +36,7 @@ from pants.engine.target import (
     StringOrStringSequenceField,
     StringSequenceField,
     Target,
+    TargetWithOrigin,
 )
 from pants.engine.target import rules as target_rules
 from pants.engine.unions import UnionMembership
@@ -400,6 +404,76 @@ def test_required_field() -> None:
         RequiredTarget({"async": 0}, address=address)
     assert str(address) in str(exc.value)
     assert "primitive" in str(exc.value)
+
+
+# -----------------------------------------------------------------------------------------------
+# Test Configuration
+# -----------------------------------------------------------------------------------------------
+
+
+def test_configuration() -> None:
+    class UnrelatedField(StringField):
+        alias = "unrelated_field"
+        default = "default"
+        value: str
+
+    class UnrelatedTarget(Target):
+        alias = "unrelated_target"
+        core_fields = (UnrelatedField,)
+
+    class NoFieldsTarget(Target):
+        alias = "no_fields_target"
+        core_fields = ()
+
+    @dataclass(frozen=True)
+    class FortranConfiguration(Configuration):
+        required_fields = (FortranSources,)
+
+        sources: FortranSources
+        unrelated_field: UnrelatedField
+
+    @dataclass(frozen=True)
+    class UnrelatedFieldConfiguration(ConfigurationWithOrigin):
+        required_fields = ()
+
+        unrelated_field: UnrelatedField
+
+    fortran_addr = Address.parse(":fortran")
+    fortran_tgt = FortranTarget({}, address=fortran_addr)
+    unrelated_addr = Address.parse(":unrelated")
+    unrelated_tgt = UnrelatedTarget({UnrelatedField.alias: "configured"}, address=unrelated_addr)
+    no_fields_addr = Address.parse(":no_fields")
+    no_fields_tgt = NoFieldsTarget({}, address=no_fields_addr)
+
+    assert FortranConfiguration.is_valid(fortran_tgt) is True
+    assert FortranConfiguration.is_valid(unrelated_tgt) is False
+    assert FortranConfiguration.is_valid(no_fields_tgt) is False
+    # When no fields are required, every target is valid.
+    for tgt in [fortran_tgt, unrelated_tgt, no_fields_tgt]:
+        assert UnrelatedFieldConfiguration.is_valid(tgt) is True
+
+    valid_fortran_config = FortranConfiguration.create(fortran_tgt)
+    assert valid_fortran_config.address == fortran_addr
+    assert valid_fortran_config.unrelated_field.value == UnrelatedField.default
+    with pytest.raises(KeyError):
+        FortranConfiguration.create(unrelated_tgt)
+
+    origin = FilesystemLiteralSpec("f.txt")
+    assert (
+        UnrelatedFieldConfiguration.create(TargetWithOrigin(fortran_tgt, origin)).origin == origin
+    )
+    assert (
+        UnrelatedFieldConfiguration.create(
+            TargetWithOrigin(unrelated_tgt, origin)
+        ).unrelated_field.value
+        == "configured"
+    )
+    assert (
+        UnrelatedFieldConfiguration.create(
+            TargetWithOrigin(no_fields_tgt, origin)
+        ).unrelated_field.value
+        == UnrelatedField.default
+    )
 
 
 # -----------------------------------------------------------------------------------------------
