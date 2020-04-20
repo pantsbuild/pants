@@ -30,8 +30,8 @@ class LoggingTest(TestBase):
 
     @contextmanager
     def logger(self, log_level: LogLevel) -> Iterator[Tuple[Logger, NativeHandler, Path]]:
-        # TODO(gregorys) - if this line isn't here this test fails with no stdout. Figure out why.
         native = self.scheduler._scheduler._native
+        # TODO(gregorys) - if this line isn't here this test fails with no stdout. Figure out why.
         print(f"Native: {native}")
         logger = logging.getLogger("my_file_logger")
         with temporary_dir() as tmpdir:
