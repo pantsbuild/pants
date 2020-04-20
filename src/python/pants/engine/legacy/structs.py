@@ -12,9 +12,9 @@ from pants.build_graph.address import Address
 from pants.build_graph.target import Target
 from pants.engine.addressable import addressable_sequence
 from pants.engine.fs import GlobExpansionConjunction, PathGlobs
-from pants.engine.objects import Locatable, union
-from pants.engine.rules import UnionRule
+from pants.engine.objects import Locatable
 from pants.engine.struct import Struct, StructWithDeps
+from pants.engine.unions import UnionRule, union
 from pants.source import wrapped_globs
 from pants.util.collections import ensure_str_list
 from pants.util.contextutil import exception_logging
@@ -284,23 +284,6 @@ class PythonAppAdaptor(AppAdaptor):
     pass
 
 
-class ResourcesAdaptor(TargetAdaptor):
-    pass
-
-
-class FilesAdaptor(TargetAdaptor):
-    pass
-
-
-# The python_requirements macro generates python_requirement_library targets and makes them
-# depend on a _python_requirements_file() target, so that pantsd knows to invalidate correctly
-# when the requirements.txt file changes.  We don't want to use a regular files() target for
-# this, as we don't want to consider the requirements.txt a source for the purpose of building
-# pexes (e.g., we don't want whitespace changes to requirements.txt to invalidate the sources pex).
-class PythonRequirementsFileAdaptor(TargetAdaptor):
-    pass
-
-
 class RemoteSourcesAdaptor(TargetAdaptor):
     def __init__(self, dest=None, **kwargs):
         """
@@ -348,14 +331,6 @@ class PythonBinaryAdaptor(PythonTargetAdaptor):
 
 
 class PythonTestsAdaptor(PythonTargetAdaptor):
-    pass
-
-
-class PythonAWSLambdaAdaptor(TargetAdaptor):
-    pass
-
-
-class PythonRequirementLibraryAdaptor(TargetAdaptor):
     pass
 
 

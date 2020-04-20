@@ -32,8 +32,15 @@ from pants.backend.python.rules.util import (
 )
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.base.specs import AddressSpecs, AscendantAddresses, SingleAddress
-from pants.build_graph.address import Address
-from pants.engine.addressable import Addresses
+from pants.core.target_types import ResourcesSources
+from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
+from pants.core.util_rules.distdir import DistDir
+from pants.core.util_rules.strip_source_roots import (
+    SourceRootStrippedSources,
+    StripSourcesFieldRequest,
+)
+from pants.engine.addresses import Address, Addresses
+from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.console import Console
 from pants.engine.fs import (
     Digest,
@@ -51,7 +58,6 @@ from pants.engine.fs import (
 )
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.isolated_process import Process, ProcessResult
-from pants.engine.objects import Collection
 from pants.engine.rules import goal_rule, named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
@@ -64,10 +70,6 @@ from pants.engine.target import (
 )
 from pants.option.custom_types import shell_str
 from pants.python.python_setup import PythonSetup
-from pants.rules.core.determine_source_files import AllSourceFilesRequest, SourceFiles
-from pants.rules.core.distdir import DistDir
-from pants.rules.core.strip_source_roots import SourceRootStrippedSources, StripSourcesFieldRequest
-from pants.rules.core.targets import ResourcesSources
 from pants.source.source_root import SourceRootConfig
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -141,8 +143,7 @@ class OwnedDependencies(Collection[OwnedDependency]):
     pass
 
 
-@dataclass(frozen=True)
-class ExportedTargetRequirements:
+class ExportedTargetRequirements(DeduplicatedCollection[str]):
     """The requirements of an ExportedTarget.
 
     Includes:
@@ -150,7 +151,7 @@ class ExportedTargetRequirements:
     - The published versions of any other ExportedTargets it depends on.
     """
 
-    requirement_strs: Tuple[str, ...]
+    sort_input = True
 
 
 @dataclass(frozen=True)
@@ -423,7 +424,7 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
             "packages": sources.packages,
             "namespace_packages": sources.namespace_packages,
             "package_data": dict(sources.package_data),
-            "install_requires": requirements.requirement_strs,
+            "install_requires": tuple(requirements),
         }
     )
     key_to_binary_spec = provides.binaries
@@ -592,15 +593,15 @@ async def get_requirements(dep_owner: DependencyOwner) -> ExportedTargetRequirem
         for tgt in direct_deps_tgts
         if tgt.has_field(PythonRequirementsField)
     )
-    req_strs = list(reqs.requirements)
+    req_strs = list(reqs)
 
     # Add the requirements on any exported targets on which we depend.
     exported_targets_we_depend_on = await MultiGet(
         Get[ExportedTarget](OwnedDependency(tgt)) for tgt in owned_by_others
     )
-    req_strs.extend(sorted(et.provides.requirement for et in set(exported_targets_we_depend_on)))
+    req_strs.extend(et.provides.requirement for et in set(exported_targets_we_depend_on))
 
-    return ExportedTargetRequirements(tuple(req_strs))
+    return ExportedTargetRequirements(req_strs)
 
 
 @named_rule(desc="Find all code to be published in the distribution")

@@ -14,6 +14,7 @@ from pants.backend.python.rules import download_pex_bin
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
+    PexPlatforms,
     PexRequest,
     PexRequirements,
 )
@@ -168,6 +169,7 @@ class PexTest(TestBase):
         requirements=PexRequirements(),
         entry_point=None,
         interpreter_constraints=PexInterpreterConstraints(),
+        platforms=PexPlatforms(),
         sources: Optional[Digest] = None,
         additional_inputs: Optional[Digest] = None,
         additional_pants_args: Tuple[str, ...] = (),
@@ -177,6 +179,7 @@ class PexTest(TestBase):
             output_filename="test.pex",
             requirements=requirements,
             interpreter_constraints=interpreter_constraints,
+            platforms=platforms,
             entry_point=entry_point,
             sources=sources,
             additional_inputs=additional_inputs,
@@ -210,6 +213,7 @@ class PexTest(TestBase):
         requirements=PexRequirements(),
         entry_point=None,
         interpreter_constraints=PexInterpreterConstraints(),
+        platforms=PexPlatforms(),
         sources: Optional[Digest] = None,
         additional_pants_args: Tuple[str, ...] = (),
         additional_pex_args: Tuple[str, ...] = (),
@@ -220,6 +224,7 @@ class PexTest(TestBase):
                 requirements=requirements,
                 entry_point=entry_point,
                 interpreter_constraints=interpreter_constraints,
+                platforms=platforms,
                 sources=sources,
                 additional_pants_args=additional_pants_args,
                 additional_pex_args=additional_pex_args,
@@ -238,29 +243,29 @@ class PexTest(TestBase):
         pex_output = self.create_pex_and_get_all_data(entry_point="main", sources=sources)
 
         pex_files = pex_output["files"]
-        self.assertTrue("pex" not in pex_files)
-        self.assertTrue("main.py" in pex_files)
-        self.assertTrue("subdir/sub.py" in pex_files)
+        assert "pex" not in pex_files
+        assert "main.py" in pex_files
+        assert "subdir/sub.py" in pex_files
 
         init_subsystem(PythonSetup)
         python_setup = PythonSetup.global_instance()
         env = {"PATH": create_path_env_var(python_setup.interpreter_search_paths)}
 
-        req = Process(
+        process = Process(
             argv=("python", "test.pex"),
             env=env,
             input_files=pex_output["pex"].directory_digest,
             description="Run the pex and make sure it works",
         )
-        result = self.request_single_product(ProcessResult, req)
-        self.assertEqual(result.stdout, b"from main\n")
+        result = self.request_single_product(ProcessResult, process)
+        assert result.stdout == b"from main\n"
 
     def test_resolves_dependencies(self) -> None:
         requirements = PexRequirements(["six==1.12.0", "jsonschema==2.6.0", "requests==2.23.0"])
         pex_info = self.create_pex_and_get_pex_info(requirements=requirements)
         # NB: We do not check for transitive dependencies, which PEX-INFO will include. We only check
         # that at least the dependencies we requested are included.
-        assert set(parse_requirements(requirements.requirements)).issubset(
+        assert set(parse_requirements(requirements)).issubset(
             set(parse_requirements(pex_info["requirements"]))
         )
 
@@ -292,11 +297,31 @@ class PexTest(TestBase):
     def test_interpreter_constraints(self) -> None:
         constraints = PexInterpreterConstraints(["CPython>=2.7,<3", "CPython>=3.6"])
         pex_info = self.create_pex_and_get_pex_info(interpreter_constraints=constraints)
-        assert set(pex_info["interpreter_constraints"]) == set(constraints.constraints)
+        assert set(pex_info["interpreter_constraints"]) == set(constraints)
 
     def test_additional_args(self) -> None:
         pex_info = self.create_pex_and_get_pex_info(additional_pex_args=("--not-zip-safe",))
         assert pex_info["zip_safe"] is False
+
+    def test_platforms(self) -> None:
+        # We use Python 2.7, rather than Python 3, to ensure that the specified platform is
+        # actually used.
+        platforms = PexPlatforms(["linux-x86_64-cp-27-cp27mu"])
+        constraints = PexInterpreterConstraints(["CPython>=2.7,<3", "CPython>=3.6"])
+        pex_output = self.create_pex_and_get_all_data(
+            requirements=PexRequirements(["cryptography==2.9"]),
+            platforms=platforms,
+            interpreter_constraints=constraints,
+        )
+        assert any(
+            "cryptography-2.9-cp27-cp27mu-manylinux2010_x86_64.whl" in fp
+            for fp in pex_output["files"]
+        )
+        assert not any("cryptography-2.9-cp27-cp27m-" in fp for fp in pex_output["files"])
+        assert not any("cryptography-2.9-cp35-abi3" in fp for fp in pex_output["files"])
+
+        # NB: Platforms override interpreter constraints.
+        assert pex_output["info"]["interpreter_constraints"] == []
 
     def test_additional_inputs(self) -> None:
         # We use pex's --preamble-file option to set a custom premable from a file.

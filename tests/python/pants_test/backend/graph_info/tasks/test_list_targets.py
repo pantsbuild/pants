@@ -13,7 +13,7 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
-from pants.rules.core import list_targets_old
+from pants.core.project_info import list_targets_old
 from pants.testutil.goal_rule_test_base import GoalRuleTestBase
 
 

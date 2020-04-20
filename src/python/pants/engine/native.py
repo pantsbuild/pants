@@ -34,9 +34,9 @@ from pants.engine.fs import (
 )
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveProcessResult
 from pants.engine.isolated_process import FallibleProcessResultWithPlatform, MultiPlatformProcess
-from pants.engine.objects import union
 from pants.engine.platform import Platform
 from pants.engine.selectors import Get
+from pants.engine.unions import union
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import read_file, safe_mkdir, safe_mkdtemp
 from pants.util.memo import memoized_classproperty, memoized_property
@@ -906,7 +906,6 @@ class Native(metaclass=SingletonMetaclass):
         scheduler,
         should_record_zipkin_spans,
         should_render_ui,
-        ui_worker_count,
         build_id,
         should_report_workunits: bool,
     ):
@@ -915,7 +914,6 @@ class Native(metaclass=SingletonMetaclass):
                 scheduler,
                 should_record_zipkin_spans,
                 should_render_ui,
-                ui_worker_count,
                 self.context.utf8_buf(build_id),
                 should_report_workunits,
             ),

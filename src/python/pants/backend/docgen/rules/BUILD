@@ -3,6 +3,8 @@
 
 python_library(
   dependencies=[
+    'src/python/pants/backend/docgen/targets',
+    'src/python/pants/engine:addresses',
     'src/python/pants/engine:target',
   ],
   tags = {"type_checked"},

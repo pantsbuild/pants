@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
-from pants.backend.python.rules.pex import TwoStepPex
+from pants.backend.python.rules.pex import PexPlatforms, TwoStepPex
 from pants.backend.python.rules.pex_from_targets import (
     PexFromTargetsRequest,
     TwoStepPexFromTargetsRequest,
@@ -18,14 +18,15 @@ from pants.backend.python.rules.targets import (
     PexZipSafe,
     PythonBinarySources,
     PythonEntryPoint,
-    PythonPlatforms,
 )
+from pants.backend.python.rules.targets import PythonPlatforms as PythonPlatformsField
 from pants.backend.python.targets.python_binary import PythonBinary
-from pants.engine.addressable import Addresses
-from pants.engine.rules import UnionRule, rule
+from pants.core.goals.binary import BinaryConfiguration, CreatedBinary
+from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
+from pants.engine.addresses import Addresses
+from pants.engine.rules import rule
 from pants.engine.selectors import Get
-from pants.rules.core.binary import BinaryConfiguration, CreatedBinary
-from pants.rules.core.determine_source_files import AllSourceFilesRequest, SourceFiles
+from pants.engine.unions import UnionRule
 
 
 @dataclass(frozen=True)
@@ -41,7 +42,7 @@ class PythonBinaryConfiguration(BinaryConfiguration):
     inherit_path: PexInheritPath
     shebang: PexShebang
     zip_safe: PexZipSafe
-    platforms: PythonPlatforms
+    platforms: PythonPlatformsField
 
     def generate_additional_args(self) -> Tuple[str, ...]:
         args = []
@@ -55,8 +56,6 @@ class PythonBinaryConfiguration(BinaryConfiguration):
             args.append(f"--inherit-path={self.inherit_path.value}")
         if self.shebang.value is not None:
             args.append(f"--python-shebang={self.shebang.value}")
-        if self.platforms.value is not None:
-            args.extend([f"--platform={platform}" for platform in self.platforms.value])
         return tuple(args)
 
 
@@ -82,6 +81,7 @@ async def create_python_binary(config: PythonBinaryConfiguration) -> CreatedBina
             PexFromTargetsRequest(
                 addresses=Addresses([config.address]),
                 entry_point=entry_point,
+                platforms=PexPlatforms.create_from_platforms_field(config.platforms),
                 output_filename=output_filename,
                 additional_args=config.generate_additional_args(),
                 description=f"Building {output_filename}",

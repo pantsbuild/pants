@@ -1,6 +1,8 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import itertools
+import time
 import unittest
 from dataclasses import dataclass, field
 from textwrap import dedent
@@ -102,6 +104,7 @@ async def rule_one_function(i: Input) -> Beta:
     a = Alpha()
     o = await Get[Omega](Alpha, a)
     b = await Get[Beta](Omega, o)
+    time.sleep(1)
     return b
 
 
@@ -212,17 +215,6 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
             remove_locations_from_traceback(str(cm.exception)),
         )
 
-    def test_fork_context(self):
-        # A smoketest that confirms that we can successfully enter and exit the fork context, which
-        # implies acquiring and releasing all relevant Engine resources.
-        expected = "42"
-
-        def fork_context_body():
-            return expected
-
-        res = self.mk_scheduler().with_fork_context(fork_context_body)
-        self.assertEquals(res, expected)
-
     @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/6829")
     def test_trace_multi(self):
         # Tests that when multiple distinct failures occur, they are each rendered.
@@ -323,13 +315,23 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
 
     @dataclass
     class WorkunitTracker:
-        workunits: List[dict] = field(default_factory=list)
+        """This class records every non-empty batch of started and completed workunits received from
+        the engine."""
+
+        finished_workunit_chunks: List[List[dict]] = field(default_factory=list)
+        started_workunit_chunks: List[List[dict]] = field(default_factory=list)
         finished: bool = False
 
         def add(self, workunits, **kwargs) -> None:
             if kwargs["finished"] is True:
                 self.finished = True
-            self.workunits.extend(workunits)
+
+            started_workunits = kwargs.get("started_workunits")
+            if started_workunits:
+                self.started_workunit_chunks.append(started_workunits)
+
+            if workunits:
+                self.finished_workunit_chunks.append(workunits)
 
     def test_streaming_workunits_reporting(self):
         rules = [fib, RootRule(int)]
@@ -344,16 +346,18 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
         with handler.session():
             scheduler.product_request(Fib, subjects=[0])
 
+        flattened = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
         # The execution of the single named @rule "fib" should be providing this one workunit.
-        self.assertEquals(len(tracker.workunits), 1)
+        self.assertEquals(len(flattened), 1)
 
-        tracker.workunits = []
+        tracker.finished_workunit_chunks = []
         with handler.session():
             scheduler.product_request(Fib, subjects=[10])
 
         # Requesting a bigger fibonacci number will result in more rule executions and thus more reported workunits.
         # In this case, we expect 10 invocations of the `fib` rule.
-        assert len(tracker.workunits) == 10
+        flattened = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+        assert len(flattened) == 10
         assert tracker.finished
 
     def test_streaming_workunits_parent_id_and_rule_metadata(self):
@@ -372,10 +376,26 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
 
         assert tracker.finished
 
-        r1 = next(item for item in tracker.workunits if item["name"] == "rule_one")
-        r2 = next(item for item in tracker.workunits if item["name"] == "rule_two")
-        r3 = next(item for item in tracker.workunits if item["name"] == "rule_three")
-        r4 = next(item for item in tracker.workunits if item["name"] == "rule_four")
+        # rule_one should complete well-after the other rules because of the artificial delay in it caused by the sleep().
+        assert {item["name"] for item in tracker.finished_workunit_chunks[0]} == {
+            "rule_two",
+            "rule_three",
+            "rule_four",
+        }
+
+        # Because of the artifical delay in rule_one, it should have time to be reported as
+        # started but not yet finished.
+        started = list(itertools.chain.from_iterable(tracker.started_workunit_chunks))
+        assert len(list(item for item in started if item["name"] == "rule_one")) > 0
+
+        assert {item["name"] for item in tracker.finished_workunit_chunks[1]} == {"rule_one"}
+
+        finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+
+        r1 = next(item for item in finished if item["name"] == "rule_one")
+        r2 = next(item for item in finished if item["name"] == "rule_two")
+        r3 = next(item for item in finished if item["name"] == "rule_three")
+        r4 = next(item for item in finished if item["name"] == "rule_four")
 
         assert r1.get("parent_id", None) is None
         assert r2["parent_id"] == r1["span_id"]

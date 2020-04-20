@@ -10,8 +10,8 @@ from pants.base.project_tree import Dir
 from pants.base.specs import AddressSpec, AddressSpecs, SingleAddress, more_specific
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
-from pants.engine.addressable import (
-    AddressableDescriptor,
+from pants.engine.addressable import AddressableDescriptor
+from pants.engine.addresses import (
     Addresses,
     AddressesWithOrigins,
     AddressWithOrigin,

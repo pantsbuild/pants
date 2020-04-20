@@ -12,6 +12,8 @@ page(
 python_tests(
   name = 'tests',
   dependencies = [
+    ':addresses',
+    ':collection',
     ':console',
     ':goal',
     ':platform',
@@ -23,28 +25,26 @@ python_tests(
 )
 
 python_library(
-  name = 'legacy_engine',
-  sources = ['legacy_engine.py', 'round_engine.py', 'round_manager.py'],
-  dependencies = [
-    'src/python/pants/base:exceptions',
-    'src/python/pants/base:workunit',
-    'src/python/pants/goal',
-    'src/python/pants/util:logging',
-    'src/python/pants/util:ordered_set',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_library(
   name='addressable',
   sources=['addressable.py'],
   dependencies=[
     ':objects',
     'src/python/pants/build_graph',
-    'src/python/pants/util:memo',
     'src/python/pants/util:objects',
   ],
   tags = {"partially_type_checked"},
+)
+
+python_library(
+  name='addresses',
+  sources=['addresses.py'],
+  dependencies=[
+    ':collection',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:specs',
+    'src/python/pants/build_graph',
+  ],
+  tags = {"type_checked"},
 )
 
 python_library(
@@ -63,7 +63,7 @@ python_library(
   sources=['fs.py'],
   dependencies=[
     '3rdparty/python:dataclasses',
-    ':objects',
+    ':collection',
     ':rules',
     ':selectors',
     'src/python/pants/base:project_tree',
@@ -106,6 +106,15 @@ python_library(
     'src/python/pants/util:ordered_set',
   ],
   tags = {'partially_type_checked'},
+)
+
+python_library(
+  name='collection',
+  sources=['collection.py'],
+  dependencies=[
+    'src/python/pants/util:ordered_set',
+  ],
+  tags = {'type_checked'},
 )
 
 python_library(
@@ -209,6 +218,7 @@ python_library(
   dependencies=[
     ':goal',
     ':selectors',
+    ':unions',
     'src/python/pants/util:collections',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
@@ -233,15 +243,15 @@ python_library(
   sources=['scheduler.py'],
   dependencies=[
     '3rdparty/python:dataclasses',
+    '3rdparty/python:typing-extensions',
+    ':collection',
     ':fs',
     ':isolated_process',
     ':native',
     ':nodes',
-    ':objects',
     ':rules',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:specs',
-    'src/python/pants/rules/core:core',
   ],
   tags = {"partially_type_checked"},
 )
@@ -280,10 +290,22 @@ python_library(
   name='target',
   sources=['target.py'],
   dependencies=[
+    ':collection',
     ':rules',
+    ':unions',
     '3rdparty/python:typing-extensions',
     'src/python/pants/util:collections',
     'src/python/pants/util:frozendict',
+    'src/python/pants/util:meta',
+    'src/python/pants/util:ordered_set',
+  ],
+  tags = {'type_checked'},
+)
+
+python_library(
+  name='unions',
+  sources=['unions.py'],
+  dependencies=[
     'src/python/pants/util:meta',
     'src/python/pants/util:ordered_set',
   ],

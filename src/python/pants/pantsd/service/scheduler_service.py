@@ -11,7 +11,7 @@ from typing import List, Optional, Set
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import Specs
 from pants.engine.fs import PathGlobs, Snapshot
-from pants.engine.rules import UnionMembership
+from pants.engine.unions import UnionMembership
 from pants.goal.run_tracker import RunTracker
 from pants.init.engine_initializer import LegacyGraphScheduler, LegacyGraphSession
 from pants.option.options import Options

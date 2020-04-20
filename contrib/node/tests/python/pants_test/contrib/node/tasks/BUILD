@@ -39,7 +39,7 @@ python_tests(
     'src/python/pants/fs',
     'src/python/pants/util:contextutil',
   ],
-  timeout=480,
+  timeout=540,
   tags={'integration', 'partially_type_checked'},
 )
 

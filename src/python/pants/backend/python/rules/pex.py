@@ -9,13 +9,13 @@ from typing import FrozenSet, Iterable, Iterator, List, NamedTuple, Optional, Se
 
 from pants.backend.python.rules.download_pex_bin import DownloadedPexBin
 from pants.backend.python.rules.hermetic_pex import HermeticPex
-from pants.backend.python.rules.targets import (
-    PythonInterpreterCompatibility,
-    PythonRequirementsField,
-)
+from pants.backend.python.rules.targets import PythonInterpreterCompatibility
+from pants.backend.python.rules.targets import PythonPlatforms as PythonPlatformsField
+from pants.backend.python.rules.targets import PythonRequirementsField
 from pants.backend.python.rules.util import parse_interpreter_constraint
 from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.engine.collection import DeduplicatedCollection
 from pants.engine.fs import (
     EMPTY_DIRECTORY_DIGEST,
     EMPTY_SNAPSHOT,
@@ -28,7 +28,6 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.isolated_process import MultiPlatformProcess, ProcessResult
-from pants.engine.legacy.structs import PythonTargetAdaptor, TargetAdaptor
 from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.rules import RootRule, named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get
@@ -37,16 +36,10 @@ from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
-from pants.util.ordered_set import FrozenOrderedSet
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
-class PexRequirements:
-    requirements: FrozenOrderedSet[str]
-
-    def __init__(self, requirements: Optional[Iterable[str]] = None) -> None:
-        self.requirements = FrozenOrderedSet(sorted(requirements or ()))
+class PexRequirements(DeduplicatedCollection[str]):
+    sort_input = True
 
     @classmethod
     def create_from_requirement_fields(
@@ -59,22 +52,6 @@ class PexRequirements:
             str(python_req.requirement) for field in fields for python_req in field.value
         }
         return PexRequirements({*field_requirements, *additional_requirements})
-
-    @classmethod
-    def create_from_adaptors(
-        cls, adaptors: Iterable[TargetAdaptor], additional_requirements: Iterable[str] = ()
-    ) -> "PexRequirements":
-        all_target_requirements = set()
-        for maybe_python_req_lib in adaptors:
-            # This is a python_requirement()-like target.
-            if hasattr(maybe_python_req_lib, "requirement"):
-                all_target_requirements.add(str(maybe_python_req_lib.requirement))
-            # This is a python_requirement_library()-like target.
-            if hasattr(maybe_python_req_lib, "requirements"):
-                for py_req in maybe_python_req_lib.requirements:
-                    all_target_requirements.add(str(py_req.requirement))
-        all_target_requirements.update(additional_requirements)
-        return PexRequirements(all_target_requirements)
 
 
 Spec = Tuple[str, str]  # e.g. (">=", "3.6")
@@ -91,13 +68,8 @@ class ParsedConstraint(NamedTuple):
         return f"{self.interpreter}{specs}"
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
-class PexInterpreterConstraints:
-    constraints: FrozenOrderedSet[str]
-
-    def __init__(self, constraints: Optional[Iterable[str]] = None) -> None:
-        self.constraints = FrozenOrderedSet(sorted(constraints or ()))
+class PexInterpreterConstraints(DeduplicatedCollection[str]):
+    sort_input = True
 
     @staticmethod
     def merge_constraint_sets(constraint_sets: Iterable[Iterable[str]]) -> List[str]:
@@ -158,26 +130,25 @@ class PexInterpreterConstraints:
         merged_constraints = cls.merge_constraint_sets(constraint_sets)
         return PexInterpreterConstraints(merged_constraints)
 
+    def generate_pex_arg_list(self) -> List[str]:
+        args = []
+        for constraint in self:
+            args.extend(["--interpreter-constraint", constraint])
+        return args
+
+
+class PexPlatforms(DeduplicatedCollection[str]):
+    sort_input = True
+
     @classmethod
-    def create_from_adaptors(
-        cls, adaptors: Iterable[TargetAdaptor], python_setup: PythonSetup
-    ) -> "PexInterpreterConstraints":
-        constraint_sets: Set[Iterable[str]] = set()
-        for adaptor in adaptors:
-            if not isinstance(adaptor, PythonTargetAdaptor):
-                continue
-            compatibility_field = PythonInterpreterCompatibility(
-                adaptor.compatibility, address=adaptor.address
-            )
-            constraint_sets.add(compatibility_field.value_or_global_default(python_setup))
-        # This will OR within each target and AND across targets.
-        merged_constraints = cls.merge_constraint_sets(constraint_sets)
-        return PexInterpreterConstraints(merged_constraints)
+    def create_from_platforms_field(cls, field: PythonPlatformsField) -> "PexPlatforms":
+        # TODO(#9562): wire to `--python-setup-platforms` once we know when/where it should be used.
+        return cls(field.value or ())
 
     def generate_pex_arg_list(self) -> List[str]:
         args = []
-        for constraint in sorted(self.constraints):
-            args.extend(["--interpreter-constraint", constraint])
+        for platform in self:
+            args.extend(["--platform", platform])
         return args
 
 
@@ -189,6 +160,7 @@ class PexRequest:
     output_filename: str
     requirements: PexRequirements
     interpreter_constraints: PexInterpreterConstraints
+    platforms: PexPlatforms
     sources: Optional[Digest]
     additional_inputs: Optional[Digest]
     entry_point: Optional[str]
@@ -203,6 +175,7 @@ class PexRequest:
         output_filename: str,
         requirements: PexRequirements = PexRequirements(),
         interpreter_constraints=PexInterpreterConstraints(),
+        platforms=PexPlatforms(),
         sources: Optional[Digest] = None,
         additional_inputs: Optional[Digest] = None,
         entry_point: Optional[str] = None,
@@ -212,6 +185,7 @@ class PexRequest:
         self.output_filename = output_filename
         self.requirements = requirements
         self.interpreter_constraints = interpreter_constraints
+        self.platforms = platforms
         self.sources = sources
         self.additional_inputs = additional_inputs
         self.entry_point = entry_point
@@ -299,7 +273,6 @@ async def create_pex(
     argv = [
         "--output-file",
         request.output_filename,
-        *request.interpreter_constraints.generate_pex_arg_list(),
         # NB: In setting `--no-pypi`, we rely on the default value of `--python-repos-indexes`
         # including PyPI, which will override `--no-pypi` and result in using PyPI in the default
         # case. Why set `--no-pypi`, then? We need to do this so that
@@ -309,6 +282,16 @@ async def create_pex(
         *(f"--repo={repo}" for repo in python_repos.repos),
         *request.additional_args,
     ]
+
+    # NB: If `--platform` is specified, this signals that the PEX should not be built locally.
+    # `--interpreter-constraint` only makes sense in the context of building locally. These two
+    # flags are mutually exclusive. See https://github.com/pantsbuild/pex/issues/957.
+    if request.platforms:
+        # TODO(#9560): consider validating that these platforms are valid with the interpreter
+        #  constraints.
+        argv.extend(request.platforms.generate_pex_arg_list())
+    else:
+        argv.extend(request.interpreter_constraints.generate_pex_arg_list())
 
     pex_debug = PexDebug(log_level)
     argv.extend(pex_debug.iter_pex_args())
@@ -330,7 +313,7 @@ async def create_pex(
     source_dir_name = "source_files"
     argv.append(f"--sources-directory={source_dir_name}")
 
-    argv.extend(request.requirements.requirements)
+    argv.extend(request.requirements)
 
     constraint_file_snapshot = EMPTY_SNAPSHOT
     if python_setup.requirement_constraints is not None:
@@ -370,8 +353,8 @@ async def create_pex(
     # constraint`".
     description = request.description
     if description is None:
-        if request.requirements.requirements:
-            description = f"Resolving {', '.join(request.requirements.requirements)}"
+        if request.requirements:
+            description = f"Resolving {', '.join(request.requirements)}"
         else:
             description = f"Building PEX"
     process = MultiPlatformProcess(
@@ -407,23 +390,24 @@ async def create_pex(
 
 @rule
 async def two_step_create_pex(two_step_pex_request: TwoStepPexRequest) -> TwoStepPex:
-    """Create a pex in two steps: a requirements-only pex and then a full pex from it."""
+    """Create a PEX in two steps: a requirements-only PEX and then a full PEX from it."""
     request = two_step_pex_request.pex_request
     req_pex_name = "__requirements.pex"
 
     additional_inputs: Optional[Digest]
 
     # Create a pex containing just the requirements.
-    if request.requirements.requirements:
+    if request.requirements:
         requirements_pex_request = PexRequest(
             output_filename=req_pex_name,
             requirements=request.requirements,
             interpreter_constraints=request.interpreter_constraints,
+            platforms=request.platforms,
             # TODO: Do we need to pass all the additional args to the requirements pex creation?
             #  Some of them may affect resolution behavior, but others may be irrelevant.
             #  For now we err on the side of caution.
             additional_args=request.additional_args,
-            description=f"Resolving {', '.join(request.requirements.requirements)}",
+            description=f"Resolving {', '.join(request.requirements)}",
         )
         requirements_pex = await Get[Pex](PexRequest, requirements_pex_request)
         additional_inputs = requirements_pex.directory_digest
@@ -432,7 +416,7 @@ async def two_step_create_pex(two_step_pex_request: TwoStepPexRequest) -> TwoSte
         additional_inputs = None
         additional_args = request.additional_args
 
-    # Now create a full pex on top of the requirements pex.
+    # Now create a full PEX on top of the requirements PEX.
     full_pex_request = dataclasses.replace(
         request,
         requirements=PexRequirements(),
