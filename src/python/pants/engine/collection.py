@@ -54,6 +54,9 @@ class Collection(Sequence[T]):
         return f"{self.__class__.__name__}({list(self.dependencies)})"
 
 
+# NB: This name is clunky. It would be more appropriate to call it `Set`, but that is claimed by
+#  `typing.Set` already. See
+#  https://github.com/pantsbuild/pants/pull/9590#pullrequestreview-395970440.
 class DeduplicatedCollection(FrozenOrderedSet[T]):
     """A light newtype around FrozenOrderedSet for use with the V2 engine.
 
