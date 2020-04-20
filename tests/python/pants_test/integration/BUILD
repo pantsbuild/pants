@@ -32,7 +32,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil:git_util',
-    'src/python/pants/testutil:base',
+    'src/python/pants/testutil:test_base',
     'src/python/pants/testutil:int-test',
     'testprojects/src/python:python_targets_directory',
     'testprojects/src/python:sources_directory',
