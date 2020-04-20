@@ -383,29 +383,6 @@ jobs:
     - ./build-support/bin/ci.py --clippy
     stage: Test Pants
     sudo: required
-  - before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-    - sudo sysctl fs.inotify.max_user_watches=524288
-    - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
-    - sudo apt-get install -y pkg-config fuse libfuse-dev
-    - sudo modprobe fuse
-    - sudo chmod 666 /dev/fuse
-    - sudo chown root:$USER /etc/fuse.conf
-    dist: xenial
-    env:
-    - CACHE_NAME=cargo_audit
-    name: Cargo audit
-    os: linux
-    python:
-    - '2.7'
-    - '3.6'
-    - '3.7'
-    script:
-    - ./build-support/bin/ci.py --cargo-audit
-    stage: Test Pants (Cron)
-    sudo: required
   - addons:
       apt:
         packages:
