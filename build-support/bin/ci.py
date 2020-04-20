@@ -491,7 +491,7 @@ def run_cargo_audit() -> None:
                     "build-support/bin/native/cargo",
                     "ensure-installed",
                     "--package=cargo-audit",
-                    "--version=0.7.0",
+                    "--version=0.11.2",
                 ],
                 check=True,
             )
