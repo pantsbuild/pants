@@ -356,16 +356,19 @@ class PantsDaemon(FingerprintedProcessManager):
             # We can't statically prove it, but we won't execute `launch()` (which
             # calls `run_sync` which calls `_pantsd_logging`) unless PantsDaemon
             # is launched with full_init=True. If PantsdDaemon is launched with
-            # full_init=True, we can guarantee self._native is non-None.
+            # full_init=True, we can guarantee self._native and self._bootstrap_options
+            # are non-None.
             native = cast(Native, self._native)
+            bootstrap_options = cast(OptionValueContainer, self._bootstrap_options)
 
             level = self._log_level
-            # TODO(gregs) - what is the right value for this warnings_filter_regexes line?
-            # warnings_filter_regexes=self._bootstrap_options.for_global_scope(),  # type: ignore[union-attr]
+            ignores = bootstrap_options.for_global_scope().ignore_pants_warnings
             clear_previous_loggers()
-            setup_logging_to_stderr(level)
+            setup_logging_to_stderr(level, warnings_filter_regexes=ignores)
             log_dir = os.path.join(self._work_dir, self.name)
-            log_handler = setup_logging_to_file(level, log_dir=log_dir, log_filename=self.LOG_NAME)
+            log_handler = setup_logging_to_file(
+                level, log_dir=log_dir, log_filename=self.LOG_NAME, warnings_filter_regexes=ignores
+            )
 
             native.override_thread_logging_destination_to_just_pantsd()
 
