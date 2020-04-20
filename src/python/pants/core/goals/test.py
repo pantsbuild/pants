@@ -35,6 +35,7 @@ from pants.engine.target import (
     TargetWithOrigin,
 )
 from pants.engine.unions import UnionMembership, union
+from pants.option.custom_types import dir_option
 
 # TODO(#6004): use proper Logging singleton, rather than static logger.
 logger = logging.getLogger(__name__)
@@ -229,6 +230,12 @@ class TestOptions(GoalSubsystem):
             default=False,
             help="If a coverage report file is generated, open it on the local system if the "
             "system supports this.",
+        )
+        register(
+            "--results-dir",
+            type=dir_option,
+            default=None,
+            help="Directory to store tests results files",
         )
 
 

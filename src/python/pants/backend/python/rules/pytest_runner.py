@@ -3,6 +3,7 @@
 
 import functools
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, List, Optional, Tuple, Union, cast
 
 from pants.backend.python.rules.importable_python_sources import ImportablePythonSources
@@ -59,6 +60,7 @@ class TestTargetSetup:
     args: Tuple[str, ...]
     input_files_digest: Digest
     timeout_seconds: Optional[int]
+    results_file_path: Optional[str]
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
@@ -210,11 +212,18 @@ async def setup_pytest_for_target(
             coverage_args.extend(["--cov", package])
 
     specified_source_file_names = sorted(specified_source_files.snapshot.files)
+    results_dir = test_options.values.results_dir
+    results_file_path = (
+        (Path(results_dir) / f"{config.address.path_safe_spec}.xml").absolute().as_posix()
+        if results_dir
+        else None
+    )
     return TestTargetSetup(
         test_runner_pex=test_runner_pex,
         args=(*pytest.options.args, *coverage_args, *specified_source_file_names),
         input_files_digest=merged_input_files,
         timeout_seconds=config.timeout.calculate_from_global_options(pytest),
+        results_file_path=results_file_path,
     )
 
 
@@ -228,7 +237,10 @@ async def run_python_test(
     test_options: TestOptions,
 ) -> TestResult:
     """Runs pytest for one target."""
-    env = {"PYTEST_ADDOPTS": f"--color={'yes' if global_options.options.colors else 'no'}"}
+    add_opts = [f"--color={'yes' if global_options.options.colors else 'no'}"]
+    if test_setup.results_file_path:
+        add_opts.append(f"--junitxml={test_setup.results_file_path}")
+    env = {"PYTEST_ADDOPTS": " ".join(add_opts)}
     run_coverage = test_options.values.run_coverage
     request = test_setup.test_runner_pex.create_execute_request(
         python_setup=python_setup,
