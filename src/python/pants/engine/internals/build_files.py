@@ -8,22 +8,23 @@ from typing import Dict
 from pants.base.exceptions import ResolveError
 from pants.base.project_tree import Dir
 from pants.base.specs import AddressSpec, AddressSpecs, SingleAddress, more_specific
-from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
-from pants.engine.addressable import AddressableDescriptor
 from pants.engine.addresses import (
+    Address,
     Addresses,
     AddressesWithOrigins,
     AddressWithOrigin,
+    BuildFileAddress,
     BuildFileAddresses,
 )
 from pants.engine.fs import Digest, FilesContent, PathGlobs, Snapshot
-from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper
-from pants.engine.objects import Locatable, SerializableFactory, Validatable
-from pants.engine.parser import HydratedStruct
+from pants.engine.internals.addressable import AddressableDescriptor
+from pants.engine.internals.mapper import AddressFamily, AddressMap, AddressMapper
+from pants.engine.internals.objects import Locatable, SerializableFactory, Validatable
+from pants.engine.internals.parser import HydratedStruct
+from pants.engine.internals.struct import Struct
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
-from pants.engine.struct import Struct
 from pants.util.objects import TypeConstraintError
 from pants.util.ordered_set import OrderedSet
 

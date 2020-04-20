@@ -15,6 +15,7 @@ from pants.engine.fs import (
     PathGlobs,
     Snapshot,
 )
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.isolated_process import (
     FallibleProcessResult,
     Process,
@@ -22,7 +23,6 @@ from pants.engine.isolated_process import (
     ProcessResult,
 )
 from pants.engine.rules import RootRule, rule
-from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Get
 from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir

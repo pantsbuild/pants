@@ -11,8 +11,8 @@ from typing_extensions import final
 
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, PathGlobs, Snapshot
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import RootRule, rule
-from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Get
 from pants.engine.target import (
     AsyncField,

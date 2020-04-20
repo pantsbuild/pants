@@ -16,7 +16,7 @@ import cffi
 import pkg_resources
 
 from pants.base.project_tree import Dir, File, Link
-from pants.build_graph.address import Address
+from pants.engine.addresses import Address
 from pants.engine.fs import (
     Digest,
     DirectoriesToMerge,

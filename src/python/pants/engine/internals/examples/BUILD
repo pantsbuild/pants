@@ -11,9 +11,9 @@ python_library(
   sources=['parsers.py'],
   dependencies=[
     'src/python/pants/build_graph',
-    'src/python/pants/engine:objects',
-    'src/python/pants/engine:parser',
+    'src/python/pants/engine/internals:core_abstractions',
     'src/python/pants/util:memo',
+    'src/python/pants/util:strutil',
   ],
   tags = {'partially_type_checked'},
 )
@@ -22,12 +22,12 @@ resources(
   name='fs_test',
   # Note that this test data dir is bundled into a tarfile, to preserve symlink structure
   # when copied into a chroot.
-  sources=['fs_test/**/*'],
+  sources=['fs_test/fs_test.tar'],
 )
 
 resources(
   name='graph_test',
-  sources=['graph_test/**/*'],
+  sources=['graph_test/*'],
 )
 
 resources(

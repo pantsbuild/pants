@@ -15,7 +15,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink, SignalHandler
 from pants.base.exiter import Exiter
 from pants.bin.daemon_pants_runner import DaemonPantsRunner
-from pants.engine.native import Native
+from pants.engine.internals.native import Native
 from pants.engine.unions import UnionMembership
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.logging import NativeHandler, init_rust_logger, setup_logging

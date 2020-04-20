@@ -9,32 +9,31 @@ from typing import Tuple, Type, cast
 from pants.base.exceptions import ResolveError
 from pants.base.project_tree import Dir
 from pants.base.specs import AddressSpecs, SiblingAddresses, SingleAddress
-from pants.build_graph.address import Address
-from pants.engine.addressable import addressable, addressable_dict
-from pants.engine.addresses import Addresses
-from pants.engine.build_files import (
+from pants.engine.addresses import Address, Addresses
+from pants.engine.fs import Digest, FileContent, FilesContent, PathGlobs, Snapshot, create_fs_rules
+from pants.engine.internals.addressable import addressable, addressable_dict
+from pants.engine.internals.build_files import (
     ResolvedTypeMismatchError,
     addresses_with_origins_from_address_families,
     create_graph_rules,
     parse_address_family,
     strip_address_origins,
 )
-from pants.engine.fs import Digest, FileContent, FilesContent, PathGlobs, Snapshot, create_fs_rules
-from pants.engine.legacy.structs import TargetAdaptor
-from pants.engine.mapper import AddressFamily, AddressMapper
-from pants.engine.nodes import Return, State, Throw
-from pants.engine.parser import HydratedStruct, SymbolTable
-from pants.engine.rules import rule
-from pants.engine.scheduler import SchedulerSession
-from pants.engine.struct import Struct, StructWithDeps
-from pants.testutil.engine.util import MockGet, Target, run_rule
-from pants.util.objects import Exactly
-from pants_test.engine.examples.parsers import (
+from pants.engine.internals.examples.parsers import (
     JsonParser,
     PythonAssignmentsParser,
     PythonCallbacksParser,
 )
-from pants_test.engine.scheduler_test_base import SchedulerTestBase
+from pants.engine.internals.mapper import AddressFamily, AddressMapper
+from pants.engine.internals.nodes import Return, State, Throw
+from pants.engine.internals.parser import HydratedStruct, SymbolTable
+from pants.engine.internals.scheduler import SchedulerSession
+from pants.engine.internals.scheduler_test_base import SchedulerTestBase
+from pants.engine.internals.struct import Struct, StructWithDeps
+from pants.engine.legacy.structs import TargetAdaptor
+from pants.engine.rules import rule
+from pants.testutil.engine.util import MockGet, Target, run_rule
+from pants.util.objects import Exactly
 
 
 class ParseAddressFamilyTest(unittest.TestCase):
