@@ -1222,8 +1222,7 @@ pub extern "C" fn setup_stderr_logger(level: u64) {
 pub extern "C" fn write_log(msg: *const raw::c_char, level: u64, target: *const raw::c_char) {
   let message_str = unsafe { CStr::from_ptr(msg).to_string_lossy() };
   let target_str = unsafe { CStr::from_ptr(target).to_string_lossy() };
-  LOGGER
-    .log_from_python(message_str.borrow(), level, target_str.borrow())
+  Logger::log_from_python(message_str.borrow(), level, target_str.borrow())
     .expect("Error logging message");
 }
 
