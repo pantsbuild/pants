@@ -29,6 +29,7 @@ from pants.engine.selectors import Get
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
+from pants.util.strutil import pluralize
 
 
 @dataclass(frozen=True)
@@ -110,7 +111,7 @@ async def bandit_lint(
         pex_path=f"./bandit.pex",
         pex_args=generate_args(specified_source_files=specified_source_files, bandit=bandit),
         input_files=merged_input_files,
-        description=f"Run Bandit for {address_references}",
+        description=f"Run Bandit on {pluralize(len(configs), 'target')}: {address_references}.",
     )
     result = await Get[FallibleProcessResult](Process, request)
     return LintResult.from_fallible_process_result(result)

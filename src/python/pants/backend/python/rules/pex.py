@@ -36,6 +36,7 @@ from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
+from pants.util.strutil import pluralize
 
 
 class PexRequirements(DeduplicatedCollection[str]):
@@ -354,9 +355,13 @@ async def create_pex(
     description = request.description
     if description is None:
         if request.requirements:
-            description = f"Resolving {', '.join(request.requirements)}"
+            description = (
+                f"Building {request.output_filename} with "
+                f"{pluralize(len(request.requirements), 'requirement')}: "
+                f"{', '.join(request.requirements)}"
+            )
         else:
-            description = f"Building PEX"
+            description = f"Building {request.output_filename}"
     process = MultiPlatformProcess(
         {
             (
@@ -407,7 +412,10 @@ async def two_step_create_pex(two_step_pex_request: TwoStepPexRequest) -> TwoSte
             #  Some of them may affect resolution behavior, but others may be irrelevant.
             #  For now we err on the side of caution.
             additional_args=request.additional_args,
-            description=f"Resolving {', '.join(request.requirements)}",
+            description=(
+                f"Resolving {pluralize(len(request.requirements), 'requirement')}: "
+                f"{', '.join(request.requirements)}"
+            ),
         )
         requirements_pex = await Get[Pex](PexRequest, requirements_pex_request)
         additional_inputs = requirements_pex.directory_digest

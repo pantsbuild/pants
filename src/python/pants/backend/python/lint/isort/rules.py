@@ -32,6 +32,7 @@ from pants.engine.unions import UnionRule
 from pants.option.custom_types import GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
+from pants.util.strutil import pluralize
 
 
 @dataclass(frozen=True)
@@ -132,7 +133,9 @@ async def setup(
         ),
         input_files=merged_input_files,
         output_files=all_source_files_snapshot.files,
-        description=f"Run isort for {address_references}",
+        description=(
+            f"Run isort on {pluralize(len(request.configs), 'target')}: {address_references}."
+        ),
     )
     return Setup(process)
 
