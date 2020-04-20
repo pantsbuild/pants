@@ -40,7 +40,7 @@ from pants.core.util_rules.strip_source_roots import (
     StripSourcesFieldRequest,
 )
 from pants.engine.addresses import Address, Addresses
-from pants.engine.collection import Collection
+from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.console import Console
 from pants.engine.fs import (
     Digest,
@@ -143,8 +143,7 @@ class OwnedDependencies(Collection[OwnedDependency]):
     pass
 
 
-@dataclass(frozen=True)
-class ExportedTargetRequirements:
+class ExportedTargetRequirements(DeduplicatedCollection[str]):
     """The requirements of an ExportedTarget.
 
     Includes:
@@ -152,7 +151,7 @@ class ExportedTargetRequirements:
     - The published versions of any other ExportedTargets it depends on.
     """
 
-    requirement_strs: Tuple[str, ...]
+    sort_input = True
 
 
 @dataclass(frozen=True)
@@ -425,7 +424,7 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
             "packages": sources.packages,
             "namespace_packages": sources.namespace_packages,
             "package_data": dict(sources.package_data),
-            "install_requires": requirements.requirement_strs,
+            "install_requires": tuple(requirements),
         }
     )
     key_to_binary_spec = provides.binaries
@@ -594,15 +593,15 @@ async def get_requirements(dep_owner: DependencyOwner) -> ExportedTargetRequirem
         for tgt in direct_deps_tgts
         if tgt.has_field(PythonRequirementsField)
     )
-    req_strs = list(reqs.requirements)
+    req_strs = list(reqs)
 
     # Add the requirements on any exported targets on which we depend.
     exported_targets_we_depend_on = await MultiGet(
         Get[ExportedTarget](OwnedDependency(tgt)) for tgt in owned_by_others
     )
-    req_strs.extend(sorted(et.provides.requirement for et in set(exported_targets_we_depend_on)))
+    req_strs.extend(et.provides.requirement for et in set(exported_targets_we_depend_on))
 
-    return ExportedTargetRequirements(tuple(req_strs))
+    return ExportedTargetRequirements(req_strs)
 
 
 @named_rule(desc="Find all code to be published in the distribution")
