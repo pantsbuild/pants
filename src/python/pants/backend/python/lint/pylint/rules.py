@@ -19,12 +19,13 @@ from pants.backend.python.subsystems.subprocess_environment import SubprocessEnc
 from pants.core.goals.lint import LinterConfiguration, LinterConfigurations, LintResult
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
-from pants.engine.addressable import Addresses
+from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
 from pants.engine.isolated_process import FallibleProcessResult, Process
-from pants.engine.rules import UnionRule, named_rule, subsystem_rule
+from pants.engine.rules import named_rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.engine.target import Dependencies, Targets
+from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
 from pants.util.strutil import pluralize

@@ -4,9 +4,6 @@
 import inspect
 from abc import ABC, abstractmethod
 from collections import namedtuple
-from typing import Any, Iterable, Sequence, TypeVar, Union, overload
-
-from pants.util.meta import decorated_type_checkable
 
 
 class SerializationError(Exception):
@@ -150,91 +147,3 @@ class Validatable(ABC):
 
         :raises: :class:`ValidationError` if this object is invalid.
         """
-
-
-T = TypeVar("T")
-
-
-class Collection(Sequence[T]):
-    """A light newtype around immutable sequences for use with the V2 engine.
-
-    This should be subclassed when you want to create a distinct collection type, such as:
-
-        @dataclass(frozen=True)
-        class Example:
-            val1: str
-
-        class Examples(Collection[Example]):
-            pass
-    """
-
-    def __init__(self, dependencies: Iterable[T]) -> None:
-        # TODO: rename to `items`, `elements`, or even make this private. Python consumers should
-        #  not directly access this.
-        self.dependencies = tuple(dependencies)
-
-    @overload  # noqa: F811
-    def __getitem__(self, index: int) -> T:
-        ...
-
-    @overload  # noqa: F811
-    def __getitem__(self, index: slice) -> "Collection[T]":
-        ...
-
-    def __getitem__(self, index: Union[int, slice]) -> Union[T, "Collection[T]"]:  # noqa: F811
-        if isinstance(index, int):
-            return self.dependencies[index]
-        return self.__class__(self.dependencies[index])
-
-    def __len__(self) -> int:
-        return len(self.dependencies)
-
-    def __eq__(self, other: Union[Any, "Collection"]) -> bool:
-        if not isinstance(other, self.__class__):
-            return NotImplemented
-        return self.dependencies == other.dependencies
-
-    def __hash__(self) -> int:
-        return hash(self.dependencies)
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({list(self.dependencies)})"
-
-
-@decorated_type_checkable
-def union(cls):
-    """A class decorator which other classes can specify that they can resolve to with `UnionRule`.
-
-    Annotating a class with @union allows other classes to use a UnionRule() instance to indicate that
-    they can be resolved to this base union class. This class will never be instantiated, and should
-    have no members -- it is used as a tag only, and will be replaced with whatever object is passed
-    in as the subject of a `await Get(...)`. See the following example:
-
-    @union
-    class UnionBase: pass
-
-    @rule
-    async def get_some_union_type(x: X) -> B:
-      result = await Get(ResultType, UnionBase, x.f())
-      # ...
-
-    If there exists a single path from (whatever type the expression `x.f()` returns) -> `ResultType`
-    in the rule graph, the engine will retrieve and execute that path to produce a `ResultType` from
-    `x.f()`. This requires also that whatever type `x.f()` returns was registered as a union member of
-    `UnionBase` with a `UnionRule`.
-
-    Unions allow @rule bodies to be written without knowledge of what types may eventually be provided
-    as input -- rather, they let the engine check that there is a valid path to the desired result.
-    """
-    # TODO: Check that the union base type is used as a tag and nothing else (e.g. no attributes)!
-    assert isinstance(cls, type)
-
-    def non_member_error_message(subject):
-        if hasattr(cls, "non_member_error_message"):
-            return cls.non_member_error_message(subject)
-        desc = f' ("{cls.__doc__}")' if cls.__doc__ else ""
-        return f"Type {type(subject).__name__} is not a member of the {cls.__name__} @union{desc}"
-
-    return union.define_instance_of(
-        cls, non_member_error_message=staticmethod(non_member_error_message)
-    )

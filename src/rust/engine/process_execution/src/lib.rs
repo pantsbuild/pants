@@ -276,7 +276,7 @@ impl MultiPlatformProcess {
       .0
       .iter()
       .next()
-      .map(|(_platforms, epr)| format!("Executing process: {}", epr.description))
+      .map(|(_platforms, epr)| epr.description.clone())
   }
 }
 

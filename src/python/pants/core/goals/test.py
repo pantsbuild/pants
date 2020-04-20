@@ -12,19 +12,19 @@ from typing import ClassVar, Dict, Iterable, List, Optional, Tuple, Type, TypeVa
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import OriginSpec
-from pants.build_graph.address import Address
 from pants.core.util_rules.filter_empty_sources import (
     ConfigurationsWithSources,
     ConfigurationsWithSourcesRequest,
 )
 from pants.engine import desktop
+from pants.engine.addresses import Address
+from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.fs import Digest, DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.isolated_process import FallibleProcessResult
-from pants.engine.objects import Collection, union
-from pants.engine.rules import UnionMembership, goal_rule, rule
+from pants.engine.rules import goal_rule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
     Field,
@@ -34,6 +34,7 @@ from pants.engine.target import (
     TargetsWithOrigins,
     TargetWithOrigin,
 )
+from pants.engine.unions import UnionMembership, union
 
 # TODO(#6004): use proper Logging singleton, rather than static logger.
 logger = logging.getLogger(__name__)

@@ -22,7 +22,6 @@ from pants.backend.python.rules.pex import (
 from pants.backend.python.rules.targets import PythonSources
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
-from pants.build_graph.address import Address
 from pants.core.goals.test import (
     ConsoleCoverageReport,
     CoverageData,
@@ -31,6 +30,7 @@ from pants.core.goals.test import (
     FilesystemCoverageReport,
 )
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
+from pants.engine.addresses import Address
 from pants.engine.fs import (
     Digest,
     DirectoriesToMerge,
@@ -40,9 +40,10 @@ from pants.engine.fs import (
     InputFilesContent,
 )
 from pants.engine.isolated_process import Process, ProcessResult
-from pants.engine.rules import RootRule, UnionRule, named_rule, rule, subsystem_rule
+from pants.engine.rules import RootRule, named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Sources, Targets, TransitiveTargets
+from pants.engine.unions import UnionRule
 from pants.python.python_setup import PythonSetup
 from pants.source.source_root import SourceRootConfig
 

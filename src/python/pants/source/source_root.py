@@ -7,7 +7,7 @@ from typing import Dict, Optional, Sequence, Set, Tuple
 
 from pants.base.build_environment import get_buildroot
 from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants.engine.objects import Collection
+from pants.engine.collection import Collection
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
 

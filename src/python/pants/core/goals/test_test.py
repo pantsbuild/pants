@@ -10,7 +10,6 @@ import pytest
 
 from pants.base.exceptions import ResolveError
 from pants.base.specs import SingleAddress
-from pants.build_graph.address import Address
 from pants.core.goals.test import (
     AddressAndTestResult,
     CoverageDataCollection,
@@ -29,6 +28,7 @@ from pants.core.util_rules.filter_empty_sources import (
     ConfigurationsWithSources,
     ConfigurationsWithSourcesRequest,
 )
+from pants.engine.addresses import Address
 from pants.engine.fs import (
     EMPTY_DIRECTORY_DIGEST,
     Digest,
@@ -37,7 +37,6 @@ from pants.engine.fs import (
     Workspace,
 )
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
-from pants.engine.rules import UnionMembership
 from pants.engine.target import (
     RegisteredTargetTypes,
     Sources,
@@ -45,6 +44,7 @@ from pants.engine.target import (
     TargetsWithOrigins,
     TargetWithOrigin,
 )
+from pants.engine.unions import UnionMembership
 from pants.testutil.engine.util import MockConsole, MockGet, create_goal_subsystem, run_rule
 from pants.testutil.test_base import TestBase
 from pants.util.ordered_set import OrderedSet

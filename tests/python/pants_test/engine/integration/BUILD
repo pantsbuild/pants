@@ -2,22 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
-  name = 'address_mapper',
-  sources = ['test_address_mapper.py'],
-  dependencies = [
-    'src/python/pants/base:specs',
-    'src/python/pants/bin',
-    'src/python/pants/build_graph',
-    'src/python/pants/engine/legacy:address_mapper',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:dirutil',
-    'src/python/pants/testutil/engine:util',
-    'src/python/pants/testutil:test_base',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_tests(
   name = 'build_ignore_integration',
   sources = [ 'test_build_ignore_integration.py' ],
   dependencies = [
@@ -130,20 +114,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'graph',
-  sources = ['test_graph.py'],
-  dependencies = [
-    'src/python/pants/bin',
-    'src/python/pants/build_graph',
-    'src/python/pants/engine/legacy:graph',
-    'src/python/pants/init',
-    'src/python/pants/testutil/engine:util',
-    'src/python/pants/testutil:test_base',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_tests(
   name='graph_integration',
   sources=['test_graph_integration.py'],
   dependencies=[
@@ -169,38 +139,4 @@ python_tests(
   ],
   tags = {'integration', 'partially_type_checked'},
   timeout = 180,
-)
-
-python_tests(
-  name = 'options_parsing',
-  sources = ['test_options_parsing.py'],
-  dependencies = [
-    'src/python/pants/bin',
-    'src/python/pants/build_graph',
-    'src/python/pants/init',
-    'src/python/pants/testutil/engine:util',
-    'src/python/pants/testutil:test_base',
-    'src/python/pants/util:logging',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_tests(
-  name = 'parser',
-  sources = ['test_parser.py'],
-  dependencies = [
-    'src/python/pants/build_graph',
-    'src/python/pants/engine/legacy:parser',
-    'src/python/pants/engine:parser',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_tests(
-  name = 'structs',
-  sources = ['test_structs.py'],
-  dependencies = [
-    'src/python/pants/engine/legacy:structs',
-  ],
-  tags = {"partially_type_checked"},
 )

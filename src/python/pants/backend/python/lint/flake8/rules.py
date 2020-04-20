@@ -24,8 +24,9 @@ from pants.core.util_rules.determine_source_files import (
 )
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
 from pants.engine.isolated_process import FallibleProcessResult, Process
-from pants.engine.rules import UnionRule, named_rule, subsystem_rule
+from pants.engine.rules import named_rule, subsystem_rule
 from pants.engine.selectors import Get
+from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
 from pants.util.strutil import pluralize

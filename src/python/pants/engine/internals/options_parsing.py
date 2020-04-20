@@ -41,7 +41,7 @@ def log_level(global_options: GlobalOptions) -> LogLevel:
     return log_level
 
 
-def create_options_parsing_rules():
+def rules():
     return [
         scope_options,
         parse_options,

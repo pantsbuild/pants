@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-import multiprocessing
 import os
 import sys
 import time
@@ -15,6 +14,7 @@ from typing_extensions import TypedDict
 
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE
+from pants.engine.collection import Collection
 from pants.engine.fs import (
     Digest,
     DirectoryToMaterialize,
@@ -24,9 +24,9 @@ from pants.engine.fs import (
 )
 from pants.engine.native import Function, TypeId
 from pants.engine.nodes import Return, Throw
-from pants.engine.objects import Collection, union
 from pants.engine.rules import Rule, RuleIndex, TaskRule
 from pants.engine.selectors import Params
+from pants.engine.unions import union
 from pants.option.global_options import ExecutionOptions
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import check_no_overlapping_paths
@@ -338,12 +338,7 @@ class Scheduler:
         return SchedulerSession(
             self,
             self._native.new_session(
-                self._scheduler,
-                zipkin_trace_v2,
-                v2_ui,
-                multiprocessing.cpu_count(),
-                build_id,
-                should_report_workunits,
+                self._scheduler, zipkin_trace_v2, v2_ui, build_id, should_report_workunits,
             ),
         )
 

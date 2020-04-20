@@ -27,10 +27,10 @@ from pants.engine.addressable import addressable_sequence
 from pants.engine.goal import GoalSubsystem
 from pants.engine.native import Native
 from pants.engine.parser import SymbolTable
-from pants.engine.rules import UnionMembership
 from pants.engine.scheduler import Scheduler
 from pants.engine.selectors import Get
 from pants.engine.struct import Struct
+from pants.engine.unions import UnionMembership
 from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.ranked_value import Rank, RankedValue, Value

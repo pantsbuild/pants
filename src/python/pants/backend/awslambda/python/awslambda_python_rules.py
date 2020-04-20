@@ -8,7 +8,7 @@ from pants.backend.awslambda.common.awslambda_common_rules import (
     CreatedAWSLambda,
 )
 from pants.backend.awslambda.python.lambdex import Lambdex
-from pants.backend.awslambda.python.targets import PythonAwsLambdaHandler
+from pants.backend.awslambda.python.targets import PythonAwsLambdaHandler, PythonAwsLambdaRuntime
 from pants.backend.python.rules import (
     download_pex_bin,
     importable_python_sources,
@@ -18,6 +18,7 @@ from pants.backend.python.rules import (
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
+    PexPlatforms,
     PexRequest,
     PexRequirements,
     TwoStepPex,
@@ -29,19 +30,21 @@ from pants.backend.python.rules.pex_from_targets import (
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.core.util_rules import strip_source_roots
-from pants.engine.addressable import Addresses
+from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge
 from pants.engine.isolated_process import Process, ProcessResult
-from pants.engine.rules import UnionRule, named_rule, subsystem_rule
+from pants.engine.rules import named_rule, subsystem_rule
 from pants.engine.selectors import Get
+from pants.engine.unions import UnionRule
 from pants.python.python_setup import PythonSetup
 
 
 @dataclass(frozen=True)
 class PythonAwsLambdaConfiguration(AWSLambdaConfiguration):
-    required_fields = (PythonAwsLambdaHandler,)
+    required_fields = (PythonAwsLambdaHandler, PythonAwsLambdaRuntime)
 
     handler: PythonAwsLambdaHandler
+    runtime: PythonAwsLambdaRuntime
 
 
 @dataclass(frozen=True)
@@ -56,11 +59,15 @@ async def create_python_awslambda(
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> CreatedAWSLambda:
-    # TODO: We must enforce that everything is built for Linux, no matter the local platform.
     pex_filename = f"{config.address.target_name}.pex"
+    py_major, py_minor = config.runtime.to_interpreter_version()
+    platform = f"linux_x86_64-cp-{py_major}{py_minor}-cp{py_major}{py_minor}m"
     pex_request = TwoStepPexFromTargetsRequest(
         PexFromTargetsRequest(
-            addresses=Addresses([config.address]), entry_point=None, output_filename=pex_filename,
+            addresses=Addresses([config.address]),
+            entry_point=None,
+            output_filename=pex_filename,
+            platforms=PexPlatforms([platform]),
         )
     )
 

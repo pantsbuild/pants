@@ -23,9 +23,10 @@ from pants.backend.python.rules.targets import PythonPlatforms as PythonPlatform
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.core.goals.binary import BinaryConfiguration, CreatedBinary
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
-from pants.engine.addressable import Addresses
-from pants.engine.rules import UnionRule, rule
+from pants.engine.addresses import Addresses
+from pants.engine.rules import rule
 from pants.engine.selectors import Get
+from pants.engine.unions import UnionRule
 
 
 @dataclass(frozen=True)

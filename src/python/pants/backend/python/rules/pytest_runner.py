@@ -32,13 +32,14 @@ from pants.backend.python.subsystems.subprocess_environment import SubprocessEnc
 from pants.core.goals.test import TestConfiguration, TestDebugRequest, TestOptions, TestResult
 from pants.core.target_types import FilesSources, ResourcesSources
 from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
-from pants.engine.addressable import Addresses
+from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge, InputFilesContent
 from pants.engine.interactive_runner import InteractiveProcessRequest
 from pants.engine.isolated_process import FallibleProcessResult, Process
-from pants.engine.rules import UnionRule, named_rule, rule, subsystem_rule
+from pants.engine.rules import named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Targets, TransitiveTargets
+from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
 from pants.python.python_setup import PythonSetup
 

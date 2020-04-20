@@ -3,8 +3,7 @@
 
 from typing import Dict, cast
 
-from pants.build_graph.address import Address
-from pants.engine.addressable import Addresses
+from pants.engine.addresses import Address, Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import goal_rule

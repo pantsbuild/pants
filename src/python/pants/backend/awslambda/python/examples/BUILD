@@ -20,5 +20,6 @@ python_awslambda(
     ':pycountry',
     ':hello-lib',
   ],
-  handler='pants.backend.awslambda.python.examples.hello_handler:handler'
+  handler='pants.backend.awslambda.python.examples.hello_handler:handler',
+  runtime='python3.7'
 )

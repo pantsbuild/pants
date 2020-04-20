@@ -9,15 +9,15 @@ from dataclasses import dataclass
 from typing import ClassVar, Dict, Iterable, List, Mapping, Sequence, Tuple, Type
 
 from pants.base.build_root import BuildRoot
-from pants.build_graph.address import Address
 from pants.core.util_rules.distdir import DistDir
+from pants.engine.addresses import Address
 from pants.engine.console import Console
 from pants.engine.fs import Digest, DirectoriesToMerge, DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
-from pants.engine.objects import union
-from pants.engine.rules import UnionMembership, goal_rule
+from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Field, RegisteredTargetTypes, Target, TargetsWithOrigins
+from pants.engine.unions import UnionMembership, union
 
 
 # TODO: Factor this out once porting fmt.py and lint.py to the Target API.

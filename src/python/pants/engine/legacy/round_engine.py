@@ -2,64 +2,45 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from collections import OrderedDict, namedtuple
+from abc import ABC, abstractmethod
+from collections import OrderedDict, defaultdict, namedtuple
 
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
-from pants.engine.legacy_engine import Engine
-from pants.engine.round_manager import RoundManager
-from pants.util.ordered_set import FrozenOrderedSet
+from pants.goal.goal import Goal
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 
-class GoalExecutor:
-    def __init__(self, context, goal, tasktypes_by_name):
-        self._context = context
-        self._goal = goal
-        self._tasktypes_by_name = tasktypes_by_name
+class Engine(ABC):
+    """An engine for running a pants command line."""
 
-    @property
-    def goal(self):
-        return self._goal
+    def execute(self, context, goals) -> int:
+        """Executes the supplied goals and their dependencies against the given context.
 
-    def attempt(self, explain):
-        """Attempts to execute the goal's tasks in installed order.
-
-        :param bool explain: If ``True`` then the goal plan will be explained instead of being
-                             executed.
+        :param context: The pants run context.
+        :param list goals: A list of ``Goal`` objects representing the command line goals explicitly
+                           requested.
+        :returns an exit code of 0 upon success and non-zero otherwise.
         """
-        goal_workdir = os.path.join(
-            self._context.options.for_global_scope().pants_workdir, self._goal.name
-        )
-        with self._context.new_workunit(name=self._goal.name, labels=[WorkUnitLabel.GOAL]):
-            for name, task_type in reversed(list(self._tasktypes_by_name.items())):
-                task_workdir = os.path.join(goal_workdir, name)
-                task = task_type(self._context, task_workdir)
-                log_config = WorkUnit.LogConfig(
-                    log_level=task.get_options().level, colors=task.get_options().colors
-                )
-                with self._context.new_workunit(
-                    name=name, labels=[WorkUnitLabel.TASK], log_config=log_config
-                ):
-                    if explain:
-                        self._context.log.debug(
-                            "Skipping execution of {} in explain mode".format(name)
-                        )
-                    elif task.skip_execution:
-                        self._context.log.info("Skipping {}".format(name))
-                    else:
-                        task.execute()
+        try:
+            self.attempt(context, goals)
+            return 0
+        except TaskError as e:
+            message = str(e)
+            if message:
+                print("\nFAILURE: {0}\n".format(message))
+            else:
+                print("\nFAILURE\n")
+            return e.exit_code
 
-            if explain:
-                reversed_tasktypes_by_name = reversed(list(self._tasktypes_by_name.items()))
-                goal_to_task = ", ".join(
-                    "{}->{}".format(name, task_type.__name__)
-                    for name, task_type in reversed_tasktypes_by_name
-                )
-                print(
-                    "{goal} [{goal_to_task}]".format(
-                        goal=self._goal.name, goal_to_task=goal_to_task
-                    )
-                )
+    @abstractmethod
+    def attempt(self, context, goals):
+        """Given the target context and command line goals, attempt to achieve all goals.
+
+        :param context: The pants run context.
+        :param list goals: A list of ``Goal`` objects representing the command line goals explicitly
+                           requested.
+        """
 
 
 class RoundEngine(Engine):
@@ -256,3 +237,146 @@ class RoundEngine(Engine):
         finally:
             if outer_lock_holder:
                 context.release_lock()
+
+
+class GoalExecutor:
+    def __init__(self, context, goal, tasktypes_by_name):
+        self._context = context
+        self._goal = goal
+        self._tasktypes_by_name = tasktypes_by_name
+
+    @property
+    def goal(self):
+        return self._goal
+
+    def attempt(self, explain):
+        """Attempts to execute the goal's tasks in installed order.
+
+        :param bool explain: If ``True`` then the goal plan will be explained instead of being
+                             executed.
+        """
+        goal_workdir = os.path.join(
+            self._context.options.for_global_scope().pants_workdir, self._goal.name
+        )
+        with self._context.new_workunit(name=self._goal.name, labels=[WorkUnitLabel.GOAL]):
+            for name, task_type in reversed(list(self._tasktypes_by_name.items())):
+                task_workdir = os.path.join(goal_workdir, name)
+                task = task_type(self._context, task_workdir)
+                log_config = WorkUnit.LogConfig(
+                    log_level=task.get_options().level, colors=task.get_options().colors
+                )
+                with self._context.new_workunit(
+                    name=name, labels=[WorkUnitLabel.TASK], log_config=log_config
+                ):
+                    if explain:
+                        self._context.log.debug(
+                            "Skipping execution of {} in explain mode".format(name)
+                        )
+                    elif task.skip_execution:
+                        self._context.log.info("Skipping {}".format(name))
+                    else:
+                        task.execute()
+
+            if explain:
+                reversed_tasktypes_by_name = reversed(list(self._tasktypes_by_name.items()))
+                goal_to_task = ", ".join(
+                    "{}->{}".format(name, task_type.__name__)
+                    for name, task_type in reversed_tasktypes_by_name
+                )
+                print(
+                    "{goal} [{goal_to_task}]".format(
+                        goal=self._goal.name, goal_to_task=goal_to_task
+                    )
+                )
+
+
+class ProducerInfo(namedtuple("ProducerInfo", ["product_type", "task_type", "goal"])):
+    """Describes the producer of a given product type."""
+
+
+class RoundManager:
+    """
+    :API: public
+    """
+
+    class MissingProductError(KeyError):
+        """Indicates a required product type is provided by non-one."""
+
+    @staticmethod
+    def _index_products():
+        producer_info_by_product_type = defaultdict(OrderedSet)
+        for goal in Goal.all():
+            for task_type in goal.task_types():
+                for product_type in task_type.product_types():
+                    producer_info = ProducerInfo(product_type, task_type, goal)
+                    producer_info_by_product_type[product_type].add(producer_info)
+        return producer_info_by_product_type
+
+    def __init__(self, context):
+        self._dependencies = OrderedSet()
+        self._optional_dependencies = OrderedSet()
+        self._context = context
+        self._producer_infos_by_product_type = None
+
+    def require(self, product_type):
+        """Schedules the tasks that produce product_type to be executed before the requesting task.
+
+        There must be at least one task that produces the required product type, or the
+        dependencies will not be satisfied.
+
+        :API: public
+        """
+        self._dependencies.add(product_type)
+        self._context.products.require(product_type)
+
+    def optional_product(self, product_type):
+        """Schedules tasks, if any, that produce product_type to be executed before the requesting
+        task.
+
+        There need not be any tasks that produce the required product type.  All this method
+        guarantees is that if there are any then they will be executed before the requesting task.
+
+        :API: public
+        """
+        self._optional_dependencies.add(product_type)
+        self.require(product_type)
+
+    def require_data(self, product_type):
+        """Schedules the tasks that produce product_type to be executed before the requesting task.
+
+        There must be at least one task that produces the required product type, or the
+        dependencies will not be satisfied.
+
+        :API: public
+        """
+        self._dependencies.add(product_type)
+        self._context.products.require_data(product_type)
+
+    def optional_data(self, product_type):
+        """Schedules tasks, if any, that produce product_type to be executed before the requesting
+        task.
+
+        There need not be any tasks that produce the required product type.  All this method
+        guarantees is that if there are any then they will be executed before the requesting task.
+
+        :API: public
+        """
+        self._optional_dependencies.add(product_type)
+        self.require_data(product_type)
+
+    def get_dependencies(self):
+        """Returns the set of data dependencies as producer infos corresponding to data
+        requirements."""
+        producer_infos = OrderedSet()
+        for product_type in self._dependencies:
+            producer_infos.update(self._get_producer_infos_by_product_type(product_type))
+        return producer_infos
+
+    def _get_producer_infos_by_product_type(self, product_type):
+        if self._producer_infos_by_product_type is None:
+            self._producer_infos_by_product_type = self._index_products()
+
+        producer_infos = self._producer_infos_by_product_type[product_type]
+        if not producer_infos and product_type not in self._optional_dependencies:
+            raise self.MissingProductError("No producers registered for '{0}'".format(product_type))
+        return producer_infos

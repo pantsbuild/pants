@@ -10,10 +10,10 @@ from textwrap import dedent
 from typing import List
 
 from pants.engine.native import Native
-from pants.engine.objects import union
-from pants.engine.rules import RootRule, UnionRule, rule
+from pants.engine.rules import RootRule, rule
 from pants.engine.scheduler import ExecutionError, SchedulerSession
 from pants.engine.selectors import Get, Params
+from pants.engine.unions import UnionRule, union
 from pants.testutil.engine.util import (
     assert_equal_with_printing,
     fmt_rust_function,
