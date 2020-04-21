@@ -78,6 +78,13 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
             type=dict,
             help="Registered target types.",
         )
+        register(
+            "--allowlist-compiler-args",
+            advanced=True,
+            type=list,
+            default=["--java-passthrough"],
+            help="Don't report targets if these compiler args are missing.",
+        )
         cls.register_jvm_tool(register, "scrooge-gen")
 
     @classmethod
@@ -253,12 +260,19 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     )
 
     def _validate_compiler_configs(self, target):
+        def filter_allowlisted_compiler_args(tgt):
+            # Filter out args that exist in the allowlist from the list of compiler args.
+            return [
+                args
+                for args in self._thrift_defaults.compiler_args(tgt)
+                if args not in self.get_options().allowlist_compiler_args
+            ]
+
         def compiler_config(tgt):
             return self._ValidateCompilerConfig(
                 language=self._thrift_defaults.language(tgt),
                 compiler=self._thrift_defaults.compiler(tgt),
-                compiler_args=self._thrift_defaults.compiler_args(tgt),
-            )
+                compiler_args=filter_allowlisted_compiler_args(tgt))
 
         mismatched_compiler_configs = defaultdict(set)
         mycompilerconfig = compiler_config(target)

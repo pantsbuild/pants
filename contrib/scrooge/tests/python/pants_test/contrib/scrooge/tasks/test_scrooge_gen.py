@@ -80,6 +80,47 @@ class ScroogeGenTest(NailgunTaskTestBase):
         task._validate_compiler_configs(self.target("test_validate:one"))
         task._validate_compiler_configs(self.target("test_validate:two"))
 
+    def test_validate_allowlisted_compiler_args(self):
+        # Set synthetic defaults for the global scope.
+        self.set_options_for_scope(
+            "thrift-defaults",
+            compiler="unchecked",
+            language="uniform",
+            service_deps="service_deps",
+            structs_deps="structs_deps",
+            allowlist_compiler_args=['--test'],
+        )
+
+        self.add_to_build_file(
+            "test_validate",
+            dedent(
+                """
+                java_thrift_library(name='one',
+                  sources=[],
+                  dependencies=[],
+                )
+                """
+            ),
+        )
+
+        self.add_to_build_file(
+            "test_validate",
+            dedent(
+                """
+                java_thrift_library(name='two',
+                  sources=[],
+                  compiler_args=['--java-passthrough'],
+                  dependencies=[':one'],
+                )
+                """
+            ),
+        )
+
+        target = self.target("test_validate:two")
+        context = self.context(target_roots=[target])
+        task = self.prepare_execute(context)
+        task._validate_compiler_configs(self.target("test_validate:two"))
+
     def test_scala(self):
         sources = [os.path.join(self.test_workdir, "org/pantsbuild/example/Example.scala")]
         self._test_help("scala", ScalaLibrary, [GEN_ADAPT], sources)
