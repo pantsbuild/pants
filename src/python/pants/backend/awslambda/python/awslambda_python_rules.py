@@ -59,9 +59,15 @@ async def create_python_awslambda(
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> CreatedAWSLambda:
-    pex_filename = f"{config.address.target_name}.pex"
+    # Lambdas typically use the .zip suffix, so we use that instead of .pex.
+    pex_filename = f"{config.address.target_name}.zip"
+    # We hardcode the platform value to the appropriate one for each AWS Lambda runtime.
+    # (Running the "hello world" lambda in the example code will report the platform, and can be
+    # used to verify correctness of these platform strings.)
     py_major, py_minor = config.runtime.to_interpreter_version()
-    platform = f"linux_x86_64-cp-{py_major}{py_minor}-cp{py_major}{py_minor}m"
+    platform = f"manylinux2014_x86_64-cp-{py_major}{py_minor}-cp{py_major}{py_minor}m"
+    if (py_major, py_minor) == (2, 7):
+        platform += "u"
     pex_request = TwoStepPexFromTargetsRequest(
         PexFromTargetsRequest(
             addresses=Addresses([config.address]),
@@ -90,10 +96,17 @@ async def create_python_awslambda(
         pex_args=lambdex_args,
         input_files=merged_input_files,
         output_files=(pex_filename,),
-        description=f"Run Lambdex for {config.address.reference()}",
+        description=f"Setting up handler in {pex_filename}",
     )
     result = await Get[ProcessResult](Process, process)
-    return CreatedAWSLambda(digest=result.output_directory_digest, name=pex_filename)
+    # Note that the AWS-facing handler function is always lambdex_handler.handler, which
+    # is the wrapper injected by lambdex that manages invocation of the actual handler.
+    return CreatedAWSLambda(
+        digest=result.output_directory_digest,
+        name=pex_filename,
+        runtime=config.runtime.value,
+        handler="lambdex_handler.handler",
+    )
 
 
 @named_rule(desc="Set up lambdex")
