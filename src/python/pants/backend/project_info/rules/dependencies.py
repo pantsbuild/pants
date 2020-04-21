@@ -37,7 +37,7 @@ class DependenciesOptions(LineOriented, GoalSubsystem):
             default=False,
             type=bool,
             help=(
-                "List all transitive dependencies. If unspecified, list only direct dependencies."
+                "List all transitive dependencies. If unspecified, list direct dependencies only."
             ),
         )
         register(

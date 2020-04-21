@@ -51,7 +51,8 @@ class FiledepsOptions(LineOriented, GoalSubsystem):
             "--transitive",
             type=bool,
             default=False,
-            help="If True, include the files used by dependencies in the output.",
+            help="If True, list files from all transitive dependencies. If unspecified, list "
+                 "files from direct dependencies only.",
         )
 
 
