@@ -79,7 +79,7 @@ async fn drop_while_waiting() {
   //
   // If the SECOND future was not removed from the waiters queue we would not get a signal
   // that thread3 acquired the lock because the 2nd task would be blocking the queue trying to
-  // poll a non existant future.
+  // poll a non existent future.
   let sema = AsyncSemaphore::new(1);
   let handle1 = sema.clone();
   let handle2 = sema.clone();

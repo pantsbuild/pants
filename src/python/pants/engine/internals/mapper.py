@@ -7,8 +7,8 @@ from typing import Any, Dict, Iterable, Optional, Tuple, Union, cast
 
 from pants.base.exceptions import DuplicateNameError, MappingError, UnaddressableObjectError
 from pants.build_graph.address import Address, BuildFileAddress
-from pants.engine.objects import Serializable
-from pants.engine.parser import Parser
+from pants.engine.internals.objects import Serializable
+from pants.engine.internals.parser import Parser
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
 

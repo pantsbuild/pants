@@ -5,9 +5,9 @@ import json
 import unittest
 from textwrap import dedent
 
-from pants.engine import parser
-from pants.engine.objects import Resolvable
-from pants_test.engine.examples import parsers
+from pants.engine.internals import parser
+from pants.engine.internals.examples import parsers
+from pants.engine.internals.objects import Resolvable
 
 
 # A duck-typed Serializable with an `==` suitable for ease of testing.
@@ -66,7 +66,7 @@ class JsonParserTest(unittest.TestCase):
             """
             # A simple example with a single Bob.
             {
-              "type_alias": "pants_test.engine.test_parsers.Bob",
+              "type_alias": "pants.engine.internals.parsers_test.Bob",
               "hobbies": [1, 2, 3]
             }
             """
@@ -74,7 +74,9 @@ class JsonParserTest(unittest.TestCase):
         results = self.parse(document)
         self.assertEqual(1, len(results))
         self.assertEqual([Bob(hobbies=[1, 2, 3])], self.round_trip(results[0]))
-        self.assertEqual("pants_test.engine.test_parsers.Bob", results[0]._asdict()["type_alias"])
+        self.assertEqual(
+            "pants.engine.internals.parsers_test.Bob", results[0]._asdict()["type_alias"]
+        )
 
     def test_symbol_table(self):
         document = dedent(
@@ -98,9 +100,9 @@ class JsonParserTest(unittest.TestCase):
             """
             # An example with nested Bobs.
             {
-              "type_alias": "pants_test.engine.test_parsers.Bob",
+              "type_alias": "pants.engine.internals.parsers_test.Bob",
               "uncle": {
-                "type_alias": "pants_test.engine.test_parsers.Bob",
+                "type_alias": "pants.engine.internals.parsers_test.Bob",
                 "age": 42
               },
               "hobbies": [1, 2, 3]
@@ -116,12 +118,12 @@ class JsonParserTest(unittest.TestCase):
             """
             # An example with deeply nested Bobs.
             {
-              "type_alias": "pants_test.engine.test_parsers.Bob",
+              "type_alias": "pants.engine.internals.parsers_test.Bob",
               "configs": [
                 {
                   "mappings": {
                     "uncle": {
-                      "type_alias": "pants_test.engine.test_parsers.Bob",
+                      "type_alias": "pants.engine.internals.parsers_test.Bob",
                       "age": 42
                     }
                   }
@@ -141,15 +143,15 @@ class JsonParserTest(unittest.TestCase):
             """
             # An example with many nested Bobs.
             {
-              "type_alias": "pants_test.engine.test_parsers.Bob",
+              "type_alias": "pants.engine.internals.parsers_test.Bob",
               "cousins": [
                 {
-                  "type_alias": "pants_test.engine.test_parsers.Bob",
+                  "type_alias": "pants.engine.internals.parsers_test.Bob",
                   "name": "Jake",
                   "age": 42
                 },
                 {
-                  "type_alias": "pants_test.engine.test_parsers.Bob",
+                  "type_alias": "pants.engine.internals.parsers_test.Bob",
                   "name": "Jane",
                   "age": 37
                 }
@@ -171,13 +173,13 @@ class JsonParserTest(unittest.TestCase):
         
             # One with hobbies.
             {
-              "type_alias": "pants_test.engine.test_parsers.Bob",
+              "type_alias": "pants.engine.internals.parsers_test.Bob",
               "hobbies": [1, 2, 3]
             }
         
             # Another that is aged.
             {
-              "type_alias": "pants_test.engine.test_parsers.Bob",
+              "type_alias": "pants.engine.internals.parsers_test.Bob",
               "age": 42
             }
             """
@@ -192,7 +194,7 @@ class JsonParserTest(unittest.TestCase):
         
             # One with hobbies.
               {
-                "type_alias": "pants_test.engine.test_parsers.Bob",
+                "type_alias": "pants.engine.internals.parsers_test.Bob",
         
                 # And internal comment and blank lines.
         
@@ -201,7 +203,7 @@ class JsonParserTest(unittest.TestCase):
             }
         
             # Another that is aged.
-            {"type_alias": "pants_test.engine.test_parsers.Bob","age": 42}
+            {"type_alias": "pants.engine.internals.parsers_test.Bob","age": 42}
             """
         ).strip()
         results = self.parse(document)
@@ -214,7 +216,7 @@ class JsonParserTest(unittest.TestCase):
         
             # One with hobbies.
               {
-                "type_alias": "pants_test.engine.test_parsers.Bob",
+                "type_alias": "pants.engine.internals.parsers_test.Bob",
         
                 # And internal comment and blank lines.
         
@@ -224,7 +226,7 @@ class JsonParserTest(unittest.TestCase):
         
             # Another that is imaginary aged.
             {
-              "type_alias": "pants_test.engine.test_parsers.Bob",
+              "type_alias": "pants.engine.internals.parsers_test.Bob",
               "age": 42i,
         
               "four": 1,
@@ -246,7 +248,7 @@ class JsonParserTest(unittest.TestCase):
 
         # This message from the json stdlib varies between python releases, so fuzz the match a bit.
         self.assertRegex(
-            actual_lines[0], r'Expecting (?:,|\',\'|",") delimiter: line 3 column 12 \(char 67\)'
+            actual_lines[0], r'Expecting (?:,|\',\'|",") delimiter: line 3 column 12 \(char 72\)'
         )
 
         self.assertEqual(
@@ -257,7 +259,7 @@ class JsonParserTest(unittest.TestCase):
         
                     # One with hobbies.
                       {{
-                        "type_alias": "pants_test.engine.test_parsers.Bob",
+                        "type_alias": "pants.engine.internals.parsers_test.Bob",
         
                         # And internal comment and blank lines.
         
@@ -267,7 +269,7 @@ class JsonParserTest(unittest.TestCase):
         
                     # Another that is imaginary aged.
                  1: {{
-                 2:   "type_alias": "pants_test.engine.test_parsers.Bob",
+                 2:   "type_alias": "pants.engine.internals.parsers_test.Bob",
                  3:   "age": 42i,
         
                  4:   "four": 1,
@@ -306,10 +308,10 @@ class JsonEncoderTest(unittest.TestCase):
             """
             {
               "name": "bob",
-              "type_alias": "pants_test.engine.test_parsers.Bob",
+              "type_alias": "pants.engine.internals.parsers_test.Bob",
               "friend": {
                 "name": "bill",
-                "type_alias": "pants_test.engine.test_parsers.Bob"
+                "type_alias": "pants.engine.internals.parsers_test.Bob"
               },
               "relative": "::an opaque address::"
             }
@@ -325,14 +327,14 @@ class JsonEncoderTest(unittest.TestCase):
             """
             {
               "name": "bob",
-              "type_alias": "pants_test.engine.test_parsers.Bob",
+              "type_alias": "pants.engine.internals.parsers_test.Bob",
               "friend": {
                 "name": "bill",
-                "type_alias": "pants_test.engine.test_parsers.Bob"
+                "type_alias": "pants.engine.internals.parsers_test.Bob"
               },
               "relative": {
                 "name": "bill",
-                "type_alias": "pants_test.engine.test_parsers.Bob"
+                "type_alias": "pants.engine.internals.parsers_test.Bob"
               }
             }
             """
@@ -347,7 +349,7 @@ class PythonAssignmentsParserTest(unittest.TestCase):
     def test_no_symbol_table(self):
         document = dedent(
             """
-            from pants_test.engine.test_parsers import Bob
+            from pants.engine.internals.parsers_test import Bob
         
             nancy = Bob(
               hobbies=[1, 2, 3]

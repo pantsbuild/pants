@@ -23,13 +23,13 @@ from typing import (
 from colors import blue, cyan, green, magenta, red
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants.engine.addressable import addressable_sequence
 from pants.engine.goal import GoalSubsystem
-from pants.engine.native import Native
-from pants.engine.parser import SymbolTable
-from pants.engine.scheduler import Scheduler
+from pants.engine.internals.addressable import addressable_sequence
+from pants.engine.internals.native import Native
+from pants.engine.internals.parser import SymbolTable
+from pants.engine.internals.scheduler import Scheduler
+from pants.engine.internals.struct import Struct
 from pants.engine.selectors import Get
-from pants.engine.struct import Struct
 from pants.engine.unions import UnionMembership
 from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS
 from pants.option.option_value_container import OptionValueContainer

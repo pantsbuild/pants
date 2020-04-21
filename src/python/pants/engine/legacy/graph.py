@@ -21,6 +21,7 @@ from pants.build_graph.target import Target as TargetV1
 from pants.engine.addresses import Addresses
 from pants.engine.collection import Collection
 from pants.engine.fs import PathGlobs, Snapshot
+from pants.engine.internals.parser import HydratedStruct
 from pants.engine.legacy.structs import (
     BundleAdaptor,
     BundlesField,
@@ -28,7 +29,6 @@ from pants.engine.legacy.structs import (
     SourcesField,
     TargetAdaptor,
 )
-from pants.engine.parser import HydratedStruct
 from pants.engine.rules import rule
 from pants.engine.selectors import Get, MultiGet
 from pants.option.global_options import GlobMatchErrorBehavior

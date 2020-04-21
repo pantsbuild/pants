@@ -95,7 +95,7 @@ class ListTargetsTest(GoalRuleTestBase):
 
     def test_list_all_empty(self):
         # NB: Also renders a warning to stderr, which is challenging to detect here but confirmed in:
-        #   tests/python/pants_test/engine/legacy/test_list_integration.py
+        #   tests/python/pants_test/integration/list_integration_test.py
         self.assert_console_output(args=[])
 
     def test_list_path(self):

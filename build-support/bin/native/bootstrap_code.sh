@@ -33,7 +33,7 @@ case "${KERNEL}" in
 esac
 
 readonly NATIVE_ENGINE_BINARY="native_engine.so"
-readonly NATIVE_ENGINE_RESOURCE="${REPO_ROOT}/src/python/pants/engine/${NATIVE_ENGINE_BINARY}"
+readonly NATIVE_ENGINE_RESOURCE="${REPO_ROOT}/src/python/pants/engine/internals/${NATIVE_ENGINE_BINARY}"
 readonly NATIVE_ENGINE_CACHE_DIR=${CACHE_ROOT}/bin/native-engine
 
 function _build_native_code() {
@@ -94,7 +94,7 @@ function bootstrap_native_code() {
 
   # Establishes the native engine wheel resource only if needed.
   # NB: The header manipulation code here must be coordinated with header stripping code in
-  #     the Native.binary method in src/python/pants/engine/native.py.
+  #     the Native.binary method in src/python/pants/engine/internals/native.py.
   if [[
     ! -f "${NATIVE_ENGINE_RESOURCE}" ||
     "$(head -1 "${NATIVE_ENGINE_RESOURCE}" | tr '\0' '\n' 2>/dev/null)" != "${engine_version_hdr}"
