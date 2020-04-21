@@ -35,7 +35,6 @@ from pants.engine.target import (
     TargetWithOrigin,
 )
 from pants.engine.unions import UnionMembership, union
-from pants.option.custom_types import dir_option
 
 # TODO(#6004): use proper Logging singleton, rather than static logger.
 logger = logging.getLogger(__name__)
@@ -52,19 +51,24 @@ class TestResult:
     stdout: str
     stderr: str
     coverage_data: Optional["CoverageData"] = None
+    test_results: Optional["XmlTestResultsData"] = None
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
 
     @staticmethod
     def from_fallible_process_result(
-        process_result: FallibleProcessResult, *, coverage_data: Optional["CoverageData"] = None,
+        process_result: FallibleProcessResult,
+        *,
+        coverage_data: Optional["CoverageData"] = None,
+        test_results: Optional["XmlTestResultsData"] = None,
     ) -> "TestResult":
         return TestResult(
             status=Status.SUCCESS if process_result.exit_code == 0 else Status.FAILURE,
             stdout=process_result.stdout.decode(),
             stderr=process_result.stderr.decode(),
             coverage_data=coverage_data,
+            test_results=test_results,
         )
 
 
@@ -137,6 +141,12 @@ class WrappedTestConfiguration:
 class AddressAndTestResult:
     address: Address
     test_result: TestResult
+
+
+@dataclass(frozen=True)
+class XmlTestResultsData:
+    address: Address
+    digest: Digest
 
 
 class CoverageData(ABC):
@@ -232,10 +242,10 @@ class TestOptions(GoalSubsystem):
             "system supports this.",
         )
         register(
-            "--results-dir",
-            type=dir_option,
-            default=None,
-            help="Directory to store tests results files",
+            "--xml-results",
+            type=bool,
+            default=False,
+            help="Enable generating XML test results file",
         )
 
 

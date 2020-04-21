@@ -3,7 +3,6 @@
 
 import functools
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, List, Optional, Tuple, Union, cast
 
 from pants.backend.python.rules.importable_python_sources import ImportablePythonSources
@@ -30,7 +29,13 @@ from pants.backend.python.rules.targets import (
 )
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
-from pants.core.goals.test import TestConfiguration, TestDebugRequest, TestOptions, TestResult
+from pants.core.goals.test import (
+    TestConfiguration,
+    TestDebugRequest,
+    TestOptions,
+    TestResult,
+    XmlTestResultsData,
+)
 from pants.core.target_types import FilesSources, ResourcesSources
 from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.engine.addresses import Addresses
@@ -60,7 +65,7 @@ class TestTargetSetup:
     args: Tuple[str, ...]
     input_files_digest: Digest
     timeout_seconds: Optional[int]
-    results_file_path: Optional[str]
+    xml_results: bool = False
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
@@ -212,18 +217,12 @@ async def setup_pytest_for_target(
             coverage_args.extend(["--cov", package])
 
     specified_source_file_names = sorted(specified_source_files.snapshot.files)
-    results_dir = test_options.values.results_dir
-    results_file_path = (
-        (Path(results_dir) / f"{config.address.path_safe_spec}.xml").absolute().as_posix()
-        if results_dir
-        else None
-    )
     return TestTargetSetup(
         test_runner_pex=test_runner_pex,
         args=(*pytest.options.args, *coverage_args, *specified_source_file_names),
         input_files_digest=merged_input_files,
         timeout_seconds=config.timeout.calculate_from_global_options(pytest),
-        results_file_path=results_file_path,
+        xml_results=test_options.values.xml_results,
     )
 
 
@@ -238,17 +237,22 @@ async def run_python_test(
 ) -> TestResult:
     """Runs pytest for one target."""
     add_opts = [f"--color={'yes' if global_options.options.colors else 'no'}"]
-    if test_setup.results_file_path:
-        add_opts.append(f"--junitxml={test_setup.results_file_path}")
+    test_results_file = f"{config.address.path_safe_spec}.xml"
+    if test_setup.xml_results:
+        add_opts.append(f"--junitxml={test_results_file}")
     env = {"PYTEST_ADDOPTS": " ".join(add_opts)}
     run_coverage = test_options.values.run_coverage
+    output_dirs = [".coverage"] if run_coverage else []
+    if test_setup.xml_results:
+        output_dirs.append(test_results_file)
+
     request = test_setup.test_runner_pex.create_execute_request(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path=f"./{test_setup.test_runner_pex.output_filename}",
         pex_args=test_setup.args,
         input_files=test_setup.input_files_digest,
-        output_directories=(".coverage",) if run_coverage else None,
+        output_directories=tuple(output_dirs) if output_dirs else None,
         description=f"Run Pytest for {config.address.reference()}",
         timeout_seconds=(
             test_setup.timeout_seconds if test_setup.timeout_seconds is not None else 9999
@@ -259,7 +263,15 @@ async def run_python_test(
     coverage_data = (
         PytestCoverageData(config.address, result.output_directory_digest) if run_coverage else None
     )
-    return TestResult.from_fallible_process_result(result, coverage_data=coverage_data)
+    # TODO: How to distinguish coverage data from XML results data.
+    test_results = (
+        XmlTestResultsData(config.address, result.output_directory_digest)
+        if test_setup.xml_results
+        else None
+    )
+    return TestResult.from_fallible_process_result(
+        result, coverage_data=coverage_data, test_results=test_results
+    )
 
 
 @named_rule(desc="Run pytest in an interactive process")
