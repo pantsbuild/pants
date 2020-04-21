@@ -56,9 +56,19 @@ pub struct StartedWorkUnit {
   pub metadata: WorkunitMetadata,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct WorkunitMetadata {
   pub desc: Option<String>,
+  pub display: bool,
+}
+
+impl WorkunitMetadata {
+  pub fn new() -> WorkunitMetadata {
+    WorkunitMetadata {
+      display: true,
+      desc: None,
+    }
+  }
 }
 
 impl StartedWorkUnit {
@@ -81,7 +91,7 @@ impl WorkUnit {
       time_span,
       span_id,
       parent_id,
-      metadata: WorkunitMetadata::default(),
+      metadata: WorkunitMetadata::new(),
     }
   }
 }
@@ -192,6 +202,7 @@ impl WorkUnitStore {
     name: String,
     time_span: TimeSpan,
     parent_id: Option<SpanId>,
+    metadata: WorkunitMetadata,
   ) {
     let inner = &mut self.inner.lock();
     let span_id = new_span_id();
@@ -200,7 +211,7 @@ impl WorkUnitStore {
       time_span,
       span_id: span_id.clone(),
       parent_id,
-      metadata: WorkunitMetadata::default(),
+      metadata,
     });
 
     inner.workunit_records.insert(span_id.clone(), workunit);

@@ -219,10 +219,12 @@ impl ByteStore {
 
     if let Some(workunit_state) = workunit_store::get_workunit_state() {
       let parent_id = workunit_state.parent_id;
+      let metadata = workunit_store::WorkunitMetadata::new();
       workunit_state.store.add_completed_workunit(
         workunit_name.clone(),
         TimeSpan::since(&start_time),
         parent_id,
+        metadata,
       );
     }
 
@@ -304,9 +306,10 @@ impl ByteStore {
       let name = workunit_name.clone();
       let time_span = TimeSpan::since(&start_time);
       let parent_id = workunit_state.parent_id;
+      let metadata = workunit_store::WorkunitMetadata::new();
       workunit_state
         .store
-        .add_completed_workunit(name, time_span, parent_id);
+        .add_completed_workunit(name, time_span, parent_id, metadata);
     }
 
     result
@@ -350,9 +353,10 @@ impl ByteStore {
           let name = workunit_name.clone();
           let time_span = TimeSpan::since(&start_time);
           let parent_id = workunit_state.parent_id;
+          let metadata = workunit_store::WorkunitMetadata::new();
           workunit_state
             .store
-            .add_completed_workunit(name, time_span, parent_id);
+            .add_completed_workunit(name, time_span, parent_id, metadata);
         }
         future
       })

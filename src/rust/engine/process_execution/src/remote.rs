@@ -839,7 +839,8 @@ fn maybe_add_workunit(
   //  TODO: workunits for scheduling, fetching, executing and uploading should be recorded
   //   only if '--reporting-zipkin-trace-v2' is set
   if !result_cached {
-    workunit_store.add_completed_workunit(name.to_string(), time_span, parent_id);
+    let metadata = workunit_store::WorkunitMetadata::new();
+    workunit_store.add_completed_workunit(name.to_string(), time_span, parent_id, metadata);
   }
 }
 
