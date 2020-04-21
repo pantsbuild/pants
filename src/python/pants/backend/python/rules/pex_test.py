@@ -21,7 +21,7 @@ from pants.backend.python.rules.pex import (
 from pants.backend.python.rules.pex import rules as pex_rules
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.engine.fs import Digest, DirectoryToMaterialize, FileContent, InputFilesContent
-from pants.engine.isolated_process import Process, ProcessResult
+from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.python.python_setup import PythonSetup

@@ -39,7 +39,7 @@ from pants.engine.fs import (
     FilesContent,
     InputFilesContent,
 )
-from pants.engine.isolated_process import Process, ProcessResult
+from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import RootRule, named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Sources, Targets, TransitiveTargets
@@ -305,7 +305,7 @@ async def merge_coverage_data(
 
     prefixes = [f"{data.address.path_safe_spec}/.coverage" for data in data_collection]
     coverage_args = ("combine", *prefixes)
-    process = coverage_setup.requirements_pex.create_execute_request(
+    process = coverage_setup.requirements_pex.create_process(
         pex_path=f"./{coverage_setup.requirements_pex.output_filename}",
         pex_args=coverage_args,
         input_files=merged_input_files,
@@ -359,7 +359,7 @@ async def generate_coverage_report(
     report_type = coverage_subsystem.options.report
     coverage_args = [report_type.report_name]
 
-    process = requirements_pex.create_execute_request(
+    process = requirements_pex.create_process(
         pex_path=f"./{coverage_setup.requirements_pex.output_filename}",
         pex_args=coverage_args,
         input_files=merged_input_files,

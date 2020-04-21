@@ -123,7 +123,7 @@ python_library(
     'src/python/pants/engine:addresses',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:interactive_runner',
-    'src/python/pants/engine:isolated_process',
+    'src/python/pants/engine:process',
     'src/python/pants/engine:platform',
     'src/python/pants/engine:selectors',
     'src/python/pants/engine:unions',

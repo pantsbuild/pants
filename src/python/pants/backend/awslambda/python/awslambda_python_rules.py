@@ -32,7 +32,7 @@ from pants.backend.python.subsystems.subprocess_environment import SubprocessEnc
 from pants.core.util_rules import strip_source_roots
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge
-from pants.engine.isolated_process import Process, ProcessResult
+from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import named_rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.engine.unions import UnionRule
@@ -89,7 +89,7 @@ async def create_python_awslambda(
 
     # NB: Lambdex modifies its input pex in-place, so the input file is also the output file.
     lambdex_args = ("build", "-e", config.handler.value, pex_filename)
-    process = lambdex_setup.requirements_pex.create_execute_request(
+    process = lambdex_setup.requirements_pex.create_process(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path="./lambdex.pex",

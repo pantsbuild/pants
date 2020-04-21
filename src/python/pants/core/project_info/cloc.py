@@ -18,7 +18,7 @@ from pants.engine.fs import (
     SourcesSnapshots,
 )
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.isolated_process import Process, ProcessResult
+from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import goal_rule, rule, subsystem_rule
 from pants.engine.selectors import Get
 
