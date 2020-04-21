@@ -36,9 +36,7 @@ from pants.rules.core.targets import FilesSources
 
 
 class PythonSources(Sources):
-    # We allow `.c` for compatibility with native wheels, e.g. `src/python/pants:pants-packaged`.
-    # This should possibly be revisited.
-    expected_file_extensions = (".py", ".c")
+    expected_file_extensions = (".py",)
 
 
 class PythonInterpreterCompatibility(StringOrStringSequenceField):
