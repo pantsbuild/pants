@@ -23,7 +23,7 @@ from pants.core.util_rules.determine_source_files import (
     SpecifiedSourceFilesRequest,
 )
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
-from pants.engine.isolated_process import FallibleProcessResult, Process
+from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import named_rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.engine.unions import UnionRule
@@ -105,7 +105,7 @@ async def bandit_lint(
 
     address_references = ", ".join(sorted(config.address.reference() for config in configs))
 
-    request = requirements_pex.create_execute_request(
+    process = requirements_pex.create_process(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path=f"./bandit.pex",
@@ -113,7 +113,7 @@ async def bandit_lint(
         input_files=merged_input_files,
         description=f"Run Bandit on {pluralize(len(configs), 'target')}: {address_references}.",
     )
-    result = await Get[FallibleProcessResult](Process, request)
+    result = await Get[FallibleProcessResult](Process, process)
     return LintResult.from_fallible_process_result(result)
 
 

@@ -17,8 +17,8 @@ python_tests(
     ':console',
     ':fs',
     ':goal',
-    ':isolated_process',
     ':platform',
+    ':process',
     ':rules',
     ':selectors',
     ':target',
@@ -121,19 +121,6 @@ python_library(
 )
 
 python_library(
-  name='isolated_process',
-  sources=['isolated_process.py'],
-  dependencies=[
-    '3rdparty/python:dataclasses',
-    ':fs',
-    ':platform',
-    ':rules',
-    'src/python/pants/util:meta',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_library(
   name='platform',
   sources=['platform.py'],
   dependencies=[
@@ -142,6 +129,19 @@ python_library(
     'src/python/pants/util:osutil',
   ],
   tags = {"type_checked"},
+)
+
+python_library(
+  name='process',
+  sources=['process.py'],
+  dependencies=[
+    '3rdparty/python:dataclasses',
+    ':fs',
+    ':platform',
+    ':rules',
+    'src/python/pants/util:meta',
+  ],
+  tags = {"partially_type_checked"},
 )
 
 python_library(

@@ -2,8 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST
-from pants.engine.isolated_process import FallibleProcessResultWithPlatform, Process
 from pants.engine.platform import Platform
+from pants.engine.process import FallibleProcessResultWithPlatform, Process
 from pants.testutil.test_base import TestBase
 
 

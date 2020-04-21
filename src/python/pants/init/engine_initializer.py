@@ -32,7 +32,6 @@ from pants.engine.internals.mapper import AddressMapper
 from pants.engine.internals.native import Native
 from pants.engine.internals.parser import SymbolTable
 from pants.engine.internals.scheduler import Scheduler, SchedulerSession
-from pants.engine.isolated_process import create_process_rules
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.graph import LegacyBuildGraph, create_legacy_graph_tasks
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
@@ -50,6 +49,7 @@ from pants.engine.legacy.structs import (
 )
 from pants.engine.legacy.structs import rules as structs_rules
 from pants.engine.platform import create_platform_rules
+from pants.engine.process import create_process_rules
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Params
 from pants.engine.target import RegisteredTargetTypes

@@ -16,7 +16,7 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.isolated_process import (
+from pants.engine.process import (
     FallibleProcessResult,
     Process,
     ProcessExecutionFailure,
@@ -206,17 +206,6 @@ def create_javac_compile_rules():
     ]
 
 
-class ProcessTest(unittest.TestCase):
-    def test_create_from_snapshot_with_env(self):
-        req = Process(
-            argv=("foo",),
-            description="Some process",
-            env={"VAR": "VAL"},
-            input_files=EMPTY_DIRECTORY_DIGEST,
-        )
-        self.assertEqual(req.env, ("VAR", "VAL"))
-
-
 class TestInputFileCreation(TestBase):
     def test_input_file_creation(self):
         file_name = "some.filename"
@@ -300,7 +289,7 @@ class TestInputFileCreation(TestBase):
         self.assertEqual(result.stdout, b"Hello\n")
 
 
-class IsolatedProcessTest(TestBase, unittest.TestCase):
+class ProcessTest(TestBase):
     @classmethod
     def rules(cls):
         return (
@@ -309,6 +298,15 @@ class IsolatedProcessTest(TestBase, unittest.TestCase):
             + create_cat_stdout_rules()
             + create_javac_compile_rules()
         )
+
+    def test_create_from_snapshot_with_env(self):
+        req = Process(
+            argv=("foo",),
+            description="Some process",
+            env={"VAR": "VAL"},
+            input_files=EMPTY_DIRECTORY_DIGEST,
+        )
+        self.assertEqual(req.env, ("VAR", "VAL"))
 
     def test_integration_concat_with_snapshots_stdout(self):
 

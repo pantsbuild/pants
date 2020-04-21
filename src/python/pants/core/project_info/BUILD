@@ -11,7 +11,7 @@ python_library(
     'src/python/pants/engine:console',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:goal',
-    'src/python/pants/engine:isolated_process',
+    'src/python/pants/engine:process',
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
     'src/python/pants/engine:target',
