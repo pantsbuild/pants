@@ -6,6 +6,7 @@ import logging
 from abc import ABC, ABCMeta
 from dataclasses import dataclass
 from enum import Enum
+from functools import partial
 from pathlib import PurePath
 from typing import Dict, Iterable, List, Optional, Type, TypeVar
 
@@ -203,53 +204,44 @@ async def run_tests(
     union_membership: UnionMembership,
     registered_target_types: RegisteredTargetTypes,
 ) -> Test:
-    config_types: Iterable[Type[TestConfiguration]] = union_membership.union_rules[
-        TestConfiguration
-    ]
+    group_targets_to_configs = partial(
+        TestConfiguration.group_targets_to_valid_subclass_configs,
+        targets_with_origins,
+        union_membership=union_membership,
+        registered_target_types=registered_target_types,
+        goal_name=options.name,
+    )
+
+    bulleted_list_sep = "\n  * "
 
     if options.values.debug:
-        target_with_origin = targets_with_origins.expect_single()
-        target = target_with_origin.target
-        valid_config_types = [
-            config_type for config_type in config_types if config_type.is_valid(target)
-        ]
-        if not valid_config_types:
-            all_valid_target_types = itertools.chain.from_iterable(
-                config_type.valid_target_types(
-                    registered_target_types.types, union_membership=union_membership
-                )
-                for config_type in config_types
-            )
-            formatted_target_types = sorted(
-                target_type.alias for target_type in all_valid_target_types
+        targets_to_valid_configs = group_targets_to_configs(error_if_no_valid_targets=True)
+        if len(targets_to_valid_configs) > 1:
+            test_target_addresses = sorted(
+                tgt_with_origin.target.address.spec for tgt_with_origin in targets_to_valid_configs
             )
             raise ValueError(
-                f"The `test` goal only works with the following target types: "
-                f"{formatted_target_types}\n\nYou used {target.address} with target "
-                f"type {repr(target.alias)}."
+                f"`test --debug` only works on one test target but was given multiple test "
+                f"targets: {bulleted_list_sep}{bulleted_list_sep.join(test_target_addresses)}\n\n"
+                f"Please select one of these targets to run or do not use the `--debug` option."
             )
-        if len(valid_config_types) > 1:
-            possible_config_types = sorted(
-                config_type.__name__ for config_type in valid_config_types
-            )
+        target_with_origin, valid_configs = list(targets_to_valid_configs.items())[0]
+        target = target_with_origin.target
+        if len(valid_configs) > 1:
+            possible_config_types = sorted(config.__class__.__name__ for config in valid_configs)
             raise ValueError(
                 f"Multiple of the registered test implementations work for {target.address} "
                 f"(target type {repr(target.alias)}). It is ambiguous which implementation to use. "
                 f"Possible implementations: {possible_config_types}."
             )
-        config_type = valid_config_types[0]
         logger.info(f"Starting test in debug mode: {target.address.reference()}")
-        request = await Get[TestDebugRequest](
-            TestConfiguration, config_type.create(target_with_origin)
-        )
+        request = await Get[TestDebugRequest](TestConfiguration, valid_configs[0])
         debug_result = interactive_runner.run_local_interactive_process(request.ipr)
         return Test(debug_result.process_exit_code)
 
-    configs = tuple(
-        config_type.create(target_with_origin)
-        for target_with_origin in targets_with_origins
-        for config_type in config_types
-        if config_type.is_valid(target_with_origin.target)
+    targets_to_valid_configs = group_targets_to_configs(error_if_no_valid_targets=False)
+    configs = itertools.chain.from_iterable(
+        configs_per_target for configs_per_target in targets_to_valid_configs.values()
     )
     configs_with_sources = await Get[ConfigurationsWithSources](
         ConfigurationsWithSourcesRequest(configs)
