@@ -699,7 +699,7 @@ class Configuration(_AbstractConfiguration, metaclass=ABCMeta):
 
     @final
     @classmethod
-    def group_targets_to_valid_subclass_config_types(
+    def group_targets_to_valid_subclass_configs(
         cls: Type[_C],
         targets_with_origins: TargetsWithOrigins,
         *,
@@ -707,22 +707,22 @@ class Configuration(_AbstractConfiguration, metaclass=ABCMeta):
         error_if_no_valid_targets: bool,
         union_membership: UnionMembership,
         registered_target_types: RegisteredTargetTypes,
-    ) -> Mapping[Target, Sequence[Type[_C]]]:
-        """Find all subclasses of this configuration by inspecting the UnionMembership, then group
-        each target to each valid Configuration, if any.
+    ) -> Mapping[Target, Sequence[_C]]:
+        """Find all subclasses of this configuration by inspecting UnionMembership, then group each
+        target to each valid Configuration, if any.
 
         This method should only be used on union bases, such as `TestConfiguration` and
         `BinaryConfiguration`.
         """
         config_types: Iterable[Type[_C]] = union_membership.union_rules[cls]
-        targets_to_valid_config_types = {}
+        targets_to_valid_configs = {}
         for tgt in targets_with_origins.targets:
-            valid_config_types = [
-                config_type for config_type in config_types if config_type.is_valid(tgt)
+            valid_configs = [
+                config_type.create(tgt) for config_type in config_types if config_type.is_valid(tgt)
             ]
-            if valid_config_types:
-                targets_to_valid_config_types[tgt] = valid_config_types
-        if not targets_to_valid_config_types and error_if_no_valid_targets:
+            if valid_configs:
+                targets_to_valid_configs[tgt] = valid_configs
+        if not targets_to_valid_configs and error_if_no_valid_targets:
             raise NoValidTargets.create_from_configs(
                 targets_with_origins,
                 config_types=config_types,
@@ -730,7 +730,7 @@ class Configuration(_AbstractConfiguration, metaclass=ABCMeta):
                 union_membership=union_membership,
                 registered_target_types=registered_target_types,
             )
-        return targets_to_valid_config_types
+        return targets_to_valid_configs
 
 
 _CWO = TypeVar("_CWO", bound="ConfigurationWithOrigin")
@@ -757,7 +757,7 @@ class ConfigurationWithOrigin(_AbstractConfiguration, metaclass=ABCMeta):
 
     @final
     @classmethod
-    def group_targets_to_valid_subclass_config_types(
+    def group_targets_to_valid_subclass_configs(
         cls: Type[_CWO],
         targets_with_origins: TargetsWithOrigins,
         *,
@@ -765,24 +765,24 @@ class ConfigurationWithOrigin(_AbstractConfiguration, metaclass=ABCMeta):
         registered_target_types: RegisteredTargetTypes,
         goal_name: str,
         error_if_no_valid_targets: bool,
-    ) -> Mapping[TargetWithOrigin, Sequence[Type[_CWO]]]:
-        """Find all subclasses of this configuration by inspecting the UnionMembership, then group
-        each target to each valid Configuration, if any.
+    ) -> Mapping[TargetWithOrigin, Sequence[_CWO]]:
+        """Find all subclasses of this configuration by inspecting UnionMembership, then group each
+        target to each valid Configuration, if any.
 
         This method should only be used on union bases, such as `TestConfiguration` and
         `BinaryConfiguration`.
         """
         config_types: Iterable[Type[_CWO]] = union_membership.union_rules[cls]
-        targets_to_valid_config_types = {}
+        targets_to_valid_configs = {}
         for tgt_with_origin in targets_with_origins:
-            valid_config_types = [
-                config_type
+            valid_configs = [
+                config_type.create(tgt_with_origin)
                 for config_type in config_types
                 if config_type.is_valid(tgt_with_origin.target)
             ]
-            if valid_config_types:
-                targets_to_valid_config_types[tgt_with_origin] = valid_config_types
-        if not targets_to_valid_config_types and error_if_no_valid_targets:
+            if valid_configs:
+                targets_to_valid_configs[tgt_with_origin] = valid_configs
+        if not targets_to_valid_configs and error_if_no_valid_targets:
             raise NoValidTargets.create_from_configs(
                 targets_with_origins,
                 config_types=config_types,
@@ -790,7 +790,7 @@ class ConfigurationWithOrigin(_AbstractConfiguration, metaclass=ABCMeta):
                 union_membership=union_membership,
                 registered_target_types=registered_target_types,
             )
-        return targets_to_valid_config_types
+        return targets_to_valid_configs
 
 
 # -----------------------------------------------------------------------------------------------

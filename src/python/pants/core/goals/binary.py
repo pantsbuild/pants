@@ -51,7 +51,7 @@ async def create_binary(
     union_membership: UnionMembership,
     registered_target_types: RegisteredTargetTypes,
 ) -> Binary:
-    targets_to_valid_config_types = BinaryConfiguration.group_targets_to_valid_subclass_config_types(
+    targets_to_valid_configs = BinaryConfiguration.group_targets_to_valid_subclass_configs(
         targets_with_origins,
         union_membership=union_membership,
         registered_target_types=registered_target_types,
@@ -59,9 +59,9 @@ async def create_binary(
         error_if_no_valid_targets=True,
     )
     binaries = await MultiGet(
-        Get[CreatedBinary](BinaryConfiguration, valid_config_type.create(target))
-        for target, valid_config_types in targets_to_valid_config_types.items()
-        for valid_config_type in valid_config_types
+        Get[CreatedBinary](BinaryConfiguration, config)
+        for valid_configs in targets_to_valid_configs.values()
+        for config in valid_configs
     )
     merged_digest = await Get[Digest](
         DirectoriesToMerge(tuple(binary.digest for binary in binaries))

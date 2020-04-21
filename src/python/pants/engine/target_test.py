@@ -510,11 +510,9 @@ def test_configuration_group_targets_to_valid_config_types() -> None:
 
     origin = FilesystemLiteralSpec("f.txt")
     valid_tgt = FortranTarget({}, address=Address.parse(":valid"))
+    valid_tgt_with_origin = TargetWithOrigin(valid_tgt, origin)
     invalid_tgt = InvalidTarget({}, address=Address.parse(":invalid"))
-    mixed_targets_with_origins = TargetsWithOrigins(
-        [TargetWithOrigin(valid_tgt, origin), TargetWithOrigin(invalid_tgt, origin)]
-    )
-    invalid_targets_with_origins = TargetsWithOrigins([TargetWithOrigin(invalid_tgt, origin)])
+    invalid_tgt_with_origin = TargetWithOrigin(invalid_tgt, origin)
 
     union_membership = UnionMembership(
         {
@@ -525,27 +523,33 @@ def test_configuration_group_targets_to_valid_config_types() -> None:
     registered_target_types = RegisteredTargetTypes.create([FortranTarget, InvalidTarget])
 
     group_config_superclass = partial(
-        ConfigSuperclass.group_targets_to_valid_subclass_config_types,
+        ConfigSuperclass.group_targets_to_valid_subclass_configs,
         goal_name="fake",
         union_membership=union_membership,
         registered_target_types=registered_target_types,
     )
-    assert group_config_superclass(mixed_targets_with_origins, error_if_no_valid_targets=True) == {
-        valid_tgt: [ConfigSubclass1, ConfigSubclass2]
-    }
+    assert group_config_superclass(
+        TargetsWithOrigins([valid_tgt_with_origin, invalid_tgt_with_origin]),
+        error_if_no_valid_targets=True,
+    ) == {valid_tgt: [ConfigSubclass1.create(valid_tgt), ConfigSubclass2.create(valid_tgt)]}
     assert (
-        group_config_superclass(invalid_targets_with_origins, error_if_no_valid_targets=False) == {}
+        group_config_superclass(
+            TargetsWithOrigins([invalid_tgt_with_origin]), error_if_no_valid_targets=False
+        )
+        == {}
     )
     with pytest.raises(NoValidTargets):
-        group_config_superclass(invalid_targets_with_origins, error_if_no_valid_targets=True)
+        group_config_superclass(
+            TargetsWithOrigins([invalid_tgt_with_origin]), error_if_no_valid_targets=True
+        )
 
-    assert ConfigSuperclassWithOrigin.group_targets_to_valid_subclass_config_types(
-        mixed_targets_with_origins,
+    assert ConfigSuperclassWithOrigin.group_targets_to_valid_subclass_configs(
+        TargetsWithOrigins([valid_tgt_with_origin, invalid_tgt_with_origin]),
         goal_name="fake",
         error_if_no_valid_targets=True,
         union_membership=union_membership,
         registered_target_types=registered_target_types,
-    ) == {TargetWithOrigin(valid_tgt, origin): [ConfigSubclassWithOrigin]}
+    ) == {valid_tgt_with_origin: [ConfigSubclassWithOrigin.create(valid_tgt_with_origin)]}
 
 
 # -----------------------------------------------------------------------------------------------
