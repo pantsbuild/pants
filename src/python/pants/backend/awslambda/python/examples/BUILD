@@ -2,6 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_requirement_library(
+  name = 'pex',
+  requirements = [
+    python_requirement('pex>=2.1.9'),
+  ],
+)
+
+python_requirement_library(
   name = 'pycountry',
   requirements = [
     python_requirement('pycountry==19.8.18'),
@@ -16,7 +23,9 @@ python_library(
 
 python_awslambda(
   name='hello-lambda',
+  sources = ['hello_handler.py'],
   dependencies=[
+    ':pex',
     ':pycountry',
     ':hello-lib',
   ],
