@@ -7,7 +7,7 @@ from logging import Logger
 from pathlib import Path
 from typing import Iterator, Tuple
 
-from pants.init.logging import FileLoggingSetupResult, setup_logging
+from pants.init.logging import NativeHandler, setup_logging_to_file
 from pants.testutil.engine.util import init_native
 from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
@@ -29,30 +29,31 @@ class LoggingTest(TestBase):
         )
 
     @contextmanager
-    def logger(self, log_level: LogLevel) -> Iterator[Tuple[Logger, FileLoggingSetupResult]]:
+    def logger(self, log_level: LogLevel) -> Iterator[Tuple[Logger, NativeHandler, Path]]:
         native = self.scheduler._scheduler._native
+        # TODO(gregorys) - if this line isn't here this test fails with no stdout. Figure out why.
+        print(f"Native: {native}")
         logger = logging.getLogger("my_file_logger")
-        with temporary_dir() as log_dir:
-            logging_setup_result = setup_logging(
-                log_level, log_dir=log_dir, scope=logger.name, native=native
-            )
-            yield logger, logging_setup_result
+        with temporary_dir() as tmpdir:
+            handler = setup_logging_to_file(log_level, log_dir=tmpdir)
+            log_file = Path(tmpdir, "pants.log")
+            yield logger, handler, log_file
 
     def test_utf8_logging(self) -> None:
-        with self.logger(LogLevel.INFO) as (file_logger, logging_setup_result):
+        with self.logger(LogLevel.INFO) as (file_logger, log_handler, log_file):
             cat = "🐈"
             file_logger.info(cat)
-            logging_setup_result.log_handler.flush()
-            self.assertIn(cat, Path(logging_setup_result.log_filename).read_text())
+            log_handler.flush()
+            self.assertIn(cat, log_file.read_text())
 
     def test_file_logging(self) -> None:
-        with self.logger(LogLevel.INFO) as (file_logger, logging_setup_result):
+        with self.logger(LogLevel.INFO) as (file_logger, log_handler, log_file):
             file_logger.warning("this is a warning")
             file_logger.info("this is some info")
             file_logger.debug("this is some debug info")
-            logging_setup_result.log_handler.flush()
+            log_handler.flush()
 
-            loglines = Path(logging_setup_result.log_filename).read_text().splitlines()
+            loglines = log_file.read_text().splitlines()
             self.assertEqual(2, len(loglines))
             self.assertIn("[WARN] this is a warning", loglines[0])
             self.assertIn("[INFO] this is some info", loglines[1])

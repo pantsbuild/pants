@@ -7,12 +7,12 @@ from pants.backend.python.lint.flake8.rules import Flake8Configuration, Flake8Co
 from pants.backend.python.lint.flake8.rules import rules as flake8_rules
 from pants.backend.python.rules.targets import PythonInterpreterCompatibility, PythonLibrary
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
-from pants.build_graph.address import Address
+from pants.core.goals.lint import LintResult
+from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.engine.target import TargetWithOrigin
-from pants.rules.core.lint import LintResult
 from pants.testutil.interpreter_selection_utils import skip_unless_python27_and_python3_present
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase

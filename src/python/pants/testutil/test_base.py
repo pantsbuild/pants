@@ -22,10 +22,10 @@ from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target as TargetV1
 from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, PathGlobsAndRoot, Snapshot
+from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.legacy.graph import HydratedField
 from pants.engine.legacy.structs import SourceGlobs, SourcesField
 from pants.engine.rules import RootRule
-from pants.engine.scheduler import SchedulerSession
 from pants.engine.selectors import Params
 from pants.engine.target import Target
 from pants.init.engine_initializer import EngineInitializer

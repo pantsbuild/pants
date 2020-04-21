@@ -5,6 +5,107 @@ This document describes releases leading up to the ``1.26.x`` ``stable`` series.
 
 The ``1.26.x`` series adds support for TOML config files, e.g. ``pants.toml``. INI config files will still be supported for some time, but INI is now legacy. Please see https://groups.google.com/forum/#!topic/pants-devel/N1H03oJONco for more information.
 
+1.26.0rc2 (04/15/2020)
+----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Upgrade to Pex 2.1.7. (#9401)
+  `PR #9401 <https://github.com/pantsbuild/pants/pull/9401>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Add respect strict dep option for export-dep-as-jar (#9482)
+  `PR #9482 <https://github.com/pantsbuild/pants/pull/9482>`_
+
+* first implement v1 of robot impl (#8793)
+  `PR #8793 <https://github.com/pantsbuild/pants/pull/8793>`_
+
+* Implement Cobertura output option for #9275 (#9325)
+  `PR #9325 <https://github.com/pantsbuild/pants/pull/9325>`_
+
+* Report warnings and errors to reporting server for JVM targets (#9293)
+  `PR #9293 <https://github.com/pantsbuild/pants/pull/9293>`_
+
+* [jvm] Add jvm_options to platform; use from junit and run (#9150)
+  `PR #9150 <https://github.com/pantsbuild/pants/pull/9150>`_
+
+Bugfixes
+~~~~~~~~
+
+* Do not mix platforms and interpreter constraints while building release pexes (#9515)
+  `PR #9515 <https://github.com/pantsbuild/pants/pull/9515>`_
+
+* Fix workdir symlink's destination/physical dir not always created (#9504)
+  `PR #9504 <https://github.com/pantsbuild/pants/pull/9504>`_
+
+* Don't report diagnostics for cached targets (#9492)
+  `PR #9492 <https://github.com/pantsbuild/pants/pull/9492>`_
+
+* fix --tag filtering when a TargetAdaptor has None for the 'tags' kwarg (#9443)
+  `PR #9443 <https://github.com/pantsbuild/pants/pull/9443>`_
+
+* Fix equality and hashing of `engine.Collection` (#9437)
+  `PR #9437 <https://github.com/pantsbuild/pants/pull/9437>`_
+
+* fix accidentally double-registering setuptools for ipex (#9341)
+  `PR #9341 <https://github.com/pantsbuild/pants/pull/9341>`_
+
+* don't match the interpreter patch version for .ipex files! (#9285)
+  `PR #9285 <https://github.com/pantsbuild/pants/pull/9285>`_
+
+* Fix `PathGlobs` to be deterministic for more cache hits (#9347)
+  `Issue #9346 <https://github.com/pantsbuild/pants/issues/9346>`_
+  `PR #9347 <https://github.com/pantsbuild/pants/pull/9347>`_
+
+* Add a coverage test for pantsd garbage collection, and fix type error. (#9271)
+  `PR #9271 <https://github.com/pantsbuild/pants/pull/9271>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Drop normpath comparison, the vast majority of which is covered by the other checks. (#9538)
+  `PR #9538 <https://github.com/pantsbuild/pants/pull/9538>`_
+
+* Avoid recomputing a BuildFileAddress when subclassing will do. (#9472)
+  `PR #9472 <https://github.com/pantsbuild/pants/pull/9472>`_
+
+* [IDE] Precompute flattened dependencies for modulizable targets (#9311)
+  `PR #9311 <https://github.com/pantsbuild/pants/pull/9311>`_
+
+* Plumb Pants log level to PEX_VERBOSE in v2. (#9328)
+  `PR #9328 <https://github.com/pantsbuild/pants/pull/9328>`_
+
+* Prevent excessive uncached readlink's when using a symlinked workdir (#9270)
+  `PR #9270 <https://github.com/pantsbuild/pants/pull/9270>`_
+
+* Move the global level option to an Enum. (#9327)
+  `PR #9327 <https://github.com/pantsbuild/pants/pull/9327>`_
+
+* Zinc: Use an Array[PublishDiagnosticsParam] for LSP compliance (#9292)
+  `PR #9292 <https://github.com/pantsbuild/pants/pull/9292>`_
+
+* Fix relative path in Zinc compiler (#9261)
+  `PR #9261 <https://github.com/pantsbuild/pants/pull/9261>`_
+
+* Enable zinc to log diagnostics for jvm languages (#9228)
+  `PR #9228 <https://github.com/pantsbuild/pants/pull/9228>`_
+
+* Format zinc compiler with scalafmt (#9227)
+  `PR #9227 <https://github.com/pantsbuild/pants/pull/9227>`_
+
+* Revert "Load the bootstrapped zinc compiler from the zinc server's classpath. (#8753)" (#9226)
+  `PR #8753 <https://github.com/pantsbuild/pants/pull/8753>`_
+  `PR #9226 <https://github.com/pantsbuild/pants/pull/9226>`_
+
+* create RequestsSession.Factory global subsystem, and use it to configure urllib3.util.Retry for http artifact cache downloads (#8568)
+  `PR #8568 <https://github.com/pantsbuild/pants/pull/8568>`_
+
+* Switch to a dict-backed OrderedSet impl. (#9305)
+  `PR #9305 <https://github.com/pantsbuild/pants/pull/9305>`_
+
 1.26.0rc1 (03/08/2020)
 ----------------------
 

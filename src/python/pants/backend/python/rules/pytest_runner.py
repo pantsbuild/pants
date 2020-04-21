@@ -12,11 +12,11 @@ from pants.backend.python.rules.pex import (
     PexRequest,
     PexRequirements,
 )
-from pants.backend.python.rules.pex_from_targets import LegacyPexFromTargetsRequest
+from pants.backend.python.rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.rules.pytest_coverage import (
     COVERAGE_PLUGIN_INPUT,
-    Coveragerc,
-    CoveragercRequest,
+    CoverageConfig,
+    CoverageConfigRequest,
     PytestCoverageData,
 )
 from pants.backend.python.rules.targets import (
@@ -29,19 +29,19 @@ from pants.backend.python.rules.targets import (
 )
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
-from pants.engine.addressable import Addresses
+from pants.core.goals.test import TestConfiguration, TestDebugRequest, TestOptions, TestResult
+from pants.core.target_types import FilesSources, ResourcesSources
+from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
+from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge, InputFilesContent
 from pants.engine.interactive_runner import InteractiveProcessRequest
-from pants.engine.isolated_process import FallibleProcessResult, Process
-from pants.engine.legacy.graph import HydratedTargets
-from pants.engine.rules import UnionRule, named_rule, rule, subsystem_rule
+from pants.engine.process import FallibleProcessResult, Process
+from pants.engine.rules import named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Targets, TransitiveTargets
+from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
 from pants.python.python_setup import PythonSetup
-from pants.rules.core.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
-from pants.rules.core.targets import FilesSources, ResourcesSources
-from pants.rules.core.test import TestConfiguration, TestDebugRequest, TestOptions, TestResult
 
 
 @dataclass(frozen=True)
@@ -124,7 +124,7 @@ async def setup_pytest_for_target(
         sources=plugin_file_digest,
     )
 
-    requirements_pex_request = LegacyPexFromTargetsRequest(
+    requirements_pex_request = PexFromTargetsRequest(
         addresses=test_addresses,
         output_filename="requirements.pex",
         include_source_files=False,
@@ -160,20 +160,14 @@ async def setup_pytest_for_target(
     # of MultiGet typing / API. Improve this since we should encourage full concurrency in general.
     requests: List[Get[Any]] = [
         Get[Pex](PexRequest, pytest_pex_request),
-        Get[Pex](LegacyPexFromTargetsRequest, requirements_pex_request),
+        Get[Pex](PexFromTargetsRequest, requirements_pex_request),
         Get[Pex](PexRequest, test_runner_pex_request),
         Get[ImportablePythonSources](Targets(python_targets + resource_targets)),
         Get[SourceFiles](SpecifiedSourceFilesRequest, specified_source_files_request),
     ]
     if run_coverage:
-        # TODO: update coverage to use the Target API. Also, add tests.
-        hydrated_python_targets = await Get[HydratedTargets](
-            Addresses(tgt.address for tgt in python_targets)
-        )
         requests.append(
-            Get[Coveragerc](
-                CoveragercRequest(HydratedTargets(hydrated_python_targets), test_time=True)
-            ),
+            Get[CoverageConfig](CoverageConfigRequest(Targets(python_targets), is_test_time=True)),
         )
 
     (
@@ -186,7 +180,7 @@ async def setup_pytest_for_target(
     ) = cast(
         Union[
             Tuple[Pex, Pex, Pex, ImportablePythonSources, SourceFiles],
-            Tuple[Pex, Pex, Pex, ImportablePythonSources, SourceFiles, Coveragerc],
+            Tuple[Pex, Pex, Pex, ImportablePythonSources, SourceFiles, CoverageConfig],
         ],
         await MultiGet(requests),
     )
@@ -198,8 +192,8 @@ async def setup_pytest_for_target(
         test_runner_pex.directory_digest,
     ]
     if run_coverage:
-        coveragerc = rest[0]
-        directories_to_merge.append(coveragerc.digest)
+        coverage_config = rest[0]
+        directories_to_merge.append(coverage_config.digest)
 
     merged_input_files = await Get[Digest](
         DirectoriesToMerge(directories=tuple(directories_to_merge))
@@ -236,7 +230,7 @@ async def run_python_test(
     """Runs pytest for one target."""
     env = {"PYTEST_ADDOPTS": f"--color={'yes' if global_options.options.colors else 'no'}"}
     run_coverage = test_options.values.run_coverage
-    request = test_setup.test_runner_pex.create_execute_request(
+    process = test_setup.test_runner_pex.create_process(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path=f"./{test_setup.test_runner_pex.output_filename}",
@@ -249,8 +243,10 @@ async def run_python_test(
         ),
         env=env,
     )
-    result = await Get[FallibleProcessResult](Process, request)
-    coverage_data = PytestCoverageData(result.output_directory_digest) if run_coverage else None
+    result = await Get[FallibleProcessResult](Process, process)
+    coverage_data = (
+        PytestCoverageData(config.address, result.output_directory_digest) if run_coverage else None
+    )
     return TestResult.from_fallible_process_result(result, coverage_data=coverage_data)
 
 

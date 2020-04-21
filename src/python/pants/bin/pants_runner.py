@@ -35,7 +35,7 @@ class PantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     def _enable_rust_logging(global_bootstrap_options: OptionValueContainer) -> None:
         log_level = global_bootstrap_options.level
         init_rust_logger(log_level, global_bootstrap_options.log_show_rust_3rdparty)
-        setup_logging_to_stderr(logging.getLogger(None), log_level)
+        setup_logging_to_stderr(log_level)
 
     def _should_run_with_pantsd(self, global_bootstrap_options: OptionValueContainer) -> bool:
         # The parent_build_id option is set only for pants commands (inner runs)

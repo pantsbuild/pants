@@ -11,7 +11,7 @@ from pants.backend.awslambda.python.awslambda_python_rules import PythonAwsLambd
 from pants.backend.awslambda.python.awslambda_python_rules import rules as awslambda_python_rules
 from pants.backend.awslambda.python.targets import PythonAWSLambda
 from pants.backend.python.rules.targets import PythonLibrary
-from pants.build_graph.address import Address
+from pants.engine.addresses import Address
 from pants.engine.fs import FilesContent
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
@@ -67,14 +67,15 @@ class TestPythonAWSLambdaCreation(TestBase):
                 python_awslambda(
                   name='hello_world_lambda',
                   dependencies=[':hello_world'],
-                  handler='foo.bar.hello_world'
+                  handler='foo.bar.hello_world',
+                  runtime='python3.7'
                 )
                 """
             ),
         )
 
         name, content = self.create_python_awslambda("src/python/foo/bar:hello_world_lambda")
-        assert "hello_world_lambda.pex" == name
+        assert "hello_world_lambda.zip" == name
         zipfile = ZipFile(BytesIO(content))
         names = set(zipfile.namelist())
         assert "lambdex_handler.py" in names

@@ -374,7 +374,7 @@ async fn main() {
           store.clone(),
           Platform::Linux,
           executor,
-          std::time::Duration::from_secs(300),
+          std::time::Duration::from_secs(320),
           std::time::Duration::from_millis(500),
           std::time::Duration::from_secs(5),
         )

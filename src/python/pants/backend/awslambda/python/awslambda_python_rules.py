@@ -8,7 +8,7 @@ from pants.backend.awslambda.common.awslambda_common_rules import (
     CreatedAWSLambda,
 )
 from pants.backend.awslambda.python.lambdex import Lambdex
-from pants.backend.awslambda.python.targets import PythonAwsLambdaHandler
+from pants.backend.awslambda.python.targets import PythonAwsLambdaHandler, PythonAwsLambdaRuntime
 from pants.backend.python.rules import (
     download_pex_bin,
     importable_python_sources,
@@ -18,6 +18,7 @@ from pants.backend.python.rules import (
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
+    PexPlatforms,
     PexRequest,
     PexRequirements,
     TwoStepPex,
@@ -28,20 +29,22 @@ from pants.backend.python.rules.pex_from_targets import (
 )
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
-from pants.engine.addressable import Addresses
+from pants.core.util_rules import strip_source_roots
+from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge
-from pants.engine.isolated_process import Process, ProcessResult
-from pants.engine.rules import UnionRule, named_rule, subsystem_rule
+from pants.engine.process import Process, ProcessResult
+from pants.engine.rules import named_rule, subsystem_rule
 from pants.engine.selectors import Get
+from pants.engine.unions import UnionRule
 from pants.python.python_setup import PythonSetup
-from pants.rules.core import strip_source_roots
 
 
 @dataclass(frozen=True)
 class PythonAwsLambdaConfiguration(AWSLambdaConfiguration):
-    required_fields = (PythonAwsLambdaHandler,)
+    required_fields = (PythonAwsLambdaHandler, PythonAwsLambdaRuntime)
 
     handler: PythonAwsLambdaHandler
+    runtime: PythonAwsLambdaRuntime
 
 
 @dataclass(frozen=True)
@@ -56,11 +59,21 @@ async def create_python_awslambda(
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> CreatedAWSLambda:
-    # TODO: We must enforce that everything is built for Linux, no matter the local platform.
-    pex_filename = f"{config.address.target_name}.pex"
+    # Lambdas typically use the .zip suffix, so we use that instead of .pex.
+    pex_filename = f"{config.address.target_name}.zip"
+    # We hardcode the platform value to the appropriate one for each AWS Lambda runtime.
+    # (Running the "hello world" lambda in the example code will report the platform, and can be
+    # used to verify correctness of these platform strings.)
+    py_major, py_minor = config.runtime.to_interpreter_version()
+    platform = f"manylinux2014_x86_64-cp-{py_major}{py_minor}-cp{py_major}{py_minor}m"
+    if (py_major, py_minor) == (2, 7):
+        platform += "u"
     pex_request = TwoStepPexFromTargetsRequest(
         PexFromTargetsRequest(
-            addresses=Addresses([config.address]), entry_point=None, output_filename=pex_filename,
+            addresses=Addresses([config.address]),
+            entry_point=None,
+            output_filename=pex_filename,
+            platforms=PexPlatforms([platform]),
         )
     )
 
@@ -76,17 +89,24 @@ async def create_python_awslambda(
 
     # NB: Lambdex modifies its input pex in-place, so the input file is also the output file.
     lambdex_args = ("build", "-e", config.handler.value, pex_filename)
-    process = lambdex_setup.requirements_pex.create_execute_request(
+    process = lambdex_setup.requirements_pex.create_process(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path="./lambdex.pex",
         pex_args=lambdex_args,
         input_files=merged_input_files,
         output_files=(pex_filename,),
-        description=f"Run Lambdex for {config.address.reference()}",
+        description=f"Setting up handler in {pex_filename}",
     )
     result = await Get[ProcessResult](Process, process)
-    return CreatedAWSLambda(digest=result.output_directory_digest, name=pex_filename)
+    # Note that the AWS-facing handler function is always lambdex_handler.handler, which
+    # is the wrapper injected by lambdex that manages invocation of the actual handler.
+    return CreatedAWSLambda(
+        digest=result.output_directory_digest,
+        name=pex_filename,
+        runtime=config.runtime.value,
+        handler="lambdex_handler.handler",
+    )
 
 
 @named_rule(desc="Set up lambdex")

@@ -64,6 +64,9 @@ class OwnersNotFoundBehavior(Enum):
     warn = "warn"
     error = "error"
 
+    def to_glob_match_error_behavior(self) -> GlobMatchErrorBehavior:
+        return GlobMatchErrorBehavior(self.value)
+
 
 class BuildFileImportsBehavior(Enum):
     warn = "warn"
@@ -350,6 +353,15 @@ class GlobalOptions(Subsystem):
             help="When set, a base directory in which to store `--pants-workdir` contents. "
             "If this option is a set, the workdir will be created as symlink into a "
             "per-workspace subdirectory.",
+        )
+        register(
+            "--pants-physical-workdir-source-control",
+            advanced=True,
+            type=bool,
+            default=False,
+            help="If tasks run processes which need access to source control state "
+            "applying this option will add a link from the physical workdir back to "
+            "any existing source control directories.",
         )
         register(
             "--pants-supportdir",

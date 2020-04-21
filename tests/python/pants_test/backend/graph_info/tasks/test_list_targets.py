@@ -13,7 +13,7 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
-from pants.rules.core import list_targets_old
+from pants.core.project_info import list_targets_old
 from pants.testutil.goal_rule_test_base import GoalRuleTestBase
 
 
@@ -95,7 +95,7 @@ class ListTargetsTest(GoalRuleTestBase):
 
     def test_list_all_empty(self):
         # NB: Also renders a warning to stderr, which is challenging to detect here but confirmed in:
-        #   tests/python/pants_test/engine/legacy/test_list_integration.py
+        #   tests/python/pants_test/integration/list_integration_test.py
         self.assert_console_output(args=[])
 
     def test_list_path(self):

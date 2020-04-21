@@ -60,13 +60,12 @@ impl Session {
     scheduler: &Scheduler,
     should_record_zipkin_spans: bool,
     should_render_ui: bool,
-    ui_worker_count: usize,
     build_id: String,
     should_report_workunits: bool,
   ) -> Session {
     let display = if should_render_ui && EngineDisplay::stdout_is_tty() {
-      let mut display = EngineDisplay::new(0);
-      display.initialize(ui_worker_count);
+      let mut display = EngineDisplay::new();
+      display.initialize(num_cpus::get());
       Some(Arc::new(Mutex::new(display)))
     } else {
       None

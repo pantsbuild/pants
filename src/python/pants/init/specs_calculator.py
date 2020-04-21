@@ -14,7 +14,7 @@ from pants.base.specs import (
     SingleAddress,
     Specs,
 )
-from pants.engine.scheduler import SchedulerSession
+from pants.engine.internals.scheduler import SchedulerSession
 from pants.option.options import Options
 from pants.scm.subsystems.changed import ChangedAddresses, ChangedOptions, ChangedRequest
 from pants.util.ordered_set import OrderedSet

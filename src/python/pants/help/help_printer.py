@@ -10,7 +10,7 @@ from typing_extensions import Literal
 
 from pants.base.build_environment import pants_release, pants_version
 from pants.engine.goal import GoalSubsystem
-from pants.engine.rules import UnionMembership
+from pants.engine.unions import UnionMembership
 from pants.goal.goal import Goal
 from pants.help.help_formatter import HelpFormatter
 from pants.help.scope_info_iterator import ScopeInfoIterator

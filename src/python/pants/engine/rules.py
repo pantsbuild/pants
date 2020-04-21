@@ -11,8 +11,8 @@ from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional, Tuple, Type, get_type_hints
 
 from pants.engine.goal import Goal
-from pants.engine.objects import union
 from pants.engine.selectors import Get
+from pants.engine.unions import UnionRule, union
 from pants.option.optionable import OptionableFactory
 from pants.util.collections import assert_single_element
 from pants.util.memo import memoized
@@ -321,41 +321,6 @@ def goal_rule(*args, **kwargs) -> Callable:
 
 def named_rule(*args, **kwargs) -> Callable:
     return inner_rule(*args, **kwargs, cacheable=True, named_rule=True)
-
-
-@dataclass(frozen=True)
-class UnionRule:
-    """Specify that an instance of `union_member` can be substituted wherever `union_base` is
-    used."""
-
-    union_base: Type
-    union_member: Type
-
-    def __post_init__(self) -> None:
-        if not union.is_instance(self.union_base):
-            raise ValueError(
-                f"union_base must be a type annotated with @union: was {self.union_base} "
-                f"(type {type(self.union_base).__name__})"
-            )
-
-
-@dataclass(frozen=True)
-class UnionMembership:
-    union_rules: Dict[Type, OrderedSet[Type]]
-
-    def is_member(self, union_type, putative_member):
-        members = self.union_rules.get(union_type)
-        if members is None:
-            raise TypeError(f"Not a registered union type: {union_type}")
-        return type(putative_member) in members
-
-    def has_members(self, union_type: Type) -> bool:
-        """Check whether the union has an implementation or not."""
-        return bool(self.union_rules.get(union_type))
-
-    def has_members_for_all(self, union_types: typing.Iterable[Type]) -> bool:
-        """Check whether every union given has an implementation or not."""
-        return all(self.has_members(union_type) for union_type in union_types)
 
 
 class Rule(ABC):

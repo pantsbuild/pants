@@ -144,7 +144,7 @@ class ExceptionSink:
 
     # All reset_* methods are ~idempotent!
     @classmethod
-    def reset_log_location(cls, new_log_location):
+    def reset_log_location(cls, new_log_location: str) -> None:
         """Re-acquire file handles to error logs based in the new location.
 
         Class state:
@@ -160,13 +160,29 @@ class ExceptionSink:
         # We could no-op here if the log locations are the same, but there's no reason not to have the
         # additional safety of re-acquiring file descriptors each time (and erroring out early if the
         # location is no longer writable).
+        try:
+            safe_mkdir(new_log_location)
+        except Exception as e:
+            raise cls.ExceptionSinkError(
+                "The provided log location path at '{}' is not writable or could not be created: {}.".format(
+                    new_log_location, str(e)
+                ),
+                e,
+            )
 
-        # Create the directory if possible, or raise if not writable.
-        cls._check_or_create_new_destination(new_log_location)
-
-        pid_specific_error_stream, shared_error_stream = cls._recapture_fatal_error_log_streams(
-            new_log_location
-        )
+        pid = os.getpid()
+        pid_specific_log_path = cls.exceptions_log_path(for_pid=pid, in_dir=new_log_location)
+        shared_log_path = cls.exceptions_log_path(in_dir=new_log_location)
+        assert pid_specific_log_path != shared_log_path
+        try:
+            pid_specific_error_stream = safe_open(pid_specific_log_path, mode="w")
+            shared_error_stream = safe_open(shared_log_path, mode="a")
+        except Exception as e:
+            raise cls.ExceptionSinkError(
+                "Error opening fatal error log streams for log location '{}': {}".format(
+                    new_log_location, str(e)
+                )
+            )
 
         # NB: mutate process-global state!
         if faulthandler.is_enabled():
@@ -316,41 +332,6 @@ class ExceptionSink:
         """
         fileobj.write(payload)
         fileobj.flush()
-
-    @classmethod
-    def _check_or_create_new_destination(cls, destination):
-        try:
-            safe_mkdir(destination)
-        except Exception as e:
-            raise cls.ExceptionSinkError(
-                "The provided exception sink path at '{}' is not writable or could not be created: {}.".format(
-                    destination, str(e)
-                ),
-                e,
-            )
-
-    @classmethod
-    def _recapture_fatal_error_log_streams(cls, new_log_location):
-        # NB: We do not close old file descriptors under the assumption their lifetimes are managed
-        # elsewhere.
-        # We recapture both log streams each time.
-        pid = os.getpid()
-        pid_specific_log_path = cls.exceptions_log_path(for_pid=pid, in_dir=new_log_location)
-        shared_log_path = cls.exceptions_log_path(in_dir=new_log_location)
-        assert pid_specific_log_path != shared_log_path
-        try:
-            # Truncate the pid-specific error log file.
-            pid_specific_error_stream = safe_open(pid_specific_log_path, mode="w")
-            # Append to the shared error file.
-            shared_error_stream = safe_open(shared_log_path, mode="a")
-        except Exception as e:
-            raise cls.ExceptionSinkError(
-                "Error opening fatal error log streams for log location '{}': {}".format(
-                    new_log_location, str(e)
-                )
-            )
-
-        return (pid_specific_error_stream, shared_error_stream)
 
     @classmethod
     def reset_signal_handler(cls, signal_handler):
