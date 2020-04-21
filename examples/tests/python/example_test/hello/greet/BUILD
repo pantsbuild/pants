@@ -11,7 +11,7 @@ python_tests(
 )
 
 # Prepare for the 'greet' test. Realistically, you wouldn't set up a
-# prep_command just to create an emtpy temp file. This is meant as a
+# prep_command just to create an empty temp file. This is meant as a
 # simple example.
 prep_command(name='prep',
   prep_executable='touch',
