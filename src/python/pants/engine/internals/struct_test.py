@@ -3,9 +3,9 @@
 
 import unittest
 
-from pants.build_graph.address import Address
-from pants.engine.objects import ValidationError
-from pants.engine.struct import Struct
+from pants.engine.addresses import Address
+from pants.engine.internals.objects import ValidationError
+from pants.engine.internals.struct import Struct
 
 
 class StructTest(unittest.TestCase):

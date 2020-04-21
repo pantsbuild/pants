@@ -32,18 +32,20 @@ from pants.engine.fs import (
     UrlToFetch,
     create_fs_rules,
 )
-from pants.engine.scheduler import ExecutionError
+from pants.engine.internals.scheduler import ExecutionError
+from pants.engine.internals.scheduler_test_base import SchedulerTestBase
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.testutil.test_base import TestBase
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import http_server, temporary_dir
 from pants.util.dirutil import relative_symlink, safe_file_dump
-from pants_test.engine.scheduler_test_base import SchedulerTestBase
 
 
 class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
 
-    _original_src = os.path.join(os.path.dirname(__file__), "examples/fs_test/fs_test.tar")
+    _original_src = os.path.join(
+        os.path.dirname(__file__), "internals/examples/fs_test/fs_test.tar"
+    )
 
     @contextmanager
     def mk_project_tree(self, ignore_patterns=None):

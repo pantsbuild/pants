@@ -13,7 +13,7 @@ from pants.core.util_rules.strip_source_roots import (
 )
 from pants.core.util_rules.strip_source_roots import rules as strip_source_root_rules
 from pants.engine.addresses import Address
-from pants.engine.scheduler import ExecutionError
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.selectors import Params
 from pants.engine.target import Sources as SourcesField
 from pants.testutil.option.util import create_options_bootstrapper

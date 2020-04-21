@@ -162,6 +162,7 @@ python_tests(
   sources = ['test_idea_plugin.py'],
   dependencies = [
     'src/python/pants/backend/project_info/tasks:idea_plugin_gen',
+    'src/python/pants/engine/internals:native',
   ],
   tags = {"partially_type_checked"},
 )

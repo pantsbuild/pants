@@ -11,9 +11,9 @@ from pants.base.build_file_target_factory import BuildFileTargetFactory
 from pants.base.exceptions import UnaddressableObjectError
 from pants.base.parse_context import ParseContext
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.engine.internals.objects import Serializable
+from pants.engine.internals.parser import ParseError, Parser, SymbolTable
 from pants.engine.legacy.structs import BundleAdaptor, TargetAdaptor
-from pants.engine.objects import Serializable
-from pants.engine.parser import ParseError, Parser, SymbolTable
 from pants.option.global_options import BuildFileImportsBehavior
 from pants.util.memo import memoized_property
 

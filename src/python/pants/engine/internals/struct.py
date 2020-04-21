@@ -5,8 +5,13 @@ from collections.abc import MutableMapping, MutableSequence
 from typing import Any, Dict, Iterable, Optional, cast
 
 from pants.build_graph.address import Address
-from pants.engine.addressable import addressable, addressable_sequence
-from pants.engine.objects import Serializable, SerializableFactory, Validatable, ValidationError
+from pants.engine.internals.addressable import addressable, addressable_sequence
+from pants.engine.internals.objects import (
+    Serializable,
+    SerializableFactory,
+    Validatable,
+    ValidationError,
+)
 from pants.util.objects import SubclassesOf, SuperclassesOf
 
 

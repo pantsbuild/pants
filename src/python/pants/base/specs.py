@@ -29,7 +29,7 @@ from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
 
 if TYPE_CHECKING:
-    from pants.engine.mapper import AddressFamily, AddressMapper
+    from pants.engine.internals.mapper import AddressFamily, AddressMapper
 
 
 class Spec(ABC):

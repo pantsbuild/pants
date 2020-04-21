@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Dict, Type
 
-from pants.engine.struct import Struct
+from pants.engine.internals.struct import Struct
 
 
 class ParseError(Exception):

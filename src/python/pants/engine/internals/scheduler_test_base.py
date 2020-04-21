@@ -6,8 +6,8 @@ import shutil
 from dataclasses import asdict
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants.engine.nodes import Throw
-from pants.engine.scheduler import Scheduler
+from pants.engine.internals.nodes import Throw
+from pants.engine.internals.scheduler import Scheduler
 from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, ExecutionOptions
 from pants.testutil.engine.util import init_native
 from pants.util.contextutil import temporary_file_path

@@ -27,8 +27,8 @@ python_tests(
   dependencies = [
     ':util_rules',
     'src/python/pants/base:specs',
+    'src/python/pants/engine/internals:scheduler',
     'src/python/pants/engine:addresses',
-    'src/python/pants/engine:scheduler',
     'src/python/pants/engine:selectors',
     'src/python/pants/engine:target',
     'src/python/pants/testutil/option',

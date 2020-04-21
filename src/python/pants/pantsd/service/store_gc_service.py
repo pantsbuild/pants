@@ -4,7 +4,7 @@
 import logging
 import time
 
-from pants.engine.scheduler import Scheduler
+from pants.engine.internals.scheduler import Scheduler
 from pants.pantsd.service.pants_service import PantsService
 
 
