@@ -25,7 +25,7 @@ class DependencyType(Enum):
 
 # TODO(#8762) Get this rule to feature parity with the dependencies task.
 class DependenciesOptions(LineOriented, GoalSubsystem):
-    """Print the target's dependencies."""
+    """List the transitive dependencies of the input targets."""
 
     name = "dependencies2"
 
