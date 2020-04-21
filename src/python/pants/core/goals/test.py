@@ -203,31 +203,29 @@ async def run_tests(
     union_membership: UnionMembership,
     registered_target_types: RegisteredTargetTypes,
 ) -> Test:
-    config_types: Iterable[Type[TestConfiguration]] = union_membership.union_rules[
-        TestConfiguration
-    ]
+    targets_to_valid_config_types = TestConfiguration.group_targets_to_valid_subclass_config_types(
+        targets_with_origins,
+        union_membership=union_membership,
+        registered_target_types=registered_target_types,
+        goal_name=options.name,
+        error_if_no_valid_targets=True,
+    )
+
+    bulleted_list_sep = "\n  * "
 
     if options.values.debug:
-        target_with_origin = targets_with_origins.expect_single()
-        target = target_with_origin.target
-        valid_config_types = [
-            config_type for config_type in config_types if config_type.is_valid(target)
-        ]
-        if not valid_config_types:
-            all_valid_target_types = itertools.chain.from_iterable(
-                config_type.valid_target_types(
-                    registered_target_types.types, union_membership=union_membership
-                )
-                for config_type in config_types
-            )
-            formatted_target_types = sorted(
-                target_type.alias for target_type in all_valid_target_types
+        if len(targets_to_valid_config_types) > 1:
+            test_target_addresses = sorted(
+                tgt_with_origin.target.address.spec
+                for tgt_with_origin in targets_to_valid_config_types
             )
             raise ValueError(
-                f"The `test` goal only works with the following target types: "
-                f"{formatted_target_types}\n\nYou used {target.address} with target "
-                f"type {repr(target.alias)}."
+                f"`test --debug` only works on one test target but was given multiple test "
+                f"targets: {bulleted_list_sep}{bulleted_list_sep.join(test_target_addresses)}\n\n"
+                f"Please select one of these targets to run or do not use the `--debug` option."
             )
+        target_with_origin, valid_config_types = list(targets_to_valid_config_types.items())[0]
+        target = target_with_origin.target
         if len(valid_config_types) > 1:
             possible_config_types = sorted(
                 config_type.__name__ for config_type in valid_config_types
@@ -247,9 +245,8 @@ async def run_tests(
 
     configs = tuple(
         config_type.create(target_with_origin)
-        for target_with_origin in targets_with_origins
-        for config_type in config_types
-        if config_type.is_valid(target_with_origin.target)
+        for target_with_origin, valid_config_types in targets_to_valid_config_types.items()
+        for config_type in valid_config_types
     )
     configs_with_sources = await Get[ConfigurationsWithSources](
         ConfigurationsWithSourcesRequest(configs)

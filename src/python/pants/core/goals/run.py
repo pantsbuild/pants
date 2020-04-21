@@ -4,11 +4,7 @@
 from pathlib import PurePath
 
 from pants.base.build_root import BuildRoot
-from pants.core.goals.binary import (
-    BinaryConfiguration,
-    CreatedBinary,
-    gather_valid_binary_configuration_types,
-)
+from pants.core.goals.binary import BinaryConfiguration, CreatedBinary
 from pants.engine.console import Console
 from pants.engine.fs import DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
@@ -59,19 +55,18 @@ async def run(
     union_membership: UnionMembership,
     registered_target_types: RegisteredTargetTypes,
 ) -> Run:
-    valid_config_types_by_target = gather_valid_binary_configuration_types(
-        goal_subsytem=options,
-        targets_with_origins=targets_with_origins,
+    targets_to_valid_config_types = BinaryConfiguration.group_targets_to_valid_subclass_config_types(
+        targets_with_origins,
         union_membership=union_membership,
         registered_target_types=registered_target_types,
+        goal_name=options.name,
+        error_if_no_valid_targets=True,
     )
 
     bulleted_list_sep = "\n  * "
 
-    if len(valid_config_types_by_target) > 1:
-        binary_target_addresses = sorted(
-            binary_target.address.spec for binary_target in valid_config_types_by_target
-        )
+    if len(targets_to_valid_config_types) > 1:
+        binary_target_addresses = sorted(tgt.address.spec for tgt in targets_to_valid_config_types)
         raise ValueError(
             f"The `run` goal only works on one binary target but was given multiple targets that "
             f"can produce a binary:"
@@ -79,7 +74,7 @@ async def run(
             f"Please select one of these targets to run."
         )
 
-    target, valid_config_types = list(valid_config_types_by_target.items())[0]
+    target, valid_config_types = list(targets_to_valid_config_types.items())[0]
     if len(valid_config_types) > 1:
         possible_config_types = sorted(config_type.__name__ for config_type in valid_config_types)
         # TODO: improve this error message. (It's never actually triggered yet because we only have

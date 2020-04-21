@@ -3,6 +3,7 @@
 
 from dataclasses import dataclass
 from enum import Enum
+from functools import partial
 from pathlib import PurePath
 from typing import Any, ClassVar, Dict, Iterable, List, Optional, Tuple, Type
 
@@ -27,7 +28,9 @@ from pants.engine.target import (
     InvalidFieldChoiceException,
     InvalidFieldException,
     InvalidFieldTypeException,
+    NoValidTargets,
     PrimitiveField,
+    RegisteredTargetTypes,
     RequiredFieldMissingException,
     ScalarField,
     SequenceField,
@@ -36,6 +39,7 @@ from pants.engine.target import (
     StringOrStringSequenceField,
     StringSequenceField,
     Target,
+    TargetsWithOrigins,
     TargetWithOrigin,
 )
 from pants.engine.target import rules as target_rules
@@ -474,6 +478,74 @@ def test_configuration() -> None:
         ).unrelated_field.value
         == UnrelatedField.default
     )
+
+
+def test_configuration_group_targets_to_valid_config_types() -> None:
+    class ConfigSuperclass(Configuration):
+        pass
+
+    @dataclass(frozen=True)
+    class ConfigSubclass1(ConfigSuperclass):
+        required_fields = (FortranSources,)
+
+        sources: FortranSources
+
+    @dataclass(frozen=True)
+    class ConfigSubclass2(ConfigSuperclass):
+        required_fields = (FortranSources,)
+
+        sources: FortranSources
+
+    class ConfigSuperclassWithOrigin(ConfigurationWithOrigin):
+        pass
+
+    class ConfigSubclassWithOrigin(ConfigSuperclassWithOrigin):
+        required_fields = (FortranSources,)
+
+        sources: FortranSources
+
+    class InvalidTarget(Target):
+        alias = "invalid_target"
+        core_fields = ()
+
+    origin = FilesystemLiteralSpec("f.txt")
+    valid_tgt = FortranTarget({}, address=Address.parse(":valid"))
+    invalid_tgt = InvalidTarget({}, address=Address.parse(":invalid"))
+    mixed_targets_with_origins = TargetsWithOrigins(
+        [TargetWithOrigin(valid_tgt, origin), TargetWithOrigin(invalid_tgt, origin)]
+    )
+    invalid_targets_with_origins = TargetsWithOrigins([TargetWithOrigin(invalid_tgt, origin)])
+
+    union_membership = UnionMembership(
+        {
+            ConfigSuperclass: OrderedSet([ConfigSubclass1, ConfigSubclass2]),
+            ConfigSuperclassWithOrigin: OrderedSet([ConfigSubclassWithOrigin]),
+        }
+    )
+    registered_target_types = RegisteredTargetTypes.create([FortranTarget, InvalidTarget])
+
+    group_config_superclass = partial(
+        ConfigSuperclass.group_targets_to_valid_subclass_config_types,
+        goal_name="fake",
+        union_membership=union_membership,
+        registered_target_types=registered_target_types,
+    )
+    assert group_config_superclass(mixed_targets_with_origins, error_if_no_valid_targets=True) == {
+        valid_tgt: [ConfigSubclass1, ConfigSubclass2]
+    }
+    assert (
+        group_config_superclass(invalid_targets_with_origins, error_if_no_valid_targets=False) == {}
+    )
+    with pytest.raises(NoValidTargets):
+        group_config_superclass(invalid_targets_with_origins, error_if_no_valid_targets=True)
+
+    assert ConfigSuperclassWithOrigin.group_targets_to_valid_subclass_config_types(
+        mixed_targets_with_origins,
+        goal_name="fake",
+        error_if_no_valid_targets=True,
+        union_membership=union_membership,
+        registered_target_types=registered_target_types,
+    ) == {TargetWithOrigin(valid_tgt, origin): [ConfigSubclassWithOrigin]}
 
 
 # -----------------------------------------------------------------------------------------------
