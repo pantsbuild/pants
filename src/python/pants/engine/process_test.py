@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-import unittest
 from dataclasses import dataclass
 from typing import ClassVar, Tuple
 
