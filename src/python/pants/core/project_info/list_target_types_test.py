@@ -15,7 +15,6 @@ from pants.testutil.engine.util import (
     create_subsystem,
     run_rule,
 )
-from pants.util.ordered_set import OrderedSet
 
 
 # Note no docstring.
@@ -126,7 +125,7 @@ def test_list_single() -> None:
         required = True
 
     tests_target_stdout = run_goal(
-        union_membership=UnionMembership({FortranTests.PluginField: OrderedSet([CustomField])}),
+        union_membership=UnionMembership({FortranTests.PluginField: [CustomField]}),
         details_target=FortranTests.alias,
     )
     assert tests_target_stdout == dedent(

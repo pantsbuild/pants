@@ -46,7 +46,6 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership
 from pants.testutil.engine.util import MockConsole, MockGet, create_goal_subsystem, run_rule
 from pants.testutil.test_base import TestBase
-from pants.util.ordered_set import OrderedSet
 
 
 class MockTarget(Target):
@@ -152,7 +151,7 @@ class TestTest(TestBase):
         options = create_goal_subsystem(TestOptions, debug=debug, run_coverage=False)
         interactive_runner = InteractiveRunner(self.scheduler)
         workspace = Workspace(self.scheduler)
-        union_membership = UnionMembership({TestConfiguration: OrderedSet([config])})
+        union_membership = UnionMembership({TestConfiguration: [config]})
 
         def mock_coordinator_of_tests(
             wrapped_config: WrappedTestConfiguration,

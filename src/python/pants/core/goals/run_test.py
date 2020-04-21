@@ -21,7 +21,6 @@ from pants.testutil.engine.util import (
     run_rule,
 )
 from pants.testutil.test_base import TestBase
-from pants.util.ordered_set import OrderedSet
 
 
 class RunTest(TestBase):
@@ -64,9 +63,7 @@ class RunTest(TestBase):
                 ),
                 create_goal_subsystem(RunOptions, args=[]),
                 create_subsystem(GlobalOptions, pants_workdir=self.pants_workdir),
-                UnionMembership(
-                    union_rules={BinaryConfiguration: OrderedSet([TestBinaryConfiguration])}
-                ),
+                UnionMembership({BinaryConfiguration: [TestBinaryConfiguration]}),
                 RegisteredTargetTypes.create([TestBinaryTarget]),
             ],
             mock_gets=[

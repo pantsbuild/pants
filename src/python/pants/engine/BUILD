@@ -191,8 +191,9 @@ python_library(
   name='unions',
   sources=['unions.py'],
   dependencies=[
-    'src/python/pants/util:meta',
+    'src/python/pants/util:frozendict',
     'src/python/pants/util:ordered_set',
+    'src/python/pants/util:meta',
   ],
   tags = {'type_checked'},
 )

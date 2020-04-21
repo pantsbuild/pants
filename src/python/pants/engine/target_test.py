@@ -275,7 +275,7 @@ def test_add_custom_fields() -> None:
         alias: ClassVar = "custom_field"
         default: ClassVar = False
 
-    union_membership = UnionMembership({FortranTarget.PluginField: OrderedSet([CustomField])})
+    union_membership = UnionMembership({FortranTarget.PluginField: [CustomField]})
     tgt_values = {CustomField.alias: True}
     tgt = FortranTarget(
         tgt_values, address=Address.parse(":lib"), union_membership=union_membership
@@ -516,8 +516,8 @@ def test_configuration_group_targets_to_valid_config_types() -> None:
 
     union_membership = UnionMembership(
         {
-            ConfigSuperclass: OrderedSet([ConfigSubclass1, ConfigSubclass2]),
-            ConfigSuperclassWithOrigin: OrderedSet([ConfigSubclassWithOrigin]),
+            ConfigSuperclass: [ConfigSubclass1, ConfigSubclass2],
+            ConfigSuperclassWithOrigin: [ConfigSubclassWithOrigin],
         }
     )
     registered_target_types = RegisteredTargetTypes.create([FortranTarget, InvalidTarget])
