@@ -13,12 +13,9 @@ python_library(
 
 python_library(
   name='pants-packaged',
-  # NB: we must include at least one file in `sources` to avoid clang/gcc complaining
-  # `error: no input files`. We don't actually need to put any meaningful files here,
-  # though, because we use `with_binaries()` to link to the actual native code,
-  # so clang/gcc do not need to build any native code. Instead, we pass a dummy file.
-  sources=['dummy.c'],
+  sources=[],
   dependencies=[
+    ':dummy_c',
     ':entry_point',
     ':version',
   ],
@@ -36,6 +33,15 @@ python_library(
   ).with_binaries(
     pants='src/python/pants/bin:pants',
   )
+)
+
+# NB: we use this to avoid clang/gcc complaining `error: no input files` when building
+# `:pants-packaged`. We don't actually need to use any meaningful file here, though, because we
+# use `with_binaries()` to link to the actual native code, so clang/gcc do not need to build any
+# native code. This is just a dummy file.
+resources(
+  name="dummy_c",
+  sources=['dummy.c'],
 )
 
 page(

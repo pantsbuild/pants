@@ -56,6 +56,8 @@ class PythonBinaryConfiguration(BinaryConfiguration):
             args.append(f"--inherit-path={self.inherit_path.value}")
         if self.shebang.value is not None:
             args.append(f"--python-shebang={self.shebang.value}")
+        if self.zip_safe.value is False:
+            args.append(f"--not-zip-safe")
         return tuple(args)
 
 
@@ -84,7 +86,6 @@ async def create_python_binary(config: PythonBinaryConfiguration) -> CreatedBina
                 platforms=PexPlatforms.create_from_platforms_field(config.platforms),
                 output_filename=output_filename,
                 additional_args=config.generate_additional_args(),
-                description=f"Building {output_filename}",
             )
         )
     )

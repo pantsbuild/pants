@@ -6,7 +6,6 @@ python_library(
   dependencies=[
     'src/python/pants/base:build_root',
     'src/python/pants/core/util_rules',
-    'src/python/pants/engine:addresses',
     'src/python/pants/engine:console',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:goal',

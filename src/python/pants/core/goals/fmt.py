@@ -4,7 +4,7 @@
 import itertools
 from abc import ABCMeta
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, List, Optional, Tuple, Type, cast
+from typing import ClassVar, Iterable, List, Optional, Tuple, Type
 
 from pants.core.goals.lint import LinterConfiguration
 from pants.core.util_rules.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
@@ -22,7 +22,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.isolated_process import ProcessResult
 from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get, MultiGet
-from pants.engine.target import Field, Target, TargetsWithOrigins, TargetWithOrigin
+from pants.engine.target import Field, Target, TargetsWithOrigins
 from pants.engine.unions import UnionMembership, union
 
 
@@ -45,14 +45,8 @@ class FmtResult:
         )
 
 
-@dataclass(frozen=True)
 class FmtConfiguration(LinterConfiguration, metaclass=ABCMeta):
-    """An ad hoc collection of the fields necessary for a particular auto-formatter to work with a
-    target."""
-
-    @classmethod
-    def create(cls, target_with_origin: TargetWithOrigin) -> "FmtConfiguration":
-        return cast(FmtConfiguration, super().create(target_with_origin))
+    """The fields necessary for a particular auto-formatter to work with a target."""
 
 
 class FmtConfigurations(Collection[FmtConfiguration]):

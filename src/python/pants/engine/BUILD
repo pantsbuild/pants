@@ -111,6 +111,9 @@ python_library(
 python_library(
   name='collection',
   sources=['collection.py'],
+  dependencies=[
+    'src/python/pants/util:ordered_set',
+  ],
   tags = {'type_checked'},
 )
 

@@ -1,22 +1,20 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import dataclasses
 import itertools
 import os
-from abc import ABC
+from abc import ABCMeta
 from dataclasses import dataclass
-from typing import ClassVar, Dict, Iterable, Tuple, Type
+from typing import Iterable, Type
 
 from pants.base.build_root import BuildRoot
 from pants.core.util_rules.distdir import DistDir
-from pants.engine.addresses import Address
 from pants.engine.console import Console
 from pants.engine.fs import Digest, DirectoriesToMerge, DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get, MultiGet
-from pants.engine.target import Field, RegisteredTargetTypes, Target, Targets
+from pants.engine.target import Configuration, RegisteredTargetTypes, Targets
 from pants.engine.unions import UnionMembership, union
 
 
@@ -28,48 +26,13 @@ class AWSLambdaError(Exception):
 class CreatedAWSLambda:
     digest: Digest
     name: str
+    runtime: str
+    handler: str
 
 
-# TODO: Factor up once done porting `setup-py2` and `fmt`/`lint`.
 @union
-@dataclass(frozen=True)
-class AWSLambdaConfiguration(ABC):
-    """An ad hoc collection of the fields necessary to create an AWS Lambda from a target."""
-
-    required_fields: ClassVar[Tuple[Type[Field], ...]]
-
-    address: Address
-
-    @classmethod
-    def is_valid(cls, tgt: Target) -> bool:
-        return tgt.has_fields(cls.required_fields)
-
-    @classmethod
-    def valid_target_types(
-        cls, target_types: Iterable[Type[Target]], *, union_membership: UnionMembership
-    ) -> Tuple[Type[Target], ...]:
-        return tuple(
-            target_type
-            for target_type in target_types
-            if target_type.class_has_fields(cls.required_fields, union_membership=union_membership)
-        )
-
-    @classmethod
-    def create(cls, tgt: Target) -> "AWSLambdaConfiguration":
-        all_expected_fields: Dict[str, Type[Field]] = {
-            dataclass_field.name: dataclass_field.type
-            for dataclass_field in dataclasses.fields(cls)
-            if isinstance(dataclass_field.type, type) and issubclass(dataclass_field.type, Field)  # type: ignore[unreachable]
-        }
-        return cls(  # type: ignore[call-arg]
-            address=tgt.address,
-            **{
-                dataclass_field_name: (
-                    tgt[field_cls] if field_cls in cls.required_fields else tgt.get(field_cls)
-                )
-                for dataclass_field_name, field_cls in all_expected_fields.items()
-            },
-        )
+class AWSLambdaConfiguration(Configuration, metaclass=ABCMeta):
+    """The fields necessary to create an AWS Lambda from a target."""
 
 
 class AWSLambdaOptions(LineOriented, GoalSubsystem):
@@ -125,8 +88,11 @@ async def create_awslambda(
         DirectoryToMaterialize(merged_digest, path_prefix=str(distdir.relpath))
     )
     with options.line_oriented(console) as print_stdout:
-        for path in result.output_paths:
-            print_stdout(f"Wrote {os.path.relpath(path, buildroot.path)}")
+        for awslambda, path in zip(awslambdas, result.output_paths):
+            print_stdout(f"Wrote code bundle to {os.path.relpath(path, buildroot.path)}")
+            print_stdout(f"  Runtime: {awslambda.runtime}")
+            print_stdout(f"  Handler: {awslambda.handler}")
+            print_stdout("")
     return AWSLambdaGoal(exit_code=0)
 
 
