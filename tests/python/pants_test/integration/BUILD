@@ -56,7 +56,7 @@ python_tests(
   name = 'goal_rule_integration',
   sources = ['goal_rule_integration_test.py'],
   dependencies = [
-    'tests/python/pants_test/pantsd:pantsd_integration_base',
+    'tests/python/pants_test/pantsd:pantsd_integration_test_base',
     'examples/src/scala/org/pantsbuild/example:hello_directory',
     'testprojects/tests/python/pants:dummies_directory',
   ],
