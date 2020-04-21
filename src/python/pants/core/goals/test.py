@@ -6,6 +6,7 @@ import logging
 from abc import ABC, ABCMeta
 from dataclasses import dataclass
 from enum import Enum
+from functools import partial
 from pathlib import PurePath
 from typing import Dict, Iterable, List, Optional, Type, TypeVar
 
@@ -203,17 +204,20 @@ async def run_tests(
     union_membership: UnionMembership,
     registered_target_types: RegisteredTargetTypes,
 ) -> Test:
-    targets_to_valid_config_types = TestConfiguration.group_targets_to_valid_subclass_config_types(
+    group_targets_to_config_types = partial(
+        TestConfiguration.group_targets_to_valid_subclass_config_types,
         targets_with_origins,
         union_membership=union_membership,
         registered_target_types=registered_target_types,
         goal_name=options.name,
-        error_if_no_valid_targets=True,
     )
 
     bulleted_list_sep = "\n  * "
 
     if options.values.debug:
+        targets_to_valid_config_types = group_targets_to_config_types(
+            error_if_no_valid_targets=True
+        )
         if len(targets_to_valid_config_types) > 1:
             test_target_addresses = sorted(
                 tgt_with_origin.target.address.spec
@@ -243,6 +247,7 @@ async def run_tests(
         debug_result = interactive_runner.run_local_interactive_process(request.ipr)
         return Test(debug_result.process_exit_code)
 
+    targets_to_valid_config_types = group_targets_to_config_types(error_if_no_valid_targets=False)
     configs = tuple(
         config_type.create(target_with_origin)
         for target_with_origin, valid_config_types in targets_to_valid_config_types.items()
