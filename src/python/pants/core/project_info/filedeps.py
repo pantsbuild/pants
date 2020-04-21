@@ -52,7 +52,7 @@ class FiledepsOptions(LineOriented, GoalSubsystem):
             type=bool,
             default=False,
             help="If True, list files from all transitive dependencies. If unspecified, list "
-                 "files from direct dependencies only.",
+            "files from direct dependencies only.",
         )
 
 
