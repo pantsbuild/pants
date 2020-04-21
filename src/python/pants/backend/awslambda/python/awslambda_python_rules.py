@@ -96,7 +96,7 @@ async def create_python_awslambda(
         pex_args=lambdex_args,
         input_files=merged_input_files,
         output_files=(pex_filename,),
-        description=f"Processing {pex_filename}",
+        description=f"Setting up handler in {pex_filename}",
     )
     result = await Get[ProcessResult](Process, process)
     # Note that the AWS-facing handler function is always lambdex_handler.handler, which

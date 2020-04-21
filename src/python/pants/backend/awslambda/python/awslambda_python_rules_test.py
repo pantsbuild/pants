@@ -75,7 +75,7 @@ class TestPythonAWSLambdaCreation(TestBase):
         )
 
         name, content = self.create_python_awslambda("src/python/foo/bar:hello_world_lambda")
-        assert "hello_world_lambda.pex" == name
+        assert "hello_world_lambda.zip" == name
         zipfile = ZipFile(BytesIO(content))
         names = set(zipfile.namelist())
         assert "lambdex_handler.py" in names
