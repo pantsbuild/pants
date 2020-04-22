@@ -5,13 +5,13 @@ from typing import cast
 
 from pants.base.build_root import BuildRoot
 from pants.base.specs import SingleAddress
-from pants.build_graph.address import Address
 from pants.core.goals.binary import BinaryConfiguration, CreatedBinary
 from pants.core.goals.run import Run, RunOptions, run
+from pants.engine.addresses import Address
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Workspace
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
-from pants.engine.rules import UnionMembership
 from pants.engine.target import RegisteredTargetTypes, Target, TargetsWithOrigins, TargetWithOrigin
+from pants.engine.unions import UnionMembership
 from pants.option.global_options import GlobalOptions
 from pants.testutil.engine.util import (
     MockConsole,
@@ -21,7 +21,6 @@ from pants.testutil.engine.util import (
     run_rule,
 )
 from pants.testutil.test_base import TestBase
-from pants.util.ordered_set import OrderedSet
 
 
 class RunTest(TestBase):
@@ -64,9 +63,7 @@ class RunTest(TestBase):
                 ),
                 create_goal_subsystem(RunOptions, args=[]),
                 create_subsystem(GlobalOptions, pants_workdir=self.pants_workdir),
-                UnionMembership(
-                    union_rules={BinaryConfiguration: OrderedSet([TestBinaryConfiguration])}
-                ),
+                UnionMembership({BinaryConfiguration: [TestBinaryConfiguration]}),
                 RegisteredTargetTypes.create([TestBinaryTarget]),
             ],
             mock_gets=[

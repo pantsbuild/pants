@@ -7,8 +7,8 @@ from pants.backend.python.rules.importable_python_sources import ImportablePytho
 from pants.backend.python.rules.importable_python_sources import (
     rules as importable_python_sources_rules,
 )
-from pants.build_graph.address import Address
 from pants.core.target_types import Files
+from pants.engine.addresses import Address
 from pants.engine.selectors import Params
 from pants.engine.target import Sources, Target, Targets
 from pants.testutil.option.util import create_options_bootstrapper

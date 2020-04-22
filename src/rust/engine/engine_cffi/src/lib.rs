@@ -761,7 +761,6 @@ pub extern "C" fn session_create(
   scheduler_ptr: *mut Scheduler,
   should_record_zipkin_spans: bool,
   should_render_ui: bool,
-  ui_worker_count: u64,
   build_id: Buffer,
   should_report_workunits: bool,
 ) -> *const Session {
@@ -773,7 +772,6 @@ pub extern "C" fn session_create(
       scheduler,
       should_record_zipkin_spans,
       should_render_ui,
-      ui_worker_count as usize,
       build_id,
       should_report_workunits,
     )))
@@ -1224,8 +1222,7 @@ pub extern "C" fn setup_stderr_logger(level: u64) {
 pub extern "C" fn write_log(msg: *const raw::c_char, level: u64, target: *const raw::c_char) {
   let message_str = unsafe { CStr::from_ptr(msg).to_string_lossy() };
   let target_str = unsafe { CStr::from_ptr(target).to_string_lossy() };
-  LOGGER
-    .log_from_python(message_str.borrow(), level, target_str.borrow())
+  Logger::log_from_python(message_str.borrow(), level, target_str.borrow())
     .expect("Error logging message");
 }
 

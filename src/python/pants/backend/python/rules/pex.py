@@ -15,6 +15,7 @@ from pants.backend.python.rules.targets import PythonRequirementsField
 from pants.backend.python.rules.util import parse_interpreter_constraint
 from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.engine.collection import DeduplicatedCollection
 from pants.engine.fs import (
     EMPTY_DIRECTORY_DIGEST,
     EMPTY_SNAPSHOT,
@@ -26,9 +27,8 @@ from pants.engine.fs import (
     PathGlobs,
     Snapshot,
 )
-from pants.engine.isolated_process import MultiPlatformProcess, ProcessResult
-from pants.engine.legacy.structs import PythonTargetAdaptor, TargetAdaptor
 from pants.engine.platform import Platform, PlatformConstraint
+from pants.engine.process import MultiPlatformProcess, ProcessResult
 from pants.engine.rules import RootRule, named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.python.python_repos import PythonRepos
@@ -36,16 +36,11 @@ from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
-from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.strutil import pluralize
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
-class PexRequirements:
-    requirements: FrozenOrderedSet[str]
-
-    def __init__(self, requirements: Optional[Iterable[str]] = None) -> None:
-        self.requirements = FrozenOrderedSet(sorted(requirements or ()))
+class PexRequirements(DeduplicatedCollection[str]):
+    sort_input = True
 
     @classmethod
     def create_from_requirement_fields(
@@ -58,22 +53,6 @@ class PexRequirements:
             str(python_req.requirement) for field in fields for python_req in field.value
         }
         return PexRequirements({*field_requirements, *additional_requirements})
-
-    @classmethod
-    def create_from_adaptors(
-        cls, adaptors: Iterable[TargetAdaptor], additional_requirements: Iterable[str] = ()
-    ) -> "PexRequirements":
-        all_target_requirements = set()
-        for maybe_python_req_lib in adaptors:
-            # This is a python_requirement()-like target.
-            if hasattr(maybe_python_req_lib, "requirement"):
-                all_target_requirements.add(str(maybe_python_req_lib.requirement))
-            # This is a python_requirement_library()-like target.
-            if hasattr(maybe_python_req_lib, "requirements"):
-                for py_req in maybe_python_req_lib.requirements:
-                    all_target_requirements.add(str(py_req.requirement))
-        all_target_requirements.update(additional_requirements)
-        return PexRequirements(all_target_requirements)
 
 
 Spec = Tuple[str, str]  # e.g. (">=", "3.6")
@@ -90,13 +69,8 @@ class ParsedConstraint(NamedTuple):
         return f"{self.interpreter}{specs}"
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
-class PexInterpreterConstraints:
-    constraints: FrozenOrderedSet[str]
-
-    def __init__(self, constraints: Optional[Iterable[str]] = None) -> None:
-        self.constraints = FrozenOrderedSet(sorted(constraints or ()))
+class PexInterpreterConstraints(DeduplicatedCollection[str]):
+    sort_input = True
 
     @staticmethod
     def merge_constraint_sets(constraint_sets: Iterable[Iterable[str]]) -> List[str]:
@@ -157,36 +131,15 @@ class PexInterpreterConstraints:
         merged_constraints = cls.merge_constraint_sets(constraint_sets)
         return PexInterpreterConstraints(merged_constraints)
 
-    @classmethod
-    def create_from_adaptors(
-        cls, adaptors: Iterable[TargetAdaptor], python_setup: PythonSetup
-    ) -> "PexInterpreterConstraints":
-        constraint_sets: Set[Iterable[str]] = set()
-        for adaptor in adaptors:
-            if not isinstance(adaptor, PythonTargetAdaptor):
-                continue
-            compatibility_field = PythonInterpreterCompatibility(
-                adaptor.compatibility, address=adaptor.address
-            )
-            constraint_sets.add(compatibility_field.value_or_global_default(python_setup))
-        # This will OR within each target and AND across targets.
-        merged_constraints = cls.merge_constraint_sets(constraint_sets)
-        return PexInterpreterConstraints(merged_constraints)
-
     def generate_pex_arg_list(self) -> List[str]:
         args = []
-        for constraint in sorted(self.constraints):
+        for constraint in self:
             args.extend(["--interpreter-constraint", constraint])
         return args
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
-class PexPlatforms:
-    platforms: FrozenOrderedSet[str]
-
-    def __init__(self, platforms: Optional[Iterable[str]] = None) -> None:
-        self.platforms = FrozenOrderedSet(sorted(platforms or ()))
+class PexPlatforms(DeduplicatedCollection[str]):
+    sort_input = True
 
     @classmethod
     def create_from_platforms_field(cls, field: PythonPlatformsField) -> "PexPlatforms":
@@ -195,7 +148,7 @@ class PexPlatforms:
 
     def generate_pex_arg_list(self) -> List[str]:
         args = []
-        for platform in sorted(self.platforms):
+        for platform in self:
             args.extend(["--platform", platform])
         return args
 
@@ -334,7 +287,7 @@ async def create_pex(
     # NB: If `--platform` is specified, this signals that the PEX should not be built locally.
     # `--interpreter-constraint` only makes sense in the context of building locally. These two
     # flags are mutually exclusive. See https://github.com/pantsbuild/pex/issues/957.
-    if request.platforms.platforms:
+    if request.platforms:
         # TODO(#9560): consider validating that these platforms are valid with the interpreter
         #  constraints.
         argv.extend(request.platforms.generate_pex_arg_list())
@@ -361,7 +314,7 @@ async def create_pex(
     source_dir_name = "source_files"
     argv.append(f"--sources-directory={source_dir_name}")
 
-    argv.extend(request.requirements.requirements)
+    argv.extend(request.requirements)
 
     constraint_file_snapshot = EMPTY_SNAPSHOT
     if python_setup.requirement_constraints is not None:
@@ -401,16 +354,20 @@ async def create_pex(
     # constraint`".
     description = request.description
     if description is None:
-        if request.requirements.requirements:
-            description = f"Resolving {', '.join(request.requirements.requirements)}"
+        if request.requirements:
+            description = (
+                f"Building {request.output_filename} with "
+                f"{pluralize(len(request.requirements), 'requirement')}: "
+                f"{', '.join(request.requirements)}"
+            )
         else:
-            description = f"Building PEX"
+            description = f"Building {request.output_filename}"
     process = MultiPlatformProcess(
         {
             (
                 PlatformConstraint(platform.value),
                 PlatformConstraint(platform.value),
-            ): pex_bin.create_execute_request(
+            ): pex_bin.create_process(
                 python_setup=python_setup,
                 subprocess_encoding_environment=subprocess_encoding_environment,
                 pex_build_environment=pex_build_environment,
@@ -445,7 +402,7 @@ async def two_step_create_pex(two_step_pex_request: TwoStepPexRequest) -> TwoSte
     additional_inputs: Optional[Digest]
 
     # Create a pex containing just the requirements.
-    if request.requirements.requirements:
+    if request.requirements:
         requirements_pex_request = PexRequest(
             output_filename=req_pex_name,
             requirements=request.requirements,
@@ -455,7 +412,10 @@ async def two_step_create_pex(two_step_pex_request: TwoStepPexRequest) -> TwoSte
             #  Some of them may affect resolution behavior, but others may be irrelevant.
             #  For now we err on the side of caution.
             additional_args=request.additional_args,
-            description=f"Resolving {', '.join(request.requirements.requirements)}",
+            description=(
+                f"Resolving {pluralize(len(request.requirements), 'requirement')}: "
+                f"{', '.join(request.requirements)}"
+            ),
         )
         requirements_pex = await Get[Pex](PexRequest, requirements_pex_request)
         additional_inputs = requirements_pex.directory_digest

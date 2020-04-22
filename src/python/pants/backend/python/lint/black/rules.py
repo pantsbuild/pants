@@ -27,11 +27,13 @@ from pants.core.util_rules.determine_source_files import (
     SpecifiedSourceFilesRequest,
 )
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
-from pants.engine.isolated_process import FallibleProcessResult, Process, ProcessResult
-from pants.engine.rules import UnionRule, named_rule, rule, subsystem_rule
+from pants.engine.process import FallibleProcessResult, Process, ProcessResult
+from pants.engine.rules import named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get
+from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
+from pants.util.strutil import pluralize
 
 
 @dataclass(frozen=True)
@@ -127,7 +129,7 @@ async def setup(
 
     address_references = ", ".join(sorted(config.address.reference() for config in request.configs))
 
-    process = requirements_pex.create_execute_request(
+    process = requirements_pex.create_process(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path="./black.pex",
@@ -138,7 +140,9 @@ async def setup(
         ),
         input_files=merged_input_files,
         output_files=all_source_files_snapshot.files,
-        description=f"Run black for {address_references}",
+        description=(
+            f"Run Black on {pluralize(len(request.configs), 'target')}: {address_references}."
+        ),
     )
     return Setup(process)
 

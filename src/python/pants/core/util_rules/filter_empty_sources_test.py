@@ -3,7 +3,6 @@
 
 from dataclasses import dataclass
 
-from pants.build_graph.address import Address
 from pants.core.util_rules.filter_empty_sources import (
     ConfigurationsWithSources,
     ConfigurationsWithSourcesRequest,
@@ -11,8 +10,8 @@ from pants.core.util_rules.filter_empty_sources import (
     TargetsWithSourcesRequest,
 )
 from pants.core.util_rules.filter_empty_sources import rules as filter_empty_sources_rules
-from pants.engine.target import Sources as SourcesField
-from pants.engine.target import Tags, Target
+from pants.engine.addresses import Address
+from pants.engine.target import Configuration, Sources, Tags, Target
 from pants.testutil.test_base import TestBase
 
 
@@ -23,20 +22,20 @@ class FilterEmptySourcesTest(TestBase):
 
     def test_filter_configurations(self) -> None:
         @dataclass(frozen=True)
-        class MockConfiguration:
-            sources: SourcesField
+        class MockConfiguration(Configuration):
+            sources: Sources
             # Another field to demo that we will preserve the whole Configuration data structure.
             tags: Tags
 
         self.create_file("f1.txt")
         valid_addr = Address.parse(":valid")
         valid_config = MockConfiguration(
-            SourcesField(["f1.txt"], address=valid_addr), Tags(None, address=valid_addr)
+            valid_addr, Sources(["f1.txt"], address=valid_addr), Tags(None, address=valid_addr)
         )
 
         empty_addr = Address.parse(":empty")
         empty_config = MockConfiguration(
-            SourcesField(None, address=empty_addr), Tags(None, address=empty_addr)
+            empty_addr, Sources(None, address=empty_addr), Tags(None, address=empty_addr)
         )
 
         result = self.request_single_product(
@@ -48,14 +47,14 @@ class FilterEmptySourcesTest(TestBase):
     def test_filter_targets(self) -> None:
         class MockTarget(Target):
             alias = "target"
-            core_fields = (SourcesField,)
+            core_fields = (Sources,)
 
         class MockTargetWithNoSourcesField(Target):
             alias = "no_sources"
             core_fields = ()
 
         self.create_file("f1.txt")
-        valid_tgt = MockTarget({SourcesField.alias: ["f1.txt"]}, address=Address.parse(":valid"))
+        valid_tgt = MockTarget({Sources.alias: ["f1.txt"]}, address=Address.parse(":valid"))
         empty_tgt = MockTarget({}, address=Address.parse(":empty"))
         invalid_tgt = MockTargetWithNoSourcesField({}, address=Address.parse(":invalid"))
 

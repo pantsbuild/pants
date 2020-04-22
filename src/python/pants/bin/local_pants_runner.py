@@ -15,12 +15,16 @@ from pants.base.specs import Specs
 from pants.base.workunit import WorkUnit
 from pants.bin.goal_runner import GoalRunner
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.engine.native import Native
-from pants.engine.rules import UnionMembership
+from pants.engine.internals.native import Native
+from pants.engine.unions import UnionMembership
 from pants.goal.run_tracker import RunTracker
 from pants.help.help_printer import HelpPrinter
 from pants.init.engine_initializer import EngineInitializer, LegacyGraphSession
-from pants.init.logging import setup_logging_from_options
+from pants.init.logging import (
+    clear_previous_loggers,
+    setup_logging_to_file,
+    setup_logging_to_stderr,
+)
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.init.repro import Repro, Reproducer
 from pants.init.specs_calculator import SpecsCalculator
@@ -31,6 +35,7 @@ from pants.reporting.reporting import Reporting
 from pants.reporting.streaming_workunit_handler import StreamingWorkunitHandler
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import maybe_profiled
+from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
 
@@ -174,11 +179,17 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         :param daemon_graph_session: The graph helper for this session.
         """
         build_root = get_buildroot()
-
         global_options = options_bootstrapper.bootstrap_options.for_global_scope()
         # This works as expected due to the encapsulated_logger in DaemonPantsRunner and
         # we don't have to gate logging setup anymore.
-        setup_logging_from_options(global_options)
+
+        level = LogLevel.ERROR if getattr(global_options, "quiet", False) else global_options.level
+        ignores = global_options.ignore_pants_warnings
+        clear_previous_loggers()
+        setup_logging_to_stderr(level, warnings_filter_regexes=ignores)
+        log_dir = global_options.logdir
+        if log_dir:
+            setup_logging_to_file(level, log_dir=log_dir, warnings_filter_regexes=ignores)
 
         options, build_config = LocalPantsRunner.parse_options(options_bootstrapper)
 

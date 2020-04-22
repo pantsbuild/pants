@@ -23,9 +23,10 @@ from pants.backend.python.rules.targets import PythonPlatforms as PythonPlatform
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.core.goals.binary import BinaryConfiguration, CreatedBinary
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
-from pants.engine.addressable import Addresses
-from pants.engine.rules import UnionRule, rule
+from pants.engine.addresses import Addresses
+from pants.engine.rules import rule
 from pants.engine.selectors import Get
+from pants.engine.unions import UnionRule
 
 
 @dataclass(frozen=True)
@@ -55,6 +56,8 @@ class PythonBinaryConfiguration(BinaryConfiguration):
             args.append(f"--inherit-path={self.inherit_path.value}")
         if self.shebang.value is not None:
             args.append(f"--python-shebang={self.shebang.value}")
+        if self.zip_safe.value is False:
+            args.append(f"--not-zip-safe")
         return tuple(args)
 
 
@@ -83,7 +86,6 @@ async def create_python_binary(config: PythonBinaryConfiguration) -> CreatedBina
                 platforms=PexPlatforms.create_from_platforms_field(config.platforms),
                 output_filename=output_filename,
                 additional_args=config.generate_additional_args(),
-                description=f"Building {output_filename}",
             )
         )
     )

@@ -7,7 +7,7 @@ from typing import Set
 
 from pants.backend.jvm.rules.targets import JarsField
 from pants.backend.python.rules.targets import PythonRequirementsField
-from pants.engine.addressable import Addresses
+from pants.engine.addresses import Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import goal_rule

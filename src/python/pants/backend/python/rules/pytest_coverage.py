@@ -22,7 +22,6 @@ from pants.backend.python.rules.pex import (
 from pants.backend.python.rules.targets import PythonSources
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
-from pants.build_graph.address import Address
 from pants.core.goals.test import (
     ConsoleCoverageReport,
     CoverageData,
@@ -31,6 +30,7 @@ from pants.core.goals.test import (
     FilesystemCoverageReport,
 )
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
+from pants.engine.addresses import Address
 from pants.engine.fs import (
     Digest,
     DirectoriesToMerge,
@@ -39,10 +39,11 @@ from pants.engine.fs import (
     FilesContent,
     InputFilesContent,
 )
-from pants.engine.isolated_process import Process, ProcessResult
-from pants.engine.rules import RootRule, UnionRule, named_rule, rule, subsystem_rule
+from pants.engine.process import Process, ProcessResult
+from pants.engine.rules import RootRule, named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Sources, Targets, TransitiveTargets
+from pants.engine.unions import UnionRule
 from pants.python.python_setup import PythonSetup
 from pants.source.source_root import SourceRootConfig
 
@@ -304,12 +305,12 @@ async def merge_coverage_data(
 
     prefixes = [f"{data.address.path_safe_spec}/.coverage" for data in data_collection]
     coverage_args = ("combine", *prefixes)
-    process = coverage_setup.requirements_pex.create_execute_request(
+    process = coverage_setup.requirements_pex.create_process(
         pex_path=f"./{coverage_setup.requirements_pex.output_filename}",
         pex_args=coverage_args,
         input_files=merged_input_files,
         output_files=(".coverage",),
-        description=f"Merge Pytest coverage reports.",
+        description=f"Merge {len(prefixes)} Pytest coverage reports.",
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
     )
@@ -358,13 +359,13 @@ async def generate_coverage_report(
     report_type = coverage_subsystem.options.report
     coverage_args = [report_type.report_name]
 
-    process = requirements_pex.create_execute_request(
+    process = requirements_pex.create_process(
         pex_path=f"./{coverage_setup.requirements_pex.output_filename}",
         pex_args=coverage_args,
         input_files=merged_input_files,
         output_directories=("htmlcov",),
         output_files=("coverage.xml",),
-        description=f"Generate coverage report.",
+        description=f"Generate Pytest coverage report.",
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
     )

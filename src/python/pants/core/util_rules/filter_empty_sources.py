@@ -5,7 +5,7 @@ from typing import TypeVar
 
 from typing_extensions import Protocol
 
-from pants.engine.objects import Collection
+from pants.engine.collection import Collection
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import HydratedSources, HydrateSourcesRequest

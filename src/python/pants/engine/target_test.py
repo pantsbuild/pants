@@ -3,20 +3,24 @@
 
 from dataclasses import dataclass
 from enum import Enum
+from functools import partial
 from pathlib import PurePath
 from typing import Any, ClassVar, Dict, Iterable, List, Optional, Tuple, Type
 
 import pytest
 from typing_extensions import final
 
-from pants.build_graph.address import Address
+from pants.base.specs import FilesystemLiteralSpec
+from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, PathGlobs, Snapshot
-from pants.engine.rules import RootRule, UnionMembership, rule
-from pants.engine.scheduler import ExecutionError
+from pants.engine.internals.scheduler import ExecutionError
+from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
 from pants.engine.target import (
     AsyncField,
     BoolField,
+    Configuration,
+    ConfigurationWithOrigin,
     DictStringToStringField,
     DictStringToStringSequenceField,
     HydratedSources,
@@ -24,7 +28,9 @@ from pants.engine.target import (
     InvalidFieldChoiceException,
     InvalidFieldException,
     InvalidFieldTypeException,
+    NoValidTargets,
     PrimitiveField,
+    RegisteredTargetTypes,
     RequiredFieldMissingException,
     ScalarField,
     SequenceField,
@@ -33,8 +39,11 @@ from pants.engine.target import (
     StringOrStringSequenceField,
     StringSequenceField,
     Target,
+    TargetsWithOrigins,
+    TargetWithOrigin,
 )
 from pants.engine.target import rules as target_rules
+from pants.engine.unions import UnionMembership
 from pants.testutil.engine.util import MockGet, run_rule
 from pants.testutil.test_base import TestBase
 from pants.util.collections import ensure_str_list
@@ -266,7 +275,7 @@ def test_add_custom_fields() -> None:
         alias: ClassVar = "custom_field"
         default: ClassVar = False
 
-    union_membership = UnionMembership({FortranTarget.PluginField: OrderedSet([CustomField])})
+    union_membership = UnionMembership({FortranTarget.PluginField: [CustomField]})
     tgt_values = {CustomField.alias: True}
     tgt = FortranTarget(
         tgt_values, address=Address.parse(":lib"), union_membership=union_membership
@@ -399,6 +408,148 @@ def test_required_field() -> None:
         RequiredTarget({"async": 0}, address=address)
     assert str(address) in str(exc.value)
     assert "primitive" in str(exc.value)
+
+
+# -----------------------------------------------------------------------------------------------
+# Test Configuration
+# -----------------------------------------------------------------------------------------------
+
+
+def test_configuration() -> None:
+    class UnrelatedField(StringField):
+        alias = "unrelated_field"
+        default = "default"
+        value: str
+
+    class UnrelatedTarget(Target):
+        alias = "unrelated_target"
+        core_fields = (UnrelatedField,)
+
+    class NoFieldsTarget(Target):
+        alias = "no_fields_target"
+        core_fields = ()
+
+    @dataclass(frozen=True)
+    class FortranConfiguration(Configuration):
+        required_fields = (FortranSources,)
+
+        sources: FortranSources
+        unrelated_field: UnrelatedField
+
+    @dataclass(frozen=True)
+    class UnrelatedFieldConfiguration(ConfigurationWithOrigin):
+        required_fields = ()
+
+        unrelated_field: UnrelatedField
+
+    fortran_addr = Address.parse(":fortran")
+    fortran_tgt = FortranTarget({}, address=fortran_addr)
+    unrelated_addr = Address.parse(":unrelated")
+    unrelated_tgt = UnrelatedTarget({UnrelatedField.alias: "configured"}, address=unrelated_addr)
+    no_fields_addr = Address.parse(":no_fields")
+    no_fields_tgt = NoFieldsTarget({}, address=no_fields_addr)
+
+    assert FortranConfiguration.is_valid(fortran_tgt) is True
+    assert FortranConfiguration.is_valid(unrelated_tgt) is False
+    assert FortranConfiguration.is_valid(no_fields_tgt) is False
+    # When no fields are required, every target is valid.
+    for tgt in [fortran_tgt, unrelated_tgt, no_fields_tgt]:
+        assert UnrelatedFieldConfiguration.is_valid(tgt) is True
+
+    valid_fortran_config = FortranConfiguration.create(fortran_tgt)
+    assert valid_fortran_config.address == fortran_addr
+    assert valid_fortran_config.unrelated_field.value == UnrelatedField.default
+    with pytest.raises(KeyError):
+        FortranConfiguration.create(unrelated_tgt)
+
+    origin = FilesystemLiteralSpec("f.txt")
+    assert (
+        UnrelatedFieldConfiguration.create(TargetWithOrigin(fortran_tgt, origin)).origin == origin
+    )
+    assert (
+        UnrelatedFieldConfiguration.create(
+            TargetWithOrigin(unrelated_tgt, origin)
+        ).unrelated_field.value
+        == "configured"
+    )
+    assert (
+        UnrelatedFieldConfiguration.create(
+            TargetWithOrigin(no_fields_tgt, origin)
+        ).unrelated_field.value
+        == UnrelatedField.default
+    )
+
+
+def test_configuration_group_targets_to_valid_config_types() -> None:
+    class ConfigSuperclass(Configuration):
+        pass
+
+    @dataclass(frozen=True)
+    class ConfigSubclass1(ConfigSuperclass):
+        required_fields = (FortranSources,)
+
+        sources: FortranSources
+
+    @dataclass(frozen=True)
+    class ConfigSubclass2(ConfigSuperclass):
+        required_fields = (FortranSources,)
+
+        sources: FortranSources
+
+    class ConfigSuperclassWithOrigin(ConfigurationWithOrigin):
+        pass
+
+    class ConfigSubclassWithOrigin(ConfigSuperclassWithOrigin):
+        required_fields = (FortranSources,)
+
+        sources: FortranSources
+
+    class InvalidTarget(Target):
+        alias = "invalid_target"
+        core_fields = ()
+
+    origin = FilesystemLiteralSpec("f.txt")
+    valid_tgt = FortranTarget({}, address=Address.parse(":valid"))
+    valid_tgt_with_origin = TargetWithOrigin(valid_tgt, origin)
+    invalid_tgt = InvalidTarget({}, address=Address.parse(":invalid"))
+    invalid_tgt_with_origin = TargetWithOrigin(invalid_tgt, origin)
+
+    union_membership = UnionMembership(
+        {
+            ConfigSuperclass: [ConfigSubclass1, ConfigSubclass2],
+            ConfigSuperclassWithOrigin: [ConfigSubclassWithOrigin],
+        }
+    )
+    registered_target_types = RegisteredTargetTypes.create([FortranTarget, InvalidTarget])
+
+    group_config_superclass = partial(
+        ConfigSuperclass.group_targets_to_valid_subclass_configs,
+        goal_name="fake",
+        union_membership=union_membership,
+        registered_target_types=registered_target_types,
+    )
+    assert group_config_superclass(
+        TargetsWithOrigins([valid_tgt_with_origin, invalid_tgt_with_origin]),
+        error_if_no_valid_targets=True,
+    ) == {valid_tgt: [ConfigSubclass1.create(valid_tgt), ConfigSubclass2.create(valid_tgt)]}
+    assert (
+        group_config_superclass(
+            TargetsWithOrigins([invalid_tgt_with_origin]), error_if_no_valid_targets=False
+        )
+        == {}
+    )
+    with pytest.raises(NoValidTargets):
+        group_config_superclass(
+            TargetsWithOrigins([invalid_tgt_with_origin]), error_if_no_valid_targets=True
+        )
+
+    assert ConfigSuperclassWithOrigin.group_targets_to_valid_subclass_configs(
+        TargetsWithOrigins([valid_tgt_with_origin, invalid_tgt_with_origin]),
+        goal_name="fake",
+        error_if_no_valid_targets=True,
+        union_membership=union_membership,
+        registered_target_types=registered_target_types,
+    ) == {valid_tgt_with_origin: [ConfigSubclassWithOrigin.create(valid_tgt_with_origin)]}
 
 
 # -----------------------------------------------------------------------------------------------

@@ -7,7 +7,7 @@ import sys
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Optional
+from typing import IO, Iterator, Optional, cast
 
 from setproctitle import setproctitle as set_process_title
 
@@ -15,10 +15,15 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink, SignalHandler
 from pants.base.exiter import Exiter
 from pants.bin.daemon_pants_runner import DaemonPantsRunner
-from pants.engine.native import Native
-from pants.engine.rules import UnionMembership
+from pants.engine.internals.native import Native
+from pants.engine.unions import UnionMembership
 from pants.init.engine_initializer import EngineInitializer
-from pants.init.logging import init_rust_logger, setup_logging
+from pants.init.logging import (
+    clear_previous_loggers,
+    init_rust_logger,
+    setup_logging_to_file,
+    setup_logging_to_stderr,
+)
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -290,7 +295,6 @@ class PantsDaemon(FingerprintedProcessManager):
             else True
         )
 
-        self._log_dir = os.path.join(work_dir, self.name)
         self._logger = logging.getLogger(__name__)
         # N.B. This Event is used as nothing more than a convenient atomic flag - nothing waits on it.
         self._kill_switch = threading.Event()
@@ -329,7 +333,7 @@ class PantsDaemon(FingerprintedProcessManager):
             os.close(file_no)
 
     @contextmanager
-    def _pantsd_logging(self):
+    def _pantsd_logging(self) -> Iterator[IO[str]]:
         """A context manager that runs with pantsd logging.
 
         Asserts that stdio (represented by file handles 0, 1, 2) is closed to ensure that we can
@@ -349,23 +353,33 @@ class PantsDaemon(FingerprintedProcessManager):
         with stdio_as(stdin_fd=-1, stdout_fd=-1, stderr_fd=-1):
             # Reinitialize logging for the daemon context.
             init_rust_logger(self._log_level, self._log_show_rust_3rdparty)
-            result = setup_logging(
-                self._log_level,
-                native=self._native,
-                log_dir=self._log_dir,
-                log_name=self.LOG_NAME,
-                warnings_filter_regexes=self._bootstrap_options.for_global_scope(),
+            # We can't statically prove it, but we won't execute `launch()` (which
+            # calls `run_sync` which calls `_pantsd_logging`) unless PantsDaemon
+            # is launched with full_init=True. If PantsdDaemon is launched with
+            # full_init=True, we can guarantee self._native and self._bootstrap_options
+            # are non-None.
+            native = cast(Native, self._native)
+            bootstrap_options = cast(OptionValueContainer, self._bootstrap_options)
+
+            level = self._log_level
+            ignores = bootstrap_options.for_global_scope().ignore_pants_warnings
+            clear_previous_loggers()
+            setup_logging_to_stderr(level, warnings_filter_regexes=ignores)
+            log_dir = os.path.join(self._work_dir, self.name)
+            log_handler = setup_logging_to_file(
+                level, log_dir=log_dir, log_filename=self.LOG_NAME, warnings_filter_regexes=ignores
             )
-            self._native.override_thread_logging_destination_to_just_pantsd()
+
+            native.override_thread_logging_destination_to_just_pantsd()
 
             # Do a python-level redirect of stdout/stderr, which will not disturb `0,1,2`.
             # TODO: Consider giving these pipes/actual fds, in order to make them "deep" replacements
             # for `1,2`, and allow them to be used via `stdio_as`.
-            sys.stdout = _LoggerStream(logging.getLogger(), logging.INFO, result.log_handler)
-            sys.stderr = _LoggerStream(logging.getLogger(), logging.WARN, result.log_handler)
+            sys.stdout = _LoggerStream(logging.getLogger(), logging.INFO, log_handler)  # type: ignore[assignment]
+            sys.stderr = _LoggerStream(logging.getLogger(), logging.WARN, log_handler)  # type: ignore[assignment]
 
             self._logger.debug("logging initialized")
-            yield (result.log_handler.stream, result.log_handler.native_filename)
+            yield log_handler.stream
 
     def _setup_services(self, pants_services):
         for service in pants_services.services:
@@ -435,7 +449,7 @@ class PantsDaemon(FingerprintedProcessManager):
         # Switch log output to the daemon's log stream from here forward.
         # Also, register an exiter using os._exit to ensure we only close stdio streams once.
         self._close_stdio()
-        with self._pantsd_logging() as (log_stream, log_filename), ExceptionSink.exiter_as(
+        with self._pantsd_logging() as log_stream, ExceptionSink.exiter_as(
             lambda _: Exiter(exiter=os._exit)
         ):
 

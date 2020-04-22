@@ -32,13 +32,14 @@ from pants.backend.python.subsystems.subprocess_environment import SubprocessEnc
 from pants.core.goals.test import TestConfiguration, TestDebugRequest, TestOptions, TestResult
 from pants.core.target_types import FilesSources, ResourcesSources
 from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
-from pants.engine.addressable import Addresses
+from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge, InputFilesContent
 from pants.engine.interactive_runner import InteractiveProcessRequest
-from pants.engine.isolated_process import FallibleProcessResult, Process
-from pants.engine.rules import UnionRule, named_rule, rule, subsystem_rule
+from pants.engine.process import FallibleProcessResult, Process
+from pants.engine.rules import named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Targets, TransitiveTargets
+from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
 from pants.python.python_setup import PythonSetup
 
@@ -229,7 +230,7 @@ async def run_python_test(
     """Runs pytest for one target."""
     env = {"PYTEST_ADDOPTS": f"--color={'yes' if global_options.options.colors else 'no'}"}
     run_coverage = test_options.values.run_coverage
-    request = test_setup.test_runner_pex.create_execute_request(
+    process = test_setup.test_runner_pex.create_process(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path=f"./{test_setup.test_runner_pex.output_filename}",
@@ -242,7 +243,7 @@ async def run_python_test(
         ),
         env=env,
     )
-    result = await Get[FallibleProcessResult](Process, request)
+    result = await Get[FallibleProcessResult](Process, process)
     coverage_data = (
         PytestCoverageData(config.address, result.output_directory_digest) if run_coverage else None
     )

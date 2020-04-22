@@ -118,12 +118,11 @@ impl Logger {
       })
   }
 
-  pub fn log_from_python(
-    &self,
-    message: &str,
-    python_level: u64,
-    target: &str,
-  ) -> Result<(), String> {
+  /// log_from_python is only used in the Python FFI, which in turn is only called within the
+  /// Python `NativeHandler` class. Every logging call from Python should get proxied through this
+  /// function, which translates the log message into the Rust log paradigm provided by
+  /// the `log` crate.
+  pub fn log_from_python(message: &str, python_level: u64, target: &str) -> Result<(), String> {
     python_level
       .try_into()
       .map_err(|err| format!("{}", err))
@@ -213,15 +212,11 @@ impl<W: Write + Send + 'static> MaybeWriteLogger<W> {
       inner: Some(WriteLogger::new(LevelFilter::max(), config, writable)),
     }
   }
-
-  pub fn level(&self) -> LevelFilter {
-    self.level
-  }
 }
 
 impl<W: Write + Send + 'static> Log for MaybeWriteLogger<W> {
   fn enabled(&self, metadata: &Metadata) -> bool {
-    metadata.level() <= self.level()
+    metadata.level() <= self.level
   }
 
   fn log(&self, record: &Record) {

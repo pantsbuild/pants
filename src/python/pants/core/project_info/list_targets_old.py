@@ -3,7 +3,7 @@
 
 from typing import Union
 
-from pants.engine.addressable import Addresses
+from pants.engine.addresses import Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.legacy.graph import HydratedTargets

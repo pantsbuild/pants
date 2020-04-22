@@ -113,7 +113,7 @@ fn main() -> Result<(), CffiBuildError> {
   // TODO: bootstrap_c_source() is used to generate C source code from @_extern_decl methods in
   // native.py. It would be very useful to be able to detect when those /declarations/ haven't
   // changed and avoid rebuilding the engine crate if we are just iterating on the implementations.
-  mark_for_change_detection(&build_root.join("src/python/pants/engine/native.py"));
+  mark_for_change_detection(&build_root.join("src/python/pants/engine/internals/native.py"));
 
   let cffi_dir = Path::new("src/cffi");
 

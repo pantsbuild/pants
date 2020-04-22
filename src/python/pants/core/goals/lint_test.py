@@ -5,7 +5,6 @@ from abc import ABCMeta, abstractmethod
 from typing import Iterable, List, Optional, Tuple, Type
 
 from pants.base.specs import SingleAddress
-from pants.build_graph.address import Address
 from pants.core.goals.lint import (
     Lint,
     LinterConfiguration,
@@ -18,11 +17,11 @@ from pants.core.util_rules.filter_empty_sources import (
     ConfigurationsWithSources,
     ConfigurationsWithSourcesRequest,
 )
-from pants.engine.rules import UnionMembership
+from pants.engine.addresses import Address
 from pants.engine.target import Sources, Target, TargetsWithOrigins, TargetWithOrigin
+from pants.engine.unions import UnionMembership
 from pants.testutil.engine.util import MockConsole, MockGet, create_goal_subsystem, run_rule
 from pants.testutil.test_base import TestBase
-from pants.util.ordered_set import OrderedSet
 
 
 class MockTarget(Target):
@@ -124,9 +123,7 @@ class LintTest(TestBase):
         include_sources: bool = True,
     ) -> Tuple[int, str]:
         console = MockConsole(use_colors=False)
-        union_membership = UnionMembership(
-            {LinterConfigurations: OrderedSet(config_collection_types)}
-        )
+        union_membership = UnionMembership({LinterConfigurations: config_collection_types})
         result: Lint = run_rule(
             lint,
             rule_args=[

@@ -4,7 +4,7 @@
 from typing import Iterable, List
 
 from pants.engine.fs import PathGlobs
-from pants.engine.native import Native
+from pants.engine.internals.native import Native
 from pants.source.wrapped_globs import Filespec
 
 

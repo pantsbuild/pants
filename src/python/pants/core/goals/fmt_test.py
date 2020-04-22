@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Iterable, List, Optional, Type, cast
 
 from pants.base.specs import SingleAddress
-from pants.build_graph.address import Address
 from pants.core.goals.fmt import (
     Fmt,
     FmtOptions,
@@ -16,6 +15,7 @@ from pants.core.goals.fmt import (
     fmt,
 )
 from pants.core.util_rules.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
+from pants.engine.addresses import Address
 from pants.engine.fs import (
     EMPTY_DIRECTORY_DIGEST,
     Digest,
@@ -23,11 +23,10 @@ from pants.engine.fs import (
     FileContent,
     Workspace,
 )
-from pants.engine.rules import UnionMembership
 from pants.engine.target import Sources, Target, TargetsWithOrigins, TargetWithOrigin
+from pants.engine.unions import UnionMembership
 from pants.testutil.engine.util import MockConsole, MockGet, create_goal_subsystem, run_rule
 from pants.testutil.test_base import TestBase
-from pants.util.ordered_set import OrderedSet
 
 
 class FortranSources(Sources):
@@ -129,9 +128,7 @@ class FmtTest(TestBase):
         include_sources: bool = True,
     ) -> str:
         console = MockConsole(use_colors=False)
-        union_membership = UnionMembership(
-            {LanguageFmtTargets: OrderedSet(language_target_collection_types)}
-        )
+        union_membership = UnionMembership({LanguageFmtTargets: language_target_collection_types})
         result: Fmt = run_rule(
             fmt,
             rule_args=[

@@ -6,9 +6,9 @@ from typing import Iterable, Optional, Tuple, Union, cast
 
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
-from pants.build_graph.address import Address
 from pants.core.target_types import FilesSources
 from pants.core.util_rules.determine_source_files import SourceFiles
+from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -36,9 +36,7 @@ from pants.python.python_setup import PythonSetup
 
 
 class PythonSources(Sources):
-    # We allow `.c` for compatibility with native wheels, e.g. `src/python/pants:pants-packaged`.
-    # This should possibly be revisited.
-    expected_file_extensions = (".py", ".c")
+    expected_file_extensions = (".py",)
 
 
 class PythonInterpreterCompatibility(StringOrStringSequenceField):

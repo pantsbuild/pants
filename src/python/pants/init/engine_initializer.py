@@ -22,15 +22,18 @@ from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.remote_sources import RemoteSources
 from pants.build_graph.target import Target as TargetV1
-from pants.engine.build_files import create_graph_rules
 from pants.engine.console import Console
 from pants.engine.fs import Workspace, create_fs_rules
 from pants.engine.goal import Goal
 from pants.engine.interactive_runner import InteractiveRunner, create_interactive_runner_rules
-from pants.engine.isolated_process import create_process_rules
+from pants.engine.internals import graph, options_parsing
+from pants.engine.internals.build_files import create_graph_rules
+from pants.engine.internals.mapper import AddressMapper
+from pants.engine.internals.native import Native
+from pants.engine.internals.parser import SymbolTable
+from pants.engine.internals.scheduler import Scheduler, SchedulerSession
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.graph import LegacyBuildGraph, create_legacy_graph_tasks
-from pants.engine.legacy.options_parsing import create_options_parsing_rules
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
 from pants.engine.legacy.structs import (
     JvmAppAdaptor,
@@ -45,14 +48,12 @@ from pants.engine.legacy.structs import (
     TargetAdaptor,
 )
 from pants.engine.legacy.structs import rules as structs_rules
-from pants.engine.mapper import AddressMapper
-from pants.engine.native import Native
-from pants.engine.parser import SymbolTable
 from pants.engine.platform import create_platform_rules
-from pants.engine.rules import RootRule, UnionMembership, rule
-from pants.engine.scheduler import Scheduler, SchedulerSession
+from pants.engine.process import create_process_rules
+from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Params
 from pants.engine.target import RegisteredTargetTypes
+from pants.engine.unions import UnionMembership
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.option.global_options import (
     DEFAULT_EXECUTION_OPTIONS,
@@ -419,13 +420,14 @@ class EngineInitializer:
             registered_target_types_singleton,
             union_membership_singleton,
             build_root_singleton,
+            *graph.rules(),
+            *options_parsing.rules(),
             *create_legacy_graph_tasks(),
             *create_fs_rules(),
             *create_interactive_runner_rules(),
             *create_process_rules(),
             *create_platform_rules(),
             *create_graph_rules(address_mapper),
-            *create_options_parsing_rules(),
             *structs_rules(),
             *changed_rules(),
             *binary_tool_rules(),

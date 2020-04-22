@@ -11,10 +11,10 @@ from pants.engine.console import Console
 from pants.engine.fs import Digest, DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
-from pants.engine.objects import union
-from pants.engine.rules import UnionMembership, goal_rule
+from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get
 from pants.engine.target import Field, Target, Targets, TransitiveTargets
+from pants.engine.unions import UnionMembership, union
 from pants.option.global_options import GlobalOptions
 from pants.util.contextutil import temporary_dir
 

@@ -1,39 +1,37 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import dataclasses
 import itertools
 import logging
-from abc import ABC
+from abc import ABC, ABCMeta
 from dataclasses import dataclass
 from enum import Enum
+from functools import partial
 from pathlib import PurePath
-from typing import ClassVar, Dict, Iterable, List, Optional, Tuple, Type, TypeVar
+from typing import Dict, Iterable, List, Optional, Type, TypeVar
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
-from pants.base.specs import OriginSpec
-from pants.build_graph.address import Address
 from pants.core.util_rules.filter_empty_sources import (
     ConfigurationsWithSources,
     ConfigurationsWithSourcesRequest,
 )
 from pants.engine import desktop
+from pants.engine.addresses import Address
+from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.fs import Digest, DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
-from pants.engine.isolated_process import FallibleProcessResult
-from pants.engine.objects import Collection, union
-from pants.engine.rules import UnionMembership, goal_rule, rule
+from pants.engine.process import FallibleProcessResult
+from pants.engine.rules import goal_rule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
-    Field,
+    ConfigurationWithOrigin,
     RegisteredTargetTypes,
     Sources,
-    Target,
     TargetsWithOrigins,
-    TargetWithOrigin,
 )
+from pants.engine.unions import UnionMembership, union
 
 # TODO(#6004): use proper Logging singleton, rather than static logger.
 logger = logging.getLogger(__name__)
@@ -74,54 +72,13 @@ class TestDebugRequest:
     __test__ = False
 
 
-# TODO: Factor this out once porting fmt.py and lint.py to the Target API. See `binary.py` for a
-#  similar implementation (that one doesn't keep the `OriginSpec`).
 @union
-@dataclass(frozen=True)
-class TestConfiguration(ABC):
-    """An ad hoc collection of the fields necessary to run tests on a target."""
-
-    required_fields: ClassVar[Tuple[Type[Field], ...]]
-
-    address: Address
-    origin: OriginSpec
+class TestConfiguration(ConfigurationWithOrigin, metaclass=ABCMeta):
+    """The fields necessary to run tests on a target."""
 
     sources: Sources
 
     __test__ = False
-
-    @classmethod
-    def is_valid(cls, tgt: Target) -> bool:
-        return tgt.has_fields(cls.required_fields)
-
-    @classmethod
-    def valid_target_types(
-        cls, target_types: Iterable[Type[Target]], *, union_membership: UnionMembership
-    ) -> Tuple[Type[Target], ...]:
-        return tuple(
-            target_type
-            for target_type in target_types
-            if target_type.class_has_fields(cls.required_fields, union_membership=union_membership)
-        )
-
-    @classmethod
-    def create(cls, target_with_origin: TargetWithOrigin) -> "TestConfiguration":
-        all_expected_fields: Dict[str, Type[Field]] = {
-            dataclass_field.name: dataclass_field.type
-            for dataclass_field in dataclasses.fields(cls)
-            if isinstance(dataclass_field.type, type) and issubclass(dataclass_field.type, Field)  # type: ignore[unreachable]
-        }
-        tgt = target_with_origin.target
-        return cls(
-            address=tgt.address,
-            origin=target_with_origin.origin,
-            **{  # type: ignore[arg-type]
-                dataclass_field_name: (
-                    tgt[field_cls] if field_cls in cls.required_fields else tgt.get(field_cls)
-                )
-                for dataclass_field_name, field_cls in all_expected_fields.items()
-            },
-        )
 
 
 # NB: This is only used for the sake of coordinator_of_tests. Consider inlining that rule so that
@@ -247,53 +204,44 @@ async def run_tests(
     union_membership: UnionMembership,
     registered_target_types: RegisteredTargetTypes,
 ) -> Test:
-    config_types: Iterable[Type[TestConfiguration]] = union_membership.union_rules[
-        TestConfiguration
-    ]
+    group_targets_to_configs = partial(
+        TestConfiguration.group_targets_to_valid_subclass_configs,
+        targets_with_origins,
+        union_membership=union_membership,
+        registered_target_types=registered_target_types,
+        goal_name=options.name,
+    )
+
+    bulleted_list_sep = "\n  * "
 
     if options.values.debug:
-        target_with_origin = targets_with_origins.expect_single()
-        target = target_with_origin.target
-        valid_config_types = [
-            config_type for config_type in config_types if config_type.is_valid(target)
-        ]
-        if not valid_config_types:
-            all_valid_target_types = itertools.chain.from_iterable(
-                config_type.valid_target_types(
-                    registered_target_types.types, union_membership=union_membership
-                )
-                for config_type in config_types
-            )
-            formatted_target_types = sorted(
-                target_type.alias for target_type in all_valid_target_types
+        targets_to_valid_configs = group_targets_to_configs(error_if_no_valid_targets=True)
+        if len(targets_to_valid_configs) > 1:
+            test_target_addresses = sorted(
+                tgt_with_origin.target.address.spec for tgt_with_origin in targets_to_valid_configs
             )
             raise ValueError(
-                f"The `test` goal only works with the following target types: "
-                f"{formatted_target_types}\n\nYou used {target.address} with target "
-                f"type {repr(target.alias)}."
+                f"`test --debug` only works on one test target but was given multiple test "
+                f"targets: {bulleted_list_sep}{bulleted_list_sep.join(test_target_addresses)}\n\n"
+                f"Please select one of these targets to run or do not use the `--debug` option."
             )
-        if len(valid_config_types) > 1:
-            possible_config_types = sorted(
-                config_type.__name__ for config_type in valid_config_types
-            )
+        target_with_origin, valid_configs = list(targets_to_valid_configs.items())[0]
+        target = target_with_origin.target
+        if len(valid_configs) > 1:
+            possible_config_types = sorted(config.__class__.__name__ for config in valid_configs)
             raise ValueError(
                 f"Multiple of the registered test implementations work for {target.address} "
                 f"(target type {repr(target.alias)}). It is ambiguous which implementation to use. "
                 f"Possible implementations: {possible_config_types}."
             )
-        config_type = valid_config_types[0]
         logger.info(f"Starting test in debug mode: {target.address.reference()}")
-        request = await Get[TestDebugRequest](
-            TestConfiguration, config_type.create(target_with_origin)
-        )
+        request = await Get[TestDebugRequest](TestConfiguration, valid_configs[0])
         debug_result = interactive_runner.run_local_interactive_process(request.ipr)
         return Test(debug_result.process_exit_code)
 
-    configs = tuple(
-        config_type.create(target_with_origin)
-        for target_with_origin in targets_with_origins
-        for config_type in config_types
-        if config_type.is_valid(target_with_origin.target)
+    targets_to_valid_configs = group_targets_to_configs(error_if_no_valid_targets=False)
+    configs = itertools.chain.from_iterable(
+        configs_per_target for configs_per_target in targets_to_valid_configs.values()
     )
     configs_with_sources = await Get[ConfigurationsWithSources](
         ConfigurationsWithSourcesRequest(configs)
