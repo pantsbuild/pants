@@ -11,8 +11,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get
-from pants.engine.target import RegisteredTargetTypes, TargetsWithOrigins
-from pants.engine.unions import UnionMembership
+from pants.engine.target import TargetsToValidConfigurations, TargetsToValidConfigurationsRequest
 from pants.option.custom_types import shell_str
 from pants.option.global_options import GlobalOptions
 from pants.util.contextutil import temporary_dir
@@ -49,24 +48,21 @@ async def run(
     workspace: Workspace,
     runner: InteractiveRunner,
     build_root: BuildRoot,
-    targets_with_origins: TargetsWithOrigins,
     options: RunOptions,
     global_options: GlobalOptions,
-    union_membership: UnionMembership,
-    registered_target_types: RegisteredTargetTypes,
 ) -> Run:
-    targets_to_valid_configs = BinaryConfiguration.group_targets_to_valid_subclass_configs(
-        targets_with_origins,
-        union_membership=union_membership,
-        registered_target_types=registered_target_types,
-        goal_name=options.name,
-        error_if_no_valid_targets=True,
+    targets_to_valid_configs = await Get[TargetsToValidConfigurations](
+        TargetsToValidConfigurationsRequest(
+            BinaryConfiguration, goal_name=options.name, error_if_no_valid_targets=True
+        )
     )
 
     bulleted_list_sep = "\n  * "
 
-    if len(targets_to_valid_configs) > 1:
-        binary_target_addresses = sorted(tgt.address.spec for tgt in targets_to_valid_configs)
+    if len(targets_to_valid_configs.targets) > 1:
+        binary_target_addresses = sorted(
+            tgt.address.spec for tgt in targets_to_valid_configs.targets
+        )
         raise ValueError(
             f"The `run` goal only works on one binary target but was given multiple targets that "
             f"can produce a binary:"
@@ -74,10 +70,11 @@ async def run(
             f"Please select one of these targets to run."
         )
 
-    target, valid_configs = list(targets_to_valid_configs.items())[0]
-    if len(valid_configs) > 1:
+    target = targets_to_valid_configs.targets[0]
+    if len(targets_to_valid_configs.configurations) > 1:
         possible_config_types = sorted(
-            config_type.__class__.__name__ for config_type in valid_configs
+            config_type.__class__.__name__
+            for config_type in targets_to_valid_configs.configurations
         )
         # TODO: improve this error message. (It's never actually triggered yet because we only have
         #  Python implemented with V2.) A better error message would explain to users how they can
@@ -89,7 +86,8 @@ async def run(
             f"{bulleted_list_sep}{bulleted_list_sep.join(possible_config_types)}."
         )
 
-    binary = await Get[CreatedBinary](BinaryConfiguration, valid_configs[0])
+    config = targets_to_valid_configs.configurations[0]
+    binary = await Get[CreatedBinary](BinaryConfiguration, config)
 
     workdir = global_options.options.pants_workdir
 

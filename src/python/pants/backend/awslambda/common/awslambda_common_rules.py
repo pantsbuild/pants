@@ -12,8 +12,12 @@ from pants.engine.fs import Digest, DirectoriesToMerge, DirectoryToMaterialize, 
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get, MultiGet
-from pants.engine.target import Configuration, RegisteredTargetTypes, TargetsWithOrigins
-from pants.engine.unions import UnionMembership, union
+from pants.engine.target import (
+    Configuration,
+    TargetsToValidConfigurations,
+    TargetsToValidConfigurationsRequest,
+)
+from pants.engine.unions import union
 
 
 class AWSLambdaError(Exception):
@@ -45,26 +49,20 @@ class AWSLambdaGoal(Goal):
 
 @goal_rule
 async def create_awslambda(
-    targets_with_origins: TargetsWithOrigins,
     console: Console,
     options: AWSLambdaOptions,
-    union_membership: UnionMembership,
-    registered_target_types: RegisteredTargetTypes,
     distdir: DistDir,
     buildroot: BuildRoot,
     workspace: Workspace,
 ) -> AWSLambdaGoal:
-    targets_to_valid_configs = AWSLambdaConfiguration.group_targets_to_valid_subclass_configs(
-        targets_with_origins,
-        union_membership=union_membership,
-        registered_target_types=registered_target_types,
-        goal_name=options.name,
-        error_if_no_valid_targets=True,
+    targets_to_valid_configs = await Get[TargetsToValidConfigurations](
+        TargetsToValidConfigurationsRequest(
+            AWSLambdaConfiguration, goal_name=options.name, error_if_no_valid_targets=True
+        )
     )
     awslambdas = await MultiGet(
         Get[CreatedAWSLambda](AWSLambdaConfiguration, config)
-        for valid_configs in targets_to_valid_configs.values()
-        for config in valid_configs
+        for config in targets_to_valid_configs.configurations
     )
     merged_digest = await Get[Digest](
         DirectoriesToMerge(tuple(awslambda.digest for awslambda in awslambdas))

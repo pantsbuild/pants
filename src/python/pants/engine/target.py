@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import dataclasses
+import itertools
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
@@ -14,7 +15,6 @@ from typing import (
     Iterable,
     Mapping,
     Optional,
-    Sequence,
     Tuple,
     Type,
     TypeVar,
@@ -699,41 +699,6 @@ class Configuration(_AbstractConfiguration, metaclass=ABCMeta):
             address=tgt.address, **_get_config_fields_from_target(cls, tgt)
         )
 
-    @final
-    @classmethod
-    def group_targets_to_valid_subclass_configs(
-        cls: Type[_C],
-        targets_with_origins: TargetsWithOrigins,
-        *,
-        goal_name: str,
-        error_if_no_valid_targets: bool,
-        union_membership: UnionMembership,
-        registered_target_types: RegisteredTargetTypes,
-    ) -> Mapping[Target, Sequence[_C]]:
-        """Find all subclasses of this configuration by inspecting UnionMembership, then group each
-        target to each valid Configuration, if any.
-
-        This method should only be used on union bases, such as `TestConfiguration` and
-        `BinaryConfiguration`.
-        """
-        config_types: Iterable[Type[_C]] = union_membership.union_rules[cls]
-        targets_to_valid_configs = {}
-        for tgt in targets_with_origins.targets:
-            valid_configs = [
-                config_type.create(tgt) for config_type in config_types if config_type.is_valid(tgt)
-            ]
-            if valid_configs:
-                targets_to_valid_configs[tgt] = valid_configs
-        if not targets_to_valid_configs and error_if_no_valid_targets:
-            raise NoValidTargets.create_from_configs(
-                targets_with_origins,
-                config_types=config_types,
-                goal_name=goal_name,
-                union_membership=union_membership,
-                registered_target_types=registered_target_types,
-            )
-        return targets_to_valid_configs
-
 
 _CWO = TypeVar("_CWO", bound="ConfigurationWithOrigin")
 
@@ -757,42 +722,90 @@ class ConfigurationWithOrigin(_AbstractConfiguration, metaclass=ABCMeta):
             **_get_config_fields_from_target(cls, tgt),
         )
 
-    @final
-    @classmethod
-    def group_targets_to_valid_subclass_configs(
-        cls: Type[_CWO],
-        targets_with_origins: TargetsWithOrigins,
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class TargetsToValidConfigurations:
+    mapping: FrozenDict[TargetWithOrigin, Tuple[_AbstractConfiguration, ...]]
+
+    def __init__(
+        self, mapping: Mapping[TargetWithOrigin, Iterable[_AbstractConfiguration]]
+    ) -> None:
+        self.mapping = FrozenDict(
+            {tgt_with_origin: tuple(configs) for tgt_with_origin, configs in mapping.items()}
+        )
+
+    @memoized_property
+    def configurations(self) -> Tuple[_AbstractConfiguration, ...]:
+        return tuple(
+            itertools.chain.from_iterable(
+                configs_per_target for configs_per_target in self.mapping.values()
+            )
+        )
+
+    @memoized_property
+    def targets(self) -> Tuple[Target, ...]:
+        return tuple(tgt_with_origin.target for tgt_with_origin in self.targets_with_origins)
+
+    @memoized_property
+    def targets_with_origins(self) -> Tuple[TargetWithOrigin, ...]:
+        return tuple(self.mapping.keys())
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class TargetsToValidConfigurationsRequest:
+    configuration_superclass: Type[_AbstractConfiguration]
+    goal_name: str
+    error_if_no_valid_targets: bool
+    # TODO: Add a `require_sources` field. To do this, figure out the dependency cycle with
+    #  `util_rules/filter_empty_sources.py`.
+    # TODO: add a "expect_only_one_config" bool option. The tricky part is the error message.
+
+    def __init__(
+        self,
+        configuration_superclass: Type[_AbstractConfiguration],
         *,
-        union_membership: UnionMembership,
-        registered_target_types: RegisteredTargetTypes,
         goal_name: str,
         error_if_no_valid_targets: bool,
-    ) -> Mapping[TargetWithOrigin, Sequence[_CWO]]:
-        """Find all subclasses of this configuration by inspecting UnionMembership, then group each
-        target to each valid Configuration, if any.
+    ) -> None:
+        self.configuration_superclass = configuration_superclass
+        self.goal_name = goal_name
+        self.error_if_no_valid_targets = error_if_no_valid_targets
 
-        This method should only be used on union bases, such as `TestConfiguration` and
-        `BinaryConfiguration`.
-        """
-        config_types: Iterable[Type[_CWO]] = union_membership.union_rules[cls]
-        targets_to_valid_configs = {}
-        for tgt_with_origin in targets_with_origins:
-            valid_configs = [
+
+@rule
+def find_valid_configurations(
+    request: TargetsToValidConfigurationsRequest,
+    targets_with_origins: TargetsWithOrigins,
+    union_membership: UnionMembership,
+    registered_target_types: RegisteredTargetTypes,
+) -> TargetsToValidConfigurations:
+    config_types: Iterable[
+        Union[Type[Configuration], Type[ConfigurationWithOrigin]]
+    ] = union_membership.union_rules[request.configuration_superclass]
+    targets_to_valid_configs = {}
+    for tgt_with_origin in targets_with_origins:
+        valid_configs = [
+            (
                 config_type.create(tgt_with_origin)
-                for config_type in config_types
-                if config_type.is_valid(tgt_with_origin.target)
-            ]
-            if valid_configs:
-                targets_to_valid_configs[tgt_with_origin] = valid_configs
-        if not targets_to_valid_configs and error_if_no_valid_targets:
-            raise NoValidTargets.create_from_configs(
-                targets_with_origins,
-                config_types=config_types,
-                goal_name=goal_name,
-                union_membership=union_membership,
-                registered_target_types=registered_target_types,
+                if issubclass(config_type, ConfigurationWithOrigin)
+                else config_type.create(tgt_with_origin.target)
             )
-        return targets_to_valid_configs
+            for config_type in config_types
+            if config_type.is_valid(tgt_with_origin.target)
+        ]
+        if valid_configs:
+            targets_to_valid_configs[tgt_with_origin] = valid_configs
+    if not targets_to_valid_configs and request.error_if_no_valid_targets:
+        raise NoValidTargets.create_from_configs(
+            targets_with_origins,
+            config_types=config_types,
+            goal_name=request.goal_name,
+            union_membership=union_membership,
+            registered_target_types=registered_target_types,
+        )
+    return TargetsToValidConfigurations(targets_to_valid_configs)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -1411,4 +1424,9 @@ class BundlesField(AsyncField):
 
 
 def rules():
-    return [hydrate_sources, RootRule(HydrateSourcesRequest)]
+    return [
+        find_valid_configurations,
+        hydrate_sources,
+        RootRule(TargetsToValidConfigurationsRequest),
+        RootRule(HydrateSourcesRequest),
+    ]

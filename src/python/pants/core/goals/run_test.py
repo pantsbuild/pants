@@ -10,8 +10,12 @@ from pants.core.goals.run import Run, RunOptions, run
 from pants.engine.addresses import Address
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Workspace
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
-from pants.engine.target import RegisteredTargetTypes, Target, TargetsWithOrigins, TargetWithOrigin
-from pants.engine.unions import UnionMembership
+from pants.engine.target import (
+    Target,
+    TargetsToValidConfigurations,
+    TargetsToValidConfigurationsRequest,
+    TargetWithOrigin,
+)
 from pants.option.global_options import GlobalOptions
 from pants.testutil.engine.util import (
     MockConsole,
@@ -45,7 +49,12 @@ class RunTest(TestBase):
             core_fields = ()
 
         address = Address.parse(address_spec)
-        origin = SingleAddress(address.spec_path, address.target_name)
+        target = TestBinaryTarget({}, address=address)
+        target_with_origin = TargetWithOrigin(
+            target, SingleAddress(address.spec_path, address.target_name)
+        )
+        config = TestBinaryConfiguration.create(target)
+
         res = run_rule(
             run,
             rule_args=[
@@ -53,20 +62,15 @@ class RunTest(TestBase):
                 workspace,
                 interactive_runner,
                 BuildRoot(),
-                TargetsWithOrigins(
-                    [
-                        TargetWithOrigin(
-                            target=TestBinaryTarget(unhydrated_values={}, address=address),
-                            origin=origin,
-                        )
-                    ]
-                ),
                 create_goal_subsystem(RunOptions, args=[]),
                 create_subsystem(GlobalOptions, pants_workdir=self.pants_workdir),
-                UnionMembership({BinaryConfiguration: [TestBinaryConfiguration]}),
-                RegisteredTargetTypes.create([TestBinaryTarget]),
             ],
             mock_gets=[
+                MockGet(
+                    product_type=TargetsToValidConfigurations,
+                    subject_type=TargetsToValidConfigurationsRequest,
+                    mock=lambda _: TargetsToValidConfigurations({target_with_origin: [config]}),
+                ),
                 MockGet(
                     product_type=CreatedBinary,
                     subject_type=TestBinaryConfiguration,

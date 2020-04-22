@@ -3,7 +3,6 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from functools import partial
 from pathlib import PurePath
 from typing import Any, ClassVar, Dict, Iterable, List, Optional, Tuple, Type
 
@@ -15,7 +14,7 @@ from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, PathGlobs, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import RootRule, rule
-from pants.engine.selectors import Get
+from pants.engine.selectors import Get, Params
 from pants.engine.target import (
     AsyncField,
     BoolField,
@@ -30,7 +29,6 @@ from pants.engine.target import (
     InvalidFieldTypeException,
     NoValidTargets,
     PrimitiveField,
-    RegisteredTargetTypes,
     RequiredFieldMissingException,
     ScalarField,
     SequenceField,
@@ -39,11 +37,13 @@ from pants.engine.target import (
     StringOrStringSequenceField,
     StringSequenceField,
     Target,
+    TargetsToValidConfigurations,
+    TargetsToValidConfigurationsRequest,
     TargetsWithOrigins,
     TargetWithOrigin,
 )
 from pants.engine.target import rules as target_rules
-from pants.engine.unions import UnionMembership
+from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.testutil.engine.util import MockGet, run_rule
 from pants.testutil.test_base import TestBase
 from pants.util.collections import ensure_str_list
@@ -480,7 +480,16 @@ def test_configuration() -> None:
     )
 
 
-def test_configuration_group_targets_to_valid_config_types() -> None:
+class TestFindValidConfigurations(TestBase):
+    class InvalidTarget(Target):
+        alias = "invalid_target"
+        core_fields = ()
+
+    @classmethod
+    def target_types(cls):
+        return [FortranTarget, cls.InvalidTarget]
+
+    @union
     class ConfigSuperclass(Configuration):
         pass
 
@@ -496,6 +505,7 @@ def test_configuration_group_targets_to_valid_config_types() -> None:
 
         sources: FortranSources
 
+    @union
     class ConfigSuperclassWithOrigin(ConfigurationWithOrigin):
         pass
 
@@ -504,52 +514,67 @@ def test_configuration_group_targets_to_valid_config_types() -> None:
 
         sources: FortranSources
 
-    class InvalidTarget(Target):
-        alias = "invalid_target"
-        core_fields = ()
-
-    origin = FilesystemLiteralSpec("f.txt")
-    valid_tgt = FortranTarget({}, address=Address.parse(":valid"))
-    valid_tgt_with_origin = TargetWithOrigin(valid_tgt, origin)
-    invalid_tgt = InvalidTarget({}, address=Address.parse(":invalid"))
-    invalid_tgt_with_origin = TargetWithOrigin(invalid_tgt, origin)
-
-    union_membership = UnionMembership(
-        {
-            ConfigSuperclass: [ConfigSubclass1, ConfigSubclass2],
-            ConfigSuperclassWithOrigin: [ConfigSubclassWithOrigin],
-        }
-    )
-    registered_target_types = RegisteredTargetTypes.create([FortranTarget, InvalidTarget])
-
-    group_config_superclass = partial(
-        ConfigSuperclass.group_targets_to_valid_subclass_configs,
-        goal_name="fake",
-        union_membership=union_membership,
-        registered_target_types=registered_target_types,
-    )
-    assert group_config_superclass(
-        TargetsWithOrigins([valid_tgt_with_origin, invalid_tgt_with_origin]),
-        error_if_no_valid_targets=True,
-    ) == {valid_tgt: [ConfigSubclass1.create(valid_tgt), ConfigSubclass2.create(valid_tgt)]}
-    assert (
-        group_config_superclass(
-            TargetsWithOrigins([invalid_tgt_with_origin]), error_if_no_valid_targets=False
-        )
-        == {}
-    )
-    with pytest.raises(NoValidTargets):
-        group_config_superclass(
-            TargetsWithOrigins([invalid_tgt_with_origin]), error_if_no_valid_targets=True
+    @classmethod
+    def rules(cls):
+        return (
+            *super().rules(),
+            *target_rules(),
+            RootRule(TargetsWithOrigins),
+            UnionRule(cls.ConfigSuperclass, cls.ConfigSubclass1),
+            UnionRule(cls.ConfigSuperclass, cls.ConfigSubclass2),
+            UnionRule(cls.ConfigSuperclassWithOrigin, cls.ConfigSubclassWithOrigin),
         )
 
-    assert ConfigSuperclassWithOrigin.group_targets_to_valid_subclass_configs(
-        TargetsWithOrigins([valid_tgt_with_origin, invalid_tgt_with_origin]),
-        goal_name="fake",
-        error_if_no_valid_targets=True,
-        union_membership=union_membership,
-        registered_target_types=registered_target_types,
-    ) == {valid_tgt_with_origin: [ConfigSubclassWithOrigin.create(valid_tgt_with_origin)]}
+    def test_find_valid_config_types(self) -> None:
+        origin = FilesystemLiteralSpec("f.txt")
+        valid_tgt = FortranTarget({}, address=Address.parse(":valid"))
+        valid_tgt_with_origin = TargetWithOrigin(valid_tgt, origin)
+        invalid_tgt = self.InvalidTarget({}, address=Address.parse(":invalid"))
+        invalid_tgt_with_origin = TargetWithOrigin(invalid_tgt, origin)
+
+        def find_valid_configs(
+            superclass: Type,
+            targets_with_origins: Iterable[TargetWithOrigin],
+            *,
+            error_if_no_valid_targets: bool = False,
+        ) -> TargetsToValidConfigurations:
+            request = TargetsToValidConfigurationsRequest(
+                superclass, goal_name="fake", error_if_no_valid_targets=error_if_no_valid_targets
+            )
+            return self.request_single_product(
+                TargetsToValidConfigurations,
+                Params(request, TargetsWithOrigins(targets_with_origins),),
+            )
+
+        valid = find_valid_configs(
+            self.ConfigSuperclass, [valid_tgt_with_origin, invalid_tgt_with_origin]
+        )
+        assert valid.targets == (valid_tgt,)
+        assert valid.targets_with_origins == (valid_tgt_with_origin,)
+        assert valid.configurations == (
+            self.ConfigSubclass1.create(valid_tgt),
+            self.ConfigSubclass2.create(valid_tgt),
+        )
+
+        no_valid_targets = find_valid_configs(self.ConfigSuperclass, [invalid_tgt_with_origin])
+        assert no_valid_targets.targets == ()
+        assert no_valid_targets.targets_with_origins == ()
+        assert no_valid_targets.configurations == ()
+
+        with pytest.raises(ExecutionError) as exc:
+            find_valid_configs(
+                self.ConfigSuperclass, [invalid_tgt_with_origin], error_if_no_valid_targets=True
+            )
+        assert NoValidTargets.__name__ in str(exc.value)
+
+        valid_with_origin = find_valid_configs(
+            self.ConfigSuperclassWithOrigin, [valid_tgt_with_origin, invalid_tgt_with_origin]
+        )
+        assert valid_with_origin.targets == (valid_tgt,)
+        assert valid_with_origin.targets_with_origins == (valid_tgt_with_origin,)
+        assert valid_with_origin.configurations == (
+            self.ConfigSubclassWithOrigin.create(valid_tgt_with_origin),
+        )
 
 
 # -----------------------------------------------------------------------------------------------
