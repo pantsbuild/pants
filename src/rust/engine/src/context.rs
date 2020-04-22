@@ -122,7 +122,13 @@ impl Core {
     let oauth_bearer_token = if let Some(path) = remote_oauth_bearer_token_path {
       Some(
         std::fs::read_to_string(&path)
-          .map_err(|err| format!("Error reading OAuth bearer token file {:?}: {}", path, err))?,
+          .map_err(|err| format!("Error reading OAuth bearer token file {:?}: {}", path, err))
+          .map(|v| v.trim_matches(|c| c == '\r' || c == '\n').to_owned())
+          .and_then(|v| if v.find(|c| c == '\r' || c == '\n').is_some() {
+            Err(format!("OAuth bearer token file must not contain multiple lines"))
+          } else {
+            Ok(v)
+          })?
       )
     } else {
       None
