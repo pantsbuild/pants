@@ -2,6 +2,47 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
+  name = 'pailgun_server',
+  sources = ['pailgun_server.py'],
+  dependencies = [
+    'src/python/pants/engine/internals:native',
+    'src/python/pants/java:nailgun_protocol',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:memo',
+    'src/python/pants/util:socket'
+  ],
+  tags = {"partially_type_checked"},
+)
+
+python_library(
+  name = 'pants_daemon',
+  sources = ['pants_daemon.py'],
+  dependencies = [
+    '3rdparty/python:dataclasses',
+    '3rdparty/python:setproctitle',
+    ':process_manager',
+    ':watchman_launcher',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:exception_sink',
+    'src/python/pants/base:exiter',
+    'src/python/pants/binaries',
+    'src/python/pants/engine/internals:native',
+    'src/python/pants/engine:unions',
+    'src/python/pants/goal:run_tracker',
+    'src/python/pants/init',
+    'src/python/pants/option',
+    'src/python/pants/pantsd/service:fs_event_service',
+    'src/python/pants/pantsd/service:pailgun_service',
+    'src/python/pants/pantsd/service:scheduler_service',
+    'src/python/pants/pantsd/service:store_gc_service',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:logging',
+    'src/python/pants/util:memo',
+  ],
+  tags = {'partially_type_checked'},
+)
+
+python_library(
   name = 'process_manager',
   sources = ['process_manager.py'],
   dependencies = [
@@ -9,17 +50,7 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/process',
     'src/python/pants/util:dirutil',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_library(
-  name = 'pailgun_server',
-  sources = ['pailgun_server.py'],
-  dependencies = [
-    'src/python/pants/java:nailgun_protocol',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:socket'
+    'src/python/pants/util:memo',
   ],
   tags = {"partially_type_checked"},
 )
@@ -37,18 +68,6 @@ python_library(
 )
 
 python_library(
-  name = 'watchman_launcher',
-  sources = ['watchman_launcher.py'],
-  dependencies = [
-    ':watchman',
-    'src/python/pants/binaries',
-    'src/python/pants/util:logging',
-    'src/python/pants/util:memo',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_library(
   name = 'watchman_client',
   sources = ['watchman_client.py'],
   dependencies = [
@@ -58,28 +77,13 @@ python_library(
 )
 
 python_library(
-  name = 'pants_daemon',
-  sources = ['pants_daemon.py'],
+  name = 'watchman_launcher',
+  sources = ['watchman_launcher.py'],
   dependencies = [
-    '3rdparty/python:dataclasses',
-    '3rdparty/python:setproctitle',
-    ':process_manager',
-    ':watchman_launcher',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/base:exception_sink',
-    'src/python/pants/base:exiter',
+    ':watchman',
     'src/python/pants/binaries',
-    'src/python/pants/engine:native',
-    'src/python/pants/goal:run_tracker',
-    'src/python/pants/init',
-    'src/python/pants/option',
-    'src/python/pants/pantsd/service:fs_event_service',
-    'src/python/pants/pantsd/service:pailgun_service',
-    'src/python/pants/pantsd/service:scheduler_service',
-    'src/python/pants/pantsd/service:store_gc_service',
-    'src/python/pants/util:contextutil',
     'src/python/pants/util:logging',
     'src/python/pants/util:memo',
   ],
-  tags = {'partially_type_checked'},
+  tags = {"partially_type_checked"},
 )

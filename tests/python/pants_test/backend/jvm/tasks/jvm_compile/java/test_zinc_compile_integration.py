@@ -10,7 +10,6 @@ from pants.base.build_environment import get_buildroot
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_open
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
 from pants_test.backend.jvm.tasks.missing_jvm_check import is_missing_jvm
 
@@ -164,25 +163,18 @@ class ZincCompileIntegrationTest(BaseCompileIT):
         """1) create a target containing two scala files 2) compile the target, which would be a
         full compile 3) modify a scala file slightly 4) recompile, and make sure the compile is
         incremental by checking the zinc outputs."""
-        with self.temporary_workdir(cleanup=False) as tmp_build_root:
-            # Make sure the tmp build root is recognized by Pants as a build root
-            # by touching BUILDROOT.
-            with open(os.path.join(tmp_build_root, "BUILDROOT"), "w") as f:
-                f.write("")
+        with self.mock_buildroot() as buildroot_manager:
+            tmp_build_root = buildroot_manager.new_buildroot
 
-            def _create_file(relpath, contents="", mode="w"):
+            def _create_file(relpath, contents=""):
                 """Writes to a file under the buildroot.
 
                 :API: public
 
                 relpath:  The relative path to the file from the build root.
                 contents: A string containing the contents of the file - '' by default..
-                mode:     The mode to write to the file in - over-write by default.
                 """
-                path = os.path.join(tmp_build_root, relpath)
-                with safe_open(path, mode=mode) as fp:
-                    fp.write(contents)
-                return path
+                buildroot_manager.write_file(relpath, contents)
 
             def _create_a_target_containing_two_sources():
                 _srcfile_a = "org/pantsbuild/incr/A.scala"
@@ -228,30 +220,24 @@ class ZincCompileIntegrationTest(BaseCompileIT):
                 }
 
                 lib_spec, src_file_a, srcfile_content = _create_a_target_containing_two_sources()
+                with buildroot_manager.pushd():
+                    pants_run = self.run_pants_with_workdir(
+                        ["-ldebug", "compile", lib_spec], workdir=workdir, config=config,
+                    )
+                    self.assert_success(pants_run)
+                    self.assertIn(
+                        "Full compilation, no sources in previous analysis", pants_run.stdout_data
+                    )
+                    self.assertIn("Compiling 2 Scala sources", pants_run.stdout_data)
 
-                pants_run = self.run_pants_with_workdir(
-                    ["-ldebug", "compile", lib_spec],
-                    workdir=workdir,
-                    config=config,
-                    cwd=tmp_build_root,
-                )
-                self.assert_success(pants_run)
-                self.assertIn(
-                    "Full compilation, no sources in previous analysis", pants_run.stdout_data
-                )
-                self.assertIn("Compiling 2 Scala sources", pants_run.stdout_data)
+                    # Modify the source file slightly
+                    _create_file(src_file_a, srcfile_content.replace("hello", "bye"))
 
-                # Modify the source file slightly
-                _create_file(src_file_a, srcfile_content.replace("hello", "bye"))
-
-                pants_run = self.run_pants_with_workdir(
-                    ["-ldebug", "compile", lib_spec],
-                    workdir=workdir,
-                    config=config,
-                    cwd=tmp_build_root,
-                )
-                self.assert_success(pants_run)
-                self.assertIn("Compiling 1 Scala source", pants_run.stdout_data)
+                    pants_run = self.run_pants_with_workdir(
+                        ["-ldebug", "compile", lib_spec], workdir=workdir, config=config,
+                    )
+                    self.assert_success(pants_run)
+                    self.assertIn("Compiling 1 Scala source", pants_run.stdout_data)
 
     def test_failed_compile_with_hermetic(self):
         with temporary_dir() as cache_dir:

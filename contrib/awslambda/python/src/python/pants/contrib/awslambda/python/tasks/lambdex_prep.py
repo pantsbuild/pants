@@ -1,9 +1,8 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from pants.backend.awslambda.python.lambdex import Lambdex
 from pants.backend.python.tasks.python_tool_prep_base import PythonToolInstance, PythonToolPrepBase
-
-from pants.contrib.awslambda.python.subsystems.lambdex import Lambdex
 
 
 class LambdexInstance(PythonToolInstance):

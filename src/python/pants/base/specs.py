@@ -18,8 +18,8 @@ from typing import (
     cast,
 )
 
+from pants.engine.collection import Collection
 from pants.engine.fs import PathGlobs
-from pants.engine.objects import Collection
 from pants.option.custom_types import GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.collections import assert_single_element
@@ -29,7 +29,7 @@ from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
 
 if TYPE_CHECKING:
-    from pants.engine.mapper import AddressFamily, AddressMapper
+    from pants.engine.internals.mapper import AddressFamily, AddressMapper
 
 
 class Spec(ABC):

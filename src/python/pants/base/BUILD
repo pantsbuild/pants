@@ -148,8 +148,8 @@ python_library(
   sources = ['specs.py'],
   dependencies = [
     '3rdparty/python:dataclasses',
+    'src/python/pants/engine:collection',
     'src/python/pants/engine:fs',
-    'src/python/pants/engine:objects',
     'src/python/pants/util:collections',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:filtering',
@@ -233,6 +233,7 @@ python_library(
 python_tests(
   name='tests',
   dependencies=[
+    'src/python/pants/engine/internals:native',
     'src/python/pants/engine/legacy:structs',
     ':specs'
   ],

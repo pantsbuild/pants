@@ -6,6 +6,7 @@ python_tests(
   dependencies=[
     'pants-plugins/3rdparty/python:beautifulsoup4',
     'pants-plugins/src/python/internal_backend/sitegen/tasks:sitegen',
+    'src/python/pants/engine/internals:native',
   ],
   tags = {"partially_type_checked"},
 )

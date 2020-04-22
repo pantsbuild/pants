@@ -126,6 +126,7 @@ function pkg_awslambda_python_install_test() {
   local version=$1
   execute_packaged_pants_with_internal_backends \
     --plugins="['pantsbuild.pants.contrib.awslambda_python==${version}']" \
+    --backend-packages2="-['pants.backend.awslambda.python']" \
     --explain bundle | grep "lambdex" &> /dev/null
 }
 

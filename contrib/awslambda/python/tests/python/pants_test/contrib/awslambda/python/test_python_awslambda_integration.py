@@ -3,6 +3,7 @@
 
 import os
 import subprocess
+from textwrap import dedent
 
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import temporary_dir
@@ -14,21 +15,55 @@ class PythonAWSLambdaIntegrationTest(PantsRunIntegrationTest):
         return True
 
     def test_awslambda_bundle(self):
-        with temporary_dir() as distdir:
-            config = {
-                "GLOBAL": {
-                    "pants_distdir": distdir,
-                    "pythonpath": ["%(buildroot)s/contrib/awslambda/python/src/python"],
-                    "backend_packages": ["pants.backend.python", "pants.contrib.awslambda.python"],
-                }
-            }
+        with temporary_dir(cleanup=False) as distdir:
+            with self.temporary_sourcedir() as src:
+                pkg_dir = os.path.join(src, "src", "python", "helloworld")
+                os.makedirs(pkg_dir)
 
-            command = [
-                "bundle",
-                "contrib/awslambda/python/src/python/pants/contrib/awslambda/python/examples:hello-lambda",
-            ]
-            pants_run = self.run_pants(command=command, config=config)
-            self.assert_success(pants_run)
+                def create_file(name, content):
+                    with open(os.path.join(pkg_dir, name), "w") as fp:
+                        fp.write(content)
+
+                create_file("__init__.py", "")
+                create_file(
+                    "handler.py",
+                    dedent(
+                        """
+                    def handler(event, context):
+                        print("Hello, world!")
+                """
+                    ),
+                )
+                create_file(
+                    "BUILD",
+                    dedent(
+                        """
+                    python_binary(
+                      name='hello-bin',
+                      sources=['handler.py'],
+                    )
+                    python_awslambda(
+                      name='hello-lambda',
+                      binary=':hello-bin',
+                      handler='helloworld.handler:handler'
+                    )
+                """
+                    ),
+                )
+                config = {
+                    "GLOBAL": {
+                        "pants_distdir": distdir,
+                        "pythonpath": ["%(buildroot)s/contrib/awslambda/python/src/python"],
+                        "backend_packages": [
+                            "pants.backend.python",
+                            "pants.contrib.awslambda.python",
+                        ],
+                    },
+                }
+
+                command = ["bundle", f"{pkg_dir}:hello-lambda"]
+                pants_run = self.run_pants(command=command, config=config)
+                self.assert_success(pants_run)
 
             # Now run the lambda via the wrapper handler injected by lambdex (note that this
             # is distinct from the pex's entry point - a handler must be a function with two arguments,
@@ -42,4 +77,4 @@ class PythonAWSLambdaIntegrationTest(PantsRunIntegrationTest):
                 encoding="utf-8",
                 check=True,
             )
-            self.assertEquals("Hello from the United States!", result.stdout.strip())
+            self.assertEqual("Hello, world!", result.stdout.strip())

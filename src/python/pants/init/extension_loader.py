@@ -130,6 +130,37 @@ def load_backends_and_plugins(
             deprecation_start_version="1.28.0.dev0",
             hint="\n".join(msg_lines),
         )
+
+    if "pants.contrib.awslambda.python" in backends1:
+        msg_lines = [
+            fill(
+                (
+                    "The original awslambda implementation is being replaced by an improved "
+                    "implementation made possible by the V2 engine."
+                ),
+                80,
+            ),
+            "",
+            fill(
+                (
+                    "To prepare for this change, remove 'pants.contrib.awslambda.python' from the "
+                    "`backend_packages` entry in the `GLOBAL` section in your `pants.toml` "
+                    "(or `pants.ini`). Then add `pants.backend.awslambda.python` to the "
+                    "`backend_packages2` entry. Ensure that you have `--v2` enabled (the default). "
+                    "Then modify your BUILD files to remove the intermediate `python_binary` "
+                    "target and the `binary=` setting on the `python_awslambda` target. "
+                    "Finally, use the `awslambda` goal instead of the `bundle` goal."
+                ),
+                80,
+            ),
+        ]
+        warn_or_error(
+            deprecated_entity_description="The V1 awslambda implementation",
+            removal_version="1.30.0.dev0",
+            deprecation_start_version="1.28.0.dev0",
+            hint="\n".join(msg_lines),
+        )
+
     load_build_configuration_from_source(build_configuration, backends1, backends2)
     load_plugins(build_configuration, plugins1, working_set, is_v1_plugin=True)
     load_plugins(build_configuration, plugins2, working_set, is_v1_plugin=False)
@@ -229,7 +260,7 @@ def load_build_configuration_from_source(
     for backend_package in backend_packages1:
         load_backend(build_configuration, backend_package, is_v1_backend=True)
 
-    backend_packages2 = FrozenOrderedSet(["pants.rules.core", *backends2])
+    backend_packages2 = FrozenOrderedSet(["pants.core", *backends2])
     for backend_package in backend_packages2:
         load_backend(build_configuration, backend_package, is_v1_backend=False)
 

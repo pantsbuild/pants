@@ -10,12 +10,12 @@ from pants.backend.python.lint.isort.rules import rules as isort_rules
 from pants.backend.python.lint.python_fmt import PythonFmtTargets, format_python_target
 from pants.backend.python.rules.targets import PythonLibrary
 from pants.base.specs import SingleAddress
-from pants.build_graph.address import Address
+from pants.core.goals.fmt import LanguageFmtResults
+from pants.engine.addresses import Address
 from pants.engine.fs import Digest, FileContent, InputFilesContent
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.engine.target import TargetsWithOrigins, TargetWithOrigin
-from pants.rules.core.fmt import LanguageFmtResults
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 

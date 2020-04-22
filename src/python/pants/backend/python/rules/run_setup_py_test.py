@@ -32,17 +32,17 @@ from pants.backend.python.rules.run_setup_py import (
     validate_args,
 )
 from pants.backend.python.rules.targets import PythonBinary, PythonLibrary, PythonRequirementLibrary
-from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.core.target_types import Resources
+from pants.core.util_rules.determine_source_files import rules as determine_source_files_rules
+from pants.core.util_rules.strip_source_roots import rules as strip_source_roots_rules
+from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import RootRule
-from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Params
 from pants.engine.target import Target, Targets, WrappedTarget
 from pants.python.python_requirement import PythonRequirement
-from pants.rules.core.determine_source_files import rules as determine_source_files_rules
-from pants.rules.core.strip_source_roots import rules as strip_source_roots_rules
-from pants.rules.core.targets import Resources
 from pants.source.source_root import SourceRootConfig
 from pants.testutil.subsystem.util import init_subsystem
 from pants.testutil.test_base import TestBase
@@ -331,7 +331,7 @@ class TestGetRequirements(TestSetupPyBase):
         reqs = self.request_single_product(
             ExportedTargetRequirements, Params(DependencyOwner(ExportedTarget(self.tgt(addr))))
         )
-        assert sorted(expected_req_strs) == sorted(reqs.requirement_strs)
+        assert sorted(expected_req_strs) == list(reqs)
 
     def test_get_requirements(self) -> None:
         self.create_file(

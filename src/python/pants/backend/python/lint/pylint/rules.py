@@ -16,17 +16,19 @@ from pants.backend.python.rules.pex import (
 from pants.backend.python.rules.targets import PythonInterpreterCompatibility, PythonSources
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
-from pants.engine.addressable import Addresses
+from pants.core.goals.lint import LinterConfiguration, LinterConfigurations, LintResult
+from pants.core.util_rules import determine_source_files, strip_source_roots
+from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
+from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
-from pants.engine.isolated_process import FallibleProcessResult, Process
-from pants.engine.rules import UnionRule, named_rule, subsystem_rule
+from pants.engine.process import FallibleProcessResult, Process
+from pants.engine.rules import named_rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.engine.target import Dependencies, Targets
+from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
-from pants.rules.core import determine_source_files, strip_source_roots
-from pants.rules.core.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
-from pants.rules.core.lint import LinterConfiguration, LinterConfigurations, LintResult
+from pants.util.strutil import pluralize
 
 
 @dataclass(frozen=True)
@@ -112,15 +114,15 @@ async def pylint_lint(
 
     address_references = ", ".join(sorted(config.address.reference() for config in configs))
 
-    request = requirements_pex.create_execute_request(
+    process = requirements_pex.create_process(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path=f"./pylint.pex",
         pex_args=generate_args(specified_source_files=specified_source_files, pylint=pylint),
         input_files=merged_input_files,
-        description=f"Run Pylint for {address_references}",
+        description=f"Run Pylint on {pluralize(len(configs), 'target')}: {address_references}.",
     )
-    result = await Get[FallibleProcessResult](Process, request)
+    result = await Get[FallibleProcessResult](Process, process)
     return LintResult.from_fallible_process_result(result)
 
 

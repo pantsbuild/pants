@@ -10,8 +10,7 @@ from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.build_graph.target import Target
-from pants.engine.objects import union
-from pants.engine.rules import UnionRule
+from pants.engine.unions import UnionRule, union
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import touch
 

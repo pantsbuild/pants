@@ -5,7 +5,6 @@ contrib_plugin(
   name='plugin',
   dependencies=[
     'contrib/awslambda/python/src/python/pants/contrib/awslambda/python/rules',
-    'contrib/awslambda/python/src/python/pants/contrib/awslambda/python/subsystems',
     'contrib/awslambda/python/src/python/pants/contrib/awslambda/python/targets',
     'contrib/awslambda/python/src/python/pants/contrib/awslambda/python/tasks',
     'src/python/pants/build_graph',
@@ -16,9 +15,4 @@ contrib_plugin(
   description='Pants plugin for creating deployable AWS Lambdas out of python code.',
   build_file_aliases=True,
   register_goals=True,
-)
-
-files(
-  name='examples_directory',
-  sources=['examples/**/*'],
 )

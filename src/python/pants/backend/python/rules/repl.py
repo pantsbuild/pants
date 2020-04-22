@@ -8,10 +8,11 @@ from pants.backend.python.rules.pex_from_targets import (
 )
 from pants.backend.python.rules.targets import PythonSources
 from pants.backend.python.subsystems.ipython import IPython
-from pants.engine.addressable import Addresses
-from pants.engine.rules import UnionRule, rule, subsystem_rule
+from pants.core.goals.repl import ReplBinary, ReplImplementation
+from pants.engine.addresses import Addresses
+from pants.engine.rules import rule, subsystem_rule
 from pants.engine.selectors import Get
-from pants.rules.core.repl import ReplBinary, ReplImplementation
+from pants.engine.unions import UnionRule
 
 
 class PythonRepl(ReplImplementation):

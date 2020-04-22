@@ -25,7 +25,7 @@ def run_example():
                 )
             else:
                 print(
-                    "An error occured! Error code: [{}] Error details: [{}]".format(
+                    "An error occurred! Error code: [{}] Error details: [{}]".format(
                         error.code(), error.details()
                     )
                 )

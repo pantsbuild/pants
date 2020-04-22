@@ -6,7 +6,7 @@ from typing import Dict, Iterable, Optional, Tuple, Union, cast
 from pants.backend.native.subsystems.native_build_step import ToolchainVariant
 from pants.backend.native.targets.external_native_library import ConanRequirement
 from pants.backend.native.targets.native_artifact import NativeArtifact
-from pants.build_graph.address import Address
+from pants.engine.addresses import Address
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,

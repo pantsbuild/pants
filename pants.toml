@@ -44,7 +44,6 @@ pythonpath = [
 backend_packages.add = [
   "pants.backend.docgen",
   "pants.contrib.avro",
-  "pants.contrib.awslambda.python",
   "pants.contrib.buildrefactor",
   "pants.contrib.codeanalysis",
   "pants.contrib.cpp",
@@ -73,6 +72,7 @@ backend_packages2 = [
   "pants.backend.python.lint.docformatter",
   "pants.backend.python.lint.flake8",
   "pants.backend.python.lint.isort",
+  "pants.backend.awslambda.python",
   "pants.backend.native",
   "internal_backend.rules_for_testing",
 ]
@@ -351,6 +351,7 @@ branch_notes = """
   '1.24.x': 'src/python/pants/notes/1.24.x.rst',
   '1.25.x': 'src/python/pants/notes/1.25.x.rst',
   '1.26.x': 'src/python/pants/notes/1.26.x.rst',
+  '1.27.x': 'src/python/pants/notes/1.27.x.rst',
 }
 """
 
@@ -399,10 +400,6 @@ timeout_default = 60
 [test.junit]
 timeouts = true
 timeout_default = 60
-
-[test.go]
-# TODO(#8649): Switch to --chroot.
-chroot = false
 
 [buildgen.go]
 materialize = true

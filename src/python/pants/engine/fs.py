@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Iterable, Optional, Tuple
 
-from pants.engine.objects import Collection
+from pants.engine.collection import Collection
 from pants.engine.rules import RootRule, side_effecting
 from pants.option.custom_types import GlobExpansionConjunction as GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior as GlobMatchErrorBehavior
@@ -19,7 +19,7 @@ from pants.util.dirutil import (
 from pants.util.meta import frozen_after_init
 
 if TYPE_CHECKING:
-    from pants.engine.scheduler import SchedulerSession
+    from pants.engine.internals.scheduler import SchedulerSession
 
 
 @dataclass(frozen=True)
@@ -316,6 +316,26 @@ class SingleFileExecutable:
 
         self._exe_filename = Path(snapshot.files[0])
         self.directory_digest = snapshot.directory_digest
+
+
+@dataclass(frozen=True)
+class SourcesSnapshot:
+    """Sources matched by command line specs, either directly via FilesystemSpecs or indirectly via
+    AddressSpecs.
+
+    Note that the resolved sources do not need an owning target. Any source resolvable by
+    `PathGlobs` is valid here.
+    """
+
+    snapshot: Snapshot
+
+
+class SourcesSnapshots(Collection[SourcesSnapshot]):
+    """A collection of sources matched by command line specs.
+
+    `@goal_rule`s may request this when they only need source files to operate and do not need any
+    target information.
+    """
 
 
 def create_fs_rules():
