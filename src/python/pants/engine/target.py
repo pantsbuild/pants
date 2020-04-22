@@ -97,7 +97,7 @@ class PrimitiveField(Field, metaclass=ABCMeta):
 
     Subclasses should also override the type hints for `value` and `raw_value` to be more precise
     than `Any`. The type hint for `raw_value` is used to generate documentation, e.g. for
-    `./pants target-types2`. If the field is required, do not use `Optional` for the type hint of
+    `./pants target-types`. If the field is required, do not use `Optional` for the type hint of
     `raw_value`.
 
     Example:
