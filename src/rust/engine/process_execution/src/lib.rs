@@ -38,7 +38,7 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 use store::UploadSummary;
-use workunit_store::WorkUnitStore;
+use workunit_store::{new_span_id, scope_task_workunit_state, WorkUnitStore, WorkunitMetadata};
 
 use futures::compat::Future01CompatExt;
 use futures::future::{FutureExt, TryFutureExt};
@@ -428,7 +428,31 @@ impl CommandRunner for BoundedCommandRunner {
       .inner
       .1
       .clone()
-      .with_acquired(move || inner.0.run(req, context).compat())
+      .with_acquired(move || {
+        let mut workunit_state = workunit_store::expect_workunit_state();
+        let name = format!(
+          "Bounded - {}",
+          req.user_facing_name().unwrap_or("Unnamed node".to_string())
+        );
+        let span_id = new_span_id();
+        let parent_id = std::mem::replace(&mut workunit_state.parent_id, Some(span_id.clone()));
+        let desc = Some("Bounded version of the workunit".to_string());
+        let metadata = WorkunitMetadata {
+          desc,
+          display: false,
+        };
+        let started_id = context
+          .workunit_store
+          .start_workunit(span_id, name, parent_id, metadata);
+        scope_task_workunit_state(Some(workunit_state), async move {
+          let result = inner.0.run(req, context.clone()).compat().await;
+          context
+            .workunit_store
+            .complete_workunit(started_id)
+            .unwrap();
+          result
+        })
+      })
       .boxed()
       .compat()
       .to_boxed()
