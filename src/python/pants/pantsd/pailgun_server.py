@@ -8,7 +8,7 @@ import traceback
 from contextlib import contextmanager
 from socketserver import BaseRequestHandler, BaseServer, TCPServer, ThreadingMixIn
 
-from pants.engine.native import Native
+from pants.engine.internals.native import Native
 from pants.java.nailgun_protocol import NailgunProtocol
 from pants.util.contextutil import maybe_profiled
 from pants.util.memo import memoized

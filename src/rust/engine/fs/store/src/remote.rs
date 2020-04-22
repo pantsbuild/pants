@@ -16,7 +16,6 @@ use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
 use uuid;
-use workunit_store::WorkUnit;
 
 #[derive(Clone)]
 pub struct ByteStore {
@@ -219,12 +218,12 @@ impl ByteStore {
         .await;
 
     if let Some(workunit_state) = workunit_store::get_workunit_state() {
-      let workunit = WorkUnit::new(
+      let parent_id = workunit_state.parent_id;
+      workunit_state.store.add_completed_workunit(
         workunit_name.clone(),
         TimeSpan::since(&start_time),
-        workunit_state.parent_id,
+        parent_id,
       );
-      workunit_state.store.add_workunit(workunit);
     }
 
     result
@@ -302,12 +301,12 @@ impl ByteStore {
       .await;
 
     if let Some(workunit_state) = workunit_store::get_workunit_state() {
-      let workunit = WorkUnit::new(
-        workunit_name.clone(),
-        TimeSpan::since(&start_time),
-        workunit_state.parent_id,
-      );
-      workunit_state.store.add_workunit(workunit);
+      let name = workunit_name.clone();
+      let time_span = TimeSpan::since(&start_time);
+      let parent_id = workunit_state.parent_id;
+      workunit_state
+        .store
+        .add_completed_workunit(name, time_span, parent_id);
     }
 
     result
@@ -348,12 +347,12 @@ impl ByteStore {
       })
       .then(move |future| {
         if let Some(workunit_state) = workunit_store::get_workunit_state() {
-          let workunit = WorkUnit::new(
-            workunit_name.clone(),
-            TimeSpan::since(&start_time),
-            workunit_state.parent_id,
-          );
-          workunit_state.store.add_workunit(workunit);
+          let name = workunit_name.clone();
+          let time_span = TimeSpan::since(&start_time);
+          let parent_id = workunit_state.parent_id;
+          workunit_state
+            .store
+            .add_completed_workunit(name, time_span, parent_id);
         }
         future
       })

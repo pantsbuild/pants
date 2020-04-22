@@ -12,7 +12,7 @@ from typing import Callable, Iterator, List, Mapping, Optional
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode, Exiter
 from pants.bin.local_pants_runner import LocalPantsRunner
-from pants.engine.rules import UnionMembership
+from pants.engine.unions import UnionMembership
 from pants.help.help_printer import HelpPrinter
 from pants.init.specs_calculator import SpecsCalculator
 from pants.init.util import clean_global_runtime_state

@@ -3,10 +3,9 @@
 
 from setuptools import find_packages, setup
 
-
 setup(
-  name='tensorflow_custom_op',
-  version='0.0.1',
-  packages=find_packages(),
-  data_files=[('', ['libtensorflow-zero-out-operator.so'])],
+    name="tensorflow_custom_op",
+    version="0.0.1",
+    packages=find_packages(),
+    data_files=[("", ["libtensorflow-zero-out-operator.so"])],
 )

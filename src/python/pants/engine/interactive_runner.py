@@ -9,7 +9,7 @@ from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Digest
 from pants.engine.rules import RootRule, side_effecting
 
 if TYPE_CHECKING:
-    from pants.engine.scheduler import SchedulerSession
+    from pants.engine.internals.scheduler import SchedulerSession
 
 
 @dataclass(frozen=True)

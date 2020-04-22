@@ -3,7 +3,10 @@
 
 python_library(
   dependencies=[
+    'src/python/pants/engine:addresses',
     'src/python/pants/engine:target',
+    'src/python/pants/fs',
+    'src/python/pants/util:frozendict',
   ],
   tags = {"type_checked"},
 )

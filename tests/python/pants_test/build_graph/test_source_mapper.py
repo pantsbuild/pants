@@ -6,7 +6,7 @@ from textwrap import dedent
 # TODO: Create a dummy target type in this test and remove this dep.
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.engine.legacy.graph import Owners, OwnersRequest
+from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.testutil.test_base import TestBase
 
 

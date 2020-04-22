@@ -18,8 +18,8 @@ from typing import (
     cast,
 )
 
+from pants.engine.collection import Collection
 from pants.engine.fs import PathGlobs
-from pants.engine.objects import Collection
 from pants.option.custom_types import GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.collections import assert_single_element
@@ -29,7 +29,7 @@ from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
 
 if TYPE_CHECKING:
-    from pants.engine.mapper import AddressFamily, AddressMapper
+    from pants.engine.internals.mapper import AddressFamily, AddressMapper
 
 
 class Spec(ABC):
@@ -450,27 +450,33 @@ class FilesystemSpecs(Collection[FilesystemSpec]):
         return tuple(spec for spec in self.dependencies if isinstance(spec, FilesystemIgnoreSpec))
 
     @staticmethod
-    def _generate_path_globs(specs: Iterable[FilesystemSpec]) -> PathGlobs:
+    def _generate_path_globs(
+        specs: Iterable[FilesystemSpec], glob_match_error_behavior: GlobMatchErrorBehavior
+    ) -> PathGlobs:
         return PathGlobs(
             globs=(s.to_spec_string() for s in specs),
-            # We error on unmatched globs for consistency with unmatched address specs. This also
-            # ensures that scripts don't silently do the wrong thing.
-            glob_match_error_behavior=GlobMatchErrorBehavior.error,
+            glob_match_error_behavior=glob_match_error_behavior,
             # We validate that _every_ glob is valid.
             conjunction=GlobExpansionConjunction.all_match,
-            description_of_origin="file arguments",
+            description_of_origin=(
+                None
+                if glob_match_error_behavior == GlobMatchErrorBehavior.ignore
+                else "file arguments"
+            ),
         )
 
     def path_globs_for_spec(
-        self, spec: Union[FilesystemLiteralSpec, FilesystemGlobSpec]
+        self,
+        spec: Union[FilesystemLiteralSpec, FilesystemGlobSpec],
+        glob_match_error_behavior: GlobMatchErrorBehavior,
     ) -> PathGlobs:
         """Generate PathGlobs for the specific spec, automatically including the instance's
         FilesystemIgnoreSpecs."""
-        return self._generate_path_globs(specs=(spec, *self.ignores))
+        return self._generate_path_globs((spec, *self.ignores), glob_match_error_behavior)
 
-    def to_path_globs(self) -> PathGlobs:
+    def to_path_globs(self, glob_match_error_behavior: GlobMatchErrorBehavior) -> PathGlobs:
         """Generate a single PathGlobs for the instance."""
-        return self._generate_path_globs(specs=(*self.includes, *self.ignores))
+        return self._generate_path_globs((*self.includes, *self.ignores), glob_match_error_behavior)
 
 
 class AmbiguousSpecs(Exception):

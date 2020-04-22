@@ -28,7 +28,7 @@ use crate::{
 };
 use std;
 use std::cmp::min;
-use workunit_store::{WorkUnit, WorkUnitStore};
+use workunit_store::WorkUnitStore;
 
 // Environment variable which is exclusively used for cache key invalidation.
 // This may be not specified in an Process, and may be populated only by the
@@ -839,8 +839,7 @@ fn maybe_add_workunit(
   //  TODO: workunits for scheduling, fetching, executing and uploading should be recorded
   //   only if '--reporting-zipkin-trace-v2' is set
   if !result_cached {
-    let workunit = WorkUnit::new(name.to_string(), time_span, parent_id);
-    workunit_store.add_workunit(workunit);
+    workunit_store.add_completed_workunit(name.to_string(), time_span, parent_id);
   }
 }
 

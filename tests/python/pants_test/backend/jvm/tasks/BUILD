@@ -417,7 +417,7 @@ python_tests(
     'src/python/pants/testutil:task_test_base',
   ],
   tags = {'partially_type_checked'},
-  timeout = 120,
+  timeout = 150,
 )
 
 python_tests(
@@ -525,7 +525,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:unicode_directory',
   ],
   tags = {'integration', 'partially_type_checked'},
-  timeout = 460,
+  timeout = 540,
 )
 
 python_tests(

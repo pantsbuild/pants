@@ -1,22 +1,23 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from functools import partialmethod
+from pathlib import PurePath
 from textwrap import dedent
 from typing import List, Optional
 
-from pants.backend.python.lint.pylint.rules import PylintLinter
+from pants.backend.python.lint.pylint.rules import PylintConfiguration, PylintConfigurations
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
-from pants.backend.python.targets.python_library import PythonLibrary
+from pants.backend.python.rules.targets import PythonInterpreterCompatibility, PythonLibrary
+from pants.backend.python.targets.python_library import PythonLibrary as PythonLibraryV1
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
-from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.engine.fs import FileContent, InputFilesContent, Snapshot
-from pants.engine.legacy.structs import PythonTargetAdaptor, PythonTargetAdaptorWithOrigin
+from pants.core.goals.lint import LintResult
+from pants.engine.addresses import Address
+from pants.engine.fs import FileContent
+from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
-from pants.rules.core.lint import LintResult
-from pants.source.wrapped_globs import EagerFilesetWithSpec
+from pants.engine.target import Dependencies, Sources, TargetWithOrigin
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
@@ -31,44 +32,56 @@ class PylintIntegrationTest(TestBase):
         path=f"{source_root}/bad.py", content=b"'''docstring'''\nlowercase_constant = ''\n",
     )
 
-    create_python_library = partialmethod(
-        TestBase.create_library, path=source_root, target_type="python_library", name="target",
-    )
-
     @classmethod
     def alias_groups(cls) -> BuildFileAliases:
-        return BuildFileAliases(targets={"python_library": PythonLibrary})
+        return BuildFileAliases(targets={"python_library": PythonLibraryV1})
+
+    @classmethod
+    def target_types(cls):
+        return [PythonLibrary]
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *pylint_rules(), RootRule(PylintLinter))
-
-    def write_file(self, file_content: FileContent) -> None:
-        self.create_file(relpath=file_content.path, contents=file_content.content.decode())
+        return (
+            *super().rules(),
+            *pylint_rules(),
+            RootRule(PylintConfigurations),
+            RootRule(HydratedTargets),
+        )
 
     def make_target_with_origin(
         self,
         source_files: List[FileContent],
         *,
+        name: str = "target",
         interpreter_constraints: Optional[str] = None,
         origin: Optional[OriginSpec] = None,
         dependencies: Optional[List[Address]] = None,
-    ) -> PythonTargetAdaptorWithOrigin:
-        input_snapshot = self.request_single_product(Snapshot, InputFilesContent(source_files))
-        adaptor_kwargs = dict(
-            sources=EagerFilesetWithSpec(self.source_root, {"globs": []}, snapshot=input_snapshot),
-            address=Address.parse(f"{self.source_root}:target"),
-            dependencies=dependencies or [],
+    ) -> TargetWithOrigin:
+        for source_file in source_files:
+            self.create_file(source_file.path, source_file.content.decode())
+        source_globs = [PurePath(source_file.path).name for source_file in source_files]
+        self.create_library(
+            path=self.source_root, target_type=PythonLibrary.alias, name=name, sources=source_globs
         )
-        if interpreter_constraints:
-            adaptor_kwargs["compatibility"] = interpreter_constraints
+        # We must re-write the files because `create_library` will have over-written the content.
+        for source_file in source_files:
+            self.create_file(source_file.path, source_file.content.decode())
+        target = PythonLibrary(
+            {
+                Sources.alias: source_globs,
+                Dependencies.alias: dependencies,
+                PythonInterpreterCompatibility.alias: interpreter_constraints,
+            },
+            address=Address(self.source_root, name),
+        )
         if origin is None:
-            origin = SingleAddress(directory=self.source_root, name="target")
-        return PythonTargetAdaptorWithOrigin(PythonTargetAdaptor(**adaptor_kwargs), origin)
+            origin = SingleAddress(directory=self.source_root, name=name)
+        return TargetWithOrigin(target, origin)
 
     def run_pylint(
         self,
-        targets: List[PythonTargetAdaptorWithOrigin],
+        targets: List[TargetWithOrigin],
         *,
         config: Optional[str] = None,
         passthrough_args: Optional[str] = None,
@@ -84,29 +97,25 @@ class PylintIntegrationTest(TestBase):
             args.append(f"--pylint-skip")
         return self.request_single_product(
             LintResult,
-            Params(PylintLinter(tuple(targets)), create_options_bootstrapper(args=args)),
+            Params(
+                PylintConfigurations(PylintConfiguration.create(tgt) for tgt in targets),
+                create_options_bootstrapper(args=args),
+            ),
         )
 
     def test_passing_source(self) -> None:
-        self.write_file(self.good_source)
-        self.create_python_library()
         target = self.make_target_with_origin([self.good_source])
         result = self.run_pylint([target])
         assert result.exit_code == 0
         assert "Your code has been rated at 10.00/10" in result.stdout.strip()
 
     def test_failing_source(self) -> None:
-        self.write_file(self.bad_source)
-        self.create_python_library()
         target = self.make_target_with_origin([self.bad_source])
         result = self.run_pylint([target])
         assert result.exit_code == 16  # convention message issued
         assert "bad.py:2:0: C0103" in result.stdout
 
     def test_mixed_sources(self) -> None:
-        self.write_file(self.good_source)
-        self.write_file(self.bad_source)
-        self.create_python_library()
         target = self.make_target_with_origin([self.good_source, self.bad_source])
         result = self.run_pylint([target])
         assert result.exit_code == 16  # convention message issued
@@ -114,12 +123,9 @@ class PylintIntegrationTest(TestBase):
         assert "bad.py:2:0: C0103" in result.stdout
 
     def test_multiple_targets(self) -> None:
-        self.write_file(self.good_source)
-        self.write_file(self.bad_source)
-        self.create_python_library()
         targets = [
-            self.make_target_with_origin([self.good_source]),
-            self.make_target_with_origin([self.bad_source]),
+            self.make_target_with_origin([self.good_source], name="t1"),
+            self.make_target_with_origin([self.bad_source], name="t2"),
         ]
         result = self.run_pylint(targets)
         assert result.exit_code == 16  # convention message issued
@@ -127,9 +133,6 @@ class PylintIntegrationTest(TestBase):
         assert "bad.py:2:0: C0103" in result.stdout
 
     def test_precise_file_args(self) -> None:
-        self.write_file(self.good_source)
-        self.write_file(self.bad_source)
-        self.create_python_library()
         target = self.make_target_with_origin(
             [self.good_source, self.bad_source], origin=FilesystemLiteralSpec(self.good_source.path)
         )
@@ -138,63 +141,52 @@ class PylintIntegrationTest(TestBase):
         assert "Your code has been rated at 10.00/10" in result.stdout.strip()
 
     def test_respects_config_file(self) -> None:
-        self.write_file(self.bad_source)
-        self.create_python_library()
         target = self.make_target_with_origin([self.bad_source])
         result = self.run_pylint([target], config="[pylint]\ndisable = C0103\n")
         assert result.exit_code == 0
         assert "Your code has been rated at 10.00/10" in result.stdout.strip()
 
     def test_respects_passthrough_args(self) -> None:
-        self.write_file(self.bad_source)
-        self.create_python_library()
         target = self.make_target_with_origin([self.bad_source])
         result = self.run_pylint([target], passthrough_args="--disable=C0103")
         assert result.exit_code == 0
         assert "Your code has been rated at 10.00/10" in result.stdout.strip()
 
     def test_includes_direct_dependencies(self) -> None:
-        self.create_python_library(name="transitive_dependency", sources=[])
-        direct_dependency = FileContent(
-            path=f"{self.source_root}/direct_dependency.py",
-            content=dedent(
-                """\
-                # No docstring because Pylint doesn't lint dependencies
+        self.make_target_with_origin(source_files=[], name="transitive_dependency")
 
-                from transitive_dep import doesnt_matter_if_variable_exists
+        direct_dependency_content = dedent(
+            """\
+            # No docstring because Pylint doesn't lint dependencies
 
-                THIS_VARIABLE_EXISTS = ''
-                """
-            ).encode(),
+            from transitive_dep import doesnt_matter_if_variable_exists
+
+            THIS_VARIABLE_EXISTS = ''
+            """
         )
-        self.write_file(direct_dependency)
-        self.create_python_library(
+        self.make_target_with_origin(
+            source_files=[
+                FileContent(
+                    f"{self.source_root}/direct_dependency.py", direct_dependency_content.encode()
+                )
+            ],
             name="direct_dependency",
-            sources=["direct_dependency.py"],
-            dependencies=[":transitive_dependency"],
+            dependencies=[Address(self.source_root, "transitive_dependency")],
         )
-        source = FileContent(
-            path=f"{self.source_root}/target.py",
-            content=dedent(
-                """\
-                '''Code is not executed, but Pylint will check that variables exist and are used'''
-                from direct_dependency import THIS_VARIABLE_EXISTS
 
-                print(THIS_VARIABLE_EXISTS)
-                """
-            ).encode(),
+        source_content = dedent(
+            """\
+            '''Code is not executed, but Pylint will check that variables exist and are used'''
+            from direct_dependency import THIS_VARIABLE_EXISTS
+
+            print(THIS_VARIABLE_EXISTS)
+            """
         )
-        self.write_file(source)
-        self.create_python_library(sources=["target.py"], dependencies=[":direct_dependency"])
-
-        # We must re-write the files because `create_python_library` will have over-written the
-        # content.
-        self.write_file(direct_dependency)
-        self.write_file(source)
-
         target = self.make_target_with_origin(
-            [source], dependencies=[Address.parse(f"{self.source_root}:direct_dependency")]
+            source_files=[FileContent(f"{self.source_root}/target.py", source_content.encode())],
+            dependencies=[Address(self.source_root, "direct_dependency")],
         )
+
         result = self.run_pylint([target])
         assert result.exit_code == 0
         assert "Your code has been rated at 10.00/10" in result.stdout.strip()

@@ -4,8 +4,11 @@
 import os.path
 from typing import Iterable, Optional, Tuple, Union, cast
 
+from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
-from pants.build_graph.address import Address
+from pants.core.target_types import FilesSources
+from pants.core.util_rules.determine_source_files import SourceFiles
+from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -15,6 +18,7 @@ from pants.engine.target import (
     IntField,
     InvalidFieldException,
     ProvidesField,
+    ScalarField,
     SequenceField,
     Sources,
     StringField,
@@ -25,8 +29,6 @@ from pants.engine.target import (
 from pants.fs.archive import TYPE_NAMES
 from pants.python.python_requirement import PythonRequirement
 from pants.python.python_setup import PythonSetup
-from pants.rules.core.determine_source_files import SourceFiles
-from pants.rules.core.targets import FilesSources
 
 # -----------------------------------------------------------------------------------------------
 # Common fields
@@ -34,9 +36,7 @@ from pants.rules.core.targets import FilesSources
 
 
 class PythonSources(Sources):
-    # We allow `.c` for compatibility with native wheels, e.g. `src/python/pants:pants-packaged`.
-    # This should possibly be revisited.
-    expected_file_extensions = (".py", ".c")
+    expected_file_extensions = (".py",)
 
 
 class PythonInterpreterCompatibility(StringOrStringSequenceField):
@@ -57,12 +57,26 @@ class PythonInterpreterCompatibility(StringOrStringSequenceField):
         return python_setup.compatibility_or_constraints(self.value)
 
 
+class PythonProvidesField(ScalarField, ProvidesField):
+    """The`setup.py` kwargs for the external artifact built from this target."""
+
+    expected_type = PythonArtifact
+    expected_type_description = "setup_py(**kwargs)"
+    value: Optional[PythonArtifact]
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[PythonArtifact], *, address: Address
+    ) -> Optional[PythonArtifact]:
+        return super().compute_value(raw_value, address=address)
+
+
 COMMON_PYTHON_FIELDS = (
     *COMMON_TARGET_FIELDS,
     Dependencies,
     # TODO(#9388): Only register the Provides field on PythonBinary and PythonLibrary, not things
     #  like PythonTests.
-    ProvidesField,
+    PythonProvidesField,
     PythonInterpreterCompatibility,
 )
 

@@ -8,6 +8,7 @@ from typing import Iterable, Optional, Tuple
 from pants.backend.python.rules.importable_python_sources import ImportablePythonSources
 from pants.backend.python.rules.pex import (
     PexInterpreterConstraints,
+    PexPlatforms,
     PexRequest,
     PexRequirements,
     TwoStepPexRequest,
@@ -18,15 +19,13 @@ from pants.backend.python.rules.targets import (
     PythonRequirementsFileSources,
     PythonSources,
 )
-from pants.engine.addressable import Addresses
+from pants.core.target_types import FilesSources, ResourcesSources
+from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge
-from pants.engine.legacy.graph import HydratedTargets, TransitiveHydratedTargets
-from pants.engine.legacy.structs import FilesAdaptor, PythonTargetAdaptor, ResourcesAdaptor
 from pants.engine.rules import RootRule, named_rule, rule
 from pants.engine.selectors import Get
 from pants.engine.target import Targets, TransitiveTargets
 from pants.python.python_setup import PythonSetup
-from pants.rules.core.targets import FilesSources, ResourcesSources
 from pants.util.meta import frozen_after_init
 
 
@@ -38,6 +37,7 @@ class PexFromTargetsRequest:
     addresses: Addresses
     output_filename: str
     entry_point: Optional[str]
+    platforms: PexPlatforms
     additional_args: Tuple[str, ...]
     additional_requirements: Tuple[str, ...]
     include_source_files: bool
@@ -53,6 +53,7 @@ class PexFromTargetsRequest:
         *,
         output_filename: str,
         entry_point: Optional[str] = None,
+        platforms: PexPlatforms = PexPlatforms(),
         additional_args: Iterable[str] = (),
         additional_requirements: Iterable[str] = (),
         include_source_files: bool = True,
@@ -63,6 +64,7 @@ class PexFromTargetsRequest:
         self.addresses = addresses
         self.output_filename = output_filename
         self.entry_point = entry_point
+        self.platforms = platforms
         self.additional_args = tuple(additional_args)
         self.additional_requirements = tuple(additional_requirements)
         self.include_source_files = include_source_files
@@ -129,6 +131,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         output_filename=request.output_filename,
         requirements=requirements,
         interpreter_constraints=interpreter_constraints,
+        platforms=request.platforms,
         entry_point=request.entry_point,
         sources=merged_input_digest,
         additional_inputs=request.additional_inputs,
@@ -143,66 +146,10 @@ async def two_step_pex_from_targets(req: TwoStepPexFromTargetsRequest) -> TwoSte
     return TwoStepPexRequest(pex_request=pex_request)
 
 
-@dataclass(frozen=True)
-class LegacyPexFromTargetsRequest:
-    """Represents a request to create a PEX from the closure of a set of targets."""
-
-    addresses: Addresses
-    output_filename: str
-    entry_point: Optional[str] = None
-    additional_requirements: Tuple[str, ...] = ()
-    include_source_files: bool = True
-    additional_args: Tuple[str, ...] = ()
-    additional_sources: Optional[Digest] = None
-
-
-@named_rule(desc="Create PEX from targets")
-async def legacy_pex_from_targets(
-    request: LegacyPexFromTargetsRequest, python_setup: PythonSetup
-) -> PexRequest:
-    transitive_hydrated_targets = await Get[TransitiveHydratedTargets](Addresses, request.addresses)
-    all_targets = transitive_hydrated_targets.closure
-
-    python_targets = [t for t in all_targets if isinstance(t.adaptor, PythonTargetAdaptor)]
-    resource_targets = [
-        t for t in all_targets if isinstance(t.adaptor, (FilesAdaptor, ResourcesAdaptor))
-    ]
-
-    all_target_adaptors = [t.adaptor for t in all_targets]
-
-    interpreter_constraints = PexInterpreterConstraints.create_from_adaptors(
-        adaptors=all_target_adaptors, python_setup=python_setup
-    )
-
-    source_digests = []
-    if request.additional_sources:
-        source_digests.append(request.additional_sources)
-    if request.include_source_files:
-        prepared_sources = await Get[ImportablePythonSources](
-            HydratedTargets(python_targets + resource_targets)
-        )
-        source_digests.append(prepared_sources.snapshot.directory_digest)
-    merged_sources_digest = await Get[Digest](DirectoriesToMerge(directories=tuple(source_digests)))
-    requirements = PexRequirements.create_from_adaptors(
-        adaptors=all_target_adaptors, additional_requirements=request.additional_requirements
-    )
-
-    return PexRequest(
-        output_filename=request.output_filename,
-        requirements=requirements,
-        interpreter_constraints=interpreter_constraints,
-        entry_point=request.entry_point,
-        sources=merged_sources_digest,
-        additional_args=request.additional_args,
-    )
-
-
 def rules():
     return [
         pex_from_targets,
         two_step_pex_from_targets,
         RootRule(PexFromTargetsRequest),
         RootRule(TwoStepPexFromTargetsRequest),
-        legacy_pex_from_targets,
-        RootRule(LegacyPexFromTargetsRequest),
     ]

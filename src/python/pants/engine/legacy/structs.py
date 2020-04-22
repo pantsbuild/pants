@@ -5,17 +5,16 @@ import logging
 import os.path
 from collections.abc import MutableSequence, MutableSet
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, List, Optional, Sequence, Tuple, Type, Union, cast
+from typing import Any, Callable, Iterable, List, Optional, Sequence, Tuple, Union, cast
 
 from pants.base.deprecated import warn_or_error
-from pants.base.specs import OriginSpec
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
-from pants.engine.addressable import addressable_sequence
 from pants.engine.fs import GlobExpansionConjunction, PathGlobs
-from pants.engine.objects import Locatable, union
-from pants.engine.rules import UnionRule
-from pants.engine.struct import Struct, StructWithDeps
+from pants.engine.internals.addressable import addressable_sequence
+from pants.engine.internals.objects import Locatable
+from pants.engine.internals.struct import Struct, StructWithDeps
+from pants.engine.unions import UnionRule, union
 from pants.source import wrapped_globs
 from pants.util.collections import ensure_str_list
 from pants.util.contextutil import exception_logging
@@ -285,23 +284,6 @@ class PythonAppAdaptor(AppAdaptor):
     pass
 
 
-class ResourcesAdaptor(TargetAdaptor):
-    pass
-
-
-class FilesAdaptor(TargetAdaptor):
-    pass
-
-
-# The python_requirements macro generates python_requirement_library targets and makes them
-# depend on a _python_requirements_file() target, so that pantsd knows to invalidate correctly
-# when the requirements.txt file changes.  We don't want to use a regular files() target for
-# this, as we don't want to consider the requirements.txt a source for the purpose of building
-# pexes (e.g., we don't want whitespace changes to requirements.txt to invalidate the sources pex).
-class PythonRequirementsFileAdaptor(TargetAdaptor):
-    pass
-
-
 class RemoteSourcesAdaptor(TargetAdaptor):
     def __init__(self, dest=None, **kwargs):
         """
@@ -352,110 +334,9 @@ class PythonTestsAdaptor(PythonTargetAdaptor):
     pass
 
 
-class PythonAWSLambdaAdaptor(TargetAdaptor):
-    pass
-
-
-class PythonRequirementLibraryAdaptor(TargetAdaptor):
-    pass
-
-
 class PantsPluginAdaptor(PythonTargetAdaptor):
     def get_sources(self) -> "GlobsWithConjunction":
         return GlobsWithConjunction.for_literal_files(["register.py"])
-
-
-# TODO(#7490): Remove this once we have multiple params support so that rules can do something
-# like `await Get[TestResult](Params(Address(..), Origin(..)))`.
-@dataclass(frozen=True)
-class TargetAdaptorWithOrigin:
-    adaptor: TargetAdaptor
-    origin: OriginSpec
-
-    @staticmethod
-    def create(adaptor: TargetAdaptor, origin: OriginSpec) -> "TargetAdaptorWithOrigin":
-        adaptor_with_origin_cls: Type["TargetAdaptorWithOrigin"] = {
-            TargetAdaptor: TargetAdaptorWithOrigin,
-            AppAdaptor: AppAdaptorWithOrigin,
-            JvmAppAdaptor: JvmAppAdaptorWithOrigin,
-            JvmBinaryAdaptor: JvmBinaryAdaptorWithOrigin,
-            PythonAppAdaptor: PythonAppAdaptorWithOrigin,
-            ResourcesAdaptor: ResourcesAdaptorWithOrigin,
-            PageAdaptor: PageAdaptorWithOrigin,
-            RemoteSourcesAdaptor: RemoteSourcesAdaptorWithOrigin,
-            PythonTargetAdaptor: PythonTargetAdaptorWithOrigin,
-            PythonBinaryAdaptor: PythonBinaryAdaptorWithOrigin,
-            PythonTestsAdaptor: PythonTestsAdaptorWithOrigin,
-            PythonAWSLambdaAdaptor: PythonAWSLambdaAdaptorWithOrigin,
-            PythonRequirementLibraryAdaptor: PythonRequirementLibraryAdaptorWithOrigin,
-            PantsPluginAdaptor: PantsPluginAdaptorWithOrigin,
-        }.get(type(adaptor), TargetAdaptorWithOrigin)
-        return adaptor_with_origin_cls(adaptor, origin)
-
-
-@dataclass(frozen=True)
-class AppAdaptorWithOrigin(TargetAdaptorWithOrigin):
-    adaptor: AppAdaptor
-
-
-@dataclass(frozen=True)
-class JvmAppAdaptorWithOrigin(TargetAdaptorWithOrigin):
-    adaptor: JvmAppAdaptor
-
-
-@dataclass(frozen=True)
-class JvmBinaryAdaptorWithOrigin(TargetAdaptorWithOrigin):
-    adaptor: JvmBinaryAdaptor
-
-
-@dataclass(frozen=True)
-class PythonAppAdaptorWithOrigin(TargetAdaptorWithOrigin):
-    adaptor: PythonAppAdaptor
-
-
-@dataclass(frozen=True)
-class ResourcesAdaptorWithOrigin(TargetAdaptorWithOrigin):
-    adaptor: ResourcesAdaptor
-
-
-@dataclass(frozen=True)
-class PageAdaptorWithOrigin(TargetAdaptorWithOrigin):
-    adaptor: PageAdaptor
-
-
-@dataclass(frozen=True)
-class RemoteSourcesAdaptorWithOrigin(TargetAdaptorWithOrigin):
-    adaptor: RemoteSourcesAdaptor
-
-
-@dataclass(frozen=True)
-class PythonTargetAdaptorWithOrigin(TargetAdaptorWithOrigin):
-    adaptor: PythonTargetAdaptor
-
-
-@dataclass(frozen=True)
-class PythonBinaryAdaptorWithOrigin(TargetAdaptorWithOrigin):
-    adaptor: PythonBinaryAdaptor
-
-
-@dataclass(frozen=True)
-class PythonTestsAdaptorWithOrigin(TargetAdaptorWithOrigin):
-    adaptor: PythonTestsAdaptor
-
-
-@dataclass(frozen=True)
-class PythonAWSLambdaAdaptorWithOrigin(TargetAdaptorWithOrigin):
-    adaptor: PythonAWSLambdaAdaptor
-
-
-@dataclass(frozen=True)
-class PythonRequirementLibraryAdaptorWithOrigin(TargetAdaptorWithOrigin):
-    adaptor: PythonRequirementLibraryAdaptor
-
-
-@dataclass(frozen=True)
-class PantsPluginAdaptorWithOrigin(TargetAdaptorWithOrigin):
-    adaptor: PantsPluginAdaptor
 
 
 class SourceGlobs(Locatable):

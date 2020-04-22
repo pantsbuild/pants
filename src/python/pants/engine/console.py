@@ -6,7 +6,7 @@ from typing import Any, Callable, Optional
 
 from colors import blue, cyan, green, magenta, red
 
-from pants.engine.native import Native
+from pants.engine.internals.native import Native
 from pants.engine.rules import side_effecting
 
 

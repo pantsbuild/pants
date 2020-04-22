@@ -1,64 +1,56 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import logging
-from dataclasses import dataclass
-from typing import ClassVar
-
-from pants.backend.python.rules.pex import Pex
-from pants.backend.python.rules.pex_from_targets import LegacyPexFromTargetsRequest
+from pants.backend.python.rules.pex import TwoStepPex
+from pants.backend.python.rules.pex_from_targets import (
+    PexFromTargetsRequest,
+    TwoStepPexFromTargetsRequest,
+)
+from pants.backend.python.rules.targets import PythonSources
 from pants.backend.python.subsystems.ipython import IPython
-from pants.engine.addressable import Addresses
-from pants.engine.legacy.graph import TransitiveHydratedTargets
-from pants.engine.legacy.structs import PythonTargetAdaptor
-from pants.engine.rules import UnionRule, rule, subsystem_rule
+from pants.core.goals.repl import ReplBinary, ReplImplementation
+from pants.engine.addresses import Addresses
+from pants.engine.rules import rule, subsystem_rule
 from pants.engine.selectors import Get
-from pants.rules.core.repl import ReplBinary, ReplImplementation
-
-logger = logging.getLogger(__name__)
+from pants.engine.unions import UnionRule
 
 
-@dataclass(frozen=True)
-class PythonRepl:
-    name: ClassVar[str] = "python"
-    addresses: Addresses
+class PythonRepl(ReplImplementation):
+    name = "python"
+    required_fields = (PythonSources,)
 
 
 @rule
 async def run_python_repl(repl: PythonRepl) -> ReplBinary:
-    targets = await Get[TransitiveHydratedTargets](Addresses, repl.addresses)
-    python_addresses = Addresses(
-        ht.adaptor.address for ht in targets.closure if isinstance(ht.adaptor, PythonTargetAdaptor)
+    addresses = Addresses(tgt.address for tgt in repl.targets)
+    two_step_pex = await Get[TwoStepPex](
+        TwoStepPexFromTargetsRequest(
+            PexFromTargetsRequest(addresses=addresses, output_filename="python-repl.pex",)
+        )
     )
-    create_pex = LegacyPexFromTargetsRequest(
-        addresses=python_addresses, output_filename="python-repl.pex",
-    )
-
-    repl_pex = await Get[Pex](LegacyPexFromTargetsRequest, create_pex)
+    repl_pex = two_step_pex.pex
     return ReplBinary(digest=repl_pex.directory_digest, binary_name=repl_pex.output_filename,)
 
 
-@dataclass(frozen=True)
-class IPythonRepl:
-    name: ClassVar[str] = "ipython"
-    addresses: Addresses
+class IPythonRepl(ReplImplementation):
+    name = "ipython"
+    required_fields = (PythonSources,)
 
 
 @rule
 async def run_ipython_repl(repl: IPythonRepl, ipython: IPython) -> ReplBinary:
-    targets = await Get[TransitiveHydratedTargets](Addresses, repl.addresses)
-    python_addresses = Addresses(
-        ht.adaptor.address for ht in targets.closure if isinstance(ht.adaptor, PythonTargetAdaptor)
+    addresses = Addresses(tgt.address for tgt in repl.targets)
+    two_step_pex = await Get[TwoStepPex](
+        TwoStepPexFromTargetsRequest(
+            PexFromTargetsRequest(
+                addresses=addresses,
+                output_filename="ipython-repl.pex",
+                entry_point=ipython.get_entry_point(),
+                additional_requirements=ipython.get_requirement_specs(),
+            )
+        )
     )
-
-    create_pex = LegacyPexFromTargetsRequest(
-        addresses=python_addresses,
-        output_filename="ipython-repl.pex",
-        entry_point=ipython.get_entry_point(),
-        additional_requirements=ipython.get_requirement_specs(),
-    )
-
-    repl_pex = await Get[Pex](LegacyPexFromTargetsRequest, create_pex)
+    repl_pex = two_step_pex.pex
     return ReplBinary(digest=repl_pex.directory_digest, binary_name=repl_pex.output_filename,)
 
 

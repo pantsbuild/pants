@@ -9,19 +9,26 @@ from pants.init.util import init_workdir
 from pants.option.option_value_container import OptionValueContainer
 from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
+from pants.util.dirutil import safe_mkdir
 
 
 class UtilTest(TestBase):
     @contextmanager
     def physical_workdir_base(self) -> OptionValueContainer:
-        with temporary_dir(cleanup=False) as physical_workdir_base:
+        with temporary_dir() as physical_workdir_base:
             bootstrap_options = self.get_bootstrap_options(
-                [f"--pants-physical-workdir-base={physical_workdir_base}"]
+                [
+                    f"--pants-physical-workdir-base={physical_workdir_base}",
+                    "--pants-physical-workdir-source-control",
+                ]
             )
             yield bootstrap_options
 
     def assert_exists(self, path):
         self.assertTrue(os.path.exists(path))
+
+    def assert_not_exists(self, path):
+        self.assertFalse(os.path.exists(path))
 
     def assert_symlink(self, path):
         self.assertTrue(os.path.islink(path))
@@ -46,3 +53,24 @@ class UtilTest(TestBase):
             self.assert_symlink(self.pants_workdir)
             # Assert symlink target's physical dir exists
             self.assert_exists(os.path.join(self.physical_workdir(bootstrap_options)))
+
+    def test_source_control_repo(self):
+        source_control_dirname = ".git"
+        with self.physical_workdir_base() as bootstrap_options:
+            safe_mkdir(os.path.join(self.build_root, source_control_dirname))
+            init_workdir(bootstrap_options)
+            self.assert_exists(
+                os.path.join(self.physical_workdir(bootstrap_options), source_control_dirname)
+            )
+
+    def test_source_control_disabled(self):
+        source_control_dirname = ".git"
+        with temporary_dir() as physical_workdir_base:
+            bootstrap_options = self.get_bootstrap_options(
+                [f"--pants-physical-workdir-base={physical_workdir_base}"]
+            )
+            safe_mkdir(os.path.join(self.build_root, source_control_dirname))
+            init_workdir(bootstrap_options)
+            self.assert_not_exists(
+                os.path.join(self.physical_workdir(bootstrap_options), source_control_dirname)
+            )

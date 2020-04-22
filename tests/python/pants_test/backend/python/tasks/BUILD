@@ -177,7 +177,7 @@ python_tests(
         "testprojects/src/python:python_distribution_directory",
     ],
     tags={"integration", "partially_type_checked"},
-    timeout=360,
+    timeout=420,
 )
 
 python_tests(

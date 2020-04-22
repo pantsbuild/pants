@@ -3,46 +3,48 @@
 
 from typing import List, Optional, Tuple
 
-from pants.backend.python.lint.docformatter.rules import DocformatterFormatter
+from pants.backend.python.lint.docformatter.rules import (
+    DocformatterConfiguration,
+    DocformatterConfigurations,
+)
 from pants.backend.python.lint.docformatter.rules import rules as docformatter_rules
+from pants.backend.python.rules.targets import PythonLibrary
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
-from pants.build_graph.address import Address
-from pants.engine.fs import Digest, DirectoriesToMerge, FileContent, InputFilesContent, Snapshot
-from pants.engine.legacy.structs import TargetAdaptor, TargetAdaptorWithOrigin
+from pants.core.goals.fmt import FmtResult
+from pants.core.goals.lint import LintResult
+from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
+from pants.engine.addresses import Address
+from pants.engine.fs import Digest, FileContent, InputFilesContent
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
-from pants.rules.core.fmt import FmtResult
-from pants.rules.core.lint import LintResult
-from pants.source.wrapped_globs import EagerFilesetWithSpec
+from pants.engine.target import TargetWithOrigin
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
 
 class DocformatterIntegrationTest(TestBase):
 
-    good_source = FileContent(path="test/good.py", content=b'"""Good docstring."""\n')
-    bad_source = FileContent(path="test/bad.py", content=b'"""Oops, missing a period"""\n')
-    fixed_bad_source = FileContent(path="test/bad.py", content=b'"""Oops, missing a period."""\n')
+    good_source = FileContent(path="good.py", content=b'"""Good docstring."""\n')
+    bad_source = FileContent(path="bad.py", content=b'"""Oops, missing a period"""\n')
+    fixed_bad_source = FileContent(path="bad.py", content=b'"""Oops, missing a period."""\n')
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *docformatter_rules(), RootRule(DocformatterFormatter))
+        return (*super().rules(), *docformatter_rules(), RootRule(DocformatterConfigurations))
 
     def make_target_with_origin(
         self, source_files: List[FileContent], *, origin: Optional[OriginSpec] = None,
-    ) -> TargetAdaptorWithOrigin:
-        input_snapshot = self.request_single_product(Snapshot, InputFilesContent(source_files))
-        adaptor = TargetAdaptor(
-            sources=EagerFilesetWithSpec("test", {"globs": []}, snapshot=input_snapshot),
-            address=Address.parse("test:target"),
-        )
+    ) -> TargetWithOrigin:
+        for source_file in source_files:
+            self.create_file(f"{source_file.path}", source_file.content.decode())
+        target = PythonLibrary({}, address=Address.parse(":target"))
         if origin is None:
-            origin = SingleAddress(directory="test", name="target")
-        return TargetAdaptorWithOrigin(adaptor, origin)
+            origin = SingleAddress(directory="", name="target")
+        return TargetWithOrigin(target, origin)
 
     def run_docformatter(
         self,
-        targets: List[TargetAdaptorWithOrigin],
+        targets: List[TargetWithOrigin],
         *,
         passthrough_args: Optional[str] = None,
         skip: bool = False,
@@ -53,19 +55,20 @@ class DocformatterIntegrationTest(TestBase):
         if skip:
             args.append(f"--docformatter-skip")
         options_bootstrapper = create_options_bootstrapper(args=args)
+        configs = [DocformatterConfiguration.create(tgt) for tgt in targets]
         lint_result = self.request_single_product(
-            LintResult, Params(DocformatterFormatter(tuple(targets)), options_bootstrapper)
+            LintResult, Params(DocformatterConfigurations(configs), options_bootstrapper)
         )
         input_snapshot = self.request_single_product(
-            Snapshot,
-            DirectoriesToMerge(
-                tuple(target.adaptor.sources.snapshot.directory_digest for target in targets)
+            SourceFiles,
+            Params(
+                AllSourceFilesRequest(config.sources for config in configs), options_bootstrapper
             ),
         )
         fmt_result = self.request_single_product(
             FmtResult,
             Params(
-                DocformatterFormatter(tuple(targets), prior_formatter_result=input_snapshot),
+                DocformatterConfigurations(configs, prior_formatter_result=input_snapshot),
                 options_bootstrapper,
             ),
         )
@@ -114,7 +117,7 @@ class DocformatterIntegrationTest(TestBase):
 
     def test_respects_passthrough_args(self) -> None:
         needs_config = FileContent(
-            path="test/config.py",
+            path="needs_config.py",
             content=b'"""\nOne line docstring acting like it\'s multiline.\n"""\n',
         )
         target = self.make_target_with_origin([needs_config])

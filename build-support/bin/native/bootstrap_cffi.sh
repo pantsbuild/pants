@@ -21,7 +21,7 @@ readonly scheduler_bindings_path="$2"
 activate_pants_venv 1>&2
 
 PYTHONPATH="${REPO_ROOT}/src/python:${PYTHONPATH}" exec python << BOOTSTRAP_C_SOURCE
-from pants.engine.native import bootstrap_c_source
+from pants.engine.internals.native import bootstrap_c_source
 
 bootstrap_c_source("${scheduler_bindings_path}", "${output_dir}")
 BOOTSTRAP_C_SOURCE

@@ -11,9 +11,9 @@ from pants.backend.python.rules import (
     importable_python_sources,
     pex,
     pex_from_targets,
-    pytest_coverage,
     pytest_runner,
 )
+from pants.backend.python.rules.pytest_coverage import CoverageConfigRequest, create_coverage_config
 from pants.backend.python.rules.pytest_runner import PythonTestConfiguration
 from pants.backend.python.rules.targets import PythonLibrary, PythonRequirementLibrary, PythonTests
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
@@ -23,16 +23,16 @@ from pants.backend.python.targets.python_requirement_library import (
 )
 from pants.backend.python.targets.python_tests import PythonTests as PythonTestsV1
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
-from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.core.goals.test import Status, TestDebugRequest, TestOptions, TestResult
+from pants.core.util_rules import determine_source_files, strip_source_roots
+from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
 from pants.engine.interactive_runner import InteractiveRunner
 from pants.engine.rules import RootRule, subsystem_rule
 from pants.engine.selectors import Params
 from pants.engine.target import TargetWithOrigin
 from pants.python.python_requirement import PythonRequirement
-from pants.rules.core import determine_source_files, strip_source_roots
-from pants.rules.core.test import Status, TestDebugRequest, TestOptions, TestResult
 from pants.testutil.interpreter_selection_utils import skip_unless_python27_and_python3_present
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
@@ -116,7 +116,7 @@ class PytestRunnerIntegrationTest(TestBase):
     def rules(cls):
         return (
             *super().rules(),
-            *pytest_coverage.rules(),
+            create_coverage_config,
             *pytest_runner.rules(),
             *download_pex_bin.rules(),
             *determine_source_files.rules(),
@@ -127,6 +127,7 @@ class PytestRunnerIntegrationTest(TestBase):
             *strip_source_roots.rules(),
             *subprocess_environment.rules(),
             subsystem_rule(TestOptions),
+            RootRule(CoverageConfigRequest),
             RootRule(PythonTestConfiguration),
         )
 

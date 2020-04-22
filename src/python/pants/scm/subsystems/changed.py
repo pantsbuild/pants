@@ -6,17 +6,12 @@ from enum import Enum
 from typing import List, Optional, Tuple, cast
 
 from pants.base.specs import AddressSpecs, DescendantAddresses
-from pants.build_graph.address import Address
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.engine.addressable import Addresses
-from pants.engine.legacy.graph import (
-    Owners,
-    OwnersRequest,
-    _DependentGraph,
-    target_types_from_build_file_aliases,
-)
-from pants.engine.mapper import AddressMapper
-from pants.engine.parser import HydratedStruct
+from pants.engine.addresses import Address, Addresses
+from pants.engine.internals.graph import Owners, OwnersRequest
+from pants.engine.internals.mapper import AddressMapper
+from pants.engine.internals.parser import HydratedStruct
+from pants.engine.legacy.graph import _DependentGraph, target_types_from_build_file_aliases
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.goal.workspace import ScmWorkspace
