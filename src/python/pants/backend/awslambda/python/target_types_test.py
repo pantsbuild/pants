@@ -3,7 +3,7 @@
 
 import pytest
 
-from pants.backend.awslambda.python.targets import PythonAwsLambdaRuntime
+from pants.backend.awslambda.python.target_types import PythonAwsLambdaRuntime
 from pants.build_graph.address import Address
 from pants.engine.target import InvalidFieldException
 

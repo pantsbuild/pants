@@ -19,7 +19,9 @@ from pants.backend.python.rules.pytest_coverage import (
     CoverageConfigRequest,
     PytestCoverageData,
 )
-from pants.backend.python.rules.targets import (
+from pants.backend.python.subsystems.pytest import PyTest
+from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.backend.python.target_types import (
     PythonCoverage,
     PythonInterpreterCompatibility,
     PythonRequirementsFileSources,
@@ -27,8 +29,6 @@ from pants.backend.python.rules.targets import (
     PythonTestsSources,
     PythonTestsTimeout,
 )
-from pants.backend.python.subsystems.pytest import PyTest
-from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.core.goals.test import TestConfiguration, TestDebugRequest, TestOptions, TestResult
 from pants.core.target_types import FilesSources, ResourcesSources
 from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest

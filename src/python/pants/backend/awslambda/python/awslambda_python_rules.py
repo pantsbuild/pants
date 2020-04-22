@@ -8,7 +8,10 @@ from pants.backend.awslambda.common.awslambda_common_rules import (
     CreatedAWSLambda,
 )
 from pants.backend.awslambda.python.lambdex import Lambdex
-from pants.backend.awslambda.python.targets import PythonAwsLambdaHandler, PythonAwsLambdaRuntime
+from pants.backend.awslambda.python.target_types import (
+    PythonAwsLambdaHandler,
+    PythonAwsLambdaRuntime,
+)
 from pants.backend.python.rules import (
     download_pex_bin,
     importable_python_sources,

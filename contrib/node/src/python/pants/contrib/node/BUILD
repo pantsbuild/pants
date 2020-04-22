@@ -4,13 +4,16 @@
 contrib_plugin(
   name='plugin',
   dependencies=[
-    'contrib/node/src/python/pants/contrib/node/rules',
     'contrib/node/src/python/pants/contrib/node/subsystems',
     'contrib/node/src/python/pants/contrib/node/subsystems/resolvers',
     'contrib/node/src/python/pants/contrib/node/targets',
     'contrib/node/src/python/pants/contrib/node/tasks',
     'src/python/pants/build_graph',
+    'src/python/pants/engine:addresses',
+    'src/python/pants/engine:target',
+    'src/python/pants/fs',
     'src/python/pants/goal:task_registrar',
+    'src/python/pants/util:frozendict',
   ],
   tags = {'partially_type_checked'},
   distribution_name='pantsbuild.pants.contrib.node',

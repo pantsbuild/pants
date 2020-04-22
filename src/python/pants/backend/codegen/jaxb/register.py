@@ -8,7 +8,7 @@ See https://www.oracle.com/technical-resources/articles/javase/jaxb.html.
 
 from pants.backend.codegen.jaxb.jaxb_gen import JaxbGen
 from pants.backend.codegen.jaxb.jaxb_library import JaxbLibrary as JaxbLibraryV1
-from pants.backend.codegen.jaxb.targets import JaxbLibrary
+from pants.backend.codegen.jaxb.target_types import JaxbLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 

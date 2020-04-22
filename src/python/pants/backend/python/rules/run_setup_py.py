@@ -16,13 +16,6 @@ from pants.backend.python.rules.pex import (
     PexRequirements,
 )
 from pants.backend.python.rules.setuptools import Setuptools
-from pants.backend.python.rules.targets import (
-    PythonEntryPoint,
-    PythonInterpreterCompatibility,
-    PythonProvidesField,
-    PythonRequirementsField,
-    PythonSources,
-)
 from pants.backend.python.rules.util import (
     PackageDatum,
     distutils_repr,
@@ -31,6 +24,13 @@ from pants.backend.python.rules.util import (
     source_root_or_raise,
 )
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.backend.python.target_types import (
+    PythonEntryPoint,
+    PythonInterpreterCompatibility,
+    PythonProvidesField,
+    PythonRequirementsField,
+    PythonSources,
+)
 from pants.base.specs import AddressSpecs, AscendantAddresses, SingleAddress
 from pants.core.target_types import ResourcesSources
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles

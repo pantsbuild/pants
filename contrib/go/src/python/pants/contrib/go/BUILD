@@ -4,10 +4,10 @@
 contrib_plugin(
   name='plugin',
   dependencies=[
-    'contrib/go/src/python/pants/contrib/go/rules',
     'contrib/go/src/python/pants/contrib/go/targets',
     'contrib/go/src/python/pants/contrib/go/tasks',
     'src/python/pants/build_graph',
+    'src/python/pants/engine:target',
     'src/python/pants/goal:task_registrar',
   ],
   tags = {'partially_type_checked'},

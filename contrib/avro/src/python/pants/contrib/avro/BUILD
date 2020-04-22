@@ -4,10 +4,10 @@
 contrib_plugin(
   name='plugin',
   dependencies=[
-    'contrib/avro/src/python/pants/contrib/avro/rules',
     'contrib/avro/src/python/pants/contrib/avro/targets',
     'contrib/avro/src/python/pants/contrib/avro/tasks',
     'src/python/pants/build_graph',
+    'src/python/pants/engine:target',
     'src/python/pants/goal:task_registrar',
   ],
   distribution_name='pantsbuild.pants.contrib.avro',

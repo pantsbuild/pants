@@ -5,7 +5,7 @@
 
 from pants.backend.awslambda.common import awslambda_common_rules
 from pants.backend.awslambda.python import awslambda_python_rules
-from pants.backend.awslambda.python.targets import PythonAWSLambda
+from pants.backend.awslambda.python.target_types import PythonAWSLambda
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
 
