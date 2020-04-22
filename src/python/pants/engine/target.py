@@ -756,22 +756,24 @@ class TargetsToValidConfigurations:
 @dataclass(unsafe_hash=True)
 class TargetsToValidConfigurationsRequest:
     configuration_superclass: Type[_AbstractConfiguration]
-    goal_name: str
+    goal_description: str
     error_if_no_valid_targets: bool
+    expect_single_config: bool
     # TODO: Add a `require_sources` field. To do this, figure out the dependency cycle with
     #  `util_rules/filter_empty_sources.py`.
-    # TODO: add a "expect_only_one_config" bool option. The tricky part is the error message.
 
     def __init__(
         self,
         configuration_superclass: Type[_AbstractConfiguration],
         *,
-        goal_name: str,
+        goal_description: str,
         error_if_no_valid_targets: bool,
+        expect_single_config: bool = False,
     ) -> None:
         self.configuration_superclass = configuration_superclass
-        self.goal_name = goal_name
+        self.goal_description = goal_description
         self.error_if_no_valid_targets = error_if_no_valid_targets
+        self.expect_single_config = expect_single_config
 
 
 @rule
@@ -797,15 +799,24 @@ def find_valid_configurations(
         ]
         if valid_configs:
             targets_to_valid_configs[tgt_with_origin] = valid_configs
-    if not targets_to_valid_configs and request.error_if_no_valid_targets:
-        raise NoValidTargets.create_from_configs(
+    if request.error_if_no_valid_targets and not targets_to_valid_configs:
+        raise NoValidTargetsException.create_from_configs(
             targets_with_origins,
             config_types=config_types,
-            goal_name=request.goal_name,
+            goal_description=request.goal_description,
             union_membership=union_membership,
             registered_target_types=registered_target_types,
         )
-    return TargetsToValidConfigurations(targets_to_valid_configs)
+    result = TargetsToValidConfigurations(targets_to_valid_configs)
+    if not request.expect_single_config:
+        return result
+    if len(result.targets) > 1:
+        raise TooManyTargetsException(result.targets, goal_description=request.goal_description)
+    if len(result.configurations) > 1:
+        raise AmbiguousImplementationsException(
+            result.targets[0], result.configurations, goal_description=request.goal_description
+        )
+    return result
 
 
 # -----------------------------------------------------------------------------------------------
@@ -856,13 +867,13 @@ class InvalidFieldChoiceException(InvalidFieldException):
 
 
 # NB: This has a tight coupling to goals. Feel free to change this if necessary.
-class NoValidTargets(Exception):
+class NoValidTargetsException(Exception):
     def __init__(
         self,
         targets_with_origins: TargetsWithOrigins,
         *,
         valid_target_types: Iterable[Type[Target]],
-        goal_name: str,
+        goal_description: str,
     ) -> None:
         valid_target_aliases = sorted({target_type.alias for target_type in valid_target_types})
         invalid_target_aliases = sorted({tgt.alias for tgt in targets_with_origins.targets})
@@ -874,7 +885,7 @@ class NoValidTargets(Exception):
         )
         bulleted_list_sep = "\n  * "
         super().__init__(
-            f"The `{goal_name}` goal only works with the following target types:"
+            f"{goal_description.capitalize()} only works with the following target types:"
             f"{bulleted_list_sep}{bulleted_list_sep.join(valid_target_aliases)}\n\n"
             f"You specified `{' '.join(specs)}`, which only included the following target types:"
             f"{bulleted_list_sep}{bulleted_list_sep.join(invalid_target_aliases)}"
@@ -886,10 +897,10 @@ class NoValidTargets(Exception):
         targets_with_origins: TargetsWithOrigins,
         *,
         config_types: Iterable[Type[_AbstractConfiguration]],
-        goal_name: str,
+        goal_description: str,
         union_membership: UnionMembership,
         registered_target_types: RegisteredTargetTypes,
-    ) -> "NoValidTargets":
+    ) -> "NoValidTargetsException":
         valid_target_types = {
             target_type
             for config_type in config_types
@@ -897,7 +908,47 @@ class NoValidTargets(Exception):
                 registered_target_types.types, union_membership=union_membership
             )
         }
-        return cls(targets_with_origins, valid_target_types=valid_target_types, goal_name=goal_name)
+        return cls(
+            targets_with_origins,
+            valid_target_types=valid_target_types,
+            goal_description=goal_description,
+        )
+
+
+# NB: This has a tight coupling to goals. Feel free to change this if necessary.
+class TooManyTargetsException(Exception):
+    def __init__(self, targets: Iterable[Target], *, goal_description: str) -> None:
+        bulleted_list_sep = "\n  * "
+        addresses = sorted(tgt.address.spec for tgt in targets)
+        super().__init__(
+            f"{goal_description.capitalize()} only works with one valid target, but was given "
+            f"multiple valid targets:{bulleted_list_sep}{bulleted_list_sep.join(addresses)}\n\n"
+            "Please select one of these targets to run."
+        )
+
+
+# NB: This has a tight coupling to goals. Feel free to change this if necessary.
+class AmbiguousImplementationsException(Exception):
+    """Exception for when a single target has multiple valid Configurations, but the goal only
+    expects there to be one Configuration."""
+
+    def __init__(
+        self,
+        target: Target,
+        configurations: Iterable[_AbstractConfiguration],
+        *,
+        goal_description: str,
+    ) -> None:
+        # TODO: improve this error message. A better error message would explain to users how they
+        #  can resolve the issue.
+        possible_config_types = sorted(config.__class__.__name__ for config in configurations)
+        bulleted_list_sep = "\n  * "
+        super().__init__(
+            f"Multiple of the registered implementations for {goal_description} work for "
+            f"{target.address} (target type {repr(target.alias)}).\n\n"
+            "It is ambiguous which implementation to use. Possible implementations:"
+            f"{bulleted_list_sep}{bulleted_list_sep.join(possible_config_types)}"
+        )
 
 
 # -----------------------------------------------------------------------------------------------

@@ -53,51 +53,23 @@ async def run(
 ) -> Run:
     targets_to_valid_configs = await Get[TargetsToValidConfigurations](
         TargetsToValidConfigurationsRequest(
-            BinaryConfiguration, goal_name=options.name, error_if_no_valid_targets=True
+            BinaryConfiguration,
+            goal_description=f"the `{options.name}` goal",
+            error_if_no_valid_targets=True,
+            expect_single_config=True,
         )
     )
-
-    bulleted_list_sep = "\n  * "
-
-    if len(targets_to_valid_configs.targets) > 1:
-        binary_target_addresses = sorted(
-            tgt.address.spec for tgt in targets_to_valid_configs.targets
-        )
-        raise ValueError(
-            f"The `run` goal only works on one binary target but was given multiple targets that "
-            f"can produce a binary:"
-            f"{bulleted_list_sep}{bulleted_list_sep.join(binary_target_addresses)}\n\n"
-            f"Please select one of these targets to run."
-        )
-
-    target = targets_to_valid_configs.targets[0]
-    if len(targets_to_valid_configs.configurations) > 1:
-        possible_config_types = sorted(
-            config_type.__class__.__name__
-            for config_type in targets_to_valid_configs.configurations
-        )
-        # TODO: improve this error message. (It's never actually triggered yet because we only have
-        #  Python implemented with V2.) A better error message would explain to users how they can
-        #  resolve the issue.
-        raise ValueError(
-            f"Multiple of the registered binary implementations work for {target.address} "
-            f"(target type {repr(target.alias)}).\n\n"
-            f"It is ambiguous which implementation to use. Possible implementations:"
-            f"{bulleted_list_sep}{bulleted_list_sep.join(possible_config_types)}."
-        )
-
     config = targets_to_valid_configs.configurations[0]
     binary = await Get[CreatedBinary](BinaryConfiguration, config)
 
     workdir = global_options.options.pants_workdir
-
     with temporary_dir(root_dir=workdir, cleanup=True) as tmpdir:
         path_relative_to_build_root = PurePath(tmpdir).relative_to(build_root.path).as_posix()
         workspace.materialize_directory(
             DirectoryToMaterialize(binary.digest, path_prefix=path_relative_to_build_root)
         )
 
-        console.write_stdout(f"Running target: {target.address}\n")
+        console.write_stdout(f"Running target: {config.address}\n")
         full_path = PurePath(tmpdir, binary.binary_name).as_posix()
         run_request = InteractiveProcessRequest(
             argv=(full_path, *options.values.args), run_in_workspace=True,
@@ -107,14 +79,14 @@ async def run(
             result = runner.run_local_interactive_process(run_request)
             exit_code = result.process_exit_code
             if result.process_exit_code == 0:
-                console.write_stdout(f"{target.address} ran successfully.\n")
+                console.write_stdout(f"{config.address} ran successfully.\n")
             else:
                 console.write_stderr(
-                    f"{target.address} failed with code {result.process_exit_code}!\n"
+                    f"{config.address} failed with code {result.process_exit_code}!\n"
                 )
 
         except Exception as e:
-            console.write_stderr(f"Exception when attempting to run {target.address}: {e!r}\n")
+            console.write_stderr(f"Exception when attempting to run {config.address}: {e!r}\n")
             exit_code = -1
 
     return Run(exit_code)

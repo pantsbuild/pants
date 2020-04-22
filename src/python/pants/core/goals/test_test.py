@@ -6,8 +6,6 @@ from pathlib import PurePath
 from textwrap import dedent
 from typing import List, Optional, Tuple, Type, cast
 
-import pytest
-
 from pants.base.specs import SingleAddress
 from pants.core.goals.test import (
     AddressAndTestResult,
@@ -254,19 +252,8 @@ class TestTest(TestBase):
             """
         )
 
-    def test_single_debug_target(self) -> None:
+    def test_debug_target(self) -> None:
         exit_code, stdout = self.run_test_rule(
             config=SuccessfulConfiguration, targets=[self.make_target_with_origin()], debug=True,
         )
         assert exit_code == 0
-
-    def test_multiple_debug_targets_fail(self) -> None:
-        with pytest.raises(ValueError):
-            self.run_test_rule(
-                config=SuccessfulConfiguration,
-                targets=[
-                    self.make_target_with_origin(Address.parse(":t1")),
-                    self.make_target_with_origin(Address.parse(":t2")),
-                ],
-                debug=True,
-            )

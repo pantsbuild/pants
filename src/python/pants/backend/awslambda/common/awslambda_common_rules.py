@@ -57,7 +57,9 @@ async def create_awslambda(
 ) -> AWSLambdaGoal:
     targets_to_valid_configs = await Get[TargetsToValidConfigurations](
         TargetsToValidConfigurationsRequest(
-            AWSLambdaConfiguration, goal_name=options.name, error_if_no_valid_targets=True
+            AWSLambdaConfiguration,
+            goal_description=f"the `{options.name}` goal",
+            error_if_no_valid_targets=True,
         )
     )
     awslambdas = await MultiGet(

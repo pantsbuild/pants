@@ -202,40 +202,25 @@ async def run_tests(
     union_membership: UnionMembership,
 ) -> Test:
     if options.values.debug:
-        bulleted_list_sep = "\n  * "
         targets_to_valid_configs = await Get[TargetsToValidConfigurations](
             TargetsToValidConfigurationsRequest(
-                TestConfiguration, goal_name=options.name, error_if_no_valid_targets=True
+                TestConfiguration,
+                goal_description="`test --debug`",
+                error_if_no_valid_targets=True,
+                expect_single_config=True,
             )
         )
-        if len(targets_to_valid_configs.targets) > 1:
-            test_target_addresses = sorted(
-                tgt.address.spec for tgt in targets_to_valid_configs.targets
-            )
-            raise ValueError(
-                f"`test --debug` only works on one test target but was given multiple test "
-                f"targets: {bulleted_list_sep}{bulleted_list_sep.join(test_target_addresses)}\n\n"
-                f"Please select one of these targets to run or do not use the `--debug` option."
-            )
-        target = targets_to_valid_configs.targets[0]
-        if len(targets_to_valid_configs.configurations) > 1:
-            possible_config_types = sorted(
-                config.__class__.__name__ for config in targets_to_valid_configs.configurations
-            )
-            raise ValueError(
-                f"Multiple of the registered test implementations work for {target.address} "
-                f"(target type {repr(target.alias)}). It is ambiguous which implementation to use. "
-                f"Possible implementations: {possible_config_types}."
-            )
         config = targets_to_valid_configs.configurations[0]
-        logger.info(f"Starting test in debug mode: {target.address.reference()}")
+        logger.info(f"Starting test in debug mode: {config.address.reference()}")
         request = await Get[TestDebugRequest](TestConfiguration, config)
         debug_result = interactive_runner.run_local_interactive_process(request.ipr)
         return Test(debug_result.process_exit_code)
 
     targets_to_valid_configs = await Get[TargetsToValidConfigurations](
         TargetsToValidConfigurationsRequest(
-            TestConfiguration, goal_name=options.name, error_if_no_valid_targets=False
+            TestConfiguration,
+            goal_description=f"the `{options.name}` goal",
+            error_if_no_valid_targets=False,
         )
     )
     configs_with_sources = await Get[ConfigurationsWithSources](

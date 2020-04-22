@@ -16,6 +16,7 @@ from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, Params
 from pants.engine.target import (
+    AmbiguousImplementationsException,
     AsyncField,
     BoolField,
     Configuration,
@@ -27,7 +28,7 @@ from pants.engine.target import (
     InvalidFieldChoiceException,
     InvalidFieldException,
     InvalidFieldTypeException,
-    NoValidTargets,
+    NoValidTargetsException,
     PrimitiveField,
     RequiredFieldMissingException,
     ScalarField,
@@ -41,6 +42,7 @@ from pants.engine.target import (
     TargetsToValidConfigurationsRequest,
     TargetsWithOrigins,
     TargetWithOrigin,
+    TooManyTargetsException,
 )
 from pants.engine.target import rules as target_rules
 from pants.engine.unions import UnionMembership, UnionRule, union
@@ -537,9 +539,13 @@ class TestFindValidConfigurations(TestBase):
             targets_with_origins: Iterable[TargetWithOrigin],
             *,
             error_if_no_valid_targets: bool = False,
+            expect_single_config: bool = False,
         ) -> TargetsToValidConfigurations:
             request = TargetsToValidConfigurationsRequest(
-                superclass, goal_name="fake", error_if_no_valid_targets=error_if_no_valid_targets
+                superclass,
+                goal_description="fake",
+                error_if_no_valid_targets=error_if_no_valid_targets,
+                expect_single_config=expect_single_config,
             )
             return self.request_single_product(
                 TargetsToValidConfigurations,
@@ -556,6 +562,23 @@ class TestFindValidConfigurations(TestBase):
             self.ConfigSubclass2.create(valid_tgt),
         )
 
+        with pytest.raises(ExecutionError) as exc:
+            find_valid_configs(
+                self.ConfigSuperclass, [valid_tgt_with_origin], expect_single_config=True
+            )
+        assert AmbiguousImplementationsException.__name__ in str(exc.value)
+
+        with pytest.raises(ExecutionError) as exc:
+            find_valid_configs(
+                self.ConfigSuperclass,
+                [
+                    valid_tgt_with_origin,
+                    TargetWithOrigin(FortranTarget({}, address=Address.parse(":valid2")), origin),
+                ],
+                expect_single_config=True,
+            )
+        assert TooManyTargetsException.__name__ in str(exc.value)
+
         no_valid_targets = find_valid_configs(self.ConfigSuperclass, [invalid_tgt_with_origin])
         assert no_valid_targets.targets == ()
         assert no_valid_targets.targets_with_origins == ()
@@ -565,7 +588,7 @@ class TestFindValidConfigurations(TestBase):
             find_valid_configs(
                 self.ConfigSuperclass, [invalid_tgt_with_origin], error_if_no_valid_targets=True
             )
-        assert NoValidTargets.__name__ in str(exc.value)
+        assert NoValidTargetsException.__name__ in str(exc.value)
 
         valid_with_origin = find_valid_configs(
             self.ConfigSuperclassWithOrigin, [valid_tgt_with_origin, invalid_tgt_with_origin]

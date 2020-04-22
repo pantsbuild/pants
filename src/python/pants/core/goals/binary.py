@@ -54,7 +54,9 @@ async def create_binary(
 ) -> Binary:
     targets_to_valid_configs = await Get[TargetsToValidConfigurations](
         TargetsToValidConfigurationsRequest(
-            BinaryConfiguration, goal_name=options.name, error_if_no_valid_targets=True
+            BinaryConfiguration,
+            goal_description=f"the `{options.name}` goal",
+            error_if_no_valid_targets=True,
         )
     )
     binaries = await MultiGet(
