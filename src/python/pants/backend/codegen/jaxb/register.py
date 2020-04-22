@@ -21,5 +21,5 @@ def register_goals():
     task(name="jaxb", action=JaxbGen).install("gen")
 
 
-def targets2():
+def target_types():
     return [JaxbLibrary]

@@ -23,5 +23,5 @@ def register_goals():
     task(name="lambdex-run", action=LambdexRun).install("bundle")
 
 
-def targets2():
+def target_types():
     return [PythonAWSLambda]

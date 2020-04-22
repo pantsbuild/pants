@@ -23,5 +23,5 @@ def register_goals():
     task(name="thrift-java", action=ApacheThriftJavaGen).install("gen")
 
 
-def targets2():
+def target_types():
     return [JavaThriftLibrary]

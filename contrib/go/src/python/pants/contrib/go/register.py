@@ -64,7 +64,7 @@ def register_goals():
     task(name="go", action=GoFmt).install("fmt")
 
 
-def targets2():
+def target_types():
     return [
         GoBinary,
         GoLibrary,

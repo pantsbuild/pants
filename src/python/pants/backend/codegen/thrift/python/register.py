@@ -27,5 +27,5 @@ def register_goals():
     task(name="py-thrift-namespace-clash-check", action=PyThriftNamespaceClashCheck).install("gen")
 
 
-def targets2():
+def target_types():
     return [PythonThriftLibrary]

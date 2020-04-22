@@ -23,5 +23,5 @@ def register_goals():
     task(name="avro-java", action=AvroJavaGenTask).install("gen")
 
 
-def targets2():
+def target_types():
     return [JavaAvroLibrary]

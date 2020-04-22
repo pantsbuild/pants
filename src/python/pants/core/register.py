@@ -60,5 +60,5 @@ def rules():
     ]
 
 
-def targets2():
+def target_types():
     return [AliasTarget, Files, GenericTarget, PrepCommand, RemoteSources, Resources]

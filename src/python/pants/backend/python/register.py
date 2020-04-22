@@ -98,13 +98,6 @@ def build_file_aliases():
     )
 
 
-def build_file_aliases2():
-    return BuildFileAliases(
-        objects={"python_requirement": PythonRequirement, "setup_py": PythonArtifact},
-        context_aware_object_factories={"python_requirements": PythonRequirements},
-    )
-
-
 def register_goals():
     task(name="interpreter", action=SelectInterpreter).install("pyprep")
     task(name="build-local-dists", action=BuildLocalPythonDistributions).install("pyprep")
@@ -138,7 +131,7 @@ def rules():
     )
 
 
-def targets2():
+def target_types():
     return [
         PythonApp,
         PythonBinary,

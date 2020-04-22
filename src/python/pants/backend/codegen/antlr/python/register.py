@@ -23,5 +23,5 @@ def register_goals():
     task(name="antlr-py", action=AntlrPyGen).install("gen")
 
 
-def targets2():
+def target_types():
     return [PythonAntlrLibrary]

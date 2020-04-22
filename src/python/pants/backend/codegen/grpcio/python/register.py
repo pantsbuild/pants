@@ -25,5 +25,5 @@ def register_goals():
     task(name="grpcio-run", action=GrpcioRun).install("gen")
 
 
-def targets2():
+def target_types():
     return [PythonGrpcioLibrary]

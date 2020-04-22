@@ -23,5 +23,5 @@ def register_goals():
     task(name="ragel", action=RagelGen).install("gen")
 
 
-def targets2():
+def target_types():
     return [JavaRagelLibrary]

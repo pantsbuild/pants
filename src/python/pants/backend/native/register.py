@@ -73,5 +73,5 @@ def rules():
     )
 
 
-def targets2():
+def target_types():
     return [CLibrary, CppLibrary, ConanNativeLibrary, PackagedNativeLibrary]

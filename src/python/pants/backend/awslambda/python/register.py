@@ -14,7 +14,7 @@ def rules():
     return [*awslambda_common_rules.rules(), *awslambda_python_rules.rules()]
 
 
-def targets2():
+def targets_types():
     return [PythonAWSLambda]
 
 
@@ -24,5 +24,5 @@ class LegacyPythonAWSLambda(Target):
         super().__init__(**kwargs)
 
 
-def build_file_aliases2():
+def build_file_aliases():
     return BuildFileAliases(targets={"python_awslambda": LegacyPythonAWSLambda})
