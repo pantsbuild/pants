@@ -1,11 +1,9 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import itertools
 import os
 from abc import ABCMeta
 from dataclasses import dataclass
-from typing import Iterable, Type
 
 from pants.base.build_root import BuildRoot
 from pants.core.util_rules.distdir import DistDir
@@ -14,7 +12,7 @@ from pants.engine.fs import Digest, DirectoriesToMerge, DirectoryToMaterialize, 
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get, MultiGet
-from pants.engine.target import Configuration, RegisteredTargetTypes, Targets
+from pants.engine.target import Configuration, RegisteredTargetTypes, TargetsWithOrigins
 from pants.engine.unions import UnionMembership, union
 
 
@@ -47,7 +45,7 @@ class AWSLambdaGoal(Goal):
 
 @goal_rule
 async def create_awslambda(
-    targets: Targets,
+    targets_with_origins: TargetsWithOrigins,
     console: Console,
     options: AWSLambdaOptions,
     union_membership: UnionMembership,
@@ -56,30 +54,17 @@ async def create_awslambda(
     buildroot: BuildRoot,
     workspace: Workspace,
 ) -> AWSLambdaGoal:
-    config_types: Iterable[Type[AWSLambdaConfiguration]] = union_membership.union_rules[
-        AWSLambdaConfiguration
-    ]
-    configs = tuple(
-        config_type.create(tgt)
-        for tgt in targets
-        for config_type in config_types
-        if config_type.is_valid(tgt)
+    targets_to_valid_configs = AWSLambdaConfiguration.group_targets_to_valid_subclass_configs(
+        targets_with_origins,
+        union_membership=union_membership,
+        registered_target_types=registered_target_types,
+        goal_name=options.name,
+        error_if_no_valid_targets=True,
     )
-    if not configs:
-        all_valid_target_types = itertools.chain.from_iterable(
-            config_type.valid_target_types(
-                registered_target_types.types, union_membership=union_membership
-            )
-            for config_type in config_types
-        )
-        formatted_target_types = sorted(target_type.alias for target_type in all_valid_target_types)
-        raise ValueError(
-            f"None of the provided targets work with the goal `{options.name}`. This goal "
-            f"works with the following target types: {formatted_target_types}."
-        )
-
     awslambdas = await MultiGet(
-        Get[CreatedAWSLambda](AWSLambdaConfiguration, config) for config in configs
+        Get[CreatedAWSLambda](AWSLambdaConfiguration, config)
+        for valid_configs in targets_to_valid_configs.values()
+        for config in valid_configs
     )
     merged_digest = await Get[Digest](
         DirectoriesToMerge(tuple(awslambda.digest for awslambda in awslambdas))

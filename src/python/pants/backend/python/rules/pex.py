@@ -27,8 +27,8 @@ from pants.engine.fs import (
     PathGlobs,
     Snapshot,
 )
-from pants.engine.isolated_process import MultiPlatformProcess, ProcessResult
 from pants.engine.platform import Platform, PlatformConstraint
+from pants.engine.process import MultiPlatformProcess, ProcessResult
 from pants.engine.rules import RootRule, named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.python.python_repos import PythonRepos
@@ -367,7 +367,7 @@ async def create_pex(
             (
                 PlatformConstraint(platform.value),
                 PlatformConstraint(platform.value),
-            ): pex_bin.create_execute_request(
+            ): pex_bin.create_process(
                 python_setup=python_setup,
                 subprocess_encoding_environment=subprocess_encoding_environment,
                 pex_build_environment=pex_build_environment,

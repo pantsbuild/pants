@@ -158,7 +158,7 @@ This is a problem, because it may be that `common-4.5.6` is not compatible
 with `3rdparty:example`, which will _break the `foo` binary at runtime_.
 
 More subtly, if you have many intermediate `java_library` targets between
-your `jvm_binaries` and your `jar_library` targets (which is normaly the
+your `jvm_binaries` and your `jar_library` targets (which is normally the
 case), simply changing which combination of `java_library` targets are in
 the same `./pants` invocation may invalidate the cache and force Pants to
 recompile them, even if their sources are unchanged. This is because they

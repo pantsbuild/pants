@@ -21,6 +21,7 @@ python_tests(
   name='tests',
   sources=['*_test.py', '!*_integration_test.py'],
   dependencies=[
+    'src/python/pants/engine/internals:native',
     'src/python/pants/build_graph',
     'src/python/pants/help',
     'src/python/pants/option',

@@ -8,7 +8,6 @@ from typing import List, Optional, Tuple, Type
 
 import pytest
 
-from pants.base.exceptions import ResolveError
 from pants.base.specs import SingleAddress
 from pants.core.goals.test import (
     AddressAndTestResult,
@@ -47,7 +46,6 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership
 from pants.testutil.engine.util import MockConsole, MockGet, create_goal_subsystem, run_rule
 from pants.testutil.test_base import TestBase
-from pants.util.ordered_set import OrderedSet
 
 
 class MockTarget(Target):
@@ -57,10 +55,6 @@ class MockTarget(Target):
 
 class MockTestConfiguration(TestConfiguration, metaclass=ABCMeta):
     required_fields = (Sources,)
-
-    @classmethod
-    def is_valid(cls, _: Target) -> bool:
-        return True
 
     @staticmethod
     @abstractmethod
@@ -114,10 +108,12 @@ class ConditionallySucceedsConfiguration(MockTestConfiguration):
         )
 
 
+class InvalidField(Sources):
+    pass
+
+
 class InvalidConfiguration(MockTestConfiguration):
-    @classmethod
-    def is_valid(cls, _: Target) -> bool:
-        return False
+    required_fields = (InvalidField,)
 
     @staticmethod
     def status(_: Address) -> Status:
@@ -155,7 +151,7 @@ class TestTest(TestBase):
         options = create_goal_subsystem(TestOptions, debug=debug, run_coverage=False)
         interactive_runner = InteractiveRunner(self.scheduler)
         workspace = Workspace(self.scheduler)
-        union_membership = UnionMembership({TestConfiguration: OrderedSet([config])})
+        union_membership = UnionMembership({TestConfiguration: [config]})
 
         def mock_coordinator_of_tests(
             wrapped_config: WrappedTestConfiguration,
@@ -211,7 +207,7 @@ class TestTest(TestBase):
 
     def test_empty_target_noops(self) -> None:
         exit_code, stdout = self.run_test_rule(
-            config=InvalidConfiguration,
+            config=SuccessfulConfiguration,
             targets=[self.make_target_with_origin()],
             include_sources=False,
         )
@@ -271,7 +267,7 @@ class TestTest(TestBase):
         assert exit_code == 0
 
     def test_multiple_debug_targets_fail(self) -> None:
-        with pytest.raises(ResolveError):
+        with pytest.raises(ValueError):
             self.run_test_rule(
                 config=SuccessfulConfiguration,
                 targets=[

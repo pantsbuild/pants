@@ -4,11 +4,7 @@
 from pathlib import PurePath
 
 from pants.base.build_root import BuildRoot
-from pants.core.goals.binary import (
-    BinaryConfiguration,
-    CreatedBinary,
-    gather_valid_binary_configuration_types,
-)
+from pants.core.goals.binary import BinaryConfiguration, CreatedBinary
 from pants.engine.console import Console
 from pants.engine.fs import DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
@@ -59,19 +55,18 @@ async def run(
     union_membership: UnionMembership,
     registered_target_types: RegisteredTargetTypes,
 ) -> Run:
-    valid_config_types_by_target = gather_valid_binary_configuration_types(
-        goal_subsytem=options,
-        targets_with_origins=targets_with_origins,
+    targets_to_valid_configs = BinaryConfiguration.group_targets_to_valid_subclass_configs(
+        targets_with_origins,
         union_membership=union_membership,
         registered_target_types=registered_target_types,
+        goal_name=options.name,
+        error_if_no_valid_targets=True,
     )
 
     bulleted_list_sep = "\n  * "
 
-    if len(valid_config_types_by_target) > 1:
-        binary_target_addresses = sorted(
-            binary_target.address.spec for binary_target in valid_config_types_by_target
-        )
+    if len(targets_to_valid_configs) > 1:
+        binary_target_addresses = sorted(tgt.address.spec for tgt in targets_to_valid_configs)
         raise ValueError(
             f"The `run` goal only works on one binary target but was given multiple targets that "
             f"can produce a binary:"
@@ -79,9 +74,11 @@ async def run(
             f"Please select one of these targets to run."
         )
 
-    target, valid_config_types = list(valid_config_types_by_target.items())[0]
-    if len(valid_config_types) > 1:
-        possible_config_types = sorted(config_type.__name__ for config_type in valid_config_types)
+    target, valid_configs = list(targets_to_valid_configs.items())[0]
+    if len(valid_configs) > 1:
+        possible_config_types = sorted(
+            config_type.__class__.__name__ for config_type in valid_configs
+        )
         # TODO: improve this error message. (It's never actually triggered yet because we only have
         #  Python implemented with V2.) A better error message would explain to users how they can
         #  resolve the issue.
@@ -91,9 +88,8 @@ async def run(
             f"It is ambiguous which implementation to use. Possible implementations:"
             f"{bulleted_list_sep}{bulleted_list_sep.join(possible_config_types)}."
         )
-    config_type = valid_config_types[0]
 
-    binary = await Get[CreatedBinary](BinaryConfiguration, config_type.create(target))
+    binary = await Get[CreatedBinary](BinaryConfiguration, valid_configs[0])
 
     workdir = global_options.options.pants_workdir
 

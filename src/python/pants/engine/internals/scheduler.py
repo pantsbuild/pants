@@ -22,8 +22,8 @@ from pants.engine.fs import (
     MaterializeDirectoryResult,
     PathGlobsAndRoot,
 )
-from pants.engine.native import Function, TypeId
-from pants.engine.nodes import Return, Throw
+from pants.engine.internals.native import Function, TypeId
+from pants.engine.internals.nodes import Return, Throw
 from pants.engine.rules import Rule, RuleIndex, TaskRule
 from pants.engine.selectors import Params
 from pants.engine.unions import union

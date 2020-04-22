@@ -19,7 +19,7 @@ from pants.engine.fs import (
     Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.isolated_process import ProcessResult
+from pants.engine.process import ProcessResult
 from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Field, Target, TargetsWithOrigins

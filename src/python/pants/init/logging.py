@@ -11,7 +11,7 @@ from typing import List, Optional, TextIO
 
 import pants.util.logging as pants_logging
 from pants.base.exception_sink import ExceptionSink
-from pants.engine.native import Native
+from pants.engine.internals.native import Native
 from pants.util.dirutil import safe_mkdir
 from pants.util.logging import LogLevel
 
@@ -55,7 +55,7 @@ class NativeHandler(StreamHandler):
 
     def emit(self, record: LogRecord) -> None:
         self.native.write_log(
-            self.format(record), record.levelno, f"{record.name}:pid={os.getpid()}"
+            msg=self.format(record), level=record.levelno, target=f"{record.name}:pid={os.getpid()}"
         )
 
     def flush(self) -> None:

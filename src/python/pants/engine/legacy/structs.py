@@ -10,10 +10,10 @@ from typing import Any, Callable, Iterable, List, Optional, Sequence, Tuple, Uni
 from pants.base.deprecated import warn_or_error
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
-from pants.engine.addressable import addressable_sequence
 from pants.engine.fs import GlobExpansionConjunction, PathGlobs
-from pants.engine.objects import Locatable
-from pants.engine.struct import Struct, StructWithDeps
+from pants.engine.internals.addressable import addressable_sequence
+from pants.engine.internals.objects import Locatable
+from pants.engine.internals.struct import Struct, StructWithDeps
 from pants.engine.unions import UnionRule, union
 from pants.source import wrapped_globs
 from pants.util.collections import ensure_str_list

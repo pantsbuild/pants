@@ -42,14 +42,14 @@ class ExportDepAsJarIntegrationTest(ScalacPluginIntegrationTestBase):
 
         target_info = export_output["targets"][target]
 
-        for (key, expeced_option_values) in expected_options_patterns.items():
+        for (key, expected_option_values) in expected_options_patterns.items():
             result_options = target_info[key]
             strigified_result_options = " ".join(result_options)
 
-            expeced_option_values += self.commonly_expected_options[key]
+            expected_option_values += self.commonly_expected_options[key]
 
-            assert len(expeced_option_values) == len(result_options)
-            for pattern in expeced_option_values:
+            assert len(expected_option_values) == len(result_options)
+            for pattern in expected_option_values:
                 assert (pattern in result_options) or re.match(pattern, strigified_result_options)
 
     def test_compile_with_compiler_options(self):

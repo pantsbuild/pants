@@ -233,6 +233,7 @@ python_library(
 python_tests(
   name='tests',
   dependencies=[
+    'src/python/pants/engine/internals:native',
     'src/python/pants/engine/legacy:structs',
     ':specs'
   ],

@@ -17,13 +17,13 @@ from pants.backend.native.subsystems.native_toolchain import (
     LLVMCToolchain,
     NativeToolchain,
 )
+from pants.engine.internals.scheduler_test_base import SchedulerTestBase
 from pants.engine.platform import Platform, create_platform_rules
 from pants.testutil.subsystem.util import global_subsystem_instance, init_subsystems
 from pants.testutil.test_base import TestBase
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import is_executable, safe_open
 from pants.util.strutil import safe_shlex_join
-from pants_test.engine.scheduler_test_base import SchedulerTestBase
 
 
 class TestNativeToolchain(TestBase, SchedulerTestBase):

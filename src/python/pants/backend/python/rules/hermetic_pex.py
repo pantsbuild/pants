@@ -5,7 +5,7 @@ from typing import Any, Iterable, Mapping, Optional
 
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.fs import Digest
-from pants.engine.isolated_process import Process
+from pants.engine.process import Process
 from pants.python.python_setup import PythonSetup
 from pants.util.strutil import create_path_env_var
 
@@ -13,7 +13,7 @@ from pants.util.strutil import create_path_env_var
 class HermeticPex:
     """A mixin for types that provide an executable Pex that should be executed hermetically."""
 
-    def create_execute_request(
+    def create_process(
         self,
         python_setup: PythonSetup,
         subprocess_encoding_environment: SubprocessEncodingEnvironment,

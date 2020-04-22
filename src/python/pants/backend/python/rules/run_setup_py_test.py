@@ -38,8 +38,8 @@ from pants.core.util_rules.determine_source_files import rules as determine_sour
 from pants.core.util_rules.strip_source_roots import rules as strip_source_roots_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import RootRule
-from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Params
 from pants.engine.target import Target, Targets, WrappedTarget
 from pants.python.python_requirement import PythonRequirement

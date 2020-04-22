@@ -19,7 +19,7 @@ from pants.util.dirutil import (
 from pants.util.meta import frozen_after_init
 
 if TYPE_CHECKING:
-    from pants.engine.scheduler import SchedulerSession
+    from pants.engine.internals.scheduler import SchedulerSession
 
 
 @dataclass(frozen=True)

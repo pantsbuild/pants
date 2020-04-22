@@ -10,8 +10,8 @@ from pants.backend.python.subsystems.subprocess_environment import SubprocessEnc
 from pants.binaries.binary_tool import BinaryToolFetchRequest, Script, ToolForPlatform, ToolVersion
 from pants.binaries.binary_util import BinaryToolUrlGenerator
 from pants.engine.fs import Digest, SingleFileExecutable, Snapshot
-from pants.engine.isolated_process import Process
 from pants.engine.platform import PlatformConstraint
+from pants.engine.process import Process
 from pants.engine.rules import rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.python.python_setup import PythonSetup
@@ -53,7 +53,7 @@ class DownloadedPexBin(HermeticPex):
         def get_external_url_generator(self):
             return PexBinUrlGenerator()
 
-    def create_execute_request(  # type: ignore[override]
+    def create_process(  # type: ignore[override]
         self,
         python_setup: PythonSetup,
         subprocess_encoding_environment: SubprocessEncodingEnvironment,
@@ -85,7 +85,7 @@ class DownloadedPexBin(HermeticPex):
         env = dict(env) if env else {}
         env.update(**pex_build_environment.invocation_environment_dict,)
 
-        return super().create_execute_request(
+        return super().create_process(
             python_setup=python_setup,
             subprocess_encoding_environment=subprocess_encoding_environment,
             pex_path=self.executable,
