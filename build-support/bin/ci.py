@@ -345,7 +345,7 @@ def bootstrap(
         try:
             skip_native_engine_so_bootstrap = (
                 try_to_skip_rust_compilation
-                and Path("src/python/pants/engine/native_engine.so").exists()
+                and Path("src/python/pants/engine/internals/native_engine.so").exists()
             )
             subprocess.run(
                 ["./build-support/bin/bootstrap_pants_pex.sh"],

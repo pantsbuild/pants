@@ -10,18 +10,23 @@ from pants.base.exceptions import DuplicateNameError, UnaddressableObjectError
 from pants.base.specs import AddressSpec, AddressSpecs, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.addresses import Addresses
-from pants.engine.build_files import create_graph_rules
 from pants.engine.collection import Collection
 from pants.engine.fs import create_fs_rules
-from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, DifferingFamiliesError
-from pants.engine.parser import HydratedStruct, SymbolTable
+from pants.engine.internals.build_files import create_graph_rules
+from pants.engine.internals.examples.parsers import JsonParser
+from pants.engine.internals.mapper import (
+    AddressFamily,
+    AddressMap,
+    AddressMapper,
+    DifferingFamiliesError,
+)
+from pants.engine.internals.parser import HydratedStruct, SymbolTable
+from pants.engine.internals.scheduler_test_base import SchedulerTestBase
+from pants.engine.internals.struct import Struct
 from pants.engine.rules import rule
 from pants.engine.selectors import Get, MultiGet
-from pants.engine.struct import Struct
 from pants.testutil.engine.util import TARGET_TABLE, Target
 from pants.util.dirutil import safe_open
-from pants_test.engine.examples.parsers import JsonParser
-from pants_test.engine.scheduler_test_base import SchedulerTestBase
 
 
 class Thing:

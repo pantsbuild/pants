@@ -24,10 +24,10 @@ from pants.engine.addresses import (
     BuildFileAddress,
 )
 from pants.engine.fs import EMPTY_SNAPSHOT, PathGlobs, Snapshot, SourcesSnapshot, SourcesSnapshots
+from pants.engine.internals.parser import HydratedStruct
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.graph import HydratedField, HydratedTarget, HydratedTargets, logger
 from pants.engine.legacy.structs import HydrateableField, SourcesField, TargetAdaptor
-from pants.engine.parser import HydratedStruct
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (

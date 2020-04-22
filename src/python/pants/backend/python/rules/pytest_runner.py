@@ -39,9 +39,9 @@ from pants.core.goals.test import (
 from pants.core.target_types import FilesSources, ResourcesSources
 from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.engine.addresses import Addresses
-from pants.engine.fs import Digest, DirectoriesToMerge, InputFilesContent
+from pants.engine.fs import Digest, DirectoriesToMerge, InputFilesContent, SnapshotSubset, PathGlobs
 from pants.engine.interactive_runner import InteractiveProcessRequest
-from pants.engine.isolated_process import FallibleProcessResult, Process
+from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Targets, TransitiveTargets
@@ -246,7 +246,7 @@ async def run_python_test(
     if test_setup.xml_results:
         output_dirs.append(test_results_file)
 
-    request = test_setup.test_runner_pex.create_execute_request(
+    process = test_setup.test_runner_pex.create_process(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path=f"./{test_setup.test_runner_pex.output_filename}",
@@ -259,18 +259,22 @@ async def run_python_test(
         ),
         env=env,
     )
-    result = await Get[FallibleProcessResult](Process, request)
-    coverage_data = (
-        PytestCoverageData(config.address, result.output_directory_digest) if run_coverage else None
-    )
-    # TODO: How to distinguish coverage data from XML results data.
-    test_results = (
-        XmlTestResultsData(config.address, result.output_directory_digest)
-        if test_setup.xml_results
-        else None
-    )
+
+    result = await Get[FallibleProcessResult](Process, process)
+    output_digest = result.output_directory_digest
+
+    if run_coverage:
+        coverage_digest = await Get[Digest](SnapshotSubset(output_digest, PathGlobs(".coverage")))
+    else:
+        coverage_digest = None
+
+    if test_setup.xml_results:
+        results_digest = await Get[Digest](SnapshotSubset(output_digest, PathGlobs(test_results_file)))
+    else:
+        results_digest = None
+
     return TestResult.from_fallible_process_result(
-        result, coverage_data=coverage_data, test_results=test_results
+        result, coverage_data=coverage_digest, test_results=results_digest
     )
 
 

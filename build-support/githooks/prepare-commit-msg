@@ -22,7 +22,7 @@ NUM_NON_MD_FILES=$(echo "${CHANGED_FILES})" | grep -c -v ".\md$")
 NUM_RUST_FILES=$(echo "${CHANGED_FILES})" | grep -c -E \
   -e "^src/rust/engine" \
   -e "^rust-toolchain" \
-  -e "^src/python/pants/engine/native.py" \
+  -e "^src/python/pants/engine/internals/native.py" \
   -e "^build-support/bin/native" \
   -e "^3rdparty/python/requirements.txt")
 

@@ -8,11 +8,12 @@ from enum import Enum
 from textwrap import dedent
 from typing import Callable, List, Optional, Tuple, Type, Union, get_type_hints
 
-from pants.engine.build_files import create_graph_rules
 from pants.engine.console import Console
 from pants.engine.fs import create_fs_rules
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.mapper import AddressMapper
+from pants.engine.internals.build_files import create_graph_rules
+from pants.engine.internals.examples.parsers import JsonParser
+from pants.engine.internals.mapper import AddressMapper
 from pants.engine.rules import (
     MissingParameterTypeAnnotation,
     MissingReturnTypeAnnotation,
@@ -35,7 +36,6 @@ from pants.testutil.engine.util import (
 )
 from pants.testutil.test_base import TestBase
 from pants.util.enums import match
-from pants_test.engine.examples.parsers import JsonParser
 
 
 def fmt_graph_rule(rule: Callable, *, gets: Optional[List[Tuple[str, str]]] = None) -> str:
@@ -276,7 +276,7 @@ class RuleIndexTest(TestBase):
         with self.assertRaisesWithMessage(
             TypeError,
             "Rule entry A() had an unexpected type: <class "
-            "'pants_test.engine.test_rules.A'>. Rules either extend Rule or UnionRule, or "
+            "'pants.engine.rules_test.A'>. Rules either extend Rule or UnionRule, or "
             "are static functions decorated with @rule.",
         ):
             RuleIndex.create([A()])
@@ -1163,7 +1163,7 @@ class RuleGraphTest(TestBase):
     def test_invalid_get_arguments(self):
         with self.assertRaisesWithMessage(
             ValueError,
-            "Could not resolve type `XXX` in top level of module pants_test.engine.test_rules",
+            "Could not resolve type `XXX` in top level of module pants.engine.rules_test",
         ):
 
             class XXX:

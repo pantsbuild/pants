@@ -1,7 +1,7 @@
 use crate::core::{Function, TypeId};
 
 /// Handles to Python types the engine needs to be aware of. This corresponds on a field-by-field
-/// basis to the Python `EngineTypes` structure defined in `src/python/pants/engine/native.py`.
+/// basis to the Python `EngineTypes` structure defined in `src/python/pants/engine/internals/native.py`.
 #[repr(C)]
 pub struct Types {
   pub construct_directory_digest: Function,

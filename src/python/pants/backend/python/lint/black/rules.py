@@ -27,7 +27,7 @@ from pants.core.util_rules.determine_source_files import (
     SpecifiedSourceFilesRequest,
 )
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
-from pants.engine.isolated_process import FallibleProcessResult, Process, ProcessResult
+from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.engine.unions import UnionRule
@@ -129,7 +129,7 @@ async def setup(
 
     address_references = ", ".join(sorted(config.address.reference() for config in request.configs))
 
-    process = requirements_pex.create_execute_request(
+    process = requirements_pex.create_process(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path="./black.pex",

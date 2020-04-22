@@ -57,7 +57,7 @@ from pants.engine.fs import (
     Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.isolated_process import Process, ProcessResult
+from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import goal_rule, named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
@@ -383,7 +383,7 @@ async def run_setup_py(
     # The setuptools dist dir, created by it under the chroot (not to be confused with
     # pants's own dist dir, at the buildroot).
     dist_dir = "dist/"
-    request = setuptools_setup.requirements_pex.create_execute_request(
+    process = setuptools_setup.requirements_pex.create_process(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path="./setuptools.pex",
@@ -394,7 +394,7 @@ async def run_setup_py(
         output_directories=(dist_dir,),
         description=f"Run setuptools for {req.exported_target.target.address.reference()}",
     )
-    result = await Get[ProcessResult](Process, request)
+    result = await Get[ProcessResult](Process, process)
     output_digest = await Get[Digest](
         DirectoryWithPrefixToStrip(result.output_directory_digest, dist_dir)
     )

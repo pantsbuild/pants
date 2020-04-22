@@ -10,7 +10,7 @@ python_library(
     'src/python/pants/core/util_rules',
     'src/python/pants/engine:addresses',
     'src/python/pants/engine:fs',
-    'src/python/pants/engine:isolated_process',
+    'src/python/pants/engine:process',
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
     'src/python/pants/engine:target',

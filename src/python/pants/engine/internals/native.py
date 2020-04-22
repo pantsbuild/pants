@@ -16,7 +16,7 @@ import cffi
 import pkg_resources
 
 from pants.base.project_tree import Dir, File, Link
-from pants.build_graph.address import Address
+from pants.engine.addresses import Address
 from pants.engine.fs import (
     Digest,
     DirectoriesToMerge,
@@ -33,8 +33,8 @@ from pants.engine.fs import (
     UrlToFetch,
 )
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveProcessResult
-from pants.engine.isolated_process import FallibleProcessResultWithPlatform, MultiPlatformProcess
 from pants.engine.platform import Platform
+from pants.engine.process import FallibleProcessResultWithPlatform, MultiPlatformProcess
 from pants.engine.selectors import Get
 from pants.engine.unions import union
 from pants.util.contextutil import temporary_dir

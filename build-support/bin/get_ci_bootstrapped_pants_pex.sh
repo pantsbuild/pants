@@ -36,7 +36,7 @@ chmod 755 ./pants.pex
 # The "|| true" is necessary because unzip returns a non-zero exit code if there were any
 # bytes before the zip magic number (in our case, the pex shebang), even though the unzip
 # operation otherwise succeeds.
-unzip -j pants.pex pants/engine/native_engine.so -d src/python/pants/engine/ || true
+unzip -j pants.pex pants/engine/internals/native_engine.so -d src/python/pants/engine/internals || true
 
 # TODO: As of 2019/10/24, we've seen sigbus errors while starting tests that feel potentially related
 # to either the PEX or native_engine.so just having finished extraction. If we continue to see those

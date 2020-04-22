@@ -12,7 +12,9 @@ from typing import (
     Dict,
     Generic,
     Iterable,
+    Mapping,
     Optional,
+    Sequence,
     Tuple,
     Type,
     TypeVar,
@@ -40,6 +42,7 @@ from pants.engine.unions import UnionMembership
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper, Filespec
 from pants.util.collections import ensure_list, ensure_str_list
 from pants.util.frozendict import FrozenDict
+from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import pluralize
@@ -561,6 +564,10 @@ class TargetsWithOrigins(Collection[TargetWithOrigin]):
         )
         return self.dependencies[0]
 
+    @memoized_property
+    def targets(self) -> Tuple[Target, ...]:
+        return tuple(tgt_with_origin.target for tgt_with_origin in self)
+
 
 @dataclass(frozen=True)
 class TransitiveTarget:
@@ -613,10 +620,12 @@ class _AbstractConfiguration(ABC):
 
     address: Address
 
+    @final
     @classmethod
     def is_valid(cls, tgt: Target) -> bool:
         return tgt.has_fields(cls.required_fields)
 
+    @final
     @classmethod
     def valid_target_types(
         cls, target_types: Iterable[Type[Target]], *, union_membership: UnionMembership
@@ -688,6 +697,41 @@ class Configuration(_AbstractConfiguration, metaclass=ABCMeta):
             address=tgt.address, **_get_config_fields_from_target(cls, tgt)
         )
 
+    @final
+    @classmethod
+    def group_targets_to_valid_subclass_configs(
+        cls: Type[_C],
+        targets_with_origins: TargetsWithOrigins,
+        *,
+        goal_name: str,
+        error_if_no_valid_targets: bool,
+        union_membership: UnionMembership,
+        registered_target_types: RegisteredTargetTypes,
+    ) -> Mapping[Target, Sequence[_C]]:
+        """Find all subclasses of this configuration by inspecting UnionMembership, then group each
+        target to each valid Configuration, if any.
+
+        This method should only be used on union bases, such as `TestConfiguration` and
+        `BinaryConfiguration`.
+        """
+        config_types: Iterable[Type[_C]] = union_membership.union_rules[cls]
+        targets_to_valid_configs = {}
+        for tgt in targets_with_origins.targets:
+            valid_configs = [
+                config_type.create(tgt) for config_type in config_types if config_type.is_valid(tgt)
+            ]
+            if valid_configs:
+                targets_to_valid_configs[tgt] = valid_configs
+        if not targets_to_valid_configs and error_if_no_valid_targets:
+            raise NoValidTargets.create_from_configs(
+                targets_with_origins,
+                config_types=config_types,
+                goal_name=goal_name,
+                union_membership=union_membership,
+                registered_target_types=registered_target_types,
+            )
+        return targets_to_valid_configs
+
 
 _CWO = TypeVar("_CWO", bound="ConfigurationWithOrigin")
 
@@ -710,6 +754,43 @@ class ConfigurationWithOrigin(_AbstractConfiguration, metaclass=ABCMeta):
             origin=target_with_origin.origin,
             **_get_config_fields_from_target(cls, tgt),
         )
+
+    @final
+    @classmethod
+    def group_targets_to_valid_subclass_configs(
+        cls: Type[_CWO],
+        targets_with_origins: TargetsWithOrigins,
+        *,
+        union_membership: UnionMembership,
+        registered_target_types: RegisteredTargetTypes,
+        goal_name: str,
+        error_if_no_valid_targets: bool,
+    ) -> Mapping[TargetWithOrigin, Sequence[_CWO]]:
+        """Find all subclasses of this configuration by inspecting UnionMembership, then group each
+        target to each valid Configuration, if any.
+
+        This method should only be used on union bases, such as `TestConfiguration` and
+        `BinaryConfiguration`.
+        """
+        config_types: Iterable[Type[_CWO]] = union_membership.union_rules[cls]
+        targets_to_valid_configs = {}
+        for tgt_with_origin in targets_with_origins:
+            valid_configs = [
+                config_type.create(tgt_with_origin)
+                for config_type in config_types
+                if config_type.is_valid(tgt_with_origin.target)
+            ]
+            if valid_configs:
+                targets_to_valid_configs[tgt_with_origin] = valid_configs
+        if not targets_to_valid_configs and error_if_no_valid_targets:
+            raise NoValidTargets.create_from_configs(
+                targets_with_origins,
+                config_types=config_types,
+                goal_name=goal_name,
+                union_membership=union_membership,
+                registered_target_types=registered_target_types,
+            )
+        return targets_to_valid_configs
 
 
 # -----------------------------------------------------------------------------------------------
@@ -757,6 +838,51 @@ class InvalidFieldChoiceException(InvalidFieldException):
             f"The {repr(field_alias)} field in target {address} must be one of "
             f"{sorted(valid_choices)}, but was {repr(raw_value)}."
         )
+
+
+# NB: This has a tight coupling to goals. Feel free to change this if necessary.
+class NoValidTargets(Exception):
+    def __init__(
+        self,
+        targets_with_origins: TargetsWithOrigins,
+        *,
+        valid_target_types: Iterable[Type[Target]],
+        goal_name: str,
+    ) -> None:
+        valid_target_aliases = sorted({target_type.alias for target_type in valid_target_types})
+        invalid_target_aliases = sorted({tgt.alias for tgt in targets_with_origins.targets})
+        specs = sorted(
+            {
+                target_with_origin.origin.to_spec_string()
+                for target_with_origin in targets_with_origins
+            }
+        )
+        bulleted_list_sep = "\n  * "
+        super().__init__(
+            f"The `{goal_name}` goal only works with the following target types:"
+            f"{bulleted_list_sep}{bulleted_list_sep.join(valid_target_aliases)}\n\n"
+            f"You specified `{' '.join(specs)}`, which only included the following target types:"
+            f"{bulleted_list_sep}{bulleted_list_sep.join(invalid_target_aliases)}"
+        )
+
+    @classmethod
+    def create_from_configs(
+        cls,
+        targets_with_origins: TargetsWithOrigins,
+        *,
+        config_types: Iterable[Type[_AbstractConfiguration]],
+        goal_name: str,
+        union_membership: UnionMembership,
+        registered_target_types: RegisteredTargetTypes,
+    ) -> "NoValidTargets":
+        valid_target_types = {
+            target_type
+            for config_type in config_types
+            for target_type in config_type.valid_target_types(
+                registered_target_types.types, union_membership=union_membership
+            )
+        }
+        return cls(targets_with_origins, valid_target_types=valid_target_types, goal_name=goal_name)
 
 
 # -----------------------------------------------------------------------------------------------

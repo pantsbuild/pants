@@ -9,8 +9,8 @@ from json.decoder import JSONDecoder
 from json.encoder import JSONEncoder
 
 from pants.build_graph.address import Address
-from pants.engine.objects import Resolvable, Serializable
-from pants.engine.parser import ParseError, Parser
+from pants.engine.internals.objects import Resolvable, Serializable
+from pants.engine.internals.parser import ParseError, Parser
 from pants.util.memo import memoized, memoized_property
 from pants.util.strutil import ensure_text
 

@@ -8,8 +8,9 @@ from dataclasses import dataclass, field
 from textwrap import dedent
 from typing import List
 
+from pants.engine.internals.scheduler import ExecutionError
+from pants.engine.internals.scheduler_test_base import SchedulerTestBase
 from pants.engine.rules import RootRule, named_rule, rule
-from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Get, MultiGet
 from pants.reporting.streaming_workunit_handler import StreamingWorkunitHandler
 from pants.testutil.engine.util import (
@@ -18,7 +19,6 @@ from pants.testutil.engine.util import (
     fmt_rust_function,
     remove_locations_from_traceback,
 )
-from pants_test.engine.scheduler_test_base import SchedulerTestBase
 
 
 class A:

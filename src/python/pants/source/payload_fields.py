@@ -12,7 +12,7 @@ from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetWithSpec, Fi
 from pants.util.memo import memoized_property
 
 if TYPE_CHECKING:
-    from pants.engine.scheduler import SchedulerSession  # noqa: F401
+    from pants.engine.internals.scheduler import SchedulerSession  # noqa: F401
 
 
 class SourcesField(PayloadField):

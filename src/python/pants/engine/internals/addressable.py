@@ -7,7 +7,7 @@ from functools import update_wrapper
 from typing import Any, Set, Tuple, Type
 
 from pants.build_graph.address import Address, BuildFileAddress
-from pants.engine.objects import Resolvable, Serializable
+from pants.engine.internals.objects import Resolvable, Serializable
 from pants.util.objects import TypeConstraintError
 
 

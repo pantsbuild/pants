@@ -35,7 +35,7 @@ from pants.engine.fs import (
     PathGlobs,
     PathGlobsAndRoot,
 )
-from pants.engine.isolated_process import Process
+from pants.engine.process import Process
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import fast_relpath
 from pants.util.enums import match

@@ -11,7 +11,7 @@ from typing import List, Optional, TextIO
 
 import pants.util.logging as pants_logging
 from pants.base.exception_sink import ExceptionSink
-from pants.engine.native import Native
+from pants.engine.internals.native import Native
 from pants.util.dirutil import safe_mkdir
 from pants.util.logging import LogLevel
 

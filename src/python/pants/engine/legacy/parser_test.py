@@ -4,8 +4,8 @@
 import unittest
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.engine.internals.parser import SymbolTable
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
-from pants.engine.parser import SymbolTable
 from pants.option.global_options import BuildFileImportsBehavior
 
 
