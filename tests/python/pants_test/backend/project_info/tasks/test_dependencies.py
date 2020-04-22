@@ -50,7 +50,9 @@ class NonPythonDependenciesTest(ConsoleTaskTestBase):
 
     def test_without_dependencies(self):
         self.assert_console_output_ordered(
-            "dependencies:third", targets=[self.target("dependencies:third")]
+            "dependencies:third",
+            targets=[self.target("dependencies:third")],
+            options={"transitive": True},
         )
 
     def test_all_dependencies(self):
@@ -61,24 +63,24 @@ class NonPythonDependenciesTest(ConsoleTaskTestBase):
             "dependencies:second",
             "org.apache:apache-jar:12.12.2012",
             targets=[self.target("project:project")],
-            options={"type": DependencyType.SOURCE_AND_THIRD_PARTY},
+            options={"transitive": True, "type": DependencyType.SOURCE_AND_THIRD_PARTY},
         )
 
-    def test_source_dependencies(self):
+    def test_transitive_source_dependencies(self):
         self.assert_console_output_ordered(
             "project:project",
             "dependencies:first",
             "dependencies:third",
             "dependencies:second",
             targets=[self.target("project:project")],
-            options={"type": DependencyType.SOURCE},
+            options={"transitive": True, "type": DependencyType.SOURCE},
         )
 
-    def test_3rdparty_dependencies(self):
+    def test_transitive_3rdparty_dependencies(self):
         self.assert_console_output_ordered(
             "org.apache:apache-jar:12.12.2012",
             targets=[self.target("project:project")],
-            options={"type": DependencyType.THIRD_PARTY},
+            options={"transitive": True, "type": DependencyType.THIRD_PARTY},
         )
 
     def test_dep_bag(self):
@@ -90,22 +92,22 @@ class NonPythonDependenciesTest(ConsoleTaskTestBase):
             "dependencies:first",
             "dependencies:third",
             targets=[self.target("project:dep-bag")],
-            options={"type": DependencyType.SOURCE_AND_THIRD_PARTY},
+            options={"transitive": True, "type": DependencyType.SOURCE_AND_THIRD_PARTY},
         )
 
-    def test_intransitive_source_dependencies(self):
+    def test_source_dependencies(self):
         self.assert_console_output_ordered(
             "dependencies:first",
             "dependencies:second",
             targets=[self.target("project:project")],
-            options={"transitive": False, "type": DependencyType.SOURCE},
+            options={"type": DependencyType.SOURCE},
         )
 
-    def test_intransitive_3rdparty_dependencies(self):
+    def test_3rdparty_dependencies(self):
         self.assert_console_output_ordered(
             "org.apache:apache-jar:12.12.2012",
             targets=[self.target("project:project")],
-            options={"transitive": False, "type": DependencyType.THIRD_PARTY},
+            options={"type": DependencyType.THIRD_PARTY},
         )
 
 
@@ -141,7 +143,7 @@ class PythonDependenciesTests(ConsoleTaskTestBase):
             dependencies=[python_inner, python_inner_with_external],
         )
 
-    def test_normal(self):
+    def test_transitive_normal(self):
         self.assert_console_output_ordered(
             "dependencies:python_root",
             "dependencies:python_inner",
@@ -149,14 +151,29 @@ class PythonDependenciesTests(ConsoleTaskTestBase):
             "dependencies:python_inner_with_external",
             "antlr_python_runtime==3.1.3",
             targets=[self.target("dependencies:python_root")],
-            options={"type": DependencyType.SOURCE_AND_THIRD_PARTY},
+            options={"transitive": True, "type": DependencyType.SOURCE_AND_THIRD_PARTY},
         )
 
-    def test_source_dependencies(self):
+    def test_transitive_source_dependencies(self):
         self.assert_console_output_ordered(
             "dependencies:python_root",
             "dependencies:python_inner",
             "dependencies:python_leaf",
+            "dependencies:python_inner_with_external",
+            targets=[self.target("dependencies:python_root")],
+            options={"transitive": True, "type": DependencyType.SOURCE},
+        )
+
+    def test_transitive_3rdparty_dependencies(self):
+        self.assert_console_output_ordered(
+            "antlr_python_runtime==3.1.3",
+            targets=[self.target("dependencies:python_root")],
+            options={"transitive": True, "type": DependencyType.THIRD_PARTY},
+        )
+
+    def test_source_dependencies(self):
+        self.assert_console_output_ordered(
+            "dependencies:python_inner",
             "dependencies:python_inner_with_external",
             targets=[self.target("dependencies:python_root")],
             options={"type": DependencyType.SOURCE},
@@ -167,19 +184,4 @@ class PythonDependenciesTests(ConsoleTaskTestBase):
             "antlr_python_runtime==3.1.3",
             targets=[self.target("dependencies:python_root")],
             options={"type": DependencyType.THIRD_PARTY},
-        )
-
-    def test_intransitive_source_dependencies(self):
-        self.assert_console_output_ordered(
-            "dependencies:python_inner",
-            "dependencies:python_inner_with_external",
-            targets=[self.target("dependencies:python_root")],
-            options={"transitive": False, "type": DependencyType.SOURCE},
-        )
-
-    def test_intransitive_3rdparty_dependencies(self):
-        self.assert_console_output_ordered(
-            "antlr_python_runtime==3.1.3",
-            targets=[self.target("dependencies:python_root")],
-            options={"transitive": False, "type": DependencyType.THIRD_PARTY},
         )
