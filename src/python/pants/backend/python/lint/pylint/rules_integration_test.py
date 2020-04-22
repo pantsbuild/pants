@@ -16,9 +16,7 @@ from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
 from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.rules import RootRule
-from pants.engine.selectors import Params
 from pants.engine.target import Dependencies, Sources, TargetWithOrigin
-from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
 
@@ -87,20 +85,16 @@ class PylintIntegrationTest(TestBase):
         passthrough_args: Optional[str] = None,
         skip: bool = False,
     ) -> LintResult:
-        args = ["--backend-packages2=pants.backend.python.lint.pylint"]
+        self.options[""]["backend-packages2"] = ["pants.backend.python.lint.pylint"]
         if config:
             self.create_file(relpath="pylintrc", contents=config)
-            args.append("--pylint-config=pylintrc")
+            self.options["pylint"]["config"] = "pylintrc"
         if passthrough_args:
-            args.append(f"--pylint-args='{passthrough_args}'")
-        if skip:
-            args.append(f"--pylint-skip")
+            self.options["pylint"]["args"] = passthrough_args
+        self.options["pylint"]["skip"] = skip
+        self.options_bootstrapper = self._make_options_bootstrapper()
         return self.request_single_product(
-            LintResult,
-            Params(
-                PylintConfigurations(PylintConfiguration.create(tgt) for tgt in targets),
-                create_options_bootstrapper(args=args),
-            ),
+            LintResult, PylintConfigurations(PylintConfiguration.create(tgt) for tgt in targets),
         )
 
     def test_passing_source(self) -> None:

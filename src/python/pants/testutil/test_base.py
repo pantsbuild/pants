@@ -18,7 +18,6 @@ from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exceptions import TaskError
 from pants.base.specs import AddressSpec, AddressSpecs, FilesystemSpecs, Specs
 from pants.build_graph.address import Address, BuildFileAddress
-from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target as TargetV1
 from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, PathGlobsAndRoot, Snapshot
@@ -29,6 +28,7 @@ from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.engine.target import Target
 from pants.init.engine_initializer import EngineInitializer
+from pants.init.options_initializer import BuildConfigInitializer
 from pants.init.util import clean_global_runtime_state
 from pants.option.global_options import BuildFileImportsBehavior
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -298,14 +298,6 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     def target_types(cls) -> Sequence[Type[Target]]:
         return ()
 
-    @classmethod
-    def build_config(cls):
-        build_config = BuildConfiguration()
-        build_config.register_aliases(cls.alias_groups())
-        build_config.register_rules(cls.rules())
-        build_config.register_targets(cls.target_types())
-        return build_config
-
     def setUp(self):
         """
         :API: public
@@ -333,15 +325,47 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
             "pants_configdir": os.path.join(self.build_root, "config"),
             "pants_subprocessdir": self.subprocess_dir,
             "cache_key_gen_version": "0-test",
+            "pants-config-files": [],
         }
         self.options["cache"] = {
             "read_from": [],
             "write_to": [],
         }
 
+        self._options_bootstrapper: Optional[OptionsBootstrapper] = None
         self._build_configuration = self.build_config()
         self._inited_target = False
         subsystem_util.init_subsystem(TargetV1.TagAssignments)
+
+    def build_config(self):
+        build_config = BuildConfigInitializer.get(self.options_bootstrapper)
+        build_config.register_aliases(self.alias_groups())
+        build_config.register_rules(self.rules())
+        build_config.register_targets(self.target_types())
+        return build_config
+
+    @property
+    def options_bootstrapper(self) -> OptionsBootstrapper:
+        if self._options_bootstrapper is None:
+            self._options_bootstrapper = self._make_options_bootstrapper()
+        return self._options_bootstrapper
+
+    @options_bootstrapper.setter
+    def options_bootstrapper(self, options_bootstrapper: OptionsBootstrapper):
+        self._reset_engine()
+        self._scheduler = None
+        self._options_bootstrapper = options_bootstrapper
+
+    def _make_options_bootstrapper(self) -> OptionsBootstrapper:
+        args = []
+        for scope, options in self.options.items():
+            if scope == "":
+                prefix = "--"
+            else:
+                prefix = f"--{scope}-"
+            for option, value in options.items():
+                args.append(f"{prefix}{option.replace('_', '-')}={value}")
+        return OptionsBootstrapper.create(args=args)
 
     def buildroot_files(self, relpath=None):
         """Returns the set of all files under the test build root.
@@ -363,7 +387,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     def _reset_engine(self):
         if self._scheduler is not None:
             self._build_graph.reset()
-            self._scheduler.invalidate_all_files()
+            self._scheduler = None
 
     @contextmanager
     def isolated_local_store(self):
@@ -403,10 +427,9 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         if self._scheduler is not None:
             return
 
-        options_bootstrapper = OptionsBootstrapper.create(args=["--pants-config-files=[]"])
         local_store_dir = (
             local_store_dir
-            or options_bootstrapper.bootstrap_options.for_global_scope().local_store_dir
+            or self.options_bootstrapper.bootstrap_options.for_global_scope().local_store_dir
         )
 
         # NB: This uses the long form of initialization because it needs to directly specify
@@ -418,7 +441,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
             build_file_imports_behavior=BuildFileImportsBehavior.error,
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
             native=init_native(),
-            options_bootstrapper=options_bootstrapper,
+            options_bootstrapper=self.options_bootstrapper,
             build_root=self.build_root,
             build_configuration=self.build_config(),
             build_ignore_patterns=None,

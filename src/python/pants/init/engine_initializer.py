@@ -410,6 +410,11 @@ class EngineInitializer:
         def build_root_singleton() -> BuildRoot:
             return cast(BuildRoot, BuildRoot.instance)
 
+        @rule
+        def options_bootstrapper_singleton() -> OptionsBootstrapper:
+            print("Rule returning options_bootstrapper: {}".format(options_bootstrapper))
+            return options_bootstrapper
+
         # Create a Scheduler containing graph and filesystem rules, with no installed goals. The
         # LegacyBuildGraph will explicitly request the products it needs.
         rules = (
@@ -420,6 +425,7 @@ class EngineInitializer:
             registered_target_types_singleton,
             union_membership_singleton,
             build_root_singleton,
+            options_bootstrapper_singleton,
             *graph.rules(),
             *options_parsing.rules(),
             *create_legacy_graph_tasks(),
