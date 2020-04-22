@@ -585,11 +585,13 @@ class TransitiveTargets:
     closure: FrozenOrderedSet[Target]
 
 
-@dataclass(frozen=True)
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class RegisteredTargetTypes:
-    # TODO: add `FrozenDict` as a light-weight wrapper around `dict` that de-registers the
-    #  mutation entry points.
-    aliases_to_types: Dict[str, Type[Target]]
+    aliases_to_types: FrozenDict[str, Type[Target]]
+
+    def __init__(self, aliases_to_types: Mapping[str, Type[Target]]) -> None:
+        self.aliases_to_types = FrozenDict(aliases_to_types)
 
     @classmethod
     def create(cls, target_types: Iterable[Type[Target]]) -> "RegisteredTargetTypes":
