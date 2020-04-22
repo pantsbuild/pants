@@ -4,7 +4,6 @@
 
 python_library(
   name = 'plugin',
-  sources = ['register.py'],
   dependencies = [
     'src/python/pants/backend/docgen/targets',
     'src/python/pants/backend/docgen/tasks',
