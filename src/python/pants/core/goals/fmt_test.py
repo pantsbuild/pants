@@ -27,7 +27,6 @@ from pants.engine.target import Sources, Target, TargetsWithOrigins, TargetWithO
 from pants.engine.unions import UnionMembership
 from pants.testutil.engine.util import MockConsole, MockGet, create_goal_subsystem, run_rule
 from pants.testutil.test_base import TestBase
-from pants.util.ordered_set import OrderedSet
 
 
 class FortranSources(Sources):
@@ -129,9 +128,7 @@ class FmtTest(TestBase):
         include_sources: bool = True,
     ) -> str:
         console = MockConsole(use_colors=False)
-        union_membership = UnionMembership(
-            {LanguageFmtTargets: OrderedSet(language_target_collection_types)}
-        )
+        union_membership = UnionMembership({LanguageFmtTargets: language_target_collection_types})
         result: Fmt = run_rule(
             fmt,
             rule_args=[

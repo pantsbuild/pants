@@ -3,18 +3,18 @@
 
 """Support for using C and C++ with Python distributions via `ctypes`."""
 
-from pants.backend.native.rules.targets import (
-    CLibrary,
-    ConanNativeLibrary,
-    CppLibrary,
-    PackagedNativeLibrary,
-)
 from pants.backend.native.subsystems.binaries.binutils import create_binutils_rules
 from pants.backend.native.subsystems.binaries.gcc import create_gcc_rules
 from pants.backend.native.subsystems.binaries.llvm import create_llvm_rules
 from pants.backend.native.subsystems.native_build_settings import NativeBuildSettings
 from pants.backend.native.subsystems.native_toolchain import create_native_toolchain_rules
 from pants.backend.native.subsystems.xcode_cli_tools import create_xcode_cli_tools_rules
+from pants.backend.native.target_types import (
+    CLibrary,
+    ConanNativeLibrary,
+    CppLibrary,
+    PackagedNativeLibrary,
+)
 from pants.backend.native.targets.external_native_library import ConanRequirement
 from pants.backend.native.targets.external_native_library import (
     ExternalNativeLibrary as ExternalNativeLibraryV1,

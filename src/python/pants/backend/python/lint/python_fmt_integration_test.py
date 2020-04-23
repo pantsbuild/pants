@@ -8,7 +8,7 @@ from pants.backend.python.lint.black.rules import rules as black_rules
 from pants.backend.python.lint.isort.rules import IsortConfigurations
 from pants.backend.python.lint.isort.rules import rules as isort_rules
 from pants.backend.python.lint.python_fmt import PythonFmtTargets, format_python_target
-from pants.backend.python.rules.targets import PythonLibrary
+from pants.backend.python.target_types import PythonLibrary
 from pants.base.specs import SingleAddress
 from pants.core.goals.fmt import LanguageFmtResults
 from pants.engine.addresses import Address

@@ -30,7 +30,6 @@ python_library(
     ':ossrh_publication_metadata',
     ':repository',
     ':scala_artifact',
-    'src/python/pants/backend/jvm/rules',
     'src/python/pants/backend/jvm/subsystems:jar_dependency_management',
     'src/python/pants/backend/jvm/subsystems:shader',
     'src/python/pants/backend/jvm/targets:all',
@@ -96,4 +95,16 @@ python_library(
     'src/python/pants/base:validation',
   ],
   tags = {"partially_type_checked"},
+)
+
+python_library(
+  name='target_types',
+  sources=['target_types.py'],
+  dependencies=[
+    'src/python/pants/backend/jvm/subsystems:shader',
+    'src/python/pants/engine:addresses',
+    'src/python/pants/engine:target',
+    'src/python/pants/java/jar',
+  ],
+  tags = {"type_checked"},
 )

@@ -14,7 +14,6 @@ from pants.contrib.python.checks.tasks.python_eval import PythonEval
 
 deprecated_module(
     removal_version="1.30.0.dev0",
-    deprecation_start_version="1.28.0.dev0",
     hint_message=(
         "The `pants.contrib.python.checks` will no longer be maintained as it has been superseded "
         "by more modern and powerful linters. To prepare, remove the "

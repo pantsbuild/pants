@@ -3,10 +3,11 @@
 
 import typing
 from dataclasses import dataclass
-from typing import Dict, Type
+from typing import Iterable, Mapping, Type
 
-from pants.util.meta import decorated_type_checkable
-from pants.util.ordered_set import OrderedSet
+from pants.util.frozendict import FrozenDict
+from pants.util.meta import decorated_type_checkable, frozen_after_init
+from pants.util.ordered_set import FrozenOrderedSet
 
 
 @decorated_type_checkable
@@ -48,11 +49,17 @@ def union(cls):
     )
 
 
-@dataclass(frozen=True)
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class UnionMembership:
-    union_rules: Dict[Type, OrderedSet[Type]]
+    union_rules: FrozenDict[Type, FrozenOrderedSet[Type]]
 
-    def is_member(self, union_type, putative_member):
+    def __init__(self, union_rules: Mapping[Type, Iterable[Type]]) -> None:
+        self.union_rules = FrozenDict(
+            {base: FrozenOrderedSet(members) for base, members in union_rules.items()}
+        )
+
+    def is_member(self, union_type: Type, putative_member: Type) -> bool:
         members = self.union_rules.get(union_type)
         if members is None:
             raise TypeError(f"Not a registered union type: {union_type}")

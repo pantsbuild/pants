@@ -8,7 +8,7 @@ from pants.backend.python.lint.docformatter.rules import (
     DocformatterConfigurations,
 )
 from pants.backend.python.lint.docformatter.rules import rules as docformatter_rules
-from pants.backend.python.rules.targets import PythonLibrary
+from pants.backend.python.target_types import PythonLibrary
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResult

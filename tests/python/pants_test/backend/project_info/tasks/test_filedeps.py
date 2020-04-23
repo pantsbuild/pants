@@ -177,7 +177,7 @@ class FileDepsTest(ConsoleTaskTestBase, AbstractTestGenerator):
                     "src/resources/lib/BUILD",
                     "src/resources/lib/data.json",
                     targets=[self.target("src/resources/lib")],
-                    options=dict(absolute=is_absolute),
+                    options=dict(absolute=is_absolute, transitive=True),
                 )
 
             def test_globs(self, is_absolute=is_absolute):
@@ -187,7 +187,7 @@ class FileDepsTest(ConsoleTaskTestBase, AbstractTestGenerator):
                     "src/java/core/BUILD",
                     "src/java/core/core*.java",
                     targets=[self.target("src/scala/core")],
-                    options=dict(globs=True, absolute=is_absolute),
+                    options=dict(globs=True, absolute=is_absolute, transitive=True),
                 )
 
             def test_globs_app(self, is_absolute=is_absolute):
@@ -207,7 +207,7 @@ class FileDepsTest(ConsoleTaskTestBase, AbstractTestGenerator):
                     "src/thrift/storage/BUILD",
                     "src/thrift/storage/data_types.thrift",
                     targets=[self.target("project:app")],
-                    options=dict(globs=True, absolute=is_absolute),
+                    options=dict(globs=True, absolute=is_absolute, transitive=True),
                 )
 
             def test_scala_java_cycle_scala_end(self, is_absolute=is_absolute):
@@ -218,7 +218,7 @@ class FileDepsTest(ConsoleTaskTestBase, AbstractTestGenerator):
                     "src/java/core/core1.java",
                     "src/java/core/core2.java",
                     targets=[self.target("src/scala/core")],
-                    options=dict(absolute=is_absolute),
+                    options=dict(absolute=is_absolute, transitive=True),
                 )
 
             def test_scala_java_cycle_java_end(self, is_absolute=is_absolute):
@@ -229,7 +229,7 @@ class FileDepsTest(ConsoleTaskTestBase, AbstractTestGenerator):
                     "src/java/core/core1.java",
                     "src/java/core/core2.java",
                     targets=[self.target("src/java/core")],
-                    options=dict(absolute=is_absolute),
+                    options=dict(absolute=is_absolute, transitive=True),
                 )
 
             def test_concrete_only(self, is_absolute=is_absolute):
@@ -246,7 +246,7 @@ class FileDepsTest(ConsoleTaskTestBase, AbstractTestGenerator):
                     "src/java/core/core1.java",
                     "src/java/core/core2.java",
                     targets=[self.target("src/java/lib")],
-                    options=dict(absolute=is_absolute),
+                    options=dict(absolute=is_absolute, transitive=True),
                 )
 
             def test_jvm_app(self, is_absolute=is_absolute):
@@ -267,7 +267,7 @@ class FileDepsTest(ConsoleTaskTestBase, AbstractTestGenerator):
                     "src/java/core/core1.java",
                     "src/java/core/core2.java",
                     targets=[self.target("project:app")],
-                    options=dict(absolute=is_absolute),
+                    options=dict(absolute=is_absolute, transitive=True),
                 )
 
             for test_name, test in sorted(locals().items()):

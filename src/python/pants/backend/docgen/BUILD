@@ -4,12 +4,12 @@
 
 python_library(
   name = 'plugin',
-  sources = ['register.py'],
   dependencies = [
-    'src/python/pants/backend/docgen/rules',
     'src/python/pants/backend/docgen/targets',
     'src/python/pants/backend/docgen/tasks',
     'src/python/pants/build_graph',
+    'src/python/pants/engine:addresses',
+    'src/python/pants/engine:target',
     'src/python/pants/goal:task_registrar',
   ],
   tags = {"partially_type_checked"},

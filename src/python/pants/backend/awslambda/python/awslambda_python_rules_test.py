@@ -9,8 +9,8 @@ from zipfile import ZipFile
 from pants.backend.awslambda.common.awslambda_common_rules import CreatedAWSLambda
 from pants.backend.awslambda.python.awslambda_python_rules import PythonAwsLambdaConfiguration
 from pants.backend.awslambda.python.awslambda_python_rules import rules as awslambda_python_rules
-from pants.backend.awslambda.python.targets import PythonAWSLambda
-from pants.backend.python.rules.targets import PythonLibrary
+from pants.backend.awslambda.python.target_types import PythonAWSLambda
+from pants.backend.python.target_types import PythonLibrary
 from pants.engine.addresses import Address
 from pants.engine.fs import FilesContent
 from pants.engine.rules import RootRule

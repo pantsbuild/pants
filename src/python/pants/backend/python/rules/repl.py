@@ -6,8 +6,8 @@ from pants.backend.python.rules.pex_from_targets import (
     PexFromTargetsRequest,
     TwoStepPexFromTargetsRequest,
 )
-from pants.backend.python.rules.targets import PythonSources
 from pants.backend.python.subsystems.ipython import IPython
+from pants.backend.python.target_types import PythonSources
 from pants.core.goals.repl import ReplBinary, ReplImplementation
 from pants.engine.addresses import Addresses
 from pants.engine.rules import rule, subsystem_rule

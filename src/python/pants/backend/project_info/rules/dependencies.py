@@ -5,8 +5,8 @@ import itertools
 from enum import Enum
 from typing import Set
 
-from pants.backend.jvm.rules.targets import JarsField
-from pants.backend.python.rules.targets import PythonRequirementsField
+from pants.backend.jvm.target_types import JarsField
+from pants.backend.python.target_types import PythonRequirementsField
 from pants.engine.addresses import Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented

@@ -11,7 +11,12 @@ from pants.backend.jvm.ossrh_publication_metadata import (
     Scm,
 )
 from pants.backend.jvm.repository import Repository as repo
-from pants.backend.jvm.rules.targets import (
+from pants.backend.jvm.scala_artifact import ScalaArtifact
+from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagementSetup
+from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
+from pants.backend.jvm.subsystems.scoverage_platform import ScoveragePlatform
+from pants.backend.jvm.subsystems.shader import Shading
+from pants.backend.jvm.target_types import (
     AnnotationProcessor,
     JarLibrary,
     JavaAgent,
@@ -29,11 +34,6 @@ from pants.backend.jvm.rules.targets import (
     ScalaLibrary,
     UnpackedJars,
 )
-from pants.backend.jvm.scala_artifact import ScalaArtifact
-from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagementSetup
-from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
-from pants.backend.jvm.subsystems.scoverage_platform import ScoveragePlatform
-from pants.backend.jvm.subsystems.shader import Shading
 from pants.backend.jvm.targets.annotation_processor import (
     AnnotationProcessor as AnnotationProcessorV1,
 )

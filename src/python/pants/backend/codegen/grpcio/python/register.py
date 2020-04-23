@@ -11,7 +11,7 @@ from pants.backend.codegen.grpcio.python.grpcio_run import GrpcioRun
 from pants.backend.codegen.grpcio.python.python_grpcio_library import (
     PythonGrpcioLibrary as PythonGrpcioLibraryV1,
 )
-from pants.backend.codegen.grpcio.python.targets import PythonGrpcioLibrary
+from pants.backend.codegen.grpcio.python.target_types import PythonGrpcioLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 

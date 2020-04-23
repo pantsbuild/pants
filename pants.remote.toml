@@ -20,7 +20,7 @@ remote_instance_name = "projects/pants-remoting-beta/instances/default_instance"
 remote_execution_extra_platform_properties = [
   # This allows network requests, e.g. to resolve dependencies with Pex.
   "dockerNetwork=standard",
-  "container-image=docker://gcr.io/pants-remoting-beta/rbe-remote-execution@sha256:5d818cd71c9180d977e16ca7a20e90ced14211621b69fe1d6c3fc4c42c537a14",
+  "container-image=docker://gcr.io/pants-remoting-beta/rbe-remote-execution@sha256:ec94526d1aa0604b7f693a0b1fb224ca7822a0d821ce20dff50ec808cad597b6",
 ]
 
 # This should correspond to the number of workers running in Google RBE. See
