@@ -435,10 +435,10 @@ impl<'t, R: Rule> GraphMaker<'t, R> {
         // If no candidates were fulfillable, this rule is not fulfillable.
         unfulfillable_diagnostics.push(Diagnostic {
           params: params.clone(),
-          // TODO(#9621): Link to up to a dedicated error page in the docs rewrite.
+          // TODO(#9621)
           reason: format!(
-            "No @rules return the type {}. If you expect to inject this type directly into the \
-            rule graph, rather than deriving it from other rules, then declare RootRule({}).",
+            "No rules can compute {}. If you expect to inject this type directly into the rule \
+              graph, rather than deriving it from other rules, then declare RootRule({}).",
             dependency_key, product,
           ),
           details: vec![],

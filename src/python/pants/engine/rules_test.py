@@ -402,8 +402,8 @@ class RuleGraphTest(TestBase):
     def cannot_compute_param_error(param: Type) -> str:
         param_str = param.__name__
         return (
-            f"No @rules return the type {param_str}. If you expect to inject this type directly "
-            "into the rule graph, rather than deriving it from other rules, then declare "
+            f"No rules can compute {param_str}. If you expect to inject this type directly into the "
+            "rule graph, rather than deriving it from other rules, then declare "
             f"RootRule({param_str})."
         )
 

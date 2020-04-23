@@ -24,7 +24,7 @@ fn create_and_validate_no_root() {
     .validate()
     .err()
     .unwrap()
-    .contains("No @rules return the type DependencyKey(\"b\", None)."));
+    .contains("No rules can compute DependencyKey(\"b\", None)."));
 }
 
 impl super::TypeId for &'static str {
