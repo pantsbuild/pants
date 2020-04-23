@@ -295,19 +295,22 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
         )
 
     def test_non_existing_root_fails_differently(self):
-        rules = [
-            upcast,
-        ]
+        rules = [upcast]
 
         with self.assertRaises(Exception) as cm:
             list(self.mk_scheduler(rules=rules, include_trace_on_error=False))
 
+        cannot_compute_param_error = (
+            f"No rules can compute MyInt. If you expect to inject this type directly into the "
+            "rule graph, rather than deriving it from other rules, then declare "
+            f"RootRule(MyInt)."
+        )
         self.assert_equal_with_printing(
             dedent(
                 f"""
                 Rules with errors: 1
                   {fmt_rule(upcast)}:
-                    No rule was available to compute MyInt. Maybe declare RootRule(MyInt)?
+                    {cannot_compute_param_error}
                 """
             ).strip(),
             str(cm.exception),

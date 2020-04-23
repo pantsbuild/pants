@@ -398,12 +398,21 @@ class GoalRuleValidation(TestBase):
 class RuleGraphTest(TestBase):
     maxDiff = None
 
+    @staticmethod
+    def cannot_compute_param_error(param: Type) -> str:
+        param_str = param.__name__
+        return (
+            f"No rules can compute {param_str}. If you expect to inject this type directly into the "
+            "rule graph, rather than deriving it from other rules, then declare "
+            f"RootRule({param_str})."
+        )
+
     def test_ruleset_with_missing_product_type(self):
         @rule
-        def a_from_b_noop(b: B) -> A:
+        def a_from_b(b: B) -> A:
             pass
 
-        rules = _suba_root_rules + [a_from_b_noop]
+        rules = [RootRule(SubA), a_from_b]
 
         with self.assertRaises(Exception) as cm:
             create_scheduler(rules)
@@ -412,8 +421,8 @@ class RuleGraphTest(TestBase):
             dedent(
                 f"""\
                 Rules with errors: 1
-                  {fmt_rule(a_from_b_noop)}:
-                    No rule was available to compute B with parameter type SubA
+                  {fmt_rule(a_from_b)}:
+                    {self.cannot_compute_param_error(B)}
                 """
             ).strip(),
             str(cm.exception),
@@ -477,8 +486,8 @@ class RuleGraphTest(TestBase):
                 f"""\
                 Rules with errors: 1
                   {fmt_rule(a_from_b_and_c)}:
-                    No rule was available to compute B with parameter type SubA
-                    No rule was available to compute C with parameter type SubA
+                    {self.cannot_compute_param_error(B)}
+                    {self.cannot_compute_param_error(C)}
                 """
             ).strip(),
             str(cm.exception),
@@ -514,9 +523,9 @@ class RuleGraphTest(TestBase):
                 f"""\
                 Rules with errors: 2
                   {fmt_rule(a_from_b)}:
-                    No rule was available to compute B with parameter type C
+                    {self.cannot_compute_param_error(B)}
                   {fmt_rule(b_from_suba)}:
-                    No rule was available to compute SubA with parameter type C
+                    {self.cannot_compute_param_error(SubA)}
                 """
             ).strip(),
             str(cm.exception),
@@ -546,7 +555,7 @@ class RuleGraphTest(TestBase):
                 f"""\
                 Rules with errors: 1
                   {fmt_rule(d_from_c)}:
-                    No rule was available to compute C with parameter type A
+                    {self.cannot_compute_param_error(C)}
                 """
             ).strip(),
             str(cm.exception),
@@ -585,9 +594,9 @@ class RuleGraphTest(TestBase):
                   {fmt_rule(a_from_c)}:
                     Was not reachable, either because no rules could produce the params or because it was shadowed by another @rule.
                   {fmt_rule(b_from_d)}:
-                    No rule was available to compute D with parameter type SubA
+                    {self.cannot_compute_param_error(D)}
                   {fmt_rule(d_from_a_and_suba, gets=[("A", "C")])}:
-                    No rule was available to compute A with parameter type SubA
+                    {self.cannot_compute_param_error(A)}
                 """
             ).strip(),
             str(cm.exception),
