@@ -7,7 +7,7 @@ from pants.base.deprecated import _deprecated_contrib_plugin
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 
-from pants.contrib.avro.rules.targets import JavaAvroLibrary
+from pants.contrib.avro.target_types import JavaAvroLibrary
 from pants.contrib.avro.targets.java_avro_library import JavaAvroLibrary as JavaAvroLibraryV1
 from pants.contrib.avro.tasks.avro_gen import AvroJavaGenTask
 

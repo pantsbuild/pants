@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 from typing import Iterable, List, Type
 
-from pants.backend.python.rules.targets import PythonSources
+from pants.backend.python.target_types import PythonSources
 from pants.core.goals.fmt import (
     FmtConfigurations,
     FmtResult,

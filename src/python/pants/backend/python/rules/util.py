@@ -8,7 +8,7 @@ from typing import Dict, Iterable, List, Optional, Set, Tuple, cast
 
 from pkg_resources import Requirement
 
-from pants.backend.python.rules.targets import PythonSources
+from pants.backend.python.target_types import PythonSources
 from pants.core.target_types import ResourcesSources
 from pants.core.util_rules.strip_source_roots import SourceRootStrippedSources
 from pants.engine.fs import FilesContent

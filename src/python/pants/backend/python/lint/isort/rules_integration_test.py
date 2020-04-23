@@ -5,7 +5,7 @@ from typing import List, Optional, Tuple
 
 from pants.backend.python.lint.isort.rules import IsortConfiguration, IsortConfigurations
 from pants.backend.python.lint.isort.rules import rules as isort_rules
-from pants.backend.python.rules.targets import PythonLibrary
+from pants.backend.python.target_types import PythonLibrary
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResult

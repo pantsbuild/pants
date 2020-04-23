@@ -8,6 +8,7 @@ python_library(
     ':pants_requirement',
     ':python_artifact',
     ':python_requirements',
+    ':target_types',
     'src/python/pants/backend/python/rules',
     'src/python/pants/backend/python/targets',
     'src/python/pants/backend/python/tasks',
@@ -83,3 +84,19 @@ python_library(
   tags = {"partially_type_checked"},
 )
 
+python_library(
+  name="target_types",
+  sources=["target_types.py"],
+  dependencies = [
+    ':python_artifact',
+    'src/python/pants/backend/python/targets',
+    'src/python/pants/core',
+    'src/python/pants/core/util_rules',
+    'src/python/pants/engine:addresses',
+    'src/python/pants/engine:fs',
+    'src/python/pants/engine:target',
+    'src/python/pants/fs',
+    'src/python/pants/python',
+  ],
+  tags={"type_checked"},
+)

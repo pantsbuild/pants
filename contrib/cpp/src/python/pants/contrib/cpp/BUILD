@@ -4,7 +4,7 @@
 contrib_plugin(
   name='plugin',
   dependencies=[
-    'contrib/cpp/src/python/pants/contrib/cpp/rules',
+    ':target_types',
     'contrib/cpp/src/python/pants/contrib/cpp/targets',
     'contrib/cpp/src/python/pants/contrib/cpp/tasks',
     'contrib/cpp/src/python/pants/contrib/cpp/toolchain',
@@ -16,4 +16,13 @@ contrib_plugin(
   build_file_aliases=True,
   register_goals=True,
   tags = {"partially_type_checked"},
+)
+
+python_library(
+  name='target_types',
+  sources=['target_types.py'],
+  dependencies=[
+    'src/python/pants/engine:target',
+  ],
+  tags = {"type_checked"},
 )

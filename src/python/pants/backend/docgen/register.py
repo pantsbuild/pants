@@ -3,7 +3,7 @@
 
 """Support for generating wiki-style documentation from Markdown and RST."""
 
-from pants.backend.docgen.rules.targets import Page
+from pants.backend.docgen.target_types import Page
 from pants.backend.docgen.targets.doc import Page as PageV1
 from pants.backend.docgen.targets.doc import Wiki, WikiArtifact
 from pants.backend.docgen.tasks.generate_pants_reference import GeneratePantsReference

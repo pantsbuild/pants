@@ -11,7 +11,7 @@ from pants.backend.jvm.targets.java_library import JavaLibrary as JavaLibraryV1
 from pants.backend.jvm.targets.jvm_app import JvmApp as JvmAppV1
 from pants.backend.jvm.targets.jvm_binary import JvmBinary as JvmBinaryV1
 from pants.backend.jvm.targets.scala_library import ScalaLibrary as ScalaLibraryV1
-from pants.backend.python.rules.targets import PythonLibrary
+from pants.backend.python.target_types import PythonLibrary
 from pants.backend.python.targets.python_library import PythonLibrary as PythonLibraryV1
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.resources import Resources as ResourcesV1

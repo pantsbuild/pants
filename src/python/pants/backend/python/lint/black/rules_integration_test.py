@@ -5,7 +5,7 @@ from typing import List, Optional, Tuple
 
 from pants.backend.python.lint.black.rules import BlackConfiguration, BlackConfigurations
 from pants.backend.python.lint.black.rules import rules as black_rules
-from pants.backend.python.rules.targets import PythonLibrary
+from pants.backend.python.target_types import PythonLibrary
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResult

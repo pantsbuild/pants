@@ -10,7 +10,7 @@ from pants.backend.codegen.ragel.java.java_ragel_library import (
     JavaRagelLibrary as JavaRagelLibraryV1,
 )
 from pants.backend.codegen.ragel.java.ragel_gen import RagelGen
-from pants.backend.codegen.ragel.java.targets import JavaRagelLibrary
+from pants.backend.codegen.ragel.java.target_types import JavaRagelLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 

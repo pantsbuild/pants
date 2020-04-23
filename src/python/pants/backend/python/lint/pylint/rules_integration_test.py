@@ -7,7 +7,7 @@ from typing import List, Optional
 
 from pants.backend.python.lint.pylint.rules import PylintConfiguration, PylintConfigurations
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
-from pants.backend.python.rules.targets import PythonInterpreterCompatibility, PythonLibrary
+from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonLibrary
 from pants.backend.python.targets.python_library import PythonLibrary as PythonLibraryV1
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.build_file_aliases import BuildFileAliases

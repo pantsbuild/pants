@@ -5,7 +5,7 @@ from typing import List, Optional
 
 from pants.backend.python.lint.bandit.rules import BanditConfiguration, BanditConfigurations
 from pants.backend.python.lint.bandit.rules import rules as bandit_rules
-from pants.backend.python.rules.targets import PythonInterpreterCompatibility, PythonLibrary
+from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonLibrary
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.core.goals.lint import LintResult
 from pants.engine.addresses import Address

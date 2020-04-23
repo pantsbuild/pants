@@ -19,9 +19,9 @@ from pants.backend.python.rules.pex import (
     PexRequest,
     PexRequirements,
 )
-from pants.backend.python.rules.targets import PythonSources
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.backend.python.target_types import PythonSources
 from pants.core.goals.test import (
     ConsoleCoverageReport,
     CoverageData,
