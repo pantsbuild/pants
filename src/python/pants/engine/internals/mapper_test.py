@@ -20,13 +20,15 @@ from pants.engine.internals.mapper import (
     AddressMapper,
     DifferingFamiliesError,
 )
-from pants.engine.internals.parser import HydratedStruct, SymbolTable
+from pants.engine.internals.parser import BuildFilePreludeSymbols, HydratedStruct, SymbolTable
 from pants.engine.internals.scheduler_test_base import SchedulerTestBase
 from pants.engine.internals.struct import Struct
 from pants.engine.rules import rule
 from pants.engine.selectors import Get, MultiGet
+from pants.option.global_options import BuildFileImportsBehavior
 from pants.testutil.engine.util import TARGET_TABLE, Target
 from pants.util.dirutil import safe_open
+from pants.util.frozendict import FrozenDict
 
 
 class Thing:
@@ -49,7 +51,9 @@ class AddressMapTest(unittest.TestCase):
     @contextmanager
     def parse_address_map(self, json):
         path = "/dev/null"
-        address_map = AddressMap.parse(path, json, self._parser)
+        address_map = AddressMap.parse(
+            path, json, self._parser, BuildFilePreludeSymbols(FrozenDict())
+        )
         self.assertEqual(path, address_map.path)
         yield address_map
 
@@ -162,7 +166,10 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
     def setUp(self) -> None:
         # Set up a scheduler that supports address mapping.
         address_mapper = AddressMapper(
-            parser=JsonParser(TARGET_TABLE), build_patterns=("*.BUILD.json",)
+            parser=JsonParser(TARGET_TABLE),
+            prelude_glob_patterns=(),
+            build_file_imports_behavior=BuildFileImportsBehavior.error,
+            build_patterns=("*.BUILD.json",),
         )
 
         # We add the `unhydrated_structs` rule because it is otherwise not used in the core engine.

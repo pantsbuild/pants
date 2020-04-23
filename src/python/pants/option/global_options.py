@@ -720,6 +720,17 @@ class GlobalOptions(Subsystem):
         )
 
         register(
+            "--build-file-prelude-globs",
+            advanced=True,
+            type=list,
+            default=[],
+            help="Python files to evaluate and whose symbols should be exposed to all BUILD files ."
+            "This allows for writing functions which create multiple rules, or set default "
+            "arguments for rules. The order these files will be evaluated is undefined - they should not rely on each "
+            "other, or override symbols from each other.",
+        )
+
+        register(
             "--local-store-dir",
             advanced=True,
             help="Directory to use for engine's local file store.",
