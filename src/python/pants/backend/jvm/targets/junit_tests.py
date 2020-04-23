@@ -88,8 +88,8 @@ class JUnitTests(RuntimePlatformMixin, JvmTarget):
             raise TargetDefinitionException(
                 self, "Cannot specify runtime_platform and test_platform together."
             )
-        if "test_platform" in kwargs and "runtime_platform" not in kwargs:
-            kwargs["runtime_platform"] = kwargs["test_platform"]
+        if "test_platform" in kwargs and not runtime_platform:
+            runtime_platform = kwargs["test_platform"]
             del kwargs["test_platform"]
 
         payload.add_fields(
