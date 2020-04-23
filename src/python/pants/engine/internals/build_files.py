@@ -6,7 +6,7 @@ import os.path
 import tokenize
 from collections.abc import Mapping
 from io import StringIO
-from typing import Dict
+from typing import Any, Dict
 
 from pants.base.exceptions import ResolveError
 from pants.base.project_tree import Dir
@@ -24,11 +24,12 @@ from pants.engine.fs import Digest, FilesContent, PathGlobs, Snapshot
 from pants.engine.internals.addressable import AddressableDescriptor
 from pants.engine.internals.mapper import AddressFamily, AddressMap, AddressMapper
 from pants.engine.internals.objects import Locatable, SerializableFactory, Validatable
-from pants.engine.internals.parser import HydratedStruct, ParseError
+from pants.engine.internals.parser import BuildFilePreludeSymbols, HydratedStruct, ParseError
 from pants.engine.internals.struct import Struct
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
-from pants.option.global_options import BuildFileImportsBehavior
+from pants.option.global_options import BuildFileImportsBehavior, GlobMatchErrorBehavior
+from pants.util.frozendict import FrozenDict
 from pants.util.objects import TypeConstraintError
 from pants.util.ordered_set import OrderedSet
 
@@ -43,11 +44,41 @@ def _key_func(entry):
 
 
 @rule
-async def parse_address_family(address_mapper: AddressMapper, directory: Dir) -> AddressFamily:
+async def evalute_preludes(address_mapper: AddressMapper) -> BuildFilePreludeSymbols:
+    snapshot = await Get[Snapshot](
+        PathGlobs(
+            address_mapper.prelude_glob_patterns,
+            glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
+        )
+    )
+    prelude_files_content = await Get[FilesContent](Digest, snapshot.directory_digest)
+    values: Dict[str, Any] = {}
+    for file_content in prelude_files_content:
+        try:
+            file_content_str = file_content.content.decode()
+            content = compile(file_content_str, file_content.path, "exec")
+            exec(content, values)
+        except Exception as e:
+            raise Exception(f"Error parsing prelude file {file_content.path}: {e}")
+        error_on_imports(
+            file_content_str, file_content.path, address_mapper.build_file_imports_behavior
+        )
+    # __builtins__ is a dict, so isn't hashable, and can't be put in a FrozenDict.
+    # Fortunately, we don't care about it - preludes should not be able to override builtins, so we just pop it out.
+    # TODO: Give a nice error message if a prelude tries to set a expose a non-hashable value.
+    values.pop("__builtins__", None)
+    return BuildFilePreludeSymbols(FrozenDict(values))
+
+
+@rule
+async def parse_address_family(
+    address_mapper: AddressMapper, prelude_symbols: BuildFilePreludeSymbols, directory: Dir
+) -> AddressFamily:
     """Given an AddressMapper and a directory, return an AddressFamily.
 
     The AddressFamily may be empty, but it will not be None.
     """
+
     path_globs = PathGlobs(
         globs=(
             *(os.path.join(directory.path, p) for p in address_mapper.build_patterns),
@@ -65,7 +96,10 @@ async def parse_address_family(address_mapper: AddressMapper, directory: Dir) ->
     for filecontent_product in files_content:
         address_maps.append(
             AddressMap.parse(
-                filecontent_product.path, filecontent_product.content, address_mapper.parser
+                filecontent_product.path,
+                filecontent_product.content,
+                address_mapper.parser,
+                prelude_symbols,
             )
         )
     return AddressFamily.create(directory.path, address_maps)
@@ -336,6 +370,7 @@ def create_graph_rules(address_mapper: AddressMapper):
         parse_address_family,
         find_build_file,
         find_build_files,
+        evalute_preludes,
         # AddressSpec handling: locate directories that contain build files, and request
         # AddressFamilies for each of them.
         addresses_with_origins_from_address_families,

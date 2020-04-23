@@ -11,7 +11,7 @@ from pants.base.parse_context import ParseContext
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.internals.build_files import error_on_imports
 from pants.engine.internals.objects import Serializable
-from pants.engine.internals.parser import Parser, SymbolTable
+from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, SymbolTable
 from pants.engine.legacy.structs import BundleAdaptor, TargetAdaptor
 from pants.option.global_options import BuildFileImportsBehavior
 from pants.util.memo import memoized_property
@@ -111,7 +111,24 @@ class LegacyPythonCallbacksParser(Parser):
 
         return symbols, parse_context
 
-    def parse(self, filepath: str, filecontent: bytes):
+    def _make_symbols(self, extra_symbols: BuildFilePreludeSymbols):
+        """Make a full dict of symbols to expose as globals to the BUILD file.
+
+        This is subtle; functions have their own globals set on __globals__ which they derive from
+        the environment where they were executed. So for each extra_symbol which comes from a
+        separate execution environment, we need to to add all of our self._symbols to those
+        __globals__, otherwise those extra symbols will not see our target aliases etc. This also
+        means that if multiple prelude files are present, they probably cannot see each others'
+        symbols. We may choose to change this at some point.
+        """
+        d = dict(self._symbols)
+        for key, value in extra_symbols.symbols.items():
+            if hasattr(value, "__globals__"):
+                value.__globals__.update(d)
+            d[key] = value
+        return d
+
+    def parse(self, filepath: str, filecontent: bytes, extra_symbols: BuildFilePreludeSymbols):
         python = filecontent.decode()
 
         # Mutate the parse context for the new path, then exec, and copy the resulting objects.
@@ -120,7 +137,7 @@ class LegacyPythonCallbacksParser(Parser):
         # _intentional_ mutation would require a deep clone, which doesn't seem worth the cost at
         # this juncture.
         self._parse_context._storage.clear(os.path.dirname(filepath))
-        exec(python, dict(self._symbols))
+        exec(python, self._make_symbols(extra_symbols))
 
         error_on_imports(python, filepath, self._build_file_imports_behavior)
 

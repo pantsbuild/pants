@@ -8,6 +8,8 @@ from textwrap import dedent
 from pants.engine.internals import parser
 from pants.engine.internals.examples import parsers
 from pants.engine.internals.objects import Resolvable
+from pants.engine.internals.parser import BuildFilePreludeSymbols
+from pants.util.frozendict import FrozenDict
 
 
 # A duck-typed Serializable with an `==` suitable for ease of testing.
@@ -34,14 +36,14 @@ TEST_TABLE = parser.SymbolTable({"bob": Bob})
 TEST_TABLE2 = parser.SymbolTable({"nancy": Bob})
 
 
-def parse(parser, document, **args):
-    return parser.parse("/dev/null", document, **args)
+def parse(parser, document):
+    return parser.parse("/dev/null", document, BuildFilePreludeSymbols(FrozenDict()))
 
 
 class JsonParserTest(unittest.TestCase):
-    def parse(self, document, symbol_table=None, **kwargs):
+    def parse(self, document, symbol_table=None):
         symbol_table = symbol_table or EMPTY_TABLE
-        return parse(parsers.JsonParser(symbol_table), document, **kwargs)
+        return parse(parsers.JsonParser(symbol_table), document)
 
     def round_trip(self, obj, symbol_table=None):
         document = parsers.encode_json(obj, inline=True)
@@ -240,7 +242,9 @@ class JsonParserTest(unittest.TestCase):
         ).strip()
         filepath = "/dev/null"
         with self.assertRaises(parser.ParseError) as exc:
-            parsers.JsonParser(EMPTY_TABLE).parse(filepath, document)
+            parsers.JsonParser(EMPTY_TABLE).parse(
+                filepath, document, BuildFilePreludeSymbols(FrozenDict())
+            )
 
         # Strip trailing whitespace from the message since our expected literal below will have
         # trailing ws stripped via editors and code reviews calling for it.

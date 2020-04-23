@@ -62,7 +62,7 @@ class JsonParser(Parser):
         )
         return JSONDecoder(object_hook=decoder, strict=True)
 
-    def parse(self, filepath, filecontent):
+    def parse(self, filepath, filecontent, _extra_symbols):
         """Parse the given json encoded string into a list of top-level objects found.
 
         The parser accepts both blank lines and comment lines (those beginning with optional whitespace
@@ -225,7 +225,7 @@ class PythonAssignmentsParser(Parser):
             parse_globals[alias] = functools.partial(aliased, alias, symbol)
         return parse_globals
 
-    def parse(self, filepath, filecontent):
+    def parse(self, filepath, filecontent, _extra_symbols):
         parse_globals = self._globals
 
         python = filecontent
@@ -287,7 +287,7 @@ class PythonCallbacksParser(Parser):
             parse_globals[alias] = functools.partial(registered, alias, symbol)
         return objects, parse_globals
 
-    def parse(self, filepath, filecontent):
+    def parse(self, filepath, filecontent, _extra_symbols):
         objects, parse_globals = self._globals
 
         python = filecontent
