@@ -345,10 +345,10 @@ impl WrappedNode for MultiPlatformExecuteProcess {
 
   fn run(self, context: Context) -> NodeFuture<ProcessResult> {
     let request = self.0;
-    let execution_context = process_execution::Context {
-      workunit_store: context.session.workunit_store(),
-      build_id: context.session.build_id().to_string(),
-    };
+    let execution_context = process_execution::Context::new(
+      context.session.workunit_store(),
+      context.session.build_id().to_string(),
+    );
     if context
       .core
       .command_runner

@@ -349,8 +349,17 @@ impl AddAssign<UploadSummary> for ExecutionStats {
 
 #[derive(Clone, Default)]
 pub struct Context {
-  pub workunit_store: WorkUnitStore,
-  pub build_id: String,
+  workunit_store: WorkUnitStore,
+  build_id: String,
+}
+
+impl Context {
+  pub fn new(workunit_store: WorkUnitStore, build_id: String) -> Context {
+    Context {
+      workunit_store,
+      build_id
+    }
+  }
 }
 
 pub trait CommandRunner: Send + Sync {
