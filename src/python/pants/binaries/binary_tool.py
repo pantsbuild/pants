@@ -17,7 +17,7 @@ from pants.engine.fs import Digest, PathGlobs, PathGlobsAndRoot, Snapshot, UrlTo
 from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
-from pants.fs.archive import XZCompressedTarArchiver, create_archiver
+from pants.fs.archive import create_archiver
 from pants.subsystem.subsystem import Subsystem
 from pants.util.enums import match
 from pants.util.memo import memoized_method, memoized_property
@@ -114,31 +114,12 @@ class BinaryToolBase(Subsystem):
 
     @classmethod
     def subsystem_dependencies(cls):
-        sub_deps = super().subsystem_dependencies() + (BinaryUtil.Factory,)
-
-        # TODO: if we need to do more conditional subsystem dependencies, do it declaratively with a
-        # dict class field so that we only try to create or access it if we declared a dependency on it.
-        if cls.archive_type == "txz":
-            sub_deps = sub_deps + (XZ.scoped(cls),)
-
-        return sub_deps
-
-    @memoized_property
-    def _xz(self):
-        if self.archive_type == "txz":
-            return XZ.scoped_instance(self)
-        return None
+        return super().subsystem_dependencies() + (BinaryUtil.Factory,)
 
     @memoized_method
     def _get_archiver(self):
         if not self.archive_type:
             return None
-
-        # This forces downloading and extracting the `XZ` archive if any BinaryTool with a 'txz'
-        # archive_type is used, but that's fine, because unless the cache is manually changed we won't
-        # do more work than necessary.
-        if self.archive_type == "txz":
-            return self._xz.tar_xz_extractor
 
         return create_archiver(self.archive_type)
 
@@ -300,19 +281,6 @@ class Script(BinaryToolBase):
     """
 
     platform_dependent = False
-
-
-class XZ(NativeTool):
-    options_scope = "xz"
-    default_version = "5.2.4-3"
-    archive_type = "tgz"
-
-    @memoized_property
-    def tar_xz_extractor(self):
-        return XZCompressedTarArchiver(self._executable_location())
-
-    def _executable_location(self):
-        return os.path.join(self.select(), "bin", "xz")
 
 
 @frozen_after_init

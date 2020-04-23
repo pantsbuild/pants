@@ -319,6 +319,11 @@ class SingleFileExecutable:
 
 
 @dataclass(frozen=True)
+class ExpandedArchive:
+    digest: Digest
+
+
+@dataclass(frozen=True)
 class SourcesSnapshot:
     """Sources matched by command line specs, either directly via FilesystemSpecs or indirectly via
     AddressSpecs.
