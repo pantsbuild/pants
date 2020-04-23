@@ -4,11 +4,10 @@
 contrib_plugin(
   name='plugin',
   dependencies=[
+    ':target_types',
     'contrib/jax_ws/src/python/pants/contrib/jax_ws/targets',
     'contrib/jax_ws/src/python/pants/contrib/jax_ws/tasks',
-    'src/python/pants/backend/jvm:target_types',
     'src/python/pants/build_graph',
-    'src/python/pants/engine:target',
     'src/python/pants/goal:task_registrar',
   ],
   distribution_name='pantsbuild.pants.contrib.jax_ws',
@@ -16,4 +15,14 @@ contrib_plugin(
   build_file_aliases=True,
   register_goals=True,
   tags = {"partially_type_checked"},
+)
+
+python_library(
+  name='target_types',
+  sources=['target_types.py'],
+  dependencies=[
+    'src/python/pants/backend/jvm:target_types',
+    'src/python/pants/engine:target',
+  ],
+  tags = {"type_checked"},
 )

@@ -4,12 +4,12 @@
 contrib_plugin(
   name='plugin',
   dependencies=[
+    ':target_types',
     'contrib/node/src/python/pants/contrib/node:plugin',
     'contrib/scalajs/src/python/pants/contrib/scalajs/subsystems',
     'contrib/scalajs/src/python/pants/contrib/scalajs/targets',
     'contrib/scalajs/src/python/pants/contrib/scalajs/tasks',
     'src/python/pants/build_graph',
-    'src/python/pants/engine:target',
     'src/python/pants/goal:task_registrar',
   ],
   tags = {'partially_type_checked'},
@@ -18,4 +18,14 @@ contrib_plugin(
   build_file_aliases=True,
   register_goals=True,
   global_subsystems=True
+)
+
+python_library(
+  name='target_types',
+  sources=['target_types.py'],
+  dependencies=[
+    'contrib/node/src/python/pants/contrib/node:target_types',
+    'src/python/pants/engine:target',
+  ],
+  tags = {"type_checked"},
 )
