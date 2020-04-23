@@ -64,5 +64,5 @@ def global_subsystems():
     return (NodePreinstalledModuleResolver, NpmResolver)
 
 
-def targets2():
+def target_types():
     return [NodeBundle, NodeModule, NodePreinstalledModule, NodeRemoteModule, NodeTest]

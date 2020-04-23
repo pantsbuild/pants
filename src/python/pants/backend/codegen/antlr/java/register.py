@@ -23,5 +23,5 @@ def register_goals():
     task(name="antlr-java", action=AntlrJavaGen).install("gen")
 
 
-def targets2():
+def target_types():
     return [JavaAntlrLibrary]

@@ -420,9 +420,6 @@ class PythonRequirementsFileSources(FilesSources):
     pass
 
 
-# TODO: filter out private targets from `./pants target-types2`? Simply check for `_`. This
-#  probably depends on how common this private target pattern will end being, which is unclear now
-#  that we have Configurations for ad hoc, internal combinations of fields.
 class PythonRequirementsFile(Target):
     """A private, helper target type for requirements.txt files."""
 

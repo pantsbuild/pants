@@ -29,5 +29,5 @@ def register_goals():
     task(name="cpp", action=CppRun).install("run")
 
 
-def targets2():
+def target_types():
     return [CppBinary, CppLibrary]

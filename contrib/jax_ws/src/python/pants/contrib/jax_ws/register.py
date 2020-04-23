@@ -23,5 +23,5 @@ def register_goals():
     task(name="jax-ws", action=JaxWsGen).install("gen")
 
 
-def targets2():
+def target_types():
     return [JaxWsLibrary]

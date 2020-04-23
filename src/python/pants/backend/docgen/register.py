@@ -28,5 +28,5 @@ def register_goals():
     task(name="reference", action=GeneratePantsReference).install()
 
 
-def targets2():
+def target_types():
     return [Page]

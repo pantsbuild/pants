@@ -101,7 +101,7 @@ def test_list_all() -> None:
         Target types
         ------------
 
-        Use `./pants target-types2 --details=$target_type` to get detailed information
+        Use `./pants target-types --details=$target_type` to get detailed information
         for a particular target type.
 
 

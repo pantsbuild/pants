@@ -340,5 +340,5 @@ def build_file_aliases():
     )
 
 
-def targets2():
+def target_types():
     return [PantsPlugin, ContribPlugin]

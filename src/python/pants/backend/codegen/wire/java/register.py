@@ -18,5 +18,5 @@ def register_goals():
     task(name="wire", action=WireGen).install("gen")
 
 
-def targets2():
+def target_types():
     return [JavaWireLibrary]

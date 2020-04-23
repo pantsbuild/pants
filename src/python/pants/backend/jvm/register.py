@@ -263,7 +263,7 @@ def register_goals():
     )
 
 
-def targets2():
+def target_types():
     return [
         AnnotationProcessor,
         JvmBenchmark,

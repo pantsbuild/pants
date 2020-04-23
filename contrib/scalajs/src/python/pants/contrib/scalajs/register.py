@@ -37,5 +37,5 @@ def global_subsystems():
     return {ScalaJSPlatform}
 
 
-def targets2():
+def target_types():
     return [ScalaJSBinary, ScalaJSLibrary]

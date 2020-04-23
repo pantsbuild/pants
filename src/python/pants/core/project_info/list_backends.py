@@ -81,10 +81,9 @@ class BackendInfo:
         stripped_path = file_content.path[len(source_root.path) + 1 :]
         module_name = os.path.dirname(stripped_path).replace(os.sep, ".")
 
-        v1_entry_points = ("register_goals", "global_subsystems", "build_file_aliases")
-        # NB: We intentionally do not check for `targets2` because even V1 is expected to have
-        # Target API bindings.
-        v2_entry_points = ("rules", "build_file_aliases2")
+        # NB: Both `build_file_aliases` and `target_types` are used by both V1 and V2.
+        v1_entry_points = ("register_goals", "global_subsystems")
+        v2_entry_points = ("rules",)
 
         def any_entry_points_registered(entry_points: Sequence[str]) -> bool:
             return any(

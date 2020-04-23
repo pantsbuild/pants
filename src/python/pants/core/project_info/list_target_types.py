@@ -33,9 +33,7 @@ from pants.util.objects import get_docstring, get_docstring_summary, pretty_prin
 class TargetTypesOptions(LineOriented, GoalSubsystem):
     """List all the registered target types, including custom plugin types."""
 
-    # TODO: drop the `2` once we settle on this name. Consider a more general goal like
-    #  `symbols --type=targets`.
-    name = "target-types2"
+    name = "target-types"
 
     @classmethod
     def register_options(cls, register):
@@ -243,7 +241,7 @@ def list_target_types(
             lines = [
                 f"\n{title}\n",
                 textwrap.fill(
-                    "Use `./pants target-types2 --details=$target_type` to get detailed "
+                    "Use `./pants target-types --details=$target_type` to get detailed "
                     "information for a particular target type.",
                     80,
                 ),
