@@ -298,7 +298,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
             list(self.mk_scheduler(rules=rules, include_trace_on_error=False))
 
         cannot_compute_param_error = (
-            f"No rules can compute MyInt. If you expect to inject this type directly into the "
+            f"No @rules return the type MyInt. If you expect to inject this type directly into the "
             "rule graph, rather than deriving it from other rules, then declare "
             f"RootRule(MyInt)."
         )
