@@ -297,7 +297,7 @@ impl Core {
 
 #[derive(Clone)]
 pub struct Context {
-  entry_id: Option<EntryId>,
+  pub entry_id: Option<EntryId>,
   pub core: Arc<Core>,
   pub session: Session,
 }

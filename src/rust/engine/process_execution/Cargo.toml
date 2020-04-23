@@ -19,6 +19,7 @@ futures01 = { package = "futures", version = "0.1" }
 futures = { version = "0.3", features = ["compat"] }
 # TODO: This is 0.5.1 + https://github.com/tikv/grpc-rs/pull/457.
 grpcio = { git = "https://github.com/pantsbuild/grpc-rs.git", rev = "d16fcfb4afbdd4c791e7c7e64e9748319ed8ad70", default_features = false, features = ["protobuf-codec", "secure"] }
+graph = { path = "../graph" }
 hashing = { path = "../hashing" }
 libc = "0.2.39"
 log = "0.4"

@@ -348,6 +348,7 @@ impl WrappedNode for MultiPlatformExecuteProcess {
     let execution_context = process_execution::Context::new(
       context.session.workunit_store(),
       context.session.build_id().to_string(),
+      context.entry_id.clone(),
     );
     if context
       .core

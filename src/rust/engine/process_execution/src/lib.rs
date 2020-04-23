@@ -38,6 +38,7 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 use store::UploadSummary;
+use graph::EntryId;
 use workunit_store::{new_span_id, scope_task_workunit_state, WorkUnitStore, WorkunitMetadata};
 
 use futures::compat::Future01CompatExt;
@@ -351,13 +352,15 @@ impl AddAssign<UploadSummary> for ExecutionStats {
 pub struct Context {
   workunit_store: WorkUnitStore,
   build_id: String,
+  entry_id: Option<EntryId>,
 }
 
 impl Context {
-  pub fn new(workunit_store: WorkUnitStore, build_id: String) -> Context {
+  pub fn new(workunit_store: WorkUnitStore, build_id: String, entry_id: Option<EntryId>) -> Context {
     Context {
       workunit_store,
-      build_id
+      build_id,
+      entry_id,
     }
   }
 }
@@ -433,10 +436,8 @@ impl CommandRunner for BoundedCommandRunner {
     context: Context,
   ) -> BoxFuture<FallibleProcessResultWithPlatform, String> {
     let inner = self.inner.clone();
-    self
-      .inner
-      .1
-      .clone()
+    let semaphor = self.inner.1.clone();
+    semaphor
       .with_acquired(move || {
         let mut workunit_state = workunit_store::expect_workunit_state();
         let name = format!(
