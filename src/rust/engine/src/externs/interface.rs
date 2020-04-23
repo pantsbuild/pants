@@ -30,8 +30,6 @@
   clippy::transmute_ptr_to_ptr,
   clippy::zero_ptr
 )]
-// There are some large async-await types generated here. Nothing to worry about?
-#![type_length_limit = "2066838"]
 
 ///
 /// This crate is a wrapper around the engine crate which exposes a python module via cpython.
@@ -45,7 +43,7 @@ use cpython::{
   PyObject, PyResult as CPyResult, PyString, PyTuple, PyType, Python, PythonObject, ToPyObject,
 };
 
-use engine::{
+use crate::{
   externs, nodes, Core, ExecutionRequest, ExecutionTermination, Failure, Function, Intrinsics,
   Params, Rule, Scheduler, Session, Tasks, Types, Value,
 };
@@ -71,9 +69,6 @@ use std::time::Duration;
 
 use tempfile::TempDir;
 use workunit_store::{Workunit, WorkunitState};
-
-#[cfg(test)]
-mod tests;
 
 py_exception!(native_engine, PollTimeout);
 
@@ -1049,7 +1044,7 @@ fn decompress_tarball(py: Python, tar_path: String, output_dir: String) -> PyUni
 
 fn graph_len(py: Python, scheduler_ptr: PyScheduler) -> CPyResult<u64> {
   with_scheduler(py, scheduler_ptr, |scheduler| {
-    Ok(scheduler.core.graph.len() as u64)
+    py.allow_threads(|| Ok(scheduler.core.graph.len() as u64))
   })
 }
 
@@ -1136,7 +1131,7 @@ fn rule_subgraph_visualize(
   })
 }
 
-fn generate_panic_string(payload: &(dyn Any + Send)) -> String {
+pub(crate) fn generate_panic_string(payload: &(dyn Any + Send)) -> String {
   match payload
     .downcast_ref::<String>()
     .cloned()

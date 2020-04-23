@@ -32,10 +32,10 @@
 
 mod context;
 mod core;
-pub mod externs;
+mod externs;
 mod interning;
 mod intrinsics;
-pub mod nodes;
+mod nodes;
 mod scheduler;
 mod selectors;
 mod tasks;

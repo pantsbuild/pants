@@ -8,6 +8,10 @@
   clippy::zero_ptr
 )]
 
+mod interface;
+#[cfg(test)]
+mod interface_tests;
+
 use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::atomic;

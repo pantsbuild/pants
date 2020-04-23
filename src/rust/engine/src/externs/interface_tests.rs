@@ -1,4 +1,5 @@
-use crate::generate_panic_string;
+use crate::externs::interface::generate_panic_string;
+
 use std::any::Any;
 
 #[test]

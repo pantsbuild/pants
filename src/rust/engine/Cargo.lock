@@ -829,6 +829,7 @@ dependencies = [
  "sharded_lmdb 0.0.1",
  "smallvec 0.6.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "store 0.1.0",
+ "tar_api 0.0.1",
  "task_executor 0.0.1",
  "tempfile 3.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "testutil 0.0.1",
@@ -838,27 +839,6 @@ dependencies = [
  "url 2.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "uuid 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "watch 0.0.1",
- "workunit_store 0.0.1",
-]
-
-[[package]]
-name = "engine_cffi"
-version = "0.0.1"
-dependencies = [
- "cpython 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "engine 0.0.1",
- "futures 0.1.29 (registry+https://github.com/rust-lang/crates.io-index)",
- "futures 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "hashing 0.0.1",
- "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "logging 0.0.1",
- "nailgun 0.0.1",
- "rule_graph 0.0.1",
- "store 0.1.0",
- "tar_api 0.0.1",
- "task_executor 0.0.1",
- "tempfile 3.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "tokio 0.2.20 (registry+https://github.com/rust-lang/crates.io-index)",
  "workunit_store 0.0.1",
 ]
 
