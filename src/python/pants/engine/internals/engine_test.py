@@ -279,10 +279,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
         )
 
     def test_illegal_root_selection(self):
-        rules = [
-            RootRule(B),
-        ]
-
+        rules = [RootRule(B)]
         scheduler = self.scheduler(rules, include_trace_on_error=False)
 
         # No rules are available to compute A.
@@ -290,7 +287,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
             list(scheduler.product_request(A, subjects=[(B())]))
 
         self.assert_equal_with_printing(
-            """No installed @rules return the type A. Is the @rule that you're expecting to run registered?""",
+            "No installed @rules return the type A. Is the @rule that you're expecting to run registered?",
             str(cm.exception),
         )
 
@@ -309,6 +306,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
             dedent(
                 f"""
                 Rules with errors: 1
+
                   {fmt_rule(upcast)}:
                     {cannot_compute_param_error}
                 """

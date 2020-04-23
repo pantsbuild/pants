@@ -1089,9 +1089,9 @@ impl<R: Rule> RuleGraph<R> {
     msgs.sort();
 
     Err(format!(
-      "Rules with errors: {}\n  {}",
+      "Rules with errors: {}\n\n  {}",
       msgs.len(),
-      msgs.join("\n  ")
+      msgs.join("\n\n  ")
     ))
   }
 
