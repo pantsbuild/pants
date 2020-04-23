@@ -1,8 +1,11 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import logging
 import os.path
+import tokenize
 from collections.abc import Mapping
+from io import StringIO
 from typing import Dict
 
 from pants.base.exceptions import ResolveError
@@ -21,10 +24,11 @@ from pants.engine.fs import Digest, FilesContent, PathGlobs, Snapshot
 from pants.engine.internals.addressable import AddressableDescriptor
 from pants.engine.internals.mapper import AddressFamily, AddressMap, AddressMapper
 from pants.engine.internals.objects import Locatable, SerializableFactory, Validatable
-from pants.engine.internals.parser import HydratedStruct
+from pants.engine.internals.parser import HydratedStruct, ParseError
 from pants.engine.internals.struct import Struct
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
+from pants.option.global_options import BuildFileImportsBehavior
 from pants.util.objects import TypeConstraintError
 from pants.util.ordered_set import OrderedSet
 
@@ -281,6 +285,41 @@ def _address_spec_to_globs(address_mapper: AddressMapper, address_specs: Address
     for address_spec in address_specs:
         patterns.update(address_spec.make_glob_patterns(address_mapper))
     return PathGlobs(globs=(*patterns, *(f"!{p}" for p in address_mapper.build_ignore_patterns)))
+
+
+def error_on_imports(
+    build_file_content: str, filepath: str, behavior: BuildFileImportsBehavior
+) -> None:
+    # Perform this check after successful execution, so we know the python is valid (and should
+    # tokenize properly!)
+    # Note that this is incredibly poor sandboxing. There are many ways to get around it.
+    # But it's sufficient to tell most users who aren't being actively malicious that they're doing
+    # something wrong, and it has a low performance overhead.
+    if "import" in build_file_content:
+        io_wrapped_python = StringIO(build_file_content)
+        for token in tokenize.generate_tokens(io_wrapped_python.readline):
+            token_str = token[1]
+            lineno, _ = token[2]
+
+            if token_str != "import":
+                continue
+
+            if behavior == BuildFileImportsBehavior.warn:
+                logger = logging.getLogger(__name__)
+                logger.warning(
+                    f"Import used in {filepath} at line {lineno}. Import statements should "
+                    f"be avoided in BUILD files because they can easily break Pants caching and lead to "
+                    f"stale results. Instead, consider rewriting your code into a Pants plugin: "
+                    f"https://www.pantsbuild.org/howto_plugin.html"
+                )
+            else:
+                raise ParseError(
+                    f"Import used in {filepath} at line {lineno}. Import statements are banned in "
+                    f"BUILD files in this repository and should generally be avoided because "
+                    f"they can easily break Pants caching and lead to stale results. Instead, consider "
+                    f"rewriting your code into a Pants plugin: "
+                    f"https://www.pantsbuild.org/howto_plugin.html"
+                )
 
 
 def create_graph_rules(address_mapper: AddressMapper):

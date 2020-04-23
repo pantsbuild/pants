@@ -3,16 +3,15 @@
 
 import logging
 import os
-import tokenize
-from io import StringIO
 from typing import Dict, Tuple
 
 from pants.base.build_file_target_factory import BuildFileTargetFactory
 from pants.base.exceptions import UnaddressableObjectError
 from pants.base.parse_context import ParseContext
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.engine.internals.build_files import error_on_imports
 from pants.engine.internals.objects import Serializable
-from pants.engine.internals.parser import ParseError, Parser, SymbolTable
+from pants.engine.internals.parser import Parser, SymbolTable
 from pants.engine.legacy.structs import BundleAdaptor, TargetAdaptor
 from pants.option.global_options import BuildFileImportsBehavior
 from pants.util.memo import memoized_property
@@ -123,34 +122,6 @@ class LegacyPythonCallbacksParser(Parser):
         self._parse_context._storage.clear(os.path.dirname(filepath))
         exec(python, dict(self._symbols))
 
-        # Perform this check after successful execution, so we know the python is valid (and should
-        # tokenize properly!)
-        # Note that this is incredibly poor sandboxing. There are many ways to get around it.
-        # But it's sufficient to tell most users who aren't being actively malicious that they're doing
-        # something wrong, and it has a low performance overhead.
-        if "import" in python:
-            io_wrapped_python = StringIO(python)
-            for token in tokenize.generate_tokens(io_wrapped_python.readline):
-                token_str = token[1]
-                lineno, _ = token[2]
-
-                if token_str != "import":
-                    continue
-
-                if self._build_file_imports_behavior == BuildFileImportsBehavior.warn:
-                    logger.warning(
-                        f"Import used in {filepath} at line {lineno}. Import statements should "
-                        f"be avoided in BUILD files because they can easily break Pants caching and lead to "
-                        f"stale results. Instead, consider rewriting your code into a Pants plugin: "
-                        f"https://www.pantsbuild.org/howto_plugin.html"
-                    )
-                else:
-                    raise ParseError(
-                        f"Import used in {filepath} at line {lineno}. Import statements are banned in "
-                        f"BUILD files in this repository and should generally be avoided because "
-                        f"they can easily break Pants caching and lead to stale results. Instead, consider "
-                        f"rewriting your code into a Pants plugin: "
-                        f"https://www.pantsbuild.org/howto_plugin.html"
-                    )
+        error_on_imports(python, filepath, self._build_file_imports_behavior)
 
         return list(self._parse_context._storage.objects)
