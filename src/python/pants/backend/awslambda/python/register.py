@@ -14,7 +14,7 @@ def rules():
     return [*awslambda_common_rules.rules(), *awslambda_python_rules.rules()]
 
 
-def targets_types():
+def target_types():
     return [PythonAWSLambda]
 
 

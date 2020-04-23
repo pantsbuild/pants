@@ -219,8 +219,8 @@ def load_plugins(
         # We also always load `build_file_aliases` because mixed repositories need to write V1
         # bindings for targets to avoid breaking V1-only goals; and there is no V2 entry-point for
         # `objects` yet. Purely V2-repos can ignore `build_file_aliases`.
-        if "targets_types" in entries:
-            targets = entries["targets_types"].load()()
+        if "target_types" in entries:
+            targets = entries["target_types"].load()()
             build_configuration.register_targets(targets)
         if "build_file_aliases" in entries:
             aliases = entries["build_file_aliases"].load()()
