@@ -3,8 +3,9 @@
 
 contrib_plugin(
   name='plugin',
+  sources=['register.py', '__init__.py'],
   dependencies=[
-    'contrib/avro/src/python/pants/contrib/avro/rules',
+    ':target_types',
     'contrib/avro/src/python/pants/contrib/avro/targets',
     'contrib/avro/src/python/pants/contrib/avro/tasks',
     'src/python/pants/build_graph',
@@ -15,4 +16,14 @@ contrib_plugin(
   build_file_aliases=True,
   register_goals=True,
   tags = {"partially_type_checked"},
+)
+
+python_library(
+  name='target_types',
+  sources=['target_types.py'],
+  dependencies=[
+    'src/python/pants/backend/jvm:target_types',
+    'src/python/pants/engine:target',
+  ],
+  tags = {"type_checked"},
 )

@@ -18,7 +18,8 @@ from pants.backend.python.rules import (
     repl,
     run_setup_py,
 )
-from pants.backend.python.rules.targets import (
+from pants.backend.python.subsystems import python_native_code, subprocess_environment
+from pants.backend.python.target_types import (
     PythonApp,
     PythonBinary,
     PythonDistribution,
@@ -28,7 +29,6 @@ from pants.backend.python.rules.targets import (
     PythonTests,
     UnpackedWheels,
 )
-from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.targets.python_app import PythonApp as PythonAppV1
 from pants.backend.python.targets.python_binary import PythonBinary as PythonBinaryV1
 from pants.backend.python.targets.python_distribution import (

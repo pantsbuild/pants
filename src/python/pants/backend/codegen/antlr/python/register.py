@@ -10,7 +10,7 @@ from pants.backend.codegen.antlr.python.antlr_py_gen import AntlrPyGen
 from pants.backend.codegen.antlr.python.python_antlr_library import (
     PythonAntlrLibrary as PythonAntlrLibraryV1,
 )
-from pants.backend.codegen.antlr.python.targets import PythonAntlrLibrary
+from pants.backend.codegen.antlr.python.target_types import PythonAntlrLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 

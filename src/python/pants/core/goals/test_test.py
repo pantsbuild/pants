@@ -4,9 +4,7 @@
 from abc import ABCMeta, abstractmethod
 from pathlib import PurePath
 from textwrap import dedent
-from typing import List, Optional, Tuple, Type
-
-import pytest
+from typing import List, Optional, Tuple, Type, cast
 
 from pants.base.specs import SingleAddress
 from pants.core.goals.test import (
@@ -37,10 +35,10 @@ from pants.engine.fs import (
 )
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.target import (
-    RegisteredTargetTypes,
     Sources,
     Target,
-    TargetsWithOrigins,
+    TargetsToValidConfigurations,
+    TargetsToValidConfigurationsRequest,
     TargetWithOrigin,
 )
 from pants.engine.unions import UnionMembership
@@ -108,18 +106,6 @@ class ConditionallySucceedsConfiguration(MockTestConfiguration):
         )
 
 
-class InvalidField(Sources):
-    pass
-
-
-class InvalidConfiguration(MockTestConfiguration):
-    required_fields = (InvalidField,)
-
-    @staticmethod
-    def status(_: Address) -> Status:
-        return Status.FAILURE
-
-
 class TestTest(TestBase):
     def make_ipr(self) -> InteractiveProcessRequest:
         input_files_content = InputFilesContent(
@@ -146,6 +132,7 @@ class TestTest(TestBase):
         targets: List[TargetWithOrigin],
         debug: bool = False,
         include_sources: bool = True,
+        valid_targets: bool = True,
     ) -> Tuple[int, str]:
         console = MockConsole(use_colors=False)
         options = create_goal_subsystem(TestOptions, debug=debug, run_coverage=False)
@@ -153,27 +140,30 @@ class TestTest(TestBase):
         workspace = Workspace(self.scheduler)
         union_membership = UnionMembership({TestConfiguration: [config]})
 
+        def mock_find_valid_configs(
+            _: TargetsToValidConfigurationsRequest,
+        ) -> TargetsToValidConfigurations:
+            if not valid_targets:
+                return TargetsToValidConfigurations({})
+            return TargetsToValidConfigurations(
+                {tgt_with_origin: [config.create(tgt_with_origin)] for tgt_with_origin in targets}
+            )
+
         def mock_coordinator_of_tests(
             wrapped_config: WrappedTestConfiguration,
         ) -> AddressAndTestResult:
-            config = wrapped_config.config
-            return AddressAndTestResult(
-                address=config.address,
-                test_result=config.test_result,  # type: ignore[attr-defined]
-            )
+            config = cast(MockTestConfiguration, wrapped_config.config)
+            return AddressAndTestResult(address=config.address, test_result=config.test_result)
 
         result: Test = run_rule(
             run_tests,
-            rule_args=[
-                console,
-                options,
-                interactive_runner,
-                TargetsWithOrigins(targets),
-                workspace,
-                union_membership,
-                RegisteredTargetTypes.create([MockTarget]),
-            ],
+            rule_args=[console, options, interactive_runner, workspace, union_membership],
             mock_gets=[
+                MockGet(
+                    product_type=TargetsToValidConfigurations,
+                    subject_type=TargetsToValidConfigurationsRequest,
+                    mock=mock_find_valid_configs,
+                ),
                 MockGet(
                     product_type=AddressAndTestResult,
                     subject_type=WrappedTestConfiguration,
@@ -216,7 +206,9 @@ class TestTest(TestBase):
 
     def test_invalid_target_noops(self) -> None:
         exit_code, stdout = self.run_test_rule(
-            config=InvalidConfiguration, targets=[self.make_target_with_origin()]
+            config=SuccessfulConfiguration,
+            targets=[self.make_target_with_origin()],
+            valid_targets=False,
         )
         assert exit_code == 0
         assert stdout.strip() == ""
@@ -260,19 +252,8 @@ class TestTest(TestBase):
             """
         )
 
-    def test_single_debug_target(self) -> None:
+    def test_debug_target(self) -> None:
         exit_code, stdout = self.run_test_rule(
             config=SuccessfulConfiguration, targets=[self.make_target_with_origin()], debug=True,
         )
         assert exit_code == 0
-
-    def test_multiple_debug_targets_fail(self) -> None:
-        with pytest.raises(ValueError):
-            self.run_test_rule(
-                config=SuccessfulConfiguration,
-                targets=[
-                    self.make_target_with_origin(Address.parse(":t1")),
-                    self.make_target_with_origin(Address.parse(":t2")),
-                ],
-                debug=True,
-            )

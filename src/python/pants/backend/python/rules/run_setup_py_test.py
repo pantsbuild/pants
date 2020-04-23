@@ -31,7 +31,7 @@ from pants.backend.python.rules.run_setup_py import (
     get_sources,
     validate_args,
 )
-from pants.backend.python.rules.targets import PythonBinary, PythonLibrary, PythonRequirementLibrary
+from pants.backend.python.target_types import PythonBinary, PythonLibrary, PythonRequirementLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.target_types import Resources
 from pants.core.util_rules.determine_source_files import rules as determine_source_files_rules
