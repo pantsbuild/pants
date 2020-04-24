@@ -276,6 +276,13 @@ async def run_tests(
         exit_code = PANTS_FAILED_EXIT_CODE
     else:
         exit_code = PANTS_SUCCEEDED_EXIT_CODE
+    if options.values.xml_results:
+        all_results_data: Iterable[XmlTestResultsData] = [
+            result.test_result.test_results
+            for result in results
+            if result.test_result.test_results is not None
+        ]
+        # TODO: do something with all_results_data
 
     if options.values.run_coverage:
         all_coverage_data: Iterable[CoverageData] = [
