@@ -25,7 +25,7 @@ class DependencyType(Enum):
 
 # TODO(#8762) Get this rule to feature parity with the dependencies task.
 class DependenciesOptions(LineOriented, GoalSubsystem):
-    """Print the target's dependencies."""
+    """List the dependencies of the input targets."""
 
     name = "dependencies2"
 
@@ -37,8 +37,7 @@ class DependenciesOptions(LineOriented, GoalSubsystem):
             default=False,
             type=bool,
             help=(
-                "Run dependencies against transitive dependencies of targets specified on the "
-                "command line."
+                "List all transitive dependencies. If unspecified, list direct dependencies only."
             ),
         )
         register(
@@ -46,7 +45,7 @@ class DependenciesOptions(LineOriented, GoalSubsystem):
             type=DependencyType,
             default=DependencyType.SOURCE,
             help=(
-                "Which types of dependencies to find, where `source` means source code "
+                "Which types of dependencies to list, where `source` means source code "
                 "dependencies and `3rdparty` means third-party requirements and JARs."
             ),
         )
