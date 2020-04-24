@@ -81,7 +81,7 @@ async def file_deps(
         )
     else:
         all_hydrated_sources = await MultiGet(
-            Get[HydratedSources](HydrateSourcesRequest, tgt.get(Sources).request) for tgt in targets
+            Get[HydratedSources](HydrateSourcesRequest(tgt.get(Sources))) for tgt in targets
         )
         unique_rel_paths.update(
             itertools.chain.from_iterable(

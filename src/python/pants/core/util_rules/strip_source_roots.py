@@ -130,7 +130,7 @@ async def strip_source_roots_from_sources_field(
         sources_snapshot = request.specified_files_snapshot
     else:
         hydrated_sources = await Get[HydratedSources](
-            HydrateSourcesRequest, request.sources_field.request
+            HydrateSourcesRequest(request.sources_field)
         )
         sources_snapshot = hydrated_sources.snapshot
 
