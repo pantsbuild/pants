@@ -271,6 +271,18 @@ impl Scheduler {
   }
 
   ///
+  /// Return unit if the Scheduler is still valid, or an error string if something has invalidated
+  /// the Scheduler, indicating that it should re-initialize. See InvalidationWatcher.
+  ///
+  pub fn is_valid(&self) -> Result<(), String> {
+    let core = self.core.clone();
+    self.core.executor.block_on(async move {
+      // Confirm that our InvalidationWatcher is still alive.
+      core.watcher.is_valid().await
+    })
+  }
+
+  ///
   /// Return all Digests currently in memory in this Scheduler.
   ///
   pub fn all_digests(&self, session: &Session) -> Vec<hashing::Digest> {

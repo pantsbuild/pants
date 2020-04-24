@@ -198,11 +198,11 @@ class SchedulerService(PantsService):
 
     def _check_invalidation_watcher_liveness(self):
         time.sleep(self.INVALIDATION_WATCHER_LIVENESS_CHECK_INTERVAL)
-        if not self._scheduler.check_invalidation_watcher_liveness():
+        try:
+            self._scheduler.check_invalidation_watcher_liveness()
+        except Exception as e:
             # Watcher failed for some reason
-            self._logger.critical(
-                "The graph invalidation watcher failed, so we are shutting down. Check the pantsd.log for details"
-            )
+            self._logger.critical(f"The scheduler was invalidated: {e}")
             self.terminate()
 
     def prepare_graph(self, options: Options) -> LegacyGraphSession:

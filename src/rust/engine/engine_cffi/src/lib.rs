@@ -674,8 +674,8 @@ pub extern "C" fn graph_invalidate_all_paths(scheduler_ptr: *mut Scheduler) -> u
 }
 
 #[no_mangle]
-pub extern "C" fn check_invalidation_watcher_liveness(scheduler_ptr: *mut Scheduler) -> bool {
-  with_scheduler(scheduler_ptr, |scheduler| scheduler.core.watcher.is_alive())
+pub extern "C" fn check_invalidation_watcher_liveness(scheduler_ptr: *mut Scheduler) -> PyResult {
+  with_scheduler(scheduler_ptr, |scheduler| scheduler.is_valid().into())
 }
 
 #[no_mangle]

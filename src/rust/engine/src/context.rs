@@ -1,16 +1,12 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std;
 use std::collections::{BTreeMap, HashSet};
 use std::convert::{Into, TryInto};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
-
-use futures::compat::Future01CompatExt;
-use futures01::Future;
 
 use crate::core::{Failure, TypeId};
 use crate::handles::maybe_drop_handles;
@@ -21,8 +17,9 @@ use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
 
 use boxfuture::{BoxFuture, Boxable};
-use core::clone::Clone;
 use fs::{safe_create_dir_all_ioerror, GitignoreStyleExcludes, PosixFS};
+use futures::compat::Future01CompatExt;
+use futures01::Future;
 use graph::{EntryId, Graph, InvalidationResult, NodeContext};
 use log::info;
 use process_execution::{
@@ -58,7 +55,7 @@ pub struct Core {
   pub command_runner: Box<dyn process_execution::CommandRunner>,
   pub http_client: reqwest::Client,
   pub vfs: PosixFS,
-  pub watcher: InvalidationWatcher,
+  pub watcher: Arc<InvalidationWatcher>,
   pub build_root: PathBuf,
 }
 
@@ -269,12 +266,12 @@ impl Core {
         .map_err(|e| format!("Could not parse build ignore patterns: {:?}", e))?;
 
     let watcher = InvalidationWatcher::new(
-      Arc::downgrade(&graph),
       executor.clone(),
       build_root.clone(),
       ignorer.clone(),
       experimental_fs_watcher,
     )?;
+    watcher.start(&graph);
 
     Ok(Core {
       graph,
