@@ -664,6 +664,11 @@ impl<N: Node> Graph<N> {
     }
   }
 
+  pub fn entry_id(&self, node: &N) -> Option<EntryId> {
+    let inner = self.inner.lock();
+    inner.entry_id(node).cloned()
+  }
+
   pub fn len(&self) -> usize {
     let inner = self.inner.lock();
     inner.nodes.len()

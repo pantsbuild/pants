@@ -29,14 +29,15 @@ use concrete_time::TimeSpan;
 use parking_lot::Mutex;
 use rand::thread_rng;
 use rand::Rng;
-use std::collections::HashMap;
+use std::collections::{BinaryHeap, HashMap};
 use tokio::task_local;
-use graph::EntryId;
+use graph::{EntryId, Node};
 use petgraph::graph::{DiGraph, NodeIndex};
 
 use std::cell::RefCell;
 use std::future::Future;
 use std::sync::Arc;
+use std::time::{Duration, SystemTime};
 
 pub type SpanId = String;
 
@@ -54,8 +55,8 @@ pub struct WorkUnit {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct StartedWorkUnit {
   pub name: String,
-  pub start_time: std::time::SystemTime,
-  pub span_id: String,
+  pub start_time: SystemTime,
+  pub span_id: SpanId,
   pub parent_id: Option<String>,
   pub metadata: WorkunitMetadata,
 }
@@ -161,12 +162,46 @@ impl WorkUnitStore {
       .collect()
   }
 
-  pub fn heavy_hitters(&self, k: usize) -> HashMap<String, Duration> {
+  pub fn heavy_hitters<N: Node>(&self, k: usize) -> HashMap<String, Duration> {
+    use petgraph::Direction;
+
+    let now = SystemTime::now();
     let inner = self.inner.lock();
-    let graph = &inner.graph;
+    let workunit_graph = &inner.graph;
 
+    let mut queue: BinaryHeap<(Duration, SpanId)> = BinaryHeap::with_capacity(k);
+    let edge_workunits = workunit_graph.externals(Direction::Outgoing);
+    queue.extend(edge_workunits
+      .map(|entry| workunit_graph[entry].clone())
+      .flat_map(|span_id: SpanId| {
+        let record = inner.workunit_records.get(&span_id);
+        match record {
+          Some(WorkunitRecord::Started(StartedWorkUnit { start_time, .. })) => {
+            now.duration_since(*start_time).ok()
+              .map(|duration| (duration, span_id))
+          },
+          _ => None
+        }
+      })
+    );
 
-
+    let mut res = HashMap::new();
+    loop {
+      if let Some((dur, span_id)) = queue.pop() {
+        let record = inner.workunit_records.get(&span_id).unwrap();
+        let name = match record {
+          WorkunitRecord::Started(StartedWorkUnit { name, .. }) => name.clone(),
+          WorkunitRecord::Completed(WorkUnit { name, .. }) => name.clone(),
+        };
+        res.insert(name, dur);
+        if res.len() >= k {
+          break;
+        }
+      } else {
+        break;
+      }
+    }
+    res
   }
 
   pub fn start_workunit(
