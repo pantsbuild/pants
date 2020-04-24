@@ -24,6 +24,7 @@ from pants.core.target_types import (
     Resources,
 )
 from pants.core.util_rules import (
+    archive,
     determine_source_files,
     distdir,
     filter_empty_sources,
@@ -53,6 +54,7 @@ def rules():
         *distdir.rules(),
         *filter_empty_sources.rules(),
         *strip_source_roots.rules(),
+        *archive.rules(),
         # other
         *target_rules(),
     ]
