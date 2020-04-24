@@ -29,11 +29,17 @@ from pants.backend.python.target_types import (
     PythonTestsSources,
     PythonTestsTimeout,
 )
-from pants.core.goals.test import TestConfiguration, TestDebugRequest, TestOptions, TestResult, XmlTestResultsData
+from pants.core.goals.test import (
+    TestConfiguration,
+    TestDebugRequest,
+    TestOptions,
+    TestResult,
+    XmlTestResultsData,
+)
 from pants.core.target_types import FilesSources, ResourcesSources
 from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.engine.addresses import Addresses
-from pants.engine.fs import Digest, DirectoriesToMerge, InputFilesContent, SnapshotSubset, PathGlobs
+from pants.engine.fs import Digest, DirectoriesToMerge, InputFilesContent, PathGlobs, SnapshotSubset
 from pants.engine.interactive_runner import InteractiveProcessRequest
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import named_rule, rule, subsystem_rule
@@ -263,7 +269,9 @@ async def run_python_test(
         coverage_digest = None
 
     if test_setup.xml_results:
-        results_digest = await Get[Digest](SnapshotSubset(output_digest, PathGlobs(test_results_file)))
+        results_digest = await Get[Digest](
+            SnapshotSubset(output_digest, PathGlobs(test_results_file))
+        )
     else:
         results_digest = None
 
