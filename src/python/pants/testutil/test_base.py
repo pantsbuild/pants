@@ -753,9 +753,9 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
             for file_name, content in files.items():
                 mode = "wb" if isinstance(content, bytes) else "w"
                 safe_file_dump(os.path.join(temp_dir, file_name), content, mode=mode)
-            return self.scheduler.capture_snapshots(
+            return cast(Snapshot, self.scheduler.capture_snapshots(
                 (PathGlobsAndRoot(PathGlobs(("**",)), temp_dir),)
-            )[0]
+            )[0])
 
     def make_snapshot_of_empty_files(self, files: Iterable[str]) -> Snapshot:
         """Makes a snapshot with empty content for each file.
@@ -763,7 +763,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         This is a convenience around `TestBase.make_snapshot`, which allows specifying the content
         for each file.
         """
-        return cast(Snapshot, self.make_snapshot({fp: "" for fp in files}))
+        return self.make_snapshot({fp: "" for fp in files})
 
     class LoggingRecorder:
         """Simple logging handler to record warnings."""
