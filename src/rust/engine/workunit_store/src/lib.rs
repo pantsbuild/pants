@@ -32,12 +32,15 @@ use rand::Rng;
 use std::collections::HashMap;
 use tokio::task_local;
 use graph::EntryId;
+use petgraph::graph::{DiGraph, NodeIndex};
 
 use std::cell::RefCell;
 use std::future::Future;
 use std::sync::Arc;
 
 pub type SpanId = String;
+
+type WorkunitGraph = DiGraph<SpanId, (), u32>;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct WorkUnit {
@@ -112,6 +115,8 @@ pub struct WorkUnitStore {
 
 #[derive(Default)]
 pub struct WorkUnitInnerStore {
+  graph: WorkunitGraph,
+  span_id_to_graph: HashMap<SpanId, NodeIndex<u32>>,
   workunit_records: HashMap<SpanId, WorkunitRecord>,
   started_ids: Vec<SpanId>,
   completed_ids: Vec<SpanId>,
@@ -123,6 +128,8 @@ impl WorkUnitStore {
   pub fn new() -> WorkUnitStore {
     WorkUnitStore {
       inner: Arc::new(Mutex::new(WorkUnitInnerStore {
+        graph: DiGraph::new(),
+        span_id_to_graph: HashMap::new(),
         workunit_records: HashMap::new(),
         started_ids: Vec::new(),
         last_seen_started_idx: 0,
@@ -154,6 +161,14 @@ impl WorkUnitStore {
       .collect()
   }
 
+  pub fn heavy_hitters(&self, k: usize) -> HashMap<String, Duration> {
+    let inner = self.inner.lock();
+    let graph = &inner.graph;
+
+
+
+  }
+
   pub fn start_workunit(
     &self,
     span_id: SpanId,
@@ -164,7 +179,7 @@ impl WorkUnitStore {
     let started = StartedWorkUnit {
       name,
       span_id: span_id.clone(),
-      parent_id,
+      parent_id: parent_id.clone(),
       start_time: std::time::SystemTime::now(),
       metadata,
     };
@@ -173,6 +188,13 @@ impl WorkUnitStore {
       .workunit_records
       .insert(span_id.clone(), WorkunitRecord::Started(started));
     inner.started_ids.push(span_id.clone());
+    let child = inner.graph.add_node(span_id.clone());
+    inner.span_id_to_graph.insert(span_id.clone(), child.clone());
+    if let Some(parent_id) = parent_id {
+      let parent = inner.span_id_to_graph.get(&parent_id).unwrap().clone();
+      inner.graph.add_edge(parent, child, ());
+    }
+
     span_id
   }
 
