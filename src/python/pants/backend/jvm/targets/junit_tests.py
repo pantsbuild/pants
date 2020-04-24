@@ -5,7 +5,6 @@
 from pants.backend.jvm.subsystems.junit import JUnit
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.runtime_platform_mixin import RuntimePlatformMixin
-from pants.base.deprecated import deprecated, deprecated_conditional
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
