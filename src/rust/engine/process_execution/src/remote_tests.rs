@@ -797,6 +797,7 @@ async fn sends_headers() {
   let context = Context {
     workunit_store: WorkUnitStore::default(),
     build_id: String::from("marmosets"),
+    entry_id: None,
   };
   command_runner
     .run(execute_request, context)

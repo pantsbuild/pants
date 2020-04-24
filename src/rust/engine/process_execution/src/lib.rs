@@ -450,6 +450,7 @@ impl CommandRunner for BoundedCommandRunner {
         let metadata = WorkunitMetadata {
           desc,
           display: false,
+          entry_id: context.entry_id,
         };
         let started_id = context
           .workunit_store

@@ -31,6 +31,7 @@ use rand::thread_rng;
 use rand::Rng;
 use std::collections::HashMap;
 use tokio::task_local;
+use graph::EntryId;
 
 use std::cell::RefCell;
 use std::future::Future;
@@ -60,6 +61,7 @@ pub struct StartedWorkUnit {
 pub struct WorkunitMetadata {
   pub desc: Option<String>,
   pub display: bool,
+  pub entry_id: Option<EntryId>,
 }
 
 impl WorkunitMetadata {
@@ -67,6 +69,7 @@ impl WorkunitMetadata {
     WorkunitMetadata {
       display: true,
       desc: None,
+      entry_id: None,
     }
   }
 }
