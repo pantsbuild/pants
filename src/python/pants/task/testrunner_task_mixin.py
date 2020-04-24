@@ -428,7 +428,7 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
             type=bool,
             default=False,
             fingerprint=True,
-            removal_version="1.28.0.dev0",
+            removal_version="1.28.0.dev2",
             removal_hint=(
                 "This option is going away for better isolation of tests, which provides "
                 "better caching. This also prepares for upgrading to the V2 test implementation,"
