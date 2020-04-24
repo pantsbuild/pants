@@ -4,6 +4,7 @@
 import os
 import re
 import unittest
+import unittest.mock
 from textwrap import dedent
 from typing import Tuple, Type, cast
 

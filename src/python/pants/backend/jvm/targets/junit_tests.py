@@ -5,7 +5,6 @@
 from pants.backend.jvm.subsystems.junit import JUnit
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.runtime_platform_mixin import RuntimePlatformMixin
-from pants.base.deprecated import deprecated, deprecated_conditional
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
@@ -78,20 +77,6 @@ class JUnitTests(RuntimePlatformMixin, JvmTarget):
             if value is not None:
                 extra_env_vars[key] = str(value)
 
-        deprecated_conditional(
-            lambda: "test_platform" in kwargs,
-            "1.28.0.dev0",
-            "test_platform",
-            "Replaced with runtime_platform.",
-        )
-        if "test_platform" in kwargs and runtime_platform:
-            raise TargetDefinitionException(
-                self, "Cannot specify runtime_platform and test_platform together."
-            )
-        if "test_platform" in kwargs and not runtime_platform:
-            runtime_platform = kwargs["test_platform"]
-            del kwargs["test_platform"]
-
         payload.add_fields(
             {
                 # TODO(zundel): Do extra_jvm_options and extra_env_vars really need to be fingerprinted?
@@ -130,16 +115,6 @@ class JUnitTests(RuntimePlatformMixin, JvmTarget):
 
         for address_spec in JUnit.global_instance().injectables_address_specs_for_key("library"):
             yield address_spec
-
-    @property
-    def test_platform(self):
-        return self._test_platform()
-
-    # NB: Cannot annotate the property. Extracted this to enable
-    # warning.
-    @deprecated("1.28.0.dev0", "Use runtime_platform")
-    def _test_platform(self):
-        return self.runtime_platform
 
     @property
     def concurrency(self):
