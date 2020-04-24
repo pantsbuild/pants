@@ -5,8 +5,8 @@ from typing import Optional
 
 import pytest
 
-from pants.backend.python.rules.targets import PythonTestsTimeout
 from pants.backend.python.subsystems.pytest import PyTest
+from pants.backend.python.target_types import PythonTestsTimeout
 from pants.engine.addresses import Address
 from pants.engine.target import InvalidFieldException
 from pants.testutil.subsystem.util import global_subsystem_instance

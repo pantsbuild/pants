@@ -9,8 +9,8 @@ from pants.backend.python.rules import (
     repl,
 )
 from pants.backend.python.rules.repl import PythonRepl
-from pants.backend.python.rules.targets import PythonLibrary
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
+from pants.backend.python.target_types import PythonLibrary
 from pants.backend.python.targets.python_library import PythonLibrary as PythonLibraryV1
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.repl import Repl, run_repl

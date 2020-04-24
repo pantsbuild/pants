@@ -5,6 +5,7 @@ python_library(
   dependencies=[
     '3rdparty/python:dataclasses',
     '3rdparty/python:setuptools',
+    'src/python/pants/backend/python:target_types',
     'src/python/pants/backend/python/rules/coverage_plugin:plugin',
     'src/python/pants/backend/python/subsystems',
     'src/python/pants/backend/python/subsystems/ipex',
@@ -37,6 +38,7 @@ python_tests(
   sources=['*_test.py', '!*_integration_test.py'],
   dependencies=[
     ':rules',
+    'src/python/pants/backend/python:target_types',
     'src/python/pants/backend/python/subsystems',
     'src/python/pants/build_graph',
     'src/python/pants/core',
@@ -66,6 +68,7 @@ python_tests(
   sources=['*_integration_test.py'],
   dependencies=[
     ':rules',
+    'src/python/pants/backend/python:target_types',
     'src/python/pants/backend/python/subsystems',
     'src/python/pants/core/goals',
     'src/python/pants/core/util_rules',

@@ -11,7 +11,7 @@ class FiledepsIntegrationTest(PantsRunIntegrationTest):
     TARGET = "examples/src/scala/org/pantsbuild/example/hello/welcome"
 
     def run_filedeps(self, *filedeps_options):
-        args = ["filedeps", self.TARGET]
+        args = ["filedeps", "--transitive", self.TARGET]
         args.extend(filedeps_options)
 
         pants_run = self.run_pants(args)

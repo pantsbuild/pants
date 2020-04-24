@@ -11,7 +11,7 @@ from collections import defaultdict
 from contextlib import contextmanager
 from tempfile import mkdtemp
 from textwrap import dedent
-from typing import Any, Iterable, List, Optional, Sequence, Type, TypeVar, Union, cast
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Type, TypeVar, Union, cast
 
 from pants.base.build_root import BuildRoot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
@@ -415,6 +415,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
             pants_ignore_patterns=[],
             use_gitignore=False,
             local_store_dir=local_store_dir,
+            build_file_prelude_globs=(),
             build_file_imports_behavior=BuildFileImportsBehavior.error,
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
             native=init_native(),
@@ -746,18 +747,18 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         args = tuple(["--pants-config-files=[]"]) + tuple(cli_options)
         return OptionsBootstrapper.create(args=args).bootstrap_options.for_global_scope()
 
-    def make_snapshot(self, files):
-        """Makes a snapshot from a collection of files.
-
-        :param files: a dictionary, where key=filename, value=file_content where both are of type String.
-        :return: a Snapshot.
-        """
+    def make_snapshot(self, files: Dict[str, Union[str, bytes]]) -> Snapshot:
+        """Makes a snapshot from a map of file name to file content."""
         with temporary_dir() as temp_dir:
             for file_name, content in files.items():
-                safe_file_dump(os.path.join(temp_dir, file_name), content)
-            return self.scheduler.capture_snapshots(
-                (PathGlobsAndRoot(PathGlobs(("**",)), temp_dir),)
-            )[0]
+                mode = "wb" if isinstance(content, bytes) else "w"
+                safe_file_dump(os.path.join(temp_dir, file_name), content, mode=mode)
+            return cast(
+                Snapshot,
+                self.scheduler.capture_snapshots((PathGlobsAndRoot(PathGlobs(("**",)), temp_dir),))[
+                    0
+                ],
+            )
 
     def make_snapshot_of_empty_files(self, files: Iterable[str]) -> Snapshot:
         """Makes a snapshot with empty content for each file.
@@ -765,7 +766,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         This is a convenience around `TestBase.make_snapshot`, which allows specifying the content
         for each file.
         """
-        return cast(Snapshot, self.make_snapshot({fp: "" for fp in files}))
+        return self.make_snapshot({fp: "" for fp in files})
 
     class LoggingRecorder:
         """Simple logging handler to record warnings."""

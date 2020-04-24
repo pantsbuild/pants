@@ -13,7 +13,7 @@ from pants.backend.python.rules.pex import (
     PexRequirements,
     TwoStepPexRequest,
 )
-from pants.backend.python.rules.targets import (
+from pants.backend.python.target_types import (
     PythonInterpreterCompatibility,
     PythonRequirementsField,
     PythonRequirementsFileSources,

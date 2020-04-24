@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional, cast
 
 from pants.backend.python.python_artifact import PythonArtifact
-from pants.backend.python.rules.targets import PythonLibrary
+from pants.backend.python.target_types import PythonLibrary
 from pants.backend.python.targets.python_library import PythonLibrary as PythonLibraryV1
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException
@@ -340,5 +340,5 @@ def build_file_aliases():
     )
 
 
-def targets2():
+def target_types():
     return [PantsPlugin, ContribPlugin]

@@ -13,7 +13,7 @@ from pants.backend.codegen.thrift.python.py_thrift_namespace_clash_check import 
 from pants.backend.codegen.thrift.python.python_thrift_library import (
     PythonThriftLibrary as PythonThriftLibraryV1,
 )
-from pants.backend.codegen.thrift.python.targets import PythonThriftLibrary
+from pants.backend.codegen.thrift.python.target_types import PythonThriftLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 
@@ -27,5 +27,5 @@ def register_goals():
     task(name="py-thrift-namespace-clash-check", action=PyThriftNamespaceClashCheck).install("gen")
 
 
-def targets2():
+def target_types():
     return [PythonThriftLibrary]

@@ -15,8 +15,8 @@ from pants.backend.python.rules import (
 )
 from pants.backend.python.rules.pytest_coverage import CoverageConfigRequest, create_coverage_config
 from pants.backend.python.rules.pytest_runner import PythonTestConfiguration
-from pants.backend.python.rules.targets import PythonLibrary, PythonRequirementLibrary, PythonTests
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
+from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary, PythonTests
 from pants.backend.python.targets.python_library import PythonLibrary as PythonLibraryV1
 from pants.backend.python.targets.python_requirement_library import (
     PythonRequirementLibrary as PythonRequirementLibraryV1,

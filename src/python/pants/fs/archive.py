@@ -2,15 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-import subprocess
-import sys
 from abc import ABC, abstractmethod
 from collections import OrderedDict
-from contextlib import contextmanager
 from zipfile import ZIP_DEFLATED
 
 from pants.util.contextutil import open_tar, open_zip, temporary_dir
-from pants.util.dirutil import is_executable, safe_concurrent_rename, safe_walk
+from pants.util.dirutil import safe_concurrent_rename, safe_walk
 from pants.util.strutil import ensure_text
 
 """Support for wholesale archive creation and extraction in a uniform API across archive types."""
@@ -84,82 +81,6 @@ class TarArchiver(Archiver):
         return tarpath
 
 
-class XZCompressedTarArchiver(TarArchiver):
-    """A workaround for the lack of xz support in Python 2.7.
-
-    Invokes an xz executable to decompress a .tar.xz into a tar stream, which is piped into the
-    extract() method.
-    """
-
-    class XZArchiverError(Exception):
-        pass
-
-    def __init__(self, xz_binary_path):
-
-        # TODO: test this exception somewhere!
-        if not is_executable(xz_binary_path):
-            raise self.XZArchiverError(
-                "The path {} does not name an existing executable file. An xz executable must be provided "
-                "to decompress xz archives.".format(xz_binary_path)
-            )
-
-        self._xz_binary_path = xz_binary_path
-
-        super().__init__("r|", "tar.xz")
-
-    @contextmanager
-    def _invoke_xz(self, xz_input_file):
-        """Run the xz command and yield a file object for its stdout.
-
-        This allows streaming the decompressed tar archive directly into a tar decompression stream,
-        which is significantly faster in practice than making a temporary file.
-        """
-        # TODO: --threads=0 is supposed to use "the number of processor cores on the machine", but I
-        # see no more than 100% cpu used at any point. This seems like it could be a bug? If performance
-        # is an issue, investigate further.
-        cmd = [
-            self._xz_binary_path,
-            "--decompress",
-            "--stdout",
-            "--keep",
-            "--threads=0",
-            xz_input_file,
-        ]
-
-        try:
-            # Pipe stderr to our own stderr, but leave stdout open so we can yield it.
-            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=sys.stderr)
-        except OSError as e:
-            raise self.XZArchiverError(
-                "Error invoking xz with command {} for input file {}: {}".format(
-                    cmd, xz_input_file, e
-                ),
-                e,
-            )
-
-        # This is a file object.
-        yield process.stdout
-
-        rc = process.wait()
-        if rc != 0:
-            raise self.XZArchiverError(
-                "Error decompressing xz input with command {} for input file {}. Exit code was: {}. ".format(
-                    cmd, xz_input_file, rc
-                )
-            )
-
-    def _extract(self, path, outdir):
-        with self._invoke_xz(path) as xz_decompressed_tar_stream:
-            return super()._extract(xz_decompressed_tar_stream, outdir, mode=self.mode)
-
-    # TODO: implement this method, if we ever need it.
-    def create(self, *args, **kwargs):
-        """
-        :raises: :class:`NotImplementedError`
-        """
-        raise NotImplementedError("XZCompressedTarArchiver can only extract, not create archives!")
-
-
 class ZipArchiver(Archiver):
     """An archiver that stores files in a zip file with optional compression.
 
@@ -211,9 +132,10 @@ class ZipArchiver(Archiver):
 TAR = TarArchiver("w:", "tar")
 TGZ = TarArchiver("w:gz", "tar.gz")
 TBZ2 = TarArchiver("w:bz2", "tar.bz2")
+TXZ = TarArchiver("w:xz", "tar.xz")
 ZIP = ZipArchiver(ZIP_DEFLATED, "zip")
 
-_ARCHIVER_BY_TYPE = OrderedDict(tar=TAR, tgz=TGZ, tbz2=TBZ2, zip=ZIP)
+_ARCHIVER_BY_TYPE = OrderedDict(tar=TAR, tgz=TGZ, tbz2=TBZ2, txz=TXZ, zip=ZIP)
 
 archive_extensions = {name: archiver.extension for name, archiver in _ARCHIVER_BY_TYPE.items()}
 
@@ -231,6 +153,7 @@ def create_archiver(typename):
     'tar'   Returns a tar archiver that applies no compression and emits .tar files.
     'tgz'   Returns a tar archiver that applies gzip compression and emits .tar.gz files.
     'tbz2'  Returns a tar archiver that applies bzip2 compression and emits .tar.bz2 files.
+    'txz'   Returna a tar archiver that applies lzma compression and emits .tar.xz files.
     'zip'   Returns a zip archiver that applies standard compression and emits .zip files.
     'jar'   Returns a jar archiver that applies no compression and emits .jar files.
       Note this is provided as a light way of zipping input files into a jar, without the
@@ -256,6 +179,8 @@ def archiver_for_path(path_name):
         return TGZ
     elif path_name.endswith(".tar.bz2"):
         return TBZ2
+    elif path_name.endswith(".tar.xz"):
+        return TXZ
     else:
         _, ext = os.path.splitext(path_name)
         if ext:

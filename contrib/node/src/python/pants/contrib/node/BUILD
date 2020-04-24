@@ -4,7 +4,7 @@
 contrib_plugin(
   name='plugin',
   dependencies=[
-    'contrib/node/src/python/pants/contrib/node/rules',
+    ':target_types',
     'contrib/node/src/python/pants/contrib/node/subsystems',
     'contrib/node/src/python/pants/contrib/node/subsystems/resolvers',
     'contrib/node/src/python/pants/contrib/node/targets',
@@ -18,4 +18,16 @@ contrib_plugin(
   build_file_aliases=True,
   register_goals=True,
   global_subsystems=True
+)
+
+python_library(
+  name='target_types',
+  sources=['target_types.py'],
+  dependencies=[
+    'src/python/pants/engine:addresses',
+    'src/python/pants/engine:target',
+    'src/python/pants/fs',
+    'src/python/pants/util:frozendict',
+  ],
+  tags = {"type_checked"},
 )

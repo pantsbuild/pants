@@ -9,12 +9,12 @@ from typing import FrozenSet, Iterable, Iterator, List, NamedTuple, Optional, Se
 
 from pants.backend.python.rules.download_pex_bin import DownloadedPexBin
 from pants.backend.python.rules.hermetic_pex import HermeticPex
-from pants.backend.python.rules.targets import PythonInterpreterCompatibility
-from pants.backend.python.rules.targets import PythonPlatforms as PythonPlatformsField
-from pants.backend.python.rules.targets import PythonRequirementsField
 from pants.backend.python.rules.util import parse_interpreter_constraint
 from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.backend.python.target_types import PythonInterpreterCompatibility
+from pants.backend.python.target_types import PythonPlatforms as PythonPlatformsField
+from pants.backend.python.target_types import PythonRequirementsField
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.fs import (
     EMPTY_DIRECTORY_DIGEST,

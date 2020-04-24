@@ -3,7 +3,7 @@
 
 from pants.engine.target import COMMON_TARGET_FIELDS, Dependencies, Sources, Target
 
-from pants.contrib.node.rules.targets import NodeModule
+from pants.contrib.node.target_types import NodeModule
 
 
 class ScalaJSBinary(Target):

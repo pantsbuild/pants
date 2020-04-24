@@ -10,7 +10,7 @@ from pants.backend.codegen.protobuf.java.java_protobuf_library import (
     JavaProtobufLibrary as JavaProtobufLibraryV1,
 )
 from pants.backend.codegen.protobuf.java.protobuf_gen import ProtobufGen
-from pants.backend.codegen.protobuf.java.targets import JavaProtobufLibrary
+from pants.backend.codegen.protobuf.java.target_types import JavaProtobufLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 
@@ -23,5 +23,5 @@ def register_goals():
     task(name="protoc", action=ProtobufGen).install("gen")
 
 
-def targets2():
+def target_types():
     return [JavaProtobufLibrary]

@@ -10,7 +10,7 @@ from pants.backend.codegen.antlr.java.antlr_java_gen import AntlrJavaGen
 from pants.backend.codegen.antlr.java.java_antlr_library import (
     JavaAntlrLibrary as JavaAntlrLibraryV1,
 )
-from pants.backend.codegen.antlr.java.targets import JavaAntlrLibrary
+from pants.backend.codegen.antlr.java.target_types import JavaAntlrLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 
@@ -23,5 +23,5 @@ def register_goals():
     task(name="antlr-java", action=AntlrJavaGen).install("gen")
 
 
-def targets2():
+def target_types():
     return [JavaAntlrLibrary]

@@ -6,7 +6,7 @@
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.goal.task_registrar import TaskRegistrar as task
 
-from pants.contrib.go.rules.targets import (
+from pants.contrib.go.target_types import (
     GoBinary,
     GoLibrary,
     GoProtobufLibrary,
@@ -64,7 +64,7 @@ def register_goals():
     task(name="go", action=GoFmt).install("fmt")
 
 
-def targets2():
+def target_types():
     return [
         GoBinary,
         GoLibrary,

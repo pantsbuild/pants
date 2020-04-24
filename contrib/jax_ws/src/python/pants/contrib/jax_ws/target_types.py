@@ -1,7 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.jvm.rules.targets import COMMON_JVM_FIELDS
+from pants.backend.jvm.target_types import COMMON_JVM_FIELDS
 from pants.engine.target import Sources, StringSequenceField, Target
 
 

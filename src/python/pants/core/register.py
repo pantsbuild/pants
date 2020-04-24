@@ -10,7 +10,6 @@ from pants.core.goals import binary, fmt, lint, repl, run, test
 from pants.core.project_info import (
     cloc,
     filedeps,
-    list_backends,
     list_roots,
     list_target_types,
     list_targets,
@@ -25,6 +24,7 @@ from pants.core.target_types import (
     Resources,
 )
 from pants.core.util_rules import (
+    archive,
     determine_source_files,
     distdir,
     filter_empty_sources,
@@ -38,7 +38,6 @@ def rules():
         # project_info
         *cloc.rules(),
         *filedeps.rules(),
-        *list_backends.rules(),
         *list_roots.rules(),
         *list_target_types.rules(),
         *list_targets.rules(),
@@ -55,10 +54,11 @@ def rules():
         *distdir.rules(),
         *filter_empty_sources.rules(),
         *strip_source_roots.rules(),
+        *archive.rules(),
         # other
         *target_rules(),
     ]
 
 
-def targets2():
+def target_types():
     return [AliasTarget, Files, GenericTarget, PrepCommand, RemoteSources, Resources]

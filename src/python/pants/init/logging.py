@@ -55,7 +55,7 @@ class NativeHandler(StreamHandler):
 
     def emit(self, record: LogRecord) -> None:
         self.native.write_log(
-            self.format(record), record.levelno, f"{record.name}:pid={os.getpid()}"
+            msg=self.format(record), level=record.levelno, target=f"{record.name}:pid={os.getpid()}"
         )
 
     def flush(self) -> None:

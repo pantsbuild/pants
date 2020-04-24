@@ -6,7 +6,6 @@ import logging
 from abc import ABC, ABCMeta
 from dataclasses import dataclass
 from enum import Enum
-from functools import partial
 from pathlib import PurePath
 from typing import Dict, Iterable, List, Optional, Type, TypeVar
 
@@ -27,9 +26,9 @@ from pants.engine.rules import goal_rule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
     ConfigurationWithOrigin,
-    RegisteredTargetTypes,
     Sources,
-    TargetsWithOrigins,
+    TargetsToValidConfigurations,
+    TargetsToValidConfigurationsRequest,
 )
 from pants.engine.unions import UnionMembership, union
 
@@ -216,52 +215,33 @@ async def run_tests(
     console: Console,
     options: TestOptions,
     interactive_runner: InteractiveRunner,
-    targets_with_origins: TargetsWithOrigins,
     workspace: Workspace,
     union_membership: UnionMembership,
-    registered_target_types: RegisteredTargetTypes,
 ) -> Test:
-    group_targets_to_configs = partial(
-        TestConfiguration.group_targets_to_valid_subclass_configs,
-        targets_with_origins,
-        union_membership=union_membership,
-        registered_target_types=registered_target_types,
-        goal_name=options.name,
-    )
-
-    bulleted_list_sep = "\n  * "
-
     if options.values.debug:
-        targets_to_valid_configs = group_targets_to_configs(error_if_no_valid_targets=True)
-        if len(targets_to_valid_configs) > 1:
-            test_target_addresses = sorted(
-                tgt_with_origin.target.address.spec for tgt_with_origin in targets_to_valid_configs
+        targets_to_valid_configs = await Get[TargetsToValidConfigurations](
+            TargetsToValidConfigurationsRequest(
+                TestConfiguration,
+                goal_description="`test --debug`",
+                error_if_no_valid_targets=True,
+                expect_single_config=True,
             )
-            raise ValueError(
-                f"`test --debug` only works on one test target but was given multiple test "
-                f"targets: {bulleted_list_sep}{bulleted_list_sep.join(test_target_addresses)}\n\n"
-                f"Please select one of these targets to run or do not use the `--debug` option."
-            )
-        target_with_origin, valid_configs = list(targets_to_valid_configs.items())[0]
-        target = target_with_origin.target
-        if len(valid_configs) > 1:
-            possible_config_types = sorted(config.__class__.__name__ for config in valid_configs)
-            raise ValueError(
-                f"Multiple of the registered test implementations work for {target.address} "
-                f"(target type {repr(target.alias)}). It is ambiguous which implementation to use. "
-                f"Possible implementations: {possible_config_types}."
-            )
-        logger.info(f"Starting test in debug mode: {target.address.reference()}")
-        request = await Get[TestDebugRequest](TestConfiguration, valid_configs[0])
+        )
+        config = targets_to_valid_configs.configurations[0]
+        logger.info(f"Starting test in debug mode: {config.address.reference()}")
+        request = await Get[TestDebugRequest](TestConfiguration, config)
         debug_result = interactive_runner.run_local_interactive_process(request.ipr)
         return Test(debug_result.process_exit_code)
 
-    targets_to_valid_configs = group_targets_to_configs(error_if_no_valid_targets=False)
-    configs = itertools.chain.from_iterable(
-        configs_per_target for configs_per_target in targets_to_valid_configs.values()
+    targets_to_valid_configs = await Get[TargetsToValidConfigurations](
+        TargetsToValidConfigurationsRequest(
+            TestConfiguration,
+            goal_description=f"the `{options.name}` goal",
+            error_if_no_valid_targets=False,
+        )
     )
     configs_with_sources = await Get[ConfigurationsWithSources](
-        ConfigurationsWithSourcesRequest(configs)
+        ConfigurationsWithSourcesRequest(targets_to_valid_configs.configurations)
     )
 
     results = await MultiGet(
