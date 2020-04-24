@@ -102,8 +102,10 @@ class ExternalTool(Subsystem):
             try:
                 ver, plat, sha256, length_str = (x.strip() for x in known_version.split("|"))
             except ValueError:
-                raise ExternalToolError(f"Bad value for --known-versions (see ./pants "
-                                        f"help-advanced {cls.options_scope}): {known_version}")
+                raise ExternalToolError(
+                    f"Bad value for --known-versions (see ./pants "
+                    f"help-advanced {cls.options_scope}): {known_version}"
+                )
             if ver == cls.default_version:
                 ret[plat] = (ver, sha256, int(length_str))
         return ret
@@ -183,8 +185,10 @@ class ExternalTool(Subsystem):
             try:
                 ver, plat_val, sha256, length = (x.strip() for x in known_version.split("|"))
             except ValueError:
-                raise ExternalToolError(f"Bad value for --known-versions (see ./pants "
-                                        f"help-advanced {cls.options_scope}): {known_version}")
+                raise ExternalToolError(
+                    f"Bad value for --known-versions (see ./pants "
+                    f"help-advanced {cls.options_scope}): {known_version}"
+                )
             if plat_val == plat.value and ver == version:
                 digest = Digest(fingerprint=sha256, serialized_bytes_length=int(length))
                 try:
