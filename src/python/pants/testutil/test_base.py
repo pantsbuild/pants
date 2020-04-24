@@ -11,7 +11,7 @@ from collections import defaultdict
 from contextlib import contextmanager
 from tempfile import mkdtemp
 from textwrap import dedent
-from typing import Any, Iterable, List, Optional, Sequence, Type, TypeVar, Union, cast
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Type, TypeVar, Union, cast
 
 from pants.base.build_root import BuildRoot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
@@ -747,12 +747,8 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         args = tuple(["--pants-config-files=[]"]) + tuple(cli_options)
         return OptionsBootstrapper.create(args=args).bootstrap_options.for_global_scope()
 
-    def make_snapshot(self, files):
-        """Makes a snapshot from a collection of files.
-
-        :param files: a dictionary, where key=filename (str), value=file_content (str or bytes).
-        :return: a Snapshot.
-        """
+    def make_snapshot(self, files: Dict[str, Union[str, bytes]]) -> Snapshot:
+        """Makes a snapshot from a map of file name to file content."""
         with temporary_dir() as temp_dir:
             for file_name, content in files.items():
                 mode = "wb" if isinstance(content, bytes) else "w"

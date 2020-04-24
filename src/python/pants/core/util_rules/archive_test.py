@@ -3,7 +3,6 @@
 
 import tarfile
 import zipfile
-from collections import OrderedDict
 from io import BytesIO
 
 from pants.core.util_rules.archive import ExtractedDigest, MaybeExtractable
@@ -16,7 +15,7 @@ from pants.testutil.test_base import TestBase
 
 class ArchiveTest(TestBase):
 
-    files = OrderedDict({"foo": b"bar", "hello/world": b"Hello, World!"})
+    files = {"foo": b"bar", "hello/world": b"Hello, World!"}
 
     expected_files_content = FilesContent(
         [FileContent(name, content) for name, content in files.items()]
