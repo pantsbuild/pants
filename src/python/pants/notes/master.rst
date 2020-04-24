@@ -25,12 +25,17 @@ API Changes
 New Features
 ~~~~~~~~~~~~
 
+* Add a special string <PYENV_LOCAL> to interpreter search path (#9613)
+  `PR #9613 <https://github.com/pantsbuild/pants/pull/9613>`_
+
 * Prelude file support (#9555)
   `PR #9555 <https://github.com/pantsbuild/pants/pull/9555>`_
 
-
 Bugfixes
 ~~~~~~~~
+
+* Temporarily disable `./pants backends` goal due to bug (#9629)
+  `PR #9629 <https://github.com/pantsbuild/pants/pull/9629>`_
 
 * fix test_platform usages (#9567)
   `PR #9567 <https://github.com/pantsbuild/pants/pull/9567>`_
