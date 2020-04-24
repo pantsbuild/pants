@@ -780,7 +780,9 @@ class TestSources(TestBase):
         addr = Address.parse("src/fortran:lib")
         self.create_files("src/fortran", files=["f1.f95", "f2.f95", "f1.f03", "ignored.f03"])
         sources = Sources(["f1.f95", "*.f03", "!ignored.f03", "!**/ignore*"], address=addr)
-        hydrated_sources = self.request_single_product(HydratedSources, HydrateSourcesRequest(sources))
+        hydrated_sources = self.request_single_product(
+            HydratedSources, HydrateSourcesRequest(sources)
+        )
         assert hydrated_sources.snapshot.files == ("src/fortran/f1.f03", "src/fortran/f1.f95")
 
         # Also test that the Filespec is correct. This does not need hydration to be calculated.
