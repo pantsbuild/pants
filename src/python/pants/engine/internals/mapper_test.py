@@ -153,7 +153,8 @@ class AddressFamilyTest(unittest.TestCase):
             )
 
 
-HydratedStructs = Collection[HydratedStruct]
+class HydratedStructs(Collection[HydratedStruct]):
+    pass
 
 
 @rule
