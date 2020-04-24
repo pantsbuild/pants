@@ -73,7 +73,6 @@ backend_packages2 = [
   "pants.backend.python.lint.flake8",
   "pants.backend.python.lint.isort",
   "pants.backend.awslambda.python",
-  "pants.backend.codegen.protobuf.python",
   "pants.backend.native",
   "internal_backend.rules_for_testing",
 ]

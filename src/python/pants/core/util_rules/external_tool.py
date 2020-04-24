@@ -39,12 +39,42 @@ class ExternalTool(Subsystem):
 
     Subclass this to configure a specific tool.
 
+
+    Idiomatic use:
+
+    class MyExternalTool(ExternalTool):
+        options_scope = "my-external-tool"
+        default_version = "1.2.3"
+        default_known_versions = [
+          "1.2.3|darwin|deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef|222222",
+          "1.2.3|linux |1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd|333333",
+        ]
+
+        @classmethod
+        def generate_url(cls, plat: Platform, version: str) -> str:
+            ...
+
+        @classmethod
+        def generate_exe(cls, plat: Platform, version: str) -> str:
+            ...
+
+    @rule
+    def my_rule(my_external_tool: MyExternalTool):
+      downloaded_tool = await Get[DownloadedExternalTool](
+        ExternalToolRequest, my_external_tool.get_request(Platform.current)
+      )
+
+    ...
+    def rules():
+      return [my_rule, subsystem_rule(MyExternalTool)]
+
+
     A lightweight replacement for the code in binary_tool.py and binary_util.py,
     which can be deprecated in favor of this.
     """
 
     # The default values for --version and --known-versions.
-    # Subclasses can set appropriately.
+    # Subclasses must set appropriately.
     default_version: str
     default_known_versions: List[str]
 
@@ -69,7 +99,11 @@ class ExternalTool(Subsystem):
         # ignore any that don't match default_version.
         ret = {}
         for known_version in cls.default_known_versions:
-            ver, plat, sha256, length_str = (x.strip() for x in known_version.split("|"))
+            try:
+                ver, plat, sha256, length_str = (x.strip() for x in known_version.split("|"))
+            except ValueError:
+                raise ExternalToolError(f"Bad value for --known-versions (see ./pants "
+                                        f"help-advanced {cls.options_scope}): {known_version}")
             if ver == cls.default_version:
                 ret[plat] = (ver, sha256, int(length_str))
         return ret
@@ -81,6 +115,7 @@ class ExternalTool(Subsystem):
             "--version",
             type=str,
             default=cls.default_version,
+            advanced=True,
             fingerprint=True,
             help=f"Use this version of {cls.name}.",
         )
@@ -89,6 +124,7 @@ class ExternalTool(Subsystem):
             type=list,
             member_type=str,
             default=cls.default_known_versions,
+            advanced=True,
             help=f"Known versions to verify downloads against. Each element is a "
             f"pipe-separated string of version|platform|sha256|length, where `version` is the "
             f"version string, `platform` is one of [{','.join(Platform.__members__.keys())}], "
@@ -106,8 +142,8 @@ class ExternalTool(Subsystem):
         # Note: After removing this, also remove get_default_versions_and_digests() above.
         register(
             "--version-digest-mapping",
-            removal_version="1.30.0.dev2",
-            removal_hint="""Use --known-versions instead.""",
+            removal_version="1.30.0.dev0",
+            removal_hint="Use --known-versions instead.",
             type=dict,
             default=cls.get_default_versions_and_digests(),
             fingerprint=True,
@@ -144,7 +180,11 @@ class ExternalTool(Subsystem):
         cls, plat: Platform, version: str, known_versions: List[str]
     ) -> ExternalToolRequest:
         for known_version in known_versions:
-            ver, plat_val, sha256, length = (x.strip() for x in known_version.split("|"))
+            try:
+                ver, plat_val, sha256, length = (x.strip() for x in known_version.split("|"))
+            except ValueError:
+                raise ExternalToolError(f"Bad value for --known-versions (see ./pants "
+                                        f"help-advanced {cls.options_scope}): {known_version}")
             if plat_val == plat.value and ver == version:
                 digest = Digest(fingerprint=sha256, serialized_bytes_length=int(length))
                 try:
@@ -160,6 +200,7 @@ class ExternalTool(Subsystem):
         )
 
     def get_request(self, plat: Platform) -> ExternalToolRequest:
+        """Generate a request for this tool."""
         return self.generate_request(
             plat, self.get_options().version, self.get_options().known_versions,
         )
