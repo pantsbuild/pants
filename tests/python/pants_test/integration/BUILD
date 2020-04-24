@@ -136,3 +136,12 @@ python_tests(
   tags = {'integration', 'partially_type_checked'},
   timeout = 180,
 )
+
+python_tests(
+  name = 'prelude_integration',
+  sources = [ 'test_prelude_integration.py' ],
+  dependencies = [
+    'src/python/pants/testutil:int-test',
+  ],
+  tags = {'integration', 'partially_type_checked'},
+)

@@ -10,7 +10,6 @@ from pants.core.goals import binary, fmt, lint, repl, run, test
 from pants.core.project_info import (
     cloc,
     filedeps,
-    list_backends,
     list_roots,
     list_target_types,
     list_targets,
@@ -38,7 +37,6 @@ def rules():
         # project_info
         *cloc.rules(),
         *filedeps.rules(),
-        *list_backends.rules(),
         *list_roots.rules(),
         *list_target_types.rules(),
         *list_targets.rules(),

@@ -524,15 +524,6 @@ def relative_symlink(source_path: str, link_path: str) -> None:
             raise
 
 
-def symlink_is_correct(source_path, target_path):
-    return (
-        os.path.exists(source_path)
-        and os.path.exists(target_path)
-        and os.path.islink(target_path)
-        and os.readlink(target_path) == source_path
-    )
-
-
 def relativize_path(path: str, rootdir: str) -> str:
     """
     :API: public

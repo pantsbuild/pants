@@ -21,7 +21,7 @@ class FrozenDict(Mapping[K, V]):
 
         These values must be hashable, which we proactively validate.
         """
-        self._data: Dict[K, V] = dict(item)  # type: ignore[arg-type]
+        self._data: Dict[K, V] = dict(item) if item else dict()
         # NB: We eagerly compute the hash to validate that the values are hashable and to avoid
         # performing the calculation multiple times. This can be revisited if it's found to be a
         # performance bottleneck.
