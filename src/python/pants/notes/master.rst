@@ -4,6 +4,136 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.28.0.dev0 (4/24/2020)
+----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Rename `target-types2` goal to `target-types` and `targets()` register.py entry point to `target_types()` (#9618)
+  `PR #9618 <https://github.com/pantsbuild/pants/pull/9618>`_
+
+* Default to `--filedeps-transitive=false` and `--dependencies-transitive=false` (#9576)
+  `PR #9576 <https://github.com/pantsbuild/pants/pull/9576>`_
+
+* Require explicit specification of an AWS Lambda runtime. (#9564)
+  `PR #9564 <https://github.com/pantsbuild/pants/pull/9564>`_
+
+* Revert allowing Python targets to include `.c` files in their sources (#9583)
+  `PR #9583 <https://github.com/pantsbuild/pants/pull/9583>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Prelude file support (#9555)
+  `PR #9555 <https://github.com/pantsbuild/pants/pull/9555>`_
+
+
+Bugfixes
+~~~~~~~~
+
+* fix test_platform usages (#9567)
+  `PR #9567 <https://github.com/pantsbuild/pants/pull/9567>`_
+
+* Use `FrozenDict` and `FrozenOrderedSet` for type safety with `UnionMembership` and `RegisteredTargetTypes` (#9609)
+  `PR #9609 <https://github.com/pantsbuild/pants/pull/9609>`_
+
+* Fix `zip_safe` field not being used with V2 binary (#9598)
+  `PR #9598 <https://github.com/pantsbuild/pants/pull/9598>`_
+
+* Fix python platform spec for AWS Lambdas. (#9600)
+  `PR #9600 <https://github.com/pantsbuild/pants/pull/9600>`_
+
+* Revert "Add link back to source control dir from physical workdir (#9531)" (#9601)
+  `PR #9601 <https://github.com/pantsbuild/pants/pull/9601>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Remove our custom .tar.xz workaround. (#9617)
+  `PR #9617 <https://github.com/pantsbuild/pants/pull/9617>`_
+
+* Rename `targets.py` files to `target_types.py` (#9616)
+  `PR #9616 <https://github.com/pantsbuild/pants/pull/9616>`_
+
+* Refactor filtering of valid targets via the engine (#9614)
+  `PR #9614 <https://github.com/pantsbuild/pants/pull/9614>`_
+
+* Some logger.rs improvements (#9599)
+  `PR #9599 <https://github.com/pantsbuild/pants/pull/9599>`_
+
+* Rename `isolated_process.py` to `process.py` (#9608)
+  `PR #9608 <https://github.com/pantsbuild/pants/pull/9608>`_
+
+* Factor up flexible handling of invalid target types (#9605)
+  `PR #9605 <https://github.com/pantsbuild/pants/pull/9605>`_
+
+* Move private engine code into `engine/internals` (#9597)
+  `PR #9597 <https://github.com/pantsbuild/pants/pull/9597>`_
+
+* Break setup_logger into two functions (#9592)
+  `PR #9592 <https://github.com/pantsbuild/pants/pull/9592>`_
+
+* Factor up common Configuration code (#9557)
+  `PR #9557 <https://github.com/pantsbuild/pants/pull/9557>`_
+
+* Improve V2 UI messages by describing the scope of the work being done (#9588)
+  `PR #9588 <https://github.com/pantsbuild/pants/pull/9588>`_
+
+* Add `DeduplicatedCollection` to newtype `FrozenOrderedSet` in rules (#9590)
+  `PR #9590 <https://github.com/pantsbuild/pants/pull/9590>`_
+
+* Some ExceptionSink refactors (#9584)
+  `PR #9584 <https://github.com/pantsbuild/pants/pull/9584>`_
+
+* Logger cleanup (#9578)
+  `PR #9578 <https://github.com/pantsbuild/pants/pull/9578>`_
+
+* Reorganize `engine/legacy` to only have legacy engine code (#9591)
+  `PR #9591 <https://github.com/pantsbuild/pants/pull/9591>`_
+
+* Remove "Executing process" text from V2 UI (#9568)
+  `PR #9568 <https://github.com/pantsbuild/pants/pull/9568>`_
+
+* Add `engine/collection.py` for the `Collection` newtype (#9586)
+  `PR #9586 <https://github.com/pantsbuild/pants/pull/9586>`_
+
+* Add `engine/unions.py` to consolidate union types into one file (#9580)
+  `PR #9580 <https://github.com/pantsbuild/pants/pull/9580>`_
+
+* Add `engine/addresses.py` for consolidated `Address` imports in V2 (#9575)
+  `PR #9575 <https://github.com/pantsbuild/pants/pull/9575>`_
+
+*  Use rust cpu_count crate to determine v2 UI swim lanes (#9574)
+  `PR #9574 <https://github.com/pantsbuild/pants/pull/9574>`_
+
+* Reorganize `rules/core` into `core/goals`, `core/project_info`, `core/util_rules`, and `core/target_types.py` (#9572)
+  `PR #9572 <https://github.com/pantsbuild/pants/pull/9572>`_
+
+Testing
+~~~~~~~
+
+* Fix test import and generic alias failures. (#9626)
+  `PR #9626 <https://github.com/pantsbuild/pants/pull/9626>`_
+
+* Use `--go-chroot` internally (#9579)
+  `PR #9579 <https://github.com/pantsbuild/pants/pull/9579>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Fixes for the proxy page. (#9628)
+  `PR #9628 <https://github.com/pantsbuild/pants/pull/9628>`_
+
+* Add description for the validate goal. (#9602)
+  `PR #9602 <https://github.com/pantsbuild/pants/pull/9602>`_
+
+* Fix typos. (#9607)
+  `PR #9607 <https://github.com/pantsbuild/pants/pull/9607>`_
+
+* Fix typo in V1 Python interpreter selection error message (#9589)
+  `PR #9589 <https://github.com/pantsbuild/pants/pull/9589>`_
+
 1.27.0rc0 (4/17/2020)
 ----------------------
 
