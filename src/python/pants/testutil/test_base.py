@@ -750,12 +750,13 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     def make_snapshot(self, files):
         """Makes a snapshot from a collection of files.
 
-        :param files: a dictionary, where key=filename, value=file_content where both are of type String.
+        :param files: a dictionary, where key=filename (str), value=file_content (str or bytes).
         :return: a Snapshot.
         """
         with temporary_dir() as temp_dir:
             for file_name, content in files.items():
-                safe_file_dump(os.path.join(temp_dir, file_name), content)
+                mode = "wb" if isinstance(content, bytes) else "w"
+                safe_file_dump(os.path.join(temp_dir, file_name), content, mode=mode)
             return self.scheduler.capture_snapshots(
                 (PathGlobsAndRoot(PathGlobs(("**",)), temp_dir),)
             )[0]
