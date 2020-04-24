@@ -8,6 +8,7 @@ python_library(
     'src/python/pants/backend/codegen/antlr/python',
     'src/python/pants/backend/codegen/jaxb',
     'src/python/pants/backend/codegen/protobuf/java',
+    'src/python/pants/backend/codegen/protobuf/python',
     'src/python/pants/backend/codegen/ragel/java',
     'src/python/pants/backend/codegen/thrift/java',
     'src/python/pants/backend/codegen/thrift/python',
