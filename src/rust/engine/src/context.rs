@@ -124,11 +124,13 @@ impl Core {
         std::fs::read_to_string(&path)
           .map_err(|err| format!("Error reading OAuth bearer token file {:?}: {}", path, err))
           .map(|v| v.trim_matches(|c| c == '\r' || c == '\n').to_owned())
-          .and_then(|v| if v.find(|c| c == '\r' || c == '\n').is_some() {
-            Err(format!("OAuth bearer token file must not contain multiple lines"))
-          } else {
-            Ok(v)
-          })?
+          .and_then(|v| {
+            if v.find(|c| c == '\r' || c == '\n').is_some() {
+              Err("OAuth bearer token file must not contain multiple lines".to_string())
+            } else {
+              Ok(v)
+            }
+          })?,
       )
     } else {
       None
