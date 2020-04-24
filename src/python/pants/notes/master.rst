@@ -104,7 +104,7 @@ Refactoring, Improvements, and Tooling
 * Add `engine/addresses.py` for consolidated `Address` imports in V2 (#9575)
   `PR #9575 <https://github.com/pantsbuild/pants/pull/9575>`_
 
-*  Use rust cpu_count crate to determine v2 UI swim lanes (#9574)
+* Use rust cpu_count crate to determine v2 UI swim lanes (#9574)
   `PR #9574 <https://github.com/pantsbuild/pants/pull/9574>`_
 
 * Reorganize `rules/core` into `core/goals`, `core/project_info`, `core/util_rules`, and `core/target_types.py` (#9572)
