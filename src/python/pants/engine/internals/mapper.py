@@ -8,7 +8,8 @@ from typing import Any, Dict, Iterable, Optional, Tuple, Union, cast
 from pants.base.exceptions import DuplicateNameError, MappingError, UnaddressableObjectError
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.internals.objects import Serializable
-from pants.engine.internals.parser import Parser
+from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
+from pants.option.global_options import BuildFileImportsBehavior
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
 
@@ -29,7 +30,13 @@ class AddressMap:
     objects_by_name: Dict[str, ThinAddressableObject]
 
     @classmethod
-    def parse(cls, filepath: str, filecontent: bytes, parser: Parser) -> "AddressMap":
+    def parse(
+        cls,
+        filepath: str,
+        filecontent: bytes,
+        parser: Parser,
+        extra_symbols: BuildFilePreludeSymbols,
+    ) -> "AddressMap":
         """Parses a source for addressable Serializable objects.
 
         No matter the parser used, the parsed and mapped addressable objects are all 'thin'; ie: any
@@ -41,7 +48,7 @@ class AddressMap:
         :param parser: The parser cls to use.
         """
         try:
-            objects = parser.parse(filepath, filecontent)
+            objects = parser.parse(filepath, filecontent, extra_symbols)
         except Exception as e:
             raise MappingError(f"Failed to parse {filepath}:\n{e!r}")
         objects_by_name: Dict[str, ThinAddressableObject] = {}
@@ -160,6 +167,8 @@ class AddressMapper:
     """Configuration to parse build files matching a filename pattern."""
 
     parser: Parser
+    prelude_glob_patterns: Tuple[str, ...]
+    build_file_imports_behavior: BuildFileImportsBehavior
     build_patterns: Tuple[str, ...]
     build_ignore_patterns: Tuple[str, ...]
     exclude_target_regexps: Tuple[str, ...]
@@ -168,6 +177,8 @@ class AddressMapper:
     def __init__(
         self,
         parser: Parser,
+        prelude_glob_patterns,
+        build_file_imports_behavior,
         build_patterns: Optional[Iterable[str]] = None,
         build_ignore_patterns: Optional[Iterable[str]] = None,
         exclude_target_regexps: Optional[Iterable[str]] = None,
@@ -185,6 +196,8 @@ class AddressMapper:
         :param exclude_target_regexps: A list of regular expressions for excluding targets.
         """
         self.parser = parser
+        self.prelude_glob_patterns = prelude_glob_patterns
+        self.build_file_imports_behavior = build_file_imports_behavior
         self.build_patterns = tuple(build_patterns or ["BUILD", "BUILD.*"])
         self.build_ignore_patterns = tuple(build_ignore_patterns or [])
         self.exclude_target_regexps = tuple(exclude_target_regexps or [])

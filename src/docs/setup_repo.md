@@ -192,54 +192,22 @@ This variable should point to a file containing trusted certificates:
 export REQUESTS_CA_BUNDLE=/etc/certs/latest.pem
 ```
 
-### Bootstrapping Ivy
-
-Pants fetches the Ivy tool with an initial manual bootstrapping step using the Python requests library.
-If you do not want to use `HTTP_PROXY` or `HTTPS_PROXY` as described above, you can re-redirect
-this initial download to another URL with a setting in `pants.toml`:
-
-    :::toml
-    [ivy]
-    bootstrap_jar_url = "https://proxy.corp.example.com/content/groups/public/org/apache/ivy/ivy/2.3.0/ivy-2.3.0.jar"
-
-You may also encounter issues downloading this .jar file if you are using self-signed SSL certificates.
-See the section on Configuring the Python requests library above.
-
 
 ## Nexus as proxy
 
-If your site uses Sonatype Nexus or another reverse proxy for
-artifacts, you do not need to use a separate HTTP proxy.  Contact the
-reverse proxy administrator to setup a proxy for the sites listed in
-`build-support/ivy/settings.xml` and `pants.toml`.  By default these
-are `https://repo1.maven.org/maven2/` and `https://dl.bintray.com/pantsbuild/maven/`:
-
-Here is an excerpt of a modified ivysettings.xml with some possible configurations:
-
-```
-<macrodef name="_remote_resolvers">
-    <chain returnFirst="true">
-      <ibiblio name="example-corp-maven"
-               m2compatible="true"
-               usepoms="true"
-               root="https://nexus.example.com/content/groups/public/"/>
-      <ibiblio name="maven.twttr.com-maven"
-               m2compatible="true"
-               usepoms="true"
-               root="https://nexus.example.com/content/repositories/maven.twttr.com/"/>
-  </chain>
-</macrodef>
-```
+If your site uses Sonatype Nexus or another reverse proxy for artifacts, you do not need to use a
+separate HTTP proxy.  Contact the reverse proxy administrator to setup a proxy for the sites
+listed in `pants.toml`.  These are likely to be `https://repo1.maven.org/maven2/` and
+`binaries.pantsbuild.org`.
 
 ### Redirecting tool downloads to other servers
 
-For the binary support tools like protoc, you will need to setup a
-proxy for the `dl.bintray.com` repo, or create your own repo of build
-tools:
+For the binary support tools like protoc, you will need to setup a proxy for the
+`binaries.pantsbuild.org` repo, or create your own repo of build tools:
 
     :::toml
     binaries_baseurls = [
-      "https://nexus.example.com/content/repositories/dl.bintray.com/pantsbuild/bin/build-support",
+      "https://nexus.example.com/content/repositories/binaries.pantsbuild.org",
     ]
 
 ### Redirecting python requirements to other servers
@@ -249,8 +217,7 @@ For Python repos, you need to override the following settings in `pants.toml`:
     :::toml
     [python-repos]
     repos = [
-      "https://pantsbuild.github.io/cheeseshop/third_party/python/dist/index.html",
-      "https://pantsbuild.github.io/cheeseshop/third_party/python/index.html",
+      "https://wheels.example.com/content/repositories/",
     ]
 
     indexes = [
@@ -264,3 +231,17 @@ You can also reference a local repo relative to your project's build root with t
     repos = [
       "%(buildroot)s/repo_path",
     ]
+
+### Bootstrapping Ivy
+
+For JVM publishing, pants fetches the Ivy tool with an initial manual bootstrapping step using the
+Python requests library.
+If you do not want to use `HTTP_PROXY` or `HTTPS_PROXY` as described above, you can re-redirect
+this initial download to another URL with a setting in `pants.toml`:
+
+    :::toml
+    [ivy]
+    bootstrap_jar_url = "https://proxy.corp.example.com/content/groups/public/org/apache/ivy/ivy/2.3.0/ivy-2.3.0.jar"
+
+You may also encounter issues downloading this .jar file if you are using self-signed SSL certificates.
+See the section on Configuring the Python requests library above.

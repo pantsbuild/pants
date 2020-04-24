@@ -209,6 +209,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Wolfram Arnold
 + Xaelias
 + Yi Cheng
++ Yuhan GUO
 + Yujie Chen
 + billybecker
 + Ólafur Páll Geirsson

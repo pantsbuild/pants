@@ -415,6 +415,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
             pants_ignore_patterns=[],
             use_gitignore=False,
             local_store_dir=local_store_dir,
+            build_file_prelude_globs=(),
             build_file_imports_behavior=BuildFileImportsBehavior.error,
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
             native=init_native(),

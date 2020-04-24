@@ -4,10 +4,12 @@
 import logging
 import os
 import subprocess
-from typing import Iterable, Optional, Tuple, cast
+from pathlib import Path
+from typing import Callable, Iterable, List, Optional, Tuple, cast
 
 from pex.variables import Variables
 
+from pants.base.build_environment import get_buildroot
 from pants.option.custom_types import UnsetBool, file_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
@@ -122,7 +124,8 @@ class PythonSetup(Subsystem):
             "strings are supported: "
             '"<PATH>" (the contents of the PATH env var), '
             '"<PEXRC>" (paths in the PEX_PYTHON_PATH variable in a pexrc file), '
-            '"<PYENV>" (all python versions under $(pyenv root)/versions).',
+            '"<PYENV>" (all python versions under $(pyenv root)/versions).'
+            '"<PYENV_LOCAL>" (the python version in BUILD_ROOT/.python-version).',
         )
         register(
             "--resolver-use-manylinux",
@@ -231,6 +234,9 @@ class PythonSetup(Subsystem):
             "<PEXRC>": cls.get_pex_python_paths,
             "<PATH>": cls.get_environment_paths,
             "<PYENV>": lambda: cls.get_pyenv_paths(pyenv_root_func=pyenv_root_func),
+            "<PYENV_LOCAL>": lambda: cls.get_pyenv_paths(
+                pyenv_root_func=pyenv_root_func, pyenv_local=True
+            ),
         }
         expanded = []
         from_pexrc = None
@@ -274,22 +280,43 @@ class PythonSetup(Subsystem):
             return []
 
     @staticmethod
-    def get_pyenv_paths(pyenv_root_func=None):
+    def get_pyenv_paths(
+        *, pyenv_root_func: Optional[Callable] = None, pyenv_local: bool = False
+    ) -> List[str]:
         """Returns a list of paths to Python interpreters managed by pyenv.
 
         :param pyenv_root_func: A no-arg function that returns the pyenv root. Defaults to
                                 running `pyenv root`, but can be overridden for testing.
+        :param bool pyenv_local: If True, only use the interpreter specified by
+                                 '.python-version' file under `build_root`.
         """
         pyenv_root_func = pyenv_root_func or get_pyenv_root
         pyenv_root = pyenv_root_func()
         if pyenv_root is None:
             return []
-        versions_dir = os.path.join(pyenv_root, "versions")
+        versions_dir = Path(pyenv_root, "versions")
+
+        if pyenv_local:
+
+            local_version_file = Path(get_buildroot(), ".python-version")
+            if not local_version_file.exists():
+                logger.info(
+                    "No `.python-version` file found in the build root, "
+                    "but <PYENV_LOCAL> was set in `--python-setup-interpreter-constraints`."
+                )
+                return []
+
+            local_version = local_version_file.read_text().strip()
+            path = Path(versions_dir, local_version, "bin")
+            if path.is_dir():
+                return [str(path)]
+            return []
+
         paths = []
-        for version in sorted(os.listdir(versions_dir)):
-            path = os.path.join(versions_dir, version, "bin")
-            if os.path.isdir(path):
-                paths.append(path)
+        for version in sorted(versions_dir.iterdir()):
+            path = Path(versions_dir, version, "bin")
+            if path.is_dir():
+                paths.append(str(path))
         return paths
 
 

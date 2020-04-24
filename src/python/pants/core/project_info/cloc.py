@@ -45,7 +45,7 @@ async def download_cloc_script(cloc_binary_tool: ClocBinary) -> DownloadedClocSc
 
 
 class CountLinesOfCodeOptions(GoalSubsystem):
-    """Print counts of lines of code."""
+    """Count lines of code."""
 
     name = "cloc2"
 

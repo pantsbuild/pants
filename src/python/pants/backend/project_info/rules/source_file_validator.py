@@ -34,6 +34,8 @@ class DetailLevel(Enum):
 
 
 class ValidateOptions(GoalSubsystem):
+    """Validate sources against regexes."""
+
     name = "validate"
 
     @classmethod

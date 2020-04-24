@@ -355,15 +355,6 @@ class GlobalOptions(Subsystem):
             "per-workspace subdirectory.",
         )
         register(
-            "--pants-physical-workdir-source-control",
-            advanced=True,
-            type=bool,
-            default=False,
-            help="If tasks run processes which need access to source control state "
-            "applying this option will add a link from the physical workdir back to "
-            "any existing source control directories.",
-        )
-        register(
             "--pants-supportdir",
             advanced=True,
             metavar="<dir>",
@@ -726,6 +717,17 @@ class GlobalOptions(Subsystem):
                 "a Pants plugin: https://www.pantsbuild.org/howto_plugin.html."
             ),
             help="Whether to allow import statements in BUILD files",
+        )
+
+        register(
+            "--build-file-prelude-globs",
+            advanced=True,
+            type=list,
+            default=[],
+            help="Python files to evaluate and whose symbols should be exposed to all BUILD files ."
+            "This allows for writing functions which create multiple rules, or set default "
+            "arguments for rules. The order these files will be evaluated is undefined - they should not rely on each "
+            "other, or override symbols from each other.",
         )
 
         register(
