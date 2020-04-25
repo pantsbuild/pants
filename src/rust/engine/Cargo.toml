@@ -42,6 +42,7 @@ members = [
   "testutil/local_cas",
   "testutil/local_execution_server",
   "ui",
+  "watch",
   "workunit_store"
 ]
 
@@ -77,6 +78,7 @@ default-members = [
   "testutil/local_cas",
   "testutil/local_execution_server",
   "ui",
+  "watch",
   "workunit_store"
 ]
 
@@ -86,12 +88,10 @@ async-trait = "0.1"
 boxfuture = { path = "boxfuture" }
 bytes = "0.4.5"
 concrete_time = { path = "concrete_time" }
-crossbeam-channel = "0.3"
 fnv = "1.0.5"
 fs = { path = "fs" }
 futures01 = { package = "futures", version = "0.1" }
 futures = { version = "0.3", features = ["compat"] }
-futures-locks = "0.3.0"
 graph = { path = "graph" }
 hashing = { path = "hashing" }
 indexmap = "1.0.2"
@@ -101,11 +101,6 @@ log = "0.4"
 logging = { path = "logging" }
 num_cpus = "1"
 num_enum = "0.4"
-# notify is currently an experimental API, we are pinning to https://docs.rs/notify/5.0.0-pre.1/notify/
-# because the latest prerelease at time of writing has removed the debounced watcher which we would like to use.
-# The author suggests they will add the debounced watcher back into the stable 5.0.0 release. When that happens
-# we can move to it.
-notify = { git = "https://github.com/notify-rs/notify", rev = "fba00891d9105e2f581c69fbe415a58cb7966fdd" }
 parking_lot = "0.6"
 process_execution = { path = "process_execution" }
 rand = "0.6"
@@ -121,6 +116,7 @@ tokio = { version = "0.2", features = ["rt-threaded"] }
 ui = { path = "ui" }
 url = "2.1"
 uuid = { version = "0.7", features = ["v4"] }
+watch = { path = "watch" }
 workunit_store = { path = "workunit_store" }
 
 [dev-dependencies]
