@@ -926,19 +926,19 @@ class TestCodegen(TestBase):
         self.create_files("src/avro", files=["f.avro"])
         protocol_sources = AvroSources(["*.avro"], address=addr)
 
-        # First, get the original protocol sources
+        # First, get the original protocol sources.
         hydrated_protocol_sources = self.request_single_product(
             HydratedSources, HydrateSourcesRequest(protocol_sources)
         )
         assert hydrated_protocol_sources.snapshot.files == ("src/avro/f.avro",)
 
-        # Test directly feeding the protocol sources into the codegen rule
+        # Test directly feeding the protocol sources into the codegen rule.
         generated_sources = self.request_single_product(
             GeneratedSources, GenerateFortranFromAvroRequest(hydrated_protocol_sources.snapshot)
         )
         assert generated_sources.snapshot.files == ("src/fortran/f.f95",)
 
-        # Test that HydrateSourcesRequest can also be used
+        # Test that HydrateSourcesRequest can also be used.
         generated_via_hydrate_sources = self.request_single_product(
             HydratedSources,
             HydrateSourcesRequest(protocol_sources, codegen_language=FortranSources),

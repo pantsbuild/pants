@@ -915,9 +915,25 @@ class AmbiguousImplementationsException(Exception):
         bulleted_list_sep = "\n  * "
         super().__init__(
             f"Multiple of the registered implementations for {goal_description} work for "
-            f"{target.address} (target type {repr(target.alias)}).\n\n"
-            "It is ambiguous which implementation to use. Possible implementations:"
+            f"{target.address} (target type {repr(target.alias)}). It is ambiguous which "
+            "implementation to use.\n\nPossible implementations:"
             f"{bulleted_list_sep}{bulleted_list_sep.join(possible_config_types)}"
+        )
+
+
+class AmbiguousCodegenImplementationsException(Exception):
+    """Exception for when there are multiple codegen implementations for the same path."""
+
+    def __init__(self, generators: Iterable[Type["GenerateSourcesRequest"]],) -> None:
+        example_generator = list(generators)[0]
+        input = example_generator.input.__name__
+        output = example_generator.output.__name__
+        possible_generators = sorted(generator.__name__ for generator in generators)
+        bulleted_list_sep = "\n  * "
+        super().__init__(
+            f"Multiple of the registered code generators can generate {output} given {input}. It "
+            "is ambiguous which implementation to use.\n\nPossible implementations:"
+            f"{bulleted_list_sep}{bulleted_list_sep.join(possible_generators)}"
         )
 
 
@@ -1380,7 +1396,7 @@ async def hydrate_sources(
     if not relevant_generate_request_types:
         return HydratedSources(EMPTY_SNAPSHOT, sources_field.filespec)
     if len(relevant_generate_request_types) > 1:
-        raise ValueError()
+        raise AmbiguousCodegenImplementationsException(relevant_generate_request_types)
     generate_request_type = relevant_generate_request_types[0]
     generated_sources = await Get[GeneratedSources](
         GenerateSourcesRequest, generate_request_type(snapshot)
