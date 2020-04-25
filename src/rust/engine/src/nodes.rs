@@ -1063,7 +1063,7 @@ impl Node for NodeKey {
 
       // We're starting a new workunit: record our parent, and set the current parent to our span.
       let parent_id = std::mem::replace(&mut workunit_state.parent_id, Some(span_id.clone()));
-      let metadata = WorkunitMetadata { desc, display, entry_id: context.entry_id };
+      let metadata = WorkunitMetadata { desc, display, entry_id: context.entry_id, waiting: false };
 
       context
         .session

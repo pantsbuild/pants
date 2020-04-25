@@ -66,6 +66,7 @@ pub struct WorkunitMetadata {
   pub desc: Option<String>,
   pub display: bool,
   pub entry_id: Option<EntryId>,
+  pub waiting: bool
 }
 
 impl WorkunitMetadata {
@@ -74,6 +75,7 @@ impl WorkunitMetadata {
       display: true,
       desc: None,
       entry_id: None,
+      waiting: false,
     }
   }
 }
