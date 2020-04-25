@@ -38,7 +38,7 @@ from pants.engine.fs import (
 from pants.engine.legacy.structs import BundleAdaptor
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
-from pants.engine.unions import UnionMembership
+from pants.engine.unions import UnionMembership, union
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper, Filespec
 from pants.util.collections import ensure_list, ensure_str_list
 from pants.util.frozendict import FrozenDict
@@ -1162,81 +1162,8 @@ class DictStringToStringSequenceField(PrimitiveField, metaclass=ABCMeta):
 
 
 # -----------------------------------------------------------------------------------------------
-# Common Fields used across most targets
+# Sources and codegen
 # -----------------------------------------------------------------------------------------------
-
-
-class Tags(StringSequenceField):
-    """Arbitrary strings that you can use to describe a target.
-
-    For example, you may tag some test targets with 'integration_test' so that you could run
-    `./pants --tags='integration_test' test ::` to only run on targets with that tag.
-    """
-
-    alias = "tags"
-
-
-class DescriptionField(StringField):
-    """A human-readable description of the target.
-
-    Use `./pants list --documented ::` to see all targets with descriptions.
-    """
-
-    alias = "description"
-
-
-# TODO(#9388): remove? We don't want this in V2, but maybe keep it for V1.
-class NoCacheField(BoolField):
-    """If True, don't store results for this target in the V1 cache."""
-
-    alias = "no_cache"
-    default = False
-    v1_only = True
-
-
-# TODO(#9388): remove?
-class ScopeField(StringField):
-    """A V1-only field for the scope of the target, which is used by the JVM to determine the
-    target's inclusion in the class path.
-
-    See `pants.build_graph.target_scopes.Scopes`.
-    """
-
-    alias = "scope"
-    v1_only = True
-
-
-# TODO(#9388): Remove.
-class IntransitiveField(BoolField):
-    alias = "_transitive"
-    default = False
-    v1_only = True
-
-
-COMMON_TARGET_FIELDS = (Tags, DescriptionField, NoCacheField, ScopeField, IntransitiveField)
-
-
-# NB: To hydrate the dependencies into Targets, use
-# `await Get[Targets](Addresses(tgt[Dependencies].value)`.
-class Dependencies(PrimitiveField):
-    """Addresses to other targets that this target depends on, e.g. `['src/python/project:lib']`."""
-
-    alias = "dependencies"
-    value: Optional[Tuple[Address, ...]]
-    default = None
-
-    # NB: The type hint for `raw_value` is a lie. While we do expect end-users to use
-    # Iterable[str], the Struct and Addressable code will have already converted those strings
-    # into a List[Address]. But, that's an implementation detail and we don't want our
-    # documentation, which is auto-generated from these type hints, to leak that.
-    @classmethod
-    def compute_value(
-        cls, raw_value: Optional[Iterable[str]], *, address: Address
-    ) -> Optional[Tuple[Address, ...]]:
-        value_or_default = super().compute_value(raw_value, address=address)
-        if value_or_default is None:
-            return None
-        return tuple(sorted(value_or_default))
 
 
 class Sources(AsyncField):
@@ -1346,6 +1273,7 @@ class Sources(AsyncField):
 @dataclass(frozen=True)
 class HydrateSourcesRequest:
     field: Sources
+    codegen_language: Optional[Type[Sources]] = None
 
 
 @dataclass(frozen=True)
@@ -1357,9 +1285,55 @@ class HydratedSources:
         return EagerFilesetWithSpec(address.spec_path, self.filespec, self.snapshot)
 
 
+class CodegenSources(Sources):
+    pass
+
+
+@union
+@dataclass(frozen=True)
+class GenerateSourcesRequest:
+    """A request to go from protocol sources -> a particular language.
+
+    This should be subclassed for each distinct codegen implementation. The subclasses must define
+    the class properties `input` and `output`. The subclass must also be registered via
+    `UnionRule(GenerateSourcesRequest, GenerateFortranFromAvroRequest)`, for example.
+
+    The rule to actually implement the codegen should take the subclass as input, and it must
+    return `GeneratedSources`.
+
+    For example:
+
+        class GenerateFortranFromAvroRequest:
+            input = AvroSources
+            output = FortranSources
+
+        @rule
+        def generate_fortran_from_avro(request: GenerateFortranFromAvroRequest) -> GeneratedSources:
+            ...
+
+        def rules():
+            return [
+                generate_fortran_from_avro,
+                UnionRule(GenerateSourcesRequest, GenerateFortranFromAvroRequest),
+            ]
+    """
+
+    protocol_sources: Snapshot
+
+    input: ClassVar[Type[CodegenSources]]
+    output: ClassVar[Type[Sources]]
+
+
+@dataclass(frozen=True)
+class GeneratedSources:
+    snapshot: Snapshot
+
+
 @rule
 async def hydrate_sources(
-    request: HydrateSourcesRequest, glob_match_error_behavior: GlobMatchErrorBehavior
+    request: HydrateSourcesRequest,
+    glob_match_error_behavior: GlobMatchErrorBehavior,
+    union_membership: UnionMembership,
 ) -> HydratedSources:
     sources_field = request.field
     globs = sources_field.sanitized_raw_value
@@ -1387,7 +1361,109 @@ async def hydrate_sources(
         )
     )
     sources_field.validate_snapshot(snapshot)
-    return HydratedSources(snapshot, sources_field.filespec)
+
+    should_generate_sources = request.codegen_language is not None and isinstance(
+        sources_field, CodegenSources
+    )
+    if not should_generate_sources:
+        return HydratedSources(snapshot, sources_field.filespec)
+
+    generate_request_types: Iterable[Type[GenerateSourcesRequest]] = union_membership.union_rules[
+        GenerateSourcesRequest
+    ]
+    relevant_generate_request_types = [
+        generate_request_type
+        for generate_request_type in generate_request_types
+        if isinstance(sources_field, generate_request_type.input)
+        and generate_request_type.output == request.codegen_language
+    ]
+    if not relevant_generate_request_types:
+        return HydratedSources(EMPTY_SNAPSHOT, sources_field.filespec)
+    if len(relevant_generate_request_types) > 1:
+        raise ValueError()
+    generate_request_type = relevant_generate_request_types[0]
+    generated_sources = await Get[GeneratedSources](
+        GenerateSourcesRequest, generate_request_type(snapshot)
+    )
+    return HydratedSources(generated_sources.snapshot, sources_field.filespec)
+
+
+# -----------------------------------------------------------------------------------------------
+# Other common Fields used across most targets
+# -----------------------------------------------------------------------------------------------
+
+
+class Tags(StringSequenceField):
+    """Arbitrary strings that you can use to describe a target.
+
+    For example, you may tag some test targets with 'integration_test' so that you could run
+    `./pants --tags='integration_test' test ::` to only run on targets with that tag.
+    """
+
+    alias = "tags"
+
+
+class DescriptionField(StringField):
+    """A human-readable description of the target.
+
+    Use `./pants list --documented ::` to see all targets with descriptions.
+    """
+
+    alias = "description"
+
+
+# TODO(#9388): remove? We don't want this in V2, but maybe keep it for V1.
+class NoCacheField(BoolField):
+    """If True, don't store results for this target in the V1 cache."""
+
+    alias = "no_cache"
+    default = False
+    v1_only = True
+
+
+# TODO(#9388): remove?
+class ScopeField(StringField):
+    """A V1-only field for the scope of the target, which is used by the JVM to determine the
+    target's inclusion in the class path.
+
+    See `pants.build_graph.target_scopes.Scopes`.
+    """
+
+    alias = "scope"
+    v1_only = True
+
+
+# TODO(#9388): Remove.
+class IntransitiveField(BoolField):
+    alias = "_transitive"
+    default = False
+    v1_only = True
+
+
+COMMON_TARGET_FIELDS = (Tags, DescriptionField, NoCacheField, ScopeField, IntransitiveField)
+
+
+# NB: To hydrate the dependencies into Targets, use
+# `await Get[Targets](Addresses(tgt[Dependencies].value)`.
+class Dependencies(PrimitiveField):
+    """Addresses to other targets that this target depends on, e.g. `['src/python/project:lib']`."""
+
+    alias = "dependencies"
+    value: Optional[Tuple[Address, ...]]
+    default = None
+
+    # NB: The type hint for `raw_value` is a lie. While we do expect end-users to use
+    # Iterable[str], the Struct and Addressable code will have already converted those strings
+    # into a List[Address]. But, that's an implementation detail and we don't want our
+    # documentation, which is auto-generated from these type hints, to leak that.
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Iterable[str]], *, address: Address
+    ) -> Optional[Tuple[Address, ...]]:
+        value_or_default = super().compute_value(raw_value, address=address)
+        if value_or_default is None:
+            return None
+        return tuple(sorted(value_or_default))
 
 
 # TODO: figure out what support looks like for this with the Target API. The expected value is an
@@ -1444,5 +1520,6 @@ def rules():
         find_valid_configurations,
         hydrate_sources,
         RootRule(TargetsToValidConfigurationsRequest),
+        RootRule(GenerateSourcesRequest),
         RootRule(HydrateSourcesRequest),
     ]

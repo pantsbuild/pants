@@ -11,7 +11,13 @@ from typing_extensions import final
 
 from pants.base.specs import FilesystemLiteralSpec
 from pants.engine.addresses import Address
-from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, PathGlobs, Snapshot
+from pants.engine.fs import (
+    EMPTY_DIRECTORY_DIGEST,
+    FileContent,
+    InputFilesContent,
+    PathGlobs,
+    Snapshot,
+)
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, Params
@@ -19,10 +25,13 @@ from pants.engine.target import (
     AmbiguousImplementationsException,
     AsyncField,
     BoolField,
+    CodegenSources,
     Configuration,
     ConfigurationWithOrigin,
     DictStringToStringField,
     DictStringToStringSequenceField,
+    GeneratedSources,
+    GenerateSourcesRequest,
     HydratedSources,
     HydrateSourcesRequest,
     InvalidFieldChoiceException,
@@ -751,7 +760,7 @@ def test_dict_string_to_string_sequence_field() -> None:
 
 
 # -----------------------------------------------------------------------------------------------
-# Test common fields
+# Test Sources
 # -----------------------------------------------------------------------------------------------
 
 
@@ -866,3 +875,98 @@ class TestSources(TestBase):
             "f2.txt",
             "f3.txt",
         )
+
+
+# -----------------------------------------------------------------------------------------------
+# Test Codegen
+# -----------------------------------------------------------------------------------------------
+
+
+class AvroSources(CodegenSources):
+    pass
+
+
+class AvroLibrary(Target):
+    alias = "avro_library"
+    core_fields = (AvroSources,)
+
+
+class GenerateFortranFromAvroRequest(GenerateSourcesRequest):
+    input = AvroSources
+    output = FortranSources
+
+
+@rule
+async def generate_fortran_from_avro(request: GenerateFortranFromAvroRequest) -> GeneratedSources:
+    protocol_files = request.protocol_sources.files
+
+    def generate_fortran(fp: str) -> FileContent:
+        parent = str(PurePath(fp).parent).replace("src/avro", "src/fortran")
+        file_name = f"{PurePath(fp).stem}.f95"
+        return FileContent(str(PurePath(parent, file_name)), b"Generated")
+
+    result = await Get[Snapshot](InputFilesContent([generate_fortran(fp) for fp in protocol_files]))
+    return GeneratedSources(result)
+
+
+class TestCodegen(TestBase):
+    @classmethod
+    def rules(cls):
+        return (
+            *super().rules(),
+            *target_rules(),
+            generate_fortran_from_avro,
+            RootRule(GenerateFortranFromAvroRequest),
+            RootRule(HydrateSourcesRequest),
+            UnionRule(GenerateSourcesRequest, GenerateFortranFromAvroRequest),
+        )
+
+    def test_generate_sources(self) -> None:
+        addr = Address.parse("src/avro:lib")
+        self.create_files("src/avro", files=["f.avro"])
+        protocol_sources = AvroSources(["*.avro"], address=addr)
+
+        # First, get the original protocol sources
+        hydrated_protocol_sources = self.request_single_product(
+            HydratedSources, HydrateSourcesRequest(protocol_sources)
+        )
+        assert hydrated_protocol_sources.snapshot.files == ("src/avro/f.avro",)
+
+        # Test directly feeding the protocol sources into the codegen rule
+        generated_sources = self.request_single_product(
+            GeneratedSources, GenerateFortranFromAvroRequest(hydrated_protocol_sources.snapshot)
+        )
+        assert generated_sources.snapshot.files == ("src/fortran/f.f95",)
+
+        # Test that HydrateSourcesRequest can also be used
+        generated_via_hydrate_sources = self.request_single_product(
+            HydratedSources,
+            HydrateSourcesRequest(protocol_sources, codegen_language=FortranSources),
+        )
+        assert generated_via_hydrate_sources.snapshot.files == ("src/fortran/f.f95",)
+
+    def test_works_with_subclass_fields(self) -> None:
+        class CustomAvroSources(AvroSources):
+            pass
+
+        addr = Address.parse("src/avro:lib")
+        self.create_files("src/avro", files=["f.avro"])
+        protocol_sources = CustomAvroSources(["*.avro"], address=addr)
+        generated = self.request_single_product(
+            HydratedSources,
+            HydrateSourcesRequest(protocol_sources, codegen_language=FortranSources),
+        )
+        assert generated.snapshot.files == ("src/fortran/f.f95",)
+
+    def test_cannot_generate_language(self) -> None:
+        class SmalltalkSources(Sources):
+            pass
+
+        addr = Address.parse("src/avro:lib")
+        self.create_files("src/avro", files=["f.avro"])
+        protocol_sources = AvroSources(["*.avro"], address=addr)
+        generated = self.request_single_product(
+            HydratedSources,
+            HydrateSourcesRequest(protocol_sources, codegen_language=SmalltalkSources),
+        )
+        assert generated.snapshot.files == ()
