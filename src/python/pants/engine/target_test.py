@@ -97,11 +97,6 @@ class FortranSources(AsyncField):
             return None
         return tuple(ensure_str_list(value_or_default))
 
-    @final
-    @property
-    def request(self) -> "FortranSourcesRequest":
-        return FortranSourcesRequest(self)
-
 
 @dataclass(frozen=True)
 class FortranSourcesRequest:
@@ -785,7 +780,9 @@ class TestSources(TestBase):
         addr = Address.parse("src/fortran:lib")
         self.create_files("src/fortran", files=["f1.f95", "f2.f95", "f1.f03", "ignored.f03"])
         sources = Sources(["f1.f95", "*.f03", "!ignored.f03", "!**/ignore*"], address=addr)
-        hydrated_sources = self.request_single_product(HydratedSources, sources.request)
+        hydrated_sources = self.request_single_product(
+            HydratedSources, HydrateSourcesRequest(sources)
+        )
         assert hydrated_sources.snapshot.files == ("src/fortran/f1.f03", "src/fortran/f1.f95")
 
         # Also test that the Filespec is correct. This does not need hydration to be calculated.
@@ -798,7 +795,7 @@ class TestSources(TestBase):
         self.create_files("", files=["f1.f95"])
         sources = Sources(["non_existent.f95"], address=Address.parse(":lib"))
         with pytest.raises(ExecutionError) as exc:
-            self.request_single_product(HydratedSources, sources.request)
+            self.request_single_product(HydratedSources, HydrateSourcesRequest(sources))
         assert "Unmatched glob" in str(exc.value)
         assert "//:lib" in str(exc.value)
         assert "non_existent.f95" in str(exc.value)
@@ -815,7 +812,9 @@ class TestSources(TestBase):
         sources = DefaultSources(None, address=addr)
         assert set(sources.sanitized_raw_value) == set(DefaultSources.default)
 
-        hydrated_sources = self.request_single_product(HydratedSources, sources.request)
+        hydrated_sources = self.request_single_product(
+            HydratedSources, HydrateSourcesRequest(sources)
+        )
         assert hydrated_sources.snapshot.files == ("src/fortran/default.f95", "src/fortran/f1.f08")
 
     def test_expected_file_extensions(self) -> None:
@@ -826,14 +825,14 @@ class TestSources(TestBase):
         self.create_files("src/fortran", files=["s.f95", "s.f03", "s.f08"])
         sources = ExpectedExtensionsSources(["s.f*"], address=addr)
         with pytest.raises(ExecutionError) as exc:
-            self.request_single_product(HydratedSources, sources.request)
+            self.request_single_product(HydratedSources, HydrateSourcesRequest(sources))
         assert "s.f08" in str(exc.value)
         assert str(addr) in str(exc.value)
 
         # Also check that we support valid sources
         valid_sources = ExpectedExtensionsSources(["s.f95"], address=addr)
         assert self.request_single_product(
-            HydratedSources, valid_sources.request
+            HydratedSources, HydrateSourcesRequest(valid_sources)
         ).snapshot.files == ("src/fortran/s.f95",)
 
     def test_expected_num_files(self) -> None:
@@ -848,7 +847,8 @@ class TestSources(TestBase):
 
         def hydrate(sources_cls: Type[Sources], sources: Iterable[str]) -> HydratedSources:
             return self.request_single_product(
-                HydratedSources, sources_cls(sources, address=Address.parse(":example")).request
+                HydratedSources,
+                HydrateSourcesRequest(sources_cls(sources, address=Address.parse(":example"))),
             )
 
         with pytest.raises(ExecutionError) as exc:

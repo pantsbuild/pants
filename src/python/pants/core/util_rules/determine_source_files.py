@@ -89,7 +89,7 @@ async def determine_all_source_files(request: AllSourceFilesRequest) -> SourceFi
         )
     else:
         all_hydrated_sources = await MultiGet(
-            Get[HydratedSources](HydrateSourcesRequest, sources_field.request)
+            Get[HydratedSources](HydrateSourcesRequest(sources_field))
             for sources_field in request.sources_fields
         )
         digests_to_merge = tuple(
@@ -104,7 +104,7 @@ async def determine_specified_source_files(request: SpecifiedSourceFilesRequest)
     """Determine the specified `sources` for targets, possibly finding a subset of the original
     `sources` fields if the user supplied file arguments."""
     all_hydrated_sources = await MultiGet(
-        Get[HydratedSources](HydrateSourcesRequest, sources_field_with_origin[0].request)
+        Get[HydratedSources](HydrateSourcesRequest(sources_field_with_origin[0]))
         for sources_field_with_origin in request.sources_fields_with_origins
     )
 

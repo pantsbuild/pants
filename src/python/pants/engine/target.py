@@ -155,13 +155,8 @@ class PrimitiveField(Field, metaclass=ABCMeta):
         return f"{self.alias}={self.value}"
 
 
-# Type alias to express the intent that the type should be a new Request class created to
-# correspond with its AsyncField.
-AsyncFieldRequest = Any
-
-
 @frozen_after_init
-@dataclass(unsafe_hash=True)  # type: ignore[misc]   # https://github.com/python/mypy/issues/5374
+@dataclass(unsafe_hash=True)
 class AsyncField(Field, metaclass=ABCMeta):
     """A field that needs the engine in order to be hydrated.
 
@@ -170,10 +165,8 @@ class AsyncField(Field, metaclass=ABCMeta):
     using tuples rather than lists and using `FrozenOrderedSet` rather than `set`.
 
     You should also create corresponding HydratedField and HydrateFieldRequest classes and define a
-    rule to go from this HydrateFieldRequest to HydratedField. The HydrateFieldRequest type must
-    be registered as a RootRule. Then, implement the property `AsyncField.request` to instantiate
-    the HydrateFieldRequest type. If you use MyPy, you should mark `AsyncField.request` as
-    `@final` (from `typing_extensions)` to ensure that subclasses don't change this property.
+    rule to go from this HydrateFieldRequest to HydratedField. The HydrateFieldRequest type should
+    have an attribute storing the underlying AsyncField; it also must be registered as a RootRule.
 
     For example:
 
@@ -185,11 +178,6 @@ class AsyncField(Field, metaclass=ABCMeta):
                 raw_value: Optional[List[str]], *, address: Address
             ) -> Optional[Tuple[str, ...]]:
                 ...
-
-            @final
-            @property
-            def request(self) -> HydrateSourcesRequest:
-                return HydrateSourcesRequest(self)
 
             # Example extension point provided by this field. Subclasses can override this to do
             # whatever validation they'd like. Each AsyncField must define its own entry points
@@ -222,10 +210,8 @@ class AsyncField(Field, metaclass=ABCMeta):
     Then, call sites can `await Get` if they need to hydrate the field, even if they subclassed
     the original `AsyncField` to have custom behavior:
 
-        sources1 = await Get[HydratedSources](HydrateSourcesRequest, my_tgt.get(Sources).request)
-        sources2 = await Get[HydratedSources[(
-            HydrateSourcesRequest, custom_tgt.get(CustomSources).request
-        )
+        sources1 = await Get[HydratedSources](HydrateSourcesRequest(my_tgt.get(Sources)))
+        sources2 = await Get[HydratedSources[(HydrateSourcesRequest(custom_tgt.get(CustomSources)))
     """
 
     address: Address
@@ -259,22 +245,6 @@ class AsyncField(Field, metaclass=ABCMeta):
 
     def __str__(self) -> str:
         return f"{self.alias}={self.sanitized_raw_value}"
-
-    @property
-    @abstractmethod
-    def request(self) -> AsyncFieldRequest:
-        """Wrap the field in its corresponding Request type.
-
-        This is necessary to avoid ambiguity in the V2 rule graph when dealing with possible
-        subclasses of this AsyncField.
-
-        For example:
-
-            @final
-            @property
-            def request() -> HydrateSourcesRequest:
-                return HydrateSourcesRequest(self)
-        """
 
 
 # -----------------------------------------------------------------------------------------------
@@ -1347,11 +1317,6 @@ class Sources(AsyncField):
                     f"The {repr(self.alias)} field in target {self.address} must have "
                     f"{expected_str}, but it had {pluralize(num_files, 'file')}."
                 )
-
-    @final
-    @property
-    def request(self) -> "HydrateSourcesRequest":
-        return HydrateSourcesRequest(self)
 
     @final
     def prefix_glob_with_address(self, glob: str) -> str:
