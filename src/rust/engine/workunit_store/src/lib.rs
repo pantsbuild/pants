@@ -31,7 +31,7 @@ use rand::thread_rng;
 use rand::Rng;
 use std::collections::{BinaryHeap, HashMap};
 use tokio::task_local;
-use graph::{EntryId, Node};
+use graph::EntryId;
 use petgraph::graph::{DiGraph, NodeIndex};
 
 use std::cell::RefCell;
@@ -162,7 +162,7 @@ impl WorkUnitStore {
       .collect()
   }
 
-  pub fn heavy_hitters<N: Node>(&self, k: usize) -> HashMap<String, Duration> {
+  pub fn heavy_hitters(&self, k: usize) -> HashMap<String, Duration> {
     use petgraph::Direction;
 
     let now = SystemTime::now();

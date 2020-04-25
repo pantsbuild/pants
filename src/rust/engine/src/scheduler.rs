@@ -15,7 +15,7 @@ use crate::context::{Context, Core};
 use crate::core::{Failure, Params, TypeId, Value};
 use crate::nodes::{NodeKey, Select, Tracer, Visualizer};
 use crate::watch::InvalidationWatcher;
-use graph::{Graph, InvalidationResult};
+use graph::InvalidationResult;
 use hashing;
 use indexmap::IndexMap;
 use log::{debug, info, warn};
@@ -356,7 +356,7 @@ impl Scheduler {
     let (sender, receiver) = mpsc::channel();
 
     Scheduler::execute_helper(context, sender, request.roots.clone(), 8);
-    let roots: Vec<NodeKey> = request
+    let _roots: Vec<NodeKey> = request
       .roots
       .clone()
       .into_iter()
@@ -380,9 +380,9 @@ impl Scheduler {
           if let Ok(res) = receiver.recv_timeout(refresh_interval) {
             break res;
           } else {
+            let workunit_store = session.workunit_store().clone();
             let render_result = Scheduler::display_ongoing_tasks(
-              &self.core.graph,
-              &roots,
+              workunit_store,
               display,
               &mut tasks_to_display,
             );
@@ -416,8 +416,7 @@ impl Scheduler {
   }
 
   fn display_ongoing_tasks(
-    graph: &Graph<NodeKey>,
-    roots: &[NodeKey],
+    workunit_store: WorkUnitStore,
     display: &Mutex<EngineDisplay>,
     tasks_to_display: &mut IndexMap<String, Duration>,
   ) -> Result<KeyboardCommand, String> {
@@ -427,7 +426,7 @@ impl Scheduler {
       let d = display.lock();
       d.worker_count()
     };
-    let heavy_hitters = graph.heavy_hitters(&roots, worker_count);
+    let heavy_hitters = workunit_store.heavy_hitters(worker_count);
 
     // Insert every one in the set of tasks to display.
     // For tasks already here, the durations are overwritten.
