@@ -25,7 +25,7 @@ class ExternalToolError(Exception):
 @dataclass(frozen=True)
 class ExternalToolRequest:
     url_to_fetch: UrlToFetch
-    exe: Optional[str]
+    exe: str
 
 
 @dataclass(frozen=True)
