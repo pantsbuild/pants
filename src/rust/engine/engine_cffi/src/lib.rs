@@ -357,7 +357,7 @@ fn make_core(
     types,
     intrinsics,
     PathBuf::from(build_root_buf.to_os_string()),
-    &ignore_patterns,
+    ignore_patterns,
     use_gitignore,
     PathBuf::from(local_store_dir_buf.to_os_string()),
     remote_execution,
@@ -906,12 +906,11 @@ pub extern "C" fn match_path_globs(path_globs: Handle, paths_buf: BufferBuffer) 
     }
   };
 
-  let paths = paths_buf
+  let matched = paths_buf
     .to_os_strings()
     .into_iter()
-    .map(PathBuf::from)
-    .collect::<Vec<_>>();
-  externs::store_bool(path_globs.matches(&paths)).into()
+    .any(|s| path_globs.matches(s.as_ref()));
+  externs::store_bool(matched).into()
 }
 
 #[no_mangle]

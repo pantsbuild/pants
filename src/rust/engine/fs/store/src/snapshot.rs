@@ -5,7 +5,8 @@ use crate::Store;
 use bazel_protos;
 use boxfuture::{BoxFuture, Boxable};
 use fs::{
-  Dir, File, GitignoreStyleExcludes, GlobMatching, PathGlobs, PathStat, PosixFS, SymlinkBehavior,
+  Dir, File, GitignoreStyleExcludes, GlobMatching, PathStat, PosixFS, PreparedPathGlobs,
+  SymlinkBehavior,
 };
 use futures::compat::Future01CompatExt;
 use futures::future::{self as future03, FutureExt, TryFutureExt};
@@ -504,7 +505,7 @@ impl Snapshot {
     store: Store,
     executor: task_executor::Executor,
     root_path: P,
-    path_globs: PathGlobs,
+    path_globs: PreparedPathGlobs,
     digest_hint: Option<Digest>,
   ) -> Result<Snapshot, String> {
     // Attempt to use the digest hint to load a Snapshot without expanding the globs; otherwise,
@@ -520,7 +521,7 @@ impl Snapshot {
     } else {
       let posix_fs = Arc::new(PosixFS::new_with_symlink_behavior(
         root_path,
-        GitignoreStyleExcludes::create(&[])?,
+        GitignoreStyleExcludes::create(vec![])?,
         executor,
         SymlinkBehavior::Oblivious,
       )?);
@@ -541,7 +542,7 @@ impl Snapshot {
   pub async fn get_snapshot_subset(
     store: Store,
     digest: Digest,
-    path_globs: PathGlobs,
+    path_globs: PreparedPathGlobs,
   ) -> Result<Snapshot, String> {
     use bazel_protos::remote_execution::{Directory, DirectoryNode, FileNode};
 
@@ -554,7 +555,7 @@ impl Snapshot {
         .get_directories()
         .iter()
         .map(move |node: &DirectoryNode| path_so_far.join(node.get_name()))
-        .filter(|path: &PathBuf| path_globs.matches(&[path.clone()]))
+        .filter(|path: &PathBuf| path_globs.matches(path))
         .collect();
 
       let file_paths: Vec<(PathBuf, Result<Digest, String>, bool)> = directory
@@ -567,7 +568,7 @@ impl Snapshot {
             node.is_executable,
           )
         })
-        .filter(|(path, _, _)| path_globs.matches(&[path.clone()]))
+        .filter(|(path, _, _)| path_globs.matches(path))
         .collect();
 
       let mut path_stats: Vec<PathStat> = vec![];

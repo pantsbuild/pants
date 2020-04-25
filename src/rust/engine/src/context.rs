@@ -69,7 +69,7 @@ impl Core {
     types: Types,
     intrinsics: Intrinsics,
     build_root: PathBuf,
-    ignore_patterns: &[String],
+    ignore_patterns: Vec<String>,
     use_gitignore: bool,
     local_store_dir: PathBuf,
     remote_execution: bool,
@@ -257,13 +257,8 @@ impl Core {
       None
     };
     let ignorer =
-      GitignoreStyleExcludes::create_with_gitignore_file(&ignore_patterns, gitignore_file)
-        .map_err(|e| {
-          format!(
-            "Could not parse build ignore inputs {:?}: {:?}",
-            ignore_patterns, e
-          )
-        })?;
+      GitignoreStyleExcludes::create_with_gitignore_file(ignore_patterns, gitignore_file)
+        .map_err(|e| format!("Could not parse build ignore patterns: {:?}", e))?;
 
     let watcher = InvalidationWatcher::new(
       Arc::downgrade(&graph),

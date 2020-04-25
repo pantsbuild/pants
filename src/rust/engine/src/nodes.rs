@@ -26,7 +26,7 @@ use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::{self, BufMut};
 use fs::{
   self, Dir, DirectoryListing, File, FileContent, GlobExpansionConjunction, GlobMatching, Link,
-  PathGlobs, PathStat, StrictGlobMatching, VFS,
+  PathGlobs, PathStat, PreparedPathGlobs, StrictGlobMatching, VFS,
 };
 use hashing;
 use process_execution::{self, MultiPlatformProcess, PlatformConstraint, Process, RelativePath};
@@ -481,7 +481,7 @@ impl From<Scandir> for NodeKey {
 pub struct Snapshot(pub Key);
 
 impl Snapshot {
-  fn create(context: Context, path_globs: PathGlobs) -> NodeFuture<store::Snapshot> {
+  fn create(context: Context, path_globs: PreparedPathGlobs) -> NodeFuture<store::Snapshot> {
     // Recursively expand PathGlobs into PathStats.
     // We rely on Context::expand tracking dependencies for scandirs,
     // and store::Snapshot::from_path_stats tracking dependencies for file digests.
@@ -499,7 +499,7 @@ impl Snapshot {
     .to_boxed()
   }
 
-  pub fn lift_path_globs(item: &Value) -> Result<PathGlobs, String> {
+  pub fn lift_path_globs(item: &Value) -> Result<PreparedPathGlobs, String> {
     let globs = externs::project_multi_strs(item, "globs");
 
     let description_of_origin_field = externs::project_str(item, "description_of_origin");
@@ -519,7 +519,8 @@ impl Snapshot {
     let conjunction_string = externs::project_str(&conjunction_obj, "value");
     let conjunction = GlobExpansionConjunction::create(&conjunction_string)?;
 
-    PathGlobs::create(&globs, strict_glob_matching, conjunction)
+    PathGlobs::new(globs.clone(), strict_glob_matching, conjunction)
+      .parse()
       .map_err(|e| format!("Failed to parse PathGlobs for globs({:?}): {}", globs, e))
   }
 
