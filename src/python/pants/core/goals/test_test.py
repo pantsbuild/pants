@@ -70,7 +70,11 @@ class MockTestConfiguration(TestConfiguration, metaclass=ABCMeta):
     @property
     def test_result(self) -> TestResult:
         return TestResult(
-            self.status(self.address), self.stdout(self.address), self.stderr(self.address)
+            status=self.status(self.address),
+            stdout=self.stdout(self.address),
+            stderr=self.stderr(self.address),
+            coverage_data=None,
+            xml_test_results=None,
         )
 
 
