@@ -18,7 +18,7 @@ from pants.engine import desktop
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
 from pants.engine.console import Console
-from pants.engine.fs import Digest, DirectoryToMaterialize, Snapshot, Workspace
+from pants.engine.fs import Digest, DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.process import FallibleProcessResult
