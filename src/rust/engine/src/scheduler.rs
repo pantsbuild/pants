@@ -14,7 +14,7 @@ use futures01::future::{self, Future};
 use crate::context::{Context, Core};
 use crate::core::{Failure, Params, TypeId, Value};
 use crate::nodes::{NodeKey, Select, Tracer, Visualizer};
-use crate::watch::InvalidationWatcher;
+
 use graph::{Graph, InvalidationResult};
 use hashing;
 use indexmap::IndexMap;
@@ -22,6 +22,7 @@ use log::{debug, info, warn};
 use logging::logger::LOGGER;
 use parking_lot::Mutex;
 use ui::{EngineDisplay, KeyboardCommand};
+use watch::Invalidatable;
 use workunit_store::WorkUnitStore;
 
 pub enum ExecutionTermination {
@@ -229,7 +230,7 @@ impl Scheduler {
   /// Invalidate the invalidation roots represented by the given Paths.
   ///
   pub fn invalidate(&self, paths: &HashSet<PathBuf>) -> usize {
-    InvalidationWatcher::invalidate(&self.core.graph, paths, "watchman")
+    self.core.graph.invalidate(paths, "watchman")
   }
 
   ///

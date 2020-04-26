@@ -795,7 +795,7 @@ async fn run_command_locally_in_dir_with_cleanup(
   dir: PathBuf,
 ) -> Result<FallibleExecuteProcessResult, String> {
   run_command_locally_in_dir(req, dir, true, None, None).await
-
+}
 
 async fn run_command_locally_in_dir(
   req: ExecuteProcessRequest,

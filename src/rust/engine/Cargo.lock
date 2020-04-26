@@ -647,13 +647,11 @@ dependencies = [
  "boxfuture 0.0.1",
  "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "concrete_time 0.0.1",
- "crossbeam-channel 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.5.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "fs 0.0.1",
  "futures 0.1.29 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "futures-locks 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "graph 0.0.1",
  "hashing 0.0.1",
  "indexmap 1.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -661,7 +659,6 @@ dependencies = [
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "logging 0.0.1",
- "notify 5.0.0-pre.1 (git+https://github.com/notify-rs/notify?rev=fba00891d9105e2f581c69fbe415a58cb7966fdd)",
  "num_cpus 1.13.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "num_enum 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "parking_lot 0.6.4 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -680,6 +677,7 @@ dependencies = [
  "ui 0.0.1",
  "url 2.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "uuid 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "watch 0.0.1",
  "workunit_store 0.0.1",
 ]
 
@@ -3500,6 +3498,27 @@ dependencies = [
 name = "wasm-bindgen-shared"
 version = "0.2.62"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "watch"
+version = "0.0.1"
+dependencies = [
+ "crossbeam-channel 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "fs 0.0.1",
+ "futures 0.1.29 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures-locks 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "graph 0.0.1",
+ "hashing 0.0.1",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "logging 0.0.1",
+ "notify 5.0.0-pre.1 (git+https://github.com/notify-rs/notify?rev=fba00891d9105e2f581c69fbe415a58cb7966fdd)",
+ "parking_lot 0.6.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "task_executor 0.0.1",
+ "tempfile 3.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "testutil 0.0.1",
+ "tokio 0.2.20 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "web-sys"
