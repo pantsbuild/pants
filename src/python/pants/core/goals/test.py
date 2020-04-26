@@ -268,9 +268,6 @@ async def run_tests(
         xml_test_results = result.test_result.xml_test_results
         if not xml_test_results:
             continue
-        print("WRITE RESULT")
-        sf = await Get[Snapshot](Digest, xml_test_results)
-        print(sf.files)
         workspace.materialize_directory(DirectoryToMaterialize(xml_test_results))
 
     if options.values.run_coverage:
