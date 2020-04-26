@@ -36,12 +36,12 @@ class TestArtifactCache(TestBase):
         return super().subsystems + (RequestsSession.Factory,)
 
     @contextmanager
-    def setup_local_cache(self, seperate_extraction_root=False):
+    def setup_local_cache(self, separate_extraction_root=False):
         with temporary_dir() as artifact_root:
             with temporary_dir() as artifact_extraction_root:
                 with temporary_dir() as cache_root:
                     extraction_root = (
-                        artifact_extraction_root if seperate_extraction_root else artifact_root
+                        artifact_extraction_root if separate_extraction_root else artifact_root
                     )
                     yield LocalArtifactCache(
                         artifact_root, extraction_root, cache_root, compression=1
@@ -95,8 +95,8 @@ class TestArtifactCache(TestBase):
         with self.setup_local_cache() as artifact_cache:
             self.do_test_artifact_cache(artifact_cache)
 
-    def test_local_cache_with_seperate_extraction_root(self):
-        with self.setup_local_cache(seperate_extraction_root=True) as artifact_cache:
+    def test_local_cache_with_separate_extraction_root(self):
+        with self.setup_local_cache(separate_extraction_root=True) as artifact_cache:
             self.do_test_artifact_cache(artifact_cache)
 
     @pytest.mark.skip(reason="flaky: https://github.com/pantsbuild/pants/issues/6838")
