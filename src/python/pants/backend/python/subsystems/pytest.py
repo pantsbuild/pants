@@ -59,6 +59,22 @@ class PyTest(Subsystem):
             advanced=True,
             help="The maximum timeout (in seconds) that can be set on a test target.",
         )
+        register(
+            "--junit-xml-dir",
+            type=str,
+            metavar="<DIR>",
+            default=None,
+            advanced=True,
+            help="Specifying a directory causes junit xml results files to be emitted under "
+            "that dir for each test run.",
+        )
+        register(
+            "--junit-family",
+            type=str,
+            default="xunit2",
+            advanced=True,
+            help="JUnit XML format family",
+        )
 
     def get_requirement_strings(self) -> Tuple[str, ...]:
         """Returns a tuple of requirements-style strings for Pytest and Pytest plugins."""

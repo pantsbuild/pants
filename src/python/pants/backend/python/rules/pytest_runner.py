@@ -29,17 +29,19 @@ from pants.backend.python.target_types import (
     PythonTestsSources,
     PythonTestsTimeout,
 )
-from pants.core.goals.test import (
-    TestConfiguration,
-    TestDebugRequest,
-    TestOptions,
-    TestResult,
-    XmlTestResultsData,
-)
+from pants.core.goals.test import TestConfiguration, TestDebugRequest, TestOptions, TestResult
 from pants.core.target_types import FilesSources, ResourcesSources
 from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.engine.addresses import Addresses
-from pants.engine.fs import Digest, DirectoriesToMerge, InputFilesContent, PathGlobs, SnapshotSubset
+from pants.engine.fs import (
+    Digest,
+    DirectoriesToMerge,
+    DirectoryWithPrefixToAdd,
+    InputFilesContent,
+    PathGlobs,
+    Snapshot,
+    SnapshotSubset,
+)
 from pants.engine.interactive_runner import InteractiveProcessRequest
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import named_rule, rule, subsystem_rule
@@ -65,7 +67,8 @@ class TestTargetSetup:
     args: Tuple[str, ...]
     input_files_digest: Digest
     timeout_seconds: Optional[int]
-    xml_results: bool = False
+    xml_dir: Optional[str]
+    junit_family: str
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
@@ -222,7 +225,8 @@ async def setup_pytest_for_target(
         args=(*pytest.options.args, *coverage_args, *specified_source_file_names),
         input_files_digest=merged_input_files,
         timeout_seconds=config.timeout.calculate_from_global_options(pytest),
-        xml_results=test_options.values.xml_results,
+        xml_dir=pytest.options.junit_xml_dir,
+        junit_family=pytest.options.junit_family,
     )
 
 
@@ -238,14 +242,16 @@ async def run_python_test(
     """Runs pytest for one target."""
     add_opts = [f"--color={'yes' if global_options.options.colors else 'no'}"]
     test_results_file = f"{config.address.path_safe_spec}.xml"
-    if test_setup.xml_results:
-        add_opts.append(f"--junitxml={test_results_file}")
+    if test_setup.xml_dir:
+        add_opts.extend(
+            (f"--junitxml={test_results_file}", f"-o junit_family={test_setup.junit_family}",)
+        )
     env = {"PYTEST_ADDOPTS": " ".join(add_opts)}
+
     run_coverage = test_options.values.run_coverage
     output_dirs = [".coverage"] if run_coverage else []
-    if test_setup.xml_results:
+    if test_setup.xml_dir:
         output_dirs.append(test_results_file)
-
     process = test_setup.test_runner_pex.create_process(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
@@ -259,24 +265,23 @@ async def run_python_test(
         ),
         env=env,
     )
-
     result = await Get[FallibleProcessResult](Process, process)
     output_digest = result.output_directory_digest
 
-    if run_coverage:
-        coverage_digest = await Get[Digest](SnapshotSubset(output_digest, PathGlobs(".coverage")))
-    else:
-        coverage_digest = None
-
-    if test_setup.xml_results:
-        results_digest = await Get[Digest](
-            SnapshotSubset(output_digest, PathGlobs(test_results_file))
+    coverage_data = (
+        PytestCoverageData(config.address, result.output_directory_digest) if run_coverage else None
+    )
+    xml_test_results_digest: Optional[Digest] = None
+    if test_setup.xml_dir:
+        snapshot = await Get[Snapshot](
+            SnapshotSubset(output_digest, PathGlobs([test_results_file]))
         )
-    else:
-        results_digest = None
+        xml_test_results_digest = await Get[Digest](
+            DirectoryWithPrefixToAdd(snapshot.directory_digest, test_setup.xml_dir)
+        )
 
     return TestResult.from_fallible_process_result(
-        result, coverage_data=coverage_digest, test_results=results_digest
+        result, coverage_data=coverage_data, xml_test_results=xml_test_results_digest
     )
 
 

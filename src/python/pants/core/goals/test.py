@@ -18,7 +18,7 @@ from pants.engine import desktop
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
 from pants.engine.console import Console
-from pants.engine.fs import Digest, DirectoryToMaterialize, Workspace
+from pants.engine.fs import Digest, DirectoryToMaterialize, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.process import FallibleProcessResult
@@ -46,8 +46,8 @@ class TestResult:
     status: Status
     stdout: str
     stderr: str
-    coverage_data: Optional["CoverageData"] = None
-    test_results: Optional["XmlTestResultsData"] = None
+    coverage_data: Optional["CoverageData"]
+    xml_test_results: Optional[Digest]
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
@@ -57,14 +57,14 @@ class TestResult:
         process_result: FallibleProcessResult,
         *,
         coverage_data: Optional["CoverageData"] = None,
-        test_results: Optional["XmlTestResultsData"] = None,
+        xml_test_results: Optional[Digest] = None,
     ) -> "TestResult":
         return TestResult(
             status=Status.SUCCESS if process_result.exit_code == 0 else Status.FAILURE,
             stdout=process_result.stdout.decode(),
             stderr=process_result.stderr.decode(),
             coverage_data=coverage_data,
-            test_results=test_results,
+            xml_test_results=xml_test_results,
         )
 
 
@@ -96,12 +96,6 @@ class WrappedTestConfiguration:
 class AddressAndTestResult:
     address: Address
     test_result: TestResult
-
-
-@dataclass(frozen=True)
-class XmlTestResultsData:
-    address: Address
-    digest: Digest
 
 
 class CoverageData(ABC):
@@ -196,12 +190,6 @@ class TestOptions(GoalSubsystem):
             help="If a coverage report file is generated, open it on the local system if the "
             "system supports this.",
         )
-        register(
-            "--xml-results",
-            type=bool,
-            default=False,
-            help="Enable generating XML test results file",
-        )
 
 
 class Test(Goal):
@@ -276,13 +264,14 @@ async def run_tests(
         exit_code = PANTS_FAILED_EXIT_CODE
     else:
         exit_code = PANTS_SUCCEEDED_EXIT_CODE
-    if options.values.xml_results:
-        all_results_data: Iterable[XmlTestResultsData] = [
-            result.test_result.test_results
-            for result in results
-            if result.test_result.test_results is not None
-        ]
-        # TODO: do something with all_results_data
+    for result in results:
+        xml_test_results = result.test_result.xml_test_results
+        if not xml_test_results:
+            continue
+        print("WRITE RESULT")
+        sf = await Get[Snapshot](Digest, xml_test_results)
+        print(sf.files)
+        workspace.materialize_directory(DirectoryToMaterialize(xml_test_results))
 
     if options.values.run_coverage:
         all_coverage_data: Iterable[CoverageData] = [
