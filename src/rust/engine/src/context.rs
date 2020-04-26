@@ -2,8 +2,9 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::convert::{Into, TryInto};
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
@@ -18,11 +19,12 @@ use crate::nodes::{NodeKey, WrappedNode};
 use crate::scheduler::Session;
 use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
-use crate::watch::InvalidationWatcher;
+
 use boxfuture::{BoxFuture, Boxable};
 use core::clone::Clone;
 use fs::{safe_create_dir_all_ioerror, GitignoreStyleExcludes, PosixFS};
-use graph::{EntryId, Graph, NodeContext};
+use graph::{EntryId, Graph, InvalidationResult, NodeContext};
+use log::info;
 use process_execution::{
   self, speculate::SpeculatingCommandRunner, BoundedCommandRunner, Platform, ProcessMetadata,
 };
@@ -32,6 +34,7 @@ use rule_graph::RuleGraph;
 use sharded_lmdb::ShardedLmdb;
 use store::Store;
 use tokio::runtime::{Builder, Runtime};
+use watch::{Invalidatable, InvalidationWatcher};
 
 const GIGABYTES: usize = 1024 * 1024 * 1024;
 
@@ -44,7 +47,7 @@ const GIGABYTES: usize = 1024 * 1024 * 1024;
 /// https://github.com/tokio-rs/tokio/issues/369 is resolved.
 ///
 pub struct Core {
-  pub graph: Arc<Graph<NodeKey>>,
+  pub graph: Arc<InvalidatableGraph>,
   pub tasks: Tasks,
   pub rule_graph: RuleGraph<Rule>,
   pub types: Types,
@@ -238,7 +241,7 @@ impl Core {
         process_execution_metadata,
       ));
     }
-    let graph = Arc::new(Graph::new());
+    let graph = Arc::new(InvalidatableGraph(Graph::new()));
 
     let http_client = reqwest::Client::new();
     let rule_graph = RuleGraph::new(tasks.as_map(), root_subject_types);
@@ -292,6 +295,33 @@ impl Core {
 
   pub fn store(&self) -> Store {
     self.store.clone()
+  }
+}
+
+pub struct InvalidatableGraph(Graph<NodeKey>);
+
+impl Invalidatable for InvalidatableGraph {
+  fn invalidate(&self, paths: &HashSet<PathBuf>, caller: &str) -> usize {
+    let InvalidationResult { cleared, dirtied } = self.invalidate_from_roots(move |node| {
+      if let Some(fs_subject) = node.fs_subject() {
+        paths.contains(fs_subject)
+      } else {
+        false
+      }
+    });
+    info!(
+      "{} invalidation: cleared {} and dirtied {} nodes for: {:?}",
+      caller, cleared, dirtied, paths
+    );
+    cleared + dirtied
+  }
+}
+
+impl Deref for InvalidatableGraph {
+  type Target = Graph<NodeKey>;
+
+  fn deref(&self) -> &Graph<NodeKey> {
+    &self.0
   }
 }
 

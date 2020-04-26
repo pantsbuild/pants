@@ -1,5 +1,32 @@
-// Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
+// Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+#![deny(warnings)]
+// Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
+#![deny(
+  clippy::all,
+  clippy::default_trait_access,
+  clippy::expl_impl_clone_on_copy,
+  clippy::if_not_else,
+  clippy::needless_continue,
+  clippy::unseparated_literal_suffix,
+  clippy::used_underscore_binding
+)]
+// It is often more clear to show that nothing is being moved.
+#![allow(clippy::match_ref_pats)]
+// Subjective style.
+#![allow(
+  clippy::len_without_is_empty,
+  clippy::redundant_field_names,
+  clippy::too_many_arguments
+)]
+// Default isn't as big a deal as people seem to think it is.
+#![allow(clippy::new_without_default, clippy::new_ret_no_self)]
+// Arc<Mutex> can be more clear than needing to grok Orderings:
+#![allow(clippy::mutex_atomic)]
+
+#[cfg(test)]
+mod tests;
 
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -10,15 +37,12 @@ use std::time::Duration;
 use crossbeam_channel::{self, Receiver, RecvTimeoutError, TryRecvError};
 use futures::compat::Future01CompatExt;
 use futures_locks::Mutex;
-use log::{debug, error, info, warn};
+use log::{debug, error, warn};
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use task_executor::Executor;
 
 use fs::GitignoreStyleExcludes;
-use graph::{Graph, InvalidationResult};
 use logging;
-
-use crate::nodes::NodeKey;
 
 ///
 /// An InvalidationWatcher maintains a Thread that receives events from a notify Watcher.
@@ -29,14 +53,6 @@ use crate::nodes::NodeKey;
 ///
 /// TODO: Need the above polling
 ///
-/// TODO: To simplify testing the InvalidationWatcher we could create  a trait which
-/// has an `invalidate_from_roots` method  and impl it on the Graph. Then we could make the InvalidationWatcher
-/// take an argument that implements the trait.
-/// Then we wouldn't have to mock out a Graph object in watch_tests.rs. This will probably
-/// only be possible when we remove watchman invalidation, when the one code path for invaldation will be
-/// the notify background thread.
-/// Potential impl here: https://github.com/pantsbuild/pants/pull/9318#discussion_r396005978
-///
 pub struct InvalidationWatcher {
   watcher: Arc<Mutex<RecommendedWatcher>>,
   executor: Executor,
@@ -45,8 +61,8 @@ pub struct InvalidationWatcher {
 }
 
 impl InvalidationWatcher {
-  pub fn new(
-    graph: Weak<Graph<NodeKey>>,
+  pub fn new<I: Invalidatable>(
+    invalidatable: Weak<I>,
     executor: Executor,
     build_root: PathBuf,
     ignorer: Arc<GitignoreStyleExcludes>,
@@ -81,7 +97,7 @@ impl InvalidationWatcher {
     }
 
     InvalidationWatcher::start_background_thread(
-      graph,
+      invalidatable,
       ignorer,
       canonical_build_root,
       thread_liveness_sender,
@@ -97,8 +113,8 @@ impl InvalidationWatcher {
   }
 
   // Public for testing purposes.
-  pub(crate) fn start_background_thread(
-    graph: Weak<Graph<NodeKey>>,
+  pub(crate) fn start_background_thread<I: Invalidatable>(
+    invalidatable: Weak<I>,
     ignorer: Arc<GitignoreStyleExcludes>,
     canonical_build_root: PathBuf,
     liveness_sender: crossbeam_channel::Sender<()>,
@@ -108,10 +124,10 @@ impl InvalidationWatcher {
       logging::set_thread_destination(logging::Destination::Pantsd);
       loop {
         let event_res = watch_receiver.recv_timeout(Duration::from_millis(10));
-        let graph = if let Some(g) = graph.upgrade() {
+        let invalidatable = if let Some(g) = invalidatable.upgrade() {
           g
         } else {
-          // The Graph has been dropped: we're done.
+          // The Invalidatable has been dropped: we're done.
           break;
         };
         match event_res {
@@ -156,7 +172,7 @@ impl InvalidationWatcher {
             // Only invalidate stuff if we have paths that weren't filtered out by gitignore.
             if !paths.is_empty() {
               debug!("notify invalidating {:?} because of {:?}", paths, ev.kind);
-              InvalidationWatcher::invalidate(&graph, &paths, "notify");
+              invalidatable.invalidate(&paths, "notify");
             };
           }
           Ok(Err(err)) => {
@@ -228,19 +244,8 @@ impl InvalidationWatcher {
       Err(TryRecvError::Empty) => true,
     }
   }
+}
 
-  pub fn invalidate(graph: &Graph<NodeKey>, paths: &HashSet<PathBuf>, caller: &str) -> usize {
-    let InvalidationResult { cleared, dirtied } = graph.invalidate_from_roots(move |node| {
-      if let Some(fs_subject) = node.fs_subject() {
-        paths.contains(fs_subject)
-      } else {
-        false
-      }
-    });
-    info!(
-      "{} invalidation: cleared {} and dirtied {} nodes for: {:?}",
-      caller, cleared, dirtied, paths
-    );
-    cleared + dirtied
-  }
+pub trait Invalidatable: Send + Sync + 'static {
+  fn invalidate(&self, paths: &HashSet<PathBuf>, caller: &str) -> usize;
 }
