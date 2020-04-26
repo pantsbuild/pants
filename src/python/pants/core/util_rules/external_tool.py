@@ -3,7 +3,7 @@
 
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List
 
 from pants.core.util_rules.archive import ExtractedDigest, MaybeExtractable
 from pants.engine.fs import Digest, Snapshot, UrlToFetch
