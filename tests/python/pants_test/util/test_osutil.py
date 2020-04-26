@@ -30,7 +30,7 @@ class OsutilTest(TestBase):
                 self.assertEqual(
                     0,
                     len(captured.warnings()),
-                    f"Recieved unexpected warnings: {captured.warnings()}",
+                    f"Received unexpected warnings: {captured.warnings()}",
                 )
 
     def test_warnings_on_unknown_names(self) -> None:
