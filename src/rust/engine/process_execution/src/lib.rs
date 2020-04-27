@@ -25,6 +25,7 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+#![type_length_limit="7000100"]
 #[macro_use]
 extern crate derivative;
 
@@ -437,21 +438,33 @@ impl CommandRunner for BoundedCommandRunner {
   ) -> BoxFuture<FallibleProcessResultWithPlatform, String> {
     let inner = self.inner.clone();
     let semaphor = self.inner.1.clone();
-    semaphor
+
+    let outer_name = format!("Bounded - {}", req.user_facing_name().unwrap_or("Unamed node".to_string()));
+    let outer_metadata = WorkunitMetadata {
+      desc: Some("Bounded version of the workunit".to_string()),
+      display: false,
+      waiting: true,
+      entry_id: context.entry_id,
+    };
+
+    let inner_context = context.clone();
+    let bounded_fut = semaphor
       .with_acquired(move || {
         let name = format!(
-          "Bounded - {}",
+          "Running - {}",
           req.user_facing_name().unwrap_or("Unnamed node".to_string())
         );
         let metadata = WorkunitMetadata {
-          desc: Some("Bounded version of the workunit".to_string()),
+          desc: Some("Running version of the workunit".to_string()),
           display: false,
           waiting: false,
-          entry_id: context.entry_id,
+          entry_id: inner_context.entry_id,
         };
-        let f = inner.0.run(req, context.clone()).compat();
-        with_workunit(context.workunit_store.clone(), name, metadata, f)
-      })
+        let f = inner.0.run(req, inner_context.clone()).compat();
+        with_workunit(inner_context.workunit_store.clone(), name, metadata, f)
+      });
+
+    with_workunit(context.workunit_store.clone(), outer_name, outer_metadata, bounded_fut)
       .boxed()
       .compat()
       .to_boxed()
