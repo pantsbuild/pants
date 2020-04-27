@@ -119,8 +119,9 @@ pub struct CommandRunner {
   store: Store,
   platform: Platform,
   executor: task_executor::Executor,
-  // We use a buffer time for queuing of process requests so that the process's requested timeout more
-  // accurately reflects how long the caller intended the process to last.
+  // We "back up" the remote execution Action timeout with our own timeout to handle protocol
+  // errors, but we give the server a buffer time / grace period for queuing of process requests
+  // to ensure that we tend to hit the server's timeout before our own in most cases.
   queue_buffer_time: Duration,
   backoff_incremental_wait: Duration,
   backoff_max_wait: Duration,
@@ -907,6 +908,13 @@ pub fn make_execute_request(
   let mut action = bazel_protos::remote_execution::Action::new();
   action.set_command_digest((&digest(&command)?).into());
   action.set_input_root_digest((&req.input_files).into());
+
+  if let Some(timeout) = req.timeout {
+    let mut timeout_duration = protobuf::well_known_types::Duration::new();
+    timeout_duration.set_seconds(timeout.as_secs() as i64);
+    timeout_duration.set_nanos(timeout.subsec_nanos() as i32);
+    action.set_timeout(timeout_duration);
+  }
 
   let mut execute_request = bazel_protos::remote_execution::ExecuteRequest::new();
   if let Some(instance_name) = instance_name {
