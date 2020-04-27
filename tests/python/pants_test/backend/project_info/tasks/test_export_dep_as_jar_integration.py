@@ -161,7 +161,7 @@ class ExportDepAsJarIntegrationTest(ScalacPluginIntegrationTestBase):
                 "examples.src.scala.org.pantsbuild.example.several_scala_targets.node.names_to_greet",
                 export_output["targets"][
                     "examples/src/scala/org/pantsbuild/example/several_scala_targets:greet_json"
-                ]["libraries"],
+                ]["compile_libraries"],
             )
 
     def test_jars_resolve_sources_javadocs(self):
