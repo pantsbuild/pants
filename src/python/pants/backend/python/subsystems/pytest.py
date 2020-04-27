@@ -73,7 +73,7 @@ class PyTest(Subsystem):
             type=str,
             default="xunit2",
             advanced=True,
-            help="JUnit XML format family",
+            help="The format of the generated XML file. See https://docs.pytest.org/en/latest/reference.html#confval-junit_family.",
         )
 
     def get_requirement_strings(self) -> Tuple[str, ...]:
