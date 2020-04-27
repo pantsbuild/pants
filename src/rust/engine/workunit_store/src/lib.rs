@@ -369,6 +369,21 @@ pub fn expect_workunit_state() -> WorkUnitState {
   get_workunit_state().expect("A WorkUnitStore has not been set for this thread.")
 }
 
+pub async fn with_workunit<F>(workunit_store: WorkUnitStore, name: String, metadata: WorkunitMetadata, f: F) -> F::Output
+where F: Future {
+  let mut workunit_state = expect_workunit_state();
+  let span_id = new_span_id();
+  let parent_id = std::mem::replace(&mut workunit_state.parent_id, Some(span_id.clone()));
+  let started_id = workunit_store.start_workunit(span_id, name, parent_id, metadata);
+  scope_task_workunit_state(Some(workunit_state), async move {
+    let result = f.await;
+    workunit_store
+      .complete_workunit(started_id)
+      .unwrap();
+    result
+  }).await
+}
+
 ///
 /// Propagate the given WorkUnitState to a Future representing a newly spawned Task.
 ///
