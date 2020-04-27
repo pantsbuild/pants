@@ -414,9 +414,7 @@ class PythonRequirementLibrary(Target):
 # -----------------------------------------------------------------------------------------------
 
 
-# NB: This subclasses FilesSources to ensure that we still properly handle stripping source roots,
-# but we still new type so that we can distinguish between normal FilesSources vs. this field.
-class PythonRequirementsFileSources(FilesSources):
+class PythonRequirementsFileSources(Sources):
     pass
 
 

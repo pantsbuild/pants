@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from pants.backend.python.rules.inject_init import InitInjectedSnapshot, InjectInitRequest
 from pants.backend.python.rules.inject_init import rules as inject_init_rules
-from pants.backend.python.target_types import PythonRequirementsFileSources, PythonSources
+from pants.backend.python.target_types import PythonSources
 from pants.core.target_types import FilesSources, ResourcesSources
 from pants.core.util_rules import determine_source_files
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
@@ -34,13 +34,8 @@ class ImportablePythonSources:
 @rule
 async def prepare_python_sources(targets: Targets) -> ImportablePythonSources:
     def is_relevant(tgt: Target) -> bool:
-        # NB: PythonRequirementsFileSources is a subclass of FilesSources. We filter it out so that
-        # requirements.txt is not included. If the user intended for the file to be included, they
-        # should use a normal `files()` target rather than `python_requirements()`.
-        return (
-            tgt.has_field(PythonSources)
-            or tgt.has_field(ResourcesSources)
-            or (tgt.has_field(FilesSources) and not tgt.has_field(PythonRequirementsFileSources))
+        return any(
+            tgt.has_field(field) for field in (PythonSources, ResourcesSources, FilesSources)
         )
 
     stripped_sources = await Get[SourceFiles](
