@@ -64,6 +64,7 @@ pub struct StartedWorkUnit {
 pub struct WorkunitMetadata {
   pub desc: Option<String>,
   pub display: bool,
+  pub running: bool,
 }
 
 impl WorkunitMetadata {
@@ -71,6 +72,7 @@ impl WorkunitMetadata {
     WorkunitMetadata {
       display: true,
       desc: None,
+      running: true,
     }
   }
 }
@@ -171,7 +173,7 @@ impl WorkUnitStore {
       .collect()
   }
 
-  pub fn heavy_hitters(&self, k: usize) -> HashMap<String, Duration> {
+  pub fn heavy_hitters(&self, k: usize) -> HashMap<String, Option<Duration>> {
     use petgraph::Direction;
 
     let now = SystemTime::now();
@@ -198,11 +200,20 @@ impl WorkUnitStore {
     let mut res = HashMap::new();
     while let Some((dur, span_id)) = queue.pop() {
       let record = inner.workunit_records.get(&span_id).unwrap();
-      let name = match record {
-        WorkunitRecord::Started(StartedWorkUnit { name, .. }) => name.clone(),
-        WorkunitRecord::Completed(WorkUnit { name, .. }) => name.clone(),
+      let (name, running) = match record {
+        WorkunitRecord::Started(StartedWorkUnit {
+          name,
+          metadata: WorkunitMetadata { running, .. },
+          ..
+        }) => (name.clone(), *running),
+        WorkunitRecord::Completed(WorkUnit {
+          name,
+          metadata: WorkunitMetadata { running, .. },
+          ..
+        }) => (name.clone(), *running),
       };
-      res.insert(name, dur);
+      let maybe_duration = if running { Some(dur) } else { None };
+      res.insert(name, maybe_duration);
       if res.len() >= k {
         break;
       }

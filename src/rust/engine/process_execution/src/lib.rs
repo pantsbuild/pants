@@ -434,40 +434,35 @@ impl CommandRunner for BoundedCommandRunner {
   ) -> BoxFuture<FallibleProcessResultWithPlatform, String> {
     let inner = self.inner.clone();
     let semaphor = self.inner.1.clone();
-
-    let outer_name = format!(
-      "Bounded - {}",
-      req
-        .user_facing_name()
-        .unwrap_or_else(|| "Unamed node".to_string())
-    );
+    let name = req
+      .user_facing_name()
+      .unwrap_or_else(|| "Unamed node".to_string());
+    let inner_name = name.clone();
     let outer_metadata = WorkunitMetadata {
-      desc: Some("Bounded version of the workunit".to_string()),
+      desc: Some("Workunit waiting for opportunity to run".to_string()),
       display: false,
+      running: false,
     };
-
     let inner_context = context.clone();
     let bounded_fut = semaphor.with_acquired(move || {
-      let name = req
-        .user_facing_name()
-        .unwrap_or_else(|| "Unnamed node".to_string());
       let metadata = WorkunitMetadata {
-        desc: Some("Running version of the workunit".to_string()),
+        desc: Some("Workunit executing currently".to_string()),
         display: false,
+        running: true,
       };
       let f = inner.0.run(req, inner_context.clone()).compat();
-      with_workunit(inner_context.workunit_store.clone(), name, metadata, f)
+      with_workunit(
+        inner_context.workunit_store.clone(),
+        inner_name,
+        metadata,
+        f,
+      )
     });
 
-    with_workunit(
-      context.workunit_store,
-      outer_name,
-      outer_metadata,
-      bounded_fut,
-    )
-    .boxed()
-    .compat()
-    .to_boxed()
+    with_workunit(context.workunit_store, name, outer_metadata, bounded_fut)
+      .boxed()
+      .compat()
+      .to_boxed()
   }
 
   fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {

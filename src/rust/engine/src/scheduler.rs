@@ -410,7 +410,7 @@ impl Scheduler {
   fn display_ongoing_tasks(
     workunit_store: WorkUnitStore,
     display: &Mutex<EngineDisplay>,
-    tasks_to_display: &mut IndexMap<String, Duration>,
+    tasks_to_display: &mut IndexMap<String, Option<Duration>>,
   ) -> Result<KeyboardCommand, String> {
     // Update the graph. To do that, we iterate over heavy hitters.
 
@@ -433,10 +433,16 @@ impl Scheduler {
 
     for (i, item) in tasks_to_display.iter().enumerate() {
       let label = item.0;
-      let duration = item.1;
-      let duration_secs: f64 = (duration.as_millis() as f64) / 1000.0;
+      let maybe_duration = item.1;
+      let duration_label = match maybe_duration {
+        None => "(Waiting) ".to_string(),
+        Some(duration) => {
+          let duration_secs: f64 = (duration.as_millis() as f64) / 1000.0;
+          format!("{:.2}s ", duration_secs)
+        }
+      };
       let mut d = display.lock();
-      d.update(i.to_string(), format!("{:.2}s {}", duration_secs, label));
+      d.update(i.to_string(), format!("{}{}", duration_label, label));
     }
 
     // If the number of ongoing tasks is less than the number of workers,
