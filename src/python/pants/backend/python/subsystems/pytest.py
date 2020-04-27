@@ -65,7 +65,7 @@ class PyTest(Subsystem):
             metavar="<DIR>",
             default=None,
             advanced=True,
-            help="Specifying a directory causes junit xml results files to be emitted under "
+            help="Specifying a directory causes Junit XML result files to be emitted under "
             "that dir for each test run.",
         )
         register(
