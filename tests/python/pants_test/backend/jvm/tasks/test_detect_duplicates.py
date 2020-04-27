@@ -229,7 +229,7 @@ class DuplicateDetectorTest(JvmBinaryTaskTestBase):
         task = self.create_task(self.context())
         self.assertFalse(task._is_excluded("foo"))
         self.assertFalse(task._is_excluded("foo/BCKEY.DSA"))
-        # excluded_files: No directroy
+        # excluded_files: No directory
         self.assertTrue(task._is_excluded(".DS_Store"))
         # excluded_files: Mixed case
         self.assertTrue(task._is_excluded("NOTICE.txt"))

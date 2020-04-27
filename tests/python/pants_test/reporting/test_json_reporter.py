@@ -130,7 +130,7 @@ class JsonReporterTest(TestBase):
 
         self._check_callbacks(expected, reporter)
 
-    def test_nested_great_grandchilden(self):
+    def test_nested_great_grandchildren(self):
         expected = {
             "name": "root",
             "id": "root_id",
