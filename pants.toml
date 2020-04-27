@@ -20,6 +20,7 @@ local_artifact_cache = "%(pants_bootstrapdir)s/artifact_cache"
 [GLOBAL]
 print_exception_stacktrace = true
 v2 = false
+process_execution_local_parallelism = 2
 
 # Enable our own custom loose-source plugins as well as contribs.
 pythonpath = [
