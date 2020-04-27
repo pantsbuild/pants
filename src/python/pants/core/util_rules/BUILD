@@ -5,6 +5,7 @@ python_library(
   dependencies = [
     '3rdparty/python:dataclasses',
     '3rdparty/python:typing-extensions',
+    'src/python/pants/base:build_environment',
     'src/python/pants/base:build_root',
     'src/python/pants/base:specs',
     'src/python/pants/core',
@@ -20,6 +21,7 @@ python_library(
     'src/python/pants/option',
     'src/python/pants/source',
     'src/python/pants/subsystem',
+    'src/python/pants/util:memo',
     'src/python/pants/util:meta',
   ],
   tags = {"type_checked"},

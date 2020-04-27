@@ -3,14 +3,17 @@
 
 from abc import abstractmethod
 from dataclasses import dataclass
+from pathlib import PurePath
 from typing import List
 
+from pants.base.build_environment import get_buildroot
 from pants.core.util_rules.archive import ExtractedDigest, MaybeExtractable
-from pants.engine.fs import Digest, Snapshot, UrlToFetch
+from pants.engine.fs import Digest, DirectoryToMaterialize, Snapshot, UrlToFetch
 from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
 from pants.subsystem.subsystem import Subsystem
+from pants.util.memo import memoized_method
 from pants.util.meta import classproperty
 
 
@@ -208,6 +211,30 @@ class ExternalTool(Subsystem):
         return self.generate_request(
             plat, self.get_options().version, self.get_options().known_versions,
         )
+
+    @memoized_method
+    def select(self, context=None):
+        """For backwards compatibility with v1 code.
+
+        Can be removed once all v1 callers are gone.
+        """
+        req = self.get_request(Platform.current)
+        rel_workdir = PurePath(context.options.for_global_scope().pants_workdir).relative_to(
+            get_buildroot()
+        )
+        rel_bindir = (
+            rel_workdir / "external_tools" / self.name / req.url_to_fetch.digest.fingerprint
+        )
+
+        downloaded_external_tool = context._scheduler.product_request(
+            DownloadedExternalTool, [self.get_request(Platform.current)]
+        )[0]
+        context._scheduler.materialize_directory(
+            DirectoryToMaterialize(
+                directory_digest=downloaded_external_tool.digest, path_prefix=rel_bindir.as_posix()
+            )
+        )
+        return (rel_bindir / req.exe).as_posix()
 
 
 @rule

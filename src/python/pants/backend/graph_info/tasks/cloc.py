@@ -5,7 +5,9 @@ import os
 
 from pants.backend.graph_info.subsystems.cloc_binary import ClocBinary
 from pants.base.workunit import WorkUnitLabel
-from pants.engine.fs import FilesContent, PathGlobs, PathGlobsAndRoot
+from pants.core.util_rules.external_tool import DownloadedExternalTool
+from pants.engine.fs import FilesContent, PathGlobs, PathGlobsAndRoot, Snapshot
+from pants.engine.platform import Platform
 from pants.engine.process import Process
 from pants.task.console_task import ConsoleTask
 from pants.util.contextutil import temporary_dir
@@ -60,7 +62,10 @@ class CountLinesOfCode(ConsoleTask):
                 (PathGlobsAndRoot(PathGlobs(("input_files_list",)), tmpdir,),)
             )[0]
 
-        cloc_path, cloc_snapshot = ClocBinary.global_instance().hackily_snapshot(self.context)
+        cloc_binary = self.context._scheduler.product_request(
+            DownloadedExternalTool, [ClocBinary.global_instance().get_request(Platform.current)]
+        )[0]
+        cloc_snapshot = self.context._scheduler.product_request(Snapshot, [cloc_binary.digest])[0]
 
         directory_digest = self.context._scheduler.merge_directories(
             tuple(
@@ -70,7 +75,7 @@ class CountLinesOfCode(ConsoleTask):
 
         cmd = (
             "/usr/bin/perl",
-            cloc_path,
+            cloc_binary.exe,
             "--skip-uniqueness",
             "--ignored=ignored",
             "--list-file=input_files_list",
