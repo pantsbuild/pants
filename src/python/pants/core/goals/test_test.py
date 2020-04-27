@@ -74,7 +74,7 @@ class MockTestConfiguration(TestConfiguration, metaclass=ABCMeta):
             stdout=self.stdout(self.address),
             stderr=self.stderr(self.address),
             coverage_data=None,
-            xml_test_results=None,
+            xml_results=None,
         )
 
 

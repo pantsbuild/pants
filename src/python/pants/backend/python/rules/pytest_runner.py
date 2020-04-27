@@ -241,8 +241,8 @@ async def run_python_test(
 ) -> TestResult:
     """Runs pytest for one target."""
     add_opts = [f"--color={'yes' if global_options.options.colors else 'no'}"]
-    test_results_file = f"{config.address.path_safe_spec}.xml"
     if test_setup.xml_dir:
+        test_results_file = f"{config.address.path_safe_spec}.xml"
         add_opts.extend(
             (f"--junitxml={test_results_file}", f"-o junit_family={test_setup.junit_family}",)
         )
@@ -269,17 +269,17 @@ async def run_python_test(
     output_digest = result.output_directory_digest
 
     coverage_data = PytestCoverageData(config.address, output_digest) if run_coverage else None
-    xml_test_results_digest: Optional[Digest] = None
+    xml_results_digest: Optional[Digest] = None
     if test_setup.xml_dir:
-        snapshot = await Get[Snapshot](
+        xml_results_snapshot = await Get[Snapshot](
             SnapshotSubset(output_digest, PathGlobs([test_results_file]))
         )
-        xml_test_results_digest = await Get[Digest](
-            DirectoryWithPrefixToAdd(snapshot.directory_digest, test_setup.xml_dir)
+        xml_results_digest = await Get[Digest](
+            DirectoryWithPrefixToAdd(xml_results_snapshot.directory_digest, test_setup.xml_dir)
         )
 
     return TestResult.from_fallible_process_result(
-        result, coverage_data=coverage_data, xml_test_results=xml_test_results_digest
+        result, coverage_data=coverage_data, xml_results=xml_results_digest
     )
 
 

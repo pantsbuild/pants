@@ -47,7 +47,7 @@ class TestResult:
     stdout: str
     stderr: str
     coverage_data: Optional["CoverageData"]
-    xml_test_results: Optional[Digest]
+    xml_results: Optional[Digest]
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
@@ -57,14 +57,14 @@ class TestResult:
         process_result: FallibleProcessResult,
         *,
         coverage_data: Optional["CoverageData"] = None,
-        xml_test_results: Optional[Digest] = None,
+        xml_results: Optional[Digest] = None,
     ) -> "TestResult":
         return TestResult(
             status=Status.SUCCESS if process_result.exit_code == 0 else Status.FAILURE,
             stdout=process_result.stdout.decode(),
             stderr=process_result.stderr.decode(),
             coverage_data=coverage_data,
-            xml_test_results=xml_test_results,
+            xml_results=xml_results,
         )
 
 
@@ -265,10 +265,10 @@ async def run_tests(
     else:
         exit_code = PANTS_SUCCEEDED_EXIT_CODE
     for result in results:
-        xml_test_results = result.test_result.xml_test_results
-        if not xml_test_results:
+        xml_results = result.test_result.xml_results
+        if not xml_results:
             continue
-        workspace.materialize_directory(DirectoryToMaterialize(xml_test_results))
+        workspace.materialize_directory(DirectoryToMaterialize(xml_results))
 
     if options.values.run_coverage:
         all_coverage_data: Iterable[CoverageData] = [
