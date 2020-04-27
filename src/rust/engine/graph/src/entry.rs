@@ -1,6 +1,5 @@
 use std::mem;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
 
 use crate::node::{EntryId, Node, NodeContext, NodeError};
 
@@ -138,7 +137,6 @@ pub enum EntryState<N: Node> {
   Running {
     run_token: RunToken,
     generation: Generation,
-    start_time: Instant,
     waiters: Vec<oneshot::Sender<Result<(N::Item, Generation), N::Error>>>,
     previous_result: Option<EntryResult<N>>,
     dirty: bool,
@@ -276,7 +274,6 @@ impl<N: Node> Entry<N> {
 
     EntryState::Running {
       waiters: Vec::new(),
-      start_time: Instant::now(),
       run_token,
       generation,
       previous_result,
@@ -549,25 +546,6 @@ impl<N: Node> Entry<N> {
       EntryState::NotStarted { run_token, .. }
       | EntryState::Running { run_token, .. }
       | EntryState::Completed { run_token, .. } => run_token,
-    }
-  }
-
-  ///
-  /// If the Node has started and has not yet completed, returns its runtime.
-  ///
-  pub(crate) fn current_running_duration(&self, now: Instant) -> Option<Duration> {
-    match *self.state.lock() {
-      EntryState::Running { start_time, .. } =>
-      // NB: `Instant::duration_since` panics if the end time is before the start time, which can
-      // happen when starting a Node races against a caller creating their Instant.
-      {
-        Some(if start_time < now {
-          now.duration_since(start_time)
-        } else {
-          Duration::from_secs(0)
-        })
-      }
-      _ => None,
     }
   }
 
