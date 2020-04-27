@@ -164,7 +164,7 @@ impl Log for Logger {
           let mut display_engine = handle.lock();
           display_engine.log(log_string);
         }
-        self.stderr_log.lock().log(record)
+        //self.stderr_log.lock().log(record)
       }
       Destination::Pantsd => self.pantsd_log.lock().log(record),
     }

@@ -24,6 +24,11 @@ use parking_lot::Mutex;
 use ui::{EngineDisplay, KeyboardCommand};
 use watch::Invalidatable;
 use workunit_store::WorkUnitStore;
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use colored::*;
+
+
+const USE_NEW_UI: bool = true;
 
 pub enum ExecutionTermination {
   KeyboardInterrupt,
@@ -64,7 +69,7 @@ impl Session {
     build_id: String,
     should_report_workunits: bool,
   ) -> Session {
-    let display = if should_render_ui && EngineDisplay::stdout_is_tty() {
+    let display = if !USE_NEW_UI && should_render_ui && EngineDisplay::stdout_is_tty() {
       let mut display = EngineDisplay::new();
       display.initialize(num_cpus::get());
       Some(Arc::new(Mutex::new(display)))
@@ -370,6 +375,58 @@ impl Scheduler {
     let refresh_interval = Duration::from_millis(100);
 
     Ok(match session.maybe_display() {
+      None if USE_NEW_UI => {
+
+        println!("Gonna start the thing");
+
+        let multi_progress = MultiProgress::new();
+
+        /*
+        let style = ProgressStyle::default_bar()
+          .template("▶ {spinner} {msg}");
+        */
+
+        let bars: Vec<_> = (0..1)
+          .map(|n| {
+            let template = format!("▶ {} {{spinner}} {{msg}}", n);
+            let style = ProgressStyle::default_bar()
+              .template(&template);
+            multi_progress.add(ProgressBar::new(50)
+              .with_style(style.clone()))
+          })
+        .collect();
+
+        let  bar_to_write_to = bars[0].clone();
+
+        let (other_sender, other_receiver) = mpsc::channel();
+
+        let _ = std::thread::spawn(move || {
+          let output = loop {
+            for bar in bars.iter() {
+              bar.set_message("YOLO");
+            }
+            if let Ok(res) = receiver.recv_timeout(refresh_interval) {
+              break res;
+            }
+            for bar in bars.iter() {
+              bar.set_message("SWAG");
+            }
+            if let Ok(res) = receiver.recv_timeout(refresh_interval) {
+              break res;
+            }
+          };
+          other_sender.send(output).unwrap();
+          for bar in bars.iter() {
+            bar.finish();
+          }
+        });
+
+        bar_to_write_to.println("hey here is some text yo");
+        bar_to_write_to.println(&format!("{}", "DESU".green()));
+
+        multi_progress.join_and_clear().unwrap();
+        other_receiver.recv().unwrap()
+      },
       Some(display) => {
         {
           let mut display = display.lock();
@@ -407,12 +464,12 @@ impl Scheduler {
           display.finish();
         }
         results
-      }
+      },
       None => loop {
         if let Ok(res) = receiver.recv_timeout(refresh_interval) {
           break res;
         }
-      },
+      }
     })
   }
 

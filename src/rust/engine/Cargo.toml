@@ -119,6 +119,7 @@ uuid = { version = "0.7", features = ["v4"] }
 watch = { path = "watch" }
 workunit_store = { path = "workunit_store" }
 indicatif = "0.14.0"
+colored = "1.9.3"
 
 [dev-dependencies]
 testutil = { path = "./testutil" }
