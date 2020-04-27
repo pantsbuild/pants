@@ -15,7 +15,7 @@ use crate::context::{Context, Core};
 use crate::core::{Failure, Params, TypeId, Value};
 use crate::nodes::{NodeKey, Select, Tracer, Visualizer};
 
-use graph::{Graph, InvalidationResult};
+use graph::InvalidationResult;
 use hashing;
 use indexmap::IndexMap;
 use log::{debug, info, warn};
@@ -357,12 +357,6 @@ impl Scheduler {
     let (sender, receiver) = mpsc::channel();
 
     Scheduler::execute_helper(context, sender, request.roots.clone(), 8);
-    let roots: Vec<NodeKey> = request
-      .roots
-      .clone()
-      .into_iter()
-      .map(NodeKey::from)
-      .collect();
 
     // This map keeps the k most relevant jobs in assigned possitions.
     // Keys are positions in the display (display workers) and the values are the actual jobs to print.
@@ -381,12 +375,9 @@ impl Scheduler {
           if let Ok(res) = receiver.recv_timeout(refresh_interval) {
             break res;
           } else {
-            let render_result = Scheduler::display_ongoing_tasks(
-              &self.core.graph,
-              &roots,
-              display,
-              &mut tasks_to_display,
-            );
+            let workunit_store = session.workunit_store().clone();
+            let render_result =
+              Scheduler::display_ongoing_tasks(workunit_store, display, &mut tasks_to_display);
             match render_result {
               Err(e) => warn!("{}", e),
               Ok(KeyboardCommand::CtrlC) => {
@@ -417,8 +408,7 @@ impl Scheduler {
   }
 
   fn display_ongoing_tasks(
-    graph: &Graph<NodeKey>,
-    roots: &[NodeKey],
+    workunit_store: WorkUnitStore,
     display: &Mutex<EngineDisplay>,
     tasks_to_display: &mut IndexMap<String, Duration>,
   ) -> Result<KeyboardCommand, String> {
@@ -428,7 +418,7 @@ impl Scheduler {
       let d = display.lock();
       d.worker_count()
     };
-    let heavy_hitters = graph.heavy_hitters(&roots, worker_count);
+    let heavy_hitters = workunit_store.heavy_hitters(worker_count);
 
     // Insert every one in the set of tasks to display.
     // For tasks already here, the durations are overwritten.

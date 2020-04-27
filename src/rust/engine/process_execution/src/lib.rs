@@ -24,7 +24,7 @@
 #![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
-
+#![type_length_limit = "7000100"]
 #[macro_use]
 extern crate derivative;
 
@@ -38,7 +38,7 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 use store::UploadSummary;
-use workunit_store::WorkUnitStore;
+use workunit_store::{with_workunit, WorkUnitStore, WorkunitMetadata};
 
 use futures::compat::Future01CompatExt;
 use futures::future::{FutureExt, TryFutureExt};
@@ -349,8 +349,17 @@ impl AddAssign<UploadSummary> for ExecutionStats {
 
 #[derive(Clone, Default)]
 pub struct Context {
-  pub workunit_store: WorkUnitStore,
-  pub build_id: String,
+  workunit_store: WorkUnitStore,
+  build_id: String,
+}
+
+impl Context {
+  pub fn new(workunit_store: WorkUnitStore, build_id: String) -> Context {
+    Context {
+      workunit_store,
+      build_id,
+    }
+  }
 }
 
 pub trait CommandRunner: Send + Sync {
@@ -424,14 +433,41 @@ impl CommandRunner for BoundedCommandRunner {
     context: Context,
   ) -> BoxFuture<FallibleProcessResultWithPlatform, String> {
     let inner = self.inner.clone();
-    self
-      .inner
-      .1
-      .clone()
-      .with_acquired(move || inner.0.run(req, context).compat())
-      .boxed()
-      .compat()
-      .to_boxed()
+    let semaphor = self.inner.1.clone();
+
+    let outer_name = format!(
+      "Bounded - {}",
+      req
+        .user_facing_name()
+        .unwrap_or_else(|| "Unamed node".to_string())
+    );
+    let outer_metadata = WorkunitMetadata {
+      desc: Some("Bounded version of the workunit".to_string()),
+      display: false,
+    };
+
+    let inner_context = context.clone();
+    let bounded_fut = semaphor.with_acquired(move || {
+      let name = req
+        .user_facing_name()
+        .unwrap_or_else(|| "Unnamed node".to_string());
+      let metadata = WorkunitMetadata {
+        desc: Some("Running version of the workunit".to_string()),
+        display: false,
+      };
+      let f = inner.0.run(req, inner_context.clone()).compat();
+      with_workunit(inner_context.workunit_store.clone(), name, metadata, f)
+    });
+
+    with_workunit(
+      context.workunit_store,
+      outer_name,
+      outer_metadata,
+      bounded_fut,
+    )
+    .boxed()
+    .compat()
+    .to_boxed()
   }
 
   fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {

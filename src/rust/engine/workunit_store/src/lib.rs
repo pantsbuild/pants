@@ -27,16 +27,20 @@
 
 use concrete_time::TimeSpan;
 use parking_lot::Mutex;
+use petgraph::graph::{DiGraph, NodeIndex};
 use rand::thread_rng;
 use rand::Rng;
-use std::collections::HashMap;
+use std::collections::{BinaryHeap, HashMap};
 use tokio::task_local;
 
 use std::cell::RefCell;
 use std::future::Future;
 use std::sync::Arc;
+use std::time::{Duration, SystemTime};
 
 pub type SpanId = String;
+
+type WorkunitGraph = DiGraph<SpanId, (), u32>;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct WorkUnit {
@@ -50,8 +54,8 @@ pub struct WorkUnit {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct StartedWorkUnit {
   pub name: String,
-  pub start_time: std::time::SystemTime,
-  pub span_id: String,
+  pub start_time: SystemTime,
+  pub span_id: SpanId,
   pub parent_id: Option<String>,
   pub metadata: WorkunitMetadata,
 }
@@ -109,6 +113,8 @@ pub struct WorkUnitStore {
 
 #[derive(Default)]
 pub struct WorkUnitInnerStore {
+  graph: WorkunitGraph,
+  span_id_to_graph: HashMap<SpanId, NodeIndex<u32>>,
   workunit_records: HashMap<SpanId, WorkunitRecord>,
   started_ids: Vec<SpanId>,
   completed_ids: Vec<SpanId>,
@@ -120,6 +126,8 @@ impl WorkUnitStore {
   pub fn new() -> WorkUnitStore {
     WorkUnitStore {
       inner: Arc::new(Mutex::new(WorkUnitInnerStore {
+        graph: DiGraph::new(),
+        span_id_to_graph: HashMap::new(),
         workunit_records: HashMap::new(),
         started_ids: Vec::new(),
         last_seen_started_idx: 0,
@@ -151,6 +159,45 @@ impl WorkUnitStore {
       .collect()
   }
 
+  pub fn heavy_hitters(&self, k: usize) -> HashMap<String, Duration> {
+    use petgraph::Direction;
+
+    let now = SystemTime::now();
+    let inner = self.inner.lock();
+    let workunit_graph = &inner.graph;
+
+    let mut queue: BinaryHeap<(Duration, SpanId)> = BinaryHeap::with_capacity(k);
+    let edge_workunits = workunit_graph.externals(Direction::Outgoing);
+    queue.extend(
+      edge_workunits
+        .map(|entry| workunit_graph[entry].clone())
+        .flat_map(|span_id: SpanId| {
+          let record = inner.workunit_records.get(&span_id);
+          match record {
+            Some(WorkunitRecord::Started(StartedWorkUnit { start_time, .. })) => now
+              .duration_since(*start_time)
+              .ok()
+              .map(|duration| (duration, span_id)),
+            _ => None,
+          }
+        }),
+    );
+
+    let mut res = HashMap::new();
+    while let Some((dur, span_id)) = queue.pop() {
+      let record = inner.workunit_records.get(&span_id).unwrap();
+      let name = match record {
+        WorkunitRecord::Started(StartedWorkUnit { name, .. }) => name.clone(),
+        WorkunitRecord::Completed(WorkUnit { name, .. }) => name.clone(),
+      };
+      res.insert(name, dur);
+      if res.len() >= k {
+        break;
+      }
+    }
+    res
+  }
+
   pub fn start_workunit(
     &self,
     span_id: SpanId,
@@ -161,7 +208,7 @@ impl WorkUnitStore {
     let started = StartedWorkUnit {
       name,
       span_id: span_id.clone(),
-      parent_id,
+      parent_id: parent_id.clone(),
       start_time: std::time::SystemTime::now(),
       metadata,
     };
@@ -170,6 +217,15 @@ impl WorkUnitStore {
       .workunit_records
       .insert(span_id.clone(), WorkunitRecord::Started(started));
     inner.started_ids.push(span_id.clone());
+    let child = inner.graph.add_node(span_id.clone());
+    inner
+      .span_id_to_graph
+      .insert(span_id.clone(), child.clone());
+    if let Some(parent_id) = parent_id {
+      let parent = *inner.span_id_to_graph.get(&parent_id).unwrap();
+      inner.graph.add_edge(parent, child, ());
+    }
+
     span_id
   }
 
@@ -305,6 +361,27 @@ pub fn get_workunit_state() -> Option<WorkUnitState> {
 
 pub fn expect_workunit_state() -> WorkUnitState {
   get_workunit_state().expect("A WorkUnitStore has not been set for this thread.")
+}
+
+pub async fn with_workunit<F>(
+  workunit_store: WorkUnitStore,
+  name: String,
+  metadata: WorkunitMetadata,
+  f: F,
+) -> F::Output
+where
+  F: Future,
+{
+  let mut workunit_state = expect_workunit_state();
+  let span_id = new_span_id();
+  let parent_id = std::mem::replace(&mut workunit_state.parent_id, Some(span_id.clone()));
+  let started_id = workunit_store.start_workunit(span_id, name, parent_id, metadata);
+  scope_task_workunit_state(Some(workunit_state), async move {
+    let result = f.await;
+    workunit_store.complete_workunit(started_id).unwrap();
+    result
+  })
+  .await
 }
 
 ///
