@@ -6,7 +6,6 @@ from typing import Iterable, Optional, Tuple, Union, cast
 
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
-from pants.core.target_types import FilesSources
 from pants.core.util_rules.determine_source_files import SourceFiles
 from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot

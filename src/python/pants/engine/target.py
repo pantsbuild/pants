@@ -1343,15 +1343,39 @@ class Sources(AsyncField):
         )
 
 
-@dataclass(frozen=True)
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class HydrateSourcesRequest:
     field: Sources
+    valid_sources_types: Tuple[Type[Sources], ...]
+
+    def __init__(
+        self, field: Sources, *, valid_sources_types: Iterable[Type[Sources]] = (Sources,)
+    ) -> None:
+        """Convert raw sources globs into an instance of HydratedSources.
+
+        If you only want to convert certain Sources fields, such as only PythonSources, set
+        `valid_sources_types`. Any invalid sources will return an empty `HydratedSources` instance,
+        indicated by the attribute `output_type = None`.
+        """
+        self.field = field
+        self.valid_sources_types = tuple(valid_sources_types)
 
 
 @dataclass(frozen=True)
 class HydratedSources:
+    """The result of hydrating a SourcesField.
+
+    The `output_type` will indicate which of the `HydrateSourcesRequest.valid_sources_type` the
+    result corresponds to, e.g. if the result comes from `FilesSources` vs. `PythonSources`. If this
+    value is None, then the input `Sources` field was not one of the expected types. This property
+    allows for switching on the result, e.g. handling hydrated files() sources differently than
+    hydrated Python sources.
+    """
+
     snapshot: Snapshot
     filespec: Filespec
+    output_type: Optional[Type[Sources]]
 
     def eager_fileset_with_spec(self, *, address: Address) -> EagerFilesetWithSpec:
         return EagerFilesetWithSpec(address.spec_path, self.filespec, self.snapshot)
@@ -1362,10 +1386,21 @@ async def hydrate_sources(
     request: HydrateSourcesRequest, glob_match_error_behavior: GlobMatchErrorBehavior
 ) -> HydratedSources:
     sources_field = request.field
-    globs = sources_field.sanitized_raw_value
 
+    output_type = next(
+        (
+            valid_type
+            for valid_type in request.valid_sources_types
+            if isinstance(sources_field, valid_type)
+        ),
+        None,
+    )
+    if output_type is None:
+        return HydratedSources(EMPTY_SNAPSHOT, sources_field.filespec, output_type=None)
+
+    globs = sources_field.sanitized_raw_value
     if globs is None:
-        return HydratedSources(EMPTY_SNAPSHOT, sources_field.filespec)
+        return HydratedSources(EMPTY_SNAPSHOT, sources_field.filespec, output_type=output_type)
 
     conjunction = (
         GlobExpansionConjunction.all_match
@@ -1387,7 +1422,7 @@ async def hydrate_sources(
         )
     )
     sources_field.validate_snapshot(snapshot)
-    return HydratedSources(snapshot, sources_field.filespec)
+    return HydratedSources(snapshot, sources_field.filespec, output_type=output_type)
 
 
 # TODO: figure out what support looks like for this with the Target API. The expected value is an

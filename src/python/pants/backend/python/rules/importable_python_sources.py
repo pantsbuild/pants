@@ -12,7 +12,7 @@ from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, 
 from pants.engine.fs import Snapshot
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
-from pants.engine.target import Sources, Target, Targets
+from pants.engine.target import Sources, Targets
 
 
 @dataclass(frozen=True)
@@ -33,14 +33,11 @@ class ImportablePythonSources:
 
 @rule
 async def prepare_python_sources(targets: Targets) -> ImportablePythonSources:
-    def is_relevant(tgt: Target) -> bool:
-        return any(
-            tgt.has_field(field) for field in (PythonSources, ResourcesSources, FilesSources)
-        )
-
     stripped_sources = await Get[SourceFiles](
         AllSourceFilesRequest(
-            (tgt.get(Sources) for tgt in targets if is_relevant(tgt)), strip_source_roots=True
+            (tgt.get(Sources) for tgt in targets),
+            valid_sources_types=(PythonSources, ResourcesSources, FilesSources),
+            strip_source_roots=True,
         )
     )
     init_injected = await Get[InitInjectedSnapshot](InjectInitRequest(stripped_sources.snapshot))
