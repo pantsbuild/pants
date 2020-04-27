@@ -258,9 +258,11 @@ impl MultiPlatformExecuteProcess {
       .parse::<f64>()
       .map_err(|err| format!("Timeout was not a float: {:?}", err))?;
 
-    if timeout_in_seconds < 0.0 {
-      return Err(format!("Timeout was negative: {:?}", timeout_in_seconds));
-    }
+    let timeout = if timeout_in_seconds < 0.0 {
+      None
+    } else {
+      Some(Duration::from_millis((timeout_in_seconds * 1000.0) as u64))
+    };
 
     let description = externs::project_str(&value, "description");
 
@@ -289,7 +291,7 @@ impl MultiPlatformExecuteProcess {
       input_files: digest,
       output_files,
       output_directories,
-      timeout: Duration::from_millis((timeout_in_seconds * 1000.0) as u64),
+      timeout,
       description,
       unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule,
       jdk_home,

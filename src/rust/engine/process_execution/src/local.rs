@@ -368,12 +368,17 @@ pub trait CapturedWorkdir {
       //   https://github.com/pantsbuild/pants/issues/6089
       .map(ChildResults::collect_from)
       .and_then(move |child_results_future| {
-        timeout(req_timeout, child_results_future)
-          .boxed()
-          .compat()
-          .map_err(|e| e.to_string())
+        let maybe_timed_out_child_results = Box::pin(async move {
+          if let Some(req_timeout) = req_timeout {
+            timeout(req_timeout, child_results_future)
+              .await
+              .map_err(|e| e.to_string())?
+          } else {
+            child_results_future.await
+          }
+        });
+        maybe_timed_out_child_results.compat()
       })
-      .and_then(|res| res)
       .and_then(move |child_results| {
         let output_snapshot = if output_file_paths.is_empty() && output_dir_paths.is_empty() {
           future::ok(store::Snapshot::empty()).to_boxed()

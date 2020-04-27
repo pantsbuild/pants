@@ -252,9 +252,7 @@ async def run_python_test(
         input_files=test_setup.input_files_digest,
         output_directories=tuple(output_dirs) if output_dirs else None,
         description=f"Run Pytest for {config.address.reference()}",
-        timeout_seconds=(
-            test_setup.timeout_seconds if test_setup.timeout_seconds is not None else 9999
-        ),
+        timeout_seconds=test_setup.timeout_seconds,
         env=env,
     )
     result = await Get[FallibleProcessResult](Process, process)

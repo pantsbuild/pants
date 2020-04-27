@@ -13,8 +13,6 @@ from pants.util.meta import frozen_after_init
 
 logger = logging.getLogger(__name__)
 
-_default_timeout_seconds = 15 * 60
-
 
 @dataclass(frozen=True)
 class ProductDescription:
@@ -50,7 +48,7 @@ class Process:
         env: Optional[Dict[str, str]] = None,
         output_files: Optional[Tuple[str, ...]] = None,
         output_directories: Optional[Tuple[str, ...]] = None,
-        timeout_seconds: Union[int, float] = _default_timeout_seconds,
+        timeout_seconds: Optional[Union[int, float]] = None,
         unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: Digest = EMPTY_DIRECTORY_DIGEST,
         jdk_home: Optional[str] = None,
         is_nailgunnable: bool = False,
@@ -62,7 +60,8 @@ class Process:
         self.env = tuple(itertools.chain.from_iterable((env or {}).items()))
         self.output_files = output_files or ()
         self.output_directories = output_directories or ()
-        self.timeout_seconds = timeout_seconds
+        # NB: A negative or None time value is normalized to -1 to ease the transfer to rust.
+        self.timeout_seconds = timeout_seconds if timeout_seconds and timeout_seconds > 0 else -1
         self.unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule = (
             unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule
         )

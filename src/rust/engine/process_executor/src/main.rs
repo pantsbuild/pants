@@ -333,7 +333,7 @@ async fn main() {
     input_files,
     output_files,
     output_directories,
-    timeout: Duration::new(15 * 60, 0),
+    timeout: Some(Duration::new(15 * 60, 0)),
     description: "process_executor".to_string(),
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
       hashing::EMPTY_DIGEST,
