@@ -16,10 +16,7 @@ from pants.backend.python.rules.pex import (
 from pants.backend.python.target_types import (
     PythonInterpreterCompatibility,
     PythonRequirementsField,
-    PythonRequirementsFileSources,
-    PythonSources,
 )
-from pants.core.target_types import FilesSources, ResourcesSources
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, DirectoriesToMerge
 from pants.engine.rules import RootRule, named_rule, rule
@@ -93,38 +90,30 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
     transitive_targets = await Get[TransitiveTargets](Addresses, request.addresses)
     all_targets = transitive_targets.closure
 
-    python_targets = []
-    resource_targets = []
-    python_requirement_fields = []
-    for tgt in all_targets:
-        if tgt.has_field(PythonSources):
-            python_targets.append(tgt)
-        if tgt.has_field(PythonRequirementsField):
-            python_requirement_fields.append(tgt[PythonRequirementsField])
-        # NB: PythonRequirementsFileSources is a subclass of FilesSources. We filter it out so that
-        # requirements.txt is not included in the PEX and so that irrelevant changes to it (e.g.
-        # whitespace changes) do not invalidate the PEX.
-        if tgt.has_field(ResourcesSources) or (
-            tgt.has_field(FilesSources) and not tgt.has_field(PythonRequirementsFileSources)
-        ):
-            resource_targets.append(tgt)
-
-    interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
-        (tgt.get(PythonInterpreterCompatibility) for tgt in python_targets), python_setup
-    )
-
     input_digests = []
     if request.additional_sources:
         input_digests.append(request.additional_sources)
     if request.include_source_files:
-        prepared_sources = await Get[ImportablePythonSources](
-            Targets(python_targets + resource_targets)
-        )
+        prepared_sources = await Get[ImportablePythonSources](Targets(all_targets))
         input_digests.append(prepared_sources.snapshot.directory_digest)
     merged_input_digest = await Get[Digest](DirectoriesToMerge(directories=tuple(input_digests)))
 
+    interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
+        (
+            tgt[PythonInterpreterCompatibility]
+            for tgt in all_targets
+            if tgt.has_field(PythonInterpreterCompatibility)
+        ),
+        python_setup,
+    )
+
     requirements = PexRequirements.create_from_requirement_fields(
-        python_requirement_fields, additional_requirements=request.additional_requirements
+        (
+            tgt[PythonRequirementsField]
+            for tgt in all_targets
+            if tgt.has_field(PythonRequirementsField)
+        ),
+        additional_requirements=request.additional_requirements,
     )
 
     return PexRequest(
