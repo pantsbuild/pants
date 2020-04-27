@@ -401,11 +401,6 @@ fn make_core(
 
 fn started_workunit_to_py_value(started_workunit: &StartedWorkUnit) -> Option<Value> {
   use std::time::UNIX_EPOCH;
-
-  if !started_workunit.metadata.display {
-    return None;
-  }
-
   let duration = started_workunit
     .start_time
     .duration_since(UNIX_EPOCH)
@@ -447,10 +442,6 @@ fn started_workunit_to_py_value(started_workunit: &StartedWorkUnit) -> Option<Va
 }
 
 fn workunit_to_py_value(workunit: &WorkUnit) -> Option<Value> {
-  if !workunit.metadata.display {
-    return None;
-  }
-
   let mut dict_entries = vec![
     (
       externs::store_utf8("name"),

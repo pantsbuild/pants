@@ -122,6 +122,18 @@ pub struct WorkUnitInnerStore {
   last_seen_completed_idx: usize,
 }
 
+fn should_display_workunit(workunit_records: &HashMap<SpanId, WorkunitRecord>, id: &str) -> bool {
+  let record = match workunit_records.get(id) {
+    None => return false,
+    Some(record) => record,
+  };
+  let metadata = match record {
+    WorkunitRecord::Started(StartedWorkUnit { metadata, .. }) => metadata,
+    WorkunitRecord::Completed(WorkUnit { metadata, .. }) => metadata,
+  };
+  metadata.display
+}
+
 impl WorkUnitStore {
   pub fn new() -> WorkUnitStore {
     WorkUnitStore {
@@ -290,7 +302,19 @@ impl WorkUnitStore {
       .flat_map(|id| workunit_records.get(id))
       .flat_map(|record| match record {
         WorkunitRecord::Completed(_) => None,
+        WorkunitRecord::Started(StartedWorkUnit { metadata, .. }) if !metadata.display => None,
         WorkunitRecord::Started(c) => Some(c.clone()),
+      })
+      .map(|started: StartedWorkUnit| {
+        if let Some(ref parent_id) = started.parent_id {
+          if !should_display_workunit(workunit_records, parent_id) {
+            return StartedWorkUnit {
+              parent_id: None,
+              ..started
+            };
+          }
+        }
+        started
       })
       .collect();
     inner_store.last_seen_started_idx = cur_len;
@@ -303,7 +327,19 @@ impl WorkUnitStore {
       .flat_map(|id| workunit_records.get(id))
       .flat_map(|record| match record {
         WorkunitRecord::Started(_) => None,
+        WorkunitRecord::Completed(WorkUnit { metadata, .. }) if !metadata.display => None,
         WorkunitRecord::Completed(c) => Some(c.clone()),
+      })
+      .map(|workunit: WorkUnit| {
+        if let Some(ref parent_id) = workunit.parent_id {
+          if !should_display_workunit(workunit_records, parent_id) {
+            return WorkUnit {
+              parent_id: None,
+              ..workunit
+            };
+          }
+        }
+        workunit
       })
       .collect();
     inner_store.last_seen_completed_idx = cur_len;
