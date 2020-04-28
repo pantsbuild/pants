@@ -318,15 +318,37 @@ impl WorkUnitStore {
         WorkunitRecord::Started(c) => Some(c.clone()),
       })
       .map(|started: StartedWorkUnit| {
-        if let Some(ref parent_id) = started.parent_id {
-          if !should_display_workunit(workunit_records, parent_id) {
+        let mut parent_id: Option<SpanId> = started.parent_id;
+        loop {
+          if let Some(current_parent_id) = parent_id {
+            if should_display_workunit(workunit_records, &current_parent_id) {
+              return StartedWorkUnit {
+                parent_id: Some(current_parent_id),
+                ..started
+              };
+            } else {
+              let new_parent_id: Option<SpanId> = workunit_records
+                .get(&current_parent_id.clone())
+                .and_then(|record| match record {
+                  WorkunitRecord::Started(StartedWorkUnit {
+                    parent_id: Some(id),
+                    ..
+                  }) => Some(id.clone()),
+                  WorkunitRecord::Completed(WorkUnit {
+                    parent_id: Some(id),
+                    ..
+                  }) => Some(id.clone()),
+                  _ => None,
+                });
+              parent_id = new_parent_id;
+            }
+          } else {
             return StartedWorkUnit {
               parent_id: None,
               ..started
             };
           }
         }
-        started
       })
       .collect();
     inner_store.last_seen_started_idx = cur_len;
@@ -343,15 +365,37 @@ impl WorkUnitStore {
         WorkunitRecord::Completed(c) => Some(c.clone()),
       })
       .map(|workunit: WorkUnit| {
-        if let Some(ref parent_id) = workunit.parent_id {
-          if !should_display_workunit(workunit_records, parent_id) {
+        let mut parent_id: Option<SpanId> = workunit.parent_id;
+        loop {
+          if let Some(current_parent_id) = parent_id {
+            if should_display_workunit(workunit_records, &current_parent_id) {
+              return WorkUnit {
+                parent_id: Some(current_parent_id),
+                ..workunit
+              };
+            } else {
+              let new_parent_id: Option<SpanId> = workunit_records
+                .get(&current_parent_id.clone())
+                .and_then(|record| match record {
+                  WorkunitRecord::Started(StartedWorkUnit {
+                    parent_id: Some(id),
+                    ..
+                  }) => Some(id.clone()),
+                  WorkunitRecord::Completed(WorkUnit {
+                    parent_id: Some(id),
+                    ..
+                  }) => Some(id.clone()),
+                  _ => None,
+                });
+              parent_id = new_parent_id;
+            }
+          } else {
             return WorkUnit {
               parent_id: None,
               ..workunit
             };
           }
         }
-        workunit
       })
       .collect();
     inner_store.last_seen_completed_idx = cur_len;
