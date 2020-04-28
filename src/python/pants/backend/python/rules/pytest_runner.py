@@ -24,13 +24,11 @@ from pants.backend.python.subsystems.subprocess_environment import SubprocessEnc
 from pants.backend.python.target_types import (
     PythonCoverage,
     PythonInterpreterCompatibility,
-    PythonRequirementsFileSources,
     PythonSources,
     PythonTestsSources,
     PythonTestsTimeout,
 )
 from pants.core.goals.test import TestConfiguration, TestDebugRequest, TestOptions, TestResult
-from pants.core.target_types import FilesSources, ResourcesSources
 from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.engine.addresses import Addresses
 from pants.engine.fs import (
@@ -86,27 +84,16 @@ async def setup_pytest_for_target(
 
     test_addresses = Addresses((config.address,))
 
-    # TODO(John Sirois): PexInterpreterConstraints are gathered in the same way by the
-    #  `create_pex_from_target_closure` rule, factor up.
     transitive_targets = await Get[TransitiveTargets](Addresses, test_addresses)
     all_targets = transitive_targets.closure
 
-    # TODO: factor this up? It's mostly duplicated with pex_from_targets.py.
-    python_targets = []
-    resource_targets = []
-    for tgt in all_targets:
-        if tgt.has_field(PythonSources):
-            python_targets.append(tgt)
-        # NB: PythonRequirementsFileSources is a subclass of FilesSources. We filter it out so that
-        # requirements.txt is not included in the PEX and so that irrelevant changes to it (e.g.
-        # whitespace changes) do not invalidate the PEX.
-        if tgt.has_field(ResourcesSources) or (
-            tgt.has_field(FilesSources) and not tgt.has_field(PythonRequirementsFileSources)
-        ):
-            resource_targets.append(tgt)
-
     interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
-        (tgt.get(PythonInterpreterCompatibility) for tgt in python_targets), python_setup
+        (
+            tgt[PythonInterpreterCompatibility]
+            for tgt in all_targets
+            if tgt.has_field(PythonInterpreterCompatibility)
+        ),
+        python_setup,
     )
 
     # Ensure all pexes we merge via PEX_PATH to form the test runner use the interpreter constraints
@@ -172,12 +159,17 @@ async def setup_pytest_for_target(
         Get[Pex](PexRequest, pytest_pex_request),
         Get[Pex](PexFromTargetsRequest, requirements_pex_request),
         Get[Pex](PexRequest, test_runner_pex_request),
-        Get[ImportablePythonSources](Targets(python_targets + resource_targets)),
+        Get[ImportablePythonSources](Targets(all_targets)),
         Get[SourceFiles](SpecifiedSourceFilesRequest, specified_source_files_request),
     ]
     if run_coverage:
         requests.append(
-            Get[CoverageConfig](CoverageConfigRequest(Targets(python_targets), is_test_time=True)),
+            Get[CoverageConfig](
+                CoverageConfigRequest(
+                    Targets((tgt for tgt in all_targets if tgt.has_field(PythonSources))),
+                    is_test_time=True,
+                )
+            ),
         )
 
     (
