@@ -74,7 +74,6 @@ class Get(Generic[_Product]):
             )
         if len(args) == 2:
             product, subject = args
-
             if isinstance(subject, (type, TypeConstraint)):
                 raise TypeError(
                     dedent(
