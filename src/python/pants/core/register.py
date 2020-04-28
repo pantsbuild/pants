@@ -27,6 +27,7 @@ from pants.core.util_rules import (
     archive,
     determine_source_files,
     distdir,
+    external_tool,
     filter_empty_sources,
     strip_source_roots,
 )
@@ -55,6 +56,7 @@ def rules():
         *filter_empty_sources.rules(),
         *strip_source_roots.rules(),
         *archive.rules(),
+        *external_tool.rules(),
         # other
         *target_rules(),
     ]
