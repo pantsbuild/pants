@@ -233,6 +233,7 @@ ignore = "%(pants_supportdir)s/eslint/.eslintignore"
 
 [flake8]
 config = "build-support/flake8/.flake8"
+version = "flake8==3.8.0"
 extra_requirements.add = ["flake8-pantsbuild>=2.0,<3"]
 
 [isort]
