@@ -6,7 +6,6 @@ from typing import Iterable, Optional, Tuple, Union, cast
 
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
-from pants.core.target_types import FilesSources
 from pants.core.util_rules.determine_source_files import SourceFiles
 from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
@@ -414,9 +413,7 @@ class PythonRequirementLibrary(Target):
 # -----------------------------------------------------------------------------------------------
 
 
-# NB: This subclasses FilesSources to ensure that we still properly handle stripping source roots,
-# but we still new type so that we can distinguish between normal FilesSources vs. this field.
-class PythonRequirementsFileSources(FilesSources):
+class PythonRequirementsFileSources(Sources):
     pass
 
 
