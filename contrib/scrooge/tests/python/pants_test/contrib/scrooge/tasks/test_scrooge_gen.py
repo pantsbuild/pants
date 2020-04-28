@@ -80,7 +80,7 @@ class ScroogeGenTest(NailgunTaskTestBase):
         task._validate_compiler_configs(self.target("test_validate:one"))
         task._validate_compiler_configs(self.target("test_validate:two"))
 
-    def test_validate_allowlisted_compiler_args(self):
+    def test_validate_unchecked_compiler_args(self):
         # Set synthetic defaults for the global scope.
         self.set_options_for_scope(
             "thrift-defaults",
@@ -88,7 +88,6 @@ class ScroogeGenTest(NailgunTaskTestBase):
             language="uniform",
             service_deps="service_deps",
             structs_deps="structs_deps",
-            allowlist_compiler_args=['--test'],
         )
 
         self.add_to_build_file(
