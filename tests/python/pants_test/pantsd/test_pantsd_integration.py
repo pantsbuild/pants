@@ -638,7 +638,7 @@ Interrupted by user over pailgun client!
             blocked = True
             while blocked:
                 log = "\n".join(read_pantsd_log(workdir))
-                if "didn't aquire the lock on the first try, polling." in log:
+                if "didn't acquire the lock on the first try, polling." in log:
                     blocked = False
                 # NB: This sleep is totally deterministic, it's just so that we don't spend too many cycles
                 # busy waiting.

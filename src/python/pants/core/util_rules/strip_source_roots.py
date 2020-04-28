@@ -4,7 +4,7 @@
 import itertools
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Optional, cast
+from typing import Iterable, Optional, Tuple, Type, cast
 
 from pants.core.target_types import FilesSources
 from pants.engine.addresses import Address
@@ -23,6 +23,7 @@ from pants.engine.target import HydratedSources, HydrateSourcesRequest
 from pants.engine.target import Sources as SourcesField
 from pants.engine.target import rules as target_rules
 from pants.source.source_root import NoSourceRootError, SourceRootConfig
+from pants.util.meta import frozen_after_init
 
 
 @dataclass(frozen=True)
@@ -46,7 +47,8 @@ class StripSnapshotRequest:
     representative_path: Optional[str] = None
 
 
-@dataclass(frozen=True)
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class StripSourcesFieldRequest:
     """A request to strip source roots for every file in a `Sources` field.
 
@@ -56,7 +58,19 @@ class StripSourcesFieldRequest:
     """
 
     sources_field: SourcesField
+    valid_sources_types: Tuple[Type[SourcesField], ...] = (SourcesField,)
     specified_files_snapshot: Optional[Snapshot] = None
+
+    def __init__(
+        self,
+        sources_field: SourcesField,
+        *,
+        valid_sources_types: Iterable[Type[SourcesField]] = (SourcesField,),
+        specified_files_snapshot: Optional[Snapshot] = None,
+    ) -> None:
+        self.sources_field = sources_field
+        self.valid_sources_types = tuple(valid_sources_types)
+        self.specified_files_snapshot = specified_files_snapshot
 
 
 @rule
@@ -129,7 +143,11 @@ async def strip_source_roots_from_sources_field(
     if request.specified_files_snapshot is not None:
         sources_snapshot = request.specified_files_snapshot
     else:
-        hydrated_sources = await Get[HydratedSources](HydrateSourcesRequest(request.sources_field))
+        hydrated_sources = await Get[HydratedSources](
+            HydrateSourcesRequest(
+                request.sources_field, valid_sources_types=request.valid_sources_types
+            )
+        )
         sources_snapshot = hydrated_sources.snapshot
 
     if not sources_snapshot.files:

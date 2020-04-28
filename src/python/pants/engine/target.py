@@ -1287,23 +1287,64 @@ class Sources(AsyncField):
         )
 
 
-@dataclass(frozen=True)
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class HydrateSourcesRequest:
     field: Sources
-    codegen_language: Optional[Type[Sources]] = None
+    valid_sources_types: Tuple[Type[Sources], ...]
+    enable_codegen: bool
+
+    def __init__(
+        self,
+        field: Sources,
+        *,
+        valid_sources_types: Iterable[Type[Sources]] = (Sources,),
+        enable_codegen: bool = False,
+    ) -> None:
+        """Convert raw sources globs into an instance of HydratedSources.
+
+        If you only want to convert certain Sources fields, such as only PythonSources, set
+        `valid_sources_types`. Any invalid sources will return an empty `HydratedSources` instance,
+        indicated by the attribute `output_type = None`.
+
+        If `enable_codegen` is set to `True`, any codegen sources will try to be converted to one
+        of the `valid_sources_types`.
+        """
+        self.field = field
+        self.valid_sources_types = tuple(valid_sources_types)
+        self.enable_codegen = enable_codegen
+        self.__post_init__()
+
+    def __post_init__(self) -> None:
+        if self.enable_codegen and self.valid_sources_types == (Sources,):
+            raise ValueError(
+                "When setting `enable_codegen=True` on `HydrateSourcesRequest`, you must also "
+                "explicitly set `valid_source_types`. Why? `valid_source_types` is used to "
+                "determine which language(s) to try to generate. For example, "
+                "`valid_source_types=(PythonSources,)` will hydrate `PythonSources` like normal, "
+                "and, if it encounters codegen sources that can be converted into Python, it will "
+                "generate Python files."
+            )
 
 
 @dataclass(frozen=True)
 class HydratedSources:
+    """The result of hydrating a SourcesField.
+
+    The `output_type` will indicate which of the `HydrateSourcesRequest.valid_sources_type` the
+    result corresponds to, e.g. if the result comes from `FilesSources` vs. `PythonSources`. If this
+    value is None, then the input `Sources` field was not one of the expected types; or, when
+    codegen was enabled in the request, there was no valid code generator to generate the requested
+    language from the original input. This property allows for switching on the result, e.g.
+    handling hydrated files() sources differently than hydrated Python sources.
+    """
+
     snapshot: Snapshot
     filespec: Filespec
+    output_type: Optional[Type[Sources]]
 
     def eager_fileset_with_spec(self, *, address: Address) -> EagerFilesetWithSpec:
         return EagerFilesetWithSpec(address.spec_path, self.filespec, self.snapshot)
-
-
-class CodegenSources(Sources):
-    pass
 
 
 @union
@@ -1338,7 +1379,7 @@ class GenerateSourcesRequest:
     protocol_sources: Snapshot
     protocol_target: Target
 
-    input: ClassVar[Type[CodegenSources]]
+    input: ClassVar[Type[Sources]]
     output: ClassVar[Type[Sources]]
 
 
@@ -1354,10 +1395,49 @@ async def hydrate_sources(
     union_membership: UnionMembership,
 ) -> HydratedSources:
     sources_field = request.field
-    globs = sources_field.sanitized_raw_value
 
+    # First, find if there are any code generators for the input `sources_field`. This will be used
+    # to determine if the sources_field is valid or not.
+    generate_request_types: Iterable[
+        Type[GenerateSourcesRequest]
+    ] = union_membership.union_rules.get(GenerateSourcesRequest, ())
+    relevant_generate_request_types = [
+        generate_request_type
+        for generate_request_type in generate_request_types
+        if isinstance(sources_field, generate_request_type.input)
+        and issubclass(generate_request_type.output, request.valid_sources_types)
+    ]
+    if request.enable_codegen and len(relevant_generate_request_types) > 1:
+        raise AmbiguousCodegenImplementationsException(relevant_generate_request_types)
+    generate_request_type = next(iter(relevant_generate_request_types), None)
+
+    # Now, determine if any of the `valid_sources_types` may be used, either because the
+    # sources_field is a direct subclass or can be generated into one of the valid types.
+    def compatible_with_sources_field(valid_type: Type[Sources]) -> bool:
+        is_instance = isinstance(sources_field, valid_type)
+        can_be_generated = (
+            request.enable_codegen
+            and generate_request_type is not None
+            and issubclass(generate_request_type.output, valid_type)
+        )
+        return is_instance or can_be_generated
+
+    output_type = next(
+        (
+            valid_type
+            for valid_type in request.valid_sources_types
+            if compatible_with_sources_field(valid_type)
+        ),
+        None,
+    )
+    if output_type is None:
+        return HydratedSources(EMPTY_SNAPSHOT, sources_field.filespec, output_type=None)
+
+    # Now, hydrate the `globs`. Even if we are going to use codegen, we will need the original
+    # protocol sources to be hydrated.
+    globs = sources_field.sanitized_raw_value
     if globs is None:
-        return HydratedSources(EMPTY_SNAPSHOT, sources_field.filespec)
+        return HydratedSources(EMPTY_SNAPSHOT, sources_field.filespec, output_type=output_type)
 
     conjunction = (
         GlobExpansionConjunction.all_match
@@ -1380,31 +1460,16 @@ async def hydrate_sources(
     )
     sources_field.validate_snapshot(snapshot)
 
-    should_generate_sources = request.codegen_language is not None and isinstance(
-        sources_field, CodegenSources
-    )
-    if not should_generate_sources:
-        return HydratedSources(snapshot, sources_field.filespec)
-
-    generate_request_types: Iterable[Type[GenerateSourcesRequest]] = union_membership.union_rules[
-        GenerateSourcesRequest
-    ]
-    relevant_generate_request_types = [
-        generate_request_type
-        for generate_request_type in generate_request_types
-        if isinstance(sources_field, generate_request_type.input)
-        and generate_request_type.output == request.codegen_language
-    ]
-    if not relevant_generate_request_types:
-        return HydratedSources(EMPTY_SNAPSHOT, sources_field.filespec)
-    if len(relevant_generate_request_types) > 1:
-        raise AmbiguousCodegenImplementationsException(relevant_generate_request_types)
-    generate_request_type = relevant_generate_request_types[0]
+    # Finally, return if codegen is not in use; otherwise, run the relevant code generator.
+    if not request.enable_codegen or generate_request_type is None:
+        return HydratedSources(snapshot, sources_field.filespec, output_type=output_type)
     wrapped_protocol_target = await Get[WrappedTarget](Address, sources_field.address)
     generated_sources = await Get[GeneratedSources](
         GenerateSourcesRequest, generate_request_type(snapshot, wrapped_protocol_target.target)
     )
-    return HydratedSources(generated_sources.snapshot, sources_field.filespec)
+    return HydratedSources(
+        generated_sources.snapshot, sources_field.filespec, output_type=output_type
+    )
 
 
 # -----------------------------------------------------------------------------------------------

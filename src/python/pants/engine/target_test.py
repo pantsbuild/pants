@@ -25,7 +25,6 @@ from pants.engine.target import (
     AmbiguousImplementationsException,
     AsyncField,
     BoolField,
-    CodegenSources,
     Configuration,
     ConfigurationWithOrigin,
     DictStringToStringField,
@@ -801,6 +800,29 @@ class TestSources(TestBase):
             "exclude": [{"globs": ["src/fortran/**/ignore*", "src/fortran/ignored.f03"]}],
         }
 
+    def test_output_type(self) -> None:
+        class SourcesSubclass(Sources):
+            pass
+
+        addr = Address.parse(":lib")
+        self.create_files("", files=["f1.f95"])
+
+        valid_sources = SourcesSubclass(["*"], address=addr)
+        hydrated_valid_sources = self.request_single_product(
+            HydratedSources,
+            HydrateSourcesRequest(valid_sources, valid_sources_types=[SourcesSubclass]),
+        )
+        assert hydrated_valid_sources.snapshot.files == ("f1.f95",)
+        assert hydrated_valid_sources.output_type == SourcesSubclass
+
+        invalid_sources = Sources(["*"], address=addr)
+        hydrated_invalid_sources = self.request_single_product(
+            HydratedSources,
+            HydrateSourcesRequest(invalid_sources, valid_sources_types=[SourcesSubclass]),
+        )
+        assert hydrated_invalid_sources.snapshot.files == ()
+        assert hydrated_invalid_sources.output_type is None
+
     def test_unmatched_globs(self) -> None:
         self.create_files("", files=["f1.f95"])
         sources = Sources(["non_existent.f95"], address=Address.parse(":lib"))
@@ -883,7 +905,7 @@ class TestSources(TestBase):
 # -----------------------------------------------------------------------------------------------
 
 
-class AvroSources(CodegenSources):
+class AvroSources(Sources):
     pass
 
 
@@ -951,9 +973,12 @@ class TestCodegen(TestBase):
         # Test that HydrateSourcesRequest can also be used.
         generated_via_hydrate_sources = self.request_single_product(
             HydratedSources,
-            HydrateSourcesRequest(protocol_sources, codegen_language=FortranSources),
+            HydrateSourcesRequest(
+                protocol_sources, valid_sources_types=[FortranSources], enable_codegen=True
+            ),
         )
         assert generated_via_hydrate_sources.snapshot.files == ("src/fortran/f.f95",)
+        assert generated_via_hydrate_sources.output_type == FortranSources
 
     def test_works_with_subclass_fields(self) -> None:
         class CustomAvroSources(AvroSources):
@@ -962,7 +987,9 @@ class TestCodegen(TestBase):
         protocol_sources = CustomAvroSources(["*.avro"], address=self.address)
         generated = self.request_single_product(
             HydratedSources,
-            HydrateSourcesRequest(protocol_sources, codegen_language=FortranSources),
+            HydrateSourcesRequest(
+                protocol_sources, valid_sources_types=[FortranSources], enable_codegen=True
+            ),
         )
         assert generated.snapshot.files == ("src/fortran/f.f95",)
 
@@ -973,6 +1000,9 @@ class TestCodegen(TestBase):
         protocol_sources = AvroSources(["*.avro"], address=self.address)
         generated = self.request_single_product(
             HydratedSources,
-            HydrateSourcesRequest(protocol_sources, codegen_language=SmalltalkSources),
+            HydrateSourcesRequest(
+                protocol_sources, valid_sources_types=[SmalltalkSources], enable_codegen=True
+            ),
         )
         assert generated.snapshot.files == ()
+        assert generated.output_type is None

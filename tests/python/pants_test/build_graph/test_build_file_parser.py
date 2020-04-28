@@ -452,7 +452,7 @@ class BuildFileParserExposedContextAwareObjectFactoryTest(TestWithBuildFileParse
         with self.assertRaises(BuildFileParser.ExecuteError):
             self.build_file_parser.parse_build_file(build_file)
 
-    def test_build_file_parser_error_hierarcy(self):
+    def test_build_file_parser_error_hierarchy(self):
         """Exception handling code depends on the fact that all explicit exceptions from
         BuildFileParser are subclassed from the BuildFileParserError base class."""
 
