@@ -96,7 +96,6 @@ python_library(
     '3rdparty/python:dataclasses',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:specs',
-    'src/python/pants/engine/legacy:address_mapper',
     'src/python/pants/engine/legacy:graph',
     'src/python/pants/engine/legacy:structs',
     'src/python/pants/engine:addresses',
