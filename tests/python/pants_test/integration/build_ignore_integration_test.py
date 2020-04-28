@@ -57,7 +57,12 @@ class IgnorePatternsPantsIniIntegrationTest(PantsRunIntegrationTest):
 
     def test_build_ignore_dependency(self):
         run_result = self.run_pants(
-            ["-q", "dependencies", "testprojects/tests/python/pants/constants_only::"],
+            [
+                "-q",
+                "dependencies",
+                "--transitive",
+                "testprojects/tests/python/pants/constants_only::",
+            ],
             config={"DEFAULT": {"build_ignore": ["testprojects/src/"]}},
         )
 
@@ -69,7 +74,12 @@ class IgnorePatternsPantsIniIntegrationTest(PantsRunIntegrationTest):
 
     def test_build_ignore_dependency_success(self):
         run_result = self.run_pants(
-            ["-q", "dependencies", "testprojects/tests/python/pants/constants_only::"],
+            [
+                "-q",
+                "dependencies",
+                "--transitive",
+                "testprojects/tests/python/pants/constants_only::",
+            ],
             config={"DEFAULT": {"build_ignore": ["testprojects/src/antlr"]}},
         )
 

@@ -7,7 +7,7 @@ from pants.base.deprecated import _deprecated_contrib_plugin
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 
-from pants.contrib.cpp.rules.targets import CppBinary, CppLibrary
+from pants.contrib.cpp.target_types import CppBinary, CppLibrary
 from pants.contrib.cpp.targets.cpp_binary import CppBinary as CppBinaryV1
 from pants.contrib.cpp.targets.cpp_library import CppLibrary as CppLibraryV1
 from pants.contrib.cpp.tasks.cpp_binary_create import CppBinaryCreate
@@ -29,5 +29,5 @@ def register_goals():
     task(name="cpp", action=CppRun).install("run")
 
 
-def targets2():
+def target_types():
     return [CppBinary, CppLibrary]

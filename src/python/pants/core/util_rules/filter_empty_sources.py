@@ -41,7 +41,7 @@ async def determine_configurations_with_sources(
     request: ConfigurationsWithSourcesRequest,
 ) -> ConfigurationsWithSources:
     all_sources = await MultiGet(
-        Get[HydratedSources](HydrateSourcesRequest, config.sources.request) for config in request
+        Get[HydratedSources](HydrateSourcesRequest(config.sources)) for config in request
     )
     return ConfigurationsWithSources(
         config for config, sources in zip(request, all_sources) if sources.snapshot.files
@@ -59,8 +59,7 @@ class TargetsWithSourcesRequest(Collection[Target]):
 @rule
 async def determine_targets_with_sources(request: TargetsWithSourcesRequest) -> TargetsWithSources:
     all_sources = await MultiGet(
-        Get[HydratedSources](HydrateSourcesRequest, tgt.get(SourcesField).request)
-        for tgt in request
+        Get[HydratedSources](HydrateSourcesRequest(tgt.get(SourcesField))) for tgt in request
     )
     return TargetsWithSources(
         tgt for tgt, sources in zip(request, all_sources) if sources.snapshot.files

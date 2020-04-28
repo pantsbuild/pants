@@ -4,7 +4,7 @@
 """Generate Java targets from the Wire protocol."""
 
 from pants.backend.codegen.wire.java.java_wire_library import JavaWireLibrary as JavaWireLibraryV1
-from pants.backend.codegen.wire.java.targets import JavaWireLibrary
+from pants.backend.codegen.wire.java.target_types import JavaWireLibrary
 from pants.backend.codegen.wire.java.wire_gen import WireGen
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
@@ -18,5 +18,5 @@ def register_goals():
     task(name="wire", action=WireGen).install("gen")
 
 
-def targets2():
+def target_types():
     return [JavaWireLibrary]

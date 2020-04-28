@@ -16,13 +16,6 @@ from pants.backend.python.rules.pex import (
     PexRequirements,
 )
 from pants.backend.python.rules.setuptools import Setuptools
-from pants.backend.python.rules.targets import (
-    PythonEntryPoint,
-    PythonInterpreterCompatibility,
-    PythonProvidesField,
-    PythonRequirementsField,
-    PythonSources,
-)
 from pants.backend.python.rules.util import (
     PackageDatum,
     distutils_repr,
@@ -31,6 +24,13 @@ from pants.backend.python.rules.util import (
     source_root_or_raise,
 )
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.backend.python.target_types import (
+    PythonEntryPoint,
+    PythonInterpreterCompatibility,
+    PythonProvidesField,
+    PythonRequirementsField,
+    PythonSources,
+)
 from pants.base.specs import AddressSpecs, AscendantAddresses, SingleAddress
 from pants.core.target_types import ResourcesSources
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
@@ -472,7 +472,11 @@ async def get_sources(
 ) -> SetupPySources:
     targets = request.targets
     stripped_srcs_list = await MultiGet(
-        Get[SourceRootStrippedSources](StripSourcesFieldRequest(target.get(Sources)))
+        Get[SourceRootStrippedSources](
+            StripSourcesFieldRequest(
+                target.get(Sources), for_sources_types=(PythonSources, ResourcesSources)
+            )
+        )
         for target in targets
     )
 
@@ -518,7 +522,9 @@ async def get_ancestor_init_py(
     """
     source_roots = source_root_config.get_source_roots()
     sources = await Get[SourceFiles](
-        AllSourceFilesRequest(tgt[PythonSources] for tgt in targets if tgt.has_field(PythonSources))
+        AllSourceFilesRequest(
+            (tgt.get(Sources) for tgt in targets), for_sources_types=(PythonSources,)
+        )
     )
     # Find the ancestors of all dirs containing .py files, including those dirs themselves.
     source_dir_ancestors: Set[Tuple[str, str]] = set()  # Items are (src_root, path incl. src_root).

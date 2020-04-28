@@ -11,6 +11,7 @@ python_tests(
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/python/targets',
     'src/python/pants/base:build_environment',
+    'src/python/pants/core/util_rules',
     'src/python/pants/testutil:task_test_base',
   ],
   tags = {"partially_type_checked"},

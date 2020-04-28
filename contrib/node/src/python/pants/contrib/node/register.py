@@ -6,17 +6,17 @@
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 
-from pants.contrib.node.rules.targets import (
+from pants.contrib.node.subsystems.resolvers.node_preinstalled_module_resolver import (
+    NodePreinstalledModuleResolver,
+)
+from pants.contrib.node.subsystems.resolvers.npm_resolver import NpmResolver
+from pants.contrib.node.target_types import (
     NodeBundle,
     NodeModule,
     NodePreinstalledModule,
     NodeRemoteModule,
     NodeTest,
 )
-from pants.contrib.node.subsystems.resolvers.node_preinstalled_module_resolver import (
-    NodePreinstalledModuleResolver,
-)
-from pants.contrib.node.subsystems.resolvers.npm_resolver import NpmResolver
 from pants.contrib.node.targets.node_bundle import NodeBundle as NodeBundleV1
 from pants.contrib.node.targets.node_module import NodeModule as NodeModuleV1
 from pants.contrib.node.targets.node_preinstalled_module import (
@@ -64,5 +64,5 @@ def global_subsystems():
     return (NodePreinstalledModuleResolver, NpmResolver)
 
 
-def targets2():
+def target_types():
     return [NodeBundle, NodeModule, NodePreinstalledModule, NodeRemoteModule, NodeTest]

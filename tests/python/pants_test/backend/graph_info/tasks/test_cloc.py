@@ -1,10 +1,10 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-
 from pants.backend.graph_info.tasks.cloc import CountLinesOfCode
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
+from pants.core.util_rules import archive, external_tool
 from pants.testutil.task_test_base import ConsoleTaskTestBase
 
 
@@ -12,6 +12,10 @@ class ClocTest(ConsoleTaskTestBase):
     @classmethod
     def task_type(cls):
         return CountLinesOfCode
+
+    @classmethod
+    def rules(cls):
+        return [*super().rules(), *archive.rules(), *external_tool.rules()]
 
     def test_counts(self):
         self.create_file(

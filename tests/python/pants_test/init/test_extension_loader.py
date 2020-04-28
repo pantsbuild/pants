@@ -174,9 +174,6 @@ class LoaderTest(unittest.TestCase):
             targets={"bob": DummyTarget}, objects={"obj1": DummyObject1, "obj2": DummyObject2}
         )
         with self.create_register(build_file_aliases=lambda: aliases) as backend_package:
-            load_backend(self.build_configuration, backend_package, is_v1_backend=False)
-            self.assert_empty_aliases()
-
             load_backend(self.build_configuration, backend_package, is_v1_backend=True)
             registered_aliases = self.build_configuration.registered_aliases()
             self.assertEqual(DummyTarget, registered_aliases.target_types["bob"])
@@ -213,8 +210,8 @@ class LoaderTest(unittest.TestCase):
             return BuildFileAliases()
 
         with self.create_register(build_file_aliases=build_file_aliases) as backend_package:
-            # Loading as v2 shouldn't raise.
-            load_backend(self.build_configuration, backend_package, is_v1_backend=False)
+            with self.assertRaises(BuildConfigurationError):
+                load_backend(self.build_configuration, backend_package, is_v1_backend=False)
             with self.assertRaises(BuildConfigurationError):
                 load_backend(self.build_configuration, backend_package, is_v1_backend=True)
 
@@ -345,10 +342,6 @@ class LoaderTest(unittest.TestCase):
         self.working_set.add(self.get_mock_plugin("aliasdemo", "0.0.1", alias=reg_alias))
 
         # Start with no aliases.
-        self.assert_empty_aliases()
-
-        # Ensure alias isn't created in a v2 world.
-        self.load_plugins(["aliasdemo"], is_v1_plugin=False)
         self.assert_empty_aliases()
 
         # Now load the plugin which defines aliases.

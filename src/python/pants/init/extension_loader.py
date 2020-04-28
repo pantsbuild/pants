@@ -127,7 +127,6 @@ def load_backends_and_plugins(
         warn_or_error(
             deprecated_entity_description="The V1 isort implementation",
             removal_version="1.30.0.dev0",
-            deprecation_start_version="1.28.0.dev0",
             hint="\n".join(msg_lines),
         )
 
@@ -216,9 +215,16 @@ def load_plugins(
 
         # While the Target API is a V2 concept, we expect V1 plugin authors to still write Target
         # API bindings. So, we end up using this entry point regardless of V1 vs. V2.
-        if "targets2" in entries:
-            targets = entries["targets2"].load()()
+        #
+        # We also always load `build_file_aliases` because mixed repositories need to write V1
+        # bindings for targets to avoid breaking V1-only goals; and there is no V2 entry-point for
+        # `objects` yet. Purely V2-repos can ignore `build_file_aliases`.
+        if "target_types" in entries:
+            targets = entries["target_types"].load()()
             build_configuration.register_targets(targets)
+        if "build_file_aliases" in entries:
+            aliases = entries["build_file_aliases"].load()()
+            build_configuration.register_aliases(aliases)
 
         if is_v1_plugin:
             if "register_goals" in entries:
@@ -226,21 +232,10 @@ def load_plugins(
             if "global_subsystems" in entries:
                 subsystems = entries["global_subsystems"].load()()
                 build_configuration.register_optionables(subsystems)
-            # For now, `build_file_aliases` is still V1-only. TBD what entry-point we use for
-            # `objects` and `context_aware_object_factories`.
-            if "build_file_aliases" in entries:
-                aliases = entries["build_file_aliases"].load()()
-                build_configuration.register_aliases(aliases)
         else:
             if "rules" in entries:
                 rules = entries["rules"].load()()
                 build_configuration.register_rules(rules)
-            if "build_file_aliases2" in entries:
-                build_file_aliases2 = entries["build_file_aliases2"].load()()
-                build_configuration.register_aliases(build_file_aliases2)
-            if "targets2" in entries:
-                targets = entries["targets2"].load()()
-                build_configuration.register_targets(targets)
         loaded[dist.as_requirement().key] = dist
 
 
@@ -294,26 +289,21 @@ def load_backend(
                 f"Entrypoint {name} in {backend_module} must be a zero-arg callable: {e!r}"
             )
 
-    # While the Target API is a V2 concept, we expect V1 plugin authors to still write Target
-    # API bindings. So, we end up using this entry point regardless of V1 vs. V2.
-    targets = invoke_entrypoint("targets2")
+    # See the comment in `load_plugins` for why we load both `target_types` and
+    # `build_file_aliases` in both V1 and V2.
+    targets = invoke_entrypoint("target_types")
     if targets:
         build_configuration.register_targets(targets)
+    build_file_aliases = invoke_entrypoint("build_file_aliases")
+    if build_file_aliases:
+        build_configuration.register_aliases(build_file_aliases)
 
     if is_v1_backend:
         invoke_entrypoint("register_goals")
         subsystems = invoke_entrypoint("global_subsystems")
         if subsystems:
             build_configuration.register_optionables(subsystems)
-        # For now, `build_file_aliases` is still V1-only. TBD what entry-point we use for
-        # `objects` and `context_aware_object_factories`.
-        build_file_aliases = invoke_entrypoint("build_file_aliases")
-        if build_file_aliases:
-            build_configuration.register_aliases(build_file_aliases)
     else:
         rules = invoke_entrypoint("rules")
         if rules:
             build_configuration.register_rules(rules)
-        build_file_aliases2 = invoke_entrypoint("build_file_aliases2")
-        if build_file_aliases2:
-            build_configuration.register_aliases(build_file_aliases2)

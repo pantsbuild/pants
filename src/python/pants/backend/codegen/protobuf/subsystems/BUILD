@@ -3,7 +3,8 @@
 
 python_library(
   dependencies = [
-    'src/python/pants/binaries'
+    'src/python/pants/core/util_rules',
+    'src/python/pants/engine:platform'
   ],
   tags = {"partially_type_checked"},
 )

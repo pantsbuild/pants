@@ -35,7 +35,6 @@ from pants.util.dirutil import (
     safe_open,
     safe_rm_oldest_items_in_dir,
     safe_rmtree,
-    symlink_is_correct,
     touch,
 )
 
@@ -397,31 +396,6 @@ class DirutilTest(unittest.TestCase):
                 ValueError, r"Path for link.*overwrite an existing directory*"
             ):
                 relative_symlink(source, link_path)
-
-    def test_symlink_is_correct(self) -> None:
-        with temporary_dir() as tmpdir_1:
-            source = os.path.join(tmpdir_1, "source")
-            link_path = os.path.join(tmpdir_1, "link")
-            touch(source)
-            os.symlink(source, link_path)
-            self.assertTrue(symlink_is_correct(source, link_path))
-
-    def test_symlink_is_not_correct(self) -> None:
-        with temporary_dir() as tmpdir_1:
-            source = os.path.join(tmpdir_1, "source")
-            source2 = os.path.join(tmpdir_1, "source2")
-            link_path = os.path.join(tmpdir_1, "link")
-            touch(source)
-            # link doesnt exist.
-            self.assertFalse(symlink_is_correct(source, link_path))
-            touch(link_path)
-            # link_path exists but isn't a symlink.
-            self.assertFalse(symlink_is_correct(source, link_path))
-            os.remove(link_path)
-            touch(source2)
-            os.symlink(source2, link_path)
-            # link_path and source exist, link is not broken, but link points to the wrong place.
-            self.assertFalse(symlink_is_correct(source, link_path))
 
     def test_get_basedir(self) -> None:
         self.assertEqual(get_basedir("foo/bar/baz"), "foo")

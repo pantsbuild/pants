@@ -2,14 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import sysconfig
 from os import PathLike
 from typing import Tuple, Union
 
-from wheel import pep425tags
-
 
 def _normalize_platform_tag(platform_tag: str) -> str:
-    return platform_tag.replace("-", "_")
+    return platform_tag.replace("-", "_").replace(".", "_")
 
 
 def name_and_platform(whl: Union[str, PathLike]) -> Tuple[str, str, str]:
@@ -26,4 +25,4 @@ def name_and_platform(whl: Union[str, PathLike]) -> Tuple[str, str, str]:
 
 
 def normalized_current_platform() -> str:
-    return _normalize_platform_tag(pep425tags.get_platform())
+    return _normalize_platform_tag(sysconfig.get_platform())

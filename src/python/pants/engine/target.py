@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import dataclasses
+import itertools
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
@@ -14,7 +15,6 @@ from typing import (
     Iterable,
     Mapping,
     Optional,
-    Sequence,
     Tuple,
     Type,
     TypeVar,
@@ -97,7 +97,7 @@ class PrimitiveField(Field, metaclass=ABCMeta):
 
     Subclasses should also override the type hints for `value` and `raw_value` to be more precise
     than `Any`. The type hint for `raw_value` is used to generate documentation, e.g. for
-    `./pants target-types2`. If the field is required, do not use `Optional` for the type hint of
+    `./pants target-types`. If the field is required, do not use `Optional` for the type hint of
     `raw_value`.
 
     Example:
@@ -155,13 +155,8 @@ class PrimitiveField(Field, metaclass=ABCMeta):
         return f"{self.alias}={self.value}"
 
 
-# Type alias to express the intent that the type should be a new Request class created to
-# correspond with its AsyncField.
-AsyncFieldRequest = Any
-
-
 @frozen_after_init
-@dataclass(unsafe_hash=True)  # type: ignore[misc]   # https://github.com/python/mypy/issues/5374
+@dataclass(unsafe_hash=True)
 class AsyncField(Field, metaclass=ABCMeta):
     """A field that needs the engine in order to be hydrated.
 
@@ -170,10 +165,8 @@ class AsyncField(Field, metaclass=ABCMeta):
     using tuples rather than lists and using `FrozenOrderedSet` rather than `set`.
 
     You should also create corresponding HydratedField and HydrateFieldRequest classes and define a
-    rule to go from this HydrateFieldRequest to HydratedField. The HydrateFieldRequest type must
-    be registered as a RootRule. Then, implement the property `AsyncField.request` to instantiate
-    the HydrateFieldRequest type. If you use MyPy, you should mark `AsyncField.request` as
-    `@final` (from `typing_extensions)` to ensure that subclasses don't change this property.
+    rule to go from this HydrateFieldRequest to HydratedField. The HydrateFieldRequest type should
+    have an attribute storing the underlying AsyncField; it also must be registered as a RootRule.
 
     For example:
 
@@ -185,11 +178,6 @@ class AsyncField(Field, metaclass=ABCMeta):
                 raw_value: Optional[List[str]], *, address: Address
             ) -> Optional[Tuple[str, ...]]:
                 ...
-
-            @final
-            @property
-            def request(self) -> HydrateSourcesRequest:
-                return HydrateSourcesRequest(self)
 
             # Example extension point provided by this field. Subclasses can override this to do
             # whatever validation they'd like. Each AsyncField must define its own entry points
@@ -222,10 +210,8 @@ class AsyncField(Field, metaclass=ABCMeta):
     Then, call sites can `await Get` if they need to hydrate the field, even if they subclassed
     the original `AsyncField` to have custom behavior:
 
-        sources1 = await Get[HydratedSources](HydrateSourcesRequest, my_tgt.get(Sources).request)
-        sources2 = await Get[HydratedSources[(
-            HydrateSourcesRequest, custom_tgt.get(CustomSources).request
-        )
+        sources1 = await Get[HydratedSources](HydrateSourcesRequest(my_tgt.get(Sources)))
+        sources2 = await Get[HydratedSources[(HydrateSourcesRequest(custom_tgt.get(CustomSources)))
     """
 
     address: Address
@@ -259,22 +245,6 @@ class AsyncField(Field, metaclass=ABCMeta):
 
     def __str__(self) -> str:
         return f"{self.alias}={self.sanitized_raw_value}"
-
-    @property
-    @abstractmethod
-    def request(self) -> AsyncFieldRequest:
-        """Wrap the field in its corresponding Request type.
-
-        This is necessary to avoid ambiguity in the V2 rule graph when dealing with possible
-        subclasses of this AsyncField.
-
-        For example:
-
-            @final
-            @property
-            def request() -> HydrateSourcesRequest:
-                return HydrateSourcesRequest(self)
-        """
 
 
 # -----------------------------------------------------------------------------------------------
@@ -585,11 +555,13 @@ class TransitiveTargets:
     closure: FrozenOrderedSet[Target]
 
 
-@dataclass(frozen=True)
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class RegisteredTargetTypes:
-    # TODO: add `FrozenDict` as a light-weight wrapper around `dict` that de-registers the
-    #  mutation entry points.
-    aliases_to_types: Dict[str, Type[Target]]
+    aliases_to_types: FrozenDict[str, Type[Target]]
+
+    def __init__(self, aliases_to_types: Mapping[str, Type[Target]]) -> None:
+        self.aliases_to_types = FrozenDict(aliases_to_types)
 
     @classmethod
     def create(cls, target_types: Iterable[Type[Target]]) -> "RegisteredTargetTypes":
@@ -697,41 +669,6 @@ class Configuration(_AbstractConfiguration, metaclass=ABCMeta):
             address=tgt.address, **_get_config_fields_from_target(cls, tgt)
         )
 
-    @final
-    @classmethod
-    def group_targets_to_valid_subclass_configs(
-        cls: Type[_C],
-        targets_with_origins: TargetsWithOrigins,
-        *,
-        goal_name: str,
-        error_if_no_valid_targets: bool,
-        union_membership: UnionMembership,
-        registered_target_types: RegisteredTargetTypes,
-    ) -> Mapping[Target, Sequence[_C]]:
-        """Find all subclasses of this configuration by inspecting UnionMembership, then group each
-        target to each valid Configuration, if any.
-
-        This method should only be used on union bases, such as `TestConfiguration` and
-        `BinaryConfiguration`.
-        """
-        config_types: Iterable[Type[_C]] = union_membership.union_rules[cls]
-        targets_to_valid_configs = {}
-        for tgt in targets_with_origins.targets:
-            valid_configs = [
-                config_type.create(tgt) for config_type in config_types if config_type.is_valid(tgt)
-            ]
-            if valid_configs:
-                targets_to_valid_configs[tgt] = valid_configs
-        if not targets_to_valid_configs and error_if_no_valid_targets:
-            raise NoValidTargets.create_from_configs(
-                targets_with_origins,
-                config_types=config_types,
-                goal_name=goal_name,
-                union_membership=union_membership,
-                registered_target_types=registered_target_types,
-            )
-        return targets_to_valid_configs
-
 
 _CWO = TypeVar("_CWO", bound="ConfigurationWithOrigin")
 
@@ -755,42 +692,101 @@ class ConfigurationWithOrigin(_AbstractConfiguration, metaclass=ABCMeta):
             **_get_config_fields_from_target(cls, tgt),
         )
 
-    @final
-    @classmethod
-    def group_targets_to_valid_subclass_configs(
-        cls: Type[_CWO],
-        targets_with_origins: TargetsWithOrigins,
-        *,
-        union_membership: UnionMembership,
-        registered_target_types: RegisteredTargetTypes,
-        goal_name: str,
-        error_if_no_valid_targets: bool,
-    ) -> Mapping[TargetWithOrigin, Sequence[_CWO]]:
-        """Find all subclasses of this configuration by inspecting UnionMembership, then group each
-        target to each valid Configuration, if any.
 
-        This method should only be used on union bases, such as `TestConfiguration` and
-        `BinaryConfiguration`.
-        """
-        config_types: Iterable[Type[_CWO]] = union_membership.union_rules[cls]
-        targets_to_valid_configs = {}
-        for tgt_with_origin in targets_with_origins:
-            valid_configs = [
-                config_type.create(tgt_with_origin)
-                for config_type in config_types
-                if config_type.is_valid(tgt_with_origin.target)
-            ]
-            if valid_configs:
-                targets_to_valid_configs[tgt_with_origin] = valid_configs
-        if not targets_to_valid_configs and error_if_no_valid_targets:
-            raise NoValidTargets.create_from_configs(
-                targets_with_origins,
-                config_types=config_types,
-                goal_name=goal_name,
-                union_membership=union_membership,
-                registered_target_types=registered_target_types,
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class TargetsToValidConfigurations:
+    mapping: FrozenDict[TargetWithOrigin, Tuple[_AbstractConfiguration, ...]]
+
+    def __init__(
+        self, mapping: Mapping[TargetWithOrigin, Iterable[_AbstractConfiguration]]
+    ) -> None:
+        self.mapping = FrozenDict(
+            {tgt_with_origin: tuple(configs) for tgt_with_origin, configs in mapping.items()}
+        )
+
+    @memoized_property
+    def configurations(self) -> Tuple[_AbstractConfiguration, ...]:
+        return tuple(
+            itertools.chain.from_iterable(
+                configs_per_target for configs_per_target in self.mapping.values()
             )
-        return targets_to_valid_configs
+        )
+
+    @memoized_property
+    def targets(self) -> Tuple[Target, ...]:
+        return tuple(tgt_with_origin.target for tgt_with_origin in self.targets_with_origins)
+
+    @memoized_property
+    def targets_with_origins(self) -> Tuple[TargetWithOrigin, ...]:
+        return tuple(self.mapping.keys())
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class TargetsToValidConfigurationsRequest:
+    configuration_superclass: Type[_AbstractConfiguration]
+    goal_description: str
+    error_if_no_valid_targets: bool
+    expect_single_config: bool
+    # TODO: Add a `require_sources` field. To do this, figure out the dependency cycle with
+    #  `util_rules/filter_empty_sources.py`.
+
+    def __init__(
+        self,
+        configuration_superclass: Type[_AbstractConfiguration],
+        *,
+        goal_description: str,
+        error_if_no_valid_targets: bool,
+        expect_single_config: bool = False,
+    ) -> None:
+        self.configuration_superclass = configuration_superclass
+        self.goal_description = goal_description
+        self.error_if_no_valid_targets = error_if_no_valid_targets
+        self.expect_single_config = expect_single_config
+
+
+@rule
+def find_valid_configurations(
+    request: TargetsToValidConfigurationsRequest,
+    targets_with_origins: TargetsWithOrigins,
+    union_membership: UnionMembership,
+    registered_target_types: RegisteredTargetTypes,
+) -> TargetsToValidConfigurations:
+    config_types: Iterable[
+        Union[Type[Configuration], Type[ConfigurationWithOrigin]]
+    ] = union_membership.union_rules[request.configuration_superclass]
+    targets_to_valid_configs = {}
+    for tgt_with_origin in targets_with_origins:
+        valid_configs = [
+            (
+                config_type.create(tgt_with_origin)
+                if issubclass(config_type, ConfigurationWithOrigin)
+                else config_type.create(tgt_with_origin.target)
+            )
+            for config_type in config_types
+            if config_type.is_valid(tgt_with_origin.target)
+        ]
+        if valid_configs:
+            targets_to_valid_configs[tgt_with_origin] = valid_configs
+    if request.error_if_no_valid_targets and not targets_to_valid_configs:
+        raise NoValidTargetsException.create_from_configs(
+            targets_with_origins,
+            config_types=config_types,
+            goal_description=request.goal_description,
+            union_membership=union_membership,
+            registered_target_types=registered_target_types,
+        )
+    result = TargetsToValidConfigurations(targets_to_valid_configs)
+    if not request.expect_single_config:
+        return result
+    if len(result.targets) > 1:
+        raise TooManyTargetsException(result.targets, goal_description=request.goal_description)
+    if len(result.configurations) > 1:
+        raise AmbiguousImplementationsException(
+            result.targets[0], result.configurations, goal_description=request.goal_description
+        )
+    return result
 
 
 # -----------------------------------------------------------------------------------------------
@@ -841,13 +837,13 @@ class InvalidFieldChoiceException(InvalidFieldException):
 
 
 # NB: This has a tight coupling to goals. Feel free to change this if necessary.
-class NoValidTargets(Exception):
+class NoValidTargetsException(Exception):
     def __init__(
         self,
         targets_with_origins: TargetsWithOrigins,
         *,
         valid_target_types: Iterable[Type[Target]],
-        goal_name: str,
+        goal_description: str,
     ) -> None:
         valid_target_aliases = sorted({target_type.alias for target_type in valid_target_types})
         invalid_target_aliases = sorted({tgt.alias for tgt in targets_with_origins.targets})
@@ -859,7 +855,7 @@ class NoValidTargets(Exception):
         )
         bulleted_list_sep = "\n  * "
         super().__init__(
-            f"The `{goal_name}` goal only works with the following target types:"
+            f"{goal_description.capitalize()} only works with the following target types:"
             f"{bulleted_list_sep}{bulleted_list_sep.join(valid_target_aliases)}\n\n"
             f"You specified `{' '.join(specs)}`, which only included the following target types:"
             f"{bulleted_list_sep}{bulleted_list_sep.join(invalid_target_aliases)}"
@@ -871,10 +867,10 @@ class NoValidTargets(Exception):
         targets_with_origins: TargetsWithOrigins,
         *,
         config_types: Iterable[Type[_AbstractConfiguration]],
-        goal_name: str,
+        goal_description: str,
         union_membership: UnionMembership,
         registered_target_types: RegisteredTargetTypes,
-    ) -> "NoValidTargets":
+    ) -> "NoValidTargetsException":
         valid_target_types = {
             target_type
             for config_type in config_types
@@ -882,7 +878,47 @@ class NoValidTargets(Exception):
                 registered_target_types.types, union_membership=union_membership
             )
         }
-        return cls(targets_with_origins, valid_target_types=valid_target_types, goal_name=goal_name)
+        return cls(
+            targets_with_origins,
+            valid_target_types=valid_target_types,
+            goal_description=goal_description,
+        )
+
+
+# NB: This has a tight coupling to goals. Feel free to change this if necessary.
+class TooManyTargetsException(Exception):
+    def __init__(self, targets: Iterable[Target], *, goal_description: str) -> None:
+        bulleted_list_sep = "\n  * "
+        addresses = sorted(tgt.address.spec for tgt in targets)
+        super().__init__(
+            f"{goal_description.capitalize()} only works with one valid target, but was given "
+            f"multiple valid targets:{bulleted_list_sep}{bulleted_list_sep.join(addresses)}\n\n"
+            "Please select one of these targets to run."
+        )
+
+
+# NB: This has a tight coupling to goals. Feel free to change this if necessary.
+class AmbiguousImplementationsException(Exception):
+    """Exception for when a single target has multiple valid Configurations, but the goal only
+    expects there to be one Configuration."""
+
+    def __init__(
+        self,
+        target: Target,
+        configurations: Iterable[_AbstractConfiguration],
+        *,
+        goal_description: str,
+    ) -> None:
+        # TODO: improve this error message. A better error message would explain to users how they
+        #  can resolve the issue.
+        possible_config_types = sorted(config.__class__.__name__ for config in configurations)
+        bulleted_list_sep = "\n  * "
+        super().__init__(
+            f"Multiple of the registered implementations for {goal_description} work for "
+            f"{target.address} (target type {repr(target.alias)}).\n\n"
+            "It is ambiguous which implementation to use. Possible implementations:"
+            f"{bulleted_list_sep}{bulleted_list_sep.join(possible_config_types)}"
+        )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -1126,81 +1162,8 @@ class DictStringToStringSequenceField(PrimitiveField, metaclass=ABCMeta):
 
 
 # -----------------------------------------------------------------------------------------------
-# Common Fields used across most targets
+# Sources
 # -----------------------------------------------------------------------------------------------
-
-
-class Tags(StringSequenceField):
-    """Arbitrary strings that you can use to describe a target.
-
-    For example, you may tag some test targets with 'integration_test' so that you could run
-    `./pants --tags='integration_test' test ::` to only run on targets with that tag.
-    """
-
-    alias = "tags"
-
-
-class DescriptionField(StringField):
-    """A human-readable description of the target.
-
-    Use `./pants list --documented ::` to see all targets with descriptions.
-    """
-
-    alias = "description"
-
-
-# TODO(#9388): remove? We don't want this in V2, but maybe keep it for V1.
-class NoCacheField(BoolField):
-    """If True, don't store results for this target in the V1 cache."""
-
-    alias = "no_cache"
-    default = False
-    v1_only = True
-
-
-# TODO(#9388): remove?
-class ScopeField(StringField):
-    """A V1-only field for the scope of the target, which is used by the JVM to determine the
-    target's inclusion in the class path.
-
-    See `pants.build_graph.target_scopes.Scopes`.
-    """
-
-    alias = "scope"
-    v1_only = True
-
-
-# TODO(#9388): Remove.
-class IntransitiveField(BoolField):
-    alias = "_transitive"
-    default = False
-    v1_only = True
-
-
-COMMON_TARGET_FIELDS = (Tags, DescriptionField, NoCacheField, ScopeField, IntransitiveField)
-
-
-# NB: To hydrate the dependencies into Targets, use
-# `await Get[Targets](Addresses(tgt[Dependencies].value)`.
-class Dependencies(PrimitiveField):
-    """Addresses to other targets that this target depends on, e.g. `['src/python/project:lib']`."""
-
-    alias = "dependencies"
-    value: Optional[Tuple[Address, ...]]
-    default = None
-
-    # NB: The type hint for `raw_value` is a lie. While we do expect end-users to use
-    # Iterable[str], the Struct and Addressable code will have already converted those strings
-    # into a List[Address]. But, that's an implementation detail and we don't want our
-    # documentation, which is auto-generated from these type hints, to leak that.
-    @classmethod
-    def compute_value(
-        cls, raw_value: Optional[Iterable[str]], *, address: Address
-    ) -> Optional[Tuple[Address, ...]]:
-        value_or_default = super().compute_value(raw_value, address=address)
-        if value_or_default is None:
-            return None
-        return tuple(sorted(value_or_default))
 
 
 class Sources(AsyncField):
@@ -1283,11 +1246,6 @@ class Sources(AsyncField):
                 )
 
     @final
-    @property
-    def request(self) -> "HydrateSourcesRequest":
-        return HydrateSourcesRequest(self)
-
-    @final
     def prefix_glob_with_address(self, glob: str) -> str:
         if glob.startswith("!"):
             return f"!{PurePath(self.address.spec_path, glob[1:])}"
@@ -1312,15 +1270,39 @@ class Sources(AsyncField):
         )
 
 
-@dataclass(frozen=True)
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class HydrateSourcesRequest:
     field: Sources
+    for_sources_types: Tuple[Type[Sources], ...]
+
+    def __init__(
+        self, field: Sources, *, for_sources_types: Iterable[Type[Sources]] = (Sources,)
+    ) -> None:
+        """Convert raw sources globs into an instance of HydratedSources.
+
+        If you only want to handle certain Sources fields, such as only PythonSources, set
+        `for_sources_types`. Any invalid sources will return a `HydratedSources` instance with an
+        empty snapshot and `output_type = None`.
+        """
+        self.field = field
+        self.for_sources_types = tuple(for_sources_types)
 
 
 @dataclass(frozen=True)
 class HydratedSources:
+    """The result of hydrating a SourcesField.
+
+    The `output_type` will indicate which of the `HydrateSourcesRequest.valid_sources_type` the
+    result corresponds to, e.g. if the result comes from `FilesSources` vs. `PythonSources`. If this
+    value is None, then the input `Sources` field was not one of the expected types. This property
+    allows for switching on the result, e.g. handling hydrated files() sources differently than
+    hydrated Python sources.
+    """
+
     snapshot: Snapshot
     filespec: Filespec
+    output_type: Optional[Type[Sources]]
 
     def eager_fileset_with_spec(self, *, address: Address) -> EagerFilesetWithSpec:
         return EagerFilesetWithSpec(address.spec_path, self.filespec, self.snapshot)
@@ -1331,10 +1313,21 @@ async def hydrate_sources(
     request: HydrateSourcesRequest, glob_match_error_behavior: GlobMatchErrorBehavior
 ) -> HydratedSources:
     sources_field = request.field
-    globs = sources_field.sanitized_raw_value
 
+    output_type = next(
+        (
+            valid_type
+            for valid_type in request.for_sources_types
+            if isinstance(sources_field, valid_type)
+        ),
+        None,
+    )
+    if output_type is None:
+        return HydratedSources(EMPTY_SNAPSHOT, sources_field.filespec, output_type=None)
+
+    globs = sources_field.sanitized_raw_value
     if globs is None:
-        return HydratedSources(EMPTY_SNAPSHOT, sources_field.filespec)
+        return HydratedSources(EMPTY_SNAPSHOT, sources_field.filespec, output_type=output_type)
 
     conjunction = (
         GlobExpansionConjunction.all_match
@@ -1356,7 +1349,85 @@ async def hydrate_sources(
         )
     )
     sources_field.validate_snapshot(snapshot)
-    return HydratedSources(snapshot, sources_field.filespec)
+    return HydratedSources(snapshot, sources_field.filespec, output_type=output_type)
+
+
+# -----------------------------------------------------------------------------------------------
+# Other common Fields used across most targets
+# -----------------------------------------------------------------------------------------------
+
+
+class Tags(StringSequenceField):
+    """Arbitrary strings that you can use to describe a target.
+
+    For example, you may tag some test targets with 'integration_test' so that you could run
+    `./pants --tags='integration_test' test ::` to only run on targets with that tag.
+    """
+
+    alias = "tags"
+
+
+class DescriptionField(StringField):
+    """A human-readable description of the target.
+
+    Use `./pants list --documented ::` to see all targets with descriptions.
+    """
+
+    alias = "description"
+
+
+# TODO(#9388): remove? We don't want this in V2, but maybe keep it for V1.
+class NoCacheField(BoolField):
+    """If True, don't store results for this target in the V1 cache."""
+
+    alias = "no_cache"
+    default = False
+    v1_only = True
+
+
+# TODO(#9388): remove?
+class ScopeField(StringField):
+    """A V1-only field for the scope of the target, which is used by the JVM to determine the
+    target's inclusion in the class path.
+
+    See `pants.build_graph.target_scopes.Scopes`.
+    """
+
+    alias = "scope"
+    v1_only = True
+
+
+# TODO(#9388): Remove.
+class IntransitiveField(BoolField):
+    alias = "_transitive"
+    default = False
+    v1_only = True
+
+
+COMMON_TARGET_FIELDS = (Tags, DescriptionField, NoCacheField, ScopeField, IntransitiveField)
+
+
+# NB: To hydrate the dependencies into Targets, use
+# `await Get[Targets](Addresses(tgt[Dependencies].value)`.
+class Dependencies(PrimitiveField):
+    """Addresses to other targets that this target depends on, e.g. `['src/python/project:lib']`."""
+
+    alias = "dependencies"
+    value: Optional[Tuple[Address, ...]]
+    default = None
+
+    # NB: The type hint for `raw_value` is a lie. While we do expect end-users to use
+    # Iterable[str], the Struct and Addressable code will have already converted those strings
+    # into a List[Address]. But, that's an implementation detail and we don't want our
+    # documentation, which is auto-generated from these type hints, to leak that.
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Iterable[str]], *, address: Address
+    ) -> Optional[Tuple[Address, ...]]:
+        value_or_default = super().compute_value(raw_value, address=address)
+        if value_or_default is None:
+            return None
+        return tuple(sorted(value_or_default))
 
 
 # TODO: figure out what support looks like for this with the Target API. The expected value is an
@@ -1409,4 +1480,9 @@ class BundlesField(AsyncField):
 
 
 def rules():
-    return [hydrate_sources, RootRule(HydrateSourcesRequest)]
+    return [
+        find_valid_configurations,
+        hydrate_sources,
+        RootRule(TargetsToValidConfigurationsRequest),
+        RootRule(HydrateSourcesRequest),
+    ]

@@ -51,7 +51,8 @@ class FiledepsOptions(LineOriented, GoalSubsystem):
             "--transitive",
             type=bool,
             default=False,
-            help="If True, include the files used by dependencies in the output.",
+            help="If True, list files from all transitive dependencies. If unspecified, list "
+            "files from direct dependencies only.",
         )
 
 
@@ -81,7 +82,7 @@ async def file_deps(
         )
     else:
         all_hydrated_sources = await MultiGet(
-            Get[HydratedSources](HydrateSourcesRequest, tgt.get(Sources).request) for tgt in targets
+            Get[HydratedSources](HydrateSourcesRequest(tgt.get(Sources))) for tgt in targets
         )
         unique_rel_paths.update(
             itertools.chain.from_iterable(

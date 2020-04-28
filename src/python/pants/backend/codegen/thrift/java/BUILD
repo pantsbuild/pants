@@ -4,7 +4,7 @@
 python_library(
   dependencies = [
     'src/python/pants/backend/codegen/thrift/lib',
-    'src/python/pants/backend/jvm/rules',
+    'src/python/pants/backend/jvm:target_types',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',

@@ -7,7 +7,8 @@ from pants.backend.python.rules.importable_python_sources import ImportablePytho
 from pants.backend.python.rules.importable_python_sources import (
     rules as importable_python_sources_rules,
 )
-from pants.core.target_types import Files
+from pants.backend.python.target_types import PythonSources
+from pants.core.target_types import Files, Resources
 from pants.engine.addresses import Address
 from pants.engine.selectors import Params
 from pants.engine.target import Sources, Target, Targets
@@ -15,8 +16,13 @@ from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
 
-class MockTarget(Target):
-    alias = "mock_target"
+class PythonTarget(Target):
+    alias = "python_target"
+    core_fields = (PythonSources,)
+
+
+class NonPythonTarget(Target):
+    alias = "non_python_target"
     core_fields = (Sources,)
 
 
@@ -26,7 +32,7 @@ class ImportablePythonSourcesTest(TestBase):
         return (*super().rules(), *importable_python_sources_rules())
 
     def create_target(
-        self, *, parent_directory: str, files: List[str], target_cls: Type[Target] = MockTarget
+        self, *, parent_directory: str, files: List[str], target_cls: Type[Target] = PythonTarget
     ) -> Target:
         self.create_files(parent_directory, files=files)
         address = Address(spec_path=parent_directory, target_name="target")
@@ -61,3 +67,21 @@ class ImportablePythonSourcesTest(TestBase):
                 "src/python/project/resources/loose_file.txt",
             ]
         )
+
+    def test_filters_out_irrelevant_targets(self) -> None:
+        targets = [
+            self.create_target(
+                parent_directory="src/python", files=["p.py"], target_cls=PythonTarget
+            ),
+            self.create_target(parent_directory="src/python", files=["f.txt"], target_cls=Files),
+            self.create_target(
+                parent_directory="src/python", files=["r.txt"], target_cls=Resources
+            ),
+            self.create_target(
+                parent_directory="src/python", files=["j.java"], target_cls=NonPythonTarget
+            ),
+        ]
+        result = self.request_single_product(
+            ImportablePythonSources, Params(Targets(targets), create_options_bootstrapper()),
+        )
+        assert sorted(result.snapshot.files) == sorted(["p.py", "src/python/f.txt", "r.txt"])

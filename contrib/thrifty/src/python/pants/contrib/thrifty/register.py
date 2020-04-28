@@ -12,7 +12,7 @@ from pants.goal.task_registrar import TaskRegistrar as task
 
 from pants.contrib.thrifty.java_thrifty_gen import JavaThriftyGen
 from pants.contrib.thrifty.java_thrifty_library import JavaThriftyLibrary as JavaThriftyLibraryV1
-from pants.contrib.thrifty.targets import JavaThriftyLibrary
+from pants.contrib.thrifty.target_types import JavaThriftyLibrary
 
 _deprecated_contrib_plugin("pantsbuild.pants.contrib.thrifty")
 
@@ -25,5 +25,5 @@ def register_goals():
     task(name="thrifty", action=JavaThriftyGen).install("gen")
 
 
-def targets2():
+def target_types():
     return [JavaThriftyLibrary]

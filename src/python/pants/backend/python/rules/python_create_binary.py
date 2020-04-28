@@ -9,7 +9,7 @@ from pants.backend.python.rules.pex_from_targets import (
     PexFromTargetsRequest,
     TwoStepPexFromTargetsRequest,
 )
-from pants.backend.python.rules.targets import (
+from pants.backend.python.target_types import (
     PexAlwaysWriteCache,
     PexEmitWarnings,
     PexIgnoreErrors,
@@ -19,7 +19,7 @@ from pants.backend.python.rules.targets import (
     PythonBinarySources,
     PythonEntryPoint,
 )
-from pants.backend.python.rules.targets import PythonPlatforms as PythonPlatformsField
+from pants.backend.python.target_types import PythonPlatforms as PythonPlatformsField
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.core.goals.binary import BinaryConfiguration, CreatedBinary
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles

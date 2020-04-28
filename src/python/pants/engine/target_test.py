@@ -3,7 +3,6 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from functools import partial
 from pathlib import PurePath
 from typing import Any, ClassVar, Dict, Iterable, List, Optional, Tuple, Type
 
@@ -15,8 +14,9 @@ from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, PathGlobs, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import RootRule, rule
-from pants.engine.selectors import Get
+from pants.engine.selectors import Get, Params
 from pants.engine.target import (
+    AmbiguousImplementationsException,
     AsyncField,
     BoolField,
     Configuration,
@@ -28,9 +28,8 @@ from pants.engine.target import (
     InvalidFieldChoiceException,
     InvalidFieldException,
     InvalidFieldTypeException,
-    NoValidTargets,
+    NoValidTargetsException,
     PrimitiveField,
-    RegisteredTargetTypes,
     RequiredFieldMissingException,
     ScalarField,
     SequenceField,
@@ -39,11 +38,14 @@ from pants.engine.target import (
     StringOrStringSequenceField,
     StringSequenceField,
     Target,
+    TargetsToValidConfigurations,
+    TargetsToValidConfigurationsRequest,
     TargetsWithOrigins,
     TargetWithOrigin,
+    TooManyTargetsException,
 )
 from pants.engine.target import rules as target_rules
-from pants.engine.unions import UnionMembership
+from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.testutil.engine.util import MockGet, run_rule
 from pants.testutil.test_base import TestBase
 from pants.util.collections import ensure_str_list
@@ -94,11 +96,6 @@ class FortranSources(AsyncField):
         if value_or_default is None:
             return None
         return tuple(ensure_str_list(value_or_default))
-
-    @final
-    @property
-    def request(self) -> "FortranSourcesRequest":
-        return FortranSourcesRequest(self)
 
 
 @dataclass(frozen=True)
@@ -275,7 +272,7 @@ def test_add_custom_fields() -> None:
         alias: ClassVar = "custom_field"
         default: ClassVar = False
 
-    union_membership = UnionMembership({FortranTarget.PluginField: OrderedSet([CustomField])})
+    union_membership = UnionMembership({FortranTarget.PluginField: [CustomField]})
     tgt_values = {CustomField.alias: True}
     tgt = FortranTarget(
         tgt_values, address=Address.parse(":lib"), union_membership=union_membership
@@ -480,7 +477,16 @@ def test_configuration() -> None:
     )
 
 
-def test_configuration_group_targets_to_valid_config_types() -> None:
+class TestFindValidConfigurations(TestBase):
+    class InvalidTarget(Target):
+        alias = "invalid_target"
+        core_fields = ()
+
+    @classmethod
+    def target_types(cls):
+        return [FortranTarget, cls.InvalidTarget]
+
+    @union
     class ConfigSuperclass(Configuration):
         pass
 
@@ -496,6 +502,7 @@ def test_configuration_group_targets_to_valid_config_types() -> None:
 
         sources: FortranSources
 
+    @union
     class ConfigSuperclassWithOrigin(ConfigurationWithOrigin):
         pass
 
@@ -504,52 +511,88 @@ def test_configuration_group_targets_to_valid_config_types() -> None:
 
         sources: FortranSources
 
-    class InvalidTarget(Target):
-        alias = "invalid_target"
-        core_fields = ()
-
-    origin = FilesystemLiteralSpec("f.txt")
-    valid_tgt = FortranTarget({}, address=Address.parse(":valid"))
-    valid_tgt_with_origin = TargetWithOrigin(valid_tgt, origin)
-    invalid_tgt = InvalidTarget({}, address=Address.parse(":invalid"))
-    invalid_tgt_with_origin = TargetWithOrigin(invalid_tgt, origin)
-
-    union_membership = UnionMembership(
-        {
-            ConfigSuperclass: OrderedSet([ConfigSubclass1, ConfigSubclass2]),
-            ConfigSuperclassWithOrigin: OrderedSet([ConfigSubclassWithOrigin]),
-        }
-    )
-    registered_target_types = RegisteredTargetTypes.create([FortranTarget, InvalidTarget])
-
-    group_config_superclass = partial(
-        ConfigSuperclass.group_targets_to_valid_subclass_configs,
-        goal_name="fake",
-        union_membership=union_membership,
-        registered_target_types=registered_target_types,
-    )
-    assert group_config_superclass(
-        TargetsWithOrigins([valid_tgt_with_origin, invalid_tgt_with_origin]),
-        error_if_no_valid_targets=True,
-    ) == {valid_tgt: [ConfigSubclass1.create(valid_tgt), ConfigSubclass2.create(valid_tgt)]}
-    assert (
-        group_config_superclass(
-            TargetsWithOrigins([invalid_tgt_with_origin]), error_if_no_valid_targets=False
-        )
-        == {}
-    )
-    with pytest.raises(NoValidTargets):
-        group_config_superclass(
-            TargetsWithOrigins([invalid_tgt_with_origin]), error_if_no_valid_targets=True
+    @classmethod
+    def rules(cls):
+        return (
+            *super().rules(),
+            *target_rules(),
+            RootRule(TargetsWithOrigins),
+            UnionRule(cls.ConfigSuperclass, cls.ConfigSubclass1),
+            UnionRule(cls.ConfigSuperclass, cls.ConfigSubclass2),
+            UnionRule(cls.ConfigSuperclassWithOrigin, cls.ConfigSubclassWithOrigin),
         )
 
-    assert ConfigSuperclassWithOrigin.group_targets_to_valid_subclass_configs(
-        TargetsWithOrigins([valid_tgt_with_origin, invalid_tgt_with_origin]),
-        goal_name="fake",
-        error_if_no_valid_targets=True,
-        union_membership=union_membership,
-        registered_target_types=registered_target_types,
-    ) == {valid_tgt_with_origin: [ConfigSubclassWithOrigin.create(valid_tgt_with_origin)]}
+    def test_find_valid_config_types(self) -> None:
+        origin = FilesystemLiteralSpec("f.txt")
+        valid_tgt = FortranTarget({}, address=Address.parse(":valid"))
+        valid_tgt_with_origin = TargetWithOrigin(valid_tgt, origin)
+        invalid_tgt = self.InvalidTarget({}, address=Address.parse(":invalid"))
+        invalid_tgt_with_origin = TargetWithOrigin(invalid_tgt, origin)
+
+        def find_valid_configs(
+            superclass: Type,
+            targets_with_origins: Iterable[TargetWithOrigin],
+            *,
+            error_if_no_valid_targets: bool = False,
+            expect_single_config: bool = False,
+        ) -> TargetsToValidConfigurations:
+            request = TargetsToValidConfigurationsRequest(
+                superclass,
+                goal_description="fake",
+                error_if_no_valid_targets=error_if_no_valid_targets,
+                expect_single_config=expect_single_config,
+            )
+            return self.request_single_product(
+                TargetsToValidConfigurations,
+                Params(request, TargetsWithOrigins(targets_with_origins),),
+            )
+
+        valid = find_valid_configs(
+            self.ConfigSuperclass, [valid_tgt_with_origin, invalid_tgt_with_origin]
+        )
+        assert valid.targets == (valid_tgt,)
+        assert valid.targets_with_origins == (valid_tgt_with_origin,)
+        assert valid.configurations == (
+            self.ConfigSubclass1.create(valid_tgt),
+            self.ConfigSubclass2.create(valid_tgt),
+        )
+
+        with pytest.raises(ExecutionError) as exc:
+            find_valid_configs(
+                self.ConfigSuperclass, [valid_tgt_with_origin], expect_single_config=True
+            )
+        assert AmbiguousImplementationsException.__name__ in str(exc.value)
+
+        with pytest.raises(ExecutionError) as exc:
+            find_valid_configs(
+                self.ConfigSuperclass,
+                [
+                    valid_tgt_with_origin,
+                    TargetWithOrigin(FortranTarget({}, address=Address.parse(":valid2")), origin),
+                ],
+                expect_single_config=True,
+            )
+        assert TooManyTargetsException.__name__ in str(exc.value)
+
+        no_valid_targets = find_valid_configs(self.ConfigSuperclass, [invalid_tgt_with_origin])
+        assert no_valid_targets.targets == ()
+        assert no_valid_targets.targets_with_origins == ()
+        assert no_valid_targets.configurations == ()
+
+        with pytest.raises(ExecutionError) as exc:
+            find_valid_configs(
+                self.ConfigSuperclass, [invalid_tgt_with_origin], error_if_no_valid_targets=True
+            )
+        assert NoValidTargetsException.__name__ in str(exc.value)
+
+        valid_with_origin = find_valid_configs(
+            self.ConfigSuperclassWithOrigin, [valid_tgt_with_origin, invalid_tgt_with_origin]
+        )
+        assert valid_with_origin.targets == (valid_tgt,)
+        assert valid_with_origin.targets_with_origins == (valid_tgt_with_origin,)
+        assert valid_with_origin.configurations == (
+            self.ConfigSubclassWithOrigin.create(valid_tgt_with_origin),
+        )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -708,7 +751,7 @@ def test_dict_string_to_string_sequence_field() -> None:
 
 
 # -----------------------------------------------------------------------------------------------
-# Test common fields
+# Test Sources
 # -----------------------------------------------------------------------------------------------
 
 
@@ -737,7 +780,9 @@ class TestSources(TestBase):
         addr = Address.parse("src/fortran:lib")
         self.create_files("src/fortran", files=["f1.f95", "f2.f95", "f1.f03", "ignored.f03"])
         sources = Sources(["f1.f95", "*.f03", "!ignored.f03", "!**/ignore*"], address=addr)
-        hydrated_sources = self.request_single_product(HydratedSources, sources.request)
+        hydrated_sources = self.request_single_product(
+            HydratedSources, HydrateSourcesRequest(sources)
+        )
         assert hydrated_sources.snapshot.files == ("src/fortran/f1.f03", "src/fortran/f1.f95")
 
         # Also test that the Filespec is correct. This does not need hydration to be calculated.
@@ -746,11 +791,34 @@ class TestSources(TestBase):
             "exclude": [{"globs": ["src/fortran/**/ignore*", "src/fortran/ignored.f03"]}],
         }
 
+    def test_output_type(self) -> None:
+        class SourcesSubclass(Sources):
+            pass
+
+        addr = Address.parse(":lib")
+        self.create_files("", files=["f1.f95"])
+
+        valid_sources = SourcesSubclass(["*"], address=addr)
+        hydrated_valid_sources = self.request_single_product(
+            HydratedSources,
+            HydrateSourcesRequest(valid_sources, for_sources_types=[SourcesSubclass]),
+        )
+        assert hydrated_valid_sources.snapshot.files == ("f1.f95",)
+        assert hydrated_valid_sources.output_type == SourcesSubclass
+
+        invalid_sources = Sources(["*"], address=addr)
+        hydrated_invalid_sources = self.request_single_product(
+            HydratedSources,
+            HydrateSourcesRequest(invalid_sources, for_sources_types=[SourcesSubclass]),
+        )
+        assert hydrated_invalid_sources.snapshot.files == ()
+        assert hydrated_invalid_sources.output_type is None
+
     def test_unmatched_globs(self) -> None:
         self.create_files("", files=["f1.f95"])
         sources = Sources(["non_existent.f95"], address=Address.parse(":lib"))
         with pytest.raises(ExecutionError) as exc:
-            self.request_single_product(HydratedSources, sources.request)
+            self.request_single_product(HydratedSources, HydrateSourcesRequest(sources))
         assert "Unmatched glob" in str(exc.value)
         assert "//:lib" in str(exc.value)
         assert "non_existent.f95" in str(exc.value)
@@ -767,7 +835,9 @@ class TestSources(TestBase):
         sources = DefaultSources(None, address=addr)
         assert set(sources.sanitized_raw_value) == set(DefaultSources.default)
 
-        hydrated_sources = self.request_single_product(HydratedSources, sources.request)
+        hydrated_sources = self.request_single_product(
+            HydratedSources, HydrateSourcesRequest(sources)
+        )
         assert hydrated_sources.snapshot.files == ("src/fortran/default.f95", "src/fortran/f1.f08")
 
     def test_expected_file_extensions(self) -> None:
@@ -778,14 +848,14 @@ class TestSources(TestBase):
         self.create_files("src/fortran", files=["s.f95", "s.f03", "s.f08"])
         sources = ExpectedExtensionsSources(["s.f*"], address=addr)
         with pytest.raises(ExecutionError) as exc:
-            self.request_single_product(HydratedSources, sources.request)
+            self.request_single_product(HydratedSources, HydrateSourcesRequest(sources))
         assert "s.f08" in str(exc.value)
         assert str(addr) in str(exc.value)
 
         # Also check that we support valid sources
         valid_sources = ExpectedExtensionsSources(["s.f95"], address=addr)
         assert self.request_single_product(
-            HydratedSources, valid_sources.request
+            HydratedSources, HydrateSourcesRequest(valid_sources)
         ).snapshot.files == ("src/fortran/s.f95",)
 
     def test_expected_num_files(self) -> None:
@@ -800,7 +870,8 @@ class TestSources(TestBase):
 
         def hydrate(sources_cls: Type[Sources], sources: Iterable[str]) -> HydratedSources:
             return self.request_single_product(
-                HydratedSources, sources_cls(sources, address=Address.parse(":example")).request
+                HydratedSources,
+                HydrateSourcesRequest(sources_cls(sources, address=Address.parse(":example"))),
             )
 
         with pytest.raises(ExecutionError) as exc:

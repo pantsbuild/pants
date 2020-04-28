@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Iterable, Tuple, Union
+from typing import Iterable, Tuple, Type, Union
 
 from pants.base.specs import AddressSpec, OriginSpec
 from pants.core.util_rules import strip_source_roots
@@ -35,12 +35,18 @@ class SourceFiles:
 @dataclass(unsafe_hash=True)
 class AllSourceFilesRequest:
     sources_fields: Tuple[SourcesField, ...]
-    strip_source_roots: bool = False
+    for_sources_types: Tuple[Type[SourcesField], ...]
+    strip_source_roots: bool
 
     def __init__(
-        self, sources_fields: Iterable[SourcesField], *, strip_source_roots: bool = False
+        self,
+        sources_fields: Iterable[SourcesField],
+        *,
+        for_sources_types: Iterable[Type[SourcesField]] = (SourcesField,),
+        strip_source_roots: bool = False
     ) -> None:
         self.sources_fields = tuple(sources_fields)
+        self.for_sources_types = tuple(for_sources_types)
         self.strip_source_roots = strip_source_roots
 
 
@@ -48,15 +54,18 @@ class AllSourceFilesRequest:
 @dataclass(unsafe_hash=True)
 class SpecifiedSourceFilesRequest:
     sources_fields_with_origins: Tuple[Tuple[SourcesField, OriginSpec], ...]
-    strip_source_roots: bool = False
+    for_sources_types: Tuple[Type[SourcesField], ...]
+    strip_source_roots: bool
 
     def __init__(
         self,
         sources_fields_with_origins: Iterable[Tuple[SourcesField, OriginSpec]],
         *,
+        for_sources_types: Iterable[Type[SourcesField]] = (SourcesField,),
         strip_source_roots: bool = False
     ) -> None:
         self.sources_fields_with_origins = tuple(sources_fields_with_origins)
+        self.for_sources_types = tuple(for_sources_types)
         self.strip_source_roots = strip_source_roots
 
 
@@ -81,7 +90,9 @@ async def determine_all_source_files(request: AllSourceFilesRequest) -> SourceFi
     """Merge all `Sources` fields into one Snapshot."""
     if request.strip_source_roots:
         stripped_snapshots = await MultiGet(
-            Get[SourceRootStrippedSources](StripSourcesFieldRequest(sources_field))
+            Get[SourceRootStrippedSources](
+                StripSourcesFieldRequest(sources_field, for_sources_types=request.for_sources_types)
+            )
             for sources_field in request.sources_fields
         )
         digests_to_merge = tuple(
@@ -89,7 +100,9 @@ async def determine_all_source_files(request: AllSourceFilesRequest) -> SourceFi
         )
     else:
         all_hydrated_sources = await MultiGet(
-            Get[HydratedSources](HydrateSourcesRequest, sources_field.request)
+            Get[HydratedSources](
+                HydrateSourcesRequest(sources_field, for_sources_types=request.for_sources_types)
+            )
             for sources_field in request.sources_fields
         )
         digests_to_merge = tuple(
@@ -104,7 +117,11 @@ async def determine_specified_source_files(request: SpecifiedSourceFilesRequest)
     """Determine the specified `sources` for targets, possibly finding a subset of the original
     `sources` fields if the user supplied file arguments."""
     all_hydrated_sources = await MultiGet(
-        Get[HydratedSources](HydrateSourcesRequest, sources_field_with_origin[0].request)
+        Get[HydratedSources](
+            HydrateSourcesRequest(
+                sources_field_with_origin[0], for_sources_types=request.for_sources_types
+            )
+        )
         for sources_field_with_origin in request.sources_fields_with_origins
     )
 
@@ -133,7 +150,11 @@ async def determine_specified_source_files(request: SpecifiedSourceFilesRequest)
         all_sources_fields = (*full_snapshots.keys(), *snapshot_subset_requests.keys())
         stripped_snapshots = await MultiGet(
             Get[SourceRootStrippedSources](
-                StripSourcesFieldRequest(sources_field, specified_files_snapshot=snapshot)
+                StripSourcesFieldRequest(
+                    sources_field,
+                    specified_files_snapshot=snapshot,
+                    for_sources_types=request.for_sources_types,
+                )
             )
             for sources_field, snapshot in zip(all_sources_fields, all_snapshots)
         )
