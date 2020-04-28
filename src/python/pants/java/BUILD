@@ -32,7 +32,6 @@ python_library(
   name = 'nailgun_io',
   sources = ['nailgun_io.py'],
   dependencies = [
-    '3rdparty/python:contextlib2',
     ':nailgun_protocol'
   ],
   tags = {"partially_type_checked"},
