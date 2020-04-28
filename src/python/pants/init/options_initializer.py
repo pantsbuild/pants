@@ -3,7 +3,6 @@
 
 import logging
 import os
-import re
 import sys
 
 import pkg_resources
@@ -112,9 +111,7 @@ class OptionsInitializer:
             # To ensure that the path is ignored regardless of whether it is a symlink or a directory, we
             # strip trailing slashes (which would signal that we wanted to ignore only directories).
             maybe_rel_path = fast_relpath_optional(absolute_path, buildroot)
-            # Exclude temp workdir from <pants_ignore>.
-            # temp workdir is /path/to/<pants_workdir>/tmp/tmp<process_id>.pants.d
-            if maybe_rel_path and not re.search("tmp/tmp(.+).pants.d", maybe_rel_path):
+            if maybe_rel_path:
                 rel_path = maybe_rel_path.rstrip(os.path.sep)
                 pants_ignore.append(f"/{rel_path}")
 

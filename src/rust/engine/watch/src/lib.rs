@@ -179,6 +179,7 @@ impl InvalidationWatcher {
                   &path_relative_to_build_root,
                   /* is_dir */ false,
                 ) {
+                  debug!("notify ignoring {:?}", path_relative_to_build_root);
                   None
                 } else {
                   Some(path_relative_to_build_root)

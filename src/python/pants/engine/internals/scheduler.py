@@ -518,7 +518,7 @@ class SchedulerSession:
                 unique_exceptions,
             )
 
-    def run_goal_rule(self, product: Type, subject: Union[Any, Params], poll: bool = False,) -> int:
+    def run_goal_rule(self, product: Type, subject: Union[Any, Params], poll: bool = False) -> int:
         """
         :param product: A Goal subtype.
         :param subject: subject for the request.
@@ -549,19 +549,21 @@ class SchedulerSession:
         self,
         product: Type,
         subjects: Sequence[Union[Any, Params]],
+        poll: bool = False,
         timeout: Optional[float] = None,
     ):
         """Executes a request for a single product for some subjects, and returns the products.
 
         :param product: A product type for the request.
         :param subjects: A list of subjects or Params instances for the request.
+        :param poll: See self.execution_request.
         :param timeout: See self.execution_request.
         :returns: A list of the requested products, with length match len(subjects).
         """
         request = None
         raised_exception = None
         try:
-            request = self.execution_request([product], subjects)
+            request = self.execution_request([product], subjects, poll=poll, timeout=timeout)
         except:  # noqa: T803
             # If there are any exceptions during CFFI extern method calls, we want to return an error with
             # them and whatever failure results from it. This typically results from unhashable types.

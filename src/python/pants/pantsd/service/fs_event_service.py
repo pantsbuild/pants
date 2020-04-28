@@ -3,7 +3,9 @@
 
 import logging
 import os
+import threading
 
+from pants.engine.internals.scheduler import Scheduler
 from pants.pantsd.service.pants_service import PantsService
 from pants.pantsd.watchman import Watchman
 
@@ -19,28 +21,27 @@ class FSEventService(PantsService):
     ZERO_DEPTH = ["depth", "eq", 0]
 
     PANTS_ALL_FILES_SUBSCRIPTION_NAME = "all_files"
-    PANTS_PID_SUBSCRIPTION_NAME = "pantsd_pid"
 
-    def __init__(self, watchman, build_root):
+    def __init__(
+        self, watchman: Watchman, scheduler: Scheduler, build_root: str,
+    ):
         """
-        :param Watchman watchman: The Watchman instance as provided by the WatchmanLauncher subsystem.
-        :param str build_root: The current build root.
+        :param watchman: The Watchman instance as provided by the WatchmanLauncher subsystem.
+        :param session: A SchedulerSession to invalidate for.
+        :param build_root: The current build root.
         """
         super().__init__()
         self._logger = logging.getLogger(__name__)
         self._watchman = watchman
         self._build_root = os.path.realpath(build_root)
-        self._handlers = {}
+        self._watchman_is_running = threading.Event()
+        self._scheduler_session = scheduler.new_session(
+            zipkin_trace_v2=False, build_id="fs_event_service_session"
+        )
 
-    def register_all_files_handler(self, callback, name):
-        """Registers a subscription for all files under a given watch path.
-
-        :param func callback: the callback to execute on each filesystem event
-        :param str name:      the subscription name as used by watchman
-        """
-        self.register_handler(
-            name,
-            dict(
+        self._handler = Watchman.EventHandler(
+            name=self.PANTS_ALL_FILES_SUBSCRIPTION_NAME,
+            metadata=dict(
                 fields=["name"],
                 # Request events for all file types.
                 # NB: Touching a file invalidates its parent directory due to:
@@ -61,49 +62,30 @@ class FSEventService(PantsService):
                     # Related: https://github.com/pantsbuild/pants/issues/2956
                 ],
             ),
-            callback,
+            # NB: We stream events from Watchman in `self.run`, so we don't need a callback.
+            callback=lambda: None,
         )
 
-    def register_pidfile_handler(self, pidfile_path, callback):
-        """
+    def await_started(self):
+        return self._watchman_is_running.wait()
 
-        :param pidfile_path: Path to the pidfile, relative to the build root
-        :param callback:
-        :return:
-        """
-        self.register_handler(
-            self.PANTS_PID_SUBSCRIPTION_NAME,
-            dict(
-                fields=["name"],
-                expression=[
-                    "allof",
-                    ["dirname", os.path.dirname(pidfile_path)],
-                    ["name", os.path.basename(pidfile_path)],
-                ],
-            ),
-            callback,
-        )
+    def _handle_all_files_event(self, event):
+        """File event notification queue processor."""
+        try:
+            is_initial_event, files = (
+                event["is_fresh_instance"],
+                event["files"],
+            )
+        except (KeyError, UnicodeDecodeError) as e:
+            self._logger.warning("%r raised by invalid watchman event: %s", e, event)
+            return
 
-    def register_handler(self, name, metadata, callback):
-        """Register subscriptions and their event handlers.
-
-        :param str name:      the subscription name as used by watchman
-        :param dict metadata: a dictionary of metadata to be serialized and passed to the watchman
-                              subscribe command. this should include the match expression as well
-                              as any required callback fields.
-        :param func callback: the callback to execute on each matching filesystem event
-        """
-        assert name not in self._handlers, "duplicate handler name: {}".format(name)
-        assert (
-            isinstance(metadata, dict) and "fields" in metadata and "expression" in metadata
-        ), "invalid handler metadata!"
-        self._handlers[name] = Watchman.EventHandler(
-            name=name, metadata=metadata, callback=callback
-        )
-
-    def fire_callback(self, handler_name, event_data):
-        """Fire an event callback for a given handler."""
-        return self._handlers[handler_name].callback(event_data)
+        # The first watchman event for all_files is a listing of all files - ignore it.
+        if is_initial_event:
+            self._logger.debug(f"watchman now watching {len(files)} files")
+        else:
+            self._logger.debug(f"handling change event for: {len(files)}")
+            self._scheduler_session.invalidate_files(files)
 
     def run(self):
         """Main service entrypoint.
@@ -114,17 +96,17 @@ class FSEventService(PantsService):
         if not (self._watchman and self._watchman.is_alive()):
             raise PantsService.ServiceError("watchman is not running, bailing!")
 
-        # Enable watchman for the build root.
+        # Enable watchman for the build root and register our all_files handler.
         self._watchman.watch_project(self._build_root)
 
-        subscriptions = list(self._handlers.values())
-
         # Setup subscriptions and begin the main event firing loop.
-        for handler_name, event_data in self._watchman.subscribed(self._build_root, subscriptions):
+        for _, event_data in self._watchman.subscribed(self._build_root, [self._handler]):
             self._state.maybe_pause()
             if self._state.is_terminating:
                 break
+            if not event_data:
+                continue
 
-            if event_data:
-                # As we receive events from watchman, trigger the relevant handlers.
-                self.fire_callback(handler_name, event_data)
+            self._handle_all_files_event(event_data)
+            if not self._watchman_is_running.is_set():
+                self._watchman_is_running.set()
