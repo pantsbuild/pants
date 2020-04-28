@@ -801,7 +801,7 @@ class TestSources(TestBase):
         valid_sources = SourcesSubclass(["*"], address=addr)
         hydrated_valid_sources = self.request_single_product(
             HydratedSources,
-            HydrateSourcesRequest(valid_sources, valid_sources_types=[SourcesSubclass]),
+            HydrateSourcesRequest(valid_sources, for_sources_types=[SourcesSubclass]),
         )
         assert hydrated_valid_sources.snapshot.files == ("f1.f95",)
         assert hydrated_valid_sources.output_type == SourcesSubclass
@@ -809,7 +809,7 @@ class TestSources(TestBase):
         invalid_sources = Sources(["*"], address=addr)
         hydrated_invalid_sources = self.request_single_product(
             HydratedSources,
-            HydrateSourcesRequest(invalid_sources, valid_sources_types=[SourcesSubclass]),
+            HydrateSourcesRequest(invalid_sources, for_sources_types=[SourcesSubclass]),
         )
         assert hydrated_invalid_sources.snapshot.files == ()
         assert hydrated_invalid_sources.output_type is None

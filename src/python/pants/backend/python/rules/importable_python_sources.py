@@ -36,7 +36,7 @@ async def prepare_python_sources(targets: Targets) -> ImportablePythonSources:
     stripped_sources = await Get[SourceFiles](
         AllSourceFilesRequest(
             (tgt.get(Sources) for tgt in targets),
-            valid_sources_types=(PythonSources, ResourcesSources, FilesSources),
+            for_sources_types=(PythonSources, ResourcesSources, FilesSources),
             strip_source_roots=True,
         )
     )

@@ -58,18 +58,18 @@ class StripSourcesFieldRequest:
     """
 
     sources_field: SourcesField
-    valid_sources_types: Tuple[Type[SourcesField], ...] = (SourcesField,)
+    for_sources_types: Tuple[Type[SourcesField], ...] = (SourcesField,)
     specified_files_snapshot: Optional[Snapshot] = None
 
     def __init__(
         self,
         sources_field: SourcesField,
         *,
-        valid_sources_types: Iterable[Type[SourcesField]] = (SourcesField,),
+        for_sources_types: Iterable[Type[SourcesField]] = (SourcesField,),
         specified_files_snapshot: Optional[Snapshot] = None,
     ) -> None:
         self.sources_field = sources_field
-        self.valid_sources_types = tuple(valid_sources_types)
+        self.for_sources_types = tuple(for_sources_types)
         self.specified_files_snapshot = specified_files_snapshot
 
 
@@ -145,7 +145,7 @@ async def strip_source_roots_from_sources_field(
     else:
         hydrated_sources = await Get[HydratedSources](
             HydrateSourcesRequest(
-                request.sources_field, valid_sources_types=request.valid_sources_types
+                request.sources_field, for_sources_types=request.for_sources_types
             )
         )
         sources_snapshot = hydrated_sources.snapshot

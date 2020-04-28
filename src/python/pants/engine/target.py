@@ -1274,19 +1274,19 @@ class Sources(AsyncField):
 @dataclass(unsafe_hash=True)
 class HydrateSourcesRequest:
     field: Sources
-    valid_sources_types: Tuple[Type[Sources], ...]
+    for_sources_types: Tuple[Type[Sources], ...]
 
     def __init__(
-        self, field: Sources, *, valid_sources_types: Iterable[Type[Sources]] = (Sources,)
+        self, field: Sources, *, for_sources_types: Iterable[Type[Sources]] = (Sources,)
     ) -> None:
         """Convert raw sources globs into an instance of HydratedSources.
 
-        If you only want to convert certain Sources fields, such as only PythonSources, set
-        `valid_sources_types`. Any invalid sources will return an empty `HydratedSources` instance,
-        indicated by the attribute `output_type = None`.
+        If you only want to handle certain Sources fields, such as only PythonSources, set
+        `for_sources_types`. Any invalid sources will return a `HydratedSources` instance with an
+        empty snapshot and `output_type = None`.
         """
         self.field = field
-        self.valid_sources_types = tuple(valid_sources_types)
+        self.for_sources_types = tuple(for_sources_types)
 
 
 @dataclass(frozen=True)
@@ -1317,7 +1317,7 @@ async def hydrate_sources(
     output_type = next(
         (
             valid_type
-            for valid_type in request.valid_sources_types
+            for valid_type in request.for_sources_types
             if isinstance(sources_field, valid_type)
         ),
         None,
