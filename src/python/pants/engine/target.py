@@ -306,6 +306,7 @@ class Target(ABC):
     def field_types(self) -> Tuple[Type[Field], ...]:
         return (*self.core_fields, *self.plugin_fields)
 
+    @union
     @final
     class PluginField:
         """A sentinel class to allow plugin authors to add additional fields to this target type.
@@ -1335,6 +1336,7 @@ class GenerateSourcesRequest:
     """
 
     protocol_sources: Snapshot
+    protocol_target: Target
 
     input: ClassVar[Type[CodegenSources]]
     output: ClassVar[Type[Sources]]
@@ -1398,8 +1400,9 @@ async def hydrate_sources(
     if len(relevant_generate_request_types) > 1:
         raise AmbiguousCodegenImplementationsException(relevant_generate_request_types)
     generate_request_type = relevant_generate_request_types[0]
+    wrapped_protocol_target = await Get[WrappedTarget](Address, sources_field.address)
     generated_sources = await Get[GeneratedSources](
-        GenerateSourcesRequest, generate_request_type(snapshot)
+        GenerateSourcesRequest, generate_request_type(snapshot, wrapped_protocol_target.target)
     )
     return HydratedSources(generated_sources.snapshot, sources_field.filespec)
 
@@ -1536,6 +1539,5 @@ def rules():
         find_valid_configurations,
         hydrate_sources,
         RootRule(TargetsToValidConfigurationsRequest),
-        RootRule(GenerateSourcesRequest),
         RootRule(HydrateSourcesRequest),
     ]

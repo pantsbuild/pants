@@ -52,6 +52,7 @@ from pants.engine.target import (
     TargetsWithOrigins,
     TargetWithOrigin,
     TooManyTargetsException,
+    WrappedTarget,
 )
 from pants.engine.target import rules as target_rules
 from pants.engine.unions import UnionMembership, UnionRule, union
@@ -921,10 +922,17 @@ class TestCodegen(TestBase):
             UnionRule(GenerateSourcesRequest, GenerateFortranFromAvroRequest),
         )
 
-    def test_generate_sources(self) -> None:
-        addr = Address.parse("src/avro:lib")
+    @classmethod
+    def target_types(cls):
+        return [AvroLibrary]
+
+    def setUp(self) -> None:
+        self.address = Address.parse("src/avro:lib")
         self.create_files("src/avro", files=["f.avro"])
-        protocol_sources = AvroSources(["*.avro"], address=addr)
+        self.add_to_build_file("src/avro", "avro_library(name='lib', sources=['*.avro'])")
+
+    def test_generate_sources(self) -> None:
+        protocol_sources = AvroSources(["*.avro"], address=self.address)
 
         # First, get the original protocol sources.
         hydrated_protocol_sources = self.request_single_product(
@@ -933,8 +941,10 @@ class TestCodegen(TestBase):
         assert hydrated_protocol_sources.snapshot.files == ("src/avro/f.avro",)
 
         # Test directly feeding the protocol sources into the codegen rule.
+        wrapped_tgt = self.request_single_product(WrappedTarget, self.address)
         generated_sources = self.request_single_product(
-            GeneratedSources, GenerateFortranFromAvroRequest(hydrated_protocol_sources.snapshot)
+            GeneratedSources,
+            GenerateFortranFromAvroRequest(hydrated_protocol_sources.snapshot, wrapped_tgt.target),
         )
         assert generated_sources.snapshot.files == ("src/fortran/f.f95",)
 
@@ -949,9 +959,7 @@ class TestCodegen(TestBase):
         class CustomAvroSources(AvroSources):
             pass
 
-        addr = Address.parse("src/avro:lib")
-        self.create_files("src/avro", files=["f.avro"])
-        protocol_sources = CustomAvroSources(["*.avro"], address=addr)
+        protocol_sources = CustomAvroSources(["*.avro"], address=self.address)
         generated = self.request_single_product(
             HydratedSources,
             HydrateSourcesRequest(protocol_sources, codegen_language=FortranSources),
@@ -962,9 +970,7 @@ class TestCodegen(TestBase):
         class SmalltalkSources(Sources):
             pass
 
-        addr = Address.parse("src/avro:lib")
-        self.create_files("src/avro", files=["f.avro"])
-        protocol_sources = AvroSources(["*.avro"], address=addr)
+        protocol_sources = AvroSources(["*.avro"], address=self.address)
         generated = self.request_single_product(
             HydratedSources,
             HydrateSourcesRequest(protocol_sources, codegen_language=SmalltalkSources),
