@@ -34,6 +34,7 @@ python_tests(
     'src/python/pants/backend/jvm/targets:all',
     'src/python/pants/backend/python/rules',
     'src/python/pants/backend/python/targets',
+    'src/python/pants/core/util_rules',
     'src/python/pants/engine:addresses',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:rules',

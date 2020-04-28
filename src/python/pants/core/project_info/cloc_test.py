@@ -4,6 +4,7 @@
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.project_info import cloc
+from pants.core.util_rules import archive, external_tool
 from pants.testutil.goal_rule_test_base import GoalRuleTestBase
 
 
@@ -12,7 +13,7 @@ class ClocTest(GoalRuleTestBase):
 
     @classmethod
     def rules(cls):
-        return super().rules() + cloc.rules()
+        return [*super().rules(), *cloc.rules(), *archive.rules(), *external_tool.rules()]
 
     @classmethod
     def alias_groups(cls):
