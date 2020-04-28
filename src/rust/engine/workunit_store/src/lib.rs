@@ -64,7 +64,7 @@ pub struct StartedWorkUnit {
 pub struct WorkunitMetadata {
   pub desc: Option<String>,
   pub display: bool,
-  pub running: bool,
+  pub blocked: bool,
 }
 
 impl WorkunitMetadata {
@@ -72,7 +72,7 @@ impl WorkunitMetadata {
     WorkunitMetadata {
       display: true,
       desc: None,
-      running: true,
+      blocked: false,
     }
   }
 }
@@ -200,19 +200,19 @@ impl WorkUnitStore {
     let mut res = HashMap::new();
     while let Some((dur, span_id)) = queue.pop() {
       let record = inner.workunit_records.get(&span_id).unwrap();
-      let (name, running) = match record {
+      let (name, blocked) = match record {
         WorkunitRecord::Started(StartedWorkUnit {
           name,
-          metadata: WorkunitMetadata { running, .. },
+          metadata: WorkunitMetadata { blocked, .. },
           ..
-        }) => (name.clone(), *running),
+        }) => (name.clone(), *blocked),
         WorkunitRecord::Completed(WorkUnit {
           name,
-          metadata: WorkunitMetadata { running, .. },
+          metadata: WorkunitMetadata { blocked, .. },
           ..
-        }) => (name.clone(), *running),
+        }) => (name.clone(), *blocked),
       };
-      let maybe_duration = if running { Some(dur) } else { None };
+      let maybe_duration = if blocked { None } else { Some(dur) };
       res.insert(name, maybe_duration);
       if res.len() >= k {
         break;
@@ -245,8 +245,9 @@ impl WorkUnitStore {
       .span_id_to_graph
       .insert(span_id.clone(), child.clone());
     if let Some(parent_id) = parent_id {
-      let parent = *inner.span_id_to_graph.get(&parent_id).unwrap();
-      inner.graph.add_edge(parent, child, ());
+      if let Some(parent) = inner.span_id_to_graph.get(&parent_id).cloned() {
+        inner.graph.add_edge(parent, child, ());
+      }
     }
 
     span_id

@@ -1065,7 +1065,7 @@ impl Node for NodeKey {
       let metadata = WorkunitMetadata {
         desc,
         display,
-        running: true,
+        blocked: false,
       };
 
       context

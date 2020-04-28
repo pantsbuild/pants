@@ -441,14 +441,14 @@ impl CommandRunner for BoundedCommandRunner {
     let outer_metadata = WorkunitMetadata {
       desc: Some("Workunit waiting for opportunity to run".to_string()),
       display: false,
-      running: false,
+      blocked: true,
     };
     let inner_context = context.clone();
     let bounded_fut = semaphor.with_acquired(move || {
       let metadata = WorkunitMetadata {
         desc: Some("Workunit executing currently".to_string()),
         display: false,
-        running: true,
+        blocked: false,
       };
       let f = inner.0.run(req, inner_context.clone()).compat();
       with_workunit(
