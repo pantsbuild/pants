@@ -259,8 +259,11 @@ async def run_python_test(
     )
     result = await Get[FallibleProcessResult](Process, process)
     output_digest = result.output_directory_digest
+    coverage_data = None
+    if run_coverage:
+        coverage_snapshot_subset = await Get[Snapshot](SnapshotSubset(output_digest, PathGlobs(".coverage")))
+        coverage_data = PytestCoverageData(config.address, coverage_snapshot_subset)
 
-    coverage_data = PytestCoverageData(config.address, output_digest) if run_coverage else None
     xml_results_digest: Optional[Digest] = None
     if test_setup.xml_dir:
         xml_results_snapshot = await Get[Snapshot](
