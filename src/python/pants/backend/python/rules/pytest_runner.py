@@ -262,7 +262,7 @@ async def run_python_test(
     coverage_data = None
     if run_coverage:
         coverage_snapshot_subset = await Get[Snapshot](SnapshotSubset(output_digest, PathGlobs([".coverage"])))
-        coverage_data = PytestCoverageData(config.address, coverage_snapshot_subset)
+        coverage_data = PytestCoverageData(config.address, coverage_snapshot_subset.digest)
 
     xml_results_digest: Optional[Digest] = None
     if test_setup.xml_dir:
