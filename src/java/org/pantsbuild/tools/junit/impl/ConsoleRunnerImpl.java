@@ -47,6 +47,8 @@ import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
+import org.kohsuke.args4j.spi.StringArrayOptionHandler;
+import org.kohsuke.args4j.spi.StringOptionHandler;
 import org.pantsbuild.args4j.InvalidCmdLineArgumentException;
 import org.pantsbuild.args4j.StringArgumentsHandler;
 import org.pantsbuild.junit.annotations.TestParallel;
@@ -889,7 +891,7 @@ public class ConsoleRunnerImpl {
 
       @Argument(usage = "Names of junit test classes or test methods to run.  Names prefixed "
                         + "with @ are considered arg file paths and these will be loaded and the "
-                        + "whitespace delimited arguments found inside added to the list",
+                        + "newline delimited arguments found inside added to the list.",
                 required = true,
                 metaVar = "TESTS",
                 handler = StringArgumentsHandler.class)
@@ -928,21 +930,7 @@ public class ConsoleRunnerImpl {
             new PrintStream(new BufferedOutputStream(System.out), true),
             new PrintStream(new BufferedOutputStream(System.err), true));
 
-    List<String> tests = Lists.newArrayList();
-    for (String test : options.tests) {
-      if (test.startsWith("@")) {
-        try {
-          String argFileContents = Files.toString(new File(test.substring(1)), Charsets.UTF_8);
-          tests.addAll(Arrays.asList(argFileContents.split("\n")));
-        } catch (IOException e) {
-          System.err.printf("Failed to load args from arg file %s: %s\n", test, e.getMessage());
-          exit(1);
-        }
-      } else {
-        tests.add(test);
-      }
-    }
-    runner.setTestsToRun(tests);
+    runner.setTestsToRun(Lists.newArrayList(options.tests));
     return runner;
   }
 

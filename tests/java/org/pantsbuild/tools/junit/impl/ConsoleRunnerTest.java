@@ -411,6 +411,15 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestBase {
   }
 
   @Test
+  public void testMultipleArgfileElements() throws IOException {
+    File file = temporary.newFile();
+    Files.write("org.pantsbuild.tools.junit.lib.MockTest1\norg.pantsbuild.tools.junit.lib.MockTest2", file,
+        Charsets.UTF_8);
+    invokeConsoleRunner("@" + file.getAbsolutePath());
+    assertThat(TestRegistry.getCalledTests(), is("test11 test12 test13 test21 test22"));
+  }
+
+  @Test
   public void testMockJUnit3Test() throws Exception {
     invokeConsoleRunner("MockJUnit3Test");
     assertEquals("mju3t1", TestRegistry.getCalledTests());
