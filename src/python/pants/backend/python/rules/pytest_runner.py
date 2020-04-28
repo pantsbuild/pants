@@ -31,7 +31,15 @@ from pants.backend.python.target_types import (
 from pants.core.goals.test import TestConfiguration, TestDebugRequest, TestOptions, TestResult
 from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.engine.addresses import Addresses
-from pants.engine.fs import Digest, DirectoriesToMerge, InputFilesContent
+from pants.engine.fs import (
+    Digest,
+    DirectoriesToMerge,
+    DirectoryWithPrefixToAdd,
+    InputFilesContent,
+    PathGlobs,
+    Snapshot,
+    SnapshotSubset,
+)
 from pants.engine.interactive_runner import InteractiveProcessRequest
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import named_rule, rule, subsystem_rule
@@ -57,6 +65,8 @@ class TestTargetSetup:
     args: Tuple[str, ...]
     input_files_digest: Digest
     timeout_seconds: Optional[int]
+    xml_dir: Optional[str]
+    junit_family: str
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
@@ -207,6 +217,8 @@ async def setup_pytest_for_target(
         args=(*pytest.options.args, *coverage_args, *specified_source_file_names),
         input_files_digest=merged_input_files,
         timeout_seconds=config.timeout.calculate_from_global_options(pytest),
+        xml_dir=pytest.options.junit_xml_dir,
+        junit_family=pytest.options.junit_family,
     )
 
 
@@ -220,15 +232,25 @@ async def run_python_test(
     test_options: TestOptions,
 ) -> TestResult:
     """Runs pytest for one target."""
-    env = {"PYTEST_ADDOPTS": f"--color={'yes' if global_options.options.colors else 'no'}"}
+    add_opts = [f"--color={'yes' if global_options.options.colors else 'no'}"]
+    if test_setup.xml_dir:
+        test_results_file = f"{config.address.path_safe_spec}.xml"
+        add_opts.extend(
+            (f"--junitxml={test_results_file}", f"-o junit_family={test_setup.junit_family}",)
+        )
+    env = {"PYTEST_ADDOPTS": " ".join(add_opts)}
+
     run_coverage = test_options.values.run_coverage
+    output_dirs = [".coverage"] if run_coverage else []
+    if test_setup.xml_dir:
+        output_dirs.append(test_results_file)
     process = test_setup.test_runner_pex.create_process(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path=f"./{test_setup.test_runner_pex.output_filename}",
         pex_args=test_setup.args,
         input_files=test_setup.input_files_digest,
-        output_directories=(".coverage",) if run_coverage else None,
+        output_directories=tuple(output_dirs) if output_dirs else None,
         description=f"Run Pytest for {config.address.reference()}",
         timeout_seconds=(
             test_setup.timeout_seconds if test_setup.timeout_seconds is not None else 9999
@@ -236,10 +258,28 @@ async def run_python_test(
         env=env,
     )
     result = await Get[FallibleProcessResult](Process, process)
-    coverage_data = (
-        PytestCoverageData(config.address, result.output_directory_digest) if run_coverage else None
+    output_digest = result.output_directory_digest
+    coverage_data = None
+    if run_coverage:
+        coverage_snapshot_subset = await Get[Snapshot](
+            SnapshotSubset(output_digest, PathGlobs([".coverage"]))
+        )
+        coverage_data = PytestCoverageData(
+            config.address, coverage_snapshot_subset.directory_digest
+        )
+
+    xml_results_digest: Optional[Digest] = None
+    if test_setup.xml_dir:
+        xml_results_snapshot = await Get[Snapshot](
+            SnapshotSubset(output_digest, PathGlobs([test_results_file]))
+        )
+        xml_results_digest = await Get[Digest](
+            DirectoryWithPrefixToAdd(xml_results_snapshot.directory_digest, test_setup.xml_dir)
+        )
+
+    return TestResult.from_fallible_process_result(
+        result, coverage_data=coverage_data, xml_results=xml_results_digest
     )
-    return TestResult.from_fallible_process_result(result, coverage_data=coverage_data)
 
 
 @named_rule(desc="Run pytest in an interactive process")
