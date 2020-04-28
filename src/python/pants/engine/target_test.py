@@ -11,11 +11,18 @@ from typing_extensions import final
 
 from pants.base.specs import FilesystemLiteralSpec
 from pants.engine.addresses import Address
-from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, PathGlobs, Snapshot
+from pants.engine.fs import (
+    EMPTY_DIRECTORY_DIGEST,
+    FileContent,
+    InputFilesContent,
+    PathGlobs,
+    Snapshot,
+)
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, Params
 from pants.engine.target import (
+    AmbiguousCodegenImplementationsException,
     AmbiguousImplementationsException,
     AsyncField,
     BoolField,
@@ -23,6 +30,8 @@ from pants.engine.target import (
     ConfigurationWithOrigin,
     DictStringToStringField,
     DictStringToStringSequenceField,
+    GeneratedSources,
+    GenerateSourcesRequest,
     HydratedSources,
     HydrateSourcesRequest,
     InvalidFieldChoiceException,
@@ -43,6 +52,7 @@ from pants.engine.target import (
     TargetsWithOrigins,
     TargetWithOrigin,
     TooManyTargetsException,
+    WrappedTarget,
 )
 from pants.engine.target import rules as target_rules
 from pants.engine.unions import UnionMembership, UnionRule, union
@@ -804,7 +814,7 @@ class TestSources(TestBase):
             HydrateSourcesRequest(valid_sources, for_sources_types=[SourcesSubclass]),
         )
         assert hydrated_valid_sources.snapshot.files == ("f1.f95",)
-        assert hydrated_valid_sources.output_type == SourcesSubclass
+        assert hydrated_valid_sources.sources_type == SourcesSubclass
 
         invalid_sources = Sources(["*"], address=addr)
         hydrated_invalid_sources = self.request_single_product(
@@ -812,7 +822,7 @@ class TestSources(TestBase):
             HydrateSourcesRequest(invalid_sources, for_sources_types=[SourcesSubclass]),
         )
         assert hydrated_invalid_sources.snapshot.files == ()
-        assert hydrated_invalid_sources.output_type is None
+        assert hydrated_invalid_sources.sources_type is None
 
     def test_unmatched_globs(self) -> None:
         self.create_files("", files=["f1.f95"])
@@ -889,3 +899,156 @@ class TestSources(TestBase):
             "f2.txt",
             "f3.txt",
         )
+
+
+# -----------------------------------------------------------------------------------------------
+# Test Codegen
+# -----------------------------------------------------------------------------------------------
+
+
+class AvroSources(Sources):
+    pass
+
+
+class AvroLibrary(Target):
+    alias = "avro_library"
+    core_fields = (AvroSources,)
+
+
+class GenerateFortranFromAvroRequest(GenerateSourcesRequest):
+    input = AvroSources
+    output = FortranSources
+
+
+@rule
+async def generate_fortran_from_avro(request: GenerateFortranFromAvroRequest) -> GeneratedSources:
+    protocol_files = request.protocol_sources.files
+
+    def generate_fortran(fp: str) -> FileContent:
+        parent = str(PurePath(fp).parent).replace("src/avro", "src/fortran")
+        file_name = f"{PurePath(fp).stem}.f95"
+        return FileContent(str(PurePath(parent, file_name)), b"Generated")
+
+    result = await Get[Snapshot](InputFilesContent([generate_fortran(fp) for fp in protocol_files]))
+    return GeneratedSources(result)
+
+
+class TestCodegen(TestBase):
+    @classmethod
+    def rules(cls):
+        return (
+            *super().rules(),
+            *target_rules(),
+            generate_fortran_from_avro,
+            RootRule(GenerateFortranFromAvroRequest),
+            RootRule(HydrateSourcesRequest),
+            UnionRule(GenerateSourcesRequest, GenerateFortranFromAvroRequest),
+        )
+
+    @classmethod
+    def target_types(cls):
+        return [AvroLibrary]
+
+    def setUp(self) -> None:
+        self.address = Address.parse("src/avro:lib")
+        self.create_files("src/avro", files=["f.avro"])
+        self.add_to_build_file("src/avro", "avro_library(name='lib', sources=['*.avro'])")
+        self.union_membership = self.request_single_product(UnionMembership, Params())
+
+    def test_generate_sources(self) -> None:
+        protocol_sources = AvroSources(["*.avro"], address=self.address)
+        assert protocol_sources.can_generate(FortranSources, self.union_membership) is True
+
+        # First, get the original protocol sources.
+        hydrated_protocol_sources = self.request_single_product(
+            HydratedSources, HydrateSourcesRequest(protocol_sources)
+        )
+        assert hydrated_protocol_sources.snapshot.files == ("src/avro/f.avro",)
+
+        # Test directly feeding the protocol sources into the codegen rule.
+        wrapped_tgt = self.request_single_product(WrappedTarget, self.address)
+        generated_sources = self.request_single_product(
+            GeneratedSources,
+            GenerateFortranFromAvroRequest(hydrated_protocol_sources.snapshot, wrapped_tgt.target),
+        )
+        assert generated_sources.snapshot.files == ("src/fortran/f.f95",)
+
+        # Test that HydrateSourcesRequest can also be used.
+        generated_via_hydrate_sources = self.request_single_product(
+            HydratedSources,
+            HydrateSourcesRequest(
+                protocol_sources, for_sources_types=[FortranSources], enable_codegen=True
+            ),
+        )
+        assert generated_via_hydrate_sources.snapshot.files == ("src/fortran/f.f95",)
+        assert generated_via_hydrate_sources.sources_type == FortranSources
+
+    def test_works_with_subclass_fields(self) -> None:
+        class CustomAvroSources(AvroSources):
+            pass
+
+        protocol_sources = CustomAvroSources(["*.avro"], address=self.address)
+        assert protocol_sources.can_generate(FortranSources, self.union_membership) is True
+        generated = self.request_single_product(
+            HydratedSources,
+            HydrateSourcesRequest(
+                protocol_sources, for_sources_types=[FortranSources], enable_codegen=True
+            ),
+        )
+        assert generated.snapshot.files == ("src/fortran/f.f95",)
+
+    def test_cannot_generate_language(self) -> None:
+        class SmalltalkSources(Sources):
+            pass
+
+        protocol_sources = AvroSources(["*.avro"], address=self.address)
+        assert protocol_sources.can_generate(SmalltalkSources, self.union_membership) is False
+        generated = self.request_single_product(
+            HydratedSources,
+            HydrateSourcesRequest(
+                protocol_sources, for_sources_types=[SmalltalkSources], enable_codegen=True
+            ),
+        )
+        assert generated.snapshot.files == ()
+        assert generated.sources_type is None
+
+    def test_ambiguous_implementations_exception(self) -> None:
+        # This error message is quite complex. We test that it correctly generates the message.
+        class FortranGenerator1(GenerateSourcesRequest):
+            input = AvroSources
+            output = FortranSources
+
+        class FortranGenerator2(GenerateSourcesRequest):
+            input = AvroSources
+            output = FortranSources
+
+        class SmalltalkSources(Sources):
+            pass
+
+        class SmalltalkGenerator(GenerateSourcesRequest):
+            input = AvroSources
+            output = SmalltalkSources
+
+        class IrrelevantSources(Sources):
+            pass
+
+        # Test when all generators have the same input and output.
+        exc = AmbiguousCodegenImplementationsException(
+            [FortranGenerator1, FortranGenerator2], for_sources_types=[FortranSources]
+        )
+        assert "can generate FortranSources from AvroSources" in str(exc)
+        assert "* FortranGenerator1" in str(exc)
+        assert "* FortranGenerator2" in str(exc)
+
+        # Test when the generators have different input and output, which usually happens because
+        # the call site used too expansive of a `for_sources_types` argument.
+        exc = AmbiguousCodegenImplementationsException(
+            [FortranGenerator1, SmalltalkGenerator],
+            for_sources_types=[FortranSources, SmalltalkSources, IrrelevantSources],
+        )
+        assert "can generate one of ['FortranSources', 'SmalltalkSources'] from AvroSources" in str(
+            exc
+        )
+        assert "IrrelevantSources" not in str(exc)
+        assert "* FortranGenerator1 -> FortranSources" in str(exc)
+        assert "* SmalltalkGenerator -> SmalltalkSources" in str(exc)

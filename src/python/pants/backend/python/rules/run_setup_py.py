@@ -68,6 +68,7 @@ from pants.engine.target import (
     TargetsWithOrigins,
     TransitiveTargets,
 )
+from pants.engine.unions import UnionMembership
 from pants.option.custom_types import shell_str
 from pants.python.python_setup import PythonSetup
 from pants.source.source_root import SourceRootConfig
@@ -279,6 +280,7 @@ async def run_setup_pys(
     python_setup: PythonSetup,
     distdir: DistDir,
     workspace: Workspace,
+    union_membership: UnionMembership,
 ) -> SetupPy:
     """Run setup.py commands on all exported targets addressed."""
     args = tuple(options.values.args)
@@ -310,7 +312,7 @@ async def run_setup_pys(
         owners = await MultiGet(
             Get[ExportedTarget](OwnedDependency(tgt))
             for tgt in transitive_targets.closure
-            if is_ownable_target(tgt)
+            if is_ownable_target(tgt, union_membership)
         )
         exported_targets = list(FrozenOrderedSet(owners))
 
@@ -474,7 +476,9 @@ async def get_sources(
     stripped_srcs_list = await MultiGet(
         Get[SourceRootStrippedSources](
             StripSourcesFieldRequest(
-                target.get(Sources), for_sources_types=(PythonSources, ResourcesSources)
+                target.get(Sources),
+                for_sources_types=(PythonSources, ResourcesSources),
+                enable_codegen=True,
             )
         )
         for target in targets
@@ -523,7 +527,9 @@ async def get_ancestor_init_py(
     source_roots = source_root_config.get_source_roots()
     sources = await Get[SourceFiles](
         AllSourceFilesRequest(
-            (tgt.get(Sources) for tgt in targets), for_sources_types=(PythonSources,)
+            (tgt.get(Sources) for tgt in targets),
+            for_sources_types=(PythonSources,),
+            enable_codegen=True,
         )
     )
     # Find the ancestors of all dirs containing .py files, including those dirs themselves.
@@ -564,12 +570,16 @@ def _is_exported(target: Target) -> bool:
 
 
 @named_rule(desc="Compute distribution's 3rd party requirements")
-async def get_requirements(dep_owner: DependencyOwner) -> ExportedTargetRequirements:
+async def get_requirements(
+    dep_owner: DependencyOwner, union_membership: UnionMembership
+) -> ExportedTargetRequirements:
     transitive_targets = await Get[TransitiveTargets](
         Addresses([dep_owner.exported_target.target.address])
     )
 
-    ownable_tgts = [tgt for tgt in transitive_targets.closure if is_ownable_target(tgt)]
+    ownable_tgts = [
+        tgt for tgt in transitive_targets.closure if is_ownable_target(tgt, union_membership)
+    ]
     owners = await MultiGet(Get[ExportedTarget](OwnedDependency(tgt)) for tgt in ownable_tgts)
     owned_by_us: Set[Target] = set()
     owned_by_others: Set[Target] = set()
@@ -611,7 +621,9 @@ async def get_requirements(dep_owner: DependencyOwner) -> ExportedTargetRequirem
 
 
 @named_rule(desc="Find all code to be published in the distribution")
-async def get_owned_dependencies(dependency_owner: DependencyOwner) -> OwnedDependencies:
+async def get_owned_dependencies(
+    dependency_owner: DependencyOwner, union_membership: UnionMembership
+) -> OwnedDependencies:
     """Find the dependencies of dependency_owner that are owned by it.
 
     Includes dependency_owner itself.
@@ -619,7 +631,9 @@ async def get_owned_dependencies(dependency_owner: DependencyOwner) -> OwnedDepe
     transitive_targets = await Get[TransitiveTargets](
         Addresses([dependency_owner.exported_target.target.address])
     )
-    ownable_targets = [tgt for tgt in transitive_targets.closure if is_ownable_target(tgt)]
+    ownable_targets = [
+        tgt for tgt in transitive_targets.closure if is_ownable_target(tgt, union_membership)
+    ]
     owners = await MultiGet(Get[ExportedTarget](OwnedDependency(tgt)) for tgt in ownable_targets)
     owned_dependencies = [
         tgt
@@ -692,8 +706,12 @@ async def setup_setuptools(setuptools: Setuptools) -> SetuptoolsSetup:
     return SetuptoolsSetup(requirements_pex=requirements_pex,)
 
 
-def is_ownable_target(tgt: Target) -> bool:
-    return tgt.has_field(PythonSources) or tgt.has_field(ResourcesSources)
+def is_ownable_target(tgt: Target, union_membership: UnionMembership) -> bool:
+    return (
+        tgt.has_field(PythonSources)
+        or tgt.has_field(ResourcesSources)
+        or tgt.get(Sources).can_generate(PythonSources, union_membership)
+    )
 
 
 def rules():

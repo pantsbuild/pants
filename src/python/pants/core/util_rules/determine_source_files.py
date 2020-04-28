@@ -36,6 +36,7 @@ class SourceFiles:
 class AllSourceFilesRequest:
     sources_fields: Tuple[SourcesField, ...]
     for_sources_types: Tuple[Type[SourcesField], ...]
+    enable_codegen: bool
     strip_source_roots: bool
 
     def __init__(
@@ -43,10 +44,12 @@ class AllSourceFilesRequest:
         sources_fields: Iterable[SourcesField],
         *,
         for_sources_types: Iterable[Type[SourcesField]] = (SourcesField,),
+        enable_codegen: bool = False,
         strip_source_roots: bool = False
     ) -> None:
         self.sources_fields = tuple(sources_fields)
         self.for_sources_types = tuple(for_sources_types)
+        self.enable_codegen = enable_codegen
         self.strip_source_roots = strip_source_roots
 
 
@@ -55,6 +58,7 @@ class AllSourceFilesRequest:
 class SpecifiedSourceFilesRequest:
     sources_fields_with_origins: Tuple[Tuple[SourcesField, OriginSpec], ...]
     for_sources_types: Tuple[Type[SourcesField], ...]
+    enable_codegen: bool
     strip_source_roots: bool
 
     def __init__(
@@ -62,10 +66,12 @@ class SpecifiedSourceFilesRequest:
         sources_fields_with_origins: Iterable[Tuple[SourcesField, OriginSpec]],
         *,
         for_sources_types: Iterable[Type[SourcesField]] = (SourcesField,),
+        enable_codegen: bool = False,
         strip_source_roots: bool = False
     ) -> None:
         self.sources_fields_with_origins = tuple(sources_fields_with_origins)
         self.for_sources_types = tuple(for_sources_types)
+        self.enable_codegen = enable_codegen
         self.strip_source_roots = strip_source_roots
 
 
@@ -91,7 +97,11 @@ async def determine_all_source_files(request: AllSourceFilesRequest) -> SourceFi
     if request.strip_source_roots:
         stripped_snapshots = await MultiGet(
             Get[SourceRootStrippedSources](
-                StripSourcesFieldRequest(sources_field, for_sources_types=request.for_sources_types)
+                StripSourcesFieldRequest(
+                    sources_field,
+                    for_sources_types=request.for_sources_types,
+                    enable_codegen=request.enable_codegen,
+                )
             )
             for sources_field in request.sources_fields
         )
@@ -101,7 +111,11 @@ async def determine_all_source_files(request: AllSourceFilesRequest) -> SourceFi
     else:
         all_hydrated_sources = await MultiGet(
             Get[HydratedSources](
-                HydrateSourcesRequest(sources_field, for_sources_types=request.for_sources_types)
+                HydrateSourcesRequest(
+                    sources_field,
+                    for_sources_types=request.for_sources_types,
+                    enable_codegen=request.enable_codegen,
+                )
             )
             for sources_field in request.sources_fields
         )
@@ -119,7 +133,9 @@ async def determine_specified_source_files(request: SpecifiedSourceFilesRequest)
     all_hydrated_sources = await MultiGet(
         Get[HydratedSources](
             HydrateSourcesRequest(
-                sources_field_with_origin[0], for_sources_types=request.for_sources_types
+                sources_field_with_origin[0],
+                for_sources_types=request.for_sources_types,
+                enable_codegen=request.enable_codegen,
             )
         )
         for sources_field_with_origin in request.sources_fields_with_origins
@@ -154,6 +170,7 @@ async def determine_specified_source_files(request: SpecifiedSourceFilesRequest)
                     sources_field,
                     specified_files_snapshot=snapshot,
                     for_sources_types=request.for_sources_types,
+                    enable_codegen=request.enable_codegen,
                 )
             )
             for sources_field, snapshot in zip(all_sources_fields, all_snapshots)
