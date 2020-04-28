@@ -40,8 +40,8 @@ mod cffi_externs;
 
 use engine::externs::*;
 use engine::{
-  externs, nodes, Core, ExecutionRequest, ExecutionTermination, Function, Handle, Intrinsics, Key,
-  Params, RootResult, Rule, Scheduler, Session, Tasks, TypeId, Types, Value,
+  externs, nodes, Core, ExecutionRequest, ExecutionTermination, Failure, Function, Handle,
+  Intrinsics, Key, Params, Rule, Scheduler, Session, Tasks, TypeId, Types, Value,
 };
 use futures::future::{self as future03, TryFutureExt};
 use futures01::{future, Future};
@@ -66,18 +66,40 @@ use workunit_store::{StartedWorkUnit, WorkUnit};
 #[cfg(test)]
 mod tests;
 
+///
+/// A clone of ExecutionTermination with a "no error" case in order to handle the fact that
+/// cbindgen cannot handle Options.
+///
+#[repr(u8)]
+pub enum RawExecutionTermination {
+  KeyboardInterrupt,
+  Timeout,
+  NoError,
+}
+
+impl From<ExecutionTermination> for RawExecutionTermination {
+  fn from(et: ExecutionTermination) -> Self {
+    match et {
+      ExecutionTermination::KeyboardInterrupt => RawExecutionTermination::KeyboardInterrupt,
+      ExecutionTermination::Timeout => RawExecutionTermination::Timeout,
+    }
+  }
+}
+
 // TODO: Consider renaming and making generic for collections of PyResults.
 #[repr(C)]
 pub struct RawNodes {
+  err: RawExecutionTermination,
   nodes_ptr: *const PyResult,
   nodes_len: u64,
   nodes: Vec<PyResult>,
 }
 
 impl RawNodes {
-  fn create(node_states: Vec<RootResult>) -> Box<RawNodes> {
+  fn create(node_states: Vec<Result<Value, Failure>>) -> Box<RawNodes> {
     let nodes = node_states.into_iter().map(PyResult::from).collect();
     let mut raw_nodes = Box::new(RawNodes {
+      err: RawExecutionTermination::NoError,
       nodes_ptr: Vec::new().as_ptr(),
       nodes_len: 0,
       nodes: nodes,
@@ -86,6 +108,15 @@ impl RawNodes {
     raw_nodes.nodes_ptr = raw_nodes.nodes.as_ptr();
     raw_nodes.nodes_len = raw_nodes.nodes.len() as u64;
     raw_nodes
+  }
+
+  fn create_for_error(err: ExecutionTermination) -> Box<RawNodes> {
+    Box::new(RawNodes {
+      err: err.into(),
+      nodes_ptr: Vec::new().as_ptr(),
+      nodes_len: 0,
+      nodes: Vec::new(),
+    })
   }
 }
 
@@ -564,10 +595,7 @@ pub extern "C" fn scheduler_execute(
         session.workunit_store().init_thread_state(None);
         match scheduler.execute(execution_request, session) {
           Ok(raw_results) => Box::into_raw(RawNodes::create(raw_results)),
-          //TODO: Passing a raw null pointer to Python is a less-than-ideal way
-          //of noting an error condition. When we have a better way to send complicated
-          //error-signaling values over the FFI boundary, we should revisit this.
-          Err(ExecutionTermination::KeyboardInterrupt) => std::ptr::null(),
+          Err(e) => Box::into_raw(RawNodes::create_for_error(e)),
         }
       })
     })
@@ -594,6 +622,23 @@ pub extern "C" fn execution_add_root_select(
         .and_then(|params| scheduler.add_root_select(execution_request, params, product))
         .into()
     })
+  })
+}
+
+#[no_mangle]
+pub extern "C" fn execution_set_poll(execution_request_ptr: *mut ExecutionRequest, poll: bool) {
+  with_execution_request(execution_request_ptr, |execution_request| {
+    execution_request.poll = poll;
+  })
+}
+
+#[no_mangle]
+pub extern "C" fn execution_set_timeout(
+  execution_request_ptr: *mut ExecutionRequest,
+  timeout_in_ms: u64,
+) {
+  with_execution_request(execution_request_ptr, |execution_request| {
+    execution_request.timeout = Some(Duration::from_millis(timeout_in_ms));
   })
 }
 

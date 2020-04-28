@@ -12,6 +12,7 @@ use boxfuture::{BoxFuture, Boxable};
 use futures01::future::{self, Future};
 use hashing::Digest;
 use parking_lot::Mutex;
+use tokio::time::{timeout, Elapsed};
 
 use rand::Rng;
 
@@ -201,6 +202,68 @@ fn invalidate_randomly() {
   );
 }
 
+#[tokio::test]
+async fn poll_cacheable() {
+  let graph = Arc::new(Graph::new());
+  let context = TContext::new(graph.clone());
+
+  // Poll with an empty graph should succeed.
+  let (result, token1) = graph.poll(TNode::new(2), None, &context).await.unwrap();
+  assert_eq!(result, vec![T(0, 0), T(1, 0), T(2, 0)]);
+
+  // Re-polling on a non-empty graph but with no LastObserved token should return immediately with
+  // the same value, and the same token.
+  let (result, token2) = graph.poll(TNode::new(2), None, &context).await.unwrap();
+  assert_eq!(result, vec![T(0, 0), T(1, 0), T(2, 0)]);
+  assert_eq!(token1, token2);
+
+  // But polling with the previous token should wait, since nothing has changed.
+  let request = graph.poll(TNode::new(2), Some(token2), &context);
+  match timeout(Duration::from_millis(1000), request).await {
+    Err(Elapsed { .. }) => (),
+    e => panic!("Should have timed out, instead got: {:?}", e),
+  }
+
+  // Invalidating something and re-polling should re-compute.
+  graph.invalidate_from_roots(|&TNode(n, _)| n == 0);
+  let (result, _) = graph
+    .poll(TNode::new(2), Some(token2), &context)
+    .await
+    .unwrap();
+  assert_eq!(result, vec![T(0, 0), T(1, 0), T(2, 0)]);
+}
+
+#[tokio::test]
+async fn poll_uncacheable() {
+  let _logger = env_logger::try_init();
+  let graph = Arc::new(Graph::new());
+  // Create a context where the middle node is uncacheable.
+  let context = {
+    let mut uncacheable = HashSet::new();
+    uncacheable.insert(TNode::new(1));
+    TContext::new(graph.clone()).with_uncacheable(uncacheable)
+  };
+
+  // Poll with an empty graph should succeed.
+  let (result, token1) = graph.poll(TNode::new(2), None, &context).await.unwrap();
+  assert_eq!(result, vec![T(0, 0), T(1, 0), T(2, 0)]);
+
+  // Polling with the previous token (in the same Session) should wait, since nothing has changed.
+  let request = graph.poll(TNode::new(2), Some(token1), &context);
+  match timeout(Duration::from_millis(1000), request).await {
+    Err(Elapsed { .. }) => (),
+    e => panic!("Should have timed out, instead got: {:?}", e),
+  }
+
+  // Invalidating something and re-polling should re-compute.
+  graph.invalidate_from_roots(|&TNode(n, _)| n == 0);
+  let (result, _) = graph
+    .poll(TNode::new(2), Some(token1), &context)
+    .await
+    .unwrap();
+  assert_eq!(result, vec![T(0, 0), T(1, 0), T(2, 0)]);
+}
+
 #[test]
 fn dirty_dependents_of_uncacheable_node() {
   let graph = Arc::new(Graph::new());
@@ -272,11 +335,17 @@ fn uncachable_node_only_runs_once() {
     graph.create(TNode::new(2), &context).wait(),
     Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
   );
-  // TNode(0) was cleared by the invalidation while all nodes were running,
-  // but the uncacheable node TNode(1) reties it directly, so it runs twice.
+  // TNode(0) and TNode(2) are cleared and dirtied (respectively) before completing, and
+  // so run twice each. But the uncacheable node runs once.
   assert_eq!(
     context.runs(),
-    vec![TNode::new(2), TNode::new(1), TNode::new(0), TNode::new(0)]
+    vec![
+      TNode::new(2),
+      TNode::new(1),
+      TNode::new(0),
+      TNode::new(0),
+      TNode::new(2)
+    ]
   );
 }
 

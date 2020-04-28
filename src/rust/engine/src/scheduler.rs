@@ -6,17 +6,16 @@ use std::convert::TryInto;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::{mpsc, Arc};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use futures::compat::Future01CompatExt;
-use futures::future::{self as future03};
-use futures01::future::Future;
+use futures::future;
 
 use crate::context::{Context, Core};
 use crate::core::{Failure, Params, TypeId, Value};
 use crate::nodes::{NodeKey, Select, Tracer, Visualizer};
 
-use graph::InvalidationResult;
+use graph::{InvalidationResult, LastObserved};
 use hashing;
 use indexmap::IndexMap;
 use log::{debug, info, warn};
@@ -29,6 +28,7 @@ use workunit_store::WorkUnitStore;
 
 pub enum ExecutionTermination {
   KeyboardInterrupt,
+  Timeout,
 }
 
 ///
@@ -41,8 +41,9 @@ pub enum ExecutionTermination {
 struct InnerSession {
   // The total size of the graph at Session-creation time.
   preceding_graph_size: usize,
-  // The set of roots that have been requested within this session.
-  roots: Mutex<HashSet<Root>>,
+  // The set of roots that have been requested within this session, with associated LastObserved
+  // times if they were polled.
+  roots: Mutex<HashMap<Root, Option<LastObserved>>>,
   // If enabled, the display that will render the progress of the V2 engine. This is only
   // Some(_) if the --v2-ui option is enabled.
   display: Option<Arc<Mutex<EngineDisplay>>>,
@@ -76,7 +77,7 @@ impl Session {
 
     let inner_session = InnerSession {
       preceding_graph_size: scheduler.core.graph.len(),
-      roots: Mutex::new(HashSet::new()),
+      roots: Mutex::new(HashMap::new()),
       display,
       should_record_zipkin_spans,
       workunit_store: WorkUnitStore::new(),
@@ -86,14 +87,22 @@ impl Session {
     Session(Arc::new(inner_session))
   }
 
-  fn extend(&self, new_roots: &[Root]) {
+  fn extend(&self, new_roots: Vec<(Root, Option<LastObserved>)>) {
     let mut roots = self.0.roots.lock();
-    roots.extend(new_roots.iter().cloned());
+    roots.extend(new_roots);
+  }
+
+  fn zip_last_observed(&self, inputs: &[Root]) -> Vec<(Root, Option<LastObserved>)> {
+    let roots = self.0.roots.lock();
+    inputs
+      .iter()
+      .map(|root| (root.clone(), roots.get(root).cloned().unwrap_or(None)))
+      .collect()
   }
 
   fn root_nodes(&self) -> Vec<NodeKey> {
     let roots = self.0.roots.lock();
-    roots.iter().map(|r| r.clone().into()).collect()
+    roots.keys().map(|r| r.clone().into()).collect()
   }
 
   pub fn preceding_graph_size(&self) -> usize {
@@ -159,11 +168,29 @@ impl Session {
 pub struct ExecutionRequest {
   // Set of roots for an execution, in the order they were declared.
   pub roots: Vec<Root>,
+  // An ExecutionRequest with `poll` set will wait for _all_ of the given roots to have changed
+  // since their previous observed value in this Session before returning them.
+  //
+  // Example: if an ExecutionRequest is made twice in a row for roots within the same Session,
+  // and this value is set, the first run will request the roots and return immediately when they
+  // complete. The second request will check whether the roots have changed, and if they haven't
+  // changed, will wait until they have (or until the timeout elapses) before re-requesting them.
+  //
+  // TODO: The "all" roots behavior is a bit peculiar, but was easiest to expose with the existing
+  // API.  In general, polled requests will probably only be for a single root.
+  pub poll: bool,
+  // A timeout applied globally to the request. When a request times out, work is _not_ cancelled,
+  // and will continue to completion in the background.
+  pub timeout: Option<Duration>,
 }
 
 impl ExecutionRequest {
   pub fn new() -> ExecutionRequest {
-    ExecutionRequest { roots: Vec::new() }
+    ExecutionRequest {
+      roots: Vec::new(),
+      poll: false,
+      timeout: None,
+    }
   }
 
   ///
@@ -290,6 +317,37 @@ impl Scheduler {
     self.core.graph.all_digests(&context)
   }
 
+  async fn poll_or_create(
+    context: &Context,
+    root: Root,
+    last_observed: Option<LastObserved>,
+    poll: bool,
+  ) -> ObservedValueResult {
+    let (result, last_observed) = if poll {
+      let (result, last_observed) = context
+        .core
+        .graph
+        .poll(root.into(), last_observed, &context)
+        .await?;
+      (result, Some(last_observed))
+    } else {
+      let result = context
+        .core
+        .graph
+        .create(root.into(), &context)
+        .compat()
+        .await?;
+      (result, None)
+    };
+
+    Ok((
+      result
+        .try_into()
+        .unwrap_or_else(|e| panic!("A Node implementation was ambiguous: {:?}", e)),
+      last_observed,
+    ))
+  }
+
   ///
   /// Attempts to complete all of the given roots, and send the result on the given mpsc Sender,
   /// which allows the caller to poll a channel for the result without blocking uninterruptibly
@@ -297,30 +355,47 @@ impl Scheduler {
   ///
   fn execute_helper(
     context: Context,
-    sender: mpsc::Sender<Vec<Result<Value, Failure>>>,
-    roots: Vec<Root>,
+    sender: mpsc::Sender<Vec<ObservedValueResult>>,
+    roots: Vec<(Root, Option<LastObserved>)>,
+    poll: bool,
   ) {
     let core = context.core.clone();
     let _join = core.executor.spawn(async move {
-      let res = future03::join_all(
+      let res = future::join_all(
         roots
           .into_iter()
-          .map(|root| {
-            context
-              .core
-              .graph
-              .create(root.into(), &context)
-              .map(|nr| {
-                nr.try_into()
-                  .unwrap_or_else(|e| panic!("A Node implementation was ambiguous: {:?}", e))
-              })
-              .compat()
-          })
+          .map(|(root, last_observed)| Self::poll_or_create(&context, root, last_observed, poll))
           .collect::<Vec<_>>(),
       )
       .await;
       let _ = sender.send(res);
     });
+  }
+
+  fn execute_record_results(
+    roots: &[Root],
+    session: &Session,
+    results: Vec<ObservedValueResult>,
+  ) -> Vec<Result<Value, Failure>> {
+    // Store the roots that were operated on and their LastObserved values.
+    session.extend(
+      results
+        .iter()
+        .zip(roots.iter())
+        .map(|(result, root)| {
+          let last_observed = result
+            .as_ref()
+            .ok()
+            .and_then(|(_value, last_observed)| *last_observed);
+          (root.clone(), last_observed)
+        })
+        .collect::<Vec<_>>(),
+    );
+
+    results
+      .into_iter()
+      .map(|res| res.map(|(value, _last_observed)| value))
+      .collect()
   }
 
   ///
@@ -330,35 +405,49 @@ impl Scheduler {
     &self,
     request: &ExecutionRequest,
     session: &Session,
-  ) -> Result<Vec<RootResult>, ExecutionTermination> {
-    // Bootstrap tasks for the roots, and then wait for all of them.
+  ) -> Result<Vec<Result<Value, Failure>>, ExecutionTermination> {
     debug!("Launching {} roots.", request.roots.len());
 
-    session.extend(&request.roots);
-
-    // Wait for all roots to complete. Failure here should be impossible, because each
+    // Spawn and wait for all roots to complete. Failure here should be impossible, because each
     // individual Future in the join was (eventually) mapped into success.
     let context = Context::new(self.core.clone(), session.clone());
     let (sender, receiver) = mpsc::channel();
-
-    Scheduler::execute_helper(context, sender, request.roots.clone());
+    Scheduler::execute_helper(
+      context,
+      sender,
+      session.zip_last_observed(&request.roots),
+      request.poll,
+    );
 
     // This map keeps the k most relevant jobs in assigned possitions.
     // Keys are positions in the display (display workers) and the values are the actual jobs to print.
     let mut tasks = IndexMap::new();
-    let refresh_interval = Duration::from_millis(100);
+    let deadline = request.timeout.map(|timeout| Instant::now() + timeout);
 
     let maybe_display_handle = Self::maybe_display_initialize(&session);
     let result = loop {
-      if let Ok(res) = receiver.recv_timeout(refresh_interval) {
-        break Ok(res);
+      if let Ok(res) = receiver.recv_timeout(Self::compute_refresh_delay(deadline)) {
+        // Completed successfully.
+        break Ok(Self::execute_record_results(&request.roots, &session, res));
       } else if let Err(e) = Self::maybe_display_render(&session, &mut tasks) {
+        // The display indicated that we should exit.
         break Err(e);
+      } else if deadline.map(|d| d < Instant::now()).unwrap_or(false) {
+        // The timeout on the request has been exceeded.
+        break Err(ExecutionTermination::Timeout);
       }
     };
     Self::maybe_display_teardown(session, maybe_display_handle);
 
     result
+  }
+
+  fn compute_refresh_delay(deadline: Option<Instant>) -> Duration {
+    let refresh_interval = Duration::from_millis(100);
+    deadline
+      .and_then(|deadline| deadline.checked_duration_since(Instant::now()))
+      .map(|duration_till_deadline| std::cmp::min(refresh_interval, duration_till_deadline))
+      .unwrap_or(refresh_interval)
   }
 
   fn maybe_display_initialize(session: &Session) -> Option<Uuid> {
@@ -471,4 +560,4 @@ impl Drop for Scheduler {
 ///
 type Root = Select;
 
-pub type RootResult = Result<Value, Failure>;
+pub type ObservedValueResult = Result<(Value, Option<LastObserved>), Failure>;

@@ -19,3 +19,4 @@ petgraph = "0.4.5"
 [dev-dependencies]
 rand = "0.6"
 env_logger = "0.5.4"
+tokio = { version = "0.2", features = ["macros", "rt-threaded", "time"] }

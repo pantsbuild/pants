@@ -337,7 +337,7 @@ impl<N: Node> InnerGraph<N> {
       .walk(
         root_ids.iter().cloned().collect(),
         Direction::Incoming,
-        |id| !self.entry_for_id(*id).unwrap().node().cacheable(),
+        |_| false,
       )
       .filter(|eid| !root_ids.contains(eid))
       .collect();
@@ -613,18 +613,12 @@ impl<N: Node> Graph<N> {
     inner.nodes.len()
   }
 
-  ///
-  /// Request the given dst Node, optionally in the context of the given src Node.
-  ///
-  /// If there is no src Node, or the src Node is not cacheable, this method will retry for
-  /// invalidation until the Node completes.
-  ///
-  pub fn get(
+  fn get_inner(
     &self,
     src_id: Option<EntryId>,
     context: &N::Context,
     dst_node: N,
-  ) -> BoxFuture<N::Item, N::Error> {
+  ) -> BoxFuture<(N::Item, Generation), N::Error> {
     // Compute information about the dst under the Graph lock, and then release it.
     let (dst_retry, mut entry, entry_id) = {
       // Get or create the destination, and then insert the dep and return its state.
@@ -683,11 +677,7 @@ impl<N: Node> Graph<N> {
           if counter == 0 {
             break Err(N::Error::exhausted());
           }
-          let dep_res = entry
-            .get(&context, entry_id)
-            .map(|(res, _)| res)
-            .compat()
-            .await;
+          let dep_res = entry.get(&context, entry_id).compat().await;
           match dep_res {
             Ok(r) => break Ok(r),
             Err(err) if err == N::Error::invalidated() => continue,
@@ -698,8 +688,26 @@ impl<N: Node> Graph<N> {
       uncached_node.boxed().compat().to_boxed()
     } else {
       // Not retriable.
-      entry.get(context, entry_id).map(|(res, _)| res).to_boxed()
+      entry.get(context, entry_id)
     }
+  }
+
+  ///
+  /// Request the given dst Node, optionally in the context of the given src Node.
+  ///
+  /// If there is no src Node, or the src Node is not cacheable, this method will retry for
+  /// invalidation until the Node completes.
+  ///
+  pub fn get(
+    &self,
+    src_id: Option<EntryId>,
+    context: &N::Context,
+    dst_node: N,
+  ) -> BoxFuture<N::Item, N::Error> {
+    self
+      .get_inner(src_id, context, dst_node)
+      .map(|(res, _generation)| res)
+      .to_boxed()
   }
 
   ///
@@ -707,6 +715,36 @@ impl<N: Node> Graph<N> {
   ///
   pub fn create(&self, node: N, context: &N::Context) -> BoxFuture<N::Item, N::Error> {
     self.get(None, context, node)
+  }
+
+  ///
+  /// Gets the value of the given Node (optionally waiting for it to have changed since the given
+  /// LastObserved token), and then returns its new value and a new LastObserved token.
+  ///
+  pub async fn poll(
+    &self,
+    node: N,
+    token: Option<LastObserved>,
+    context: &N::Context,
+  ) -> Result<(N::Item, LastObserved), N::Error> {
+    // If the node is currently clean at the given token, Entry::poll will delay until it has
+    // changed in some way.
+    if let Some(LastObserved(generation)) = token {
+      let entry = {
+        let mut inner = self.inner.lock();
+        let entry_id = inner.ensure_entry(node.clone());
+        inner.unsafe_entry_for_id(entry_id).clone()
+      };
+      entry
+        .poll(context, generation)
+        .compat()
+        .await
+        .expect("Poll is infalliable.");
+    };
+
+    // Re-request the Node.
+    let (res, generation) = self.get_inner(None, context, node).compat().await?;
+    Ok((res, LastObserved(generation)))
   }
 
   fn report_cycle(
@@ -870,9 +908,9 @@ impl<N: Node> Graph<N> {
     run_token: RunToken,
     result: Option<Result<N::Item, N::Error>>,
   ) {
-    let (entry, has_dirty_dependencies, dep_generations) = {
+    let (entry, has_uncacheable_deps, dep_generations) = {
       let inner = self.inner.lock();
-      let mut has_dirty_dependencies = false;
+      let mut has_uncacheable_deps = false;
       // Get the Generations of all dependencies of the Node. We can trust that these have not changed
       // since we began executing, as long as we are not currently marked dirty (see the method doc).
       let dep_generations = inner
@@ -880,18 +918,19 @@ impl<N: Node> Graph<N> {
         .neighbors_directed(entry_id, Direction::Outgoing)
         .filter_map(|dep_id| inner.entry_for_id(dep_id))
         .map(|entry| {
-          // If a dependency is uncacheable or currently dirty, this Node should complete as dirty,
-          // independent of matching Generation values. This is to allow for the behaviour that an
-          // uncacheable Node should always have dirty dependents, transitively.
-          if !entry.node().cacheable() || !entry.is_clean(context) {
-            has_dirty_dependencies = true;
+          // If a dependency is itself uncacheable or has uncacheable deps, this Node should
+          // also complete as having uncacheable dpes, independent of matching Generation values.
+          // This is to allow for the behaviour that an uncacheable Node should always have "dirty"
+          // (marked as UncacheableDependencies) dependents, transitively.
+          if !entry.node().cacheable() || entry.has_uncacheable_deps() {
+            has_uncacheable_deps = true;
           }
           entry.generation()
         })
         .collect();
       (
         inner.entry_for_id(entry_id).cloned(),
-        has_dirty_dependencies,
+        has_uncacheable_deps,
         dep_generations,
       )
     };
@@ -903,7 +942,7 @@ impl<N: Node> Graph<N> {
         run_token,
         dep_generations,
         result,
-        has_dirty_dependencies,
+        has_uncacheable_deps,
         &mut inner,
       );
     }
@@ -984,6 +1023,12 @@ impl<N: Node> Graph<N> {
     }
   }
 }
+
+///
+/// An opaque token that represents a particular observed "version" of a Node.
+///
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct LastObserved(Generation);
 
 ///
 /// Represents the state of a particular walk through a Graph. Implements Iterator and has the same
