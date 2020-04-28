@@ -16,7 +16,6 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.engine.fs import DirectoryToMaterialize
 from pants.engine.isolated_process import ExecuteProcessRequest
-from pants.java.distribution.distribution import DistributionLocator
 from pants.util.dirutil import fast_relpath, safe_walk
 from pants.util.meta import classproperty
 
@@ -108,10 +107,7 @@ class JavacCompile(JvmCompile):
         if self.get_options().capture_classpath:
             self._record_compile_classpath(classpath, ctx.target, ctx.classes_dir.path)
 
-        try:
-            distribution = JvmPlatform.preferred_jvm_distribution([settings], strict=True)
-        except DistributionLocator.Error:
-            distribution = JvmPlatform.preferred_jvm_distribution([settings], strict=False)
+        distribution = self._local_jvm_distribution(settings)
 
         javac_args = []
 
