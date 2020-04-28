@@ -1317,7 +1317,23 @@ class Sources(AsyncField):
     @final
     @classmethod
     def can_generate(cls, output_type: Type["Sources"], union_membership: UnionMembership) -> bool:
-        """Can this Sources field be used to generate the output_type?"""
+        """Can this Sources field be used to generate the output_type?
+
+        Generally, this method does not need to be used. Most call sites can simply use the below,
+        and the engine will generate the sources if possible or will return an instance of
+        HydratedSources with an empty snapshot if not possible:
+
+            await Get[HydratedSources](
+                HydrateSourcesRequest(
+                    sources_field,
+                    for_sources_types=[FortranSources],
+                    enable_codegen=True,
+                )
+            )
+
+        This method is useful when you need to filter targets before hydrating them, such as how
+        you may filter targets via `tgt.has_field(MyField)`.
+        """
         generate_request_types: Iterable[
             Type[GenerateSourcesRequest]
         ] = union_membership.union_rules.get(GenerateSourcesRequest, ())
