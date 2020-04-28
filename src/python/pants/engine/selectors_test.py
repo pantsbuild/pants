@@ -58,22 +58,26 @@ Get({a!r}, {t!r}, {b!r})
 
         with self.assertRaises(ValueError) as cm:
             Get.extract_constraints(self._get_call_node("Get(1, 2)"))
-        self.assertEqual(
-            str(cm.exception),
-            """\
-Two arg form of Get expected (product_type, subject_type(subject)), but got: (Num, Num)""",
-        )
+
+        # The name of the type of a number literal AST node changed from "Num" to "Constant" between Python 3.6 and Python 3.8.
+        # This will compute the correct name for either version of Python.
+        n = ast.parse("1").body[0].value
+        num_ty = getattr(n, "id", type(n).__name__)
+
+        msg = f"Two arg form of Get expected (product_type, subject_type(subject)), but got: ({num_ty}, {num_ty})"
+        assert str(cm.exception) == msg
 
         parsed_three_arg_call = self._get_call_node("Get(A, B, C(x))")
         self.assertEqual(("A", "B"), Get.extract_constraints(parsed_three_arg_call))
 
         with self.assertRaises(ValueError) as cm:
             Get.extract_constraints(self._get_call_node("Get(A, 'asdf', C(x))"))
-        self.assertEqual(
-            str(cm.exception),
-            """\
-Three arg form of Get expected (product_type, subject_declared_type, subject), but got: (A, Str, Call)""",
-        )
+
+        # The name of the type of a string literal AST node also changed between Python 3.6 and Python 3.8.
+        n = ast.parse("'test'").body[0].value
+        str_ty = getattr(n, "id", type(n).__name__)
+        msg = f"Three arg form of Get expected (product_type, subject_declared_type, subject), but got: (A, {str_ty}, Call)"
+        assert str(cm.exception) == msg
 
     def test_create_statically_for_rule_graph(self):
         self.assertEqual(
