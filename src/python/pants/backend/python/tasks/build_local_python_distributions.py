@@ -5,10 +5,10 @@ import glob
 import os
 import re
 import shutil
+import sysconfig
 from pathlib import Path
 
 from pex.interpreter import PythonInterpreter
-from wheel import pep425tags
 
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.link_shared_libraries import SharedLibrary
@@ -248,7 +248,8 @@ class BuildLocalPythonDistributions(Task):
         egg_info_snapshot_tag_args = ["egg_info", f"--tag-build=+{snapshot_fingerprint}"]
         bdist_whl_args = ["bdist_wheel"]
         if is_platform_specific:
-            platform_args = ["--plat-name", pep425tags.get_platform()]
+            platform = sysconfig.get_platform().replace(".", "_").replace("-", "_")
+            platform_args = ["--plat-name", platform]
         else:
             platform_args = []
 
