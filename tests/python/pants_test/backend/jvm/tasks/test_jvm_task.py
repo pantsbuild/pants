@@ -78,7 +78,7 @@ class JvmTaskTest(JvmTaskTestBase):
                 plat_mock.return_value = fake_dist
                 dist = self.task.preferred_jvm_distribution_for_targets(targets)
 
-                plat_mock.assert_called_once_with([java8_platform], strict=False, jdk=False)
+                plat_mock.assert_called_once_with([java8_platform], strict=None, jdk=False)
                 self.assertEqual(fake_dist, dist)
 
     def test_runtime_platforms_for_targets(self):

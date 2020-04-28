@@ -92,7 +92,7 @@ class JvmTask(Task):
         classpath.extend(classpath_for_targets)
         return classpath
 
-    def preferred_jvm_distribution_for_targets(self, targets, jdk=False, strict=False):
+    def preferred_jvm_distribution_for_targets(self, targets, jdk=False, strict=None):
         """Find the preferred jvm distribution for running code from the given targets."""
         return self.preferred_jvm_distribution(
             self.runtime_platforms_for_targets(targets), jdk=jdk, strict=strict
@@ -115,5 +115,5 @@ class JvmTask(Task):
         else:
             return target.platform
 
-    def preferred_jvm_distribution(self, platforms, jdk=False, strict=False):
+    def preferred_jvm_distribution(self, platforms, jdk=False, strict=None):
         return JvmPlatform.preferred_jvm_distribution(platforms, jdk=jdk, strict=strict)
