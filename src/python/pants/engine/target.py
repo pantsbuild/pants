@@ -926,18 +926,44 @@ class AmbiguousCodegenImplementationsException(Exception):
     """Exception for when there are multiple codegen implementations and it is ambiguous which to
     use."""
 
-    # TODO: handle a) all the same generators and b) different generators
-    def __init__(self, generators: Iterable[Type["GenerateSourcesRequest"]]) -> None:
+    def __init__(
+        self,
+        generators: Iterable[Type["GenerateSourcesRequest"]],
+        *,
+        for_sources_types: Iterable[Type["Sources"]],
+    ) -> None:
+        bulleted_list_sep = "\n  * "
+        all_same_generator_paths = (
+            len(set((generator.input, generator.output) for generator in generators)) == 1
+        )
         example_generator = list(generators)[0]
         input = example_generator.input.__name__
-        output = example_generator.output.__name__
-        possible_generators = sorted(generator.__name__ for generator in generators)
-        bulleted_list_sep = "\n  * "
-        super().__init__(
-            f"Multiple of the registered code generators can generate {output} given {input}. It "
-            "is ambiguous which implementation to use.\n\nPossible implementations:"
-            f"{bulleted_list_sep}{bulleted_list_sep.join(possible_generators)}"
-        )
+        if all_same_generator_paths:
+            output = example_generator.output.__name__
+            possible_generators = sorted(generator.__name__ for generator in generators)
+            super().__init__(
+                f"Multiple of the registered code generators can generate {output} from {input}. "
+                "It is ambiguous which implementation to use.\n\nPossible implementations:"
+                f"{bulleted_list_sep}{bulleted_list_sep.join(possible_generators)}"
+            )
+        else:
+            possible_output_types = sorted(
+                generator.output.__name__
+                for generator in generators
+                if issubclass(generator.output, tuple(for_sources_types))
+            )
+            possible_generators_with_output = [
+                f"{generator.__name__} -> {generator.output.__name__}"
+                for generator in sorted(generators, key=lambda generator: generator.output.__name__)
+            ]
+            super().__init__(
+                f"Multiple of the registered code generators can generate one of "
+                f"{possible_output_types} from {input}. It is ambiguous which implementation to "
+                f"use. This can happen when the call site requests too many different output types "
+                f"from the same original protocol sources.\n\nPossible implementations with their "
+                f"output type: {bulleted_list_sep}"
+                f"{bulleted_list_sep.join(possible_generators_with_output)}"
+            )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -1425,7 +1451,9 @@ async def hydrate_sources(
         and issubclass(generate_request_type.output, request.for_sources_types)
     ]
     if request.enable_codegen and len(relevant_generate_request_types) > 1:
-        raise AmbiguousCodegenImplementationsException(relevant_generate_request_types)
+        raise AmbiguousCodegenImplementationsException(
+            relevant_generate_request_types, for_sources_types=request.for_sources_types
+        )
     generate_request_type = next(iter(relevant_generate_request_types), None)
 
     # Now, determine if any of the `for_sources_types` may be used, either because the

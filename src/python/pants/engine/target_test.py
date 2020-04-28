@@ -22,6 +22,7 @@ from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, Params
 from pants.engine.target import (
+    AmbiguousCodegenImplementationsException,
     AmbiguousImplementationsException,
     AsyncField,
     BoolField,
@@ -1010,3 +1011,44 @@ class TestCodegen(TestBase):
         )
         assert generated.snapshot.files == ()
         assert generated.output_type is None
+
+    def test_ambiguous_implementations_exception(self) -> None:
+        # This error message is quite complex. We test that it correctly generates the message.
+        class FortranGenerator1(GenerateSourcesRequest):
+            input = AvroSources
+            output = FortranSources
+
+        class FortranGenerator2(GenerateSourcesRequest):
+            input = AvroSources
+            output = FortranSources
+
+        class SmalltalkSources(Sources):
+            pass
+
+        class SmalltalkGenerator(GenerateSourcesRequest):
+            input = AvroSources
+            output = SmalltalkSources
+
+        class IrrelevantSources(Sources):
+            pass
+
+        # Test when all generators have the same input and output.
+        exc = AmbiguousCodegenImplementationsException(
+            [FortranGenerator1, FortranGenerator2], for_sources_types=[FortranSources]
+        )
+        assert "can generate FortranSources from AvroSources" in str(exc)
+        assert "* FortranGenerator1" in str(exc)
+        assert "* FortranGenerator2" in str(exc)
+
+        # Test when the generators have different input and output, which usually happens because
+        # the call site used too expansive of a `for_sources_types` argument.
+        exc = AmbiguousCodegenImplementationsException(
+            [FortranGenerator1, SmalltalkGenerator],
+            for_sources_types=[FortranSources, SmalltalkSources, IrrelevantSources],
+        )
+        assert "can generate one of ['FortranSources', 'SmalltalkSources'] from AvroSources" in str(
+            exc
+        )
+        assert "IrrelevantSources" not in str(exc)
+        assert "* FortranGenerator1 -> FortranSources" in str(exc)
+        assert "* SmalltalkGenerator -> SmalltalkSources" in str(exc)
