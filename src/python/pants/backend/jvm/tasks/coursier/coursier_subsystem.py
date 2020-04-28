@@ -2,24 +2,31 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+from typing import List
+
+import requests
 
 from pants.base.build_environment import get_pants_cachedir
-from pants.binaries.binary_tool import Script
-from pants.binaries.binary_util import BinaryToolUrlGenerator
+from pants.core.util_rules.external_tool import ExternalTool, ExternalToolError
+from pants.engine.platform import Platform
 
 
-class CoursierSubsystem(Script):
+class CoursierSubsystem(ExternalTool):
     """Common configuration items for coursier tasks.
 
     :API: public
     """
 
     options_scope = "coursier"
+    name = "coursier"
     default_version = "1.1.0.cf365ea27a710d5f09db1f0a6feee129aa1fc417"
 
-    _default_urls = [
-        "https://github.com/coursier/coursier/releases/download/pants_release_1.5.x/coursier-cli-{version}.jar",
+    default_known_versions = [
+        f"1.1.0.cf365ea27a710d5f09db1f0a6feee129aa1fc417|{plat}|24945c529eaa32a16a70256ac357108edc1b51a4dd45b656a1808c0cbf00617e|27573328"
+        for plat in ["darwin", "linux"]
     ]
+
+    _default_url = "https://github.com/coursier/coursier/releases/download/pants_release_1.5.x/coursier-cli-{version}.jar"
 
     class Error(Exception):
         """Indicates an error bootstrapping coursier."""
@@ -73,18 +80,20 @@ class CoursierSubsystem(Script):
             "--bootstrap-jar-urls",
             fingerprint=True,
             type=list,
-            default=cls._default_urls,
+            default=[cls._default_url],
             help="Locations to download a bootstrap version of Coursier from.",
         )
 
-    def get_external_url_generator(self):
-        return CoursierUrlGenerator(list(self.get_options().bootstrap_jar_urls))
-
-
-class CoursierUrlGenerator(BinaryToolUrlGenerator):
-    def __init__(self, template_urls):
-        super().__init__()
-        self._template_urls = template_urls
-
-    def generate_urls(self, version, host_platform):
-        return [url.format(version=version) for url in self._template_urls]
+    def generate_url(self, plat: Platform) -> str:
+        # We need to pick one URL to return, so we check for the first one that returns a
+        # 200 for a HEAD request.
+        # TODO: Allow ExternalTool to handle multiple URLs itself? May be overkill.
+        #  It's not even clear that this subsystem really needs to do so.
+        version = self.get_options().version
+        urls_to_try: List[str] = [
+            url.format(version=version) for url in self.get_options().bootstrap_jar_urls
+        ]
+        for url in urls_to_try:
+            if requests.head(url).ok:
+                return url
+        raise ExternalToolError()  # Calling code will generate a sensible error message.
