@@ -1162,81 +1162,8 @@ class DictStringToStringSequenceField(PrimitiveField, metaclass=ABCMeta):
 
 
 # -----------------------------------------------------------------------------------------------
-# Common Fields used across most targets
+# Sources
 # -----------------------------------------------------------------------------------------------
-
-
-class Tags(StringSequenceField):
-    """Arbitrary strings that you can use to describe a target.
-
-    For example, you may tag some test targets with 'integration_test' so that you could run
-    `./pants --tags='integration_test' test ::` to only run on targets with that tag.
-    """
-
-    alias = "tags"
-
-
-class DescriptionField(StringField):
-    """A human-readable description of the target.
-
-    Use `./pants list --documented ::` to see all targets with descriptions.
-    """
-
-    alias = "description"
-
-
-# TODO(#9388): remove? We don't want this in V2, but maybe keep it for V1.
-class NoCacheField(BoolField):
-    """If True, don't store results for this target in the V1 cache."""
-
-    alias = "no_cache"
-    default = False
-    v1_only = True
-
-
-# TODO(#9388): remove?
-class ScopeField(StringField):
-    """A V1-only field for the scope of the target, which is used by the JVM to determine the
-    target's inclusion in the class path.
-
-    See `pants.build_graph.target_scopes.Scopes`.
-    """
-
-    alias = "scope"
-    v1_only = True
-
-
-# TODO(#9388): Remove.
-class IntransitiveField(BoolField):
-    alias = "_transitive"
-    default = False
-    v1_only = True
-
-
-COMMON_TARGET_FIELDS = (Tags, DescriptionField, NoCacheField, ScopeField, IntransitiveField)
-
-
-# NB: To hydrate the dependencies into Targets, use
-# `await Get[Targets](Addresses(tgt[Dependencies].value)`.
-class Dependencies(PrimitiveField):
-    """Addresses to other targets that this target depends on, e.g. `['src/python/project:lib']`."""
-
-    alias = "dependencies"
-    value: Optional[Tuple[Address, ...]]
-    default = None
-
-    # NB: The type hint for `raw_value` is a lie. While we do expect end-users to use
-    # Iterable[str], the Struct and Addressable code will have already converted those strings
-    # into a List[Address]. But, that's an implementation detail and we don't want our
-    # documentation, which is auto-generated from these type hints, to leak that.
-    @classmethod
-    def compute_value(
-        cls, raw_value: Optional[Iterable[str]], *, address: Address
-    ) -> Optional[Tuple[Address, ...]]:
-        value_or_default = super().compute_value(raw_value, address=address)
-        if value_or_default is None:
-            return None
-        return tuple(sorted(value_or_default))
 
 
 class Sources(AsyncField):
@@ -1423,6 +1350,84 @@ async def hydrate_sources(
     )
     sources_field.validate_snapshot(snapshot)
     return HydratedSources(snapshot, sources_field.filespec, output_type=output_type)
+
+
+# -----------------------------------------------------------------------------------------------
+# Other common Fields used across most targets
+# -----------------------------------------------------------------------------------------------
+
+
+class Tags(StringSequenceField):
+    """Arbitrary strings that you can use to describe a target.
+
+    For example, you may tag some test targets with 'integration_test' so that you could run
+    `./pants --tags='integration_test' test ::` to only run on targets with that tag.
+    """
+
+    alias = "tags"
+
+
+class DescriptionField(StringField):
+    """A human-readable description of the target.
+
+    Use `./pants list --documented ::` to see all targets with descriptions.
+    """
+
+    alias = "description"
+
+
+# TODO(#9388): remove? We don't want this in V2, but maybe keep it for V1.
+class NoCacheField(BoolField):
+    """If True, don't store results for this target in the V1 cache."""
+
+    alias = "no_cache"
+    default = False
+    v1_only = True
+
+
+# TODO(#9388): remove?
+class ScopeField(StringField):
+    """A V1-only field for the scope of the target, which is used by the JVM to determine the
+    target's inclusion in the class path.
+
+    See `pants.build_graph.target_scopes.Scopes`.
+    """
+
+    alias = "scope"
+    v1_only = True
+
+
+# TODO(#9388): Remove.
+class IntransitiveField(BoolField):
+    alias = "_transitive"
+    default = False
+    v1_only = True
+
+
+COMMON_TARGET_FIELDS = (Tags, DescriptionField, NoCacheField, ScopeField, IntransitiveField)
+
+
+# NB: To hydrate the dependencies into Targets, use
+# `await Get[Targets](Addresses(tgt[Dependencies].value)`.
+class Dependencies(PrimitiveField):
+    """Addresses to other targets that this target depends on, e.g. `['src/python/project:lib']`."""
+
+    alias = "dependencies"
+    value: Optional[Tuple[Address, ...]]
+    default = None
+
+    # NB: The type hint for `raw_value` is a lie. While we do expect end-users to use
+    # Iterable[str], the Struct and Addressable code will have already converted those strings
+    # into a List[Address]. But, that's an implementation detail and we don't want our
+    # documentation, which is auto-generated from these type hints, to leak that.
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Iterable[str]], *, address: Address
+    ) -> Optional[Tuple[Address, ...]]:
+        value_or_default = super().compute_value(raw_value, address=address)
+        if value_or_default is None:
+            return None
+        return tuple(sorted(value_or_default))
 
 
 # TODO: figure out what support looks like for this with the Target API. The expected value is an
