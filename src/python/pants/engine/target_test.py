@@ -814,7 +814,7 @@ class TestSources(TestBase):
             HydrateSourcesRequest(valid_sources, for_sources_types=[SourcesSubclass]),
         )
         assert hydrated_valid_sources.snapshot.files == ("f1.f95",)
-        assert hydrated_valid_sources.output_type == SourcesSubclass
+        assert hydrated_valid_sources.sources_type == SourcesSubclass
 
         invalid_sources = Sources(["*"], address=addr)
         hydrated_invalid_sources = self.request_single_product(
@@ -822,7 +822,7 @@ class TestSources(TestBase):
             HydrateSourcesRequest(invalid_sources, for_sources_types=[SourcesSubclass]),
         )
         assert hydrated_invalid_sources.snapshot.files == ()
-        assert hydrated_invalid_sources.output_type is None
+        assert hydrated_invalid_sources.sources_type is None
 
     def test_unmatched_globs(self) -> None:
         self.create_files("", files=["f1.f95"])
@@ -981,7 +981,7 @@ class TestCodegen(TestBase):
             ),
         )
         assert generated_via_hydrate_sources.snapshot.files == ("src/fortran/f.f95",)
-        assert generated_via_hydrate_sources.output_type == FortranSources
+        assert generated_via_hydrate_sources.sources_type == FortranSources
 
     def test_works_with_subclass_fields(self) -> None:
         class CustomAvroSources(AvroSources):
@@ -1010,7 +1010,7 @@ class TestCodegen(TestBase):
             ),
         )
         assert generated.snapshot.files == ()
-        assert generated.output_type is None
+        assert generated.sources_type is None
 
     def test_ambiguous_implementations_exception(self) -> None:
         # This error message is quite complex. We test that it correctly generates the message.

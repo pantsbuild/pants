@@ -1346,7 +1346,7 @@ class HydrateSourcesRequest:
 
         If you only want to handle certain Sources fields, such as only PythonSources, set
         `for_sources_types`. Any invalid sources will return a `HydratedSources` instance with an
-        empty snapshot and `output_type = None`.
+        empty snapshot and `sources_type = None`.
 
         If `enable_codegen` is set to `True`, any codegen sources will try to be converted to one
         of the `for_sources_types`.
@@ -1372,17 +1372,17 @@ class HydrateSourcesRequest:
 class HydratedSources:
     """The result of hydrating a SourcesField.
 
-    The `output_type` will indicate which of the `HydrateSourcesRequest.for_sources_type` the result
-    corresponds to, e.g. if the result comes from `FilesSources` vs. `PythonSources`. If this value
-    is None, then the input `Sources` field was not one of the expected types; or, when codegen was
-    enabled in the request, there was no valid code generator to generate the requested language
-    from the original input. This property allows for switching on the result, e.g. handling
-    hydrated files() sources differently than hydrated Python sources.
+    The `sources_type` will indicate which of the `HydrateSourcesRequest.for_sources_type` the
+    result corresponds to, e.g. if the result comes from `FilesSources` vs. `PythonSources`. If this
+    value is None, then the input `Sources` field was not one of the expected types; or, when
+    codegen was enabled in the request, there was no valid code generator to generate the requested
+    language from the original input. This property allows for switching on the result, e.g.
+    handling hydrated files() sources differently than hydrated Python sources.
     """
 
     snapshot: Snapshot
     filespec: Filespec
-    output_type: Optional[Type[Sources]]
+    sources_type: Optional[Type[Sources]]
 
     def eager_fileset_with_spec(self, *, address: Address) -> EagerFilesetWithSpec:
         return EagerFilesetWithSpec(address.spec_path, self.filespec, self.snapshot)
@@ -1467,7 +1467,7 @@ async def hydrate_sources(
         )
         return is_instance or can_be_generated
 
-    output_type = next(
+    sources_type = next(
         (
             valid_type
             for valid_type in request.for_sources_types
@@ -1475,14 +1475,14 @@ async def hydrate_sources(
         ),
         None,
     )
-    if output_type is None:
-        return HydratedSources(EMPTY_SNAPSHOT, sources_field.filespec, output_type=None)
+    if sources_type is None:
+        return HydratedSources(EMPTY_SNAPSHOT, sources_field.filespec, sources_type=None)
 
     # Now, hydrate the `globs`. Even if we are going to use codegen, we will need the original
     # protocol sources to be hydrated.
     globs = sources_field.sanitized_raw_value
     if globs is None:
-        return HydratedSources(EMPTY_SNAPSHOT, sources_field.filespec, output_type=output_type)
+        return HydratedSources(EMPTY_SNAPSHOT, sources_field.filespec, sources_type=sources_type)
 
     conjunction = (
         GlobExpansionConjunction.all_match
@@ -1507,13 +1507,13 @@ async def hydrate_sources(
 
     # Finally, return if codegen is not in use; otherwise, run the relevant code generator.
     if not request.enable_codegen or generate_request_type is None:
-        return HydratedSources(snapshot, sources_field.filespec, output_type=output_type)
+        return HydratedSources(snapshot, sources_field.filespec, sources_type=sources_type)
     wrapped_protocol_target = await Get[WrappedTarget](Address, sources_field.address)
     generated_sources = await Get[GeneratedSources](
         GenerateSourcesRequest, generate_request_type(snapshot, wrapped_protocol_target.target)
     )
     return HydratedSources(
-        generated_sources.snapshot, sources_field.filespec, output_type=output_type
+        generated_sources.snapshot, sources_field.filespec, sources_type=sources_type
     )
 
 
