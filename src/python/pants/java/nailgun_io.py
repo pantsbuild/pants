@@ -5,9 +5,7 @@ import io
 import os
 import select
 import threading
-from contextlib import contextmanager
-
-from contextlib2 import ExitStack
+from contextlib import ExitStack, contextmanager
 
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 

@@ -5,7 +5,7 @@ import itertools
 from dataclasses import dataclass
 
 from pants.backend.graph_info.subsystems.cloc_binary import ClocBinary
-from pants.binaries.binary_tool import BinaryToolFetchRequest
+from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.engine.console import Console
 from pants.engine.fs import (
     Digest,
@@ -14,12 +14,12 @@ from pants.engine.fs import (
     FilesContent,
     InputFilesContent,
     SingleFileExecutable,
-    Snapshot,
     SourcesSnapshots,
 )
 from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import goal_rule, rule, subsystem_rule
+from pants.engine.rules import goal_rule, subsystem_rule
 from pants.engine.selectors import Get
 
 
@@ -36,12 +36,6 @@ class DownloadedClocScript:
     @property
     def digest(self) -> Digest:
         return self.exe.directory_digest
-
-
-@rule
-async def download_cloc_script(cloc_binary_tool: ClocBinary) -> DownloadedClocScript:
-    snapshot = await Get[Snapshot](BinaryToolFetchRequest(cloc_binary_tool))
-    return DownloadedClocScript(SingleFileExecutable(snapshot))
 
 
 class CountLinesOfCodeOptions(GoalSubsystem):
@@ -68,11 +62,10 @@ class CountLinesOfCode(Goal):
 async def run_cloc(
     console: Console,
     options: CountLinesOfCodeOptions,
-    cloc_script: DownloadedClocScript,
+    cloc_binary: ClocBinary,
     sources_snapshots: SourcesSnapshots,
 ) -> CountLinesOfCode:
     """Runs the cloc perl script in an isolated process."""
-
     snapshots = [sources_snapshot.snapshot for sources_snapshot in sources_snapshots]
     file_content = "\n".join(
         sorted(set(itertools.chain.from_iterable(snapshot.files for snapshot in snapshots)))
@@ -85,11 +78,14 @@ async def run_cloc(
     input_file_digest = await Get[Digest](
         InputFilesContent([FileContent(path=input_files_filename, content=file_content)]),
     )
+    downloaded_cloc_binary = await Get[DownloadedExternalTool](
+        ExternalToolRequest, cloc_binary.get_request(Platform.current)
+    )
     digest = await Get[Digest](
         DirectoriesToMerge(
             (
                 input_file_digest,
-                cloc_script.digest,
+                downloaded_cloc_binary.digest,
                 *(snapshot.directory_digest for snapshot in snapshots),
             )
         )
@@ -100,7 +96,7 @@ async def run_cloc(
 
     cmd = (
         "/usr/bin/perl",
-        cloc_script.script_path,
+        downloaded_cloc_binary.exe,
         "--skip-uniqueness",  # Skip the file uniqueness check.
         f"--ignored={ignore_filename}",  # Write the names and reasons of ignored files to this file.
         f"--report-file={report_filename}",  # Write the output to this file rather than stdout.
@@ -132,6 +128,5 @@ async def run_cloc(
 def rules():
     return [
         run_cloc,
-        download_cloc_script,
         subsystem_rule(ClocBinary),
     ]

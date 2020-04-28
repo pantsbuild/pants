@@ -1306,37 +1306,37 @@ class Sources(AsyncField):
 @dataclass(unsafe_hash=True)
 class HydrateSourcesRequest:
     field: Sources
-    valid_sources_types: Tuple[Type[Sources], ...]
+    for_sources_types: Tuple[Type[Sources], ...]
     enable_codegen: bool
 
     def __init__(
         self,
         field: Sources,
         *,
-        valid_sources_types: Iterable[Type[Sources]] = (Sources,),
+        for_sources_types: Iterable[Type[Sources]] = (Sources,),
         enable_codegen: bool = False,
     ) -> None:
         """Convert raw sources globs into an instance of HydratedSources.
 
-        If you only want to convert certain Sources fields, such as only PythonSources, set
-        `valid_sources_types`. Any invalid sources will return an empty `HydratedSources` instance,
-        indicated by the attribute `output_type = None`.
+        If you only want to handle certain Sources fields, such as only PythonSources, set
+        `for_sources_types`. Any invalid sources will return a `HydratedSources` instance with an
+        empty snapshot and `output_type = None`.
 
         If `enable_codegen` is set to `True`, any codegen sources will try to be converted to one
-        of the `valid_sources_types`.
+        of the `for_sources_types`.
         """
         self.field = field
-        self.valid_sources_types = tuple(valid_sources_types)
+        self.for_sources_types = tuple(for_sources_types)
         self.enable_codegen = enable_codegen
         self.__post_init__()
 
     def __post_init__(self) -> None:
-        if self.enable_codegen and self.valid_sources_types == (Sources,):
+        if self.enable_codegen and self.for_sources_types == (Sources,):
             raise ValueError(
                 "When setting `enable_codegen=True` on `HydrateSourcesRequest`, you must also "
-                "explicitly set `valid_source_types`. Why? `valid_source_types` is used to "
+                "explicitly set `for_source_types`. Why? `for_source_types` is used to "
                 "determine which language(s) to try to generate. For example, "
-                "`valid_source_types=(PythonSources,)` will hydrate `PythonSources` like normal, "
+                "`for_source_types=(PythonSources,)` will hydrate `PythonSources` like normal, "
                 "and, if it encounters codegen sources that can be converted into Python, it will "
                 "generate Python files."
             )
@@ -1346,12 +1346,12 @@ class HydrateSourcesRequest:
 class HydratedSources:
     """The result of hydrating a SourcesField.
 
-    The `output_type` will indicate which of the `HydrateSourcesRequest.valid_sources_type` the
-    result corresponds to, e.g. if the result comes from `FilesSources` vs. `PythonSources`. If this
-    value is None, then the input `Sources` field was not one of the expected types; or, when
-    codegen was enabled in the request, there was no valid code generator to generate the requested
-    language from the original input. This property allows for switching on the result, e.g.
-    handling hydrated files() sources differently than hydrated Python sources.
+    The `output_type` will indicate which of the `HydrateSourcesRequest.for_sources_type` the result
+    corresponds to, e.g. if the result comes from `FilesSources` vs. `PythonSources`. If this value
+    is None, then the input `Sources` field was not one of the expected types; or, when codegen was
+    enabled in the request, there was no valid code generator to generate the requested language
+    from the original input. This property allows for switching on the result, e.g. handling
+    hydrated files() sources differently than hydrated Python sources.
     """
 
     snapshot: Snapshot
@@ -1422,13 +1422,13 @@ async def hydrate_sources(
         generate_request_type
         for generate_request_type in generate_request_types
         if isinstance(sources_field, generate_request_type.input)
-        and issubclass(generate_request_type.output, request.valid_sources_types)
+        and issubclass(generate_request_type.output, request.for_sources_types)
     ]
     if request.enable_codegen and len(relevant_generate_request_types) > 1:
         raise AmbiguousCodegenImplementationsException(relevant_generate_request_types)
     generate_request_type = next(iter(relevant_generate_request_types), None)
 
-    # Now, determine if any of the `valid_sources_types` may be used, either because the
+    # Now, determine if any of the `for_sources_types` may be used, either because the
     # sources_field is a direct subclass or can be generated into one of the valid types.
     def compatible_with_sources_field(valid_type: Type[Sources]) -> bool:
         is_instance = isinstance(sources_field, valid_type)
@@ -1442,7 +1442,7 @@ async def hydrate_sources(
     output_type = next(
         (
             valid_type
-            for valid_type in request.valid_sources_types
+            for valid_type in request.for_sources_types
             if compatible_with_sources_field(valid_type)
         ),
         None,

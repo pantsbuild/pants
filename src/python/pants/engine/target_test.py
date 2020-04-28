@@ -810,7 +810,7 @@ class TestSources(TestBase):
         valid_sources = SourcesSubclass(["*"], address=addr)
         hydrated_valid_sources = self.request_single_product(
             HydratedSources,
-            HydrateSourcesRequest(valid_sources, valid_sources_types=[SourcesSubclass]),
+            HydrateSourcesRequest(valid_sources, for_sources_types=[SourcesSubclass]),
         )
         assert hydrated_valid_sources.snapshot.files == ("f1.f95",)
         assert hydrated_valid_sources.output_type == SourcesSubclass
@@ -818,7 +818,7 @@ class TestSources(TestBase):
         invalid_sources = Sources(["*"], address=addr)
         hydrated_invalid_sources = self.request_single_product(
             HydratedSources,
-            HydrateSourcesRequest(invalid_sources, valid_sources_types=[SourcesSubclass]),
+            HydrateSourcesRequest(invalid_sources, for_sources_types=[SourcesSubclass]),
         )
         assert hydrated_invalid_sources.snapshot.files == ()
         assert hydrated_invalid_sources.output_type is None
@@ -976,7 +976,7 @@ class TestCodegen(TestBase):
         generated_via_hydrate_sources = self.request_single_product(
             HydratedSources,
             HydrateSourcesRequest(
-                protocol_sources, valid_sources_types=[FortranSources], enable_codegen=True
+                protocol_sources, for_sources_types=[FortranSources], enable_codegen=True
             ),
         )
         assert generated_via_hydrate_sources.snapshot.files == ("src/fortran/f.f95",)
@@ -991,7 +991,7 @@ class TestCodegen(TestBase):
         generated = self.request_single_product(
             HydratedSources,
             HydrateSourcesRequest(
-                protocol_sources, valid_sources_types=[FortranSources], enable_codegen=True
+                protocol_sources, for_sources_types=[FortranSources], enable_codegen=True
             ),
         )
         assert generated.snapshot.files == ("src/fortran/f.f95",)
@@ -1005,7 +1005,7 @@ class TestCodegen(TestBase):
         generated = self.request_single_product(
             HydratedSources,
             HydrateSourcesRequest(
-                protocol_sources, valid_sources_types=[SmalltalkSources], enable_codegen=True
+                protocol_sources, for_sources_types=[SmalltalkSources], enable_codegen=True
             ),
         )
         assert generated.snapshot.files == ()

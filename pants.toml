@@ -281,8 +281,11 @@ config = "%(buildroot)s/build-support/scalastyle/scalastyle_config.xml"
 [lint.scalastyle]
 excludes = "%(buildroot)s/build-support/scalastyle/excludes.txt"
 
+[protoc]
+version = "2.4.1"
+
 [protoc.gen.go-protobuf]
-version = "3.4.1"
+version = "3.11.4"
 
 [scala]
 version = 2.12
