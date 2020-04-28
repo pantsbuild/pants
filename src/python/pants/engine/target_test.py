@@ -952,9 +952,11 @@ class TestCodegen(TestBase):
         self.address = Address.parse("src/avro:lib")
         self.create_files("src/avro", files=["f.avro"])
         self.add_to_build_file("src/avro", "avro_library(name='lib', sources=['*.avro'])")
+        self.union_membership = self.request_single_product(UnionMembership, Params())
 
     def test_generate_sources(self) -> None:
         protocol_sources = AvroSources(["*.avro"], address=self.address)
+        assert protocol_sources.can_generate(FortranSources, self.union_membership) is True
 
         # First, get the original protocol sources.
         hydrated_protocol_sources = self.request_single_product(
@@ -985,6 +987,7 @@ class TestCodegen(TestBase):
             pass
 
         protocol_sources = CustomAvroSources(["*.avro"], address=self.address)
+        assert protocol_sources.can_generate(FortranSources, self.union_membership) is True
         generated = self.request_single_product(
             HydratedSources,
             HydrateSourcesRequest(
@@ -998,6 +1001,7 @@ class TestCodegen(TestBase):
             pass
 
         protocol_sources = AvroSources(["*.avro"], address=self.address)
+        assert protocol_sources.can_generate(SmalltalkSources, self.union_membership) is False
         generated = self.request_single_product(
             HydratedSources,
             HydrateSourcesRequest(

@@ -923,9 +923,11 @@ class AmbiguousImplementationsException(Exception):
 
 
 class AmbiguousCodegenImplementationsException(Exception):
-    """Exception for when there are multiple codegen implementations for the same path."""
+    """Exception for when there are multiple codegen implementations and it is ambiguous which to
+    use."""
 
-    def __init__(self, generators: Iterable[Type["GenerateSourcesRequest"]],) -> None:
+    # TODO: handle a) all the same generators and b) different generators
+    def __init__(self, generators: Iterable[Type["GenerateSourcesRequest"]]) -> None:
         example_generator = list(generators)[0]
         input = example_generator.input.__name__
         output = example_generator.output.__name__
@@ -1286,6 +1288,19 @@ class Sources(AsyncField):
             args=includes, exclude=[excludes], root=self.address.spec_path
         )
 
+    @final
+    @classmethod
+    def can_generate(cls, output_type: Type["Sources"], union_membership: UnionMembership) -> bool:
+        """Can this Sources field be used to generate the output_type?"""
+        generate_request_types: Iterable[
+            Type[GenerateSourcesRequest]
+        ] = union_membership.union_rules.get(GenerateSourcesRequest, ())
+        return any(
+            issubclass(cls, generate_request_type.input)
+            and issubclass(generate_request_type.output, output_type)
+            for generate_request_type in generate_request_types
+        )
+
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
@@ -1398,6 +1413,8 @@ async def hydrate_sources(
 
     # First, find if there are any code generators for the input `sources_field`. This will be used
     # to determine if the sources_field is valid or not.
+    # We could alternatively use `sources_field.can_generate()`, but we want to error if there are
+    # 2+ generators due to ambiguity.
     generate_request_types: Iterable[
         Type[GenerateSourcesRequest]
     ] = union_membership.union_rules.get(GenerateSourcesRequest, ())
