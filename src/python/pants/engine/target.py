@@ -1162,81 +1162,8 @@ class DictStringToStringSequenceField(PrimitiveField, metaclass=ABCMeta):
 
 
 # -----------------------------------------------------------------------------------------------
-# Common Fields used across most targets
+# Sources
 # -----------------------------------------------------------------------------------------------
-
-
-class Tags(StringSequenceField):
-    """Arbitrary strings that you can use to describe a target.
-
-    For example, you may tag some test targets with 'integration_test' so that you could run
-    `./pants --tags='integration_test' test ::` to only run on targets with that tag.
-    """
-
-    alias = "tags"
-
-
-class DescriptionField(StringField):
-    """A human-readable description of the target.
-
-    Use `./pants list --documented ::` to see all targets with descriptions.
-    """
-
-    alias = "description"
-
-
-# TODO(#9388): remove? We don't want this in V2, but maybe keep it for V1.
-class NoCacheField(BoolField):
-    """If True, don't store results for this target in the V1 cache."""
-
-    alias = "no_cache"
-    default = False
-    v1_only = True
-
-
-# TODO(#9388): remove?
-class ScopeField(StringField):
-    """A V1-only field for the scope of the target, which is used by the JVM to determine the
-    target's inclusion in the class path.
-
-    See `pants.build_graph.target_scopes.Scopes`.
-    """
-
-    alias = "scope"
-    v1_only = True
-
-
-# TODO(#9388): Remove.
-class IntransitiveField(BoolField):
-    alias = "_transitive"
-    default = False
-    v1_only = True
-
-
-COMMON_TARGET_FIELDS = (Tags, DescriptionField, NoCacheField, ScopeField, IntransitiveField)
-
-
-# NB: To hydrate the dependencies into Targets, use
-# `await Get[Targets](Addresses(tgt[Dependencies].value)`.
-class Dependencies(PrimitiveField):
-    """Addresses to other targets that this target depends on, e.g. `['src/python/project:lib']`."""
-
-    alias = "dependencies"
-    value: Optional[Tuple[Address, ...]]
-    default = None
-
-    # NB: The type hint for `raw_value` is a lie. While we do expect end-users to use
-    # Iterable[str], the Struct and Addressable code will have already converted those strings
-    # into a List[Address]. But, that's an implementation detail and we don't want our
-    # documentation, which is auto-generated from these type hints, to leak that.
-    @classmethod
-    def compute_value(
-        cls, raw_value: Optional[Iterable[str]], *, address: Address
-    ) -> Optional[Tuple[Address, ...]]:
-        value_or_default = super().compute_value(raw_value, address=address)
-        if value_or_default is None:
-            return None
-        return tuple(sorted(value_or_default))
 
 
 class Sources(AsyncField):
@@ -1343,15 +1270,39 @@ class Sources(AsyncField):
         )
 
 
-@dataclass(frozen=True)
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class HydrateSourcesRequest:
     field: Sources
+    for_sources_types: Tuple[Type[Sources], ...]
+
+    def __init__(
+        self, field: Sources, *, for_sources_types: Iterable[Type[Sources]] = (Sources,)
+    ) -> None:
+        """Convert raw sources globs into an instance of HydratedSources.
+
+        If you only want to handle certain Sources fields, such as only PythonSources, set
+        `for_sources_types`. Any invalid sources will return a `HydratedSources` instance with an
+        empty snapshot and `output_type = None`.
+        """
+        self.field = field
+        self.for_sources_types = tuple(for_sources_types)
 
 
 @dataclass(frozen=True)
 class HydratedSources:
+    """The result of hydrating a SourcesField.
+
+    The `output_type` will indicate which of the `HydrateSourcesRequest.valid_sources_type` the
+    result corresponds to, e.g. if the result comes from `FilesSources` vs. `PythonSources`. If this
+    value is None, then the input `Sources` field was not one of the expected types. This property
+    allows for switching on the result, e.g. handling hydrated files() sources differently than
+    hydrated Python sources.
+    """
+
     snapshot: Snapshot
     filespec: Filespec
+    output_type: Optional[Type[Sources]]
 
     def eager_fileset_with_spec(self, *, address: Address) -> EagerFilesetWithSpec:
         return EagerFilesetWithSpec(address.spec_path, self.filespec, self.snapshot)
@@ -1362,10 +1313,21 @@ async def hydrate_sources(
     request: HydrateSourcesRequest, glob_match_error_behavior: GlobMatchErrorBehavior
 ) -> HydratedSources:
     sources_field = request.field
-    globs = sources_field.sanitized_raw_value
 
+    output_type = next(
+        (
+            valid_type
+            for valid_type in request.for_sources_types
+            if isinstance(sources_field, valid_type)
+        ),
+        None,
+    )
+    if output_type is None:
+        return HydratedSources(EMPTY_SNAPSHOT, sources_field.filespec, output_type=None)
+
+    globs = sources_field.sanitized_raw_value
     if globs is None:
-        return HydratedSources(EMPTY_SNAPSHOT, sources_field.filespec)
+        return HydratedSources(EMPTY_SNAPSHOT, sources_field.filespec, output_type=output_type)
 
     conjunction = (
         GlobExpansionConjunction.all_match
@@ -1387,7 +1349,85 @@ async def hydrate_sources(
         )
     )
     sources_field.validate_snapshot(snapshot)
-    return HydratedSources(snapshot, sources_field.filespec)
+    return HydratedSources(snapshot, sources_field.filespec, output_type=output_type)
+
+
+# -----------------------------------------------------------------------------------------------
+# Other common Fields used across most targets
+# -----------------------------------------------------------------------------------------------
+
+
+class Tags(StringSequenceField):
+    """Arbitrary strings that you can use to describe a target.
+
+    For example, you may tag some test targets with 'integration_test' so that you could run
+    `./pants --tags='integration_test' test ::` to only run on targets with that tag.
+    """
+
+    alias = "tags"
+
+
+class DescriptionField(StringField):
+    """A human-readable description of the target.
+
+    Use `./pants list --documented ::` to see all targets with descriptions.
+    """
+
+    alias = "description"
+
+
+# TODO(#9388): remove? We don't want this in V2, but maybe keep it for V1.
+class NoCacheField(BoolField):
+    """If True, don't store results for this target in the V1 cache."""
+
+    alias = "no_cache"
+    default = False
+    v1_only = True
+
+
+# TODO(#9388): remove?
+class ScopeField(StringField):
+    """A V1-only field for the scope of the target, which is used by the JVM to determine the
+    target's inclusion in the class path.
+
+    See `pants.build_graph.target_scopes.Scopes`.
+    """
+
+    alias = "scope"
+    v1_only = True
+
+
+# TODO(#9388): Remove.
+class IntransitiveField(BoolField):
+    alias = "_transitive"
+    default = False
+    v1_only = True
+
+
+COMMON_TARGET_FIELDS = (Tags, DescriptionField, NoCacheField, ScopeField, IntransitiveField)
+
+
+# NB: To hydrate the dependencies into Targets, use
+# `await Get[Targets](Addresses(tgt[Dependencies].value)`.
+class Dependencies(PrimitiveField):
+    """Addresses to other targets that this target depends on, e.g. `['src/python/project:lib']`."""
+
+    alias = "dependencies"
+    value: Optional[Tuple[Address, ...]]
+    default = None
+
+    # NB: The type hint for `raw_value` is a lie. While we do expect end-users to use
+    # Iterable[str], the Struct and Addressable code will have already converted those strings
+    # into a List[Address]. But, that's an implementation detail and we don't want our
+    # documentation, which is auto-generated from these type hints, to leak that.
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Iterable[str]], *, address: Address
+    ) -> Optional[Tuple[Address, ...]]:
+        value_or_default = super().compute_value(raw_value, address=address)
+        if value_or_default is None:
+            return None
+        return tuple(sorted(value_or_default))
 
 
 # TODO: figure out what support looks like for this with the Target API. The expected value is an

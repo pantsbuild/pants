@@ -751,7 +751,7 @@ def test_dict_string_to_string_sequence_field() -> None:
 
 
 # -----------------------------------------------------------------------------------------------
-# Test common fields
+# Test Sources
 # -----------------------------------------------------------------------------------------------
 
 
@@ -790,6 +790,29 @@ class TestSources(TestBase):
             "globs": ["src/fortran/*.f03", "src/fortran/f1.f95"],
             "exclude": [{"globs": ["src/fortran/**/ignore*", "src/fortran/ignored.f03"]}],
         }
+
+    def test_output_type(self) -> None:
+        class SourcesSubclass(Sources):
+            pass
+
+        addr = Address.parse(":lib")
+        self.create_files("", files=["f1.f95"])
+
+        valid_sources = SourcesSubclass(["*"], address=addr)
+        hydrated_valid_sources = self.request_single_product(
+            HydratedSources,
+            HydrateSourcesRequest(valid_sources, for_sources_types=[SourcesSubclass]),
+        )
+        assert hydrated_valid_sources.snapshot.files == ("f1.f95",)
+        assert hydrated_valid_sources.output_type == SourcesSubclass
+
+        invalid_sources = Sources(["*"], address=addr)
+        hydrated_invalid_sources = self.request_single_product(
+            HydratedSources,
+            HydrateSourcesRequest(invalid_sources, for_sources_types=[SourcesSubclass]),
+        )
+        assert hydrated_invalid_sources.snapshot.files == ()
+        assert hydrated_invalid_sources.output_type is None
 
     def test_unmatched_globs(self) -> None:
         self.create_files("", files=["f1.f95"])

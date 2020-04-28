@@ -472,7 +472,11 @@ async def get_sources(
 ) -> SetupPySources:
     targets = request.targets
     stripped_srcs_list = await MultiGet(
-        Get[SourceRootStrippedSources](StripSourcesFieldRequest(target.get(Sources)))
+        Get[SourceRootStrippedSources](
+            StripSourcesFieldRequest(
+                target.get(Sources), for_sources_types=(PythonSources, ResourcesSources)
+            )
+        )
         for target in targets
     )
 
@@ -518,7 +522,9 @@ async def get_ancestor_init_py(
     """
     source_roots = source_root_config.get_source_roots()
     sources = await Get[SourceFiles](
-        AllSourceFilesRequest(tgt[PythonSources] for tgt in targets if tgt.has_field(PythonSources))
+        AllSourceFilesRequest(
+            (tgt.get(Sources) for tgt in targets), for_sources_types=(PythonSources,)
+        )
     )
     # Find the ancestors of all dirs containing .py files, including those dirs themselves.
     source_dir_ancestors: Set[Tuple[str, str]] = set()  # Items are (src_root, path incl. src_root).
