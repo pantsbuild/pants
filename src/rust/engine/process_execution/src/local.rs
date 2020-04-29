@@ -81,11 +81,12 @@ impl CommandRunner {
       .collect();
 
     // TODO: should we error when globs fail?
-    let output_globs = try_future!(PathGlobs::create(
-      &try_future!(output_paths),
+    let output_globs = try_future!(PathGlobs::new(
+      try_future!(output_paths),
       StrictGlobMatching::Ignore,
       GlobExpansionConjunction::AllMatch,
-    ));
+    )
+    .parse());
 
     Box::pin(async move {
       let path_stats = posix_fs
@@ -379,7 +380,7 @@ pub trait CapturedWorkdir {
           future::ok(store::Snapshot::empty()).to_boxed()
         } else {
           // Use no ignore patterns, because we are looking for explicitly listed paths.
-          future::done(fs::GitignoreStyleExcludes::create(&[]))
+          future::done(fs::GitignoreStyleExcludes::create(vec![]))
             .and_then(|ignorer| future::done(fs::PosixFS::new(workdir_path2, ignorer, executor)))
             .map_err(|err| {
               format!(

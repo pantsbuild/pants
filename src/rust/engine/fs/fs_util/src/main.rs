@@ -446,17 +446,20 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         ));
         let store_copy = store.clone();
         let paths = posix_fs
-          .expand(fs::PathGlobs::create(
-            &args
-              .values_of("globs")
-              .unwrap()
-              .map(str::to_string)
-              .collect::<Vec<String>>(),
-            // By using `Ignore`, we say that we don't care if some globs fail to expand. Is
-            // that a valid assumption?
-            fs::StrictGlobMatching::Ignore,
-            fs::GlobExpansionConjunction::AllMatch,
-          )?)
+          .expand(
+            fs::PathGlobs::new(
+              args
+                .values_of("globs")
+                .unwrap()
+                .map(str::to_string)
+                .collect::<Vec<String>>(),
+              // By using `Ignore`, we say that we don't care if some globs fail to expand. Is
+              // that a valid assumption?
+              fs::StrictGlobMatching::Ignore,
+              fs::GlobExpansionConjunction::AllMatch,
+            )
+            .parse()?,
+          )
           .await
           .map_err(|e| format!("Error expanding globs: {:?}", e))?;
 
@@ -652,7 +655,7 @@ fn make_posix_fs<P: AsRef<Path>>(executor: task_executor::Executor, root: P) -> 
   // Unwrapping the output of creating the git ignorer with no patterns is infallible.
   fs::PosixFS::new(
     &root,
-    fs::GitignoreStyleExcludes::create(&[]).unwrap(),
+    fs::GitignoreStyleExcludes::create(vec![]).unwrap(),
     executor,
   )
   .unwrap()

@@ -33,7 +33,7 @@ fn setup() -> (
   )
   .unwrap();
   let dir = tempfile::Builder::new().prefix("root").tempdir().unwrap();
-  let ignorer = GitignoreStyleExcludes::create(&[]).unwrap();
+  let ignorer = GitignoreStyleExcludes::create(vec![]).unwrap();
   let posix_fs = Arc::new(PosixFS::new(dir.path(), ignorer, executor).unwrap());
   let file_saver = OneOffStoreFileByDigest::new(store.clone(), posix_fs.clone());
   (store, dir, posix_fs, file_saver)
@@ -485,11 +485,12 @@ async fn expand_all_sorted(posix_fs: Arc<PosixFS>) -> Vec<PathStat> {
   let mut v = posix_fs
     .expand(
       // Don't error or warn if there are no paths matched -- that is a valid state.
-      PathGlobs::create(
-        &["**".to_owned()],
+      PathGlobs::new(
+        vec!["**".to_owned()],
         StrictGlobMatching::Ignore,
         GlobExpansionConjunction::AllMatch,
       )
+      .parse()
       .unwrap(),
     )
     .await
