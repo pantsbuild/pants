@@ -66,8 +66,9 @@ class MockLanguageTargets(LanguageFmtTargets, metaclass=ABCMeta):
         # not matter.
         digest = EMPTY_DIRECTORY_DIGEST
         return LanguageFmtResults(
-            (FmtResult(digest=digest, stdout=self.stdout(addresses), stderr=""),),
+            (FmtResult(digest=digest, stdout=self.stdout(addresses), stderr="", did_change=True),),
             combined_digest=digest,
+            did_change=True,
         )
 
 

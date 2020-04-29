@@ -95,6 +95,7 @@ class IsortIntegrationTest(TestBase):
         assert lint_result.stdout == ""
         assert fmt_result.stdout == ""
         assert fmt_result.digest == self.get_digest([self.good_source])
+        assert fmt_result.did_change is False
 
     def test_failing_source(self) -> None:
         target = self.make_target_with_origin([self.bad_source])
@@ -104,6 +105,7 @@ class IsortIntegrationTest(TestBase):
         assert "Fixing" in fmt_result.stdout
         assert "bad.py" in fmt_result.stdout
         assert fmt_result.digest == self.get_digest([self.fixed_bad_source])
+        assert fmt_result.did_change is True
 
     def test_mixed_sources(self) -> None:
         target = self.make_target_with_origin([self.good_source, self.bad_source])
@@ -114,6 +116,7 @@ class IsortIntegrationTest(TestBase):
         assert "Fixing" in fmt_result.stdout and "bad.py" in fmt_result.stdout
         assert "good.py" not in fmt_result.stdout
         assert fmt_result.digest == self.get_digest([self.good_source, self.fixed_bad_source])
+        assert fmt_result.did_change is True
 
     def test_multiple_targets(self) -> None:
         targets = [
@@ -127,6 +130,7 @@ class IsortIntegrationTest(TestBase):
         assert "Fixing" in fmt_result.stdout and "bad.py" in fmt_result.stdout
         assert "good.py" not in fmt_result.stdout
         assert fmt_result.digest == self.get_digest([self.good_source, self.fixed_bad_source])
+        assert fmt_result.did_change is True
 
     def test_precise_file_args(self) -> None:
         target = self.make_target_with_origin(
@@ -137,6 +141,7 @@ class IsortIntegrationTest(TestBase):
         assert lint_result.stdout == ""
         assert fmt_result.stdout == ""
         assert fmt_result.digest == self.get_digest([self.good_source, self.bad_source])
+        assert fmt_result.did_change is False
 
     def test_respects_config_file(self) -> None:
         target = self.make_target_with_origin([self.needs_config_source])
@@ -148,6 +153,7 @@ class IsortIntegrationTest(TestBase):
         assert "Fixing" in fmt_result.stdout
         assert "config.py" in fmt_result.stdout
         assert fmt_result.digest == self.get_digest([self.fixed_needs_config_source])
+        assert fmt_result.did_change is True
 
     def test_respects_passthrough_args(self) -> None:
         target = self.make_target_with_origin([self.needs_config_source])
@@ -157,9 +163,11 @@ class IsortIntegrationTest(TestBase):
         assert "Fixing" in fmt_result.stdout
         assert "config.py" in fmt_result.stdout
         assert fmt_result.digest == self.get_digest([self.fixed_needs_config_source])
+        assert fmt_result.did_change is True
 
     def test_skip(self) -> None:
         target = self.make_target_with_origin([self.bad_source])
         lint_result, fmt_result = self.run_isort([target], skip=True)
         assert lint_result == LintResult.noop()
         assert fmt_result == FmtResult.noop()
+        assert fmt_result.did_change is False

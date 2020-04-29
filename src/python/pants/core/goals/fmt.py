@@ -31,17 +31,21 @@ class FmtResult:
     digest: Digest
     stdout: str
     stderr: str
+    did_change: bool
 
     @staticmethod
     def noop() -> "FmtResult":
-        return FmtResult(digest=EMPTY_DIRECTORY_DIGEST, stdout="", stderr="")
+        return FmtResult(digest=EMPTY_DIRECTORY_DIGEST, stdout="", stderr="", did_change=False)
 
     @staticmethod
-    def from_process_result(process_result: ProcessResult) -> "FmtResult":
+    def from_process_result(
+        process_result: ProcessResult, *, original_digest: Digest
+    ) -> "FmtResult":
         return FmtResult(
             digest=process_result.output_directory_digest,
             stdout=process_result.stdout.decode(),
             stderr=process_result.stderr.decode(),
+            did_change=process_result.output_directory_digest != original_digest,
         )
 
 
@@ -96,6 +100,7 @@ class LanguageFmtResults:
 
     results: Tuple[FmtResult, ...]
     combined_digest: Digest
+    did_change: bool
 
 
 class FmtOptions(GoalSubsystem):
@@ -212,15 +217,18 @@ async def fmt(
     if not individual_results:
         return Fmt(exit_code=0)
 
-    # NB: this will fail if there are any conflicting changes, which we want to happen rather than
-    # silently having one result override the other. In practicality, this should never happen due
-    # to us grouping each language's formatters into a single combined_digest.
-    merged_formatted_digest = await Get[Digest](
-        DirectoriesToMerge(
-            tuple(language_result.combined_digest for language_result in per_language_results)
-        )
+    changed_combined_digests = tuple(
+        language_result.combined_digest
+        for language_result in per_language_results
+        if language_result.did_change
     )
-    workspace.materialize_directory(DirectoryToMaterialize(merged_formatted_digest))
+    if changed_combined_digests:
+        # NB: this will fail if there are any conflicting changes, which we want to happen rather
+        # than silently having one result override the other. In practicality, this should never
+        # happen due to us grouping each language's formatters into a single combined_digest.
+        merged_formatted_digest = await Get[Digest](DirectoriesToMerge(changed_combined_digests))
+        workspace.materialize_directory(DirectoryToMaterialize(merged_formatted_digest))
+
     for result in individual_results:
         if result.stdout:
             console.print_stdout(result.stdout)

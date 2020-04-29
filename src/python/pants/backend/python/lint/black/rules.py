@@ -56,6 +56,7 @@ class SetupRequest:
 @dataclass(frozen=True)
 class Setup:
     process: Process
+    original_digest: Digest
 
 
 def generate_args(
@@ -144,7 +145,7 @@ async def setup(
             f"Run Black on {pluralize(len(request.configs), 'target')}: {address_references}."
         ),
     )
-    return Setup(process)
+    return Setup(process, original_digest=all_source_files_snapshot.directory_digest)
 
 
 @named_rule(desc="Format using Black")
@@ -153,7 +154,7 @@ async def black_fmt(configs: BlackConfigurations, black: Black) -> FmtResult:
         return FmtResult.noop()
     setup = await Get[Setup](SetupRequest(configs, check_only=False))
     result = await Get[ProcessResult](Process, setup.process)
-    return FmtResult.from_process_result(result)
+    return FmtResult.from_process_result(result, original_digest=setup.original_digest)
 
 
 @named_rule(desc="Lint using Black")

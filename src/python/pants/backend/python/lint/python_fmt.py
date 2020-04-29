@@ -58,9 +58,14 @@ async def format_python_target(
         )
         if result != FmtResult.noop():
             results.append(result)
+        if result.did_change:
             prior_formatter_result = await Get[Snapshot](Digest, result.digest)
     return LanguageFmtResults(
-        tuple(results), combined_digest=prior_formatter_result.directory_digest
+        tuple(results),
+        combined_digest=prior_formatter_result.directory_digest,
+        did_change=(
+            prior_formatter_result.directory_digest != original_sources.snapshot.directory_digest
+        ),
     )
 
 
