@@ -53,7 +53,6 @@ struct Inner {
   watcher: RecommendedWatcher,
   executor: Executor,
   liveness: Receiver<String>,
-  enabled: bool,
   // Until the background task has started, contains the relevant inputs to launch it via
   // start_background_thread. The decoupling of creating the `InvalidationWatcher` and starting it
   // is to allow for testing of the background thread.
@@ -74,7 +73,6 @@ impl InvalidationWatcher {
     executor: Executor,
     build_root: PathBuf,
     ignorer: Arc<GitignoreStyleExcludes>,
-    enabled: bool,
   ) -> Result<Arc<InvalidationWatcher>, String> {
     // Inotify events contain canonical paths to the files being watched.
     // If the build_root contains a symlink the paths returned in notify events
@@ -87,28 +85,26 @@ impl InvalidationWatcher {
       .map_err(|e| format!("Failed to begin watching the filesystem: {}", e))?;
 
     let (liveness_sender, liveness_receiver) = crossbeam_channel::unbounded();
-    if enabled {
-      // On darwin the notify API is much more efficient if you watch the build root
-      // recursively, so we set up that watch here and then return early when watch() is
-      // called by nodes that are running. On Linux the notify crate handles adding paths to watch
-      // much more efficiently so we do that instead on Linux.
-      if cfg!(target_os = "macos") {
-        watcher
-          .watch(canonical_build_root.clone(), RecursiveMode::Recursive)
-          .map_err(|e| {
-            format!(
-              "Failed to begin recursively watching files in the build root: {}",
-              e
-            )
-          })?
-      }
+
+    // On darwin the notify API is much more efficient if you watch the build root
+    // recursively, so we set up that watch here and then return early when watch() is
+    // called by nodes that are running. On Linux the notify crate handles adding paths to watch
+    // much more efficiently so we do that instead on Linux.
+    if cfg!(target_os = "macos") {
+      watcher
+        .watch(canonical_build_root.clone(), RecursiveMode::Recursive)
+        .map_err(|e| {
+          format!(
+            "Failed to begin recursively watching files in the build root: {}",
+            e
+          )
+        })?
     }
 
     Ok(Arc::new(InvalidationWatcher(Mutex::new(Inner {
       watcher,
       executor,
       liveness: liveness_receiver,
-      enabled,
       background_task_inputs: Some((
         ignorer,
         canonical_build_root,
@@ -254,13 +250,14 @@ impl InvalidationWatcher {
   /// Add a path to the set of paths being watched by this invalidation watcher, non-recursively.
   ///
   pub async fn watch(self: &Arc<Self>, path: PathBuf) -> Result<(), notify::Error> {
+    if cfg!(target_os = "macos") {
+      // Short circuit here if we are on a Darwin platform because we should be watching
+      // the entire build root recursively already.
+      return Ok(());
+    }
+
     let executor = {
       let inner = self.0.lock();
-      if cfg!(target_os = "macos") || !inner.enabled {
-        // Short circuit here if we are on a Darwin platform because we should be watching
-        // the entire build root recursively already, or if we are not enabled.
-        return Ok(());
-      }
       inner.executor.clone()
     };
 
