@@ -55,6 +55,7 @@ use parking_lot::Mutex;
 use petgraph::graph::DiGraph;
 use petgraph::visit::EdgeRef;
 use petgraph::Direction;
+use tokio::time::delay_for;
 
 pub use crate::node::{EntryId, Node, NodeContext, NodeError, NodeTracer, NodeVisualizer};
 use boxfuture::{BoxFuture, Boxable};
@@ -324,8 +325,11 @@ impl<N: Node> InnerGraph<N> {
     let root_ids: HashSet<_, FNV> = self
       .nodes
       .iter()
-      .filter_map(|(entry, &entry_id)| {
-        if predicate(entry) {
+      .filter_map(|(node, &entry_id)| {
+        // A NotStarted entry does not need clearing, and we can assume that its dependencies are
+        // either already dirtied, or have never observed a value for it. Filtering these redundant
+        // events helps to "debounce" invalidation (ie, avoid redundent re-dirtying of dependencies).
+        if predicate(node) && self.unsafe_entry_for_id(entry_id).is_started() {
           Some(entry_id)
         } else {
           None
@@ -725,6 +729,7 @@ impl<N: Node> Graph<N> {
     &self,
     node: N,
     token: Option<LastObserved>,
+    delay: Option<Duration>,
     context: &N::Context,
   ) -> Result<(N::Item, LastObserved), N::Error> {
     // If the node is currently clean at the given token, Entry::poll will delay until it has
@@ -739,7 +744,10 @@ impl<N: Node> Graph<N> {
         .poll(context, generation)
         .compat()
         .await
-        .expect("Poll is infalliable.");
+        .expect("Polling is infalliable");
+      if let Some(delay) = delay {
+        delay_for(delay).await;
+      }
     };
 
     // Re-request the Node.

@@ -36,7 +36,7 @@ use std::time::Duration;
 
 use crossbeam_channel::{self, Receiver, RecvTimeoutError, TryRecvError};
 use fs::GitignoreStyleExcludes;
-use log::{debug, warn};
+use log::{debug, trace, warn};
 use logging;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use parking_lot::Mutex;
@@ -179,7 +179,7 @@ impl InvalidationWatcher {
                   &path_relative_to_build_root,
                   /* is_dir */ false,
                 ) {
-                  debug!("notify ignoring {:?}", path_relative_to_build_root);
+                  trace!("notify ignoring {:?}", path_relative_to_build_root);
                   None
                 } else {
                   Some(path_relative_to_build_root)

@@ -58,8 +58,8 @@ impl Generation {
 /// same values as they did when this Node was last run; if so, the value can be re-used
 /// (and should be marked "Clean").
 ///
-/// If the value is Uncacheable it may only be consumed in the Session that produced it, and should
-/// be recomputed in a new Session.
+/// If the value is Uncacheable it may only be consumed in the same Run that produced it, and should
+/// be recomputed in a new Run.
 ///
 /// A value of type UncacheableDependencies has Uncacheable dependencies, and is treated as
 /// equivalent to Dirty in all cases except when `poll`d: since `poll` requests are waiting for
@@ -75,7 +75,7 @@ pub enum EntryResult<N: Node> {
   Dirty(Result<N::Item, N::Error>),
   Uncacheable(
     Result<N::Item, N::Error>,
-    <<N as Node>::Context as NodeContext>::SessionId,
+    <<N as Node>::Context as NodeContext>::RunId,
   ),
 }
 
@@ -83,7 +83,7 @@ impl<N: Node> EntryResult<N> {
   fn is_clean(&self, context: &N::Context) -> bool {
     match self {
       EntryResult::Clean(..) => true,
-      EntryResult::Uncacheable(_, session_id) => context.session_id() == session_id,
+      EntryResult::Uncacheable(_, run_id) => context.run_id() == run_id,
       EntryResult::Dirty(..) => false,
       EntryResult::UncacheableDependencies(..) => false,
     }
@@ -100,7 +100,7 @@ impl<N: Node> EntryResult<N> {
   /// currently to clean it).
   fn poll_should_wait(&self, context: &N::Context) -> bool {
     match self {
-      EntryResult::Uncacheable(_, session_id) => context.session_id() == session_id,
+      EntryResult::Uncacheable(_, run_id) => context.run_id() == run_id,
       EntryResult::Dirty(..) => false,
       EntryResult::UncacheableDependencies(_) | EntryResult::Clean(..) => true,
     }
@@ -438,7 +438,7 @@ impl<N: Node> Entry<N> {
           // will cause it to re-run if the dep_generations mismatch).
           //
           // On the other hand, if the Node is uncacheable, we store the previous result as
-          // Uncacheable, which allows its value to be used only within the current Session.
+          // Uncacheable, which allows its value to be used only within the current Run.
           Self::run(
             context,
             &self.node,
@@ -549,7 +549,7 @@ impl<N: Node> Entry<N> {
           // If the new result does not match the previous result, the generation increments.
           let (generation, next_result) = if let Some(result) = result {
             let next_result = if !self.node.cacheable() {
-              EntryResult::Uncacheable(result, context.session_id().clone())
+              EntryResult::Uncacheable(result, context.run_id().clone())
             } else if has_uncacheable_deps {
               EntryResult::UncacheableDependencies(result)
             } else {
@@ -707,6 +707,13 @@ impl<N: Node> Entry<N> {
         result.dirty();
       }
       &mut EntryState::NotStarted { .. } => {}
+    }
+  }
+
+  pub fn is_started(&self) -> bool {
+    match *self.state.lock() {
+      EntryState::NotStarted { .. } => false,
+      EntryState::Completed { .. } | EntryState::Running { .. } => true,
     }
   }
 

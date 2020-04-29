@@ -51,8 +51,16 @@ struct InnerSession {
   should_record_zipkin_spans: bool,
   // A place to store info about workunits in rust part
   workunit_store: WorkUnitStore,
-  // The unique id for this run. Used as the id of the session, and for metrics gathering purposes.
+  // The unique id for this Session: used for metrics gathering purposes.
   build_id: String,
+  // An id used to control the visibility of uncacheable rules. Generally this is identical for an
+  // entire Session, but in some cases (in particular, a `--loop`) the caller wants to retain the
+  // same Session while still observing new values for uncacheable rules like Goals.
+  //
+  // TODO: Figure out how the `--loop` interplays with metrics. It's possible that for metrics
+  // purposes, each iteration of a loop should be considered to be a new Session, but for now the
+  // Session/build_id would be stable.
+  run_id: Mutex<Uuid>,
   should_report_workunits: bool,
 }
 
@@ -82,6 +90,7 @@ impl Session {
       should_record_zipkin_spans,
       workunit_store: WorkUnitStore::new(),
       build_id,
+      run_id: Mutex::new(Uuid::new_v4()),
       should_report_workunits,
     };
     Session(Arc::new(inner_session))
@@ -96,7 +105,10 @@ impl Session {
     let roots = self.0.roots.lock();
     inputs
       .iter()
-      .map(|root| (root.clone(), roots.get(root).cloned().unwrap_or(None)))
+      .map(|root| {
+        let last_observed = roots.get(root).cloned().unwrap_or(None);
+        (root.clone(), last_observed)
+      })
       .collect()
   }
 
@@ -127,6 +139,16 @@ impl Session {
 
   pub fn build_id(&self) -> &String {
     &self.0.build_id
+  }
+
+  pub fn run_id(&self) -> Uuid {
+    let run_id = self.0.run_id.lock();
+    *run_id
+  }
+
+  pub fn new_run_id(&self) {
+    let mut run_id = self.0.run_id.lock();
+    *run_id = Uuid::new_v4();
   }
 
   pub fn write_stdout(&self, msg: &str) {
@@ -176,9 +198,13 @@ pub struct ExecutionRequest {
   // complete. The second request will check whether the roots have changed, and if they haven't
   // changed, will wait until they have (or until the timeout elapses) before re-requesting them.
   //
-  // TODO: The "all" roots behavior is a bit peculiar, but was easiest to expose with the existing
-  // API.  In general, polled requests will probably only be for a single root.
+  // TODO: The `poll`, `poll_delay`, and `timeout` parameters exist to support a coarse-grained API
+  // for synchronous Node-watching to Python. Rather than further expanding this `execute` API, we
+  // should likely port those usecases to rust.
   pub poll: bool,
+  // If poll is set, a delay to apply after having noticed that Nodes have changed and before
+  // requesting them.
+  pub poll_delay: Option<Duration>,
   // A timeout applied globally to the request. When a request times out, work is _not_ cancelled,
   // and will continue to completion in the background.
   pub timeout: Option<Duration>,
@@ -189,6 +215,7 @@ impl ExecutionRequest {
     ExecutionRequest {
       roots: Vec::new(),
       poll: false,
+      poll_delay: None,
       timeout: None,
     }
   }
@@ -322,12 +349,13 @@ impl Scheduler {
     root: Root,
     last_observed: Option<LastObserved>,
     poll: bool,
+    poll_delay: Option<Duration>,
   ) -> ObservedValueResult {
     let (result, last_observed) = if poll {
       let (result, last_observed) = context
         .core
         .graph
-        .poll(root.into(), last_observed, &context)
+        .poll(root.into(), last_observed, poll_delay, &context)
         .await?;
       (result, Some(last_observed))
     } else {
@@ -354,17 +382,23 @@ impl Scheduler {
   /// on a Future.
   ///
   fn execute_helper(
-    context: Context,
+    &self,
+    request: &ExecutionRequest,
+    session: &Session,
     sender: mpsc::Sender<Vec<ObservedValueResult>>,
-    roots: Vec<(Root, Option<LastObserved>)>,
-    poll: bool,
   ) {
+    let context = Context::new(self.core.clone(), session.clone());
+    let roots = session.zip_last_observed(&request.roots);
+    let poll = request.poll;
+    let poll_delay = request.poll_delay;
     let core = context.core.clone();
     let _join = core.executor.spawn(async move {
       let res = future::join_all(
         roots
           .into_iter()
-          .map(|(root, last_observed)| Self::poll_or_create(&context, root, last_observed, poll))
+          .map(|(root, last_observed)| {
+            Self::poll_or_create(&context, root, last_observed, poll, poll_delay)
+          })
           .collect::<Vec<_>>(),
       )
       .await;
@@ -406,18 +440,16 @@ impl Scheduler {
     request: &ExecutionRequest,
     session: &Session,
   ) -> Result<Vec<Result<Value, Failure>>, ExecutionTermination> {
-    debug!("Launching {} roots.", request.roots.len());
+    debug!(
+      "Launching {} roots (poll={}).",
+      request.roots.len(),
+      request.poll
+    );
 
     // Spawn and wait for all roots to complete. Failure here should be impossible, because each
     // individual Future in the join was (eventually) mapped into success.
-    let context = Context::new(self.core.clone(), session.clone());
     let (sender, receiver) = mpsc::channel();
-    Scheduler::execute_helper(
-      context,
-      sender,
-      session.zip_last_observed(&request.roots),
-      request.poll,
-    );
+    self.execute_helper(request, session, sender);
 
     // This map keeps the k most relevant jobs in assigned possitions.
     // Keys are positions in the display (display workers) and the values are the actual jobs to print.

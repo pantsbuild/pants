@@ -179,12 +179,18 @@ class LegacyGraphScheduler:
     goal_map: Any
 
     def new_session(
-        self, zipkin_trace_v2, build_id, v2_ui=False, should_report_workunits=False
+        self,
+        zipkin_trace_v2,
+        build_id,
+        v2_ui=False,
+        use_colors=True,
+        should_report_workunits=False,
     ) -> "LegacyGraphSession":
         session = self.scheduler.new_session(
             zipkin_trace_v2, build_id, v2_ui, should_report_workunits
         )
-        return LegacyGraphSession(session, self.build_file_aliases, self.goal_map)
+        console = Console(use_colors=use_colors, session=session if v2_ui else None,)
+        return LegacyGraphSession(session, console, self.build_file_aliases, self.goal_map)
 
 
 @dataclass(frozen=True)
@@ -192,6 +198,7 @@ class LegacyGraphSession:
     """A thin wrapper around a SchedulerSession configured with @rules for a symbol table."""
 
     scheduler_session: SchedulerSession
+    console: Console
     build_file_aliases: Any
     goal_map: Any
 
@@ -212,6 +219,8 @@ class LegacyGraphSession:
         options: Options,
         goals: Iterable[str],
         specs: Specs,
+        poll: bool = False,
+        poll_delay: Optional[float] = None,
     ) -> int:
         """Runs @goal_rules sequentially and interactively by requesting their implicit Goal
         products.
@@ -221,12 +230,6 @@ class LegacyGraphSession:
         :returns: An exit code.
         """
 
-        global_options = options.for_global_scope()
-
-        console = Console(
-            use_colors=global_options.colors,
-            session=self.scheduler_session if global_options.get("v2_ui") else None,
-        )
         workspace = Workspace(self.scheduler_session)
         interactive_runner = InteractiveRunner(self.scheduler_session)
 
@@ -242,13 +245,19 @@ class LegacyGraphSession:
             if not is_implemented:
                 continue
             params = Params(
-                specs.provided_specs, options_bootstrapper, console, workspace, interactive_runner,
+                specs.provided_specs,
+                options_bootstrapper,
+                self.console,
+                workspace,
+                interactive_runner,
             )
             logger.debug(f"requesting {goal_product} to satisfy execution of `{goal}` goal")
             try:
-                exit_code = self.scheduler_session.run_goal_rule(goal_product, params)
+                exit_code = self.scheduler_session.run_goal_rule(
+                    goal_product, params, poll=poll, poll_delay=poll_delay
+                )
             finally:
-                console.flush()
+                self.console.flush()
 
             if exit_code != PANTS_SUCCEEDED_EXIT_CODE:
                 return exit_code

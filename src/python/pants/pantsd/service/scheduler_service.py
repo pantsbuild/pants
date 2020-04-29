@@ -2,13 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-import threading
 from typing import List, Optional, Tuple, cast
 
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import Specs
 from pants.engine.fs import PathGlobs, Snapshot
-from pants.engine.internals.scheduler import ExecutionTimeoutError
+from pants.engine.internals.scheduler import ExecutionError, ExecutionTimeoutError
 from pants.engine.unions import UnionMembership
 from pants.goal.run_tracker import RunTracker
 from pants.init.engine_initializer import LegacyGraphScheduler, LegacyGraphSession
@@ -65,8 +64,6 @@ class SchedulerService(PantsService):
             tuple(invalidation_globs),
             None,
         )
-
-        self._loop_condition = LoopCondition()
 
     def _get_snapshot(self, globs: Tuple[str, ...], poll: bool) -> Optional[Snapshot]:
         """Returns a Snapshot of the input globs.
@@ -157,8 +154,11 @@ class SchedulerService(PantsService):
         global_options = options.for_global_scope()
         build_id = RunTracker.global_instance().run_id
         v2_ui = global_options.get("v2_ui", False)
+        use_colors = global_options.get("colors", True)
         zipkin_trace_v2 = options.for_scope("reporting").zipkin_trace_v2
-        return self._graph_helper.new_session(zipkin_trace_v2, build_id, v2_ui)
+        return self._graph_helper.new_session(
+            zipkin_trace_v2, build_id, v2_ui=v2_ui, use_colors=use_colors
+        )
 
     def graph_run_v2(
         self,
@@ -177,24 +177,20 @@ class SchedulerService(PantsService):
         v2 = global_options.v2
 
         if not perform_loop:
-            return self._body(session, options, options_bootstrapper, specs, v2)
+            return self._body(session, options, options_bootstrapper, specs, v2, poll=False)
 
         iterations = global_options.loop_max
         exit_code = PANTS_SUCCEEDED_EXIT_CODE
 
         while iterations and not self._state.is_terminating:
+            # NB: We generate a new "run id" per iteration of the loop in order to allow us to
+            # observe fresh values for Goals. See notes in `scheduler.rs`.
+            session.scheduler_session.new_run_id()
             try:
-                exit_code = self._body(session, options, options_bootstrapper, specs, v2)
-            except session.scheduler_session.execution_error_type as e:
+                exit_code = self._body(session, options, options_bootstrapper, specs, v2, poll=True)
+            except ExecutionError as e:
                 self._logger.warning(e)
-
             iterations -= 1
-            while (
-                iterations
-                and not self._state.is_terminating
-                and not self._loop_condition.wait(timeout=1)
-            ):
-                continue
 
         return exit_code
 
@@ -205,6 +201,7 @@ class SchedulerService(PantsService):
         options_bootstrapper: OptionsBootstrapper,
         specs: Specs,
         v2: bool,
+        poll: bool,
     ) -> int:
         exit_code = PANTS_SUCCEEDED_EXIT_CODE
 
@@ -213,13 +210,16 @@ class SchedulerService(PantsService):
         if v2_goals or (ambiguous_goals and v2):
             goals = v2_goals + (ambiguous_goals if v2 else tuple())
 
-            # N.B. @goal_rules run pre-fork in order to cache the products they request during execution.
+            # When polling we use a delay (only applied in cases where we have waited for something
+            # to do) in order to avoid re-running too quickly when changes arrive in clusters.
             exit_code = session.run_goal_rules(
                 options_bootstrapper=options_bootstrapper,
                 union_membership=self._union_membership,
                 options=options,
                 goals=goals,
                 specs=specs,
+                poll=poll,
+                poll_delay=(0.1 if poll else None),
             )
 
         return exit_code
@@ -231,33 +231,3 @@ class SchedulerService(PantsService):
             self._check_invalidation_watcher_liveness()
             # NB: This is a long poll that will keep us from looping too quickly here.
             self._check_invalidation_globs(poll=True)
-
-
-class LoopCondition:
-    """A wrapped condition variable to handle deciding when loop consumers should re-run.
-
-    Any number of threads may wait and/or notify the condition.
-    """
-
-    def __init__(self):
-        super().__init__()
-        self._condition = threading.Condition(threading.Lock())
-        self._iteration = 0
-
-    def notify_all(self):
-        """Notifies all threads waiting for the condition."""
-        with self._condition:
-            self._iteration += 1
-            self._condition.notify_all()
-
-    def wait(self, timeout):
-        """Waits for the condition for at most the given timeout and returns True if the condition
-        triggered.
-
-        Generally called in a loop until the condition triggers.
-        """
-
-        with self._condition:
-            previous_iteration = self._iteration
-            self._condition.wait(timeout)
-            return previous_iteration != self._iteration

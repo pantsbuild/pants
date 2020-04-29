@@ -285,6 +285,10 @@ class Scheduler:
     def execution_set_poll(self, execution_request, poll: bool):
         self._native.lib.execution_set_poll(execution_request, poll)
 
+    def execution_set_poll_delay(self, execution_request, poll_delay: float):
+        poll_delay_in_ms = int(poll_delay * 1000)
+        self._native.lib.execution_set_poll_delay(execution_request, poll_delay_in_ms)
+
     @property
     def visualize_to_dir(self):
         return self._visualize_to_dir
@@ -380,8 +384,6 @@ class SchedulerSession:
     Session.
     """
 
-    execution_error_type = ExecutionError
-
     def __init__(self, scheduler, session):
         self._scheduler = scheduler
         self._session = session
@@ -396,6 +398,15 @@ class SchedulerSession:
 
     def graph_len(self):
         return self._scheduler.graph_len()
+
+    def new_run_id(self):
+        """Assigns a new "run id" to this Session, without creating a new Session.
+
+        Usually each Session corresponds to one end user "run", but there are exceptions: notably,
+        the `--loop` feature uses one Session, but would like to observe new values for uncacheable
+        nodes in each iteration of its loop.
+        """
+        self._scheduler._native.lib.session_new_run_id(self._session)
 
     def trace(self, execution_request):
         """Yields a stringified 'stacktrace' starting from the scheduler's roots."""
@@ -417,6 +428,7 @@ class SchedulerSession:
         products: Sequence[Type],
         subjects: Sequence[Union[Any, Params]],
         poll: bool = False,
+        poll_delay: Optional[float] = None,
         timeout: Optional[float] = None,
     ) -> ExecutionRequest:
         """Create and return an ExecutionRequest for the given products and subjects.
@@ -430,6 +442,8 @@ class SchedulerSession:
         :param subjects: A list of singleton input parameters or Params instances.
         :param poll: True to wait for _all_ of the given roots to
           have changed since their last observed values in this SchedulerSession.
+        :param poll_delay: A delay (in seconds) to wait after observing a change, and before
+          beginning to compute a new value.
         :param timeout: An optional timeout to wait for the request to complete (in seconds). If the
           request has not completed before the timeout has elapsed, ExecutionTimeoutError is raised.
         :returns: An ExecutionRequest for the given products and subjects.
@@ -440,6 +454,8 @@ class SchedulerSession:
             self._scheduler.execution_add_root_select(native_execution_request, subject, product)
         if timeout:
             self._scheduler.execution_set_timeout(native_execution_request, timeout)
+        if poll_delay:
+            self._scheduler.execution_set_poll_delay(native_execution_request, poll_delay)
         self._scheduler.execution_set_poll(native_execution_request, poll)
         return ExecutionRequest(request_specs, native_execution_request)
 
@@ -518,11 +534,18 @@ class SchedulerSession:
                 unique_exceptions,
             )
 
-    def run_goal_rule(self, product: Type, subject: Union[Any, Params], poll: bool = False) -> int:
+    def run_goal_rule(
+        self,
+        product: Type,
+        subject: Union[Any, Params],
+        poll: bool = False,
+        poll_delay: Optional[float] = None,
+    ) -> int:
         """
         :param product: A Goal subtype.
         :param subject: subject for the request.
         :param poll: See self.execution_request.
+        :param poll_delay: See self.execution_request.
         :returns: An exit_code for the given Goal.
         """
         if self._scheduler.visualize_to_dir is not None:
@@ -534,7 +557,7 @@ class SchedulerSession:
                 product,
             )
 
-        request = self.execution_request([product], [subject], poll=poll)
+        request = self.execution_request([product], [subject], poll=poll, poll_delay=poll_delay)
         returns, throws = self.execute(request)
 
         if throws:

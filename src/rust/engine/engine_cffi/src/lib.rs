@@ -633,6 +633,16 @@ pub extern "C" fn execution_set_poll(execution_request_ptr: *mut ExecutionReques
 }
 
 #[no_mangle]
+pub extern "C" fn execution_set_poll_delay(
+  execution_request_ptr: *mut ExecutionRequest,
+  poll_delay_in_ms: u64,
+) {
+  with_execution_request(execution_request_ptr, |execution_request| {
+    execution_request.poll_delay = Some(Duration::from_millis(poll_delay_in_ms));
+  })
+}
+
+#[no_mangle]
 pub extern "C" fn execution_set_timeout(
   execution_request_ptr: *mut ExecutionRequest,
   timeout_in_ms: u64,
@@ -821,6 +831,11 @@ pub extern "C" fn session_create(
       should_report_workunits,
     )))
   })
+}
+
+#[no_mangle]
+pub extern "C" fn session_new_run_id(session_ptr: *mut Session) {
+  with_session(session_ptr, |session| session.new_run_id())
 }
 
 #[no_mangle]
