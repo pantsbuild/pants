@@ -4,7 +4,8 @@
 from textwrap import dedent
 
 # TODO: Create a dummy target type in this test and remove this dep.
-from pants.backend.jvm.targets.java_library import JavaLibrary
+from pants.backend.jvm.target_types import JavaLibrary
+from pants.backend.jvm.targets.java_library import JavaLibrary as JavaLibraryV1
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.testutil.test_base import TestBase
@@ -13,7 +14,11 @@ from pants.testutil.test_base import TestBase
 class SourceMapperTest(TestBase):
     @classmethod
     def alias_groups(cls):
-        return BuildFileAliases(targets={"java_library": JavaLibrary})
+        return BuildFileAliases(targets={"java_library": JavaLibraryV1})
+
+    @classmethod
+    def target_types(cls):
+        return [JavaLibrary]
 
     def owner(self, owner, f):
         request = OwnersRequest(sources=(f,))
