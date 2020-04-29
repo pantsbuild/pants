@@ -100,7 +100,7 @@ async def generate_python_from_protobuf(
                 downloaded_protoc_binary.exe,
                 "--python_out",
                 output_dir,
-                *sorted(stripped_target_sources.snapshot.files),
+                *stripped_target_sources.snapshot.files,
             ),
             input_files=input_digest,
             description=f"Generating Python sources from {request.protocol_target.address}.",
