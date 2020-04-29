@@ -399,7 +399,7 @@ fn make_core(
   )
 }
 
-fn started_workunit_to_py_value(started_workunit: &StartedWorkUnit) -> Value {
+fn started_workunit_to_py_value(started_workunit: &StartedWorkUnit) -> Option<Value> {
   use std::time::UNIX_EPOCH;
   let duration = started_workunit
     .start_time
@@ -438,10 +438,10 @@ fn started_workunit_to_py_value(started_workunit: &StartedWorkUnit) -> Value {
     ));
   }
 
-  externs::store_dict(&dict_entries.as_slice())
+  Some(externs::store_dict(&dict_entries.as_slice()))
 }
 
-fn workunit_to_py_value(workunit: &WorkUnit) -> Value {
+fn workunit_to_py_value(workunit: &WorkUnit) -> Option<Value> {
   let mut dict_entries = vec![
     (
       externs::store_utf8("name"),
@@ -482,12 +482,12 @@ fn workunit_to_py_value(workunit: &WorkUnit) -> Value {
     ));
   }
 
-  externs::store_dict(&dict_entries.as_slice())
+  Some(externs::store_dict(&dict_entries.as_slice()))
 }
 
 fn workunits_to_py_tuple_value<'a>(workunits: impl Iterator<Item = &'a WorkUnit>) -> Value {
   let workunit_values = workunits
-    .map(|workunit: &WorkUnit| workunit_to_py_value(workunit))
+    .flat_map(|workunit: &WorkUnit| workunit_to_py_value(workunit))
     .collect::<Vec<_>>();
   externs::store_tuple(&workunit_values)
 }
@@ -496,7 +496,7 @@ fn started_workunits_to_py_tuple_value<'a>(
   workunits: impl Iterator<Item = &'a StartedWorkUnit>,
 ) -> Value {
   let workunit_values = workunits
-    .map(|started_workunit: &StartedWorkUnit| started_workunit_to_py_value(started_workunit))
+    .flat_map(|started_workunit: &StartedWorkUnit| started_workunit_to_py_value(started_workunit))
     .collect::<Vec<_>>();
   externs::store_tuple(&workunit_values)
 }
