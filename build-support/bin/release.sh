@@ -633,7 +633,8 @@ function publish_packages() {
   # Fetch unstable wheels, rename any linux whls to manylinux, and reversion them
   # from PANTS_UNSTABLE_VERSION to PANTS_STABLE_VERSION
   fetch_and_check_prebuilt_wheels "${DEPLOY_DIR}"
-  adjust_wheel_platform "linux_x86_64" "manylinux1_x86_64" \
+  # See https://www.python.org/dev/peps/pep-0599/. We build on Centos7 so use manylinux2014.
+  adjust_wheel_platform "linux_x86_64" "manylinux2014_x86_64" \
     "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}"
   reversion_whls \
     "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}" \
