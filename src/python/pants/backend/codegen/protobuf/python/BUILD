@@ -7,6 +7,7 @@ python_library(
     'src/python/pants/backend/codegen/protobuf/subsystems',
     'src/python/pants/backend/python:target_types',
     'src/python/pants/core/util_rules',
+    'src/python/pants/engine:addresses',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:platform',
     'src/python/pants/engine:process',
@@ -14,5 +15,19 @@ python_library(
     'src/python/pants/engine:rules',
     'src/python/pants/engine:unions',
   ],
-  tags = {"partially_type_checked"},
+  tags = {"type_checked"},
+)
+
+python_tests(
+  name="tests",
+  dependencies = [
+    ':python',
+    'src/python/pants/backend/codegen/protobuf',
+    'src/python/pants/engine:addresses',
+    'src/python/pants/engine:rules',
+    'src/python/pants/engine:target',
+    'src/python/pants/testutil:test_base',
+    'src/python/pants/testutil/option',
+  ],
+  tags = {"type_checked"},
 )
