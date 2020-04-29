@@ -57,18 +57,23 @@ class MockLanguageTargets(LanguageFmtTargets, metaclass=ABCMeta):
     def stdout(_: Iterable[Address]) -> str:
         pass
 
-    @property
-    def language_fmt_results(self) -> LanguageFmtResults:
+    def language_fmt_results(self, result_digest: Digest) -> LanguageFmtResults:
         addresses = [
             target_with_origin.target.address for target_with_origin in self.targets_with_origins
         ]
-        # NB: Due to mocking `await Get[Digest](DirectoriesToMerge), the digest we use here does
-        # not matter.
-        digest = EMPTY_DIRECTORY_DIGEST
+        # NB: For these tests, we only care that
+        # LanguageFmtResults.input != LanguageFmtResults.output so that we write to the build root.
         return LanguageFmtResults(
-            (FmtResult(digest=digest, stdout=self.stdout(addresses), stderr="", did_change=True),),
-            combined_digest=digest,
-            did_change=True,
+            (
+                FmtResult(
+                    input=EMPTY_DIRECTORY_DIGEST,
+                    output=EMPTY_DIRECTORY_DIGEST,
+                    stdout=self.stdout(addresses),
+                    stderr="",
+                ),
+            ),
+            input=EMPTY_DIRECTORY_DIGEST,
+            output=result_digest,
         )
 
 
@@ -143,7 +148,9 @@ class FmtTest(TestBase):
                 MockGet(
                     product_type=LanguageFmtResults,
                     subject_type=LanguageFmtTargets,
-                    mock=lambda language_targets_collection: language_targets_collection.language_fmt_results,
+                    mock=lambda language_targets_collection: language_targets_collection.language_fmt_results(
+                        result_digest
+                    ),
                 ),
                 MockGet(
                     product_type=TargetsWithSources,

@@ -87,7 +87,7 @@ class BlackIntegrationTest(TestBase):
         assert lint_result.exit_code == 0
         assert "1 file would be left unchanged" in lint_result.stderr
         assert "1 file left unchanged" in fmt_result.stderr
-        assert fmt_result.digest == self.get_digest([self.good_source])
+        assert fmt_result.output == self.get_digest([self.good_source])
         assert fmt_result.did_change is False
 
     def test_failing_source(self) -> None:
@@ -96,7 +96,7 @@ class BlackIntegrationTest(TestBase):
         assert lint_result.exit_code == 1
         assert "1 file would be reformatted" in lint_result.stderr
         assert "1 file reformatted" in fmt_result.stderr
-        assert fmt_result.digest == self.get_digest([self.fixed_bad_source])
+        assert fmt_result.output == self.get_digest([self.fixed_bad_source])
         assert fmt_result.did_change is True
 
     def test_mixed_sources(self) -> None:
@@ -105,7 +105,7 @@ class BlackIntegrationTest(TestBase):
         assert lint_result.exit_code == 1
         assert "1 file would be reformatted, 1 file would be left unchanged" in lint_result.stderr
         assert "1 file reformatted, 1 file left unchanged", fmt_result.stderr
-        assert fmt_result.digest == self.get_digest([self.good_source, self.fixed_bad_source])
+        assert fmt_result.output == self.get_digest([self.good_source, self.fixed_bad_source])
         assert fmt_result.did_change is True
 
     def test_multiple_targets(self) -> None:
@@ -117,7 +117,7 @@ class BlackIntegrationTest(TestBase):
         assert lint_result.exit_code == 1
         assert "1 file would be reformatted, 1 file would be left unchanged" in lint_result.stderr
         assert "1 file reformatted, 1 file left unchanged" in fmt_result.stderr
-        assert fmt_result.digest == self.get_digest([self.good_source, self.fixed_bad_source])
+        assert fmt_result.output == self.get_digest([self.good_source, self.fixed_bad_source])
         assert fmt_result.did_change is True
 
     def test_precise_file_args(self) -> None:
@@ -128,7 +128,7 @@ class BlackIntegrationTest(TestBase):
         assert lint_result.exit_code == 0
         assert "1 file would be left unchanged" in lint_result.stderr
         assert "1 file left unchanged" in fmt_result.stderr
-        assert fmt_result.digest == self.get_digest([self.good_source, self.bad_source])
+        assert fmt_result.output == self.get_digest([self.good_source, self.bad_source])
         assert fmt_result.did_change is False
 
     def test_respects_config_file(self) -> None:
@@ -139,7 +139,7 @@ class BlackIntegrationTest(TestBase):
         assert lint_result.exit_code == 0
         assert "1 file would be left unchanged" in lint_result.stderr
         assert "1 file left unchanged" in fmt_result.stderr
-        assert fmt_result.digest == self.get_digest([self.needs_config_source])
+        assert fmt_result.output == self.get_digest([self.needs_config_source])
         assert fmt_result.did_change is False
 
     def test_respects_passthrough_args(self) -> None:
@@ -150,7 +150,7 @@ class BlackIntegrationTest(TestBase):
         assert lint_result.exit_code == 0
         assert "1 file would be left unchanged" in lint_result.stderr
         assert "1 file left unchanged" in fmt_result.stderr
-        assert fmt_result.digest == self.get_digest([self.needs_config_source])
+        assert fmt_result.output == self.get_digest([self.needs_config_source])
         assert fmt_result.did_change is False
 
     def test_skip(self) -> None:

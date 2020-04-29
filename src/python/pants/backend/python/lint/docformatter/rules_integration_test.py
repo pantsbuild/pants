@@ -81,7 +81,7 @@ class DocformatterIntegrationTest(TestBase):
         target = self.make_target_with_origin([self.good_source])
         lint_result, fmt_result = self.run_docformatter([target])
         assert lint_result == LintResult.noop()
-        assert fmt_result.digest == self.get_digest([self.good_source])
+        assert fmt_result.output == self.get_digest([self.good_source])
         assert fmt_result.did_change is False
 
     def test_failing_source(self) -> None:
@@ -89,7 +89,7 @@ class DocformatterIntegrationTest(TestBase):
         lint_result, fmt_result = self.run_docformatter([target])
         assert lint_result.exit_code == 3
         assert lint_result.stderr.strip() == self.bad_source.path
-        assert fmt_result.digest == self.get_digest([self.fixed_bad_source])
+        assert fmt_result.output == self.get_digest([self.fixed_bad_source])
         assert fmt_result.did_change is True
 
     def test_mixed_sources(self) -> None:
@@ -97,7 +97,7 @@ class DocformatterIntegrationTest(TestBase):
         lint_result, fmt_result = self.run_docformatter([target])
         assert lint_result.exit_code == 3
         assert lint_result.stderr.strip() == self.bad_source.path
-        assert fmt_result.digest == self.get_digest([self.good_source, self.fixed_bad_source])
+        assert fmt_result.output == self.get_digest([self.good_source, self.fixed_bad_source])
         assert fmt_result.did_change is True
 
     def test_multiple_targets(self) -> None:
@@ -108,7 +108,7 @@ class DocformatterIntegrationTest(TestBase):
         lint_result, fmt_result = self.run_docformatter(targets)
         assert lint_result.exit_code == 3
         assert lint_result.stderr.strip() == self.bad_source.path
-        assert fmt_result.digest == self.get_digest([self.good_source, self.fixed_bad_source])
+        assert fmt_result.output == self.get_digest([self.good_source, self.fixed_bad_source])
         assert fmt_result.did_change is True
 
     def test_precise_file_args(self) -> None:
@@ -117,7 +117,7 @@ class DocformatterIntegrationTest(TestBase):
         )
         lint_result, fmt_result = self.run_docformatter([target])
         assert lint_result == LintResult.noop()
-        assert fmt_result.digest == self.get_digest([self.good_source, self.bad_source])
+        assert fmt_result.output == self.get_digest([self.good_source, self.bad_source])
         assert fmt_result.did_change is False
 
     def test_respects_passthrough_args(self) -> None:
@@ -130,7 +130,7 @@ class DocformatterIntegrationTest(TestBase):
             [target], passthrough_args="--make-summary-multi-line"
         )
         assert lint_result == LintResult.noop()
-        assert fmt_result.digest == self.get_digest([needs_config])
+        assert fmt_result.output == self.get_digest([needs_config])
         assert fmt_result.did_change is False
 
     def test_skip(self) -> None:

@@ -61,7 +61,7 @@ class PythonFmtIntegrationTest(TestBase):
             "test/target.py", content=b'from animals import cat, dog\n\nprint("hello")\n',
         )
         results = self.run_black_and_isort([original_source], name="same_file")
-        assert results.combined_digest == self.get_digest([fixed_source])
+        assert results.output == self.get_digest([fixed_source])
         assert results.did_change is True
 
     def test_multiple_formatters_changing_different_files(self) -> None:
@@ -74,7 +74,7 @@ class PythonFmtIntegrationTest(TestBase):
             FileContent("test/black.py", content=b'print("hello")\n'),
         ]
         results = self.run_black_and_isort(original_sources, name="different_file")
-        assert results.combined_digest == self.get_digest(fixed_sources)
+        assert results.output == self.get_digest(fixed_sources)
         assert results.did_change is True
 
     def test_skipped_formatter(self) -> None:
@@ -88,7 +88,7 @@ class PythonFmtIntegrationTest(TestBase):
         results = self.run_black_and_isort(
             [original_source], name="skipped", extra_args=["--black-skip"]
         )
-        assert results.combined_digest == self.get_digest([fixed_source])
+        assert results.output == self.get_digest([fixed_source])
         assert results.did_change is True
 
     def test_no_changes(self) -> None:
@@ -96,5 +96,5 @@ class PythonFmtIntegrationTest(TestBase):
             "test/skipped.py", content=b"from animals import dog, cat\n\nprint('hello')\n",
         )
         results = self.run_black_and_isort([source], name="different_file")
-        assert results.combined_digest == self.get_digest([source])
+        assert results.output == self.get_digest([source])
         assert results.did_change is False
