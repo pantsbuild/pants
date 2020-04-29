@@ -200,25 +200,18 @@ class Owners:
 async def find_owners(owners_request: OwnersRequest) -> Owners:
     sources_set = FrozenOrderedSet(owners_request.sources)
     dirs_set = FrozenOrderedSet(os.path.dirname(source) for source in sources_set)
-
     candidate_specs = tuple(AscendantAddresses(directory=d) for d in dirs_set)
+
     candidate_targets = await Get[Targets](AddressSpecs(candidate_specs))
-    candidate_hydrated_sources = await MultiGet(
-        Get[HydratedSources](HydrateSourcesRequest(tgt.get(Sources))) for tgt in candidate_targets
-    )
-
-    def owns_any_source(hydrated_sources: HydratedSources) -> bool:
-        intersecting_files = sources_set.intersection(hydrated_sources.snapshot.files)
-        return bool(intersecting_files)
-
     build_file_addresses = await MultiGet(
         Get[BuildFileAddress](Address, tgt.address) for tgt in candidate_targets
     )
 
     owners = Addresses(
-        bfa.to_address()
-        for bfa, hydrated_sources in zip(build_file_addresses, candidate_hydrated_sources)
-        if owns_any_source(hydrated_sources) or bfa.rel_path in sources_set
+        tgt.address
+        for tgt, bfa in zip(candidate_targets, build_file_addresses)
+        if bfa.rel_path in sources_set
+        or any_matches_filespec(sources_set, tgt.get(Sources).filespec)
     )
     return Owners(owners)
 
