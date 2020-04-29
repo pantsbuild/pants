@@ -1,8 +1,6 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Tuple
-
 from pants.backend.codegen.protobuf.subsystems.protoc import Protoc
 from pants.backend.codegen.protobuf.target_types import ProtobufSources
 from pants.backend.python.target_types import PythonSources
@@ -37,11 +35,6 @@ class GeneratePythonFromProtobufRequest(GenerateSourcesRequest):
     output = PythonSources
 
 
-def generate_args() -> Tuple[str, ...]:
-    args = []
-    return tuple(args)
-
-
 @named_rule(desc="Generate Python from Protobuf")
 async def generate_python_from_protobuf(
     request: GeneratePythonFromProtobufRequest, protoc: Protoc
@@ -68,7 +61,12 @@ async def generate_python_from_protobuf(
         AllSourceFilesRequest(
             (tgt.get(Sources) for tgt in transitive_targets.closure),
             for_sources_types=(ProtobufSources,),
+            # NB: By stripping the source roots, we avoid having to set the value `--proto_path`.
+            strip_source_roots=True,
         )
+    )
+    stripped_target_sources = await Get[SourceFiles](
+        AllSourceFilesRequest([request.protocol_target[ProtobufSources]], strip_source_roots=True)
     )
 
     input_digest = await Get[Digest](
@@ -87,10 +85,7 @@ async def generate_python_from_protobuf(
                 downloaded_protoc_binary.exe,
                 "--python_out",
                 output_dir,
-                # TODO: make this generic
-                "--proto_path",
-                "src/protobuf",
-                *sorted(request.protocol_sources.files),
+                *sorted(stripped_target_sources.snapshot.files),
             ),
             input_files=input_digest,
             description=f"Generating Python sources from {request.protocol_target.address}.",
