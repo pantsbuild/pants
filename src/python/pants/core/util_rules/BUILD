@@ -39,6 +39,7 @@ python_tests(
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
     'src/python/pants/engine:target',
+    'src/python/pants/testutil/engine:engine_test_base',
     'src/python/pants/testutil/option',
     'src/python/pants/testutil:test_base',
   ],

@@ -15,8 +15,8 @@ class Protoc(ExternalTool):
         "3.11.4|linux |6d0f18cd84b918c7b3edd0203e75569e0c8caecb1367bbbe409b45e28514f5be|1591191",
     ]
 
-    @classmethod
-    def generate_url(cls, plat: Platform, version: str) -> str:
+    def generate_url(self, plat: Platform) -> str:
+        version = self.get_options().version
         if version in {"2.4.1", "2.5.0", "2.6.1"}:
             # Very old versions of protoc don't have binaries available in their github releases.
             # So for now we rely on the pants-hosted binaries.
@@ -41,8 +41,8 @@ class Protoc(ExternalTool):
             f"v{version}/protoc-{version}-{plat_str}-x86_64.zip"
         )
 
-    @classmethod
-    def generate_exe(cls, plat: Platform, version: str) -> str:
+    def generate_exe(self, plat: Platform) -> str:
+        version = self.get_options().version
         if version in {"2.4.1", "2.5.0", "2.6.1"}:
             return "protoc"
         else:

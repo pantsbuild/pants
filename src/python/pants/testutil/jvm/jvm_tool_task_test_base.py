@@ -11,6 +11,7 @@ from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_pants_cachedir
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
+from pants.core.util_rules import archive, external_tool
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.testutil.jvm.jvm_task_test_base import JvmTaskTestBase
 from pants.util.dirutil import safe_mkdir
@@ -21,6 +22,10 @@ class JvmToolTaskTestBase(JvmTaskTestBase):
 
     :API: public
     """
+
+    @classmethod
+    def rules(cls):
+        return [*super().rules(), *archive.rules(), *external_tool.rules()]
 
     @classmethod
     def alias_groups(cls):

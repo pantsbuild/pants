@@ -11,10 +11,12 @@ from pants.core.util_rules.external_tool import (
 )
 from pants.engine.fs import Digest, UrlToFetch
 from pants.engine.platform import Platform
+from pants.testutil.engine.util import create_subsystem
 
 
 class FooBar(ExternalTool):
     name = "foobar"
+    options_scope = "foobar"
     default_version = "3.4.7"
     default_known_versions = [
         "3.2.0|darwin   |1102324cdaacd589e50b8b7770595f220f54e18a1d76ee3c445198f80ab865b8|123346",
@@ -24,29 +26,31 @@ class FooBar(ExternalTool):
         "3.4.7|linux    |a019dfc4b32d63c1392aa264aed2253c1e0c2fb09216f8e2cc269bbfb8bb49b5|134213",
     ]
 
-    @classmethod
-    def generate_url(cls, plat: Platform, version: str) -> str:
+    def generate_url(self, plat: Platform) -> str:
         if plat == Platform.darwin:
             plat_str = "osx-x86_64"
         elif plat == Platform.linux:
             plat_str = "linux-x86_64"
         else:
             raise ExternalToolError()
+        version = self.get_options().version
         return f"https://foobar.org/bin/v{version}/foobar-{version}-{plat_str}.tgz"
 
-    @classmethod
-    def generate_exe(cls, plat: Platform, version: str) -> str:
-        return f"foobar-{version}/bin/foobar"
+    def generate_exe(self, plat: Platform) -> str:
+        return f"foobar-{self.get_options().version}/bin/foobar"
 
 
 def test_generate_request() -> None:
     def do_test(
         expected_url: str, expected_length: int, expected_sha256: str, plat: Platform, version: str
     ) -> None:
+        foobar = create_subsystem(
+            FooBar, version=version, known_versions=FooBar.default_known_versions
+        )
         assert ExternalToolRequest(
             UrlToFetch(url=expected_url, digest=Digest(expected_sha256, expected_length)),
             f"foobar-{version}/bin/foobar",
-        ) == FooBar.generate_request(plat, version, FooBar.default_known_versions)
+        ) == foobar.get_request(plat)
 
     do_test(
         "https://foobar.org/bin/v3.2.0/foobar-3.2.0-osx-x86_64.tgz",
@@ -64,7 +68,9 @@ def test_generate_request() -> None:
     )
 
     with pytest.raises(UnknownVersion):
-        FooBar.generate_request(Platform.darwin, "9.9.9", FooBar.default_known_versions)
+        create_subsystem(
+            FooBar, version="9.9.9", known_versions=FooBar.default_known_versions
+        ).get_request(Platform.darwin)
 
 
 # Delete this test after ExternalTool.get_default_versions_and_digests() is removed.

@@ -15,6 +15,6 @@ class ClocBinary(ExternalTool):
         "1.80|linux |2b23012b1c3c53bd6b9dd43cd6aa75715eed4feb2cb6db56ac3fbbd2dffeac9d|546279",
     ]
 
-    @classmethod
-    def generate_url(cls, plat: Platform, version: str) -> str:
+    def generate_url(self, plat: Platform) -> str:
+        version = self.get_options().version
         return f"https://github.com/AlDanial/cloc/releases/download/{version}/cloc-{version}.pl"
