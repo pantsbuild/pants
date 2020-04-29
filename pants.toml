@@ -66,6 +66,7 @@ backend_packages.remove = [
   "pants.backend.python.lint.isort",
 ]
 backend_packages2 = [
+  "pants.backend.codegen.protobuf.python",
   "pants.backend.project_info",
   "pants.backend.python",
   "pants.backend.python.lint.black",
