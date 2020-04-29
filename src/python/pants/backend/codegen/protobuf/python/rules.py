@@ -9,7 +9,6 @@ from pants.backend.python.target_types import PythonSources
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.engine.addresses import Addresses
-from pants.engine.console import Console
 from pants.engine.fs import (
     EMPTY_DIRECTORY_DIGEST,
     Digest,
@@ -17,18 +16,11 @@ from pants.engine.fs import (
     DirectoryWithPrefixToStrip,
     Snapshot,
 )
-from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import goal_rule, named_rule, subsystem_rule
+from pants.engine.rules import named_rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
-from pants.engine.target import (
-    GeneratedSources,
-    GenerateSourcesRequest,
-    Sources,
-    Targets,
-    TransitiveTargets,
-)
+from pants.engine.target import GeneratedSources, GenerateSourcesRequest, Sources, TransitiveTargets
 from pants.engine.unions import UnionRule
 
 
@@ -121,31 +113,9 @@ async def generate_python_from_protobuf(
     return GeneratedSources(normalized_snapshot)
 
 
-class ProtocOptions(GoalSubsystem):
-    name = "run-protoc"
-
-
-class ProtocGoal(Goal):
-    subsystem_cls = ProtocOptions
-
-
-@goal_rule
-async def protoc_goal(targets: Targets, console: Console) -> ProtocGoal:
-    all_sources = await Get[SourceFiles](
-        AllSourceFilesRequest(
-            (tgt.get(Sources) for tgt in targets),
-            for_sources_types=(PythonSources,),
-            enable_codegen=True,
-        )
-    )
-    console.print_stdout(sorted(all_sources.snapshot.files))
-    return ProtocGoal(0)
-
-
 def rules():
     return [
         generate_python_from_protobuf,
-        protoc_goal,
         UnionRule(GenerateSourcesRequest, GeneratePythonFromProtobufRequest),
         subsystem_rule(Protoc),
     ]

@@ -66,15 +66,14 @@ backend_packages.remove = [
   "pants.backend.python.lint.isort",
 ]
 backend_packages2 = [
-  "pants.backend.codegen.protobuf.python",
+  "pants.backend.awslambda.python",
+  "pants.backend.native",
   "pants.backend.project_info",
   "pants.backend.python",
   "pants.backend.python.lint.black",
   "pants.backend.python.lint.docformatter",
   "pants.backend.python.lint.flake8",
   "pants.backend.python.lint.isort",
-  "pants.backend.awslambda.python",
-  "pants.backend.native",
   "internal_backend.rules_for_testing",
 ]
 ignore_pants_warnings = [

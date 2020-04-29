@@ -53,7 +53,7 @@ class ProtobufPythonIntegrationTest(TestBase):
                 syntax = "proto2";
 
                 package dir1;
-                
+
                 message Person {
                   required string name = 1;
                   required int32 id = 2;
