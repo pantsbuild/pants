@@ -226,7 +226,7 @@ class ExternalTool(Subsystem):
                 directory_digest=downloaded_external_tool.digest, path_prefix=rel_bindir.as_posix()
             )
         )
-        return (rel_bindir / req.exe).as_posix()
+        return (PurePath(get_buildroot()) / rel_bindir / req.exe).as_posix()
 
 
 @rule

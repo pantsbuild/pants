@@ -32,6 +32,7 @@ from pants.build_graph.address import Address
 from pants.build_graph.register import build_file_aliases as register_core
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
+from pants.core.util_rules import archive, external_tool
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.jar.jar_dependency import JarDependency
 from pants.testutil.subsystem.util import init_subsystems
@@ -45,6 +46,10 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
     @classmethod
     def task_type(cls):
         return ExportDepAsJar
+
+    @classmethod
+    def rules(cls):
+        return [*super().rules(), *archive.rules(), *external_tool.rules()]
 
     @classmethod
     def alias_groups(cls):
