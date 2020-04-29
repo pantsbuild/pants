@@ -28,21 +28,31 @@ from pants.engine.unions import UnionMembership, union
 
 @dataclass(frozen=True)
 class FmtResult:
-    digest: Digest
+    input: Digest
+    output: Digest
     stdout: str
     stderr: str
 
     @staticmethod
     def noop() -> "FmtResult":
-        return FmtResult(digest=EMPTY_DIRECTORY_DIGEST, stdout="", stderr="")
+        return FmtResult(
+            input=EMPTY_DIRECTORY_DIGEST, output=EMPTY_DIRECTORY_DIGEST, stdout="", stderr=""
+        )
 
     @staticmethod
-    def from_process_result(process_result: ProcessResult) -> "FmtResult":
+    def from_process_result(
+        process_result: ProcessResult, *, original_digest: Digest
+    ) -> "FmtResult":
         return FmtResult(
-            digest=process_result.output_directory_digest,
+            input=original_digest,
+            output=process_result.output_directory_digest,
             stdout=process_result.stdout.decode(),
             stderr=process_result.stderr.decode(),
         )
+
+    @property
+    def did_change(self) -> bool:
+        return self.output != self.input
 
 
 class FmtConfiguration(LinterConfiguration, metaclass=ABCMeta):
@@ -88,14 +98,19 @@ class LanguageFmtTargets:
 class LanguageFmtResults:
     """This collection allows us to safely aggregate multiple `FmtResult`s for a language.
 
-    The `combined_digest` is used to ensure that none of the formatters overwrite each other. The
+    The `output` digest is used to ensure that none of the formatters overwrite each other. The
     language implementation should run each formatter one at a time and pipe the resulting digest of
-    one formatter into the next. The `combined_digest` must contain all files for the target,
-    including any which were not re-formatted.
+    one formatter into the next. The `input` and `output` digests must contain all files for the
+    target(s), including any which were not re-formatted.
     """
 
     results: Tuple[FmtResult, ...]
-    combined_digest: Digest
+    input: Digest
+    output: Digest
+
+    @property
+    def did_change(self) -> bool:
+        return self.input != self.output
 
 
 class FmtOptions(GoalSubsystem):
@@ -212,15 +227,18 @@ async def fmt(
     if not individual_results:
         return Fmt(exit_code=0)
 
-    # NB: this will fail if there are any conflicting changes, which we want to happen rather than
-    # silently having one result override the other. In practicality, this should never happen due
-    # to us grouping each language's formatters into a single combined_digest.
-    merged_formatted_digest = await Get[Digest](
-        DirectoriesToMerge(
-            tuple(language_result.combined_digest for language_result in per_language_results)
-        )
+    changed_digests = tuple(
+        language_result.output
+        for language_result in per_language_results
+        if language_result.did_change
     )
-    workspace.materialize_directory(DirectoryToMaterialize(merged_formatted_digest))
+    if changed_digests:
+        # NB: this will fail if there are any conflicting changes, which we want to happen rather
+        # than silently having one result override the other. In practicality, this should never
+        # happen due to us grouping each language's formatters into a single digest.
+        merged_formatted_digest = await Get[Digest](DirectoriesToMerge(changed_digests))
+        workspace.materialize_directory(DirectoryToMaterialize(merged_formatted_digest))
+
     for result in individual_results:
         if result.stdout:
             console.print_stdout(result.stdout)
