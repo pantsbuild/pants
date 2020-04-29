@@ -200,8 +200,9 @@ class Owners:
 async def find_owners(owners_request: OwnersRequest) -> Owners:
     sources_set = FrozenOrderedSet(owners_request.sources)
     dirs_set = FrozenOrderedSet(os.path.dirname(source) for source in sources_set)
-    candidate_specs = tuple(AscendantAddresses(directory=d) for d in dirs_set)
 
+    # Walk up the buildroot looking for targets that would conceivably claim changed sources.
+    candidate_specs = tuple(AscendantAddresses(directory=d) for d in dirs_set)
     candidate_targets = await Get[Targets](AddressSpecs(candidate_specs))
     build_file_addresses = await MultiGet(
         Get[BuildFileAddress](Address, tgt.address) for tgt in candidate_targets
@@ -211,6 +212,8 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
         tgt.address
         for tgt, bfa in zip(candidate_targets, build_file_addresses)
         if bfa.rel_path in sources_set
+        # NB: Deleted files can only be matched against the 'filespec' (i.e. `PathGlobs`) for a
+        # target, which is why we use `any_matches_filespec`.
         or any_matches_filespec(sources_set, tgt.get(Sources).filespec)
     )
     return Owners(owners)
