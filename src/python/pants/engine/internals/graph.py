@@ -31,8 +31,6 @@ from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
     Dependencies,
-    HydratedSources,
-    HydrateSourcesRequest,
     RegisteredTargetTypes,
     Sources,
     Target,
