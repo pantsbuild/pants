@@ -24,7 +24,7 @@ from pants.core.util_rules.determine_source_files import (
     SourceFiles,
     SpecifiedSourceFilesRequest,
 )
-from pants.engine.fs import Digest, DirectoriesToMerge
+from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get
@@ -97,11 +97,8 @@ async def setup(
     )
 
     merged_input_files = await Get[Digest](
-        DirectoriesToMerge(
-            directories=(
-                all_source_files_snapshot.directory_digest,
-                requirements_pex.directory_digest,
-            )
+        MergeDigests(
+            (all_source_files_snapshot.directory_digest, requirements_pex.directory_digest)
         ),
     )
 

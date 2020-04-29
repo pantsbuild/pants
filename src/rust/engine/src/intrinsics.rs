@@ -62,23 +62,23 @@ impl Intrinsics {
     intrinsics.insert(
       Intrinsic {
         product: types.directory_digest,
-        inputs: vec![types.directories_to_merge],
+        inputs: vec![types.merge_digests],
       },
-      Box::new(directories_to_merge_to_digest),
+      Box::new(merge_digests_request_to_digest),
     );
     intrinsics.insert(
       Intrinsic {
         product: types.directory_digest,
-        inputs: vec![types.directory_with_prefix_to_strip],
+        inputs: vec![types.remove_prefix],
       },
-      Box::new(directory_with_prefix_to_strip_to_digest),
+      Box::new(remove_prefix_request_to_digest),
     );
     intrinsics.insert(
       Intrinsic {
         product: types.directory_digest,
-        inputs: vec![types.directory_with_prefix_to_add],
+        inputs: vec![types.add_prefix],
       },
-      Box::new(directory_with_prefix_to_add_to_digest),
+      Box::new(add_prefix_request_to_digest),
     );
     intrinsics.insert(
       Intrinsic {
@@ -159,17 +159,11 @@ fn directory_digest_to_files_content(context: Context, args: Vec<Value>) -> Node
     .to_boxed()
 }
 
-fn directory_with_prefix_to_strip_to_digest(
-  context: Context,
-  args: Vec<Value>,
-) -> NodeFuture<Value> {
+fn remove_prefix_request_to_digest(context: Context, args: Vec<Value>) -> NodeFuture<Value> {
   let core = context.core;
 
   Box::pin(async move {
-    let input_digest = lift_digest(&externs::project_ignoring_type(
-      &args[0],
-      "directory_digest",
-    ))?;
+    let input_digest = lift_digest(&externs::project_ignoring_type(&args[0], "digest"))?;
     let prefix = externs::project_str(&args[0], "prefix");
     let digest =
       store::Snapshot::strip_prefix(core.store(), input_digest, PathBuf::from(prefix)).await?;
@@ -181,14 +175,10 @@ fn directory_with_prefix_to_strip_to_digest(
   .to_boxed()
 }
 
-fn directory_with_prefix_to_add_to_digest(context: Context, args: Vec<Value>) -> NodeFuture<Value> {
+fn add_prefix_request_to_digest(context: Context, args: Vec<Value>) -> NodeFuture<Value> {
   let core = context.core;
   Box::pin(async move {
-    let input_digest = lift_digest(&externs::project_ignoring_type(
-      &args[0],
-      "directory_digest",
-    ))?;
-
+    let input_digest = lift_digest(&externs::project_ignoring_type(&args[0], "digest"))?;
     let prefix = externs::project_str(&args[0], "prefix");
     let digest =
       store::Snapshot::add_prefix(core.store(), input_digest, PathBuf::from(prefix)).await?;
@@ -214,13 +204,12 @@ fn digest_to_snapshot(context: Context, args: Vec<Value>) -> NodeFuture<Value> {
   .to_boxed()
 }
 
-fn directories_to_merge_to_digest(context: Context, args: Vec<Value>) -> NodeFuture<Value> {
+fn merge_digests_request_to_digest(context: Context, args: Vec<Value>) -> NodeFuture<Value> {
   let core = context.core;
-  let digests: Result<Vec<hashing::Digest>, String> =
-    externs::project_multi(&args[0], "directories")
-      .into_iter()
-      .map(|val| lift_digest(&val))
-      .collect();
+  let digests: Result<Vec<hashing::Digest>, String> = externs::project_multi(&args[0], "digests")
+    .into_iter()
+    .map(|val| lift_digest(&val))
+    .collect();
   Box::pin(async move {
     let digest = store::Snapshot::merge_directories(core.store(), digests?).await?;
     let res: Result<_, String> = Ok(Snapshot::store_directory(&core, &digest));

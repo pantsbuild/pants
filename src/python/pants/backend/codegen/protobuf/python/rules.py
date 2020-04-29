@@ -9,13 +9,7 @@ from pants.backend.python.target_types import PythonSources
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.engine.addresses import Addresses
-from pants.engine.fs import (
-    EMPTY_DIRECTORY_DIGEST,
-    Digest,
-    DirectoriesToMerge,
-    DirectoryWithPrefixToStrip,
-    Snapshot,
-)
+from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Digest, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import named_rule, subsystem_rule
@@ -85,7 +79,7 @@ async def generate_python_from_protobuf(
     )
 
     input_digest = await Get[Digest](
-        DirectoriesToMerge(
+        MergeDigests(
             (
                 all_sources.snapshot.directory_digest,
                 downloaded_protoc_binary.digest,
@@ -108,7 +102,7 @@ async def generate_python_from_protobuf(
         )
     )
     normalized_snapshot = await Get[Snapshot](
-        DirectoryWithPrefixToStrip(result.output_directory_digest, output_dir)
+        RemovePrefix(result.output_directory_digest, output_dir)
     )
     return GeneratedSources(normalized_snapshot)
 

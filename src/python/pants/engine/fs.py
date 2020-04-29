@@ -196,26 +196,55 @@ class SnapshotSubset:
     globs: PathGlobs
 
 
-@dataclass(frozen=True)
-class DirectoriesToMerge:
-    directories: Tuple[Digest, ...]
+@dataclass(unsafe_hash=True)
+class MergeDigests:
+    digests: Tuple[Digest, ...]
+
+    def __init__(self, digests: Iterable[Digest]) -> None:
+        """A request to merge several digests into one single digest.
+
+        This will fail if there are any conflicting changes, such as two digests having the same
+        file but with different content.
+
+        Example:
+
+            result = await Get[Digest](MergeDigests([digest1, digest2])
+        """
+        self.digests = tuple(digests)
 
     def __post_init__(self) -> None:
-        non_digests = [v for v in self.directories if not isinstance(v, Digest)]  # type: ignore[unreachable]
+        non_digests = [v for v in self.digests if not isinstance(v, Digest)]  # type: ignore[unreachable]
         if non_digests:
             formatted_non_digests = "\n".join(f"* {v}" for v in non_digests)
             raise ValueError(f"Not all arguments are digests:\n\n{formatted_non_digests}")
 
 
 @dataclass(frozen=True)
-class DirectoryWithPrefixToStrip:
-    directory_digest: Digest
+class RemovePrefix:
+    """A request to remove the specified prefix path from every file and directory in the digest.
+
+    This will fail if there are any files or directories in the original input digest without the
+    specified digest.
+
+    Example:
+
+        result = await Get[Digest](RemovePrefix(input_digest, "my_dir")
+    """
+
+    digest: Digest
     prefix: str
 
 
 @dataclass(frozen=True)
-class DirectoryWithPrefixToAdd:
-    directory_digest: Digest
+class AddPrefix:
+    """A request to add the specified prefix path to every file and directory in the digest.
+
+    Example:
+
+        result = await Get[Digest](AddPrefix(input_digest, "my_dir")
+    """
+
+    digest: Digest
     prefix: str
 
 
@@ -344,10 +373,10 @@ def create_fs_rules():
         RootRule(Workspace),
         RootRule(InputFilesContent),
         RootRule(Digest),
-        RootRule(DirectoriesToMerge),
+        RootRule(MergeDigests),
         RootRule(PathGlobs),
-        RootRule(DirectoryWithPrefixToStrip),
-        RootRule(DirectoryWithPrefixToAdd),
+        RootRule(RemovePrefix),
+        RootRule(AddPrefix),
         RootRule(UrlToFetch),
         RootRule(SnapshotSubset),
     ]
