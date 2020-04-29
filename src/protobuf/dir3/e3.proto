@@ -1,0 +1,4 @@
+syntax = "proto2";
+
+package dir3;
+import "dir2/e2.proto";
