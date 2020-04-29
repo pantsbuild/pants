@@ -67,14 +67,11 @@ class ProtobufGen(SimpleCodegenTask):
             "as recommended by the protoc documentation.",
         )
 
-    # TODO https://github.com/pantsbuild/pants/issues/604 prep start
     @classmethod
     def prepare(cls, options, round_manager):
         super().prepare(options, round_manager)
         round_manager.require_data(JarImportProducts)
         round_manager.optional_data("deferred_sources")
-
-    # TODO https://github.com/pantsbuild/pants/issues/604 prep finish
 
     def __init__(self, *args, **kwargs):
         """Generates Java files from .proto files using the Google protobuf compiler."""

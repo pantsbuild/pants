@@ -47,6 +47,7 @@ target(
   name='plugins',
   dependencies=[
     'src/python/pants/backend/awslambda/python',
+    'src/python/pants/backend/codegen/protobuf/python',
     'src/python/pants/backend/codegen:plugin',
     'src/python/pants/backend/docgen:plugin',
     'src/python/pants/backend/graph_info:plugin',
