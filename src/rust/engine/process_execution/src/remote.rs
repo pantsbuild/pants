@@ -383,9 +383,9 @@ impl super::CommandRunner for CommandRunner {
                             // This timeout is here to make sure that if something goes wrong, e.g.
                             // the connection hangs, we don't poll forever.
                             let elapsed = start_time.elapsed();
-                            let total_timeout = timeout + command_runner.queue_buffer_time;
+                            let total_timeout = timeout.map(|t| t + command_runner.queue_buffer_time);
 
-                            if elapsed > total_timeout {
+                            if total_timeout.map(|t| elapsed > t).unwrap_or(false) {
                               let ExecutionHistory {
                                 mut attempts,
                                 mut current_attempt,

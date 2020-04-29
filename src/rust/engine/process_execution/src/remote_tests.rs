@@ -69,7 +69,7 @@ async fn local_only_scratch_files_ignored() {
       .into_iter()
       .map(PathBuf::from)
       .collect(),
-    timeout: Duration::from_millis(1000),
+    timeout: one_second(),
     description: "some description".to_owned(),
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
       hashing::EMPTY_DIGEST,
@@ -94,7 +94,7 @@ async fn local_only_scratch_files_ignored() {
       .into_iter()
       .map(PathBuf::from)
       .collect(),
-    timeout: Duration::from_millis(1000),
+    timeout: one_second(),
     description: "some description".to_owned(),
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
       TestDirectory::containing_falcons_dir().digest(),
@@ -128,7 +128,7 @@ async fn make_execute_request() {
       .into_iter()
       .map(PathBuf::from)
       .collect(),
-    timeout: Duration::from_millis(1000),
+    timeout: one_second(),
     description: "some description".to_owned(),
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
       hashing::EMPTY_DIGEST,
@@ -212,7 +212,7 @@ async fn make_execute_request_with_instance_name() {
       .into_iter()
       .map(PathBuf::from)
       .collect(),
-    timeout: Duration::from_millis(1000),
+    timeout: one_second(),
     description: "some description".to_owned(),
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
       hashing::EMPTY_DIGEST,
@@ -304,7 +304,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
       .into_iter()
       .map(PathBuf::from)
       .collect(),
-    timeout: Duration::from_millis(1000),
+    timeout: one_second(),
     description: "some description".to_owned(),
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
       hashing::EMPTY_DIGEST,
@@ -392,7 +392,7 @@ async fn make_execute_request_with_jdk() {
     input_files: input_directory.digest(),
     output_files: BTreeSet::new(),
     output_directories: BTreeSet::new(),
-    timeout: Duration::from_millis(1000),
+    timeout: one_second(),
     description: "some description".to_owned(),
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
       hashing::EMPTY_DIGEST,
@@ -458,7 +458,7 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
     input_files: input_directory.digest(),
     output_files: BTreeSet::new(),
     output_directories: BTreeSet::new(),
-    timeout: Duration::from_millis(1000),
+    timeout: one_second(),
     description: "some description".to_owned(),
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
       hashing::EMPTY_DIGEST,
@@ -566,7 +566,7 @@ async fn server_rejecting_execute_request_gives_error() {
             input_files: EMPTY_DIGEST,
             output_files: BTreeSet::new(),
             output_directories: BTreeSet::new(),
-            timeout: Duration::from_millis(1000),
+            timeout: one_second(),
             description: "wrong command".to_string(),
             unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
               hashing::EMPTY_DIGEST,
@@ -1100,7 +1100,7 @@ async fn timeout_after_sufficiently_delayed_getoperations() {
     input_files: EMPTY_DIGEST,
     output_files: BTreeSet::new(),
     output_directories: BTreeSet::new(),
-    timeout: request_timeout,
+    timeout: Some(request_timeout),
     description: "echo-a-foo".to_string(),
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
       hashing::EMPTY_DIGEST,
@@ -1155,7 +1155,7 @@ async fn dropped_request_cancels() {
     input_files: EMPTY_DIGEST,
     output_files: BTreeSet::new(),
     output_directories: BTreeSet::new(),
-    timeout: request_timeout,
+    timeout: Some(request_timeout),
     description: "echo-a-foo".to_string(),
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
       hashing::EMPTY_DIGEST,
@@ -2366,7 +2366,7 @@ pub fn echo_foo_request() -> MultiPlatformProcess {
     input_files: EMPTY_DIGEST,
     output_files: BTreeSet::new(),
     output_directories: BTreeSet::new(),
-    timeout: Duration::from_millis(5000),
+    timeout: Some(Duration::from_millis(5000)),
     description: "echo a foo".to_string(),
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
       hashing::EMPTY_DIGEST,
@@ -2684,7 +2684,7 @@ fn cat_roland_request() -> MultiPlatformProcess {
     input_files: TestDirectory::containing_roland().digest(),
     output_files: BTreeSet::new(),
     output_directories: BTreeSet::new(),
-    timeout: Duration::from_millis(1000),
+    timeout: one_second(),
     description: "cat a roland".to_string(),
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
       hashing::EMPTY_DIGEST,
@@ -2703,7 +2703,7 @@ fn echo_roland_request() -> MultiPlatformProcess {
     input_files: EMPTY_DIGEST,
     output_files: BTreeSet::new(),
     output_directories: BTreeSet::new(),
-    timeout: Duration::from_millis(1000),
+    timeout: one_second(),
     description: "unleash a roaring meow".to_string(),
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
       hashing::EMPTY_DIGEST,
@@ -2734,4 +2734,8 @@ fn assert_cancellation_requests(
     .map(|req| req.get_name().to_owned())
     .collect::<Vec<_>>();
   assert_eq!(expected, cancels);
+}
+
+fn one_second() -> Option<Duration> {
+  Some(Duration::from_millis(1000))
 }

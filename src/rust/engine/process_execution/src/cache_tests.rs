@@ -55,7 +55,7 @@ async fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
     input_files: EMPTY_DIGEST,
     output_files: vec![PathBuf::from("roland")].into_iter().collect(),
     output_directories: BTreeSet::new(),
-    timeout: Duration::from_millis(1000),
+    timeout: Some(Duration::from_millis(1000)),
     description: "bash".to_string(),
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
       hashing::EMPTY_DIGEST,

@@ -222,7 +222,7 @@ pub struct Process {
 
   pub output_directories: BTreeSet<PathBuf>,
 
-  pub timeout: std::time::Duration,
+  pub timeout: Option<std::time::Duration>,
 
   #[derivative(PartialEq = "ignore", Hash = "ignore")]
   pub description: String,
