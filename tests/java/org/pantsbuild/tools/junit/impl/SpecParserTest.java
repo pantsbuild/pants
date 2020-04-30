@@ -13,6 +13,7 @@ import org.junit.Test;
 import org.pantsbuild.tools.junit.lib.MockJUnit3Test;
 import org.pantsbuild.tools.junit.lib.MockRunWithTest;
 import org.pantsbuild.tools.junit.lib.MockScalaTest;
+import org.pantsbuild.tools.junit.lib.ParameterizedTest;
 import org.pantsbuild.tools.junit.lib.UnannotatedTestClass;
 
 import static org.hamcrest.CoreMatchers.containsString;
@@ -97,6 +98,37 @@ public class SpecParserTest {
       assertThat(expected.getMessage(),
           containsString("Method doesNotExist not found in class"));
     }
+  }
+
+  @Test
+  public void testScalaSpec() {
+    String specString = "org.pantsbuild.tools.junit.lib.MockScalaTest#test should pass";
+    SpecParser parser = new SpecParser(ImmutableList.of(specString));
+    Collection<Spec> specs = parser.parse();
+    Spec spec = Iterables.getOnlyElement(specs);
+    assertEquals(MockScalaTest.class, spec.getSpecClass());
+    assertEquals("org.pantsbuild.tools.junit.lib.MockScalaTest", spec.getSpecName());
+  }
+
+  @Test
+  public void testParameterizedSpec() {
+    String specString = "org.pantsbuild.tools.junit.lib.ParameterizedTest#isLessThanFive[1]";
+    SpecParser parser = new SpecParser(ImmutableList.of(specString));
+    Collection<Spec> specs = parser.parse();
+    Spec spec = Iterables.getOnlyElement(specs);
+    assertEquals(ParameterizedTest.class, spec.getSpecClass());
+    assertEquals("org.pantsbuild.tools.junit.lib.ParameterizedTest", spec.getSpecName());
+  }
+
+  @Test
+  public void testMultipleParameterizedSpecs() {
+    SpecParser parser = new SpecParser(ImmutableList.of(
+        "org.pantsbuild.tools.junit.lib.ParameterizedTest#isLessThanFive[1]",
+        "org.pantsbuild.tools.junit.lib.ParameterizedTest#isLessThanFive[2]"));
+    Collection<Spec> specs = parser.parse();
+    Spec spec = Iterables.getOnlyElement(specs);
+    assertEquals(ParameterizedTest.class, spec.getSpecClass());
+    assertEquals("org.pantsbuild.tools.junit.lib.ParameterizedTest", spec.getSpecName());
   }
 
   private void assertNoSpecs(String className) {
