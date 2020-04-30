@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
-from pants.base.exceptions import TargetDefinitionException
+from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.context import Context
 from pants.testutil.jvm.nailgun_task_test_base import NailgunTaskTestBase
@@ -41,36 +41,17 @@ class ScroogeGenTest(NailgunTaskTestBase):
         )
 
     def test_validate_compiler_configs(self):
-        # Set synthetic defaults for the global scope.
-        self.set_options_for_scope(
-            "thrift-defaults",
-            compiler="unchecked",
-            language="uniform",
-            service_deps="service_deps",
-            structs_deps="structs_deps",
-        )
-
         self.add_to_build_file(
             "test_validate",
-            dedent(
-                """
-                java_thrift_library(name='one',
-                  sources=[],
-                  dependencies=[],
-                )
-                """
+            self._test_create_build_str(
+                name="one", sources="[]", language="uniform", compiler_args="[]", deps="[]"
             ),
         )
 
         self.add_to_build_file(
             "test_validate",
-            dedent(
-                """
-                java_thrift_library(name='two',
-                  sources=[],
-                  dependencies=[':one'],
-                )
-                """
+            self._test_create_build_str(
+                name="two", sources="[]", language="uniform", compiler_args="[]", deps="[':one']"
             ),
         )
 
@@ -79,6 +60,56 @@ class ScroogeGenTest(NailgunTaskTestBase):
         task = self.prepare_execute(context)
         task._validate_compiler_configs(self.target("test_validate:one"))
         task._validate_compiler_configs(self.target("test_validate:two"))
+
+    def test_validate_unchecked_compiler_args(self):
+        self.add_to_build_file(
+            "test_validate",
+            self._test_create_build_str(
+                name="one", sources="[]", language="uniform", compiler_args="[]", deps="[]"
+            ),
+        )
+
+        self.add_to_build_file(
+            "test_validate",
+            self._test_create_build_str(
+                name="two",
+                sources="[]",
+                language="uniform",
+                compiler_args="['--java-passthrough']",
+                deps="[':one']",
+            ),
+        )
+
+        target = self.target("test_validate:two")
+        context = self.context(target_roots=[target])
+        task = self.prepare_execute(context)
+        task._validate_compiler_configs(self.target("test_validate:one"))
+        task._validate_compiler_configs(self.target("test_validate:two"))
+
+    def test_validate_invalid_unchecked_compiler_args(self):
+        self.add_to_build_file(
+            "test_validate",
+            self._test_create_build_str(
+                name="one", sources="[]", language="uniform", compiler_args="[]", deps="[]"
+            ),
+        )
+
+        self.add_to_build_file(
+            "test_validate",
+            self._test_create_build_str(
+                name="two",
+                sources="[]",
+                language="uniform",
+                compiler_args="['--invalid_args']",
+                deps="[':one']",
+            ),
+        )
+
+        target = self.target("test_validate:two")
+        context = self.context(target_roots=[target])
+        task = self.prepare_execute(context)
+        with self.assertRaises(TaskError):
+            task._validate_compiler_configs(self.target("test_validate:two"))
 
     def test_scala(self):
         sources = [os.path.join(self.test_workdir, "org/pantsbuild/example/Example.scala")]
@@ -105,13 +136,12 @@ class ScroogeGenTest(NailgunTaskTestBase):
         comma_separated = ", ".join(quoted)
         return f"[{comma_separated}]"
 
-    def _test_create_build_str(self, language, compiler_args):
-        compiler_args_str = self.compiler_args_to_string(compiler_args)
+    def _test_create_build_str(self, name, sources, language, compiler_args, deps):
         return dedent(
             """
-            java_thrift_library(name='a',
-              sources=['a.thrift'],
-              dependencies=[],
+            java_thrift_library(name='{name}',
+              sources={sources},
+              dependencies={deps},
               compiler='scrooge',
               language='{language}',
               compiler_args={compiler_args},
@@ -119,7 +149,11 @@ class ScroogeGenTest(NailgunTaskTestBase):
               tags=['my_tag'],
             )
             """.format(
-                language=language, compiler_args=compiler_args_str
+                name=name,
+                sources=sources,
+                language=language,
+                compiler_args=compiler_args,
+                deps=deps,
             )
         )
 
@@ -134,7 +168,13 @@ class ScroogeGenTest(NailgunTaskTestBase):
         )
 
         self.create_file(relpath="test_smoke/a.thrift", contents=contents)
-        build_string = self._test_create_build_str(language, compiler_args)
+        build_string = self._test_create_build_str(
+            name="a",
+            sources=["a.thrift"],
+            language=language,
+            compiler_args=compiler_args,
+            deps="[]",
+        )
         self.add_to_build_file("test_smoke", build_string)
 
         target = self.target("test_smoke:a")
