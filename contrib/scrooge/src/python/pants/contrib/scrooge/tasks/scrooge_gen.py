@@ -86,8 +86,7 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
             help="Don't fail if these options are different between targets."
             "Usually, Scrooge requires all targets in the dependency tree to"
             "have the same compiler options. However, discrepancies in options"
-            "specified in this list will not cause the compiler to fail."
-
+            "specified in this list will not cause the compiler to fail.",
         )
         cls.register_jvm_tool(register, "scrooge-gen")
 
@@ -276,7 +275,8 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
             return self._ValidateCompilerConfig(
                 language=self._thrift_defaults.language(tgt),
                 compiler=self._thrift_defaults.compiler(tgt),
-                compiler_args=filter_unchecked_compiler_args(tgt))
+                compiler_args=filter_unchecked_compiler_args(tgt),
+            )
 
         mismatched_compiler_configs = defaultdict(set)
         mycompilerconfig = compiler_config(target)
