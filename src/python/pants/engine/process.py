@@ -209,7 +209,7 @@ def remove_platform_information(res: FallibleProcessResultWithPlatform,) -> Fall
     )
 
 
-def create_process_rules():
+def rules():
     """Creates rules that consume the intrinsic filesystem types."""
     return [
         RootRule(Process),
