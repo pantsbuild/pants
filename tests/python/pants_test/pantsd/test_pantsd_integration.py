@@ -301,18 +301,16 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                 return "\n".join(read_pantsd_log(ctx.workdir))
 
             # Check the logs.
+            ctx.checker.assert_running()
             self.assertRegex(
                 full_pantsd_log(), r"watching invalidating files:.*{}".format(test_dir)
             )
-
-            ctx.checker.assert_running()
 
             # Create a new file in test_dir
             with temporary_file(suffix=".py", binary_mode=False, root_dir=test_dir) as temp_f:
                 temp_f.write("import that\n")
                 temp_f.close()
 
-                time.sleep(10)
                 ctx.checker.assert_stopped()
 
             self.assertIn("saw file events covered by invalidation globs", full_pantsd_log())
@@ -332,7 +330,6 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
             # Delete tmp_pants_toml
             os.unlink(tmp_pants_toml)
-            time.sleep(10)
             ctx.checker.assert_stopped()
 
     def test_pantsd_pid_deleted(self):
@@ -347,8 +344,6 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             subprocess_dir = ctx.pantsd_config["GLOBAL"]["pants_subprocessdir"]
             os.unlink(os.path.join(subprocess_dir, "pantsd", "pid"))
 
-            # Permit ample time for the async file event propagate in CI.
-            time.sleep(10)
             ctx.checker.assert_stopped()
 
     def test_pantsd_pid_change(self):
@@ -365,8 +360,6 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             with open(pidpath, "w") as f:
                 f.write("9")
 
-            # Permit ample time for the async file event propagate in CI.
-            time.sleep(10)
             ctx.checker.assert_stopped()
 
             # Remove the pidfile so that the teardown script doesn't try to kill process 9.
