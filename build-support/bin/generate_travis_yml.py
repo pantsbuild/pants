@@ -570,10 +570,7 @@ def build_wheels_linux() -> Dict:
     shard = {
         **linux_shard(python_version=PythonVersion.py36, use_docker=True),
         "name": "Build Linux wheels (Python 3.6)",
-        "script": [
-            docker_build_travis_ci_image(),
-            docker_run_travis_ci_image(command),
-        ],
+        "script": [docker_build_travis_ci_image(), docker_run_travis_ci_image(command)],
     }
     safe_extend(shard, "env", _build_wheels_env(platform=Platform.linux))
     return shard
