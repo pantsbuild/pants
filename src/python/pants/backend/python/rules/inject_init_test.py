@@ -32,7 +32,7 @@ class InjectInitTest(TestBase):
         # Ensure all original `__init__.py` are preserved with their original content.
         materialized_original_inits = [
             fc
-            for fc in self.request_single_product(FilesContent, result.directory_digest)
+            for fc in self.request_single_product(FilesContent, result.digest)
             if fc.path in original_files and fc.path.endswith("__init__.py")
         ]
         for original_init in materialized_original_inits:

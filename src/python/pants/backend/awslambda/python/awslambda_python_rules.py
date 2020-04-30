@@ -34,7 +34,7 @@ from pants.backend.python.subsystems import python_native_code, subprocess_envir
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.core.util_rules import strip_source_roots
 from pants.engine.addresses import Addresses
-from pants.engine.fs import Digest, DirectoriesToMerge
+from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import named_rule, subsystem_rule
 from pants.engine.selectors import Get
@@ -82,12 +82,7 @@ async def create_python_awslambda(
 
     pex_result = await Get[TwoStepPex](TwoStepPexFromTargetsRequest, pex_request)
     merged_input_files = await Get[Digest](
-        DirectoriesToMerge(
-            directories=(
-                pex_result.pex.directory_digest,
-                lambdex_setup.requirements_pex.directory_digest,
-            )
-        )
+        MergeDigests((pex_result.pex.digest, lambdex_setup.requirements_pex.digest))
     )
 
     # NB: Lambdex modifies its input pex in-place, so the input file is also the output file.
@@ -105,7 +100,7 @@ async def create_python_awslambda(
     # Note that the AWS-facing handler function is always lambdex_handler.handler, which
     # is the wrapper injected by lambdex that manages invocation of the actual handler.
     return CreatedAWSLambda(
-        digest=result.output_directory_digest,
+        digest=result.output_digest,
         name=pex_filename,
         runtime=config.runtime.value,
         handler="lambdex_handler.handler",

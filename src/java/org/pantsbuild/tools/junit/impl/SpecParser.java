@@ -3,10 +3,10 @@
 
 package org.pantsbuild.tools.junit.impl;
 
-import com.google.common.base.Optional;
 import java.lang.reflect.Method;
 import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.Optional;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
@@ -27,6 +27,8 @@ class SpecParser {
    * <ul>
    *   <li>package.className</li>
    *   <li>package.className#methodName</li>
+   *   <li>package.className#methodName[parameters]</li>
+   *   <li>package.className#space delimited scala test</li>
    * </ul>
    * Note that each class or method will only be executed once, no matter how many times it is
    * present in the list.
@@ -79,11 +81,14 @@ class SpecParser {
     if (Util.isTestClass(clazz)) {
       if (!specs.containsKey(clazz)) {
         Spec newSpec = new Spec(clazz);
+        if (ScalaTestUtil.isScalaTestTest(clazz) || Util.isUsingCustomRunner(clazz)) {
+          newSpec = newSpec.asCustomRunnerSpec();
+        }
         specs.put(clazz, newSpec);
       }
       return Optional.of(specs.get(clazz));
     }
-    return Optional.absent();
+    return Optional.empty();
   }
 
   private Class<?> loadClassOrThrow(final String className, String specString) {
@@ -121,6 +126,10 @@ class SpecParser {
     Optional<Spec> spec = getOrCreateSpec(className, specString);
     if (spec.isPresent()) {
       Spec s = spec.get();
+      if (s.methodNameAllowedToNotMatch()) {
+        specs.put(s.getSpecClass(), s.withMethod(methodName));
+        return;
+      }
       for (Method clazzMethod : s.getSpecClass().getMethods()) {
         if (clazzMethod.getName().equals(methodName)) {
           Spec specWithMethod = s.withMethod(methodName);

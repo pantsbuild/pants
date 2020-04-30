@@ -37,6 +37,7 @@ async def prepare_python_sources(targets: Targets) -> ImportablePythonSources:
         AllSourceFilesRequest(
             (tgt.get(Sources) for tgt in targets),
             for_sources_types=(PythonSources, ResourcesSources, FilesSources),
+            enable_codegen=True,
             strip_source_roots=True,
         )
     )

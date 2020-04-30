@@ -6,7 +6,7 @@ use fs::{self, GlobExpansionConjunction, GlobMatching, PathGlobs, StrictGlobMatc
 use futures::future::{FutureExt, TryFutureExt};
 use futures::stream::{BoxStream, StreamExt, TryStreamExt};
 use futures01::{future, Future};
-use log::info;
+use log::{debug, info};
 use nails::execution::{ChildOutput, ExitCode};
 
 use std::collections::{BTreeSet, HashSet};
@@ -81,11 +81,12 @@ impl CommandRunner {
       .collect();
 
     // TODO: should we error when globs fail?
-    let output_globs = try_future!(PathGlobs::create(
-      &try_future!(output_paths),
+    let output_globs = try_future!(PathGlobs::new(
+      try_future!(output_paths),
       StrictGlobMatching::Ignore,
       GlobExpansionConjunction::AllMatch,
-    ));
+    )
+    .parse());
 
     Box::pin(async move {
       let path_stats = posix_fs
@@ -149,7 +150,10 @@ impl StreamedHermeticCommand {
   ///
   /// TODO: See the note on references in ASYNC.md.
   ///
-  fn stream<'a, 'b>(&'a mut self) -> Result<BoxStream<'b, Result<ChildOutput, String>>, String> {
+  fn stream<'a, 'b>(
+    &'a mut self,
+    req: &Process,
+  ) -> Result<BoxStream<'b, Result<ChildOutput, String>>, String> {
     self
       .inner
       .stdin(Stdio::null())
@@ -158,6 +162,7 @@ impl StreamedHermeticCommand {
       .spawn()
       .map_err(|e| format!("Error launching process: {:?}", e))
       .and_then(|mut child| {
+        debug!("spawned local process as {} for {:?}", child.id(), req);
         let stdout_stream = FramedRead::new(child.stdout.take().unwrap(), BytesCodec::new())
           .map_ok(|bytes| ChildOutput::Stdout(bytes.into()))
           .boxed();
@@ -269,13 +274,13 @@ impl CapturedWorkdir for CommandRunner {
   ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String> {
     StreamedHermeticCommand::new(&req.argv[0])
       .args(&req.argv[1..])
-      .current_dir(if let Some(working_directory) = req.working_directory {
+      .current_dir(if let Some(ref working_directory) = req.working_directory {
         workdir_path.join(working_directory)
       } else {
         workdir_path.to_owned()
       })
       .envs(&req.env)
-      .stream()
+      .stream(&req)
   }
 }
 
@@ -368,18 +373,23 @@ pub trait CapturedWorkdir {
       //   https://github.com/pantsbuild/pants/issues/6089
       .map(ChildResults::collect_from)
       .and_then(move |child_results_future| {
-        timeout(req_timeout, child_results_future)
-          .boxed()
-          .compat()
-          .map_err(|e| e.to_string())
+        let maybe_timed_out_child_results = Box::pin(async move {
+          if let Some(req_timeout) = req_timeout {
+            timeout(req_timeout, child_results_future)
+              .await
+              .map_err(|e| e.to_string())?
+          } else {
+            child_results_future.await
+          }
+        });
+        maybe_timed_out_child_results.compat()
       })
-      .and_then(|res| res)
       .and_then(move |child_results| {
         let output_snapshot = if output_file_paths.is_empty() && output_dir_paths.is_empty() {
           future::ok(store::Snapshot::empty()).to_boxed()
         } else {
           // Use no ignore patterns, because we are looking for explicitly listed paths.
-          future::done(fs::GitignoreStyleExcludes::create(&[]))
+          future::done(fs::GitignoreStyleExcludes::create(vec![]))
             .and_then(|ignorer| future::done(fs::PosixFS::new(workdir_path2, ignorer, executor)))
             .map_err(|err| {
               format!(

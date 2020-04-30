@@ -348,11 +348,12 @@ async fn memfs_expand_basic() {
   let p1 = PathBuf::from("some/file");
   let p2 = PathBuf::from("some/other");
   let fs = Arc::new(MemFS::new(vec![p1.clone(), p2.join("file")]));
-  let globs = PathGlobs::create(
-    &["some/*".into()],
+  let globs = PathGlobs::new(
+    vec!["some/*".into()],
     StrictGlobMatching::Ignore,
     GlobExpansionConjunction::AnyMatch,
   )
+  .parse()
   .unwrap();
 
   assert_eq!(
@@ -385,7 +386,7 @@ async fn assert_only_file_is_executable(path: &Path, want_is_executable: bool) {
 fn new_posixfs<P: AsRef<Path>>(dir: P) -> PosixFS {
   PosixFS::new(
     dir.as_ref(),
-    GitignoreStyleExcludes::create(&[]).unwrap(),
+    GitignoreStyleExcludes::empty(),
     task_executor::Executor::new(Handle::current()),
   )
   .unwrap()
@@ -394,7 +395,7 @@ fn new_posixfs<P: AsRef<Path>>(dir: P) -> PosixFS {
 fn new_posixfs_symlink_oblivious<P: AsRef<Path>>(dir: P) -> PosixFS {
   PosixFS::new_with_symlink_behavior(
     dir.as_ref(),
-    GitignoreStyleExcludes::create(&[]).unwrap(),
+    GitignoreStyleExcludes::empty(),
     task_executor::Executor::new(Handle::current()),
     SymlinkBehavior::Oblivious,
   )
@@ -431,7 +432,8 @@ async fn test_basic_gitignore_functionality() {
   make_file(&gitignore_path, gitignore_content.as_bytes(), 0o700);
   let executor = task_executor::Executor::new(Handle::current());
   let ignorer =
-    GitignoreStyleExcludes::create_with_gitignore_file(&[], Some(gitignore_path.clone())).unwrap();
+    GitignoreStyleExcludes::create_with_gitignore_file(vec![], Some(gitignore_path.clone()))
+      .unwrap();
   let posix_fs = Arc::new(PosixFS::new(root.as_ref(), ignorer, executor).unwrap());
 
   let stats = read_mock_files(
@@ -453,7 +455,7 @@ async fn test_basic_gitignore_functionality() {
   // Test that .gitignore files work in tandem with explicit ignores.
   let executor = task_executor::Executor::new(Handle::current());
   let ignorer = GitignoreStyleExcludes::create_with_gitignore_file(
-    &["unimportant.x".to_string()],
+    vec!["unimportant.x".to_string()],
     Some(gitignore_path),
   )
   .unwrap();

@@ -24,7 +24,7 @@
 #![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
-
+#![type_length_limit = "7000100"]
 #[macro_use]
 extern crate derivative;
 
@@ -38,7 +38,7 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 use store::UploadSummary;
-use workunit_store::WorkUnitStore;
+use workunit_store::{with_workunit, WorkUnitStore, WorkunitMetadata};
 
 use futures::compat::Future01CompatExt;
 use futures::future::{FutureExt, TryFutureExt};
@@ -222,7 +222,7 @@ pub struct Process {
 
   pub output_directories: BTreeSet<PathBuf>,
 
-  pub timeout: std::time::Duration,
+  pub timeout: Option<std::time::Duration>,
 
   #[derivative(PartialEq = "ignore", Hash = "ignore")]
   pub description: String,
@@ -349,8 +349,17 @@ impl AddAssign<UploadSummary> for ExecutionStats {
 
 #[derive(Clone, Default)]
 pub struct Context {
-  pub workunit_store: WorkUnitStore,
-  pub build_id: String,
+  workunit_store: WorkUnitStore,
+  build_id: String,
+}
+
+impl Context {
+  pub fn new(workunit_store: WorkUnitStore, build_id: String) -> Context {
+    Context {
+      workunit_store,
+      build_id,
+    }
+  }
 }
 
 pub trait CommandRunner: Send + Sync {
@@ -424,11 +433,33 @@ impl CommandRunner for BoundedCommandRunner {
     context: Context,
   ) -> BoxFuture<FallibleProcessResultWithPlatform, String> {
     let inner = self.inner.clone();
-    self
-      .inner
-      .1
-      .clone()
-      .with_acquired(move || inner.0.run(req, context).compat())
+    let semaphor = self.inner.1.clone();
+    let name = req
+      .user_facing_name()
+      .unwrap_or_else(|| "Unamed node".to_string());
+    let inner_name = name.clone();
+    let outer_metadata = WorkunitMetadata {
+      desc: Some("Workunit waiting for opportunity to run".to_string()),
+      display: false,
+      blocked: true,
+    };
+    let inner_context = context.clone();
+    let bounded_fut = semaphor.with_acquired(move || {
+      let metadata = WorkunitMetadata {
+        desc: Some("Workunit executing currently".to_string()),
+        display: false,
+        blocked: false,
+      };
+      let f = inner.0.run(req, inner_context.clone()).compat();
+      with_workunit(
+        inner_context.workunit_store.clone(),
+        inner_name,
+        metadata,
+        f,
+      )
+    });
+
+    with_workunit(context.workunit_store, name, outer_metadata, bounded_fut)
       .boxed()
       .compat()
       .to_boxed()

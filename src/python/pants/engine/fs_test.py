@@ -16,17 +16,17 @@ from typing import Callable
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.fs import (
-    EMPTY_DIRECTORY_DIGEST,
+    EMPTY_DIGEST,
+    AddPrefix,
     Digest,
-    DirectoriesToMerge,
     DirectoryToMaterialize,
-    DirectoryWithPrefixToAdd,
-    DirectoryWithPrefixToStrip,
     FileContent,
     FilesContent,
     InputFilesContent,
+    MergeDigests,
     PathGlobs,
     PathGlobsAndRoot,
+    RemovePrefix,
     Snapshot,
     SnapshotSubset,
     UrlToFetch,
@@ -67,9 +67,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         snapshot = self.execute_expecting_one_result(
             scheduler, Snapshot, self.path_globs(filespecs_or_globs)
         ).value
-        result = self.execute_expecting_one_result(
-            scheduler, FilesContent, snapshot.directory_digest
-        ).value
+        result = self.execute_expecting_one_result(scheduler, FilesContent, snapshot.digest).value
         return {f.path: f.content for f in result.dependencies}
 
     def assert_walk_dirs(self, filespecs_or_globs, paths, **kwargs):
@@ -100,7 +98,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
             result = self.execute(scheduler, Snapshot, self.path_globs(filespecs_or_globs))[0]
             # Confirm all expected files were digested.
             self.assertEqual(set(expected_files), set(result.files))
-            self.assertTrue(result.directory_digest.fingerprint is not None)
+            self.assertTrue(result.digest.fingerprint is not None)
 
     def test_walk_literal(self):
         self.assert_walk_files(["4.txt"], ["4.txt"])
@@ -284,7 +282,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
                 ["susannah"],
                 Digest("d3539cfc21eb4bab328ca9173144a8e932c515b1b9e26695454eeedbc5a95f6f", 82),
             )
-            self.assert_snapshot_equals(snapshots[2], [], EMPTY_DIRECTORY_DIGEST)
+            self.assert_snapshot_equals(snapshots[2], [], EMPTY_DIGEST)
 
     def test_snapshot_from_outside_buildroot_failure(self):
         with temporary_dir() as temp_dir:
@@ -296,14 +294,14 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
                 )
             self.assertIn("doesnotexist", str(cm.exception))
 
-    def assert_snapshot_equals(self, snapshot, files, directory_digest):
+    def assert_snapshot_equals(self, snapshot, files, digest):
         self.assertEqual(list(snapshot.files), files)
-        self.assertEqual(snapshot.directory_digest, directory_digest)
+        self.assertEqual(snapshot.digest, digest)
 
     def test_merge_zero_directories(self):
         scheduler = self.mk_scheduler(rules=create_fs_rules())
         dir = scheduler.merge_directories(())
-        self.assertEqual(EMPTY_DIRECTORY_DIGEST, dir)
+        self.assertEqual(EMPTY_DIGEST, dir)
 
     def test_synchronously_merge_directories(self):
         with temporary_dir() as temp_dir:
@@ -325,25 +323,23 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
                 )
             )
 
-            empty_merged = self.scheduler.merge_directories((empty_snapshot.directory_digest,))
+            empty_merged = self.scheduler.merge_directories((empty_snapshot.digest,))
             self.assertEqual(
-                empty_snapshot.directory_digest, empty_merged,
+                empty_snapshot.digest, empty_merged,
             )
 
             roland_merged = self.scheduler.merge_directories(
-                (roland_snapshot.directory_digest, empty_snapshot.directory_digest,)
+                (roland_snapshot.digest, empty_snapshot.digest)
             )
-            self.assertEqual(
-                roland_snapshot.directory_digest, roland_merged,
-            )
+            self.assertEqual(roland_snapshot.digest, roland_merged)
 
             both_merged = self.scheduler.merge_directories(
-                (roland_snapshot.directory_digest, susannah_snapshot.directory_digest,)
+                (roland_snapshot.digest, susannah_snapshot.digest)
             )
 
-            self.assertEqual(both_snapshot.directory_digest, both_merged)
+            self.assertEqual(both_snapshot.digest, both_merged)
 
-    def test_asynchronously_merge_directories(self):
+    def test_asynchronously_merge_digests(self):
         with temporary_dir() as temp_dir:
             with open(os.path.join(temp_dir, "roland"), "w") as f:
                 f.write("European Burmese")
@@ -364,28 +360,22 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
             )
 
             empty_merged = self.request_single_product(
-                Digest, DirectoriesToMerge((empty_snapshot.directory_digest,)),
+                Digest, MergeDigests((empty_snapshot.digest,)),
             )
-            self.assertEqual(empty_snapshot.directory_digest, empty_merged)
+            self.assertEqual(empty_snapshot.digest, empty_merged)
 
             roland_merged = self.request_single_product(
-                Digest,
-                DirectoriesToMerge(
-                    (roland_snapshot.directory_digest, empty_snapshot.directory_digest)
-                ),
+                Digest, MergeDigests((roland_snapshot.digest, empty_snapshot.digest)),
             )
             self.assertEqual(
-                roland_snapshot.directory_digest, roland_merged,
+                roland_snapshot.digest, roland_merged,
             )
 
             both_merged = self.request_single_product(
-                Digest,
-                DirectoriesToMerge(
-                    (roland_snapshot.directory_digest, susannah_snapshot.directory_digest)
-                ),
+                Digest, MergeDigests((roland_snapshot.digest, susannah_snapshot.digest)),
             )
 
-            self.assertEqual(both_snapshot.directory_digest, both_merged)
+            self.assertEqual(both_snapshot.digest, both_merged)
 
     def test_materialize_directories(self):
         self.prime_store_with_roland_digest()
@@ -403,14 +393,14 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
 
         digest = self.request_single_product(Digest, input_files_content)
 
-        dpa = DirectoryWithPrefixToAdd(digest, "outer_dir")
+        dpa = AddPrefix(digest, "outer_dir")
         output_digest = self.request_single_product(Digest, dpa)
         snapshot = self.request_single_product(Snapshot, output_digest)
 
         self.assertEqual(sorted(snapshot.files), ["outer_dir/main.py", "outer_dir/subdir/sub.py"])
         self.assertEqual(sorted(snapshot.dirs), ["outer_dir", "outer_dir/subdir"])
 
-    def test_strip_prefix(self):
+    def test_remove_prefix(self):
         # Set up files:
 
         relevant_files = (
@@ -451,14 +441,13 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
 
             # Strip empty prefix:
             zero_prefix_stripped_digest = self.request_single_product(
-                Digest, DirectoryWithPrefixToStrip(snapshot.directory_digest, ""),
+                Digest, RemovePrefix(snapshot.digest, ""),
             )
-            self.assertEquals(snapshot.directory_digest, zero_prefix_stripped_digest)
+            self.assertEquals(snapshot.digest, zero_prefix_stripped_digest)
 
             # Strip a non-empty prefix shared by all files:
             stripped_digest = self.request_single_product(
-                Digest,
-                DirectoryWithPrefixToStrip(snapshot.directory_digest, "characters/dark_tower"),
+                Digest, RemovePrefix(snapshot.digest, "characters/dark_tower"),
             )
             self.assertEquals(
                 stripped_digest,
@@ -471,7 +460,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
                 self.scheduler.capture_snapshots((PathGlobsAndRoot(PathGlobs(["*"]), tower_dir),))
             )
             self.assertEquals(expected_snapshot.files, ("roland", "susannah"))
-            self.assertEquals(stripped_digest, expected_snapshot.directory_digest)
+            self.assertEquals(stripped_digest, expected_snapshot.digest)
 
             # Try to strip a prefix which isn't shared by all files:
             with self.assertRaisesWithMessageContaining(
@@ -481,17 +470,14 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
                 "contained non-matching directory named: books and file named: index",
             ):
                 self.request_single_product(
-                    Digest,
-                    DirectoryWithPrefixToStrip(
-                        snapshot_with_extra_files.directory_digest, "characters/dark_tower"
-                    ),
+                    Digest, RemovePrefix(snapshot_with_extra_files.digest, "characters/dark_tower"),
                 )
 
-    def test_lift_directory_digest_to_snapshot(self):
+    def test_lift_digest_to_snapshot(self):
         digest = self.prime_store_with_roland_digest()
         snapshot = self.request_single_product(Snapshot, digest)
         self.assertEquals(snapshot.files, ("roland",))
-        self.assertEquals(snapshot.directory_digest, digest)
+        self.assertEquals(snapshot.digest, digest)
 
     def test_error_lifting_file_digest_to_snapshot(self):
         self.prime_store_with_roland_digest()
@@ -660,16 +646,15 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         return self.request_single_product(Digest, input_files_content)
 
     def test_empty_snapshot_subset(self) -> None:
-        ss = SnapshotSubset(directory_digest=self.generate_original_digest(), globs=PathGlobs(()),)
+        ss = SnapshotSubset(self.generate_original_digest(), PathGlobs(()),)
         subset_snapshot = self.request_single_product(Snapshot, ss)
-        assert subset_snapshot.directory_digest == EMPTY_DIRECTORY_DIGEST
+        assert subset_snapshot.digest == EMPTY_DIGEST
         assert subset_snapshot.files == ()
         assert subset_snapshot.dirs == ()
 
     def test_snapshot_subset_globs(self) -> None:
         ss = SnapshotSubset(
-            directory_digest=self.generate_original_digest(),
-            globs=PathGlobs(("a.txt", "c.txt", "subdir2/**")),
+            self.generate_original_digest(), PathGlobs(("a.txt", "c.txt", "subdir2/**")),
         )
 
         subset_snapshot = self.request_single_product(Snapshot, ss)
@@ -691,12 +676,11 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
             )
         )
         subset_digest = self.request_single_product(Digest, subset_input)
-        assert subset_snapshot.directory_digest == subset_digest
+        assert subset_snapshot.digest == subset_digest
 
     def test_snapshot_subset_globs_2(self) -> None:
         ss = SnapshotSubset(
-            directory_digest=self.generate_original_digest(),
-            globs=PathGlobs(("a.txt", "c.txt", "subdir2/*")),
+            self.generate_original_digest(), PathGlobs(("a.txt", "c.txt", "subdir2/*"))
         )
 
         subset_snapshot = self.request_single_product(Snapshot, ss)
@@ -706,8 +690,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
     def test_nonexistent_filename_globs(self) -> None:
         # We expect to ignore, rather than error, on files that don't exist in the original snapshot.
         ss = SnapshotSubset(
-            directory_digest=self.generate_original_digest(),
-            globs=PathGlobs(("some_file_not_in_snapshot.txt", "a.txt")),
+            self.generate_original_digest(), PathGlobs(("some_file_not_in_snapshot.txt", "a.txt")),
         )
 
         subset_snapshot = self.request_single_product(Snapshot, ss)
@@ -717,7 +700,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         subset_input = InputFilesContent((FileContent(path="a.txt", content=content),))
 
         subset_digest = self.request_single_product(Digest, subset_input)
-        assert subset_snapshot.directory_digest == subset_digest
+        assert subset_snapshot.digest == subset_digest
 
     def test_file_content_invalidated(self) -> None:
         """Test that we can update files and have the native engine invalidate previous operations
@@ -769,7 +752,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
                     f"Deleting parent dir and could still read file from original snapshot."
                 )
 
-    def assert_mutated_directory_digest(
+    def assert_mutated_digest(
         self, mutation_function: Callable[[FileSystemProjectTree, str], Exception]
     ):
         with self.mk_project_tree() as project_tree:
@@ -787,7 +770,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
                     scheduler, Snapshot, self.path_globs([dir_glob])
                 ).value
                 assert not new_snapshot.is_empty
-                if initial_snapshot.directory_digest != new_snapshot.directory_digest:
+                if initial_snapshot.digest != new_snapshot.digest:
                     # successfully invalidated snapshot and got a new digest
                     return True
                 return False
@@ -803,7 +786,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
                 return True
         return False
 
-    def test_directory_digest_invalidated_by_child_removal(self):
+    def test_digest_invalidated_by_child_removal(self):
         def mutation_function(project_tree, dir_path):
             removed_path = os.path.join(project_tree.build_root, dir_path, "3.txt")
             os.remove(removed_path)
@@ -811,9 +794,9 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
                 f"Did not find a new directory snapshot after adding file {removed_path}."
             )
 
-        self.assert_mutated_directory_digest(mutation_function)
+        self.assert_mutated_digest(mutation_function)
 
-    def test_directory_digest_invalidated_by_child_change(self):
+    def test_digest_invalidated_by_child_change(self):
         def mutation_function(project_tree, dir_path):
             new_file_path = os.path.join(project_tree.build_root, dir_path, "new_file.txt")
             with open(new_file_path, "w") as f:
@@ -822,7 +805,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
                 f"Did not find a new directory snapshot after adding file {new_file_path}."
             )
 
-        self.assert_mutated_directory_digest(mutation_function)
+        self.assert_mutated_digest(mutation_function)
 
 
 class StubHandler(BaseHTTPRequestHandler):

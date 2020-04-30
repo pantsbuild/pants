@@ -36,7 +36,7 @@ from pants.base.exceptions import TaskError
 from pants.base.worker_pool import WorkerPool
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.target import Target
-from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, PathGlobs, PathGlobsAndRoot
+from pants.engine.fs import EMPTY_DIGEST, PathGlobs, PathGlobsAndRoot
 from pants.java.distribution.distribution import DistributionLocator
 from pants.option.compiler_option_sets_mixin import CompilerOptionSetsMixin
 from pants.option.ranked_value import RankedValue
@@ -399,7 +399,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
         # TODO: Switch to using #7739 once it is available.
         extra_resources = self.post_compile_extra_resources(compile_context)
         if not extra_resources:
-            return EMPTY_DIRECTORY_DIGEST
+            return EMPTY_DIGEST
 
         def _snapshot_resources(resources, prefix="."):
             with temporary_dir() as root_dir:
@@ -415,7 +415,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
                     [PathGlobsAndRoot(PathGlobs(extra_resources_relative_to_rootdir), root_dir)]
                 )
 
-            return snapshot.directory_digest
+            return snapshot.digest
 
         if prepend_post_merge_relative_path:
             rel_post_compile_merge_dir = fast_relpath(
@@ -683,7 +683,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
         )
         for target, snapshot in list(zip(valid_targets, snapshots)):
             cc = self.select_runtime_context(compile_contexts[target])
-            self._set_directory_digest_for_compile_context(cc, snapshot.directory_digest)
+            self._set_directory_digest_for_compile_context(cc, snapshot.digest)
 
     def _set_directory_digest_for_compile_context(self, ctx, directory_digest):
         if self.get_options().use_classpath_jars:

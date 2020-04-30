@@ -25,14 +25,14 @@ from pants.engine.addresses import (
 )
 from pants.engine.fs import EMPTY_SNAPSHOT, PathGlobs, Snapshot, SourcesSnapshot, SourcesSnapshots
 from pants.engine.internals.parser import HydratedStruct
-from pants.engine.legacy.address_mapper import LegacyAddressMapper
-from pants.engine.legacy.graph import HydratedField, HydratedTarget, HydratedTargets, logger
+from pants.engine.legacy.graph import HydratedField, logger
 from pants.engine.legacy.structs import HydrateableField, SourcesField, TargetAdaptor
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
     Dependencies,
     RegisteredTargetTypes,
+    Sources,
     Target,
     Targets,
     TargetsWithOrigins,
@@ -201,31 +201,18 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
 
     # Walk up the buildroot looking for targets that would conceivably claim changed sources.
     candidate_specs = tuple(AscendantAddresses(directory=d) for d in dirs_set)
-    candidate_targets = await Get[HydratedTargets](AddressSpecs(candidate_specs))
-
-    # Match the source globs against the expanded candidate targets.
-    def owns_any_source(legacy_target: HydratedTarget) -> bool:
-        """Given a `HydratedTarget` instance, check if it owns the given source file."""
-        target_kwargs = legacy_target.adaptor.kwargs()
-
-        # Handle `sources`-declaring targets.
-        # NB: Deleted files can only be matched against the 'filespec' (ie, `PathGlobs`) for a target,
-        # so we don't actually call `fileset.matches` here.
-        # TODO: This matching logic should be implemented using the rust `fs` crate for two reasons:
-        #  1) having two implementations isn't great
-        #  2) we're expanding sources via HydratedTarget, but it isn't necessary to do that to match
-        target_sources = target_kwargs.get("sources", None)
-        return target_sources and any_matches_filespec(
-            paths=sources_set, spec=target_sources.filespec
-        )
-
+    candidate_targets = await Get[Targets](AddressSpecs(candidate_specs))
     build_file_addresses = await MultiGet(
-        Get[BuildFileAddress](Address, ht.adaptor.address) for ht in candidate_targets
+        Get[BuildFileAddress](Address, tgt.address) for tgt in candidate_targets
     )
+
     owners = Addresses(
-        ht.adaptor.address
-        for ht, bfa in zip(candidate_targets, build_file_addresses)
-        if LegacyAddressMapper.any_is_declaring_file(bfa, sources_set) or owns_any_source(ht)
+        tgt.address
+        for tgt, bfa in zip(candidate_targets, build_file_addresses)
+        if bfa.rel_path in sources_set
+        # NB: Deleted files can only be matched against the 'filespec' (i.e. `PathGlobs`) for a
+        # target, which is why we use `any_matches_filespec`.
+        or any_matches_filespec(sources_set, tgt.get(Sources).filespec)
     )
     return Owners(owners)
 

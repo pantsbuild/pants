@@ -26,7 +26,6 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.target import Target
 from pants.engine.fs import Digest, PathGlobs, PathGlobsAndRoot
 from pants.invalidation.cache_manager import VersionedTargetSet
-from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.java import util
 from pants.java.executor import Executor
 from pants.util.dirutil import fast_relpath, safe_mkdir_for
@@ -100,7 +99,7 @@ class BootstrapJvmTools(CoursierMixin, JarTask):
 
     @classmethod
     def subsystem_dependencies(cls):
-        return super().subsystem_dependencies() + (IvySubsystem, Shader.Factory)
+        return super().subsystem_dependencies() + (Shader.Factory,)
 
     @classmethod
     def prepare(cls, options, round_manager):
@@ -189,8 +188,8 @@ class BootstrapJvmTools(CoursierMixin, JarTask):
                             )
                         else:
                             # The tool classpath is empty by default, so we just inject a dummy target that
-                            # ivy resolves as the empty list classpath.  JarLibrary won't do since it requires
-                            # one or more jars, so we just pick a target type ivy has no resolve work to do for.
+                            # coursier resolves as the empty list classpath.  JarLibrary won't do since it requires
+                            # one or more jars, so we just pick a target type coursier has no resolve work to do for.
                             tool_classpath_target = Target(
                                 name=dep_address.target_name,
                                 address=dep_address,
@@ -215,13 +214,8 @@ class BootstrapJvmTools(CoursierMixin, JarTask):
             callback_product_map = self.context.products.get_data(
                 "jvm_build_tools_classpath_callbacks", init_func=lambda: defaultdict(dict)
             )
-            # We leave a callback in the products map because we want these Ivy calls
-            # to be done lazily (they might never actually get executed) and we want
-            # to hit Task.invalidated (called in Task._ivy_resolve) on the instance of
-            # BootstrapJvmTools rather than the instance of whatever class requires
-            # the bootstrap tools.  It would be awkward and possibly incorrect to call
-            # self.invalidated twice on a Task that does meaningful invalidation on its
-            # targets. -pl
+            # We leave a callback in the products map because we want these resolver calls
+            # to be done lazily (they might never actually get executed).
             for jvm_tool in registered_tools:
                 dep_spec = jvm_tool.dep_spec(self.context.options)
                 callback = self.cached_bootstrap_classpath_callback(dep_spec, jvm_tool)
@@ -373,8 +367,8 @@ class BootstrapJvmTools(CoursierMixin, JarTask):
                 )
             ]
         )[0]
-        snapshot.directory_digest.dump(shaded_jar)
-        return ClasspathEntry(shaded_jar, directory_digest=snapshot.directory_digest)
+        snapshot.digest.dump(shaded_jar)
+        return ClasspathEntry(shaded_jar, directory_digest=snapshot.digest)
 
     def check_artifact_cache_for(self, invalidation_check):
         tool_vts = self.tool_vts(invalidation_check)

@@ -26,7 +26,7 @@ use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::{self, BufMut};
 use fs::{
   self, Dir, DirectoryListing, File, FileContent, GlobExpansionConjunction, GlobMatching, Link,
-  PathGlobs, PathStat, StrictGlobMatching, VFS,
+  PathGlobs, PathStat, PreparedPathGlobs, StrictGlobMatching, VFS,
 };
 use hashing;
 use process_execution::{self, MultiPlatformProcess, PlatformConstraint, Process, RelativePath};
@@ -258,9 +258,11 @@ impl MultiPlatformExecuteProcess {
       .parse::<f64>()
       .map_err(|err| format!("Timeout was not a float: {:?}", err))?;
 
-    if timeout_in_seconds < 0.0 {
-      return Err(format!("Timeout was negative: {:?}", timeout_in_seconds));
-    }
+    let timeout = if timeout_in_seconds < 0.0 {
+      None
+    } else {
+      Some(Duration::from_millis((timeout_in_seconds * 1000.0) as u64))
+    };
 
     let description = externs::project_str(&value, "description");
 
@@ -289,7 +291,7 @@ impl MultiPlatformExecuteProcess {
       input_files: digest,
       output_files,
       output_directories,
-      timeout: Duration::from_millis((timeout_in_seconds * 1000.0) as u64),
+      timeout,
       description,
       unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule,
       jdk_home,
@@ -345,10 +347,10 @@ impl WrappedNode for MultiPlatformExecuteProcess {
 
   fn run(self, context: Context) -> NodeFuture<ProcessResult> {
     let request = self.0;
-    let execution_context = process_execution::Context {
-      workunit_store: context.session.workunit_store(),
-      build_id: context.session.build_id().to_string(),
-    };
+    let execution_context = process_execution::Context::new(
+      context.session.workunit_store(),
+      context.session.build_id().to_string(),
+    );
     if context
       .core
       .command_runner
@@ -481,7 +483,7 @@ impl From<Scandir> for NodeKey {
 pub struct Snapshot(pub Key);
 
 impl Snapshot {
-  fn create(context: Context, path_globs: PathGlobs) -> NodeFuture<store::Snapshot> {
+  fn create(context: Context, path_globs: PreparedPathGlobs) -> NodeFuture<store::Snapshot> {
     // Recursively expand PathGlobs into PathStats.
     // We rely on Context::expand tracking dependencies for scandirs,
     // and store::Snapshot::from_path_stats tracking dependencies for file digests.
@@ -499,7 +501,7 @@ impl Snapshot {
     .to_boxed()
   }
 
-  pub fn lift_path_globs(item: &Value) -> Result<PathGlobs, String> {
+  pub fn lift_path_globs(item: &Value) -> Result<PreparedPathGlobs, String> {
     let globs = externs::project_multi_strs(item, "globs");
 
     let description_of_origin_field = externs::project_str(item, "description_of_origin");
@@ -519,7 +521,8 @@ impl Snapshot {
     let conjunction_string = externs::project_str(&conjunction_obj, "value");
     let conjunction = GlobExpansionConjunction::create(&conjunction_string)?;
 
-    PathGlobs::create(&globs, strict_glob_matching, conjunction)
+    PathGlobs::new(globs.clone(), strict_glob_matching, conjunction)
+      .parse()
       .map_err(|e| format!("Failed to parse PathGlobs for globs({:?}): {}", globs, e))
   }
 
@@ -1053,22 +1056,25 @@ impl Node for NodeKey {
 
   fn run(self, context: Context) -> NodeFuture<NodeResult> {
     let mut workunit_state = workunit_store::expect_workunit_state();
-    let maybe_started_workunit_id: Option<String> = if context.session.should_handle_workunits() {
-      self.user_facing_name().map(|node_name| {
-        let span_id = new_span_id();
-        let desc = self.display_info().and_then(|di| di.desc.as_ref().cloned());
 
-        // We're starting a new workunit: record our parent, and set the current parent to our span.
-        let parent_id = std::mem::replace(&mut workunit_state.parent_id, Some(span_id.clone()));
-        let metadata = WorkunitMetadata { desc };
+    let started_workunit_id = {
+      let display = context.session.should_handle_workunits() && self.user_facing_name().is_some();
+      let name = self.user_facing_name().unwrap_or(format!("{}", self));
+      let span_id = new_span_id();
+      let desc = self.display_info().and_then(|di| di.desc.as_ref().cloned());
 
-        context
-          .session
-          .workunit_store()
-          .start_workunit(span_id, node_name, parent_id, metadata)
-      })
-    } else {
-      None
+      // We're starting a new workunit: record our parent, and set the current parent to our span.
+      let parent_id = std::mem::replace(&mut workunit_state.parent_id, Some(span_id.clone()));
+      let metadata = WorkunitMetadata {
+        desc,
+        display,
+        blocked: false,
+      };
+
+      context
+        .session
+        .workunit_store()
+        .start_workunit(span_id, name, parent_id, metadata)
     };
 
     scope_task_workunit_state(Some(workunit_state), async move {
@@ -1100,13 +1106,11 @@ impl Node for NodeKey {
         },
         Err(e) => Err(e),
       };
-      if let Some(id) = maybe_started_workunit_id {
-        context2
-          .session
-          .workunit_store()
-          .complete_workunit(id)
-          .unwrap();
-      }
+      context2
+        .session
+        .workunit_store()
+        .complete_workunit(started_workunit_id)
+        .unwrap();
       result
     })
     .boxed()

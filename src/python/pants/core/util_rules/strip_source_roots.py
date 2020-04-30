@@ -11,9 +11,9 @@ from pants.engine.addresses import Address
 from pants.engine.fs import (
     EMPTY_SNAPSHOT,
     Digest,
-    DirectoriesToMerge,
-    DirectoryWithPrefixToStrip,
+    MergeDigests,
     PathGlobs,
+    RemovePrefix,
     Snapshot,
     SnapshotSubset,
 )
@@ -21,7 +21,6 @@ from pants.engine.rules import RootRule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import HydratedSources, HydrateSourcesRequest
 from pants.engine.target import Sources as SourcesField
-from pants.engine.target import rules as target_rules
 from pants.source.source_root import NoSourceRootError, SourceRootConfig
 from pants.util.meta import frozen_after_init
 
@@ -58,18 +57,21 @@ class StripSourcesFieldRequest:
     """
 
     sources_field: SourcesField
-    for_sources_types: Tuple[Type[SourcesField], ...] = (SourcesField,)
-    specified_files_snapshot: Optional[Snapshot] = None
+    for_sources_types: Tuple[Type[SourcesField], ...]
+    enable_codegen: bool
+    specified_files_snapshot: Optional[Snapshot]
 
     def __init__(
         self,
         sources_field: SourcesField,
         *,
         for_sources_types: Iterable[Type[SourcesField]] = (SourcesField,),
+        enable_codegen: bool = False,
         specified_files_snapshot: Optional[Snapshot] = None,
     ) -> None:
         self.sources_field = sources_field
         self.for_sources_types = tuple(for_sources_types)
+        self.enable_codegen = enable_codegen
         self.specified_files_snapshot = specified_files_snapshot
 
 
@@ -92,9 +94,8 @@ async def strip_source_roots_from_snapshot(
 
     if request.representative_path is not None:
         resulting_digest = await Get[Digest](
-            DirectoryWithPrefixToStrip(
-                directory_digest=request.snapshot.directory_digest,
-                prefix=determine_source_root(request.representative_path),
+            RemovePrefix(
+                request.snapshot.digest, determine_source_root(request.representative_path),
             )
         )
         resulting_snapshot = await Get[Snapshot](Digest, resulting_digest)
@@ -107,23 +108,15 @@ async def strip_source_roots_from_snapshot(
         )
     }
     snapshot_subsets = await MultiGet(
-        Get[Snapshot](
-            SnapshotSubset(
-                directory_digest=request.snapshot.directory_digest, globs=PathGlobs(files),
-            )
-        )
+        Get[Snapshot](SnapshotSubset(request.snapshot.digest, PathGlobs(files)))
         for files in files_grouped_by_source_root.values()
     )
     resulting_digests = await MultiGet(
-        Get[Digest](
-            DirectoryWithPrefixToStrip(
-                directory_digest=snapshot.directory_digest, prefix=source_root
-            )
-        )
+        Get[Digest](RemovePrefix(snapshot.digest, source_root))
         for snapshot, source_root in zip(snapshot_subsets, files_grouped_by_source_root.keys())
     )
 
-    merged_result = await Get[Digest](DirectoriesToMerge(resulting_digests))
+    merged_result = await Get[Digest](MergeDigests(resulting_digests))
     resulting_snapshot = await Get[Snapshot](Digest, merged_result)
     return SourceRootStrippedSources(resulting_snapshot)
 
@@ -145,7 +138,9 @@ async def strip_source_roots_from_sources_field(
     else:
         hydrated_sources = await Get[HydratedSources](
             HydrateSourcesRequest(
-                request.sources_field, for_sources_types=request.for_sources_types
+                request.sources_field,
+                for_sources_types=request.for_sources_types,
+                enable_codegen=request.enable_codegen,
             )
         )
         sources_snapshot = hydrated_sources.snapshot
@@ -174,5 +169,4 @@ def rules():
         subsystem_rule(SourceRootConfig),
         RootRule(StripSnapshotRequest),
         RootRule(StripSourcesFieldRequest),
-        *target_rules(),
     ]

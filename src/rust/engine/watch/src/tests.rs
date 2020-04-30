@@ -57,7 +57,7 @@ fn receive_watch_event_on_file_change() {
     .to_path_buf();
 
   let invalidatable = Arc::new(TestInvalidatable::default());
-  let ignorer = GitignoreStyleExcludes::create(&[]).unwrap();
+  let ignorer = GitignoreStyleExcludes::empty();
   let _watcher = setup_watch(
     ignorer,
     invalidatable.clone(),
@@ -96,7 +96,7 @@ fn ignore_file_events_matching_patterns_in_pants_ignore() {
     .to_path_buf();
 
   let invalidatable = Arc::new(TestInvalidatable::default());
-  let ignorer = GitignoreStyleExcludes::create(&["/foo".to_string()]).unwrap();
+  let ignorer = GitignoreStyleExcludes::create(vec!["/foo".to_string()]).unwrap();
   let _watcher = setup_watch(
     ignorer,
     invalidatable.clone(),
@@ -124,7 +124,7 @@ fn test_liveness() {
   let build_root = tempdir.path().to_path_buf();
 
   let invalidatable = Arc::new(TestInvalidatable::default());
-  let ignorer = GitignoreStyleExcludes::create(&[]).unwrap();
+  let ignorer = GitignoreStyleExcludes::empty();
   let (liveness_sender, liveness_receiver) = crossbeam_channel::unbounded();
   let (event_sender, event_receiver) = crossbeam_channel::unbounded();
   InvalidationWatcher::start_background_thread(

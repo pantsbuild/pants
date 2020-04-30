@@ -357,7 +357,7 @@ fn make_core(
     types,
     intrinsics,
     PathBuf::from(build_root_buf.to_os_string()),
-    &ignore_patterns,
+    ignore_patterns,
     use_gitignore,
     PathBuf::from(local_store_dir_buf.to_os_string()),
     remote_execution,
@@ -399,7 +399,7 @@ fn make_core(
   )
 }
 
-fn started_workunit_to_py_value(started_workunit: &StartedWorkUnit) -> Value {
+fn started_workunit_to_py_value(started_workunit: &StartedWorkUnit) -> Option<Value> {
   use std::time::UNIX_EPOCH;
   let duration = started_workunit
     .start_time
@@ -438,10 +438,10 @@ fn started_workunit_to_py_value(started_workunit: &StartedWorkUnit) -> Value {
     ));
   }
 
-  externs::store_dict(&dict_entries.as_slice())
+  Some(externs::store_dict(&dict_entries.as_slice()))
 }
 
-fn workunit_to_py_value(workunit: &WorkUnit) -> Value {
+fn workunit_to_py_value(workunit: &WorkUnit) -> Option<Value> {
   let mut dict_entries = vec![
     (
       externs::store_utf8("name"),
@@ -482,12 +482,12 @@ fn workunit_to_py_value(workunit: &WorkUnit) -> Value {
     ));
   }
 
-  externs::store_dict(&dict_entries.as_slice())
+  Some(externs::store_dict(&dict_entries.as_slice()))
 }
 
 fn workunits_to_py_tuple_value<'a>(workunits: impl Iterator<Item = &'a WorkUnit>) -> Value {
   let workunit_values = workunits
-    .map(|workunit: &WorkUnit| workunit_to_py_value(workunit))
+    .flat_map(|workunit: &WorkUnit| workunit_to_py_value(workunit))
     .collect::<Vec<_>>();
   externs::store_tuple(&workunit_values)
 }
@@ -496,7 +496,7 @@ fn started_workunits_to_py_tuple_value<'a>(
   workunits: impl Iterator<Item = &'a StartedWorkUnit>,
 ) -> Value {
   let workunit_values = workunits
-    .map(|started_workunit: &StartedWorkUnit| started_workunit_to_py_value(started_workunit))
+    .flat_map(|started_workunit: &StartedWorkUnit| started_workunit_to_py_value(started_workunit))
     .collect::<Vec<_>>();
   externs::store_tuple(&workunit_values)
 }
@@ -906,12 +906,11 @@ pub extern "C" fn match_path_globs(path_globs: Handle, paths_buf: BufferBuffer) 
     }
   };
 
-  let paths = paths_buf
+  let matched = paths_buf
     .to_os_strings()
     .into_iter()
-    .map(PathBuf::from)
-    .collect::<Vec<_>>();
-  externs::store_bool(path_globs.matches(&paths)).into()
+    .any(|s| path_globs.matches(s.as_ref()));
+  externs::store_bool(matched).into()
 }
 
 #[no_mangle]
@@ -1114,8 +1113,7 @@ pub extern "C" fn materialize_directories(
     values
       .iter()
       .map(|value| {
-        let dir_digest =
-          nodes::lift_digest(&externs::project_ignoring_type(&value, "directory_digest"));
+        let dir_digest = nodes::lift_digest(&externs::project_ignoring_type(&value, "digest"));
         let path_prefix = PathBuf::from(externs::project_str(&value, "path_prefix"));
         dir_digest.map(|dir_digest| (dir_digest, path_prefix))
       })

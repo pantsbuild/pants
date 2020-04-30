@@ -21,7 +21,7 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.mirrored_target_option_mixin import MirroredTargetOptionMixin
 from pants.engine.fs import (
-    EMPTY_DIRECTORY_DIGEST,
+    EMPTY_DIGEST,
     Digest,
     DirectoryToMaterialize,
     PathGlobs,
@@ -327,9 +327,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
                         ),
                     ]
                 )
-                rsc_cc.rsc_jar_file.hydrate_missing_directory_digest(
-                    classes_dir_snapshot.directory_digest
-                )
+                rsc_cc.rsc_jar_file.hydrate_missing_directory_digest(classes_dir_snapshot.digest)
 
             if rsc_cc.workflow is not None:
                 cp_entries = match(
@@ -488,7 +486,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
                 )
 
                 classpath_paths = []
-                classpath_directory_digests = []
+                classpath_digests = []
                 classpath_product = self.context.products.get_data("rsc_mixed_compile_classpath")
                 classpath_entries = classpath_product.get_classpath_entries_for_targets(
                     dependencies_for_target
@@ -502,7 +500,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
                             "ClasspathEntry {} didn't have a Digest, so won't be present for hermetic "
                             "execution of {}".format(classpath_entry, outliner)
                         )
-                    classpath_directory_digests.append(classpath_entry.directory_digest)
+                    classpath_digests.append(classpath_entry.directory_digest)
 
                 ctx.ensure_output_dirs_exist()
 
@@ -525,15 +523,14 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
                         )
 
                         merged_sources_and_jdk_digest = self.context._scheduler.merge_directories(
-                            (jdk_libs_digest, sources_snapshot.directory_digest)
-                            + tuple(classpath_directory_digests)
+                            (jdk_libs_digest, sources_snapshot.digest) + tuple(classpath_digests)
                         )
                         classpath_rel_jdk = classpath_paths + jdk_libs_rel
                         return (merged_sources_and_jdk_digest, classpath_rel_jdk)
 
                     def nonhermetic_digest_classpath():
                         classpath_abs_jdk = classpath_paths + self._jdk_libs_abs(distribution)
-                        return ((EMPTY_DIRECTORY_DIGEST), classpath_abs_jdk)
+                        return ((EMPTY_DIGEST), classpath_abs_jdk)
 
                     (input_digest, classpath_entry_paths) = match(
                         self.execution_strategy,
@@ -889,15 +886,13 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         if pathglobs:
             root = PathGlobsAndRoot(PathGlobs(tuple(pathglobs)), get_buildroot())
             # dont capture snapshot, if pathglobs is empty
-            path_globs_input_digest = self.context._scheduler.capture_snapshots((root,))[
-                0
-            ].directory_digest
+            path_globs_input_digest = self.context._scheduler.capture_snapshots((root,))[0].digest
 
         epr_input_files = self.context._scheduler.merge_directories(
             ((path_globs_input_digest,) if path_globs_input_digest else ())
             + ((input_digest,) if input_digest else ())
-            + tuple(s.directory_digest for s in additional_snapshots)
-            + (argfile_snapshot.directory_digest,)
+            + tuple(s.digest for s in additional_snapshots)
+            + (argfile_snapshot.digest,)
         )
 
         epr = Process(
@@ -922,11 +917,9 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
 
         # TODO: parse the output of -Xprint:timings for rsc and write it to self._record_target_stats()!
 
-        res.output_directory_digest.dump(ctx.rsc_jar_file.path)
-        self.context._scheduler.materialize_directory(
-            DirectoryToMaterialize(res.output_directory_digest),
-        )
-        ctx.rsc_jar_file.hydrate_missing_directory_digest(res.output_directory_digest)
+        res.output_digest.dump(ctx.rsc_jar_file.path)
+        self.context._scheduler.materialize_directory(DirectoryToMaterialize(res.output_digest),)
+        ctx.rsc_jar_file.hydrate_missing_directory_digest(res.output_digest)
 
         return res
 
@@ -1056,10 +1049,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     def _jdk_libs_paths_and_digest(self, hermetic_dist):
         jdk_libs_rel, jdk_libs_globs = hermetic_dist.find_libs_path_globs(self._JDK_LIB_NAMES)
         jdk_libs_digest = self.context._scheduler.merge_directories(
-            [
-                snap.directory_digest
-                for snap in (self.context._scheduler.capture_snapshots(jdk_libs_globs))
-            ]
+            [snap.digest for snap in (self.context._scheduler.capture_snapshots(jdk_libs_globs))]
         )
         return (jdk_libs_rel, jdk_libs_digest)
 
@@ -1076,6 +1066,6 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
             (classes_dir_snapshot,) = self.context._scheduler.capture_snapshots(
                 [PathGlobsAndRoot(PathGlobs([relpath]), get_buildroot(), Digest.load(relpath))]
             )
-            classpath_entry.hydrate_missing_directory_digest(classes_dir_snapshot.directory_digest)
+            classpath_entry.hydrate_missing_directory_digest(classes_dir_snapshot.digest)
             # Re-validate the vts!
             vts.update()

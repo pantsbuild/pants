@@ -16,13 +16,7 @@ from pants.core.goals.fmt import (
 )
 from pants.core.util_rules.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
 from pants.engine.addresses import Address
-from pants.engine.fs import (
-    EMPTY_DIRECTORY_DIGEST,
-    Digest,
-    DirectoriesToMerge,
-    FileContent,
-    Workspace,
-)
+from pants.engine.fs import EMPTY_DIGEST, Digest, FileContent, MergeDigests, Workspace
 from pants.engine.target import Sources, Target, TargetsWithOrigins, TargetWithOrigin
 from pants.engine.unions import UnionMembership
 from pants.testutil.engine.util import MockConsole, MockGet, create_goal_subsystem, run_rule
@@ -57,17 +51,23 @@ class MockLanguageTargets(LanguageFmtTargets, metaclass=ABCMeta):
     def stdout(_: Iterable[Address]) -> str:
         pass
 
-    @property
-    def language_fmt_results(self) -> LanguageFmtResults:
+    def language_fmt_results(self, result_digest: Digest) -> LanguageFmtResults:
         addresses = [
             target_with_origin.target.address for target_with_origin in self.targets_with_origins
         ]
-        # NB: Due to mocking `await Get[Digest](DirectoriesToMerge), the digest we use here does
-        # not matter.
-        digest = EMPTY_DIRECTORY_DIGEST
+        # NB: For these tests, we only care that
+        # LanguageFmtResults.input != LanguageFmtResults.output so that we write to the build root.
         return LanguageFmtResults(
-            (FmtResult(digest=digest, stdout=self.stdout(addresses), stderr=""),),
-            combined_digest=digest,
+            (
+                FmtResult(
+                    input=EMPTY_DIGEST,
+                    output=EMPTY_DIGEST,
+                    stdout=self.stdout(addresses),
+                    stderr="",
+                ),
+            ),
+            input=EMPTY_DIGEST,
+            output=result_digest,
         )
 
 
@@ -102,10 +102,10 @@ class FmtTest(TestBase):
         self.smalltalk_file = FileContent("formatted.st", b"y := self size + super size.')\n")
         self.fortran_digest = self.make_snapshot(
             {self.fortran_file.path: self.fortran_file.content.decode()}
-        ).directory_digest
+        ).digest
         self.merged_digest = self.make_snapshot(
             {fc.path: fc.content.decode() for fc in (self.fortran_file, self.smalltalk_file)}
-        ).directory_digest
+        ).digest
 
     @staticmethod
     def make_target_with_origin(
@@ -142,7 +142,9 @@ class FmtTest(TestBase):
                 MockGet(
                     product_type=LanguageFmtResults,
                     subject_type=LanguageFmtTargets,
-                    mock=lambda language_targets_collection: language_targets_collection.language_fmt_results,
+                    mock=lambda language_targets_collection: language_targets_collection.language_fmt_results(
+                        result_digest
+                    ),
                 ),
                 MockGet(
                     product_type=TargetsWithSources,
@@ -150,9 +152,7 @@ class FmtTest(TestBase):
                     mock=lambda tgts: TargetsWithSources(tgts if include_sources else ()),
                 ),
                 MockGet(
-                    product_type=Digest,
-                    subject_type=DirectoriesToMerge,
-                    mock=lambda _: result_digest,
+                    product_type=Digest, subject_type=MergeDigests, mock=lambda _: result_digest,
                 ),
             ],
             union_membership=union_membership,

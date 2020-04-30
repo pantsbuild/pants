@@ -161,9 +161,8 @@ class ExternalTool(Subsystem):
             "the downloaded file, respectively.",
         )
 
-    @classmethod
     @abstractmethod
-    def generate_url(cls, plat: Platform, version: str) -> str:
+    def generate_url(self, plat: Platform) -> str:
         """Returns the URL for the given version of the tool, runnable on the given os+arch.
 
         os and arch default to those of the current system.
@@ -172,44 +171,37 @@ class ExternalTool(Subsystem):
         to a URL.  The raised exception need not have a message - a sensible one will be generated.
         """
 
-    @classmethod
-    def generate_exe(cls, plat: Platform, version: str) -> str:
+    def generate_exe(self, plat: Platform) -> str:
         """Returns the archive path to the given version of the tool.
 
         If the tool is downloaded directly, not in an archive, this can be left unimplemented.
         """
         return ""
 
-    @classmethod
-    def generate_request(
-        cls, plat: Platform, version: str, known_versions: List[str]
-    ) -> ExternalToolRequest:
+    def get_request(self, plat: Platform) -> ExternalToolRequest:
+        """Generate a request for this tool."""
+        version = self.get_options().version
+        known_versions = self.get_options().known_versions
         for known_version in known_versions:
             try:
                 ver, plat_val, sha256, length = (x.strip() for x in known_version.split("|"))
             except ValueError:
                 raise ExternalToolError(
                     f"Bad value for --known-versions (see ./pants "
-                    f"help-advanced {cls.options_scope}): {known_version}"
+                    f"help-advanced {self.options_scope}): {known_version}"
                 )
             if plat_val == plat.value and ver == version:
                 digest = Digest(fingerprint=sha256, serialized_bytes_length=int(length))
                 try:
-                    url = cls.generate_url(plat, version)
-                    exe = cls.generate_exe(plat, version) or url.rsplit("/", 1)[-1]
+                    url = self.generate_url(plat)
+                    exe = self.generate_exe(plat) or url.rsplit("/", 1)[-1]
                 except ExternalToolError as e:
                     raise ExternalToolError(
-                        f"Couldn't find {cls.name} version {version} on {plat.value}"
+                        f"Couldn't find {self.name} version {version} on {plat.value}"
                     ) from e
                 return ExternalToolRequest(UrlToFetch(url=url, digest=digest), exe)
         raise UnknownVersion(
-            f"No known version of {cls.name} {version} for {plat.value} found in {known_versions}"
-        )
-
-    def get_request(self, plat: Platform) -> ExternalToolRequest:
-        """Generate a request for this tool."""
-        return self.generate_request(
-            plat, self.get_options().version, self.get_options().known_versions,
+            f"No known version of {self.name} {version} for {plat.value} found in {known_versions}"
         )
 
     @memoized_method
@@ -231,16 +223,16 @@ class ExternalTool(Subsystem):
         )[0]
         context._scheduler.materialize_directory(
             DirectoryToMaterialize(
-                directory_digest=downloaded_external_tool.digest, path_prefix=rel_bindir.as_posix()
+                downloaded_external_tool.digest, path_prefix=rel_bindir.as_posix()
             )
         )
-        return (rel_bindir / req.exe).as_posix()
+        return (PurePath(get_buildroot()) / rel_bindir / req.exe).as_posix()
 
 
 @rule
 async def download_external_tool(request: ExternalToolRequest) -> DownloadedExternalTool:
     snapshot = await Get[Snapshot](UrlToFetch, request.url_to_fetch)
-    extracted_digest = await Get[ExtractedDigest](MaybeExtractable(snapshot.directory_digest))
+    extracted_digest = await Get[ExtractedDigest](MaybeExtractable(snapshot.digest))
     return DownloadedExternalTool(extracted_digest.digest, request.exe)
 
 

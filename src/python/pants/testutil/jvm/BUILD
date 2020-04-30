@@ -15,6 +15,7 @@ python_library(
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/base:build_environment',
     'src/python/pants/build_graph',
+    'src/python/pants/core/util_rules',
     'src/python/pants/ivy',
     'src/python/pants/java/jar',
     'src/python/pants/util:dirutil',

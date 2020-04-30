@@ -24,7 +24,7 @@ from pants.core.util_rules.determine_source_files import (
     SourceFiles,
     SpecifiedSourceFilesRequest,
 )
-from pants.engine.fs import Digest, DirectoriesToMerge
+from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get
@@ -53,6 +53,7 @@ class SetupRequest:
 @dataclass(frozen=True)
 class Setup:
     process: Process
+    original_digest: Digest
 
 
 def generate_args(
@@ -96,12 +97,7 @@ async def setup(
     )
 
     merged_input_files = await Get[Digest](
-        DirectoriesToMerge(
-            directories=(
-                all_source_files_snapshot.directory_digest,
-                requirements_pex.directory_digest,
-            )
-        ),
+        MergeDigests((all_source_files_snapshot.digest, requirements_pex.digest)),
     )
 
     address_references = ", ".join(sorted(config.address.reference() for config in request.configs))
@@ -122,7 +118,7 @@ async def setup(
             f"{address_references}."
         ),
     )
-    return Setup(process)
+    return Setup(process, original_digest=all_source_files_snapshot.digest)
 
 
 @named_rule(desc="Format Python docstrings with docformatter")
@@ -133,7 +129,7 @@ async def docformatter_fmt(
         return FmtResult.noop()
     setup = await Get[Setup](SetupRequest(configs, check_only=False))
     result = await Get[ProcessResult](Process, setup.process)
-    return FmtResult.from_process_result(result)
+    return FmtResult.from_process_result(result, original_digest=setup.original_digest)
 
 
 @named_rule(desc="Lint Python docstrings with docformatter")

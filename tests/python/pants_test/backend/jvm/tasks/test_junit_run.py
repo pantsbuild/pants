@@ -146,7 +146,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
         executor = SubprocessExecutor(distribution=distribution)
         with temporary_file() as f:
             res = executor.execute(
-                classpath=[global_subsystem_instance(CoursierSubsystem).select()],
+                classpath=[global_subsystem_instance(CoursierSubsystem).select(self.context())],
                 main="coursier.cli.Coursier",
                 args=[
                     "fetch",

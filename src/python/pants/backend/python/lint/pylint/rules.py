@@ -20,7 +20,7 @@ from pants.core.goals.lint import LinterConfiguration, LinterConfigurations, Lin
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.engine.addresses import Addresses
-from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
+from pants.engine.fs import Digest, MergeDigests, PathGlobs, Snapshot
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import named_rule, subsystem_rule
 from pants.engine.selectors import Get
@@ -70,7 +70,7 @@ async def pylint_lint(
         addresses.append(config.address)
         addresses.extend(config.dependencies.value or ())
     targets = await Get[Targets](Addresses(addresses))
-    chrooted_python_sources = await Get[ImportablePythonSources](Targets, targets)
+    prepared_python_sources = await Get[ImportablePythonSources](Targets, targets)
 
     # NB: Pylint output depends upon which Python interpreter version it's run with. We ensure that
     # each target runs with its own interpreter constraints. See
@@ -97,11 +97,11 @@ async def pylint_lint(
     )
 
     merged_input_files = await Get[Digest](
-        DirectoriesToMerge(
-            directories=(
-                requirements_pex.directory_digest,
-                config_snapshot.directory_digest,
-                chrooted_python_sources.snapshot.directory_digest,
+        MergeDigests(
+            (
+                requirements_pex.digest,
+                config_snapshot.digest,
+                prepared_python_sources.snapshot.digest,
             )
         ),
     )

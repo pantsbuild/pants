@@ -24,7 +24,7 @@ from pants.core.util_rules.determine_source_files import (
     SourceFiles,
     SpecifiedSourceFilesRequest,
 )
-from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
+from pants.engine.fs import Digest, MergeDigests, PathGlobs, Snapshot
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import named_rule, rule, subsystem_rule
 from pants.engine.selectors import Get
@@ -55,6 +55,7 @@ class SetupRequest:
 @dataclass(frozen=True)
 class Setup:
     process: Process
+    original_digest: Digest
 
 
 def generate_args(
@@ -111,12 +112,8 @@ async def setup(
     )
 
     merged_input_files = await Get[Digest](
-        DirectoriesToMerge(
-            directories=(
-                all_source_files_snapshot.directory_digest,
-                requirements_pex.directory_digest,
-                config_snapshot.directory_digest,
-            )
+        MergeDigests(
+            (all_source_files_snapshot.digest, requirements_pex.digest, config_snapshot.digest)
         ),
     )
 
@@ -137,7 +134,7 @@ async def setup(
             f"Run isort on {pluralize(len(request.configs), 'target')}: {address_references}."
         ),
     )
-    return Setup(process)
+    return Setup(process, original_digest=all_source_files_snapshot.digest)
 
 
 @named_rule(desc="Format using isort")
@@ -146,7 +143,7 @@ async def isort_fmt(configs: IsortConfigurations, isort: Isort) -> FmtResult:
         return FmtResult.noop()
     setup = await Get[Setup](SetupRequest(configs, check_only=False))
     result = await Get[ProcessResult](Process, setup.process)
-    return FmtResult.from_process_result(result)
+    return FmtResult.from_process_result(result, original_digest=setup.original_digest)
 
 
 @named_rule(desc="Lint using isort")

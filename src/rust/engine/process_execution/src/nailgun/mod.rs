@@ -59,7 +59,7 @@ fn construct_nailgun_server_request(
     input_files: hashing::EMPTY_DIGEST,
     output_files: BTreeSet::new(),
     output_directories: BTreeSet::new(),
-    timeout: Duration::new(1000, 0),
+    timeout: Some(Duration::new(1000, 0)),
     description: format!("Start a nailgun server for {}", nailgun_name),
     unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
       hashing::EMPTY_DIGEST,

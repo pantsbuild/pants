@@ -102,6 +102,10 @@ public abstract class ConsoleRunnerTestBase {
     prepareConsoleRunner(argsString).run();
   }
 
+  protected void invokeConsoleRunner(List<String> argsStrings) {
+    prepareConsoleRunner(argsStrings).run();
+  }
+
   /**
    * As invokeConsoleRunner, but returns a ConsoleRunnerImpl ready for calling run() on.
    */
@@ -114,8 +118,12 @@ public abstract class ConsoleRunnerTestBase {
       }
       testArgs.add(arg);
     }
+    return prepareConsoleRunner(testArgs);
+  }
 
+  protected ConsoleRunnerImpl prepareConsoleRunner(List<String> testArgs) {
     // Tack on extra parameters from the Parameterized runner
+    testArgs = new ArrayList<>(testArgs);
     if (!testArgs.contains(DEFAULT_CONCURRENCY_FLAG) && parameters.defaultConcurrency != null) {
       if (!testArgs.contains(DEFAULT_CONCURRENCY_FLAG)
           && !testArgs.contains(DEFAULT_PARALLEL_FLAG)) {

@@ -38,7 +38,7 @@ from pants.engine.fs import (
 from pants.engine.legacy.structs import BundleAdaptor
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
-from pants.engine.unions import UnionMembership
+from pants.engine.unions import UnionMembership, union
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper, Filespec
 from pants.util.collections import ensure_list, ensure_str_list
 from pants.util.frozendict import FrozenDict
@@ -306,6 +306,7 @@ class Target(ABC):
     def field_types(self) -> Tuple[Type[Field], ...]:
         return (*self.core_fields, *self.plugin_fields)
 
+    @union
     @final
     class PluginField:
         """A sentinel class to allow plugin authors to add additional fields to this target type.
@@ -915,10 +916,54 @@ class AmbiguousImplementationsException(Exception):
         bulleted_list_sep = "\n  * "
         super().__init__(
             f"Multiple of the registered implementations for {goal_description} work for "
-            f"{target.address} (target type {repr(target.alias)}).\n\n"
-            "It is ambiguous which implementation to use. Possible implementations:"
+            f"{target.address} (target type {repr(target.alias)}). It is ambiguous which "
+            "implementation to use.\n\nPossible implementations:"
             f"{bulleted_list_sep}{bulleted_list_sep.join(possible_config_types)}"
         )
+
+
+class AmbiguousCodegenImplementationsException(Exception):
+    """Exception for when there are multiple codegen implementations and it is ambiguous which to
+    use."""
+
+    def __init__(
+        self,
+        generators: Iterable[Type["GenerateSourcesRequest"]],
+        *,
+        for_sources_types: Iterable[Type["Sources"]],
+    ) -> None:
+        bulleted_list_sep = "\n  * "
+        all_same_generator_paths = (
+            len(set((generator.input, generator.output) for generator in generators)) == 1
+        )
+        example_generator = list(generators)[0]
+        input = example_generator.input.__name__
+        if all_same_generator_paths:
+            output = example_generator.output.__name__
+            possible_generators = sorted(generator.__name__ for generator in generators)
+            super().__init__(
+                f"Multiple of the registered code generators can generate {output} from {input}. "
+                "It is ambiguous which implementation to use.\n\nPossible implementations:"
+                f"{bulleted_list_sep}{bulleted_list_sep.join(possible_generators)}"
+            )
+        else:
+            possible_output_types = sorted(
+                generator.output.__name__
+                for generator in generators
+                if issubclass(generator.output, tuple(for_sources_types))
+            )
+            possible_generators_with_output = [
+                f"{generator.__name__} -> {generator.output.__name__}"
+                for generator in sorted(generators, key=lambda generator: generator.output.__name__)
+            ]
+            super().__init__(
+                f"Multiple of the registered code generators can generate one of "
+                f"{possible_output_types} from {input}. It is ambiguous which implementation to "
+                f"use. This can happen when the call site requests too many different output types "
+                f"from the same original protocol sources.\n\nPossible implementations with their "
+                f"output type: {bulleted_list_sep}"
+                f"{bulleted_list_sep.join(possible_generators_with_output)}"
+            )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -1162,7 +1207,7 @@ class DictStringToStringSequenceField(PrimitiveField, metaclass=ABCMeta):
 
 
 # -----------------------------------------------------------------------------------------------
-# Sources
+# Sources and codegen
 # -----------------------------------------------------------------------------------------------
 
 
@@ -1269,65 +1314,191 @@ class Sources(AsyncField):
             args=includes, exclude=[excludes], root=self.address.spec_path
         )
 
+    @final
+    @classmethod
+    def can_generate(cls, output_type: Type["Sources"], union_membership: UnionMembership) -> bool:
+        """Can this Sources field be used to generate the output_type?
+
+        Generally, this method does not need to be used. Most call sites can simply use the below,
+        and the engine will generate the sources if possible or will return an instance of
+        HydratedSources with an empty snapshot if not possible:
+
+            await Get[HydratedSources](
+                HydrateSourcesRequest(
+                    sources_field,
+                    for_sources_types=[FortranSources],
+                    enable_codegen=True,
+                )
+            )
+
+        This method is useful when you need to filter targets before hydrating them, such as how
+        you may filter targets via `tgt.has_field(MyField)`.
+        """
+        generate_request_types: Iterable[
+            Type[GenerateSourcesRequest]
+        ] = union_membership.union_rules.get(GenerateSourcesRequest, ())
+        return any(
+            issubclass(cls, generate_request_type.input)
+            and issubclass(generate_request_type.output, output_type)
+            for generate_request_type in generate_request_types
+        )
+
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class HydrateSourcesRequest:
     field: Sources
     for_sources_types: Tuple[Type[Sources], ...]
+    enable_codegen: bool
 
     def __init__(
-        self, field: Sources, *, for_sources_types: Iterable[Type[Sources]] = (Sources,)
+        self,
+        field: Sources,
+        *,
+        for_sources_types: Iterable[Type[Sources]] = (Sources,),
+        enable_codegen: bool = False,
     ) -> None:
         """Convert raw sources globs into an instance of HydratedSources.
 
         If you only want to handle certain Sources fields, such as only PythonSources, set
         `for_sources_types`. Any invalid sources will return a `HydratedSources` instance with an
-        empty snapshot and `output_type = None`.
+        empty snapshot and `sources_type = None`.
+
+        If `enable_codegen` is set to `True`, any codegen sources will try to be converted to one
+        of the `for_sources_types`.
         """
         self.field = field
         self.for_sources_types = tuple(for_sources_types)
+        self.enable_codegen = enable_codegen
+        self.__post_init__()
+
+    def __post_init__(self) -> None:
+        if self.enable_codegen and self.for_sources_types == (Sources,):
+            raise ValueError(
+                "When setting `enable_codegen=True` on `HydrateSourcesRequest`, you must also "
+                "explicitly set `for_source_types`. Why? `for_source_types` is used to "
+                "determine which language(s) to try to generate. For example, "
+                "`for_source_types=(PythonSources,)` will hydrate `PythonSources` like normal, "
+                "and, if it encounters codegen sources that can be converted into Python, it will "
+                "generate Python files."
+            )
 
 
 @dataclass(frozen=True)
 class HydratedSources:
     """The result of hydrating a SourcesField.
 
-    The `output_type` will indicate which of the `HydrateSourcesRequest.valid_sources_type` the
+    The `sources_type` will indicate which of the `HydrateSourcesRequest.for_sources_type` the
     result corresponds to, e.g. if the result comes from `FilesSources` vs. `PythonSources`. If this
-    value is None, then the input `Sources` field was not one of the expected types. This property
-    allows for switching on the result, e.g. handling hydrated files() sources differently than
-    hydrated Python sources.
+    value is None, then the input `Sources` field was not one of the expected types; or, when
+    codegen was enabled in the request, there was no valid code generator to generate the requested
+    language from the original input. This property allows for switching on the result, e.g.
+    handling hydrated files() sources differently than hydrated Python sources.
     """
 
     snapshot: Snapshot
     filespec: Filespec
-    output_type: Optional[Type[Sources]]
+    sources_type: Optional[Type[Sources]]
 
     def eager_fileset_with_spec(self, *, address: Address) -> EagerFilesetWithSpec:
         return EagerFilesetWithSpec(address.spec_path, self.filespec, self.snapshot)
 
 
+@union
+@dataclass(frozen=True)
+class GenerateSourcesRequest:
+    """A request to go from protocol sources -> a particular language.
+
+    This should be subclassed for each distinct codegen implementation. The subclasses must define
+    the class properties `input` and `output`. The subclass must also be registered via
+    `UnionRule(GenerateSourcesRequest, GenerateFortranFromAvroRequest)`, for example.
+
+    The rule to actually implement the codegen should take the subclass as input, and it must
+    return `GeneratedSources`.
+
+    For example:
+
+        class GenerateFortranFromAvroRequest:
+            input = AvroSources
+            output = FortranSources
+
+        @rule
+        def generate_fortran_from_avro(request: GenerateFortranFromAvroRequest) -> GeneratedSources:
+            ...
+
+        def rules():
+            return [
+                generate_fortran_from_avro,
+                UnionRule(GenerateSourcesRequest, GenerateFortranFromAvroRequest),
+            ]
+    """
+
+    protocol_sources: Snapshot
+    protocol_target: Target
+
+    input: ClassVar[Type[Sources]]
+    output: ClassVar[Type[Sources]]
+
+
+@dataclass(frozen=True)
+class GeneratedSources:
+    snapshot: Snapshot
+
+
 @rule
 async def hydrate_sources(
-    request: HydrateSourcesRequest, glob_match_error_behavior: GlobMatchErrorBehavior
+    request: HydrateSourcesRequest,
+    glob_match_error_behavior: GlobMatchErrorBehavior,
+    union_membership: UnionMembership,
 ) -> HydratedSources:
     sources_field = request.field
 
-    output_type = next(
+    # First, find if there are any code generators for the input `sources_field`. This will be used
+    # to determine if the sources_field is valid or not.
+    # We could alternatively use `sources_field.can_generate()`, but we want to error if there are
+    # 2+ generators due to ambiguity.
+    generate_request_types: Iterable[
+        Type[GenerateSourcesRequest]
+    ] = union_membership.union_rules.get(GenerateSourcesRequest, ())
+    relevant_generate_request_types = [
+        generate_request_type
+        for generate_request_type in generate_request_types
+        if isinstance(sources_field, generate_request_type.input)
+        and issubclass(generate_request_type.output, request.for_sources_types)
+    ]
+    if request.enable_codegen and len(relevant_generate_request_types) > 1:
+        raise AmbiguousCodegenImplementationsException(
+            relevant_generate_request_types, for_sources_types=request.for_sources_types
+        )
+    generate_request_type = next(iter(relevant_generate_request_types), None)
+
+    # Now, determine if any of the `for_sources_types` may be used, either because the
+    # sources_field is a direct subclass or can be generated into one of the valid types.
+    def compatible_with_sources_field(valid_type: Type[Sources]) -> bool:
+        is_instance = isinstance(sources_field, valid_type)
+        can_be_generated = (
+            request.enable_codegen
+            and generate_request_type is not None
+            and issubclass(generate_request_type.output, valid_type)
+        )
+        return is_instance or can_be_generated
+
+    sources_type = next(
         (
             valid_type
             for valid_type in request.for_sources_types
-            if isinstance(sources_field, valid_type)
+            if compatible_with_sources_field(valid_type)
         ),
         None,
     )
-    if output_type is None:
-        return HydratedSources(EMPTY_SNAPSHOT, sources_field.filespec, output_type=None)
+    if sources_type is None:
+        return HydratedSources(EMPTY_SNAPSHOT, sources_field.filespec, sources_type=None)
 
+    # Now, hydrate the `globs`. Even if we are going to use codegen, we will need the original
+    # protocol sources to be hydrated.
     globs = sources_field.sanitized_raw_value
     if globs is None:
-        return HydratedSources(EMPTY_SNAPSHOT, sources_field.filespec, output_type=output_type)
+        return HydratedSources(EMPTY_SNAPSHOT, sources_field.filespec, sources_type=sources_type)
 
     conjunction = (
         GlobExpansionConjunction.all_match
@@ -1349,7 +1520,17 @@ async def hydrate_sources(
         )
     )
     sources_field.validate_snapshot(snapshot)
-    return HydratedSources(snapshot, sources_field.filespec, output_type=output_type)
+
+    # Finally, return if codegen is not in use; otherwise, run the relevant code generator.
+    if not request.enable_codegen or generate_request_type is None:
+        return HydratedSources(snapshot, sources_field.filespec, sources_type=sources_type)
+    wrapped_protocol_target = await Get[WrappedTarget](Address, sources_field.address)
+    generated_sources = await Get[GeneratedSources](
+        GenerateSourcesRequest, generate_request_type(snapshot, wrapped_protocol_target.target)
+    )
+    return HydratedSources(
+        generated_sources.snapshot, sources_field.filespec, sources_type=sources_type
+    )
 
 
 # -----------------------------------------------------------------------------------------------

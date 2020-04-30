@@ -35,7 +35,7 @@ class ArchiveTest(TestBase):
         io.flush()
         input_snapshot = self.make_snapshot({"test.zip": io.getvalue()})
         extracted_digest = self.request_single_product(
-            ExtractedDigest, Params(MaybeExtractable(input_snapshot.directory_digest))
+            ExtractedDigest, Params(MaybeExtractable(input_snapshot.digest))
         )
 
         files_content = self.request_single_product(FilesContent, Params(extracted_digest.digest))
@@ -60,7 +60,7 @@ class ArchiveTest(TestBase):
         ext = f"tar.{compression}" if compression else "tar"
         input_snapshot = self.make_snapshot({f"test.{ext}": io.getvalue()})
         extracted_digest = self.request_single_product(
-            ExtractedDigest, Params(MaybeExtractable(input_snapshot.directory_digest))
+            ExtractedDigest, Params(MaybeExtractable(input_snapshot.digest))
         )
 
         files_content = self.request_single_product(FilesContent, Params(extracted_digest.digest))
@@ -81,7 +81,7 @@ class ArchiveTest(TestBase):
     def test_non_archive(self) -> None:
         input_snapshot = self.make_snapshot({"test.sh": b"# A shell script"})
         extracted_digest = self.request_single_product(
-            ExtractedDigest, Params(MaybeExtractable(input_snapshot.directory_digest))
+            ExtractedDigest, Params(MaybeExtractable(input_snapshot.digest))
         )
 
         files_content = self.request_single_product(FilesContent, Params(extracted_digest.digest))

@@ -37,13 +37,12 @@ mod node;
 pub use crate::entry::{Entry, EntryState};
 use crate::entry::{Generation, RunToken};
 
-use std::collections::binary_heap::BinaryHeap;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs::{File, OpenOptions};
 use std::hash::BuildHasherDefault;
 use std::io::{self, BufWriter, Write};
 use std::path::Path;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use fnv::FnvHasher;
 
@@ -551,61 +550,6 @@ impl<N: Node> InnerGraph<N> {
     Ok(())
   }
 
-  ///
-  /// Computes the K longest running entries in a Graph-aware fashion.
-  ///
-  fn heavy_hitters(&self, roots: &[N], k: usize) -> HashMap<String, Duration> {
-    let now = Instant::now();
-    let queue_entry = |id| {
-      self
-        .entry_for_id(id)
-        .and_then(|entry| entry.current_running_duration(now))
-        .map(|d| (d, id))
-    };
-
-    let mut queue: BinaryHeap<(Duration, EntryId)> = BinaryHeap::with_capacity(k);
-    let mut visited: HashSet<EntryId, FNV> = HashSet::default();
-    let mut res = HashMap::new();
-
-    // Initialize the queue.
-    queue.extend(
-      roots
-        .iter()
-        .filter_map(|nk| self.entry_id(nk))
-        .filter_map(|eid| queue_entry(*eid)),
-    );
-
-    while let Some((duration, id)) = queue.pop() {
-      if !visited.insert(id) {
-        continue;
-      }
-
-      // Compute the running dependencies of the node.
-      let mut deps = self
-        .pg
-        .neighbors_directed(id, Direction::Outgoing)
-        .filter_map(&queue_entry)
-        .peekable();
-
-      if deps.peek().is_none() {
-        // If the entry has no running deps, it is a leaf. Emit it.
-        let node = self.unsafe_entry_for_id(id).node();
-        let output = node
-          .user_facing_name()
-          .unwrap_or_else(|| format!("{}", node));
-        res.insert(output, duration);
-        if res.len() >= k {
-          break;
-        }
-      } else {
-        // Otherwise, assume it is blocked on the running dependencies and expand them.
-        queue.extend(deps);
-      }
-    }
-
-    res
-  }
-
   fn reachable_digest_count(&self, roots: &[N], context: &N::Context) -> usize {
     // TODO: This is a surprisingly expensive method, because it will clone all reachable values by
     // calling `peek` on them.
@@ -1006,11 +950,6 @@ impl<N: Node> Graph<N> {
   ) -> io::Result<()> {
     let inner = self.inner.lock();
     inner.visualize(visualizer, roots, path, context)
-  }
-
-  pub fn heavy_hitters(&self, roots: &[N], k: usize) -> HashMap<String, Duration> {
-    let inner = self.inner.lock();
-    inner.heavy_hitters(roots, k)
   }
 
   pub fn reachable_digest_count(&self, roots: &[N], context: &N::Context) -> usize {

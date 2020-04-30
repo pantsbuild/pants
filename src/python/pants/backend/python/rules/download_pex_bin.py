@@ -31,8 +31,9 @@ class DownloadedPexBin(HermeticPex):
         return self.exe.exe_filename
 
     @property
-    def directory_digest(self) -> Digest:
-        return self.exe.directory_digest
+    def digest(self) -> Digest:
+        """A directory digest containing the Pex executable."""
+        return self.exe.digest
 
     class Factory(Script):
         options_scope = "download-pex-bin"
@@ -75,9 +76,9 @@ class DownloadedPexBin(HermeticPex):
         :param pex_args: The arguments to pass to the pex CLI tool.
         :param description: A description of the process execution to be performed.
         :param input_files: The files that contain the pex CLI tool itself and any input files it
-                            needs to run against. By default just the files that contain the pex CLI
-                            tool itself. To merge in additional files, include the
-                            `directory_digest` in `DirectoriesToMerge` request.
+                            needs to run against. By default, this is just the files that contain
+                            the PEX CLI tool itself. To merge in additional files, include
+                            `self.digest` in a `MergeDigests` request.
         :param env: The environment to run the PEX in.
         :param kwargs: Any additional :class:`Process` kwargs to pass through.
         """
@@ -91,7 +92,7 @@ class DownloadedPexBin(HermeticPex):
             pex_path=self.executable,
             pex_args=pex_args,
             description=description,
-            input_files=input_files or self.directory_digest,
+            input_files=input_files or self.digest,
             env=env,
             **kwargs,
         )
