@@ -34,17 +34,20 @@ export PROTOC="${protoc}"
 
 # We implicitly pull in `ar` to create libnative_engine_ffi.a from native_engine.o via the `cc`
 # crate in engine_cffi/build.rs.
-# The homebrew version of the `ar` tool appears to "sometimes" create libnative_engine_ffi.a
-# instances which aren't recognized as Mach-O x86-64 binaries when first on the PATH. This causes a
-# silent linking error at build time due to the use of the `-undefined dynamic_lookup` flag, which
-# then becomes:
-# "Symbol not found: _wrapped_PyInit_native_engine"
-# when attempting to import the native engine library in native.py.
 case "$(uname)" in
   "Darwin")
+    # The homebrew version of the `ar` tool appears to "sometimes" create libnative_engine_ffi.a
+    # instances which aren't recognized as Mach-O x86-64 binaries when first on the PATH. This
+    # causes a silent linking error at build time due to the use of the `-undefined dynamic_lookup`
+    # flag, which then becomes:
+    # "Symbol not found: _wrapped_PyInit_native_engine"
+    # when attempting to import the native engine library in native.py.
+    # NB: This line uses the version of `ar` provided by OSX itself, which avoids the linking error.
     export AR='/usr/bin/ar'
     ;;
   "Linux")
+    # While the linking error when consuming libnative_engine_ffi.a does not repro on Linux, since
+    # we have a reliable version of `ar` available from the pantsbuild s3, we might as well use it.
     binutils="$("${download_binary}" "binutils" "2.30" "binutils.tar.gz")"
     export AR="${binutils}/bin/ar"
     ;;
