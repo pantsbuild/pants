@@ -20,6 +20,19 @@ from pants.engine.selectors import Get
 from pants.python.python_setup import PythonSetup
 
 
+class PexBin(ExternalTool):
+    options_scope = "download-pex-bin"
+    name = "pex"
+    default_version = "v2.1.9"
+    default_known_versions = [
+        f"v2.1.9|{plat}|4e2677ce7270dd04d767e93e1904c90aa8c7f4f53b76f3615215970b45d100d7|2624111"
+        for plat in ["darwin", "linux"]
+    ]
+
+    def generate_url(self, plat: Platform) -> str:
+        return f"https://github.com/pantsbuild/pex/releases/download/{self.options.version}/pex"
+
+
 @dataclass(frozen=True)
 class DownloadedPexBin(HermeticPex):
     downloaded_tool: DownloadedExternalTool
@@ -32,18 +45,6 @@ class DownloadedPexBin(HermeticPex):
     def digest(self) -> Digest:
         """A directory digest containing the Pex executable."""
         return self.downloaded_tool.digest
-
-    class Factory(ExternalTool):
-        options_scope = "download-pex-bin"
-        name = "pex"
-        default_version = "v2.1.9"
-        default_known_versions = [
-            f"v2.1.9|{plat}|4e2677ce7270dd04d767e93e1904c90aa8c7f4f53b76f3615215970b45d100d7|2624111"
-            for plat in ["darwin", "linux"]
-        ]
-
-        def generate_url(self, plat: Platform) -> str:
-            return f"https://github.com/pantsbuild/pex/releases/download/{self.options.version}/pex"
 
     def create_process(  # type: ignore[override]
         self,
@@ -90,7 +91,7 @@ class DownloadedPexBin(HermeticPex):
 
 
 @rule
-async def download_pex_bin(pex_binary_tool: DownloadedPexBin.Factory) -> DownloadedPexBin:
+async def download_pex_bin(pex_binary_tool: PexBin) -> DownloadedPexBin:
     downloaded_tool = await Get[DownloadedExternalTool](
         ExternalToolRequest, pex_binary_tool.get_request(Platform.current)
     )
@@ -98,4 +99,4 @@ async def download_pex_bin(pex_binary_tool: DownloadedPexBin.Factory) -> Downloa
 
 
 def rules():
-    return [download_pex_bin, subsystem_rule(DownloadedPexBin.Factory)]
+    return [download_pex_bin, subsystem_rule(PexBin)]
