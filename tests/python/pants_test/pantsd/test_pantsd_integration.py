@@ -44,12 +44,6 @@ def launch_file_toucher(f):
 
 
 class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
-    def test_pantsd_compile(self):
-        with self.pantsd_successful_run_context(log_level="debug") as ctx:
-            # This tests a deeper pantsd-based run by actually invoking a full compile.
-            ctx.runner(["compile", "examples/src/scala/org/pantsbuild/example/hello/welcome"])
-            ctx.checker.assert_started()
-
     @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/7573")
     def test_pantsd_run(self):
         with self.pantsd_successful_run_context(log_level="debug") as ctx:
@@ -656,21 +650,6 @@ Interrupted by user over pailgun client!
             result = first_run_handle.join(stdin_data="exit()")
             self.assert_success(result)
             checker.assert_running()
-
-    def test_pantsd_environment_scrubbing(self):
-        # This pair of JVM options causes the JVM to always crash, so the command will fail if the env
-        # isn't stripped.
-        with self.pantsd_successful_run_context(
-            extra_config={"compile.rsc": {"jvm_options": ["-Xmx1g"]}},
-            extra_env={"_JAVA_OPTIONS": "-Xms2g"},
-        ) as ctx:
-            ctx.runner(["help"])
-            ctx.checker.assert_started()
-
-            result = ctx.runner(
-                ["compile", "examples/src/java/org/pantsbuild/example/hello/simple"]
-            )
-            self.assert_success(result)
 
     def test_pantsd_unicode_environment(self):
         with self.pantsd_successful_run_context(extra_env={"XXX": "¡"},) as ctx:
