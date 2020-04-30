@@ -29,7 +29,7 @@ from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
 from pants.engine.interactive_runner import InteractiveRunner
-from pants.engine.rules import RootRule, subsystem_rule
+from pants.engine.rules import RootRule, SubsystemRule
 from pants.engine.selectors import Params
 from pants.engine.target import TargetWithOrigin
 from pants.python.python_requirement import PythonRequirement
@@ -126,7 +126,7 @@ class PytestRunnerIntegrationTest(TestBase):
             *python_native_code.rules(),
             *strip_source_roots.rules(),
             *subprocess_environment.rules(),
-            subsystem_rule(TestOptions),
+            SubsystemRule(TestOptions),
             RootRule(CoverageConfigRequest),
             RootRule(PythonTestConfiguration),
         )

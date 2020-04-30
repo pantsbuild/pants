@@ -17,7 +17,7 @@ from pants.engine.fs import (
     Snapshot,
     SnapshotSubset,
 )
-from pants.engine.rules import RootRule, rule, subsystem_rule
+from pants.engine.rules import RootRule, SubsystemRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import HydratedSources, HydrateSourcesRequest
 from pants.engine.target import Sources as SourcesField
@@ -166,7 +166,7 @@ def rules():
     return [
         strip_source_roots_from_snapshot,
         strip_source_roots_from_sources_field,
-        subsystem_rule(SourceRootConfig),
+        SubsystemRule(SourceRootConfig),
         RootRule(StripSnapshotRequest),
         RootRule(StripSourcesFieldRequest),
     ]

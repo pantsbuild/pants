@@ -42,7 +42,7 @@ from pants.engine.fs import (
 )
 from pants.engine.interactive_runner import InteractiveProcessRequest
 from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import named_rule, rule, subsystem_rule
+from pants.engine.rules import SubsystemRule, named_rule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Targets, TransitiveTargets
 from pants.engine.unions import UnionRule
@@ -291,6 +291,6 @@ def rules():
         debug_python_test,
         setup_pytest_for_target,
         UnionRule(TestConfiguration, PythonTestConfiguration),
-        subsystem_rule(PyTest),
-        subsystem_rule(PythonSetup),
+        SubsystemRule(PyTest),
+        SubsystemRule(PythonSetup),
     ]

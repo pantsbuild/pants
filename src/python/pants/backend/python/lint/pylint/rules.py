@@ -22,7 +22,7 @@ from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedS
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, MergeDigests, PathGlobs, Snapshot
 from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import named_rule, subsystem_rule
+from pants.engine.rules import SubsystemRule, named_rule
 from pants.engine.selectors import Get
 from pants.engine.target import Dependencies, Targets
 from pants.engine.unions import UnionRule
@@ -129,7 +129,7 @@ async def pylint_lint(
 def rules():
     return [
         pylint_lint,
-        subsystem_rule(Pylint),
+        SubsystemRule(Pylint),
         UnionRule(LinterConfigurations, PylintConfigurations),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),

@@ -69,7 +69,7 @@ class _RuleVisitor(ast.NodeVisitor):
 
 
 @memoized
-def subsystem_rule(optionable_factory: Type[OptionableFactory]) -> "TaskRule":
+def SubsystemRule(optionable_factory: Type[OptionableFactory]) -> "TaskRule":
     """Returns a TaskRule that constructs an instance of the subsystem.
 
     TODO: This API is slightly awkward for two reasons:
@@ -164,7 +164,7 @@ def _make_rule(
         )
 
         # Register dependencies for @goal_rule/Goal.
-        dependency_rules = (subsystem_rule(return_type.subsystem_cls),) if is_goal_cls else None
+        dependency_rules = (SubsystemRule(return_type.subsystem_cls),) if is_goal_cls else None
 
         # Set a default canonical name if one is not explicitly provided. For Goal classes
         # this is the name of the Goal; for other named ruled this is the __name__ of the function

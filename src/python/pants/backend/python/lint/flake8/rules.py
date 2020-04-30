@@ -24,7 +24,7 @@ from pants.core.util_rules.determine_source_files import (
 )
 from pants.engine.fs import Digest, MergeDigests, PathGlobs, Snapshot
 from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import named_rule, subsystem_rule
+from pants.engine.rules import SubsystemRule, named_rule
 from pants.engine.selectors import Get
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobMatchErrorBehavior
@@ -117,7 +117,7 @@ async def flake8_lint(
 def rules():
     return [
         flake8_lint,
-        subsystem_rule(Flake8),
+        SubsystemRule(Flake8),
         UnionRule(LinterConfigurations, Flake8Configurations),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),

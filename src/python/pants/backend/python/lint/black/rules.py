@@ -28,7 +28,7 @@ from pants.core.util_rules.determine_source_files import (
 )
 from pants.engine.fs import Digest, MergeDigests, PathGlobs, Snapshot
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
-from pants.engine.rules import named_rule, rule, subsystem_rule
+from pants.engine.rules import SubsystemRule, named_rule, rule
 from pants.engine.selectors import Get
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobMatchErrorBehavior
@@ -167,7 +167,7 @@ def rules():
         setup,
         black_fmt,
         black_lint,
-        subsystem_rule(Black),
+        SubsystemRule(Black),
         UnionRule(PythonFmtConfigurations, BlackConfigurations),
         UnionRule(LinterConfigurations, BlackConfigurations),
         *download_pex_bin.rules(),
