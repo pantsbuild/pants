@@ -17,6 +17,7 @@ python_library(
     'src/python/pants/engine:addresses',
     'src/python/pants/engine:collection',
     'src/python/pants/engine:fs',
+    'src/python/pants/engine:platform',
     'src/python/pants/engine:process',
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
