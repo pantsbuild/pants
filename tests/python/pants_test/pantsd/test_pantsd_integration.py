@@ -657,23 +657,6 @@ Interrupted by user over pailgun client!
             ctx.checker.assert_started()
             self.assert_success(result)
 
-    def test_daemon_auto_shutdown_after_first_run(self):
-        config = {"GLOBAL": {"shutdown_pantsd_after_run": True}}
-        with self.pantsd_test_context(extra_config=config) as (workdir, config, checker):
-            wait_handle = self.run_pants_with_workdir_without_waiting(["list"], workdir, config,)
-
-            # TODO(#6574, #7330): We might have a new default timeout after these are resolved.
-            checker.assert_started(timeout=16)
-            pantsd_processes = checker.runner_process_context.current_processes()
-            pants_run = wait_handle.join()
-            self.assert_success(pants_run)
-
-            # Permit enough time for the process to terminate in CI
-            time.sleep(5)
-
-            for process in pantsd_processes:
-                self.assertFalse(process.is_running())
-
     # This is a regression test for a bug where we would incorrectly detect a cycle if two targets swapped their
     # dependency relationship (#7404).
     def test_dependencies_swap(self):
