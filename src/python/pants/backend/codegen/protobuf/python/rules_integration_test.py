@@ -17,7 +17,6 @@ from pants.engine.target import (
     HydrateSourcesRequest,
     WrappedTarget,
 )
-from pants.engine.target import rules as target_rules
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
@@ -35,7 +34,6 @@ class ProtobufPythonIntegrationTest(TestBase):
             *archive.rules(),
             *determine_source_files.rules(),
             *external_tool.rules(),
-            *target_rules(),
             RootRule(GeneratePythonFromProtobufRequest),
         )
 

@@ -24,7 +24,6 @@ from pants.core.util_rules.strip_source_roots import rules as strip_source_roots
 from pants.engine.addresses import Address
 from pants.engine.selectors import Params
 from pants.engine.target import Sources as SourcesField
-from pants.engine.target import rules as target_rules
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
@@ -50,7 +49,6 @@ class DetermineSourceFilesTest(TestBase):
             *super().rules(),
             *determine_source_files_rules(),
             *strip_source_roots_rules(),
-            *target_rules(),
         )
 
     def mock_sources_field_with_origin(
