@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pants.base.build_root import BuildRoot
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.console import Console
-from pants.engine.fs import Digest, DirectoriesToMerge, DirectoryToMaterialize, Workspace
+from pants.engine.fs import Digest, DirectoryToMaterialize, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get, MultiGet
@@ -63,9 +63,7 @@ async def create_binary(
         Get[CreatedBinary](BinaryConfiguration, config)
         for config in targets_to_valid_configs.configurations
     )
-    merged_digest = await Get[Digest](
-        DirectoriesToMerge(tuple(binary.digest for binary in binaries))
-    )
+    merged_digest = await Get[Digest](MergeDigests(binary.digest for binary in binaries))
     result = workspace.materialize_directory(
         DirectoryToMaterialize(merged_digest, path_prefix=str(distdir.relpath))
     )

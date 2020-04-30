@@ -20,7 +20,7 @@ from pants.core.goals.lint import LinterConfiguration, LinterConfigurations, Lin
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.engine.addresses import Addresses
-from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
+from pants.engine.fs import Digest, MergeDigests, PathGlobs, Snapshot
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import named_rule, subsystem_rule
 from pants.engine.selectors import Get
@@ -97,8 +97,8 @@ async def pylint_lint(
     )
 
     merged_input_files = await Get[Digest](
-        DirectoriesToMerge(
-            directories=(
+        MergeDigests(
+            (
                 requirements_pex.directory_digest,
                 config_snapshot.directory_digest,
                 chrooted_python_sources.snapshot.directory_digest,

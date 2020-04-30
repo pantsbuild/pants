@@ -17,16 +17,16 @@ from typing import Callable
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.fs import (
     EMPTY_DIRECTORY_DIGEST,
+    AddPrefix,
     Digest,
-    DirectoriesToMerge,
     DirectoryToMaterialize,
-    DirectoryWithPrefixToAdd,
-    DirectoryWithPrefixToStrip,
     FileContent,
     FilesContent,
     InputFilesContent,
+    MergeDigests,
     PathGlobs,
     PathGlobsAndRoot,
+    RemovePrefix,
     Snapshot,
     SnapshotSubset,
     UrlToFetch,
@@ -343,7 +343,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
 
             self.assertEqual(both_snapshot.directory_digest, both_merged)
 
-    def test_asynchronously_merge_directories(self):
+    def test_asynchronously_merge_digests(self):
         with temporary_dir() as temp_dir:
             with open(os.path.join(temp_dir, "roland"), "w") as f:
                 f.write("European Burmese")
@@ -364,15 +364,13 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
             )
 
             empty_merged = self.request_single_product(
-                Digest, DirectoriesToMerge((empty_snapshot.directory_digest,)),
+                Digest, MergeDigests((empty_snapshot.directory_digest,)),
             )
             self.assertEqual(empty_snapshot.directory_digest, empty_merged)
 
             roland_merged = self.request_single_product(
                 Digest,
-                DirectoriesToMerge(
-                    (roland_snapshot.directory_digest, empty_snapshot.directory_digest)
-                ),
+                MergeDigests((roland_snapshot.directory_digest, empty_snapshot.directory_digest)),
             )
             self.assertEqual(
                 roland_snapshot.directory_digest, roland_merged,
@@ -380,7 +378,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
 
             both_merged = self.request_single_product(
                 Digest,
-                DirectoriesToMerge(
+                MergeDigests(
                     (roland_snapshot.directory_digest, susannah_snapshot.directory_digest)
                 ),
             )
@@ -403,14 +401,14 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
 
         digest = self.request_single_product(Digest, input_files_content)
 
-        dpa = DirectoryWithPrefixToAdd(digest, "outer_dir")
+        dpa = AddPrefix(digest, "outer_dir")
         output_digest = self.request_single_product(Digest, dpa)
         snapshot = self.request_single_product(Snapshot, output_digest)
 
         self.assertEqual(sorted(snapshot.files), ["outer_dir/main.py", "outer_dir/subdir/sub.py"])
         self.assertEqual(sorted(snapshot.dirs), ["outer_dir", "outer_dir/subdir"])
 
-    def test_strip_prefix(self):
+    def test_remove_prefix(self):
         # Set up files:
 
         relevant_files = (
@@ -451,14 +449,13 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
 
             # Strip empty prefix:
             zero_prefix_stripped_digest = self.request_single_product(
-                Digest, DirectoryWithPrefixToStrip(snapshot.directory_digest, ""),
+                Digest, RemovePrefix(snapshot.directory_digest, ""),
             )
             self.assertEquals(snapshot.directory_digest, zero_prefix_stripped_digest)
 
             # Strip a non-empty prefix shared by all files:
             stripped_digest = self.request_single_product(
-                Digest,
-                DirectoryWithPrefixToStrip(snapshot.directory_digest, "characters/dark_tower"),
+                Digest, RemovePrefix(snapshot.directory_digest, "characters/dark_tower"),
             )
             self.assertEquals(
                 stripped_digest,
@@ -482,7 +479,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
             ):
                 self.request_single_product(
                     Digest,
-                    DirectoryWithPrefixToStrip(
+                    RemovePrefix(
                         snapshot_with_extra_files.directory_digest, "characters/dark_tower"
                     ),
                 )

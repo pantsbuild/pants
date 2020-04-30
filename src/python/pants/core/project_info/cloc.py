@@ -9,10 +9,10 @@ from pants.core.util_rules.external_tool import DownloadedExternalTool, External
 from pants.engine.console import Console
 from pants.engine.fs import (
     Digest,
-    DirectoriesToMerge,
     FileContent,
     FilesContent,
     InputFilesContent,
+    MergeDigests,
     SingleFileExecutable,
     SourcesSnapshots,
 )
@@ -82,7 +82,7 @@ async def run_cloc(
         ExternalToolRequest, cloc_binary.get_request(Platform.current)
     )
     digest = await Get[Digest](
-        DirectoriesToMerge(
+        MergeDigests(
             (
                 input_file_digest,
                 downloaded_cloc_binary.digest,

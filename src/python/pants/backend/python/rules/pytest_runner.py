@@ -32,10 +32,10 @@ from pants.core.goals.test import TestConfiguration, TestDebugRequest, TestOptio
 from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.engine.addresses import Addresses
 from pants.engine.fs import (
+    AddPrefix,
     Digest,
-    DirectoriesToMerge,
-    DirectoryWithPrefixToAdd,
     InputFilesContent,
+    MergeDigests,
     PathGlobs,
     Snapshot,
     SnapshotSubset,
@@ -187,7 +187,7 @@ async def setup_pytest_for_target(
         await MultiGet(requests),
     )
 
-    directories_to_merge = [
+    digests_to_merge = [
         prepared_sources.snapshot.directory_digest,
         requirements_pex.directory_digest,
         pytest_pex.directory_digest,
@@ -195,11 +195,9 @@ async def setup_pytest_for_target(
     ]
     if run_coverage:
         coverage_config = rest[0]
-        directories_to_merge.append(coverage_config.digest)
+        digests_to_merge.append(coverage_config.digest)
 
-    merged_input_files = await Get[Digest](
-        DirectoriesToMerge(directories=tuple(directories_to_merge))
-    )
+    merged_input_files = await Get[Digest](MergeDigests(digests_to_merge))
 
     coverage_args = []
     if run_coverage:
@@ -272,7 +270,7 @@ async def run_python_test(
             SnapshotSubset(output_digest, PathGlobs([test_results_file]))
         )
         xml_results_digest = await Get[Digest](
-            DirectoryWithPrefixToAdd(xml_results_snapshot.directory_digest, test_setup.xml_dir)
+            AddPrefix(xml_results_snapshot.directory_digest, test_setup.xml_dir)
         )
 
     return TestResult.from_fallible_process_result(

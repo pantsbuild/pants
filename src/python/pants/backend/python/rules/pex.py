@@ -19,11 +19,11 @@ from pants.engine.collection import DeduplicatedCollection
 from pants.engine.fs import (
     EMPTY_DIRECTORY_DIGEST,
     EMPTY_SNAPSHOT,
+    AddPrefix,
     Digest,
-    DirectoriesToMerge,
-    DirectoryWithPrefixToAdd,
     GlobExpansionConjunction,
     GlobMatchErrorBehavior,
+    MergeDigests,
     PathGlobs,
     Snapshot,
 )
@@ -328,13 +328,13 @@ async def create_pex(
         )
 
     sources_digest_as_subdir = await Get[Digest](
-        DirectoryWithPrefixToAdd(request.sources or EMPTY_DIRECTORY_DIGEST, source_dir_name)
+        AddPrefix(request.sources or EMPTY_DIRECTORY_DIGEST, source_dir_name)
     )
     additional_inputs_digest = request.additional_inputs or EMPTY_DIRECTORY_DIGEST
 
     merged_digest = await Get[Digest](
-        DirectoriesToMerge(
-            directories=(
+        MergeDigests(
+            (
                 pex_bin.directory_digest,
                 sources_digest_as_subdir,
                 additional_inputs_digest,

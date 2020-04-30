@@ -43,15 +43,15 @@ from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.console import Console
 from pants.engine.fs import (
+    AddPrefix,
     Digest,
-    DirectoriesToMerge,
     DirectoryToMaterialize,
-    DirectoryWithPrefixToAdd,
-    DirectoryWithPrefixToStrip,
     FileContent,
     FilesContent,
     InputFilesContent,
+    MergeDigests,
     PathGlobs,
+    RemovePrefix,
     Snapshot,
     SnapshotSubset,
     Workspace,
@@ -378,9 +378,7 @@ async def run_setup_py(
 ) -> RunSetupPyResult:
     """Run a setup.py command on a single exported target."""
     merged_input_files = await Get[Digest](
-        DirectoriesToMerge(
-            directories=(req.chroot.digest, setuptools_setup.requirements_pex.directory_digest)
-        )
+        MergeDigests((req.chroot.digest, setuptools_setup.requirements_pex.directory_digest))
     )
     # The setuptools dist dir, created by it under the chroot (not to be confused with
     # pants's own dist dir, at the buildroot).
@@ -397,9 +395,7 @@ async def run_setup_py(
         description=f"Run setuptools for {req.exported_target.target.address.reference()}",
     )
     result = await Get[ProcessResult](Process, process)
-    output_digest = await Get[Digest](
-        DirectoryWithPrefixToStrip(result.output_directory_digest, dist_dir)
-    )
+    output_digest = await Get[Digest](RemovePrefix(result.output_directory_digest, dist_dir))
     return RunSetupPyResult(output_digest)
 
 
@@ -413,7 +409,7 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
     requirements = await Get[ExportedTargetRequirements](DependencyOwner(exported_target))
 
     # Nest the sources under the src/ prefix.
-    src_digest = await Get[Digest](DirectoryWithPrefixToAdd(sources.digest, CHROOT_SOURCE_ROOT))
+    src_digest = await Get[Digest](AddPrefix(sources.digest, CHROOT_SOURCE_ROOT))
 
     target = exported_target.target
     provides = exported_target.provides
@@ -464,7 +460,7 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
         )
     )
 
-    chroot_digest = await Get[Digest](DirectoriesToMerge((src_digest, extra_files_digest)))
+    chroot_digest = await Get[Digest](MergeDigests((src_digest, extra_files_digest)))
     return SetupPyChroot(chroot_digest, json.dumps(setup_kwargs, sort_keys=True))
 
 
@@ -495,7 +491,7 @@ async def get_sources(
     ]
     ancestor_init_pys = await Get[AncestorInitPyFiles](Targets, targets)
     sources_digest = await Get[Digest](
-        DirectoriesToMerge(directories=tuple([*stripped_srcs_digests, *ancestor_init_pys.digests]))
+        MergeDigests((*stripped_srcs_digests, *ancestor_init_pys.digests))
     )
     init_pys_snapshot = await Get[Snapshot](
         SnapshotSubset(sources_digest, PathGlobs(["**/__init__.py"]))
@@ -552,11 +548,7 @@ async def get_ancestor_init_py(
     )
 
     source_root_stripped_ancestor_init_pys = await MultiGet[Digest](
-        Get[Digest](
-            DirectoryWithPrefixToStrip(
-                directory_digest=snapshot.directory_digest, prefix=source_dir_ancestor[0]
-            )
-        )
+        Get[Digest](RemovePrefix(snapshot.directory_digest, source_dir_ancestor[0]))
         for snapshot, source_dir_ancestor in zip(
             ancestor_init_py_snapshots, source_dir_ancestors_list
         )

@@ -10,7 +10,7 @@ from pants.core.util_rules.strip_source_roots import (
     SourceRootStrippedSources,
     StripSourcesFieldRequest,
 )
-from pants.engine.fs import DirectoriesToMerge, PathGlobs, Snapshot, SnapshotSubset
+from pants.engine.fs import MergeDigests, PathGlobs, Snapshot, SnapshotSubset
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import HydratedSources, HydrateSourcesRequest
@@ -122,7 +122,7 @@ async def determine_all_source_files(request: AllSourceFilesRequest) -> SourceFi
         digests_to_merge = tuple(
             hydrated_sources.snapshot.directory_digest for hydrated_sources in all_hydrated_sources
         )
-    result = await Get[Snapshot](DirectoriesToMerge(digests_to_merge))
+    result = await Get[Snapshot](MergeDigests(digests_to_merge))
     return SourceFiles(result)
 
 
@@ -177,7 +177,7 @@ async def determine_specified_source_files(request: SpecifiedSourceFilesRequest)
         )
         all_snapshots = (stripped_snapshot.snapshot for stripped_snapshot in stripped_snapshots)
     result = await Get[Snapshot](
-        DirectoriesToMerge(tuple(snapshot.directory_digest for snapshot in all_snapshots))
+        MergeDigests(snapshot.directory_digest for snapshot in all_snapshots)
     )
     return SourceFiles(result)
 

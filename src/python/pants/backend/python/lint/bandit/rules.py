@@ -22,7 +22,7 @@ from pants.core.util_rules.determine_source_files import (
     SourceFiles,
     SpecifiedSourceFilesRequest,
 )
-from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
+from pants.engine.fs import Digest, MergeDigests, PathGlobs, Snapshot
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import named_rule, subsystem_rule
 from pants.engine.selectors import Get
@@ -94,8 +94,8 @@ async def bandit_lint(
     )
 
     merged_input_files = await Get[Digest](
-        DirectoriesToMerge(
-            directories=(
+        MergeDigests(
+            (
                 all_source_files.snapshot.directory_digest,
                 requirements_pex.directory_digest,
                 config_snapshot.directory_digest,

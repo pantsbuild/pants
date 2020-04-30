@@ -75,9 +75,9 @@ class DownloadedPexBin(HermeticPex):
         :param pex_args: The arguments to pass to the pex CLI tool.
         :param description: A description of the process execution to be performed.
         :param input_files: The files that contain the pex CLI tool itself and any input files it
-                            needs to run against. By default just the files that contain the pex CLI
-                            tool itself. To merge in additional files, include the
-                            `directory_digest` in `DirectoriesToMerge` request.
+                            needs to run against. By default, this is just the files that contain
+                            the PEX CLI tool itself. To merge in additional files, include
+                            `self.directory_digest` in a `MergeDigests` request.
         :param env: The environment to run the PEX in.
         :param kwargs: Any additional :class:`Process` kwargs to pass through.
         """

@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
-from pants.engine.fs import Digest, DirectoryWithPrefixToStrip, Snapshot
+from pants.engine.fs import Digest, RemovePrefix, Snapshot
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
@@ -57,7 +57,7 @@ async def maybe_extract(extractable: MaybeExtractable) -> ExtractedDigest:
             )
             result = await Get[ProcessResult](Process, proc)
             strip_output_dir = await Get[Digest](
-                DirectoryWithPrefixToStrip(result.output_directory_digest, output_dir)
+                RemovePrefix(result.output_directory_digest, output_dir)
             )
             return ExtractedDigest(strip_output_dir)
     return ExtractedDigest(digest)

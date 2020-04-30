@@ -18,16 +18,16 @@ import pkg_resources
 from pants.base.project_tree import Dir, File, Link
 from pants.engine.addresses import Address
 from pants.engine.fs import (
+    AddPrefix,
     Digest,
-    DirectoriesToMerge,
-    DirectoryWithPrefixToAdd,
-    DirectoryWithPrefixToStrip,
     FileContent,
     FilesContent,
     InputFilesContent,
     MaterializeDirectoriesResult,
     MaterializeDirectoryResult,
+    MergeDigests,
     PathGlobs,
+    RemovePrefix,
     Snapshot,
     SnapshotSubset,
     UrlToFetch,
@@ -569,9 +569,9 @@ class EngineTypes(NamedTuple):
     construct_materialize_directory_result: Function
     address: TypeId
     path_globs: TypeId
-    directories_to_merge: TypeId
-    directory_with_prefix_to_strip: TypeId
-    directory_with_prefix_to_add: TypeId
+    merge_digests: TypeId
+    add_prefix: TypeId
+    remove_prefix: TypeId
     input_files_content: TypeId
     dir: TypeId
     file: TypeId
@@ -950,9 +950,9 @@ class Native(metaclass=SingletonMetaclass):
             construct_materialize_directory_result=func(MaterializeDirectoryResult),
             address=ti(Address),
             path_globs=ti(PathGlobs),
-            directories_to_merge=ti(DirectoriesToMerge),
-            directory_with_prefix_to_strip=ti(DirectoryWithPrefixToStrip),
-            directory_with_prefix_to_add=ti(DirectoryWithPrefixToAdd),
+            merge_digests=ti(MergeDigests),
+            add_prefix=ti(AddPrefix),
+            remove_prefix=ti(RemovePrefix),
             input_files_content=ti(InputFilesContent),
             dir=ti(Dir),
             file=ti(File),

@@ -16,13 +16,7 @@ from pants.core.goals.fmt import (
 )
 from pants.core.util_rules.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
 from pants.engine.addresses import Address
-from pants.engine.fs import (
-    EMPTY_DIRECTORY_DIGEST,
-    Digest,
-    DirectoriesToMerge,
-    FileContent,
-    Workspace,
-)
+from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Digest, FileContent, MergeDigests, Workspace
 from pants.engine.target import Sources, Target, TargetsWithOrigins, TargetWithOrigin
 from pants.engine.unions import UnionMembership
 from pants.testutil.engine.util import MockConsole, MockGet, create_goal_subsystem, run_rule
@@ -158,9 +152,7 @@ class FmtTest(TestBase):
                     mock=lambda tgts: TargetsWithSources(tgts if include_sources else ()),
                 ),
                 MockGet(
-                    product_type=Digest,
-                    subject_type=DirectoriesToMerge,
-                    mock=lambda _: result_digest,
+                    product_type=Digest, subject_type=MergeDigests, mock=lambda _: result_digest,
                 ),
             ],
             union_membership=union_membership,

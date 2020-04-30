@@ -13,8 +13,8 @@ from pants.engine.console import Console
 from pants.engine.fs import (
     EMPTY_DIRECTORY_DIGEST,
     Digest,
-    DirectoriesToMerge,
     DirectoryToMaterialize,
+    MergeDigests,
     Snapshot,
     Workspace,
 )
@@ -236,7 +236,7 @@ async def fmt(
         # NB: this will fail if there are any conflicting changes, which we want to happen rather
         # than silently having one result override the other. In practicality, this should never
         # happen due to us grouping each language's formatters into a single digest.
-        merged_formatted_digest = await Get[Digest](DirectoriesToMerge(changed_digests))
+        merged_formatted_digest = await Get[Digest](MergeDigests(changed_digests))
         workspace.materialize_directory(DirectoryToMaterialize(merged_formatted_digest))
 
     for result in individual_results:
