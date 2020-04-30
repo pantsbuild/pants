@@ -5,7 +5,7 @@ from pathlib import PurePath
 from textwrap import dedent
 from typing import List, Optional
 
-from pants.backend.python.lint.pylint.rules import PylintConfiguration, PylintConfigurations
+from pants.backend.python.lint.pylint.rules import PylintFieldSet, PylintFieldSets
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
 from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonLibrary
 from pants.backend.python.targets.python_library import PythonLibrary as PythonLibraryV1
@@ -45,7 +45,7 @@ class PylintIntegrationTest(TestBase):
         return (
             *super().rules(),
             *pylint_rules(),
-            RootRule(PylintConfigurations),
+            RootRule(PylintFieldSets),
             RootRule(HydratedTargets),
         )
 
@@ -98,7 +98,7 @@ class PylintIntegrationTest(TestBase):
         return self.request_single_product(
             LintResult,
             Params(
-                PylintConfigurations(PylintConfiguration.create(tgt) for tgt in targets),
+                PylintFieldSets(PylintFieldSet.create(tgt) for tgt in targets),
                 create_options_bootstrapper(args=args),
             ),
         )

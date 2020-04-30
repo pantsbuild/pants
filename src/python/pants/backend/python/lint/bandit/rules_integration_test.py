@@ -3,7 +3,7 @@
 
 from typing import List, Optional
 
-from pants.backend.python.lint.bandit.rules import BanditConfiguration, BanditConfigurations
+from pants.backend.python.lint.bandit.rules import BanditFieldSet, BanditFieldSets
 from pants.backend.python.lint.bandit.rules import rules as bandit_rules
 from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonLibrary
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
@@ -25,7 +25,7 @@ class BanditIntegrationTest(TestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *bandit_rules(), RootRule(BanditConfigurations))
+        return (*super().rules(), *bandit_rules(), RootRule(BanditFieldSets))
 
     def make_target_with_origin(
         self,
@@ -63,7 +63,7 @@ class BanditIntegrationTest(TestBase):
         return self.request_single_product(
             LintResult,
             Params(
-                BanditConfigurations(BanditConfiguration.create(tgt) for tgt in targets),
+                BanditFieldSets(BanditFieldSet.create(tgt) for tgt in targets),
                 create_options_bootstrapper(args=args),
             ),
         )

@@ -14,7 +14,7 @@ from pants.backend.python.rules import (
     pytest_runner,
 )
 from pants.backend.python.rules.pytest_coverage import CoverageConfigRequest, create_coverage_config
-from pants.backend.python.rules.pytest_runner import PythonTestConfiguration
+from pants.backend.python.rules.pytest_runner import PythonTestFieldSet
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary, PythonTests
 from pants.backend.python.targets.python_library import PythonLibrary as PythonLibraryV1
@@ -128,7 +128,7 @@ class PytestRunnerIntegrationTest(TestBase):
             *subprocess_environment.rules(),
             SubsystemRule(TestOptions),
             RootRule(CoverageConfigRequest),
-            RootRule(PythonTestConfiguration),
+            RootRule(PythonTestFieldSet),
         )
 
     def run_pytest(
@@ -148,7 +148,7 @@ class PytestRunnerIntegrationTest(TestBase):
             origin = SingleAddress(directory=address.spec_path, name=address.target_name)
         tgt = PythonTests({}, address=address)
         params = Params(
-            PythonTestConfiguration.create(TargetWithOrigin(tgt, origin)), options_bootstrapper
+            PythonTestFieldSet.create(TargetWithOrigin(tgt, origin)), options_bootstrapper
         )
         test_result = self.request_single_product(TestResult, params)
         debug_request = self.request_single_product(TestDebugRequest, params)

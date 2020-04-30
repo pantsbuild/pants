@@ -11,8 +11,8 @@ from typing import Dict, Iterable, List, Optional, Type, TypeVar
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.core.util_rules.filter_empty_sources import (
-    ConfigurationsWithSources,
-    ConfigurationsWithSourcesRequest,
+    FieldSetsWithSources,
+    FieldSetsWithSourcesRequest,
 )
 from pants.engine import desktop
 from pants.engine.addresses import Address
@@ -25,10 +25,10 @@ from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import goal_rule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
-    ConfigurationWithOrigin,
+    FieldSetWithOrigin,
     Sources,
-    TargetsToValidConfigurations,
-    TargetsToValidConfigurationsRequest,
+    TargetsToValidFieldSets,
+    TargetsToValidFieldSetsRequest,
 )
 from pants.engine.unions import UnionMembership, union
 
@@ -77,7 +77,7 @@ class TestDebugRequest:
 
 
 @union
-class TestConfiguration(ConfigurationWithOrigin, metaclass=ABCMeta):
+class TestFieldSet(FieldSetWithOrigin, metaclass=ABCMeta):
     """The fields necessary to run tests on a target."""
 
     sources: Sources
@@ -88,8 +88,8 @@ class TestConfiguration(ConfigurationWithOrigin, metaclass=ABCMeta):
 # NB: This is only used for the sake of coordinator_of_tests. Consider inlining that rule so that
 # we can remove this wrapper type.
 @dataclass(frozen=True)
-class WrappedTestConfiguration:
-    config: TestConfiguration
+class WrappedTestFieldSet:
+    field_set: TestFieldSet
 
 
 @dataclass(frozen=True)
@@ -162,7 +162,7 @@ class TestOptions(GoalSubsystem):
 
     name = "test"
 
-    required_union_implementations = (TestConfiguration,)
+    required_union_implementations = (TestFieldSet,)
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
@@ -207,34 +207,34 @@ async def run_tests(
     union_membership: UnionMembership,
 ) -> Test:
     if options.values.debug:
-        targets_to_valid_configs = await Get[TargetsToValidConfigurations](
-            TargetsToValidConfigurationsRequest(
-                TestConfiguration,
+        targets_to_valid_field_sets = await Get[TargetsToValidFieldSets](
+            TargetsToValidFieldSetsRequest(
+                TestFieldSet,
                 goal_description="`test --debug`",
                 error_if_no_valid_targets=True,
-                expect_single_config=True,
+                expect_single_field_set=True,
             )
         )
-        config = targets_to_valid_configs.configurations[0]
-        logger.info(f"Starting test in debug mode: {config.address.reference()}")
-        request = await Get[TestDebugRequest](TestConfiguration, config)
+        field_set = targets_to_valid_field_sets.field_sets[0]
+        logger.info(f"Starting test in debug mode: {field_set.address.reference()}")
+        request = await Get[TestDebugRequest](TestFieldSet, field_set)
         debug_result = interactive_runner.run_local_interactive_process(request.ipr)
         return Test(debug_result.process_exit_code)
 
-    targets_to_valid_configs = await Get[TargetsToValidConfigurations](
-        TargetsToValidConfigurationsRequest(
-            TestConfiguration,
+    targets_to_valid_field_sets = await Get[TargetsToValidFieldSets](
+        TargetsToValidFieldSetsRequest(
+            TestFieldSet,
             goal_description=f"the `{options.name}` goal",
             error_if_no_valid_targets=False,
         )
     )
-    configs_with_sources = await Get[ConfigurationsWithSources](
-        ConfigurationsWithSourcesRequest(targets_to_valid_configs.configurations)
+    field_sets_with_sources = await Get[FieldSetsWithSources](
+        FieldSetsWithSourcesRequest(targets_to_valid_field_sets.field_sets)
     )
 
     results = await MultiGet(
-        Get[AddressAndTestResult](WrappedTestConfiguration(config))
-        for config in configs_with_sources
+        Get[AddressAndTestResult](WrappedTestFieldSet(field_set))
+        for field_set in field_sets_with_sources
     )
 
     did_any_fail = False
@@ -306,19 +306,19 @@ async def run_tests(
 
 
 @rule
-async def coordinator_of_tests(wrapped_config: WrappedTestConfiguration) -> AddressAndTestResult:
-    config = wrapped_config.config
+async def coordinator_of_tests(wrapped_field_set: WrappedTestFieldSet) -> AddressAndTestResult:
+    field_set = wrapped_field_set.field_set
 
     # TODO(#6004): when streaming to live TTY, rely on V2 UI for this information. When not a
     # live TTY, periodically dump heavy hitters to stderr. See
     # https://github.com/pantsbuild/pants/issues/6004#issuecomment-492699898.
-    logger.info(f"Starting tests: {config.address.reference()}")
-    result = await Get[TestResult](TestConfiguration, config)
+    logger.info(f"Starting tests: {field_set.address.reference()}")
+    result = await Get[TestResult](TestFieldSet, field_set)
     logger.info(
         f"Tests {'succeeded' if result.status == Status.SUCCESS else 'failed'}: "
-        f"{config.address.reference()}"
+        f"{field_set.address.reference()}"
     )
-    return AddressAndTestResult(config.address, result)
+    return AddressAndTestResult(field_set.address, result)
 
 
 def rules():
