@@ -43,5 +43,5 @@ class InteractiveRunner:
         return self._scheduler.run_local_interactive_process(request)
 
 
-def create_interactive_runner_rules():
+def rules():
     return [RootRule(InteractiveRunner)]

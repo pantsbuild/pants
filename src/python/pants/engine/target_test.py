@@ -54,7 +54,6 @@ from pants.engine.target import (
     TooManyTargetsException,
     WrappedTarget,
 )
-from pants.engine.target import rules as target_rules
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.testutil.engine.util import MockGet, run_rule
 from pants.testutil.test_base import TestBase
@@ -525,7 +524,6 @@ class TestFindValidConfigurations(TestBase):
     def rules(cls):
         return (
             *super().rules(),
-            *target_rules(),
             RootRule(TargetsWithOrigins),
             UnionRule(cls.ConfigSuperclass, cls.ConfigSubclass1),
             UnionRule(cls.ConfigSuperclass, cls.ConfigSubclass2),
@@ -768,7 +766,7 @@ def test_dict_string_to_string_sequence_field() -> None:
 class TestSources(TestBase):
     @classmethod
     def rules(cls):
-        return (*super().rules(), *target_rules(), RootRule(HydrateSourcesRequest))
+        return (*super().rules(), RootRule(HydrateSourcesRequest))
 
     def test_raw_value_sanitation(self) -> None:
         addr = Address.parse(":test")
@@ -938,7 +936,6 @@ class TestCodegen(TestBase):
     def rules(cls):
         return (
             *super().rules(),
-            *target_rules(),
             generate_fortran_from_avro,
             RootRule(GenerateFortranFromAvroRequest),
             RootRule(HydrateSourcesRequest),

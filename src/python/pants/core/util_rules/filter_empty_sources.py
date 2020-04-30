@@ -11,7 +11,6 @@ from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import HydratedSources, HydrateSourcesRequest
 from pants.engine.target import Sources as SourcesField
 from pants.engine.target import Target
-from pants.engine.target import rules as target_rules
 
 
 # This protocol allows us to work with any arbitrary Configuration. See
@@ -72,5 +71,4 @@ def rules():
         determine_targets_with_sources,
         RootRule(ConfigurationsWithSourcesRequest),
         RootRule(TargetsWithSourcesRequest),
-        *target_rules(),
     ]

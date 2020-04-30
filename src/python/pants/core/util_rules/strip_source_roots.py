@@ -21,7 +21,6 @@ from pants.engine.rules import RootRule, rule, subsystem_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import HydratedSources, HydrateSourcesRequest
 from pants.engine.target import Sources as SourcesField
-from pants.engine.target import rules as target_rules
 from pants.source.source_root import NoSourceRootError, SourceRootConfig
 from pants.util.meta import frozen_after_init
 
@@ -175,5 +174,4 @@ def rules():
         subsystem_rule(SourceRootConfig),
         RootRule(StripSnapshotRequest),
         RootRule(StripSourcesFieldRequest),
-        *target_rules(),
     ]
