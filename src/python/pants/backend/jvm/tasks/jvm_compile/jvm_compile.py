@@ -683,7 +683,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
         )
         for target, snapshot in list(zip(valid_targets, snapshots)):
             cc = self.select_runtime_context(compile_contexts[target])
-            self._set_directory_digest_for_compile_context(cc, snapshot.directory_digest)
+            self._set_directory_digest_for_compile_context(cc, snapshot.digest)
 
     def _set_directory_digest_for_compile_context(self, ctx, directory_digest):
         if self.get_options().use_classpath_jars:
