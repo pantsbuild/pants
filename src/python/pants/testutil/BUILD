@@ -151,6 +151,12 @@ python_library(
 )
 
 python_library(
+  name='retry',
+  sources=['retry.py'],
+  tags = {"partially_type_checked"},
+)
+
+python_library(
   name='pexrc_util',
   sources=['pexrc_util.py'],
   dependencies = [

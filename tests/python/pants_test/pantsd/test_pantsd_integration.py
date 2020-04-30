@@ -44,12 +44,6 @@ def launch_file_toucher(f):
 
 
 class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
-    def test_pantsd_compile(self):
-        with self.pantsd_successful_run_context(log_level="debug") as ctx:
-            # This tests a deeper pantsd-based run by actually invoking a full compile.
-            ctx.runner(["compile", "examples/src/scala/org/pantsbuild/example/hello/welcome"])
-            ctx.checker.assert_started()
-
     @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/7573")
     def test_pantsd_run(self):
         with self.pantsd_successful_run_context(log_level="debug") as ctx:
@@ -307,18 +301,16 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                 return "\n".join(read_pantsd_log(ctx.workdir))
 
             # Check the logs.
+            ctx.checker.assert_running()
             self.assertRegex(
                 full_pantsd_log(), r"watching invalidating files:.*{}".format(test_dir)
             )
-
-            ctx.checker.assert_running()
 
             # Create a new file in test_dir
             with temporary_file(suffix=".py", binary_mode=False, root_dir=test_dir) as temp_f:
                 temp_f.write("import that\n")
                 temp_f.close()
 
-                time.sleep(10)
                 ctx.checker.assert_stopped()
 
             self.assertIn("saw file events covered by invalidation globs", full_pantsd_log())
@@ -338,7 +330,6 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
             # Delete tmp_pants_toml
             os.unlink(tmp_pants_toml)
-            time.sleep(10)
             ctx.checker.assert_stopped()
 
     def test_pantsd_pid_deleted(self):
@@ -353,8 +344,6 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             subprocess_dir = ctx.pantsd_config["GLOBAL"]["pants_subprocessdir"]
             os.unlink(os.path.join(subprocess_dir, "pantsd", "pid"))
 
-            # Permit ample time for the async file event propagate in CI.
-            time.sleep(10)
             ctx.checker.assert_stopped()
 
     def test_pantsd_pid_change(self):
@@ -371,8 +360,6 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             with open(pidpath, "w") as f:
                 f.write("9")
 
-            # Permit ample time for the async file event propagate in CI.
-            time.sleep(10)
             ctx.checker.assert_stopped()
 
             # Remove the pidfile so that the teardown script doesn't try to kill process 9.
@@ -657,43 +644,11 @@ Interrupted by user over pailgun client!
             self.assert_success(result)
             checker.assert_running()
 
-    def test_pantsd_environment_scrubbing(self):
-        # This pair of JVM options causes the JVM to always crash, so the command will fail if the env
-        # isn't stripped.
-        with self.pantsd_successful_run_context(
-            extra_config={"compile.rsc": {"jvm_options": ["-Xmx1g"]}},
-            extra_env={"_JAVA_OPTIONS": "-Xms2g"},
-        ) as ctx:
-            ctx.runner(["help"])
-            ctx.checker.assert_started()
-
-            result = ctx.runner(
-                ["compile", "examples/src/java/org/pantsbuild/example/hello/simple"]
-            )
-            self.assert_success(result)
-
     def test_pantsd_unicode_environment(self):
         with self.pantsd_successful_run_context(extra_env={"XXX": "¡"},) as ctx:
             result = ctx.runner(["help"])
             ctx.checker.assert_started()
             self.assert_success(result)
-
-    def test_daemon_auto_shutdown_after_first_run(self):
-        config = {"GLOBAL": {"shutdown_pantsd_after_run": True}}
-        with self.pantsd_test_context(extra_config=config) as (workdir, config, checker):
-            wait_handle = self.run_pants_with_workdir_without_waiting(["list"], workdir, config,)
-
-            # TODO(#6574, #7330): We might have a new default timeout after these are resolved.
-            checker.assert_started(timeout=16)
-            pantsd_processes = checker.runner_process_context.current_processes()
-            pants_run = wait_handle.join()
-            self.assert_success(pants_run)
-
-            # Permit enough time for the process to terminate in CI
-            time.sleep(5)
-
-            for process in pantsd_processes:
-                self.assertFalse(process.is_running())
 
     # This is a regression test for a bug where we would incorrectly detect a cycle if two targets swapped their
     # dependency relationship (#7404).

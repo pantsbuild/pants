@@ -72,9 +72,10 @@ python_library(
   dependencies = [
     '3rdparty/python:ansicolors',
     'src/python/pants/pantsd:process_manager',
-    'src/python/pants/util:collections',
-    'src/python/pants/testutil:process_test_util',
     'src/python/pants/testutil:int-test',
+    'src/python/pants/testutil:process_test_util',
+    'src/python/pants/testutil:retry',
+    'src/python/pants/util:collections',
   ],
   tags = {'partially_type_checked'},
 )
