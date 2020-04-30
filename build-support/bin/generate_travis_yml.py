@@ -621,9 +621,7 @@ def integration_tests_v1(python_version: PythonVersion) -> List[Dict]:
             ],
         }
         safe_append(
-            shard,
-            "env",
-            f"CACHE_NAME=integration.v1.shard_{shard_num}.py{python_version.number}",
+            shard, "env", f"CACHE_NAME=integration.v1.shard_{shard_num}.py{python_version.number}",
         )
         return shard
 
