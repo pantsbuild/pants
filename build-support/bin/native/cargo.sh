@@ -32,6 +32,18 @@ PATH="${cmakeroot}/bin:${goroot}/bin:${CARGO_HOME}/bin:$(dirname "${protoc}"):${
 export PATH
 export PROTOC="${protoc}"
 
+# We implicitly pull in `ar` to create libnative_engine_ffi.a from native_engine.o via the `cc`
+# crate in engine_cffi/build.rs.
+# The homebrew version of the `ar` tool appears to "sometimes" create libnative_engine_ffi.a
+# instances which aren't recognized as Mach-O x86-64 binaries when first on the PATH. This causes a
+# silent linking error at build time due to the use of the `-undefined dynamic_lookup` flag, which
+# then becomes:
+# "Symbol not found: _wrapped_PyInit_native_engine"
+# when attempting to import the native engine library in native.py.
+if [[ "$(uname)" == 'Darwin' ]]; then
+  export AR='/usr/bin/ar'
+fi
+
 cargo_bin="${CARGO_HOME}/bin/cargo"
 
 if [[ -n "${CARGO_WRAPPER_DEBUG}" ]]; then
@@ -41,6 +53,7 @@ if [[ -n "${CARGO_WRAPPER_DEBUG}" ]]; then
 >>>   GOROOT=${GOROOT}
 >>>   PATH=${PATH}
 >>>   PROTOC=${PROTOC}
+>>>   AR=${AR:-<not explicitly set>}
 >>>
 DEBUG
 fi
