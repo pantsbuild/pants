@@ -89,8 +89,9 @@ async def run_repl(
     repl_implementation_cls = implementations.get(repl_shell_name)
     if repl_implementation_cls is None:
         available = sorted(set(implementations.keys()))
-        console.write_stdout(
-            f"{repl_shell_name} is not an installed REPL program. Available REPLs: {available}"
+        console.print_stderr(
+            f"{repr(repl_shell_name)} is not a registered REPL. Available REPLs (which may "
+            f"be specified through the option `--repl-shell`): {available}"
         )
         return Repl(-1)
 
@@ -111,14 +112,7 @@ async def run_repl(
         run_request = InteractiveProcessRequest(argv=(full_path,), run_in_workspace=True,)
 
     result = runner.run_local_interactive_process(run_request)
-    exit_code = result.process_exit_code
-
-    if exit_code == 0:
-        console.write_stdout("REPL exited successfully.")
-    else:
-        console.write_stdout(f"REPL exited with error: {exit_code}.")
-
-    return Repl(exit_code)
+    return Repl(result.process_exit_code)
 
 
 def rules():

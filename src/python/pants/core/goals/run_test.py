@@ -3,6 +3,8 @@
 
 from typing import cast
 
+import pytest
+
 from pants.base.build_root import BuildRoot
 from pants.base.specs import SingleAddress
 from pants.core.goals.binary import BinaryConfiguration, CreatedBinary
@@ -58,12 +60,12 @@ class RunTest(TestBase):
         res = run_rule(
             run,
             rule_args=[
-                console,
-                workspace,
-                interactive_runner,
-                BuildRoot(),
                 create_goal_subsystem(RunOptions, args=[]),
                 create_subsystem(GlobalOptions, pants_workdir=self.pants_workdir),
+                console,
+                interactive_runner,
+                workspace,
+                BuildRoot(),
             ],
             mock_gets=[
                 MockGet(
@@ -86,12 +88,7 @@ class RunTest(TestBase):
         res = self.single_target_run(
             console=console, program_text=program_text, address_spec="some/addr",
         )
-        self.assertEqual(res.exit_code, 0)
-        self.assertEqual(
-            console.stdout.getvalue(),
-            "Running target: some/addr:addr\nsome/addr:addr ran successfully.\n",
-        )
-        self.assertEqual(console.stderr.getvalue(), "")
+        assert res.exit_code == 0
 
     def test_materialize_input_files(self) -> None:
         program_text = b'#!/usr/bin/python\nprint("hello")'
@@ -101,12 +98,12 @@ class RunTest(TestBase):
             argv=("./program.py",), run_in_workspace=False, input_files=binary.digest,
         )
         result = interactive_runner.run_local_interactive_process(request)
-        self.assertEqual(result.process_exit_code, 0)
+        assert result.process_exit_code == 0
 
     def test_no_input_files_in_workspace(self) -> None:
         program_text = b'#!/usr/bin/python\nprint("hello")'
         binary = self.create_mock_binary(program_text)
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             InteractiveProcessRequest(
                 argv=("/usr/bin/python",), run_in_workspace=True, input_files=binary.digest
             )
@@ -117,6 +114,4 @@ class RunTest(TestBase):
         res = self.single_target_run(
             console=console, program_text=program_text, address_spec="some/addr"
         )
-        self.assertEqual(res.exit_code, 1)
-        self.assertEqual(console.stdout.getvalue(), "Running target: some/addr:addr\n")
-        self.assertEqual(console.stderr.getvalue(), "some/addr:addr failed with code 1!\n")
+        assert res.exit_code == 1
