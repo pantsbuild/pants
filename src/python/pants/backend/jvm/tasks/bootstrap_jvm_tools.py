@@ -373,8 +373,8 @@ class BootstrapJvmTools(CoursierMixin, JarTask):
                 )
             ]
         )[0]
-        snapshot.directory_digest.dump(shaded_jar)
-        return ClasspathEntry(shaded_jar, directory_digest=snapshot.directory_digest)
+        snapshot.digest.dump(shaded_jar)
+        return ClasspathEntry(shaded_jar, directory_digest=snapshot.digest)
 
     def check_artifact_cache_for(self, invalidation_check):
         tool_vts = self.tool_vts(invalidation_check)

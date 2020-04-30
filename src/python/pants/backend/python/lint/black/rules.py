@@ -120,11 +120,7 @@ async def setup(
 
     merged_input_files = await Get[Digest](
         MergeDigests(
-            (
-                all_source_files_snapshot.directory_digest,
-                requirements_pex.directory_digest,
-                config_snapshot.directory_digest,
-            )
+            (all_source_files_snapshot.digest, requirements_pex.digest, config_snapshot.digest)
         ),
     )
 
@@ -145,7 +141,7 @@ async def setup(
             f"Run Black on {pluralize(len(request.configs), 'target')}: {address_references}."
         ),
     )
-    return Setup(process, original_digest=all_source_files_snapshot.directory_digest)
+    return Setup(process, original_digest=all_source_files_snapshot.digest)
 
 
 @named_rule(desc="Format using Black")

@@ -162,5 +162,5 @@ class BinaryToolBaseTest(TestBase):
             _, snapshot = default_version_tool.hackily_snapshot(context)
             self.assertEqual(
                 "51a98706ab7458069aabe01856cb352ca97686e3edd3bf9ebd3205c2b38b2974",
-                snapshot.directory_digest.fingerprint,
+                snapshot.digest.fingerprint,
             )

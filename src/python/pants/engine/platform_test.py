@@ -1,7 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.engine.fs import EMPTY_DIRECTORY_DIGEST
+from pants.engine.fs import EMPTY_DIGEST
 from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResultWithPlatform, Process
 from pants.testutil.test_base import TestBase
@@ -14,7 +14,7 @@ class PlatformTest(TestBase):
 
         req = Process(
             argv=("/bin/echo", "test"),
-            input_files=EMPTY_DIRECTORY_DIGEST,
+            input_files=EMPTY_DIGEST,
             description="Run some program that will exit cleanly.",
         )
         result = self.request_single_product(FallibleProcessResultWithPlatform, req)

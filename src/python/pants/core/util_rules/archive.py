@@ -56,9 +56,7 @@ async def maybe_extract(extractable: MaybeExtractable) -> ExtractedDigest:
                 output_directories=(output_dir,),
             )
             result = await Get[ProcessResult](Process, proc)
-            strip_output_dir = await Get[Digest](
-                RemovePrefix(result.output_directory_digest, output_dir)
-            )
+            strip_output_dir = await Get[Digest](RemovePrefix(result.output_digest, output_dir))
             return ExtractedDigest(strip_output_dir)
     return ExtractedDigest(digest)
 

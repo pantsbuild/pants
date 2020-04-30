@@ -166,7 +166,7 @@ async def list_backends(
 ) -> Backends:
     source_roots = source_roots_config.get_source_roots()
     discovered_register_pys = await Get[Snapshot](PathGlobs(["**/*/register.py"]))
-    register_pys_content = await Get[FilesContent](Digest, discovered_register_pys.directory_digest)
+    register_pys_content = await Get[FilesContent](Digest, discovered_register_pys.digest)
 
     backend_infos = tuple(
         BackendInfo.create(fc, source_roots, global_options) for fc in register_pys_content

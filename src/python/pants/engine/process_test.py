@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import ClassVar, Tuple
 
 from pants.engine.fs import (
-    EMPTY_DIRECTORY_DIGEST,
+    EMPTY_DIGEST,
     Digest,
     FileContent,
     FilesContent,
@@ -84,7 +84,7 @@ async def cat_files_process_result_concatted(cat_exe_req: CatExecutionRequest) -
     cat_files_snapshot = await Get[Snapshot](PathGlobs, cat_exe_req.path_globs)
     process = Process(
         argv=cat_bin.argv_from_snapshot(cat_files_snapshot),
-        input_files=cat_files_snapshot.directory_digest,
+        input_files=cat_files_snapshot.digest,
         description="cat some files",
     )
     cat_process_result = await Get[ProcessResult](Process, process)
@@ -126,7 +126,7 @@ async def get_javac_version_output(
     javac_version_proc_req = Process(
         argv=javac_version_command.gen_argv(),
         description=javac_version_command.description,
-        input_files=EMPTY_DIRECTORY_DIGEST,
+        input_files=EMPTY_DIGEST,
     )
     javac_version_proc_result = await Get[ProcessResult](Process, javac_version_proc_req,)
 
@@ -164,7 +164,7 @@ class JavacCompileRequest:
 class JavacCompileResult:
     stdout: str
     stderr: str
-    directory_digest: Digest
+    digest: Digest
 
 
 # Note that this rule assumes that no additional classes are generated other than one for each
@@ -185,7 +185,7 @@ async def javac_compile_process_result(
     output_dirs = tuple({os.path.dirname(java_file) for java_file in java_files})
     process = Process(
         argv=javac_compile_req.argv_from_source_snapshot(sources_snapshot),
-        input_files=sources_snapshot.directory_digest,
+        input_files=sources_snapshot.digest,
         output_directories=output_dirs,
         description="javac compilation",
     )
@@ -194,7 +194,7 @@ async def javac_compile_process_result(
     return JavacCompileResult(
         javac_proc_result.stdout.decode(),
         javac_proc_result.stderr.decode(),
-        javac_proc_result.output_directory_digest,
+        javac_proc_result.output_digest,
     )
 
 
@@ -300,10 +300,7 @@ class ProcessTest(TestBase):
 
     def test_create_from_snapshot_with_env(self):
         req = Process(
-            argv=("foo",),
-            description="Some process",
-            env={"VAR": "VAL"},
-            input_files=EMPTY_DIRECTORY_DIGEST,
+            argv=("foo",), description="Some process", env={"VAR": "VAL"}, input_files=EMPTY_DIGEST,
         )
         self.assertEqual(req.env, ("VAR", "VAL"))
 
@@ -327,13 +324,13 @@ class ProcessTest(TestBase):
             argv=("/bin/bash", "-c", "echo -n 'European Burmese' > roland"),
             description="echo roland",
             output_files=("roland",),
-            input_files=EMPTY_DIRECTORY_DIGEST,
+            input_files=EMPTY_DIGEST,
         )
 
         process_result = self.request_single_product(ProcessResult, request)
 
         self.assertEqual(
-            process_result.output_directory_digest,
+            process_result.output_digest,
             Digest(
                 fingerprint="63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16",
                 serialized_bytes_length=80,
@@ -341,7 +338,7 @@ class ProcessTest(TestBase):
         )
 
         files_content_result = self.request_single_product(
-            FilesContent, process_result.output_directory_digest,
+            FilesContent, process_result.output_digest,
         )
 
         self.assertEqual(
@@ -353,7 +350,7 @@ class ProcessTest(TestBase):
             argv=("/bin/bash", "-c", "/bin/sleep 0.2; /bin/echo -n 'European Burmese'"),
             timeout_seconds=0.1,
             description="sleepy-cat",
-            input_files=EMPTY_DIRECTORY_DIGEST,
+            input_files=EMPTY_DIGEST,
         )
         result = self.request_single_product(FallibleProcessResult, request)
         self.assertNotEqual(result.exit_code, 0)
@@ -376,9 +373,7 @@ class Simple {
         )
 
         result = self.request_single_product(JavacCompileResult, request)
-        files_content = self.request_single_product(
-            FilesContent, result.directory_digest
-        ).dependencies
+        files_content = self.request_single_product(FilesContent, result.digest).dependencies
 
         self.assertEqual(
             tuple(sorted(("simple/Simple.java", "simple/Simple.class",))),
@@ -415,7 +410,7 @@ class Broken {
                 f.write("European Burmese")
             request = Process(
                 argv=("/bin/cat", ".jdk/roland"),
-                input_files=EMPTY_DIRECTORY_DIGEST,
+                input_files=EMPTY_DIGEST,
                 description="cat JDK roland",
                 jdk_home=temp_dir,
             )
@@ -424,9 +419,7 @@ class Broken {
 
     def test_fallible_failing_command_returns_exited_result(self):
         request = Process(
-            argv=("/bin/bash", "-c", "exit 1"),
-            description="one-cat",
-            input_files=EMPTY_DIRECTORY_DIGEST,
+            argv=("/bin/bash", "-c", "exit 1"), description="one-cat", input_files=EMPTY_DIGEST,
         )
 
         result = self.request_single_product(FallibleProcessResult, request)
@@ -435,9 +428,7 @@ class Broken {
 
     def test_non_fallible_failing_command_raises(self):
         request = Process(
-            argv=("/bin/bash", "-c", "exit 1"),
-            description="one-cat",
-            input_files=EMPTY_DIRECTORY_DIGEST,
+            argv=("/bin/bash", "-c", "exit 1"), description="one-cat", input_files=EMPTY_DIGEST,
         )
 
         with self.assertRaises(ExecutionError) as cm:

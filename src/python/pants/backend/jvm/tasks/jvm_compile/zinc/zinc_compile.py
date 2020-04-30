@@ -29,12 +29,7 @@ from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.resources import Resources
-from pants.engine.fs import (
-    EMPTY_DIRECTORY_DIGEST,
-    DirectoryToMaterialize,
-    PathGlobs,
-    PathGlobsAndRoot,
-)
+from pants.engine.fs import EMPTY_DIGEST, DirectoryToMaterialize, PathGlobs, PathGlobsAndRoot
 from pants.engine.process import Process
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import fast_relpath
@@ -639,7 +634,7 @@ class BaseZincCompile(JvmCompile):
                 ),
             )
         )
-        nailgun_jar_digest = nailgun_jar_snapshot.directory_digest
+        nailgun_jar_digest = nailgun_jar_snapshot.digest
         return ClasspathEntry(nailgun_jar, nailgun_jar_digest)
 
     def _compile_hermetic(
@@ -672,17 +667,17 @@ class BaseZincCompile(JvmCompile):
             compiler_bridge_classpath_entry,
             self._nailgun_server_classpath_entry(),  # We include nailgun-server, to use it to start servers when needed from the hermetic execution case.
         ]
-        directory_digests = [
+        digests = [
             entry.directory_digest for entry in relevant_classpath_entries if entry.directory_digest
         ]
-        if len(directory_digests) != len(relevant_classpath_entries):
+        if len(digests) != len(relevant_classpath_entries):
             for dep in relevant_classpath_entries:
                 if not dep.directory_digest:
                     raise AssertionError(
                         "ClasspathEntry {} didn't have a Digest, so won't be present for hermetic "
                         "execution of zinc".format(dep)
                     )
-        directory_digests.extend(
+        digests.extend(
             classpath_entry.directory_digest for classpath_entry in scalac_classpath_entries
         )
 
@@ -696,7 +691,7 @@ class BaseZincCompile(JvmCompile):
                 )
             native_image_path, native_image_snapshot = self._zinc.native_image(self.context)
             native_image_snapshots = [
-                native_image_snapshot.directory_digest,
+                native_image_snapshot.digest,
             ]
             scala_boot_classpath = [
                 classpath_entry.path for classpath_entry in scalac_classpath_entries
@@ -739,11 +734,11 @@ class BaseZincCompile(JvmCompile):
         argv = image_specific_argv + [f"@{argfile_snapshot.files[0]}"]
 
         merged_input_digest = self.context._scheduler.merge_directories(
-            [self._zinc.zinc.directory_digest]
-            + [s.directory_digest for s in snapshots]
-            + directory_digests
+            [self._zinc.zinc.digest]
+            + [s.digest for s in snapshots]
+            + digests
             + native_image_snapshots
-            + [self.post_compile_extra_resources_digest(ctx), argfile_snapshot.directory_digest]
+            + [self.post_compile_extra_resources_digest(ctx), argfile_snapshot.digest]
         )
 
         # NB: We always capture the output jar, but if classpath jars are not used, we additionally
@@ -767,12 +762,10 @@ class BaseZincCompile(JvmCompile):
         )
 
         # TODO: Materialize as a batch in do_compile or somewhere
-        self.context._scheduler.materialize_directory(
-            DirectoryToMaterialize(res.output_directory_digest)
-        )
+        self.context._scheduler.materialize_directory(DirectoryToMaterialize(res.output_digest))
 
         # TODO: This should probably return a ClasspathEntry rather than a Digest
-        return res.output_directory_digest
+        return res.output_digest
 
     def _compute_local_only_inputs(self, classes_dir, relpath_to_analysis, jar_file):
         """Compute for the scratch inputs for Process.
@@ -786,7 +779,7 @@ class BaseZincCompile(JvmCompile):
         :return: digest of merged analysis file and loose class files.
         """
         if not os.path.exists(relpath_to_analysis):
-            return EMPTY_DIRECTORY_DIGEST
+            return EMPTY_DIGEST
 
         def _get_analysis_snapshot():
             (_analysis_snapshot,) = self.context._scheduler.capture_snapshots(
@@ -807,7 +800,7 @@ class BaseZincCompile(JvmCompile):
         analysis_snapshot = _get_analysis_snapshot()
         classes_dir_snapshot = _get_classes_dir_snapshot()
         return self.context._scheduler.merge_directories(
-            [analysis_snapshot.directory_digest, classes_dir_snapshot.directory_digest]
+            [analysis_snapshot.digest, classes_dir_snapshot.digest]
         )
 
     def get_zinc_compiler_classpath(self):

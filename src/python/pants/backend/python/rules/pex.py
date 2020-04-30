@@ -17,7 +17,7 @@ from pants.backend.python.target_types import PythonPlatforms as PythonPlatforms
 from pants.backend.python.target_types import PythonRequirementsField
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.fs import (
-    EMPTY_DIRECTORY_DIGEST,
+    EMPTY_DIGEST,
     EMPTY_SNAPSHOT,
     AddPrefix,
     Digest,
@@ -213,7 +213,7 @@ class TwoStepPexRequest:
 class Pex(HermeticPex):
     """Wrapper for a digest containing a pex file created with some filename."""
 
-    directory_digest: Digest
+    digest: Digest
     output_filename: str
 
 
@@ -328,17 +328,17 @@ async def create_pex(
         )
 
     sources_digest_as_subdir = await Get[Digest](
-        AddPrefix(request.sources or EMPTY_DIRECTORY_DIGEST, source_dir_name)
+        AddPrefix(request.sources or EMPTY_DIGEST, source_dir_name)
     )
-    additional_inputs_digest = request.additional_inputs or EMPTY_DIRECTORY_DIGEST
+    additional_inputs_digest = request.additional_inputs or EMPTY_DIGEST
 
     merged_digest = await Get[Digest](
         MergeDigests(
             (
-                pex_bin.directory_digest,
+                pex_bin.digest,
                 sources_digest_as_subdir,
                 additional_inputs_digest,
-                constraint_file_snapshot.directory_digest,
+                constraint_file_snapshot.digest,
             )
         )
     )
@@ -388,9 +388,7 @@ async def create_pex(
             for line in lines:
                 pex_debug.log(line)
 
-    return Pex(
-        directory_digest=result.output_directory_digest, output_filename=request.output_filename
-    )
+    return Pex(digest=result.output_digest, output_filename=request.output_filename)
 
 
 @rule
@@ -418,7 +416,7 @@ async def two_step_create_pex(two_step_pex_request: TwoStepPexRequest) -> TwoSte
             ),
         )
         requirements_pex = await Get[Pex](PexRequest, requirements_pex_request)
-        additional_inputs = requirements_pex.directory_digest
+        additional_inputs = requirements_pex.digest
         additional_args = (*request.additional_args, f"--requirements-pex={req_pex_name}")
     else:
         additional_inputs = None

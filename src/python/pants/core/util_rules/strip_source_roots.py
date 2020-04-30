@@ -96,8 +96,7 @@ async def strip_source_roots_from_snapshot(
     if request.representative_path is not None:
         resulting_digest = await Get[Digest](
             RemovePrefix(
-                request.snapshot.directory_digest,
-                determine_source_root(request.representative_path),
+                request.snapshot.digest, determine_source_root(request.representative_path),
             )
         )
         resulting_snapshot = await Get[Snapshot](Digest, resulting_digest)
@@ -110,15 +109,11 @@ async def strip_source_roots_from_snapshot(
         )
     }
     snapshot_subsets = await MultiGet(
-        Get[Snapshot](
-            SnapshotSubset(
-                directory_digest=request.snapshot.directory_digest, globs=PathGlobs(files),
-            )
-        )
+        Get[Snapshot](SnapshotSubset(request.snapshot.digest, PathGlobs(files)))
         for files in files_grouped_by_source_root.values()
     )
     resulting_digests = await MultiGet(
-        Get[Digest](RemovePrefix(snapshot.directory_digest, source_root))
+        Get[Digest](RemovePrefix(snapshot.digest, source_root))
         for snapshot, source_root in zip(snapshot_subsets, files_grouped_by_source_root.keys())
     )
 

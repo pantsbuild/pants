@@ -378,7 +378,7 @@ async def run_setup_py(
 ) -> RunSetupPyResult:
     """Run a setup.py command on a single exported target."""
     merged_input_files = await Get[Digest](
-        MergeDigests((req.chroot.digest, setuptools_setup.requirements_pex.directory_digest))
+        MergeDigests((req.chroot.digest, setuptools_setup.requirements_pex.digest))
     )
     # The setuptools dist dir, created by it under the chroot (not to be confused with
     # pants's own dist dir, at the buildroot).
@@ -395,7 +395,7 @@ async def run_setup_py(
         description=f"Run setuptools for {req.exported_target.target.address.reference()}",
     )
     result = await Get[ProcessResult](Process, process)
-    output_digest = await Get[Digest](RemovePrefix(result.output_directory_digest, dist_dir))
+    output_digest = await Get[Digest](RemovePrefix(result.output_digest, dist_dir))
     return RunSetupPyResult(output_digest)
 
 
@@ -487,7 +487,7 @@ async def get_sources(
     # targets, whether or not they are in the target set for this run - basically the entire repo.
     # So it's the repo owners' responsibility to ensure __init__.py hygiene.
     stripped_srcs_digests = [
-        stripped_sources.snapshot.directory_digest for stripped_sources in stripped_srcs_list
+        stripped_sources.snapshot.digest for stripped_sources in stripped_srcs_list
     ]
     ancestor_init_pys = await Get[AncestorInitPyFiles](Targets, targets)
     sources_digest = await Get[Digest](
@@ -496,7 +496,7 @@ async def get_sources(
     init_pys_snapshot = await Get[Snapshot](
         SnapshotSubset(sources_digest, PathGlobs(["**/__init__.py"]))
     )
-    init_py_contents = await Get[FilesContent](Digest, init_pys_snapshot.directory_digest)
+    init_py_contents = await Get[FilesContent](Digest, init_pys_snapshot.digest)
 
     packages, namespace_packages, package_data = find_packages(
         source_roots=source_root_config.get_source_roots(),
@@ -548,7 +548,7 @@ async def get_ancestor_init_py(
     )
 
     source_root_stripped_ancestor_init_pys = await MultiGet[Digest](
-        Get[Digest](RemovePrefix(snapshot.directory_digest, source_dir_ancestor[0]))
+        Get[Digest](RemovePrefix(snapshot.digest, source_dir_ancestor[0]))
         for snapshot, source_dir_ancestor in zip(
             ancestor_init_py_snapshots, source_dir_ancestors_list
         )

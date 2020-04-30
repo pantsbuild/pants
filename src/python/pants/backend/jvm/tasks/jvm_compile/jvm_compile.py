@@ -36,7 +36,7 @@ from pants.base.exceptions import TaskError
 from pants.base.worker_pool import WorkerPool
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.target import Target
-from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, PathGlobs, PathGlobsAndRoot
+from pants.engine.fs import EMPTY_DIGEST, PathGlobs, PathGlobsAndRoot
 from pants.java.distribution.distribution import DistributionLocator
 from pants.option.compiler_option_sets_mixin import CompilerOptionSetsMixin
 from pants.option.ranked_value import RankedValue
@@ -399,7 +399,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
         # TODO: Switch to using #7739 once it is available.
         extra_resources = self.post_compile_extra_resources(compile_context)
         if not extra_resources:
-            return EMPTY_DIRECTORY_DIGEST
+            return EMPTY_DIGEST
 
         def _snapshot_resources(resources, prefix="."):
             with temporary_dir() as root_dir:

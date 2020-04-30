@@ -9,7 +9,7 @@ from pants.backend.python.target_types import PythonSources
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.engine.addresses import Addresses
-from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Digest, MergeDigests, RemovePrefix, Snapshot
+from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import named_rule, subsystem_rule
@@ -37,7 +37,7 @@ async def generate_python_from_protobuf(
         Process(
             (f"/bin/mkdir", output_dir),
             description=f"Create the directory {output_dir}",
-            input_files=EMPTY_DIRECTORY_DIGEST,
+            input_files=EMPTY_DIGEST,
             output_directories=(output_dir,),
         )
     )
@@ -81,9 +81,9 @@ async def generate_python_from_protobuf(
     input_digest = await Get[Digest](
         MergeDigests(
             (
-                all_sources.snapshot.directory_digest,
+                all_sources.snapshot.digest,
                 downloaded_protoc_binary.digest,
-                create_output_dir_result.output_directory_digest,
+                create_output_dir_result.output_digest,
             )
         )
     )
@@ -101,9 +101,7 @@ async def generate_python_from_protobuf(
             output_directories=(output_dir,),
         )
     )
-    normalized_snapshot = await Get[Snapshot](
-        RemovePrefix(result.output_directory_digest, output_dir)
-    )
+    normalized_snapshot = await Get[Snapshot](RemovePrefix(result.output_digest, output_dir))
     return GeneratedSources(normalized_snapshot)
 
 

@@ -291,9 +291,9 @@ async def merge_coverage_data(
         MergeDigests(
             (
                 *coverage_digests,
-                sources_with_inits.snapshot.directory_digest,
+                sources_with_inits.snapshot.digest,
                 coverage_config.digest,
-                coverage_setup.requirements_pex.directory_digest,
+                coverage_setup.requirements_pex.digest,
             )
         ),
     )
@@ -311,7 +311,7 @@ async def merge_coverage_data(
     )
 
     result = await Get[ProcessResult](Process, process)
-    return MergedCoverageData(coverage_data=result.output_directory_digest)
+    return MergedCoverageData(coverage_data=result.output_digest)
 
 
 @named_rule(desc="Generate Pytest coverage report")
@@ -345,8 +345,8 @@ async def generate_coverage_report(
             (
                 merged_coverage_data.coverage_data,
                 coverage_config.digest,
-                requirements_pex.directory_digest,
-                sources_with_inits_snapshot.snapshot.directory_digest,
+                requirements_pex.digest,
+                sources_with_inits_snapshot.snapshot.digest,
             )
         ),
     )
@@ -378,7 +378,7 @@ async def generate_coverage_report(
         report_file = report_dir / "coverage.xml"
 
     return FilesystemCoverageReport(
-        result_digest=result.output_directory_digest,
+        result_digest=result.output_digest,
         directory_to_materialize_to=report_dir,
         report_file=report_file,
     )

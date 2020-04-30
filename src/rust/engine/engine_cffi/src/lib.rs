@@ -1113,8 +1113,7 @@ pub extern "C" fn materialize_directories(
     values
       .iter()
       .map(|value| {
-        let dir_digest =
-          nodes::lift_digest(&externs::project_ignoring_type(&value, "directory_digest"));
+        let dir_digest = nodes::lift_digest(&externs::project_ignoring_type(&value, "digest"));
         let path_prefix = PathBuf::from(externs::project_str(&value, "path_prefix"));
         dir_digest.map(|dir_digest| (dir_digest, path_prefix))
       })
