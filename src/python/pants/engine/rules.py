@@ -68,16 +68,15 @@ class _RuleVisitor(ast.NodeVisitor):
         self.generic_visit(node)
 
 
+# NB: This violates Python naming conventions of using snake_case for functions. This is because
+# SubsystemRule behaves very similarly to UnionRule and RootRule, and we want to use the same
+# naming scheme.
+#
+# We could refactor this to be a class with __call__() defined, but we would lose the `@memoized`
+# decorator.
 @memoized
 def SubsystemRule(optionable_factory: Type[OptionableFactory]) -> "TaskRule":
-    """Returns a TaskRule that constructs an instance of the subsystem.
-
-    TODO: This API is slightly awkward for two reasons:
-      1) We should consider whether Subsystems/Optionables should be constructed explicitly using
-        `@rule`s, which would allow them to have non-option dependencies that would be explicit in
-        their constructors (which would avoid the need for the `Subsystem.Factory` pattern).
-      2) Optionable depending on TaskRule would create a cycle in the Python package graph.
-    """
+    """Returns a TaskRule that constructs an instance of the subsystem."""
     return TaskRule(**optionable_factory.signature())
 
 
