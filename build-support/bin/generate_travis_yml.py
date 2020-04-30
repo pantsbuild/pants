@@ -46,10 +46,10 @@ class Stage(Enum):
         is_cron = "type = cron"
         is_not_cron = "type != cron"
         return {
-            self.bootstrap: is_cron,
-            self.bootstrap_cron: is_not_cron,
-            self.test: is_cron,
-            self.test_cron: is_not_cron,
+            self.bootstrap: is_not_cron,
+            self.bootstrap_cron: is_cron,
+            self.test: is_not_cron,
+            self.test_cron: is_cron,
             self.build_stable: r"tag IS present AND tag =~ ^release_.*$",
             self.build_unstable: r"tag IS NOT present AND type NOT IN (pull_request, cron)",
         }[
