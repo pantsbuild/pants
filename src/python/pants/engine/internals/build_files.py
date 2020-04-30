@@ -375,8 +375,5 @@ def create_graph_rules(address_mapper: AddressMapper):
         # AddressFamilies for each of them.
         addresses_with_origins_from_address_families,
         strip_address_origins,
-        # Root rules representing parameters that might be provided via root subjects.
-        RootRule(Address),
-        RootRule(AddressWithOrigin),
         RootRule(AddressSpecs),
     ]

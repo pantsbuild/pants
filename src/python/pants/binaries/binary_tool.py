@@ -382,7 +382,6 @@ async def fetch_binary_tool(req: BinaryToolFetchRequest, url_set: BinaryToolUrlS
 
 def rules():
     return [
-        RootRule(PlatformConstraint),
         translate_host_platform,
         get_binary_tool_urls,
         fetch_binary_tool,

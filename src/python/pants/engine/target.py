@@ -36,7 +36,7 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.legacy.structs import BundleAdaptor
-from pants.engine.rules import RootRule, rule
+from pants.engine.rules import rule
 from pants.engine.selectors import Get
 from pants.engine.unions import UnionMembership, union
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper, Filespec
@@ -166,7 +166,7 @@ class AsyncField(Field, metaclass=ABCMeta):
 
     You should also create corresponding HydratedField and HydrateFieldRequest classes and define a
     rule to go from this HydrateFieldRequest to HydratedField. The HydrateFieldRequest type should
-    have an attribute storing the underlying AsyncField; it also must be registered as a RootRule.
+    have an attribute storing the underlying AsyncField.
 
     For example:
 
@@ -205,7 +205,7 @@ class AsyncField(Field, metaclass=ABCMeta):
 
 
         def rules():
-            return [hydrate_sources, RootRule(HydrateSourcesRequest)]
+            return [hydrate_sources]
 
     Then, call sites can `await Get` if they need to hydrate the field, even if they subclassed
     the original `AsyncField` to have custom behavior:
@@ -1653,9 +1653,4 @@ class BundlesField(AsyncField):
 
 
 def rules():
-    return [
-        find_valid_field_sets,
-        hydrate_sources,
-        RootRule(TargetsToValidFieldSetsRequest),
-        RootRule(HydrateSourcesRequest),
-    ]
+    return [find_valid_field_sets, hydrate_sources]

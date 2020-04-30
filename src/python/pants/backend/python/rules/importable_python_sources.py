@@ -10,7 +10,7 @@ from pants.core.target_types import FilesSources, ResourcesSources
 from pants.core.util_rules import determine_source_files
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
 from pants.engine.fs import Snapshot
-from pants.engine.rules import RootRule, rule
+from pants.engine.rules import rule
 from pants.engine.selectors import Get
 from pants.engine.target import Sources, Targets
 
@@ -46,9 +46,4 @@ async def prepare_python_sources(targets: Targets) -> ImportablePythonSources:
 
 
 def rules():
-    return [
-        prepare_python_sources,
-        *determine_source_files.rules(),
-        *inject_init_rules(),
-        RootRule(Targets),
-    ]
+    return [prepare_python_sources, *determine_source_files.rules(), *inject_init_rules()]

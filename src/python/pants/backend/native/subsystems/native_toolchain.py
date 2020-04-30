@@ -19,7 +19,7 @@ from pants.backend.native.subsystems.libc_dev import LibcDev
 from pants.backend.native.subsystems.native_build_step import ToolchainVariant
 from pants.backend.native.subsystems.xcode_cli_tools import XCodeCLITools
 from pants.engine.platform import Platform
-from pants.engine.rules import RootRule, rule
+from pants.engine.rules import RootRule, rule, subsystem_rule
 from pants.engine.selectors import Get
 from pants.subsystem.subsystem import Subsystem
 from pants.util.enums import match
@@ -398,6 +398,6 @@ def create_native_toolchain_rules():
         select_gcc_cpp_toolchain,
         select_c_toolchain,
         select_cpp_toolchain,
-        RootRule(NativeToolchain),
+        subsystem_rule(NativeToolchain),
         RootRule(ToolchainVariantRequest),
     ]

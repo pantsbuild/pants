@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 
 from pants.engine.fs import Digest, FileContent, InputFilesContent, MergeDigests, Snapshot
-from pants.engine.rules import RootRule, rule
+from pants.engine.rules import rule
 from pants.engine.selectors import Get
 from pants.python.pex_build_util import identify_missing_init_files
 
@@ -38,4 +38,4 @@ async def inject_missing_init_files(request: InjectInitRequest) -> InitInjectedS
 
 
 def rules():
-    return [inject_missing_init_files, RootRule(InjectInitRequest)]
+    return [inject_missing_init_files]

@@ -19,7 +19,7 @@ from pants.backend.python.target_types import (
 )
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, MergeDigests
-from pants.engine.rules import RootRule, named_rule, rule
+from pants.engine.rules import named_rule, rule
 from pants.engine.selectors import Get
 from pants.engine.target import Targets, TransitiveTargets
 from pants.python.python_setup import PythonSetup
@@ -136,9 +136,4 @@ async def two_step_pex_from_targets(req: TwoStepPexFromTargetsRequest) -> TwoSte
 
 
 def rules():
-    return [
-        pex_from_targets,
-        two_step_pex_from_targets,
-        RootRule(PexFromTargetsRequest),
-        RootRule(TwoStepPexFromTargetsRequest),
-    ]
+    return [pex_from_targets, two_step_pex_from_targets]

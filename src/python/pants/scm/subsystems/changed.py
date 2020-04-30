@@ -136,7 +136,4 @@ class Changed(Subsystem):
 
 
 def rules():
-    return [
-        find_owners,
-        RootRule(ChangedRequest),
-    ]
+    return [find_owners, RootRule(ChangedRequest)]

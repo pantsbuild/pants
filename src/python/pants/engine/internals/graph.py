@@ -338,5 +338,4 @@ def rules():
         sources_snapshots_from_address_specs,
         sources_snapshots_from_filesystem_specs,
         RootRule(FilesystemSpecs),
-        RootRule(OwnersRequest),
     ]
