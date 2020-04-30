@@ -95,11 +95,7 @@ async def bandit_lint(
 
     merged_input_files = await Get[Digest](
         MergeDigests(
-            (
-                all_source_files.snapshot.directory_digest,
-                requirements_pex.directory_digest,
-                config_snapshot.directory_digest,
-            )
+            (all_source_files.snapshot.digest, requirements_pex.digest, config_snapshot.digest)
         ),
     )
 

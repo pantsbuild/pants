@@ -188,15 +188,14 @@ async def setup_pytest_for_target(
     )
 
     digests_to_merge = [
-        prepared_sources.snapshot.directory_digest,
-        requirements_pex.directory_digest,
-        pytest_pex.directory_digest,
-        test_runner_pex.directory_digest,
+        prepared_sources.snapshot.digest,
+        requirements_pex.digest,
+        pytest_pex.digest,
+        test_runner_pex.digest,
     ]
     if run_coverage:
         coverage_config = rest[0]
         digests_to_merge.append(coverage_config.digest)
-
     merged_input_files = await Get[Digest](MergeDigests(digests_to_merge))
 
     coverage_args = []
@@ -254,23 +253,21 @@ async def run_python_test(
         env=env,
     )
     result = await Get[FallibleProcessResult](Process, process)
-    output_digest = result.output_directory_digest
+
     coverage_data = None
     if run_coverage:
-        coverage_snapshot_subset = await Get[Snapshot](
-            SnapshotSubset(output_digest, PathGlobs([".coverage"]))
+        coverage_snapshot = await Get[Snapshot](
+            SnapshotSubset(result.output_digest, PathGlobs([".coverage"]))
         )
-        coverage_data = PytestCoverageData(
-            config.address, coverage_snapshot_subset.directory_digest
-        )
+        coverage_data = PytestCoverageData(config.address, coverage_snapshot.digest)
 
-    xml_results_digest: Optional[Digest] = None
+    xml_results_digest = None
     if test_setup.xml_dir:
         xml_results_snapshot = await Get[Snapshot](
-            SnapshotSubset(output_digest, PathGlobs([test_results_file]))
+            SnapshotSubset(result.output_digest, PathGlobs([test_results_file]))
         )
         xml_results_digest = await Get[Digest](
-            AddPrefix(xml_results_snapshot.directory_digest, test_setup.xml_dir)
+            AddPrefix(xml_results_snapshot.digest, test_setup.xml_dir)
         )
 
     return TestResult.from_fallible_process_result(

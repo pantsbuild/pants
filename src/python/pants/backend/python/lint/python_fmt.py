@@ -62,8 +62,8 @@ async def format_python_target(
             prior_formatter_result = await Get[Snapshot](Digest, result.output)
     return LanguageFmtResults(
         tuple(results),
-        input=original_sources.snapshot.directory_digest,
-        output=prior_formatter_result.directory_digest,
+        input=original_sources.snapshot.digest,
+        output=prior_formatter_result.digest,
     )
 
 

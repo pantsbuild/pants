@@ -11,7 +11,7 @@ from pants.core.util_rules.filter_empty_sources import TargetsWithSources, Targe
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.fs import (
-    EMPTY_DIRECTORY_DIGEST,
+    EMPTY_DIGEST,
     Digest,
     DirectoryToMaterialize,
     MergeDigests,
@@ -35,9 +35,7 @@ class FmtResult:
 
     @staticmethod
     def noop() -> "FmtResult":
-        return FmtResult(
-            input=EMPTY_DIRECTORY_DIGEST, output=EMPTY_DIRECTORY_DIGEST, stdout="", stderr=""
-        )
+        return FmtResult(input=EMPTY_DIGEST, output=EMPTY_DIGEST, stdout="", stderr="")
 
     @staticmethod
     def from_process_result(
@@ -45,7 +43,7 @@ class FmtResult:
     ) -> "FmtResult":
         return FmtResult(
             input=original_digest,
-            output=process_result.output_directory_digest,
+            output=process_result.output_digest,
             stdout=process_result.stdout.decode(),
             stderr=process_result.stderr.decode(),
         )

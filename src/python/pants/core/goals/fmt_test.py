@@ -16,7 +16,7 @@ from pants.core.goals.fmt import (
 )
 from pants.core.util_rules.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
 from pants.engine.addresses import Address
-from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Digest, FileContent, MergeDigests, Workspace
+from pants.engine.fs import EMPTY_DIGEST, Digest, FileContent, MergeDigests, Workspace
 from pants.engine.target import Sources, Target, TargetsWithOrigins, TargetWithOrigin
 from pants.engine.unions import UnionMembership
 from pants.testutil.engine.util import MockConsole, MockGet, create_goal_subsystem, run_rule
@@ -60,13 +60,13 @@ class MockLanguageTargets(LanguageFmtTargets, metaclass=ABCMeta):
         return LanguageFmtResults(
             (
                 FmtResult(
-                    input=EMPTY_DIRECTORY_DIGEST,
-                    output=EMPTY_DIRECTORY_DIGEST,
+                    input=EMPTY_DIGEST,
+                    output=EMPTY_DIGEST,
                     stdout=self.stdout(addresses),
                     stderr="",
                 ),
             ),
-            input=EMPTY_DIRECTORY_DIGEST,
+            input=EMPTY_DIGEST,
             output=result_digest,
         )
 
@@ -102,10 +102,10 @@ class FmtTest(TestBase):
         self.smalltalk_file = FileContent("formatted.st", b"y := self size + super size.')\n")
         self.fortran_digest = self.make_snapshot(
             {self.fortran_file.path: self.fortran_file.content.decode()}
-        ).directory_digest
+        ).digest
         self.merged_digest = self.make_snapshot(
             {fc.path: fc.content.decode() for fc in (self.fortran_file, self.smalltalk_file)}
-        ).directory_digest
+        ).digest
 
     @staticmethod
     def make_target_with_origin(

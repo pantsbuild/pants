@@ -11,13 +11,7 @@ from typing_extensions import final
 
 from pants.base.specs import FilesystemLiteralSpec
 from pants.engine.addresses import Address
-from pants.engine.fs import (
-    EMPTY_DIRECTORY_DIGEST,
-    FileContent,
-    InputFilesContent,
-    PathGlobs,
-    Snapshot,
-)
+from pants.engine.fs import EMPTY_DIGEST, FileContent, InputFilesContent, PathGlobs, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, Params
@@ -245,11 +239,7 @@ def test_async_field() -> None:
                 MockGet(
                     product_type=Snapshot,
                     subject_type=PathGlobs,
-                    mock=lambda _: Snapshot(
-                        directory_digest=EMPTY_DIRECTORY_DIGEST,
-                        files=hydrated_source_files,
-                        dirs=(),
-                    ),
+                    mock=lambda _: Snapshot(EMPTY_DIGEST, files=hydrated_source_files, dirs=()),
                 )
             ],
         )

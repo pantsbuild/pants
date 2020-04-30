@@ -275,10 +275,7 @@ fn snapshot_subset_to_snapshot(context: Context, args: Vec<Value>) -> NodeFuture
 
   Box::pin(async move {
     let path_globs = Snapshot::lift_path_globs(&globs)?;
-    let original_digest = lift_digest(&externs::project_ignoring_type(
-      &args[0],
-      "directory_digest",
-    ))?;
+    let original_digest = lift_digest(&externs::project_ignoring_type(&args[0], "digest"))?;
 
     let snapshot = store::Snapshot::get_snapshot_subset(store, original_digest, path_globs).await?;
 

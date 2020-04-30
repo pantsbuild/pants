@@ -114,14 +114,6 @@ class Digest:
 
     The contents of file sets referenced opaquely can be inspected by requesting a FilesContent for
     it.
-
-    In the future, it will be possible to inspect the file metadata by requesting a Snapshot for it,
-    but at the moment we can't install rules which go both:
-     PathGlobs -> Digest -> Snapshot
-     PathGlobs -> Snapshot
-    because it would lead to an ambiguity in the engine, and we have existing code which already
-    relies on the latter existing. This can be resolved when ordering is removed from Snapshots. See
-    https://github.com/pantsbuild/pants/issues/5802
     """
 
     fingerprint: str
@@ -179,7 +171,7 @@ class Snapshot:
     files being operated on and easing their movement to and from isolated execution sandboxes.
     """
 
-    directory_digest: Digest
+    digest: Digest
     files: Tuple[str, ...]
     dirs: Tuple[str, ...]
 
@@ -190,9 +182,14 @@ class Snapshot:
 
 @dataclass(frozen=True)
 class SnapshotSubset:
-    """A request to create a subset of a snapshot."""
+    """A request to get a subset of a directory digest.
 
-    directory_digest: Digest
+    Example:
+
+        result = await Get[Snapshot](DigestSubset(original_digest, PathGlobs(["subdir1", "f.txt"]))
+    """
+
+    digest: Digest
     globs: PathGlobs
 
 
@@ -253,7 +250,7 @@ class DirectoryToMaterialize:
     """A request to materialize the contents of a directory digest at the build root, optionally
     with a path prefix (relative to the build root)."""
 
-    directory_digest: Digest
+    digest: Digest
     path_prefix: str = ""  # i.e., we default to the root level of the build root
 
     def __post_init__(self) -> None:
@@ -313,9 +310,8 @@ class Workspace:
 _EMPTY_FINGERPRINT = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
 
-EMPTY_DIRECTORY_DIGEST = Digest(fingerprint=_EMPTY_FINGERPRINT, serialized_bytes_length=0)
-
-EMPTY_SNAPSHOT = Snapshot(directory_digest=EMPTY_DIRECTORY_DIGEST, files=(), dirs=())
+EMPTY_DIGEST = Digest(fingerprint=_EMPTY_FINGERPRINT, serialized_bytes_length=0)
+EMPTY_SNAPSHOT = Snapshot(EMPTY_DIGEST, files=(), dirs=())
 
 
 @frozen_after_init
@@ -324,7 +320,7 @@ class SingleFileExecutable:
     """Wraps a `Snapshot` and ensures that it only contains a single file."""
 
     _exe_filename: Path
-    directory_digest: Digest
+    digest: Digest
 
     @property
     def exe_filename(self) -> str:
@@ -340,11 +336,11 @@ class SingleFileExecutable:
     def __init__(self, snapshot: Snapshot) -> None:
         if len(snapshot.files) != 1:
             self._raise_validation_error(snapshot, "have exactly 1 file!")
-        if snapshot.directory_digest == EMPTY_DIRECTORY_DIGEST:
+        if snapshot.digest == EMPTY_DIGEST:
             self._raise_validation_error(snapshot, "have a non-empty digest!")
 
         self._exe_filename = Path(snapshot.files[0])
-        self.directory_digest = snapshot.directory_digest
+        self.digest = snapshot.digest
 
 
 @dataclass(frozen=True)

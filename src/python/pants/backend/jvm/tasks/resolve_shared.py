@@ -38,12 +38,12 @@ class JvmResolverBase(TaskBase):
             )
         )
         for snapshot, jar_path in zip(snapshots, jar_paths):
-            snapshot.directory_digest.dump(jar_path)
+            snapshot.digest.dump(jar_path)
 
         # We want to map back the list[Snapshot] to targets_and_jars
         # We assume that (1) jars_to_snapshot has the same number of ResolveJars as snapshots does Snapshots,
         # and that (2) capture_snapshots preserves ordering.
-        digests = [snapshot.directory_digest for snapshot in snapshots]
+        digests = [snapshot.digest for snapshot in snapshots]
         digest_iterator = iter(digests)
 
         snapshotted_targets_and_jars = []

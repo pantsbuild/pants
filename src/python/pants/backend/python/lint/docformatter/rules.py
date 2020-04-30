@@ -97,9 +97,7 @@ async def setup(
     )
 
     merged_input_files = await Get[Digest](
-        MergeDigests(
-            (all_source_files_snapshot.directory_digest, requirements_pex.directory_digest)
-        ),
+        MergeDigests((all_source_files_snapshot.digest, requirements_pex.digest)),
     )
 
     address_references = ", ".join(sorted(config.address.reference() for config in request.configs))
@@ -120,7 +118,7 @@ async def setup(
             f"{address_references}."
         ),
     )
-    return Setup(process, original_digest=all_source_files_snapshot.directory_digest)
+    return Setup(process, original_digest=all_source_files_snapshot.digest)
 
 
 @named_rule(desc="Format Python docstrings with docformatter")

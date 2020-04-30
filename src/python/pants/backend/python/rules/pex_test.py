@@ -194,7 +194,7 @@ class PexTest(TestBase):
                 ),
             ),
         )
-        self.scheduler.materialize_directory(DirectoryToMaterialize(pex.directory_digest),)
+        self.scheduler.materialize_directory(DirectoryToMaterialize(pex.digest))
         pex_path = os.path.join(self.build_root, "test.pex")
         with zipfile.ZipFile(pex_path, "r") as zipfp:
             with zipfp.open("PEX-INFO", "r") as pex_info:
@@ -254,7 +254,7 @@ class PexTest(TestBase):
         process = Process(
             argv=("python", "test.pex"),
             env=env,
-            input_files=pex_output["pex"].directory_digest,
+            input_files=pex_output["pex"].digest,
             description="Run the pex and make sure it works",
         )
         result = self.request_single_product(ProcessResult, process)

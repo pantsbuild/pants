@@ -29,7 +29,7 @@ async def run_python_repl(repl: PythonRepl) -> ReplBinary:
         )
     )
     repl_pex = two_step_pex.pex
-    return ReplBinary(digest=repl_pex.directory_digest, binary_name=repl_pex.output_filename,)
+    return ReplBinary(digest=repl_pex.digest, binary_name=repl_pex.output_filename)
 
 
 class IPythonRepl(ReplImplementation):
@@ -51,7 +51,7 @@ async def run_ipython_repl(repl: IPythonRepl, ipython: IPython) -> ReplBinary:
         )
     )
     repl_pex = two_step_pex.pex
-    return ReplBinary(digest=repl_pex.directory_digest, binary_name=repl_pex.output_filename,)
+    return ReplBinary(digest=repl_pex.digest, binary_name=repl_pex.output_filename)
 
 
 def rules():

@@ -85,10 +85,7 @@ def calculate_specified_sources(
     # It's possible when given a glob filesystem spec that the spec will have
     # resolved files not belonging to this target - those must be filtered out.
     precise_files_specified = set(sources_snapshot.files).intersection(origin.resolved_files)
-    return SnapshotSubset(
-        directory_digest=sources_snapshot.directory_digest,
-        globs=PathGlobs(sorted(precise_files_specified)),
-    )
+    return SnapshotSubset(sources_snapshot.digest, PathGlobs(sorted(precise_files_specified)))
 
 
 @rule
@@ -106,7 +103,7 @@ async def determine_all_source_files(request: AllSourceFilesRequest) -> SourceFi
             for sources_field in request.sources_fields
         )
         digests_to_merge = tuple(
-            stripped_snapshot.snapshot.directory_digest for stripped_snapshot in stripped_snapshots
+            stripped_snapshot.snapshot.digest for stripped_snapshot in stripped_snapshots
         )
     else:
         all_hydrated_sources = await MultiGet(
@@ -120,7 +117,7 @@ async def determine_all_source_files(request: AllSourceFilesRequest) -> SourceFi
             for sources_field in request.sources_fields
         )
         digests_to_merge = tuple(
-            hydrated_sources.snapshot.directory_digest for hydrated_sources in all_hydrated_sources
+            hydrated_sources.snapshot.digest for hydrated_sources in all_hydrated_sources
         )
     result = await Get[Snapshot](MergeDigests(digests_to_merge))
     return SourceFiles(result)
@@ -176,9 +173,7 @@ async def determine_specified_source_files(request: SpecifiedSourceFilesRequest)
             for sources_field, snapshot in zip(all_sources_fields, all_snapshots)
         )
         all_snapshots = (stripped_snapshot.snapshot for stripped_snapshot in stripped_snapshots)
-    result = await Get[Snapshot](
-        MergeDigests(snapshot.directory_digest for snapshot in all_snapshots)
-    )
+    result = await Get[Snapshot](MergeDigests(snapshot.digest for snapshot in all_snapshots))
     return SourceFiles(result)
 
 

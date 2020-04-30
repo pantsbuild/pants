@@ -26,13 +26,7 @@ from pants.core.util_rules.filter_empty_sources import (
     ConfigurationsWithSourcesRequest,
 )
 from pants.engine.addresses import Address
-from pants.engine.fs import (
-    EMPTY_DIRECTORY_DIGEST,
-    Digest,
-    FileContent,
-    InputFilesContent,
-    Workspace,
-)
+from pants.engine.fs import EMPTY_DIGEST, Digest, FileContent, InputFilesContent, Workspace
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.target import (
     Sources,
@@ -189,7 +183,7 @@ class TestTest(TestBase):
                     product_type=CoverageReport,
                     subject_type=CoverageDataCollection,
                     mock=lambda _: FilesystemCoverageReport(
-                        result_digest=EMPTY_DIRECTORY_DIGEST,
+                        result_digest=EMPTY_DIGEST,
                         directory_to_materialize_to=PurePath("mockety/mock"),
                         report_file=None,
                     ),

@@ -70,7 +70,7 @@ async def pylint_lint(
         addresses.append(config.address)
         addresses.extend(config.dependencies.value or ())
     targets = await Get[Targets](Addresses(addresses))
-    chrooted_python_sources = await Get[ImportablePythonSources](Targets, targets)
+    prepared_python_sources = await Get[ImportablePythonSources](Targets, targets)
 
     # NB: Pylint output depends upon which Python interpreter version it's run with. We ensure that
     # each target runs with its own interpreter constraints. See
@@ -99,9 +99,9 @@ async def pylint_lint(
     merged_input_files = await Get[Digest](
         MergeDigests(
             (
-                requirements_pex.directory_digest,
-                config_snapshot.directory_digest,
-                chrooted_python_sources.snapshot.directory_digest,
+                requirements_pex.digest,
+                config_snapshot.digest,
+                prepared_python_sources.snapshot.digest,
             )
         ),
     )

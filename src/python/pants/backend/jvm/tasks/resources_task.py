@@ -96,8 +96,8 @@ class ResourcesTask(Task):
         )
         result = []
         for vt, snapshot in zip(vts, snapshots):
-            snapshot.directory_digest.dump(vt.current_results_dir)
-            result.append((vt, snapshot.directory_digest))
+            snapshot.digest.dump(vt.current_results_dir)
+            result.append((vt, snapshot.digest))
         return result
 
     @abstractmethod

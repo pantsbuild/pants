@@ -19,7 +19,7 @@ class ResourcesTaskTestBase(TaskTestBase):
         def __init__(self, contents, **kwargs):
             payload = Payload()
             payload.add_field("contents", PrimitiveField(contents))
-            super(MinimalImplResourcesTaskTest.TestTarget, self).__init__(payload=payload, **kwargs)
+            super().__init__(payload=payload, **kwargs)
 
     class MinimalImplResourcesTask(ResourcesTask):
         @staticmethod

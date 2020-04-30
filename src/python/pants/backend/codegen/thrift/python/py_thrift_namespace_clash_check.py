@@ -52,7 +52,7 @@ class PyThriftNamespaceClashCheck(Task):
     def _get_python_thrift_library_sources(self, py_thrift_targets):
         """Get file contents for python thrift library targets."""
         target_snapshots = OrderedDict(
-            (t, t.sources_snapshot(scheduler=self.context._scheduler).directory_digest)
+            (t, t.sources_snapshot(scheduler=self.context._scheduler).digest)
             for t in py_thrift_targets
         )
         filescontent_by_target = OrderedDict(
