@@ -40,9 +40,18 @@ export PROTOC="${protoc}"
 # then becomes:
 # "Symbol not found: _wrapped_PyInit_native_engine"
 # when attempting to import the native engine library in native.py.
-if [[ "$(uname)" == 'Darwin' ]]; then
-  export AR='/usr/bin/ar'
-fi
+case "$(uname)" in
+  "Darwin")
+    export AR='/usr/bin/ar'
+    ;;
+  "Linux")
+    binutils="$("${download_binary}" "binutils" "2.30" "binutils.tar.gz")"
+    export AR="${binutils}/bin/ar"
+    ;;
+  *)
+    die "Unknown platform: uname was $(uname)"
+    ;;
+esac
 
 cargo_bin="${CARGO_HOME}/bin/cargo"
 
