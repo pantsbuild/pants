@@ -415,7 +415,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
                     [PathGlobsAndRoot(PathGlobs(extra_resources_relative_to_rootdir), root_dir)]
                 )
 
-            return snapshot.directory_digest
+            return snapshot.digest
 
         if prepend_post_merge_relative_path:
             rel_post_compile_merge_dir = fast_relpath(

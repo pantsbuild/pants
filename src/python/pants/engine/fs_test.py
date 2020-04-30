@@ -648,7 +648,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
     def test_empty_snapshot_subset(self) -> None:
         ss = SnapshotSubset(self.generate_original_digest(), PathGlobs(()),)
         subset_snapshot = self.request_single_product(Snapshot, ss)
-        assert subset_snapshot.directory_digest == EMPTY_DIGEST
+        assert subset_snapshot.digest == EMPTY_DIGEST
         assert subset_snapshot.files == ()
         assert subset_snapshot.dirs == ()
 

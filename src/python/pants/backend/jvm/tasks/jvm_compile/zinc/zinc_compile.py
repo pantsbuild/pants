@@ -734,7 +734,7 @@ class BaseZincCompile(JvmCompile):
         argv = image_specific_argv + [f"@{argfile_snapshot.files[0]}"]
 
         merged_input_digest = self.context._scheduler.merge_directories(
-            [self._zinc.zinc.digest]
+            [self._zinc.zinc.directory_digest]
             + [s.digest for s in snapshots]
             + digests
             + native_image_snapshots
