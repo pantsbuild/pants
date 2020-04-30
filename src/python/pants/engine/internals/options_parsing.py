@@ -3,7 +3,7 @@
 
 from dataclasses import dataclass
 
-from pants.engine.rules import RootRule, rule, subsystem_rule
+from pants.engine.rules import RootRule, SubsystemRule, rule
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.option.global_options import GlobalOptions
 from pants.option.options import Options
@@ -45,7 +45,7 @@ def rules():
     return [
         scope_options,
         parse_options,
-        subsystem_rule(GlobalOptions),
+        SubsystemRule(GlobalOptions),
         log_level,
         RootRule(Scope),
         RootRule(OptionsBootstrapper),

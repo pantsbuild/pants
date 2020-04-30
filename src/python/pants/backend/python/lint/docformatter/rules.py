@@ -26,7 +26,7 @@ from pants.core.util_rules.determine_source_files import (
 )
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
-from pants.engine.rules import named_rule, rule, subsystem_rule
+from pants.engine.rules import SubsystemRule, named_rule, rule
 from pants.engine.selectors import Get
 from pants.engine.unions import UnionRule
 from pants.python.python_setup import PythonSetup
@@ -148,7 +148,7 @@ def rules():
         setup,
         docformatter_fmt,
         docformatter_lint,
-        subsystem_rule(Docformatter),
+        SubsystemRule(Docformatter),
         UnionRule(PythonFmtConfigurations, DocformatterConfigurations),
         UnionRule(LinterConfigurations, DocformatterConfigurations),
         *download_pex_bin.rules(),

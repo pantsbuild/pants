@@ -40,7 +40,7 @@ from pants.engine.fs import (
     MergeDigests,
 )
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import RootRule, named_rule, rule, subsystem_rule
+from pants.engine.rules import RootRule, SubsystemRule, named_rule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Sources, Targets, TransitiveTargets
 from pants.engine.unions import UnionRule
@@ -390,7 +390,7 @@ def rules():
         generate_coverage_report,
         merge_coverage_data,
         setup_coverage,
-        subsystem_rule(PytestCoverage),
+        SubsystemRule(PytestCoverage),
         UnionRule(CoverageDataCollection, PytestCoverageDataCollection),
         RootRule(CoverageConfigRequest),
     ]

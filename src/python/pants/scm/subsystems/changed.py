@@ -71,7 +71,7 @@ class ChangedOptions:
     """A wrapper for the options from the `Changed` Subsystem.
 
     This is necessary because parsing of these options happens before conventional subsystems are
-    configured, so the normal mechanisms like `subsystem_rule` would not work properly.
+    configured, so the normal mechanisms like `SubsystemRule` would not work properly.
     """
 
     changes_since: Optional[str]
