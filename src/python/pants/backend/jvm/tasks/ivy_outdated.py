@@ -7,6 +7,7 @@ import re
 from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
+from pants.base.deprecated import deprecated_conditional
 from pants.base.workunit import WorkUnitLabel
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.java.jar.jar_dependency import JarDependency
@@ -64,6 +65,9 @@ class IvyOutdated(NailgunTask):
         return True
 
     def execute(self):
+        deprecated_conditional(
+            lambda: True, removal_version="1.30.0.dev0", entity_description="The outdated goal"
+        )
         targets = self.context.targets()
         jars, global_excludes = IvyUtils.calculate_classpath(targets)
 
