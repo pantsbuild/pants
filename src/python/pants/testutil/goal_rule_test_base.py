@@ -27,17 +27,11 @@ class GoalRuleResult:
 
 
 class GoalRuleTestBase(TestBase):
-    """A baseclass useful for testing a Goal defined as a @goal_rule.
-
-    :API: public
-    """
+    """A baseclass useful for testing a Goal defined as a @goal_rule."""
 
     @classproperty
     def goal_cls(cls):
-        """Subclasses must return the Goal type to test.
-
-        :API: public
-        """
+        """Subclasses must return the Goal type to test."""
         raise NotImplementedError()
 
     def setUp(self):
@@ -55,8 +49,6 @@ class GoalRuleTestBase(TestBase):
         additional_params: Optional[Iterable[Any]] = None,
     ) -> GoalRuleResult:
         """Executes the @goal_rule for this test class.
-
-        :API: public
 
         Returns the return code, stdout, and stderr of the goal.
         """
@@ -93,12 +85,10 @@ class GoalRuleTestBase(TestBase):
 
         return GoalRuleResult(actual_exit_code, stdout_val, stderr_val)
 
-    def assert_entries(self, sep, *output, **kwargs) -> None:
+    def assert_entries(self, sep: str, *output, **kwargs) -> None:
         """Verifies the expected output text is flushed by goal rule.
 
         NB: order of entries is not tested, just presence.
-
-        :API: public
 
         sep:      the expected output separator.
         *output:  the output entries expected between the separators
@@ -116,8 +106,6 @@ class GoalRuleTestBase(TestBase):
 
         NB: order of entries is not tested, just presence.
 
-        :API: public
-
         *output:  the expected output entries
         **kwargs: additional kwargs passed to execute_rule.
         """
@@ -126,8 +114,6 @@ class GoalRuleTestBase(TestBase):
 
     def assert_console_output_contains(self, output, **kwargs) -> None:
         """Verifies the expected output string is emitted by the goal rule.
-
-        :API: public
 
         output:  the expected output entry(ies)
         **kwargs: additional kwargs passed to execute_rule.
@@ -140,8 +126,6 @@ class GoalRuleTestBase(TestBase):
 
         NB: order of entries is tested.
 
-        :API: public
-
         *output:  the expected output entries in expected order
         **kwargs: additional kwargs passed to execute_rule.
         """
@@ -150,8 +134,6 @@ class GoalRuleTestBase(TestBase):
 
     def assert_console_raises(self, exception: Type[Exception], **kwargs) -> None:
         """Verifies the expected exception is raised by the goal rule.
-
-        :API: public
 
         **kwargs: additional kwargs are passed to execute_rule.
         """
