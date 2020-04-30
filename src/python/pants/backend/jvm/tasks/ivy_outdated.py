@@ -66,7 +66,11 @@ class IvyOutdated(NailgunTask):
 
     def execute(self):
         deprecated_conditional(
-            lambda: True, removal_version="1.30.0.dev0", entity_description="The outdated goal"
+            lambda: True,
+            removal_version="1.30.0.dev0",
+            entity_description="The `outdated` goal",
+            hint_message="Contact the Pants team on Slack or pants-devel@googlegroups.com "
+            "if you need this functionality.",
         )
         targets = self.context.targets()
         jars, global_excludes = IvyUtils.calculate_classpath(targets)

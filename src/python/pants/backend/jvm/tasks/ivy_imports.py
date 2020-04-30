@@ -30,7 +30,11 @@ class IvyImports(CoursierMixin, NailgunTask):
 
     def execute(self):
         deprecated_conditional(
-            lambda: True, removal_version="1.30.0.dev0", entity_description="The imports goal"
+            lambda: True,
+            removal_version="1.30.0.dev0",
+            entity_description="The `imports` goal",
+            hint_message="Contact the Pants team on Slack or pants-devel@googlegroups.com "
+            "if you need this functionality.",
         )
         jar_import_products = self.context.products.get_data(
             JarImportProducts, init_func=JarImportProducts
