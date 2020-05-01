@@ -24,7 +24,8 @@ NUM_RUST_FILES=$(echo "${CHANGED_FILES})" | grep -c -E \
   -e "^rust-toolchain" \
   -e "^src/python/pants/engine/internals/native.py" \
   -e "^build-support/bin/native" \
-  -e "^3rdparty/python/requirements.txt")
+  -e "^3rdparty/python/requirements.txt" \
+  -e "^build-support/bin/generate_travis_yml.py")
 
 # Ensure that this stays in sync with `build-support/bin/ci.py`.
 NUM_JVM_FILES=$(echo "${CHANGED_FILES})" | grep -c -E \
@@ -32,7 +33,8 @@ NUM_JVM_FILES=$(echo "${CHANGED_FILES})" | grep -c -E \
   -e "^src/scala" \
   -e "^tests/java" \
   -e "^tests/scala" \
-  -e "^zinc")
+  -e "^zinc" \
+  -e "^build-support/bin/generate_travis_yml.py")
 
 # To avoid putting skip labels multiple times, check if the labels already exist
 # in the commit message.
