@@ -81,7 +81,7 @@ async def create_python_awslambda(
     )
 
     pex_result = await Get[TwoStepPex](TwoStepPexFromTargetsRequest, pex_request)
-    merged_input_files = await Get[Digest](
+    input_digest = await Get[Digest](
         MergeDigests((pex_result.pex.digest, lambdex_setup.requirements_pex.digest))
     )
 
@@ -92,7 +92,7 @@ async def create_python_awslambda(
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path="./lambdex.pex",
         pex_args=lambdex_args,
-        input_files=merged_input_files,
+        input_digest=input_digest,
         output_files=(pex_filename,),
         description=f"Setting up handler in {pex_filename}",
     )

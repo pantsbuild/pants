@@ -95,7 +95,7 @@ class RunTest(TestBase):
         binary = self.create_mock_binary(program_text)
         interactive_runner = InteractiveRunner(self.scheduler)
         request = InteractiveProcessRequest(
-            argv=("./program.py",), run_in_workspace=False, input_files=binary.digest,
+            argv=("./program.py",), run_in_workspace=False, input_digest=binary.digest,
         )
         result = interactive_runner.run_local_interactive_process(request)
         assert result.process_exit_code == 0
@@ -105,7 +105,7 @@ class RunTest(TestBase):
         binary = self.create_mock_binary(program_text)
         with pytest.raises(ValueError):
             InteractiveProcessRequest(
-                argv=("/usr/bin/python",), run_in_workspace=True, input_files=binary.digest
+                argv=("/usr/bin/python",), run_in_workspace=True, input_digest=binary.digest
             )
 
     def test_failed_run(self) -> None:

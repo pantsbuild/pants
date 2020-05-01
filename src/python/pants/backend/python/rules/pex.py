@@ -374,7 +374,7 @@ async def create_pex(
                 subprocess_encoding_environment=subprocess_encoding_environment,
                 pex_build_environment=pex_build_environment,
                 pex_args=argv,
-                input_files=merged_digest,
+                input_digest=merged_digest,
                 description=description,
                 output_files=(request.output_filename,),
             )

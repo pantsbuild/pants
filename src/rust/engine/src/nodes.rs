@@ -240,7 +240,7 @@ impl MultiPlatformExecuteProcess {
       }
     };
 
-    let digest = lift_digest(&externs::project_ignoring_type(&value, "input_files"))
+    let digest = lift_digest(&externs::project_ignoring_type(&value, "input_digest"))
       .map_err(|err| format!("Error parsing digest {}", err))?;
 
     let output_files = externs::project_multi_strs(&value, "output_files")

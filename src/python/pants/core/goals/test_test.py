@@ -111,7 +111,7 @@ class TestTest(TestBase):
         )
         digest = self.request_single_product(Digest, input_files_content)
         return InteractiveProcessRequest(
-            argv=("/usr/bin/python", "program.py",), run_in_workspace=False, input_files=digest,
+            argv=("/usr/bin/python", "program.py",), run_in_workspace=False, input_digest=digest,
         )
 
     @staticmethod

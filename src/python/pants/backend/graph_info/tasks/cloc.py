@@ -83,7 +83,7 @@ class CountLinesOfCode(ConsoleTask):
         # The cloc script reaches into $PATH to look up perl. Let's assume it's in /usr/bin.
         req = Process(
             argv=cmd,
-            input_files=input_digest,
+            input_digest=input_digest,
             output_files=("ignored", "report"),
             description="cloc",
         )
