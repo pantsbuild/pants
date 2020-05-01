@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
 from pants.backend.python.lint.isort.subsystem import Isort
-from pants.backend.python.lint.python_fmt import PythonFmtConfigurations
+from pants.backend.python.lint.python_fmt import PythonFmtFieldSets
 from pants.backend.python.rules import download_pex_bin, pex
 from pants.backend.python.rules.pex import (
     Pex,
@@ -16,17 +16,17 @@ from pants.backend.python.rules.pex import (
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.backend.python.target_types import PythonSources
-from pants.core.goals.fmt import FmtConfiguration, FmtConfigurations, FmtResult
-from pants.core.goals.lint import LinterConfigurations, LintResult
+from pants.core.goals.fmt import FmtFieldSet, FmtFieldSets, FmtResult
+from pants.core.goals.lint import LinterFieldSets, LintResult
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.core.util_rules.determine_source_files import (
     AllSourceFilesRequest,
     SourceFiles,
     SpecifiedSourceFilesRequest,
 )
-from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
+from pants.engine.fs import Digest, MergeDigests, PathGlobs, Snapshot
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
-from pants.engine.rules import named_rule, rule, subsystem_rule
+from pants.engine.rules import SubsystemRule, named_rule, rule
 from pants.engine.selectors import Get
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import GlobExpansionConjunction
@@ -36,19 +36,19 @@ from pants.util.strutil import pluralize
 
 
 @dataclass(frozen=True)
-class IsortConfiguration(FmtConfiguration):
+class IsortFieldSet(FmtFieldSet):
     required_fields = (PythonSources,)
 
     sources: PythonSources
 
 
-class IsortConfigurations(FmtConfigurations):
-    config_type = IsortConfiguration
+class IsortFieldSets(FmtFieldSets):
+    field_set_type = IsortFieldSet
 
 
 @dataclass(frozen=True)
 class SetupRequest:
-    configs: IsortConfigurations
+    field_sets: IsortFieldSets
     check_only: bool
 
 
@@ -99,29 +99,29 @@ async def setup(
         )
     )
 
-    if request.configs.prior_formatter_result is None:
+    if request.field_sets.prior_formatter_result is None:
         all_source_files = await Get[SourceFiles](
-            AllSourceFilesRequest(config.sources for config in request.configs)
+            AllSourceFilesRequest(field_set.sources for field_set in request.field_sets)
         )
         all_source_files_snapshot = all_source_files.snapshot
     else:
-        all_source_files_snapshot = request.configs.prior_formatter_result
+        all_source_files_snapshot = request.field_sets.prior_formatter_result
 
     specified_source_files = await Get[SourceFiles](
-        SpecifiedSourceFilesRequest((config.sources, config.origin) for config in request.configs)
+        SpecifiedSourceFilesRequest(
+            (field_set.sources, field_set.origin) for field_set in request.field_sets
+        )
     )
 
     merged_input_files = await Get[Digest](
-        DirectoriesToMerge(
-            directories=(
-                all_source_files_snapshot.directory_digest,
-                requirements_pex.directory_digest,
-                config_snapshot.directory_digest,
-            )
+        MergeDigests(
+            (all_source_files_snapshot.digest, requirements_pex.digest, config_snapshot.digest)
         ),
     )
 
-    address_references = ", ".join(sorted(config.address.reference() for config in request.configs))
+    address_references = ", ".join(
+        sorted(field_set.address.reference() for field_set in request.field_sets)
+    )
 
     process = requirements_pex.create_process(
         python_setup=python_setup,
@@ -135,26 +135,26 @@ async def setup(
         input_files=merged_input_files,
         output_files=all_source_files_snapshot.files,
         description=(
-            f"Run isort on {pluralize(len(request.configs), 'target')}: {address_references}."
+            f"Run isort on {pluralize(len(request.field_sets), 'target')}: {address_references}."
         ),
     )
-    return Setup(process, original_digest=all_source_files_snapshot.directory_digest)
+    return Setup(process, original_digest=all_source_files_snapshot.digest)
 
 
 @named_rule(desc="Format using isort")
-async def isort_fmt(configs: IsortConfigurations, isort: Isort) -> FmtResult:
+async def isort_fmt(field_sets: IsortFieldSets, isort: Isort) -> FmtResult:
     if isort.options.skip:
         return FmtResult.noop()
-    setup = await Get[Setup](SetupRequest(configs, check_only=False))
+    setup = await Get[Setup](SetupRequest(field_sets, check_only=False))
     result = await Get[ProcessResult](Process, setup.process)
     return FmtResult.from_process_result(result, original_digest=setup.original_digest)
 
 
 @named_rule(desc="Lint using isort")
-async def isort_lint(configs: IsortConfigurations, isort: Isort) -> LintResult:
+async def isort_lint(field_sets: IsortFieldSets, isort: Isort) -> LintResult:
     if isort.options.skip:
         return LintResult.noop()
-    setup = await Get[Setup](SetupRequest(configs, check_only=True))
+    setup = await Get[Setup](SetupRequest(field_sets, check_only=True))
     result = await Get[FallibleProcessResult](Process, setup.process)
     return LintResult.from_fallible_process_result(result)
 
@@ -164,9 +164,9 @@ def rules():
         setup,
         isort_fmt,
         isort_lint,
-        subsystem_rule(Isort),
-        UnionRule(PythonFmtConfigurations, IsortConfigurations),
-        UnionRule(LinterConfigurations, IsortConfigurations),
+        SubsystemRule(Isort),
+        UnionRule(PythonFmtFieldSets, IsortFieldSets),
+        UnionRule(LinterFieldSets, IsortFieldSets),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),
         *pex.rules(),

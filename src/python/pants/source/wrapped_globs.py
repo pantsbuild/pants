@@ -119,7 +119,7 @@ class EagerFilesetWithSpec(FilesetWithSpec):
 
     @property
     def files_hash(self) -> bytes:
-        return self._snapshot.directory_digest.fingerprint.encode()
+        return self._snapshot.digest.fingerprint.encode()
 
     @property
     def snapshot(self) -> Snapshot:

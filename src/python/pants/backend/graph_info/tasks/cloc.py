@@ -67,10 +67,8 @@ class CountLinesOfCode(ConsoleTask):
         )[0]
         cloc_snapshot = self.context._scheduler.product_request(Snapshot, [cloc_binary.digest])[0]
 
-        directory_digest = self.context._scheduler.merge_directories(
-            tuple(
-                s.directory_digest for s in input_snapshots + (cloc_snapshot, list_file_snapshot,)
-            )
+        input_digest = self.context._scheduler.merge_directories(
+            tuple(s.digest for s in input_snapshots + (cloc_snapshot, list_file_snapshot,))
         )
 
         cmd = (
@@ -85,7 +83,7 @@ class CountLinesOfCode(ConsoleTask):
         # The cloc script reaches into $PATH to look up perl. Let's assume it's in /usr/bin.
         req = Process(
             argv=cmd,
-            input_files=directory_digest,
+            input_files=input_digest,
             output_files=("ignored", "report"),
             description="cloc",
         )
@@ -94,7 +92,7 @@ class CountLinesOfCode(ConsoleTask):
         )
 
         files_content_tuple = self.context._scheduler.product_request(
-            FilesContent, [exec_result.output_directory_digest]
+            FilesContent, [exec_result.output_digest]
         )[0].dependencies
 
         files_content = {fc.path: fc.content.decode() for fc in files_content_tuple}

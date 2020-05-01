@@ -4,16 +4,17 @@
 import hashlib
 import itertools
 import json
+import logging
 import os
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from urllib import parse
 
-from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.subsystems.jar_dependency_management import (
     JarDependencyManagement,
     PinnedJarArtifactSet,
 )
 from pants.backend.jvm.subsystems.resolve_subsystem import JvmResolveSubsystem
+from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
@@ -22,18 +23,28 @@ from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.backend.jvm.tasks.resolve_shared import JvmResolverBase
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import FingerprintStrategy
+from pants.base.revision import Revision
 from pants.base.workunit import WorkUnitLabel
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.java import util
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import Executor, SubprocessExecutor
+from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_mkdir
 from pants.util.fileutil import safe_hardlink_or_copy
 
+logger = logging.getLogger(__name__)
+
 
 class CoursierResultNotFound(Exception):
+    pass
+
+
+class ConflictingDepsError(Exception):
+    """Indicates two or more declared dependencies conflict."""
+
     pass
 
 
@@ -148,10 +159,7 @@ class CoursierMixin(JvmResolverBase):
             )
 
         for artifact_set, target_subset in jar_targets.items():
-            # TODO(wisechengyi): this is the only place we are using IvyUtil method, which isn't specific to ivy really.
-            raw_jar_deps, global_excludes = IvyUtils.calculate_classpath(target_subset)
-
-            # ['sources'] * False = [], ['sources'] * True = ['sources']
+            raw_jar_deps, global_excludes = calculate_classpath(target_subset)
             confs_for_fingerprint = ["sources"] * sources + ["javadoc"] * javadoc
             fp_strategy = CoursierResolveFingerprintStrategy(confs_for_fingerprint)
 
@@ -227,7 +235,8 @@ class CoursierMixin(JvmResolverBase):
                 if self.artifact_cache_writes_enabled():
                     self.update_artifact_cache([(resolve_vts, [vt_set_results_dir])])
 
-    def _override_classifiers_for_conf(self, conf):
+    @staticmethod
+    def _override_classifiers_for_conf(conf):
         # TODO Encapsulate this in the result from coursier instead of here.
         #      https://github.com/coursier/coursier/issues/803
         if conf == "src_doc":
@@ -576,7 +585,6 @@ class CoursierMixin(JvmResolverBase):
 
                 for jar in t.jar_dependencies:
                     # if there are override classifiers, then force use of those.
-                    coord_candidates = []
                     if override_classifiers:
                         coord_candidates = [
                             jar.coordinate.copy(classifier=c) for c in override_classifiers
@@ -605,8 +613,8 @@ class CoursierMixin(JvmResolverBase):
                             coord, coord_to_resolved_jars
                         )
                         if transitive_resolved_jars:
-                            for jar in transitive_resolved_jars:
-                                jars_to_digest.append(jar)
+                            for tjar in transitive_resolved_jars:
+                                jars_to_digest.append(tjar)
 
                 jars_per_target.append((t, jars_to_digest))
 
@@ -880,3 +888,123 @@ class CoursierResolveFingerprintStrategy(FingerprintStrategy):
 
     def __eq__(self, other):
         return type(self) == type(other) and self._confs == other._confs
+
+
+def calculate_classpath(targets):
+    """Creates a consistent classpath and list of excludes for the passed targets.
+
+    It also modifies the JarDependency objects' excludes to contain all the jars excluded by
+    provides.
+
+    :param iterable targets: List of targets to collect JarDependencies and excludes from.
+
+    :returns: A pair of a list of JarDependencies, and a set of excludes to apply globally.
+    """
+    jars = OrderedDict()
+    global_excludes = set()
+    provide_excludes = set()
+    targets_processed = set()
+
+    # Support the ivy force concept when we sanely can for internal dep conflicts.
+    # TODO(John Sirois): Consider supporting / implementing the configured ivy revision picking
+    # strategy generally.
+    def add_jar(jr):
+        # TODO(John Sirois): Maven allows for depending on an artifact at one rev and one of its
+        # attachments (classified artifacts) at another.  Ivy does not, allow this, the dependency
+        # can carry only 1 rev and that hosts multiple artifacts for that rev.  This conflict
+        # resolution happens at the classifier level, allowing skew in a
+        # multi-artifact/multi-classifier dependency.  We only find out about the skew later in
+        # `_generate_jar_template` below which will blow up with a conflict.  Move this logic closer
+        # together to get a more clear validate, then emit ivy.xml then resolve flow instead of the
+        # spread-out validations happening here.
+        # See: https://github.com/pantsbuild/pants/issues/2239
+        coord = (jr.org, jr.name, jr.classifier)
+        existing = jars.get(coord)
+        jars[coord] = jr if not existing else _resolve_conflict(existing=existing, proposed=jr)
+
+    def collect_jars(tgt):
+        if isinstance(tgt, JarLibrary):
+            for jr in tgt.jar_dependencies:
+                add_jar(jr)
+
+    def collect_excludes(tgt):
+        target_excludes = tgt.payload.get_field_value("excludes")
+        if target_excludes:
+            global_excludes.update(target_excludes)
+
+    def collect_provide_excludes(tgt):
+        if not (isinstance(tgt, ExportableJvmLibrary) and tgt.provides):
+            return
+        logger.debug(
+            "Automatically excluding jar {}.{}, which is provided by {}".format(
+                tgt.provides.org, tgt.provides.name, tgt
+            )
+        )
+        provide_excludes.add(Exclude(org=tgt.provides.org, name=tgt.provides.name))
+
+    def collect_elements(tgt):
+        targets_processed.add(tgt)
+        collect_jars(tgt)
+        collect_excludes(tgt)
+        collect_provide_excludes(tgt)
+
+    for target in targets:
+        target.walk(collect_elements, predicate=lambda tgt: tgt not in targets_processed)
+
+    # If a source dep is exported (ie, has a provides clause), it should always override
+    # remote/binary versions of itself, ie "round trip" dependencies.
+    # TODO: Move back to applying provides excludes as target-level excludes when they are no
+    # longer global.
+    if provide_excludes:
+        additional_excludes = tuple(provide_excludes)
+        new_jars = OrderedDict()
+        for coordinate, jar in jars.items():
+            new_jars[coordinate] = jar.copy(excludes=jar.excludes + additional_excludes)
+        jars = new_jars
+
+    return list(jars.values()), global_excludes
+
+
+def _resolve_conflict(existing, proposed):
+    if existing.rev is None:
+        return proposed
+    if proposed.rev is None:
+        return existing
+    if proposed == existing:
+        if proposed.force:
+            return proposed
+        return existing
+    elif existing.force and proposed.force:
+        raise ConflictingDepsError(
+            "Cannot force {}#{};{} to both rev {} and {}".format(
+                proposed.org, proposed.name, proposed.classifier or "", existing.rev, proposed.rev,
+            )
+        )
+    elif existing.force:
+        logger.debug(
+            "Ignoring rev {} for {}#{};{} already forced to {}".format(
+                proposed.rev, proposed.org, proposed.name, proposed.classifier or "", existing.rev,
+            )
+        )
+        return existing
+    elif proposed.force:
+        logger.debug(
+            "Forcing {}#{};{} from {} to {}".format(
+                proposed.org, proposed.name, proposed.classifier or "", existing.rev, proposed.rev,
+            )
+        )
+        return proposed
+    else:
+        if Revision.lenient(proposed.rev) > Revision.lenient(existing.rev):
+            logger.debug(
+                "Upgrading {}#{};{} from rev {}  to {}".format(
+                    proposed.org,
+                    proposed.name,
+                    proposed.classifier or "",
+                    existing.rev,
+                    proposed.rev,
+                )
+            )
+            return proposed
+        else:
+            return existing

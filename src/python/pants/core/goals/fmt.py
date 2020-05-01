@@ -6,15 +6,15 @@ from abc import ABCMeta
 from dataclasses import dataclass
 from typing import ClassVar, Iterable, List, Optional, Tuple, Type
 
-from pants.core.goals.lint import LinterConfiguration
+from pants.core.goals.lint import LinterFieldSet
 from pants.core.util_rules.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.fs import (
-    EMPTY_DIRECTORY_DIGEST,
+    EMPTY_DIGEST,
     Digest,
-    DirectoriesToMerge,
     DirectoryToMaterialize,
+    MergeDigests,
     Snapshot,
     Workspace,
 )
@@ -35,9 +35,7 @@ class FmtResult:
 
     @staticmethod
     def noop() -> "FmtResult":
-        return FmtResult(
-            input=EMPTY_DIRECTORY_DIGEST, output=EMPTY_DIRECTORY_DIGEST, stdout="", stderr=""
-        )
+        return FmtResult(input=EMPTY_DIGEST, output=EMPTY_DIGEST, stdout="", stderr="")
 
     @staticmethod
     def from_process_result(
@@ -45,7 +43,7 @@ class FmtResult:
     ) -> "FmtResult":
         return FmtResult(
             input=original_digest,
-            output=process_result.output_directory_digest,
+            output=process_result.output_digest,
             stdout=process_result.stdout.decode(),
             stderr=process_result.stderr.decode(),
         )
@@ -55,23 +53,23 @@ class FmtResult:
         return self.output != self.input
 
 
-class FmtConfiguration(LinterConfiguration, metaclass=ABCMeta):
+class FmtFieldSet(LinterFieldSet, metaclass=ABCMeta):
     """The fields necessary for a particular auto-formatter to work with a target."""
 
 
-class FmtConfigurations(Collection[FmtConfiguration]):
-    """A collection of Configurations for a particular formatter, e.g. a collection of
-    `IsortConfiguration`s."""
+class FmtFieldSets(Collection[FmtFieldSet]):
+    """A collection of `FieldSet`s for a particular formatter, e.g. a collection of
+    `IsortFieldSet`s."""
 
-    config_type: ClassVar[Type[FmtConfiguration]]
+    field_set_type: ClassVar[Type[FmtFieldSet]]
 
     def __init__(
         self,
-        configs: Iterable[FmtConfiguration],
+        field_sets: Iterable[FmtFieldSet],
         *,
         prior_formatter_result: Optional[Snapshot] = None
     ) -> None:
-        super().__init__(configs)
+        super().__init__(field_sets)
         self.prior_formatter_result = prior_formatter_result
 
 
@@ -236,7 +234,7 @@ async def fmt(
         # NB: this will fail if there are any conflicting changes, which we want to happen rather
         # than silently having one result override the other. In practicality, this should never
         # happen due to us grouping each language's formatters into a single digest.
-        merged_formatted_digest = await Get[Digest](DirectoriesToMerge(changed_digests))
+        merged_formatted_digest = await Get[Digest](MergeDigests(changed_digests))
         workspace.materialize_directory(DirectoryToMaterialize(merged_formatted_digest))
 
     for result in individual_results:

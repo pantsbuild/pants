@@ -157,17 +157,17 @@ final class Util {
       return false;
     }
 
+    // Support classes using junit 4.x custom runners.
+    if (isUsingCustomRunner(clazz)) {
+      return true;
+    }
+
     // The class must have some public constructor to be instantiated by the runner being used
     if (!Iterables.any(Arrays.asList(clazz.getConstructors()), IS_PUBLIC_CONSTRUCTOR)) {
       return false;
     }
 
     if (isJunit3Test(clazz)) {
-      return true;
-    }
-
-    // Support classes using junit 4.x custom runners.
-    if (isUsingCustomRunner(clazz)) {
       return true;
     }
 

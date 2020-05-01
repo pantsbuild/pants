@@ -9,17 +9,17 @@ from pants.core.util_rules.external_tool import DownloadedExternalTool, External
 from pants.engine.console import Console
 from pants.engine.fs import (
     Digest,
-    DirectoriesToMerge,
     FileContent,
     FilesContent,
     InputFilesContent,
+    MergeDigests,
     SingleFileExecutable,
     SourcesSnapshots,
 )
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import goal_rule, subsystem_rule
+from pants.engine.rules import SubsystemRule, goal_rule
 from pants.engine.selectors import Get
 
 
@@ -35,7 +35,7 @@ class DownloadedClocScript:
 
     @property
     def digest(self) -> Digest:
-        return self.exe.directory_digest
+        return self.exe.digest
 
 
 class CountLinesOfCodeOptions(GoalSubsystem):
@@ -82,11 +82,11 @@ async def run_cloc(
         ExternalToolRequest, cloc_binary.get_request(Platform.current)
     )
     digest = await Get[Digest](
-        DirectoriesToMerge(
+        MergeDigests(
             (
                 input_file_digest,
                 downloaded_cloc_binary.digest,
-                *(snapshot.directory_digest for snapshot in snapshots),
+                *(snapshot.digest for snapshot in snapshots),
             )
         )
     )
@@ -110,7 +110,7 @@ async def run_cloc(
     )
 
     exec_result = await Get[ProcessResult](Process, req)
-    files_content = await Get[FilesContent](Digest, exec_result.output_directory_digest)
+    files_content = await Get[FilesContent](Digest, exec_result.output_digest)
 
     file_outputs = {fc.path: fc.content.decode() for fc in files_content}
 
@@ -128,5 +128,5 @@ async def run_cloc(
 def rules():
     return [
         run_cloc,
-        subsystem_rule(ClocBinary),
+        SubsystemRule(ClocBinary),
     ]

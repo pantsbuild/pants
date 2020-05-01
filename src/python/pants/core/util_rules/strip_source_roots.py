@@ -11,17 +11,16 @@ from pants.engine.addresses import Address
 from pants.engine.fs import (
     EMPTY_SNAPSHOT,
     Digest,
-    DirectoriesToMerge,
-    DirectoryWithPrefixToStrip,
+    MergeDigests,
     PathGlobs,
+    RemovePrefix,
     Snapshot,
     SnapshotSubset,
 )
-from pants.engine.rules import RootRule, rule, subsystem_rule
+from pants.engine.rules import RootRule, SubsystemRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import HydratedSources, HydrateSourcesRequest
 from pants.engine.target import Sources as SourcesField
-from pants.engine.target import rules as target_rules
 from pants.source.source_root import NoSourceRootError, SourceRootConfig
 from pants.util.meta import frozen_after_init
 
@@ -95,9 +94,8 @@ async def strip_source_roots_from_snapshot(
 
     if request.representative_path is not None:
         resulting_digest = await Get[Digest](
-            DirectoryWithPrefixToStrip(
-                directory_digest=request.snapshot.directory_digest,
-                prefix=determine_source_root(request.representative_path),
+            RemovePrefix(
+                request.snapshot.digest, determine_source_root(request.representative_path),
             )
         )
         resulting_snapshot = await Get[Snapshot](Digest, resulting_digest)
@@ -110,23 +108,15 @@ async def strip_source_roots_from_snapshot(
         )
     }
     snapshot_subsets = await MultiGet(
-        Get[Snapshot](
-            SnapshotSubset(
-                directory_digest=request.snapshot.directory_digest, globs=PathGlobs(files),
-            )
-        )
+        Get[Snapshot](SnapshotSubset(request.snapshot.digest, PathGlobs(files)))
         for files in files_grouped_by_source_root.values()
     )
     resulting_digests = await MultiGet(
-        Get[Digest](
-            DirectoryWithPrefixToStrip(
-                directory_digest=snapshot.directory_digest, prefix=source_root
-            )
-        )
+        Get[Digest](RemovePrefix(snapshot.digest, source_root))
         for snapshot, source_root in zip(snapshot_subsets, files_grouped_by_source_root.keys())
     )
 
-    merged_result = await Get[Digest](DirectoriesToMerge(resulting_digests))
+    merged_result = await Get[Digest](MergeDigests(resulting_digests))
     resulting_snapshot = await Get[Snapshot](Digest, merged_result)
     return SourceRootStrippedSources(resulting_snapshot)
 
@@ -176,8 +166,7 @@ def rules():
     return [
         strip_source_roots_from_snapshot,
         strip_source_roots_from_sources_field,
-        subsystem_rule(SourceRootConfig),
+        SubsystemRule(SourceRootConfig),
         RootRule(StripSnapshotRequest),
         RootRule(StripSourcesFieldRequest),
-        *target_rules(),
     ]

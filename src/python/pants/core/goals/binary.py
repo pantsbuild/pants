@@ -8,20 +8,16 @@ from dataclasses import dataclass
 from pants.base.build_root import BuildRoot
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.console import Console
-from pants.engine.fs import Digest, DirectoriesToMerge, DirectoryToMaterialize, Workspace
+from pants.engine.fs import Digest, DirectoryToMaterialize, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get, MultiGet
-from pants.engine.target import (
-    Configuration,
-    TargetsToValidConfigurations,
-    TargetsToValidConfigurationsRequest,
-)
+from pants.engine.target import FieldSet, TargetsToValidFieldSets, TargetsToValidFieldSetsRequest
 from pants.engine.unions import union
 
 
 @union
-class BinaryConfiguration(Configuration, metaclass=ABCMeta):
+class BinaryFieldSet(FieldSet, metaclass=ABCMeta):
     """The fields necessary to create a binary from a target."""
 
 
@@ -37,7 +33,7 @@ class BinaryOptions(LineOriented, GoalSubsystem):
 
     name = "binary"
 
-    required_union_implementations = (BinaryConfiguration,)
+    required_union_implementations = (BinaryFieldSet,)
 
 
 class Binary(Goal):
@@ -52,20 +48,18 @@ async def create_binary(
     distdir: DistDir,
     buildroot: BuildRoot,
 ) -> Binary:
-    targets_to_valid_configs = await Get[TargetsToValidConfigurations](
-        TargetsToValidConfigurationsRequest(
-            BinaryConfiguration,
+    targets_to_valid_field_sets = await Get[TargetsToValidFieldSets](
+        TargetsToValidFieldSetsRequest(
+            BinaryFieldSet,
             goal_description=f"the `{options.name}` goal",
             error_if_no_valid_targets=True,
         )
     )
     binaries = await MultiGet(
-        Get[CreatedBinary](BinaryConfiguration, config)
-        for config in targets_to_valid_configs.configurations
+        Get[CreatedBinary](BinaryFieldSet, field_set)
+        for field_set in targets_to_valid_field_sets.field_sets
     )
-    merged_digest = await Get[Digest](
-        DirectoriesToMerge(tuple(binary.digest for binary in binaries))
-    )
+    merged_digest = await Get[Digest](MergeDigests(binary.digest for binary in binaries))
     result = workspace.materialize_directory(
         DirectoryToMaterialize(merged_digest, path_prefix=str(distdir.relpath))
     )

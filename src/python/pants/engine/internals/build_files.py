@@ -51,7 +51,7 @@ async def evalute_preludes(address_mapper: AddressMapper) -> BuildFilePreludeSym
             glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
         )
     )
-    prelude_files_content = await Get[FilesContent](Digest, snapshot.directory_digest)
+    prelude_files_content = await Get[FilesContent](Digest, snapshot.digest)
     values: Dict[str, Any] = {}
     for file_content in prelude_files_content:
         try:
@@ -86,7 +86,7 @@ async def parse_address_family(
         )
     )
     snapshot = await Get[Snapshot](PathGlobs, path_globs)
-    files_content = await Get[FilesContent](Digest, snapshot.directory_digest)
+    files_content = await Get[FilesContent](Digest, snapshot.digest)
 
     if not files_content:
         raise ResolveError(

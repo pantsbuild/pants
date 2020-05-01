@@ -68,16 +68,15 @@ class _RuleVisitor(ast.NodeVisitor):
         self.generic_visit(node)
 
 
+# NB: This violates Python naming conventions of using snake_case for functions. This is because
+# SubsystemRule behaves very similarly to UnionRule and RootRule, and we want to use the same
+# naming scheme.
+#
+# We could refactor this to be a class with __call__() defined, but we would lose the `@memoized`
+# decorator.
 @memoized
-def subsystem_rule(optionable_factory: Type[OptionableFactory]) -> "TaskRule":
-    """Returns a TaskRule that constructs an instance of the subsystem.
-
-    TODO: This API is slightly awkward for two reasons:
-      1) We should consider whether Subsystems/Optionables should be constructed explicitly using
-        `@rule`s, which would allow them to have non-option dependencies that would be explicit in
-        their constructors (which would avoid the need for the `Subsystem.Factory` pattern).
-      2) Optionable depending on TaskRule would create a cycle in the Python package graph.
-    """
+def SubsystemRule(optionable_factory: Type[OptionableFactory]) -> "TaskRule":
+    """Returns a TaskRule that constructs an instance of the subsystem."""
     return TaskRule(**optionable_factory.signature())
 
 
@@ -164,7 +163,7 @@ def _make_rule(
         )
 
         # Register dependencies for @goal_rule/Goal.
-        dependency_rules = (subsystem_rule(return_type.subsystem_cls),) if is_goal_cls else None
+        dependency_rules = (SubsystemRule(return_type.subsystem_cls),) if is_goal_cls else None
 
         # Set a default canonical name if one is not explicitly provided. For Goal classes
         # this is the name of the Goal; for other named ruled this is the __name__ of the function

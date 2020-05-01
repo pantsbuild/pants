@@ -11,13 +11,7 @@ from typing_extensions import final
 
 from pants.base.specs import FilesystemLiteralSpec
 from pants.engine.addresses import Address
-from pants.engine.fs import (
-    EMPTY_DIRECTORY_DIGEST,
-    FileContent,
-    InputFilesContent,
-    PathGlobs,
-    Snapshot,
-)
+from pants.engine.fs import EMPTY_DIGEST, FileContent, InputFilesContent, PathGlobs, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, Params
@@ -26,10 +20,10 @@ from pants.engine.target import (
     AmbiguousImplementationsException,
     AsyncField,
     BoolField,
-    Configuration,
-    ConfigurationWithOrigin,
     DictStringToStringField,
     DictStringToStringSequenceField,
+    FieldSet,
+    FieldSetWithOrigin,
     GeneratedSources,
     GenerateSourcesRequest,
     HydratedSources,
@@ -47,14 +41,13 @@ from pants.engine.target import (
     StringOrStringSequenceField,
     StringSequenceField,
     Target,
-    TargetsToValidConfigurations,
-    TargetsToValidConfigurationsRequest,
+    TargetsToValidFieldSets,
+    TargetsToValidFieldSetsRequest,
     TargetsWithOrigins,
     TargetWithOrigin,
     TooManyTargetsException,
     WrappedTarget,
 )
-from pants.engine.target import rules as target_rules
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.testutil.engine.util import MockGet, run_rule
 from pants.testutil.test_base import TestBase
@@ -246,11 +239,7 @@ def test_async_field() -> None:
                 MockGet(
                     product_type=Snapshot,
                     subject_type=PathGlobs,
-                    mock=lambda _: Snapshot(
-                        directory_digest=EMPTY_DIRECTORY_DIGEST,
-                        files=hydrated_source_files,
-                        dirs=(),
-                    ),
+                    mock=lambda _: Snapshot(EMPTY_DIGEST, files=hydrated_source_files, dirs=()),
                 )
             ],
         )
@@ -418,11 +407,11 @@ def test_required_field() -> None:
 
 
 # -----------------------------------------------------------------------------------------------
-# Test Configuration
+# Test FieldSet
 # -----------------------------------------------------------------------------------------------
 
 
-def test_configuration() -> None:
+def test_field_set() -> None:
     class UnrelatedField(StringField):
         alias = "unrelated_field"
         default = "default"
@@ -437,14 +426,14 @@ def test_configuration() -> None:
         core_fields = ()
 
     @dataclass(frozen=True)
-    class FortranConfiguration(Configuration):
+    class FortranFieldSet(FieldSet):
         required_fields = (FortranSources,)
 
         sources: FortranSources
         unrelated_field: UnrelatedField
 
     @dataclass(frozen=True)
-    class UnrelatedFieldConfiguration(ConfigurationWithOrigin):
+    class UnrelatedFieldSet(FieldSetWithOrigin):
         required_fields = ()
 
         unrelated_field: UnrelatedField
@@ -456,38 +445,32 @@ def test_configuration() -> None:
     no_fields_addr = Address.parse(":no_fields")
     no_fields_tgt = NoFieldsTarget({}, address=no_fields_addr)
 
-    assert FortranConfiguration.is_valid(fortran_tgt) is True
-    assert FortranConfiguration.is_valid(unrelated_tgt) is False
-    assert FortranConfiguration.is_valid(no_fields_tgt) is False
+    assert FortranFieldSet.is_valid(fortran_tgt) is True
+    assert FortranFieldSet.is_valid(unrelated_tgt) is False
+    assert FortranFieldSet.is_valid(no_fields_tgt) is False
     # When no fields are required, every target is valid.
     for tgt in [fortran_tgt, unrelated_tgt, no_fields_tgt]:
-        assert UnrelatedFieldConfiguration.is_valid(tgt) is True
+        assert UnrelatedFieldSet.is_valid(tgt) is True
 
-    valid_fortran_config = FortranConfiguration.create(fortran_tgt)
-    assert valid_fortran_config.address == fortran_addr
-    assert valid_fortran_config.unrelated_field.value == UnrelatedField.default
+    valid_fortran_field_set = FortranFieldSet.create(fortran_tgt)
+    assert valid_fortran_field_set.address == fortran_addr
+    assert valid_fortran_field_set.unrelated_field.value == UnrelatedField.default
     with pytest.raises(KeyError):
-        FortranConfiguration.create(unrelated_tgt)
+        FortranFieldSet.create(unrelated_tgt)
 
     origin = FilesystemLiteralSpec("f.txt")
+    assert UnrelatedFieldSet.create(TargetWithOrigin(fortran_tgt, origin)).origin == origin
     assert (
-        UnrelatedFieldConfiguration.create(TargetWithOrigin(fortran_tgt, origin)).origin == origin
-    )
-    assert (
-        UnrelatedFieldConfiguration.create(
-            TargetWithOrigin(unrelated_tgt, origin)
-        ).unrelated_field.value
+        UnrelatedFieldSet.create(TargetWithOrigin(unrelated_tgt, origin)).unrelated_field.value
         == "configured"
     )
     assert (
-        UnrelatedFieldConfiguration.create(
-            TargetWithOrigin(no_fields_tgt, origin)
-        ).unrelated_field.value
+        UnrelatedFieldSet.create(TargetWithOrigin(no_fields_tgt, origin)).unrelated_field.value
         == UnrelatedField.default
     )
 
 
-class TestFindValidConfigurations(TestBase):
+class TestFindValidFieldSets(TestBase):
     class InvalidTarget(Target):
         alias = "invalid_target"
         core_fields = ()
@@ -497,26 +480,26 @@ class TestFindValidConfigurations(TestBase):
         return [FortranTarget, cls.InvalidTarget]
 
     @union
-    class ConfigSuperclass(Configuration):
+    class FieldSetSuperclass(FieldSet):
         pass
 
     @dataclass(frozen=True)
-    class ConfigSubclass1(ConfigSuperclass):
+    class FieldSetSubclass1(FieldSetSuperclass):
         required_fields = (FortranSources,)
 
         sources: FortranSources
 
     @dataclass(frozen=True)
-    class ConfigSubclass2(ConfigSuperclass):
+    class FieldSetSubclass2(FieldSetSuperclass):
         required_fields = (FortranSources,)
 
         sources: FortranSources
 
     @union
-    class ConfigSuperclassWithOrigin(ConfigurationWithOrigin):
+    class FieldSetSuperclassWithOrigin(FieldSetWithOrigin):
         pass
 
-    class ConfigSubclassWithOrigin(ConfigSuperclassWithOrigin):
+    class FieldSetSubclassWithOrigin(FieldSetSuperclassWithOrigin):
         required_fields = (FortranSources,)
 
         sources: FortranSources
@@ -525,57 +508,55 @@ class TestFindValidConfigurations(TestBase):
     def rules(cls):
         return (
             *super().rules(),
-            *target_rules(),
             RootRule(TargetsWithOrigins),
-            UnionRule(cls.ConfigSuperclass, cls.ConfigSubclass1),
-            UnionRule(cls.ConfigSuperclass, cls.ConfigSubclass2),
-            UnionRule(cls.ConfigSuperclassWithOrigin, cls.ConfigSubclassWithOrigin),
+            UnionRule(cls.FieldSetSuperclass, cls.FieldSetSubclass1),
+            UnionRule(cls.FieldSetSuperclass, cls.FieldSetSubclass2),
+            UnionRule(cls.FieldSetSuperclassWithOrigin, cls.FieldSetSubclassWithOrigin),
         )
 
-    def test_find_valid_config_types(self) -> None:
+    def test_find_valid_field_sets(self) -> None:
         origin = FilesystemLiteralSpec("f.txt")
         valid_tgt = FortranTarget({}, address=Address.parse(":valid"))
         valid_tgt_with_origin = TargetWithOrigin(valid_tgt, origin)
         invalid_tgt = self.InvalidTarget({}, address=Address.parse(":invalid"))
         invalid_tgt_with_origin = TargetWithOrigin(invalid_tgt, origin)
 
-        def find_valid_configs(
+        def find_valid_field_sets(
             superclass: Type,
             targets_with_origins: Iterable[TargetWithOrigin],
             *,
             error_if_no_valid_targets: bool = False,
             expect_single_config: bool = False,
-        ) -> TargetsToValidConfigurations:
-            request = TargetsToValidConfigurationsRequest(
+        ) -> TargetsToValidFieldSets:
+            request = TargetsToValidFieldSetsRequest(
                 superclass,
                 goal_description="fake",
                 error_if_no_valid_targets=error_if_no_valid_targets,
-                expect_single_config=expect_single_config,
+                expect_single_field_set=expect_single_config,
             )
             return self.request_single_product(
-                TargetsToValidConfigurations,
-                Params(request, TargetsWithOrigins(targets_with_origins),),
+                TargetsToValidFieldSets, Params(request, TargetsWithOrigins(targets_with_origins),),
             )
 
-        valid = find_valid_configs(
-            self.ConfigSuperclass, [valid_tgt_with_origin, invalid_tgt_with_origin]
+        valid = find_valid_field_sets(
+            self.FieldSetSuperclass, [valid_tgt_with_origin, invalid_tgt_with_origin]
         )
         assert valid.targets == (valid_tgt,)
         assert valid.targets_with_origins == (valid_tgt_with_origin,)
-        assert valid.configurations == (
-            self.ConfigSubclass1.create(valid_tgt),
-            self.ConfigSubclass2.create(valid_tgt),
+        assert valid.field_sets == (
+            self.FieldSetSubclass1.create(valid_tgt),
+            self.FieldSetSubclass2.create(valid_tgt),
         )
 
         with pytest.raises(ExecutionError) as exc:
-            find_valid_configs(
-                self.ConfigSuperclass, [valid_tgt_with_origin], expect_single_config=True
+            find_valid_field_sets(
+                self.FieldSetSuperclass, [valid_tgt_with_origin], expect_single_config=True
             )
         assert AmbiguousImplementationsException.__name__ in str(exc.value)
 
         with pytest.raises(ExecutionError) as exc:
-            find_valid_configs(
-                self.ConfigSuperclass,
+            find_valid_field_sets(
+                self.FieldSetSuperclass,
                 [
                     valid_tgt_with_origin,
                     TargetWithOrigin(FortranTarget({}, address=Address.parse(":valid2")), origin),
@@ -584,24 +565,24 @@ class TestFindValidConfigurations(TestBase):
             )
         assert TooManyTargetsException.__name__ in str(exc.value)
 
-        no_valid_targets = find_valid_configs(self.ConfigSuperclass, [invalid_tgt_with_origin])
+        no_valid_targets = find_valid_field_sets(self.FieldSetSuperclass, [invalid_tgt_with_origin])
         assert no_valid_targets.targets == ()
         assert no_valid_targets.targets_with_origins == ()
-        assert no_valid_targets.configurations == ()
+        assert no_valid_targets.field_sets == ()
 
         with pytest.raises(ExecutionError) as exc:
-            find_valid_configs(
-                self.ConfigSuperclass, [invalid_tgt_with_origin], error_if_no_valid_targets=True
+            find_valid_field_sets(
+                self.FieldSetSuperclass, [invalid_tgt_with_origin], error_if_no_valid_targets=True
             )
         assert NoValidTargetsException.__name__ in str(exc.value)
 
-        valid_with_origin = find_valid_configs(
-            self.ConfigSuperclassWithOrigin, [valid_tgt_with_origin, invalid_tgt_with_origin]
+        valid_with_origin = find_valid_field_sets(
+            self.FieldSetSuperclassWithOrigin, [valid_tgt_with_origin, invalid_tgt_with_origin]
         )
         assert valid_with_origin.targets == (valid_tgt,)
         assert valid_with_origin.targets_with_origins == (valid_tgt_with_origin,)
-        assert valid_with_origin.configurations == (
-            self.ConfigSubclassWithOrigin.create(valid_tgt_with_origin),
+        assert valid_with_origin.field_sets == (
+            self.FieldSetSubclassWithOrigin.create(valid_tgt_with_origin),
         )
 
 
@@ -768,7 +749,7 @@ def test_dict_string_to_string_sequence_field() -> None:
 class TestSources(TestBase):
     @classmethod
     def rules(cls):
-        return (*super().rules(), *target_rules(), RootRule(HydrateSourcesRequest))
+        return (*super().rules(), RootRule(HydrateSourcesRequest))
 
     def test_raw_value_sanitation(self) -> None:
         addr = Address.parse(":test")
@@ -938,7 +919,6 @@ class TestCodegen(TestBase):
     def rules(cls):
         return (
             *super().rules(),
-            *target_rules(),
             generate_fortran_from_avro,
             RootRule(GenerateFortranFromAvroRequest),
             RootRule(HydrateSourcesRequest),

@@ -17,19 +17,19 @@ from pants.backend.python.target_types import PythonPlatforms as PythonPlatforms
 from pants.backend.python.target_types import PythonRequirementsField
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.fs import (
-    EMPTY_DIRECTORY_DIGEST,
+    EMPTY_DIGEST,
     EMPTY_SNAPSHOT,
+    AddPrefix,
     Digest,
-    DirectoriesToMerge,
-    DirectoryWithPrefixToAdd,
     GlobExpansionConjunction,
     GlobMatchErrorBehavior,
+    MergeDigests,
     PathGlobs,
     Snapshot,
 )
 from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.process import MultiPlatformProcess, ProcessResult
-from pants.engine.rules import RootRule, named_rule, rule, subsystem_rule
+from pants.engine.rules import RootRule, SubsystemRule, named_rule, rule
 from pants.engine.selectors import Get
 from pants.python.python_repos import PythonRepos
 from pants.python.python_setup import PythonSetup
@@ -82,6 +82,8 @@ class PexInterpreterConstraints(DeduplicatedCollection[str]):
         """
         # Each element (a Set[ParsedConstraint]) will get ANDed. We use sets to deduplicate
         # identical top-level parsed constraint sets.
+        if not constraint_sets:
+            return []
         parsed_constraint_sets: Set[FrozenSet[ParsedConstraint]] = set()
         for constraint_set in constraint_sets:
             # Each element (a ParsedConstraint) will get ORed.
@@ -213,7 +215,7 @@ class TwoStepPexRequest:
 class Pex(HermeticPex):
     """Wrapper for a digest containing a pex file created with some filename."""
 
-    directory_digest: Digest
+    digest: Digest
     output_filename: str
 
 
@@ -328,17 +330,17 @@ async def create_pex(
         )
 
     sources_digest_as_subdir = await Get[Digest](
-        DirectoryWithPrefixToAdd(request.sources or EMPTY_DIRECTORY_DIGEST, source_dir_name)
+        AddPrefix(request.sources or EMPTY_DIGEST, source_dir_name)
     )
-    additional_inputs_digest = request.additional_inputs or EMPTY_DIRECTORY_DIGEST
+    additional_inputs_digest = request.additional_inputs or EMPTY_DIGEST
 
     merged_digest = await Get[Digest](
-        DirectoriesToMerge(
-            directories=(
-                pex_bin.directory_digest,
+        MergeDigests(
+            (
+                pex_bin.digest,
                 sources_digest_as_subdir,
                 additional_inputs_digest,
-                constraint_file_snapshot.directory_digest,
+                constraint_file_snapshot.digest,
             )
         )
     )
@@ -388,9 +390,7 @@ async def create_pex(
             for line in lines:
                 pex_debug.log(line)
 
-    return Pex(
-        directory_digest=result.output_directory_digest, output_filename=request.output_filename
-    )
+    return Pex(digest=result.output_digest, output_filename=request.output_filename)
 
 
 @rule
@@ -418,7 +418,7 @@ async def two_step_create_pex(two_step_pex_request: TwoStepPexRequest) -> TwoSte
             ),
         )
         requirements_pex = await Get[Pex](PexRequest, requirements_pex_request)
-        additional_inputs = requirements_pex.directory_digest
+        additional_inputs = requirements_pex.digest
         additional_args = (*request.additional_args, f"--requirements-pex={req_pex_name}")
     else:
         additional_inputs = None
@@ -441,6 +441,6 @@ def rules():
         two_step_create_pex,
         RootRule(PexRequest),
         RootRule(TwoStepPexRequest),
-        subsystem_rule(PythonSetup),
-        subsystem_rule(PythonRepos),
+        SubsystemRule(PythonSetup),
+        SubsystemRule(PythonRepos),
     ]

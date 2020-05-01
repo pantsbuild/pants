@@ -6,7 +6,7 @@ import logging
 from dataclasses import dataclass
 from typing import Dict, Optional, Tuple, Union
 
-from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Digest
+from pants.engine.fs import EMPTY_DIGEST, Digest
 from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.rules import RootRule, rule
 from pants.util.meta import frozen_after_init
@@ -49,7 +49,7 @@ class Process:
         output_files: Optional[Tuple[str, ...]] = None,
         output_directories: Optional[Tuple[str, ...]] = None,
         timeout_seconds: Optional[Union[int, float]] = None,
-        unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: Digest = EMPTY_DIRECTORY_DIGEST,
+        unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: Digest = EMPTY_DIGEST,
         jdk_home: Optional[str] = None,
         is_nailgunnable: bool = False,
     ) -> None:
@@ -113,7 +113,7 @@ class ProcessResult:
 
     stdout: bytes
     stderr: bytes
-    output_directory_digest: Digest
+    output_digest: Digest
 
 
 @dataclass(frozen=True)
@@ -126,7 +126,7 @@ class FallibleProcessResult:
     stdout: bytes
     stderr: bytes
     exit_code: int
-    output_directory_digest: Digest
+    output_digest: Digest
 
 
 @dataclass(frozen=True)
@@ -139,7 +139,7 @@ class FallibleProcessResultWithPlatform:
     stdout: bytes
     stderr: bytes
     exit_code: int
-    output_directory_digest: Digest
+    output_digest: Digest
     platform: Platform
 
 
@@ -188,7 +188,7 @@ def fallible_to_exec_result_or_raise(
 
     if fallible_result.exit_code == 0:
         return ProcessResult(
-            fallible_result.stdout, fallible_result.stderr, fallible_result.output_directory_digest,
+            fallible_result.stdout, fallible_result.stderr, fallible_result.output_digest,
         )
     else:
         raise ProcessExecutionFailure(
@@ -205,11 +205,11 @@ def remove_platform_information(res: FallibleProcessResultWithPlatform,) -> Fall
         exit_code=res.exit_code,
         stdout=res.stdout,
         stderr=res.stderr,
-        output_directory_digest=res.output_directory_digest,
+        output_digest=res.output_digest,
     )
 
 
-def create_process_rules():
+def rules():
     """Creates rules that consume the intrinsic filesystem types."""
     return [
         RootRule(Process),

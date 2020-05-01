@@ -69,7 +69,7 @@ class ExternalTool(Subsystem):
 
     ...
     def rules():
-      return [my_rule, subsystem_rule(MyExternalTool)]
+      return [my_rule, SubsystemRule(MyExternalTool)]
 
 
     A lightweight replacement for the code in binary_tool.py and binary_util.py,
@@ -223,7 +223,7 @@ class ExternalTool(Subsystem):
         )[0]
         context._scheduler.materialize_directory(
             DirectoryToMaterialize(
-                directory_digest=downloaded_external_tool.digest, path_prefix=rel_bindir.as_posix()
+                downloaded_external_tool.digest, path_prefix=rel_bindir.as_posix()
             )
         )
         return (PurePath(get_buildroot()) / rel_bindir / req.exe).as_posix()
@@ -232,7 +232,7 @@ class ExternalTool(Subsystem):
 @rule
 async def download_external_tool(request: ExternalToolRequest) -> DownloadedExternalTool:
     snapshot = await Get[Snapshot](UrlToFetch, request.url_to_fetch)
-    extracted_digest = await Get[ExtractedDigest](MaybeExtractable(snapshot.directory_digest))
+    extracted_digest = await Get[ExtractedDigest](MaybeExtractable(snapshot.digest))
     return DownloadedExternalTool(extracted_digest.digest, request.exe)
 
 

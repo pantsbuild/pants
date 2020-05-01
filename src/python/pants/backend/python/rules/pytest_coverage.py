@@ -32,15 +32,15 @@ from pants.core.goals.test import (
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
 from pants.engine.addresses import Address
 from pants.engine.fs import (
+    AddPrefix,
     Digest,
-    DirectoriesToMerge,
-    DirectoryWithPrefixToAdd,
     FileContent,
     FilesContent,
     InputFilesContent,
+    MergeDigests,
 )
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import RootRule, named_rule, rule, subsystem_rule
+from pants.engine.rules import RootRule, SubsystemRule, named_rule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Sources, Targets, TransitiveTargets
 from pants.engine.unions import UnionRule
@@ -143,9 +143,7 @@ async def create_coverage_config(
     coverage_config_request: CoverageConfigRequest, source_root_config: SourceRootConfig
 ) -> CoverageConfig:
     sources = await Get[SourceFiles](
-        AllSourceFilesRequest(
-            (tgt.get(Sources) for tgt in coverage_config_request.targets), strip_source_roots=False,
-        )
+        AllSourceFilesRequest((tgt.get(Sources) for tgt in coverage_config_request.targets))
     )
     init_injected = await Get[InitInjectedSnapshot](InjectInitRequest(sources.snapshot))
     source_roots = source_root_config.get_source_roots()
@@ -278,27 +276,24 @@ async def merge_coverage_data(
     # We start with a bunch of test results, each of which has a coverage data file called
     # `.coverage`. We prefix each of these with their address so that we can write them all into a
     # single PEX.
-    coverage_directory_digests = await MultiGet(
-        Get[Digest](DirectoryWithPrefixToAdd(data.digest, prefix=data.address.path_safe_spec))
+    coverage_digests = await MultiGet(
+        Get[Digest](AddPrefix(data.digest, prefix=data.address.path_safe_spec))
         for data in data_collection
     )
     sources = await Get[SourceFiles](
-        AllSourceFilesRequest(
-            (tgt.get(Sources) for tgt in transitive_targets.closure), strip_source_roots=False
-        )
+        AllSourceFilesRequest((tgt.get(Sources) for tgt in transitive_targets.closure))
     )
     sources_with_inits = await Get[InitInjectedSnapshot](InjectInitRequest(sources.snapshot))
     coverage_config = await Get[CoverageConfig](
         CoverageConfigRequest(Targets(transitive_targets.closure), is_test_time=True)
     )
-    merged_input_files: Digest = await Get(
-        Digest,
-        DirectoriesToMerge(
-            directories=(
-                *coverage_directory_digests,
-                sources_with_inits.snapshot.directory_digest,
+    merged_input_files = await Get[Digest](
+        MergeDigests(
+            (
+                *coverage_digests,
+                sources_with_inits.snapshot.digest,
                 coverage_config.digest,
-                coverage_setup.requirements_pex.directory_digest,
+                coverage_setup.requirements_pex.digest,
             )
         ),
     )
@@ -316,7 +311,7 @@ async def merge_coverage_data(
     )
 
     result = await Get[ProcessResult](Process, process)
-    return MergedCoverageData(coverage_data=result.output_directory_digest)
+    return MergedCoverageData(coverage_data=result.output_digest)
 
 
 @named_rule(desc="Generate Pytest coverage report")
@@ -346,12 +341,12 @@ async def generate_coverage_report(
     )
     merged_input_files: Digest = await Get(
         Digest,
-        DirectoriesToMerge(
-            directories=(
+        MergeDigests(
+            (
                 merged_coverage_data.coverage_data,
                 coverage_config.digest,
-                requirements_pex.directory_digest,
-                sources_with_inits_snapshot.snapshot.directory_digest,
+                requirements_pex.digest,
+                sources_with_inits_snapshot.snapshot.digest,
             )
         ),
     )
@@ -383,7 +378,7 @@ async def generate_coverage_report(
         report_file = report_dir / "coverage.xml"
 
     return FilesystemCoverageReport(
-        result_digest=result.output_directory_digest,
+        result_digest=result.output_digest,
         directory_to_materialize_to=report_dir,
         report_file=report_file,
     )
@@ -395,7 +390,7 @@ def rules():
         generate_coverage_report,
         merge_coverage_data,
         setup_coverage,
-        subsystem_rule(PytestCoverage),
+        SubsystemRule(PytestCoverage),
         UnionRule(CoverageDataCollection, PytestCoverageDataCollection),
         RootRule(CoverageConfigRequest),
     ]

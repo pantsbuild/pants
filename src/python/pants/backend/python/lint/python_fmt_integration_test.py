@@ -3,9 +3,9 @@
 
 from typing import List, Optional
 
-from pants.backend.python.lint.black.rules import BlackConfigurations
+from pants.backend.python.lint.black.rules import BlackFieldSets
 from pants.backend.python.lint.black.rules import rules as black_rules
-from pants.backend.python.lint.isort.rules import IsortConfigurations
+from pants.backend.python.lint.isort.rules import IsortFieldSets
 from pants.backend.python.lint.isort.rules import rules as isort_rules
 from pants.backend.python.lint.python_fmt import PythonFmtTargets, format_python_target
 from pants.backend.python.target_types import PythonLibrary
@@ -29,8 +29,8 @@ class PythonFmtIntegrationTest(TestBase):
             *black_rules(),
             *isort_rules(),
             RootRule(PythonFmtTargets),
-            RootRule(BlackConfigurations),
-            RootRule(IsortConfigurations),
+            RootRule(BlackFieldSets),
+            RootRule(IsortFieldSets),
         )
 
     def run_black_and_isort(

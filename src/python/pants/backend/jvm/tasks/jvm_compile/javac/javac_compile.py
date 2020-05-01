@@ -243,7 +243,7 @@ class JavacCompile(JvmCompile):
 
         process = Process(
             argv=tuple(cmd),
-            input_files=input_snapshot.directory_digest,
+            input_files=input_snapshot.digest,
             output_files=output_files,
             description=f"Compiling {ctx.target.address.spec} with javac",
         )
@@ -254,7 +254,7 @@ class JavacCompile(JvmCompile):
         # Dump the output to the .pants.d directory where it's expected by downstream tasks.
         merged_directories = self.context._scheduler.merge_directories(
             [
-                exec_result.output_directory_digest,
+                exec_result.output_digest,
                 self.post_compile_extra_resources_digest(
                     ctx, prepend_post_merge_relative_path=False
                 ),

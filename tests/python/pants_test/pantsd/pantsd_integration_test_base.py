@@ -17,6 +17,7 @@ from pants.testutil.process_test_util import (
     TrackedProcessesContext,
     no_lingering_process_by_command,
 )
+from pants.testutil.retry import attempts
 from pants.util.collections import recursively_update
 
 
@@ -38,10 +39,7 @@ class PantsDaemonMonitor(ProcessManager):
     def _log(self):
         print(magenta(f"PantsDaemonMonitor: pid is {self._pid} is_alive={self.is_alive()}"))
 
-    # TODO(#7330): Determine why pantsd takes so long to start! Waiting for
-    # 'testprojects/src/python/coordinated_runs:waiter' specifically seems to require this 16-second
-    # timeout.
-    def assert_started(self, timeout=16):
+    def assert_started(self, timeout=30):
         self._process = None
         self._pid = self.await_pid(timeout)
         self._check_pantsd_is_alive()
@@ -78,7 +76,9 @@ class PantsDaemonMonitor(ProcessManager):
         assert (
             self._pid is not None
         ), "cannot assert pantsd stoppage. Try calling assert_started before calling this method."
-        assert self.is_dead(), "pantsd should be stopped!"
+        for _ in attempts("pantsd should be stopped!"):
+            if self.is_dead():
+                break
         return self._pid
 
 

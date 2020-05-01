@@ -617,16 +617,16 @@ class SchedulerSession:
         )
         return self._scheduler._raise_or_return(result)
 
-    def merge_directories(self, directory_digests):
+    def merge_directories(self, digests):
         """Merges any number of directories.
 
-        :param directory_digests: Tuple of DirectoryDigests.
+        :param digests: Tuple of directory digests.
         :return: A Digest.
         """
         result = self._scheduler._native.lib.merge_directories(
             self._scheduler._scheduler,
             self._session,
-            self._scheduler._to_value(_DirectoryDigests(directory_digests)),
+            self._scheduler._to_value(_DirectoryDigests(digests)),
         )
         return self._scheduler._raise_or_return(result)
 

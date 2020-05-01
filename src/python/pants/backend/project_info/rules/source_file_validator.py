@@ -12,7 +12,7 @@ from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.fs import Digest, FilesContent, SourcesSnapshot, SourcesSnapshots
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.rules import goal_rule, rule, subsystem_rule
+from pants.engine.rules import SubsystemRule, goal_rule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method
@@ -288,7 +288,7 @@ async def match_regexes_for_one_snapshot(
     sources_snapshot: SourcesSnapshot, source_file_validation: SourceFileValidation,
 ) -> RegexMatchResults:
     multi_matcher = source_file_validation.get_multi_matcher()
-    files_content = await Get[FilesContent](Digest, sources_snapshot.snapshot.directory_digest)
+    files_content = await Get[FilesContent](Digest, sources_snapshot.snapshot.digest)
     return RegexMatchResults(
         multi_matcher.check_source_file(file_content.path, file_content.content)
         for file_content in files_content
@@ -299,5 +299,5 @@ def rules():
     return [
         validate,
         match_regexes_for_one_snapshot,
-        subsystem_rule(SourceFileValidation),
+        SubsystemRule(SourceFileValidation),
     ]

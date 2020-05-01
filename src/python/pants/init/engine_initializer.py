@@ -22,10 +22,11 @@ from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.remote_sources import RemoteSources
 from pants.build_graph.target import Target as TargetV1
+from pants.engine import interactive_runner, process, target
 from pants.engine.console import Console
 from pants.engine.fs import Workspace, create_fs_rules
 from pants.engine.goal import Goal
-from pants.engine.interactive_runner import InteractiveRunner, create_interactive_runner_rules
+from pants.engine.interactive_runner import InteractiveRunner
 from pants.engine.internals import graph, options_parsing
 from pants.engine.internals.build_files import create_graph_rules
 from pants.engine.internals.mapper import AddressMapper
@@ -49,7 +50,6 @@ from pants.engine.legacy.structs import (
 )
 from pants.engine.legacy.structs import rules as structs_rules
 from pants.engine.platform import create_platform_rules
-from pants.engine.process import create_process_rules
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Params
 from pants.engine.target import RegisteredTargetTypes
@@ -425,12 +425,13 @@ class EngineInitializer:
             registered_target_types_singleton,
             union_membership_singleton,
             build_root_singleton,
+            *interactive_runner.rules(),
             *graph.rules(),
             *options_parsing.rules(),
+            *process.rules(),
+            *target.rules(),
             *create_legacy_graph_tasks(),
             *create_fs_rules(),
-            *create_interactive_runner_rules(),
-            *create_process_rules(),
             *create_platform_rules(),
             *create_graph_rules(address_mapper),
             *structs_rules(),

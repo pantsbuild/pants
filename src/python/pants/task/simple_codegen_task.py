@@ -310,7 +310,7 @@ class SimpleCodegenTask(Task):
         snapshots = self.context._scheduler.capture_snapshots(tuple(to_capture))
 
         for snapshot, vt in zip(snapshots, vts):
-            snapshot.directory_digest.dump(vt.current_results_dir)
+            snapshot.digest.dump(vt.current_results_dir)
 
         return tuple(
             EagerFilesetWithSpec(results_dir_relpath, filespec, snapshot,)

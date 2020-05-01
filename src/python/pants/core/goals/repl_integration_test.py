@@ -63,29 +63,29 @@ class ReplTest(GoalRuleTestBase):
 
     def test_repl_with_targets(self) -> None:
         self.setup_python_library()
-        output = self.execute_rule(
+        result = self.execute_rule(
             global_args=["--backend-packages2=pants.backend.python"],
             args=["src/python:some_lib"],
             additional_params=[InteractiveRunner(self.scheduler)],
         )
-        assert output == "REPL exited successfully."
+        assert result.stdout == "REPL exited successfully."
 
     def test_repl_ipython(self) -> None:
         self.setup_python_library()
-        output = self.execute_rule(
+        result = self.execute_rule(
             global_args=["--backend-packages2=pants.backend.python"],
             args=["--shell=ipython", "src/python:some_lib"],
             additional_params=[InteractiveRunner(self.scheduler)],
         )
-        assert output == "REPL exited successfully."
+        assert result.stdout == "REPL exited successfully."
 
     def test_repl_bogus_repl_name(self) -> None:
         self.setup_python_library()
-        output = self.execute_rule(
+        result = self.execute_rule(
             global_args=["--backend-packages2=pants.backend.python"],
             args=["--shell=bogus-repl", "src/python:some_lib"],
             additional_params=[InteractiveRunner(self.scheduler)],
             exit_code=-1,
         )
 
-        assert "bogus-repl is not an installed REPL program. Available REPLs:" in output
+        assert "bogus-repl is not an installed REPL program. Available REPLs:" in result.stdout

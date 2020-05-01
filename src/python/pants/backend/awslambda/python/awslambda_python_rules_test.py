@@ -7,7 +7,7 @@ from typing import Tuple
 from zipfile import ZipFile
 
 from pants.backend.awslambda.common.awslambda_common_rules import CreatedAWSLambda
-from pants.backend.awslambda.python.awslambda_python_rules import PythonAwsLambdaConfiguration
+from pants.backend.awslambda.python.awslambda_python_rules import PythonAwsLambdaFieldSet
 from pants.backend.awslambda.python.awslambda_python_rules import rules as awslambda_python_rules
 from pants.backend.awslambda.python.target_types import PythonAWSLambda
 from pants.backend.python.target_types import PythonLibrary
@@ -23,7 +23,7 @@ from pants.testutil.test_base import TestBase
 class TestPythonAWSLambdaCreation(TestBase):
     @classmethod
     def rules(cls):
-        return (*super().rules(), *awslambda_python_rules(), RootRule(PythonAwsLambdaConfiguration))
+        return (*super().rules(), *awslambda_python_rules(), RootRule(PythonAwsLambdaFieldSet))
 
     @classmethod
     def target_types(cls):
@@ -34,7 +34,7 @@ class TestPythonAWSLambdaCreation(TestBase):
         created_awslambda = self.request_single_product(
             CreatedAWSLambda,
             Params(
-                PythonAwsLambdaConfiguration.create(target),
+                PythonAwsLambdaFieldSet.create(target),
                 create_options_bootstrapper(
                     args=["--backend-packages2=pants.backend.awslambda.python"]
                 ),

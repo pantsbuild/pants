@@ -5,12 +5,7 @@ from dataclasses import dataclass
 from typing import Iterable, List, Type
 
 from pants.backend.python.target_types import PythonSources
-from pants.core.goals.fmt import (
-    FmtConfigurations,
-    FmtResult,
-    LanguageFmtResults,
-    LanguageFmtTargets,
-)
+from pants.core.goals.fmt import FmtFieldSets, FmtResult, LanguageFmtResults, LanguageFmtTargets
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
 from pants.engine.fs import Digest, Snapshot
 from pants.engine.rules import rule
@@ -24,7 +19,7 @@ class PythonFmtTargets(LanguageFmtTargets):
 
 
 @union
-class PythonFmtConfigurations:
+class PythonFmtFieldSets:
     pass
 
 
@@ -42,15 +37,15 @@ async def format_python_target(
     prior_formatter_result = original_sources.snapshot
 
     results: List[FmtResult] = []
-    config_collection_types: Iterable[Type[FmtConfigurations]] = union_membership.union_rules[
-        PythonFmtConfigurations
+    field_set_collection_types: Iterable[Type[FmtFieldSets]] = union_membership.union_rules[
+        PythonFmtFieldSets
     ]
-    for config_collection_type in config_collection_types:
+    for field_set_collection_type in field_set_collection_types:
         result = await Get[FmtResult](
-            PythonFmtConfigurations,
-            config_collection_type(
+            PythonFmtFieldSets,
+            field_set_collection_type(
                 (
-                    config_collection_type.config_type.create(target_with_origin)
+                    field_set_collection_type.field_set_type.create(target_with_origin)
                     for target_with_origin in targets_with_origins
                 ),
                 prior_formatter_result=prior_formatter_result,
@@ -62,8 +57,8 @@ async def format_python_target(
             prior_formatter_result = await Get[Snapshot](Digest, result.output)
     return LanguageFmtResults(
         tuple(results),
-        input=original_sources.snapshot.directory_digest,
-        output=prior_formatter_result.directory_digest,
+        input=original_sources.snapshot.digest,
+        output=prior_formatter_result.digest,
     )
 
 

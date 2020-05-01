@@ -18,7 +18,6 @@ from pants.build_graph.resources import Resources as ResourcesV1
 from pants.build_graph.target import Target as TargetV1
 from pants.core.project_info import filedeps
 from pants.core.target_types import GenericTarget, Resources
-from pants.engine.target import rules as target_rules
 from pants.testutil.goal_rule_test_base import GoalRuleTestBase
 
 
@@ -28,7 +27,7 @@ class FileDepsTest(GoalRuleTestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *filedeps.rules(), *target_rules())
+        return (*super().rules(), *filedeps.rules())
 
     @classmethod
     def target_types(cls):

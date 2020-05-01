@@ -26,7 +26,7 @@ class NodeBuild(NodeTask):
         (classes_dir_snapshot,) = self.context._scheduler.capture_snapshots(
             [PathGlobsAndRoot(PathGlobs([relpath]), get_buildroot(), Digest.load(relpath))]
         )
-        return ClasspathEntry(results_dir, classes_dir_snapshot.directory_digest)
+        return ClasspathEntry(results_dir, classes_dir_snapshot.digest)
 
     @classmethod
     def product_types(cls):

@@ -115,7 +115,7 @@ class SchedulerService(PantsService):
         new_snapshot = self._get_snapshot()
         if (
             self._invalidating_snapshot
-            and new_snapshot.directory_digest != self._invalidating_snapshot.directory_digest
+            and new_snapshot.digest != self._invalidating_snapshot.digest
         ):
             self._logger.critical(
                 "saw file events covered by invalidation globs [{}], terminating the daemon.".format(

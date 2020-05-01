@@ -544,6 +544,8 @@ class GlobalOptions(Subsystem):
             advanced=True,
             type=bool,
             default=False,
+            removal_version="1.29.0.dev2",
+            removal_hint="Not widely used, and will soon be rewritten to be inherent.",
             help="Create a new pantsd server, and use it, and shut it down immediately after. "
             "If pantsd is already running, it will shut it down and spawn a new instance (Beta)",
         )

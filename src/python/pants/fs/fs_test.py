@@ -6,7 +6,7 @@ from pathlib import Path
 
 from pants.engine.console import Console
 from pants.engine.fs import (
-    EMPTY_DIRECTORY_DIGEST,
+    EMPTY_DIGEST,
     Digest,
     DirectoryToMaterialize,
     FileContent,
@@ -134,7 +134,7 @@ class SingleFileExecutableTest(TestBase):
             SingleFileExecutable(snapshot)
 
     def test_raises_empty_digest(self):
-        snapshot = Snapshot(EMPTY_DIRECTORY_DIGEST, files=("a.txt",), dirs=())
+        snapshot = Snapshot(EMPTY_DIGEST, files=("a.txt",), dirs=())
 
         with self.assertRaisesWithMessage(
             SingleFileExecutable.ValidationError,
