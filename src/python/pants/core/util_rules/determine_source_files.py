@@ -11,7 +11,7 @@ from pants.core.util_rules.strip_source_roots import (
     StripSourcesFieldRequest,
 )
 from pants.engine.fs import MergeDigests, PathGlobs, Snapshot, SnapshotSubset
-from pants.engine.rules import rule
+from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import HydratedSources, HydrateSourcesRequest
 from pants.engine.target import Sources as SourcesField
@@ -182,4 +182,6 @@ def rules():
         determine_all_source_files,
         determine_specified_source_files,
         *strip_source_roots.rules(),
+        RootRule(AllSourceFilesRequest),
+        RootRule(SpecifiedSourceFilesRequest),
     ]
