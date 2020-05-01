@@ -125,6 +125,9 @@ def test_merge_interpreter_constraints() -> None:
         input=[["CPython==3.7.*", "PyPy==43.0"]], expected=["CPython==3.7.*", "PyPy==43.0"]
     )
 
+    # Ensure we can handle empty input.
+    assert_merged(input=[], expected=[])
+
 
 @dataclass(frozen=True)
 class ExactRequirement:

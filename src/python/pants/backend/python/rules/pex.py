@@ -108,6 +108,8 @@ class PexInterpreterConstraints:
         """
         # Each element (a Set[ParsedConstraint]) will get ANDed. We use sets to deduplicate
         # identical top-level parsed constraint sets.
+        if not constraint_sets:
+            return []
         parsed_constraint_sets: Set[FrozenSet[ParsedConstraint]] = set()
         for constraint_set in constraint_sets:
             # Each element (a ParsedConstraint) will get ORed.
