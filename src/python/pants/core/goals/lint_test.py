@@ -7,15 +7,15 @@ from typing import Iterable, List, Optional, Tuple, Type
 from pants.base.specs import SingleAddress
 from pants.core.goals.lint import (
     Lint,
-    LinterConfiguration,
-    LinterConfigurations,
+    LinterFieldSet,
+    LinterFieldSets,
     LintOptions,
     LintResult,
     lint,
 )
 from pants.core.util_rules.filter_empty_sources import (
-    ConfigurationsWithSources,
-    ConfigurationsWithSourcesRequest,
+    FieldSetsWithSources,
+    FieldSetsWithSourcesRequest,
 )
 from pants.engine.addresses import Address
 from pants.engine.target import Sources, Target, TargetsWithOrigins, TargetWithOrigin
@@ -29,12 +29,12 @@ class MockTarget(Target):
     core_fields = (Sources,)
 
 
-class MockLinterConfiguration(LinterConfiguration):
+class MockLinterFieldSet(LinterFieldSet):
     required_fields = (Sources,)
 
 
-class MockLinterConfigurations(LinterConfigurations, metaclass=ABCMeta):
-    config_type = MockLinterConfiguration
+class MockLinterFieldSets(LinterFieldSets, metaclass=ABCMeta):
+    field_set_type = MockLinterFieldSet
 
     @staticmethod
     @abstractmethod
@@ -52,7 +52,7 @@ class MockLinterConfigurations(LinterConfigurations, metaclass=ABCMeta):
         return LintResult(self.exit_code(addresses), self.stdout(addresses), "")
 
 
-class SuccessfulConfigurations(MockLinterConfigurations):
+class SuccessfulFieldSets(MockLinterFieldSets):
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
         return 0
@@ -62,7 +62,7 @@ class SuccessfulConfigurations(MockLinterConfigurations):
         return f"Successful linter: {', '.join(str(address) for address in addresses)}"
 
 
-class FailingConfigurations(MockLinterConfigurations):
+class FailingFieldSets(MockLinterFieldSets):
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
         return 1
@@ -72,7 +72,7 @@ class FailingConfigurations(MockLinterConfigurations):
         return f"Failing linter: {', '.join(str(address) for address in addresses)}"
 
 
-class ConditionallySucceedsConfigurations(MockLinterConfigurations):
+class ConditionallySucceedsFieldSets(MockLinterFieldSets):
     @staticmethod
     def exit_code(addresses: Iterable[Address]) -> int:
         if any(address.target_name == "bad" for address in addresses):
@@ -88,12 +88,12 @@ class InvalidField(Sources):
     pass
 
 
-class InvalidConfiguration(MockLinterConfiguration):
+class InvalidFieldSet(MockLinterFieldSet):
     required_fields = (InvalidField,)
 
 
-class InvalidConfigurations(MockLinterConfigurations):
-    config_type = InvalidConfiguration
+class InvalidFieldSets(MockLinterFieldSets):
+    field_set_type = InvalidFieldSet
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -117,13 +117,13 @@ class LintTest(TestBase):
     @staticmethod
     def run_lint_rule(
         *,
-        config_collection_types: List[Type[LinterConfigurations]],
+        field_set_collection_types: List[Type[LinterFieldSets]],
         targets: List[TargetWithOrigin],
         per_target_caching: bool,
         include_sources: bool = True,
     ) -> Tuple[int, str]:
         console = MockConsole(use_colors=False)
-        union_membership = UnionMembership({LinterConfigurations: config_collection_types})
+        union_membership = UnionMembership({LinterFieldSets: field_set_collection_types})
         result: Lint = run_rule(
             lint,
             rule_args=[
@@ -135,14 +135,14 @@ class LintTest(TestBase):
             mock_gets=[
                 MockGet(
                     product_type=LintResult,
-                    subject_type=LinterConfigurations,
-                    mock=lambda config_collection: config_collection.lint_result,
+                    subject_type=LinterFieldSets,
+                    mock=lambda field_set_collection: field_set_collection.lint_result,
                 ),
                 MockGet(
-                    product_type=ConfigurationsWithSources,
-                    subject_type=ConfigurationsWithSourcesRequest,
-                    mock=lambda configs: ConfigurationsWithSources(
-                        configs if include_sources else ()
+                    product_type=FieldSetsWithSources,
+                    subject_type=FieldSetsWithSourcesRequest,
+                    mock=lambda field_sets: FieldSetsWithSources(
+                        field_sets if include_sources else ()
                     ),
                 ),
             ],
@@ -153,7 +153,7 @@ class LintTest(TestBase):
     def test_empty_target_noops(self) -> None:
         def assert_noops(per_target_caching: bool) -> None:
             exit_code, stdout = self.run_lint_rule(
-                config_collection_types=[FailingConfigurations],
+                field_set_collection_types=[FailingFieldSets],
                 targets=[self.make_target_with_origin()],
                 per_target_caching=per_target_caching,
                 include_sources=False,
@@ -167,7 +167,7 @@ class LintTest(TestBase):
     def test_invalid_target_noops(self) -> None:
         def assert_noops(per_target_caching: bool) -> None:
             exit_code, stdout = self.run_lint_rule(
-                config_collection_types=[InvalidConfigurations],
+                field_set_collection_types=[InvalidFieldSets],
                 targets=[self.make_target_with_origin()],
                 per_target_caching=per_target_caching,
             )
@@ -183,12 +183,12 @@ class LintTest(TestBase):
 
         def assert_expected(per_target_caching: bool) -> None:
             exit_code, stdout = self.run_lint_rule(
-                config_collection_types=[FailingConfigurations],
+                field_set_collection_types=[FailingFieldSets],
                 targets=[target_with_origin],
                 per_target_caching=per_target_caching,
             )
-            assert exit_code == FailingConfigurations.exit_code([address])
-            assert stdout.strip() == FailingConfigurations.stdout([address])
+            assert exit_code == FailingFieldSets.exit_code([address])
+            assert stdout.strip() == FailingFieldSets.stdout([address])
 
         assert_expected(per_target_caching=False)
         assert_expected(per_target_caching=True)
@@ -199,14 +199,14 @@ class LintTest(TestBase):
 
         def assert_expected(per_target_caching: bool) -> None:
             exit_code, stdout = self.run_lint_rule(
-                config_collection_types=[SuccessfulConfigurations, FailingConfigurations],
+                field_set_collection_types=[SuccessfulFieldSets, FailingFieldSets],
                 targets=[target_with_origin],
                 per_target_caching=per_target_caching,
             )
-            assert exit_code == FailingConfigurations.exit_code([address])
+            assert exit_code == FailingFieldSets.exit_code([address])
             assert stdout.splitlines() == [
-                SuccessfulConfigurations.stdout([address]),
-                FailingConfigurations.stdout([address]),
+                SuccessfulFieldSets.stdout([address]),
+                FailingFieldSets.stdout([address]),
             ]
 
         assert_expected(per_target_caching=False)
@@ -218,24 +218,22 @@ class LintTest(TestBase):
 
         def get_stdout(*, per_target_caching: bool) -> str:
             exit_code, stdout = self.run_lint_rule(
-                config_collection_types=[ConditionallySucceedsConfigurations],
+                field_set_collection_types=[ConditionallySucceedsFieldSets],
                 targets=[
                     self.make_target_with_origin(good_address),
                     self.make_target_with_origin(bad_address),
                 ],
                 per_target_caching=per_target_caching,
             )
-            assert exit_code == ConditionallySucceedsConfigurations.exit_code([bad_address])
+            assert exit_code == ConditionallySucceedsFieldSets.exit_code([bad_address])
             return stdout
 
         stdout = get_stdout(per_target_caching=False)
-        assert stdout.strip() == ConditionallySucceedsConfigurations.stdout(
-            [good_address, bad_address]
-        )
+        assert stdout.strip() == ConditionallySucceedsFieldSets.stdout([good_address, bad_address])
 
         stdout = get_stdout(per_target_caching=True)
         assert stdout.splitlines() == [
-            ConditionallySucceedsConfigurations.stdout([address])
+            ConditionallySucceedsFieldSets.stdout([address])
             for address in [good_address, bad_address]
         ]
 
@@ -245,28 +243,25 @@ class LintTest(TestBase):
 
         def get_stdout(*, per_target_caching: bool) -> str:
             exit_code, stdout = self.run_lint_rule(
-                config_collection_types=[
-                    ConditionallySucceedsConfigurations,
-                    SuccessfulConfigurations,
-                ],
+                field_set_collection_types=[ConditionallySucceedsFieldSets, SuccessfulFieldSets,],
                 targets=[
                     self.make_target_with_origin(good_address),
                     self.make_target_with_origin(bad_address),
                 ],
                 per_target_caching=per_target_caching,
             )
-            assert exit_code == ConditionallySucceedsConfigurations.exit_code([bad_address])
+            assert exit_code == ConditionallySucceedsFieldSets.exit_code([bad_address])
             return stdout
 
         stdout = get_stdout(per_target_caching=False)
         assert stdout.splitlines() == [
-            config_collection.stdout([good_address, bad_address])
-            for config_collection in [ConditionallySucceedsConfigurations, SuccessfulConfigurations]
+            field_set_collection.stdout([good_address, bad_address])
+            for field_set_collection in [ConditionallySucceedsFieldSets, SuccessfulFieldSets]
         ]
 
         stdout = get_stdout(per_target_caching=True)
         assert stdout.splitlines() == [
-            config_collection.stdout([address])
-            for config_collection in [ConditionallySucceedsConfigurations, SuccessfulConfigurations]
+            field_set_collection.stdout([address])
+            for field_set_collection in [ConditionallySucceedsFieldSets, SuccessfulFieldSets]
             for address in [good_address, bad_address]
         ]

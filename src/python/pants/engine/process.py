@@ -4,7 +4,8 @@
 import itertools
 import logging
 from dataclasses import dataclass
-from typing import Dict, Optional, Tuple, Union
+from textwrap import dedent
+from typing import Dict, Iterable, Optional, Tuple, Union
 
 from pants.engine.fs import EMPTY_DIGEST, Digest
 from pants.engine.platform import Platform, PlatformConstraint
@@ -22,13 +23,11 @@ class ProductDescription:
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class Process:
-    """Request for execution with args and snapshots to extract."""
-
     # TODO: add a method to hack together a `process_executor` invocation command line which
     # reproduces this process execution request to make debugging remote executions effortless!
     argv: Tuple[str, ...]
-    input_files: Digest
     description: str
+    input_digest: Digest
     working_directory: Optional[str]
     env: Tuple[str, ...]
     output_files: Tuple[str, ...]
@@ -40,27 +39,50 @@ class Process:
 
     def __init__(
         self,
-        argv: Tuple[str, ...],
+        argv: Iterable[str],
         *,
-        input_files: Digest,
         description: str,
+        input_digest: Digest = EMPTY_DIGEST,
         working_directory: Optional[str] = None,
         env: Optional[Dict[str, str]] = None,
-        output_files: Optional[Tuple[str, ...]] = None,
-        output_directories: Optional[Tuple[str, ...]] = None,
+        output_files: Optional[Iterable[str]] = None,
+        output_directories: Optional[Iterable[str]] = None,
         timeout_seconds: Optional[Union[int, float]] = None,
         unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: Digest = EMPTY_DIGEST,
         jdk_home: Optional[str] = None,
         is_nailgunnable: bool = False,
     ) -> None:
-        self.argv = argv
-        self.input_files = input_files
+        """Request to run a subprocess, similar to subprocess.Popen.
+
+        This process will be hermetic, meaning that it cannot access files and environment variables
+        that are not explicitly populated. For example, $PATH will not be defined by default, unless
+        populated through the `env` parameter.
+
+        Usually, you will want to provide input files/directories via the parameter `input_digest`. The
+        process will then be able to access these paths through relative paths. If you want to give
+        multiple input digests, first merge them with `await Get[Digest](MergeDigests)`.
+
+        Often, you will want to capture the files/directories created in the process. To do this, you
+        can either set `output_files` or `output_directories`. The specified paths will then be used to
+        populate `output_digest` on the `ProcessResult`. If you want to split up this output digest
+        into multiple digests, use `await Get[Snapshot](SnapshotSubset)` on the `output_digest`.
+
+        To actually run the process, use `await Get[ProcessResult](Process)` or
+        `await Get[FallibleProcessResult](Process)`.
+
+        Example:
+
+            result = await Get[ProcessResult](Process(["/bin/echo", "hello world"], description="demo"))
+            assert result.stdout == b"hello world"
+        """
+        self.argv = tuple(argv)
         self.description = description
+        self.input_digest = input_digest
         self.working_directory = working_directory
         self.env = tuple(itertools.chain.from_iterable((env or {}).items()))
-        self.output_files = output_files or ()
-        self.output_directories = output_directories or ()
-        # NB: A negative or None time value is normalized to -1 to ease the transfer to rust.
+        self.output_files = tuple(output_files or ())
+        self.output_directories = tuple(output_directories or ())
+        # NB: A negative or None time value is normalized to -1 to ease the transfer to Rust.
         self.timeout_seconds = timeout_seconds if timeout_seconds and timeout_seconds > 0 else -1
         self.unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule = (
             unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule
@@ -106,9 +128,10 @@ class MultiPlatformProcess:
 
 @dataclass(frozen=True)
 class ProcessResult:
-    """Result of successfully executing a process.
+    """Result of executing a process which should not fail.
 
-    Requesting one of these will raise an exception if the exit code is non-zero.
+    If the process has a non-zero exit code, this will raise an exception, unlike
+    FallibleProcessResult.
     """
 
     stdout: bytes
@@ -118,9 +141,9 @@ class ProcessResult:
 
 @dataclass(frozen=True)
 class FallibleProcessResult:
-    """Result of executing a process.
+    """Result of executing a process which might fail.
 
-    Requesting one of these will not raise an exception if the exit code is non-zero.
+    If the process has a non-zero exit code, this will not raise an exception, unlike ProcessResult.
     """
 
     stdout: bytes
@@ -131,10 +154,7 @@ class FallibleProcessResult:
 
 @dataclass(frozen=True)
 class FallibleProcessResultWithPlatform:
-    """Result of executing a process.
-
-    Contains information about what platform a request ran on.
-    """
+    """Result of executing a process which might fail, along with the platform it ran on."""
 
     stdout: bytes
     stderr: bytes
@@ -149,33 +169,34 @@ class ProcessExecutionFailure(Exception):
     For example, exiting with a non-zero code.
     """
 
-    MSG_FMT = """process '{desc}' failed with exit code {code}.
-stdout:
-{stdout}
-stderr:
-{stderr}
-"""
-
-    def __init__(self, exit_code, stdout, stderr, process_description):
+    def __init__(
+        self, exit_code: int, stdout: bytes, stderr: bytes, process_description: str
+    ) -> None:
         # These are intentionally "public" members.
         self.exit_code = exit_code
         self.stdout = stdout
         self.stderr = stderr
+        super().__init__(
+            dedent(
+                f"""\
+                Process '{process_description}' failed with exit code {exit_code}.
+                stdout:
+                {stdout.decode()}
 
-        msg = self.MSG_FMT.format(
-            desc=process_description, code=exit_code, stdout=stdout.decode(), stderr=stderr.decode()
+                stderr:
+                {stderr.decode()}
+                """
+            )
         )
-
-        super().__init__(msg)
 
 
 @rule
-def get_multi_platform_request_description(req: MultiPlatformProcess,) -> ProductDescription:
+def get_multi_platform_request_description(req: MultiPlatformProcess) -> ProductDescription:
     return req.product_description
 
 
 @rule
-def upcast_process(req: Process,) -> MultiPlatformProcess:
+def upcast_process(req: Process) -> MultiPlatformProcess:
     """This rule allows an Process to be run as a platform compatible MultiPlatformProcess."""
     return MultiPlatformProcess({(PlatformConstraint.none, PlatformConstraint.none): req})
 
@@ -190,13 +211,12 @@ def fallible_to_exec_result_or_raise(
         return ProcessResult(
             fallible_result.stdout, fallible_result.stderr, fallible_result.output_digest,
         )
-    else:
-        raise ProcessExecutionFailure(
-            fallible_result.exit_code,
-            fallible_result.stdout,
-            fallible_result.stderr,
-            description.value,
-        )
+    raise ProcessExecutionFailure(
+        fallible_result.exit_code,
+        fallible_result.stdout,
+        fallible_result.stderr,
+        description.value,
+    )
 
 
 @rule

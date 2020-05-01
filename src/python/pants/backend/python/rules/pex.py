@@ -29,7 +29,7 @@ from pants.engine.fs import (
 )
 from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.process import MultiPlatformProcess, ProcessResult
-from pants.engine.rules import RootRule, named_rule, rule, subsystem_rule
+from pants.engine.rules import RootRule, SubsystemRule, named_rule, rule
 from pants.engine.selectors import Get
 from pants.python.python_repos import PythonRepos
 from pants.python.python_setup import PythonSetup
@@ -82,6 +82,8 @@ class PexInterpreterConstraints(DeduplicatedCollection[str]):
         """
         # Each element (a Set[ParsedConstraint]) will get ANDed. We use sets to deduplicate
         # identical top-level parsed constraint sets.
+        if not constraint_sets:
+            return []
         parsed_constraint_sets: Set[FrozenSet[ParsedConstraint]] = set()
         for constraint_set in constraint_sets:
             # Each element (a ParsedConstraint) will get ORed.
@@ -372,7 +374,7 @@ async def create_pex(
                 subprocess_encoding_environment=subprocess_encoding_environment,
                 pex_build_environment=pex_build_environment,
                 pex_args=argv,
-                input_files=merged_digest,
+                input_digest=merged_digest,
                 description=description,
                 output_files=(request.output_filename,),
             )
@@ -439,6 +441,6 @@ def rules():
         two_step_create_pex,
         RootRule(PexRequest),
         RootRule(TwoStepPexRequest),
-        subsystem_rule(PythonSetup),
-        subsystem_rule(PythonRepos),
+        SubsystemRule(PythonSetup),
+        SubsystemRule(PythonRepos),
     ]

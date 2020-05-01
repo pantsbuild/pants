@@ -2,7 +2,6 @@ use crate::{
   CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform,
   PlatformConstraint, Process, ProcessMetadata,
 };
-use futures::compat::Future01CompatExt;
 use hashing::EMPTY_DIGEST;
 use sharded_lmdb::ShardedLmdb;
 use std::collections::{BTreeMap, BTreeSet};
@@ -64,10 +63,7 @@ async fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
     is_nailgunnable: false,
   };
 
-  let local_result = local
-    .run(request.clone().into(), Context::default())
-    .compat()
-    .await;
+  let local_result = local.run(request.clone().into(), Context::default()).await;
 
   let cache_dir = TempDir::new().unwrap();
   let max_lmdb_size = 50 * 1024 * 1024; //50 MB - I didn't pick that number but it seems reasonable.
@@ -90,7 +86,6 @@ async fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
 
   let uncached_result = caching
     .run(request.clone().into(), Context::default())
-    .compat()
     .await;
 
   assert_eq!(local_result, uncached_result);
@@ -99,10 +94,7 @@ async fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
   // fail due to a FileNotFound error. So, If the second run succeeds, that implies that the
   // cache was successfully used.
   std::fs::remove_file(&script_path).unwrap();
-  let maybe_cached_result = caching
-    .run(request.into(), Context::default())
-    .compat()
-    .await;
+  let maybe_cached_result = caching.run(request.into(), Context::default()).await;
 
   RoundtripResults {
     uncached: uncached_result,

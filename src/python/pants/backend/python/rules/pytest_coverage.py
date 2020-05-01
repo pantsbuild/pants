@@ -40,7 +40,7 @@ from pants.engine.fs import (
     MergeDigests,
 )
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import RootRule, named_rule, rule, subsystem_rule
+from pants.engine.rules import RootRule, SubsystemRule, named_rule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Sources, Targets, TransitiveTargets
 from pants.engine.unions import UnionRule
@@ -287,7 +287,7 @@ async def merge_coverage_data(
     coverage_config = await Get[CoverageConfig](
         CoverageConfigRequest(Targets(transitive_targets.closure), is_test_time=True)
     )
-    merged_input_files = await Get[Digest](
+    input_digest = await Get[Digest](
         MergeDigests(
             (
                 *coverage_digests,
@@ -303,7 +303,7 @@ async def merge_coverage_data(
     process = coverage_setup.requirements_pex.create_process(
         pex_path=f"./{coverage_setup.requirements_pex.output_filename}",
         pex_args=coverage_args,
-        input_files=merged_input_files,
+        input_digest=input_digest,
         output_files=(".coverage",),
         description=f"Merge {len(prefixes)} Pytest coverage reports.",
         python_setup=python_setup,
@@ -339,7 +339,7 @@ async def generate_coverage_report(
     sources_with_inits_snapshot = await Get[InitInjectedSnapshot](
         InjectInitRequest(sources.snapshot)
     )
-    merged_input_files: Digest = await Get(
+    input_digest: Digest = await Get(
         Digest,
         MergeDigests(
             (
@@ -357,7 +357,7 @@ async def generate_coverage_report(
     process = requirements_pex.create_process(
         pex_path=f"./{coverage_setup.requirements_pex.output_filename}",
         pex_args=coverage_args,
-        input_files=merged_input_files,
+        input_digest=input_digest,
         output_directories=("htmlcov",),
         output_files=("coverage.xml",),
         description=f"Generate Pytest coverage report.",
@@ -390,7 +390,7 @@ def rules():
         generate_coverage_report,
         merge_coverage_data,
         setup_coverage,
-        subsystem_rule(PytestCoverage),
+        SubsystemRule(PytestCoverage),
         UnionRule(CoverageDataCollection, PytestCoverageDataCollection),
         RootRule(CoverageConfigRequest),
     ]

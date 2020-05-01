@@ -69,7 +69,7 @@ class ExternalTool(Subsystem):
 
     ...
     def rules():
-      return [my_rule, subsystem_rule(MyExternalTool)]
+      return [my_rule, SubsystemRule(MyExternalTool)]
 
 
     A lightweight replacement for the code in binary_tool.py and binary_util.py,

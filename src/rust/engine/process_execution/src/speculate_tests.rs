@@ -4,11 +4,9 @@ use crate::{
   CommandRunner, Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform,
   PlatformConstraint, Process,
 };
-use boxfuture::{BoxFuture, Boxable};
+
+use async_trait::async_trait;
 use bytes::Bytes;
-use futures::compat::Future01CompatExt;
-use futures::future::{FutureExt, TryFutureExt};
-use futures01::future::Future;
 use hashing::EMPTY_DIGEST;
 use parking_lot::Mutex;
 use std::sync::Arc;
@@ -136,7 +134,7 @@ async fn run_speculation_test(
     Duration::from_millis(speculation_delay_ms),
   );
   (
-    runner.run(execute_request, context).compat().await,
+    runner.run(execute_request, context).await,
     call_counter,
     finished_counter,
   )
@@ -206,26 +204,17 @@ impl DelayedCommandRunner {
   }
 }
 
+#[async_trait]
 impl CommandRunner for DelayedCommandRunner {
-  fn run(
+  async fn run(
     &self,
     _req: MultiPlatformProcess,
     _context: Context,
-  ) -> BoxFuture<FallibleProcessResultWithPlatform, String> {
-    let delay = delay_for(self.delay).unit_error().compat();
-    let exec_result = self.result.clone();
-    let command_runner = self.clone();
-    command_runner.incr_call_counter();
-    delay
-      .then(move |delay_res| match delay_res {
-        Ok(_) => exec_result,
-        Err(_) => Err(String::from("Timer failed during testing")),
-      })
-      .then(move |res| {
-        command_runner.incr_finished_counter();
-        res
-      })
-      .to_boxed()
+  ) -> Result<FallibleProcessResultWithPlatform, String> {
+    self.incr_call_counter();
+    delay_for(self.delay).await;
+    self.incr_finished_counter();
+    self.result.clone()
   }
 
   fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {

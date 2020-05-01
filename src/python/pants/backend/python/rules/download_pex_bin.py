@@ -15,7 +15,7 @@ from pants.core.util_rules.external_tool import (
 from pants.engine.fs import Digest
 from pants.engine.platform import Platform
 from pants.engine.process import Process
-from pants.engine.rules import rule, subsystem_rule
+from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get
 from pants.python.python_setup import PythonSetup
 
@@ -54,7 +54,7 @@ class DownloadedPexBin(HermeticPex):
         *,
         pex_args: Iterable[str],
         description: str,
-        input_files: Optional[Digest] = None,
+        input_digest: Optional[Digest] = None,
         env: Optional[Mapping[str, str]] = None,
         **kwargs: Any,
     ) -> Process:
@@ -67,10 +67,10 @@ class DownloadedPexBin(HermeticPex):
         :param pex_build_environment: The build environment for the pex tool.
         :param pex_args: The arguments to pass to the pex CLI tool.
         :param description: A description of the process execution to be performed.
-        :param input_files: The files that contain the pex CLI tool itself and any input files it
-                            needs to run against. By default, this is just the files that contain
-                            the PEX CLI tool itself. To merge in additional files, include
-                            `self.digest` in a `MergeDigests` request.
+        :param input_digest: The directory digest that contain the PEX CLI tool itself and any
+                             input files it needs to run against. By default, this is just the
+                             files that contain the PEX CLI tool itself. To merge in additional
+                             files, include `self.digest` in a `MergeDigests` request.
         :param env: The environment to run the PEX in.
         :param kwargs: Any additional :class:`Process` kwargs to pass through.
         """
@@ -84,7 +84,7 @@ class DownloadedPexBin(HermeticPex):
             pex_path=self.executable,
             pex_args=pex_args,
             description=description,
-            input_files=input_files or self.digest,
+            input_digest=input_digest or self.digest,
             env=env,
             **kwargs,
         )
@@ -99,4 +99,4 @@ async def download_pex_bin(pex_binary_tool: PexBin) -> DownloadedPexBin:
 
 
 def rules():
-    return [download_pex_bin, subsystem_rule(PexBin)]
+    return [download_pex_bin, SubsystemRule(PexBin)]

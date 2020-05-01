@@ -125,6 +125,9 @@ def test_merge_interpreter_constraints() -> None:
         input=[["CPython==3.7.*", "PyPy==43.0"]], expected=["CPython==3.7.*", "PyPy==43.0"]
     )
 
+    # Ensure we can handle empty input.
+    assert_merged(input=[], expected=[])
+
 
 @dataclass(frozen=True)
 class ExactRequirement:
@@ -254,7 +257,7 @@ class PexTest(TestBase):
         process = Process(
             argv=("python", "test.pex"),
             env=env,
-            input_files=pex_output["pex"].digest,
+            input_digest=pex_output["pex"].digest,
             description="Run the pex and make sure it works",
         )
         result = self.request_single_product(ProcessResult, process)

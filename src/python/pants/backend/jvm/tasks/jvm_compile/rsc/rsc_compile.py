@@ -897,7 +897,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
 
         epr = Process(
             argv=tuple(cmd),
-            input_files=epr_input_files,
+            input_digest=epr_input_files,
             output_files=(fast_relpath(ctx.rsc_jar_file.path, get_buildroot()),),
             output_directories=tuple(),
             timeout_seconds=15 * 60,

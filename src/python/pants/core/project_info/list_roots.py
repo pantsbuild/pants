@@ -6,7 +6,7 @@ from typing import Set
 from pants.engine.console import Console
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
-from pants.engine.rules import goal_rule, rule, subsystem_rule
+from pants.engine.rules import SubsystemRule, goal_rule, rule
 from pants.engine.selectors import Get
 from pants.source.source_root import AllSourceRoots, SourceRoot, SourceRootConfig
 
@@ -61,4 +61,4 @@ async def list_roots(console: Console, options: RootsOptions, all_roots: AllSour
 
 
 def rules():
-    return [all_roots, list_roots, subsystem_rule(SourceRootConfig)]
+    return [all_roots, list_roots, SubsystemRule(SourceRootConfig)]

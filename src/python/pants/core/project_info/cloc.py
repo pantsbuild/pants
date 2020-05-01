@@ -19,8 +19,9 @@ from pants.engine.fs import (
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import goal_rule, subsystem_rule
+from pants.engine.rules import SubsystemRule, goal_rule
 from pants.engine.selectors import Get
+from pants.util.strutil import pluralize
 
 
 @dataclass(frozen=True)
@@ -65,11 +66,15 @@ async def run_cloc(
     cloc_binary: ClocBinary,
     sources_snapshots: SourcesSnapshots,
 ) -> CountLinesOfCode:
-    """Runs the cloc perl script in an isolated process."""
-    snapshots = [sources_snapshot.snapshot for sources_snapshot in sources_snapshots]
-    file_content = "\n".join(
-        sorted(set(itertools.chain.from_iterable(snapshot.files for snapshot in snapshots)))
-    ).encode()
+    """Runs the cloc Perl script."""
+    all_file_names = sorted(
+        set(
+            itertools.chain.from_iterable(
+                sources_snapshot.snapshot.files for sources_snapshot in sources_snapshots
+            )
+        )
+    )
+    file_content = "\n".join(all_file_names).encode()
 
     if not file_content:
         return CountLinesOfCode(exit_code=0)
@@ -86,7 +91,7 @@ async def run_cloc(
             (
                 input_file_digest,
                 downloaded_cloc_binary.digest,
-                *(snapshot.digest for snapshot in snapshots),
+                *(sources_snapshot.snapshot.digest for sources_snapshot in sources_snapshots),
             )
         )
     )
@@ -104,9 +109,9 @@ async def run_cloc(
     )
     req = Process(
         argv=cmd,
-        input_files=digest,
+        input_digest=digest,
         output_files=(report_filename, ignore_filename),
-        description="cloc",
+        description=f"Count lines of code for {pluralize(len(all_file_names), 'file')}",
     )
 
     exec_result = await Get[ProcessResult](Process, req)
@@ -128,5 +133,5 @@ async def run_cloc(
 def rules():
     return [
         run_cloc,
-        subsystem_rule(ClocBinary),
+        SubsystemRule(ClocBinary),
     ]

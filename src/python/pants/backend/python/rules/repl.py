@@ -10,7 +10,7 @@ from pants.backend.python.subsystems.ipython import IPython
 from pants.backend.python.target_types import PythonSources
 from pants.core.goals.repl import ReplBinary, ReplImplementation
 from pants.engine.addresses import Addresses
-from pants.engine.rules import rule, subsystem_rule
+from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get
 from pants.engine.unions import UnionRule
 
@@ -56,7 +56,7 @@ async def run_ipython_repl(repl: IPythonRepl, ipython: IPython) -> ReplBinary:
 
 def rules():
     return [
-        subsystem_rule(IPython),
+        SubsystemRule(IPython),
         UnionRule(ReplImplementation, PythonRepl),
         UnionRule(ReplImplementation, IPythonRepl),
         run_python_repl,

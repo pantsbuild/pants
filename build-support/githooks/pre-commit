@@ -61,9 +61,9 @@ if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
   if git diff "${MERGE_BASE}" --name-only | grep build-support/bin/generate_travis_yml.py > /dev/null; then
     echo "* Checking .travis.yml generation"
     actual_travis_yml=$(<.travis.yml)
-    expected_travis_yml=$(./pants --quiet run build-support/bin:generate_travis_yml)
+    expected_travis_yml=$(./v2 run build-support/bin:generate_travis_yml)
     [ "${expected_travis_yml}" == "${actual_travis_yml}" ] || \
-      die "Travis config generator changed but .travis.yml file not regenerated. See top of that file for instructions."
+      die "Travis config generator changed, but .travis.yml file was not regenerated. See the header of .travis.yml for instructions."
   fi
 else
   echo "* Skipping import/lint checks in partial working copy."

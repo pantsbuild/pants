@@ -14,16 +14,16 @@ from pants.core.goals.test import (
     FilesystemCoverageReport,
     Status,
     Test,
-    TestConfiguration,
     TestDebugRequest,
+    TestFieldSet,
     TestOptions,
     TestResult,
-    WrappedTestConfiguration,
+    WrappedTestFieldSet,
     run_tests,
 )
 from pants.core.util_rules.filter_empty_sources import (
-    ConfigurationsWithSources,
-    ConfigurationsWithSourcesRequest,
+    FieldSetsWithSources,
+    FieldSetsWithSourcesRequest,
 )
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, Digest, FileContent, InputFilesContent, Workspace
@@ -31,8 +31,8 @@ from pants.engine.interactive_runner import InteractiveProcessRequest, Interacti
 from pants.engine.target import (
     Sources,
     Target,
-    TargetsToValidConfigurations,
-    TargetsToValidConfigurationsRequest,
+    TargetsToValidFieldSets,
+    TargetsToValidFieldSetsRequest,
     TargetWithOrigin,
 )
 from pants.engine.unions import UnionMembership
@@ -45,7 +45,7 @@ class MockTarget(Target):
     core_fields = (Sources,)
 
 
-class MockTestConfiguration(TestConfiguration, metaclass=ABCMeta):
+class MockTestFieldSet(TestFieldSet, metaclass=ABCMeta):
     required_fields = (Sources,)
 
     @staticmethod
@@ -72,7 +72,7 @@ class MockTestConfiguration(TestConfiguration, metaclass=ABCMeta):
         )
 
 
-class SuccessfulConfiguration(MockTestConfiguration):
+class SuccessfulFieldSet(MockTestFieldSet):
     @staticmethod
     def status(_: Address) -> Status:
         return Status.SUCCESS
@@ -82,7 +82,7 @@ class SuccessfulConfiguration(MockTestConfiguration):
         return f"Successful test target: Passed for {address}!"
 
 
-class ConditionallySucceedsConfiguration(MockTestConfiguration):
+class ConditionallySucceedsFieldSet(MockTestFieldSet):
     @staticmethod
     def status(address: Address) -> Status:
         return Status.FAILURE if address.target_name == "bad" else Status.SUCCESS
@@ -111,7 +111,7 @@ class TestTest(TestBase):
         )
         digest = self.request_single_product(Digest, input_files_content)
         return InteractiveProcessRequest(
-            argv=("/usr/bin/python", "program.py",), run_in_workspace=False, input_files=digest,
+            argv=("/usr/bin/python", "program.py",), run_in_workspace=False, input_digest=digest,
         )
 
     @staticmethod
@@ -126,7 +126,7 @@ class TestTest(TestBase):
     def run_test_rule(
         self,
         *,
-        config: Type[TestConfiguration],
+        field_set: Type[TestFieldSet],
         targets: List[TargetWithOrigin],
         debug: bool = False,
         include_sources: bool = True,
@@ -136,47 +136,52 @@ class TestTest(TestBase):
         options = create_goal_subsystem(TestOptions, debug=debug, run_coverage=False)
         interactive_runner = InteractiveRunner(self.scheduler)
         workspace = Workspace(self.scheduler)
-        union_membership = UnionMembership({TestConfiguration: [config]})
+        union_membership = UnionMembership({TestFieldSet: [field_set]})
 
-        def mock_find_valid_configs(
-            _: TargetsToValidConfigurationsRequest,
-        ) -> TargetsToValidConfigurations:
+        def mock_find_valid_field_sets(
+            _: TargetsToValidFieldSetsRequest,
+        ) -> TargetsToValidFieldSets:
             if not valid_targets:
-                return TargetsToValidConfigurations({})
-            return TargetsToValidConfigurations(
-                {tgt_with_origin: [config.create(tgt_with_origin)] for tgt_with_origin in targets}
+                return TargetsToValidFieldSets({})
+            return TargetsToValidFieldSets(
+                {
+                    tgt_with_origin: [field_set.create(tgt_with_origin)]
+                    for tgt_with_origin in targets
+                }
             )
 
         def mock_coordinator_of_tests(
-            wrapped_config: WrappedTestConfiguration,
+            wrapped_field_set: WrappedTestFieldSet,
         ) -> AddressAndTestResult:
-            config = cast(MockTestConfiguration, wrapped_config.config)
-            return AddressAndTestResult(address=config.address, test_result=config.test_result)
+            field_set = cast(MockTestFieldSet, wrapped_field_set.field_set)
+            return AddressAndTestResult(
+                address=field_set.address, test_result=field_set.test_result
+            )
 
         result: Test = run_rule(
             run_tests,
             rule_args=[console, options, interactive_runner, workspace, union_membership],
             mock_gets=[
                 MockGet(
-                    product_type=TargetsToValidConfigurations,
-                    subject_type=TargetsToValidConfigurationsRequest,
-                    mock=mock_find_valid_configs,
+                    product_type=TargetsToValidFieldSets,
+                    subject_type=TargetsToValidFieldSetsRequest,
+                    mock=mock_find_valid_field_sets,
                 ),
                 MockGet(
                     product_type=AddressAndTestResult,
-                    subject_type=WrappedTestConfiguration,
+                    subject_type=WrappedTestFieldSet,
                     mock=lambda wrapped_config: mock_coordinator_of_tests(wrapped_config),
                 ),
                 MockGet(
                     product_type=TestDebugRequest,
-                    subject_type=TestConfiguration,
+                    subject_type=TestFieldSet,
                     mock=lambda _: TestDebugRequest(self.make_ipr()),
                 ),
                 MockGet(
-                    product_type=ConfigurationsWithSources,
-                    subject_type=ConfigurationsWithSourcesRequest,
-                    mock=lambda configs: ConfigurationsWithSources(
-                        configs if include_sources else ()
+                    product_type=FieldSetsWithSources,
+                    subject_type=FieldSetsWithSourcesRequest,
+                    mock=lambda field_sets: FieldSetsWithSources(
+                        field_sets if include_sources else ()
                     ),
                 ),
                 MockGet(
@@ -195,7 +200,7 @@ class TestTest(TestBase):
 
     def test_empty_target_noops(self) -> None:
         exit_code, stdout = self.run_test_rule(
-            config=SuccessfulConfiguration,
+            field_set=SuccessfulFieldSet,
             targets=[self.make_target_with_origin()],
             include_sources=False,
         )
@@ -204,7 +209,7 @@ class TestTest(TestBase):
 
     def test_invalid_target_noops(self) -> None:
         exit_code, stdout = self.run_test_rule(
-            config=SuccessfulConfiguration,
+            field_set=SuccessfulFieldSet,
             targets=[self.make_target_with_origin()],
             valid_targets=False,
         )
@@ -214,13 +219,13 @@ class TestTest(TestBase):
     def test_single_target(self) -> None:
         address = Address.parse(":tests")
         exit_code, stdout = self.run_test_rule(
-            config=SuccessfulConfiguration, targets=[self.make_target_with_origin(address)]
+            field_set=SuccessfulFieldSet, targets=[self.make_target_with_origin(address)]
         )
         assert exit_code == 0
         assert stdout == dedent(
             f"""\
             {address} stdout:
-            {SuccessfulConfiguration.stdout(address)}
+            {SuccessfulFieldSet.stdout(address)}
 
             {address}                                                                        .....   SUCCESS
             """
@@ -231,7 +236,7 @@ class TestTest(TestBase):
         bad_address = Address.parse(":bad")
 
         exit_code, stdout = self.run_test_rule(
-            config=ConditionallySucceedsConfiguration,
+            field_set=ConditionallySucceedsFieldSet,
             targets=[
                 self.make_target_with_origin(good_address),
                 self.make_target_with_origin(bad_address),
@@ -241,9 +246,9 @@ class TestTest(TestBase):
         assert stdout == dedent(
             f"""\
             {good_address} stdout:
-            {ConditionallySucceedsConfiguration.stdout(good_address)}
+            {ConditionallySucceedsFieldSet.stdout(good_address)}
             {bad_address} stderr:
-            {ConditionallySucceedsConfiguration.stderr(bad_address)}
+            {ConditionallySucceedsFieldSet.stderr(bad_address)}
 
             {good_address}                                                                         .....   SUCCESS
             {bad_address}                                                                          .....   FAILURE
@@ -252,6 +257,6 @@ class TestTest(TestBase):
 
     def test_debug_target(self) -> None:
         exit_code, stdout = self.run_test_rule(
-            config=SuccessfulConfiguration, targets=[self.make_target_with_origin()], debug=True,
+            field_set=SuccessfulFieldSet, targets=[self.make_target_with_origin()], debug=True,
         )
         assert exit_code == 0

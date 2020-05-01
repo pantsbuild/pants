@@ -6,7 +6,7 @@ from abc import ABCMeta
 from dataclasses import dataclass
 from typing import ClassVar, Iterable, List, Optional, Tuple, Type
 
-from pants.core.goals.lint import LinterConfiguration
+from pants.core.goals.lint import LinterFieldSet
 from pants.core.util_rules.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
 from pants.engine.collection import Collection
 from pants.engine.console import Console
@@ -53,23 +53,23 @@ class FmtResult:
         return self.output != self.input
 
 
-class FmtConfiguration(LinterConfiguration, metaclass=ABCMeta):
+class FmtFieldSet(LinterFieldSet, metaclass=ABCMeta):
     """The fields necessary for a particular auto-formatter to work with a target."""
 
 
-class FmtConfigurations(Collection[FmtConfiguration]):
-    """A collection of Configurations for a particular formatter, e.g. a collection of
-    `IsortConfiguration`s."""
+class FmtFieldSets(Collection[FmtFieldSet]):
+    """A collection of `FieldSet`s for a particular formatter, e.g. a collection of
+    `IsortFieldSet`s."""
 
-    config_type: ClassVar[Type[FmtConfiguration]]
+    field_set_type: ClassVar[Type[FmtFieldSet]]
 
     def __init__(
         self,
-        configs: Iterable[FmtConfiguration],
+        field_sets: Iterable[FmtFieldSet],
         *,
         prior_formatter_result: Optional[Snapshot] = None
     ) -> None:
-        super().__init__(configs)
+        super().__init__(field_sets)
         self.prior_formatter_result = prior_formatter_result
 
 

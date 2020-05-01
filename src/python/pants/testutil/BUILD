@@ -95,6 +95,7 @@ python_library(
   sources = ['goal_rule_test_base.py'],
   dependencies = [
     ':test_base',
+    '3rdparty/python:dataclasses',
     'src/python/pants/init',
     'src/python/pants/testutil/option',
     'src/python/pants/util:meta',
