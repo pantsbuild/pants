@@ -419,4 +419,4 @@ class Broken {
 
         with self.assertRaises(ExecutionError) as cm:
             self.request_single_product(ProcessResult, request)
-        self.assertIn("process 'one-cat' failed with exit code 1.", str(cm.exception))
+        assert "Process 'one-cat' failed with exit code 1." in str(cm.exception)
