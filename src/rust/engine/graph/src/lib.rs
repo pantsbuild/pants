@@ -614,88 +614,99 @@ impl<N: Node> Graph<N> {
   }
 
   ///
-  /// In the context of the given src Node, declare a dependency on the given dst Node and
-  /// begin its execution if it has not already started.
+  /// Request the given dst Node, optionally in the context of the given src Node.
+  ///
+  /// If there is no src Node, or the src Node is not cacheable, this method will retry for
+  /// invalidation until the Node completes.
   ///
   pub fn get(
     &self,
-    src_id: EntryId,
+    src_id: Option<EntryId>,
     context: &N::Context,
     dst_node: N,
   ) -> BoxFuture<N::Item, N::Error> {
-    let maybe_entries_and_id = {
+    // Compute information about the dst under the Graph lock, and then release it.
+    let (dst_retry, mut entry, entry_id) = {
       // Get or create the destination, and then insert the dep and return its state.
       let mut inner = self.inner.lock();
       if inner.draining {
-        None
-      } else {
-        let dst_id = {
-          // TODO: doing cycle detection under the lock... unfortunate, but probably unavoidable
-          // without a much more complicated algorithm.
-          let potential_dst_id = inner.ensure_entry(dst_node);
-          if let Some(cycle_path) =
-            Self::report_cycle(src_id, potential_dst_id, &mut inner, context)
-          {
-            // Cyclic dependency: render an error.
-            let path_strs = cycle_path
-              .into_iter()
-              .map(|e| e.node().to_string())
-              .collect();
-            return future::err(N::Error::cyclic(path_strs)).to_boxed();
-          } else {
-            // Valid dependency.
-            trace!(
-              "Adding dependency from {:?} to {:?}",
-              inner.entry_for_id(src_id).unwrap().node(),
-              inner.entry_for_id(potential_dst_id).unwrap().node()
-            );
-            potential_dst_id
-          }
-        };
+        return future::err(N::Error::invalidated()).to_boxed();
+      }
+
+      // TODO: doing cycle detection under the lock... unfortunate, but probably unavoidable
+      // without a much more complicated algorithm.
+      let dst_id = inner.ensure_entry(dst_node);
+      let dst_retry = if let Some(src_id) = src_id {
+        if let Some(cycle_path) = Self::report_cycle(src_id, dst_id, &mut inner, context) {
+          // Cyclic dependency: render an error.
+          let path_strs = cycle_path
+            .into_iter()
+            .map(|e| e.node().to_string())
+            .collect();
+          return future::err(N::Error::cyclic(path_strs)).to_boxed();
+        }
+
+        // Valid dependency.
+        trace!(
+          "Adding dependency from {:?} to {:?}",
+          inner.entry_for_id(src_id).unwrap().node(),
+          inner.entry_for_id(dst_id).unwrap().node()
+        );
         // All edges get a weight of 1.0 so that we can Bellman-Ford over the graph, treating each
         // edge as having equal weight.
         inner.pg.add_edge(src_id, dst_id, 1.0);
-        let src_entry = inner.entry_for_id(src_id).cloned().unwrap();
-        inner
-          .entry_for_id(dst_id)
-          .cloned()
-          .map(|dst_entry| (src_entry, dst_entry, dst_id))
-      }
+
+        // We can retry the dst Node if the src Node is not cacheable. If the src is not cacheable,
+        // it only be allowed to run once, and so Node invalidation does not pass through it.
+        !inner.entry_for_id(src_id).unwrap().node().cacheable()
+      } else {
+        // Otherwise, this is an external request: always retry.
+        trace!(
+          "Requesting node {:?}",
+          inner.entry_for_id(dst_id).unwrap().node()
+        );
+        true
+      };
+
+      let dst_entry = inner.entry_for_id(dst_id).cloned().unwrap();
+      (dst_retry, dst_entry, dst_id)
     };
 
-    // Declare the dep, and return the state of the destination.
-    if let Some((src_entry, mut entry, entry_id)) = maybe_entries_and_id {
-      if src_entry.node().cacheable() {
-        entry.get(context, entry_id).map(|(res, _)| res).to_boxed()
-      } else {
-        // Src node is uncacheable, which means it is side-effecting, and can only be allowed to run once.
-        // We retry its dependencies a number of times here in case a side effect of the Node invalidated
-        // some of its dependencies, or another (external) process causes invalidation.
-        let context2 = context.clone();
+    // Return the state of the destination.
+    if dst_retry {
+      // Retry the dst a number of times to handle Node invalidation.
+      let context = context.clone();
+      let uncached_node = async move {
         let mut counter: usize = 8;
-        let uncached_node = async move {
-          loop {
-            counter -= 1;
-            if counter == 0 {
-              break Err(N::Error::exhausted());
-            }
-            let dep_res = entry
-              .get(&context2, entry_id)
-              .map(|(res, _)| res)
-              .compat()
-              .await;
-            match dep_res {
-              Ok(r) => break Ok(r),
-              Err(err) if err == N::Error::invalidated() => continue,
-              Err(other_err) => break Err(other_err),
-            }
+        loop {
+          counter -= 1;
+          if counter == 0 {
+            break Err(N::Error::exhausted());
           }
-        };
-        uncached_node.boxed().compat().to_boxed()
-      }
+          let dep_res = entry
+            .get(&context, entry_id)
+            .map(|(res, _)| res)
+            .compat()
+            .await;
+          match dep_res {
+            Ok(r) => break Ok(r),
+            Err(err) if err == N::Error::invalidated() => continue,
+            Err(other_err) => break Err(other_err),
+          }
+        }
+      };
+      uncached_node.boxed().compat().to_boxed()
     } else {
-      future::err(N::Error::invalidated()).to_boxed()
+      // Not retriable.
+      entry.get(context, entry_id).map(|(res, _)| res).to_boxed()
     }
+  }
+
+  ///
+  /// Return the value of the given Node. Shorthand for `self.get(None, context, node)`.
+  ///
+  pub fn create(&self, node: N, context: &N::Context) -> BoxFuture<N::Item, N::Error> {
+    self.get(None, context, node)
   }
 
   fn report_cycle(
@@ -762,26 +773,6 @@ impl<N: Node> Graph<N> {
     F: Fn(&Entry<N>) -> Duration,
   {
     self.inner.lock().critical_path(roots, duration)
-  }
-
-  ///
-  /// Create the given Node if it does not already exist.
-  ///
-  pub fn create(&self, node: N, context: &N::Context) -> BoxFuture<N::Item, N::Error> {
-    let maybe_entry_and_id = {
-      let mut inner = self.inner.lock();
-      if inner.draining {
-        None
-      } else {
-        let id = inner.ensure_entry(node);
-        inner.entry_for_id(id).cloned().map(|entry| (entry, id))
-      }
-    };
-    if let Some((mut entry, entry_id)) = maybe_entry_and_id {
-      entry.get(context, entry_id).map(|(res, _)| res).to_boxed()
-    } else {
-      future::err(N::Error::invalidated()).to_boxed()
-    }
   }
 
   ///
