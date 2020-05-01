@@ -13,11 +13,11 @@ from pants.engine.fs import FileContent
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.engine.target import TargetWithOrigin
+from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option.util import create_options_bootstrapper
-from pants.testutil.test_base import TestBase
 
 
-class BanditIntegrationTest(TestBase):
+class BanditIntegrationTest(ExternalToolTestBase):
 
     good_source = FileContent(path="good.py", content=b"hashlib.sha256()\n")
     # MD5 is a insecure hashing function

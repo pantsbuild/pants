@@ -11,25 +11,22 @@ from pants.backend.awslambda.python.awslambda_python_rules import PythonAwsLambd
 from pants.backend.awslambda.python.awslambda_python_rules import rules as awslambda_python_rules
 from pants.backend.awslambda.python.target_types import PythonAWSLambda
 from pants.backend.python.target_types import PythonLibrary
-from pants.core.util_rules import archive, external_tool
 from pants.engine.addresses import Address
 from pants.engine.fs import FilesContent
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.engine.target import WrappedTarget
+from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option.util import create_options_bootstrapper
-from pants.testutil.test_base import TestBase
 
 
-class TestPythonAWSLambdaCreation(TestBase):
+class TestPythonAWSLambdaCreation(ExternalToolTestBase):
     @classmethod
     def rules(cls):
         return (
             *super().rules(),
             *awslambda_python_rules(),
             RootRule(PythonAwsLambdaFieldSet),
-            *archive.rules(),
-            *external_tool.rules(),
         )
 
     @classmethod

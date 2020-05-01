@@ -20,15 +20,14 @@ from pants.backend.python.rules.pex import (
 )
 from pants.backend.python.rules.pex import rules as pex_rules
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
-from pants.core.util_rules import archive, external_tool
 from pants.engine.fs import Digest, DirectoryToMaterialize, FileContent, InputFilesContent
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.python.python_setup import PythonSetup
+from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.subsystem.util import init_subsystem
-from pants.testutil.test_base import TestBase
 from pants.util.strutil import create_path_env_var
 
 
@@ -155,15 +154,13 @@ def parse_requirements(requirements: Iterable[str]) -> Iterator[ExactRequirement
         yield ExactRequirement.parse(requirement)
 
 
-class PexTest(TestBase):
+class PexTest(ExternalToolTestBase):
     @classmethod
     def rules(cls):
         return (
             *super().rules(),
             *pex_rules(),
             *download_pex_bin.rules(),
-            *archive.rules(),
-            *external_tool.rules(),
             *python_native_code.rules(),
             *subprocess_environment.rules(),
             RootRule(PexRequest),

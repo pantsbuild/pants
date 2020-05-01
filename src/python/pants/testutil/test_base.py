@@ -291,7 +291,6 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
     @classmethod
     def rules(cls):
-        # Required for sources_for:
         return [RootRule(SourcesField)]
 
     @classmethod

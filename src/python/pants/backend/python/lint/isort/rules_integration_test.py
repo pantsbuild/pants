@@ -15,11 +15,11 @@ from pants.engine.fs import Digest, FileContent, InputFilesContent
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.engine.target import TargetWithOrigin
+from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option.util import create_options_bootstrapper
-from pants.testutil.test_base import TestBase
 
 
-class IsortIntegrationTest(TestBase):
+class IsortIntegrationTest(ExternalToolTestBase):
 
     good_source = FileContent(path="good.py", content=b"from animals import cat, dog\n")
     bad_source = FileContent(path="bad.py", content=b"from colors import green, blue\n")
