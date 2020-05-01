@@ -21,7 +21,7 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.target_types import PythonPlatforms as PythonPlatformsField
 from pants.backend.python.targets.python_binary import PythonBinary
-from pants.core.goals.binary import BinaryConfiguration, CreatedBinary
+from pants.core.goals.binary import BinaryFieldSet, CreatedBinary
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
 from pants.engine.addresses import Addresses
 from pants.engine.rules import rule
@@ -30,7 +30,7 @@ from pants.engine.unions import UnionRule
 
 
 @dataclass(frozen=True)
-class PythonBinaryConfiguration(BinaryConfiguration):
+class PythonBinaryFieldSet(BinaryFieldSet):
     required_fields = (PythonEntryPoint, PythonBinarySources)
 
     sources: PythonBinarySources
@@ -62,13 +62,13 @@ class PythonBinaryConfiguration(BinaryConfiguration):
 
 
 @rule
-async def create_python_binary(config: PythonBinaryConfiguration) -> CreatedBinary:
+async def create_python_binary(field_set: PythonBinaryFieldSet) -> CreatedBinary:
     entry_point: Optional[str]
-    if config.entry_point.value is not None:
-        entry_point = config.entry_point.value
+    if field_set.entry_point.value is not None:
+        entry_point = field_set.entry_point.value
     else:
         source_files = await Get[SourceFiles](
-            AllSourceFilesRequest([config.sources], strip_source_roots=True)
+            AllSourceFilesRequest([field_set.sources], strip_source_roots=True)
         )
         # NB: `PythonBinarySources` enforces that we have 0-1 sources.
         if len(source_files.files) == 1:
@@ -77,15 +77,15 @@ async def create_python_binary(config: PythonBinaryConfiguration) -> CreatedBina
         else:
             entry_point = None
 
-    output_filename = f"{config.address.target_name}.pex"
+    output_filename = f"{field_set.address.target_name}.pex"
     two_step_pex = await Get[TwoStepPex](
         TwoStepPexFromTargetsRequest(
             PexFromTargetsRequest(
-                addresses=Addresses([config.address]),
+                addresses=Addresses([field_set.address]),
                 entry_point=entry_point,
-                platforms=PexPlatforms.create_from_platforms_field(config.platforms),
+                platforms=PexPlatforms.create_from_platforms_field(field_set.platforms),
                 output_filename=output_filename,
-                additional_args=config.generate_additional_args(),
+                additional_args=field_set.generate_additional_args(),
             )
         )
     )
@@ -94,4 +94,4 @@ async def create_python_binary(config: PythonBinaryConfiguration) -> CreatedBina
 
 
 def rules():
-    return [create_python_binary, UnionRule(BinaryConfiguration, PythonBinaryConfiguration)]
+    return [create_python_binary, UnionRule(BinaryFieldSet, PythonBinaryFieldSet)]

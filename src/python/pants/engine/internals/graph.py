@@ -1,6 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import logging
 import os.path
 from collections import defaultdict, deque
 from dataclasses import dataclass
@@ -23,14 +24,14 @@ from pants.engine.addresses import (
     AddressWithOrigin,
     BuildFileAddress,
 )
-from pants.engine.fs import EMPTY_SNAPSHOT, PathGlobs, Snapshot, SourcesSnapshot, SourcesSnapshots
+from pants.engine.fs import PathGlobs, Snapshot, SourcesSnapshot, SourcesSnapshots
 from pants.engine.internals.parser import HydratedStruct
-from pants.engine.legacy.graph import HydratedField, logger
-from pants.engine.legacy.structs import HydrateableField, SourcesField, TargetAdaptor
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
     Dependencies,
+    HydratedSources,
+    HydrateSourcesRequest,
     RegisteredTargetTypes,
     Sources,
     Target,
@@ -44,8 +45,9 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership
 from pants.option.global_options import GlobalOptions, OwnersNotFoundBehavior
 from pants.source.filespec import any_matches_filespec
-from pants.source.wrapped_globs import EagerFilesetWithSpec
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+
+logger = logging.getLogger(__name__)
 
 # -----------------------------------------------------------------------------------------------
 # Struct -> Target(s)
@@ -288,17 +290,12 @@ async def addresses_with_origins_from_filesystem_specs(
 
 
 @rule
-async def hydrate_sources_snapshot(hydrated_struct: HydratedStruct) -> SourcesSnapshot:
-    """Construct a SourcesSnapshot from a TargetAdaptor without hydrating any other fields."""
-    target_adaptor = cast(TargetAdaptor, hydrated_struct.value)
-    sources_field = next(
-        (fa for fa in target_adaptor.field_adaptors if isinstance(fa, SourcesField)), None
+async def sources_snapshot_from_target(wrapped_tgt: WrappedTarget) -> SourcesSnapshot:
+    """Construct a SourcesSnapshot from a Target without hydrating any other fields."""
+    hydrated_sources = await Get[HydratedSources](
+        HydrateSourcesRequest(wrapped_tgt.target.get(Sources))
     )
-    if sources_field is None:
-        return SourcesSnapshot(EMPTY_SNAPSHOT)
-    hydrated_sources_field = await Get[HydratedField](HydrateableField, sources_field)
-    efws = cast(EagerFilesetWithSpec, hydrated_sources_field.value)
-    return SourcesSnapshot(efws.snapshot)
+    return SourcesSnapshot(hydrated_sources.snapshot)
 
 
 @rule
@@ -337,7 +334,7 @@ def rules():
         transitive_targets,
         find_owners,
         addresses_with_origins_from_filesystem_specs,
-        hydrate_sources_snapshot,
+        sources_snapshot_from_target,
         sources_snapshots_from_address_specs,
         sources_snapshots_from_filesystem_specs,
         RootRule(FilesystemSpecs),

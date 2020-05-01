@@ -4,14 +4,14 @@
 from pathlib import PurePath
 
 from pants.base.build_root import BuildRoot
-from pants.core.goals.binary import BinaryConfiguration, CreatedBinary
+from pants.core.goals.binary import BinaryFieldSet, CreatedBinary
 from pants.engine.console import Console
 from pants.engine.fs import DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get
-from pants.engine.target import TargetsToValidConfigurations, TargetsToValidConfigurationsRequest
+from pants.engine.target import TargetsToValidFieldSets, TargetsToValidFieldSetsRequest
 from pants.option.custom_types import shell_str
 from pants.option.global_options import GlobalOptions
 from pants.util.contextutil import temporary_dir
@@ -26,8 +26,8 @@ class RunOptions(GoalSubsystem):
 
     name = "run"
 
-    # NB: To be runnable, there must be a BinaryConfiguration that works with the target.
-    required_union_implementations = (BinaryConfiguration,)
+    # NB: To be runnable, there must be a BinaryFieldSet that works with the target.
+    required_union_implementations = (BinaryFieldSet,)
 
     @classmethod
     def register_options(cls, register) -> None:
@@ -55,16 +55,16 @@ async def run(
     workspace: Workspace,
     build_root: BuildRoot,
 ) -> Run:
-    targets_to_valid_configs = await Get[TargetsToValidConfigurations](
-        TargetsToValidConfigurationsRequest(
-            BinaryConfiguration,
+    targets_to_valid_field_sets = await Get[TargetsToValidFieldSets](
+        TargetsToValidFieldSetsRequest(
+            BinaryFieldSet,
             goal_description=f"the `{options.name}` goal",
             error_if_no_valid_targets=True,
-            expect_single_config=True,
+            expect_single_field_set=True,
         )
     )
-    config = targets_to_valid_configs.configurations[0]
-    binary = await Get[CreatedBinary](BinaryConfiguration, config)
+    field_set = targets_to_valid_field_sets.field_sets[0]
+    binary = await Get[CreatedBinary](BinaryFieldSet, field_set)
 
     workdir = global_options.options.pants_workdir
     with temporary_dir(root_dir=workdir, cleanup=True) as tmpdir:
@@ -82,7 +82,7 @@ async def run(
             result = runner.run_local_interactive_process(run_request)
             exit_code = result.process_exit_code
         except Exception as e:
-            console.print_stderr(f"Exception when attempting to run {config.address}: {e!r}")
+            console.print_stderr(f"Exception when attempting to run {field_set.address}: {e!r}")
             exit_code = -1
 
     return Run(exit_code)

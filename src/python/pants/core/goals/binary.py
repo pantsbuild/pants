@@ -12,11 +12,7 @@ from pants.engine.fs import Digest, DirectoryToMaterialize, MergeDigests, Worksp
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get, MultiGet
-from pants.engine.target import (
-    Configuration,
-    TargetsToValidConfigurations,
-    TargetsToValidConfigurationsRequest,
-)
+from pants.engine.target import FieldSet, TargetsToValidFieldSets, TargetsToValidFieldSetsRequest
 from pants.engine.unions import union
 
 # TODO(#6004): use proper Logging singleton, rather than static logger.
@@ -24,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 @union
-class BinaryConfiguration(Configuration, metaclass=ABCMeta):
+class BinaryFieldSet(FieldSet, metaclass=ABCMeta):
     """The fields necessary to create a binary from a target."""
 
 
@@ -40,7 +36,7 @@ class BinaryOptions(GoalSubsystem):
 
     name = "binary"
 
-    required_union_implementations = (BinaryConfiguration,)
+    required_union_implementations = (BinaryFieldSet,)
 
 
 class Binary(Goal):
@@ -49,16 +45,16 @@ class Binary(Goal):
 
 @goal_rule
 async def create_binary(workspace: Workspace, dist_dir: DistDir, build_root: BuildRoot) -> Binary:
-    targets_to_valid_configs = await Get[TargetsToValidConfigurations](
-        TargetsToValidConfigurationsRequest(
-            BinaryConfiguration,
+    targets_to_valid_field_sets = await Get[TargetsToValidFieldSets](
+        TargetsToValidFieldSetsRequest(
+            BinaryFieldSet,
             goal_description=f"the `binary` goal",
             error_if_no_valid_targets=True,
         )
     )
     binaries = await MultiGet(
-        Get[CreatedBinary](BinaryConfiguration, config)
-        for config in targets_to_valid_configs.configurations
+        Get[CreatedBinary](BinaryFieldSet, field_set)
+        for field_set in targets_to_valid_field_sets.field_sets
     )
     merged_digest = await Get[Digest](MergeDigests(binary.digest for binary in binaries))
     result = workspace.materialize_directory(

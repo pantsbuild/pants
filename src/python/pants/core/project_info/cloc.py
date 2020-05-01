@@ -19,7 +19,7 @@ from pants.engine.fs import (
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import goal_rule, subsystem_rule
+from pants.engine.rules import SubsystemRule, goal_rule
 from pants.engine.selectors import Get
 
 
@@ -128,5 +128,5 @@ async def run_cloc(
 def rules():
     return [
         run_cloc,
-        subsystem_rule(ClocBinary),
+        SubsystemRule(ClocBinary),
     ]

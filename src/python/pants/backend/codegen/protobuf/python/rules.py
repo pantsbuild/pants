@@ -12,7 +12,7 @@ from pants.engine.addresses import Addresses
 from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import named_rule, subsystem_rule
+from pants.engine.rules import SubsystemRule, named_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import GeneratedSources, GenerateSourcesRequest, Sources, TransitiveTargets
 from pants.engine.unions import UnionRule
@@ -109,5 +109,5 @@ def rules():
     return [
         generate_python_from_protobuf,
         UnionRule(GenerateSourcesRequest, GeneratePythonFromProtobufRequest),
-        subsystem_rule(Protoc),
+        SubsystemRule(Protoc),
     ]

@@ -1,8 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.backend.jvm.target_types import JavaLibrary
+from pants.backend.python.target_types import PythonLibrary
 from pants.core.project_info import cloc
 from pants.core.util_rules import archive, external_tool
 from pants.testutil.goal_rule_test_base import GoalRuleResult, GoalRuleTestBase
@@ -31,12 +31,12 @@ class ClocTest(GoalRuleTestBase):
     goal_cls = cloc.CountLinesOfCode
 
     @classmethod
-    def rules(cls):
-        return [*super().rules(), *cloc.rules(), *archive.rules(), *external_tool.rules()]
+    def target_types(cls):
+        return [JavaLibrary, PythonLibrary]
 
     @classmethod
-    def alias_groups(cls):
-        return BuildFileAliases(targets={"java_library": JavaLibrary})
+    def rules(cls):
+        return [*super().rules(), *cloc.rules(), *archive.rules(), *external_tool.rules()]
 
     def test_cloc(self) -> None:
         py_dir = "src/py/foo"

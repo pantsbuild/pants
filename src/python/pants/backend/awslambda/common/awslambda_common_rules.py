@@ -12,11 +12,7 @@ from pants.engine.fs import Digest, DirectoryToMaterialize, MergeDigests, Worksp
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get, MultiGet
-from pants.engine.target import (
-    Configuration,
-    TargetsToValidConfigurations,
-    TargetsToValidConfigurationsRequest,
-)
+from pants.engine.target import FieldSet, TargetsToValidFieldSets, TargetsToValidFieldSetsRequest
 from pants.engine.unions import union
 
 
@@ -33,7 +29,7 @@ class CreatedAWSLambda:
 
 
 @union
-class AWSLambdaConfiguration(Configuration, metaclass=ABCMeta):
+class AWSLambdaFieldSet(FieldSet, metaclass=ABCMeta):
     """The fields necessary to create an AWS Lambda from a target."""
 
 
@@ -55,16 +51,16 @@ async def create_awslambda(
     buildroot: BuildRoot,
     workspace: Workspace,
 ) -> AWSLambdaGoal:
-    targets_to_valid_configs = await Get[TargetsToValidConfigurations](
-        TargetsToValidConfigurationsRequest(
-            AWSLambdaConfiguration,
+    targets_to_valid_field_sets = await Get[TargetsToValidFieldSets](
+        TargetsToValidFieldSetsRequest(
+            AWSLambdaFieldSet,
             goal_description=f"the `{options.name}` goal",
             error_if_no_valid_targets=True,
         )
     )
     awslambdas = await MultiGet(
-        Get[CreatedAWSLambda](AWSLambdaConfiguration, config)
-        for config in targets_to_valid_configs.configurations
+        Get[CreatedAWSLambda](AWSLambdaFieldSet, field_set)
+        for field_set in targets_to_valid_field_sets.field_sets
     )
     merged_digest = await Get[Digest](MergeDigests(awslambda.digest for awslambda in awslambdas))
     result = workspace.materialize_directory(

@@ -12,7 +12,7 @@ from pants.binaries.binary_util import BinaryToolUrlGenerator
 from pants.engine.fs import Digest, SingleFileExecutable, Snapshot
 from pants.engine.platform import PlatformConstraint
 from pants.engine.process import Process
-from pants.engine.rules import rule, subsystem_rule
+from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get
 from pants.python.python_setup import PythonSetup
 
@@ -105,4 +105,4 @@ async def download_pex_bin(pex_binary_tool: DownloadedPexBin.Factory) -> Downloa
 
 
 def rules():
-    return [download_pex_bin, subsystem_rule(DownloadedPexBin.Factory)]
+    return [download_pex_bin, SubsystemRule(DownloadedPexBin.Factory)]

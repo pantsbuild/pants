@@ -43,7 +43,7 @@ class SetupPyRunner:
                 "--wheel-version",
                 advanced=True,
                 fingerprint=True,
-                default="0.33.6",
+                default="0.34.2",
                 help="The wheel version to use when executing `setup.py` scripts.",
             )
 

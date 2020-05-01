@@ -28,7 +28,7 @@ from pants.backend.python.target_types import (
     PythonTestsSources,
     PythonTestsTimeout,
 )
-from pants.core.goals.test import TestConfiguration, TestDebugRequest, TestOptions, TestResult
+from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestOptions, TestResult
 from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.engine.addresses import Addresses
 from pants.engine.fs import (
@@ -42,7 +42,7 @@ from pants.engine.fs import (
 )
 from pants.engine.interactive_runner import InteractiveProcessRequest
 from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import named_rule, rule, subsystem_rule
+from pants.engine.rules import SubsystemRule, named_rule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Targets, TransitiveTargets
 from pants.engine.unions import UnionRule
@@ -51,7 +51,7 @@ from pants.python.python_setup import PythonSetup
 
 
 @dataclass(frozen=True)
-class PythonTestConfiguration(TestConfiguration):
+class PythonTestFieldSet(TestFieldSet):
     required_fields = (PythonTestsSources,)
 
     sources: PythonTestsSources
@@ -74,7 +74,7 @@ class TestTargetSetup:
 
 @rule
 async def setup_pytest_for_target(
-    config: PythonTestConfiguration,
+    field_set: PythonTestFieldSet,
     pytest: PyTest,
     test_options: TestOptions,
     python_setup: PythonSetup,
@@ -82,7 +82,7 @@ async def setup_pytest_for_target(
     # TODO: Rather than consuming the TestOptions subsystem, the TestRunner should pass on coverage
     # configuration via #7490.
 
-    test_addresses = Addresses((config.address,))
+    test_addresses = Addresses((field_set.address,))
 
     transitive_targets = await Get[TransitiveTargets](Addresses, test_addresses)
     all_targets = transitive_targets.closure
@@ -148,7 +148,7 @@ async def setup_pytest_for_target(
     # Get the file names for the test_target so that we can specify to Pytest precisely which files
     # to test, rather than using auto-discovery.
     specified_source_files_request = SpecifiedSourceFilesRequest(
-        [(config.sources, config.origin)], strip_source_roots=True
+        [(field_set.sources, field_set.origin)], strip_source_roots=True
     )
 
     # TODO(John Sirois): Support exploiting concurrency better:
@@ -203,7 +203,7 @@ async def setup_pytest_for_target(
         coverage_args = [
             "--cov-report=",  # To not generate any output. https://pytest-cov.readthedocs.io/en/latest/config.html
         ]
-        for package in config.coverage.determine_packages_to_cover(
+        for package in field_set.coverage.determine_packages_to_cover(
             specified_source_files=specified_source_files
         ):
             coverage_args.extend(["--cov", package])
@@ -213,7 +213,7 @@ async def setup_pytest_for_target(
         test_runner_pex=test_runner_pex,
         args=(*pytest.options.args, *coverage_args, *specified_source_file_names),
         input_files_digest=merged_input_files,
-        timeout_seconds=config.timeout.calculate_from_global_options(pytest),
+        timeout_seconds=field_set.timeout.calculate_from_global_options(pytest),
         xml_dir=pytest.options.junit_xml_dir,
         junit_family=pytest.options.junit_family,
     )
@@ -221,7 +221,7 @@ async def setup_pytest_for_target(
 
 @named_rule(desc="Run pytest")
 async def run_python_test(
-    config: PythonTestConfiguration,
+    field_set: PythonTestFieldSet,
     test_setup: TestTargetSetup,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
@@ -231,7 +231,7 @@ async def run_python_test(
     """Runs pytest for one target."""
     add_opts = [f"--color={'yes' if global_options.options.colors else 'no'}"]
     if test_setup.xml_dir:
-        test_results_file = f"{config.address.path_safe_spec}.xml"
+        test_results_file = f"{field_set.address.path_safe_spec}.xml"
         add_opts.extend(
             (f"--junitxml={test_results_file}", f"-o junit_family={test_setup.junit_family}",)
         )
@@ -248,7 +248,7 @@ async def run_python_test(
         pex_args=test_setup.args,
         input_files=test_setup.input_files_digest,
         output_directories=tuple(output_dirs) if output_dirs else None,
-        description=f"Run Pytest for {config.address.reference()}",
+        description=f"Run Pytest for {field_set.address.reference()}",
         timeout_seconds=test_setup.timeout_seconds,
         env=env,
     )
@@ -259,7 +259,7 @@ async def run_python_test(
         coverage_snapshot = await Get[Snapshot](
             SnapshotSubset(result.output_digest, PathGlobs([".coverage"]))
         )
-        coverage_data = PytestCoverageData(config.address, coverage_snapshot.digest)
+        coverage_data = PytestCoverageData(field_set.address, coverage_snapshot.digest)
 
     xml_results_digest = None
     if test_setup.xml_dir:
@@ -290,7 +290,7 @@ def rules():
         run_python_test,
         debug_python_test,
         setup_pytest_for_target,
-        UnionRule(TestConfiguration, PythonTestConfiguration),
-        subsystem_rule(PyTest),
-        subsystem_rule(PythonSetup),
+        UnionRule(TestFieldSet, PythonTestFieldSet),
+        SubsystemRule(PyTest),
+        SubsystemRule(PythonSetup),
     ]

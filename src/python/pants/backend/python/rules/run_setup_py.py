@@ -58,7 +58,7 @@ from pants.engine.fs import (
 )
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import goal_rule, named_rule, rule, subsystem_rule
+from pants.engine.rules import SubsystemRule, goal_rule, named_rule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
     Dependencies,
@@ -717,5 +717,5 @@ def rules():
         get_owned_dependencies,
         get_exporting_owner,
         setup_setuptools,
-        subsystem_rule(Setuptools),
+        SubsystemRule(Setuptools),
     ]

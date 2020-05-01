@@ -527,7 +527,6 @@ def cargo_audit() -> Dict:
         "stage": Stage.test_cron.value,
         "script": ["./build-support/bin/ci.py --cargo-audit"],
         "env": ["CACHE_NAME=cargo_audit"],
-        "if": SKIP_RUST_CONDITION,
     }
 
 
@@ -607,13 +606,13 @@ def build_wheels_osx() -> Dict:
 # -------------------------------------------------------------------------
 
 
-def integration_tests_v1(python_version: PythonVersion, *, use_pantsd: bool = False) -> List[Dict]:
+def integration_tests_v1(python_version: PythonVersion) -> List[Dict]:
     num_integration_shards = 7
 
     def make_shard(*, shard_num: int) -> Dict:
         shard = {
             **linux_shard(python_version=python_version),
-            "name": f"Integration tests {'with Pantsd' if use_pantsd else ''} - V1 - shard {shard_num} (Python {python_version.decimal})",
+            "name": f"Integration tests - V1 - shard {shard_num} (Python {python_version.decimal})",
             "script": [
                 (
                     "./build-support/bin/ci.py --integration-tests-v1 --integration-shard "
@@ -622,13 +621,8 @@ def integration_tests_v1(python_version: PythonVersion, *, use_pantsd: bool = Fa
             ],
         }
         safe_append(
-            shard,
-            "env",
-            f"CACHE_NAME=integration.v1.shard_{shard_num}.py{python_version.number}{'.pantsd' if use_pantsd else ''}",
+            shard, "env", f"CACHE_NAME=integration.v1.shard_{shard_num}.py{python_version.number}",
         )
-        if use_pantsd:
-            shard["stage"] = Stage.test_cron.value
-            safe_append(shard, "env", 'USE_PANTSD_FOR_INTEGRATION_TESTS="true"')
         return shard
 
     return [make_shard(shard_num=i) for i in range(num_integration_shards)]
@@ -872,15 +866,13 @@ def main() -> None:
                 "include": [
                     *[bootstrap_linux(v) for v in PythonVersion],
                     *[bootstrap_osx(v) for v in PythonVersion],
-                    {**bootstrap_linux(PythonVersion.py36), "stage": Stage.bootstrap_cron.value},
-                    {**bootstrap_osx(PythonVersion.py36), "stage": Stage.bootstrap_cron.value},
                     *[lint(v) for v in PythonVersion],
                     clippy(),
-                    cargo_audit(),
+                    # TODO: fix Cargo audit. Run `build-support/bin/ci.py --cargo-audit` locally.
+                    # cargo_audit(),
                     *[unit_tests(v) for v in PythonVersion],
                     *[integration_tests_v2(v) for v in PythonVersion],
                     *integration_tests_v1(PythonVersion.py36),
-                    *integration_tests_v1(PythonVersion.py36, use_pantsd=True),
                     *integration_tests_v1(PythonVersion.py37),
                     rust_tests_linux(),
                     rust_tests_osx(),
