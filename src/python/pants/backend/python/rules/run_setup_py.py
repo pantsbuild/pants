@@ -377,7 +377,7 @@ async def run_setup_py(
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> RunSetupPyResult:
     """Run a setup.py command on a single exported target."""
-    merged_input_files = await Get[Digest](
+    input_digest = await Get[Digest](
         MergeDigests((req.chroot.digest, setuptools_setup.requirements_pex.digest))
     )
     # The setuptools dist dir, created by it under the chroot (not to be confused with
@@ -388,7 +388,7 @@ async def run_setup_py(
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path="./setuptools.pex",
         pex_args=("setup.py", *req.args),
-        input_files=merged_input_files,
+        input_digest=input_digest,
         # setuptools commands that create dists write them to the distdir.
         # TODO: Could there be other useful files to capture?
         output_directories=(dist_dir,),

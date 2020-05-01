@@ -50,7 +50,7 @@ async def maybe_extract(extractable: MaybeExtractable) -> ExtractedDigest:
             extraction_cmd_str = " ".join(extraction_cmd)
             proc = Process(
                 argv=("/bin/bash", "-c", f"{extraction_cmd_str}"),
-                input_files=digest,
+                input_digest=digest,
                 description=f"Extract {snapshot.files[0]}",
                 env={"PATH": "/usr/bin:/bin:/usr/local/bin"},
                 output_directories=(output_dir,),

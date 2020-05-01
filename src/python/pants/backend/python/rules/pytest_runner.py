@@ -63,7 +63,7 @@ class PythonTestConfiguration(TestConfiguration):
 class TestTargetSetup:
     test_runner_pex: Pex
     args: Tuple[str, ...]
-    input_files_digest: Digest
+    input_digest: Digest
     timeout_seconds: Optional[int]
     xml_dir: Optional[str]
     junit_family: str
@@ -196,7 +196,7 @@ async def setup_pytest_for_target(
     if run_coverage:
         coverage_config = rest[0]
         digests_to_merge.append(coverage_config.digest)
-    merged_input_files = await Get[Digest](MergeDigests(digests_to_merge))
+    input_digest = await Get[Digest](MergeDigests(digests_to_merge))
 
     coverage_args = []
     if run_coverage:
@@ -212,7 +212,7 @@ async def setup_pytest_for_target(
     return TestTargetSetup(
         test_runner_pex=test_runner_pex,
         args=(*pytest.options.args, *coverage_args, *specified_source_file_names),
-        input_files_digest=merged_input_files,
+        input_digest=input_digest,
         timeout_seconds=config.timeout.calculate_from_global_options(pytest),
         xml_dir=pytest.options.junit_xml_dir,
         junit_family=pytest.options.junit_family,
@@ -246,7 +246,7 @@ async def run_python_test(
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path=f"./{test_setup.test_runner_pex.output_filename}",
         pex_args=test_setup.args,
-        input_files=test_setup.input_files_digest,
+        input_digest=test_setup.input_digest,
         output_directories=tuple(output_dirs) if output_dirs else None,
         description=f"Run Pytest for {config.address.reference()}",
         timeout_seconds=test_setup.timeout_seconds,
@@ -280,7 +280,7 @@ async def debug_python_test(test_setup: TestTargetSetup) -> TestDebugRequest:
     run_request = InteractiveProcessRequest(
         argv=(test_setup.test_runner_pex.output_filename, *test_setup.args),
         run_in_workspace=False,
-        input_files=test_setup.input_files_digest,
+        input_digest=test_setup.input_digest,
     )
     return TestDebugRequest(run_request)
 

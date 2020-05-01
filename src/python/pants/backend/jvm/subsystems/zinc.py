@@ -354,7 +354,7 @@ class Zinc:
         )
         req = Process(
             argv=argv,
-            input_files=inputs_digest,
+            input_digest=inputs_digest,
             output_files=(self._relative_to_buildroot(bridge_jar),),
             description="bootstrap compiler bridge.",
             # Since this is always hermetic, we need to use `underlying_dist`

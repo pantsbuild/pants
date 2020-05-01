@@ -9,7 +9,7 @@ from pants.backend.python.target_types import PythonSources
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.engine.addresses import Addresses
-from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests, RemovePrefix, Snapshot
+from pants.engine.fs import Digest, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import SubsystemRule, named_rule
@@ -37,7 +37,6 @@ async def generate_python_from_protobuf(
         Process(
             (f"/bin/mkdir", output_dir),
             description=f"Create the directory {output_dir}",
-            input_files=EMPTY_DIGEST,
             output_directories=(output_dir,),
         )
     )
@@ -96,7 +95,7 @@ async def generate_python_from_protobuf(
                 output_dir,
                 *stripped_target_sources.snapshot.files,
             ),
-            input_files=input_digest,
+            input_digest=input_digest,
             description=f"Generating Python sources from {request.protocol_target.address}.",
             output_directories=(output_dir,),
         )
