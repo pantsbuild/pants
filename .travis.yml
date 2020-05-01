@@ -238,101 +238,6 @@ jobs:
     - ./build-support/bin/ci-failure.sh
     before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
-    - find build-support -name "*.py[co]" -delete
-    - ./build-support/bin/prune_travis_cache.sh
-    before_install:
-    - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
-    before_script:
-    - ulimit -c unlimited
-    cache:
-      directories:
-      - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT_OSX}
-      - ${HOME}/.cache/pants/rust/cargo
-      - build-support/virtualenvs
-      - src/rust/engine/target
-      timeout: 500
-    dist: xenial
-    env:
-    - CACHE_NAME=bootstrap.linux.py36
-    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    language: python
-    name: Build Linux native engine and pants.pex (Python 3.6)
-    os: linux
-    python:
-    - '2.7'
-    - '3.6'
-    - '3.7'
-    script:
-    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos6:latest"
-      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
-      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
-    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
-      travis_ci:latest sh -c "./build-support/bin/bootstrap_and_deploy_ci_pants_pex.py
-      --python-version 3.6 --aws-bucket ${AWS_BUCKET} --native-engine-so-key-prefix
-      ${NATIVE_ENGINE_SO_KEY_PREFIX} --pex-key ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}"
-    services:
-    - docker
-    stage: Bootstrap Pants (Cron)
-    sudo: required
-  - after_failure:
-    - ./build-support/bin/ci-failure.sh
-    before_cache:
-    - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
-    - find build-support -name "*.py[co]" -delete
-    - ./build-support/bin/prune_travis_cache.sh
-    before_install:
-    - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64
-      -o /usr/local/bin/jq
-    - chmod 755 /usr/local/bin/jq
-    - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY27_VERSION}" "${PYENV_PY36_VERSION}"
-    before_script:
-    - ulimit -c unlimited
-    - ulimit -n 8192
-    cache:
-      directories:
-      - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT_OSX}
-      - ${HOME}/.cache/pants/rust/cargo
-      - build-support/virtualenvs
-      - src/rust/engine/target
-      timeout: 500
-    env:
-    - PATH="/usr/local/opt/openssl/bin:${PATH}"
-    - LDFLAGS="-L/usr/local/opt/openssl/lib"
-    - CPPFLAGS="-I/usr/local/opt/openssl/include"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
-    - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
-    - CACHE_NAME=bootstrap.osx.py36
-    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
-    language: generic
-    name: Build OSX native engine and pants.pex (Python 3.6)
-    os: osx
-    osx_image: xcode8
-    script:
-    - ./build-support/bin/bootstrap_and_deploy_ci_pants_pex.py --python-version 3.6
-      --aws-bucket ${AWS_BUCKET} --native-engine-so-key-prefix ${NATIVE_ENGINE_SO_KEY_PREFIX}
-      --pex-key ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
-    stage: Bootstrap Pants (Cron)
-  - addons:
-      apt:
-        packages:
-        - lib32stdc++6
-        - lib32z1
-        - lib32z1-dev
-        - gcc-multilib
-        - python-dev
-        - openssl
-        - libssl-dev
-        - jq
-        - unzip
-        - shellcheck
-    after_failure:
-    - ./build-support/bin/ci-failure.sh
-    before_cache:
-    - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
     - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete
     - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
     - rm -rf ${HOME}/.ivy2/pants/com.example
@@ -477,30 +382,6 @@ jobs:
     script:
     - ./build-support/bin/ci.py --clippy
     stage: Test Pants
-    sudo: required
-  - before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-    - sudo sysctl fs.inotify.max_user_watches=524288
-    - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
-    - sudo apt-get install -y pkg-config fuse libfuse-dev
-    - sudo modprobe fuse
-    - sudo chmod 666 /dev/fuse
-    - sudo chown root:$USER /etc/fuse.conf
-    dist: xenial
-    env:
-    - CACHE_NAME=cargo_audit
-    if: commit_message !~ /\[ci skip-rust-tests\]/
-    name: Cargo audit
-    os: linux
-    python:
-    - '2.7'
-    - '3.6'
-    - '3.7'
-    script:
-    - ./build-support/bin/ci.py --cargo-audit
-    stage: Test Pants (Cron)
     sudo: required
   - addons:
       apt:
@@ -785,7 +666,7 @@ jobs:
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_0.py36
     language: python
-    name: Integration tests  - V1 - shard 0 (Python 3.6)
+    name: Integration tests - V1 - shard 0 (Python 3.6)
     os: linux
     python:
     - '2.7'
@@ -841,7 +722,7 @@ jobs:
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_1.py36
     language: python
-    name: Integration tests  - V1 - shard 1 (Python 3.6)
+    name: Integration tests - V1 - shard 1 (Python 3.6)
     os: linux
     python:
     - '2.7'
@@ -897,7 +778,7 @@ jobs:
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_2.py36
     language: python
-    name: Integration tests  - V1 - shard 2 (Python 3.6)
+    name: Integration tests - V1 - shard 2 (Python 3.6)
     os: linux
     python:
     - '2.7'
@@ -953,7 +834,7 @@ jobs:
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_3.py36
     language: python
-    name: Integration tests  - V1 - shard 3 (Python 3.6)
+    name: Integration tests - V1 - shard 3 (Python 3.6)
     os: linux
     python:
     - '2.7'
@@ -1009,7 +890,7 @@ jobs:
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_4.py36
     language: python
-    name: Integration tests  - V1 - shard 4 (Python 3.6)
+    name: Integration tests - V1 - shard 4 (Python 3.6)
     os: linux
     python:
     - '2.7'
@@ -1065,7 +946,7 @@ jobs:
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_5.py36
     language: python
-    name: Integration tests  - V1 - shard 5 (Python 3.6)
+    name: Integration tests - V1 - shard 5 (Python 3.6)
     os: linux
     python:
     - '2.7'
@@ -1121,7 +1002,7 @@ jobs:
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_6.py36
     language: python
-    name: Integration tests  - V1 - shard 6 (Python 3.6)
+    name: Integration tests - V1 - shard 6 (Python 3.6)
     os: linux
     python:
     - '2.7'
@@ -1173,411 +1054,12 @@ jobs:
       timeout: 500
     dist: xenial
     env:
-    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
-    - CACHE_NAME=integration.v1.shard_0.py36.pantsd
-    - USE_PANTSD_FOR_INTEGRATION_TESTS="true"
-    language: python
-    name: Integration tests with Pantsd - V1 - shard 0 (Python 3.6)
-    os: linux
-    python:
-    - '2.7'
-    - '3.6'
-    - '3.7'
-    script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 0/7 --python-version
-      3.6
-    stage: Test Pants (Cron)
-    sudo: required
-  - addons:
-      apt:
-        packages:
-        - lib32stdc++6
-        - lib32z1
-        - lib32z1-dev
-        - gcc-multilib
-        - python-dev
-        - openssl
-        - libssl-dev
-        - jq
-        - unzip
-        - shellcheck
-    after_failure:
-    - ./build-support/bin/ci-failure.sh
-    before_cache:
-    - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
-    - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete
-    - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
-    - rm -rf ${HOME}/.ivy2/pants/com.example
-    - du -m -d2 ${HOME}/.cache/pants | sort -r -n
-    - ./build-support/bin/prune_travis_cache.sh
-    before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-    - sudo sysctl fs.inotify.max_user_watches=524288
-    - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
-    before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
-    cache:
-      directories:
-      - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT_OSX}
-      - ${HOME}/.cache/pants/tools
-      - ${HOME}/.cache/pants/zinc
-      - ${HOME}/.ivy2/pants
-      - ${HOME}/.npm
-      timeout: 500
-    dist: xenial
-    env:
-    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
-    - CACHE_NAME=integration.v1.shard_1.py36.pantsd
-    - USE_PANTSD_FOR_INTEGRATION_TESTS="true"
-    language: python
-    name: Integration tests with Pantsd - V1 - shard 1 (Python 3.6)
-    os: linux
-    python:
-    - '2.7'
-    - '3.6'
-    - '3.7'
-    script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 1/7 --python-version
-      3.6
-    stage: Test Pants (Cron)
-    sudo: required
-  - addons:
-      apt:
-        packages:
-        - lib32stdc++6
-        - lib32z1
-        - lib32z1-dev
-        - gcc-multilib
-        - python-dev
-        - openssl
-        - libssl-dev
-        - jq
-        - unzip
-        - shellcheck
-    after_failure:
-    - ./build-support/bin/ci-failure.sh
-    before_cache:
-    - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
-    - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete
-    - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
-    - rm -rf ${HOME}/.ivy2/pants/com.example
-    - du -m -d2 ${HOME}/.cache/pants | sort -r -n
-    - ./build-support/bin/prune_travis_cache.sh
-    before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-    - sudo sysctl fs.inotify.max_user_watches=524288
-    - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
-    before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
-    cache:
-      directories:
-      - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT_OSX}
-      - ${HOME}/.cache/pants/tools
-      - ${HOME}/.cache/pants/zinc
-      - ${HOME}/.ivy2/pants
-      - ${HOME}/.npm
-      timeout: 500
-    dist: xenial
-    env:
-    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
-    - CACHE_NAME=integration.v1.shard_2.py36.pantsd
-    - USE_PANTSD_FOR_INTEGRATION_TESTS="true"
-    language: python
-    name: Integration tests with Pantsd - V1 - shard 2 (Python 3.6)
-    os: linux
-    python:
-    - '2.7'
-    - '3.6'
-    - '3.7'
-    script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 2/7 --python-version
-      3.6
-    stage: Test Pants (Cron)
-    sudo: required
-  - addons:
-      apt:
-        packages:
-        - lib32stdc++6
-        - lib32z1
-        - lib32z1-dev
-        - gcc-multilib
-        - python-dev
-        - openssl
-        - libssl-dev
-        - jq
-        - unzip
-        - shellcheck
-    after_failure:
-    - ./build-support/bin/ci-failure.sh
-    before_cache:
-    - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
-    - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete
-    - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
-    - rm -rf ${HOME}/.ivy2/pants/com.example
-    - du -m -d2 ${HOME}/.cache/pants | sort -r -n
-    - ./build-support/bin/prune_travis_cache.sh
-    before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-    - sudo sysctl fs.inotify.max_user_watches=524288
-    - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
-    before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
-    cache:
-      directories:
-      - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT_OSX}
-      - ${HOME}/.cache/pants/tools
-      - ${HOME}/.cache/pants/zinc
-      - ${HOME}/.ivy2/pants
-      - ${HOME}/.npm
-      timeout: 500
-    dist: xenial
-    env:
-    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
-    - CACHE_NAME=integration.v1.shard_3.py36.pantsd
-    - USE_PANTSD_FOR_INTEGRATION_TESTS="true"
-    language: python
-    name: Integration tests with Pantsd - V1 - shard 3 (Python 3.6)
-    os: linux
-    python:
-    - '2.7'
-    - '3.6'
-    - '3.7'
-    script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 3/7 --python-version
-      3.6
-    stage: Test Pants (Cron)
-    sudo: required
-  - addons:
-      apt:
-        packages:
-        - lib32stdc++6
-        - lib32z1
-        - lib32z1-dev
-        - gcc-multilib
-        - python-dev
-        - openssl
-        - libssl-dev
-        - jq
-        - unzip
-        - shellcheck
-    after_failure:
-    - ./build-support/bin/ci-failure.sh
-    before_cache:
-    - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
-    - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete
-    - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
-    - rm -rf ${HOME}/.ivy2/pants/com.example
-    - du -m -d2 ${HOME}/.cache/pants | sort -r -n
-    - ./build-support/bin/prune_travis_cache.sh
-    before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-    - sudo sysctl fs.inotify.max_user_watches=524288
-    - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
-    before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
-    cache:
-      directories:
-      - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT_OSX}
-      - ${HOME}/.cache/pants/tools
-      - ${HOME}/.cache/pants/zinc
-      - ${HOME}/.ivy2/pants
-      - ${HOME}/.npm
-      timeout: 500
-    dist: xenial
-    env:
-    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
-    - CACHE_NAME=integration.v1.shard_4.py36.pantsd
-    - USE_PANTSD_FOR_INTEGRATION_TESTS="true"
-    language: python
-    name: Integration tests with Pantsd - V1 - shard 4 (Python 3.6)
-    os: linux
-    python:
-    - '2.7'
-    - '3.6'
-    - '3.7'
-    script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 4/7 --python-version
-      3.6
-    stage: Test Pants (Cron)
-    sudo: required
-  - addons:
-      apt:
-        packages:
-        - lib32stdc++6
-        - lib32z1
-        - lib32z1-dev
-        - gcc-multilib
-        - python-dev
-        - openssl
-        - libssl-dev
-        - jq
-        - unzip
-        - shellcheck
-    after_failure:
-    - ./build-support/bin/ci-failure.sh
-    before_cache:
-    - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
-    - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete
-    - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
-    - rm -rf ${HOME}/.ivy2/pants/com.example
-    - du -m -d2 ${HOME}/.cache/pants | sort -r -n
-    - ./build-support/bin/prune_travis_cache.sh
-    before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-    - sudo sysctl fs.inotify.max_user_watches=524288
-    - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
-    before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
-    cache:
-      directories:
-      - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT_OSX}
-      - ${HOME}/.cache/pants/tools
-      - ${HOME}/.cache/pants/zinc
-      - ${HOME}/.ivy2/pants
-      - ${HOME}/.npm
-      timeout: 500
-    dist: xenial
-    env:
-    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
-    - CACHE_NAME=integration.v1.shard_5.py36.pantsd
-    - USE_PANTSD_FOR_INTEGRATION_TESTS="true"
-    language: python
-    name: Integration tests with Pantsd - V1 - shard 5 (Python 3.6)
-    os: linux
-    python:
-    - '2.7'
-    - '3.6'
-    - '3.7'
-    script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 5/7 --python-version
-      3.6
-    stage: Test Pants (Cron)
-    sudo: required
-  - addons:
-      apt:
-        packages:
-        - lib32stdc++6
-        - lib32z1
-        - lib32z1-dev
-        - gcc-multilib
-        - python-dev
-        - openssl
-        - libssl-dev
-        - jq
-        - unzip
-        - shellcheck
-    after_failure:
-    - ./build-support/bin/ci-failure.sh
-    before_cache:
-    - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
-    - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete
-    - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
-    - rm -rf ${HOME}/.ivy2/pants/com.example
-    - du -m -d2 ${HOME}/.cache/pants | sort -r -n
-    - ./build-support/bin/prune_travis_cache.sh
-    before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-    - sudo sysctl fs.inotify.max_user_watches=524288
-    - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
-    before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
-    cache:
-      directories:
-      - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT_OSX}
-      - ${HOME}/.cache/pants/tools
-      - ${HOME}/.cache/pants/zinc
-      - ${HOME}/.ivy2/pants
-      - ${HOME}/.npm
-      timeout: 500
-    dist: xenial
-    env:
-    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
-    - CACHE_NAME=integration.v1.shard_6.py36.pantsd
-    - USE_PANTSD_FOR_INTEGRATION_TESTS="true"
-    language: python
-    name: Integration tests with Pantsd - V1 - shard 6 (Python 3.6)
-    os: linux
-    python:
-    - '2.7'
-    - '3.6'
-    - '3.7'
-    script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 6/7 --python-version
-      3.6
-    stage: Test Pants (Cron)
-    sudo: required
-  - addons:
-      apt:
-        packages:
-        - lib32stdc++6
-        - lib32z1
-        - lib32z1-dev
-        - gcc-multilib
-        - python-dev
-        - openssl
-        - libssl-dev
-        - jq
-        - unzip
-        - shellcheck
-    after_failure:
-    - ./build-support/bin/ci-failure.sh
-    before_cache:
-    - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
-    - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete
-    - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
-    - rm -rf ${HOME}/.ivy2/pants/com.example
-    - du -m -d2 ${HOME}/.cache/pants | sort -r -n
-    - ./build-support/bin/prune_travis_cache.sh
-    before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-    - sudo sysctl fs.inotify.max_user_watches=524288
-    - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
-    before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
-    cache:
-      directories:
-      - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT_OSX}
-      - ${HOME}/.cache/pants/tools
-      - ${HOME}/.cache/pants/zinc
-      - ${HOME}/.ivy2/pants
-      - ${HOME}/.npm
-      timeout: 500
-    dist: xenial
-    env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
     - CACHE_NAME=integration.v1.shard_0.py37
     language: python
-    name: Integration tests  - V1 - shard 0 (Python 3.7)
+    name: Integration tests - V1 - shard 0 (Python 3.7)
     os: linux
     python:
     - '2.7'
@@ -1634,7 +1116,7 @@ jobs:
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
     - CACHE_NAME=integration.v1.shard_1.py37
     language: python
-    name: Integration tests  - V1 - shard 1 (Python 3.7)
+    name: Integration tests - V1 - shard 1 (Python 3.7)
     os: linux
     python:
     - '2.7'
@@ -1691,7 +1173,7 @@ jobs:
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
     - CACHE_NAME=integration.v1.shard_2.py37
     language: python
-    name: Integration tests  - V1 - shard 2 (Python 3.7)
+    name: Integration tests - V1 - shard 2 (Python 3.7)
     os: linux
     python:
     - '2.7'
@@ -1748,7 +1230,7 @@ jobs:
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
     - CACHE_NAME=integration.v1.shard_3.py37
     language: python
-    name: Integration tests  - V1 - shard 3 (Python 3.7)
+    name: Integration tests - V1 - shard 3 (Python 3.7)
     os: linux
     python:
     - '2.7'
@@ -1805,7 +1287,7 @@ jobs:
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
     - CACHE_NAME=integration.v1.shard_4.py37
     language: python
-    name: Integration tests  - V1 - shard 4 (Python 3.7)
+    name: Integration tests - V1 - shard 4 (Python 3.7)
     os: linux
     python:
     - '2.7'
@@ -1862,7 +1344,7 @@ jobs:
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
     - CACHE_NAME=integration.v1.shard_5.py37
     language: python
-    name: Integration tests  - V1 - shard 5 (Python 3.7)
+    name: Integration tests - V1 - shard 5 (Python 3.7)
     os: linux
     python:
     - '2.7'
@@ -1919,7 +1401,7 @@ jobs:
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
     - CACHE_NAME=integration.v1.shard_6.py37
     language: python
-    name: Integration tests  - V1 - shard 6 (Python 3.7)
+    name: Integration tests - V1 - shard 6 (Python 3.7)
     os: linux
     python:
     - '2.7'
