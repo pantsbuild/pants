@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 
 from pants.backend.awslambda.common.awslambda_common_rules import (
-    AWSLambdaConfiguration,
+    AWSLambdaFieldSet,
     CreatedAWSLambda,
 )
 from pants.backend.awslambda.python.lambdex import Lambdex
@@ -43,7 +43,7 @@ from pants.python.python_setup import PythonSetup
 
 
 @dataclass(frozen=True)
-class PythonAwsLambdaConfiguration(AWSLambdaConfiguration):
+class PythonAwsLambdaFieldSet(AWSLambdaFieldSet):
     required_fields = (PythonAwsLambdaHandler, PythonAwsLambdaRuntime)
 
     handler: PythonAwsLambdaHandler
@@ -57,23 +57,23 @@ class LambdexSetup:
 
 @named_rule(desc="Create Python AWS Lambda")
 async def create_python_awslambda(
-    config: PythonAwsLambdaConfiguration,
+    field_set: PythonAwsLambdaFieldSet,
     lambdex_setup: LambdexSetup,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> CreatedAWSLambda:
     # Lambdas typically use the .zip suffix, so we use that instead of .pex.
-    pex_filename = f"{config.address.target_name}.zip"
+    pex_filename = f"{field_set.address.target_name}.zip"
     # We hardcode the platform value to the appropriate one for each AWS Lambda runtime.
     # (Running the "hello world" lambda in the example code will report the platform, and can be
     # used to verify correctness of these platform strings.)
-    py_major, py_minor = config.runtime.to_interpreter_version()
+    py_major, py_minor = field_set.runtime.to_interpreter_version()
     platform = f"manylinux2014_x86_64-cp-{py_major}{py_minor}-cp{py_major}{py_minor}m"
     if (py_major, py_minor) == (2, 7):
         platform += "u"
     pex_request = TwoStepPexFromTargetsRequest(
         PexFromTargetsRequest(
-            addresses=Addresses([config.address]),
+            addresses=Addresses([field_set.address]),
             entry_point=None,
             output_filename=pex_filename,
             platforms=PexPlatforms([platform]),
@@ -86,7 +86,7 @@ async def create_python_awslambda(
     )
 
     # NB: Lambdex modifies its input pex in-place, so the input file is also the output file.
-    lambdex_args = ("build", "-e", config.handler.value, pex_filename)
+    lambdex_args = ("build", "-e", field_set.handler.value, pex_filename)
     process = lambdex_setup.requirements_pex.create_process(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
@@ -102,7 +102,7 @@ async def create_python_awslambda(
     return CreatedAWSLambda(
         digest=result.output_digest,
         name=pex_filename,
-        runtime=config.runtime.value,
+        runtime=field_set.runtime.value,
         handler="lambdex_handler.handler",
     )
 
@@ -126,7 +126,7 @@ def rules():
     return [
         create_python_awslambda,
         setup_lambdex,
-        UnionRule(AWSLambdaConfiguration, PythonAwsLambdaConfiguration),
+        UnionRule(AWSLambdaFieldSet, PythonAwsLambdaFieldSet),
         SubsystemRule(Lambdex),
         *download_pex_bin.rules(),
         *importable_python_sources.rules(),

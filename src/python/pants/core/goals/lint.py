@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from typing import ClassVar, Iterable, Type, TypeVar
 
 from pants.core.util_rules.filter_empty_sources import (
-    ConfigurationsWithSources,
-    ConfigurationsWithSourcesRequest,
+    FieldSetsWithSources,
+    FieldSetsWithSourcesRequest,
 )
 from pants.engine.collection import Collection
 from pants.engine.console import Console
@@ -15,7 +15,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get, MultiGet
-from pants.engine.target import ConfigurationWithOrigin, Sources, TargetsWithOrigins
+from pants.engine.target import FieldSetWithOrigin, Sources, TargetsWithOrigins
 from pants.engine.unions import UnionMembership, union
 
 
@@ -38,21 +38,21 @@ class LintResult:
         )
 
 
-class LinterConfiguration(ConfigurationWithOrigin, metaclass=ABCMeta):
+class LinterFieldSet(FieldSetWithOrigin, metaclass=ABCMeta):
     """The fields necessary for a particular linter to work with a target."""
 
     sources: Sources
 
 
-C = TypeVar("C", bound="LinterConfiguration")
+_FS = TypeVar("_FS", bound="LinterFieldSet")
 
 
 @union
-class LinterConfigurations(Collection[C]):
-    """A collection of Configurations for a particular linter, e.g. a collection of
-    `Flake8Configuration`s."""
+class LinterFieldSets(Collection[_FS]):
+    """A collection of `FieldSet`s for a particular linter, e.g. a collection of
+    `Flake8FieldSet`s."""
 
-    config_type: ClassVar[Type[C]]
+    field_set_type: ClassVar[Type[_FS]]
 
 
 class LintOptions(GoalSubsystem):
@@ -60,7 +60,7 @@ class LintOptions(GoalSubsystem):
 
     name = "lint"
 
-    required_union_implementations = (LinterConfigurations,)
+    required_union_implementations = (LinterFieldSets,)
 
     @classmethod
     def register_options(cls, register) -> None:
@@ -97,43 +97,43 @@ async def lint(
     options: LintOptions,
     union_membership: UnionMembership,
 ) -> Lint:
-    config_collection_types: Iterable[Type[LinterConfigurations]] = union_membership.union_rules[
-        LinterConfigurations
+    field_set_collection_types: Iterable[Type[LinterFieldSets]] = union_membership.union_rules[
+        LinterFieldSets
     ]
 
-    config_collections: Iterable[LinterConfigurations] = tuple(
-        config_collection_type(
-            config_collection_type.config_type.create(target_with_origin)
+    field_set_collections: Iterable[LinterFieldSets] = tuple(
+        field_set_collection_type(
+            field_set_collection_type.field_set_type.create(target_with_origin)
             for target_with_origin in targets_with_origins
-            if config_collection_type.config_type.is_valid(target_with_origin.target)
+            if field_set_collection_type.field_set_type.is_valid(target_with_origin.target)
         )
-        for config_collection_type in config_collection_types
+        for field_set_collection_type in field_set_collection_types
     )
-    config_collections_with_sources: Iterable[ConfigurationsWithSources] = await MultiGet(
-        Get[ConfigurationsWithSources](ConfigurationsWithSourcesRequest(config_collection))
-        for config_collection in config_collections
+    field_set_collections_with_sources: Iterable[FieldSetsWithSources] = await MultiGet(
+        Get[FieldSetsWithSources](FieldSetsWithSourcesRequest(field_set_collection))
+        for field_set_collection in field_set_collections
     )
-    # NB: We must convert back the generic ConfigurationsWithSources objects back into their
-    # corresponding LinterConfigurations, e.g. back to IsortConfigurations, in order for the union
-    # rule to work.
-    valid_config_collections: Iterable[LinterConfigurations] = tuple(
-        config_collection_cls(config_collection)
-        for config_collection_cls, config_collection in zip(
-            config_collection_types, config_collections_with_sources
+    # NB: We must convert back the generic FieldSetsWithSources objects back into their
+    # corresponding LinterFieldSets, e.g. back to IsortFieldSets, in order for the union rule to
+    # work.
+    valid_field_set_collections: Iterable[LinterFieldSets] = tuple(
+        field_set_collection_cls(field_set_collection)
+        for field_set_collection_cls, field_set_collection in zip(
+            field_set_collection_types, field_set_collections_with_sources
         )
-        if config_collection
+        if field_set_collection
     )
 
     if options.values.per_target_caching:
         results = await MultiGet(
-            Get[LintResult](LinterConfigurations, config_collection.__class__([config]))
-            for config_collection in valid_config_collections
-            for config in config_collection
+            Get[LintResult](LinterFieldSets, field_set_collection.__class__([field_set]))
+            for field_set_collection in valid_field_set_collections
+            for field_set in field_set_collection
         )
     else:
         results = await MultiGet(
-            Get[LintResult](LinterConfigurations, config_collection)
-            for config_collection in valid_config_collections
+            Get[LintResult](LinterFieldSets, field_set_collection)
+            for field_set_collection in valid_field_set_collections
         )
 
     if not results:

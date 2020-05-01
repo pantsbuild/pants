@@ -3,7 +3,7 @@
 
 from typing import List, Optional, Tuple
 
-from pants.backend.python.lint.isort.rules import IsortConfiguration, IsortConfigurations
+from pants.backend.python.lint.isort.rules import IsortFieldSet, IsortFieldSets
 from pants.backend.python.lint.isort.rules import rules as isort_rules
 from pants.backend.python.target_types import PythonLibrary
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
@@ -37,7 +37,7 @@ class IsortIntegrationTest(TestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *isort_rules(), RootRule(IsortConfigurations))
+        return (*super().rules(), *isort_rules(), RootRule(IsortFieldSets))
 
     def make_target_with_origin(
         self, source_files: List[FileContent], *, origin: Optional[OriginSpec] = None,
@@ -66,20 +66,21 @@ class IsortIntegrationTest(TestBase):
         if skip:
             args.append(f"--isort-skip")
         options_bootstrapper = create_options_bootstrapper(args=args)
-        configs = [IsortConfiguration.create(tgt) for tgt in targets]
+        field_sets = [IsortFieldSet.create(tgt) for tgt in targets]
         lint_result = self.request_single_product(
-            LintResult, Params(IsortConfigurations(configs), options_bootstrapper)
+            LintResult, Params(IsortFieldSets(field_sets), options_bootstrapper)
         )
         input_snapshot = self.request_single_product(
             SourceFiles,
             Params(
-                AllSourceFilesRequest(config.sources for config in configs), options_bootstrapper
+                AllSourceFilesRequest(field_set.sources for field_set in field_sets),
+                options_bootstrapper,
             ),
         )
         fmt_result = self.request_single_product(
             FmtResult,
             Params(
-                IsortConfigurations(configs, prior_formatter_result=input_snapshot),
+                IsortFieldSets(field_sets, prior_formatter_result=input_snapshot),
                 options_bootstrapper,
             ),
         )
