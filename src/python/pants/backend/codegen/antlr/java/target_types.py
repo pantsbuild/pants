@@ -13,7 +13,7 @@ class AntlrCompiler(StringField):
     """The name of the compiler used to compile the ANTLR files."""
 
     alias = "compiler"
-    valid_choices = ("antlr3", "antlr4")
+    valid_choices = ("antlr3", "antlr4", "antlr4_fork")
     value: str
     default = "antlr3"
 

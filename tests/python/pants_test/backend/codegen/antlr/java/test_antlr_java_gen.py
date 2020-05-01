@@ -165,23 +165,26 @@ class AntlrJavaGenTest(NailgunTaskTestBase):
         self.execute_antlr_test(expected_package)
 
     def test_derived_package_v3(self):
-        self._test_derived_package(None, "3")
+        self._test_derived_package(None, "3", "g3")
 
     def test_derived_package_v4(self):
-        self._test_derived_package(self.PARTS["dir"].replace("/", "."), "4")
+        self._test_derived_package(self.PARTS["dir"].replace("/", "."), "4", "g4")
 
-    def _test_derived_package(self, expected_package, version):
+    def test_derived_package_v4_fork(self):
+        self._test_derived_package(self.PARTS["dir"].replace("/", "."), "4_fork", "g4")
+
+    def _test_derived_package(self, expected_package, compiler_ver, ext):
         self.add_to_build_file(
             self.BUILDFILE,
             dedent(
                 """
                 java_antlr_library(
                   name='{name}',
-                  compiler='antlr{version}',
-                  sources=['{prefix}.g{version}'],
+                  compiler='antlr{compiler_ver}',
+                  sources=['{prefix}.{ext}'],
                 )
                 """.format(
-                    version=version, **self.PARTS
+                    compiler_ver=compiler_ver, ext=ext, **self.PARTS
                 )
             ),
         )
@@ -213,23 +216,30 @@ class AntlrJavaGenTest(NailgunTaskTestBase):
             self.execute(self.create_context())
 
     def test_generated_target_fingerprint_stable_v3(self):
-        self._test_generated_target_fingerprint_stable("3", None)
+        self._test_generated_target_fingerprint_stable("3", "g3", None)
 
     def test_generated_target_fingerprint_stable_v4(self):
-        self._test_generated_target_fingerprint_stable("4", self.PARTS["dir"].replace("/", "."))
+        self._test_generated_target_fingerprint_stable(
+            "4", "g4", self.PARTS["dir"].replace("/", ".")
+        )
 
-    def _test_generated_target_fingerprint_stable(self, version, package):
+    def test_generated_target_fingerprint_stable_v4_fork(self):
+        self._test_generated_target_fingerprint_stable(
+            "4_fork", "g4", self.PARTS["dir"].replace("/", ".")
+        )
+
+    def _test_generated_target_fingerprint_stable(self, compiler_ver, ext, package):
         self.add_to_build_file(
             self.BUILDFILE,
             dedent(
                 """
                 java_antlr_library(
                   name='{name}',
-                  compiler='antlr{version}',
-                  sources=['{prefix}.g{version}'],
+                  compiler='antlr{compiler_ver}',
+                  sources=['{prefix}.{ext}'],
                 )
                 """.format(
-                    version=version, **self.PARTS
+                    compiler_ver=compiler_ver, ext=ext, **self.PARTS
                 )
             ),
         )

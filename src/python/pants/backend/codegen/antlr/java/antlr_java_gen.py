@@ -21,9 +21,17 @@ def antlr4_jar(name):
     return JarDependency(org="org.antlr", name=name, rev="4.1")
 
 
+def antlr4_fork_jar(name):
+    return JarDependency(org="com.tunnelvisionlabs", name=name, rev="4.7.4")
+
+
 _DEFAULT_ANTLR_DEPS = {
     "antlr3": ("//:antlr-3.4", [JarDependency(org="org.antlr", name="antlr", rev="3.4")]),
     "antlr4": ("//:antlr-4", [antlr4_jar(name="antlr4"), antlr4_jar(name="antlr4-runtime")]),
+    "antlr4_fork": (
+        "//:antlr-4",
+        [antlr4_fork_jar(name="antlr4"), antlr4_fork_jar(name="antlr4-runtime")],
+    ),
 }
 
 
@@ -70,7 +78,7 @@ class AntlrJavaGen(SimpleCodegenTask, NailgunTask):
                     "The 'package' attribute is not supported for antlr3 and will be ignored."
                 )
             java_main = "org.antlr.Tool"
-        elif compiler == "antlr4":
+        elif compiler == "antlr4" or compiler == "antlr4_fork":
             args.append("-visitor")  # Generate Parse Tree Visitor As Well
             # Note that this assumes that there is no package set in the antlr file itself,
             # which is considered an ANTLR best practice.

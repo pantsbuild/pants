@@ -9,3 +9,13 @@ jvm_binary(
   ],
   strict_deps=False,
 )
+
+jvm_binary(
+  name="antlr4_fork",
+  sources=['ExampleAntlr4.java'],
+  main='org.pantsbuild.example.antlr4.ExampleAntlr4',
+  dependencies=[
+    'examples/src/antlr/org/pantsbuild/example/exp:exp_antlr4_fork',
+  ],
+  strict_deps=False,
+)

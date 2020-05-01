@@ -22,3 +22,12 @@ class AntlrJavaGenIntegrationTest(PantsRunIntegrationTest):
             args=["7*6"],
         )
         self.assertEqual("42.0", stdout_data.rstrip(), msg=f"got output:{stdout_data}")
+
+    def test_run_antlr4_fork(self):
+        stdout_data = self.bundle_and_run(
+            "examples/src/java/org/pantsbuild/example/antlr4:antlr4_fork",
+            "examples.src.java.org.pantsbuild.example.antlr4.antlr4_fork",
+            bundle_jar_name="antlr4_fork",
+            args=["7*6"],
+        )
+        self.assertEqual("42.0", stdout_data.rstrip(), msg=f"got output:{stdout_data}")

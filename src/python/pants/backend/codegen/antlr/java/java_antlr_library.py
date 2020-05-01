@@ -30,7 +30,7 @@ class JavaAntlrLibrary(JvmTarget):
             the sources are spread among different files, this must be set as the package cannot be
             inferred.
         """
-        if compiler not in ("antlr3", "antlr4"):
+        if compiler not in ("antlr3", "antlr4", "antlr4_fork"):
             raise TargetDefinitionException(
                 self, "Illegal value for 'compiler': {}.".format(compiler)
             )
