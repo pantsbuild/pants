@@ -2136,6 +2136,7 @@ dependencies = [
 name = "process_execution"
 version = "0.0.1"
 dependencies = [
+ "async-trait 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "async_semaphore 0.0.1",
  "bazel_protos 0.0.1",
  "bincode 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",

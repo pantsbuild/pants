@@ -1,8 +1,10 @@
 use log;
 use tempfile;
 
+use async_trait::async_trait;
 use boxfuture::{try_future, BoxFuture, Boxable};
 use fs::{self, GlobExpansionConjunction, GlobMatching, PathGlobs, StrictGlobMatching};
+use futures::compat::Future01CompatExt;
 use futures::future::{FutureExt, TryFutureExt};
 use futures::stream::{BoxStream, StreamExt, TryStreamExt};
 use futures01::{future, Future};
@@ -224,6 +226,7 @@ impl ChildResults {
   }
 }
 
+#[async_trait]
 impl super::CommandRunner for CommandRunner {
   fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
     for compatible_constraint in vec![
@@ -248,23 +251,27 @@ impl super::CommandRunner for CommandRunner {
   ///
   /// TODO: start to create workunits for local process execution
   ///
-  fn run(
+  async fn run(
     &self,
     req: MultiPlatformProcess,
     context: Context,
-  ) -> BoxFuture<FallibleProcessResultWithPlatform, String> {
+  ) -> Result<FallibleProcessResultWithPlatform, String> {
     let req = self.extract_compatible_request(&req).unwrap();
-    self.run_and_capture_workdir(
-      req,
-      context,
-      self.store.clone(),
-      self.executor.clone(),
-      self.cleanup_local_dirs,
-      &self.work_dir_base,
-      self.platform(),
-    )
+    self
+      .run_and_capture_workdir(
+        req,
+        context,
+        self.store.clone(),
+        self.executor.clone(),
+        self.cleanup_local_dirs,
+        &self.work_dir_base,
+        self.platform(),
+      )
+      .compat()
+      .await
   }
 }
+
 impl CapturedWorkdir for CommandRunner {
   fn run_in_workdir<'a, 'b, 'c>(
     &'a self,

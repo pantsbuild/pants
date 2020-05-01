@@ -5,7 +5,6 @@ use crate::{
   CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, Platform,
   PlatformConstraint, Process, RelativePath,
 };
-use futures::compat::Future01CompatExt;
 use hashing::EMPTY_DIGEST;
 use spectral::{assert_that, string::StrAssertions};
 use std;
@@ -819,7 +818,7 @@ async fn run_command_locally_in_dir(
   let store =
     store.unwrap_or_else(|| Store::local_only(executor.clone(), store_dir.path()).unwrap());
   let runner = crate::local::CommandRunner::new(store, executor.clone(), dir, cleanup);
-  runner.run(req.into(), Context::default()).compat().await
+  runner.run(req.into(), Context::default()).await
 }
 
 fn one_second() -> Option<Duration> {
