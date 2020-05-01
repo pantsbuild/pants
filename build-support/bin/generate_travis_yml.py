@@ -277,14 +277,15 @@ def _linux_before_install(
         "./build-support/bin/install_aws_cli_for_ci.sh",
         # TODO(John Sirois): Get rid of this in favor of explicitly adding pyenv versions to the PATH:
         #   https://github.com/pantsbuild/pants/issues/7601
-        "pyenv global 2.7.15 3.6.7 3.7.1",
+        "pyenv global 2.7.17 3.6.10 3.7.6",
     ]
     if install_travis_wait:
         commands.extend(
             [
                 (
-                    'wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2'
-                    '.1_linux_x86_64.tar.gz" | tar -zxvf - travis-wait-enhanced'
+                    'wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download'
+                    '/v1.1.0/travis-wait-enhanced_1.1.0_linux_x86_64.tar.gz" | tar -zxvf - '
+                    'travis-wait-enhanced'
                 ),
                 "mv travis-wait-enhanced /home/travis/bin/",
             ]
@@ -310,7 +311,7 @@ def linux_shard(
         raise ValueError("Must provide the Python version if using a test config.")
     setup = {
         "os": "linux",
-        "dist": "xenial",
+        "dist": "bionic",
         "python": ["2.7", "3.6", "3.7"],
         "addons": {
             "apt": {
@@ -357,7 +358,7 @@ def linux_shard(
 def linux_fuse_shard() -> Dict:
     return {
         "os": "linux",
-        "dist": "xenial",
+        "dist": "bionic",
         "python": ["2.7", "3.6", "3.7"],
         "before_install": _linux_before_install()
         + [

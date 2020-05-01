@@ -52,7 +52,7 @@ jobs:
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.17 3.6.10 3.7.6
     before_script:
     - ulimit -c unlimited
     cache:
@@ -63,7 +63,7 @@ jobs:
       - build-support/virtualenvs
       - src/rust/engine/target
       timeout: 500
-    dist: xenial
+    dist: bionic
     env:
     - CACHE_NAME=bootstrap.linux.py36
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
@@ -106,7 +106,7 @@ jobs:
     - ./build-support/bin/prune_travis_cache.sh
     before_install:
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.17 3.6.10 3.7.6
     before_script:
     - ulimit -c unlimited
     cache:
@@ -117,7 +117,7 @@ jobs:
       - build-support/virtualenvs
       - src/rust/engine/target
       timeout: 500
-    dist: xenial
+    dist: bionic
     env:
     - CACHE_NAME=bootstrap.linux.py37
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
@@ -246,8 +246,8 @@ jobs:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
-    - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
+    - pyenv global 2.7.17 3.6.10 3.7.6
+    - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v1.1.0/travis-wait-enhanced_1.1.0_linux_x86_64.tar.gz"
       | tar -zxvf - travis-wait-enhanced
     - mv travis-wait-enhanced /home/travis/bin/
     before_script:
@@ -261,7 +261,7 @@ jobs:
       - ${HOME}/.ivy2/pants
       - ${HOME}/.npm
       timeout: 500
-    dist: xenial
+    dist: bionic
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
@@ -306,8 +306,8 @@ jobs:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
-    - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
+    - pyenv global 2.7.17 3.6.10 3.7.6
+    - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v1.1.0/travis-wait-enhanced_1.1.0_linux_x86_64.tar.gz"
       | tar -zxvf - travis-wait-enhanced
     - mv travis-wait-enhanced /home/travis/bin/
     before_script:
@@ -321,7 +321,7 @@ jobs:
       - ${HOME}/.ivy2/pants
       - ${HOME}/.npm
       timeout: 500
-    dist: xenial
+    dist: bionic
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
@@ -349,7 +349,7 @@ jobs:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.17 3.6.10 3.7.6
     - sudo apt-get install -y pkg-config fuse libfuse-dev
     - sudo modprobe fuse
     - sudo chmod 666 /dev/fuse
@@ -365,7 +365,7 @@ jobs:
       - build-support/virtualenvs
       - src/rust/engine/target
       timeout: 500
-    dist: xenial
+    dist: bionic
     env:
     - CACHE_NAME=clippy
     if: commit_message !~ /\[ci skip-rust-tests\]/
@@ -405,8 +405,8 @@ jobs:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
-    - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
+    - pyenv global 2.7.17 3.6.10 3.7.6
+    - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v1.1.0/travis-wait-enhanced_1.1.0_linux_x86_64.tar.gz"
       | tar -zxvf - travis-wait-enhanced
     - mv travis-wait-enhanced /home/travis/bin/
     before_script:
@@ -420,7 +420,7 @@ jobs:
       - ${HOME}/.ivy2/pants
       - ${HOME}/.npm
       timeout: 500
-    dist: xenial
+    dist: bionic
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
@@ -463,8 +463,8 @@ jobs:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
-    - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
+    - pyenv global 2.7.17 3.6.10 3.7.6
+    - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v1.1.0/travis-wait-enhanced_1.1.0_linux_x86_64.tar.gz"
       | tar -zxvf - travis-wait-enhanced
     - mv travis-wait-enhanced /home/travis/bin/
     before_script:
@@ -478,7 +478,7 @@ jobs:
       - ${HOME}/.ivy2/pants
       - ${HOME}/.npm
       timeout: 500
-    dist: xenial
+    dist: bionic
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
@@ -522,8 +522,8 @@ jobs:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
-    - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
+    - pyenv global 2.7.17 3.6.10 3.7.6
+    - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v1.1.0/travis-wait-enhanced_1.1.0_linux_x86_64.tar.gz"
       | tar -zxvf - travis-wait-enhanced
     - mv travis-wait-enhanced /home/travis/bin/
     before_script:
@@ -537,7 +537,7 @@ jobs:
       - ${HOME}/.ivy2/pants
       - ${HOME}/.npm
       timeout: 500
-    dist: xenial
+    dist: bionic
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
@@ -580,8 +580,8 @@ jobs:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
-    - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2.1_linux_x86_64.tar.gz"
+    - pyenv global 2.7.17 3.6.10 3.7.6
+    - wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v1.1.0/travis-wait-enhanced_1.1.0_linux_x86_64.tar.gz"
       | tar -zxvf - travis-wait-enhanced
     - mv travis-wait-enhanced /home/travis/bin/
     before_script:
@@ -595,7 +595,7 @@ jobs:
       - ${HOME}/.ivy2/pants
       - ${HOME}/.npm
       timeout: 500
-    dist: xenial
+    dist: bionic
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
@@ -639,7 +639,7 @@ jobs:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.17 3.6.10 3.7.6
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
@@ -651,7 +651,7 @@ jobs:
       - ${HOME}/.ivy2/pants
       - ${HOME}/.npm
       timeout: 500
-    dist: xenial
+    dist: bionic
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
@@ -694,7 +694,7 @@ jobs:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.17 3.6.10 3.7.6
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
@@ -706,7 +706,7 @@ jobs:
       - ${HOME}/.ivy2/pants
       - ${HOME}/.npm
       timeout: 500
-    dist: xenial
+    dist: bionic
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
@@ -749,7 +749,7 @@ jobs:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.17 3.6.10 3.7.6
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
@@ -761,7 +761,7 @@ jobs:
       - ${HOME}/.ivy2/pants
       - ${HOME}/.npm
       timeout: 500
-    dist: xenial
+    dist: bionic
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
@@ -804,7 +804,7 @@ jobs:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.17 3.6.10 3.7.6
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
@@ -816,7 +816,7 @@ jobs:
       - ${HOME}/.ivy2/pants
       - ${HOME}/.npm
       timeout: 500
-    dist: xenial
+    dist: bionic
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
@@ -859,7 +859,7 @@ jobs:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.17 3.6.10 3.7.6
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
@@ -871,7 +871,7 @@ jobs:
       - ${HOME}/.ivy2/pants
       - ${HOME}/.npm
       timeout: 500
-    dist: xenial
+    dist: bionic
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
@@ -914,7 +914,7 @@ jobs:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.17 3.6.10 3.7.6
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
@@ -926,7 +926,7 @@ jobs:
       - ${HOME}/.ivy2/pants
       - ${HOME}/.npm
       timeout: 500
-    dist: xenial
+    dist: bionic
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
@@ -969,7 +969,7 @@ jobs:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.17 3.6.10 3.7.6
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
@@ -981,7 +981,7 @@ jobs:
       - ${HOME}/.ivy2/pants
       - ${HOME}/.npm
       timeout: 500
-    dist: xenial
+    dist: bionic
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
@@ -1024,7 +1024,7 @@ jobs:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.17 3.6.10 3.7.6
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
@@ -1036,7 +1036,7 @@ jobs:
       - ${HOME}/.ivy2/pants
       - ${HOME}/.npm
       timeout: 500
-    dist: xenial
+    dist: bionic
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
@@ -1080,7 +1080,7 @@ jobs:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.17 3.6.10 3.7.6
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
@@ -1092,7 +1092,7 @@ jobs:
       - ${HOME}/.ivy2/pants
       - ${HOME}/.npm
       timeout: 500
-    dist: xenial
+    dist: bionic
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
@@ -1136,7 +1136,7 @@ jobs:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.17 3.6.10 3.7.6
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
@@ -1148,7 +1148,7 @@ jobs:
       - ${HOME}/.ivy2/pants
       - ${HOME}/.npm
       timeout: 500
-    dist: xenial
+    dist: bionic
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
@@ -1192,7 +1192,7 @@ jobs:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.17 3.6.10 3.7.6
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
@@ -1204,7 +1204,7 @@ jobs:
       - ${HOME}/.ivy2/pants
       - ${HOME}/.npm
       timeout: 500
-    dist: xenial
+    dist: bionic
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
@@ -1248,7 +1248,7 @@ jobs:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.17 3.6.10 3.7.6
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
@@ -1260,7 +1260,7 @@ jobs:
       - ${HOME}/.ivy2/pants
       - ${HOME}/.npm
       timeout: 500
-    dist: xenial
+    dist: bionic
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
@@ -1304,7 +1304,7 @@ jobs:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.17 3.6.10 3.7.6
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
@@ -1316,7 +1316,7 @@ jobs:
       - ${HOME}/.ivy2/pants
       - ${HOME}/.npm
       timeout: 500
-    dist: xenial
+    dist: bionic
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
@@ -1360,7 +1360,7 @@ jobs:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.17 3.6.10 3.7.6
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     cache:
@@ -1372,7 +1372,7 @@ jobs:
       - ${HOME}/.ivy2/pants
       - ${HOME}/.npm
       timeout: 500
-    dist: xenial
+    dist: bionic
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
@@ -1398,7 +1398,7 @@ jobs:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.17 3.6.10 3.7.6
     - sudo apt-get install -y pkg-config fuse libfuse-dev
     - sudo modprobe fuse
     - sudo chmod 666 /dev/fuse
@@ -1414,7 +1414,7 @@ jobs:
       - build-support/virtualenvs
       - src/rust/engine/target
       timeout: 500
-    dist: xenial
+    dist: bionic
     env:
     - CACHE_NAME=rust_tests.linux
     - PREPARE_DEPLOY=1
@@ -1490,7 +1490,7 @@ jobs:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.17 3.6.10 3.7.6
     before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     - ulimit -c unlimited
@@ -1503,7 +1503,7 @@ jobs:
       - ${HOME}/.ivy2/pants
       - ${HOME}/.npm
       timeout: 500
-    dist: xenial
+    dist: bionic
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
@@ -1730,7 +1730,7 @@ jobs:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.17 3.6.10 3.7.6
     - sudo apt-get install -y pkg-config fuse libfuse-dev
     - sudo modprobe fuse
     - sudo chmod 666 /dev/fuse
@@ -1746,7 +1746,7 @@ jobs:
       - ${HOME}/.ivy2/pants
       - ${HOME}/.npm
       timeout: 500
-    dist: xenial
+    dist: bionic
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
@@ -1789,7 +1789,7 @@ jobs:
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
+    - pyenv global 2.7.17 3.6.10 3.7.6
     - sudo apt-get install -y pkg-config fuse libfuse-dev
     - sudo modprobe fuse
     - sudo chmod 666 /dev/fuse
@@ -1805,7 +1805,7 @@ jobs:
       - ${HOME}/.ivy2/pants
       - ${HOME}/.npm
       timeout: 500
-    dist: xenial
+    dist: bionic
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
