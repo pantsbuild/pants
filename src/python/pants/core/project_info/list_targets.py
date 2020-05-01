@@ -12,7 +12,7 @@ from pants.engine.target import DescriptionField, ProvidesField, Targets
 
 
 class ListOptions(LineOriented, GoalSubsystem):
-    """Lists all targets."""
+    """Lists all targets matching the file or target arguments."""
 
     name = "list-v2"
 
