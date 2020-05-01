@@ -20,6 +20,7 @@ from pants.backend.python.rules.pex import (
 )
 from pants.backend.python.rules.pex import rules as pex_rules
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
+from pants.core.util_rules import archive, external_tool
 from pants.engine.fs import Digest, DirectoryToMaterialize, FileContent, InputFilesContent
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import RootRule
@@ -161,6 +162,8 @@ class PexTest(TestBase):
             *super().rules(),
             *pex_rules(),
             *download_pex_bin.rules(),
+            *archive.rules(),
+            *external_tool.rules(),
             *python_native_code.rules(),
             *subprocess_environment.rules(),
             RootRule(PexRequest),
