@@ -41,7 +41,7 @@ class TargetTypesOptions(LineOriented, GoalSubsystem):
         register(
             "--details",
             type=str,
-            metavar="target_type",
+            metavar="<target_type>",
             help="List all of the target type's registered fields.",
         )
 

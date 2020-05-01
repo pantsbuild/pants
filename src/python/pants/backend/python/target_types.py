@@ -42,8 +42,9 @@ class PythonInterpreterCompatibility(StringOrStringSequenceField):
     """A string for Python interpreter constraints on this target.
 
     This should be written in Requirement-style format, e.g. `CPython==2.7.*` or `CPython>=3.6,<4`.
-
     As a shortcut, you can leave off `CPython`, e.g. `>=2.7` will be expanded to `CPython>=2.7`.
+
+    If this is left off, this will default to `--python-setup-interpreter-constraints`.
     """
 
     alias = "compatibility"
@@ -133,13 +134,22 @@ class PythonApp(Target):
 
 
 class PythonBinarySources(PythonSources):
+    """A single file containing the executable, such as ['app.py'].
+
+    You can leave this off if you include the executable file in one of this target's
+    `dependencies` and explicitly set this target's `entry_point`.
+
+    This must have 0 or 1 files, but no more. If you depend on more files, put them in a
+    `python_library` target and include that target in the `dependencies` field.
+    """
+
     expected_num_files = range(0, 2)
 
 
 class PythonEntryPoint(StringField):
     """The default entry point for the binary.
 
-    If omitted, Pants will try to infer the entry point by looking at the `source` argument for a
+    If omitted, Pants will try to infer the entry point by looking at the `sources` argument for a
     `__main__` function.
     """
 
@@ -147,7 +157,7 @@ class PythonEntryPoint(StringField):
 
 
 class PythonPlatforms(StringOrStringSequenceField):
-    """Extra platforms to target when building a Python binary.
+    """The platforms the built PEX should be compatible with.
 
     This defaults to the current platform, but can be overridden to different platforms. You can
     give a list of multiple platforms to create a multiplatform PEX.
@@ -194,7 +204,7 @@ class PexZipSafe(BoolField):
 
 
 class PexAlwaysWriteCache(BoolField):
-    """Whether Pex should always write the .deps cache of the Pex file to disk or not.
+    """Whether PEX should always write the .deps cache of the .pex file to disk or not.
 
     This can use less memory in RAM constrained environments.
     """
@@ -204,14 +214,14 @@ class PexAlwaysWriteCache(BoolField):
 
 
 class PexIgnoreErrors(BoolField):
-    """Should we ignore when Pex cannot resolve dependencies?"""
+    """Should we ignore when PEX cannot resolve dependencies?"""
 
     alias = "ignore_errors"
     default = False
 
 
 class PexShebang(StringField):
-    """For the generated Pex, use this shebang."""
+    """For the generated PEX, use this shebang."""
 
     alias = "shebang"
 
@@ -220,18 +230,18 @@ class PexShebang(StringField):
 #  How would that work with the Target API? Likely, make this an AsyncField and in the rule
 #  request the corresponding subsystem. For now, we ignore the option.
 class PexEmitWarnings(BoolField):
-    """Whether or not to emit Pex warnings at runtime."""
+    """Whether or not to emit PEX warnings at runtime."""
 
     alias = "emit_warnings"
     default = True
 
 
 class PythonBinary(Target):
-    """A Python target that can be converted into an executable Pex file.
+    """A Python target that can be converted into an executable PEX file.
 
-    Pex files are self-contained executable files that contain a complete Python
-    environment capable of running the target. For more information about Pex files, see
-    http://pantsbuild.github.io/python-readme.html#how-pex-files-work.
+    PEX files are self-contained executable files that contain a complete Python environment capable
+    of running the target. For more information about PEX files, see
+    https://pants.readme.io/docs/pex-files.
     """
 
     alias = "python_binary"
@@ -275,7 +285,11 @@ class PythonTestsSources(PythonSources):
 
 
 class PythonCoverage(StringOrStringSequenceField):
-    """The module(s) whose coverage should be generated, e.g. `['pants.util']`."""
+    """A list of the module(s) you expect for this test target to cover.
+
+    Usually, Pants and pytest-cov can auto-discover this if your tests are located in the same
+    folder as the `python_library` code, but this is useful if the tests are not collocated.
+    """
 
     alias = "coverage"
 
@@ -307,7 +321,7 @@ class PythonCoverage(StringOrStringSequenceField):
 class PythonTestsTimeout(IntField):
     """A timeout (in seconds) which covers the total runtime of all tests in this target.
 
-    This only applies if `--pytest-timeouts` is set to True.
+    This only applies if the option `--pytest-timeouts` is set to True.
     """
 
     alias = "timeout"
@@ -338,7 +352,10 @@ class PythonTestsTimeout(IntField):
 
 
 class PythonTests(Target):
-    """Python tests (either Pytest-style or unittest style)."""
+    """Python tests.
+
+    These may be written in either Pytest-style or unittest style.
+    """
 
     alias = "python_tests"
     core_fields = (*COMMON_PYTHON_FIELDS, PythonTestsSources, PythonCoverage, PythonTestsTimeout)
@@ -384,7 +401,15 @@ class PythonDistribution(Target):
 
 
 class PythonRequirementsField(SequenceField):
-    """A sequence of `python_requirement` objects."""
+    """A sequence of `python_requirement` objects.
+
+    For example:
+
+        requirements = [
+            python_requirement('dep1==1.8'),
+            python_requirement('dep2>=3.0,<3.1'),
+        ]
+    """
 
     alias = "requirements"
     expected_element_type = PythonRequirement
@@ -402,7 +427,13 @@ class PythonRequirementsField(SequenceField):
 
 
 class PythonRequirementLibrary(Target):
-    """A set of Pip requirements."""
+    """A set of Pip requirements.
+
+    This target is useful when you want to declare Python requirements inline in a BUILD file. If
+    you have a `requirements.txt` file already, you can instead use the macro
+    `python_requirements()` to convert each requirement into a `python_requirement_library()` target
+    automatically.
+    """
 
     alias = "python_requirement_library"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, PythonRequirementsField)
