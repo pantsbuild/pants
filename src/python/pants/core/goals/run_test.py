@@ -5,15 +5,15 @@ from typing import cast
 
 from pants.base.build_root import BuildRoot
 from pants.base.specs import SingleAddress
-from pants.core.goals.binary import BinaryConfiguration, CreatedBinary
+from pants.core.goals.binary import BinaryFieldSet, CreatedBinary
 from pants.core.goals.run import Run, RunOptions, run
 from pants.engine.addresses import Address
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Workspace
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.target import (
     Target,
-    TargetsToValidConfigurations,
-    TargetsToValidConfigurationsRequest,
+    TargetsToValidFieldSets,
+    TargetsToValidFieldSetsRequest,
     TargetWithOrigin,
 )
 from pants.option.global_options import GlobalOptions
@@ -41,7 +41,7 @@ class RunTest(TestBase):
         workspace = Workspace(self.scheduler)
         interactive_runner = InteractiveRunner(self.scheduler)
 
-        class TestBinaryConfiguration(BinaryConfiguration):
+        class TestBinaryFieldSet(BinaryFieldSet):
             required_fields = ()
 
         class TestBinaryTarget(Target):
@@ -53,7 +53,7 @@ class RunTest(TestBase):
         target_with_origin = TargetWithOrigin(
             target, SingleAddress(address.spec_path, address.target_name)
         )
-        config = TestBinaryConfiguration.create(target)
+        field_set = TestBinaryFieldSet.create(target)
 
         res = run_rule(
             run,
@@ -67,13 +67,13 @@ class RunTest(TestBase):
             ],
             mock_gets=[
                 MockGet(
-                    product_type=TargetsToValidConfigurations,
-                    subject_type=TargetsToValidConfigurationsRequest,
-                    mock=lambda _: TargetsToValidConfigurations({target_with_origin: [config]}),
+                    product_type=TargetsToValidFieldSets,
+                    subject_type=TargetsToValidFieldSetsRequest,
+                    mock=lambda _: TargetsToValidFieldSets({target_with_origin: [field_set]}),
                 ),
                 MockGet(
                     product_type=CreatedBinary,
-                    subject_type=TestBinaryConfiguration,
+                    subject_type=TestBinaryFieldSet,
                     mock=lambda _: self.create_mock_binary(program_text),
                 ),
             ],

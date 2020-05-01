@@ -13,37 +13,37 @@ from pants.engine.target import Sources as SourcesField
 from pants.engine.target import Target
 
 
-# This protocol allows us to work with any arbitrary Configuration. See
+# This protocol allows us to work with any arbitrary FieldSet. See
 # https://mypy.readthedocs.io/en/stable/protocols.html.
-class ConfigurationWithSources(Protocol):
+class FieldSetWithSources(Protocol):
     @property
     def sources(self) -> SourcesField:
         ...
 
 
-C = TypeVar("C", bound=ConfigurationWithSources)
+_FS = TypeVar("_FS", bound=FieldSetWithSources)
 
 
-class ConfigurationsWithSources(Collection[C]):
-    """Configurations which have non-empty source fields."""
+class FieldSetsWithSources(Collection[_FS]):
+    """Field sets which have non-empty source fields."""
 
 
-class ConfigurationsWithSourcesRequest(Collection[C]):
-    """Request to filter out all configs with empty source fields.
+class FieldSetsWithSourcesRequest(Collection[_FS]):
+    """Request to filter out all field sets with empty source fields.
 
-    This works with any Configurations, so long as they have a `sources` field defined.
+    This works with any FieldSet, so long as it has a `sources` field defined.
     """
 
 
 @rule
-async def determine_configurations_with_sources(
-    request: ConfigurationsWithSourcesRequest,
-) -> ConfigurationsWithSources:
+async def determine_field_sets_with_sources(
+    request: FieldSetsWithSourcesRequest,
+) -> FieldSetsWithSources:
     all_sources = await MultiGet(
-        Get[HydratedSources](HydrateSourcesRequest(config.sources)) for config in request
+        Get[HydratedSources](HydrateSourcesRequest(field_set.sources)) for field_set in request
     )
-    return ConfigurationsWithSources(
-        config for config, sources in zip(request, all_sources) if sources.snapshot.files
+    return FieldSetsWithSources(
+        field_set for field_set, sources in zip(request, all_sources) if sources.snapshot.files
     )
 
 
@@ -67,8 +67,8 @@ async def determine_targets_with_sources(request: TargetsWithSourcesRequest) -> 
 
 def rules():
     return [
-        determine_configurations_with_sources,
+        determine_field_sets_with_sources,
         determine_targets_with_sources,
-        RootRule(ConfigurationsWithSourcesRequest),
+        RootRule(FieldSetsWithSourcesRequest),
         RootRule(TargetsWithSourcesRequest),
     ]

@@ -583,12 +583,12 @@ class RegisteredTargetTypes:
 
 
 # -----------------------------------------------------------------------------------------------
-# Configuration
+# FieldSet
 # -----------------------------------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
-class _AbstractConfiguration(ABC):
+class _AbstractFieldSet(ABC):
     required_fields: ClassVar[Tuple[Type[Field], ...]]
 
     address: Address
@@ -610,28 +610,26 @@ class _AbstractConfiguration(ABC):
         )
 
 
-def _get_config_fields_from_target(
-    configuration: Type[_AbstractConfiguration], target: Target
+def _get_field_set_fields_from_target(
+    field_set: Type[_AbstractFieldSet], target: Target
 ) -> Dict[str, Field]:
     all_expected_fields: Dict[str, Type[Field]] = {
         dataclass_field.name: dataclass_field.type
-        for dataclass_field in dataclasses.fields(configuration)
+        for dataclass_field in dataclasses.fields(field_set)
         if isinstance(dataclass_field.type, type) and issubclass(dataclass_field.type, Field)  # type: ignore[unreachable]
     }
     return {
         dataclass_field_name: (
-            target[field_cls]
-            if field_cls in configuration.required_fields
-            else target.get(field_cls)
+            target[field_cls] if field_cls in field_set.required_fields else target.get(field_cls)
         )
         for dataclass_field_name, field_cls in all_expected_fields.items()
     }
 
 
-_C = TypeVar("_C", bound="Configuration")
+_FS = TypeVar("_FS", bound="FieldSet")
 
 
-class Configuration(_AbstractConfiguration, metaclass=ABCMeta):
+class FieldSet(_AbstractFieldSet, metaclass=ABCMeta):
     """An ad hoc set of fields from a target which are used by rules.
 
     Subclasses should declare all the fields they consume as dataclass attributes. They should also
@@ -644,73 +642,71 @@ class Configuration(_AbstractConfiguration, metaclass=ABCMeta):
     For example:
 
         @dataclass(frozen=True)
-        class FortranTestConfiguration(Configuration):
+        class FortranTestFieldSet(FieldSet):
             required_fields = (FortranSources,)
 
             sources: FortranSources
             fortran_version: FortranVersion
 
-    This configuration may then created from a `Target` through the `is_valid()` and `create()`
+    This field set may then created from a `Target` through the `is_valid()` and `create()`
     class methods:
 
-        configs = [
-            FortranTestConfiguration.create(tgt) for tgt in targets
-            if FortranTestConfiguration.is_valid(tgt)
+        field_sets = [
+            FortranTestFieldSet.create(tgt) for tgt in targets
+            if FortranTestFieldSet.is_valid(tgt)
         ]
 
-    Configurations are consumed like any normal dataclass:
+    FieldSets are consumed like any normal dataclass:
 
-        print(config.address)
-        print(config.sources)
+        print(field_set.address)
+        print(field_set.sources)
     """
 
     @classmethod
-    def create(cls: Type[_C], tgt: Target) -> _C:
+    def create(cls: Type[_FS], tgt: Target) -> _FS:
         return cls(  # type: ignore[call-arg]
-            address=tgt.address, **_get_config_fields_from_target(cls, tgt)
+            address=tgt.address, **_get_field_set_fields_from_target(cls, tgt)
         )
 
 
-_CWO = TypeVar("_CWO", bound="ConfigurationWithOrigin")
+_FSWO = TypeVar("_FSWO", bound="FieldSetWithOrigin")
 
 
 @dataclass(frozen=True)
-class ConfigurationWithOrigin(_AbstractConfiguration, metaclass=ABCMeta):
+class FieldSetWithOrigin(_AbstractFieldSet, metaclass=ABCMeta):
     """An ad hoc set of fields from a target which are used by rules, along with the original spec
     used to find the original target.
 
-    See Configuration for documentation on how subclasses should use this base class.
+    See FieldSet for documentation on how subclasses should use this base class.
     """
 
     origin: OriginSpec
 
     @classmethod
-    def create(cls: Type[_CWO], target_with_origin: TargetWithOrigin) -> _CWO:
+    def create(cls: Type[_FSWO], target_with_origin: TargetWithOrigin) -> _FSWO:
         tgt = target_with_origin.target
         return cls(  # type: ignore[call-arg]
             address=tgt.address,
             origin=target_with_origin.origin,
-            **_get_config_fields_from_target(cls, tgt),
+            **_get_field_set_fields_from_target(cls, tgt),
         )
 
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class TargetsToValidConfigurations:
-    mapping: FrozenDict[TargetWithOrigin, Tuple[_AbstractConfiguration, ...]]
+class TargetsToValidFieldSets:
+    mapping: FrozenDict[TargetWithOrigin, Tuple[_AbstractFieldSet, ...]]
 
-    def __init__(
-        self, mapping: Mapping[TargetWithOrigin, Iterable[_AbstractConfiguration]]
-    ) -> None:
+    def __init__(self, mapping: Mapping[TargetWithOrigin, Iterable[_AbstractFieldSet]]) -> None:
         self.mapping = FrozenDict(
-            {tgt_with_origin: tuple(configs) for tgt_with_origin, configs in mapping.items()}
+            {tgt_with_origin: tuple(field_sets) for tgt_with_origin, field_sets in mapping.items()}
         )
 
     @memoized_property
-    def configurations(self) -> Tuple[_AbstractConfiguration, ...]:
+    def field_sets(self) -> Tuple[_AbstractFieldSet, ...]:
         return tuple(
             itertools.chain.from_iterable(
-                configs_per_target for configs_per_target in self.mapping.values()
+                field_sets_per_target for field_sets_per_target in self.mapping.values()
             )
         )
 
@@ -725,67 +721,67 @@ class TargetsToValidConfigurations:
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class TargetsToValidConfigurationsRequest:
-    configuration_superclass: Type[_AbstractConfiguration]
+class TargetsToValidFieldSetsRequest:
+    field_set_superclass: Type[_AbstractFieldSet]
     goal_description: str
     error_if_no_valid_targets: bool
-    expect_single_config: bool
+    expect_single_field_set: bool
     # TODO: Add a `require_sources` field. To do this, figure out the dependency cycle with
     #  `util_rules/filter_empty_sources.py`.
 
     def __init__(
         self,
-        configuration_superclass: Type[_AbstractConfiguration],
+        field_set_superclass: Type[_AbstractFieldSet],
         *,
         goal_description: str,
         error_if_no_valid_targets: bool,
-        expect_single_config: bool = False,
+        expect_single_field_set: bool = False,
     ) -> None:
-        self.configuration_superclass = configuration_superclass
+        self.field_set_superclass = field_set_superclass
         self.goal_description = goal_description
         self.error_if_no_valid_targets = error_if_no_valid_targets
-        self.expect_single_config = expect_single_config
+        self.expect_single_field_set = expect_single_field_set
 
 
 @rule
-def find_valid_configurations(
-    request: TargetsToValidConfigurationsRequest,
+def find_valid_field_sets(
+    request: TargetsToValidFieldSetsRequest,
     targets_with_origins: TargetsWithOrigins,
     union_membership: UnionMembership,
     registered_target_types: RegisteredTargetTypes,
-) -> TargetsToValidConfigurations:
-    config_types: Iterable[
-        Union[Type[Configuration], Type[ConfigurationWithOrigin]]
-    ] = union_membership.union_rules[request.configuration_superclass]
-    targets_to_valid_configs = {}
+) -> TargetsToValidFieldSets:
+    field_set_types: Iterable[
+        Union[Type[FieldSet], Type[FieldSetWithOrigin]]
+    ] = union_membership.union_rules[request.field_set_superclass]
+    targets_to_valid_field_sets = {}
     for tgt_with_origin in targets_with_origins:
-        valid_configs = [
+        valid_field_sets = [
             (
-                config_type.create(tgt_with_origin)
-                if issubclass(config_type, ConfigurationWithOrigin)
-                else config_type.create(tgt_with_origin.target)
+                field_set_type.create(tgt_with_origin)
+                if issubclass(field_set_type, FieldSetWithOrigin)
+                else field_set_type.create(tgt_with_origin.target)
             )
-            for config_type in config_types
-            if config_type.is_valid(tgt_with_origin.target)
+            for field_set_type in field_set_types
+            if field_set_type.is_valid(tgt_with_origin.target)
         ]
-        if valid_configs:
-            targets_to_valid_configs[tgt_with_origin] = valid_configs
-    if request.error_if_no_valid_targets and not targets_to_valid_configs:
-        raise NoValidTargetsException.create_from_configs(
+        if valid_field_sets:
+            targets_to_valid_field_sets[tgt_with_origin] = valid_field_sets
+    if request.error_if_no_valid_targets and not targets_to_valid_field_sets:
+        raise NoValidTargetsException.create_from_field_sets(
             targets_with_origins,
-            config_types=config_types,
+            field_set_types=field_set_types,
             goal_description=request.goal_description,
             union_membership=union_membership,
             registered_target_types=registered_target_types,
         )
-    result = TargetsToValidConfigurations(targets_to_valid_configs)
-    if not request.expect_single_config:
+    result = TargetsToValidFieldSets(targets_to_valid_field_sets)
+    if not request.expect_single_field_set:
         return result
     if len(result.targets) > 1:
         raise TooManyTargetsException(result.targets, goal_description=request.goal_description)
-    if len(result.configurations) > 1:
+    if len(result.field_sets) > 1:
         raise AmbiguousImplementationsException(
-            result.targets[0], result.configurations, goal_description=request.goal_description
+            result.targets[0], result.field_sets, goal_description=request.goal_description
         )
     return result
 
@@ -863,19 +859,19 @@ class NoValidTargetsException(Exception):
         )
 
     @classmethod
-    def create_from_configs(
+    def create_from_field_sets(
         cls,
         targets_with_origins: TargetsWithOrigins,
         *,
-        config_types: Iterable[Type[_AbstractConfiguration]],
+        field_set_types: Iterable[Type[_AbstractFieldSet]],
         goal_description: str,
         union_membership: UnionMembership,
         registered_target_types: RegisteredTargetTypes,
     ) -> "NoValidTargetsException":
         valid_target_types = {
             target_type
-            for config_type in config_types
-            for target_type in config_type.valid_target_types(
+            for field_set_type in field_set_types
+            for target_type in field_set_type.valid_target_types(
                 registered_target_types.types, union_membership=union_membership
             )
         }
@@ -900,25 +896,21 @@ class TooManyTargetsException(Exception):
 
 # NB: This has a tight coupling to goals. Feel free to change this if necessary.
 class AmbiguousImplementationsException(Exception):
-    """Exception for when a single target has multiple valid Configurations, but the goal only
-    expects there to be one Configuration."""
+    """Exception for when a single target has multiple valid FieldSets, but the goal only expects
+    there to be one FieldSet."""
 
     def __init__(
-        self,
-        target: Target,
-        configurations: Iterable[_AbstractConfiguration],
-        *,
-        goal_description: str,
+        self, target: Target, field_sets: Iterable[_AbstractFieldSet], *, goal_description: str,
     ) -> None:
         # TODO: improve this error message. A better error message would explain to users how they
         #  can resolve the issue.
-        possible_config_types = sorted(config.__class__.__name__ for config in configurations)
+        possible_field_sets_types = sorted(field_set.__class__.__name__ for field_set in field_sets)
         bulleted_list_sep = "\n  * "
         super().__init__(
             f"Multiple of the registered implementations for {goal_description} work for "
             f"{target.address} (target type {repr(target.alias)}). It is ambiguous which "
             "implementation to use.\n\nPossible implementations:"
-            f"{bulleted_list_sep}{bulleted_list_sep.join(possible_config_types)}"
+            f"{bulleted_list_sep}{bulleted_list_sep.join(possible_field_sets_types)}"
         )
 
 
@@ -1662,8 +1654,8 @@ class BundlesField(AsyncField):
 
 def rules():
     return [
-        find_valid_configurations,
+        find_valid_field_sets,
         hydrate_sources,
-        RootRule(TargetsToValidConfigurationsRequest),
+        RootRule(TargetsToValidFieldSetsRequest),
         RootRule(HydrateSourcesRequest),
     ]

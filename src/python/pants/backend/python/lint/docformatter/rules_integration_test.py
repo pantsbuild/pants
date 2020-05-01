@@ -3,10 +3,7 @@
 
 from typing import List, Optional, Tuple
 
-from pants.backend.python.lint.docformatter.rules import (
-    DocformatterConfiguration,
-    DocformatterConfigurations,
-)
+from pants.backend.python.lint.docformatter.rules import DocformatterFieldSet, DocformatterFieldSets
 from pants.backend.python.lint.docformatter.rules import rules as docformatter_rules
 from pants.backend.python.target_types import PythonLibrary
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
@@ -30,7 +27,7 @@ class DocformatterIntegrationTest(TestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *docformatter_rules(), RootRule(DocformatterConfigurations))
+        return (*super().rules(), *docformatter_rules(), RootRule(DocformatterFieldSets))
 
     def make_target_with_origin(
         self, source_files: List[FileContent], *, origin: Optional[OriginSpec] = None,
@@ -55,20 +52,21 @@ class DocformatterIntegrationTest(TestBase):
         if skip:
             args.append(f"--docformatter-skip")
         options_bootstrapper = create_options_bootstrapper(args=args)
-        configs = [DocformatterConfiguration.create(tgt) for tgt in targets]
+        field_sets = [DocformatterFieldSet.create(tgt) for tgt in targets]
         lint_result = self.request_single_product(
-            LintResult, Params(DocformatterConfigurations(configs), options_bootstrapper)
+            LintResult, Params(DocformatterFieldSets(field_sets), options_bootstrapper)
         )
         input_snapshot = self.request_single_product(
             SourceFiles,
             Params(
-                AllSourceFilesRequest(config.sources for config in configs), options_bootstrapper
+                AllSourceFilesRequest(field_set.sources for field_set in field_sets),
+                options_bootstrapper,
             ),
         )
         fmt_result = self.request_single_product(
             FmtResult,
             Params(
-                DocformatterConfigurations(configs, prior_formatter_result=input_snapshot),
+                DocformatterFieldSets(field_sets, prior_formatter_result=input_snapshot),
                 options_bootstrapper,
             ),
         )

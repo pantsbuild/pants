@@ -15,7 +15,7 @@ from pants.backend.python.rules.pex import (
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonSources
-from pants.core.goals.lint import LinterConfiguration, LinterConfigurations, LintResult
+from pants.core.goals.lint import LinterFieldSet, LinterFieldSets, LintResult
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.core.util_rules.determine_source_files import (
     AllSourceFilesRequest,
@@ -33,15 +33,15 @@ from pants.util.strutil import pluralize
 
 
 @dataclass(frozen=True)
-class BanditConfiguration(LinterConfiguration):
+class BanditFieldSet(LinterFieldSet):
     required_fields = (PythonSources,)
 
     sources: PythonSources
     compatibility: PythonInterpreterCompatibility
 
 
-class BanditConfigurations(LinterConfigurations):
-    config_type = BanditConfiguration
+class BanditFieldSets(LinterFieldSets):
+    field_set_type = BanditFieldSet
 
 
 def generate_args(*, specified_source_files: SourceFiles, bandit: Bandit) -> Tuple[str, ...]:
@@ -55,7 +55,7 @@ def generate_args(*, specified_source_files: SourceFiles, bandit: Bandit) -> Tup
 
 @named_rule(desc="Lint using Bandit")
 async def bandit_lint(
-    configs: BanditConfigurations,
+    field_sets: BanditFieldSets,
     bandit: Bandit,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
@@ -66,7 +66,7 @@ async def bandit_lint(
     # NB: Bandit output depends upon which Python interpreter version it's run with. See
     # https://github.com/PyCQA/bandit#under-which-version-of-python-should-i-install-bandit.
     interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
-        (config.compatibility for config in configs), python_setup=python_setup
+        (field_set.compatibility for field_set in field_sets), python_setup=python_setup
     )
     requirements_pex = await Get[Pex](
         PexRequest(
@@ -87,10 +87,12 @@ async def bandit_lint(
     )
 
     all_source_files = await Get[SourceFiles](
-        AllSourceFilesRequest(config.sources for config in configs)
+        AllSourceFilesRequest(field_set.sources for field_set in field_sets)
     )
     specified_source_files = await Get[SourceFiles](
-        SpecifiedSourceFilesRequest((config.sources, config.origin) for config in configs)
+        SpecifiedSourceFilesRequest(
+            (field_set.sources, field_set.origin) for field_set in field_sets
+        )
     )
 
     merged_input_files = await Get[Digest](
@@ -99,7 +101,9 @@ async def bandit_lint(
         ),
     )
 
-    address_references = ", ".join(sorted(config.address.reference() for config in configs))
+    address_references = ", ".join(
+        sorted(field_set.address.reference() for field_set in field_sets)
+    )
 
     process = requirements_pex.create_process(
         python_setup=python_setup,
@@ -107,7 +111,7 @@ async def bandit_lint(
         pex_path=f"./bandit.pex",
         pex_args=generate_args(specified_source_files=specified_source_files, bandit=bandit),
         input_files=merged_input_files,
-        description=f"Run Bandit on {pluralize(len(configs), 'target')}: {address_references}.",
+        description=f"Run Bandit on {pluralize(len(field_sets), 'target')}: {address_references}.",
     )
     result = await Get[FallibleProcessResult](Process, process)
     return LintResult.from_fallible_process_result(result)
@@ -117,7 +121,7 @@ def rules():
     return [
         bandit_lint,
         SubsystemRule(Bandit),
-        UnionRule(LinterConfigurations, BanditConfigurations),
+        UnionRule(LinterFieldSets, BanditFieldSets),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),
         *pex.rules(),
