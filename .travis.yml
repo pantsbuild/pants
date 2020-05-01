@@ -85,7 +85,6 @@ jobs:
     services:
     - docker
     stage: Bootstrap Pants
-    sudo: required
   - addons:
       apt:
         packages:
@@ -140,7 +139,6 @@ jobs:
     services:
     - docker
     stage: Bootstrap Pants (Cron)
-    sudo: required
   - after_failure:
     - ./build-support/bin/ci-failure.sh
     before_cache:
@@ -281,7 +279,6 @@ jobs:
     - travis-wait-enhanced --timeout 40m --interval 9m -- ./build-support/bin/ci.py
       --remote-execution-enabled --lint --python-version 3.6
     stage: Test Pants
-    sudo: required
   - addons:
       apt:
         packages:
@@ -343,7 +340,6 @@ jobs:
     - travis-wait-enhanced --timeout 40m --interval 9m -- ./build-support/bin/ci.py
       --remote-execution-enabled --lint --python-version 3.7
     stage: Test Pants (Cron)
-    sudo: required
   - before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
     - find build-support -name "*.py[co]" -delete
@@ -382,7 +378,6 @@ jobs:
     script:
     - ./build-support/bin/ci.py --clippy
     stage: Test Pants
-    sudo: required
   - addons:
       apt:
         packages:
@@ -441,7 +436,6 @@ jobs:
     - travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py
       --unit-tests --plugin-tests --remote-execution-enabled --python-version 3.6
     stage: Test Pants
-    sudo: required
   - addons:
       apt:
         packages:
@@ -501,7 +495,6 @@ jobs:
     - travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py
       --unit-tests --plugin-tests --remote-execution-enabled --python-version 3.7
     stage: Test Pants (Cron)
-    sudo: required
   - addons:
       apt:
         packages:
@@ -560,7 +553,6 @@ jobs:
     - travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py
       --integration-tests-v2 --remote-execution-enabled --python-version 3.6
     stage: Test Pants
-    sudo: required
   - addons:
       apt:
         packages:
@@ -620,7 +612,6 @@ jobs:
     - travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py
       --integration-tests-v2 --remote-execution-enabled --python-version 3.7
     stage: Test Pants (Cron)
-    sudo: required
   - addons:
       apt:
         packages:
@@ -676,7 +667,6 @@ jobs:
     - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 0/7 --python-version
       3.6
     stage: Test Pants
-    sudo: required
   - addons:
       apt:
         packages:
@@ -732,7 +722,6 @@ jobs:
     - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 1/7 --python-version
       3.6
     stage: Test Pants
-    sudo: required
   - addons:
       apt:
         packages:
@@ -788,7 +777,6 @@ jobs:
     - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 2/7 --python-version
       3.6
     stage: Test Pants
-    sudo: required
   - addons:
       apt:
         packages:
@@ -844,7 +832,6 @@ jobs:
     - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 3/7 --python-version
       3.6
     stage: Test Pants
-    sudo: required
   - addons:
       apt:
         packages:
@@ -900,7 +887,6 @@ jobs:
     - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 4/7 --python-version
       3.6
     stage: Test Pants
-    sudo: required
   - addons:
       apt:
         packages:
@@ -956,7 +942,6 @@ jobs:
     - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 5/7 --python-version
       3.6
     stage: Test Pants
-    sudo: required
   - addons:
       apt:
         packages:
@@ -1012,7 +997,6 @@ jobs:
     - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 6/7 --python-version
       3.6
     stage: Test Pants
-    sudo: required
   - addons:
       apt:
         packages:
@@ -1069,7 +1053,6 @@ jobs:
     - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 0/7 --python-version
       3.7
     stage: Test Pants (Cron)
-    sudo: required
   - addons:
       apt:
         packages:
@@ -1126,7 +1109,6 @@ jobs:
     - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 1/7 --python-version
       3.7
     stage: Test Pants (Cron)
-    sudo: required
   - addons:
       apt:
         packages:
@@ -1183,7 +1165,6 @@ jobs:
     - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 2/7 --python-version
       3.7
     stage: Test Pants (Cron)
-    sudo: required
   - addons:
       apt:
         packages:
@@ -1240,7 +1221,6 @@ jobs:
     - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 3/7 --python-version
       3.7
     stage: Test Pants (Cron)
-    sudo: required
   - addons:
       apt:
         packages:
@@ -1297,7 +1277,6 @@ jobs:
     - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 4/7 --python-version
       3.7
     stage: Test Pants (Cron)
-    sudo: required
   - addons:
       apt:
         packages:
@@ -1354,7 +1333,6 @@ jobs:
     - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 5/7 --python-version
       3.7
     stage: Test Pants (Cron)
-    sudo: required
   - addons:
       apt:
         packages:
@@ -1411,7 +1389,6 @@ jobs:
     - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 6/7 --python-version
       3.7
     stage: Test Pants (Cron)
-    sudo: required
   - before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
     - find build-support -name "*.py[co]" -delete
@@ -1452,7 +1429,6 @@ jobs:
     - ./build-support/bin/ci.py --rust-tests
     - ./build-support/bin/release.sh -f
     stage: Test Pants
-    sudo: required
   - before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
     - find build-support -name "*.py[co]" -delete
@@ -1550,7 +1526,6 @@ jobs:
     services:
     - docker
     stage: Test Pants
-    sudo: required
   - before_install:
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64
       -o /usr/local/bin/jq
@@ -1787,7 +1762,6 @@ jobs:
     script:
     - ./build-support/bin/ci.py --jvm-tests --python-version 3.6
     stage: Test Pants
-    sudo: required
   - addons:
       apt:
         packages:
@@ -1848,7 +1822,6 @@ jobs:
     script:
     - ./build-support/bin/ci.py --jvm-tests --python-version 3.7
     stage: Test Pants (Cron)
-    sudo: required
   - before_install:
     - pyenv global 3.6.3
     deploy:

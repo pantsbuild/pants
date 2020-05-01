@@ -311,7 +311,6 @@ def linux_shard(
     setup = {
         "os": "linux",
         "dist": "xenial",
-        "sudo": "required",
         "python": ["2.7", "3.6", "3.7"],
         "addons": {
             "apt": {
@@ -359,7 +358,6 @@ def linux_fuse_shard() -> Dict:
     return {
         "os": "linux",
         "dist": "xenial",
-        "sudo": "required",
         "python": ["2.7", "3.6", "3.7"],
         "before_install": _linux_before_install()
         + [
