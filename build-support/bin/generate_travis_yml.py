@@ -151,8 +151,7 @@ AWS_GET_PANTS_PEX_COMMAND = (
 # ----------------------------------------------------------------------
 
 
-def docker_build_travis_ci_image(*, python_version: PythonVersion) -> str:
-    centos_version = 6 if python_version.is_py36 else 7
+def docker_build_travis_ci_image() -> str:
     return " ".join(
         [
             "docker",
@@ -160,8 +159,6 @@ def docker_build_travis_ci_image(*, python_version: PythonVersion) -> str:
             "--rm",
             "-t",
             "travis_ci",
-            "--build-arg",
-            f'"BASE_IMAGE=pantsbuild/centos{centos_version}:latest"',
             "--build-arg",
             '"TRAVIS_USER=$(id -un)"',
             "--build-arg",
@@ -449,7 +446,7 @@ def bootstrap_linux(python_version: PythonVersion) -> Dict:
         "name": f"Build Linux native engine and pants.pex (Python {python_version.decimal})",
         "stage": python_version.default_stage(is_bootstrap=True).value,
         "script": [
-            docker_build_travis_ci_image(python_version=python_version),
+            docker_build_travis_ci_image(),
             docker_run_travis_ci_image(_bootstrap_command(python_version=python_version)),
         ],
     }
@@ -572,10 +569,7 @@ def build_wheels_linux() -> Dict:
     shard = {
         **linux_shard(python_version=PythonVersion.py36, use_docker=True),
         "name": "Build Linux wheels (Python 3.6)",
-        "script": [
-            docker_build_travis_ci_image(python_version=PythonVersion.py36),
-            docker_run_travis_ci_image(command),
-        ],
+        "script": [docker_build_travis_ci_image(), docker_run_travis_ci_image(command)],
     }
     safe_extend(shard, "env", _build_wheels_env(platform=Platform.linux))
     return shard

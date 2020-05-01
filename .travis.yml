@@ -75,9 +75,9 @@ jobs:
     - '3.6'
     - '3.7'
     script:
-    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos6:latest"
-      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
-      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker build --rm -t travis_ci --build-arg "TRAVIS_USER=$(id -un)" --build-arg
+      "TRAVIS_UID=$(id -u)" --build-arg "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id
+      -g)" build-support/docker/travis_ci/
     - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
       travis_ci:latest sh -c "./build-support/bin/bootstrap_and_deploy_ci_pants_pex.py
       --python-version 3.6 --aws-bucket ${AWS_BUCKET} --native-engine-so-key-prefix
@@ -130,9 +130,9 @@ jobs:
     - '3.6'
     - '3.7'
     script:
-    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos7:latest"
-      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
-      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker build --rm -t travis_ci --build-arg "TRAVIS_USER=$(id -un)" --build-arg
+      "TRAVIS_UID=$(id -u)" --build-arg "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id
+      -g)" build-support/docker/travis_ci/
     - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
       travis_ci:latest sh -c "./build-support/bin/bootstrap_and_deploy_ci_pants_pex.py
       --python-version 3.7 --aws-bucket ${AWS_BUCKET} --native-engine-so-key-prefix
@@ -1541,9 +1541,9 @@ jobs:
     - '3.6'
     - '3.7'
     script:
-    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos6:latest"
-      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
-      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker build --rm -t travis_ci --build-arg "TRAVIS_USER=$(id -un)" --build-arg
+      "TRAVIS_UID=$(id -u)" --build-arg "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id
+      -g)" build-support/docker/travis_ci/
     - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
       travis_ci:latest sh -c "./build-support/bin/check_pants_pex_abi.py abi3 cp36m
       && RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n"
