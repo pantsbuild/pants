@@ -8,7 +8,7 @@ from pants.backend.native.subsystems.utils.archive_file_mapper import ArchiveFil
 from pants.binaries.binary_tool import NativeTool
 from pants.binaries.binary_util import BinaryToolUrlGenerator
 from pants.engine.platform import Platform
-from pants.engine.rules import rule, subsystem_rule
+from pants.engine.rules import SubsystemRule, rule
 from pants.util.dirutil import is_readable_dir
 from pants.util.enums import match
 from pants.util.memo import memoized_method, memoized_property
@@ -138,4 +138,4 @@ def get_clang_plusplus(llvm: LLVM) -> CppCompiler:
 
 
 def create_llvm_rules():
-    return [get_lld, get_clang, get_clang_plusplus, subsystem_rule(LLVM)]
+    return [get_lld, get_clang, get_clang_plusplus, SubsystemRule(LLVM)]
