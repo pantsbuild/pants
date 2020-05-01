@@ -1,9 +1,9 @@
 use crate::{
   CommandRunner, Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Process,
 };
-use boxfuture::{BoxFuture, Boxable};
-use futures::future::{FutureExt, TryFutureExt};
-use futures01::future::{err, ok, Either, Future};
+
+use async_trait::async_trait;
+use futures::future::{self, Either, FutureExt};
 use log::{debug, trace};
 use std::sync::Arc;
 use std::time::Duration;
@@ -29,64 +29,55 @@ impl SpeculatingCommandRunner {
     }
   }
 
-  fn speculate(
+  async fn speculate(
     &self,
     req: MultiPlatformProcess,
     context: Context,
-  ) -> BoxFuture<FallibleProcessResultWithPlatform, String> {
-    let delay = delay_for(self.speculation_timeout)
-      .unit_error()
-      .boxed()
-      .compat();
-    let req2 = req.clone();
+  ) -> Result<FallibleProcessResultWithPlatform, String> {
     trace!(
       "Primary command runner queue length: {:?}",
       self.primary.num_waiters()
     );
-    self
-      .primary
-      .run(req, context.clone())
-      .select2({
-        let command_runner = self.clone();
-        delay.then(move |_| {
-          trace!(
-            "Secondary command runner queue length: {:?}",
-            command_runner.secondary.num_waiters()
-          );
-          command_runner.secondary.run(req2, context)
-        })
-      })
-      .then(|raced_result| match raced_result {
-        Ok(either_success) => {
-          // .split() takes out the homogeneous success type for either primary or
-          // secondary successes.
-          ok::<FallibleProcessResultWithPlatform, String>(either_success.split().0).to_boxed()
-        }
-        Err(Either::A((failed_primary_res, _))) => {
-          debug!("primary request FAILED, aborting");
-          err::<FallibleProcessResultWithPlatform, String>(failed_primary_res).to_boxed()
-        }
+
+    let secondary_request = {
+      let command_runner = self.clone();
+      let req = req.clone();
+      let context = context.clone();
+      async move {
+        delay_for(self.speculation_timeout).await;
+
+        trace!(
+          "Secondary command runner queue length: {:?}",
+          command_runner.secondary.num_waiters()
+        );
+        command_runner.secondary.run(req, context).await
+      }
+    };
+
+    match future::select(self.primary.run(req, context), secondary_request.boxed()).await {
+      Either::Left((Ok(s), _)) | Either::Right((Ok(s), _)) => Ok(s),
+      Either::Left((Err(e), _)) => {
+        debug!("primary request FAILED, aborting");
+        Err(e)
+      }
+      Either::Right((Err(_secondary_request_err), primary_request)) => {
+        debug!("secondary request FAILED, waiting for primary!");
         // We handle the case of the secondary failing specially. We only want to show
         // a failure to the user if the primary execution source fails. This maintains
         // feel between speculation on and off states.
-        Err(Either::B((_failed_secondary_res, outstanding_primary_request))) => {
-          debug!("secondary request FAILED, waiting for primary!");
-          outstanding_primary_request
-            .then(|primary_result| {
-              if primary_result.is_ok() {
-                debug!("primary request eventually SUCCEEDED after secondary failed");
-              } else {
-                debug!("primary request eventually FAILED after secondary failed");
-              }
-              primary_result
-            })
-            .to_boxed()
+        let primary_result = primary_request.await;
+        if primary_result.is_ok() {
+          debug!("primary request eventually SUCCEEDED after secondary failed");
+        } else {
+          debug!("primary request eventually FAILED after secondary failed");
         }
-      })
-      .to_boxed()
+        primary_result
+      }
+    }
   }
 }
 
+#[async_trait]
 impl CommandRunner for SpeculatingCommandRunner {
   fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
     match (
@@ -99,23 +90,22 @@ impl CommandRunner for SpeculatingCommandRunner {
     }
   }
 
-  fn run(
+  async fn run(
     &self,
     req: MultiPlatformProcess,
     context: Context,
-  ) -> BoxFuture<FallibleProcessResultWithPlatform, String> {
+  ) -> Result<FallibleProcessResultWithPlatform, String> {
     match (
       self.primary.extract_compatible_request(&req),
       self.secondary.extract_compatible_request(&req),
     ) {
-      (Some(_), Some(_)) => self.speculate(req, context),
-      (Some(_), None) => self.primary.run(req, context),
-      (None, Some(_)) => self.secondary.run(req, context),
-      (None, None) => err(format!(
+      (Some(_), Some(_)) => self.speculate(req, context).await,
+      (Some(_), None) => self.primary.run(req, context).await,
+      (None, Some(_)) => self.secondary.run(req, context).await,
+      (None, None) => Err(format!(
         "No compatible requests found for available platforms in {:?}",
         req
-      ))
-      .to_boxed(),
+      )),
     }
   }
 }

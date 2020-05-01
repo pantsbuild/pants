@@ -357,13 +357,18 @@ impl WrappedNode for MultiPlatformExecuteProcess {
       .extract_compatible_request(&request)
       .is_some()
     {
-      context
-        .core
-        .command_runner
-        .run(request, execution_context)
-        .map(ProcessResult)
-        .map_err(|e| throw(&format!("Failed to execute process: {}", e)))
-        .to_boxed()
+      Box::pin(async move {
+        let res = context
+          .core
+          .command_runner
+          .run(request, execution_context)
+          .await
+          .map_err(|e| throw(&format!("Failed to execute process: {}", e)))?;
+
+        Ok(ProcessResult(res))
+      })
+      .compat()
+      .to_boxed()
     } else {
       err(throw(&format!(
         "No compatible platform found for request: {:?}",

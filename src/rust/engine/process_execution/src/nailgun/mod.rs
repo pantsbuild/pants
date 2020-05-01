@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
-use boxfuture::{try_future, BoxFuture, Boxable};
+use async_trait::async_trait;
 use futures::compat::Future01CompatExt;
 use futures::future::{FutureExt, TryFutureExt};
 use futures::stream::{BoxStream, StreamExt};
@@ -162,17 +162,18 @@ impl CommandRunner {
   }
 }
 
+#[async_trait]
 impl super::CommandRunner for CommandRunner {
-  fn run(
+  async fn run(
     &self,
     req: MultiPlatformProcess,
     context: Context,
-  ) -> BoxFuture<FallibleProcessResultWithPlatform, String> {
+  ) -> Result<FallibleProcessResultWithPlatform, String> {
     let original_request = self.extract_compatible_request(&req).unwrap();
 
     if !original_request.is_nailgunnable {
       trace!("The request is not nailgunnable! Short-circuiting to regular process execution");
-      return self.inner.run(req, context);
+      return self.inner.run(req, context).await;
     }
     debug!("Running request under nailgun:\n {:#?}", &original_request);
 
@@ -180,21 +181,21 @@ impl super::CommandRunner for CommandRunner {
     let store = self.inner.store.clone();
     let ParsedJVMCommandLines {
       client_main_class, ..
-    } = try_future!(ParsedJVMCommandLines::parse_command_lines(
-      &original_request.argv
-    ));
+    } = ParsedJVMCommandLines::parse_command_lines(&original_request.argv)?;
     let nailgun_name = CommandRunner::calculate_nailgun_name(&client_main_class);
-    let workdir_for_this_nailgun = try_future!(self.get_nailgun_workdir(&nailgun_name));
+    let workdir_for_this_nailgun = self.get_nailgun_workdir(&nailgun_name)?;
 
-    self.run_and_capture_workdir(
-      original_request,
-      context,
-      store,
-      executor,
-      true,
-      &workdir_for_this_nailgun,
-      Platform::current().unwrap(),
-    )
+    self
+      .run_and_capture_workdir(
+        original_request,
+        context,
+        store,
+        executor,
+        true,
+        &workdir_for_this_nailgun,
+        Platform::current().unwrap(),
+      )
+      .await
   }
 
   fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
