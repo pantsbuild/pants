@@ -356,7 +356,7 @@ dependencies = [
  "strsim 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "textwrap 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "unicode-width 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
- "vec_map 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "vec_map 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1155,7 +1155,7 @@ dependencies = [
 
 [[package]]
 name = "h2"
-version = "0.2.4"
+version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "bytes 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1264,7 +1264,7 @@ dependencies = [
  "futures-channel 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures-core 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures-util 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "h2 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "h2 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "http 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "http-body 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "httparse 1.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3396,7 +3396,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "vec_map"
-version = "0.8.1"
+version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -3734,7 +3734,7 @@ dependencies = [
 "checksum grpcio-compiler 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a63ccc27b0099347d2bea2c3d0f1c79c018a13cfd08b814a1992e341b645d5e1"
 "checksum grpcio-sys 0.2.3 (git+https://github.com/pantsbuild/grpc-rs.git?rev=b582ef3dc4e8c7289093c8febff8dadf0997b532)" = "<none>"
 "checksum h2 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)" = "a5b34c246847f938a410a03c5458c7fee2274436675e76d8b903c08efc29c462"
-"checksum h2 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)" = "377038bf3c89d18d6ca1431e7a5027194fbd724ca10592b9487ede5e8e144f42"
+"checksum h2 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)" = "79b7246d7e4b979c03fa093da39cfb3617a96bbeee6310af63991668d7e843ff"
 "checksum heck 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "20564e78d53d2bb135c343b3f47714a56af2061f1c928fdb541dc7b9fdd94205"
 "checksum hermit-abi 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)" = "61565ff7aaace3525556587bd2dc31d4a07071957be715e63ce7b1eccf51a8f4"
 "checksum hex 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)" = "805026a5d0141ffc30abb3be3173848ad46a1b1664fe632428479619a3644d77"
@@ -3956,7 +3956,7 @@ dependencies = [
 "checksum uuid 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)" = "78c590b5bd79ed10aad8fb75f078a59d8db445af6c743e55c4a53227fc01c13f"
 "checksum uuid 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)" = "90dbc611eb48397705a6b0f6e917da23ae517e4d127123d2cf7674206627d32a"
 "checksum vcpkg 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)" = "3fc439f2794e98976c88a2a2dafce96b930fe8010b0a256b3c2199a773933168"
-"checksum vec_map 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)" = "05c78687fb1a80548ae3250346c3db86a80a7cdd77bda190189f2d0a0987c81a"
+"checksum vec_map 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)" = "f1bddf1187be692e79c5ffeab891132dfb0f236ed36a43c7ed39f1165ee20191"
 "checksum version_check 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)" = "078775d0255232fb988e6fccf26ddc9d1ac274299aaedcedce21c6f72cc533ce"
 "checksum walkdir 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)" = "c66c0b9792f0a765345452775f3adbd28dde9d33f30d13e5dcc5ae17cf6f3780"
 "checksum walkdir 2.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "777182bc735b6424e1a57516d35ed72cb8019d85c8c9bf536dccb3445c1a2f7d"

@@ -307,7 +307,7 @@ fn exhaust_uncacheable_retries() {
     graph2.invalidate_from_roots(|&TNode(n, _)| n == 0);
   });
   let (assertion, subject) = match graph.create(TNode::new(2), &context).wait() {
-    Err(TError::Throw) => (true, None),
+    Err(TError::Exhausted) => (true, None),
     Err(e) => (false, Some(Err(e))),
     other => (false, Some(other)),
   };
@@ -315,7 +315,7 @@ fn exhaust_uncacheable_retries() {
   assert!(
     assertion,
     "expected {:?} found {:?}",
-    Err::<(), TError>(TError::Throw),
+    Err::<(), TError>(TError::Exhausted),
     subject
   );
 }
@@ -350,7 +350,7 @@ fn drain_and_resume() {
   // drain.
   assert_eq!(
     graph.create(TNode::new(2), &context).wait(),
-    Err(TError::Invalidated),
+    Err(TError::Exhausted),
   );
 
   // Unmark the Graph draining, and try again: we expect the `Invalidated` result we saw before
@@ -730,7 +730,7 @@ impl TContext {
   }
 
   fn get(&self, dst: TNode) -> BoxFuture<Vec<T>, TError> {
-    self.graph.get(self.entry_id.unwrap(), self, dst)
+    self.graph.get(self.entry_id, self, dst)
   }
 
   fn ran(&self, node: TNode) {
@@ -770,8 +770,8 @@ impl TContext {
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum TError {
   Cyclic,
+  Exhausted,
   Invalidated,
-  Throw,
 }
 impl NodeError for TError {
   fn invalidated() -> Self {
@@ -779,7 +779,7 @@ impl NodeError for TError {
   }
 
   fn exhausted() -> Self {
-    TError::Throw
+    TError::Exhausted
   }
 
   fn cyclic(_path: Vec<String>) -> Self {

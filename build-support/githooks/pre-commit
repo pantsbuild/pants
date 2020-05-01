@@ -66,8 +66,6 @@ if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
   ./build-support/bin/mypy.py || exit 1
 
   if git diff "${MERGE_BASE}" --name-only | grep '\.rs$' > /dev/null; then
-    echo "* Checking formatting of Rust files"
-    ./build-support/bin/check_rust_formatting.sh || exit 1
     # Clippy happens on a different Travis CI shard because of separate caching concerns.
     # The TRAVIS env var is documented here:
     #   https://docs.travis-ci.com/user/environment-variables/#default-environment-variables
@@ -75,6 +73,8 @@ if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
       echo "* Running cargo clippy"
       ./build-support/bin/check_clippy.sh || exit 1
     fi
+    echo "* Checking formatting of Rust files"
+    ./build-support/bin/check_rust_formatting.sh || exit 1
     echo "* Checking Rust target headers"
     build-support/bin/check_rust_target_headers.sh || exit 1
   fi
