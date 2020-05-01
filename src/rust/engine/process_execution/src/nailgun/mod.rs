@@ -195,7 +195,6 @@ impl super::CommandRunner for CommandRunner {
         &workdir_for_this_nailgun,
         Platform::current().unwrap(),
       )
-      .compat()
       .await
   }
 
