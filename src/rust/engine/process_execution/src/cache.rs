@@ -5,7 +5,6 @@ use crate::{
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use bincode;
 use bytes::Bytes;
 use futures::compat::Future01CompatExt;
 use futures::future;

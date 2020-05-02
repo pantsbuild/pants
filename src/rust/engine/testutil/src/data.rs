@@ -1,7 +1,4 @@
-use bazel_protos;
-use bytes;
 use digest::FixedOutput;
-use hashing;
 use protobuf::Message;
 use sha2::{self, Digest};
 

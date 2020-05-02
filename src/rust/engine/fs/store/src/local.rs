@@ -7,7 +7,6 @@ use lmdb::Error::NotFound;
 use lmdb::{self, Cursor, Database, RwTransaction, Transaction, WriteFlags};
 use sha2::Sha256;
 use sharded_lmdb::{ShardedLmdb, VersionedFingerprint};
-use std;
 use std::collections::BinaryHeap;
 use std::path::Path;
 use std::sync::Arc;
