@@ -4,6 +4,161 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.28.0.dev1 (5/1/2020)
+-----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Replace `list` with `list-v2` when in V2 exclusive mode (#9671)
+  `PR #9671 <https://github.com/pantsbuild/pants/pull/9671>`_
+
+* Build pantsbuild.pants as a manylinux2014 wheel (#9656)
+  `PR #9656 <https://github.com/pantsbuild/pants/pull/9656>`_
+
+* Remove default process timeout value (#9639)
+  `PR #9639 <https://github.com/pantsbuild/pants/pull/9639>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Adding allowlist_compiler_args in ScroogeGen (#9610)
+  `PR #9610 <https://github.com/pantsbuild/pants/pull/9610>`_
+
+* [junit-runner] allow test specs to work for parameterized tests and t… (#9397)
+  `PR #9397 <https://github.com/pantsbuild/pants/pull/9397>`_
+
+* Add Protobuf Python support to V2 (#9651)
+  `PR #9651 <https://github.com/pantsbuild/pants/pull/9651>`_
+
+* Add generic mechanism to codegen sources in V2 (#9634)
+  `PR #9634 <https://github.com/pantsbuild/pants/pull/9634>`_
+
+* Allow `HydratedSourcesRequest` to indicate which Sources types are expected (#9641)
+  `PR #9641 <https://github.com/pantsbuild/pants/pull/9641>`_
+
+* [jvm-platform] add strict as an attr to jvm platforms (#9287)
+  `PR #9287 <https://github.com/pantsbuild/pants/pull/9287>`_
+
+* Add the ability to write junit test results file for pytest runs. (#9594)
+  `PR #9594 <https://github.com/pantsbuild/pants/pull/9594>`_
+
+* Rules to extract archives. (#9624)
+  `PR #9624 <https://github.com/pantsbuild/pants/pull/9624>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix crash when V2 goals like `repl` have no specified targets (#9673)
+  `PR #9673 <https://github.com/pantsbuild/pants/pull/9673>`_
+
+* Fix selectors test for Python 3.8 (#9642)
+  `PR #9642 <https://github.com/pantsbuild/pants/pull/9642>`_
+
+* Fix typos in the tests directory. (#9637)
+  `PR #9637 <https://github.com/pantsbuild/pants/pull/9637>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Simplify Scheduler::execute and unify Graph retry (#9674)
+  `PR #9674 <https://github.com/pantsbuild/pants/pull/9674>`_
+
+* Rename `Process.input_files` to `Process.input_digest` (#9669)
+  `PR #9669 <https://github.com/pantsbuild/pants/pull/9669>`_
+
+* Port the bulk of the process_execution crate to async/await (#9676)
+  `PR #9676 <https://github.com/pantsbuild/pants/pull/9676>`_
+
+* Remove noisy Pants output with V2 `binary`, `run`, and `repl` (#9667)
+  `PR #9667 <https://github.com/pantsbuild/pants/pull/9667>`_
+
+* Upgrade wheel from 0.33.6 to 0.34.2 (#9647)
+  `PR #9647 <https://github.com/pantsbuild/pants/pull/9647>`_
+
+* Upgrade PyYAML 5.1.2 to 5.3.1 (#9649)
+  `PR #9649 <https://github.com/pantsbuild/pants/pull/9649>`_
+
+* Rename V2 `Configuration` to `FieldSet` (#9668)
+  `PR #9668 <https://github.com/pantsbuild/pants/pull/9668>`_
+
+* Calculate `SourcesSnapshot` using the Target API (#9659)
+  `PR #9659 <https://github.com/pantsbuild/pants/pull/9659>`_
+
+* Rename `subsystem_rule` to `SubsystemRule` (#9666)
+  `PR #9666 <https://github.com/pantsbuild/pants/pull/9666>`_
+
+* Change `GoalRuleTestBase.execute_rule` to return the captured stderr (#9664)
+  `PR #9664 <https://github.com/pantsbuild/pants/pull/9664>`_
+
+* Deprecate some v1 goals that use Ivy. (#9657)
+  `PR #9657 <https://github.com/pantsbuild/pants/pull/9657>`_
+
+* Rename `Snapshot.directory_digest` to `Snapshot.digest` (#9658)
+  `PR #9658 <https://github.com/pantsbuild/pants/pull/9658>`_
+
+* Always register `engine.target.rules()` via `engine_initializer.py` (#9661)
+  `PR #9661 <https://github.com/pantsbuild/pants/pull/9661>`_
+
+* Rename several `engine/fs.py` types
+
+* Make the ExternalTool URL generator an instance method. (#9646)
+  `PR #9646 <https://github.com/pantsbuild/pants/pull/9646>`_
+
+* Only write to the build root when V2 `fmt` makes changes (#9652)
+  `PR #9652 <https://github.com/pantsbuild/pants/pull/9652>`_
+
+* Port the finding of owning targets to the Target API (#9648)
+  `PR #9648 <https://github.com/pantsbuild/pants/pull/9648>`_
+
+* Compute process execution times by walking the workunit graph (#9622)
+  `PR #9622 <https://github.com/pantsbuild/pants/pull/9622>`_
+
+* Align the rust and python PathGlobs objects. (#9653)
+  `PR #9653 <https://github.com/pantsbuild/pants/pull/9653>`_
+
+* Use ExitStack from python standard library. (#9645)
+  `PR #9645 <https://github.com/pantsbuild/pants/pull/9645>`_
+
+* An ExternalTool subsystem base for downloading external tools. (#9625)
+  `PR #9625 <https://github.com/pantsbuild/pants/pull/9625>`_
+
+* Use sysconfig.get_platform() (#9644)
+  `PR #9644 <https://github.com/pantsbuild/pants/pull/9644>`_
+
+* Simplify excluding the `requirements.txt` file generated from python_requirements() (#9640)
+  `PR #9640 <https://github.com/pantsbuild/pants/pull/9640>`_
+
+* Factor up filtering out non-Python targets in V2 (#9638)
+  `PR #9638 <https://github.com/pantsbuild/pants/pull/9638>`_
+
+* Extract a `watch` crate. (#9635)
+  `PR #9635 <https://github.com/pantsbuild/pants/pull/9635>`_
+
+* Remove premature generalization for AsyncFields (#9632)
+  `PR #9632 <https://github.com/pantsbuild/pants/pull/9632>`_
+
+Testing
+~~~~~~~
+
+* Install Python 3.8 in centos7 docker image (#9670)
+  `PR #9670 <https://github.com/pantsbuild/pants/pull/9670>`_
+
+* Stabilize the cron CI test suite (#9581)
+  `PR #9581 <https://github.com/pantsbuild/pants/pull/9581>`_
+
+* Prune the pantsd integration test target (#9660)
+  `PR #9660 <https://github.com/pantsbuild/pants/pull/9660>`_
+
+* Remoting: ensure oauth token file only has one line (#9630)
+  `PR #9630 <https://github.com/pantsbuild/pants/pull/9630>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Prepare 1.26.0 (#9654)
+  `PR #9654 <https://github.com/pantsbuild/pants/pull/9654>`_
+
 1.28.0.dev0 (4/24/2020)
 -----------------------
 
