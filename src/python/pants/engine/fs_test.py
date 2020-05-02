@@ -436,20 +436,20 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
                 )
             )
             # Check that we got the full snapshots that we expect
-            self.assertEquals(snapshot.files, relevant_files)
-            self.assertEquals(snapshot_with_extra_files.files, all_files)
+            self.assertEqual(snapshot.files, relevant_files)
+            self.assertEqual(snapshot_with_extra_files.files, all_files)
 
             # Strip empty prefix:
             zero_prefix_stripped_digest = self.request_single_product(
                 Digest, RemovePrefix(snapshot.digest, ""),
             )
-            self.assertEquals(snapshot.digest, zero_prefix_stripped_digest)
+            self.assertEqual(snapshot.digest, zero_prefix_stripped_digest)
 
             # Strip a non-empty prefix shared by all files:
             stripped_digest = self.request_single_product(
                 Digest, RemovePrefix(snapshot.digest, "characters/dark_tower"),
             )
-            self.assertEquals(
+            self.assertEqual(
                 stripped_digest,
                 Digest(
                     fingerprint="71e788fc25783c424db555477071f5e476d942fc958a5d06ffc1ed223f779a8c",
@@ -459,8 +459,8 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
             expected_snapshot = assert_single_element(
                 self.scheduler.capture_snapshots((PathGlobsAndRoot(PathGlobs(["*"]), tower_dir),))
             )
-            self.assertEquals(expected_snapshot.files, ("roland", "susannah"))
-            self.assertEquals(stripped_digest, expected_snapshot.digest)
+            self.assertEqual(expected_snapshot.files, ("roland", "susannah"))
+            self.assertEqual(stripped_digest, expected_snapshot.digest)
 
             # Try to strip a prefix which isn't shared by all files:
             with self.assertRaisesWithMessageContaining(
@@ -476,8 +476,8 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
     def test_lift_digest_to_snapshot(self):
         digest = self.prime_store_with_roland_digest()
         snapshot = self.request_single_product(Snapshot, digest)
-        self.assertEquals(snapshot.files, ("roland",))
-        self.assertEquals(snapshot.digest, digest)
+        self.assertEqual(snapshot.files, ("roland",))
+        self.assertEqual(snapshot.digest, digest)
 
     def test_error_lifting_file_digest_to_snapshot(self):
         self.prime_store_with_roland_digest()

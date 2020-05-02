@@ -110,12 +110,12 @@ class MultiMatcherTest(unittest.TestCase):
             .lstrip()
             .encode("utf8")
         )
-        self.assertEquals(
+        self.assertEqual(
             (("python_header",), ("no_six",)),
             self._rm.check_content(("python_header", "no_six"), py_file_content, "utf8"),
         )
 
-        self.assertEquals(
+        self.assertEqual(
             RegexMatchResult("foo/bar/baz.py", ("python_header",), ("no_six",)),
             self._rm.check_source_file("foo/bar/baz.py", py_file_content),
         )
