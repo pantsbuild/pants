@@ -101,6 +101,7 @@ Refactoring, Improvements, and Tooling
   `PR #9661 <https://github.com/pantsbuild/pants/pull/9661>`_
 
 * Rename several `engine/fs.py` types
+  `PR #9655 <https://github.com/pantsbuild/pants/pull/9655>`_
 
 * Make the ExternalTool URL generator an instance method. (#9646)
   `PR #9646 <https://github.com/pantsbuild/pants/pull/9646>`_
