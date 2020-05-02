@@ -10,14 +10,17 @@ not undergone the vetting associated with ``stable`` releases.
 API Changes
 ~~~~~~~~~~~
 
-* Replace `list` with `list-v2` when in V2 exclusive mode (#9671)
-  `PR #9671 <https://github.com/pantsbuild/pants/pull/9671>`_
-
 * Build pantsbuild.pants as a manylinux2014 wheel (#9656)
   `PR #9656 <https://github.com/pantsbuild/pants/pull/9656>`_
 
-* Remove default process timeout value (#9639)
-  `PR #9639 <https://github.com/pantsbuild/pants/pull/9639>`_
+* Upgrade wheel from 0.33.6 to 0.34.2 (#9647)
+  `PR #9647 <https://github.com/pantsbuild/pants/pull/9647>`_
+
+* Upgrade PyYAML 5.1.2 to 5.3.1 (#9649)
+  `PR #9649 <https://github.com/pantsbuild/pants/pull/9649>`_
+
+* Deprecate some v1 goals that use Ivy. (#9657)
+  `PR #9657 <https://github.com/pantsbuild/pants/pull/9657>`_
 
 New Features
 ~~~~~~~~~~~~
@@ -34,9 +37,6 @@ New Features
 * Add generic mechanism to codegen sources in V2 (#9634)
   `PR #9634 <https://github.com/pantsbuild/pants/pull/9634>`_
 
-* Allow `HydratedSourcesRequest` to indicate which Sources types are expected (#9641)
-  `PR #9641 <https://github.com/pantsbuild/pants/pull/9641>`_
-
 * [jvm-platform] add strict as an attr to jvm platforms (#9287)
   `PR #9287 <https://github.com/pantsbuild/pants/pull/9287>`_
 
@@ -52,14 +52,17 @@ Bugfixes
 * Fix crash when V2 goals like `repl` have no specified targets (#9673)
   `PR #9673 <https://github.com/pantsbuild/pants/pull/9673>`_
 
-* Fix selectors test for Python 3.8 (#9642)
-  `PR #9642 <https://github.com/pantsbuild/pants/pull/9642>`_
-
-* Fix typos in the tests directory. (#9637)
-  `PR #9637 <https://github.com/pantsbuild/pants/pull/9637>`_
-
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Allow `HydratedSourcesRequest` to indicate which Sources types are expected (#9641)
+  `PR #9641 <https://github.com/pantsbuild/pants/pull/9641>`_
+
+* Remove default process timeout value (#9639)
+  `PR #9639 <https://github.com/pantsbuild/pants/pull/9639>`_
+
+* Replace `list` with `list-v2` when in V2 exclusive mode (#9671)
+  `PR #9671 <https://github.com/pantsbuild/pants/pull/9671>`_
 
 * Simplify Scheduler::execute and unify Graph retry (#9674)
   `PR #9674 <https://github.com/pantsbuild/pants/pull/9674>`_
@@ -73,12 +76,6 @@ Refactoring, Improvements, and Tooling
 * Remove noisy Pants output with V2 `binary`, `run`, and `repl` (#9667)
   `PR #9667 <https://github.com/pantsbuild/pants/pull/9667>`_
 
-* Upgrade wheel from 0.33.6 to 0.34.2 (#9647)
-  `PR #9647 <https://github.com/pantsbuild/pants/pull/9647>`_
-
-* Upgrade PyYAML 5.1.2 to 5.3.1 (#9649)
-  `PR #9649 <https://github.com/pantsbuild/pants/pull/9649>`_
-
 * Rename V2 `Configuration` to `FieldSet` (#9668)
   `PR #9668 <https://github.com/pantsbuild/pants/pull/9668>`_
 
@@ -90,9 +87,6 @@ Refactoring, Improvements, and Tooling
 
 * Change `GoalRuleTestBase.execute_rule` to return the captured stderr (#9664)
   `PR #9664 <https://github.com/pantsbuild/pants/pull/9664>`_
-
-* Deprecate some v1 goals that use Ivy. (#9657)
-  `PR #9657 <https://github.com/pantsbuild/pants/pull/9657>`_
 
 * Rename `Snapshot.directory_digest` to `Snapshot.digest` (#9658)
   `PR #9658 <https://github.com/pantsbuild/pants/pull/9658>`_
@@ -142,6 +136,9 @@ Refactoring, Improvements, and Tooling
 Testing
 ~~~~~~~
 
+* Fix selectors test for Python 3.8 (#9642)
+  `PR #9642 <https://github.com/pantsbuild/pants/pull/9642>`_
+
 * Install Python 3.8 in centos7 docker image (#9670)
   `PR #9670 <https://github.com/pantsbuild/pants/pull/9670>`_
 
@@ -156,6 +153,9 @@ Testing
 
 Documentation
 ~~~~~~~~~~~~~
+
+* Fix typos in the tests directory. (#9637)
+  `PR #9637 <https://github.com/pantsbuild/pants/pull/9637>`_
 
 * Prepare 1.26.0 (#9654)
   `PR #9654 <https://github.com/pantsbuild/pants/pull/9654>`_
