@@ -724,17 +724,7 @@ dependencies = [
 
 [[package]]
 name = "derivative"
-version = "1.0.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "proc-macro2 0.4.30 (registry+https://github.com/rust-lang/crates.io-index)",
- "quote 0.6.13 (registry+https://github.com/rust-lang/crates.io-index)",
- "syn 0.15.44 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "derivative"
-version = "2.0.2"
+version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "proc-macro2 1.0.12 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2063,7 +2053,7 @@ name = "num_enum"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "derivative 2.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "derivative 2.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "num_enum_derive 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -2328,7 +2318,7 @@ dependencies = [
  "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "concrete_time 0.0.1",
  "copy_dir 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "derivative 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "derivative 2.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "digest 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "fs 0.0.1",
  "futures 0.1.29 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3966,8 +3956,7 @@ dependencies = [
 "checksum ct-logs 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "4d3686f5fa27dbc1d76c751300376e167c5a43387f44bb451fd1c24776e49113"
 "checksum curl 0.4.28 (registry+https://github.com/rust-lang/crates.io-index)" = "eda1c0c03cacf3365d84818a40293f0e3f3953db8759c9c565a3b434edf0b52e"
 "checksum curl-sys 0.4.30+curl-7.69.1 (registry+https://github.com/rust-lang/crates.io-index)" = "923b38e423a8f47a4058e96f2a1fa2865a6231097ee860debd678d244277d50c"
-"checksum derivative 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)" = "3c6d883546668a3e2011b6a716a7330b82eabb0151b138217f632c8243e17135"
-"checksum derivative 2.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "1b94d2eb97732ec84b4e25eaf37db890e317b80e921f168c82cb5282473f8151"
+"checksum derivative 2.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "cb582b60359da160a9477ee80f15c8d784c477e69c217ef2cdd4169c24ea380f"
 "checksum digest 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)" = "f3d0c8c8752312f9713efd397ff63acb9f85585afbf179282e720e7704954dd5"
 "checksum dir-diff 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)" = "2860407d7d7e2e004bb2128510ad9e8d669e76fa005ccf567977b5d71b8b4a0b"
 "checksum dirs 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)" = "3fd78930633bd1c6e35c4b42b1df7b0cbc6bc191146e512bb3bedf243fcc3901"

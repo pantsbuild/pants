@@ -13,7 +13,7 @@ async_semaphore = { path = "../async_semaphore" }
 bazel_protos = { path = "bazel_protos" }
 boxfuture = { path = "../boxfuture" }
 bytes = "0.4.5"
-derivative = "1.0.2"
+derivative = "2.1.1"
 digest = "0.8"
 fs = { path = "../fs" }
 futures01 = { package = "futures", version = "0.1" }
