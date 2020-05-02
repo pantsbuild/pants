@@ -11,5 +11,6 @@ class ExternalToolTestBase(TestBase):
     :API: public
     """
 
-    def rules(self):
+    @classmethod
+    def rules(cls):
         return [*super().rules(), *archive.rules(), *external_tool.rules()]
