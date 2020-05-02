@@ -7,10 +7,8 @@ use crate::tasks::Intrinsic;
 use crate::types::Types;
 
 use boxfuture::Boxable;
-use bytes;
 use futures::future::{self as future03, TryFutureExt};
 use futures01::{future, Future};
-use hashing;
 use indexmap::IndexMap;
 
 use std::path::PathBuf;

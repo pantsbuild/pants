@@ -16,7 +16,6 @@ use crate::core::{Failure, Params, TypeId, Value};
 use crate::nodes::{NodeKey, Select, Visualizer};
 
 use graph::{InvalidationResult, LastObserved};
-use hashing;
 use log::{debug, info, warn};
 use parking_lot::Mutex;
 use task_executor::Executor;
