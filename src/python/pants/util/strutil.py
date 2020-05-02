@@ -133,3 +133,10 @@ def strip_prefix(string: str, prefix: str) -> str:
         return string[len(prefix) :]
     else:
         return string
+
+
+# NB: We allow bytes because `ProcessResult.std{err,out}` uses bytes.
+def strip_v2_chroot_path(v: Union[bytes, str]) -> str:
+    if isinstance(v, bytes):
+        v = v.decode()
+    return re.sub(r"/.*/process-execution[a-zA-Z0-9]+/", "", v)
