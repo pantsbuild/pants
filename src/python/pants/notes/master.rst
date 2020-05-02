@@ -154,6 +154,9 @@ Testing
 * Stop using deprecated assertEquals() (#9682)
   `PR #9682 <https://github.com/pantsbuild/pants/pull/9682>`_
 
+* Reduce the # of V1 integration test shards by 1 (#9582)
+  `PR #9582 <https://github.com/pantsbuild/pants/pull/9582>`_
+
 Documentation
 ~~~~~~~~~~~~~
 
@@ -282,9 +285,6 @@ Testing
 
 * Use `--go-chroot` internally (#9579)
   `PR #9579 <https://github.com/pantsbuild/pants/pull/9579>`_
-
-* Reduce the # of V1 integration test shards by 1 (#9582)
-  `PR #9582 <https://github.com/pantsbuild/pants/pull/9582>`_
 
 Documentation
 ~~~~~~~~~~~~~
