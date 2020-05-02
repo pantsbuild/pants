@@ -62,6 +62,7 @@ target(
     'src/python/pants/backend/python/lint/pylint',
     'src/python/pants/backend/native',
     'src/python/pants/core:plugin',
+    'src/python/pants/pants_info',
   ],
 )
 

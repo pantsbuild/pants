@@ -3,13 +3,13 @@
 
 from textwrap import dedent
 
-from pants.core.project_info.list_backends import (
+from pants.engine.fs import EMPTY_SNAPSHOT, Digest, FileContent, FilesContent, PathGlobs, Snapshot
+from pants.option.global_options import GlobalOptions
+from pants.pants_info.list_backends import (
     BackendsOptions,
     hackily_get_module_docstring,
     list_backends,
 )
-from pants.engine.fs import EMPTY_SNAPSHOT, Digest, FileContent, FilesContent, PathGlobs, Snapshot
-from pants.option.global_options import GlobalOptions
 from pants.source.source_root import SourceRootConfig
 from pants.testutil.engine.util import MockConsole, MockGet, create_goal_subsystem, run_rule
 from pants.testutil.subsystem.util import global_subsystem_instance
