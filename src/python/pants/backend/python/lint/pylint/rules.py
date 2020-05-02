@@ -96,7 +96,7 @@ async def pylint_lint(
         )
     )
 
-    merged_input_files = await Get[Digest](
+    input_digest = await Get[Digest](
         MergeDigests(
             (
                 requirements_pex.digest,
@@ -122,7 +122,7 @@ async def pylint_lint(
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path=f"./pylint.pex",
         pex_args=generate_args(specified_source_files=specified_source_files, pylint=pylint),
-        input_files=merged_input_files,
+        input_digest=input_digest,
         description=f"Run Pylint on {pluralize(len(field_sets), 'target')}: {address_references}.",
     )
     result = await Get[FallibleProcessResult](Process, process)

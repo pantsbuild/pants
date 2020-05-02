@@ -372,7 +372,7 @@ class EngineInitializer:
         build_file_aliases = build_configuration.registered_aliases()
         rules = build_configuration.rules()
 
-        registered_target_types = RegisteredTargetTypes.create(build_configuration.targets())
+        registered_target_types = RegisteredTargetTypes.create(build_configuration.target_types())
 
         symbol_table = _legacy_symbol_table(build_file_aliases, registered_target_types)
 

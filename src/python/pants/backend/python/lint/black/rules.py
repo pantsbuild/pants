@@ -120,10 +120,10 @@ async def setup(
         )
     )
 
-    merged_input_files = await Get[Digest](
+    input_digest = await Get[Digest](
         MergeDigests(
             (all_source_files_snapshot.digest, requirements_pex.digest, config_snapshot.digest)
-        ),
+        )
     )
 
     address_references = ", ".join(
@@ -139,7 +139,7 @@ async def setup(
             black=black,
             check_only=request.check_only,
         ),
-        input_files=merged_input_files,
+        input_digest=input_digest,
         output_files=all_source_files_snapshot.files,
         description=(
             f"Run Black on {pluralize(len(request.field_sets), 'target')}: {address_references}."

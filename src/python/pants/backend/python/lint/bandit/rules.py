@@ -95,10 +95,10 @@ async def bandit_lint(
         )
     )
 
-    merged_input_files = await Get[Digest](
+    input_digest = await Get[Digest](
         MergeDigests(
             (all_source_files.snapshot.digest, requirements_pex.digest, config_snapshot.digest)
-        ),
+        )
     )
 
     address_references = ", ".join(
@@ -110,7 +110,7 @@ async def bandit_lint(
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path=f"./bandit.pex",
         pex_args=generate_args(specified_source_files=specified_source_files, bandit=bandit),
-        input_files=merged_input_files,
+        input_digest=input_digest,
         description=f"Run Bandit on {pluralize(len(field_sets), 'target')}: {address_references}.",
     )
     result = await Get[FallibleProcessResult](Process, process)

@@ -96,10 +96,10 @@ async def flake8_lint(
         )
     )
 
-    merged_input_files = await Get[Digest](
+    input_digest = await Get[Digest](
         MergeDigests(
             (all_source_files.snapshot.digest, requirements_pex.digest, config_snapshot.digest)
-        ),
+        )
     )
 
     address_references = ", ".join(
@@ -111,7 +111,7 @@ async def flake8_lint(
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path=f"./flake8.pex",
         pex_args=generate_args(specified_source_files=specified_source_files, flake8=flake8),
-        input_files=merged_input_files,
+        input_digest=input_digest,
         description=f"Run Flake8 on {pluralize(len(field_sets), 'target')}: {address_references}.",
     )
     result = await Get[FallibleProcessResult](Process, process)

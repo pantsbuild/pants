@@ -257,7 +257,7 @@ class PexTest(TestBase):
         process = Process(
             argv=("python", "test.pex"),
             env=env,
-            input_files=pex_output["pex"].digest,
+            input_digest=pex_output["pex"].digest,
             description="Run the pex and make sure it works",
         )
         result = self.request_single_product(ProcessResult, process)

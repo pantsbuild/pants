@@ -1041,8 +1041,8 @@ pub extern "C" fn run_local_interactive_process(
           Some(TempDir::new().map_err(|err| format!("Error creating tempdir: {}", err))?)
         };
 
-        let input_files_value = externs::project_ignoring_type(&value, "input_files");
-        let digest: Digest = nodes::lift_digest(&input_files_value)?;
+        let input_digest_value = externs::project_ignoring_type(&value, "input_digest");
+        let digest: Digest = nodes::lift_digest(&input_digest_value)?;
         if digest != EMPTY_DIGEST {
           if run_in_workspace {
             warn!("Local interactive process should not attempt to materialize files when run in workspace");
