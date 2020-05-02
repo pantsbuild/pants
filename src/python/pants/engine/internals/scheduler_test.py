@@ -193,11 +193,11 @@ class SchedulerTest(TestBase):
         # Confirm that we can pass in Params in order to provide multiple inputs to an execution.
         a, b = A(), B()
         result_str = self.request_single_product(str, Params(a, b))
-        self.assertEquals(result_str, consumes_a_and_b(a, b))
+        self.assertEqual(result_str, consumes_a_and_b(a, b))
 
         # And confirm that a superset of Params is also accepted.
         result_str = self.request_single_product(str, Params(a, b, self))
-        self.assertEquals(result_str, consumes_a_and_b(a, b))
+        self.assertEqual(result_str, consumes_a_and_b(a, b))
 
         # But not a subset.
         expected_msg = "No installed @rules can compute {} given input Params(A), but".format(
@@ -211,7 +211,7 @@ class SchedulerTest(TestBase):
         # the selectors of consumes_a_and_b().
         a, c = A(), C()
         result_str = self.request_single_product(str, Params(a, c))
-        self.assertEquals(
+        self.assertEqual(
             remove_locations_from_traceback(result_str),
             remove_locations_from_traceback(consumes_a_and_b(a, transitive_b_c(c))),
         )

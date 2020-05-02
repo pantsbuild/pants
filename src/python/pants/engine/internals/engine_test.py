@@ -348,7 +348,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
 
         flattened = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
         # The execution of the single named @rule "fib" should be providing this one workunit.
-        self.assertEquals(len(flattened), 1)
+        self.assertEqual(len(flattened), 1)
 
         tracker.finished_workunit_chunks = []
         with handler.session():
