@@ -202,6 +202,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Tomasz Pasternak
 + Travis Crawford
 + Troy Howard
++ Tushar Singh
 + Ugo Di Girolamo
 + Wei An
 + Wilhelmina Drengwitz
