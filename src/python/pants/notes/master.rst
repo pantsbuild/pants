@@ -34,17 +34,11 @@ New Features
 * Add Protobuf Python support to V2 (#9651)
   `PR #9651 <https://github.com/pantsbuild/pants/pull/9651>`_
 
-* Add generic mechanism to codegen sources in V2 (#9634)
-  `PR #9634 <https://github.com/pantsbuild/pants/pull/9634>`_
-
 * [jvm-platform] add strict as an attr to jvm platforms (#9287)
   `PR #9287 <https://github.com/pantsbuild/pants/pull/9287>`_
 
 * Add the ability to write junit test results file for pytest runs. (#9594)
   `PR #9594 <https://github.com/pantsbuild/pants/pull/9594>`_
-
-* Rules to extract archives. (#9624)
-  `PR #9624 <https://github.com/pantsbuild/pants/pull/9624>`_
 
 Bugfixes
 ~~~~~~~~
@@ -54,6 +48,12 @@ Bugfixes
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Rules to extract archives. (#9624)
+  `PR #9624 <https://github.com/pantsbuild/pants/pull/9624>`_
+
+* Add generic mechanism to codegen sources in V2 (#9634)
+  `PR #9634 <https://github.com/pantsbuild/pants/pull/9634>`_
 
 * Allow `HydratedSourcesRequest` to indicate which Sources types are expected (#9641)
   `PR #9641 <https://github.com/pantsbuild/pants/pull/9641>`_
