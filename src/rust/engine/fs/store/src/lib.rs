@@ -25,6 +25,9 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+#[macro_use]
+extern crate log;
+
 mod snapshot;
 pub use crate::snapshot::{OneOffStoreFileByDigest, Snapshot, StoreFileByDigest};
 #[cfg(test)]
