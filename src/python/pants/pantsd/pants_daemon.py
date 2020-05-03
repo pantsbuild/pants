@@ -180,6 +180,7 @@ class PantsDaemon(FingerprintedProcessManager):
                     build_root,
                     bootstrap_options_values,
                     legacy_graph_scheduler,
+                    native,
                     watchman,
                     union_membership=UnionMembership(build_config.union_rules()),
                 )
@@ -207,6 +208,7 @@ class PantsDaemon(FingerprintedProcessManager):
             build_root,
             bootstrap_options,
             legacy_graph_scheduler,
+            native,
             watchman,
             union_membership: UnionMembership,
         ):
@@ -214,7 +216,7 @@ class PantsDaemon(FingerprintedProcessManager):
 
             :returns: A PantsServices instance.
             """
-            should_shutdown_after_run = bootstrap_options.shutdown_pantsd_after_run
+            native.override_thread_logging_destination_to_just_pantsd()
             fs_event_service = (
                 FSEventService(
                     watchman, scheduler=legacy_graph_scheduler.scheduler, build_root=build_root
@@ -236,10 +238,9 @@ class PantsDaemon(FingerprintedProcessManager):
             )
 
             pailgun_service = PailgunService(
-                (bootstrap_options.pantsd_pailgun_host, bootstrap_options.pantsd_pailgun_port),
-                DaemonPantsRunner,
+                bootstrap_options.pantsd_pailgun_port,
+                DaemonPantsRunner(scheduler_service),
                 scheduler_service,
-                should_shutdown_after_run,
             )
 
             store_gc_service = StoreGCService(legacy_graph_scheduler.scheduler)
@@ -255,7 +256,7 @@ class PantsDaemon(FingerprintedProcessManager):
                     )
                     if service is not None
                 ),
-                port_map=dict(pailgun=pailgun_service.pailgun_port),
+                port_map=dict(pailgun=pailgun_service.pailgun_port()),
             )
 
     def __init__(

@@ -151,7 +151,7 @@ class RemotePantsRunner:
         port = pantsd_handle.port
         pid = pantsd_handle.pid
         # Merge the nailgun TTY capability environment variables with the passed environment dict.
-        ng_env = NailgunProtocol.isatty_to_env(self._stdin, self._stdout, self._stderr)
+        ng_env = NailgunProtocol.ttynames_to_env(self._stdin, self._stdout, self._stderr)
         modified_env = {
             **self._env,
             **ng_env,

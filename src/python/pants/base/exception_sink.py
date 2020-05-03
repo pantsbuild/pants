@@ -470,10 +470,8 @@ Exception message: {exception_message}{maybe_newline}
         cls._exiter.exit_and_fail(msg=formatted_terminal_msg, out=cls._interactive_output_stream)
 
     @classmethod
-    def _log_unhandled_exception_and_exit(
-        cls, exc_class=None, exc=None, tb=None, add_newline=False
-    ):
-        """A sys.excepthook implementation which logs the error and exits with failure."""
+    def log_unhandled_exception(cls, exc_class=None, exc=None, tb=None, add_newline=False):
+        """Logs an unhandled exception to a variety of locations"""
         exc_class = exc_class or sys.exc_info()[0]
         exc = exc or sys.exc_info()[1]
         tb = tb or sys.exc_info()[2]
@@ -508,6 +506,16 @@ Exception message: {exception_message}{maybe_newline}
             # see that boilerplate by default.
             error_msgs = getattr(exc, "end_user_messages", lambda: [str(exc)])()
             stderr_printed_error = "\n" + "\n".join(f"ERROR: {msg}" for msg in error_msgs)
+        return stderr_printed_error
+
+    @classmethod
+    def _log_unhandled_exception_and_exit(
+        cls, exc_class=None, exc=None, tb=None, add_newline=False
+    ):
+        """A sys.excepthook implementation which logs the error and exits with failure."""
+        stderr_printed_error = cls.log_unhandled_exception(
+            exc_class=exc_class, exc=exc, tb=tb, add_newline=add_newline
+        )
         cls._exit_with_failure(stderr_printed_error)
 
     _CATCHABLE_SIGNAL_ERROR_LOG_FORMAT = """\

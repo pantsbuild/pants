@@ -20,6 +20,7 @@ python_library(
     '3rdparty/python:psutil',
     ':nailgun_io',
     ':nailgun_protocol',
+    'src/python/pants/base:exiter',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:osutil',
     'src/python/pants/util:socket',

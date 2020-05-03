@@ -109,6 +109,7 @@ impl Core {
       .build()
       .map_err(|e| format!("Failed to start the runtime: {}", e))?;
     let executor = task_executor::Executor::new(runtime.handle().clone());
+
     // We re-use these certs for both the execution and store service; they're generally tied together.
     let root_ca_certs = if let Some(path) = remote_root_ca_certs_path {
       Some(

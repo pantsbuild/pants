@@ -1,89 +1,59 @@
-# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-from contextlib import contextmanager
+import time
 
-from pants.pantsd.pailgun_server import PailgunServer
+from pants.engine.internals.native import RawFdRunner
 from pants.pantsd.service.pants_service import PantsService
+from pants.pantsd.service.scheduler_service import SchedulerService
+
+logger = logging.getLogger(__name__)
 
 
 class PailgunService(PantsService):
     """A service that runs the Pailgun server."""
 
-    def __init__(self, bind_addr, runner_class, scheduler_service, shutdown_after_run):
+    def __init__(
+        self, port_requested: int, runner: RawFdRunner, scheduler_service: SchedulerService,
+    ):
         """
-        :param tuple bind_addr: The (hostname, port) tuple to bind the Pailgun server to.
-        :param class runner_class: The `PantsRunner` class to be used for Pailgun runs. Generally this
-          will be `DaemonPantsRunner`, but this decoupling avoids a cycle between the `pants.pantsd` and
-          `pants.bin` packages.
-        :param SchedulerService scheduler_service: The SchedulerService instance for access to the
-                                                   resident scheduler.
-        :param bool shutdown_after_run: PailgunService should shut down after running the first request.
+        :param port_requested: A port to bind the service to, or 0 to choose a random port (which
+          will be exposed by `pailgun_port`).
+        :param runner: A runner for inbound requests. Generally this will be a method of
+          `DaemonPantsRunner`.
+        :param scheduler_service: The SchedulerService instance for access to the resident scheduler.
         """
         super().__init__()
-        self._bind_addr = bind_addr
-        self._runner_class = runner_class
-        self._scheduler_service = scheduler_service
 
-        self._logger = logging.getLogger(__name__)
-        self._pailgun = None
-        self._shutdown_after_run = shutdown_after_run if shutdown_after_run else False
+        self._scheduler = scheduler_service._scheduler
+        self._server = self._setup_server(port_requested, runner)
 
-    @property
-    def pailgun(self):
-        if not self._pailgun:
-            self._pailgun = self._setup_pailgun()
-        return self._pailgun
+    def _setup_server(self, port_requested, runner):
+        return self._scheduler.new_nailgun_server(port_requested, runner)
 
-    @property
     def pailgun_port(self):
-        return self.pailgun.server_port
-
-    def _request_complete_callback(self):
-        if self._shutdown_after_run:
-            self.terminate()
-
-    def _setup_pailgun(self):
-        """Sets up a PailgunServer instance."""
-        # Constructs and returns a runnable PantsRunner.
-        def runner_factory(sock, arguments, environment):
-            return self._runner_class.create(sock, arguments, environment, self._scheduler_service,)
-
-        # Plumb the daemon's lifecycle lock to the `PailgunServer` to safeguard teardown.
-        # This indirection exists to allow the server to be created before PantsService.setup
-        # has been called to actually initialize the `services` field.
-        @contextmanager
-        def lifecycle_lock():
-            with self.services.lifecycle_lock:
-                yield
-
-        return PailgunServer(
-            self._bind_addr, runner_factory, lifecycle_lock, self._request_complete_callback
-        )
+        return self._scheduler.nailgun_server_await_bound(self._server)
 
     def run(self):
         """Main service entrypoint.
 
         Called via Thread.start() via PantsDaemon.run().
         """
-        self._logger.info("starting pailgun server on port {}".format(self.pailgun_port))
-
         try:
-            # Manually call handle_request() in a loop vs serve_forever() for interruptability.
+            logger.info("started pailgun server on port {}".format(self.pailgun_port()))
             while not self._state.is_terminating:
-                self.pailgun.handle_request()
-                self._state.maybe_pause()
-        except Exception:
-            self._logger.error("pailgun service shutting down due to an error", exc_info=True)
+                # Once the server has started, `await_bound` will return quickly with an error if it
+                # has exited.
+                self.pailgun_port()
+                time.sleep(0.5)
+        except:  # noqa: E722
+            logger.error("pailgun service shutting down due to an error", exc_info=True)
+            self.terminate()
         finally:
-            self._logger.info("pailgun service on port {} shutting down".format(self.pailgun_port))
+            logger.info("pailgun service on shutting down")
 
     def terminate(self):
-        """Override of PantsService.terminate() that cleans up when the Pailgun server is
-        terminated."""
-        # Tear down the Pailgun TCPServer.
-        if self.pailgun:
-            self.pailgun.server_close()
-
+        """Override of PantsService.terminate() that drops the server when terminated."""
+        self._server = None
         super().terminate()

@@ -64,7 +64,6 @@ class NailgunProtocol:
     """
 
     ENVIRON_SEP = "="
-    TTY_ENV_TMPL = "NAILGUN_TTY_{}"
     TTY_PATH_ENV = "NAILGUN_TTY_PATH_{}"
     HEADER_FMT = b">Ic"
     HEADER_BYTES = 5
@@ -350,7 +349,7 @@ class NailgunProtocol:
         return str(obj).encode()
 
     @classmethod
-    def isatty_to_env(cls, stdin, stdout, stderr):
+    def ttynames_to_env(cls, stdin, stdout, stderr):
         """Generate nailgun tty capability environment variables based on checking a set of fds.
 
         :param file stdin: The stream to check for stdin tty capabilities.
@@ -361,31 +360,9 @@ class NailgunProtocol:
 
         def gen_env_vars():
             for fd_id, fd in zip(STDIO_DESCRIPTORS, (stdin, stdout, stderr)):
-                is_atty = fd.isatty()
-                yield (cls.TTY_ENV_TMPL.format(fd_id), cls.encode_env_var_value(int(is_atty)))
-                if is_atty:
+                if fd.isatty():
                     yield (cls.TTY_PATH_ENV.format(fd_id), os.ttyname(fd.fileno()) or b"")
-
         return dict(gen_env_vars())
-
-    @classmethod
-    def isatty_from_env(cls, env):
-        """Determine whether remote file descriptors are tty capable using std nailgunned env
-        variables.
-
-        :param dict env: A dictionary representing the environment.
-        :returns: A tuple of boolean values indicating istty or not for (stdin, stdout, stderr).
-        """
-
-        def str_int_bool(i):
-            return i.isdigit() and bool(
-                int(i)
-            )  # Environment variable values should always be strings.
-
-        return tuple(
-            str_int_bool(env.get(cls.TTY_ENV_TMPL.format(fd_id), "0"))
-            for fd_id in STDIO_DESCRIPTORS
-        )
 
     @classmethod
     def ttynames_from_env(cls, env):

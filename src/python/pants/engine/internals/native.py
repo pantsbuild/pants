@@ -10,10 +10,11 @@ import sysconfig
 import traceback
 from contextlib import closing
 from types import CoroutineType
-from typing import Any, Iterable, List, NamedTuple, Tuple, Type, cast
+from typing import Any, Dict, Iterable, List, NamedTuple, Tuple, Type, cast
 
 import cffi
 import pkg_resources
+from typing_extensions import Protocol
 
 from pants.base.project_tree import Dir, File, Link
 from pants.engine.addresses import Address
@@ -605,6 +606,20 @@ class RawResult(NamedTuple):
     raw_pointer: Any
 
 
+class RawFdRunner(Protocol):
+    def __call__(
+        self,
+        command: str,
+        args: Tuple[str, ...],
+        env: Dict[str, str],
+        working_directory: bytes,
+        stdin_fd: int,
+        stdout_fd: int,
+        stderr_fd: int,
+    ) -> int:
+        ...
+
+
 class ExternContext:
     """A wrapper around python objects used in static extern functions in this module.
 
@@ -675,6 +690,15 @@ class ExternContext:
             raise value
         else:
             return value
+
+    def raise_raw_or_return(self, raw_result):
+        """Consumes the given RawResult to raise/return the exception/value it represents."""
+        if raw_result.is_throw:
+            value = self.from_value(raw_result.throw_handle)
+            self.drop_handles([raw_result.throw_handle])
+            raise value
+        else:
+            return raw_result.raw_pointer
 
     def drop_handles(self, handles):
         self._handles -= set(handles)
@@ -894,6 +918,16 @@ class Native(metaclass=SingletonMetaclass):
         result = self.lib.match_path_globs(path_globs, paths_buf)
         return cast(bool, self.context.raise_or_return(result))
 
+    def nailgun_server_await_bound(self, scheduler, nailgun_server) -> int:
+        result = self.lib.nailgun_server_await_bound(scheduler, nailgun_server)
+        return cast(int, self.context.raise_or_return(result))
+
+    def new_nailgun_server(self, scheduler, port: int, runner: RawFdRunner) -> Any:
+        nailgun_server = self.context.raise_raw_or_return(
+            self.lib.nailgun_server_create(scheduler, port, Function(self.context.to_key(runner)))
+        )
+        return self.gc(nailgun_server, self.lib.nailgun_server_destroy)
+
     def new_tasks(self):
         return self.gc(self.lib.tasks_create(), self.lib.tasks_destroy)
 
@@ -972,7 +1006,7 @@ class Native(metaclass=SingletonMetaclass):
             construct_platform=func(Platform),
         )
 
-        scheduler_result = self.lib.scheduler_create(
+        scheduler_raw_result = self.lib.scheduler_create(
             tasks,
             engine_types,
             # Project tree.
@@ -1006,12 +1040,7 @@ class Native(metaclass=SingletonMetaclass):
             self.context.utf8_dict(execution_options.remote_execution_headers),
             execution_options.process_execution_local_enable_nailgun,
         )
-        if scheduler_result.is_throw:
-            value = self.context.from_value(scheduler_result.throw_handle)
-            self.context.drop_handles([scheduler_result.throw_handle])
-            raise value
-        else:
-            scheduler = scheduler_result.raw_pointer
+        scheduler = self.context.raise_raw_or_return(scheduler_raw_result)
         return self.gc(scheduler, self.lib.scheduler_destroy)
 
     def set_panic_handler(self):
