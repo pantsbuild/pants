@@ -289,7 +289,7 @@ impl Scheduler {
     roots: Vec<Root>,
   ) {
     let core = context.core.clone();
-    core.executor.spawn_and_ignore(async move {
+    let _join = core.executor.spawn(async move {
       let res = future03::join_all(
         roots
           .into_iter()

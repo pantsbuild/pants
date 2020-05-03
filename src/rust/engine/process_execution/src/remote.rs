@@ -80,7 +80,7 @@ impl Drop for CancelRemoteExecutionToken {
         .cancel_operation_async(&cancel_op_req)
       {
         Ok(receiver) => {
-          self.executor.spawn_and_ignore(async move {
+          let _join = self.executor.spawn(async move {
             match receiver.compat().await {
               Ok(_) => debug!("Canceled operation {} successfully", operation_name),
               Err(err) => debug!("Failed to cancel operation {}, err {}", operation_name, err),
