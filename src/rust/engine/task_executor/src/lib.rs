@@ -64,7 +64,7 @@ impl Executor {
     future: F,
   ) -> impl Future<Output = O> {
     tokio::spawn(Self::future_with_correct_context(future))
-      .map(|e| e.expect("Background task exited unsafely."))
+      .map(|r| r.expect("Background task exited unsafely."))
   }
 
   ///
@@ -110,7 +110,7 @@ impl Executor {
       workunit_store::set_thread_workunit_state(workunit_state);
       f()
     })
-    .map(|e| e.expect("Background task exited unsafely."))
+    .map(|r| r.expect("Background task exited unsafely."))
   }
 
   ///
