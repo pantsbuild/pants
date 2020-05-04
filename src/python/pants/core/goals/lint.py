@@ -17,6 +17,7 @@ from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import FieldSetWithOrigin, Sources, TargetsWithOrigins
 from pants.engine.unions import UnionMembership, union
+from pants.util.strutil import strip_v2_chroot_path
 
 
 @dataclass(frozen=True)
@@ -30,11 +31,16 @@ class LintResult:
         return LintResult(exit_code=0, stdout="", stderr="")
 
     @staticmethod
-    def from_fallible_process_result(process_result: FallibleProcessResult,) -> "LintResult":
+    def from_fallible_process_result(
+        process_result: FallibleProcessResult, *, strip_chroot_path: bool = False
+    ) -> "LintResult":
+        def prep_output(s: bytes) -> str:
+            return strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
+
         return LintResult(
             exit_code=process_result.exit_code,
-            stdout=process_result.stdout.decode(),
-            stderr=process_result.stderr.decode(),
+            stdout=prep_output(process_result.stdout),
+            stderr=prep_output(process_result.stderr),
         )
 
 

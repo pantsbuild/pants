@@ -147,7 +147,9 @@ async def isort_fmt(field_sets: IsortFieldSets, isort: Isort) -> FmtResult:
         return FmtResult.noop()
     setup = await Get[Setup](SetupRequest(field_sets, check_only=False))
     result = await Get[ProcessResult](Process, setup.process)
-    return FmtResult.from_process_result(result, original_digest=setup.original_digest)
+    return FmtResult.from_process_result(
+        result, original_digest=setup.original_digest, strip_chroot_path=True
+    )
 
 
 @named_rule(desc="Lint using isort")
@@ -156,7 +158,7 @@ async def isort_lint(field_sets: IsortFieldSets, isort: Isort) -> LintResult:
         return LintResult.noop()
     setup = await Get[Setup](SetupRequest(field_sets, check_only=True))
     result = await Get[FallibleProcessResult](Process, setup.process)
-    return LintResult.from_fallible_process_result(result)
+    return LintResult.from_fallible_process_result(result, strip_chroot_path=True)
 
 
 def rules():
