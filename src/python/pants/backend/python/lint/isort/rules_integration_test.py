@@ -70,7 +70,7 @@ class IsortIntegrationTest(TestBase):
         lint_result = self.request_single_product(
             LintResult, Params(IsortFieldSets(field_sets), options_bootstrapper)
         )
-        input_snapshot = self.request_single_product(
+        input_sources = self.request_single_product(
             SourceFiles,
             Params(
                 AllSourceFilesRequest(field_set.sources for field_set in field_sets),
@@ -80,7 +80,7 @@ class IsortIntegrationTest(TestBase):
         fmt_result = self.request_single_product(
             FmtResult,
             Params(
-                IsortFieldSets(field_sets, prior_formatter_result=input_snapshot),
+                IsortFieldSets(field_sets, prior_formatter_result=input_sources.snapshot),
                 options_bootstrapper,
             ),
         )
