@@ -83,7 +83,7 @@ function activate_pants_venv() {
     ensure_gcc
 
     for req in "${REQUIREMENTS[@]}"; do
-      pip install ${pip_extra} -r "${req}" || \
+      pip install "${pip_extra}" -r "${req}" || \
         die "Failed to install requirements from ${req}."
     done
     touch "${BOOTSTRAPPED_FILE}"
