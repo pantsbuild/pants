@@ -68,9 +68,11 @@ function activate_pants_venv() {
 
   if ! [ -f "${BOOTSTRAPPED_FILE}" ]; then
     log "Bootstrapping pants_deps with requirements:"
-    # Use -f ${REPO_ROOT}/third_party if patching in local dependencies like so
-    # pip_extra="-f ${REPO_ROOT}/third_party"
-    pip_extra=""
+    # Use -f ${REPO_ROOT}/third_party if patching in local dependencies like so:
+    #
+    #   pip_extra=(-f "${REPO_ROOT}/third_party")
+    #
+    pip_extra=()
 
     for req in "${REQUIREMENTS[@]}"; do
       log "  ${req}"
@@ -83,7 +85,7 @@ function activate_pants_venv() {
     ensure_gcc
 
     for req in "${REQUIREMENTS[@]}"; do
-      pip install "${pip_extra}" -r "${req}" || \
+      pip install "${pip_extra[@]}" -r "${req}" || \
         die "Failed to install requirements from ${req}."
     done
     touch "${BOOTSTRAPPED_FILE}"
