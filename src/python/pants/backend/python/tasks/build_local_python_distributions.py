@@ -11,7 +11,6 @@ from pex.interpreter import PythonInterpreter
 
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.link_shared_libraries import SharedLibrary
-from pants.backend.python.subsystems.pex_build_util import is_local_python_dist
 from pants.backend.python.subsystems.python_native_code import (
     BuildSetupRequiresPex,
     PythonNativeCode,

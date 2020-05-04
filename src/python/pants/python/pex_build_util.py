@@ -17,6 +17,7 @@ from pex.resolver import resolve
 from pex.util import DistributionHelper
 from pex.version import __version__ as pex_version
 from pkg_resources import Distribution, get_provider
+from twitter.common.collections import OrderedSet
 
 from pants.backend.python.subsystems.ipex import ipex_launcher
 from pants.backend.python.targets.python_binary import PythonBinary
@@ -35,7 +36,6 @@ from pants.python.python_setup import PythonSetup
 from pants.subsystem.subsystem import Subsystem
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_file
-from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import module_dirname
 
 
@@ -239,23 +239,6 @@ class PexBuilderWrapper:
                   requirements
                   needed to resolve the initial given requirements `reqs` for the given platforms.
         """
-        distributions = self._resolve_distributions_by_platform(reqs, platforms=["current"])
-        try:
-            matched_dist = assert_single_element(
-                list(
-                    dist
-                    for _, dists in distributions.items()
-                    for dist in dists
-                    if dist.key == dist_key
-                )
-            )
-        except (StopIteration, ValueError) as e:
-            raise self.SingleDistExtractionError(
-                f"Exactly one dist was expected to match name {dist_key} in requirements {reqs}: {e!r}"
-            )
-        return matched_dist
-
-    def _resolve_distributions_by_platform(self, reqs, platforms):
         deduped_reqs = OrderedSet(reqs)
         find_links: OrderedSet[str] = OrderedSet()
         for req in deduped_reqs:
@@ -502,7 +485,7 @@ class PexBuilderWrapper:
             allow_prereleases=UnsetBool.coerce_bool(
                 python_setup.resolver_allow_prereleases, default=True
             ),
-            manylinux=python_setup.manylinux,
+            use_manylinux=python_setup.use_manylinux,
         )
 
         # IPEX-INFO: A json mapping interpreted in ipex_launcher.py:

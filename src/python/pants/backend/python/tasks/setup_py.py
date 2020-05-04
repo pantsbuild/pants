@@ -30,7 +30,6 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import sort_targets
 from pants.build_graph.resources import Resources
 from pants.python.pex_build_util import is_local_python_dist
-from pants.python.setup_py_runner import SetupPyRunner
 from pants.task.task import Task
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_concurrent_creation, safe_rmtree, safe_walk
