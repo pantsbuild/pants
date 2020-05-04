@@ -220,8 +220,8 @@ def load_plugins(
         # bindings for targets to avoid breaking V1-only goals; and there is no V2 entry-point for
         # `objects` yet. Purely V2-repos can ignore `build_file_aliases`.
         if "target_types" in entries:
-            targets = entries["target_types"].load()()
-            build_configuration.register_targets(targets)
+            target_types = entries["target_types"].load()()
+            build_configuration.register_target_types(target_types)
         if "build_file_aliases" in entries:
             aliases = entries["build_file_aliases"].load()()
             build_configuration.register_aliases(aliases)
@@ -291,9 +291,9 @@ def load_backend(
 
     # See the comment in `load_plugins` for why we load both `target_types` and
     # `build_file_aliases` in both V1 and V2.
-    targets = invoke_entrypoint("target_types")
-    if targets:
-        build_configuration.register_targets(targets)
+    target_types = invoke_entrypoint("target_types")
+    if target_types:
+        build_configuration.register_target_types(target_types)
     build_file_aliases = invoke_entrypoint("build_file_aliases")
     if build_file_aliases:
         build_configuration.register_aliases(build_file_aliases)

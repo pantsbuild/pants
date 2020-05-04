@@ -63,8 +63,11 @@ class GoalSubsystem(SubsystemClientMixin, Optionable):
         # changes when switching to v2-exclusive mode (e.g., some v1 options aren't even registered
         # in that mode), so this is in keeping with existing expectations. And this provides
         # a much better experience to new users who never encountered v1 anyway.
-        if is_v2_exclusive and cls.name.endswith("2"):
-            return cls.name[:-1]
+        if is_v2_exclusive:
+            if cls.name == "list-v2":
+                return "list"
+            if cls.name.endswith("2"):
+                return cls.name[:-1]
         return cls.name
 
     @classproperty

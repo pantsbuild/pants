@@ -183,12 +183,17 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
                 pexes=[mypy_requirement_pex, *extra_pexes],
             ) as builder:
                 with temporary_file(binary_mode=False) as exe_fp:
-                    # MyPy searches for types for a package in packages containing a `py.types` marker file
-                    # or else in a sibling `<package>-stubs` package as per PEP-0561. Going further than that
-                    # PEP, MyPy restricts its search to `site-packages`. Since PEX deliberately isolates
-                    # itself from `site-packages` as part of its raison d'etre, we monkey-patch
-                    # `site.getsitepackages` to look inside the scrubbed PEX sys.path before handing off to
-                    # `mypy`.
+                    # MyPy searches for types for a package in packages containing a `py.types`
+                    # marker file or else in a sibling `<package>-stubs` package as per PEP-0561.
+                    # Going further than that PEP, MyPy restricts its search to `site-packages`.
+                    # Since PEX deliberately isolates itself from `site-packages` as part of its
+                    # raison d'etre, we monkey-patch `site.getsitepackages` to look inside the
+                    # scrubbed PEX sys.path before handing off to `mypy`.
+                    #
+                    # As a complication, MyPy does its own validation to ensure packages aren't
+                    # both available in site-packages and on the PYTHONPATH. As such, we elide all
+                    # PYTHONPATH entries from artificial site-packages we set up since MyPy will
+                    # manually scan PYTHONPATH outside this PEX to find packages.
                     #
                     # See:
                     #   https://mypy.readthedocs.io/en/stable/installed_packages.html#installed-packages
@@ -196,14 +201,20 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
                     exe_fp.write(
                         dedent(
                             """
+                            import os
                             import runpy
                             import site
                             import sys
-                
-                
-                            site.getsitepackages = lambda: sys.path[:]
-                
+
+                            PYTHONPATH = frozenset(
+                                os.path.realpath(p)
+                                for p in os.environ.get('PYTHONPATH', '').split(os.pathsep)
+                            )
                             
+                            site.getsitepackages = lambda: [
+                                p for p in sys.path if os.path.realpath(p) not in PYTHONPATH
+                            ]
+
                             runpy.run_module('mypy', run_name='__main__')
                             """
                         )

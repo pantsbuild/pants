@@ -48,8 +48,8 @@ class TestEngineOptionsParsing(TestBase):
         # If two OptionsBootstrapper instances are not equal, memoization will definitely not kick in.
         one_opts = ob()
         two_opts = ob()
-        self.assertEquals(one_opts, two_opts)
-        self.assertEquals(hash(one_opts), hash(two_opts))
+        self.assertEqual(one_opts, two_opts)
+        self.assertEqual(hash(one_opts), hash(two_opts))
 
         # If they are equal, executing parsing on them should result in a memoized object.
         one = parse(one_opts)

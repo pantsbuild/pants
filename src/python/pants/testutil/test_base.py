@@ -302,7 +302,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         build_config = BuildConfiguration()
         build_config.register_aliases(cls.alias_groups())
         build_config.register_rules(cls.rules())
-        build_config.register_targets(cls.target_types())
+        build_config.register_target_types(cls.target_types())
         return build_config
 
     def setUp(self):

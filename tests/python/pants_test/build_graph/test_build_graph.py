@@ -208,11 +208,8 @@ class BuildGraphTest(TestBase):
 
         self.assertEqual(OrderedSet([d, a, c, b]), BuildGraph.closure(d_gen()))
 
-        def empty_gen():
-            return
-            yield  # type: ignore[misc] # MyPy complains that this is not reachable
-
-        self.assertEqual(OrderedSet([]), BuildGraph.closure(empty_gen()))
+        empty_gen = iter(())
+        self.assertEqual(OrderedSet([]), BuildGraph.closure(empty_gen))
 
     def test_closure_bfs(self):
         root = self.inject_graph(

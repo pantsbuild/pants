@@ -350,12 +350,10 @@ impl Context {
   pub fn get<N: WrappedNode>(&self, node: N) -> BoxFuture<N::Item, Failure> {
     // TODO: Odd place for this... could do it periodically in the background?
     maybe_drop_handles();
-    let result = if let Some(entry_id) = self.entry_id {
-      self.core.graph.get(entry_id, self, node.into()).to_boxed()
-    } else {
-      self.core.graph.create(node.into(), self).to_boxed()
-    };
-    result
+    self
+      .core
+      .graph
+      .get(self.entry_id, self, node.into())
       .map(|node_result| {
         node_result
           .try_into()
@@ -393,8 +391,6 @@ impl NodeContext for Context {
   where
     F: Future<Item = (), Error = ()> + Send + 'static,
   {
-    self.core.executor.spawn_and_ignore(async move {
-      let _ = future.compat().await;
-    });
+    let _join = self.core.executor.spawn(future.compat());
   }
 }

@@ -11,8 +11,10 @@ from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get
 
 
+# TODO: when deleting this, be sure to update engine/goal.py and core/register.py to no longer
+#  unregister this goal and rename `list-v2` to `list`.
 class ListOptions(LineOriented, GoalSubsystem):
-    """Lists all targets matching the target specs."""
+    """Lists all targets matching the file or target arguments."""
 
     name = "list"
 

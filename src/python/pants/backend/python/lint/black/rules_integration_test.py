@@ -63,7 +63,7 @@ class BlackIntegrationTest(ExternalToolTestBase):
         lint_result = self.request_single_product(
             LintResult, Params(BlackFieldSets(field_sets), options_bootstrapper)
         )
-        input_snapshot = self.request_single_product(
+        input_sources = self.request_single_product(
             SourceFiles,
             Params(
                 AllSourceFilesRequest(field_set.sources for field_set in field_sets),
@@ -73,7 +73,7 @@ class BlackIntegrationTest(ExternalToolTestBase):
         fmt_result = self.request_single_product(
             FmtResult,
             Params(
-                BlackFieldSets(field_sets, prior_formatter_result=input_snapshot),
+                BlackFieldSets(field_sets, prior_formatter_result=input_sources.snapshot),
                 options_bootstrapper,
             ),
         )
