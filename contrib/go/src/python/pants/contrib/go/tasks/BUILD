@@ -15,7 +15,6 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/option',
     'src/python/pants/process',
-    'src/python/pants/source',
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
