@@ -25,6 +25,10 @@ class GoalRuleResult:
     stdout: str
     stderr: str
 
+    @staticmethod
+    def noop() -> "GoalRuleResult":
+        return GoalRuleResult(0, stdout="", stderr="")
+
 
 class GoalRuleTestBase(TestBase):
     """A baseclass useful for testing a Goal defined as a @goal_rule."""

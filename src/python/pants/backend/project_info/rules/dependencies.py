@@ -23,7 +23,6 @@ class DependencyType(Enum):
     SOURCE_AND_THIRD_PARTY = "source-and-3rdparty"
 
 
-# TODO(#8762) Get this rule to feature parity with the dependencies task.
 class DependenciesOptions(LineOriented, GoalSubsystem):
     """List the dependencies of the input targets."""
 
