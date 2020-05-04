@@ -25,9 +25,9 @@ from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.python.python_setup import PythonSetup
+from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.subsystem.util import init_subsystem
-from pants.testutil.test_base import TestBase
 from pants.util.strutil import create_path_env_var
 
 
@@ -154,7 +154,7 @@ def parse_requirements(requirements: Iterable[str]) -> Iterator[ExactRequirement
         yield ExactRequirement.parse(requirement)
 
 
-class PexTest(TestBase):
+class PexTest(ExternalToolTestBase):
     @classmethod
     def rules(cls):
         return (
