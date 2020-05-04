@@ -484,7 +484,7 @@ class ExportDepAsJar(ConsoleTask):
             non_modulizable_deps = [dep for dep in dependencies if dep not in modulizable_targets]
             entry: OrderedSet[Target] = OrderedSet()
             for dep in non_modulizable_deps:
-                entry.update(flat_deps.get(dep, set()).union({dep}))
+                entry.update(OrderedSet([*flat_deps.get(dep, set()), dep]))
             flat_deps[target_key] = OrderedSet(entry)
 
         targets_with_strict_deps = [t for t in modulizable_targets if self._is_strict_deps(t)]
