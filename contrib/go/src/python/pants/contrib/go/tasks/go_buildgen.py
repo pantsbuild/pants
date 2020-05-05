@@ -34,9 +34,6 @@ class GoTargetGenerator:
         For example, a Go main package was defined as a GoLibrary instead of a GoBinary.
         """
 
-    class RemoteRequired(GenerationError):
-        """Indicates that the --remote-root was required but not specified."""
-
     class NewRemoteEncounteredButRemotesNotAllowedError(GenerationError):
         """Indicates a new remote library dependency was found but --remote was not enabled."""
 
@@ -47,14 +44,14 @@ class GoTargetGenerator:
         local_root,
         fetcher_factory,
         generate_remotes=False,
-        remote_root=None,
+        remote_root_func=None,
     ):
         self._import_oracle = import_oracle
         self._build_graph = build_graph
         self._local_source_root = local_root
         self._fetcher_factory = fetcher_factory
         self._generate_remotes = generate_remotes
-        self._remote_source_root = remote_root
+        self._remote_source_root_func = remote_root_func
 
     def generate(self, local_go_targets):
         """Automatically generates a Go target graph for the given local go targets.
@@ -90,11 +87,9 @@ class GoTargetGenerator:
                             remote_root, import_path
                         )
                         name = remote_pkg_path or os.path.basename(import_path)
-                        if not self._remote_source_root:
-                            raise self.RemoteRequired(
-                                "You must provide the remote source root with --remote-root"
-                            )
-                        address = Address(os.path.join(self._remote_source_root, remote_root), name)
+                        address = Address(
+                            os.path.join(self._remote_source_root_func(), remote_root), name
+                        )
                         try:
                             self._build_graph.inject_address_closure(address)
                         except AddressLookupError:
@@ -422,7 +417,27 @@ class GoBuildgen(GoTask):
                 f"multiple build roots: {', '.join(sorted(local_roots))}"
             )
         local_root = local_roots.pop()
-        remote_root = self.get_options().remote_root
+
+        def infer_remote_root():
+            inferrable_roots = ["3rdparty/go", "3rd_party/go", "thirdparty/go", "third_party/go"]
+            msg = (
+                f"You can provide an explicit remote source root by setting remote_root in the "
+                f"[{self.options_scope}] section of your config file."
+            )
+            rr = None
+            for path in inferrable_roots:
+                if os.path.isdir(path):
+                    if rr:
+                        raise self.InvalidRemoteRootsError(
+                            f"Couldn't infer a single remote root. Found {rr} and {path}. {msg}"
+                        )
+                    rr = path
+            if not rr:
+                raise self.InvalidRemoteRootsError(
+                    f"Couldn't infer remote root.  Found none of: {','.join(inferrable_roots)}. {msg}"
+                )
+
+        remote_root_func = lambda: self.get_options().remote_root or infer_remote_root()
 
         generator = GoTargetGenerator(
             self.import_oracle,
@@ -430,11 +445,17 @@ class GoBuildgen(GoTask):
             local_root,
             self.get_fetcher_factory(),
             generate_remotes=self.get_options().remote,
-            remote_root=remote_root,
+            remote_root_func=remote_root_func,
         )
         with self.context.new_workunit("go.buildgen", labels=[WorkUnitLabel.MULTITOOL]):
             try:
                 generated = generator.generate(local_go_targets)
+                try:
+                    remote_root = remote_root_func()
+                except self.InvalidRemoteRootsError:
+                    # The result may have been generated without any remote root, so it's
+                    # not an error for there not to be one here.
+                    remote_root = None
                 return self.GenerationResult(
                     generated=generated, local_root=local_root, remote_root=remote_root
                 )
