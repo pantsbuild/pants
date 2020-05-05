@@ -13,6 +13,7 @@ from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open
+from pants.util.memo import memoized
 
 from pants.contrib.go.subsystems.fetcher_factory import FetcherFactory
 from pants.contrib.go.targets.go_binary import GoBinary
@@ -51,7 +52,16 @@ class GoTargetGenerator:
         self._local_source_root = local_root
         self._fetcher_factory = fetcher_factory
         self._generate_remotes = generate_remotes
+        # We invoke self._remote_source_root_func lazily to create self._remote_source_root,
+        # then set it to None so we know that there's no need to reinvoke it.
         self._remote_source_root_func = remote_root_func
+        self._remote_source_root = None
+
+    def _get_remote_source_root(self):
+        if self._remote_source_root_func:
+            self._remote_source_root = self._remote_source_root_func()
+            self._remote_source_root_func = None
+        return self._remote_source_root
 
     def generate(self, local_go_targets):
         """Automatically generates a Go target graph for the given local go targets.
@@ -64,7 +74,10 @@ class GoTargetGenerator:
             for local_go_target in local_go_targets:
                 deps = self._list_deps(gopath, local_go_target.address)
                 self._generate_missing(gopath, local_go_target.address, deps, visited)
-        return list(visited.items())
+        # We don't want to trigger an exception if there's no remote root and we didn't need
+        # one, so we return self._remote_source_root directly, instead of calling
+        # self._get_remote_source_root().
+        return list(visited.items()), self._remote_source_root
 
     def _generate_missing(self, gopath, local_address, import_listing, visited):
         target_type = GoBinary if import_listing.pkg_name == "main" else GoLibrary
@@ -88,7 +101,7 @@ class GoTargetGenerator:
                         )
                         name = remote_pkg_path or os.path.basename(import_path)
                         address = Address(
-                            os.path.join(self._remote_source_root_func(), remote_root), name
+                            os.path.join(self._get_remote_source_root(), remote_root), name
                         )
                         try:
                             self._build_graph.inject_address_closure(address)
@@ -418,6 +431,7 @@ class GoBuildgen(GoTask):
             )
         local_root = local_roots.pop()
 
+        @memoized
         def infer_remote_root():
             inferrable_roots = ["3rdparty/go", "3rd_party/go", "thirdparty/go", "third_party/go"]
             msg = (
@@ -436,6 +450,7 @@ class GoBuildgen(GoTask):
                 raise self.InvalidRemoteRootsError(
                     f"Couldn't infer remote root.  Found none of: {','.join(inferrable_roots)}. {msg}"
                 )
+            return rr
 
         remote_root_func = lambda: self.get_options().remote_root or infer_remote_root()
 
@@ -449,13 +464,7 @@ class GoBuildgen(GoTask):
         )
         with self.context.new_workunit("go.buildgen", labels=[WorkUnitLabel.MULTITOOL]):
             try:
-                generated = generator.generate(local_go_targets)
-                try:
-                    remote_root = remote_root_func()
-                except self.InvalidRemoteRootsError:
-                    # The result may have been generated without any remote root, so it's
-                    # not an error for there not to be one here.
-                    remote_root = None
+                generated, remote_root = generator.generate(local_go_targets)
                 return self.GenerationResult(
                     generated=generated, local_root=local_root, remote_root=remote_root
                 )
