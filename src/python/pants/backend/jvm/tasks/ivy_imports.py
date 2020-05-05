@@ -7,7 +7,6 @@ from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.coursier_resolve import CoursierMixin
 from pants.backend.jvm.tasks.jar_import_products import JarImportProducts
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
-from pants.base.deprecated import deprecated_conditional
 
 
 class IvyImports(CoursierMixin, NailgunTask):
@@ -29,13 +28,6 @@ class IvyImports(CoursierMixin, NailgunTask):
         return isinstance(target, ImportJarsMixin) and target.imported_targets
 
     def execute(self):
-        deprecated_conditional(
-            lambda: True,
-            removal_version="1.30.0.dev0",
-            entity_description="The `imports` goal",
-            hint_message="Contact the Pants team on Slack or pants-devel@googlegroups.com "
-            "if you need this functionality.",
-        )
         jar_import_products = self.context.products.get_data(
             JarImportProducts, init_func=JarImportProducts
         )

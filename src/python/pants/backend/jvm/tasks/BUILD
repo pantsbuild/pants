@@ -226,7 +226,6 @@ python_library(
     ':jar_import_products',
     ':nailgun_task',
     'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/base:deprecated',
   ],
   tags = {'partially_type_checked'},
 )
@@ -727,6 +726,7 @@ python_library(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:jar_import_products',
     'src/python/pants/base:build_environment',
+    'src/python/pants/base:deprecated',
     'src/python/pants/base:fingerprint_strategy',
     'src/python/pants/fs',
     'src/python/pants/task',
