@@ -21,7 +21,7 @@ class DependeesOutputFormat(Enum):
 
 
 class DependeesOptions(LineOriented, GoalSubsystem):
-    """List all targets that depend on any of the input target."""
+    """List all targets that depend on any of the input targets."""
 
     name = "dependees2"
 
