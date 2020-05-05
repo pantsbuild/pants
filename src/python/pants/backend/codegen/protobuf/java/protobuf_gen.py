@@ -11,6 +11,7 @@ from pants.backend.codegen.protobuf.subsystems.protoc import Protoc
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.jar_import_products import JarImportProducts
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.fs.archive import ZIP
@@ -174,6 +175,14 @@ class ProtobufGen(SimpleCodegenTask):
         imports = jar_import_products.imports(target)
         for coordinate, jar in imports:
             files.add(self._extract_jar(coordinate, jar))
+        if files:
+            deprecated_conditional(
+                lambda: True,
+                removal_version="1.30.0.dev0",
+                entity_description="Importing from .protos embedded in remote JAR files.",
+                hint_message="Contact the Pants team on Slack or pants-devel@googlegroups.com "
+                "if you need this functionality.",
+            )
         return files
 
     def _extract_jar(self, coordinate, jar_path):
