@@ -129,9 +129,7 @@ class PantsDaemon(FingerprintedProcessManager):
             stub_pantsd = cls.create(options_bootstrapper, full_init=False)
             with stub_pantsd._services.lifecycle_lock:
                 if stub_pantsd.needs_restart(stub_pantsd.options_fingerprint):
-                    # Once we determine we actually need to launch, recreate with full initialization.
-                    pantsd = cls.create(options_bootstrapper)
-                    return pantsd.launch()
+                    return stub_pantsd.launch()
                 else:
                     # We're already launched.
                     return PantsDaemon.Handle(
@@ -148,7 +146,7 @@ class PantsDaemon(FingerprintedProcessManager):
             :returns: A Handle for the pantsd instance.
             :rtype: PantsDaemon.Handle
             """
-            pantsd = cls.create(options_bootstrapper)
+            pantsd = cls.create(options_bootstrapper, full_init=False)
             with pantsd._services.lifecycle_lock:
                 # N.B. This will call `pantsd.terminate()` before starting.
                 return pantsd.launch()
@@ -165,8 +163,6 @@ class PantsDaemon(FingerprintedProcessManager):
             """
             bootstrap_options = options_bootstrapper.bootstrap_options
             bootstrap_options_values = bootstrap_options.for_global_scope()
-            # TODO: https://github.com/pantsbuild/pants/issues/3479
-            watchman = WatchmanLauncher.create(bootstrap_options_values).watchman
 
             native: Optional[Native] = None
             build_root: Optional[str] = None
@@ -178,6 +174,8 @@ class PantsDaemon(FingerprintedProcessManager):
                 legacy_graph_scheduler = EngineInitializer.setup_legacy_graph(
                     native, options_bootstrapper, build_config
                 )
+                # TODO: https://github.com/pantsbuild/pants/issues/3479
+                watchman = WatchmanLauncher.create(bootstrap_options_values).watchman
                 services = cls._setup_services(
                     build_root,
                     bootstrap_options_values,
