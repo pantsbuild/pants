@@ -13,14 +13,6 @@ from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method
 
 
-class SourceRootCategories:
-    UNKNOWN = "unknown"
-    SOURCE = "source"
-    TEST = "test"
-    THIRDPARTY = "thirdparty"
-    ALL = [UNKNOWN, SOURCE, TEST, THIRDPARTY]
-
-
 @dataclass(frozen=True)
 class SourceRoot:
     path: str
