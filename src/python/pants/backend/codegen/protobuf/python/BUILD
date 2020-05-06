@@ -6,6 +6,7 @@ python_library(
     'src/python/pants/backend/codegen/protobuf',
     'src/python/pants/backend/codegen/protobuf/subsystems',
     'src/python/pants/backend/python:target_types',
+    'src/python/pants/build_graph',
     'src/python/pants/core/util_rules',
     'src/python/pants/engine:addresses',
     'src/python/pants/engine:fs',

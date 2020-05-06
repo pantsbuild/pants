@@ -97,8 +97,7 @@ async def strip_source_roots_from_snapshot(
 
     if request.representative_path is not None:
         source_root = determine_source_root(request.representative_path)
-        is_repo_level_source_root = source_root == ""
-        if is_repo_level_source_root:
+        if source_root == "":
             return SourceRootStrippedSources(request.snapshot)
         resulting_snapshot = await Get[Snapshot](RemovePrefix(request.snapshot.digest, source_root))
         return SourceRootStrippedSources(resulting_snapshot)
@@ -111,9 +110,8 @@ async def strip_source_roots_from_snapshot(
     }
 
     if len(files_grouped_by_source_root) == 1:
-        source_root = next(iter(files_grouped_by_source_root))
-        is_repo_level_source_root = source_root == ""
-        if is_repo_level_source_root:
+        source_root = next(iter(files_grouped_by_source_root.keys()))
+        if source_root == "":
             return SourceRootStrippedSources(request.snapshot)
         resulting_snapshot = await Get[Snapshot](RemovePrefix(request.snapshot.digest, source_root))
         return SourceRootStrippedSources(resulting_snapshot)

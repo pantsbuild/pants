@@ -3,7 +3,7 @@
 
 import functools
 from dataclasses import dataclass
-from typing import Any, List, Optional, Tuple, Union, cast
+from typing import List, Optional, Tuple, Union, cast
 
 from pants.backend.python.rules.importable_python_sources import ImportablePythonSources
 from pants.backend.python.rules.pex import (
@@ -155,7 +155,7 @@ async def setup_pytest_for_target(
     #   https://github.com/pantsbuild/pants/issues/9294
     # Some awkward code follows in order to execute 5-6 items concurrently given the current state
     # of MultiGet typing / API. Improve this since we should encourage full concurrency in general.
-    requests: List[Get[Any]] = [
+    requests: List[Get] = [
         Get[Pex](PexRequest, pytest_pex_request),
         Get[Pex](PexFromTargetsRequest, requirements_pex_request),
         Get[Pex](PexRequest, test_runner_pex_request),

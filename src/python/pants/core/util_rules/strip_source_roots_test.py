@@ -35,7 +35,7 @@ class StripSourceRootsTest(TestBase):
         result = self.request_single_product(
             SourceRootStrippedSources, Params(request, create_options_bootstrapper(args=args)),
         )
-        return sorted(result.snapshot.files)
+        return list(result.snapshot.files)
 
     def test_strip_snapshot(self) -> None:
         def get_stripped_files_for_snapshot(
@@ -44,7 +44,7 @@ class StripSourceRootsTest(TestBase):
             use_representative_path: bool = True,
             args: Optional[List[str]] = None,
         ) -> List[str]:
-            input_snapshot = self.make_snapshot({fp: "" for fp in paths})
+            input_snapshot = self.make_snapshot_of_empty_files(paths)
             request = StripSnapshotRequest(
                 input_snapshot, representative_path=paths[0] if use_representative_path else None
             )

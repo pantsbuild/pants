@@ -5,6 +5,7 @@ from hashlib import sha1
 
 from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.backend.jvm.tasks.jar_import_products import JarImportProducts
+from pants.base.deprecated import deprecated_conditional
 from pants.base.fingerprint_strategy import DefaultFingerprintHashingMixin, FingerprintStrategy
 from pants.fs.archive import ZIP
 from pants.task.unpack_remote_sources_base import UnpackRemoteSourcesBase
@@ -47,6 +48,14 @@ class UnpackJars(UnpackRemoteSourcesBase):
         return UnpackJarsFingerprintStrategy()
 
     def unpack_target(self, unpacked_jars, unpack_dir):
+        deprecated_conditional(
+            lambda: True,
+            removal_version="1.30.0.dev0",
+            entity_description="The `unpack-jars` goal",
+            hint_message="Contact the Pants team on Slack or pants-devel@googlegroups.com "
+            "if you need this functionality.",
+        )
+
         direct_coords = {jar.coordinate for jar in unpacked_jars.all_imported_jar_deps}
         unpack_filter = self.get_unpack_filter(unpacked_jars)
         jar_import_products = self.context.products.get_data(JarImportProducts)
