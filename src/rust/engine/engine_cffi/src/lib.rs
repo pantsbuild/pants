@@ -61,6 +61,7 @@ use std::panic;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tempfile::TempDir;
+use tokio;
 use workunit_store::{StartedWorkUnit, WorkUnit};
 
 #[cfg(test)]
@@ -1052,10 +1053,12 @@ pub extern "C" fn run_local_interactive_process(
               None => unreachable!()
             };
 
-            scheduler.core.store().materialize_directory(
-              destination,
-              digest,
-            ).wait()?;
+            block_in_place_and_wait(
+              scheduler.core.store().materialize_directory(
+                destination,
+                digest,
+              )
+            )?;
           }
         }
 
@@ -1134,54 +1137,55 @@ pub extern "C" fn materialize_directories(
       let construct_materialize_directories_results =
         types.construct_materialize_directories_results;
       let construct_materialize_directory_result = types.construct_materialize_directory_result;
-      future::join_all(
-        digests_and_path_prefixes
-          .into_iter()
-          .map(|(digest, path_prefix)| {
-            // NB: all DirectoryToMaterialize paths are validated in Python to be relative paths.
-            // Here, we join them with the build root.
-            let mut destination = PathBuf::new();
-            destination.push(scheduler.core.build_root.clone());
-            destination.push(path_prefix);
-            let metadata = scheduler
-              .core
-              .store()
-              .materialize_directory(destination.clone(), digest);
-            metadata.map(|m| (destination, m))
-          })
-          .collect::<Vec<_>>(),
+      block_in_place_and_wait(
+        future::join_all(
+          digests_and_path_prefixes
+            .into_iter()
+            .map(|(digest, path_prefix)| {
+              // NB: all DirectoryToMaterialize paths are validated in Python to be relative paths.
+              // Here, we join them with the build root.
+              let mut destination = PathBuf::new();
+              destination.push(scheduler.core.build_root.clone());
+              destination.push(path_prefix);
+              let metadata = scheduler
+                .core
+                .store()
+                .materialize_directory(destination.clone(), digest);
+              metadata.map(|m| (destination, m))
+            })
+            .collect::<Vec<_>>(),
+        )
+        .map(move |metadata_list| {
+          let entries: Vec<Value> = metadata_list
+            .iter()
+            .map(
+              |(output_dir, metadata): &(PathBuf, store::DirectoryMaterializeMetadata)| {
+                let path_list = metadata.to_path_list();
+                let path_values: Vec<Value> = path_list
+                  .into_iter()
+                  .map(|rel_path: String| {
+                    let mut path = PathBuf::new();
+                    path.push(output_dir);
+                    path.push(rel_path);
+                    externs::store_utf8(&path.to_string_lossy())
+                  })
+                  .collect();
+
+                externs::unsafe_call(
+                  &construct_materialize_directory_result,
+                  &[externs::store_tuple(&path_values)],
+                )
+              },
+            )
+            .collect();
+
+          let output: Value = externs::unsafe_call(
+            &construct_materialize_directories_results,
+            &[externs::store_tuple(&entries)],
+          );
+          output
+        }),
       )
-      .map(move |metadata_list| {
-        let entries: Vec<Value> = metadata_list
-          .iter()
-          .map(
-            |(output_dir, metadata): &(PathBuf, store::DirectoryMaterializeMetadata)| {
-              let path_list = metadata.to_path_list();
-              let path_values: Vec<Value> = path_list
-                .into_iter()
-                .map(|rel_path: String| {
-                  let mut path = PathBuf::new();
-                  path.push(output_dir);
-                  path.push(rel_path);
-                  externs::store_utf8(&path.to_string_lossy())
-                })
-                .collect();
-
-              externs::unsafe_call(
-                &construct_materialize_directory_result,
-                &[externs::store_tuple(&path_values)],
-              )
-            },
-          )
-          .collect();
-
-        let output: Value = externs::unsafe_call(
-          &construct_materialize_directories_results,
-          &[externs::store_tuple(&entries)],
-        );
-        output
-      })
-      .wait()
     })
   })
   .into()
@@ -1258,6 +1262,18 @@ fn write_to_file(path: &Path, graph: &RuleGraph<Rule>) -> io::Result<()> {
 
 unsafe fn str_ptr_to_string(ptr: *const raw::c_char) -> String {
   CStr::from_ptr(ptr).to_string_lossy().into_owned()
+}
+
+///
+/// Calling `wait()` in the context of a @goal_rule blocks a thread that is owned by the tokio
+/// runtime. To do that safely, we need to relinquish it.
+///   see https://github.com/pantsbuild/pants/issues/9476
+///
+/// TODO: The alternative to blocking the runtime would be to have the Python code `await` special
+/// methods for things like `materialize_directories` and etc.
+///
+fn block_in_place_and_wait<T, E>(f: impl Future<Item = T, Error = E>) -> Result<T, E> {
+  tokio::task::block_in_place(|| f.wait())
 }
 
 ///

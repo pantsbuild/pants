@@ -28,7 +28,7 @@
 use std::future::Future;
 
 use futures::future::FutureExt;
-use tokio::runtime::{Handle, Runtime};
+use tokio::runtime::Handle;
 
 #[derive(Clone)]
 pub struct Executor {
@@ -63,7 +63,9 @@ impl Executor {
     &self,
     future: F,
   ) -> impl Future<Output = O> {
-    tokio::spawn(Self::future_with_correct_context(future))
+    self
+      .handle
+      .spawn(Self::future_with_correct_context(future))
       .map(|r| r.expect("Background task exited unsafely."))
   }
 
@@ -73,17 +75,15 @@ impl Executor {
   /// This should never be called from in a Future context, and should only ever be called in
   /// something that resembles a main method.
   ///
-  /// This method makes a new Runtime every time it runs, to ensure that the caller doesn't
-  /// accidentally deadlock by using this when a Future attempts to itself call Executor::spawn.
-  /// Because it should be used only in very limited situations, this overhead is viewed to be
-  /// acceptable.
+  /// Even after this method returns, work `spawn`ed into the background may continue to run on the
+  /// threads owned by this Executor.
   ///
   pub fn block_on<F: Future + Send + 'static>(&self, future: F) -> F::Output {
     // Make sure to copy our (thread-local) logging destination into the task.
     // When a daemon thread kicks off a future, it should log like a daemon thread (and similarly
     // for a user-facing thread).
-    Runtime::new()
-      .unwrap()
+    self
+      .handle
       .block_on(Self::future_with_correct_context(future))
   }
 
