@@ -64,6 +64,7 @@ class MockLanguageTargets(LanguageFmtTargets, metaclass=ABCMeta):
                     output=EMPTY_DIGEST,
                     stdout=self.stdout(addresses),
                     stderr="",
+                    formatter_name="MockFormatter",
                 ),
             ),
             input=EMPTY_DIGEST,

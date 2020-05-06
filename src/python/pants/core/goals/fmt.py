@@ -33,14 +33,21 @@ class FmtResult:
     output: Digest
     stdout: str
     stderr: str
+    formatter_name: str
 
     @staticmethod
     def noop() -> "FmtResult":
-        return FmtResult(input=EMPTY_DIGEST, output=EMPTY_DIGEST, stdout="", stderr="")
+        return FmtResult(
+            input=EMPTY_DIGEST, output=EMPTY_DIGEST, stdout="", stderr="", formatter_name=""
+        )
 
     @staticmethod
     def from_process_result(
-        process_result: ProcessResult, *, original_digest: Digest, strip_chroot_path: bool = False
+        process_result: ProcessResult,
+        *,
+        original_digest: Digest,
+        formatter_name: str,
+        strip_chroot_path: bool = False,
     ) -> "FmtResult":
         def prep_output(s: bytes) -> str:
             return strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
@@ -50,6 +57,7 @@ class FmtResult:
             output=process_result.output_digest,
             stdout=prep_output(process_result.stdout),
             stderr=prep_output(process_result.stderr),
+            formatter_name=formatter_name,
         )
 
     @property
@@ -71,7 +79,7 @@ class FmtFieldSets(Collection[FmtFieldSet]):
         self,
         field_sets: Iterable[FmtFieldSet],
         *,
-        prior_formatter_result: Optional[Snapshot] = None
+        prior_formatter_result: Optional[Snapshot] = None,
     ) -> None:
         super().__init__(field_sets)
         self.prior_formatter_result = prior_formatter_result
@@ -241,11 +249,17 @@ async def fmt(
         merged_formatted_digest = await Get[Digest](MergeDigests(changed_digests))
         workspace.materialize_directory(DirectoryToMaterialize(merged_formatted_digest))
 
-    for result in individual_results:
+    for result in sorted(individual_results, key=lambda res: res.formatter_name):
+        console.print_stderr(
+            f"{console.green('✓')} {result.formatter_name} made no changes."
+            if not result.did_change
+            else f"{console.red('𐄂')} {result.formatter_name} made changes."
+        )
         if result.stdout:
             console.print_stdout(result.stdout)
         if result.stderr:
             console.print_stderr(result.stderr)
+        console.print_stderr("")
 
     # Since the rules to produce FmtResult should use ExecuteRequest, rather than
     # FallibleProcess, we assume that there were no failures.

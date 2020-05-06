@@ -168,7 +168,10 @@ async def black_fmt(field_sets: BlackFieldSets, black: Black) -> FmtResult:
     setup = await Get[Setup](SetupRequest(field_sets, check_only=False))
     result = await Get[ProcessResult](Process, setup.process)
     return FmtResult.from_process_result(
-        result, original_digest=setup.original_digest, strip_chroot_path=True
+        result,
+        original_digest=setup.original_digest,
+        formatter_name="Black",
+        strip_chroot_path=True,
     )
 
 
@@ -178,7 +181,9 @@ async def black_lint(field_sets: BlackFieldSets, black: Black) -> LintResult:
         return LintResult.noop()
     setup = await Get[Setup](SetupRequest(field_sets, check_only=True))
     result = await Get[FallibleProcessResult](Process, setup.process)
-    return LintResult.from_fallible_process_result(result, strip_chroot_path=True)
+    return LintResult.from_fallible_process_result(
+        result, linter_name="Black", strip_chroot_path=True
+    )
 
 
 def rules():

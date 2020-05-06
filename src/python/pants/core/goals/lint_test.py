@@ -49,7 +49,9 @@ class MockLinterFieldSets(LinterFieldSets, metaclass=ABCMeta):
     @property
     def lint_result(self) -> LintResult:
         addresses = [config.address for config in self]
-        return LintResult(self.exit_code(addresses), self.stdout(addresses), "")
+        return LintResult(
+            self.exit_code(addresses), self.stdout(addresses), "", linter_name="MockLinter"
+        )
 
 
 class SuccessfulFieldSets(MockLinterFieldSets):
