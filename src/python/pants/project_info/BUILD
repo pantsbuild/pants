@@ -48,7 +48,7 @@ python_tests(
     'src/python/pants/testutil/subsystem',
     'src/python/pants/util:ordered_set',
   ],
-  tags = {"partially_type_checked"},
+  tags = {"type_checked"},
 )
 
 python_tests(
@@ -60,5 +60,5 @@ python_tests(
     'examples/src/scala/org/pantsbuild/example:hello_directory',
     'examples/src/resources/org/pantsbuild/example:hello_directory',
   ],
-  tags = {'integration', 'partially_type_checked'},
+  tags = {'integration', 'type_checked'},
 )

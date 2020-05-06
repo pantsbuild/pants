@@ -4,10 +4,10 @@
 from textwrap import dedent
 from typing import List
 
-from pants.backend.project_info.rules.dependees import Dependees
-from pants.backend.project_info.rules.dependees import DependeesOutputFormat as OutputFormat
-from pants.backend.project_info.rules.dependees import dependees_goal
 from pants.engine.target import Dependencies, Target
+from pants.project_info.dependees import Dependees
+from pants.project_info.dependees import DependeesOutputFormat as OutputFormat
+from pants.project_info.dependees import dependees_goal
 from pants.testutil.goal_rule_test_base import GoalRuleTestBase
 
 

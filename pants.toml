@@ -65,10 +65,9 @@ backend_packages.remove = [
   # We use the V2 isort implementation.
   "pants.backend.python.lint.isort",
 ]
-backend_packages2 = [
+backend_packages2.add = [
   "pants.backend.awslambda.python",
   "pants.backend.native",
-  "pants.backend.project_info",
   "pants.backend.python",
   "pants.backend.python.lint.black",
   "pants.backend.python.lint.docformatter",

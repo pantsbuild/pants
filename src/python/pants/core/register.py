@@ -7,7 +7,6 @@ These are always activated and cannot be disabled.
 """
 
 from pants.core.goals import binary, fmt, lint, repl, run, test
-from pants.core.project_info import cloc, filedeps, list_roots, list_targets, list_targets_old
 from pants.core.target_types import (
     AliasTarget,
     Files,
@@ -24,17 +23,10 @@ from pants.core.util_rules import (
     filter_empty_sources,
     strip_source_roots,
 )
-from pants.option.options_bootstrapper import is_v2_exclusive
 
 
 def rules():
     return [
-        # project_info
-        *cloc.rules(),
-        *filedeps.rules(),
-        *list_roots.rules(),
-        *list_targets.rules(),
-        *(list_targets_old.rules() if not is_v2_exclusive else ()),
         # goals
         *binary.rules(),
         *fmt.rules(),
