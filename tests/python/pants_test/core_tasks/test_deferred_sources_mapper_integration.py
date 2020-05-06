@@ -12,8 +12,8 @@ from pants.util.dirutil import safe_open
 
 class DeferredSourcesMapperIntegration(PantsRunIntegrationTest):
     @classmethod
-    def _emit_targets(cls, workdir):
-        with safe_open(os.path.join(workdir, "BUILD"), "w") as f:
+    def _emit_targets(cls, buildroot):
+        with safe_open(os.path.join(buildroot, "BUILD"), "w") as f:
             f.write(
                 dedent(
                     """
@@ -81,7 +81,7 @@ class DeferredSourcesMapperIntegration(PantsRunIntegrationTest):
                 )
             )
         return [
-            f"{os.path.relpath(workdir, get_buildroot())}:proto-{suffix}"
+            f"{os.path.relpath(buildroot, get_buildroot())}:proto-{suffix}"
             for suffix in (8, 9, "other")
         ]
 
@@ -90,7 +90,6 @@ class DeferredSourcesMapperIntegration(PantsRunIntegrationTest):
             command=command,
             workdir=workdir,
             config={
-                "GLOBAL": {"build_ignore": [], "pants_ignore": []},
                 "jvm-platform": {
                     "default_platform": "java8",
                     "platforms": {
@@ -105,12 +104,14 @@ class DeferredSourcesMapperIntegration(PantsRunIntegrationTest):
 
     def test_deferred_sources_gen_successfully(self):
         with self.temporary_workdir() as workdir:
-            pants_run = self._configured_pants_run(["gen", self._emit_targets(workdir)[0]], workdir)
+            pants_run = self._configured_pants_run(
+                ["gen", self._emit_targets(os.getcwd())[0]], workdir
+            )
             self.assert_success(pants_run)
 
     def test_deferred_sources_export_successfully(self):
         with self.temporary_workdir() as workdir:
-            proto8, proto9, proto_other = self._emit_targets(workdir)
+            proto8, proto9, proto_other = self._emit_targets(os.getcwd())
             pants_run = self._configured_pants_run(["export", proto8, proto9, proto_other], workdir)
 
             self.assert_success(pants_run)

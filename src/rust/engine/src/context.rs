@@ -1,16 +1,12 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std;
 use std::collections::{BTreeMap, HashSet};
 use std::convert::{Into, TryInto};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
-
-use futures::compat::Future01CompatExt;
-use futures01::Future;
 
 use crate::core::{Failure, TypeId};
 use crate::handles::maybe_drop_handles;
@@ -21,8 +17,9 @@ use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
 
 use boxfuture::{BoxFuture, Boxable};
-use core::clone::Clone;
 use fs::{safe_create_dir_all_ioerror, GitignoreStyleExcludes, PosixFS};
+use futures::compat::Future01CompatExt;
+use futures01::Future;
 use graph::{EntryId, Graph, InvalidationResult, NodeContext};
 use log::info;
 use process_execution::{
@@ -34,6 +31,7 @@ use rule_graph::RuleGraph;
 use sharded_lmdb::ShardedLmdb;
 use store::Store;
 use tokio::runtime::{Builder, Runtime};
+use uuid::Uuid;
 use watch::{Invalidatable, InvalidationWatcher};
 
 const GIGABYTES: usize = 1024 * 1024 * 1024;
@@ -58,7 +56,7 @@ pub struct Core {
   pub command_runner: Box<dyn process_execution::CommandRunner>,
   pub http_client: reqwest::Client,
   pub vfs: PosixFS,
-  pub watcher: InvalidationWatcher,
+  pub watcher: Arc<InvalidationWatcher>,
   pub build_root: PathBuf,
 }
 
@@ -269,12 +267,12 @@ impl Core {
         .map_err(|e| format!("Could not parse build ignore patterns: {:?}", e))?;
 
     let watcher = InvalidationWatcher::new(
-      Arc::downgrade(&graph),
       executor.clone(),
       build_root.clone(),
       ignorer.clone(),
       experimental_fs_watcher,
     )?;
+    watcher.start(&graph);
 
     Ok(Core {
       graph,
@@ -333,14 +331,17 @@ pub struct Context {
   entry_id: Option<EntryId>,
   pub core: Arc<Core>,
   pub session: Session,
+  run_id: Uuid,
 }
 
 impl Context {
   pub fn new(core: Arc<Core>, session: Session) -> Context {
+    let run_id = session.run_id();
     Context {
       entry_id: None,
       core,
       session,
+      run_id,
     }
   }
 
@@ -365,7 +366,7 @@ impl Context {
 
 impl NodeContext for Context {
   type Node = NodeKey;
-  type SessionId = String;
+  type RunId = Uuid;
 
   ///
   /// Clones this Context for a new EntryId. Because the Core of the context is an Arc, this
@@ -376,11 +377,12 @@ impl NodeContext for Context {
       entry_id: Some(entry_id),
       core: self.core.clone(),
       session: self.session.clone(),
+      run_id: self.run_id,
     }
   }
 
-  fn session_id(&self) -> &Self::SessionId {
-    self.session.build_id()
+  fn run_id(&self) -> &Self::RunId {
+    &self.run_id
   }
 
   fn graph(&self) -> &Graph<NodeKey> {

@@ -30,7 +30,7 @@ from pants.engine.internals.examples.parsers import (
 from pants.engine.internals.mapper import AddressFamily, AddressMapper
 from pants.engine.internals.nodes import Return, State, Throw
 from pants.engine.internals.parser import BuildFilePreludeSymbols, HydratedStruct, SymbolTable
-from pants.engine.internals.scheduler import SchedulerSession
+from pants.engine.internals.scheduler import ExecutionRequest, SchedulerSession
 from pants.engine.internals.scheduler_test_base import SchedulerTestBase
 from pants.engine.internals.struct import Struct, StructWithDeps
 from pants.engine.legacy.structs import TargetAdaptor
@@ -257,7 +257,7 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
 
     def _populate(
         self, scheduler: SchedulerSession, address: Address,
-    ) -> Tuple[HydratedStruct, State]:
+    ) -> Tuple[ExecutionRequest, State]:
         """Perform an ExecutionRequest to parse the given Address into a Struct."""
         request = scheduler.execution_request([HydratedStruct], [address])
         returns, throws = scheduler.execute(request)
