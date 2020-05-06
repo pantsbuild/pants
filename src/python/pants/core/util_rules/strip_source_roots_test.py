@@ -85,6 +85,18 @@ class StripSourceRootsTest(TestBase):
             get_stripped_files_for_snapshot(file_names, use_representative_path=False)
         ) == sorted(["project/example.py", "com/project/example.java"])
 
+        # Test a source root at the repo root. We have performance optimizations for this case
+        # because there is nothing to strip.
+        source_root_config = ["--source-source-roots={'': ('python',)}"]
+        assert get_stripped_files_for_snapshot(
+            ["project/f1.py", "project/f2.py"],
+            args=source_root_config,
+            use_representative_path=True,
+        ) == ["project/f1.py", "project/f2.py"]
+        assert get_stripped_files_for_snapshot(
+            ["dir1/f.py", "dir2/f.py"], args=source_root_config, use_representative_path=False
+        ) == ["dir1/f.py", "dir2/f.py"]
+
         # Gracefully handle an empty snapshot
         assert self.get_stripped_files(StripSnapshotRequest(EMPTY_SNAPSHOT)) == []
 
