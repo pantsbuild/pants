@@ -252,7 +252,7 @@ class SourceRootConfig(Subsystem):
         )
 
         register(
-            "--roots",
+            "--root-patterns",
             metavar="<list>",
             type=list,
             fingerprint=True,
@@ -265,7 +265,10 @@ class SourceRootConfig(Subsystem):
             "a potential source root. E.g., `src/python` will match `<buildroot>/src/python`, "
             "`<buildroot>/project1/src/python` etc. Prepend a `^/` to anchor the match at the "
             "buildroot.  E.g., `^/src/python` will match `<buildroot>/src/python` but not "
-            "`<buildroot>/project1/src/python`.",
+            "`<buildroot>/project1/src/python`.  A `*` wildcard will match a single path segment, "
+            "e.g., `src/*` will match `<buildroot>/src/python` and `<buildroot>/src/rust`. "
+            "Use an empty string to signify that the buildroot itself is a source root. "
+            "See https://pants.readme.io/docs/source-roots.",
         )
 
     @memoized_method
@@ -277,27 +280,30 @@ class SourceRootConfig(Subsystem):
         trie = SourceRootTrie()
         options = self.get_options()
 
-        if options.roots:
-            for path in options.roots:
+        if options.root_patterns:
+            for path in options.root_patterns:
                 trie.add_pattern(path)
         else:
+            legacy_patterns = []
+            for category in ["source", "test", "thirdparty"]:
+                # Add patterns.
+                for pattern in options.get("{}_root_patterns".format(category), []):
+                    trie.add_pattern(pattern)
+                    legacy_patterns.append(pattern)
+                # Add fixed source roots.
+                for path, langs in options.get("{}_roots".format(category), {}).items():
+                    trie.add_fixed(path)
+                    legacy_patterns.append(f"^/{path}")
             # We need to issue a deprecation warning even if relying on the default values
             # of the deprecated options.
             deprecated_conditional(
                 lambda: True,
                 removal_version="1.30.0.dev0",
                 entity_description="the *_root_patterns and *_roots options",
-                hint_message="Explicitly list your source roots with the `roots` option in the "
-                "[source] scope. See https://pants.readme.io/docs/source-roots.",
+                hint_message="Explicitly list your source roots with the `root_patterns` option in "
+                "the [source] scope. See https://pants.readme.io/docs/source-roots. "
+                f"Your current roots are covered by: [{', '.join(legacy_patterns)}]",
             )
-            for category in ["source", "test", "thirdparty"]:
-                # Add patterns.
-                for pattern in options.get("{}_root_patterns".format(category), []):
-                    trie.add_pattern(pattern)
-                # Add fixed source roots.
-                for path, langs in options.get("{}_roots".format(category), {}).items():
-                    trie.add_fixed(path)
-
         return trie
 
 

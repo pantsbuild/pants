@@ -100,33 +100,14 @@ pants_ignore.add = [
 
 [source]
 
-roots = [
-  "src/python",
-  "src/java",
-  "src/scala",
-  "src/cpp",
-  "src/node",
-  "src/resources",
-  "src/antlr",
-  "src/protobuf",
-  "src/thrift",
-  "src/wire",
-  "src/go/src",
-  "src/main/java",
-  "src/main/scala",
-  "src/main/resources",
-  "src/main/proto",
-  "src/main/go/src",
-  "src/test/java",
-  "src/test/scala",
-  "src/test/resources",
-  "tests/python",
-  "tests/java",
-  "tests/scala",
-  "tests/resources",
-  "tests/avro",
-  "tests/thrift",
-  "tests/wsdl",
+root_patterns = [
+  "src/*",
+  "src/main/*",
+  "src/test/*",
+  "^/src/go/src",
+  "test/*",
+  "tests/*",
+  "3rdparty/*",
 ]
 
 [cache]
