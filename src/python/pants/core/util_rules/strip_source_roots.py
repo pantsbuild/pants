@@ -110,11 +110,13 @@ async def strip_source_roots_from_snapshot(
         )
     }
 
-    only_has_repo_level_source_root = (
-        len(files_grouped_by_source_root) == 1 and next(iter(files_grouped_by_source_root)) == ""
-    )
-    if only_has_repo_level_source_root:
-        return SourceRootStrippedSources(request.snapshot)
+    if len(files_grouped_by_source_root) == 1:
+        source_root = next(iter(files_grouped_by_source_root))
+        is_repo_level_source_root = source_root == ""
+        if is_repo_level_source_root:
+            return SourceRootStrippedSources(request.snapshot)
+        resulting_snapshot = await Get[Snapshot](RemovePrefix(request.snapshot.digest, source_root))
+        return SourceRootStrippedSources(resulting_snapshot)
 
     snapshot_subsets = await MultiGet(
         Get[Snapshot](SnapshotSubset(request.snapshot.digest, PathGlobs(files)))

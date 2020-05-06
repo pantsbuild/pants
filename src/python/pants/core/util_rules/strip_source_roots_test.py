@@ -54,6 +54,9 @@ class StripSourceRootsTest(TestBase):
         assert get_stripped_files_for_snapshot(["src/python/project/example.py"]) == [
             "project/example.py"
         ]
+        assert get_stripped_files_for_snapshot(
+            ["src/python/project/example.py"], use_representative_path=False
+        ) == ["project/example.py"]
         assert get_stripped_files_for_snapshot(["src/java/com/project/example.java"]) == [
             "com/project/example.java"
         ]
