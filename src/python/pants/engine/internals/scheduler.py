@@ -8,7 +8,7 @@ import time
 import traceback
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple, Type, Union, cast
 
 from typing_extensions import TypedDict
 
@@ -69,6 +69,10 @@ class ExecutionError(Exception):
 
     def end_user_messages(self):
         return [str(exc) for exc in self.wrapped_exceptions]
+
+
+class ExecutionTimeoutError(ExecutionError):
+    """An ExecutionRequest specified a timeout which elapsed before the request completed."""
 
 
 class Scheduler:
@@ -260,18 +264,30 @@ class Scheduler:
     def invalidate_all_files(self):
         return self._native.lib.graph_invalidate_all_paths(self._scheduler)
 
-    def check_invalidation_watcher_liveness(self) -> bool:
-        return cast(bool, self._native.lib.check_invalidation_watcher_liveness(self._scheduler))
+    def check_invalidation_watcher_liveness(self):
+        res = self._native.lib.check_invalidation_watcher_liveness(self._scheduler)
+        self._raise_or_return(res)
 
     def graph_len(self):
         return self._native.lib.graph_len(self._scheduler)
 
-    def add_root_selection(self, execution_request, subject_or_params, product):
+    def execution_add_root_select(self, execution_request, subject_or_params, product):
         params = self._to_params_list(subject_or_params)
         res = self._native.lib.execution_add_root_select(
             self._scheduler, execution_request, self._to_vals_buf(params), self._to_type(product)
         )
         self._raise_or_return(res)
+
+    def execution_set_timeout(self, execution_request, timeout: float):
+        timeout_in_ms = int(timeout * 1000)
+        self._native.lib.execution_set_timeout(execution_request, timeout_in_ms)
+
+    def execution_set_poll(self, execution_request, poll: bool):
+        self._native.lib.execution_set_poll(execution_request, poll)
+
+    def execution_set_poll_delay(self, execution_request, poll_delay: float):
+        poll_delay_in_ms = int(poll_delay * 1000)
+        self._native.lib.execution_set_poll_delay(execution_request, poll_delay_in_ms)
 
     @property
     def visualize_to_dir(self):
@@ -288,8 +304,14 @@ class Scheduler:
 
     def _run_and_return_roots(self, session, execution_request):
         raw_roots = self._native.lib.scheduler_execute(self._scheduler, session, execution_request)
-        if raw_roots == self._native.ffi.NULL:
+        if raw_roots.err == self._native.lib.NoError:
+            pass
+        elif raw_roots.err == self._native.lib.KeyboardInterrupt:
             raise KeyboardInterrupt
+        elif raw_roots.err == self._native.lib.Timeout:
+            raise ExecutionTimeoutError("Timed out")
+        else:
+            raise Exception(f"Unrecognized error type from native execution: {raw_roots.err}")
 
         remaining_runtime_exceptions_to_capture = list(
             self._native.consume_cffi_extern_method_runtime_exceptions()
@@ -362,8 +384,6 @@ class SchedulerSession:
     Session.
     """
 
-    execution_error_type = ExecutionError
-
     def __init__(self, scheduler, session):
         self._scheduler = scheduler
         self._session = session
@@ -378,6 +398,15 @@ class SchedulerSession:
 
     def graph_len(self):
         return self._scheduler.graph_len()
+
+    def new_run_id(self):
+        """Assigns a new "run id" to this Session, without creating a new Session.
+
+        Usually each Session corresponds to one end user "run", but there are exceptions: notably,
+        the `--loop` feature uses one Session, but would like to observe new values for uncacheable
+        nodes in each iteration of its loop.
+        """
+        self._scheduler._native.lib.session_new_run_id(self._session)
 
     def trace(self, execution_request):
         """Yields a stringified 'stacktrace' starting from the scheduler's roots."""
@@ -394,30 +423,41 @@ class SchedulerSession:
     def visualize_rule_graph_to_file(self, filename):
         self._scheduler.visualize_rule_graph_to_file(filename)
 
-    def execution_request_literal(self, request_specs):
-        native_execution_request = self._scheduler._native.new_execution_request()
-        for subject, product in request_specs:
-            self._scheduler.add_root_selection(native_execution_request, subject, product)
-        return ExecutionRequest(request_specs, native_execution_request)
-
-    def execution_request(self, products, subjects):
+    def execution_request(
+        self,
+        products: Sequence[Type],
+        subjects: Sequence[Union[Any, Params]],
+        poll: bool = False,
+        poll_delay: Optional[float] = None,
+        timeout: Optional[float] = None,
+    ) -> ExecutionRequest:
         """Create and return an ExecutionRequest for the given products and subjects.
 
         The resulting ExecutionRequest object will contain keys tied to this scheduler's product Graph,
         and so it will not be directly usable with other scheduler instances without being re-created.
 
-        NB: This method does a "cross product", mapping all subjects to all products. To create a
-        request for just the given list of subject -> product tuples, use `execution_request_literal()`!
+        NB: This method does a "cross product", mapping all subjects to all products.
 
         :param products: A list of product types to request for the roots.
-        :type products: list of types
-        :param subjects: A list of AddressSpec and/or PathGlobs objects.
-        :type subject: list of :class:`pants.base.specs.AddressSpec`, `pants.build_graph.Address`, and/or
-          :class:`pants.engine.fs.PathGlobs` objects.
+        :param subjects: A list of singleton input parameters or Params instances.
+        :param poll: True to wait for _all_ of the given roots to
+          have changed since their last observed values in this SchedulerSession.
+        :param poll_delay: A delay (in seconds) to wait after observing a change, and before
+          beginning to compute a new value.
+        :param timeout: An optional timeout to wait for the request to complete (in seconds). If the
+          request has not completed before the timeout has elapsed, ExecutionTimeoutError is raised.
         :returns: An ExecutionRequest for the given products and subjects.
         """
-        roots = tuple((s, p) for s in subjects for p in products)
-        return self.execution_request_literal(roots)
+        request_specs = tuple((s, p) for s in subjects for p in products)
+        native_execution_request = self._scheduler._native.new_execution_request()
+        for subject, product in request_specs:
+            self._scheduler.execution_add_root_select(native_execution_request, subject, product)
+        if timeout:
+            self._scheduler.execution_set_timeout(native_execution_request, timeout)
+        if poll_delay:
+            self._scheduler.execution_set_poll_delay(native_execution_request, poll_delay)
+        self._scheduler.execution_set_poll(native_execution_request, poll)
+        return ExecutionRequest(request_specs, native_execution_request)
 
     def invalidate_files(self, direct_filenames):
         """Invalidates the given filenames in an internal product Graph instance."""
@@ -448,7 +488,7 @@ class SchedulerSession:
             self._run_count += 1
             self.visualize_graph_to_file(os.path.join(self._scheduler.visualize_to_dir, name))
 
-    def execute(self, execution_request):
+    def execute(self, execution_request: ExecutionRequest):
         """Invoke the engine for the given ExecutionRequest, returning Return and Throw states.
 
         :return: A tuple of (root, Return) tuples and (root, Throw) tuples.
@@ -474,7 +514,7 @@ class SchedulerSession:
 
         returns = tuple((root, state) for root, state in roots if type(state) is Return)
         throws = tuple((root, state) for root, state in roots if type(state) is Throw)
-        return returns, throws
+        return cast(Tuple[Tuple[Return, ...], Tuple[Throw, ...]], (returns, throws))
 
     def _trace_on_error(self, unique_exceptions, request):
         exception_noun = pluralize(len(unique_exceptions), "Exception")
@@ -494,10 +534,18 @@ class SchedulerSession:
                 unique_exceptions,
             )
 
-    def run_goal_rule(self, product, subject) -> int:
+    def run_goal_rule(
+        self,
+        product: Type,
+        subject: Union[Any, Params],
+        poll: bool = False,
+        poll_delay: Optional[float] = None,
+    ) -> int:
         """
         :param product: A Goal subtype.
         :param subject: subject for the request.
+        :param poll: See self.execution_request.
+        :param poll_delay: See self.execution_request.
         :returns: An exit_code for the given Goal.
         """
         if self._scheduler.visualize_to_dir is not None:
@@ -509,7 +557,7 @@ class SchedulerSession:
                 product,
             )
 
-        request = self.execution_request([product], [subject])
+        request = self.execution_request([product], [subject], poll=poll, poll_delay=poll_delay)
         returns, throws = self.execute(request)
 
         if throws:
@@ -520,17 +568,25 @@ class SchedulerSession:
         _, state = returns[0]
         return cast(int, state.value.exit_code)
 
-    def product_request(self, product, subjects):
+    def product_request(
+        self,
+        product: Type,
+        subjects: Sequence[Union[Any, Params]],
+        poll: bool = False,
+        timeout: Optional[float] = None,
+    ):
         """Executes a request for a single product for some subjects, and returns the products.
 
-        :param class product: A product type for the request.
-        :param list subjects: A list of subjects or Params instances for the request.
+        :param product: A product type for the request.
+        :param subjects: A list of subjects or Params instances for the request.
+        :param poll: See self.execution_request.
+        :param timeout: See self.execution_request.
         :returns: A list of the requested products, with length match len(subjects).
         """
         request = None
         raised_exception = None
         try:
-            request = self.execution_request([product], subjects)
+            request = self.execution_request([product], subjects, poll=poll, timeout=timeout)
         except:  # noqa: T803
             # If there are any exceptions during CFFI extern method calls, we want to return an error with
             # them and whatever failure results from it. This typically results from unhashable types.
@@ -589,7 +645,7 @@ class SchedulerSession:
                 )
             )
 
-        returns, throws = self.execute(request)
+        returns, throws = self.execute(cast(ExecutionRequest, request))
 
         # Throw handling.
         if throws:

@@ -149,6 +149,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         )
 
         v2_ui = options.for_global_scope().get("v2_ui", False)
+        use_colors = options.for_global_scope().get("colors", True)
         zipkin_trace_v2 = options.for_scope("reporting").zipkin_trace_v2
         # TODO(#8658) This should_report_workunits flag must be set to True for
         # StreamingWorkunitHandler to receive WorkUnits. It should eventually
@@ -159,7 +160,8 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         return graph_scheduler_helper.new_session(
             zipkin_trace_v2,
             RunTracker.global_instance().run_id,
-            v2_ui,
+            v2_ui=v2_ui,
+            use_colors=use_colors,
             should_report_workunits=stream_workunits,
         )
 
