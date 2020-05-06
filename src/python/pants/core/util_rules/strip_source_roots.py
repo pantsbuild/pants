@@ -81,6 +81,9 @@ async def strip_source_roots_from_snapshot(
 ) -> SourceRootStrippedSources:
     """Removes source roots from a snapshot, e.g. `src/python/pants/util/strutil.py` ->
     `pants/util/strutil.py`."""
+    if not request.snapshot.files:
+        return SourceRootStrippedSources(request.snapshot)
+
     source_roots_object = source_root_config.get_source_roots()
 
     def determine_source_root(path: str) -> str:
@@ -93,13 +96,12 @@ async def strip_source_roots_from_snapshot(
         return PurePath(path).parent.as_posix()
 
     if request.representative_path is not None:
-        resulting_digest = await Get[Digest](
-            RemovePrefix(
-                request.snapshot.digest, determine_source_root(request.representative_path),
-            )
-        )
-        resulting_snapshot = await Get[Snapshot](Digest, resulting_digest)
-        return SourceRootStrippedSources(snapshot=resulting_snapshot)
+        source_root = determine_source_root(request.representative_path)
+        is_repo_level_source_root = source_root == ""
+        if is_repo_level_source_root:
+            return SourceRootStrippedSources(request.snapshot)
+        resulting_snapshot = await Get[Snapshot](RemovePrefix(request.snapshot.digest, source_root))
+        return SourceRootStrippedSources(resulting_snapshot)
 
     files_grouped_by_source_root = {
         source_root: tuple(files)
@@ -107,6 +109,13 @@ async def strip_source_roots_from_snapshot(
             request.snapshot.files, key=determine_source_root
         )
     }
+
+    only_has_repo_level_source_root = (
+        len(files_grouped_by_source_root) == 1 and next(iter(files_grouped_by_source_root)) == ""
+    )
+    if only_has_repo_level_source_root:
+        return SourceRootStrippedSources(request.snapshot)
+
     snapshot_subsets = await MultiGet(
         Get[Snapshot](SnapshotSubset(request.snapshot.digest, PathGlobs(files)))
         for files in files_grouped_by_source_root.values()
@@ -116,8 +125,7 @@ async def strip_source_roots_from_snapshot(
         for snapshot, source_root in zip(snapshot_subsets, files_grouped_by_source_root.keys())
     )
 
-    merged_result = await Get[Digest](MergeDigests(resulting_digests))
-    resulting_snapshot = await Get[Snapshot](Digest, merged_result)
+    resulting_snapshot = await Get[Snapshot](MergeDigests(resulting_digests))
     return SourceRootStrippedSources(resulting_snapshot)
 
 
