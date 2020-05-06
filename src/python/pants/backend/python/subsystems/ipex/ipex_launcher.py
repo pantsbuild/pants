@@ -67,11 +67,10 @@ def _hydrate_pex_file(self, hydrated_pex_file):
 
     # Perform a fully pinned intransitive resolve to hydrate the install cache.
     resolver_settings = ipex_info["resolver_settings"]
-    fetchers = (
-        [Fetcher([url]) for url in resolver_settings.pop('find_links')] +
-        [PyPIFetcher(url) for url in resolver_settings.pop('indexes')]
-    )
-    resolver_settings['fetchers'] = fetchers
+    fetchers = [Fetcher([url]) for url in resolver_settings.pop("find_links")] + [
+        PyPIFetcher(url) for url in resolver_settings.pop("indexes")
+    ]
+    resolver_settings["fetchers"] = fetchers
 
     resolved_distributions = resolver.resolve(
         requirements=bootstrap_info.requirements,
