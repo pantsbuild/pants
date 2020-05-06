@@ -316,7 +316,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
             # Check the logs.
             self.assertRegex(
-                full_pantsd_log(), r"watching invalidating files:.*{}".format(test_dir)
+                full_pantsd_log(), r"watching invalidation patterns:.*{}".format(test_dir)
             )
 
             checker.assert_running()
@@ -329,7 +329,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                 time.sleep(10)
                 checker.assert_stopped()
 
-            self.assertIn("saw file events covered by invalidation globs", full_pantsd_log())
+            self.assertIn("saw filesystem changes covered by invalidation globs", full_pantsd_log())
 
     def test_pantsd_invalidation_pants_toml_file(self):
         # Test tmp_pants_toml (--pants-config-files=$tmp_pants_toml)'s removal

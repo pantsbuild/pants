@@ -6,6 +6,7 @@ from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
+from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open
 
 
@@ -18,8 +19,8 @@ class PrepCommandIntegrationTest(PantsRunIntegrationTest):
     }
 
     @classmethod
-    def _emit_targets(cls, workdir):
-        prep_command_path = os.path.join(workdir, "src/java/org/pantsbuild/prepcommand")
+    def _emit_targets(cls, buildroot):
+        prep_command_path = os.path.join(buildroot, "src/java/org/pantsbuild/prepcommand")
         with safe_open(os.path.join(prep_command_path, "BUILD"), "w") as fp:
             for name, touch_target in cls._SENTINELS.items():
                 fp.write(
@@ -32,7 +33,7 @@ class PrepCommandIntegrationTest(PantsRunIntegrationTest):
                           prep_args=['{tmpdir}/{touch_target}'],
                         )
                         """.format(
-                            name=name, goal=name, tmpdir=workdir, touch_target=touch_target
+                            name=name, goal=name, tmpdir=buildroot, touch_target=touch_target
                         )
                     )
                 )
@@ -50,30 +51,26 @@ class PrepCommandIntegrationTest(PantsRunIntegrationTest):
 
     @contextmanager
     def _execute_pants(self, goal):
-        with self.temporary_workdir() as workdir:
-            prep_commands_specs = self._emit_targets(workdir)
-            # Make sure the emitted BUILD under .pants.d is not ignored.
-            config = {"GLOBAL": {"build_ignore": [], "pants_ignore": []}}
-            pants_run = self.run_pants_with_workdir(
-                [goal] + prep_commands_specs, workdir, config=config
-            )
+        with temporary_dir(os.getcwd()) as buildroot, self.temporary_workdir(buildroot) as workdir:
+            prep_commands_specs = self._emit_targets(buildroot)
+            pants_run = self.run_pants_with_workdir([goal] + prep_commands_specs, workdir)
             self.assert_success(pants_run)
-            yield workdir
+            yield buildroot
 
     def test_prep_command_in_compile(self):
-        with self._execute_pants("compile") as workdir:
-            self._assert_goal_ran(workdir, "compile")
-            self._assert_goal_did_not_run(workdir, "test")
-            self._assert_goal_did_not_run(workdir, "binary")
+        with self._execute_pants("compile") as buildroot:
+            self._assert_goal_ran(buildroot, "compile")
+            self._assert_goal_did_not_run(buildroot, "test")
+            self._assert_goal_did_not_run(buildroot, "binary")
 
     def test_prep_command_in_test(self):
-        with self._execute_pants("test") as workdir:
-            self._assert_goal_ran(workdir, "compile")
-            self._assert_goal_ran(workdir, "test")
-            self._assert_goal_did_not_run(workdir, "binary")
+        with self._execute_pants("test") as buildroot:
+            self._assert_goal_ran(buildroot, "compile")
+            self._assert_goal_ran(buildroot, "test")
+            self._assert_goal_did_not_run(buildroot, "binary")
 
     def test_prep_command_in_binary(self):
-        with self._execute_pants("binary") as workdir:
-            self._assert_goal_ran(workdir, "compile")
-            self._assert_goal_ran(workdir, "binary")
-            self._assert_goal_did_not_run(workdir, "test")
+        with self._execute_pants("binary") as buildroot:
+            self._assert_goal_ran(buildroot, "compile")
+            self._assert_goal_ran(buildroot, "binary")
+            self._assert_goal_did_not_run(buildroot, "test")

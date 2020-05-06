@@ -24,7 +24,7 @@ from pants.engine.mapper import AddressFamily, AddressMapper
 from pants.engine.nodes import Return, State, Throw
 from pants.engine.parser import HydratedStruct, SymbolTable
 from pants.engine.rules import rule
-from pants.engine.scheduler import SchedulerSession
+from pants.engine.scheduler import ExecutionRequest, SchedulerSession
 from pants.engine.struct import Struct, StructWithDeps
 from pants.testutil.engine.util import MockGet, Target, run_rule
 from pants.util.objects import Exactly
@@ -164,7 +164,7 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
         address_specs = AddressSpecs(
             [SingleAddress("root", "not_me")], exclude_patterns=tuple(["root.*"])
         )
-        address_family = AddressFamily("root", {"not_me": ("root/BUILD", TargetAdaptor()),})
+        address_family = AddressFamily("root", {"not_me": ("root/BUILD", TargetAdaptor())})
 
         targets = self._resolve_addresses(
             address_specs, address_family, self._snapshot(), self._address_mapper()
@@ -239,7 +239,7 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
 
     def _populate(
         self, scheduler: SchedulerSession, address: Address,
-    ) -> Tuple[HydratedStruct, State]:
+    ) -> Tuple[ExecutionRequest, State]:
         """Perform an ExecutionRequest to parse the given Address into a Struct."""
         request = scheduler.execution_request([HydratedStruct], [address])
         returns, throws = scheduler.execute(request)

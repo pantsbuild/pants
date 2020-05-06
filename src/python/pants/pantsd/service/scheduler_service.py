@@ -2,17 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-import os
-import queue
-import sys
-import threading
-import time
-from typing import List, Optional, Set, Tuple, cast
+from typing import List, Optional, Tuple, cast
 
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import Specs
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.rules import UnionMembership
+from pants.engine.scheduler import ExecutionError, ExecutionTimeoutError
 from pants.goal.run_tracker import RunTracker
 from pants.init.engine_initializer import LegacyGraphScheduler, LegacyGraphSession
 from pants.init.specs_calculator import SpecsCalculator
@@ -28,8 +24,10 @@ class SchedulerService(PantsService):
     This service holds an online Scheduler instance that is primed via watchman filesystem events.
     """
 
-    QUEUE_SIZE = 64
-    INVALIDATION_WATCHER_LIVENESS_CHECK_INTERVAL = 1
+    # The interval on which we will long-poll the invalidation globs. If a glob changes, the poll
+    # will return immediately, so this value primarily affects how frequently the `run` method
+    # will check the terminated condition.
+    INVALIDATION_POLL_INTERVAL = 0.5
 
     def __init__(
         self,
@@ -38,7 +36,6 @@ class SchedulerService(PantsService):
         legacy_graph_scheduler: LegacyGraphScheduler,
         build_root: str,
         invalidation_globs: List[str],
-        pantsd_pidfile: Optional[str],
         union_membership: UnionMembership,
     ) -> None:
         """
@@ -47,14 +44,11 @@ class SchedulerService(PantsService):
         :param build_root: The current build root.
         :param invalidation_globs: A list of `globs` that when encountered in filesystem event
                                    subscriptions will tear down the daemon.
-        :param pantsd_pidfile: The path to the pantsd pidfile for fs event monitoring.
         """
         super().__init__()
         self._fs_event_service = fs_event_service
         self._graph_helper = legacy_graph_scheduler
-        self._invalidation_globs = invalidation_globs
         self._build_root = build_root
-        self._pantsd_pidfile = pantsd_pidfile
         self._union_membership = union_membership
 
         self._scheduler = legacy_graph_scheduler.scheduler
@@ -64,147 +58,89 @@ class SchedulerService(PantsService):
             zipkin_trace_v2=False, build_id="scheduler_service_session",
         )
         self._logger = logging.getLogger(__name__)
-        self._event_queue: queue.Queue = queue.Queue(maxsize=self.QUEUE_SIZE)
-        self._watchman_is_running = threading.Event()
-        self._invalidating_snapshot = None
-        self._invalidating_files: Set[str] = set()
 
-        self._loop_condition = LoopCondition()
+        # NB: We declare these as a single field so that they can be changed atomically
+        # by add_invalidation_glob.
+        self._invalidation_globs_and_snapshot: Tuple[Tuple[str, ...], Optional[Snapshot]] = (
+            tuple(invalidation_globs),
+            None,
+        )
 
-    def _get_snapshot(self):
-        """Returns a Snapshot of the input globs."""
-        return self._scheduler_session.product_request(
-            Snapshot, subjects=[PathGlobs(self._invalidation_globs)]
-        )[0]
+    def _get_snapshot(self, globs: Tuple[str, ...], poll: bool) -> Optional[Snapshot]:
+        """Returns a Snapshot of the input globs.
+
+        If poll=True, will wait for up to INVALIDATION_POLL_INTERVAL for the globs to have changed,
+        and will return None if they have not changed.
+        """
+        timeout = self.INVALIDATION_POLL_INTERVAL if poll else None
+        try:
+            snapshot = self._scheduler_session.product_request(
+                Snapshot, subjects=[PathGlobs(globs)], poll=poll, timeout=timeout,
+            )[0]
+            return cast(Snapshot, snapshot)
+        except ExecutionTimeoutError:
+            if poll:
+                return None
+            raise
 
     def setup(self, services):
         """Service setup."""
         super().setup(services)
-        # Register filesystem event handlers on an FSEventService instance.
-        if self._fs_event_service is not None:
-            self._fs_event_service.register_all_files_handler(
-                self._enqueue_fs_event, self._fs_event_service.PANTS_ALL_FILES_SUBSCRIPTION_NAME
-            )
 
         # N.B. We compute the invalidating fileset eagerly at launch with an assumption that files
         # that exist at startup are the only ones that can affect the running daemon.
-        if self._fs_event_service is not None:
-            if self._invalidation_globs:
-                self._invalidating_snapshot = self._get_snapshot()
-                self._invalidating_files = self._invalidating_snapshot.files
-                self._logger.info(
-                    "watching invalidating files: {}".format(self._invalidating_files)
-                )
+        globs, _ = self._invalidation_globs_and_snapshot
+        self._invalidation_globs_and_snapshot = (globs, self._get_snapshot(globs, poll=False))
+        self._logger.info("watching invalidation patterns: {}".format(globs))
 
-            if self._pantsd_pidfile:
-                self._fs_event_service.register_pidfile_handler(
-                    self._pantsd_pidfile, self._enqueue_fs_event
-                )
+    def add_invalidation_glob(self, glob: str):
+        """Add an invalidation glob to monitoring after startup.
 
-    def _enqueue_fs_event(self, event):
-        """Watchman filesystem event handler for BUILD/requirements.txt updates.
-
-        Called via a thread.
+        NB: This exists effectively entirely because pantsd needs to be fully started before writing
+        its pid file: all other globs should be passed via the constructor.
         """
-        self._logger.info(
-            "enqueuing {} changes for subscription {}".format(
-                len(event["files"]), event["subscription"]
-            )
-        )
-        self._event_queue.put(event)
+        self._logger.info("adding invalidation pattern: {}".format(glob))
 
-    def _maybe_invalidate_scheduler_batch(self):
-        new_snapshot = self._get_snapshot()
-        if (
-            self._invalidating_snapshot
-            and new_snapshot.directory_digest != self._invalidating_snapshot.directory_digest
-        ):
-            self._logger.fatal(
-                "saw file events covered by invalidation globs [{}], terminating the daemon.".format(
-                    self._invalidating_files
-                )
-            )
-            self.terminate()
+        # Check one more time synchronously with our current set of globs.
+        self._check_invalidation_globs(poll=False)
 
-    def _maybe_invalidate_scheduler_pidfile(self):
-        new_pid = self._check_pid_changed()
-        if new_pid is not False:
-            self._logger.fatal(
-                "{} says pantsd PID is {} but my PID is: {}: terminating".format(
-                    self._pantsd_pidfile, new_pid, os.getpid(),
-                )
-            )
-            self.terminate()
+        # Synchronously invalidate the path on disk to prevent races with async invalidation, which
+        # might otherwise take time to notice that the file had been created.
+        self._scheduler.invalidate_files([glob])
 
-    def _check_pid_changed(self):
-        """Reads pidfile and returns False if its PID is ours, else a printable (maybe falsey)
-        value."""
-        try:
-            with open(os.path.join(self._build_root, self._pantsd_pidfile), "r") as f:
-                pid_from_file = f.read()
-        except IOError:
-            return "[no file could be read]"
-        if int(pid_from_file) != os.getpid():
-            return pid_from_file
+        # Swap out the globs and snapshot.
+        globs, _ = self._invalidation_globs_and_snapshot
+        globs = globs + (glob,)
+        self._invalidation_globs_and_snapshot = (globs, self._get_snapshot(globs, poll=False))
+
+    def _check_invalidation_globs(self, poll: bool):
+        """Check the digest of our invalidation Snapshot and exit if it has changed."""
+        globs, invalidation_snapshot = self._invalidation_globs_and_snapshot
+        assert invalidation_snapshot is not None, "Service.setup was not called."
+
+        snapshot = self._get_snapshot(globs, poll=poll)
+        if snapshot is None or snapshot.directory_digest == invalidation_snapshot.directory_digest:
+            return
+
+        before = set(invalidation_snapshot.files + invalidation_snapshot.dirs)
+        after = set(snapshot.files + snapshot.dirs)
+        added = after - before
+        removed = before - after
+        if added or removed:
+            description = f"+{added or '{}'}, -{removed or '{}'}"
         else:
-            return False
-
-    def _handle_batch_event(self, files):
-        self._logger.debug("handling change event for: %s", files)
-
-        invalidated = self._scheduler.invalidate_files(files)
-        if invalidated:
-            self._loop_condition.notify_all()
-
-        self._maybe_invalidate_scheduler_batch()
-
-    def _process_event_queue(self):
-        """File event notification queue processor."""
-        try:
-            event = self._event_queue.get(timeout=0.05)
-        except queue.Empty:
-            return
-
-        try:
-            subscription, is_initial_event, files = (
-                event["subscription"],
-                event["is_fresh_instance"],
-                event["files"],
-            )
-        except (KeyError, UnicodeDecodeError) as e:
-            self._logger.warning("%r raised by invalid watchman event: %s", e, event)
-            return
-
-        self._logger.debug(
-            "processing {} files for subscription {} (first_event={})".format(
-                len(files), subscription, is_initial_event
-            )
+            description = f"content changed ({snapshot.directory_digest} fs {invalidation_snapshot.directory_digest})"
+        self._logger.critical(
+            f"saw filesystem changes covered by invalidation globs: {description}. terminating the daemon."
         )
-
-        # The first watchman event for all_files is a listing of all files - ignore it.
-        if (
-            not is_initial_event
-            and self._fs_event_service is not None
-            and subscription == self._fs_event_service.PANTS_ALL_FILES_SUBSCRIPTION_NAME
-        ):
-            self._handle_batch_event(files)
-
-        # However, we do want to check for the initial event in the pid file creation.
-        if subscription == self._fs_event_service.PANTS_PID_SUBSCRIPTION_NAME:
-            self._maybe_invalidate_scheduler_pidfile()
-
-        if not self._watchman_is_running.is_set():
-            self._watchman_is_running.set()
-
-        self._event_queue.task_done()
+        self.terminate()
 
     def _check_invalidation_watcher_liveness(self):
-        time.sleep(self.INVALIDATION_WATCHER_LIVENESS_CHECK_INTERVAL)
-        if not self._scheduler.check_invalidation_watcher_liveness():
+        try:
+            self._scheduler.check_invalidation_watcher_liveness()
+        except Exception as e:
             # Watcher failed for some reason
-            self._logger.critical(
-                "The graph invalidation watcher failed, so we are shutting down. Check the pantsd.log for details"
-            )
+            self._logger.critical(f"The scheduler was invalidated: {e}")
             self.terminate()
 
     def prepare_v1_graph_run_v2(
@@ -221,53 +157,17 @@ class SchedulerService(PantsService):
             self._logger.debug(
                 f"fs event service is running and graph_len > 0: waiting for initial watchman event"
             )
-            self._watchman_is_running.wait()
+            self._fs_event_service.await_started()
+
+        global_options = options.for_global_scope()
         build_id = RunTracker.global_instance().run_id
         v2_ui = options.for_global_scope().get("v2_ui", False)
+        use_colors = global_options.get("colors", True)
         zipkin_trace_v2 = options.for_scope("reporting").zipkin_trace_v2
-        session = self._graph_helper.new_session(zipkin_trace_v2, build_id, v2_ui)
+        session = self._graph_helper.new_session(
+            zipkin_trace_v2, build_id, v2_ui=v2_ui, use_colors=use_colors
+        )
 
-        if options.for_global_scope().get("loop", False):
-            fn = self._loop
-        else:
-            fn = self._body
-
-        specs, exit_code = fn(session, options, options_bootstrapper)
-        return session, specs, exit_code
-
-    def _loop(
-        self,
-        session: LegacyGraphSession,
-        options: Options,
-        options_bootstrapper: OptionsBootstrapper,
-    ) -> Tuple[Specs, int]:
-        # TODO: See https://github.com/pantsbuild/pants/issues/6288 regarding Ctrl+C handling.
-        iterations = options.for_global_scope().loop_max
-        specs = None
-        exit_code = PANTS_SUCCEEDED_EXIT_CODE
-        while iterations and not self._state.is_terminating:
-            try:
-                specs, exit_code = self._body(session, options, options_bootstrapper)
-            except session.scheduler_session.execution_error_type as e:
-                # Render retryable exceptions raised by the Scheduler.
-                print(e, file=sys.stderr)
-
-            iterations -= 1
-            while (
-                iterations
-                and not self._state.is_terminating
-                and not self._loop_condition.wait(timeout=1)
-            ):
-                continue
-        return cast(Specs, specs), exit_code
-
-    def _body(
-        self,
-        session: LegacyGraphSession,
-        options: Options,
-        options_bootstrapper: OptionsBootstrapper,
-    ) -> Tuple[Specs, int]:
-        global_options = options.for_global_scope()
         specs = SpecsCalculator.create(
             options=options,
             session=session.scheduler_session,
@@ -276,59 +176,64 @@ class SchedulerService(PantsService):
             else tuple(),
             tags=tuple(global_options.tag) if global_options.tag else tuple(),
         )
+
+        v2 = global_options.v2
+        perform_loop = global_options.get("loop", False)
+        if not perform_loop:
+            return (
+                session,
+                specs,
+                self._body(session, options, options_bootstrapper, specs, v2, poll=False),
+            )
+
+        iterations = global_options.loop_max
+        exit_code = PANTS_SUCCEEDED_EXIT_CODE
+        while iterations and not self._state.is_terminating:
+            # NB: We generate a new "run id" per iteration of the loop in order to allow us to
+            # observe fresh values for Goals. See notes in `scheduler.rs`.
+            session.scheduler_session.new_run_id()
+            try:
+                exit_code = self._body(session, options, options_bootstrapper, specs, v2, poll=True)
+            except ExecutionError as e:
+                self._logger.warning(e)
+            iterations -= 1
+
+        return session, specs, exit_code
+
+    def _body(
+        self,
+        session: LegacyGraphSession,
+        options: Options,
+        options_bootstrapper: OptionsBootstrapper,
+        specs: Specs,
+        v2: bool,
+        poll: bool,
+    ) -> int:
         exit_code = PANTS_SUCCEEDED_EXIT_CODE
 
-        v1_goals, ambiguous_goals, v2_goals = options.goals_by_version
+        _, ambiguous_goals, v2_goals = options.goals_by_version
 
-        if v2_goals or (ambiguous_goals and global_options.v2):
-            goals = v2_goals + (ambiguous_goals if global_options.v2 else tuple())
+        if v2_goals or (ambiguous_goals and v2):
+            goals = v2_goals + (ambiguous_goals if v2 else tuple())
 
-            # N.B. @goal_rules run pre-fork in order to cache the products they request during execution.
+            # When polling we use a delay (only applied in cases where we have waited for something
+            # to do) in order to avoid re-running too quickly when changes arrive in clusters.
             exit_code = session.run_goal_rules(
                 options_bootstrapper=options_bootstrapper,
                 union_membership=self._union_membership,
                 options=options,
                 goals=goals,
                 specs=specs,
+                poll=poll,
+                poll_delay=(0.1 if poll else None),
             )
 
-        return specs, exit_code
+        return exit_code
 
     def run(self):
         """Main service entrypoint."""
         while not self._state.is_terminating:
-            if self._fs_event_service is not None:
-                self._process_event_queue()
-            else:
-                self._check_invalidation_watcher_liveness()
             self._state.maybe_pause()
-
-
-class LoopCondition:
-    """A wrapped condition variable to handle deciding when loop consumers should re-run.
-
-    Any number of threads may wait and/or notify the condition.
-    """
-
-    def __init__(self):
-        super().__init__()
-        self._condition = threading.Condition(threading.Lock())
-        self._iteration = 0
-
-    def notify_all(self):
-        """Notifies all threads waiting for the condition."""
-        with self._condition:
-            self._iteration += 1
-            self._condition.notify_all()
-
-    def wait(self, timeout):
-        """Waits for the condition for at most the given timeout and returns True if the condition
-        triggered.
-
-        Generally called in a loop until the condition triggers.
-        """
-
-        with self._condition:
-            previous_iteration = self._iteration
-            self._condition.wait(timeout)
-            return previous_iteration != self._iteration
+            self._check_invalidation_watcher_liveness()
+            # NB: This is a long poll that will keep us from looping too quickly here.
+            self._check_invalidation_globs(poll=True)

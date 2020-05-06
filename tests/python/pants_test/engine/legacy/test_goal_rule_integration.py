@@ -59,18 +59,29 @@ class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
 
             # Launch the loop as a background process.
             handle = self.run_pants_with_workdir_without_waiting(
-                ["--no-v1", "--v2", "--loop", "--loop-max=3", "list", f"{tmpdir}:",],
+                # NB: We disable watchman here because in the context of `--loop`, the total count
+                # of invalidations matters, and with both `notify` and `watchman` enabled we get
+                # twice as many.
+                [
+                    "--no-v1",
+                    "--v2",
+                    "--no-watchman-enable",
+                    "--loop",
+                    "--loop-max=3",
+                    "list",
+                    f"{tmpdir}:",
+                ],
                 workdir,
                 config,
             )
 
-            # Wait for the loop to stabilize.
-            time.sleep(10)
+            # Wait for pantsd to come up and for the loop to stabilize.
             checker.assert_started()
+            time.sleep(10)
 
             # Replace the BUILD file content twice.
             dump('target(name="two")')
-            time.sleep(5)
+            time.sleep(10)
             dump('target(name="three")')
 
             # Verify that the three different target states were listed, and that the process exited.

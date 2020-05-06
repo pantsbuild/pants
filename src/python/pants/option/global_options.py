@@ -722,7 +722,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
             type=list,
             default=[],
             help="Filesystem events matching any of these globs will trigger a daemon restart. "
-            "The `--pythonpath` and `--pants-config-files` are inherently invalidated.",
+            "Pants' own code, plugins, and `--pants-config-files` are inherently invalidated.",
         )
 
         # Watchman options.

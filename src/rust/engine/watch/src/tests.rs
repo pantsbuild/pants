@@ -7,12 +7,13 @@ use std::sync::Arc;
 use std::thread::sleep;
 use std::time::Duration;
 
-use crossbeam_channel;
+use crossbeam_channel::{self, RecvTimeoutError};
 use fs::GitignoreStyleExcludes;
 use notify;
 use parking_lot::Mutex;
 use task_executor::Executor;
 use testutil::{append_to_existing_file, make_file};
+use tokio::runtime::Handle;
 
 fn setup_fs() -> (tempfile::TempDir, PathBuf) {
   // setup a build_root with a file in it to watch.
@@ -25,28 +26,21 @@ fn setup_fs() -> (tempfile::TempDir, PathBuf) {
   (tempdir, file_path)
 }
 
-fn setup_watch(
+/// Create (but don't start) an InvalidationWatcher.
+async fn setup_watch(
   ignorer: Arc<GitignoreStyleExcludes>,
-  invalidatable: Arc<TestInvalidatable>,
   build_root: PathBuf,
   file_path: PathBuf,
-) -> InvalidationWatcher {
-  let mut rt = tokio::runtime::Runtime::new().unwrap();
-  let executor = Executor::new(rt.handle().clone());
-  let watcher = InvalidationWatcher::new(
-    Arc::downgrade(&invalidatable),
-    executor,
-    build_root,
-    ignorer,
-    /*enabled*/ true,
-  )
-  .expect("Couldn't create InvalidationWatcher");
-  rt.block_on(watcher.watch(file_path)).unwrap();
+) -> Arc<InvalidationWatcher> {
+  let executor = Executor::new(Handle::current());
+  let watcher = InvalidationWatcher::new(executor, build_root, ignorer, /*enabled*/ true)
+    .expect("Couldn't create InvalidationWatcher");
+  watcher.watch(file_path).await.unwrap();
   watcher
 }
 
-#[test]
-fn receive_watch_event_on_file_change() {
+#[tokio::test]
+async fn receive_watch_event_on_file_change() {
   // Instantiate a watcher and watch the file in question.
   let (tempdir, file_path) = setup_fs();
   let build_root = tempdir.path().to_path_buf();
@@ -58,12 +52,8 @@ fn receive_watch_event_on_file_change() {
 
   let invalidatable = Arc::new(TestInvalidatable::default());
   let ignorer = GitignoreStyleExcludes::create(&[]).unwrap();
-  let _watcher = setup_watch(
-    ignorer,
-    invalidatable.clone(),
-    build_root.clone(),
-    file_path.clone(),
-  );
+  let watcher = setup_watch(ignorer, build_root.clone(), file_path.clone()).await;
+  watcher.start(&invalidatable);
 
   // Update the content of the file being watched.
   let new_content = "stnetnoc".as_bytes().to_vec();
@@ -79,14 +69,11 @@ fn receive_watch_event_on_file_change() {
     }
   }
   // If we didn't find a new state fail the test.
-  assert!(
-    false,
-    "Nodes EntryState was not invalidated, or reset to NotStarted."
-  )
+  assert!(false, "Did not observe invalidation.")
 }
 
-#[test]
-fn ignore_file_events_matching_patterns_in_pants_ignore() {
+#[tokio::test]
+async fn ignore_file_events_matching_patterns_in_pants_ignore() {
   let (tempdir, file_path) = setup_fs();
   let build_root = tempdir.path().to_path_buf();
   let file_path_rel = file_path
@@ -97,12 +84,8 @@ fn ignore_file_events_matching_patterns_in_pants_ignore() {
 
   let invalidatable = Arc::new(TestInvalidatable::default());
   let ignorer = GitignoreStyleExcludes::create(&["/foo".to_string()]).unwrap();
-  let _watcher = setup_watch(
-    ignorer,
-    invalidatable.clone(),
-    build_root.clone(),
-    file_path.clone(),
-  );
+  let watcher = setup_watch(ignorer, build_root, file_path.clone()).await;
+  watcher.start(&invalidatable);
 
   // Update the content of the file being watched.
   let new_content = "stnetnoc".as_bytes().to_vec();
@@ -118,30 +101,42 @@ fn ignore_file_events_matching_patterns_in_pants_ignore() {
   }
 }
 
-#[test]
-fn test_liveness() {
-  let (tempdir, _) = setup_fs();
+#[tokio::test]
+async fn liveness_watch_error() {
+  let (tempdir, file_path) = setup_fs();
   let build_root = tempdir.path().to_path_buf();
 
   let invalidatable = Arc::new(TestInvalidatable::default());
   let ignorer = GitignoreStyleExcludes::create(&[]).unwrap();
+  // NB: We create this watcher, but we don't call start: instead we create the background thread
+  // directly.
+  let _watcher = setup_watch(ignorer.clone(), build_root.clone(), file_path.clone()).await;
   let (liveness_sender, liveness_receiver) = crossbeam_channel::unbounded();
   let (event_sender, event_receiver) = crossbeam_channel::unbounded();
-  InvalidationWatcher::start_background_thread(
+  let join_handle = InvalidationWatcher::start_background_thread(
     Arc::downgrade(&invalidatable),
     ignorer,
     build_root,
     liveness_sender,
     event_receiver,
   );
+
+  // Should not exit.
+  assert_eq!(
+    Err(RecvTimeoutError::Timeout),
+    liveness_receiver.recv_timeout(Duration::from_millis(100))
+  );
   event_sender
     .send(Err(notify::Error::generic(
       "This should kill the background thread",
     )))
     .unwrap();
+
+  // Should exit.
   assert!(liveness_receiver
-    .recv_timeout(Duration::from_millis(100))
+    .recv_timeout(Duration::from_millis(1000))
     .is_ok());
+  join_handle.join().unwrap();
 }
 
 #[derive(Default)]
