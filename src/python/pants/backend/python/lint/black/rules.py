@@ -4,7 +4,7 @@
 import re
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple, Union, cast
 
 from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.lint.python_fmt import PythonFmtFieldSets
@@ -29,7 +29,7 @@ from pants.core.util_rules.determine_source_files import (
 from pants.engine.fs import Digest, MergeDigests, PathGlobs, Snapshot
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import SubsystemRule, named_rule, rule
-from pants.engine.selectors import Get
+from pants.engine.selectors import Get, MultiGet
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
@@ -86,7 +86,7 @@ async def setup(
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> Setup:
-    requirements_pex = await Get[Pex](
+    requirements_pex_request = Get[Pex](
         PexRequest(
             output_filename="black.pex",
             requirements=PexRequirements(black.get_requirement_specs()),
@@ -98,7 +98,7 @@ async def setup(
     )
 
     config_path: Optional[str] = black.options.config
-    config_snapshot = await Get[Snapshot](
+    config_snapshot_request = Get[Snapshot](
         PathGlobs(
             globs=tuple([config_path] if config_path else []),
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
@@ -106,18 +106,31 @@ async def setup(
         )
     )
 
-    if request.field_sets.prior_formatter_result is None:
-        all_source_files = await Get[SourceFiles](
-            AllSourceFilesRequest(field_set.sources for field_set in request.field_sets)
-        )
-        all_source_files_snapshot = all_source_files.snapshot
-    else:
-        all_source_files_snapshot = request.field_sets.prior_formatter_result
-
-    specified_source_files = await Get[SourceFiles](
+    all_source_files_request = Get[SourceFiles](
+        AllSourceFilesRequest(field_set.sources for field_set in request.field_sets)
+    )
+    specified_source_files_request = Get[SourceFiles](
         SpecifiedSourceFilesRequest(
             (field_set.sources, field_set.origin) for field_set in request.field_sets
         )
+    )
+
+    requests: List[Get] = [
+        requirements_pex_request,
+        config_snapshot_request,
+        specified_source_files_request,
+    ]
+    if request.field_sets.prior_formatter_result is None:
+        requests.append(all_source_files_request)
+    requirements_pex, config_snapshot, specified_source_files, *rest = cast(
+        Union[Tuple[Pex, Snapshot, SourceFiles], Tuple[Pex, Snapshot, SourceFiles, SourceFiles]],
+        await MultiGet(requests),
+    )
+
+    all_source_files_snapshot = (
+        request.field_sets.prior_formatter_result
+        if request.field_sets.prior_formatter_result
+        else rest[0].snapshot
     )
 
     input_digest = await Get[Digest](
