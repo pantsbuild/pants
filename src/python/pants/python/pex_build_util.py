@@ -317,7 +317,6 @@ class PexBuilderWrapper:
         find_links = list(find_links) if find_links else []
         find_links.extend(python_repos.repos)
 
-        distributions = {}
         fetchers = python_repos.get_fetchers()
         fetchers.extend(Fetcher([path]) for path in find_links)
 
