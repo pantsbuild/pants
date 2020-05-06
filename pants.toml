@@ -98,6 +98,36 @@ pants_ignore.add = [
   "!/pants.pex",
 ]
 
+[source]
+
+roots = [
+  "src/python",
+  "src/java",
+  "src/scala",
+  "src/go",
+  "src/cpp",
+  "src/node",
+  "src/resources",
+  "src/antlr",
+  "src/protobuf",
+  "src/thrift",
+  "src/wire",
+  "src/main/java",
+  "src/main/scala",
+  "src/main/resources",
+  "src/main/proto",
+  "src/test/java",
+  "src/test/scala",
+  "src/test/resources",
+  "tests/python",
+  "tests/java",
+  "tests/scala",
+  "tests/resources",
+  "tests/avro",
+  "tests/thrift",
+  "tests/wsdl",
+]
+
 [cache]
 # Caching is on globally by default, but we disable it here for development purposes.
 # It is explicitly re-enabled below for [cache.bootstrap] only.
