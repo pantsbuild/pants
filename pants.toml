@@ -103,6 +103,17 @@ pants_ignore.add = [
   "!/pants.pex",
 ]
 
+[source]
+root_patterns = [
+  "src/*",
+  "src/main/*",
+  "src/test/*",
+  "^/src/go/src",
+  "test/*",
+  "tests/*",
+  "3rdparty/*",
+]
+
 [cache]
 # Caching is on globally by default, but we disable it here for development purposes.
 # It is explicitly re-enabled below for [cache.bootstrap] only.
