@@ -663,7 +663,7 @@ class GlobalOptions(Subsystem):
             type=bool,
             advanced=True,
             default=False,
-            removal_version="1.29.0.dev2",
+            removal_version="1.30.0.dev0",
             removal_hint="The native watcher is now sufficient to monitor for filesystem changes.",
             help="Use the watchman daemon filesystem event watcher to watch for changes "
             "in the buildroot in addition to the built in watcher.",
@@ -902,7 +902,7 @@ class GlobalOptions(Subsystem):
             type=bool,
             default=True,
             advanced=True,
-            removal_version="1.29.0.dev2",
+            removal_version="1.30.0.dev0",
             removal_hint="Enabled by default: flag is disabled.",
             help="Whether to use the engine filesystem watcher which registers the workspace"
             " for kernel file change events",
