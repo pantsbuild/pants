@@ -47,6 +47,8 @@ pub trait Node: Clone + Debug + Display + Eq + Hash + Send + 'static {
   fn user_facing_name(&self) -> Option<String> {
     None
   }
+
+  fn canonical_name(&self) -> String;
 }
 
 pub trait NodeError: Clone + Debug + Eq + Send {

@@ -1064,7 +1064,7 @@ impl Node for NodeKey {
 
     let started_workunit_id = {
       let display = context.session.should_handle_workunits() && self.user_facing_name().is_some();
-      let name = self.display_info().and_then(|di| di.name.as_ref().cloned()).unwrap_or(format!("{}", self));
+      let name = self.canonical_name();
       let span_id = new_span_id();
 
       // We're starting a new workunit: record our parent, and set the current parent to our span.
@@ -1150,6 +1150,17 @@ impl Node for NodeKey {
       NodeKey::ReadLink(..) => None,
       NodeKey::Scandir(..) => None,
       NodeKey::Select(..) => None,
+    }
+  }
+
+  fn canonical_name(&self) -> String {
+    match self {
+      NodeKey::Task(_) => self
+        .display_info()
+        .and_then(|di| di.name.as_ref())
+        .map(|s| s.to_owned())
+        .unwrap_or_else(|| format!("{}", self)),
+      _ => format!("{}", self),
     }
   }
 }
