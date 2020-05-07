@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os.path
-from typing import Iterable, Optional, Tuple, Union, cast
+from typing import Iterable, Optional, Sequence, Tuple, Union, cast
 
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
@@ -44,7 +44,10 @@ class PythonInterpreterCompatibility(StringOrStringSequenceField):
     This should be written in Requirement-style format, e.g. `CPython==2.7.*` or `CPython>=3.6,<4`.
     As a shortcut, you can leave off `CPython`, e.g. `>=2.7` will be expanded to `CPython>=2.7`.
 
-    If this is left off, this will default to `--python-setup-interpreter-constraints`.
+    If this is left off, this will default to the option `interpreter_constraints` in the
+    [python-setup] scope.
+
+    See https://pants.readme.io/docs/python-interpreter-compatibility.
     """
 
     alias = "compatibility"
@@ -58,7 +61,10 @@ class PythonInterpreterCompatibility(StringOrStringSequenceField):
 
 
 class PythonProvidesField(ScalarField, ProvidesField):
-    """The`setup.py` kwargs for the external artifact built from this target."""
+    """The`setup.py` kwargs for the external artifact built from this target.
+
+    See https://pants.readme.io/docs/python-setup-py-goal.
+    """
 
     expected_type = PythonArtifact
     expected_type_description = "setup_py(**kwargs)"
@@ -145,12 +151,20 @@ class PythonBinarySources(PythonSources):
 
     expected_num_files = range(0, 2)
 
+    @staticmethod
+    def translate_source_file_to_entry_point(stripped_sources: Sequence[str]) -> Optional[str]:
+        # We assume we have 0-1 sources, which is enforced by PythonBinarySources.
+        if len(stripped_sources) != 1:
+            return None
+        module_base, _ = os.path.splitext(stripped_sources[0])
+        return module_base.replace(os.path.sep, ".")
+
 
 class PythonEntryPoint(StringField):
     """The default entry point for the binary.
 
-    If omitted, Pants will try to infer the entry point by looking at the `sources` argument for a
-    `__main__` function.
+    If omitted, Pants will use the module name from the `sources` field, e.g. `project/app.py` will
+    become the entry point `project.app` .
     """
 
     alias = "entry_point"
@@ -285,7 +299,7 @@ class PythonTestsSources(PythonSources):
 
 
 class PythonCoverage(StringOrStringSequenceField):
-    """A list of the module(s) you expect for this test target to cover.
+    """A list of the module(s) you expect this test target to cover.
 
     Usually, Pants and pytest-cov can auto-discover this if your tests are located in the same
     folder as the `python_library` code, but this is useful if the tests are not collocated.
@@ -355,6 +369,8 @@ class PythonTests(Target):
     """Python tests.
 
     These may be written in either Pytest-style or unittest style.
+
+    See https://pants.readme.io/docs/python-test-goal.
     """
 
     alias = "python_tests"
@@ -433,6 +449,8 @@ class PythonRequirementLibrary(Target):
     you have a `requirements.txt` file already, you can instead use the macro
     `python_requirements()` to convert each requirement into a `python_requirement_library()` target
     automatically.
+
+    See https://pants.readme.io/docs/python-third-party-dependencies.
     """
 
     alias = "python_requirement_library"

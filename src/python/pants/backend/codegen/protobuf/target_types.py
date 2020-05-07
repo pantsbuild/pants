@@ -6,12 +6,13 @@ from pants.engine.target import COMMON_TARGET_FIELDS, Dependencies, Sources, Tar
 
 class ProtobufSources(Sources):
     default = ("*.proto",)
+    expected_file_extensions = (".proto",)
 
 
 class ProtobufLibrary(Target):
     """Protobuf files used to generate various languages.
 
-    See https://developers.google.com/protocol-buffers/.
+    See https://pants.readme.io/docs/protobuf.
     """
 
     alias = "protobuf_library"

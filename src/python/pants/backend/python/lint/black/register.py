@@ -3,7 +3,8 @@
 
 """Autoformatter for Python.
 
-See https://black.readthedocs.io/en/stable/.
+See https://pants.readme.io/docs/python-linters-and-formatters and
+https://black.readthedocs.io/en/stable/.
 """
 
 from pants.backend.python.lint import python_fmt

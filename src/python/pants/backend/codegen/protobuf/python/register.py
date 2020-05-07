@@ -3,7 +3,7 @@
 
 """Generate Python sources from Protocol Buffers (Protobufs).
 
-See https://developers.google.com/protocol-buffers/.
+See https://pants.readme.io/docs/protobuf.
 """
 
 from pants.backend.codegen.protobuf.python import additional_fields

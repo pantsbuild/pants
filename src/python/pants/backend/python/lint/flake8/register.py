@@ -3,7 +3,8 @@
 
 """Linter for Python.
 
-Works with all Flake8 plugins. See https://flake8.pycqa.org/en/latest/.
+See https://pants.readme.io/docs/python-linters-and-formatters and
+https://flake8.pycqa.org/en/latest/.
 """
 
 from pants.backend.python.lint.flake8 import rules as flake8_rules
