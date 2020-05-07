@@ -148,17 +148,19 @@ async def lint(
         return Lint(exit_code=0)
 
     exit_code = 0
-    for result in sorted(results, key=lambda res: res.linter_name):
+    sorted_results = sorted(results, key=lambda res: res.linter_name)
+    for result in sorted_results:
         console.print_stderr(
             f"{console.green('✓')} {result.linter_name} succeeded."
             if result.exit_code == 0
             else f"{console.red('𐄂')} {result.linter_name} failed."
         )
         if result.stdout:
-            console.print_stdout(result.stdout)
+            console.print_stderr(result.stdout)
         if result.stderr:
             console.print_stderr(result.stderr)
-        console.print_stderr("")
+        if result != sorted_results[-1]:
+            console.print_stderr("")
         if result.exit_code != 0:
             exit_code = result.exit_code
 

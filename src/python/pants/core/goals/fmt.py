@@ -249,17 +249,19 @@ async def fmt(
         merged_formatted_digest = await Get[Digest](MergeDigests(changed_digests))
         workspace.materialize_directory(DirectoryToMaterialize(merged_formatted_digest))
 
-    for result in sorted(individual_results, key=lambda res: res.formatter_name):
+    sorted_results = sorted(individual_results, key=lambda res: res.formatter_name)
+    for result in sorted_results:
         console.print_stderr(
             f"{console.green('✓')} {result.formatter_name} made no changes."
             if not result.did_change
             else f"{console.red('𐄂')} {result.formatter_name} made changes."
         )
         if result.stdout:
-            console.print_stdout(result.stdout)
+            console.print_stderr(result.stdout)
         if result.stderr:
             console.print_stderr(result.stderr)
-        console.print_stderr("")
+        if result != sorted_results[-1]:
+            console.print_stderr("")
 
     # Since the rules to produce FmtResult should use ExecuteRequest, rather than
     # FallibleProcess, we assume that there were no failures.
