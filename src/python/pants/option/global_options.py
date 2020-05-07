@@ -662,9 +662,11 @@ class GlobalOptions(Subsystem):
             "--watchman-enable",
             type=bool,
             advanced=True,
-            default=True,
+            default=False,
+            removal_version="1.29.0.dev2",
+            removal_hint="The native watcher is now sufficient to monitor for filesystem changes.",
             help="Use the watchman daemon filesystem event watcher to watch for changes "
-            "in the buildroot. Disable this to rely solely on the experimental pants engine filesystem watcher.",
+            "in the buildroot in addition to the built in watcher.",
         )
         register(
             "--watchman-version", advanced=True, default="4.9.0-pants1", help="Watchman version."
