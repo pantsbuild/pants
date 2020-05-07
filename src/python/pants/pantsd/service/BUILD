@@ -26,7 +26,6 @@ python_library(
   sources = ['pailgun_service.py'],
   dependencies = [
     ':pants_service',
-    'src/python/pants/pantsd:pailgun_server'
   ],
   tags = {"partially_type_checked"},
 )

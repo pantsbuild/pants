@@ -7,7 +7,7 @@ import time
 import unittest
 import unittest.mock
 
-from pants.java.nailgun_io import NailgunStreamWriter, Pipe, PipedNailgunStreamWriter
+from pants.java.nailgun_io import NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 
 PATCH_OPTS = dict(autospec=True, spec_set=True)
@@ -63,35 +63,4 @@ class TestNailgunStreamWriter(unittest.TestCase):
                 unittest.mock.call(unittest.mock.ANY, ChunkType.STDIN, b"A" * 300),
                 unittest.mock.call(unittest.mock.ANY, ChunkType.STDIN_EOF),
             ]
-        )
-
-
-class TestPipedNailgunStreamWriter(unittest.TestCase):
-    def setUp(self):
-        self.mock_socket = unittest.mock.Mock()
-
-    @unittest.mock.patch("os.read")
-    @unittest.mock.patch("select.select")
-    @unittest.mock.patch.object(NailgunProtocol, "write_chunk")
-    def test_auto_shutdown_on_write_end_closed(self, mock_writer, mock_select, mock_read):
-        pipe = Pipe.create(False)
-        test_data = [b"A"] * 1000 + [b""]
-        mock_read.side_effect = test_data
-        mock_select.side_effect = [([pipe.read_fd], [], [])] * len(test_data)
-
-        writer = PipedNailgunStreamWriter(
-            pipes=[pipe],
-            socket=self.mock_socket,
-            chunk_type=(ChunkType.STDOUT,),
-            chunk_eof_type=None,
-            buf_size=len(b"A"),
-        )
-
-        with writer.running():
-            pipe.stop_writing()
-            writer.join(1)
-            self.assertFalse(writer.is_alive())
-
-        mock_writer.assert_has_calls(
-            [unittest.mock.call(unittest.mock.ANY, ChunkType.STDOUT, b"A")] * (len(test_data) - 1)
         )

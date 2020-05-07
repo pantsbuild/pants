@@ -42,17 +42,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'pailgun_server',
-  sources = ['test_pailgun_server.py'],
-  coverage = ['pants.pantsd.pailgun_server'],
-  dependencies = [
-    ':test_deps',
-    'src/python/pants/pantsd:pailgun_server'
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_tests(
   name = 'pants_daemon',
   sources = ['test_pants_daemon.py'],
   coverage = ['pants.pantsd.pants_daemon'],

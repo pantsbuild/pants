@@ -6,12 +6,11 @@ import os
 import sys
 import time
 from contextlib import contextmanager
-from dataclasses import dataclass
 from threading import Lock
-from typing import Callable, Dict, Iterator, List, Mapping, Optional, Tuple
+from typing import Dict, Tuple
 
 from pants.base.exception_sink import ExceptionSink
-from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode, Exiter
+from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.bin.local_pants_runner import LocalPantsRunner
 from pants.engine.internals.native import RawFdRunner
 from pants.engine.unions import UnionMembership
@@ -21,7 +20,6 @@ from pants.init.util import clean_global_runtime_state
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.service.scheduler_service import SchedulerService
 from pants.util.contextutil import argv_as, hermetic_environment_as, stdio_as
-from pants.util.socket import teardown_socket
 
 logger = logging.getLogger(__name__)
 
@@ -138,9 +136,9 @@ class DaemonPantsRunner(RawFdRunner):
             # self.scheduler_service.graph_run_v2 will already run v2 or ambiguous goals. We should
             # only enter this code path if v1 is set.
             if global_options.v1:
-                runner = LocalPantsRunner.create(self.env, options_bootstrapper, specs, session)
+                runner = LocalPantsRunner.create(os.environ, options_bootstrapper, specs, session)
 
-                env_start_time = self.env.pop("PANTSD_RUNTRACKER_CLIENT_START_TIME", None)
+                env_start_time = os.environ.get("PANTSD_RUNTRACKER_CLIENT_START_TIME", None)
                 start_time = float(env_start_time) if env_start_time else None
                 runner.set_start_time(start_time)
                 # TODO: This is almost certainly not correct: we should likely have the entire run
@@ -151,10 +149,10 @@ class DaemonPantsRunner(RawFdRunner):
 
         except KeyboardInterrupt:
             print("Interrupted by user.\n", file=sys.stderr)
-            return 1
+            return PANTS_FAILED_EXIT_CODE
         except Exception as e:
             ExceptionSink.log_unhandled_exception(exc=e)
-            return 1
+            return PANTS_FAILED_EXIT_CODE
 
     def __call__(
         self,

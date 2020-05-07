@@ -471,7 +471,7 @@ Exception message: {exception_message}{maybe_newline}
 
     @classmethod
     def log_unhandled_exception(cls, exc_class=None, exc=None, tb=None, add_newline=False):
-        """Logs an unhandled exception to a variety of locations"""
+        """Logs an unhandled exception to a variety of locations."""
         exc_class = exc_class or sys.exc_info()[0]
         exc = exc or sys.exc_info()[1]
         tb = tb or sys.exc_info()[2]
