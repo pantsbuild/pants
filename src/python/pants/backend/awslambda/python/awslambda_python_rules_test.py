@@ -16,14 +16,18 @@ from pants.engine.fs import FilesContent
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.engine.target import WrappedTarget
+from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option.util import create_options_bootstrapper
-from pants.testutil.test_base import TestBase
 
 
-class TestPythonAWSLambdaCreation(TestBase):
+class TestPythonAWSLambdaCreation(ExternalToolTestBase):
     @classmethod
     def rules(cls):
-        return (*super().rules(), *awslambda_python_rules(), RootRule(PythonAwsLambdaFieldSet))
+        return (
+            *super().rules(),
+            *awslambda_python_rules(),
+            RootRule(PythonAwsLambdaFieldSet),
+        )
 
     @classmethod
     def target_types(cls):

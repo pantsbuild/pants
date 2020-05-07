@@ -33,14 +33,14 @@ from pants.engine.rules import RootRule, SubsystemRule
 from pants.engine.selectors import Params
 from pants.engine.target import TargetWithOrigin
 from pants.python.python_requirement import PythonRequirement
+from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.interpreter_selection_utils import skip_unless_python27_and_python3_present
 from pants.testutil.option.util import create_options_bootstrapper
-from pants.testutil.test_base import TestBase
 
 
 # TODO: Figure out what testing should look like with the Target API. Should we still call
 #  self.add_to_build_file(), for example?
-class PytestRunnerIntegrationTest(TestBase):
+class PytestRunnerIntegrationTest(ExternalToolTestBase):
 
     source_root = "tests/python/pants_test"
     good_source = FileContent(path="test_good.py", content=b"def test():\n  pass\n")
@@ -49,7 +49,7 @@ class PytestRunnerIntegrationTest(TestBase):
     library_source = FileContent(path="library.py", content=b"def add_two(x):\n  return x + 2\n")
 
     create_python_library = partialmethod(
-        TestBase.create_library, path=source_root, target_type="python_library",
+        ExternalToolTestBase.create_library, path=source_root, target_type="python_library",
     )
 
     def write_file(self, file_content: FileContent) -> None:

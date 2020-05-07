@@ -15,11 +15,11 @@ from pants.engine.fs import Digest, FileContent, InputFilesContent
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.engine.target import TargetWithOrigin
+from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option.util import create_options_bootstrapper
-from pants.testutil.test_base import TestBase
 
 
-class DocformatterIntegrationTest(TestBase):
+class DocformatterIntegrationTest(ExternalToolTestBase):
 
     good_source = FileContent(path="good.py", content=b'"""Good docstring."""\n')
     bad_source = FileContent(path="bad.py", content=b'"""Oops, missing a period"""\n')
@@ -56,7 +56,7 @@ class DocformatterIntegrationTest(TestBase):
         lint_result = self.request_single_product(
             LintResult, Params(DocformatterFieldSets(field_sets), options_bootstrapper)
         )
-        input_snapshot = self.request_single_product(
+        input_sources = self.request_single_product(
             SourceFiles,
             Params(
                 AllSourceFilesRequest(field_set.sources for field_set in field_sets),
@@ -66,7 +66,7 @@ class DocformatterIntegrationTest(TestBase):
         fmt_result = self.request_single_product(
             FmtResult,
             Params(
-                DocformatterFieldSets(field_sets, prior_formatter_result=input_snapshot),
+                DocformatterFieldSets(field_sets, prior_formatter_result=input_sources.snapshot),
                 options_bootstrapper,
             ),
         )

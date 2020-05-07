@@ -18,11 +18,11 @@ from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.engine.target import Dependencies, Sources, TargetWithOrigin
+from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option.util import create_options_bootstrapper
-from pants.testutil.test_base import TestBase
 
 
-class PylintIntegrationTest(TestBase):
+class PylintIntegrationTest(ExternalToolTestBase):
     # See http://pylint.pycqa.org/en/latest/user_guide/run.html#exit-codes for exit codes.
     source_root = "src/python"
     good_source = FileContent(

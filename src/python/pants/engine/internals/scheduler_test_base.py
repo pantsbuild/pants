@@ -56,6 +56,7 @@ class SchedulerTestBase:
         work_dir = work_dir or self._create_work_dir()
         project_tree = project_tree or self.mk_fs_tree(work_dir=work_dir)
         local_store_dir = os.path.realpath(safe_mkdtemp())
+        local_execution_root_dir = os.path.realpath(safe_mkdtemp())
         if execution_options is not None:
             eo = asdict(DEFAULT_EXECUTION_OPTIONS)
             eo.update(execution_options)
@@ -66,6 +67,7 @@ class SchedulerTestBase:
             use_gitignore=False,
             build_root=project_tree.build_root,
             local_store_dir=local_store_dir,
+            local_execution_root_dir=local_execution_root_dir,
             rules=rules,
             union_rules=union_rules,
             execution_options=execution_options or DEFAULT_EXECUTION_OPTIONS,

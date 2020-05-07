@@ -7,6 +7,27 @@ The ``1.27.x`` series deprecates several unused backends and plugins. Please
 see https://groups.google.com/forum/#!topic/pants-devel/ngMZRIJvwHM for more
 information.
 
+1.27.0rc1 (5/7/2020)
+--------------------
+
+Bugfixes
+~~~~~~~~
+
+* Fix crash when V2 goals like `repl` have no specified targets (#9673)
+  `PR #9673 <https://github.com/pantsbuild/pants/pull/9673>`_
+
+* Temporarily disable `./pants backends` goal due to bug (#9629)
+  `PR #9629 <https://github.com/pantsbuild/pants/pull/9629>`_
+
+* Fix `zip_safe` field not being used with V2 binary (#9598)
+  `PR #9598 <https://github.com/pantsbuild/pants/pull/9598>`_
+
+* Fix typo in V1 Python interpreter selection error message (#9589)
+  `PR #9589 <https://github.com/pantsbuild/pants/pull/9589>`_
+
+* Revert allowing Python targets to include `.c` files in their sources (#9583)
+  `PR #9583 <https://github.com/pantsbuild/pants/pull/9583>`_
+
 1.27.0rc0 (4/17/2020)
 ----------------------
 

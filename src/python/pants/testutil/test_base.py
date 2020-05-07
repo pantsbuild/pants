@@ -291,7 +291,6 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
     @classmethod
     def rules(cls):
-        # Required for sources_for:
         return [RootRule(SourcesField)]
 
     @classmethod
@@ -303,7 +302,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         build_config = BuildConfiguration()
         build_config.register_aliases(cls.alias_groups())
         build_config.register_rules(cls.rules())
-        build_config.register_targets(cls.target_types())
+        build_config.register_target_types(cls.target_types())
         return build_config
 
     def setUp(self):
@@ -404,10 +403,9 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
             return
 
         options_bootstrapper = OptionsBootstrapper.create(args=["--pants-config-files=[]"])
-        local_store_dir = (
-            local_store_dir
-            or options_bootstrapper.bootstrap_options.for_global_scope().local_store_dir
-        )
+        global_options = options_bootstrapper.bootstrap_options.for_global_scope()
+        local_store_dir = local_store_dir or global_options.local_store_dir
+        local_execution_root_dir = global_options.local_execution_root_dir
 
         # NB: This uses the long form of initialization because it needs to directly specify
         # `cls.alias_groups` rather than having them be provided by bootstrap options.
@@ -415,6 +413,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
             pants_ignore_patterns=[],
             use_gitignore=False,
             local_store_dir=local_store_dir,
+            local_execution_root_dir=local_execution_root_dir,
             build_file_prelude_globs=(),
             build_file_imports_behavior=BuildFileImportsBehavior.error,
             glob_match_error_behavior=GlobMatchErrorBehavior.error,

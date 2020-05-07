@@ -19,7 +19,7 @@ class GoLocalSourceTestBase(ABC):
     def setUpClass(cls):
         if not issubclass(cls, TestBase):
             raise TypeError("Subclasses must mix in TestBase")
-        super().setUpClass()  # type: ignore[misc]  # MyPy does not understand this mixin
+        super().setUpClass()
 
     def setUp(self):
         super().setUp()

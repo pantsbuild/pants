@@ -32,7 +32,7 @@ class BuildConfiguration:
     _optionables: OrderedSet = field(default_factory=OrderedSet)
     _rules: OrderedSet = field(default_factory=OrderedSet)
     _union_rules: Dict[Type, OrderedSet[Type]] = field(default_factory=dict)
-    _targets: OrderedSet[Type[Target]] = field(default_factory=OrderedSet)
+    _target_types: OrderedSet[Type[Target]] = field(default_factory=OrderedSet)
 
     class ParseState(namedtuple("ParseState", ["parse_context", "parse_globals"])):
         @property
@@ -193,26 +193,28 @@ class BuildConfiguration:
     # because we pass whatever people put in their `register.py`s to this function; i.e., this is
     # an impure function that reads from the outside world. So, we use the type hint `Any` and
     # perform runtime type checking.
-    def register_targets(self, targets: Union[typing.Iterable[Type[Target]], Any]) -> None:
+    def register_target_types(
+        self, target_types: Union[typing.Iterable[Type[Target]], Any]
+    ) -> None:
         """Registers the given target types."""
-        if not isinstance(targets, Iterable):
+        if not isinstance(target_types, Iterable):
             raise TypeError(
-                f"The entrypoint `targets` must return an iterable. Given {repr(targets)}"
+                f"The entrypoint `target_types` must return an iterable. Given {repr(target_types)}"
             )
         bad_elements = [
             tgt_type
-            for tgt_type in targets
+            for tgt_type in target_types
             if not isinstance(tgt_type, type) or not issubclass(tgt_type, Target)
         ]
         if bad_elements:
             raise TypeError(
-                "Every element of the entrypoint `targets` must be a subclass of "
+                "Every element of the entrypoint `target_types` must be a subclass of "
                 f"{Target.__name__}. Bad elements: {bad_elements}."
             )
-        self._targets.update(targets)
+        self._target_types.update(target_types)
 
-    def targets(self) -> OrderedSet[Type[Target]]:
-        return self._targets
+    def target_types(self) -> OrderedSet[Type[Target]]:
+        return self._target_types
 
     @memoized_method
     def _get_addressable_factory(self, target_type, alias):

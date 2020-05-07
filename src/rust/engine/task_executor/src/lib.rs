@@ -27,7 +27,8 @@
 
 use std::future::Future;
 
-use tokio::runtime::{Handle, Runtime};
+use futures::future::FutureExt;
+use tokio::runtime::Handle;
 
 #[derive(Clone)]
 pub struct Executor {
@@ -51,46 +52,21 @@ impl Executor {
   }
 
   ///
-  /// Drive running of a Future on a tokio Runtime as a new Task.
-  ///
-  /// The future will be driven to completion, but the result can't be accessed directly.
-  ///
-  /// This may be useful e.g. if you want to kick off a potentially long-running task, which will
-  /// notify dependees of its completion over an mpsc channel.
-  ///
-  pub fn spawn_and_ignore<F: Future<Output = ()> + Send + 'static>(&self, future: F) {
-    tokio::spawn(Self::future_with_correct_context(future));
-  }
-
-  ///
   /// Run a Future on a tokio Runtime as a new Task, and return a Future handle to it.
   ///
-  /// If the returned Future is dropped, the computation will still continue to completion: see the
-  /// tokio::task::JoinHandle docs.
+  /// Unlike tokio::spawn, if the background Task panics, the returned Future will too.
   ///
-  /// This may be useful for tokio tasks which use the tokio blocking feature (unrelated to the
-  /// Executor::block_on method). When tokio blocking tasks run, they prevent progress on any
-  /// futures running in the same task. e.g. if you run f1.select(f2) and f1 and f2 are
-  /// tokio blocking futures, f1 and f2 will not run in parallel, defeating the point of select.
+  /// If the returned Future is dropped, the computation will still continue to completion: see
+  /// https://docs.rs/tokio/0.2.20/tokio/task/struct.JoinHandle.html
   ///
-  /// On the other hand, if you run:
-  /// spawn_oneshot(f1).select(spawn_oneshot(f2))
-  /// those futures will run in parallel.
-  ///
-  /// Using spawn_oneshot allows for selecting the granularity when using tokio blocking.
-  ///
-  /// See https://docs.rs/tokio-threadpool/0.1.15/tokio_threadpool/fn.blocking.html for details of
-  /// tokio blocking.
-  ///
-  pub async fn spawn_oneshot<O: Send + 'static, F: Future<Output = O> + Send + 'static>(
+  pub fn spawn<O: Send + 'static, F: Future<Output = O> + Send + 'static>(
     &self,
     future: F,
-  ) -> O {
-    // NB: We unwrap here because the only thing that should cause an error in a spawned task is a
-    // panic, in which case we want to propagate that.
-    tokio::spawn(Self::future_with_correct_context(future))
-      .await
-      .unwrap()
+  ) -> impl Future<Output = O> {
+    self
+      .handle
+      .spawn(Self::future_with_correct_context(future))
+      .map(|r| r.expect("Background task exited unsafely."))
   }
 
   ///
@@ -99,17 +75,15 @@ impl Executor {
   /// This should never be called from in a Future context, and should only ever be called in
   /// something that resembles a main method.
   ///
-  /// This method makes a new Runtime every time it runs, to ensure that the caller doesn't
-  /// accidentally deadlock by using this when a Future attempts to itself call
-  /// Executor::spawn_and_ignore or Executor::spawn_oneshot. Because it should be used only in very
-  /// limited situations, this overhead is viewed to be acceptable.
+  /// Even after this method returns, work `spawn`ed into the background may continue to run on the
+  /// threads owned by this Executor.
   ///
   pub fn block_on<F: Future + Send + 'static>(&self, future: F) -> F::Output {
     // Make sure to copy our (thread-local) logging destination into the task.
     // When a daemon thread kicks off a future, it should log like a daemon thread (and similarly
     // for a user-facing thread).
-    Runtime::new()
-      .unwrap()
+    self
+      .handle
       .block_on(Self::future_with_correct_context(future))
   }
 
@@ -117,15 +91,16 @@ impl Executor {
   /// Spawn a Future on a threadpool specifically reserved for I/O tasks which are allowed to be
   /// long-running.
   ///
-  /// At some point in the future we may want to migrate to use tokio-threadpool's blocking
-  /// functionality instead of this threadpool, but we've run into teething issues where introducing
-  /// it has caused significant performance regressions, so for how we continue to use our legacy
-  /// I/O CpuPool. Hopefully we can delete this method at some point.
+  /// Unlike tokio::task::spawn_blocking, If the background Task panics, the returned Future will
+  /// too.
   ///
-  pub async fn spawn_blocking<F: FnOnce() -> R + Send + 'static, R: Send + 'static>(
+  /// If the returned Future is dropped, the computation will still continue to completion: see
+  /// https://docs.rs/tokio/0.2.20/tokio/task/struct.JoinHandle.html
+  ///
+  pub fn spawn_blocking<F: FnOnce() -> R + Send + 'static, R: Send + 'static>(
     &self,
     f: F,
-  ) -> R {
+  ) -> impl Future<Output = R> {
     let logging_destination = logging::get_destination();
     let workunit_state = workunit_store::get_workunit_state();
     // NB: We unwrap here because the only thing that should cause an error in a spawned task is a
@@ -135,8 +110,7 @@ impl Executor {
       workunit_store::set_thread_workunit_state(workunit_state);
       f()
     })
-    .await
-    .unwrap()
+    .map(|r| r.expect("Background task exited unsafely."))
   }
 
   ///

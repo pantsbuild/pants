@@ -13,6 +13,7 @@ from pants.core.util_rules.strip_source_roots import (
 )
 from pants.core.util_rules.strip_source_roots import rules as strip_source_root_rules
 from pants.engine.addresses import Address
+from pants.engine.fs import EMPTY_SNAPSHOT
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.selectors import Params
 from pants.engine.target import Sources as SourcesField
@@ -34,7 +35,7 @@ class StripSourceRootsTest(TestBase):
         result = self.request_single_product(
             SourceRootStrippedSources, Params(request, create_options_bootstrapper(args=args)),
         )
-        return sorted(result.snapshot.files)
+        return list(result.snapshot.files)
 
     def test_strip_snapshot(self) -> None:
         def get_stripped_files_for_snapshot(
@@ -43,7 +44,7 @@ class StripSourceRootsTest(TestBase):
             use_representative_path: bool = True,
             args: Optional[List[str]] = None,
         ) -> List[str]:
-            input_snapshot = self.make_snapshot({fp: "" for fp in paths})
+            input_snapshot = self.make_snapshot_of_empty_files(paths)
             request = StripSnapshotRequest(
                 input_snapshot, representative_path=paths[0] if use_representative_path else None
             )
@@ -53,6 +54,9 @@ class StripSourceRootsTest(TestBase):
         assert get_stripped_files_for_snapshot(["src/python/project/example.py"]) == [
             "project/example.py"
         ]
+        assert get_stripped_files_for_snapshot(
+            ["src/python/project/example.py"], use_representative_path=False
+        ) == ["project/example.py"]
         assert get_stripped_files_for_snapshot(["src/java/com/project/example.java"]) == [
             "com/project/example.java"
         ]
@@ -80,6 +84,21 @@ class StripSourceRootsTest(TestBase):
         assert sorted(
             get_stripped_files_for_snapshot(file_names, use_representative_path=False)
         ) == sorted(["project/example.py", "com/project/example.java"])
+
+        # Test a source root at the repo root. We have performance optimizations for this case
+        # because there is nothing to strip.
+        source_root_config = ["--source-source-roots={'': ('python',)}"]
+        assert get_stripped_files_for_snapshot(
+            ["project/f1.py", "project/f2.py"],
+            args=source_root_config,
+            use_representative_path=True,
+        ) == ["project/f1.py", "project/f2.py"]
+        assert get_stripped_files_for_snapshot(
+            ["dir1/f.py", "dir2/f.py"], args=source_root_config, use_representative_path=False
+        ) == ["dir1/f.py", "dir2/f.py"]
+
+        # Gracefully handle an empty snapshot
+        assert self.get_stripped_files(StripSnapshotRequest(EMPTY_SNAPSHOT)) == []
 
     def test_strip_sources_field(self) -> None:
         source_root = "src/python/project"

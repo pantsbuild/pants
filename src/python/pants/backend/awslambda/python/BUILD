@@ -34,7 +34,7 @@ python_tests(
     'src/python/pants/engine:target',
     'src/python/pants/source',
     'src/python/pants/util:contextutil',
-    'src/python/pants/testutil:test_base',
+    'src/python/pants/testutil:external_tool_test_base',
     'src/python/pants/testutil/option',
   ],
   tags = {'partially_type_checked'},

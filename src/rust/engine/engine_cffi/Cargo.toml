@@ -19,6 +19,7 @@ rule_graph = { path = "../rule_graph" }
 store = { path = "../fs/store" }
 tar_api = { path = "../tar_api" }
 tempfile = "3"
+tokio = { version = "0.2", features = ["rt-threaded"] }
 workunit_store = { path = "../workunit_store" }
 
 [build-dependencies]

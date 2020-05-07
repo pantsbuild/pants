@@ -24,6 +24,7 @@ from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Field, Target, TargetsWithOrigins
 from pants.engine.unions import UnionMembership, union
+from pants.util.strutil import strip_v2_chroot_path
 
 
 @dataclass(frozen=True)
@@ -39,13 +40,16 @@ class FmtResult:
 
     @staticmethod
     def from_process_result(
-        process_result: ProcessResult, *, original_digest: Digest
+        process_result: ProcessResult, *, original_digest: Digest, strip_chroot_path: bool = False
     ) -> "FmtResult":
+        def prep_output(s: bytes) -> str:
+            return strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
+
         return FmtResult(
             input=original_digest,
             output=process_result.output_digest,
-            stdout=process_result.stdout.decode(),
-            stderr=process_result.stderr.decode(),
+            stdout=prep_output(process_result.stdout),
+            stderr=prep_output(process_result.stderr),
         )
 
     @property

@@ -90,4 +90,4 @@ class ClocTest(GoalRuleTestBase):
         py_dir = "src/py/foo"
         self.add_to_build_file(py_dir, "python_library(sources=[])")
         result = self.execute_rule(args=[py_dir])
-        assert result == GoalRuleResult(return_code=0, stdout="", stderr="")
+        assert result == GoalRuleResult.noop()

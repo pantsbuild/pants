@@ -25,4 +25,4 @@ class LegacyPythonAWSLambda(Target):
 
 
 def build_file_aliases():
-    return BuildFileAliases(targets={"python_awslambda": LegacyPythonAWSLambda})
+    return BuildFileAliases(targets={PythonAWSLambda.alias: LegacyPythonAWSLambda})

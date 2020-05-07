@@ -13,12 +13,12 @@ from pants.engine.fs import FileContent
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.engine.target import TargetWithOrigin
+from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.interpreter_selection_utils import skip_unless_python27_and_python3_present
 from pants.testutil.option.util import create_options_bootstrapper
-from pants.testutil.test_base import TestBase
 
 
-class Flake8IntegrationTest(TestBase):
+class Flake8IntegrationTest(ExternalToolTestBase):
 
     good_source = FileContent(path="good.py", content=b"print('Nothing suspicious here..')\n")
     bad_source = FileContent(path="bad.py", content=b"import typing\n")  # unused import

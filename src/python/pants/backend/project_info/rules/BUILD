@@ -15,7 +15,7 @@ python_library(
     'src/python/pants/util:enums',
     'src/python/pants/util:memo',
   ],
-  tags = {"partially_type_checked"},
+  tags = {"type_checked"},
 )
 
 python_tests(
@@ -24,5 +24,5 @@ python_tests(
     ':rules',
     'src/python/pants/testutil:goal_rule_test_base',
   ],
-  tags = {'partially_type_checked'},
+  tags = {'type_checked'},
 )

@@ -3,7 +3,7 @@
 
 """Various goals for insights on your project, such as finding a target's dependencies."""
 
-from pants.backend.project_info.rules import dependencies, source_file_validator
+from pants.backend.project_info.rules import dependees, dependencies, source_file_validator
 from pants.backend.project_info.tasks.dependencies import Dependencies
 from pants.backend.project_info.tasks.depmap import Depmap
 from pants.backend.project_info.tasks.export import Export
@@ -28,5 +28,6 @@ def register_goals():
 def rules():
     return (
         *source_file_validator.rules(),
+        *dependees.rules(),
         *dependencies.rules(),
     )
