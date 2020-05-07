@@ -1,6 +1,6 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
+import json
 from typing import List, Optional, Type, Union
 
 import pytest
@@ -87,7 +87,7 @@ class StripSourceRootsTest(TestBase):
 
         # Test a source root at the repo root. We have performance optimizations for this case
         # because there is nothing to strip.
-        source_root_config = ["--source-source-roots={'': ('python',)}"]
+        source_root_config = [f"--source-root-patterns={json.dumps(['^'])}"]
         assert get_stripped_files_for_snapshot(
             ["project/f1.py", "project/f2.py"],
             args=source_root_config,

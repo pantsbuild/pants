@@ -267,7 +267,7 @@ class SourceRootConfig(Subsystem):
             "buildroot.  E.g., `^/src/python` will match `<buildroot>/src/python` but not "
             "`<buildroot>/project1/src/python`.  A `*` wildcard will match a single path segment, "
             "e.g., `src/*` will match `<buildroot>/src/python` and `<buildroot>/src/rust`. "
-            "Use an empty string to signify that the buildroot itself is a source root. "
+            "Use `^` to signify that the buildroot itself is a source root. "
             "See https://pants.readme.io/docs/source-roots.",
         )
 

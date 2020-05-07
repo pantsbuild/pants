@@ -104,7 +104,6 @@ pants_ignore.add = [
 ]
 
 [source]
-
 root_patterns = [
   "src/*",
   "src/main/*",
