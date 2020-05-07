@@ -1145,10 +1145,12 @@ impl Node for NodeKey {
       NodeKey::Task(ref task) => task.task.display_info.desc.as_ref().map(|s| s.to_owned()),
       NodeKey::Snapshot(_) => Some(format!("{}", self)),
       NodeKey::MultiPlatformExecuteProcess(mp_epr) => mp_epr.0.user_facing_name(),
-      NodeKey::DigestFile(..) => None,
+      NodeKey::DigestFile(DigestFile(File { path, .. })) => {
+        Some(format!("Fingerprinting: {}", path.display()))
+      }
       NodeKey::DownloadedFile(..) => None,
       NodeKey::ReadLink(..) => None,
-      NodeKey::Scandir(..) => None,
+      NodeKey::Scandir(Scandir(Dir(path))) => Some(format!("Reading {}", path.display())),
       NodeKey::Select(..) => None,
     }
   }
