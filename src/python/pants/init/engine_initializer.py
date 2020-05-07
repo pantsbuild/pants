@@ -316,6 +316,7 @@ class EngineInitializer:
             OptionsInitializer.compute_pants_ignore(build_root, bootstrap_options),
             use_gitignore,
             bootstrap_options.local_store_dir,
+            bootstrap_options.local_execution_root_dir,
             bootstrap_options.build_file_prelude_globs,
             bootstrap_options.build_file_imports,
             options_bootstrapper,
@@ -336,7 +337,8 @@ class EngineInitializer:
     def setup_legacy_graph_extended(
         pants_ignore_patterns: List[str],
         use_gitignore: bool,
-        local_store_dir,
+        local_store_dir: str,
+        local_execution_root_dir: str,
         build_file_prelude_globs: Tuple[str, ...],
         build_file_imports_behavior: BuildFileImportsBehavior,
         options_bootstrapper: OptionsBootstrapper,
@@ -353,6 +355,7 @@ class EngineInitializer:
         """Construct and return the components necessary for LegacyBuildGraph construction.
 
         :param local_store_dir: The directory to use for storing the engine's LMDB store in.
+        :param local_execution_root_dir: The directory to use for local execution sandboxes.
         :param build_file_prelude_globs: Globs to match files to be prepended to all BUILD files.
         :param build_file_imports_behavior: How to behave if a BUILD file being parsed tries to use
                                             import statements.
@@ -460,6 +463,7 @@ class EngineInitializer:
             use_gitignore=use_gitignore,
             build_root=build_root,
             local_store_dir=local_store_dir,
+            local_execution_root_dir=local_execution_root_dir,
             rules=rules,
             union_rules=union_rules,
             execution_options=execution_options,
