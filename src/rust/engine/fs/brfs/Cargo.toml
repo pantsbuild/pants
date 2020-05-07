@@ -22,7 +22,7 @@ serverset = { path = "../../serverset" }
 store = { path = "../store" }
 task_executor = { path = "../../task_executor" }
 time = "0.1.39"
-tokio = { version = "0.2", features = ["rt-threaded", "macros"] }
+tokio = { version = "0.2", features = ["rt-threaded", "macros", "signal", "stream"] }
 workunit_store = { path = "../../workunit_store" }
 
 [dev-dependencies]

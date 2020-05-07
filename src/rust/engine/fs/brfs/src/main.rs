@@ -29,7 +29,7 @@ use bazel_protos;
 use clap;
 use dirs;
 
-use errno;
+use env_logger;
 use fuse;
 
 use libc;
@@ -38,16 +38,21 @@ use serverset;
 
 use time;
 
+use futures::future::FutureExt;
 use hashing::{Digest, Fingerprint};
 use log::{debug, error, warn};
 use parking_lot::Mutex;
 use std::collections::hash_map::Entry::{Occupied, Vacant};
 use std::collections::HashMap;
-use std::ffi::{CString, OsStr, OsString};
+use std::ffi::{OsStr, OsString};
 use std::path::Path;
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use store::Store;
 use tokio::runtime::Handle;
+use tokio::signal::unix::{signal, SignalKind};
+use tokio::stream::StreamExt;
+use tokio::task;
 
 const TTL: time::Timespec = time::Timespec { sec: 0, nsec: 0 };
 
@@ -122,7 +127,14 @@ enum Node {
   File(bazel_protos::remote_execution::FileNode),
 }
 
+#[derive(Clone, Copy, Debug)]
+pub enum BRFSEvent {
+  INIT,
+  DESTROY,
+}
+
 struct BuildResultFS {
+  sender: Sender<BRFSEvent>,
   runtime: task_executor::Executor,
   store: Store,
   inode_digest_cache: HashMap<Inode, InodeDetails>,
@@ -132,8 +144,13 @@ struct BuildResultFS {
 }
 
 impl BuildResultFS {
-  pub fn new(runtime: task_executor::Executor, store: Store) -> BuildResultFS {
+  pub fn new(
+    sender: Sender<BRFSEvent>,
+    runtime: task_executor::Executor,
+    store: Store,
+  ) -> BuildResultFS {
     BuildResultFS {
+      sender: sender,
       runtime: runtime,
       store: store,
       inode_digest_cache: HashMap::new(),
@@ -403,6 +420,17 @@ impl BuildResultFS {
 //  3: /directory
 //  ... created on demand and cached for the lifetime of the program.
 impl fuse::Filesystem for BuildResultFS {
+  fn init(&mut self, _req: &fuse::Request) -> Result<(), libc::c_int> {
+    self.sender.send(BRFSEvent::INIT).map_err(|_| 1)
+  }
+
+  fn destroy(&mut self, _req: &fuse::Request) {
+    self
+      .sender
+      .send(BRFSEvent::DESTROY)
+      .unwrap_or_else(|err| warn!("Failed to send {:?} event: {}", BRFSEvent::DESTROY, err))
+  }
+
   // Used to answer stat calls
   fn lookup(
     &mut self,
@@ -629,26 +657,27 @@ pub fn mount<'a, P: AsRef<Path>>(
   mount_path: P,
   store: Store,
   runtime: task_executor::Executor,
-) -> std::io::Result<fuse::BackgroundSession<'a>> {
+) -> std::io::Result<(fuse::BackgroundSession<'a>, Receiver<BRFSEvent>)> {
   // TODO: Work out how to disable caching in the filesystem
   let options = ["-o", "ro", "-o", "fsname=brfs", "-o", "noapplexattr"]
     .iter()
     .map(<&str>::as_ref)
     .collect::<Vec<&OsStr>>();
 
-  debug!("About to spawn_mount with options {:?}", options);
+  let (sender, receiver) = channel();
+  let brfs = BuildResultFS::new(sender, runtime, store);
 
-  let fs = unsafe { fuse::spawn_mount(BuildResultFS::new(runtime, store), &mount_path, &options) };
-  // fuse::spawn_mount doesn't always fully initialise the filesystem before returning.
-  // Bluntly sleep for a bit here. If this poses a problem, we should maybe start doing some polling
-  // stats or something until the filesystem seems to be correct.
-  std::thread::sleep(std::time::Duration::from_secs(1));
-  debug!("Did spawn mount");
-  fs
+  debug!("About to spawn_mount with options {:?}", options);
+  let result = unsafe { fuse::spawn_mount(brfs, &mount_path, &options) };
+  // N.B.: The session won't be used by the caller, but we return it since a reference must be
+  // maintained to prevent early dropping which unmounts the filesystem.
+  result.map(|session| (session, receiver))
 }
 
 #[tokio::main]
 async fn main() {
+  env_logger::init();
+
   let default_store_path = dirs::home_dir()
     .expect("Couldn't find homedir")
     .join(".cache")
@@ -674,16 +703,17 @@ async fn main() {
         .required(false),
     ).arg(
       clap::Arg::with_name("root-ca-cert-file")
-          .help("Path to file containing root certificate authority certificates. If not set, TLS will not be used when connecting to the remote.")
-          .takes_value(true)
-          .long("root-ca-cert-file")
-          .required(false)
-    ).arg(clap::Arg::with_name("oauth-bearer-token-file")
+        .help("Path to file containing root certificate authority certificates. If not set, TLS will not be used when connecting to the remote.")
+        .takes_value(true)
+        .long("root-ca-cert-file")
+        .required(false)
+    ).arg(
+      clap::Arg::with_name("oauth-bearer-token-file")
         .help("Path to file containing oauth bearer token. If not set, no authorization will be provided to remote servers.")
         .takes_value(true)
         .long("oauth-bearer-token-file")
         .required(false)
-  ).arg(
+    ).arg(
       clap::Arg::with_name("mount-path")
         .required(true)
         .takes_value(true),
@@ -691,18 +721,6 @@ async fn main() {
 
   let mount_path = args.value_of("mount-path").unwrap();
   let store_path = args.value_of("local-store-path").unwrap();
-
-  // Unmount whatever happens to be mounted there already.
-  // This is handy for development, but should probably be removed :)
-  let unmount_return = unmount(mount_path);
-  if unmount_return != 0 {
-    match errno::errno() {
-      errno::Errno(22) => {
-        debug!("unmount failed, continuing because error code suggests directory was not mounted")
-      }
-      v => panic!("Error unmounting: {:?}", v),
-    }
-  }
 
   let root_ca_certs = if let Some(path) = args.value_of("root-ca-cert-file") {
     Some(std::fs::read(path).expect("Error reading root CA certs file"))
@@ -715,6 +733,7 @@ async fn main() {
   } else {
     None
   };
+
   let runtime = task_executor::Executor::new(Handle::current());
 
   let store = match args.value_of("server-address") {
@@ -742,25 +761,66 @@ async fn main() {
   }
   .expect("Error making store");
 
-  let _fs = mount(mount_path, store, runtime).expect("Error mounting");
-  loop {
-    std::thread::sleep(std::time::Duration::from_secs(1));
+  #[derive(Clone, Copy, Debug)]
+  enum Sig {
+    INT,
+    TERM,
+    Unmount,
   }
-}
 
-#[cfg(target_os = "macos")]
-fn unmount(mount_path: &str) -> i32 {
-  unsafe {
-    let path = CString::new(mount_path).unwrap();
-    libc::unmount(path.as_ptr(), 0)
+  fn install_handler<F>(install_fn: F, sig: Sig) -> impl StreamExt<Item = Option<Sig>>
+  where
+    F: Fn() -> SignalKind,
+  {
+    signal(install_fn())
+      .unwrap_or_else(|_| panic!("Failed to install SIG{:?} handler", sig))
+      .map(move |_| Some(sig))
   }
-}
 
-#[cfg(target_os = "linux")]
-fn unmount(mount_path: &str) -> i32 {
-  unsafe {
-    let path = CString::new(mount_path).unwrap();
-    libc::umount(path.as_ptr())
+  let sigint = install_handler(SignalKind::interrupt, Sig::INT);
+  let sigterm = install_handler(SignalKind::terminate, Sig::TERM);
+
+  match mount(mount_path, store, runtime.clone()) {
+    Err(err) => {
+      error!(
+        "Store {} failed to mount at {}: {}",
+        store_path, mount_path, err
+      );
+      std::process::exit(1);
+    }
+    Ok((_, receiver)) => {
+      match receiver.recv().unwrap() {
+        BRFSEvent::INIT => debug!("Store {} mounted at {}", store_path, mount_path),
+        BRFSEvent::DESTROY => {
+          warn!("Externally unmounted before we could mount.");
+          return;
+        }
+      }
+
+      let unmount = task::spawn_blocking(move || {
+        // N.B.: In practice recv always errs and we exercise the or branch. It seems the sender
+        // side thread always exits (which drops our BuildResultFS) before we get a chance to
+        // complete the read.
+        match receiver.recv().unwrap_or(BRFSEvent::DESTROY) {
+          BRFSEvent::DESTROY => Some(Sig::Unmount),
+          event => {
+            warn!("Received unexpected event {:?}", event);
+            None
+          }
+        }
+      })
+      .map(|res| res.unwrap())
+      .into_stream();
+
+      let mut shutdown_signal = sigint.merge(sigterm).merge(unmount).filter_map(|x| x);
+      debug!("Awaiting shutdown signal ...");
+      if let Some(sig) = shutdown_signal.next().await {
+        match sig {
+          Sig::Unmount => debug!("Externally unmounted"),
+          sig => debug!("Received SIG{:?}", sig),
+        }
+      }
+    }
   }
 }
 
