@@ -196,38 +196,38 @@ class TestTest(TestBase):
             ],
             union_membership=union_membership,
         )
-        return result.exit_code, console.stdout.getvalue()
+        assert not console.stdout.getvalue()
+        return result.exit_code, console.stderr.getvalue()
 
     def test_empty_target_noops(self) -> None:
-        exit_code, stdout = self.run_test_rule(
+        exit_code, stderr = self.run_test_rule(
             field_set=SuccessfulFieldSet,
             targets=[self.make_target_with_origin()],
             include_sources=False,
         )
         assert exit_code == 0
-        assert stdout.strip() == ""
+        assert stderr.strip() == ""
 
     def test_invalid_target_noops(self) -> None:
-        exit_code, stdout = self.run_test_rule(
+        exit_code, stderr = self.run_test_rule(
             field_set=SuccessfulFieldSet,
             targets=[self.make_target_with_origin()],
             valid_targets=False,
         )
         assert exit_code == 0
-        assert stdout.strip() == ""
+        assert stderr.strip() == ""
 
     def test_single_target(self) -> None:
         address = Address.parse(":tests")
-        exit_code, stdout = self.run_test_rule(
+        exit_code, stderr = self.run_test_rule(
             field_set=SuccessfulFieldSet, targets=[self.make_target_with_origin(address)]
         )
         assert exit_code == 0
-        assert stdout == dedent(
+        # NB: We don't render a summary when only running one target.
+        assert stderr == dedent(
             f"""\
-            {address} stdout:
+            ✓ {address}
             {SuccessfulFieldSet.stdout(address)}
-
-            {address}                                                                        .....   SUCCESS
             """
         )
 
@@ -235,7 +235,7 @@ class TestTest(TestBase):
         good_address = Address.parse(":good")
         bad_address = Address.parse(":bad")
 
-        exit_code, stdout = self.run_test_rule(
+        exit_code, stderr = self.run_test_rule(
             field_set=ConditionallySucceedsFieldSet,
             targets=[
                 self.make_target_with_origin(good_address),
@@ -243,11 +243,12 @@ class TestTest(TestBase):
             ],
         )
         assert exit_code == 1
-        assert stdout == dedent(
+        assert stderr == dedent(
             f"""\
-            {good_address} stdout:
+            ✓ {good_address}
             {ConditionallySucceedsFieldSet.stdout(good_address)}
-            {bad_address} stderr:
+
+            𐄂 {bad_address}
             {ConditionallySucceedsFieldSet.stderr(bad_address)}
 
             {good_address}                                                                         .....   SUCCESS
