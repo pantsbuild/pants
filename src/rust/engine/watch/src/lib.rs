@@ -35,14 +35,12 @@ use std::thread;
 use std::time::Duration;
 
 use crossbeam_channel::{self, Receiver, RecvTimeoutError, TryRecvError};
-use futures::compat::Future01CompatExt;
-use futures_locks::Mutex;
-use log::{debug, error, warn};
-use notify::{RecommendedWatcher, RecursiveMode, Watcher};
-use task_executor::Executor;
-
 use fs::GitignoreStyleExcludes;
+use log::{debug, trace, warn};
 use logging;
+use notify::{RecommendedWatcher, RecursiveMode, Watcher};
+use parking_lot::Mutex;
+use task_executor::Executor;
 
 ///
 /// An InvalidationWatcher maintains a Thread that receives events from a notify Watcher.
@@ -51,23 +49,31 @@ use logging;
 /// and the caller should create a new InvalidationWatcher (or shut down, in some cases). Generally
 /// this will mean polling.
 ///
-/// TODO: Need the above polling
-///
-pub struct InvalidationWatcher {
-  watcher: Arc<Mutex<RecommendedWatcher>>,
+struct Inner {
+  watcher: RecommendedWatcher,
   executor: Executor,
-  liveness: Receiver<()>,
-  enabled: bool,
+  liveness: Receiver<String>,
+  // Until the background task has started, contains the relevant inputs to launch it via
+  // start_background_thread. The decoupling of creating the `InvalidationWatcher` and starting it
+  // is to allow for testing of the background thread.
+  background_task_inputs: Option<WatcherTaskInputs>,
 }
 
+type WatcherTaskInputs = (
+  Arc<GitignoreStyleExcludes>,
+  PathBuf,
+  crossbeam_channel::Sender<String>,
+  Receiver<notify::Result<notify::Event>>,
+);
+
+pub struct InvalidationWatcher(Mutex<Inner>);
+
 impl InvalidationWatcher {
-  pub fn new<I: Invalidatable>(
-    invalidatable: Weak<I>,
+  pub fn new(
     executor: Executor,
     build_root: PathBuf,
     ignorer: Arc<GitignoreStyleExcludes>,
-    enabled: bool,
-  ) -> Result<InvalidationWatcher, String> {
+  ) -> Result<Arc<InvalidationWatcher>, String> {
     // Inotify events contain canonical paths to the files being watched.
     // If the build_root contains a symlink the paths returned in notify events
     // wouldn't have the build_root as a prefix, and so we would miss invalidating certain nodes.
@@ -78,38 +84,53 @@ impl InvalidationWatcher {
     let mut watcher: RecommendedWatcher = Watcher::new(watch_sender, Duration::from_millis(50))
       .map_err(|e| format!("Failed to begin watching the filesystem: {}", e))?;
 
-    let (thread_liveness_sender, thread_liveness_receiver) = crossbeam_channel::unbounded();
-    if enabled {
-      // On darwin the notify API is much more efficient if you watch the build root
-      // recursively, so we set up that watch here and then return early when watch() is
-      // called by nodes that are running. On Linux the notify crate handles adding paths to watch
-      // much more efficiently so we do that instead on Linux.
-      if cfg!(target_os = "macos") {
-        watcher
-          .watch(canonical_build_root.clone(), RecursiveMode::Recursive)
-          .map_err(|e| {
-            format!(
-              "Failed to begin recursively watching files in the build root: {}",
-              e
-            )
-          })?
-      }
+    let (liveness_sender, liveness_receiver) = crossbeam_channel::unbounded();
+
+    // On darwin the notify API is much more efficient if you watch the build root
+    // recursively, so we set up that watch here and then return early when watch() is
+    // called by nodes that are running. On Linux the notify crate handles adding paths to watch
+    // much more efficiently so we do that instead on Linux.
+    if cfg!(target_os = "macos") {
+      watcher
+        .watch(canonical_build_root.clone(), RecursiveMode::Recursive)
+        .map_err(|e| {
+          format!(
+            "Failed to begin recursively watching files in the build root: {}",
+            e
+          )
+        })?
     }
 
+    Ok(Arc::new(InvalidationWatcher(Mutex::new(Inner {
+      watcher,
+      executor,
+      liveness: liveness_receiver,
+      background_task_inputs: Some((
+        ignorer,
+        canonical_build_root,
+        liveness_sender,
+        watch_receiver,
+      )),
+    }))))
+  }
+
+  ///
+  /// Starts the background task that monitors watch events. Panics if called more than once.
+  ///
+  pub fn start<I: Invalidatable>(&self, invalidatable: &Arc<I>) {
+    let mut inner = self.0.lock();
+    let (ignorer, canonical_build_root, liveness_sender, watch_receiver) = inner
+      .background_task_inputs
+      .take()
+      .expect("An InvalidationWatcher can only be started once.");
+
     InvalidationWatcher::start_background_thread(
-      invalidatable,
+      Arc::downgrade(&invalidatable),
       ignorer,
       canonical_build_root,
-      thread_liveness_sender,
+      liveness_sender,
       watch_receiver,
     );
-
-    Ok(InvalidationWatcher {
-      watcher: Arc::new(Mutex::new(watcher)),
-      executor,
-      liveness: thread_liveness_receiver,
-      enabled,
-    })
   }
 
   // Public for testing purposes.
@@ -117,18 +138,18 @@ impl InvalidationWatcher {
     invalidatable: Weak<I>,
     ignorer: Arc<GitignoreStyleExcludes>,
     canonical_build_root: PathBuf,
-    liveness_sender: crossbeam_channel::Sender<()>,
+    liveness_sender: crossbeam_channel::Sender<String>,
     watch_receiver: Receiver<notify::Result<notify::Event>>,
-  ) {
+  ) -> thread::JoinHandle<()> {
     thread::spawn(move || {
       logging::set_thread_destination(logging::Destination::Pantsd);
-      loop {
+      let exit_msg = loop {
         let event_res = watch_receiver.recv_timeout(Duration::from_millis(10));
         let invalidatable = if let Some(g) = invalidatable.upgrade() {
           g
         } else {
           // The Invalidatable has been dropped: we're done.
-          break;
+          break "The watcher was shut down.".to_string();
         };
         match event_res {
           Ok(Ok(ev)) => {
@@ -154,12 +175,13 @@ impl InvalidationWatcher {
                   &path_relative_to_build_root,
                   /* is_dir */ false,
                 ) {
+                  trace!("notify ignoring {:?}", path_relative_to_build_root);
                   None
                 } else {
                   Some(path_relative_to_build_root)
                 }
               })
-              .map(|path_relative_to_build_root| {
+              .flat_map(|path_relative_to_build_root| {
                 let mut paths_to_invalidate: Vec<PathBuf> = vec![];
                 if let Some(parent_dir) = path_relative_to_build_root.parent() {
                   paths_to_invalidate.push(parent_dir.to_path_buf());
@@ -167,8 +189,8 @@ impl InvalidationWatcher {
                 paths_to_invalidate.push(path_relative_to_build_root);
                 paths_to_invalidate
               })
-              .flatten()
               .collect();
+
             // Only invalidate stuff if we have paths that weren't filtered out by gitignore.
             if !paths.is_empty() {
               debug!("notify invalidating {:?} because of {:?}", paths, ev.kind);
@@ -180,69 +202,72 @@ impl InvalidationWatcher {
               warn!("Path(s) did not exist: {:?}", err.paths);
               continue;
             } else {
-              error!("File watcher failing with: {}", err);
-              break;
+              break format!("Watch error: {}", err);
             }
           }
           Err(RecvTimeoutError::Timeout) => continue,
           Err(RecvTimeoutError::Disconnected) => {
-            // The Watcher is gone: we're done.
-            break;
+            break "The watch provider exited.".to_owned();
           }
         };
+      };
+
+      // Log and send the exit code.
+      warn!("File watcher exiting with: {}", exit_msg);
+      let _ = liveness_sender.send(exit_msg);
+    })
+  }
+
+  ///
+  /// An InvalidationWatcher will never restart on its own: a consumer should re-initialize if this
+  /// method returns an error.
+  ///
+  /// NB: This is currently polled by pantsd, but it could be long-polled or a callback.
+  ///
+  pub async fn is_valid(&self) -> Result<(), String> {
+    // Confirm that the Watcher itself is still alive.
+    let watcher = self.0.lock();
+    match watcher.liveness.try_recv() {
+      Ok(msg) => {
+        // The watcher background task set the exit condition.
+        Err(msg)
       }
-      debug!("Watch thread exiting.");
-      // Signal that we're exiting (which we would also do by just dropping the channel).
-      let _ = liveness_sender.send(());
-    });
-  }
-
-  pub fn is_alive(&self) -> bool {
-    if let Ok(()) = self.liveness.try_recv() {
-      // The watcher background thread set the exit condition. Return false to signal that
-      // the watcher is not alive.
-      false
-    } else {
-      true
-    }
-  }
-
-  ///
-  /// Watch the given path non-recursively.
-  ///
-  pub async fn watch(&self, path: PathBuf) -> Result<(), notify::Error> {
-    // Short circuit here if we are on a Darwin platform because we should be watching
-    // the entire build root recursively already, or if we are not enabled.
-    if cfg!(target_os = "macos") || !self.enabled {
-      Ok(())
-    } else {
-      // Using a futurized mutex here because for some reason using a regular mutex
-      // to block the io pool causes the v2 ui to not update which nodes its working
-      // on properly.
-      let watcher_lock = self.watcher.lock().compat().await;
-      match watcher_lock {
-        Ok(mut watcher_lock) => {
-          self
-            .executor
-            .spawn_blocking(move || watcher_lock.watch(path, RecursiveMode::NonRecursive))
-            .await
-        }
-        Err(()) => Err(notify::Error::new(notify::ErrorKind::Generic(
-          "Couldn't lock mutex for invalidation watcher".to_string(),
-        ))),
+      Err(TryRecvError::Disconnected) => {
+        // The watcher background task died (panic, possible?).
+        Err(
+          "The filesystem watcher exited abnormally: please see the log for more information."
+            .to_owned(),
+        )
+      }
+      Err(TryRecvError::Empty) => {
+        // Still alive.
+        Ok(())
       }
     }
   }
 
   ///
-  /// Returns true if this InvalidationWatcher is still valid: if it is not valid, it will have
-  /// already logged some sort of error, and will never restart on its own.
+  /// Add a path to the set of paths being watched by this invalidation watcher, non-recursively.
   ///
-  pub fn running(&self) -> bool {
-    match self.liveness.try_recv() {
-      Ok(()) | Err(TryRecvError::Disconnected) => false,
-      Err(TryRecvError::Empty) => true,
+  pub async fn watch(self: &Arc<Self>, path: PathBuf) -> Result<(), notify::Error> {
+    if cfg!(target_os = "macos") {
+      // Short circuit here if we are on a Darwin platform because we should be watching
+      // the entire build root recursively already.
+      return Ok(());
     }
+
+    let executor = {
+      let inner = self.0.lock();
+      inner.executor.clone()
+    };
+
+    let watcher = self.clone();
+    executor
+      .spawn_blocking(move || {
+        let mut inner = watcher.0.lock();
+        inner.watcher.watch(path, RecursiveMode::NonRecursive)
+      })
+      .await
   }
 }
 

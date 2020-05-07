@@ -12,6 +12,7 @@ use boxfuture::{BoxFuture, Boxable};
 use futures01::future::{self, Future};
 use hashing::Digest;
 use parking_lot::Mutex;
+use tokio::time::{timeout, Elapsed};
 
 use rand::Rng;
 
@@ -88,7 +89,7 @@ fn invalidate_and_rerun() {
 
   // Request with a different salt, which will cause both the middle and upper nodes to rerun since
   // their input values have changed.
-  let context = context.new_session(1).with_salt(1);
+  let context = context.new_run(1).with_salt(1);
   assert_eq!(
     graph.create(TNode::new(2), &context).wait(),
     Ok(vec![T(0, 0), T(1, 1), T(2, 1)])
@@ -201,6 +202,77 @@ fn invalidate_randomly() {
   );
 }
 
+#[tokio::test]
+async fn poll_cacheable() {
+  let graph = Arc::new(Graph::new());
+  let context = TContext::new(graph.clone());
+
+  // Poll with an empty graph should succeed.
+  let (result, token1) = graph
+    .poll(TNode::new(2), None, None, &context)
+    .await
+    .unwrap();
+  assert_eq!(result, vec![T(0, 0), T(1, 0), T(2, 0)]);
+
+  // Re-polling on a non-empty graph but with no LastObserved token should return immediately with
+  // the same value, and the same token.
+  let (result, token2) = graph
+    .poll(TNode::new(2), None, None, &context)
+    .await
+    .unwrap();
+  assert_eq!(result, vec![T(0, 0), T(1, 0), T(2, 0)]);
+  assert_eq!(token1, token2);
+
+  // But polling with the previous token should wait, since nothing has changed.
+  let request = graph.poll(TNode::new(2), Some(token2), None, &context);
+  match timeout(Duration::from_millis(1000), request).await {
+    Err(Elapsed { .. }) => (),
+    e => panic!("Should have timed out, instead got: {:?}", e),
+  }
+
+  // Invalidating something and re-polling should re-compute.
+  graph.invalidate_from_roots(|&TNode(n, _)| n == 0);
+  let (result, _) = graph
+    .poll(TNode::new(2), Some(token2), None, &context)
+    .await
+    .unwrap();
+  assert_eq!(result, vec![T(0, 0), T(1, 0), T(2, 0)]);
+}
+
+#[tokio::test]
+async fn poll_uncacheable() {
+  let _logger = env_logger::try_init();
+  let graph = Arc::new(Graph::new());
+  // Create a context where the middle node is uncacheable.
+  let context = {
+    let mut uncacheable = HashSet::new();
+    uncacheable.insert(TNode::new(1));
+    TContext::new(graph.clone()).with_uncacheable(uncacheable)
+  };
+
+  // Poll with an empty graph should succeed.
+  let (result, token1) = graph
+    .poll(TNode::new(2), None, None, &context)
+    .await
+    .unwrap();
+  assert_eq!(result, vec![T(0, 0), T(1, 0), T(2, 0)]);
+
+  // Polling with the previous token (in the same session) should wait, since nothing has changed.
+  let request = graph.poll(TNode::new(2), Some(token1), None, &context);
+  match timeout(Duration::from_millis(1000), request).await {
+    Err(Elapsed { .. }) => (),
+    e => panic!("Should have timed out, instead got: {:?}", e),
+  }
+
+  // Invalidating something and re-polling should re-compute.
+  graph.invalidate_from_roots(|&TNode(n, _)| n == 0);
+  let (result, _) = graph
+    .poll(TNode::new(2), Some(token1), None, &context)
+    .await
+    .unwrap();
+  assert_eq!(result, vec![T(0, 0), T(1, 0), T(2, 0)]);
+}
+
 #[test]
 fn dirty_dependents_of_uncacheable_node() {
   let graph = Arc::new(Graph::new());
@@ -223,7 +295,7 @@ fn dirty_dependents_of_uncacheable_node() {
   );
 
   // Re-request the root in a new session and confirm that only the bottom node re-runs.
-  let context = context.new_session(1);
+  let context = context.new_run(1);
   assert_eq!(
     graph.create(TNode::new(2), &context).wait(),
     Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
@@ -232,7 +304,7 @@ fn dirty_dependents_of_uncacheable_node() {
 
   // Re-request with a new session and different salt, and confirm that everything re-runs bottom
   // up (the order of node cleaning).
-  let context = context.new_session(2).with_salt(1);
+  let context = context.new_run(2).with_salt(1);
   assert_eq!(
     graph.create(TNode::new(2), &context).wait(),
     Ok(vec![T(0, 1), T(1, 1), T(2, 1)])
@@ -272,11 +344,17 @@ fn uncachable_node_only_runs_once() {
     graph.create(TNode::new(2), &context).wait(),
     Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
   );
-  // TNode(0) was cleared by the invalidation while all nodes were running,
-  // but the uncacheable node TNode(1) reties it directly, so it runs twice.
+  // TNode(0) and TNode(2) are cleared and dirtied (respectively) before completing, and
+  // so run twice each. But the uncacheable node runs once.
   assert_eq!(
     context.runs(),
-    vec![TNode::new(2), TNode::new(1), TNode::new(0), TNode::new(0)]
+    vec![
+      TNode::new(2),
+      TNode::new(1),
+      TNode::new(0),
+      TNode::new(0),
+      TNode::new(2)
+    ]
   );
 }
 
@@ -630,7 +708,7 @@ impl TNode {
 ///
 #[derive(Clone)]
 struct TContext {
-  session_id: usize,
+  run_id: usize,
   // A value that is included in every value computed by this context. Stands in for "the state of the
   // outside world". A test that wants to "change the outside world" and observe its effect on the
   // graph should change the salt to do so.
@@ -648,11 +726,11 @@ struct TContext {
 }
 impl NodeContext for TContext {
   type Node = TNode;
-  type SessionId = usize;
+  type RunId = usize;
 
   fn clone_for(&self, entry_id: EntryId) -> TContext {
     TContext {
-      session_id: self.session_id,
+      run_id: self.run_id,
       salt: self.salt,
       edges: self.edges.clone(),
       delays: self.delays.clone(),
@@ -663,8 +741,8 @@ impl NodeContext for TContext {
     }
   }
 
-  fn session_id(&self) -> &usize {
-    &self.session_id
+  fn run_id(&self) -> &usize {
+    &self.run_id
   }
 
   fn graph(&self) -> &Graph<TNode> {
@@ -685,7 +763,7 @@ impl NodeContext for TContext {
 impl TContext {
   fn new(graph: Arc<Graph<TNode>>) -> TContext {
     TContext {
-      session_id: 0,
+      run_id: 0,
       salt: 0,
       edges: Arc::default(),
       delays: Arc::default(),
@@ -716,8 +794,8 @@ impl TContext {
     self
   }
 
-  fn new_session(mut self, new_session_id: usize) -> TContext {
-    self.session_id = new_session_id;
+  fn new_run(mut self, new_run_id: usize) -> TContext {
+    self.run_id = new_run_id;
     {
       let mut runs = self.runs.lock();
       runs.clear();

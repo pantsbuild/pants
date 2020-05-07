@@ -198,6 +198,12 @@ class PantsDaemon(FingerprintedProcessManager):
                 bootstrap_options=bootstrap_options,
             )
 
+        @classmethod
+        def absolute_pidfile(cls):
+            return PantsDaemon.metadata_file_path(
+                "pantsd", "pid", bootstrap_options.pants_subprocessdir
+            )
+
         @staticmethod
         def _setup_services(
             build_root,
@@ -212,31 +218,22 @@ class PantsDaemon(FingerprintedProcessManager):
             """
             should_shutdown_after_run = bootstrap_options.shutdown_pantsd_after_run
             fs_event_service = (
-                FSEventService(watchman, build_root,) if bootstrap_options.watchman_enable else None
-            )
-
-            pidfile_absolute = PantsDaemon.metadata_file_path(
-                "pantsd", "pid", bootstrap_options.pants_subprocessdir
-            )
-            if pidfile_absolute.startswith(build_root):
-                pidfile = os.path.relpath(pidfile_absolute, build_root)
-            else:
-                pidfile = None
-                logging.getLogger(__name__).warning(
-                    "Not watching pantsd pidfile because subprocessdir is outside of buildroot. Having "
-                    "subprocessdir be a child of buildroot (as it is by default) may help avoid stray "
-                    "pantsd processes."
+                FSEventService(
+                    watchman, scheduler=legacy_graph_scheduler.scheduler, build_root=build_root
                 )
+                if bootstrap_options.watchman_enable
+                else None
+            )
 
-            # TODO make SchedulerService handle fs_event_service_being None
+            invalidation_globs = OptionsInitializer.compute_pantsd_invalidation_globs(
+                build_root, bootstrap_options
+            )
+
             scheduler_service = SchedulerService(
                 fs_event_service=fs_event_service,
                 legacy_graph_scheduler=legacy_graph_scheduler,
                 build_root=build_root,
-                invalidation_globs=OptionsInitializer.compute_pantsd_invalidation_globs(
-                    build_root, bootstrap_options
-                ),
-                pantsd_pidfile=pidfile,
+                invalidation_globs=invalidation_globs,
                 union_membership=union_membership,
             )
 
@@ -419,11 +416,9 @@ class PantsDaemon(FingerprintedProcessManager):
                     f"service {service} failed to start, shutting down!"
                 )
 
-        # Once all services are started, write our pid.
-        self.write_pid()
-        self.write_metadata_by_name(
-            "pantsd", self.FINGERPRINT_KEY, ensure_text(self.options_fingerprint)
-        )
+        # Once all services are started, write our pid and notify the SchedulerService to start
+        # watching it.
+        self._initialize_pid()
 
         # Monitor services.
         while not self.is_killed:
@@ -441,6 +436,46 @@ class PantsDaemon(FingerprintedProcessManager):
         """Write multiple named sockets using a socket mapping."""
         for socket_name, socket_info in socket_map.items():
             self.write_named_socket(socket_name, socket_info)
+
+    def _initialize_pid(self):
+        """Writes out our pid and metadata, and begin watching it for validity.
+
+        Once written and watched, does a one-time read of the pid to confirm that we haven't raced
+        another process starting.
+
+        All services must already have been initialized before this is called.
+        """
+
+        # Write the pidfile.
+        self.write_pid()
+        self.write_metadata_by_name(
+            "pantsd", self.FINGERPRINT_KEY, ensure_text(self.options_fingerprint)
+        )
+
+        # Add the pidfile to watching via the scheduler.
+        pidfile_absolute = self._metadata_file_path("pantsd", "pid")
+        if pidfile_absolute.startswith(self._build_root):
+            scheduler_service = next(
+                s for s in self._services.services if isinstance(s, SchedulerService)
+            )
+            scheduler_service.add_invalidation_glob(
+                os.path.relpath(pidfile_absolute, self._build_root)
+            )
+        else:
+            logging.getLogger(__name__).warning(
+                "Not watching pantsd pidfile because subprocessdir is outside of buildroot. Having "
+                "subprocessdir be a child of buildroot (as it is by default) may help avoid stray "
+                "pantsd processes."
+            )
+
+        # Finally, once watched, confirm that we didn't race another process.
+        try:
+            with open(pidfile_absolute, "r") as f:
+                pid_from_file = f.read()
+        except IOError:
+            raise Exception(f"Could not read pants pidfile at {pidfile_absolute}.")
+        if int(pid_from_file) != os.getpid():
+            raise Exception(f"Another instance of pantsd is running at {pid_from_file}")
 
     def run_sync(self):
         """Synchronously run pantsd."""

@@ -23,7 +23,7 @@ use tokio::task_local;
 use ui::EngineDisplay;
 use uuid::Uuid;
 
-const TIME_FORMAT_STR: &str = "%H:%M:%S";
+const TIME_FORMAT_STR: &str = "%H:%M:%S:%3f";
 
 lazy_static! {
   pub static ref LOGGER: Logger = Logger::new();

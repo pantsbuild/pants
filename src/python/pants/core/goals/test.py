@@ -135,7 +135,7 @@ class ConsoleCoverageReport(CoverageReport):
     report: str
 
     def materialize(self, console: Console, workspace: Workspace) -> Optional[PurePath]:
-        console.print_stdout(f"\n{self.report}")
+        console.print_stderr(f"\n{self.report}")
         return None
 
 
@@ -153,7 +153,7 @@ class FilesystemCoverageReport(CoverageReport):
                 self.result_digest, path_prefix=str(self.directory_to_materialize_to),
             )
         )
-        console.print_stdout(f"\nWrote coverage report to `{self.directory_to_materialize_to}`")
+        console.print_stderr(f"\nWrote coverage report to `{self.directory_to_materialize_to}`")
         return self.report_file
 
 
@@ -216,7 +216,6 @@ async def run_tests(
             )
         )
         field_set = targets_to_valid_field_sets.field_sets[0]
-        logger.info(f"Starting test in debug mode: {field_set.address.reference()}")
         request = await Get[TestDebugRequest](TestFieldSet, field_set)
         debug_result = interactive_runner.run_local_interactive_process(request.ipr)
         return Test(debug_result.process_exit_code)
@@ -237,33 +236,33 @@ async def run_tests(
         for field_set in field_sets_with_sources
     )
 
-    did_any_fail = False
+    exit_code = PANTS_SUCCEEDED_EXIT_CODE
     for result in results:
         if result.test_result.status == Status.FAILURE:
-            did_any_fail = True
+            exit_code = PANTS_FAILED_EXIT_CODE
+        has_output = result.test_result.stdout or result.test_result.stderr
+        if has_output:
+            status = (
+                console.green("✓")
+                if result.test_result.status == Status.SUCCESS
+                else console.red("𐄂")
+            )
+            console.print_stderr(f"{status} {result.address}")
         if result.test_result.stdout:
-            console.write_stdout(
-                f"{result.address.reference()} stdout:\n{result.test_result.stdout}\n"
-            )
+            console.print_stderr(result.test_result.stdout)
         if result.test_result.stderr:
-            # NB: we write to stdout, rather than to stderr, to avoid potential issues interleaving
-            # the two streams.
-            console.write_stdout(
-                f"{result.address.reference()} stderr:\n{result.test_result.stderr}\n"
+            console.print_stderr(result.test_result.stderr)
+        if has_output and result != results[-1]:
+            console.print_stderr("")
+
+    # Print summary
+    if len(results) > 1:
+        console.print_stderr("")
+        for result in results:
+            console.print_stderr(
+                f"{result.address.reference():80}.....{result.test_result.status.value:>10}"
             )
 
-    console.write_stdout("\n")
-
-    for result in results:
-        console.print_stdout(
-            f"{result.address.reference():80}.....{result.test_result.status.value:>10}"
-        )
-
-    if did_any_fail:
-        console.print_stderr(console.red("\nTests failed"))
-        exit_code = PANTS_FAILED_EXIT_CODE
-    else:
-        exit_code = PANTS_SUCCEEDED_EXIT_CODE
     for result in results:
         xml_results = result.test_result.xml_results
         if not xml_results:

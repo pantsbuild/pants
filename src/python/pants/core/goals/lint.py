@@ -25,14 +25,15 @@ class LintResult:
     exit_code: int
     stdout: str
     stderr: str
+    linter_name: str
 
     @staticmethod
     def noop() -> "LintResult":
-        return LintResult(exit_code=0, stdout="", stderr="")
+        return LintResult(exit_code=0, stdout="", stderr="", linter_name="")
 
     @staticmethod
     def from_fallible_process_result(
-        process_result: FallibleProcessResult, *, strip_chroot_path: bool = False
+        process_result: FallibleProcessResult, *, linter_name: str, strip_chroot_path: bool = False
     ) -> "LintResult":
         def prep_output(s: bytes) -> str:
             return strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
@@ -41,6 +42,7 @@ class LintResult:
             exit_code=process_result.exit_code,
             stdout=prep_output(process_result.stdout),
             stderr=prep_output(process_result.stderr),
+            linter_name=linter_name,
         )
 
 
@@ -146,11 +148,19 @@ async def lint(
         return Lint(exit_code=0)
 
     exit_code = 0
-    for result in results:
+    sorted_results = sorted(results, key=lambda res: res.linter_name)
+    for result in sorted_results:
+        console.print_stderr(
+            f"{console.green('✓')} {result.linter_name} succeeded."
+            if result.exit_code == 0
+            else f"{console.red('𐄂')} {result.linter_name} failed."
+        )
         if result.stdout:
-            console.print_stdout(result.stdout)
+            console.print_stderr(result.stdout)
         if result.stderr:
             console.print_stderr(result.stderr)
+        if result != sorted_results[-1]:
+            console.print_stderr("")
         if result.exit_code != 0:
             exit_code = result.exit_code
 

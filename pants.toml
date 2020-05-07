@@ -80,8 +80,13 @@ ignore_pants_warnings = [
   "DEPRECATED: the antlr, jaxb, ragel, and wire codegen backends",
 ]
 
-# The pants script in this repo consumes these files to run pants
-pantsd_invalidation_globs.add = ["src/python/**/*.py"]
+# The invalidation globs cover the PYTHONPATH by default, but we additionally add the rust code.
+pantsd_invalidation_globs.add = [
+  "!*_test.py",
+  # NB: The `target` directory is ignored via `pants_ignore` below.
+  "src/rust/engine/**/*.rs",
+  "src/rust/engine/**/*.toml",
+]
 # Path patterns to ignore for filesystem operations on top of the builtin patterns.
 pants_ignore.add = [
   # venv directories under build-support.
@@ -95,6 +100,17 @@ pants_ignore.add = [
   "!*.class",
   # We also want to override the .gitignore'd pants.pex file
   "!/pants.pex",
+]
+
+[source]
+root_patterns = [
+  "src/*",
+  "src/main/*",
+  "src/test/*",
+  "^/src/go/src",
+  "test/*",
+  "tests/*",
+  "3rdparty/*",
 ]
 
 [cache]
