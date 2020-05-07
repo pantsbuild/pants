@@ -10,7 +10,8 @@ from pants.testutil.test_base import TestBase
 
 class TestWatchmanLauncher(TestBase):
     def watchman_launcher(self, cli_options=()):
-        bootstrap_options = self.get_bootstrap_options(cli_options)
+        options = ("--watchman-enable", *cli_options)
+        bootstrap_options = self.get_bootstrap_options(options)
         return WatchmanLauncher.create(bootstrap_options)
 
     def create_mock_watchman(self, is_alive):

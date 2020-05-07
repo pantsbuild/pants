@@ -102,7 +102,6 @@ class ExecutionOptions:
     remote_execution_extra_platform_properties: Any
     remote_execution_headers: Any
     process_execution_local_enable_nailgun: bool
-    experimental_fs_watcher: bool
 
     @classmethod
     def from_bootstrap_options(cls, bootstrap_options):
@@ -128,7 +127,6 @@ class ExecutionOptions:
             remote_execution_extra_platform_properties=bootstrap_options.remote_execution_extra_platform_properties,
             remote_execution_headers=bootstrap_options.remote_execution_headers,
             process_execution_local_enable_nailgun=bootstrap_options.process_execution_local_enable_nailgun,
-            experimental_fs_watcher=bootstrap_options.experimental_fs_watcher,
         )
 
 
@@ -154,7 +152,6 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_execution_extra_platform_properties=[],
     remote_execution_headers={},
     process_execution_local_enable_nailgun=False,
-    experimental_fs_watcher=True,
 )
 
 
@@ -665,9 +662,11 @@ class GlobalOptions(Subsystem):
             "--watchman-enable",
             type=bool,
             advanced=True,
-            default=True,
+            default=False,
+            removal_version="1.30.0.dev0",
+            removal_hint="The native watcher is now sufficient to monitor for filesystem changes.",
             help="Use the watchman daemon filesystem event watcher to watch for changes "
-            "in the buildroot. Disable this to rely solely on the experimental pants engine filesystem watcher.",
+            "in the buildroot in addition to the built in watcher.",
         )
         register(
             "--watchman-version", advanced=True, default="4.9.0-pants1", help="Watchman version."
@@ -903,6 +902,8 @@ class GlobalOptions(Subsystem):
             type=bool,
             default=True,
             advanced=True,
+            removal_version="1.30.0.dev0",
+            removal_hint="Enabled by default: flag is disabled.",
             help="Whether to use the engine filesystem watcher which registers the workspace"
             " for kernel file change events",
         )
@@ -1063,6 +1064,8 @@ class GlobalOptions(Subsystem):
         Raises pants.option.errors.OptionsError on validation failure.
         """
         if opts.get("loop") and not opts.enable_pantsd:
+            # TODO: This remains the case today because there are two spots that
+            # call `run_goal_rules`: fixing in a followup.
             raise OptionsError(
                 "The `--loop` option requires `--enable-pantsd`, in order to watch files."
             )
