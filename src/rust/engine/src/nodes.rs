@@ -1162,6 +1162,7 @@ impl Node for NodeKey {
         .and_then(|di| di.name.as_ref())
         .map(|s| s.to_owned())
         .unwrap_or_else(|| format!("{}", self)),
+      NodeKey::MultiPlatformExecuteProcess(mp_epr) => mp_epr.0.canonical_name(),
       _ => format!("{}", self),
     }
   }

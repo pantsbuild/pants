@@ -275,6 +275,10 @@ impl MultiPlatformProcess {
       .next()
       .map(|(_platforms, epr)| epr.description.clone())
   }
+
+  pub fn canonical_name(&self) -> String {
+    "MultiPlatformProcess".to_string()
+  }
 }
 
 impl From<Process> for MultiPlatformProcess {
@@ -431,7 +435,7 @@ impl CommandRunner for BoundedCommandRunner {
     req: MultiPlatformProcess,
     context: Context,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
-    let name = "multi_platform_process - waiting".to_string();
+    let name = format!("{}-waiting", req.canonical_name());
     let desc = req
       .user_facing_name()
       .unwrap_or_else(|| "<Unnamed process>".to_string());
@@ -444,7 +448,7 @@ impl CommandRunner for BoundedCommandRunner {
       let inner = self.inner.clone();
       let semaphore = self.inner.1.clone();
       let context = context.clone();
-      let name = "multi_platform_process - running".to_string();
+      let name = format!("{}-running", req.canonical_name());
 
       semaphore.with_acquired(move || {
         let metadata = WorkunitMetadata {
