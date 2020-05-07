@@ -78,7 +78,8 @@ class DocformatterIntegrationTest(ExternalToolTestBase):
     def test_passing_source(self) -> None:
         target = self.make_target_with_origin([self.good_source])
         lint_result, fmt_result = self.run_docformatter([target])
-        assert lint_result == LintResult.noop()
+        assert lint_result.exit_code == 0
+        assert lint_result.stderr == ""
         assert fmt_result.output == self.get_digest([self.good_source])
         assert fmt_result.did_change is False
 
@@ -114,7 +115,8 @@ class DocformatterIntegrationTest(ExternalToolTestBase):
             [self.good_source, self.bad_source], origin=FilesystemLiteralSpec(self.good_source.path)
         )
         lint_result, fmt_result = self.run_docformatter([target])
-        assert lint_result == LintResult.noop()
+        assert lint_result.exit_code == 0
+        assert lint_result.stderr == ""
         assert fmt_result.output == self.get_digest([self.good_source, self.bad_source])
         assert fmt_result.did_change is False
 
@@ -127,7 +129,8 @@ class DocformatterIntegrationTest(ExternalToolTestBase):
         lint_result, fmt_result = self.run_docformatter(
             [target], passthrough_args="--make-summary-multi-line"
         )
-        assert lint_result == LintResult.noop()
+        assert lint_result.exit_code == 0
+        assert lint_result.stderr == ""
         assert fmt_result.output == self.get_digest([needs_config])
         assert fmt_result.did_change is False
 

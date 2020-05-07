@@ -142,7 +142,9 @@ async def docformatter_fmt(
         return FmtResult.noop()
     setup = await Get[Setup](SetupRequest(field_sets, check_only=False))
     result = await Get[ProcessResult](Process, setup.process)
-    return FmtResult.from_process_result(result, original_digest=setup.original_digest)
+    return FmtResult.from_process_result(
+        result, original_digest=setup.original_digest, formatter_name="Docformatter"
+    )
 
 
 @named_rule(desc="Lint Python docstrings with docformatter")
@@ -153,7 +155,7 @@ async def docformatter_lint(
         return LintResult.noop()
     setup = await Get[Setup](SetupRequest(field_sets, check_only=True))
     result = await Get[FallibleProcessResult](Process, setup.process)
-    return LintResult.from_fallible_process_result(result)
+    return LintResult.from_fallible_process_result(result, linter_name="Docformatter")
 
 
 def rules():
