@@ -40,8 +40,8 @@ mod cffi_externs;
 
 use engine::externs::*;
 use engine::{
-  externs, nodes, Core, ExecutionRequest, ExecutionTermination, Function, Handle, Intrinsics, Key,
-  Params, RootResult, Rule, Scheduler, Session, Tasks, TypeId, Types, Value,
+  externs, nodes, Core, ExecutionRequest, ExecutionTermination, Failure, Function, Handle,
+  Intrinsics, Key, Params, Rule, Scheduler, Session, Tasks, TypeId, Types, Value,
 };
 use futures::future::{self as future03, TryFutureExt};
 use futures01::{future, Future};
@@ -67,18 +67,40 @@ use workunit_store::{StartedWorkUnit, WorkUnit};
 #[cfg(test)]
 mod tests;
 
+///
+/// A clone of ExecutionTermination with a "no error" case in order to handle the fact that
+/// cbindgen cannot handle Options.
+///
+#[repr(u8)]
+pub enum RawExecutionTermination {
+  KeyboardInterrupt,
+  Timeout,
+  NoError,
+}
+
+impl From<ExecutionTermination> for RawExecutionTermination {
+  fn from(et: ExecutionTermination) -> Self {
+    match et {
+      ExecutionTermination::KeyboardInterrupt => RawExecutionTermination::KeyboardInterrupt,
+      ExecutionTermination::Timeout => RawExecutionTermination::Timeout,
+    }
+  }
+}
+
 // TODO: Consider renaming and making generic for collections of PyResults.
 #[repr(C)]
 pub struct RawNodes {
+  err: RawExecutionTermination,
   nodes_ptr: *const PyResult,
   nodes_len: u64,
   nodes: Vec<PyResult>,
 }
 
 impl RawNodes {
-  fn create(node_states: Vec<RootResult>) -> Box<RawNodes> {
+  fn create(node_states: Vec<Result<Value, Failure>>) -> Box<RawNodes> {
     let nodes = node_states.into_iter().map(PyResult::from).collect();
     let mut raw_nodes = Box::new(RawNodes {
+      err: RawExecutionTermination::NoError,
       nodes_ptr: Vec::new().as_ptr(),
       nodes_len: 0,
       nodes: nodes,
@@ -87,6 +109,15 @@ impl RawNodes {
     raw_nodes.nodes_ptr = raw_nodes.nodes.as_ptr();
     raw_nodes.nodes_len = raw_nodes.nodes.len() as u64;
     raw_nodes
+  }
+
+  fn create_for_error(err: ExecutionTermination) -> Box<RawNodes> {
+    Box::new(RawNodes {
+      err: err.into(),
+      nodes_ptr: Vec::new().as_ptr(),
+      nodes_len: 0,
+      nodes: Vec::new(),
+    })
   }
 }
 
@@ -185,6 +216,7 @@ pub extern "C" fn scheduler_create(
   types: Types,
   build_root_buf: Buffer,
   local_store_dir_buf: Buffer,
+  local_execution_root_dir_buf: Buffer,
   ignore_patterns_buf: BufferBuffer,
   use_gitignore: bool,
   root_type_ids: TypeIdBuffer,
@@ -209,13 +241,13 @@ pub extern "C" fn scheduler_create(
   process_execution_use_local_cache: bool,
   remote_execution_headers_buf: BufferBuffer,
   process_execution_local_enable_nailgun: bool,
-  experimental_fs_watcher: bool,
 ) -> RawResult {
   match make_core(
     tasks_ptr,
     types,
     build_root_buf,
     local_store_dir_buf,
+    local_execution_root_dir_buf,
     ignore_patterns_buf,
     use_gitignore,
     root_type_ids,
@@ -240,7 +272,6 @@ pub extern "C" fn scheduler_create(
     process_execution_use_local_cache,
     remote_execution_headers_buf,
     process_execution_local_enable_nailgun,
-    experimental_fs_watcher,
   ) {
     Ok(core) => RawResult {
       is_throw: false,
@@ -260,6 +291,7 @@ fn make_core(
   types: Types,
   build_root_buf: Buffer,
   local_store_dir_buf: Buffer,
+  local_execution_root_dir_buf: Buffer,
   ignore_patterns_buf: BufferBuffer,
   use_gitignore: bool,
   root_type_ids: TypeIdBuffer,
@@ -284,7 +316,6 @@ fn make_core(
   process_execution_use_local_cache: bool,
   remote_execution_headers_buf: BufferBuffer,
   process_execution_local_enable_nailgun: bool,
-  experimental_fs_watcher: bool,
 ) -> Result<Core, String> {
   let root_type_ids = root_type_ids.to_vec();
   let ignore_patterns = ignore_patterns_buf
@@ -361,6 +392,7 @@ fn make_core(
     ignore_patterns,
     use_gitignore,
     PathBuf::from(local_store_dir_buf.to_os_string()),
+    PathBuf::from(local_execution_root_dir_buf.to_os_string()),
     remote_execution,
     remote_store_servers_vec,
     if remote_execution_server_string.is_empty() {
@@ -396,7 +428,6 @@ fn make_core(
     process_execution_use_local_cache,
     remote_execution_headers,
     process_execution_local_enable_nailgun,
-    experimental_fs_watcher,
   )
 }
 
@@ -565,10 +596,7 @@ pub extern "C" fn scheduler_execute(
         session.workunit_store().init_thread_state(None);
         match scheduler.execute(execution_request, session) {
           Ok(raw_results) => Box::into_raw(RawNodes::create(raw_results)),
-          //TODO: Passing a raw null pointer to Python is a less-than-ideal way
-          //of noting an error condition. When we have a better way to send complicated
-          //error-signaling values over the FFI boundary, we should revisit this.
-          Err(ExecutionTermination::KeyboardInterrupt) => std::ptr::null(),
+          Err(e) => Box::into_raw(RawNodes::create_for_error(e)),
         }
       })
     })
@@ -595,6 +623,33 @@ pub extern "C" fn execution_add_root_select(
         .and_then(|params| scheduler.add_root_select(execution_request, params, product))
         .into()
     })
+  })
+}
+
+#[no_mangle]
+pub extern "C" fn execution_set_poll(execution_request_ptr: *mut ExecutionRequest, poll: bool) {
+  with_execution_request(execution_request_ptr, |execution_request| {
+    execution_request.poll = poll;
+  })
+}
+
+#[no_mangle]
+pub extern "C" fn execution_set_poll_delay(
+  execution_request_ptr: *mut ExecutionRequest,
+  poll_delay_in_ms: u64,
+) {
+  with_execution_request(execution_request_ptr, |execution_request| {
+    execution_request.poll_delay = Some(Duration::from_millis(poll_delay_in_ms));
+  })
+}
+
+#[no_mangle]
+pub extern "C" fn execution_set_timeout(
+  execution_request_ptr: *mut ExecutionRequest,
+  timeout_in_ms: u64,
+) {
+  with_execution_request(execution_request_ptr, |execution_request| {
+    execution_request.timeout = Some(Duration::from_millis(timeout_in_ms));
   })
 }
 
@@ -675,8 +730,8 @@ pub extern "C" fn graph_invalidate_all_paths(scheduler_ptr: *mut Scheduler) -> u
 }
 
 #[no_mangle]
-pub extern "C" fn check_invalidation_watcher_liveness(scheduler_ptr: *mut Scheduler) -> bool {
-  with_scheduler(scheduler_ptr, |scheduler| scheduler.core.watcher.is_alive())
+pub extern "C" fn check_invalidation_watcher_liveness(scheduler_ptr: *mut Scheduler) -> PyResult {
+  with_scheduler(scheduler_ptr, |scheduler| scheduler.is_valid().into())
 }
 
 #[no_mangle]
@@ -777,6 +832,11 @@ pub extern "C" fn session_create(
       should_report_workunits,
     )))
   })
+}
+
+#[no_mangle]
+pub extern "C" fn session_new_run_id(session_ptr: *mut Session) {
+  with_session(session_ptr, |session| session.new_run_id())
 }
 
 #[no_mangle]

@@ -19,6 +19,7 @@ from pants.testutil.process_test_util import (
 )
 from pants.testutil.retry import attempts
 from pants.util.collections import recursively_update
+from pants.util.contextutil import temporary_dir
 
 
 def banner(s):
@@ -53,8 +54,9 @@ class PantsDaemonMonitor(ProcessManager):
     def _check_pantsd_is_alive(self):
         self._log()
         assert (
-            self._pid is not None and self.is_alive()
+            self._pid is not None
         ), "cannot assert that pantsd is running. Try calling assert_started before calling this method."
+        assert self.is_alive(), "pantsd was not alive."
         return self._pid
 
     def current_memory_usage(self):
@@ -101,7 +103,7 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
         self, *, log_level: str = "info", extra_config: Optional[Dict[str, Any]] = None
     ) -> Iterator[Tuple[str, Dict[str, Any], PantsDaemonMonitor]]:
         with no_lingering_process_by_command("pantsd") as runner_process_context:
-            with self.temporary_workdir() as workdir_base:
+            with temporary_dir(root_dir=os.getcwd()) as workdir_base:
                 pid_dir = os.path.join(workdir_base, ".pids")
                 workdir = os.path.join(workdir_base, ".workdir.pants.d")
                 print(f"\npantsd log is {workdir}/pantsd/pantsd.log")
@@ -202,7 +204,11 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
         elapsed = time.time() - start_time
         print(bold(cyan(f"\ncompleted in {elapsed} seconds")))
 
-        # TODO: uncomment this and add an issue link!
+        if success:
+            self.assert_success(run)
+        else:
+            self.assert_failure(run)
+
         runs_created = self._run_count(workdir) - run_count
         self.assertEqual(
             runs_created,
@@ -211,8 +217,5 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
                 expected_runs, runs_created,
             ),
         )
-        if success:
-            self.assert_success(run)
-        else:
-            self.assert_failure(run)
+
         return run

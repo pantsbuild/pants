@@ -113,11 +113,11 @@ pub trait NodeContext: Clone + Send + Sync + 'static {
   type Node: Node;
 
   ///
-  /// The Session ID type for this Context. Some Node behaviours (in particular: Node::cacheable)
-  /// have Session-specific semantics. More than one context object might be associated with a
-  /// single caller "session".
+  /// The Run ID type for this Context. Some Node behaviours have Run-specific semantics. In
+  /// particular: an uncacheable (Node::cacheable) Node will execute once per Run, regardless
+  /// of other invalidation.
   ///
-  type SessionId: Clone + Debug + Eq + Send;
+  type RunId: Clone + Debug + Eq + Send;
 
   ///
   /// Creates a clone of this NodeContext to be used for a different Node.
@@ -127,10 +127,10 @@ pub trait NodeContext: Clone + Send + Sync + 'static {
   fn clone_for(&self, entry_id: EntryId) -> <Self::Node as Node>::Context;
 
   ///
-  /// Returns the SessionId for this Context, which should uniquely identify a caller's run for the
-  /// purposes of "once per Session" behaviour.
+  /// Returns the RunId for this Context, which should uniquely identify a caller's run for the
+  /// purposes of "once per Run" behaviour.
   ///
-  fn session_id(&self) -> &Self::SessionId;
+  fn run_id(&self) -> &Self::RunId;
 
   ///
   /// Returns a reference to the Graph for this Context.
