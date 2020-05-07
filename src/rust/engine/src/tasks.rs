@@ -311,7 +311,7 @@ impl Tasks {
       .expect("Must `begin()` a task creation before adding display info!");
     task.display_info = DisplayInfo {
       name: Some(name),
-      desc: Some(desc),
+      desc: if desc.is_empty() { None } else { Some(desc) },
     };
   }
 

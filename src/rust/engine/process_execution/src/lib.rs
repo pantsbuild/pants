@@ -24,7 +24,7 @@
 #![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
-#![type_length_limit = "32185118"]
+#![type_length_limit = "32187898"]
 #[macro_use]
 extern crate derivative;
 
@@ -431,11 +431,12 @@ impl CommandRunner for BoundedCommandRunner {
     req: MultiPlatformProcess,
     context: Context,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
-    let name = req
+    let name = "multi_platform_process - waiting".to_string();
+    let desc = req
       .user_facing_name()
-      .unwrap_or_else(|| "Unnamed node".to_string());
+      .unwrap_or_else(|| "<Unnamed process>".to_string());
     let outer_metadata = WorkunitMetadata {
-      desc: Some("Workunit waiting for opportunity to run".to_string()),
+      desc: Some(desc.clone()),
       display: false,
       blocked: true,
     };
@@ -443,11 +444,11 @@ impl CommandRunner for BoundedCommandRunner {
       let inner = self.inner.clone();
       let semaphore = self.inner.1.clone();
       let context = context.clone();
-      let name = name.clone();
+      let name = "multi_platform_process - running".to_string();
 
       semaphore.with_acquired(move || {
         let metadata = WorkunitMetadata {
-          desc: Some("Workunit executing currently".to_string()),
+          desc: Some(desc),
           display: false,
           blocked: false,
         };

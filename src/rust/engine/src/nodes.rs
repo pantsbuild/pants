@@ -1064,14 +1064,13 @@ impl Node for NodeKey {
 
     let started_workunit_id = {
       let display = context.session.should_handle_workunits() && self.user_facing_name().is_some();
-      let name = self.user_facing_name().unwrap_or(format!("{}", self));
+      let name = self.display_info().and_then(|di| di.name.as_ref().cloned()).unwrap_or(format!("{}", self));
       let span_id = new_span_id();
-      let desc = self.display_info().and_then(|di| di.desc.as_ref().cloned());
 
       // We're starting a new workunit: record our parent, and set the current parent to our span.
       let parent_id = std::mem::replace(&mut workunit_state.parent_id, Some(span_id.clone()));
       let metadata = WorkunitMetadata {
-        desc,
+        desc: self.user_facing_name(),
         display,
         blocked: false,
       };
@@ -1143,7 +1142,7 @@ impl Node for NodeKey {
 
   fn user_facing_name(&self) -> Option<String> {
     match self {
-      NodeKey::Task(ref task) => task.task.display_info.name.as_ref().map(|s| s.to_owned()),
+      NodeKey::Task(ref task) => task.task.display_info.desc.as_ref().map(|s| s.to_owned()),
       NodeKey::Snapshot(_) => Some(format!("{}", self)),
       NodeKey::MultiPlatformExecuteProcess(mp_epr) => mp_epr.0.user_facing_name(),
       NodeKey::DigestFile(..) => None,
@@ -1166,7 +1165,7 @@ impl Display for NodeKey {
       &NodeKey::ReadLink(ref s) => write!(f, "ReadLink({:?})", s.0),
       &NodeKey::Scandir(ref s) => write!(f, "Scandir({:?})", s.0),
       &NodeKey::Select(ref s) => write!(f, "Select({}, {})", s.params, s.product,),
-      &NodeKey::Task(ref s) => write!(f, "{:?}", s),
+      &NodeKey::Task(ref task) => write!(f, "{:?}", task),
       &NodeKey::Snapshot(ref s) => write!(f, "Snapshot({})", format!("{}", &s.0)),
     }
   }
