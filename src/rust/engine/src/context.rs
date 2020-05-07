@@ -70,6 +70,7 @@ impl Core {
     ignore_patterns: Vec<String>,
     use_gitignore: bool,
     local_store_dir: PathBuf,
+    local_execution_root_dir: PathBuf,
     remote_execution: bool,
     remote_store_servers: Vec<String>,
     remote_execution_server: Option<String>,
@@ -172,7 +173,7 @@ impl Core {
     let local_command_runner = process_execution::local::CommandRunner::new(
       store.clone(),
       executor.clone(),
-      std::env::temp_dir(),
+      local_execution_root_dir,
       process_execution_cleanup_local_dirs,
     );
 

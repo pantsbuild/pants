@@ -4,6 +4,7 @@
 import multiprocessing
 import os
 import sys
+import tempfile
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
@@ -739,7 +740,12 @@ class GlobalOptions(Subsystem):
             # fs::Store::default_path
             default=os.path.expanduser("~/.cache/pants/lmdb_store"),
         )
-
+        register(
+            "--local-execution-root-dir",
+            advanced=True,
+            help="Directory to use for engine's local process execution sandboxing.",
+            default=tempfile.gettempdir(),
+        )
         register(
             "--remote-execution",
             advanced=True,
