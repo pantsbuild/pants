@@ -33,7 +33,7 @@ async fn setup_watch(
   file_path: PathBuf,
 ) -> Arc<InvalidationWatcher> {
   let executor = Executor::new(Handle::current());
-  let watcher = InvalidationWatcher::new(executor, build_root, ignorer, /*enabled*/ true)
+  let watcher = InvalidationWatcher::new(executor, build_root, ignorer)
     .expect("Couldn't create InvalidationWatcher");
   watcher.watch(file_path).await.unwrap();
   watcher
