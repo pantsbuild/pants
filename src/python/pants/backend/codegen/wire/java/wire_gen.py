@@ -64,7 +64,7 @@ class WireGen(NailgunTaskBase, SimpleCodegenTask):
         def capture_and_relativize_to_source_root(source):
             source_root = self.context.source_roots.find_by_path(source)
             if not source_root:
-                source_root = self.context.source_roots.find(target)
+                source_root = self.context.source_roots.find_by_path(target.address.spec_path)
             source_roots.add(source_root.path)
             return fast_relpath(source, source_root.path)
 

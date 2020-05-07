@@ -14,7 +14,7 @@ from pants.core.util_rules.strip_source_roots import SourceRootStrippedSources
 from pants.engine.fs import FilesContent
 from pants.engine.target import Target
 from pants.python.python_setup import PythonSetup
-from pants.source.source_root import NoSourceRootError, SourceRoots
+from pants.source.source_root import SourceRoots
 from pants.util.strutil import ensure_text
 
 # Convenient type alias for the pair (package name, data files in the package).
@@ -32,14 +32,6 @@ def parse_interpreter_constraint(constraint: str) -> Requirement:
     except ValueError:
         parsed_requirement = Requirement.parse(f"CPython{constraint}")
     return parsed_requirement
-
-
-def source_root_or_raise(source_roots: SourceRoots, path: str) -> str:
-    """Find the source root for the given path, or raise if none is found."""
-    source_root = source_roots.find_by_path(path)
-    if not source_root:
-        raise NoSourceRootError(f"Found no source root for {path}")
-    return source_root.path
 
 
 # Distutils does not support unicode strings in setup.py, so we must explicitly convert to binary
@@ -133,7 +125,7 @@ def find_packages(
     # Now find all package_data.
     for tgt, stripped_srcs in tgts_and_stripped_srcs:
         if tgt.has_field(ResourcesSources):
-            source_root = source_root_or_raise(source_roots, tgt.address.spec_path)
+            source_root = source_roots.strict_find_by_path(tgt.address.spec_path).path
             resource_dir_relpath = os.path.relpath(tgt.address.spec_path, source_root)
             # Find the closest enclosing package, if any.  Resources will be loaded relative to that.
             package: str = resource_dir_relpath.replace(os.path.sep, ".")

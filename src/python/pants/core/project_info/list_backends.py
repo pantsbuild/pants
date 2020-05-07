@@ -12,7 +12,7 @@ from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get
 from pants.option.global_options import GlobalOptions
-from pants.source.source_root import NoSourceRootError, SourceRootConfig, SourceRoots
+from pants.source.source_root import SourceRootConfig, SourceRoots
 
 
 class BackendsOptions(LineOriented, GoalSubsystem):
@@ -75,9 +75,7 @@ class BackendInfo:
     def create(
         cls, file_content: FileContent, source_roots: SourceRoots, global_options: GlobalOptions
     ) -> "BackendInfo":
-        source_root = source_roots.safe_find_by_path(file_content.path)
-        if source_root is None:
-            raise NoSourceRootError(f"Could not find a source root for `{file_content.path}`.")
+        source_root = source_roots.strict_find_by_path(file_content.path)
         stripped_path = file_content.path[len(source_root.path) + 1 :]
         module_name = os.path.dirname(stripped_path).replace(os.sep, ".")
 
