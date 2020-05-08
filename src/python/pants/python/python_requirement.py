@@ -6,29 +6,28 @@ from pkg_resources import Requirement
 
 
 class PythonRequirement:
-    """Pants wrapper around pkg_resources.Requirement.
+    """A Pants wrapper around pkg_resources.Requirement.
 
-    Describes an external dependency as understood by ``easy_install`` or
-    ``pip``. It takes
-    a single non-keyword argument of the `Requirement`-style string, e.g. ::
+    Describes an external dependency as understood by `pip`. It takes a single non-keyword argument
+    of the `Requirement`-style string, e.g.
 
         python_requirement('django-celery')
         python_requirement('tornado==2.2')
         python_requirement('kombu>=2.1.1,<3.0')
 
-    Pants resolves the dependency *and its transitive closure*.
-    For example, `django-celery` pulls also pulls down its
-    dependencies: `celery>=2.5.1`, `django-picklefield>=0.2.0`, `ordereddict`,
-    `python-dateutil`,
-    `kombu>=2.1.1,<3.0`, `anyjson>=0.3.1`, `importlib`, and `amqplib>=1.0`.
+    Pants resolves the dependency _and_ its transitive closure*. For example, `django-celery` also
+    pulls down its dependencies: `celery>=2.5.1`, `django-picklefield>=0.2.0`, `ordereddict`,
+    `python-dateutil`, `kombu>=2.1.1,<3.0`, `anyjson>=0.3.1`, `importlib`, and `amqplib>=1.0`.
 
-    To let other Targets depend on this ``python_requirement``, put it in a
-    `python_requirement_library <#python_requirement_library>`_.
+    To let other Targets depend on this `python_requirement`, put it in a
+    `python_requirement_library`.
 
     :API: public
     """
 
-    def __init__(self, requirement, name=None, repository=None, use_2to3=False, compatibility=None):
+    def __init__(
+        self, requirement: str, name=None, repository=None, use_2to3=False, compatibility=None
+    ) -> None:
         # TODO(wickman) Allow PythonRequirements to be specified using pip-style vcs or url
         # identifiers, e.g. git+https or just http://...
         self._requirement = Requirement.parse(requirement)
