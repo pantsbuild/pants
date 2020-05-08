@@ -109,9 +109,9 @@ async def setup_pytest_for_target(
     # and then by Pytest). See https://github.com/jaraco/zipp/pull/26.
     additional_args_for_pytest = ("--not-zip-safe",)
 
-    run_coverage = test_options.values.run_coverage
+    use_coverage = test_options.values.use_coverage
     plugin_file_digest: Optional[Digest] = (
-        await Get[Digest](InputFilesContent, COVERAGE_PLUGIN_INPUT) if run_coverage else None
+        await Get[Digest](InputFilesContent, COVERAGE_PLUGIN_INPUT) if use_coverage else None
     )
 
     pytest_pex_request = pex_request(
@@ -162,7 +162,7 @@ async def setup_pytest_for_target(
         Get[ImportablePythonSources](Targets(all_targets)),
         Get[SourceFiles](SpecifiedSourceFilesRequest, specified_source_files_request),
     ]
-    if run_coverage:
+    if use_coverage:
         requests.append(
             Get[CoverageConfig](
                 CoverageConfigRequest(
@@ -193,13 +193,13 @@ async def setup_pytest_for_target(
         pytest_pex.digest,
         test_runner_pex.digest,
     ]
-    if run_coverage:
+    if use_coverage:
         coverage_config = rest[0]
         digests_to_merge.append(coverage_config.digest)
     input_digest = await Get[Digest](MergeDigests(digests_to_merge))
 
     coverage_args = []
-    if run_coverage:
+    if use_coverage:
         coverage_args = [
             "--cov-report=",  # To not generate any output. https://pytest-cov.readthedocs.io/en/latest/config.html
         ]
