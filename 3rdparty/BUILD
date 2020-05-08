@@ -155,13 +155,7 @@ jar_library(name='junit',
 
 jar_library(name='scalatest',
             jars=[
-              scala_jar('org.scalatest', 'scalatest', '3.1.1')
-            ],
-            dependencies = [':scalatestplus-junit4'])
-
-jar_library(name='scalatestplus-junit4',
-            jars=[
-              scala_jar('org.scalatestplus', 'junit-4-12', '3.1.1.0')
+              scala_jar('org.scalatest', 'scalatest', '3.0.8')
             ])
 
 jar_library(name='wire-runtime',
