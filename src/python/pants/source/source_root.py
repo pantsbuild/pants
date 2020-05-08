@@ -56,7 +56,10 @@ class SourceRoots:
         matched = self._trie.find(path)
         if matched:
             return matched
-        raise NoSourceRootError(f"Could not find a source root for `{path}`.")
+        raise NoSourceRootError(
+            f"Could not find a source root for `{path}`. See "
+            f"https://pants.readme.io/docs/source-roots for how to define source roots."
+        )
 
     def find_by_path(self, path: str) -> Optional[SourceRoot]:
         """Find the source root for the given path, or None.

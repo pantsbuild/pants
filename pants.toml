@@ -112,6 +112,8 @@ root_patterns = [
   "test/*",
   "tests/*",
   "3rdparty/*",
+  "^/build-support/bin",
+  "^/build-support/migration-support"
 ]
 
 [cache]
