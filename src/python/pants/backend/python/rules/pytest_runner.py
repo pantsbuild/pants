@@ -237,8 +237,8 @@ async def run_python_test(
         )
     env = {"PYTEST_ADDOPTS": " ".join(add_opts)}
 
-    run_coverage = test_options.values.run_coverage
-    output_dirs = [".coverage"] if run_coverage else []
+    use_coverage = test_options.values.use_coverage
+    output_dirs = [".coverage"] if use_coverage else []
     if test_setup.xml_dir:
         output_dirs.append(test_results_file)
     process = test_setup.test_runner_pex.create_process(
@@ -255,7 +255,7 @@ async def run_python_test(
     result = await Get[FallibleProcessResult](Process, process)
 
     coverage_data = None
-    if run_coverage:
+    if use_coverage:
         coverage_snapshot = await Get[Snapshot](
             SnapshotSubset(result.output_digest, PathGlobs([".coverage"]))
         )
