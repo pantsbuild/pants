@@ -21,7 +21,6 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/base:payload_field',
     'src/python/pants/task',
-    'src/python/pants/project_info',
     'src/python/pants/util:ordered_set',
   ],
   tags = {"partially_type_checked"},
