@@ -698,9 +698,19 @@ impl Store {
     let store = self.clone();
     async move {
       if let RootOrParentMetadataBuilder::Root(..) = root_or_parent_metadata {
-        fs::safe_create_dir_all(&destination)?;
+        let destination = destination.clone();
+        store
+          .local
+          .executor()
+          .spawn_blocking(move || fs::safe_create_dir_all(&destination))
+          .await?;
       } else {
-        fs::safe_create_dir(&destination)?;
+        let destination = destination.clone();
+        store
+          .local
+          .executor()
+          .spawn_blocking(move || fs::safe_create_dir(&destination))
+          .await?;
       }
 
       let (directory, metadata) = store
