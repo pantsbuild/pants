@@ -1223,7 +1223,6 @@ dependencies = [
  "digest 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "hex 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.105 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_derive 1.0.105 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_test 1.0.105 (registry+https://github.com/rust-lang/crates.io-index)",
  "sha2 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
