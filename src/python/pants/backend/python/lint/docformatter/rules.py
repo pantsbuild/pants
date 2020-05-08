@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Tuple
+from typing import List, Tuple, Union, cast
 
 from pants.backend.python.lint.docformatter.subsystem import Docformatter
 from pants.backend.python.lint.python_fmt import PythonFmtFieldSets
@@ -27,7 +27,7 @@ from pants.core.util_rules.determine_source_files import (
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import SubsystemRule, named_rule, rule
-from pants.engine.selectors import Get
+from pants.engine.selectors import Get, MultiGet
 from pants.engine.unions import UnionRule
 from pants.python.python_setup import PythonSetup
 from pants.util.strutil import pluralize
@@ -73,7 +73,7 @@ async def setup(
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> Setup:
-    requirements_pex = await Get[Pex](
+    requirements_pex_request = Get[Pex](
         PexRequest(
             output_filename="docformatter.pex",
             requirements=PexRequirements(docformatter.get_requirement_specs()),
@@ -84,18 +84,27 @@ async def setup(
         )
     )
 
-    if request.field_sets.prior_formatter_result is None:
-        all_source_files = await Get[SourceFiles](
-            AllSourceFilesRequest(field_set.sources for field_set in request.field_sets)
-        )
-        all_source_files_snapshot = all_source_files.snapshot
-    else:
-        all_source_files_snapshot = request.field_sets.prior_formatter_result
-
-    specified_source_files = await Get[SourceFiles](
+    all_source_files_request = Get[SourceFiles](
+        AllSourceFilesRequest(field_set.sources for field_set in request.field_sets)
+    )
+    specified_source_files_request = Get[SourceFiles](
         SpecifiedSourceFilesRequest(
             (field_set.sources, field_set.origin) for field_set in request.field_sets
         )
+    )
+
+    requests: List[Get] = [requirements_pex_request, specified_source_files_request]
+    if request.field_sets.prior_formatter_result is None:
+        requests.append(all_source_files_request)
+    requirements_pex, specified_source_files, *rest = cast(
+        Union[Tuple[Pex, SourceFiles], Tuple[Pex, SourceFiles, SourceFiles]],
+        await MultiGet(requests),
+    )
+
+    all_source_files_snapshot = (
+        request.field_sets.prior_formatter_result
+        if request.field_sets.prior_formatter_result
+        else rest[0].snapshot
     )
 
     input_digest = await Get[Digest](
@@ -133,7 +142,9 @@ async def docformatter_fmt(
         return FmtResult.noop()
     setup = await Get[Setup](SetupRequest(field_sets, check_only=False))
     result = await Get[ProcessResult](Process, setup.process)
-    return FmtResult.from_process_result(result, original_digest=setup.original_digest)
+    return FmtResult.from_process_result(
+        result, original_digest=setup.original_digest, formatter_name="Docformatter"
+    )
 
 
 @named_rule(desc="Lint Python docstrings with docformatter")
@@ -144,7 +155,7 @@ async def docformatter_lint(
         return LintResult.noop()
     setup = await Get[Setup](SetupRequest(field_sets, check_only=True))
     result = await Get[FallibleProcessResult](Process, setup.process)
-    return LintResult.from_fallible_process_result(result)
+    return LintResult.from_fallible_process_result(result, linter_name="Docformatter")
 
 
 def rules():

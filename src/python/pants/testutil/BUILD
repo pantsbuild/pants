@@ -91,6 +91,17 @@ python_library(
 )
 
 python_library(
+  name = 'external_tool_test_base',
+  sources = ['external_tool_test_base.py'],
+  dependencies = [
+    ':test_base',
+    'src/python/pants/core/util_rules',
+  ],
+  tags = {"partially_type_checked"},
+)
+
+
+python_library(
   name = 'goal_rule_test_base',
   sources = ['goal_rule_test_base.py'],
   dependencies = [

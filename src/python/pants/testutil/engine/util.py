@@ -219,6 +219,7 @@ def create_scheduler(rules, union_rules=None, validate=True, native=None):
         use_gitignore=False,
         build_root=tree.build_root,
         local_store_dir="./.pants.d",
+        local_execution_root_dir="./.pants.d",
         rules=rules,
         union_rules=union_rules,
         execution_options=DEFAULT_EXECUTION_OPTIONS,

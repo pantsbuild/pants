@@ -40,8 +40,8 @@ mod cffi_externs;
 
 use engine::externs::*;
 use engine::{
-  externs, nodes, Core, ExecutionRequest, ExecutionTermination, Function, Handle, Intrinsics, Key,
-  Params, RootResult, Rule, Scheduler, Session, Tasks, TypeId, Types, Value,
+  externs, nodes, Core, ExecutionRequest, ExecutionTermination, Failure, Function, Handle,
+  Intrinsics, Key, Params, Rule, Scheduler, Session, Tasks, TypeId, Types, Value,
 };
 use futures::future::{self as future03, TryFutureExt};
 use futures01::{future, Future};
@@ -61,23 +61,46 @@ use std::panic;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tempfile::TempDir;
+use tokio;
 use workunit_store::{StartedWorkUnit, WorkUnit};
 
 #[cfg(test)]
 mod tests;
 
+///
+/// A clone of ExecutionTermination with a "no error" case in order to handle the fact that
+/// cbindgen cannot handle Options.
+///
+#[repr(u8)]
+pub enum RawExecutionTermination {
+  KeyboardInterrupt,
+  Timeout,
+  NoError,
+}
+
+impl From<ExecutionTermination> for RawExecutionTermination {
+  fn from(et: ExecutionTermination) -> Self {
+    match et {
+      ExecutionTermination::KeyboardInterrupt => RawExecutionTermination::KeyboardInterrupt,
+      ExecutionTermination::Timeout => RawExecutionTermination::Timeout,
+    }
+  }
+}
+
 // TODO: Consider renaming and making generic for collections of PyResults.
 #[repr(C)]
 pub struct RawNodes {
+  err: RawExecutionTermination,
   nodes_ptr: *const PyResult,
   nodes_len: u64,
   nodes: Vec<PyResult>,
 }
 
 impl RawNodes {
-  fn create(node_states: Vec<RootResult>) -> Box<RawNodes> {
+  fn create(node_states: Vec<Result<Value, Failure>>) -> Box<RawNodes> {
     let nodes = node_states.into_iter().map(PyResult::from).collect();
     let mut raw_nodes = Box::new(RawNodes {
+      err: RawExecutionTermination::NoError,
       nodes_ptr: Vec::new().as_ptr(),
       nodes_len: 0,
       nodes: nodes,
@@ -86,6 +109,15 @@ impl RawNodes {
     raw_nodes.nodes_ptr = raw_nodes.nodes.as_ptr();
     raw_nodes.nodes_len = raw_nodes.nodes.len() as u64;
     raw_nodes
+  }
+
+  fn create_for_error(err: ExecutionTermination) -> Box<RawNodes> {
+    Box::new(RawNodes {
+      err: err.into(),
+      nodes_ptr: Vec::new().as_ptr(),
+      nodes_len: 0,
+      nodes: Vec::new(),
+    })
   }
 }
 
@@ -184,6 +216,7 @@ pub extern "C" fn scheduler_create(
   types: Types,
   build_root_buf: Buffer,
   local_store_dir_buf: Buffer,
+  local_execution_root_dir_buf: Buffer,
   ignore_patterns_buf: BufferBuffer,
   use_gitignore: bool,
   root_type_ids: TypeIdBuffer,
@@ -208,13 +241,13 @@ pub extern "C" fn scheduler_create(
   process_execution_use_local_cache: bool,
   remote_execution_headers_buf: BufferBuffer,
   process_execution_local_enable_nailgun: bool,
-  experimental_fs_watcher: bool,
 ) -> RawResult {
   match make_core(
     tasks_ptr,
     types,
     build_root_buf,
     local_store_dir_buf,
+    local_execution_root_dir_buf,
     ignore_patterns_buf,
     use_gitignore,
     root_type_ids,
@@ -239,7 +272,6 @@ pub extern "C" fn scheduler_create(
     process_execution_use_local_cache,
     remote_execution_headers_buf,
     process_execution_local_enable_nailgun,
-    experimental_fs_watcher,
   ) {
     Ok(core) => RawResult {
       is_throw: false,
@@ -259,6 +291,7 @@ fn make_core(
   types: Types,
   build_root_buf: Buffer,
   local_store_dir_buf: Buffer,
+  local_execution_root_dir_buf: Buffer,
   ignore_patterns_buf: BufferBuffer,
   use_gitignore: bool,
   root_type_ids: TypeIdBuffer,
@@ -283,7 +316,6 @@ fn make_core(
   process_execution_use_local_cache: bool,
   remote_execution_headers_buf: BufferBuffer,
   process_execution_local_enable_nailgun: bool,
-  experimental_fs_watcher: bool,
 ) -> Result<Core, String> {
   let root_type_ids = root_type_ids.to_vec();
   let ignore_patterns = ignore_patterns_buf
@@ -360,6 +392,7 @@ fn make_core(
     ignore_patterns,
     use_gitignore,
     PathBuf::from(local_store_dir_buf.to_os_string()),
+    PathBuf::from(local_execution_root_dir_buf.to_os_string()),
     remote_execution,
     remote_store_servers_vec,
     if remote_execution_server_string.is_empty() {
@@ -395,7 +428,6 @@ fn make_core(
     process_execution_use_local_cache,
     remote_execution_headers,
     process_execution_local_enable_nailgun,
-    experimental_fs_watcher,
   )
 }
 
@@ -564,10 +596,7 @@ pub extern "C" fn scheduler_execute(
         session.workunit_store().init_thread_state(None);
         match scheduler.execute(execution_request, session) {
           Ok(raw_results) => Box::into_raw(RawNodes::create(raw_results)),
-          //TODO: Passing a raw null pointer to Python is a less-than-ideal way
-          //of noting an error condition. When we have a better way to send complicated
-          //error-signaling values over the FFI boundary, we should revisit this.
-          Err(ExecutionTermination::KeyboardInterrupt) => std::ptr::null(),
+          Err(e) => Box::into_raw(RawNodes::create_for_error(e)),
         }
       })
     })
@@ -594,6 +623,33 @@ pub extern "C" fn execution_add_root_select(
         .and_then(|params| scheduler.add_root_select(execution_request, params, product))
         .into()
     })
+  })
+}
+
+#[no_mangle]
+pub extern "C" fn execution_set_poll(execution_request_ptr: *mut ExecutionRequest, poll: bool) {
+  with_execution_request(execution_request_ptr, |execution_request| {
+    execution_request.poll = poll;
+  })
+}
+
+#[no_mangle]
+pub extern "C" fn execution_set_poll_delay(
+  execution_request_ptr: *mut ExecutionRequest,
+  poll_delay_in_ms: u64,
+) {
+  with_execution_request(execution_request_ptr, |execution_request| {
+    execution_request.poll_delay = Some(Duration::from_millis(poll_delay_in_ms));
+  })
+}
+
+#[no_mangle]
+pub extern "C" fn execution_set_timeout(
+  execution_request_ptr: *mut ExecutionRequest,
+  timeout_in_ms: u64,
+) {
+  with_execution_request(execution_request_ptr, |execution_request| {
+    execution_request.timeout = Some(Duration::from_millis(timeout_in_ms));
   })
 }
 
@@ -674,8 +730,8 @@ pub extern "C" fn graph_invalidate_all_paths(scheduler_ptr: *mut Scheduler) -> u
 }
 
 #[no_mangle]
-pub extern "C" fn check_invalidation_watcher_liveness(scheduler_ptr: *mut Scheduler) -> bool {
-  with_scheduler(scheduler_ptr, |scheduler| scheduler.core.watcher.is_alive())
+pub extern "C" fn check_invalidation_watcher_liveness(scheduler_ptr: *mut Scheduler) -> PyResult {
+  with_scheduler(scheduler_ptr, |scheduler| scheduler.is_valid().into())
 }
 
 #[no_mangle]
@@ -776,6 +832,11 @@ pub extern "C" fn session_create(
       should_report_workunits,
     )))
   })
+}
+
+#[no_mangle]
+pub extern "C" fn session_new_run_id(session_ptr: *mut Session) {
+  with_session(session_ptr, |session| session.new_run_id())
 }
 
 #[no_mangle]
@@ -1052,10 +1113,12 @@ pub extern "C" fn run_local_interactive_process(
               None => unreachable!()
             };
 
-            scheduler.core.store().materialize_directory(
-              destination,
-              digest,
-            ).wait()?;
+            block_in_place_and_wait(
+              scheduler.core.store().materialize_directory(
+                destination,
+                digest,
+              )
+            )?;
           }
         }
 
@@ -1134,54 +1197,55 @@ pub extern "C" fn materialize_directories(
       let construct_materialize_directories_results =
         types.construct_materialize_directories_results;
       let construct_materialize_directory_result = types.construct_materialize_directory_result;
-      future::join_all(
-        digests_and_path_prefixes
-          .into_iter()
-          .map(|(digest, path_prefix)| {
-            // NB: all DirectoryToMaterialize paths are validated in Python to be relative paths.
-            // Here, we join them with the build root.
-            let mut destination = PathBuf::new();
-            destination.push(scheduler.core.build_root.clone());
-            destination.push(path_prefix);
-            let metadata = scheduler
-              .core
-              .store()
-              .materialize_directory(destination.clone(), digest);
-            metadata.map(|m| (destination, m))
-          })
-          .collect::<Vec<_>>(),
+      block_in_place_and_wait(
+        future::join_all(
+          digests_and_path_prefixes
+            .into_iter()
+            .map(|(digest, path_prefix)| {
+              // NB: all DirectoryToMaterialize paths are validated in Python to be relative paths.
+              // Here, we join them with the build root.
+              let mut destination = PathBuf::new();
+              destination.push(scheduler.core.build_root.clone());
+              destination.push(path_prefix);
+              let metadata = scheduler
+                .core
+                .store()
+                .materialize_directory(destination.clone(), digest);
+              metadata.map(|m| (destination, m))
+            })
+            .collect::<Vec<_>>(),
+        )
+        .map(move |metadata_list| {
+          let entries: Vec<Value> = metadata_list
+            .iter()
+            .map(
+              |(output_dir, metadata): &(PathBuf, store::DirectoryMaterializeMetadata)| {
+                let path_list = metadata.to_path_list();
+                let path_values: Vec<Value> = path_list
+                  .into_iter()
+                  .map(|rel_path: String| {
+                    let mut path = PathBuf::new();
+                    path.push(output_dir);
+                    path.push(rel_path);
+                    externs::store_utf8(&path.to_string_lossy())
+                  })
+                  .collect();
+
+                externs::unsafe_call(
+                  &construct_materialize_directory_result,
+                  &[externs::store_tuple(&path_values)],
+                )
+              },
+            )
+            .collect();
+
+          let output: Value = externs::unsafe_call(
+            &construct_materialize_directories_results,
+            &[externs::store_tuple(&entries)],
+          );
+          output
+        }),
       )
-      .map(move |metadata_list| {
-        let entries: Vec<Value> = metadata_list
-          .iter()
-          .map(
-            |(output_dir, metadata): &(PathBuf, store::DirectoryMaterializeMetadata)| {
-              let path_list = metadata.to_path_list();
-              let path_values: Vec<Value> = path_list
-                .into_iter()
-                .map(|rel_path: String| {
-                  let mut path = PathBuf::new();
-                  path.push(output_dir);
-                  path.push(rel_path);
-                  externs::store_utf8(&path.to_string_lossy())
-                })
-                .collect();
-
-              externs::unsafe_call(
-                &construct_materialize_directory_result,
-                &[externs::store_tuple(&path_values)],
-              )
-            },
-          )
-          .collect();
-
-        let output: Value = externs::unsafe_call(
-          &construct_materialize_directories_results,
-          &[externs::store_tuple(&entries)],
-        );
-        output
-      })
-      .wait()
     })
   })
   .into()
@@ -1258,6 +1322,18 @@ fn write_to_file(path: &Path, graph: &RuleGraph<Rule>) -> io::Result<()> {
 
 unsafe fn str_ptr_to_string(ptr: *const raw::c_char) -> String {
   CStr::from_ptr(ptr).to_string_lossy().into_owned()
+}
+
+///
+/// Calling `wait()` in the context of a @goal_rule blocks a thread that is owned by the tokio
+/// runtime. To do that safely, we need to relinquish it.
+///   see https://github.com/pantsbuild/pants/issues/9476
+///
+/// TODO: The alternative to blocking the runtime would be to have the Python code `await` special
+/// methods for things like `materialize_directories` and etc.
+///
+fn block_in_place_and_wait<T, E>(f: impl Future<Item = T, Error = E>) -> Result<T, E> {
+  tokio::task::block_in_place(|| f.wait())
 }
 
 ///

@@ -5,7 +5,7 @@ import json
 
 from pants.core.project_info import list_roots
 from pants.engine.fs import Digest, PathGlobs, Snapshot
-from pants.source.source_root import SourceRoot, SourceRootCategories, SourceRootConfig
+from pants.source.source_root import SourceRoot, SourceRootConfig
 from pants.testutil.engine.util import MockGet, run_rule
 from pants.testutil.goal_rule_test_base import GoalRuleTestBase
 from pants.testutil.test_base import TestBase
@@ -13,9 +13,6 @@ from pants.testutil.test_base import TestBase
 
 class AllRootsTest(TestBase):
     def test_all_roots(self):
-        SOURCE = SourceRootCategories.SOURCE
-        TEST = SourceRootCategories.TEST
-        THIRDPARTY = SourceRootCategories.THIRDPARTY
 
         options = {
             "pants_ignore": [],
@@ -37,7 +34,7 @@ class AllRootsTest(TestBase):
         source_roots = source_root_config.get_source_roots()
 
         # Ensure that we see any manually added roots.
-        source_roots.add_source_root("fixed/root/jvm", ("java", "scala"), TEST)
+        source_roots.add_source_root("fixed/root/jvm")
 
         # This function mocks out reading real directories off the file system
         def provider_rule(path_globs: PathGlobs) -> Snapshot:
@@ -64,15 +61,15 @@ class AllRootsTest(TestBase):
 
         self.assertEqual(
             {
-                SourceRoot("contrib/go/examples/3rdparty/go", ("go",), THIRDPARTY),
-                SourceRoot("contrib/go/examples/src/go/src", ("go",), SOURCE),
-                SourceRoot("src/java", ("java",), SOURCE),
-                SourceRoot("src/python", ("python",), SOURCE),
-                SourceRoot("src/kotlin", ("kotlin",), SOURCE),
-                SourceRoot("src/example/java", ("java",), SOURCE),
-                SourceRoot("src/example/python", ("python",), SOURCE),
-                SourceRoot("my/project/src/java", ("java",), SOURCE),
-                SourceRoot("fixed/root/jvm", ("java", "scala"), TEST),
+                SourceRoot("contrib/go/examples/3rdparty/go"),
+                SourceRoot("contrib/go/examples/src/go/src"),
+                SourceRoot("src/java"),
+                SourceRoot("src/python"),
+                SourceRoot("src/kotlin"),
+                SourceRoot("src/example/java"),
+                SourceRoot("src/example/python"),
+                SourceRoot("my/project/src/java"),
+                SourceRoot("fixed/root/jvm"),
             },
             set(output),
         )
@@ -102,9 +99,7 @@ class AllRootsTest(TestBase):
             mock_gets=[MockGet(product_type=Snapshot, subject_type=PathGlobs, mock=provider_rule)],
         )
 
-        self.assertEqual(
-            {SourceRoot("", ("python",), SourceRootCategories.SOURCE),}, set(output),
-        )
+        self.assertEqual({SourceRoot("")}, set(output))
 
 
 class RootsTest(GoalRuleTestBase):
@@ -114,22 +109,37 @@ class RootsTest(GoalRuleTestBase):
     def rules(cls):
         return super().rules() + list_roots.rules()
 
-    def test_no_langs(self):
+    def test_no_langs_deprecated(self):
         source_roots = json.dumps({"fakeroot": tuple()})
         self.create_dir("fakeroot")
-        self.assert_console_output("fakeroot: *", args=[f"--source-source-roots={source_roots}"])
+        self.assert_console_output("fakeroot", args=[f"--source-source-roots={source_roots}"])
 
-    def test_single_source_root(self):
+    def test_single_source_root_deprecated(self):
         source_roots = json.dumps({"fakeroot": ("lang1", "lang2")})
         self.create_dir("fakeroot")
-        self.assert_console_output(
-            "fakeroot: lang1,lang2", args=[f"--source-source-roots={source_roots}"]
-        )
+        self.assert_console_output("fakeroot", args=[f"--source-source-roots={source_roots}"])
 
-    def test_multiple_source_roots(self):
+    def test_multiple_source_roots_deprecated(self):
         source_roots = json.dumps({"fakerootA": ("lang1",), "fakerootB": ("lang2",)})
         self.create_dir("fakerootA")
         self.create_dir("fakerootB")
         self.assert_console_output(
-            "fakerootA: lang1", "fakerootB: lang2", args=[f"--source-source-roots={source_roots}"]
+            "fakerootA", "fakerootB", args=[f"--source-source-roots={source_roots}"]
         )
+
+    def test_single_source_root(self):
+        source_roots = json.dumps(["fakeroot"])
+        self.create_dir("fakeroot")
+        self.assert_console_output("fakeroot", args=[f"--source-root-patterns={source_roots}"])
+
+    def test_multiple_source_roots(self):
+        self.create_dir("fakerootA")
+        self.create_dir("fakerootB")
+        source_roots = json.dumps(["fakerootA", "fakerootB"])
+        self.assert_console_output(
+            "fakerootA", "fakerootB", args=[f"--source-root-patterns={source_roots}"]
+        )
+
+    def test_buildroot_is_source_root(self):
+        source_roots = json.dumps(["^"])
+        self.assert_console_output(".", args=[f"--source-root-patterns={source_roots}"])

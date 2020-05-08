@@ -26,14 +26,14 @@ pathspec==0.5.9
 pex==2.1.9
 psutil==5.6.3
 Pygments==2.3.1
-pyopenssl==17.3.0
+pyopenssl==19.1.0
 pystache==0.5.3
 python-Levenshtein==0.12.0
 pywatchman==1.4.1
 PyYAML>=5.3.1,<5.4
 py_zipkin==0.18.4
 requests[security]>=2.20.1
-responses==0.10.4
+responses==0.10.14
 setproctitle==1.1.10
 setuptools==44.0.0
 toml==0.10.0

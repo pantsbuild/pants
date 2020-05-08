@@ -3,7 +3,8 @@
 
 """Python autoformatter for PEP257 docstring conventions.
 
-See https://github.com/myint/docformatter.
+See https://pants.readme.io/docs/python-linters-and-formatters and
+https://github.com/myint/docformatter.
 """
 
 from pants.backend.python.lint import python_fmt

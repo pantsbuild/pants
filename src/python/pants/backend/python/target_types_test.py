@@ -6,7 +6,7 @@ from typing import Optional
 import pytest
 
 from pants.backend.python.subsystems.pytest import PyTest
-from pants.backend.python.target_types import PythonTestsTimeout
+from pants.backend.python.target_types import PythonBinarySources, PythonTestsTimeout
 from pants.engine.addresses import Address
 from pants.engine.target import InvalidFieldException
 from pants.testutil.subsystem.util import global_subsystem_instance
@@ -62,3 +62,17 @@ class TestTimeout(TestBase):
 
     def test_timeouts_disabled(self) -> None:
         self.assert_timeout_calculated(field_value=10, timeouts_enabled=False, expected=None)
+
+
+def test_translate_source_file_to_entry_point() -> None:
+    assert (
+        PythonBinarySources.translate_source_file_to_entry_point(["example/app.py"])
+        == "example.app"
+    )
+    # NB: the onus is on the call site to strip the source roots before calling this method.
+    assert (
+        PythonBinarySources.translate_source_file_to_entry_point(["src/python/app.py"])
+        == "src.python.app"
+    )
+    assert PythonBinarySources.translate_source_file_to_entry_point([]) is None
+    assert PythonBinarySources.translate_source_file_to_entry_point(["f1.py", "f2.py"]) is None

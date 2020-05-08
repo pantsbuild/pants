@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Optional, Tuple, cast
 
 from pants.backend.python.lint.pylint.subsystem import Pylint
 from pants.backend.python.rules import download_pex_bin, importable_python_sources, pex
@@ -23,7 +23,7 @@ from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, MergeDigests, PathGlobs, Snapshot
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import SubsystemRule, named_rule
-from pants.engine.selectors import Get
+from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Dependencies, Targets
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobMatchErrorBehavior
@@ -70,7 +70,6 @@ async def pylint_lint(
         addresses.append(field_set.address)
         addresses.extend(field_set.dependencies.value or ())
     targets = await Get[Targets](Addresses(addresses))
-    prepared_python_sources = await Get[ImportablePythonSources](Targets, targets)
 
     # NB: Pylint output depends upon which Python interpreter version it's run with. We ensure that
     # each target runs with its own interpreter constraints. See
@@ -78,7 +77,7 @@ async def pylint_lint(
     interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
         (field_set.compatibility for field_set in field_sets), python_setup
     )
-    requirements_pex = await Get[Pex](
+    requirements_pex_request = Get[Pex](
         PexRequest(
             output_filename="pylint.pex",
             requirements=PexRequirements(pylint.get_requirement_specs()),
@@ -88,12 +87,32 @@ async def pylint_lint(
     )
 
     config_path: Optional[str] = pylint.options.config
-    config_snapshot = await Get[Snapshot](
+    config_snapshot_request = Get[Snapshot](
         PathGlobs(
             globs=tuple([config_path] if config_path else []),
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
             description_of_origin="the option `--pylint-config`",
         )
+    )
+
+    prepare_python_sources_request = Get[ImportablePythonSources](Targets, targets)
+    specified_source_files_request = Get[SourceFiles](
+        SpecifiedSourceFilesRequest(
+            ((field_set.sources, field_set.origin) for field_set in field_sets),
+            strip_source_roots=True,
+        )
+    )
+
+    requirements_pex, config_snapshot, prepared_python_sources, specified_source_files = cast(
+        Tuple[Pex, Snapshot, ImportablePythonSources, SourceFiles],
+        await MultiGet(
+            [
+                requirements_pex_request,
+                config_snapshot_request,
+                prepare_python_sources_request,
+                specified_source_files_request,
+            ]
+        ),
     )
 
     input_digest = await Get[Digest](
@@ -104,13 +123,6 @@ async def pylint_lint(
                 prepared_python_sources.snapshot.digest,
             )
         ),
-    )
-
-    specified_source_files = await Get[SourceFiles](
-        SpecifiedSourceFilesRequest(
-            ((field_set.sources, field_set.origin) for field_set in field_sets),
-            strip_source_roots=True,
-        )
     )
 
     address_references = ", ".join(
@@ -126,7 +138,7 @@ async def pylint_lint(
         description=f"Run Pylint on {pluralize(len(field_sets), 'target')}: {address_references}.",
     )
     result = await Get[FallibleProcessResult](Process, process)
-    return LintResult.from_fallible_process_result(result)
+    return LintResult.from_fallible_process_result(result, linter_name="Pylint")
 
 
 def rules():

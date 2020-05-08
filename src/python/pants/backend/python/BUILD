@@ -21,7 +21,7 @@ python_library(
 
 python_library(
   name = 'all_utils',
-  sources = ['*.py', '!__init__.py', '!register.py'],
+  sources = ['*.py', '!__init__.py', '!register.py', '!*_test.py'],
   dependencies = [
     ':interpreter_cache',
     ':python_artifact',
@@ -99,4 +99,15 @@ python_library(
     'src/python/pants/python',
   ],
   tags={"type_checked"},
+)
+
+python_tests(
+  name="tests",
+  dependencies=[
+    ":target_types",
+    'src/python/pants/engine:addresses',
+    'src/python/pants/engine:target',
+    'src/python/pants/testutil:test_base',
+    'src/python/pants/testutil/subsystem',
+  ],
 )

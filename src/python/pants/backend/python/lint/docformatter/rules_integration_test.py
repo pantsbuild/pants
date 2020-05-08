@@ -15,11 +15,11 @@ from pants.engine.fs import Digest, FileContent, InputFilesContent
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.engine.target import TargetWithOrigin
+from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option.util import create_options_bootstrapper
-from pants.testutil.test_base import TestBase
 
 
-class DocformatterIntegrationTest(TestBase):
+class DocformatterIntegrationTest(ExternalToolTestBase):
 
     good_source = FileContent(path="good.py", content=b'"""Good docstring."""\n')
     bad_source = FileContent(path="bad.py", content=b'"""Oops, missing a period"""\n')
@@ -78,7 +78,8 @@ class DocformatterIntegrationTest(TestBase):
     def test_passing_source(self) -> None:
         target = self.make_target_with_origin([self.good_source])
         lint_result, fmt_result = self.run_docformatter([target])
-        assert lint_result == LintResult.noop()
+        assert lint_result.exit_code == 0
+        assert lint_result.stderr == ""
         assert fmt_result.output == self.get_digest([self.good_source])
         assert fmt_result.did_change is False
 
@@ -114,7 +115,8 @@ class DocformatterIntegrationTest(TestBase):
             [self.good_source, self.bad_source], origin=FilesystemLiteralSpec(self.good_source.path)
         )
         lint_result, fmt_result = self.run_docformatter([target])
-        assert lint_result == LintResult.noop()
+        assert lint_result.exit_code == 0
+        assert lint_result.stderr == ""
         assert fmt_result.output == self.get_digest([self.good_source, self.bad_source])
         assert fmt_result.did_change is False
 
@@ -127,7 +129,8 @@ class DocformatterIntegrationTest(TestBase):
         lint_result, fmt_result = self.run_docformatter(
             [target], passthrough_args="--make-summary-multi-line"
         )
-        assert lint_result == LintResult.noop()
+        assert lint_result.exit_code == 0
+        assert lint_result.stderr == ""
         assert fmt_result.output == self.get_digest([needs_config])
         assert fmt_result.did_change is False
 

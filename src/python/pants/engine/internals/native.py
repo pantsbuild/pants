@@ -923,8 +923,9 @@ class Native(metaclass=SingletonMetaclass):
         self,
         tasks,
         root_subject_types,
-        build_root,
-        local_store_dir,
+        build_root: str,
+        local_store_dir: str,
+        local_execution_root_dir: str,
         ignore_patterns: List[str],
         use_gitignore: bool,
         execution_options,
@@ -977,6 +978,7 @@ class Native(metaclass=SingletonMetaclass):
             # Project tree.
             self.context.utf8_buf(build_root),
             self.context.utf8_buf(local_store_dir),
+            self.context.utf8_buf(local_execution_root_dir),
             self.context.utf8_buf_buf(ignore_patterns),
             use_gitignore,
             self.to_ids_buf(root_subject_types),
@@ -1003,7 +1005,6 @@ class Native(metaclass=SingletonMetaclass):
             execution_options.process_execution_use_local_cache,
             self.context.utf8_dict(execution_options.remote_execution_headers),
             execution_options.process_execution_local_enable_nailgun,
-            execution_options.experimental_fs_watcher,
         )
         if scheduler_result.is_throw:
             value = self.context.from_value(scheduler_result.throw_handle)

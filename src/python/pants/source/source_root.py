@@ -6,25 +6,16 @@ from dataclasses import dataclass
 from typing import Dict, Optional, Sequence, Set, Tuple
 
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import deprecated_conditional
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.collection import Collection
 from pants.subsystem.subsystem import Subsystem
-from pants.util.memo import memoized_method, memoized_property
-
-
-class SourceRootCategories:
-    UNKNOWN = "unknown"
-    SOURCE = "source"
-    TEST = "test"
-    THIRDPARTY = "thirdparty"
-    ALL = [UNKNOWN, SOURCE, TEST, THIRDPARTY]
+from pants.util.memo import memoized_method
 
 
 @dataclass(frozen=True)
 class SourceRoot:
     path: str
-    langs: Tuple[str, ...]
-    category: str
 
 
 class NoSourceRootError(Exception):
@@ -33,28 +24,6 @@ class NoSourceRootError(Exception):
 
 class AllSourceRoots(Collection[SourceRoot]):
     pass
-
-
-class SourceRootFactory:
-    """Creates source roots that respect language canonicalizations."""
-
-    def __init__(self, lang_canonicalizations):
-        """Creates a source root factory that enforces the given `lang_canonicalizations`.
-
-        :param dict lang_canonicalizations: a mapping from language nicknames to the canonical language
-                                            names the nickname could represent.
-        """
-        self._lang_canonicalizations = lang_canonicalizations
-
-    def _canonicalize_langs(self, langs):
-        for lang in langs or ():
-            canonicalized = self._lang_canonicalizations.get(lang, (lang,))
-            for canonical in canonicalized:
-                yield canonical
-
-    def create(self, relpath, langs, category) -> SourceRoot:
-        """Return a source root at the given `relpath` for the given `langs` and `category`."""
-        return SourceRoot(relpath, tuple(sorted(self._canonicalize_langs(langs))), category)
 
 
 class SourceRoots:
@@ -68,17 +37,16 @@ class SourceRoots:
         Non-test code should not instantiate directly. See SourceRootConfig.get_source_roots().
         """
         self._trie = source_root_config.create_trie()
-        self._source_root_factory = source_root_config.source_root_factory
         self._options = source_root_config.get_options()
 
-    def add_source_root(self, path, langs=tuple(), category=SourceRootCategories.UNKNOWN):
+    def add_source_root(self, path):
         """Add the specified fixed source root, which must be relative to the buildroot.
 
         Useful in a limited set of circumstances, e.g., when unpacking sources from a jar with
         unknown structure.  Tests should prefer to use dirs that match our source root patterns
         instead of explicitly setting source roots here.
         """
-        self._trie.add_fixed(path, langs, category)
+        self._trie.add_fixed(path)
 
     def find(self, target) -> Optional[SourceRoot]:
         """Find the source root for the given target, or None.
@@ -101,7 +69,7 @@ class SourceRoots:
             return None
         # If no source root is found, use the path directly.
         # TODO: Remove this logic. It should be an error to have no matching source root.
-        return SourceRoot(path, (), SourceRootCategories.UNKNOWN)
+        return SourceRoot(path)
 
     # TODO: this is how find_by_path should behave. Figure out how to deprecate the behavior of
     # find_by_path so that this method becomes redundant.
@@ -115,7 +83,7 @@ class SourceRoots:
     def all_roots(self):
         """Return all known source roots.
 
-        Returns a generator over (source root, list of langs, category) triples.
+        Returns a generator over SourceRoot instances.
 
         Note: Requires a directory walk to match actual directories against patterns.
         However we don't descend into source roots, once found, so this should be fast in practice.
@@ -124,9 +92,9 @@ class SourceRoots:
         project_tree = FileSystemProjectTree(get_buildroot(), self._options.pants_ignore)
 
         fixed_roots = set()
-        for root, langs, category in self._trie.fixed():
+        for root in self._trie.fixed():
             if project_tree.exists(root):
-                yield self._source_root_factory.create(root, langs, category)
+                yield SourceRoot(root)
             fixed_roots.add(root)
 
         for relpath, dirnames, _ in project_tree.walk("", topdown=True):
@@ -138,46 +106,10 @@ class SourceRoots:
 
 
 class SourceRootConfig(Subsystem):
-    """Configuration for roots of source trees.
-
-    We detect source roots based on a list of source root patterns.  E.g., if we have src/java
-    as a pattern then any directory that ends with src/java will be considered a source root:
-    src/java, my/project/src/java etc.
-
-    A source root may be associated with one or more 'languages'. E.g., src/java can be associated
-    with java, and src/jvm can be associated with java and scala. Note that this is a generalized
-    concept of 'language'. For example 'resources' is a language in this sense.
-
-    We specify source roots in three ways:
-
-    1. We autoconstruct patterns by appending language names to parent dirs. E.g., for languages
-       'java' and 'python', and parents 'src' and 'example/src', we construct the patterns
-       'src/java', 'src/python', 'example/src/java' and 'example/src/python'.  These are of course
-       associated with the appropriate language.
-
-    2. We can explicitly specify a mapping from source root pattern to language(s). E.g.,
-       {
-         'src/jvm': ['java', 'scala'],
-         'src/py': ['python']
-       }
-
-    3. We can also bypass the pattern mechanism altogether and specify a list of fixed source roots.
-       E.g., src/java will match just <buildroot>/src/java, and not <buildroot>/some/dir/src/java.
-
-    Note that we distinguish between 'source roots' and 'test roots'. All the above holds for both.
-    We don't currently use this distinction in a useful way, but we may in the future, and we don't
-    want to then require everyone to modify their source root declarations, so we implement the
-    distinction now.
-
-    Note also that there's no harm in specifying source root patterns that don't exist in your repo,
-    within reason.  This means that in most cases the defaults below will be sufficient and repo
-    owners will not need to explicitly specify source root patterns at all.
-    """
+    """Configuration for roots of source trees."""
 
     options_scope = "source"
 
-    # TODO: When we have a proper model of the concept of a language, these should really be
-    # gathered from backends.
     _DEFAULT_LANG_CANONICALIZATIONS = {
         "jvm": ("java", "scala"),
         "protobuf": ("proto",),
@@ -236,6 +168,9 @@ class SourceRootConfig(Subsystem):
             fingerprint=True,
             default=cls._DEFAULT_LANG_CANONICALIZATIONS,
             advanced=True,
+            removal_version="1.30.0.dev0",
+            removal_hint="No longer necessary. Source roots are no longer associated with "
+            "languages.",
             help="Map of language aliases to their canonical names.",
         )
 
@@ -250,6 +185,8 @@ class SourceRootConfig(Subsystem):
             fingerprint=True,
             default=cls._DEFAULT_SOURCE_ROOT_PATTERNS,
             advanced=True,
+            removal_version="1.30.0.dev0",
+            removal_hint="Use --roots instead.",
             help=pattern_help_fmt.format("source"),
         )
         register(
@@ -259,6 +196,8 @@ class SourceRootConfig(Subsystem):
             fingerprint=True,
             default=cls._DEFAULT_TEST_ROOT_PATTERNS,
             advanced=True,
+            removal_version="1.30.0.dev0",
+            removal_hint="Use --roots instead.",
             help=pattern_help_fmt.format("test"),
         )
         register(
@@ -268,6 +207,8 @@ class SourceRootConfig(Subsystem):
             fingerprint=True,
             default=cls._DEFAULT_THIRDPARTY_ROOT_PATTERNS,
             advanced=True,
+            removal_version="1.30.0.dev0",
+            removal_hint="Use --roots instead.",
             help=pattern_help_fmt.format("third-party"),
         )
 
@@ -283,6 +224,8 @@ class SourceRootConfig(Subsystem):
             fingerprint=True,
             default=cls._DEFAULT_SOURCE_ROOTS,
             advanced=True,
+            removal_version="1.30.0.dev0",
+            removal_hint="Use --roots instead.",
             help=fixed_help_fmt.format("source"),
         )
         register(
@@ -292,6 +235,8 @@ class SourceRootConfig(Subsystem):
             fingerprint=True,
             default=cls._DEFAULT_TEST_ROOTS,
             advanced=True,
+            removal_version="1.30.0.dev0",
+            removal_hint="Use --roots instead.",
             help=fixed_help_fmt.format("test"),
         )
         register(
@@ -301,7 +246,29 @@ class SourceRootConfig(Subsystem):
             fingerprint=True,
             default=cls._DEFAULT_THIRDPARTY_ROOTS,
             advanced=True,
+            removal_version="1.30.0.dev0",
+            removal_hint="Use --roots instead.",
             help=fixed_help_fmt.format("third-party"),
+        )
+
+        register(
+            "--root-patterns",
+            metavar="<list>",
+            type=list,
+            fingerprint=True,
+            # For Python a good default might be the repo root, but that would be a bad default
+            # for other languages, so best to have no default for now, and force users to be
+            # explicit about this when integrating Pants.  It's a fairly trivial thing to do.
+            default=[],
+            advanced=True,
+            help="A list of source root suffixes. A directory with this suffix will be considered "
+            "a potential source root. E.g., `src/python` will match `<buildroot>/src/python`, "
+            "`<buildroot>/project1/src/python` etc. Prepend a `^/` to anchor the match at the "
+            "buildroot.  E.g., `^/src/python` will match `<buildroot>/src/python` but not "
+            "`<buildroot>/project1/src/python`.  A `*` wildcard will match a single path segment, "
+            "e.g., `src/*` will match `<buildroot>/src/python` and `<buildroot>/src/rust`. "
+            "Use `^` to signify that the buildroot itself is a source root. "
+            "See https://pants.readme.io/docs/source-roots.",
         )
 
     @memoized_method
@@ -310,23 +277,34 @@ class SourceRootConfig(Subsystem):
 
     def create_trie(self) -> "SourceRootTrie":
         """Create a trie of source root patterns from options."""
-        trie = SourceRootTrie(self.source_root_factory)
+        trie = SourceRootTrie()
         options = self.get_options()
 
-        for category in SourceRootCategories.ALL:
-            # Add patterns.
-            for pattern in options.get("{}_root_patterns".format(category), []):
-                trie.add_pattern(pattern, category)
-            # Add fixed source roots.
-            for path, langs in options.get("{}_roots".format(category), {}).items():
-                trie.add_fixed(path, langs, category)
-
+        if options.root_patterns:
+            for path in options.root_patterns:
+                trie.add_pattern(path)
+        else:
+            legacy_patterns = []
+            for category in ["source", "test", "thirdparty"]:
+                # Add patterns.
+                for pattern in options.get("{}_root_patterns".format(category), []):
+                    trie.add_pattern(pattern)
+                    legacy_patterns.append(pattern)
+                # Add fixed source roots.
+                for path, langs in options.get("{}_roots".format(category), {}).items():
+                    trie.add_fixed(path)
+                    legacy_patterns.append(f"^/{path}")
+            # We need to issue a deprecation warning even if relying on the default values
+            # of the deprecated options.
+            deprecated_conditional(
+                lambda: True,
+                removal_version="1.30.0.dev0",
+                entity_description="the *_root_patterns and *_roots options",
+                hint_message="Explicitly list your source roots with the `root_patterns` option in "
+                "the [source] scope. See https://pants.readme.io/docs/source-roots. "
+                f"Your current roots are covered by: [{', '.join(legacy_patterns)}]",
+            )
         return trie
-
-    @memoized_property
-    def source_root_factory(self) -> SourceRootFactory:
-        """Creates source roots that respects language canonicalizations."""
-        return SourceRootFactory(self.get_options().lang_canonicalizations)
 
 
 class SourceRootTrie:
@@ -347,30 +325,21 @@ class SourceRootTrie:
     class Node:
         def __init__(self):
             self.children = {}
-            self.langs = tuple()
-            self.category = (
-                None  # One of SourceRootCategories, or None if this isn't a terminal node.
-            )
             self.is_terminal = False
             # We need an explicit terminal flag because not all terminals are leaf nodes,  e.g.,
             # if we have patterns src/* and src/main/* then the '*' is a terminal (for the first pattern)
             # but not a leaf.
 
-        def get_child(self, key, langs):
+        def get_child(self, key):
             """Return the child node for the given key, or None if no such child.
 
             :param key: The child to return.
-            :param langs: An output parameter which we update with any langs associated with the child.
             """
             # An exact match takes precedence over a wildcard match, to support situations such as
             # src/* and src/main/*.
             ret = self.children.get(key)
-            if ret:
-                langs.update(ret.langs)
-            elif key != "^":
+            if not ret and key != "^":
                 ret = self.children.get("*")
-                if ret:
-                    langs.add(key)
             return ret
 
         def new_child(self, key):
@@ -381,28 +350,27 @@ class SourceRootTrie:
         def subpatterns(self):
             if self.children:
                 for key, child in self.children.items():
-                    for sp, langs, category in child.subpatterns():
+                    for sp in child.subpatterns():
                         if sp:
-                            yield os.path.join(key, sp), langs, category
+                            yield os.path.join(key, sp)
                         else:
-                            yield key, langs, category
+                            yield key
             else:
-                yield "", self.langs, self.category
+                yield ""
 
-    def __init__(self, source_root_factory: SourceRootFactory) -> None:
-        self._source_root_factory = source_root_factory
+    def __init__(self) -> None:
         self._root = SourceRootTrie.Node()
 
-    def add_pattern(self, pattern, category=SourceRootCategories.UNKNOWN):
+    def add_pattern(self, pattern):
         """Add a pattern to the trie."""
-        self._do_add_pattern(pattern, tuple(), category)
+        self._do_add_pattern(pattern)
 
-    def add_fixed(self, path, langs, category=SourceRootCategories.UNKNOWN):
+    def add_fixed(self, path):
         """Add a fixed source root to the trie."""
         if "*" in path:
             raise self.InvalidPath(path, "fixed path cannot contain the * character")
         fixed_path = os.path.join("^", path) if path else "^"
-        self._do_add_pattern(fixed_path, tuple(langs), category)
+        self._do_add_pattern(fixed_path)
 
     def fixed(self):
         """Returns a list of just the fixed source roots in the trie."""
@@ -411,22 +379,22 @@ class SourceRootTrie:
                 return list(child.subpatterns())
         return []
 
-    def _do_add_pattern(self, pattern, langs, category):
+    def _do_add_pattern(self, pattern):
         if pattern != os.path.normpath(pattern):
             raise self.InvalidPath(pattern, "must be a normalized path")
         keys = pattern.split(os.path.sep)
 
         node = self._root
         for key in keys:
-            child = node.children.get(
-                key
-            )  # Can't use get_child, as we don't want to wildcard-match.
+            # Can't use get_child, as we don't want to wildcard-match.
+            child = node.children.get(key)
             if not child:
                 child = node.new_child(key)
             node = child
-        node.langs = langs
-        node.category = category
         node.is_terminal = True
+
+    def is_empty(self) -> bool:
+        return not bool(self._root.children)
 
     def traverse(self) -> Set[str]:
         source_roots: Set[str] = set()
@@ -449,10 +417,9 @@ class SourceRootTrie:
             # See if we have a match at position i.  We have such a match if following the path
             # segments into the trie, from the root, leads us to a terminal.
             node = self._root
-            langs: Set[str] = set()
             j = i
             while j < len(keys):
-                child = node.get_child(keys[j], langs)
+                child = node.get_child(keys[j])
                 if child is None:
                     break
                 else:
@@ -463,6 +430,6 @@ class SourceRootTrie:
                     path = ""
                 else:
                     path = os.path.join(*keys[1:j])
-                return self._source_root_factory.create(path, langs, node.category)
+                return SourceRoot(path)
             # Otherwise, try the next value of i.
         return None
