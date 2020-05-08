@@ -3,7 +3,8 @@
 
 """Autoformatter for Python import statements.
 
-See https://timothycrosley.github.io/isort/.
+See https://pants.readme.io/docs/python-linters-and-formatters and
+https://timothycrosley.github.io/isort/.
 """
 
 from pants.backend.python.lint import python_fmt
