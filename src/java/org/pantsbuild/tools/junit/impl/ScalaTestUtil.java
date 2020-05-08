@@ -17,7 +17,7 @@ public final class ScalaTestUtil {
   static {
     try {
       suiteClass = Class.forName("org.scalatest.Suite");
-      junitRunnerClass = Class.forName("org.scalatest.junit.JUnitRunner");
+      junitRunnerClass = Class.forName("org.scalatestplus.junit.JUnitRunner");
     } catch (ClassNotFoundException e) {
       // No scalatest tests on classpath
     }
