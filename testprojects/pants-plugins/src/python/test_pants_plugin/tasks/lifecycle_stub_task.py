@@ -6,21 +6,21 @@ import sys
 from test_pants_plugin.subsystems.lifecycle_stubs import LifecycleStubs
 
 from pants.base.exception_sink import ExceptionSink
-from pants.base.exiter import Exiter
+from pants.base.exiter import ExitCode
 from pants.task.task import Task
 from pants.util.memo import memoized_property
 
 
-class MessagingExiter(Exiter):
-    """An Exiter that prints a provided message to stderr."""
+class MessagingExiter:
+    """A class that prints a provided message to stderr before dying."""
 
     def __init__(self, message):
         super().__init__()
         self._message = message
 
-    def exit(self, *args, **kwargs):
+    def __call__(self, exit_code: ExitCode):
         print(self._message, file=sys.stderr)
-        super().exit(*args, **kwargs)
+        sys.exit(exit_code)
 
 
 class LifecycleStubTask(Task):
@@ -38,8 +38,7 @@ class LifecycleStubTask(Task):
     def execute(self):
         exit_msg = self._lifecycle_stubs.add_exiter_message
         if exit_msg:
-            new_exiter = MessagingExiter(exit_msg)
-            ExceptionSink._reset_exiter(new_exiter)
+            ExceptionSink.reset_exiter(MessagingExiter(exit_msg))
 
         output_file = self._lifecycle_stubs.new_interactive_stream_output_file
         if output_file:

@@ -7,7 +7,9 @@ import os
 import socket
 import sys
 import time
+from typing import Dict, List, Optional, cast
 
+from pants.base.exiter import ExitCode
 from pants.java.nailgun_io import NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, MaybeShutdownSocket, NailgunProtocol
 from pants.util.osutil import safe_kill
@@ -250,17 +252,23 @@ class NailgunClient:
         if self.remote_pid is not None:
             safe_kill(self.remote_pid, signum)
 
-    def execute(self, main_class, cwd=None, *args, **environment):
+    def execute(
+        self,
+        main_class: str,
+        args: List[str],
+        env: Optional[Dict[str, str]] = None,
+        cwd: Optional[str] = None,
+    ) -> ExitCode:
         """Executes the given main_class with any supplied args in the given environment.
 
-        :param string main_class: the fully qualified class name of the main entrypoint
-        :param string cwd: Set the working directory for this command
-        :param list args: any arguments to pass to the main entrypoint
-        :param dict environment: an env mapping made available to native nails via the nail context
+        :param main_class: the fully qualified class name of the main entrypoint
+        :param args: any arguments to pass to the main entrypoint
+        :param env: an env mapping made available to native nails via the nail context
+        :param cwd: Set the working directory for this command
         :returns: the exit code of the main_class.
         :raises: :class:`NailgunClient.NailgunError` if there was an error during execution.
         """
-        environment = dict(**environment)
+        environment = dict(env or {})
         environment.update(self.ENV_DEFAULTS)
         cwd = cwd or os.getcwd()
 
@@ -277,7 +285,8 @@ class NailgunClient:
             exit_on_broken_pipe=self._exit_on_broken_pipe,
         )
         try:
-            return self._session.execute(cwd, main_class, *args, **environment)
+            exit_code = self._session.execute(cwd, main_class, *args, **environment)
+            return cast(ExitCode, exit_code)
         except (socket.error, NailgunProtocol.ProtocolError) as e:
             raise self.NailgunError(
                 address=self._address_string, wrapped_exc=e,

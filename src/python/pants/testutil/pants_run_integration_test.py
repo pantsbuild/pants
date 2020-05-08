@@ -115,29 +115,26 @@ def ensure_daemon(f):
 
     def wrapper(self, *args, **kwargs):
         for enable_daemon in [False, True]:
-            with temporary_dir() as subprocess_dir:
-                enable_daemon_str = str(enable_daemon)
-                env = {
-                    "HERMETIC_ENV": "PANTS_ENABLE_PANTSD,PANTS_ENABLE_V2_ENGINE,PANTS_SUBPROCESSDIR",
-                    "PANTS_ENABLE_PANTSD": enable_daemon_str,
-                    "PANTS_ENABLE_V2_ENGINE": enable_daemon_str,
-                    "PANTS_SUBPROCESSDIR": subprocess_dir,
-                }
-                with environment_as(**env):
-                    try:
-                        f(self, *args, **kwargs)
-                        if enable_daemon:
-                            self.assert_success(self.run_pants(["kill-pantsd"]))
-                    except Exception:
-                        print(f"Test failed with enable-pantsd={enable_daemon}:")
-                        if enable_daemon:
-                            # If we are already raising, do not attempt to confirm that `kill-pantsd` succeeds.
-                            self.run_pants(["kill-pantsd"])
-                        else:
-                            print(
-                                "Skipping run with enable-pantsd=true because it already failed with enable-pantsd=false."
-                            )
-                        raise
+            enable_daemon_str = str(enable_daemon)
+            env = {
+                "HERMETIC_ENV": "PANTS_ENABLE_PANTSD,PANTS_ENABLE_V2_ENGINE,PANTS_SUBPROCESSDIR",
+                "PANTS_ENABLE_PANTSD": enable_daemon_str,
+            }
+            with environment_as(**env):
+                try:
+                    f(self, *args, **kwargs)
+                    if enable_daemon:
+                        self.assert_success(self.run_pants(["kill-pantsd"]))
+                except Exception:
+                    print(f"Test failed with enable-pantsd={enable_daemon}:")
+                    if enable_daemon:
+                        # If we are already raising, do not attempt to confirm that `kill-pantsd` succeeds.
+                        self.run_pants(["kill-pantsd"])
+                    else:
+                        print(
+                            "Skipping run with enable-pantsd=true because it already failed with enable-pantsd=false."
+                        )
+                    raise
 
     return wrapper
 

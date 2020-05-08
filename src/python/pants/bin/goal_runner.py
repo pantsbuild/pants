@@ -2,9 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-import sys
 from typing import List
 
+from pants.base.exiter import ExitCode
 from pants.base.specs import AddressSpecs, FilesystemSpecs, SingleAddress, Specs
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.build_configuration import BuildConfiguration
@@ -38,7 +38,6 @@ class GoalRunnerFactory:
         reporting: Reporting,
         graph_session: LegacyGraphSession,
         specs: Specs,
-        exiter=sys.exit,
     ) -> None:
         """
         :param root_dir: The root directory of the pants workspace (aka the "build root").
@@ -48,7 +47,6 @@ class GoalRunnerFactory:
         :param reporting: The global, pre-initialized Reporting instance.
         :param graph_session: The graph session for this run.
         :param specs: The specs for this run, i.e. either the address or filesystem specs.
-        :param func exiter: A function that accepts an exit code value and exits. (for tests, Optional)
         """
         self._root_dir = root_dir
         self._options_bootstrapper = options_bootstrapper
@@ -58,7 +56,6 @@ class GoalRunnerFactory:
         self._reporting = reporting
         self._graph_session = graph_session
         self._specs = specs
-        self._exiter = exiter
 
         self._global_options = options.for_global_scope()
         self._fail_fast = self._global_options.fail_fast
@@ -182,7 +179,7 @@ class GoalRunner:
         )
         return False
 
-    def _execute_engine(self) -> int:
+    def _execute_engine(self) -> ExitCode:
         engine = RoundEngine()
         sorted_goal_infos = engine.sort_goals(self._context, self._goals)
         RunTracker.global_instance().set_sorted_goal_infos(sorted_goal_infos)
@@ -193,7 +190,7 @@ class GoalRunner:
 
         return result
 
-    def _run_goals(self) -> int:
+    def _run_goals(self) -> ExitCode:
         should_kill_nailguns = self._kill_nailguns
 
         try:
@@ -221,7 +218,7 @@ class GoalRunner:
 
         return result
 
-    def run(self) -> int:
+    def run(self) -> ExitCode:
         global_options = self._context.options.for_global_scope()
 
         if not self._is_valid_workdir(global_options.pants_workdir):

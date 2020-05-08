@@ -16,6 +16,7 @@ import cffi
 import pkg_resources
 from typing_extensions import Protocol
 
+from pants.base.exiter import ExitCode
 from pants.base.project_tree import Dir, File, Link
 from pants.engine.addresses import Address
 from pants.engine.fs import (
@@ -616,7 +617,7 @@ class RawFdRunner(Protocol):
         stdin_fd: int,
         stdout_fd: int,
         stderr_fd: int,
-    ) -> int:
+    ) -> ExitCode:
         ...
 
 

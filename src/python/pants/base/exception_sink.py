@@ -10,12 +10,13 @@ import sys
 import threading
 import traceback
 from contextlib import contextmanager
-from typing import Callable, Iterator, Optional
+from typing import Callable, Optional
 
 import setproctitle
 
-from pants.base.exiter import Exiter
+from pants.base.exiter import ExitCode
 from pants.util.dirutil import safe_mkdir, safe_open
+from pants.util.meta import classproperty
 from pants.util.osutil import Pid
 
 logger = logging.getLogger(__name__)
@@ -112,7 +113,7 @@ class ExceptionSink:
     _log_dir = None
     # We need an exiter in order to know what to do after we log a fatal exception or handle a
     # catchable signal.
-    _exiter: Optional[Exiter] = None
+    _exiter: Callable[[ExitCode], None] = sys.exit
     # Where to log stacktraces to in a SIGUSR2 handler.
     _interactive_output_stream = None
     # Whether to print a stacktrace in any fatal error message printed to the terminal.
@@ -132,6 +133,11 @@ class ExceptionSink:
 
     class ExceptionSinkError(Exception):
         pass
+
+    @classmethod
+    def exit(cls, code: ExitCode):
+        """Exits using the currently configured global exiter."""
+        cls._exiter(code)
 
     @classmethod
     def reset_should_print_backtrace_to_terminal(cls, should_print_backtrace):
@@ -198,47 +204,8 @@ class ExceptionSink:
         cls._pid_specific_error_fileobj = pid_specific_error_stream
         cls._shared_error_fileobj = shared_error_stream
 
-    class AccessGlobalExiterMixin:
-        @property
-        def _exiter(self) -> Optional[Exiter]:
-            return ExceptionSink.get_global_exiter()
-
     @classmethod
-    def get_global_exiter(cls) -> Optional[Exiter]:
-        return cls._exiter
-
-    @classmethod
-    @contextmanager
-    def exiter_as(cls, new_exiter_fun: Callable[[Optional[Exiter]], Exiter]) -> Iterator[None]:
-        """Temporarily override the global exiter.
-
-        NB: We don't want to try/finally here, because we want exceptions to propagate
-        with the most recent exiter installed in sys.excepthook.
-        If we wrap this in a try:finally, exceptions will be caught and exiters unset.
-        """
-        previous_exiter = cls._exiter
-        new_exiter = new_exiter_fun(previous_exiter)
-        cls._reset_exiter(new_exiter)
-        yield
-        cls._reset_exiter(previous_exiter)
-
-    @classmethod
-    @contextmanager
-    def exiter_as_until_exception(
-        cls, new_exiter_fun: Callable[[Optional[Exiter]], Exiter]
-    ) -> Iterator[None]:
-        """Temporarily override the global exiter, except this will unset it when an exception
-        happens."""
-        previous_exiter = cls._exiter
-        new_exiter = new_exiter_fun(previous_exiter)
-        try:
-            cls._reset_exiter(new_exiter)
-            yield
-        finally:
-            cls._reset_exiter(previous_exiter)
-
-    @classmethod
-    def _reset_exiter(cls, exiter: Optional[Exiter]) -> None:
+    def reset_exiter(cls, exiter: Callable[[ExitCode], None]) -> None:
         """Class state:
 
         - Overwrites `cls._exiter`.
@@ -250,7 +217,7 @@ class ExceptionSink:
         # uncaught exception handler uses cls._exiter to exit.
         cls._exiter = exiter
         # NB: mutate process-global state!
-        sys.excepthook = cls._log_unhandled_exception_and_exit
+        sys.excepthook = cls.log_exception
 
     @classmethod
     def reset_interactive_output_stream(
@@ -276,9 +243,13 @@ class ExceptionSink:
             cls._interactive_output_stream = interactive_output_stream
         except ValueError:
             # Warn about "ValueError: IO on closed file" when the stream is closed.
-            cls.log_exception(
+            cls._log_exception(
                 "Cannot reset interactive_output_stream -- stream (probably stderr) is closed"
             )
+
+    @classproperty
+    def should_print_exception_stacktrace(cls):
+        return cls._should_print_backtrace_to_terminal
 
     @classmethod
     def exceptions_log_path(cls, for_pid=None, in_dir=None):
@@ -294,7 +265,7 @@ class ExceptionSink:
         )
 
     @classmethod
-    def log_exception(cls, msg):
+    def _log_exception(cls, msg):
         """Try to log an error message to this process's error log and the shared error log.
 
         NB: Doesn't raise (logs an error instead).
@@ -446,31 +417,8 @@ Exception message: {exception_message}{maybe_newline}
             maybe_newline=maybe_newline,
         )
 
-    _EXIT_FAILURE_TERMINAL_MESSAGE_FORMAT = """\
-{timestamp_msg}{terminal_msg}{details_msg}
-"""
-
     @classmethod
-    def _exit_with_failure(cls, terminal_msg):
-        timestamp_msg = (
-            f"timestamp: {cls._iso_timestamp_for_now()}\n"
-            if cls._should_print_backtrace_to_terminal
-            else ""
-        )
-        details_msg = (
-            ""
-            if cls._should_print_backtrace_to_terminal
-            else "\n\n(Use --print-exception-stacktrace to see more error details.)"
-        )
-        terminal_msg = terminal_msg or "<no exit reason provided>"
-        formatted_terminal_msg = cls._EXIT_FAILURE_TERMINAL_MESSAGE_FORMAT.format(
-            timestamp_msg=timestamp_msg, terminal_msg=terminal_msg, details_msg=details_msg
-        )
-        # Exit with failure, printing a message to the terminal (or whatever the interactive stream is).
-        cls._exiter.exit_and_fail(msg=formatted_terminal_msg, out=cls._interactive_output_stream)
-
-    @classmethod
-    def log_unhandled_exception(cls, exc_class=None, exc=None, tb=None, add_newline=False):
+    def log_exception(cls, exc_class=None, exc=None, tb=None, add_newline=False):
         """Logs an unhandled exception to a variety of locations."""
         exc_class = exc_class or sys.exc_info()[0]
         exc = exc or sys.exc_info()[1]
@@ -486,37 +434,13 @@ Exception message: {exception_message}{maybe_newline}
             exception_log_entry = cls._format_unhandled_exception_log(
                 exc, tb, add_newline, should_print_backtrace=True
             )
-            cls.log_exception(exception_log_entry)
+            cls._log_exception(exception_log_entry)
         except Exception as e:
             extra_err_msg = "Additional error logging unhandled exception {}: {}".format(exc, e)
             logger.error(extra_err_msg)
 
-        # Generate an unhandled exception report fit to be printed to the terminal (respecting the
-        # Exiter's should_print_backtrace field).
-        if cls._should_print_backtrace_to_terminal:
-            stderr_printed_error = cls._format_unhandled_exception_log(
-                exc, tb, add_newline, should_print_backtrace=cls._should_print_backtrace_to_terminal
-            )
-            if extra_err_msg:
-                stderr_printed_error = "{}\n{}".format(stderr_printed_error, extra_err_msg)
-        else:
-            # If the user didn't ask for a backtrace, show a succinct error message without
-            # all the exception-related preamble.  A power-user/pants developer can still
-            # get all the preamble info along with the backtrace, but the end user shouldn't
-            # see that boilerplate by default.
-            error_msgs = getattr(exc, "end_user_messages", lambda: [str(exc)])()
-            stderr_printed_error = "\n" + "\n".join(f"ERROR: {msg}" for msg in error_msgs)
-        return stderr_printed_error
-
-    @classmethod
-    def _log_unhandled_exception_and_exit(
-        cls, exc_class=None, exc=None, tb=None, add_newline=False
-    ):
-        """A sys.excepthook implementation which logs the error and exits with failure."""
-        stderr_printed_error = cls.log_unhandled_exception(
-            exc_class=exc_class, exc=exc, tb=tb, add_newline=add_newline
-        )
-        cls._exit_with_failure(stderr_printed_error)
+        # Generate an unhandled exception report fit to be printed to the terminal.
+        logger.exception(exc)
 
     _CATCHABLE_SIGNAL_ERROR_LOG_FORMAT = """\
 Signal {signum} ({signame}) was raised. Exiting with failure.{formatted_traceback}
@@ -524,8 +448,7 @@ Signal {signum} ({signame}) was raised. Exiting with failure.{formatted_tracebac
 
     @classmethod
     def _handle_signal_gracefully(cls, signum, signame, traceback_lines):
-        """Signal handler for non-fatal signals which raises or logs an error and exits with
-        failure."""
+        """Signal handler for non-fatal signals which raises or logs an error."""
         # Extract the stack, and format an entry to be written to the exception log.
         formatted_traceback = cls._format_traceback(
             traceback_lines=traceback_lines, should_print_backtrace=True
@@ -536,7 +459,7 @@ Signal {signum} ({signame}) was raised. Exiting with failure.{formatted_tracebac
         # TODO: determine the appropriate signal-safe behavior here (to avoid writing to our file
         # descriptors re-entrantly, which raises an IOError).
         # This method catches any exceptions raised within it.
-        cls.log_exception(signal_error_log_entry)
+        cls._log_exception(signal_error_log_entry)
 
         # Create a potentially-abbreviated traceback for the terminal or other interactive stream.
         formatted_traceback_for_terminal = cls._format_traceback(
@@ -546,19 +469,19 @@ Signal {signum} ({signame}) was raised. Exiting with failure.{formatted_tracebac
         terminal_log_entry = cls._CATCHABLE_SIGNAL_ERROR_LOG_FORMAT.format(
             signum=signum, signame=signame, formatted_traceback=formatted_traceback_for_terminal
         )
-        # Exit, printing the output to the terminal.
-        cls._exit_with_failure(terminal_log_entry)
+        # Print the output via standard logging.
+        logger.error(terminal_log_entry)
 
 
 # Setup global state such as signal handlers and sys.excepthook with probably-safe values at module
 # import time.
 # Set the log location for writing logs before bootstrap options are parsed.
 ExceptionSink.reset_log_location(os.getcwd())
-# Sets except hook for exceptions at import time.
-ExceptionSink._reset_exiter(Exiter(exiter=sys.exit))
+# Sets exiter at import time.
+ExceptionSink.reset_exiter(sys.exit)
 # Sets a SIGUSR2 handler.
 ExceptionSink.reset_interactive_output_stream(sys.stderr.buffer)
-# Sets a handler that logs nonfatal signals to the exception sink before exiting.
+# Sets a handler that logs nonfatal signals to the exception sink.
 ExceptionSink.reset_signal_handler(SignalHandler())
 # Set whether to print stacktraces on exceptions or signals during import time.
 # NB: This will be overridden by bootstrap options in PantsRunner, so we avoid printing out a full

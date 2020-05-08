@@ -362,6 +362,7 @@ class NailgunProtocol:
             for fd_id, fd in zip(STDIO_DESCRIPTORS, (stdin, stdout, stderr)):
                 if fd.isatty():
                     yield (cls.TTY_PATH_ENV.format(fd_id), os.ttyname(fd.fileno()) or b"")
+
         return dict(gen_env_vars())
 
     @classmethod

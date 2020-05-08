@@ -9,13 +9,15 @@ from contextlib import contextmanager
 from threading import Lock
 from typing import Dict, Tuple
 
-from pants.base.exception_sink import ExceptionSink
-from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
+from pants.base.exiter import PANTS_FAILED_EXIT_CODE, ExitCode
 from pants.bin.local_pants_runner import LocalPantsRunner
-from pants.engine.internals.native import RawFdRunner
-from pants.engine.unions import UnionMembership
-from pants.help.help_printer import HelpPrinter
-from pants.init.specs_calculator import SpecsCalculator
+from pants.engine.internals.native import Native, RawFdRunner
+from pants.init.logging import (
+    clear_logging_handlers,
+    get_logging_handlers,
+    set_logging_handlers,
+    setup_logging,
+)
 from pants.init.util import clean_global_runtime_state
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.service.scheduler_service import SchedulerService
@@ -90,7 +92,28 @@ class DaemonPantsRunner(RawFdRunner):
                     "Timed out while waiting for another pants invocation to finish."
                 )
 
-    def _run(self, working_dir: str) -> int:
+    @contextmanager
+    def _stderr_logging(self, global_bootstrap_options):
+        """Temporarily replaces existing handlers (ie, the pantsd handler) with a stderr handler.
+
+        In the context of pantsd, there will be an existing handler for the pantsd log, which we
+        temporarily replace. Making them additive would cause per-run logs to go to pantsd, which
+        we don't want.
+
+        TODO: It would be good to handle logging destinations entirely via the threadlocal state
+        rather than via handler mutations.
+        """
+        handlers = get_logging_handlers()
+        try:
+            clear_logging_handlers()
+            Native().override_thread_logging_destination_to_just_stderr()
+            setup_logging(global_bootstrap_options)
+            yield
+        finally:
+            Native().override_thread_logging_destination_to_just_pantsd()
+            set_logging_handlers(handlers)
+
+    def _run(self, working_dir: str) -> ExitCode:
         """Run a single daemonized run of Pants.
 
         All aspects of the `sys` global should already have been replaced in `__call__`, so this
@@ -98,61 +121,35 @@ class DaemonPantsRunner(RawFdRunner):
         environment.
         """
 
-        exit_code = PANTS_SUCCEEDED_EXIT_CODE
-        try:
-            if working_dir != os.getcwd():
-                # This is likely an implementation error in the client (which we control).
-                raise Exception(
-                    "Running in a directory other than the build root is not currently supported.\n"
-                    f"client in: {working_dir}\n"
-                    f"server in: {os.getcwd()}"
+        # Capture the client's start time, which we propagate here in order to get an accurate
+        # view of total time.
+        env_start_time = os.environ.get("PANTSD_RUNTRACKER_CLIENT_START_TIME", None)
+        start_time = float(env_start_time) if env_start_time else time.time()
+
+        # Clear global mutable state before entering `LocalPantsRunner`. Note that we use
+        # `sys.argv` and `os.environ`, since they have been mutated to maintain the illusion
+        # of a local run: once we allow for concurrent runs, this information should be
+        # propagated down from the caller.
+        #   see https://github.com/pantsbuild/pants/issues/7654
+        clean_global_runtime_state(reset_subsystem=True)
+        options_bootstrapper = OptionsBootstrapper.create(env=os.environ, args=sys.argv)
+        bootstrap_options = options_bootstrapper.bootstrap_options
+        global_bootstrap_options = bootstrap_options.for_global_scope()
+
+        # Run using the pre-warmed Session.
+        with self._stderr_logging(global_bootstrap_options):
+            try:
+                scheduler = self._scheduler_service.prepare()
+                runner = LocalPantsRunner.create(
+                    os.environ, options_bootstrapper, scheduler=scheduler
                 )
-
-            # Clean global state.
-            clean_global_runtime_state(reset_subsystem=True)
-
-            options_bootstrapper = OptionsBootstrapper.create(args=sys.argv, env=os.environ)
-            options, build_config = LocalPantsRunner.parse_options(options_bootstrapper)
-
-            global_options = options.for_global_scope()
-            session = self._scheduler_service.prepare_graph(options)
-
-            specs = SpecsCalculator.create(
-                options=options,
-                session=session.scheduler_session,
-                exclude_patterns=tuple(global_options.exclude_target_regexp),
-                tags=tuple(global_options.tag) if global_options.tag else (),
-            )
-
-            if options.help_request:
-                help_printer = HelpPrinter(
-                    options=options, union_membership=UnionMembership(build_config.union_rules()),
-                )
-                return help_printer.print_help()
-
-            exit_code = self._scheduler_service.graph_run_v2(
-                session, specs, options, options_bootstrapper
-            )
-            # self.scheduler_service.graph_run_v2 will already run v2 or ambiguous goals. We should
-            # only enter this code path if v1 is set.
-            if global_options.v1:
-                runner = LocalPantsRunner.create(os.environ, options_bootstrapper, specs, session)
-
-                env_start_time = os.environ.get("PANTSD_RUNTRACKER_CLIENT_START_TIME", None)
-                start_time = float(env_start_time) if env_start_time else None
-                runner.set_start_time(start_time)
-                # TODO: This is almost certainly not correct: we should likely have the entire run
-                # occur inside LocalPantsRunner now, and have it return an exit code directly.
-                exit_code = runner.run()
-
-            return exit_code
-
-        except KeyboardInterrupt:
-            print("Interrupted by user.\n", file=sys.stderr)
-            return PANTS_FAILED_EXIT_CODE
-        except Exception as e:
-            ExceptionSink.log_unhandled_exception(exc=e)
-            return PANTS_FAILED_EXIT_CODE
+                return runner.run(start_time)
+            except Exception as e:
+                logger.exception(e)
+                return PANTS_FAILED_EXIT_CODE
+            except KeyboardInterrupt:
+                print("Interrupted by user.\n", file=sys.stderr)
+                return PANTS_FAILED_EXIT_CODE
 
     def __call__(
         self,
@@ -163,7 +160,7 @@ class DaemonPantsRunner(RawFdRunner):
         stdin_fd: int,
         stdout_fd: int,
         stderr_fd: int,
-    ) -> int:
+    ) -> ExitCode:
         request_timeout = float(env.get("PANTSD_REQUEST_TIMEOUT_LIMIT", -1))
         # NB: Order matters: we acquire a lock before mutating either `sys.std*`, `os.environ`, etc.
         with self._one_run_at_a_time(stderr_fd, timeout=request_timeout), stdio_as(
@@ -171,4 +168,8 @@ class DaemonPantsRunner(RawFdRunner):
         ), hermetic_environment_as(**env), argv_as((command,) + args):
             # NB: Run implements exception handling, so only the most primitive errors will escape
             # this function, where they will be logged to the pantsd.log by the server.
-            return self._run(working_directory.decode())
+            logger.info(f"handling request: `{' '.join(args)}`")
+            try:
+                return self._run(working_directory.decode())
+            finally:
+                logger.info(f"request completed: `{' '.join(args)}`")

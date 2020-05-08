@@ -4,19 +4,16 @@
 import os
 import signal
 import time
-from contextlib import contextmanager
 from textwrap import dedent
-from unittest import skipIf
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
-from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import environment_as, temporary_dir
-from pants.util.dirutil import read_file, safe_file_dump, safe_mkdir, touch
-from pants.util.osutil import get_normalized_os_name
+from pants.util.dirutil import read_file
+from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
 
 
-class ExceptionSinkIntegrationTest(PantsRunIntegrationTest):
+class ExceptionSinkIntegrationTest(PantsDaemonIntegrationTestBase):
     def _assert_unhandled_exception_log_matches(self, pid, file_contents):
         self.assertRegex(
             file_contents,
@@ -37,10 +34,8 @@ Exception message:.* 1 Exception encountered:
         # Ensure we write all output such as stderr and reporting files before closing any streams.
         self.assertNotIn("Exception message: I/O operation on closed file.", file_contents)
 
-    def _get_log_file_paths(self, workdir, pants_run):
-        pid_specific_log_file = ExceptionSink.exceptions_log_path(
-            for_pid=pants_run.pid, in_dir=workdir
-        )
+    def _get_log_file_paths(self, workdir, pid):
+        pid_specific_log_file = ExceptionSink.exceptions_log_path(for_pid=pid, in_dir=workdir)
         self.assertTrue(os.path.isfile(pid_specific_log_file))
 
         shared_log_file = ExceptionSink.exceptions_log_path(in_dir=workdir)
@@ -72,7 +67,9 @@ Exception message:.* 1 Exception encountered:
                     pants_run.stderr_data,
                 )
 
-                pid_specific_log_file, shared_log_file = self._get_log_file_paths(tmpdir, pants_run)
+                pid_specific_log_file, shared_log_file = self._get_log_file_paths(
+                    tmpdir, pants_run.pid
+                )
 
                 self.assertIn(
                     "KeyboardInterrupt: ctrl-c interrupted execution of a cffi method!",
@@ -102,7 +99,9 @@ Exception message:.* 1 Exception encountered:
                     pants_run.stderr_data,
                 )
 
-                pid_specific_log_file, shared_log_file = self._get_log_file_paths(tmpdir, pants_run)
+                pid_specific_log_file, shared_log_file = self._get_log_file_paths(
+                    tmpdir, pants_run.pid
+                )
 
                 self.assertEqual("", read_file(pid_specific_log_file))
                 self.assertEqual("", read_file(shared_log_file))
@@ -119,10 +118,10 @@ Exception message:.* 1 Exception encountered:
             self.assertRegex(
                 pants_run.stderr_data,
                 """\
-ERROR: "this-target-does-not-exist" was not found in namespace ""\\. Did you mean one of:
+"this-target-does-not-exist" was not found in namespace ""\\. Did you mean one of:
 """,
             )
-            pid_specific_log_file, shared_log_file = self._get_log_file_paths(tmpdir, pants_run)
+            pid_specific_log_file, shared_log_file = self._get_log_file_paths(tmpdir, pants_run.pid)
             self._assert_unhandled_exception_log_matches(
                 pants_run.pid, read_file(pid_specific_log_file)
             )
@@ -144,48 +143,6 @@ Signal {signum} \\({signame}\\) was raised\\. Exiting with failure\\.
         # Ensure we write all output such as stderr and reporting files before closing any streams.
         self.assertNotIn("Exception message: I/O operation on closed file.", contents)
 
-    @contextmanager
-    def _make_waiter_handle(self):
-        with temporary_dir() as tmpdir:
-            # The path is required to end in '.pants.d'. This is validated in
-            # GoalRunner#is_valid_workdir().
-            workdir = os.path.join(tmpdir, ".pants.d")
-            safe_mkdir(workdir)
-            arrive_file = os.path.join(tmpdir, "arrived")
-            await_file = os.path.join(tmpdir, "await")
-            waiter_handle = self.run_pants_with_workdir_without_waiting(
-                [
-                    "--no-enable-pantsd",
-                    "run",
-                    "testprojects/src/python/coordinated_runs:phaser",
-                    "--",
-                    arrive_file,
-                    await_file,
-                ],
-                workdir,
-            )
-
-            # Wait for testprojects/src/python/coordinated_runs:phaser to be running.
-            while not os.path.exists(arrive_file):
-                time.sleep(0.1)
-
-            def join():
-                touch(await_file)
-                return waiter_handle.join()
-
-            yield (workdir, waiter_handle.process.pid, join)
-
-    @contextmanager
-    def _send_signal_to_waiter_handle(self, signum):
-        # This needs to be a contextmanager as well, because workdir may be temporary.
-        with self._make_waiter_handle() as (workdir, pid, join):
-            os.kill(pid, signum)
-            waiter_run = join()
-            self.assert_failure(waiter_run)
-            # Return the (failed) pants execution result.
-            yield (workdir, waiter_run)
-
-    @skipIf(get_normalized_os_name() == "darwin", "https://github.com/pantsbuild/pants/issues/8127")
     def test_dumps_logs_on_signal(self):
         """Send signals which are handled, but don't get converted into a KeyboardInterrupt."""
         signal_names = {
@@ -193,34 +150,34 @@ Signal {signum} \\({signame}\\) was raised\\. Exiting with failure\\.
             signal.SIGTERM: "SIGTERM",
         }
         for (signum, signame) in signal_names.items():
-            with self._send_signal_to_waiter_handle(signum) as (workdir, waiter_run):
-                self.assertRegex(
-                    waiter_run.stderr_data,
-                    """\
-timestamp: ([^\n]+)
-Signal {signum} \\({signame}\\) was raised\\. Exiting with failure\\.
-""".format(
-                        signum=signum, signame=signame
-                    ),
-                )
-                # Check that the logs show a graceful exit by SIGTERM.
-                pid_specific_log_file, shared_log_file = self._get_log_file_paths(
-                    workdir, waiter_run
+            with self.pantsd_successful_run_context() as ctx:
+                ctx.runner(["help"])
+                pid = ctx.checker.assert_started()
+                os.kill(pid, signum)
+
+                time.sleep(5)
+
+                # Check that the logs show a graceful exit by signal.
+                pid_specific_log_file, shared_log_file = self._get_log_file_paths(ctx.workdir, pid)
+                self._assert_graceful_signal_log_matches(
+                    pid, signum, signame, read_file(pid_specific_log_file)
                 )
                 self._assert_graceful_signal_log_matches(
-                    waiter_run.pid, signum, signame, read_file(pid_specific_log_file)
-                )
-                self._assert_graceful_signal_log_matches(
-                    waiter_run.pid, signum, signame, read_file(shared_log_file)
+                    pid, signum, signame, read_file(shared_log_file)
                 )
 
-    @skipIf(get_normalized_os_name() == "darwin", "https://github.com/pantsbuild/pants/issues/8127")
     def test_dumps_traceback_on_sigabrt(self):
         # SIGABRT sends a traceback to the log file for the current process thanks to
         # faulthandler.enable().
-        with self._send_signal_to_waiter_handle(signal.SIGABRT) as (workdir, waiter_run):
+        with self.pantsd_successful_run_context() as ctx:
+            ctx.runner(["help"])
+            pid = ctx.checker.assert_started()
+            os.kill(pid, signal.SIGABRT)
+
+            time.sleep(5)
+
             # Check that the logs show an abort signal and the beginning of a traceback.
-            pid_specific_log_file, shared_log_file = self._get_log_file_paths(workdir, waiter_run)
+            pid_specific_log_file, shared_log_file = self._get_log_file_paths(ctx.workdir, pid)
             self.assertRegex(
                 read_file(pid_specific_log_file),
                 """\
@@ -232,28 +189,20 @@ Thread [^\n]+ \\(most recent call first\\):
             # faulthandler.enable() only allows use of a single logging file at once for fatal tracebacks.
             self.assertEqual("", read_file(shared_log_file))
 
-    @skipIf(get_normalized_os_name() == "darwin", "https://github.com/pantsbuild/pants/issues/8127")
     def test_prints_traceback_on_sigusr2(self):
-        with self._make_waiter_handle() as (workdir, pid, join):
-            # Send SIGUSR2, then sleep so the signal handler from faulthandler.register() can run.
+        with self.pantsd_successful_run_context() as ctx:
+            ctx.runner(["help"])
+            pid = ctx.checker.assert_started()
             os.kill(pid, signal.SIGUSR2)
-            time.sleep(1)
 
-            waiter_run = join()
-            self.assert_success(waiter_run)
+            time.sleep(5)
+
+            ctx.checker.assert_running()
             self.assertRegex(
-                waiter_run.stderr_data,
+                read_file(os.path.join(ctx.workdir, "pantsd", "pantsd.log")),
                 """\
 Current thread [^\n]+ \\(most recent call first\\):
 """,
-            )
-
-    @skipIf(get_normalized_os_name() == "darwin", "https://github.com/pantsbuild/pants/issues/8127")
-    def test_keyboardinterrupt(self):
-        with self._send_signal_to_waiter_handle(signal.SIGINT) as (_, waiter_run):
-            self.assertIn(
-                "Interrupted by user:\nUser interrupted execution with control-c!",
-                waiter_run.stderr_data,
             )
 
     def _lifecycle_stub_cmdline(self):
@@ -289,24 +238,3 @@ Current thread [^\n]+ \\(most recent call first\\):
         self.assert_failure(changed_exiter_run)
         self.assertIn("erroneous!", changed_exiter_run.stderr_data)
         self.assertIn("NEW MESSAGE", changed_exiter_run.stderr_data)
-
-    def test_reset_interactive_output_stream(self):
-        """Test redirecting the terminal output stream to a separate file."""
-        lifecycle_stub_cmdline = self._lifecycle_stub_cmdline()
-
-        failing_pants_run = self.run_pants(lifecycle_stub_cmdline)
-        self.assert_failure(failing_pants_run)
-        self.assertIn("erroneous!", failing_pants_run.stderr_data)
-
-        with temporary_dir() as tmpdir:
-            some_file = os.path.join(tmpdir, "some_file")
-            safe_file_dump(some_file, "")
-            redirected_pants_run = self.run_pants(
-                [f"--lifecycle-stubs-new-interactive-stream-output-file={some_file}"]
-                + lifecycle_stub_cmdline
-            )
-            self.assert_failure(redirected_pants_run)
-            # The Exiter prints the final error message to whatever the interactive output stream is set
-            # to, so when it's redirected it won't be in stderr.
-            self.assertNotIn("erroneous!", redirected_pants_run.stderr_data)
-            self.assertIn("erroneous!", read_file(some_file))

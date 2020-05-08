@@ -15,7 +15,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use chrono;
 use lazy_static::lazy_static;
-use log::{log, set_logger, set_max_level, LevelFilter, Log, Metadata, Record};
+use log::{debug, log, set_logger, set_max_level, LevelFilter, Log, Metadata, Record};
 use parking_lot::Mutex;
 use simplelog::{ConfigBuilder, LevelPadding, WriteLogger};
 use tokio::task_local;
@@ -55,7 +55,9 @@ impl Logger {
         LOGGER
           .show_rust_3rdparty_logs
           .store(show_rust_3rdparty_logs, Ordering::SeqCst);
-        set_logger(&*LOGGER).expect("Error setting up global logger.");
+        if set_logger(&*LOGGER).is_err() {
+          debug!("Logging already initialized.");
+        }
       }
       Err(err) => panic!("Unrecognised log level from python: {}: {}", max_level, err),
     };

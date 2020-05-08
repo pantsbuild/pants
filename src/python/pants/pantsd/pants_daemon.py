@@ -13,17 +13,11 @@ from setproctitle import setproctitle as set_process_title
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink, SignalHandler
-from pants.base.exiter import Exiter
 from pants.bin.daemon_pants_runner import DaemonPantsRunner
 from pants.engine.internals.native import Native
 from pants.engine.unions import UnionMembership
 from pants.init.engine_initializer import EngineInitializer
-from pants.init.logging import (
-    clear_previous_loggers,
-    init_rust_logger,
-    setup_logging_to_file,
-    setup_logging_to_stderr,
-)
+from pants.init.logging import clear_logging_handlers, init_rust_logger, setup_logging_to_file
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -359,8 +353,7 @@ class PantsDaemon(FingerprintedProcessManager):
 
             level = self._log_level
             ignores = bootstrap_options.for_global_scope().ignore_pants_warnings
-            clear_previous_loggers()
-            setup_logging_to_stderr(level, warnings_filter_regexes=ignores)
+            clear_logging_handlers()
             log_dir = os.path.join(self._work_dir, self.name)
             log_handler = setup_logging_to_file(
                 level, log_dir=log_dir, log_filename=self.LOG_NAME, warnings_filter_regexes=ignores
@@ -483,9 +476,8 @@ class PantsDaemon(FingerprintedProcessManager):
         # Switch log output to the daemon's log stream from here forward.
         # Also, register an exiter using os._exit to ensure we only close stdio streams once.
         self._close_stdio()
-        with self._pantsd_logging() as log_stream, ExceptionSink.exiter_as(
-            lambda _: Exiter(exiter=os._exit)
-        ):
+        ExceptionSink.reset_exiter(os._exit)
+        with self._pantsd_logging() as log_stream:
 
             # We don't have any stdio streams to log to anymore, so we log to a file.
             # We don't override the faulthandler destination because the stream we get will proxy things
