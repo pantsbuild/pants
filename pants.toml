@@ -411,6 +411,7 @@ pytest_plugins.add = [
   "setuptools==44.0.0",
   "ipdb",
   "pytest-icdiff",
+  "pygments",
 ]
 
 [test.pytest]
