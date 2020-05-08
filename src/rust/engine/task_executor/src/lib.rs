@@ -78,7 +78,7 @@ impl Executor {
   /// Even after this method returns, work `spawn`ed into the background may continue to run on the
   /// threads owned by this Executor.
   ///
-  pub fn block_on<F: Future + Send + 'static>(&self, future: F) -> F::Output {
+  pub fn block_on<F: Future>(&self, future: F) -> F::Output {
     // Make sure to copy our (thread-local) logging destination into the task.
     // When a daemon thread kicks off a future, it should log like a daemon thread (and similarly
     // for a user-facing thread).
