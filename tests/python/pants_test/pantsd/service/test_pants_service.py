@@ -46,8 +46,8 @@ class TestPantsService(TestBase):
         # there without exiting.
         self.assertTrue(self.service._state.await_paused(timeout=5))
         t.join(timeout=0.5)
-        self.assertTrue(t.isAlive())
+        self.assertTrue(t.is_alive())
         # Resume the service, and confirm that the child thread exits.
         self.service.resume()
         t.join(timeout=5)
-        self.assertFalse(t.isAlive())
+        self.assertFalse(t.is_alive())
