@@ -3,7 +3,7 @@ beautifulsoup4>=4.6.0,<4.7
 cffi==1.13.2
 coverage>=4.5,<4.6
 dataclasses==0.6
-docutils==0.14
+docutils==0.16
 fasteners==0.15.0
 
 # The MyPy requirement should be maintained in lockstep with the requirement the Pants repo uses
