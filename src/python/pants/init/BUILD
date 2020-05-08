@@ -52,7 +52,8 @@ target(
     'src/python/pants/backend/docgen:plugin',
     'src/python/pants/backend/graph_info:plugin',
     'src/python/pants/backend/jvm:plugin',
-    'src/python/pants/backend/project_info:plugin',
+    'src/python/pants/backend/pants_info',
+    'src/python/pants/backend/project_info',
     'src/python/pants/backend/python:plugin',
     'src/python/pants/backend/python/lint/bandit',
     'src/python/pants/backend/python/lint/black',
@@ -62,8 +63,6 @@ target(
     'src/python/pants/backend/python/lint/pylint',
     'src/python/pants/backend/native',
     'src/python/pants/core:plugin',
-    'src/python/pants/pants_info',
-    'src/python/pants/project_info',
   ],
 )
 

@@ -3,7 +3,7 @@
 
 """Information on Pants' internals, such as registered target types and goals."""
 
-from pants.pants_info import list_target_types
+from pants.backend.pants_info import list_target_types
 
 
 def rules():

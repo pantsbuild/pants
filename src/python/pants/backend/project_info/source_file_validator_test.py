@@ -4,7 +4,7 @@
 import textwrap
 import unittest
 
-from pants.project_info.source_file_validator import Matcher, MultiMatcher, RegexMatchResult
+from pants.backend.project_info.source_file_validator import Matcher, MultiMatcher, RegexMatchResult
 
 
 # Note that some parts of these tests are just exercising various capabilities of the regex engine.

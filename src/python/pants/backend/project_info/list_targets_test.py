@@ -6,9 +6,9 @@ from typing import List, Optional, Tuple, cast
 
 from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.repository import Repository
+from pants.backend.project_info.list_targets import ListOptions, list_targets
 from pants.engine.addresses import Address, Addresses
 from pants.engine.target import DescriptionField, ProvidesField, Target, Targets
-from pants.project_info.list_targets import ListOptions, list_targets
 from pants.testutil.engine.util import MockConsole, MockGet, create_goal_subsystem, run_rule
 
 

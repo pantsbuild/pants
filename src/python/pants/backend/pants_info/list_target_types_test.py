@@ -5,10 +5,10 @@ from enum import Enum
 from textwrap import dedent
 from typing import Optional, cast
 
+from pants.backend.pants_info.list_target_types import TargetTypesOptions, list_target_types
 from pants.engine.target import BoolField, IntField, RegisteredTargetTypes, StringField, Target
 from pants.engine.unions import UnionMembership
 from pants.option.global_options import GlobalOptions
-from pants.pants_info.list_target_types import TargetTypesOptions, list_target_types
 from pants.testutil.engine.util import (
     MockConsole,
     create_goal_subsystem,

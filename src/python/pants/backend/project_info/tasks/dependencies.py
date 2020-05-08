@@ -4,8 +4,8 @@
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.backend.project_info.dependencies import DependencyType
 from pants.base.payload_field import JarsField, PythonRequirementsField
-from pants.project_info.dependencies import DependencyType
 from pants.task.console_task import ConsoleTask
 from pants.util.ordered_set import OrderedSet
 
