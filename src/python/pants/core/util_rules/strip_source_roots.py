@@ -21,7 +21,7 @@ from pants.engine.rules import RootRule, SubsystemRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import HydratedSources, HydrateSourcesRequest
 from pants.engine.target import Sources as SourcesField
-from pants.source.source_root import NoSourceRootError, SourceRootConfig
+from pants.source.source_root import SourceRootConfig
 from pants.util.meta import frozen_after_init
 
 
@@ -87,13 +87,7 @@ async def strip_source_roots_from_snapshot(
     source_roots_object = source_root_config.get_source_roots()
 
     def determine_source_root(path: str) -> str:
-        source_root = source_roots_object.safe_find_by_path(path)
-        if source_root is not None:
-            return cast(str, source_root.path)
-        if source_root_config.options.unmatched == "fail":
-            raise NoSourceRootError(f"Could not find a source root for `{path}`.")
-        # Otherwise, create a source root by using the parent directory.
-        return PurePath(path).parent.as_posix()
+        return cast(str, source_roots_object.strict_find_by_path(path).path)
 
     if request.representative_path is not None:
         source_root = determine_source_root(request.representative_path)

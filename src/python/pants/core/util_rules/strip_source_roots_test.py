@@ -67,11 +67,8 @@ class StripSourceRootsTest(TestBase):
 
         # Unrecognized source root
         unrecognized_source_root = "no-source-root/example.txt"
-        assert get_stripped_files_for_snapshot([unrecognized_source_root]) == ["example.txt"]
         with pytest.raises(ExecutionError) as exc:
-            get_stripped_files_for_snapshot(
-                [unrecognized_source_root], args=["--source-unmatched=fail"]
-            )
+            get_stripped_files_for_snapshot([unrecognized_source_root])
         assert (
             f"NoSourceRootError: Could not find a source root for `{unrecognized_source_root}`"
             in str(exc.value)

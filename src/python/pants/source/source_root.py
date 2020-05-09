@@ -48,12 +48,18 @@ class SourceRoots:
         """
         self._trie.add_fixed(path)
 
-    def find(self, target) -> Optional[SourceRoot]:
-        """Find the source root for the given target, or None.
+    def strict_find_by_path(self, path: str) -> SourceRoot:
+        """Find the source root for the given path.
 
-        :param target: Find the source root for this target.
+        Raises an error if there is no known source root for the path.
         """
-        return self.find_by_path(target.address.spec_path)
+        matched = self._trie.find(path)
+        if matched:
+            return matched
+        raise NoSourceRootError(
+            f"Could not find a source root for `{path}`. See "
+            f"https://pants.readme.io/docs/source-roots for how to define source roots."
+        )
 
     def find_by_path(self, path: str) -> Optional[SourceRoot]:
         """Find the source root for the given path, or None.
@@ -61,6 +67,10 @@ class SourceRoots:
         :param path: Find the source root for this path, relative to the buildroot.
         :return: A SourceRoot instance, or None if the path is not located under a source root
                  and `unmatched == fail`.
+
+        TODO: Only v1 code should call this method. v2 code should use strict_find_by_path().
+         Silently creating source roots on the fly is confusing legacy behavior that we shouldn't
+         carry over into v2.
         """
         matched = self._trie.find(path)
         if matched:
@@ -68,14 +78,7 @@ class SourceRoots:
         elif self._options.unmatched == "fail":
             return None
         # If no source root is found, use the path directly.
-        # TODO: Remove this logic. It should be an error to have no matching source root.
         return SourceRoot(path)
-
-    # TODO: this is how find_by_path should behave. Figure out how to deprecate the behavior of
-    # find_by_path so that this method becomes redundant.
-    def safe_find_by_path(self, path: str) -> Optional[SourceRoot]:
-        """Find the source root for the given path, if any."""
-        return self._trie.find(path)
 
     def traverse(self) -> Set[str]:
         return self._trie.traverse()
