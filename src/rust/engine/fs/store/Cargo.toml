@@ -39,3 +39,9 @@ mock = { path = "../../testutil/mock" }
 testutil = { path = "../../testutil" }
 tokio = { version = "0.2", features = ["rt-core", "macros"] }
 walkdir = "2"
+criterion = "0.3"
+
+[[bench]]
+name = "store"
+# Using criterion: see https://bheisler.github.io/criterion.rs/book/getting_started.html
+harness = false

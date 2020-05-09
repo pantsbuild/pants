@@ -695,83 +695,91 @@ impl Store {
     root_or_parent_metadata: RootOrParentMetadataBuilder,
     digest: Digest,
   ) -> BoxFuture<(), String> {
-    if let RootOrParentMetadataBuilder::Root(..) = root_or_parent_metadata {
-      try_future!(fs::safe_create_dir_all(&destination));
-    } else {
-      try_future!(fs::safe_create_dir(&destination));
-    }
-
-    let loaded_directory = {
-      let store = self.clone();
-      let res = async move { store.load_directory(digest).await };
-      res.boxed().compat()
-    };
-
     let store = self.clone();
-    loaded_directory
-      .and_then(move |directory_and_metadata_opt| {
-        let (directory, metadata) = directory_and_metadata_opt
-          .ok_or_else(|| format!("Directory with digest {:?} not found", digest))?;
-        let (child_directories, child_files) = match root_or_parent_metadata {
-          RootOrParentMetadataBuilder::Root(root) => {
-            let builder = DirectoryMaterializeMetadataBuilder::new(metadata);
-            let child_directories = builder.child_directories.clone();
-            let child_files = builder.child_files.clone();
-            *root.lock() = Some(builder);
-            (child_directories, child_files)
-          }
-          RootOrParentMetadataBuilder::Parent((
-            dir_name,
-            parent_child_directories,
-            _parent_files,
-          )) => {
-            let builder = DirectoryMaterializeMetadataBuilder::new(metadata);
-            let child_directories = builder.child_directories.clone();
-            let child_files = builder.child_files.clone();
-            parent_child_directories.lock().insert(dir_name, builder);
-            (child_directories, child_files)
-          }
-        };
-        Ok((directory, child_directories, child_files))
-      })
-      .and_then(move |(directory, child_directories, child_files)| {
-        let file_futures = directory
-          .get_files()
-          .iter()
-          .map(|file_node| {
-            let store = store.clone();
-            let path = destination.join(file_node.get_name());
-            let digest = try_future!(file_node.get_digest().into());
-            let child_files = child_files.clone();
-            let name = file_node.get_name().to_owned();
-            store
-              .materialize_file(path, digest, file_node.is_executable)
-              .map(move |metadata| child_files.lock().insert(name, metadata))
-              .to_boxed()
-          })
-          .collect::<Vec<_>>();
-        let directory_futures = directory
-          .get_directories()
-          .iter()
-          .map(|directory_node| {
-            let store = store.clone();
-            let path = destination.join(directory_node.get_name());
-            let digest = try_future!(directory_node.get_digest().into());
+    async move {
+      if let RootOrParentMetadataBuilder::Root(..) = root_or_parent_metadata {
+        let destination = destination.clone();
+        store
+          .local
+          .executor()
+          .spawn_blocking(move || fs::safe_create_dir_all(&destination))
+          .await?;
+      } else {
+        let destination = destination.clone();
+        store
+          .local
+          .executor()
+          .spawn_blocking(move || fs::safe_create_dir(&destination))
+          .await?;
+      }
 
-            let builder = RootOrParentMetadataBuilder::Parent((
-              directory_node.get_name().to_owned(),
-              child_directories.clone(),
-              child_files.clone(),
-            ));
+      let (directory, metadata) = store
+        .load_directory(digest)
+        .await?
+        .ok_or_else(|| format!("Directory with digest {:?} not found", digest))?;
 
-            store.materialize_directory_helper(path, builder, digest)
-          })
-          .collect::<Vec<_>>();
-        future::join_all(file_futures)
-          .join(future::join_all(directory_futures))
-          .map(|_| ())
-      })
-      .to_boxed()
+      let (child_directories, child_files) = match root_or_parent_metadata {
+        RootOrParentMetadataBuilder::Root(root) => {
+          let builder = DirectoryMaterializeMetadataBuilder::new(metadata);
+          let child_directories = builder.child_directories.clone();
+          let child_files = builder.child_files.clone();
+          *root.lock() = Some(builder);
+          (child_directories, child_files)
+        }
+        RootOrParentMetadataBuilder::Parent((
+          dir_name,
+          parent_child_directories,
+          _parent_files,
+        )) => {
+          let builder = DirectoryMaterializeMetadataBuilder::new(metadata);
+          let child_directories = builder.child_directories.clone();
+          let child_files = builder.child_files.clone();
+          parent_child_directories.lock().insert(dir_name, builder);
+          (child_directories, child_files)
+        }
+      };
+
+      let file_futures = directory
+        .get_files()
+        .iter()
+        .map(|file_node| {
+          let store = store.clone();
+          let path = destination.join(file_node.get_name());
+          let digest = try_future!(file_node.get_digest().into());
+          let child_files = child_files.clone();
+          let name = file_node.get_name().to_owned();
+          store
+            .materialize_file(path, digest, file_node.is_executable)
+            .map(move |metadata| child_files.lock().insert(name, metadata))
+            .to_boxed()
+        })
+        .collect::<Vec<_>>();
+      let directory_futures = directory
+        .get_directories()
+        .iter()
+        .map(|directory_node| {
+          let store = store.clone();
+          let path = destination.join(directory_node.get_name());
+          let digest = try_future!(directory_node.get_digest().into());
+
+          let builder = RootOrParentMetadataBuilder::Parent((
+            directory_node.get_name().to_owned(),
+            child_directories.clone(),
+            child_files.clone(),
+          ));
+
+          store.materialize_directory_helper(path, builder, digest)
+        })
+        .collect::<Vec<_>>();
+      let _ = future::join_all(file_futures)
+        .join(future::join_all(directory_futures))
+        .compat()
+        .await?;
+      Ok(())
+    }
+    .boxed()
+    .compat()
+    .to_boxed()
   }
 
   fn materialize_file(
