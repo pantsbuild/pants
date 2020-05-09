@@ -522,14 +522,6 @@ class UnpackedWheelsWithinDataSubdir(BoolField):
     alias = "within_data_subdir"
     default = False
 
-    @classmethod
-    def compute_value(  # type: ignore[override]
-        cls, raw_value: Optional[Union[bool, str]], *, address: Address
-    ) -> Union[bool, str]:
-        if isinstance(raw_value, str):
-            return raw_value
-        return super().compute_value(raw_value, address=address)
-
 
 class UnpackedWheels(Target):
     """A set of sources extracted from wheel files.
