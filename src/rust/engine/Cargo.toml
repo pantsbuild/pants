@@ -112,7 +112,7 @@ store = { path = "fs/store" }
 task_executor = { path = "task_executor" }
 tempfile = "3"
 time = "0.1.40"
-tokio = { version = "0.2", features = ["rt-threaded"] }
+tokio = { version = "=0.2.13", features = ["rt-threaded"] }
 ui = { path = "ui" }
 url = "2.1"
 uuid = { version = "0.7", features = ["v4"] }
