@@ -50,7 +50,7 @@ class _Workdirs:
 
     @memoized_method
     def target_set_id(self, *targets):
-        return Target.maybe_readable_identify(targets or self.target)
+        return Target.maybe_readable_identify(targets) if targets else self.target.id
 
     @memoized_method
     def junitxml_path(self, *targets):
