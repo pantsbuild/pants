@@ -28,7 +28,7 @@ from pants.base.hash_utils import Sharder
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.target import Target
 from pants.task.task import Task
-from pants.task.testrunner_task_mixin import PartitionedTestRunnerTaskMixin, TestResult
+from pants.task.testrunner_task_mixin import ChrootedTestRunnerTaskMixin, TestResult
 from pants.util.contextutil import environment_as, pushd, temporary_dir, temporary_file
 from pants.util.dirutil import mergetree, safe_mkdir, safe_mkdir_for
 from pants.util.memo import memoized_method, memoized_property
@@ -40,17 +40,17 @@ from pants.util.xml_parser import XmlParser
 @dataclass(frozen=True)
 class _Workdirs:
     root_dir: Any
-    partition: Any
+    target: Any
 
     @classmethod
-    def for_partition(cls, work_dir, partition):
-        root_dir = os.path.join(work_dir, Target.maybe_readable_identify(partition))
+    def for_target(cls, work_dir, target):
+        root_dir = os.path.join(work_dir, target.id)
         safe_mkdir(root_dir, clean=False)
-        return cls(root_dir=root_dir, partition=partition)
+        return cls(root_dir=root_dir, target=target)
 
     @memoized_method
     def target_set_id(self, *targets):
-        return Target.maybe_readable_identify(targets or self.partition)
+        return Target.maybe_readable_identify(targets) if targets else self.target.id
 
     @memoized_method
     def junitxml_path(self, *targets):
@@ -91,7 +91,7 @@ class PytestResult(TestResult):
         return 0 if value in cls._SUCCESS_EXIT_CODES else value
 
 
-class PytestRun(PartitionedTestRunnerTaskMixin, Task):
+class PytestRun(ChrootedTestRunnerTaskMixin, Task):
     @classmethod
     def implementation_version(cls):
         return super().implementation_version() + [("PytestRun", 3)]
@@ -601,27 +601,16 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
         return relsrc_to_target.get(relsrc)
 
     @contextmanager
-    def partitions(self, per_target, all_targets, test_targets):
-        if per_target:
-
-            def iter_partitions():
-                for test_target in test_targets:
-                    yield (test_target,)
-
-        else:
-
-            def iter_partitions():
-                yield tuple(test_targets)
-
+    def tests(self, all_targets, test_targets):
         workdir = self.workdir
 
-        def iter_partitions_with_args():
-            for partition in iter_partitions():
-                workdirs = _Workdirs.for_partition(workdir, partition)
+        def iter_tests():
+            for test_target in test_targets:
+                workdirs = _Workdirs.for_target(workdir, test_target)
                 args = (workdirs,)
-                yield partition, args
+                yield test_target, args
 
-        yield iter_partitions_with_args
+        yield iter_tests
 
     # TODO(John Sirois): Its probably worth generalizing a means to mark certain options or target
     # attributes as making results un-cacheable. See: https://github.com/pantsbuild/pants/issues/4748

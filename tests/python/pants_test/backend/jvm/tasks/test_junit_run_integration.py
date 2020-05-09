@@ -111,7 +111,7 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
             self.assertIn("Welcome.scala", html_report_string)
 
     def test_junit_run_with_coverage_succeeds_scoverage(self):
-        self.do_test_junit_run_with_coverage_succeeds_scoverage(args=["--no-chroot", "--fast"])
+        self.do_test_junit_run_with_coverage_succeeds_scoverage(args=["--no-chroot"])
 
     def do_test_junit_run_with_coverage_succeeds_cobertura(self, tests=(), args=()):
         html_path = (
@@ -214,11 +214,10 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
         self.assert_failure(pants_run)
         self.assertIn("No target found for test specifier", pants_run.stdout_data)
 
-    def test_junit_run_no_fast_multi(self):
+    def test_junit_run_multi(self):
         pants_run = self.run_pants(
             [
                 "test.junit",
-                "--no-fast",
                 "--test=PassingTest",
                 "testprojects/tests/java/org/pantsbuild/testproject/dummies:passing_target",
                 "testprojects/tests/java/org/pantsbuild/testproject/matcher",

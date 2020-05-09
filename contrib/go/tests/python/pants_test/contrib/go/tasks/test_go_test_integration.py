@@ -44,14 +44,6 @@ class GoTestIntegrationTest(PantsRunIntegrationTest):
         self.assertIn("=== RUN   TestAdd", pants_run.stdout_data)
         self.assertIn("PASS", pants_run.stdout_data)
 
-    def test_no_fast(self):
-        args = ["test.go", "--no-fast", "contrib/go/examples/src/go/libA"]
-        pants_run = self.run_pants(args)
-        self.assert_success(pants_run)
-        # libA depends on libB, so both tests should be run.
-        self.assertRegex(pants_run.stdout_data, r"ok\s+libA")
-        self.assertRegex(pants_run.stdout_data, r"ok\s+libB")
-
     def test_go_test_unstyle(self):
         with self.temporary_sourcedir() as srcdir:
             lib_unstyle_relpath = "src/go/libUnstyle"
