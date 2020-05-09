@@ -3,7 +3,7 @@
 
 from textwrap import dedent
 
-from pants.core.project_info.list_backends import (
+from pants.backend.pants_info.list_backends import (
     BackendsOptions,
     hackily_get_module_docstring,
     list_backends,

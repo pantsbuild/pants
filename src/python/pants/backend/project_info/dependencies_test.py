@@ -7,7 +7,7 @@ from typing import List, Optional
 from pants.backend.jvm.target_types import JarLibrary, JavaLibrary
 from pants.backend.jvm.targets.jar_library import JarLibrary as JarLibraryV1
 from pants.backend.jvm.targets.java_library import JavaLibrary as JavaLibraryV1
-from pants.backend.project_info.rules.dependencies import Dependencies, DependencyType, rules
+from pants.backend.project_info.dependencies import Dependencies, DependencyType, rules
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.backend.python.targets.python_library import PythonLibrary as PythonLibraryV1
 from pants.backend.python.targets.python_requirement_library import (

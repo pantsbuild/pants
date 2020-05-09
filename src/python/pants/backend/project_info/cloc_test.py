@@ -2,8 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.jvm.target_types import JavaLibrary
+from pants.backend.project_info import cloc
 from pants.backend.python.target_types import PythonLibrary
-from pants.core.project_info import cloc
 from pants.core.util_rules import archive, external_tool
 from pants.testutil.goal_rule_test_base import GoalRuleResult, GoalRuleTestBase
 
