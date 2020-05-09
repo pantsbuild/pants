@@ -67,6 +67,9 @@ Bugfixes
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+* Add benchmark harness and improve performance of materialize_directory  (#9729)
+  `PR #9729 <https://github.com/pantsbuild/pants/pull/9729>`_
+
 * Reorganize some V2 goals into `pants.backend.pants_info` and `pants.backend.project_info` #9708
   `PR #9708 <https://github.com/pantsbuild/pants/pull/9708>`_
 
