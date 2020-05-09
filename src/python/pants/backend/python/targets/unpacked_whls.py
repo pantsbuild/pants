@@ -4,7 +4,6 @@
 import logging
 
 from pants.backend.python.targets.import_wheels_mixin import ImportWheelsMixin
-from pants.base.deprecated import deprecated_conditional
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.build_graph.target import Target
@@ -66,13 +65,6 @@ class UnpackedWheels(ImportWheelsMixin, Target):
                                         `include_patterns` matching exactly what is specified in the
                                         setup.py.
         """
-        # NB: Update python/rules/targets.py to no longer allow `str` when removing this deprecation.
-        deprecated_conditional(
-            lambda: type(within_data_subdir) not in (bool, type(None)),
-            removal_version="1.28.0.dev2",
-            entity_description="A non-boolean value for `within_data_subdir`",
-            hint_message="The location of the .data subdirectory will be inferred from the module name!",
-        )
         payload = payload or Payload()
         payload.add_fields(
             {

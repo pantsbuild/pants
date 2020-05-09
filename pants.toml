@@ -409,6 +409,8 @@ pytest_plugins.add = [
   #  understands our __init__ files. NB: this version matches 3rdparty/python/requirements.txt.
   "setuptools==44.0.0",
   "ipdb",
+  "pytest-icdiff",
+  "pygments",
 ]
 
 [test.pytest]
