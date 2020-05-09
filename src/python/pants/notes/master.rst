@@ -4,8 +4,146 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.28.0.dev2 (5/9/2020)
+----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Loosen restriction on docutils to not require 0.16. #9735
+  `PR #9735 <https://github.com/pantsbuild/pants/pull/9735>`_
+
+* Remove deprecated `--fast` option for tests. (#9733)
+  `PR #9733 <https://github.com/pantsbuild/pants/pull/9733>`_
+
+* Remove deprecated support for `within_data_subdir`. (#9730)
+  `PR #9730 <https://github.com/pantsbuild/pants/pull/9730>`_
+
+* Remove `build-setup-requires-pex` options scope. (#9732)
+  `PR #9732 <https://github.com/pantsbuild/pants/pull/9732>`_
+
+* Remove deprecated PythonSetup options. (#9731)
+  `PR #9731 <https://github.com/pantsbuild/pants/pull/9731>`_
+
+* Adapt to upstream scalatest change (#9707)
+  `PR #9707 <https://github.com/pantsbuild/pants/pull/9707>`_
+
+* Upgrade docutils from 0.14 to 0.16 (#9724)
+  `PR #9724 <https://github.com/pantsbuild/pants/pull/9724>`_
+
+* Upgrade responses. (#9712)
+  `PR #9712 <https://github.com/pantsbuild/pants/pull/9712>`_
+
+* Simplify the source roots mechanism. (#9709)
+  `PR #9709 <https://github.com/pantsbuild/pants/pull/9709>`_
+
+* Disable watchman by default. (#9714)
+  `PR #9714 <https://github.com/pantsbuild/pants/pull/9714>`_
+
+* Upgrade pyopenssl. (#9693)
+  `PR #9693 <https://github.com/pantsbuild/pants/pull/9693>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Configurable local execution root for v2. (#9716)
+  `PR #9716 <https://github.com/pantsbuild/pants/pull/9716>`_
+
+* Add V2 `dependees` goal (#9692)
+  `PR #9692 <https://github.com/pantsbuild/pants/pull/9692>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix `protobuf_library` to be parsable by V1 tasks (#9700)
+  `PR #9700 <https://github.com/pantsbuild/pants/pull/9700>`_
+
+* Remove deprecation warning from ivy_imports.py. (#9696)
+  `PR #9696 <https://github.com/pantsbuild/pants/pull/9696>`_
+
+* Fix `PYTHONPATH` comingling in sitepackages. (#9690)
+  `PR #9690 <https://github.com/pantsbuild/pants/pull/9690>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Add benchmark harness and improve performance of materialize_directory  (#9729)
+  `PR #9729 <https://github.com/pantsbuild/pants/pull/9729>`_
+
+* Reorganize some V2 goals into `pants.backend.pants_info` and `pants.backend.project_info` #9708
+  `PR #9708 <https://github.com/pantsbuild/pants/pull/9708>`_
+
+* Rename V2's `--test-run-coverage` to `--test-use-coverage` (#9723)
+  `PR #9723 <https://github.com/pantsbuild/pants/pull/9723>`_
+
+* Improve pytest output. (#9691)
+  `PR #9691 <https://github.com/pantsbuild/pants/pull/9691>`_
+
+* Fix up dependency features (#9721)
+  `PR #9721 <https://github.com/pantsbuild/pants/pull/9721>`_
+
+* Improve output of V2 `test` goal (#9718)
+  `PR #9718 <https://github.com/pantsbuild/pants/pull/9718>`_
+
+* Improve output of V2 `fmt` and `lint` goals (#9710)
+  `PR #9710 <https://github.com/pantsbuild/pants/pull/9710>`_
+
+* Fix brfs to cleanly unmount. (#9715)
+  `PR #9715 <https://github.com/pantsbuild/pants/pull/9715>`_
+
+* Pin down floaty lockfile. (#9713)
+  `PR #9713 <https://github.com/pantsbuild/pants/pull/9713>`_
+
+* Move file invalidation handling to rust (#9636)
+  `PR #9636 <https://github.com/pantsbuild/pants/pull/9636>`_
+
+* Avoid unnecessary `strip_source_roots.py` work when using a repo-level root (#9702)
+  `PR #9702 <https://github.com/pantsbuild/pants/pull/9702>`_
+
+* Optimize `strip_source_roots.py` when there is only 1 source root (#9705)
+  `PR #9705 <https://github.com/pantsbuild/pants/pull/9705>`_
+
+* Improve concurrency of V2 formatter and linter setup (#9701)
+  `PR #9701 <https://github.com/pantsbuild/pants/pull/9701>`_
+
+* Update tokio past 0.2.16. (#9703)
+  `PR #9703 <https://github.com/pantsbuild/pants/pull/9703>`_
+
+* Simplify v1 Go buildgen's use of source roots. (#9694)
+  `PR #9694 <https://github.com/pantsbuild/pants/pull/9694>`_
+
+* Switch DownloadedPexBin to use ExternalTool. (#9665)
+  `PR #9665 <https://github.com/pantsbuild/pants/pull/9665>`_
+
+* Fix V2 isort and Black including the tmpdir in their output (#9683)
+  `PR #9683 <https://github.com/pantsbuild/pants/pull/9683>`_
+
+* MyPy now checks partially_type_checked targets. (#9688)
+  `PR #9688 <https://github.com/pantsbuild/pants/pull/9688>`_
+
+* Fix Shellcheck lint. (#9689)
+  `PR #9689 <https://github.com/pantsbuild/pants/pull/9689>`_
+
+* Improve `Snapshot::merge` errors. (#9685)
+  `PR #9685 <https://github.com/pantsbuild/pants/pull/9685>`_
+
+* Clean up Executor::spawn APIs and docs to better align them with tokio 0.2. (#9684)
+  `PR #9684 <https://github.com/pantsbuild/pants/pull/9684>`_
+
+* pin AR=/usr/bin/ar on osx when building native_engine.so (#9662)
+  `PR #9662 <https://github.com/pantsbuild/pants/pull/9662>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Improve docs for Python target types (#9679)
+  `PR #9679 <https://github.com/pantsbuild/pants/pull/9679>`_
+
+* Prepare 1.27.0rc1 (#9717)
+  `PR #9717 <https://github.com/pantsbuild/pants/pull/9717>`_
+
 1.28.0.dev1 (5/1/2020)
------------------------
+----------------------
 
 API Changes
 ~~~~~~~~~~~
