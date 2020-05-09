@@ -3,7 +3,7 @@
 
 import json
 
-from pants.core.project_info import list_roots
+from pants.backend.project_info import list_roots
 from pants.engine.fs import Digest, PathGlobs, Snapshot
 from pants.source.source_root import SourceRoot, SourceRootConfig
 from pants.testutil.engine.util import MockGet, run_rule

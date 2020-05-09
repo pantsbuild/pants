@@ -3,7 +3,7 @@
 
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.backend.project_info.rules.dependencies import DependencyType
+from pants.backend.project_info.dependencies import DependencyType
 from pants.backend.project_info.tasks.dependencies import Dependencies
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary

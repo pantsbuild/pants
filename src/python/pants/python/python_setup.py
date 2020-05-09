@@ -22,8 +22,6 @@ class PythonSetup(Subsystem):
 
     options_scope = "python-setup"
 
-    _DEFAULT_MANYLINUX_UPPER_BOUND = "manylinux2014"
-
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
@@ -71,15 +69,6 @@ class PythonSetup(Subsystem):
             "If unspecified, a standard path under the workdir is used.",
         )
         register(
-            "--chroot-cache-dir",
-            advanced=True,
-            default=None,
-            metavar="<dir>",
-            removal_version="1.28.0.dev2",
-            removal_hint="This option is now unused, please remove configuration of it.",
-            help="DEPRECATED: This option is unused.",
-        )
-        register(
             "--resolver-cache-dir",
             advanced=True,
             default=None,
@@ -88,31 +77,12 @@ class PythonSetup(Subsystem):
             "If unspecified, a standard path under the workdir is used.",
         )
         register(
-            "--resolver-cache-ttl",
-            advanced=True,
-            type=int,
-            metavar="<seconds>",
-            default=10 * 365 * 86400,  # 10 years.
-            removal_version="1.28.0.dev2",
-            removal_hint="This option is now unused, please remove configuration of it.",
-            help="DEPRECATED: This option is unused.",
-        )
-        register(
             "--resolver-allow-prereleases",
             advanced=True,
             type=bool,
             default=UnsetBool,
             fingerprint=True,
             help="Whether to include pre-releases when resolving requirements.",
-        )
-        register(
-            "--artifact-cache-dir",
-            advanced=True,
-            default=None,
-            metavar="<dir>",
-            removal_version="1.28.0.dev2",
-            removal_hint="This option is now unused, please remove configuration of it.",
-            help="DEPRECATED: This option is unused.",
         )
         register(
             "--interpreter-search-paths",
@@ -128,21 +98,10 @@ class PythonSetup(Subsystem):
             '"<PYENV_LOCAL>" (the python version in BUILD_ROOT/.python-version).',
         )
         register(
-            "--resolver-use-manylinux",
-            advanced=True,
-            type=bool,
-            default=False,
-            fingerprint=True,
-            removal_version="1.28.0.dev2",
-            removal_hint="Use --resolver-manylinux=<manylinux spec upper bound> instead.",
-            help="Whether to consider manylinux wheels when resolving requirements for foreign"
-            "linux platforms.",
-        )
-        register(
             "--resolver-manylinux",
             advanced=True,
             type=str,
-            default=cls._DEFAULT_MANYLINUX_UPPER_BOUND,
+            default="manylinux2014",
             fingerprint=True,
             help="Whether to allow resolution of manylinux wheels when resolving requirements for "
             "foreign linux platforms. The value should be a manylinux platform upper bound, "
@@ -192,22 +151,10 @@ class PythonSetup(Subsystem):
 
     @property
     def manylinux(self):
-        if self.get_options().resolver_manylinux:
-            manylinux = self.get_options().resolver_manylinux
-            if manylinux.lower() in ("false", "no", "none"):
-                if self.get_options().resolver_use_manylinux:
-                    logger.warning(
-                        "The [{scope}] manylinux option is explicitly set to {manylinux} "
-                        "over-riding the [{scope}] use_manylinux option.".format(
-                            scope=self.options_scope, manylinux=manylinux
-                        )
-                    )
-                return None
-            return manylinux
-        elif self.get_options().resolver_use_manylinux:
-            return self._DEFAULT_MANYLINUX_UPPER_BOUND
-        else:
+        manylinux = self.get_options().resolver_manylinux
+        if manylinux is None or manylinux.lower() in ("false", "no", "none"):
             return None
+        return manylinux
 
     @property
     def resolver_jobs(self):

@@ -134,7 +134,7 @@ class ConsoleCoverageReport(CoverageReport):
 
     report: str
 
-    def materialize(self, console: Console, workspace: Workspace) -> Optional[PurePath]:
+    def materialize(self, console: Console, workspace: Workspace) -> None:
         console.print_stderr(f"\n{self.report}")
         return None
 
@@ -174,21 +174,25 @@ class TestOptions(GoalSubsystem):
             "--debug",
             type=bool,
             default=False,
-            help="Run a single test target in an interactive process. This is necessary, for "
-            "example, when you add breakpoints in your code.",
+            help=(
+                "Run a single test target in an interactive process. This is necessary, for "
+                "example, when you add breakpoints to your code."
+            ),
         )
         register(
-            "--run-coverage",
+            "--use-coverage",
             type=bool,
             default=False,
-            help="Generate a coverage report for this test run.",
+            help="Generate a coverage report if the test runner supports it.",
         )
         register(
             "--open-coverage",
             type=bool,
             default=False,
-            help="If a coverage report file is generated, open it on the local system if the "
-            "system supports this.",
+            help=(
+                "If a coverage report file is generated, open it on the local system if the "
+                "system supports this."
+            ),
         )
 
 
@@ -269,7 +273,7 @@ async def run_tests(
             continue
         workspace.materialize_directory(DirectoryToMaterialize(xml_results))
 
-    if options.values.run_coverage:
+    if options.values.use_coverage:
         all_coverage_data: Iterable[CoverageData] = [
             result.test_result.coverage_data
             for result in results

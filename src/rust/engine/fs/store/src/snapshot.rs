@@ -16,7 +16,7 @@ use indexmap::{self, IndexMap};
 use itertools::Itertools;
 use log;
 use protobuf;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::ffi::OsString;
 use std::fmt;
 use std::iter::Iterator;
@@ -302,102 +302,10 @@ impl Snapshot {
         file_nodes.into_iter().dedup().collect(),
       ));
 
-      // Ensure merge is unique and fail with debugging info if not.
-      let unique_count = out_dir
-        .get_files()
-        .iter()
-        .map(bazel_protos::remote_execution::FileNode::get_name)
-        .dedup()
-        .count();
-      if unique_count != out_dir.get_files().len() {
-        let file_nodes_by_name = out_dir
-          .get_files()
-          .iter()
-          .map(|file_node| (file_node.get_name(), file_node))
-          .into_group_map();
-        let (file_name, file_nodes) = file_nodes_by_name
-          .iter()
-          .find(|(_file_name, file_nodes)| file_nodes.len() > 1)
-          .expect("Should have found at least one duplicate file.");
-        let duplicate_details = future03::try_join_all(
-          file_nodes
-            .iter()
-            .enumerate()
-            .map(|(index, file_node)| {
-              let digest_proto = file_node.get_digest();
-              let header = format!(
-                "{}.) digest={} size={}:\n\n",
-                index + 1,
-                digest_proto.hash,
-                digest_proto.size_bytes
-              );
-
-              let maybe_digest: Result<hashing::Digest, String> = digest_proto.into();
-              match maybe_digest {
-                Err(err) => future03::err::<String, String>(format!(
-                  "{}Failed to convert digest proto {:?} into a hashing::Digest: {}",
-                  header, digest_proto, err
-                ))
-                .boxed(),
-                Ok(digest) => store
-                  .load_file_bytes_with(digest, |mut bytes| {
-                    const MAX_LENGTH: usize = 1024;
-                    let content_length = bytes.len();
-                    if content_length > MAX_LENGTH && !log_enabled!(log::Level::Debug) {
-                      bytes = bytes.slice_to(MAX_LENGTH);
-                      bytes.extend_from_slice(
-                        format!(
-                          "\n... TRUNCATED contents from {}B to {}B \
-                          (Pass -ldebug to see full contents).",
-                          content_length, MAX_LENGTH
-                        )
-                        .as_bytes(),
-                      );
-                    }
-                    String::from_utf8_lossy(bytes.to_vec().as_slice()).to_string()
-                  })
-                  .then(move |result| {
-                    let detail = result.map_or_else(
-                      |err| {
-                        format!(
-                          "{}Contents were not able to be loaded for comparison: {}",
-                          header, err
-                        )
-                      },
-                      |maybe_contents| {
-                        maybe_contents.map_or_else(
-                          || format!("{}Contents were not found for comparison.", header),
-                          |(contents, _metadata)| format!("{}{}", header, contents),
-                        )
-                      },
-                    );
-                    future03::ok::<String, String>(detail)
-                  })
-                  .boxed(),
-              }
-            })
-            .collect::<Vec<_>>(),
-        )
-        .await
-        .unwrap_or_else(|err| {
-          vec![format!(
-            "Failed to load file contents for comparison: {}",
-            err
-          )]
-        });
-
-        return Err(format!(
-          "Can only merge Directories with no duplicates, but found {} duplicate files for: {}\
-          \n\n{}",
-          file_nodes.len(),
-          parent_path.join(file_name).as_path().display(),
-          duplicate_details.join("\n\n")
-        ));
-      }
-
       // Group and recurse for DirectoryNodes.
       let child_directory_futures = {
         let store = store.clone();
+        let parent_path = parent_path.clone();
         let mut directories_to_merge = Iterator::flatten(
           directories
             .iter_mut()
@@ -432,9 +340,126 @@ impl Snapshot {
       let child_directories = future03::try_join_all(child_directory_futures).await?;
 
       out_dir.set_directories(protobuf::RepeatedField::from_vec(child_directories));
+
+      Self::error_for_collisions(&store, &parent_path, &out_dir).await?;
       store.record_directory(&out_dir, true).await
     }
     .boxed()
+  }
+
+  ///
+  /// Ensure merge is unique and fail with debugging info if not.
+  ///
+  async fn error_for_collisions(
+    store: &Store,
+    parent_path: &Path,
+    dir: &bazel_protos::remote_execution::Directory,
+  ) -> Result<(), String> {
+    // Attempt to cheaply check for collisions to bail out early if there aren't any.
+    let unique_count = dir
+      .get_files()
+      .iter()
+      .map(bazel_protos::remote_execution::FileNode::get_name)
+      .chain(
+        dir
+          .get_directories()
+          .iter()
+          .map(bazel_protos::remote_execution::DirectoryNode::get_name),
+      )
+      .collect::<HashSet<_>>()
+      .len();
+    if unique_count == (dir.get_files().len() + dir.get_directories().len()) {
+      return Ok(());
+    }
+
+    let file_details_by_name = dir
+      .get_files()
+      .iter()
+      .map(|file_node| async move {
+        let digest_proto = file_node.get_digest();
+        let header = format!(
+          "file digest={} size={}:\n\n",
+          digest_proto.hash, digest_proto.size_bytes
+        );
+
+        let digest_res: Result<hashing::Digest, String> = digest_proto.into();
+        let contents = store
+          .load_file_bytes_with(digest_res?, |mut bytes| {
+            const MAX_LENGTH: usize = 1024;
+            let content_length = bytes.len();
+            if content_length > MAX_LENGTH && !log_enabled!(log::Level::Debug) {
+              bytes = bytes.slice_to(MAX_LENGTH);
+              bytes.extend_from_slice(
+                format!(
+                  "\n... TRUNCATED contents from {}B to {}B \
+                  (Pass -ldebug to see full contents).",
+                  content_length, MAX_LENGTH
+                )
+                .as_bytes(),
+              );
+            }
+            String::from_utf8_lossy(bytes.to_vec().as_slice()).to_string()
+          })
+          .await?
+          .map(|(content, _metadata)| content)
+          .unwrap_or_else(|| "<could not load contents>".to_string());
+        let detail = format!("{}{}", header, contents);
+        let res: Result<_, String> = Ok((file_node.get_name(), detail));
+        res
+      })
+      .map(|f| f.boxed());
+    let dir_details_by_name = dir
+      .get_directories()
+      .iter()
+      .map(|dir_node| async move {
+        let digest_proto = dir_node.get_digest();
+        let detail = format!(
+          "dir digest={} size={}:\n\n",
+          digest_proto.hash, digest_proto.size_bytes
+        );
+        let res: Result<_, String> = Ok((dir_node.get_name(), detail));
+        res
+      })
+      .map(|f| f.boxed());
+
+    let duplicate_details = async move {
+      let details_by_name = future03::try_join_all(
+        file_details_by_name
+          .chain(dir_details_by_name)
+          .collect::<Vec<_>>(),
+      )
+      .await?
+      .into_iter()
+      .into_group_map();
+
+      let enumerated_details =
+        std::iter::Iterator::flatten(details_by_name.iter().filter_map(|(name, details)| {
+          if details.len() > 1 {
+            Some(
+              details
+                .iter()
+                .enumerate()
+                .map(move |(index, detail)| format!("`{}`: {}.) {}", name, index + 1, detail)),
+            )
+          } else {
+            None
+          }
+        }))
+        .collect();
+
+      let res: Result<Vec<String>, String> = Ok(enumerated_details);
+      res
+    }
+    .await
+    .unwrap_or_else(|err| vec![format!("Failed to load contents for comparison: {}", err)]);
+
+    Err(format!(
+      "Can only merge Directories with no duplicates, but found {} duplicate entries in {}:\
+      \n\n{}",
+      duplicate_details.len(),
+      parent_path.display(),
+      duplicate_details.join("\n\n")
+    ))
   }
 
   pub async fn add_prefix(store: Store, digest: Digest, prefix: PathBuf) -> Result<Digest, String> {

@@ -54,6 +54,10 @@ impl ByteStore {
     })
   }
 
+  pub fn executor(&self) -> &task_executor::Executor {
+    &self.inner.executor
+  }
+
   // Note: This performs IO on the calling thread. Hopefully the IO is small enough not to matter.
   pub fn entry_type(&self, fingerprint: &Fingerprint) -> Result<Option<EntryType>, String> {
     if *fingerprint == EMPTY_DIGEST.0 {
