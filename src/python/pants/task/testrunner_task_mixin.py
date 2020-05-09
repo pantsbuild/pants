@@ -406,11 +406,10 @@ class TestRunnerTaskMixin:
         raise NotImplementedError
 
 
-class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
-    """A mixin for test tasks that support running tests over both individual targets and batches.
+class ChrootedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
+    """A mixin for test tasks that support running tests in chroots.
 
-    Provides support for partitioning via `--fast` (batches) and `--no-fast` (per target) options and
-    helps ensure correct caching behavior in either mode.
+    Provides support for testing (per target) options and helps ensure correct caching behavior.
 
     It's expected that mixees implement proper chrooting (see `run_tests_in_chroot`) to support
     correct successful test result caching.
@@ -438,6 +437,8 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
         return VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
 
     def check_artifact_cache_for(self, invalidation_check):
+        # TODO(https://github.com/pantsbuild/pants/issues/9734): Remove this override and leverage
+        #  default target level caching suport now that the --fast option is removed.
         # Tests generate artifacts, namely junit.xml and coverage reports, that cover the full target
         # set whether that is all targets in the context (`--fast`) or each target individually
         # (`--no-fast`).
@@ -531,6 +532,9 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
                 # A low-level test execution failure occurred before tests were run.
                 raise TaskError()
 
+    # TODO(https://github.com/pantsbuild/pants/issues/9734): Simplify this method and mixin as a
+    #  whole now that targets are always tested individually and there are no longer ever
+    #  multi-target partitions now that the --fast option is removed.
     # Some notes on invalidation vs caching as used in `run_partition` below. Here invalidation
     # refers to executing task work in `Task.invalidated` blocks against invalid targets. Caching
     # refers to storing the results of that work in the artifact cache using

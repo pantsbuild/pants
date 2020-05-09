@@ -23,7 +23,7 @@ from pants.build_graph.target_scopes import Scopes
 from pants.java.executor import SubprocessExecutor
 from pants.java.junit.junit_xml_parser import RegistryOfTests, Test, parse_failed_targets
 from pants.process.lock import OwnerPrintingInterProcessFileLock
-from pants.task.testrunner_task_mixin import PartitionedTestRunnerTaskMixin, TestResult
+from pants.task.testrunner_task_mixin import ChrootedTestRunnerTaskMixin, TestResult
 from pants.util import desktop
 from pants.util.argutil import ensure_arg, remove_arg
 from pants.util.contextutil import environment_as
@@ -33,7 +33,7 @@ from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import pluralize
 
 
-class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
+class JUnitRun(ChrootedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     """
     :API: public
     """

@@ -28,7 +28,7 @@ from pants.base.hash_utils import Sharder
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.target import Target
 from pants.task.task import Task
-from pants.task.testrunner_task_mixin import PartitionedTestRunnerTaskMixin, TestResult
+from pants.task.testrunner_task_mixin import ChrootedTestRunnerTaskMixin, TestResult
 from pants.util.contextutil import environment_as, pushd, temporary_dir, temporary_file
 from pants.util.dirutil import mergetree, safe_mkdir, safe_mkdir_for
 from pants.util.memo import memoized_method, memoized_property
@@ -91,7 +91,7 @@ class PytestResult(TestResult):
         return 0 if value in cls._SUCCESS_EXIT_CODES else value
 
 
-class PytestRun(PartitionedTestRunnerTaskMixin, Task):
+class PytestRun(ChrootedTestRunnerTaskMixin, Task):
     @classmethod
     def implementation_version(cls):
         return super().implementation_version() + [("PytestRun", 3)]
