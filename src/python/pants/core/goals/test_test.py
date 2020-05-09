@@ -2,16 +2,17 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from abc import ABCMeta, abstractmethod
-from pathlib import PurePath
+from dataclasses import dataclass
 from textwrap import dedent
 from typing import List, Optional, Tuple, Type, cast
 
 from pants.base.specs import SingleAddress
 from pants.core.goals.test import (
     AddressAndTestResult,
+    ConsoleCoverageReport,
+    CoverageData,
     CoverageDataCollection,
     CoverageReport,
-    FilesystemCoverageReport,
     Status,
     Test,
     TestDebugRequest,
@@ -26,7 +27,7 @@ from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSourcesRequest,
 )
 from pants.engine.addresses import Address
-from pants.engine.fs import EMPTY_DIGEST, Digest, FileContent, InputFilesContent, Workspace
+from pants.engine.fs import Digest, FileContent, InputFilesContent, Workspace
 from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
 from pants.engine.target import (
     Sources,
@@ -43,6 +44,15 @@ from pants.testutil.test_base import TestBase
 class MockTarget(Target):
     alias = "mock_target"
     core_fields = (Sources,)
+
+
+@dataclass(frozen=True)
+class MockCoverageData(CoverageData):
+    address: Address
+
+
+class MockCoverageDataCollection(CoverageDataCollection):
+    element_type = MockCoverageData
 
 
 class MockTestFieldSet(TestFieldSet, metaclass=ABCMeta):
@@ -67,7 +77,7 @@ class MockTestFieldSet(TestFieldSet, metaclass=ABCMeta):
             status=self.status(self.address),
             stdout=self.stdout(self.address),
             stderr=self.stderr(self.address),
-            coverage_data=None,
+            coverage_data=MockCoverageData(self.address),
             xml_results=None,
         )
 
@@ -129,14 +139,17 @@ class TestTest(TestBase):
         field_set: Type[TestFieldSet],
         targets: List[TargetWithOrigin],
         debug: bool = False,
+        use_coverage: bool = False,
         include_sources: bool = True,
         valid_targets: bool = True,
     ) -> Tuple[int, str]:
         console = MockConsole(use_colors=False)
-        options = create_goal_subsystem(TestOptions, debug=debug, run_coverage=False)
+        options = create_goal_subsystem(TestOptions, debug=debug, use_coverage=use_coverage)
         interactive_runner = InteractiveRunner(self.scheduler)
         workspace = Workspace(self.scheduler)
-        union_membership = UnionMembership({TestFieldSet: [field_set]})
+        union_membership = UnionMembership(
+            {TestFieldSet: [field_set], CoverageDataCollection: [MockCoverageDataCollection]}
+        )
 
         def mock_find_valid_field_sets(
             _: TargetsToValidFieldSetsRequest,
@@ -157,6 +170,14 @@ class TestTest(TestBase):
             return AddressAndTestResult(
                 address=field_set.address, test_result=field_set.test_result
             )
+
+        def mock_coverage_report_generation(
+            coverage_data_collection: MockCoverageDataCollection,
+        ) -> CoverageReport:
+            addresses = ", ".join(
+                coverage_data.address.spec for coverage_data in coverage_data_collection
+            )
+            return ConsoleCoverageReport(f"Ran coverage on {addresses}")
 
         result: Test = run_rule(
             run_tests,
@@ -187,11 +208,7 @@ class TestTest(TestBase):
                 MockGet(
                     product_type=CoverageReport,
                     subject_type=CoverageDataCollection,
-                    mock=lambda _: FilesystemCoverageReport(
-                        result_digest=EMPTY_DIGEST,
-                        directory_to_materialize_to=PurePath("mockety/mock"),
-                        report_file=None,
-                    ),
+                    mock=mock_coverage_report_generation,
                 ),
             ],
             union_membership=union_membership,
@@ -257,7 +274,18 @@ class TestTest(TestBase):
         )
 
     def test_debug_target(self) -> None:
-        exit_code, stdout = self.run_test_rule(
+        exit_code, _ = self.run_test_rule(
             field_set=SuccessfulFieldSet, targets=[self.make_target_with_origin()], debug=True,
         )
         assert exit_code == 0
+
+    def test_coverage(self) -> None:
+        addr1 = Address.parse(":t1")
+        addr2 = Address.parse(":t2")
+        exit_code, stderr = self.run_test_rule(
+            field_set=SuccessfulFieldSet,
+            targets=[self.make_target_with_origin(addr1), self.make_target_with_origin(addr2)],
+            use_coverage=True,
+        )
+        assert exit_code == 0
+        assert stderr.strip().endswith(f"Ran coverage on {addr1.spec}, {addr2.spec}")
