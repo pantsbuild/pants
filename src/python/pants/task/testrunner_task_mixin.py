@@ -424,23 +424,6 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
         # https://github.com/pantsbuild/pants/issues/5073
 
         register(
-            "--fast",
-            type=bool,
-            default=False,
-            fingerprint=True,
-            removal_version="1.28.0.dev2",
-            removal_hint=(
-                "This option is going away for better isolation of tests, which provides "
-                "better caching. This also prepares for upgrading to the V2 test implementation,"
-                "which provides even better caching and parallelism.\n\nWe recommend running a "
-                "full CI suite with `no-fast` (the default now) to see if any tests fail. If any "
-                "fail, this likely signals shared state between your test targets."
-            ),
-            help="Run all tests in a single invocation. If turned off, each test target "
-            "will run in its own invocation, which will be slower, but isolates "
-            "tests from process-wide state created by tests in other targets.",
-        )
-        register(
             "--chroot",
             advanced=True,
             fingerprint=True,
@@ -501,13 +484,13 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
 
         self.context.release_lock()
 
-        per_target = not self.get_options().fast
         fail_fast = self.get_options().fail_fast
 
         results = {}
         failure = False
-        with self.partitions(per_target, all_targets, test_targets) as partitions:
-            for (partition, args) in partitions():
+        with self.tests(all_targets=all_targets, test_targets=test_targets) as tests:
+            for (test_target, args) in tests():
+                partition = (test_target,)
                 try:
                     rv = self._run_partition(fail_fast, partition, *args)
                 except ErrorWhileTesting as e:
@@ -645,14 +628,14 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
         return None
 
     @abstractmethod
-    def partitions(self, per_target, all_targets, test_targets):
-        """Return a context manager that can be called to iterate of target partitions.
+    def tests(self, all_targets, test_targets):
+        """Return a context manager that can be called to iterate over tests.
 
-        The iterator should return a 2-tuple with the partitions targets in the first slot and a tuple
-        of extra arguments needed to `run_tests` and `collect_files`.
+        The iterator should return a 2-tuple with the test target in the first slot and a tuple of
+        extra arguments needed to `run_tests` and `collect_files`.
 
         :rtype: A context manager that is callable with no arguments; returning an iterator over
-                (partition, tuple(args))
+                (test target, tuple(args))
         """
 
     @abstractmethod
