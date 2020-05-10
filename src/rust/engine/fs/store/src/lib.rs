@@ -679,13 +679,40 @@ impl Store {
     digest: Digest,
   ) -> BoxFuture<DirectoryMaterializeMetadata, String> {
     let root = Arc::new(Mutex::new(None));
+    let executor = self.local.executor().clone();
     self
       .materialize_directory_helper(
-        destination,
+        destination.clone(),
         RootOrParentMetadataBuilder::Root(root.clone()),
         digest,
       )
-      .map(|()| Arc::try_unwrap(root).unwrap().into_inner().unwrap().build())
+      .and_then(move |()| {
+        let dmm = Arc::try_unwrap(root).unwrap().into_inner().unwrap().build();
+        // We fundamentally materialize files for other processes to read; as such, we must ensure
+        // data is flushed to disk and visible to them as opposed to just our process. Even though
+        // we need to re-open all written files, executing all fsyncs at the end of the
+        // materialize call is significantly faster than doing it as we go.
+        future::join_all(
+          dmm
+            .to_path_list()
+            .into_iter()
+            .map(|path| {
+              let path = destination.join(path);
+              executor
+                .spawn_blocking(move || {
+                  OpenOptions::new()
+                    .write(true)
+                    .create(false)
+                    .open(path)?
+                    .sync_all()
+                })
+                .compat()
+            })
+            .collect::<Vec<_>>(),
+        )
+        .map_err(|e| format!("Failed to fsync directory contents: {}", e))
+        .map(move |_| dmm)
+      })
       .to_boxed()
   }
 
@@ -804,13 +831,7 @@ impl Store {
               .mode(if is_executable { 0o755 } else { 0o644 })
               .open(&destination)
           })
-          .and_then(|mut f| {
-            f.write_all(&bytes)?;
-            // See `materialize_directory`, but we fundamentally materialize files for other
-            // processes to read; as such, we must ensure data is flushed to disk and visible
-            // to them as opposed to just our process.
-            f.sync_all()
-          })
+          .and_then(|mut f| f.write_all(&bytes))
           .map_err(|e| format!("Error writing file {:?}: {:?}", destination, e))
         })
         .await?;
