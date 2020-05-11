@@ -1063,7 +1063,8 @@ impl Node for NodeKey {
     let mut workunit_state = workunit_store::expect_workunit_state();
 
     let started_workunit_id = {
-      let display = context.session.should_handle_workunits() && self.user_facing_name().is_some();
+      let display = context.session.should_handle_workunits()
+        && (self.user_facing_name().is_some() || self.display_info().is_some());
       let name = self.canonical_name();
       let span_id = new_span_id();
 
