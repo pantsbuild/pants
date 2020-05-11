@@ -11,7 +11,6 @@ use std::time::{Duration, Instant};
 use futures::compat::Future01CompatExt;
 use futures::future;
 
-use crate::console_ui::ConsoleUI;
 use crate::context::{Context, Core};
 use crate::core::{Failure, Params, TypeId, Value};
 use crate::nodes::{NodeKey, Select, Tracer, Visualizer};
@@ -21,6 +20,7 @@ use hashing;
 use log::{debug, info, warn};
 use parking_lot::Mutex;
 use task_executor::Executor;
+use ui::ConsoleUI;
 use uuid::Uuid;
 use watch::Invalidatable;
 use workunit_store::WorkUnitStore;
