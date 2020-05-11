@@ -1,0 +1,198 @@
+// Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::time::Duration;
+
+use futures::future::{self, FutureExt, TryFutureExt};
+use indexmap::IndexMap;
+use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle};
+use uuid::Uuid;
+
+use logging::logger::{StdioHandler, LOGGER};
+use task_executor::Executor;
+use workunit_store::WorkUnitStore;
+
+pub struct ConsoleUI {
+  workunit_store: WorkUnitStore,
+  // While the UI is running, there will be an Instance present.
+  instance: Option<Instance>,
+}
+
+impl ConsoleUI {
+  pub fn new(workunit_store: WorkUnitStore) -> ConsoleUI {
+    ConsoleUI {
+      workunit_store,
+      instance: None,
+    }
+  }
+
+  fn default_draw_target() -> ProgressDrawTarget {
+    // NB: We render more frequently than we receive new data in order to minimize aliasing where a
+    // render might barely miss a data refresh.
+    ProgressDrawTarget::stderr_with_hz(Self::render_rate_hz() * 2)
+  }
+
+  ///
+  /// The number of times per-second that `Self::render` should be called.
+  ///
+  pub fn render_rate_hz() -> u64 {
+    10
+  }
+
+  pub fn write_stdout(&self, msg: &str) {
+    print!("{}", msg);
+  }
+
+  pub fn write_stderr(&self, msg: &str) {
+    if let Some(instance) = &self.instance {
+      instance.bars[0].println(msg);
+    } else {
+      eprintln!("{}", msg);
+    }
+  }
+
+  pub fn with_console_ui_disabled<F: FnOnce() -> T, T>(&self, f: F) -> T {
+    if let Some(instance) = &self.instance {
+      instance
+        .multi_progress
+        .set_draw_target(ProgressDrawTarget::hidden());
+      let res = f();
+      instance
+        .multi_progress
+        .set_draw_target(Self::default_draw_target());
+      res
+    } else {
+      f()
+    }
+  }
+
+  fn setup_bars(num_swimlanes: usize) -> (MultiProgress, Vec<ProgressBar>) {
+    let multi_progress_bars = MultiProgress::with_draw_target(Self::default_draw_target());
+
+    let bars = (0..num_swimlanes)
+      .map(|_n| {
+        let style = ProgressStyle::default_bar().template("{spinner} {wide_msg}");
+        multi_progress_bars.add(ProgressBar::new(50).with_style(style))
+      })
+      .collect();
+
+    (multi_progress_bars, bars)
+  }
+
+  fn get_label_from_heavy_hitters<'a>(
+    tasks_to_display: impl Iterator<Item = (&'a String, &'a Option<Duration>)>,
+  ) -> Vec<String> {
+    tasks_to_display
+      .map(|(label, maybe_duration)| {
+        let duration_label = match maybe_duration {
+          None => "(Waiting) ".to_string(),
+          Some(duration) => {
+            let duration_secs: f64 = (duration.as_millis() as f64) / 1000.0;
+            format!("{:.2}s ", duration_secs)
+          }
+        };
+        format!("{}{}", duration_label, label)
+      })
+      .collect()
+  }
+
+  ///
+  /// Updates all of the swimlane ProgressBars with new data from the WorkUnitStore. For this
+  /// method to have any effect, the `initialize` method must have been called first.
+  ///
+  /// *Technically this method does not do the "render"ing: rather, the `MultiProgress` instance
+  /// running on a background thread is drives rendering, while this method feeds it new data.
+  ///
+  pub fn render(&mut self) {
+    let instance = if let Some(i) = &mut self.instance {
+      i
+    } else {
+      return;
+    };
+
+    let num_swimlanes = instance.bars.len();
+    let heavy_hitters = self.workunit_store.heavy_hitters(num_swimlanes);
+    let tasks_to_display = &mut instance.tasks_to_display;
+
+    // Insert every one in the set of tasks to display.
+    // For tasks already here, the durations are overwritten.
+    tasks_to_display.extend(heavy_hitters.clone().into_iter());
+
+    // And remove the tasks that no longer should be there.
+    for (task, _) in tasks_to_display.clone().into_iter() {
+      if !heavy_hitters.contains_key(&task) {
+        tasks_to_display.swap_remove(&task);
+      }
+    }
+
+    let swimlane_labels: Vec<String> = Self::get_label_from_heavy_hitters(tasks_to_display.iter());
+    for (n, pbar) in instance.bars.iter().enumerate() {
+      match swimlane_labels.get(n) {
+        Some(label) => pbar.set_message(label),
+        None => pbar.set_message(""),
+      }
+    }
+  }
+
+  ///
+  /// If the ConsoleUI is not already running, starts it.
+  ///
+  /// Errors if a ConsoleUI is already running (which would likely indicate concurrent usage of a
+  /// Session attached to a console).
+  ///
+  pub fn initialize(
+    &mut self,
+    executor: Executor,
+    stderr_handler: StdioHandler,
+  ) -> Result<(), String> {
+    if self.instance.is_some() {
+      return Err("A ConsoleUI cannot render multiple UIs concurrently.".to_string());
+    }
+
+    // Setup bars, and then spawning rendering of the bars into a background task.
+    let (multi_progress, bars) = Self::setup_bars(num_cpus::get());
+    let multi_progress = Arc::new(multi_progress);
+    let multi_progress_task = {
+      let multi_progress = multi_progress.clone();
+      executor
+        .spawn_blocking(move || multi_progress.join())
+        .boxed()
+    };
+
+    self.instance = Some(Instance {
+      tasks_to_display: IndexMap::new(),
+      logger_handle: LOGGER.register_stderr_handler(stderr_handler),
+      multi_progress,
+      multi_progress_task,
+      bars,
+    });
+    Ok(())
+  }
+
+  ///
+  /// If the ConsoleUI is running, completes it.
+  ///
+  pub fn teardown(&mut self) -> impl Future<Output = Result<(), String>> {
+    if let Some(instance) = self.instance.take() {
+      LOGGER.deregister_stderr_handler(instance.logger_handle);
+      instance
+        .multi_progress_task
+        .map_err(|e| format!("Failed to render UI: {}", e))
+        .boxed()
+    } else {
+      future::ok(()).boxed()
+    }
+  }
+}
+
+/// The state for one run of the ConsoleUI.
+struct Instance {
+  tasks_to_display: IndexMap<String, Option<Duration>>,
+  multi_progress: Arc<MultiProgress>,
+  multi_progress_task: Pin<Box<dyn Future<Output = std::io::Result<()>> + Send>>,
+  bars: Vec<ProgressBar>,
+  logger_handle: Uuid,
+}

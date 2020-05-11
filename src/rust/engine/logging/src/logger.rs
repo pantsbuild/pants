@@ -12,7 +12,6 @@ use std::future::Future;
 use std::io::{stderr, Stderr, Write};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 
 use chrono;
 use lazy_static::lazy_static;
@@ -20,10 +19,11 @@ use log::{log, set_logger, set_max_level, LevelFilter, Log, Metadata, Record};
 use parking_lot::Mutex;
 use simplelog::{ConfigBuilder, LevelPadding, WriteLogger};
 use tokio::task_local;
-use ui::EngineDisplay;
 use uuid::Uuid;
 
 const TIME_FORMAT_STR: &str = "%H:%M:%S:%3f";
+
+pub type StdioHandler = Box<dyn Fn(&str) -> () + Send>;
 
 lazy_static! {
   pub static ref LOGGER: Logger = Logger::new();
@@ -33,7 +33,7 @@ pub struct Logger {
   pantsd_log: Mutex<MaybeWriteLogger<File>>,
   stderr_log: Mutex<MaybeWriteLogger<Stderr>>,
   show_rust_3rdparty_logs: AtomicBool,
-  engine_display_handles: Mutex<HashMap<Uuid, Arc<Mutex<EngineDisplay>>>>,
+  stderr_handlers: Mutex<HashMap<Uuid, StdioHandler>>,
 }
 
 impl Logger {
@@ -42,7 +42,7 @@ impl Logger {
       pantsd_log: Mutex::new(MaybeWriteLogger::empty()),
       stderr_log: Mutex::new(MaybeWriteLogger::empty()),
       show_rust_3rdparty_logs: AtomicBool::new(true),
-      engine_display_handles: Mutex::new(HashMap::new()),
+      stderr_handlers: Mutex::new(HashMap::new()),
     }
   }
 
@@ -131,16 +131,16 @@ impl Logger {
       })
   }
 
-  pub fn register_engine_display(&self, engine_display: Arc<Mutex<EngineDisplay>>) -> Uuid {
-    let mut handle = self.engine_display_handles.lock();
+  pub fn register_stderr_handler(&self, callback: StdioHandler) -> Uuid {
+    let mut handlers = self.stderr_handlers.lock();
     let unique_id = Uuid::new_v4();
-    handle.insert(unique_id, engine_display);
+    handlers.insert(unique_id, callback);
     unique_id
   }
 
-  pub fn deregister_engine_display(&self, unique_id: Uuid) {
-    let mut handle = self.engine_display_handles.lock();
-    handle.remove(&unique_id);
+  pub fn deregister_stderr_handler(&self, unique_id: Uuid) {
+    let mut handlers = self.stderr_handlers.lock();
+    handlers.remove(&unique_id);
   }
 }
 
@@ -156,15 +156,16 @@ impl Log for Logger {
     let destination = get_destination();
     match destination {
       Destination::Stderr => {
-        let mut handles_map = self.engine_display_handles.lock();
-        for handle in handles_map.values_mut() {
-          let cur_time = chrono::Utc::now().format(TIME_FORMAT_STR);
-          let level = record.level();
-          let log_string: String = format!("{} [{}] {}", cur_time, level, record.args());
-          let mut display_engine = handle.lock();
-          display_engine.log(log_string);
+        let cur_time = chrono::Utc::now().format(TIME_FORMAT_STR);
+        let level = record.level();
+        let log_string: String = format!("{} [{}] {}", cur_time, level, record.args());
+
+        {
+          let handlers_map = self.stderr_handlers.lock();
+          for callback in handlers_map.values() {
+            callback(&log_string);
+          }
         }
-        self.stderr_log.lock().log(record)
       }
       Destination::Pantsd => self.pantsd_log.lock().log(record),
     }

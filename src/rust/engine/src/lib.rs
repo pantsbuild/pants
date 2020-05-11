@@ -30,6 +30,7 @@
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 #![type_length_limit = "42187898"]
 
+mod console_ui;
 mod context;
 mod core;
 pub mod externs;
