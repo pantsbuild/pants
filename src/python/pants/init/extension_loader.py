@@ -255,7 +255,9 @@ def load_build_configuration_from_source(
     for backend_package in backend_packages1:
         load_backend(build_configuration, backend_package, is_v1_backend=True)
 
-    backend_packages2 = FrozenOrderedSet(["pants.core", *backends2])
+    backend_packages2 = FrozenOrderedSet(
+        ["pants.core", "pants.backend.pants_info", "pants.backend.project_info", *backends2]
+    )
     for backend_package in backend_packages2:
         load_backend(build_configuration, backend_package, is_v1_backend=False)
 

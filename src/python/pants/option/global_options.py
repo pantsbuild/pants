@@ -314,7 +314,7 @@ class GlobalOptions(Subsystem):
             "--backend-packages2",
             advanced=True,
             type=list,
-            default=["pants.backend.pants_info", "pants.backend.project_info"],
+            default=[],
             help=(
                 "Register v2 rules from these backends. The backend packages must be present on "
                 "the PYTHONPATH, typically because they are in the Pants core dist, in a "
