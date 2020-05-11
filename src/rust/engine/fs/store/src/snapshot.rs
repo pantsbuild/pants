@@ -4,6 +4,7 @@
 use crate::Store;
 use bazel_protos;
 use boxfuture::{BoxFuture, Boxable};
+use bytes::Bytes;
 use fs::{
   Dir, File, GitignoreStyleExcludes, GlobMatching, PathStat, PosixFS, PreparedPathGlobs,
   SymlinkBehavior,
@@ -384,11 +385,11 @@ impl Snapshot {
 
         let digest_res: Result<hashing::Digest, String> = digest_proto.into();
         let contents = store
-          .load_file_bytes_with(digest_res?, |mut bytes| {
+          .load_file_bytes_with(digest_res?, |bytes| {
             const MAX_LENGTH: usize = 1024;
             let content_length = bytes.len();
+            let mut bytes = Bytes::from(&bytes[0..std::cmp::min(content_length, MAX_LENGTH)]);
             if content_length > MAX_LENGTH && !log_enabled!(log::Level::Debug) {
-              bytes = bytes.slice_to(MAX_LENGTH);
               bytes.extend_from_slice(
                 format!(
                   "\n... TRUNCATED contents from {}B to {}B \
