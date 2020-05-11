@@ -9,7 +9,7 @@ import time
 import traceback
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple, Type, Union, cast
+from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Tuple, Type, Union, cast
 
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE

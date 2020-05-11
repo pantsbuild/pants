@@ -190,12 +190,6 @@ class PantsDaemon(FingerprintedProcessManager):
                 bootstrap_options=bootstrap_options,
             )
 
-        @classmethod
-        def absolute_pidfile(cls):
-            return PantsDaemon.metadata_file_path(
-                "pantsd", "pid", bootstrap_options.pants_subprocessdir
-            )
-
         @staticmethod
         def _setup_services(
             build_root,

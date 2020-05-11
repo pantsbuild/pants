@@ -10,11 +10,11 @@ from typing import Tuple
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.python.subsystems.executable_pex_tool import ExecutablePexTool
-from pants.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.base.exceptions import IncompatiblePlatformsError
 from pants.engine.rules import rule, subsystem_rule
 from pants.python import pex_build_util
+from pants.python.python_requirement import PythonRequirement
 from pants.python.python_setup import PythonSetup
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
