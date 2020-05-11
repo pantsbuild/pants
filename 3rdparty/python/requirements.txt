@@ -25,7 +25,7 @@ parameterized==0.6.1
 pathspec==0.8.0
 pex==2.1.9
 psutil==5.6.3
-Pygments==2.3.1
+Pygments==2.6.1
 pyopenssl==19.1.0
 pystache==0.5.3
 python-Levenshtein==0.12.0
