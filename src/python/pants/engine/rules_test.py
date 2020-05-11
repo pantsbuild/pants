@@ -401,10 +401,10 @@ class RuleGraphTest(TestBase):
 
     def test_ruleset_with_missing_product_type(self):
         @rule
-        def a_from_b_noop(b: B) -> A:
+        def a_from_b(b: B) -> A:
             pass
 
-        rules = _suba_root_rules + [a_from_b_noop]
+        rules = [RootRule(SubA), a_from_b]
 
         with self.assertRaises(Exception) as cm:
             create_scheduler(rules)
@@ -413,7 +413,8 @@ class RuleGraphTest(TestBase):
             dedent(
                 f"""\
                 Rules with errors: 1
-                  {fmt_rule(a_from_b_noop)}:
+
+                  {fmt_rule(a_from_b)}:
                     No rule was available to compute B with parameter type SubA
                 """
             ).strip(),
@@ -449,10 +450,13 @@ class RuleGraphTest(TestBase):
             dedent(
                 f"""\
                 Rules with errors: 3
+
                   {fmt_rule(a_from_b_and_c)}:
                     Was not reachable, either because no rules could produce the params or because it was shadowed by another @rule.
+
                   {fmt_rule(a_from_c_and_b)}:
                     Was not reachable, either because no rules could produce the params or because it was shadowed by another @rule.
+
                   {fmt_rule(d_from_a)}:
                     Ambiguous rules to compute A with parameter types (B, C):
                       {fmt_graph_rule(a_from_b_and_c)}
@@ -477,6 +481,7 @@ class RuleGraphTest(TestBase):
             dedent(
                 f"""\
                 Rules with errors: 1
+
                   {fmt_rule(a_from_b_and_c)}:
                     No rule was available to compute B with parameter type SubA
                     No rule was available to compute C with parameter type SubA
@@ -514,8 +519,10 @@ class RuleGraphTest(TestBase):
             dedent(
                 f"""\
                 Rules with errors: 2
+
                   {fmt_rule(a_from_b)}:
                     No rule was available to compute B with parameter type C
+
                   {fmt_rule(b_from_suba)}:
                     No rule was available to compute SubA with parameter type C
                 """
@@ -546,6 +553,7 @@ class RuleGraphTest(TestBase):
             dedent(
                 f"""\
                 Rules with errors: 1
+
                   {fmt_rule(d_from_c)}:
                     No rule was available to compute C with parameter type A
                 """
@@ -583,11 +591,14 @@ class RuleGraphTest(TestBase):
             dedent(
                 f"""\
                 Rules with errors: 3
+
                   {fmt_rule(a_from_c)}:
                     Was not reachable, either because no rules could produce the params or because it was shadowed by another @rule.
                   {fmt_rule(b_from_d)}:
+
                     No rule was available to compute D with parameter type SubA
                   {fmt_rule(d_from_a_and_suba, gets=[("A", "C")])}:
+
                     No rule was available to compute A with parameter type SubA
                 """
             ).strip(),
@@ -618,6 +629,7 @@ class RuleGraphTest(TestBase):
             dedent(
                 f"""\
                 Rules with errors: 1
+
                   {fmt_rule(d_for_b)}:
                     Was not reachable, either because no rules could produce the params or because it was shadowed by another @rule.
                 """
