@@ -19,15 +19,25 @@ from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get
 from pants.python.python_setup import PythonSetup
 
+_PEX_VERSION = "2.1.10"
+
 
 class PexBin(ExternalTool):
+
     options_scope = "download-pex-bin"
     name = "pex"
-    default_version = "v2.1.10"
+    default_version = f"v{_PEX_VERSION}"
     default_known_versions = [
-        f"v2.1.10|{plat}|a9b5eb55ec4d7babc11279fc070c066565915c8b8a7b009a4eaceb41149a5f03|2631051"
+        (
+            f"v{_PEX_VERSION}|{plat}|"
+            "a9b5eb55ec4d7babc11279fc070c066565915c8b8a7b009a4eaceb41149a5f03|2631051"
+        )
         for plat in ["darwin", "linux"]
     ]
+
+    @property
+    def requirement(self) -> str:
+        return f"pex=={self.options.version}"
 
     def generate_url(self, plat: Platform) -> str:
         return f"https://github.com/pantsbuild/pex/releases/download/{self.options.version}/pex"

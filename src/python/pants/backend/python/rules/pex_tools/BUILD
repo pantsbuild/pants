@@ -2,6 +2,18 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
+  name='pex_tool',
+  sources=[
+    'pex_tool.py',
+  ],
+  dependencies=[
+    '3rdparty/python:setuptools',
+    'src/python/pants/engine:fs',
+  ],
+  tags = {'type_checked'},
+)
+
+python_library(
   name='common',
   sources=[
     'common.py',
@@ -44,7 +56,6 @@ python_library(
   ],
   tags = {'type_checked'},
 )
-
 
 python_binary(
   name='builder-bin',

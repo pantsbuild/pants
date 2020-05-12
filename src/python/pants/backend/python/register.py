@@ -19,6 +19,7 @@ from pants.backend.python.rules import (
     pytest_runner,
     python_create_binary,
     repl,
+    resolve,
     run_setup_py,
 )
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
@@ -131,6 +132,7 @@ def rules():
         *repl.rules(),
         *run_setup_py.rules(),
         *subprocess_environment.rules(),
+        *resolve.rules(),
     )
 
 
