@@ -13,7 +13,7 @@ from pants.testutil.engine.util import MockConsole, MockGet, create_goal_subsyst
 
 
 class MockTarget(Target):
-    alias = "mock_target"
+    alias = "tgt"
     core_fields = (DescriptionField, ProvidesField)
 
 

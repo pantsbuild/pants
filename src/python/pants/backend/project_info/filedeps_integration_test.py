@@ -12,7 +12,6 @@ class FiledepsIntegrationTest(PantsRunIntegrationTest):
     ) -> None:
         args = [
             "filedeps2",
-            "--no-absolute",
             "--transitive",
             *(filedeps_options or []),
             "examples/src/scala/org/pantsbuild/example/hello/exe:exe",
