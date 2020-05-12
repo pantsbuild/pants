@@ -149,6 +149,8 @@ impl Session {
     if let Some(display) = &self.0.display {
       let display = display.lock();
       display.write_stdout(msg);
+    } else {
+      print!("{}", msg);
     }
   }
 
@@ -156,6 +158,8 @@ impl Session {
     if let Some(display) = &self.0.display {
       let display = display.lock();
       display.write_stderr(msg);
+    } else {
+      eprint!("{}", msg);
     }
   }
 

@@ -162,8 +162,12 @@ impl Log for Logger {
 
         {
           let handlers_map = self.stderr_handlers.lock();
-          for callback in handlers_map.values() {
-            callback(&log_string);
+          if handlers_map.len() == 0 {
+            self.stderr_log.lock().log(record);
+          } else {
+            for callback in handlers_map.values() {
+              callback(&log_string);
+            }
           }
         }
       }

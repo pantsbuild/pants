@@ -74,7 +74,7 @@ impl ConsoleUI {
     if let Some(instance) = &self.instance {
       instance.bars[0].println(msg);
     } else {
-      eprintln!("{}", msg);
+      eprint!("{}", msg);
     }
   }
 
