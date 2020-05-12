@@ -8,8 +8,6 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Tuple
 
-from twitter.common.collections import OrderedSet
-
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
@@ -30,6 +28,7 @@ from pants.java.jar.jar_dependency_utils import M2Coordinate
 from pants.task.console_task import ConsoleTask
 from pants.util.contextutil import temporary_file
 from pants.util.memo import memoized_property
+from pants.util.ordered_set import  OrderedSet, FrozenOrderedSet
 
 
 @dataclass()
@@ -335,16 +334,12 @@ class ExportDepAsJar(ConsoleTask):
             [self._jar_id(jar) for jar in iter_transitive_jars(current_target)]
         )
         compile_libraries_for_target = libraries_for_target.copy()
-        for dep in sorted(
-            flat_non_modulizable_deps_for_modulizable_targets[current_target].compile_deps
-        ):
+        for dep in flat_non_modulizable_deps_for_modulizable_targets[current_target].compile_deps:
             compile_libraries_for_target.update(_full_library_set_for_target(dep))
         info["compile_libraries"].extend(compile_libraries_for_target)
 
         runtime_libraries_for_target = libraries_for_target.copy()
-        for dep in sorted(
-            flat_non_modulizable_deps_for_modulizable_targets[current_target].runtime_deps
-        ):
+        for dep in flat_non_modulizable_deps_for_modulizable_targets[current_target].runtime_deps:
             runtime_libraries_for_target.update(_full_library_set_for_target(dep))
         info["runtime_libraries"].extend(runtime_libraries_for_target)
 
