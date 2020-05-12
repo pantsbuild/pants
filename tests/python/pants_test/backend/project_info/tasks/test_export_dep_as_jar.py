@@ -61,6 +61,7 @@ class ExportDepAsJarTest(ConsoleTaskTestBase):
         # We need an initialized ScalaPlatform in order to make ScalaLibrary targets below.
         scala_options = {ScalaPlatform.options_scope: {"version": "custom"}}
         init_subsystems([JUnit, ScalaPlatform, ScoveragePlatform], scala_options)
+        self.set_options_for_scope("compile.rsc", error_on_synthetic_modulizable_targets=True)
 
         self.make_target(
             ":jar-tool", JarLibrary, jars=[JarDependency("org.pantsbuild", "jar-tool", "0.0.10")]

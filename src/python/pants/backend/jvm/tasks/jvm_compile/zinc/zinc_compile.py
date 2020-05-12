@@ -203,6 +203,14 @@ class BaseZincCompile(JvmCompile):
             "Warning, Error) to the reporting server.",
         )
 
+        register(
+            "--error-on-synthetic-modulizable-targets",
+            advanced=True,
+            type=bool,
+            default=False,
+            help="If true, error if modulizable targets contain any synthetic target.",
+        )
+
     @classmethod
     def subsystem_dependencies(cls):
         return super().subsystem_dependencies() + (Zinc.Factory, JvmPlatform,)
@@ -1029,14 +1037,24 @@ class ZincCompile(BaseZincCompile):
             filter(lambda x: is_synthetic_or_can_derive_synthetic(x), modulizable_targets)
         )
         if len(synthetic_modulizable_targets) > 0:
+            formatted_targets = "\n".join(
+                f"{t.address.spec}\n\tderived from {t.derived_from.address.spec}"
+                for t in synthetic_modulizable_targets
+            )
             # TODO(yic): improve the error message to show the dependency chain that caused
             # a synthetic target depending on a non-synthetic one.
-            raise TaskError(
-                f"Modulizable targets must not contain any synthetic target, but in this case the "
-                f"following synthetic targets depend on other non-synthetic modules:\n"
-                f"{synthetic_modulizable_targets}\n"
-                f"One approach that may help is to reduce the scope of the import to further avoid synthetic targets."
+            msg = (
+                f"Modulizable targets must not contain any synthetic target, but in this "
+                f"case the "
+                f"following synthetic targets depend on other non-synthetformatted_targetsic modules:\n"
+                f"{formatted_targets}\n"
+                f"One approach that may help is to reduce the scope of the import to "
+                f"further avoid synthetic targets."
             )
+            if self.get_options().error_on_synthetic_modulizable_targets:
+                raise TaskError(msg)
+            else:
+                self.context.log.warn(msg)
 
         self.context.products.get_data("jvm_modulizable_targets", set).update(modulizable_targets)
         return modulizable_targets
