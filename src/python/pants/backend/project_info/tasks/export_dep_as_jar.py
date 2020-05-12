@@ -28,7 +28,7 @@ from pants.java.jar.jar_dependency_utils import M2Coordinate
 from pants.task.console_task import ConsoleTask
 from pants.util.contextutil import temporary_file
 from pants.util.memo import memoized_property
-from pants.util.ordered_set import  OrderedSet, FrozenOrderedSet
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 
 @dataclass()
