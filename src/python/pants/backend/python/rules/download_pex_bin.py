@@ -23,9 +23,9 @@ from pants.python.python_setup import PythonSetup
 class PexBin(ExternalTool):
     options_scope = "download-pex-bin"
     name = "pex"
-    default_version = "v2.1.9"
+    default_version = "v2.1.10"
     default_known_versions = [
-        f"v2.1.9|{plat}|4e2677ce7270dd04d767e93e1904c90aa8c7f4f53b76f3615215970b45d100d7|2624111"
+        f"v2.1.10|{plat}|a9b5eb55ec4d7babc11279fc070c066565915c8b8a7b009a4eaceb41149a5f03|2631051"
         for plat in ["darwin", "linux"]
     ]
 
