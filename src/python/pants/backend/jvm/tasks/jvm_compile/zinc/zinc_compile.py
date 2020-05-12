@@ -1008,7 +1008,11 @@ class ZincCompile(BaseZincCompile):
             filter(is_jvm_or_resource_target, self.context.target_roots)
         )
         jvm_and_resources_target_roots_minus_synthetic_addresses = set(
-            t.address for t in filter(lambda x: not is_synthetic_or_can_derive_synthetic(x), jvm_and_resources_target_roots)
+            t.address
+            for t in filter(
+                lambda x: not is_synthetic_or_can_derive_synthetic(x),
+                jvm_and_resources_target_roots,
+            )
         )
         all_targets = set(self.context.targets())
         modulizable_targets = set(
@@ -1021,7 +1025,9 @@ class ZincCompile(BaseZincCompile):
             )
             if is_jvm_or_resource_target(t)
         )
-        synthetic_modulizable_targets = set(filter(lambda x: is_synthetic_or_can_derive_synthetic(x), modulizable_targets))
+        synthetic_modulizable_targets = set(
+            filter(lambda x: is_synthetic_or_can_derive_synthetic(x), modulizable_targets)
+        )
         if len(synthetic_modulizable_targets) > 0:
             # TODO(yic): improve the error message to show the dependency chain that caused
             # a synthetic target depending on a non-synthetic one.
