@@ -40,6 +40,7 @@ from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import chmod_plus_x, safe_open
 from pants.util.osutil import get_os_name, normalize_os_name
 
+# In the absence of explicit scoping (https://www.pantsbuild.org/jvm_projects.html#setting-target-scopes),
 # runtime_libraries should be the same as compile_libraries for non-strict-deps targets,
 # so we'll often test them together.
 LIBRARIES_ENTRIES = ["compile_libraries", "runtime_libraries"]
