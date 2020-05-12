@@ -220,21 +220,3 @@ Current thread [^\n]+ \\(most recent call first\\):
         ]
 
         return lifecycle_stub_cmdline
-
-    def test_reset_exiter(self):
-        """Test that when reset_exiter() is used that sys.excepthook uses the new Exiter."""
-        lifecycle_stub_cmdline = self._lifecycle_stub_cmdline()
-
-        # The normal Exiter will print the exception message on an unhandled exception.
-        normal_exiter_run = self.run_pants(lifecycle_stub_cmdline)
-        self.assert_failure(normal_exiter_run)
-        self.assertIn("erroneous!", normal_exiter_run.stderr_data)
-        self.assertNotIn("NEW MESSAGE", normal_exiter_run.stderr_data)
-
-        # The exiter that gets added when this option is changed prints that option to stderr.
-        changed_exiter_run = self.run_pants(
-            ["--lifecycle-stubs-add-exiter-message='NEW MESSAGE'"] + lifecycle_stub_cmdline
-        )
-        self.assert_failure(changed_exiter_run)
-        self.assertIn("erroneous!", changed_exiter_run.stderr_data)
-        self.assertIn("NEW MESSAGE", changed_exiter_run.stderr_data)

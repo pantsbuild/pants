@@ -1,26 +1,11 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import sys
-
 from test_pants_plugin.subsystems.lifecycle_stubs import LifecycleStubs
 
 from pants.base.exception_sink import ExceptionSink
-from pants.base.exiter import ExitCode
 from pants.task.task import Task
 from pants.util.memo import memoized_property
-
-
-class MessagingExiter:
-    """A class that prints a provided message to stderr before dying."""
-
-    def __init__(self, message):
-        super().__init__()
-        self._message = message
-
-    def __call__(self, exit_code: ExitCode):
-        print(self._message, file=sys.stderr)
-        sys.exit(exit_code)
 
 
 class LifecycleStubTask(Task):
@@ -36,10 +21,6 @@ class LifecycleStubTask(Task):
         return LifecycleStubs.scoped_instance(self)
 
     def execute(self):
-        exit_msg = self._lifecycle_stubs.add_exiter_message
-        if exit_msg:
-            ExceptionSink.reset_exiter(MessagingExiter(exit_msg))
-
         output_file = self._lifecycle_stubs.new_interactive_stream_output_file
         if output_file:
             file_stream = open(output_file, "wb")

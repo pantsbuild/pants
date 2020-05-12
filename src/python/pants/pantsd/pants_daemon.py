@@ -474,9 +474,7 @@ class PantsDaemon(FingerprintedProcessManager):
         os.environ.pop("PYTHONPATH")
 
         # Switch log output to the daemon's log stream from here forward.
-        # Also, register an exiter using os._exit to ensure we only close stdio streams once.
         self._close_stdio()
-        ExceptionSink.reset_exiter(os._exit)
         with self._pantsd_logging() as log_stream:
 
             # We don't have any stdio streams to log to anymore, so we log to a file.

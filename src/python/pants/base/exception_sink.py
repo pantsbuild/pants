@@ -10,11 +10,10 @@ import sys
 import threading
 import traceback
 from contextlib import contextmanager
-from typing import Callable, Optional
+from typing import Optional
 
 import setproctitle
 
-from pants.base.exiter import ExitCode
 from pants.util.dirutil import safe_mkdir, safe_open
 from pants.util.meta import classproperty
 from pants.util.osutil import Pid
@@ -111,9 +110,6 @@ class ExceptionSink:
     # NB: see the bottom of this file where we call reset_log_location() and other mutators in order
     # to properly setup global state.
     _log_dir = None
-    # We need an exiter in order to know what to do after we log a fatal exception or handle a
-    # catchable signal.
-    _exiter: Callable[[ExitCode], None] = sys.exit
     # Where to log stacktraces to in a SIGUSR2 handler.
     _interactive_output_stream = None
     # Whether to print a stacktrace in any fatal error message printed to the terminal.
@@ -133,11 +129,6 @@ class ExceptionSink:
 
     class ExceptionSinkError(Exception):
         pass
-
-    @classmethod
-    def exit(cls, code: ExitCode):
-        """Exits using the currently configured global exiter."""
-        cls._exiter(code)
 
     @classmethod
     def reset_should_print_backtrace_to_terminal(cls, should_print_backtrace):
@@ -203,21 +194,6 @@ class ExceptionSink:
         cls._log_dir = new_log_location
         cls._pid_specific_error_fileobj = pid_specific_error_stream
         cls._shared_error_fileobj = shared_error_stream
-
-    @classmethod
-    def reset_exiter(cls, exiter: Callable[[ExitCode], None]) -> None:
-        """Class state:
-
-        - Overwrites `cls._exiter`.
-        Python state:
-        - Overwrites sys.excepthook.
-        """
-        logger.debug(f"overriding the global exiter with {exiter} (from {cls._exiter})")
-        # NB: mutate the class variables! This is done before mutating the exception hook, because the
-        # uncaught exception handler uses cls._exiter to exit.
-        cls._exiter = exiter
-        # NB: mutate process-global state!
-        sys.excepthook = cls.log_exception
 
     @classmethod
     def reset_interactive_output_stream(
@@ -477,8 +453,8 @@ Signal {signum} ({signame}) was raised. Exiting with failure.{formatted_tracebac
 # import time.
 # Set the log location for writing logs before bootstrap options are parsed.
 ExceptionSink.reset_log_location(os.getcwd())
-# Sets exiter at import time.
-ExceptionSink.reset_exiter(sys.exit)
+# NB: Mutate process-global state!
+sys.excepthook = ExceptionSink.log_exception
 # Sets a SIGUSR2 handler.
 ExceptionSink.reset_interactive_output_stream(sys.stderr.buffer)
 # Sets a handler that logs nonfatal signals to the exception sink.

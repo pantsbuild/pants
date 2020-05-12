@@ -169,7 +169,8 @@ def setup_logging_to_file(
     safe_mkdir(log_dir)
     log_path = os.path.join(log_dir, log_filename)
 
-    native.setup_pantsd_logger(log_path, level.level)
+    fd = native.setup_pantsd_logger(log_path, level.level)
+    ExceptionSink.reset_interactive_output_stream(os.fdopen(os.dup(fd), "a"))
     handler = NativeHandler(level, native_filename=log_path)
 
     logger.addHandler(handler)
